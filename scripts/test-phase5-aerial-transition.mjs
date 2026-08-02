@@ -18,6 +18,7 @@ const lodSource = read('app/js/world/lod.js');
 const diagnosticsSource = read('app/js/runtime-diagnostics.js');
 const streamingSource = read('app/js/terrain/streaming.js');
 const farFieldSource = read('app/js/terrain/far-field.js');
+const hudSource = read('app/js/hud.js');
 const {
   FAR_FIELD_OUTER_DISTANCE_METERS,
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
@@ -54,7 +55,14 @@ assert.match(streamingSource, /for \(let dx = -activeRing; dx <= activeRing; dx\
 assert.match(streamingSource, /z: appCtx\.TERRAIN_ZOOM/);
 assert.doesNotMatch(streamingSource, /childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
-assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 15000);
+assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
+assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);
+assert.match(hudSource, /const earthCelestialDistance = 11000/);
+assert.doesNotMatch(
+  hudSource,
+  /cameraX \+ dirX \* 1400, cameraY \+ dirY \* 1400, cameraZ \+ dirZ \* 1400/,
+  'Earth sun or moon remained in front of the distant terrain field'
+);
 assert.equal(FAR_CONTEXT_ZOOM, 13);
 assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
 const axis = buildClipmapAxis(-100, -20, 30, 100, 15);

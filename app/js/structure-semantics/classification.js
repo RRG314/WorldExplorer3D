@@ -132,6 +132,19 @@ function classifyStructureSemantics(tags = {}, options = {}) {
       location === 'roof'
     );
 
+  // `layer` describes relative ordering, not a physical deck height. Keep it
+  // available to topology, but require an explicit bridge/level/roof signal
+  // before publishing pedestrian structure geometry. This prevents incomplete
+  // OSM tagging from becoming invented skywalks worldwide.
+  const physicalStructureEvidence =
+    isBridge ||
+    isTunnel ||
+    culvert ||
+    explicitBaseOffset > 0 ||
+    location === 'roof' ||
+    underground ||
+    buildingPassage;
+
   const skywalk =
     elevatedConnectorCandidate &&
     (isBridge || isIndoor || isCovered || location === 'roof' || explicitBaseOffset > 2.5);
@@ -150,9 +163,14 @@ function classifyStructureSemantics(tags = {}, options = {}) {
   } else if (isBridge) {
     structureKind = 'bridge';
     terrainMode = 'elevated';
-  } else if (verticalOrder > 0 || explicitBaseOffset > 2.5 || location === 'roof') {
+  } else if (explicitBaseOffset > 2.5 || location === 'roof') {
     structureKind = isPedestrianConnector ? 'connector' : 'elevated';
     terrainMode = 'elevated';
+  } else if (verticalOrder > 0) {
+    // A positive layer without bridge/level/min-height evidence is only an
+    // ordering hint. Preserve that order for topology while draping the way
+    // to terrain so incomplete OSM tags cannot fabricate a floating deck.
+    structureKind = 'layer';
   } else if (isCovered || isIndoor) {
     structureKind = 'covered';
   }
@@ -162,6 +180,7 @@ function classifyStructureSemantics(tags = {}, options = {}) {
     structureKind,
     terrainMode,
     gradeSeparated: terrainMode !== 'at_grade',
+    topologySeparated: terrainMode !== 'at_grade' || layer !== 0,
     isBridge,
     isTunnel,
     culvert,
@@ -179,6 +198,7 @@ function classifyStructureSemantics(tags = {}, options = {}) {
     deckClearance,
     cutDepth,
     explicitBaseOffset,
+    physicalStructureEvidence,
     elevatedConnectorCandidate,
     rampCandidate,
     verticalGroup: `${terrainMode}:${verticalOrder}:${structureKind}`

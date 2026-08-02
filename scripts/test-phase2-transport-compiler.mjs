@@ -209,6 +209,35 @@ assert.equal(sourceIntersectionGraph.connections[0].kind, 'source-node-intersect
 assert.equal(sourceIntersectionGraph.connections[0].provenance.method, 'shared-source-node');
 assert.equal(sourceIntersectionGraph.connections[0].provenance.confidence, 1);
 
+const groundApproach = feature(
+  'osm:way:ground-approach',
+  [{ x: -20, z: 40 }, { x: 0, z: 40 }],
+  {
+    sourceNodeIds: ['ground-start', 'layer-change'],
+    sourceTopologyNodes: [
+      { id: 'ground-start', x: -20, z: 40 },
+      { id: 'layer-change', x: 0, z: 40 }
+    ]
+  }
+);
+const elevatedDeparture = feature(
+  'osm:way:elevated-departure',
+  [{ x: 0, z: 40 }, { x: 30, z: 40 }],
+  {
+    semantics: elevated,
+    sourceNodeIds: ['layer-change', 'deck-end'],
+    sourceTopologyNodes: [
+      { id: 'layer-change', x: 0, z: 40 },
+      { id: 'deck-end', x: 30, z: 40 }
+    ]
+  }
+);
+const layerTransitionGraph = compileTransportNetworkModel([groundApproach, elevatedDeparture]);
+assert.equal(layerTransitionGraph.connections.length, 1);
+assert.equal(layerTransitionGraph.connections[0].provenance.method, 'shared-source-node');
+assert.equal(groundApproach.connectedFeatures.end[0].feature, elevatedDeparture);
+assert.equal(elevatedDeparture.connectedFeatures.start[0].feature, groundApproach);
+
 appCtx.transportNetworkModel = mergeGraph;
 appCtx.linearFeatures = [];
 appCtx.overlayRuntimeLinearFeatures = [];

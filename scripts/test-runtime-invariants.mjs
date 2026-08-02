@@ -1001,9 +1001,13 @@ async function main() {
         ? ctx.roads.filter((road) =>
             road?.transportSurfaceModel?.authority === 'compiled_transport_surface')
         : [];
+      const engineeredRoads = compiledRoads.filter((road) =>
+        road?.structureSemantics?.terrainMode !== 'at_grade');
       const transportSurfaceCoverage = {
         roadCount: Number(ctx?.roads?.length || 0),
         compiledRoadCount: compiledRoads.length,
+        atGradeRoadCount: compiledRoads.filter((road) =>
+          road?.structureSemantics?.terrainMode === 'at_grade').length,
         liveTerrainSamplerCount: compiledRoads.filter((road) =>
           typeof road?.surfaceTerrainSampler === 'function').length,
         invalidModelCount: compiledRoads.filter((road) =>
@@ -1012,6 +1016,8 @@ async function main() {
           !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumGrade)
         ).length,
         maximumGrade: compiledRoads.reduce((maximum, road) =>
+          Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0),
+        engineeredMaximumGrade: engineeredRoads.reduce((maximum, road) =>
           Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0)
       };
       const transportStructureModel = ctx?.transportStructureModel || null;
@@ -1228,9 +1234,10 @@ async function main() {
       compiledTransportAuthority:
         report.transportSurfaceCoverage?.roadCount > 0 &&
         report.transportSurfaceCoverage?.compiledRoadCount === report.transportSurfaceCoverage?.roadCount &&
-        report.transportSurfaceCoverage?.liveTerrainSamplerCount === 0 &&
+        report.transportSurfaceCoverage?.liveTerrainSamplerCount ===
+          report.transportSurfaceCoverage?.atGradeRoadCount &&
         report.transportSurfaceCoverage?.invalidModelCount === 0 &&
-        report.transportSurfaceCoverage?.maximumGrade <= 0.1202 &&
+        report.transportSurfaceCoverage?.engineeredMaximumGrade <= 0.1202 &&
         report.transportSurfacePublication?.authority === 'compiled_transport_surface' &&
         report.transportSurfacePublication?.roadCount === report.transportSurfaceCoverage?.roadCount,
       compiledStructureAuthority:

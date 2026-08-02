@@ -194,14 +194,10 @@ assert.equal(
 );
 assert.equal(
   shouldRenderRoadSkirts(steepAtGradeRoad),
-  true,
-  'steep at-grade engineered fill did not gain retaining presentation'
+  false,
+  'steep ordinary road gained an artificial elevated-slab wall'
 );
-assert.ok(
-  roadSkirtDepth(steepAtGradeRoad) >=
-    steepAtGradeRoad.transportSurfaceModel.stats.maximumFill + 0.59,
-  'retaining skirt does not reach below the compiled fill envelope'
-);
+assert.equal(roadSkirtDepth(steepAtGradeRoad), 0);
 
 const hiddenPathContext = {
   linearFeatures: [],

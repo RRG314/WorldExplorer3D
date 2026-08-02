@@ -2,6 +2,23 @@ import {
   publishLinearFeaturePresentation
 } from './linear-feature-presentation.js?v=1';
 
+export function shouldOmitUnmatchedElevatedPedestrianFeature(
+  classification,
+  structureSemantics,
+  runtimeOptions = {}
+) {
+  if (classification?.kind !== 'footway') return false;
+  if (structureSemantics?.terrainMode !== 'elevated') return false;
+
+  // A standalone OSM footway/steps bridge rarely carries enough vertical
+  // information to reconstruct a trustworthy 3D structure. In steep or
+  // multi-level cities, rendering those fragments independently fabricated
+  // disconnected skywalks and arbitrarily tall supports. Only a future
+  // vehicle-bridge matcher may opt a pedestrian feature back in after it has
+  // positively associated the full path with a compiled road-bridge chain.
+  return runtimeOptions.matchedVehicleBridge === true ? false : true;
+}
+
 export function createLinearFeatureRuntime(options = {}) {
   const {
     appCtx,
@@ -35,6 +52,11 @@ export function createLinearFeatureRuntime(options = {}) {
       featureKind: classification.kind,
       subtype: classification.subtype
     });
+    if (shouldOmitUnmatchedElevatedPedestrianFeature(
+      classification,
+      structureSemantics,
+      runtimeOptions
+    )) return false;
     const feature = {
       kind: classification.kind,
       subtype: classification.subtype,
@@ -69,6 +91,7 @@ export function createLinearFeatureRuntime(options = {}) {
     applyBuildingContextSemanticsToFeature(feature);
     feature.isStructureConnector =
       runtimeOptions.force === true &&
+      feature?.structureSemantics?.physicalStructureEvidence === true &&
       (feature?.structureSemantics?.gradeSeparated || feature?.structureSemantics?.skywalk === true);
     if (runtimeOptions.force === true && !feature.isStructureConnector) return false;
 

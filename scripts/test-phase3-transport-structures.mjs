@@ -7,6 +7,7 @@ import { classifyStructureSemantics } from '../app/js/structure-semantics/classi
 import { compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system-model.js';
 import { compileTransportStructureModel } from '../app/js/world/compiler/transport-structure-model.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
+import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
 import {
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
@@ -81,6 +82,8 @@ const taxonomy = {
   culvert: classifyStructureSemantics({ tunnel: 'culvert', layer: '-1' }, { featureKind: 'road', subtype: 'service' }),
   cutting: classifyStructureSemantics({ cutting: 'yes' }, { featureKind: 'road', subtype: 'secondary' }),
   embankment: classifyStructureSemantics({ embankment: 'yes' }, { featureKind: 'road', subtype: 'secondary' }),
+  layerOnlyRoad: classifyStructureSemantics({ layer: '1' }, { featureKind: 'road', subtype: 'service' }),
+  layerOnlyFootway: classifyStructureSemantics({ highway: 'footway', layer: '1' }, { featureKind: 'footway', subtype: 'footway' }),
   indoorNo: classifyStructureSemantics({ indoor: 'no' }, { featureKind: 'road', subtype: 'service' })
 };
 assert.equal(taxonomy.bridge.structureKind, 'bridge');
@@ -92,7 +95,43 @@ assert.equal(taxonomy.buildingPassage.isTunnel, false);
 assert.equal(taxonomy.culvert.structureKind, 'culvert');
 assert.equal(taxonomy.cutting.cutting, true);
 assert.equal(taxonomy.embankment.embankment, true);
+assert.equal(taxonomy.layerOnlyRoad.terrainMode, 'at_grade');
+assert.equal(taxonomy.layerOnlyRoad.topologySeparated, true);
+assert.equal(taxonomy.layerOnlyRoad.physicalStructureEvidence, false);
+assert.equal(taxonomy.layerOnlyFootway.terrainMode, 'at_grade');
+assert.equal(taxonomy.layerOnlyFootway.physicalStructureEvidence, false);
 assert.equal(taxonomy.indoorNo.indoor, false);
+assert.equal(
+  shouldOmitUnmatchedElevatedPedestrianFeature(
+    { kind: 'footway', subtype: 'footway' },
+    classifyStructureSemantics(
+      { highway: 'footway', bridge: 'yes', layer: '1' },
+      { featureKind: 'footway', subtype: 'footway' }
+    )
+  ),
+  true,
+  'standalone elevated footways must not publish inferred 3D structures'
+);
+assert.equal(
+  shouldOmitUnmatchedElevatedPedestrianFeature(
+    { kind: 'footway', subtype: 'steps' },
+    classifyStructureSemantics(
+      { highway: 'steps', bridge: 'yes', layer: '1' },
+      { featureKind: 'footway', subtype: 'steps' }
+    ),
+    { matchedVehicleBridge: true }
+  ),
+  false,
+  'a future positive vehicle-bridge match may retain the pedestrian structure'
+);
+assert.equal(
+  shouldOmitUnmatchedElevatedPedestrianFeature(
+    { kind: 'footway', subtype: 'footway' },
+    taxonomy.layerOnlyFootway
+  ),
+  false,
+  'ordinary terrain-draped footways must remain available'
+);
 
 const bridgeA = structureFeature(
   'osm:way:bridge-a',

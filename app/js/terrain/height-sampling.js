@@ -1,7 +1,7 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=30";
+} from "../structure-semantics.js?v=37";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
@@ -84,13 +84,15 @@ function createTerrainHeightSamplingApi(deps = {}) {
     }
 
     let adjustedY = terrainY;
-    for (let i = 0; i < appCtx.structureTerrainCuts.length; i++) {
-      const cut = appCtx.structureTerrainCuts[i];
+    const candidates = appCtx.structureTerrainCuts;
+    for (let i = 0; i < candidates.length; i++) {
+      const cut = candidates[i];
       if (!cut?.feature || !cut?.bounds) continue;
       if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
 
       const projected = projectPointToFeature(cut.feature, worldX, worldZ);
       if (!projected) continue;
+
       const width = Math.max(4.5, Number(cut.width) || Number(cut.feature?.width) || 6);
       const influenceRadius = width * 0.82 + 3.4;
       if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;

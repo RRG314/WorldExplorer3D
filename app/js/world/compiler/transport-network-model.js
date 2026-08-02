@@ -35,6 +35,22 @@ function verticalCompatible(left, right) {
     finite(a.verticalOrder) === finite(b.verticalOrder);
 }
 
+function occurrenceIsEndpoint(occurrence) {
+  return occurrence?.topologyIndex === 0 ||
+    occurrence?.topologyIndex === occurrence?.topologyCount - 1;
+}
+
+function sharedSourceNodeCompatible(leftOccurrence, rightOccurrence) {
+  if (verticalCompatible(leftOccurrence?.descriptor?.feature, rightOccurrence?.descriptor?.feature)) {
+    return true;
+  }
+  // OSM commonly splits one physical route at a bridge, ramp, or layer
+  // boundary. A shared source node at either way endpoint is an explicit
+  // topology tie-in. Interior/interior crossings still require matching
+  // vertical groups so stacked decks remain separate.
+  return occurrenceIsEndpoint(leftOccurrence) || occurrenceIsEndpoint(rightOccurrence);
+}
+
 function sourceNodeProvenance(endpoint, candidate) {
   const endpointNodeId = endpoint.sourceNodeId;
   if (!endpointNodeId) return null;
@@ -200,10 +216,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
         const leftOccurrence = occurrences[leftIndex];
         const rightOccurrence = occurrences[rightIndex];
         if (leftOccurrence.descriptor === rightOccurrence.descriptor) continue;
-        if (!verticalCompatible(
-          leftOccurrence.descriptor.feature,
-          rightOccurrence.descriptor.feature
-        )) continue;
+        if (!sharedSourceNodeCompatible(leftOccurrence, rightOccurrence)) continue;
         const leftProjection = projectPointToDescriptor(
           leftOccurrence.descriptor,
           leftOccurrence.point

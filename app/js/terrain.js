@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=13";
+} from "./terrain/structure-visuals.js?v=23";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -10,7 +10,7 @@ import {
   isUrbanLanduseType,
   pointsBoundsLocal
 } from "./terrain/context-utils.js?v=1";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=4";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=6";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=10";
 import {
@@ -54,12 +54,12 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=35";
+} from "./terrain/tiles.js?v=39";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=15";
+} from "./terrain/rebuild.js?v=18";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -67,7 +67,7 @@ import {
 } from "./terrain/debug-tools.js?v=4";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=3";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=4";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { pointInWaterBody } from "./world/water-surface-registry.js?v=2";
 // terrain.js - Accepted-ground artifact and terrain presentation system

@@ -1,4 +1,4 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=30";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=37";
 
 const JUNCTION_SURFACE_LIFT = 0.006;
 
@@ -59,6 +59,50 @@ function junctionBranchCorners(intersection, branch, roads) {
   }));
 }
 
+function fitJunctionPlane(intersection, corners, centerY) {
+  let xx = 0;
+  let xz = 0;
+  let zz = 0;
+  let xy = 0;
+  let zy = 0;
+  for (const point of corners) {
+    const dx = point.x - intersection.x;
+    const dz = point.z - intersection.z;
+    const dy = point.y - centerY;
+    xx += dx * dx;
+    xz += dx * dz;
+    zz += dz * dz;
+    xy += dx * dy;
+    zy += dz * dy;
+  }
+  const regularizer = Math.max(1e-4, (xx + zz) * 1e-6);
+  xx += regularizer;
+  zz += regularizer;
+  const determinant = xx * zz - xz * xz;
+  let slopeX = 0;
+  let slopeZ = 0;
+  if (Math.abs(determinant) > 1e-8) {
+    slopeX = (xy * zz - zy * xz) / determinant;
+    slopeZ = (zy * xx - xy * xz) / determinant;
+  }
+  // Junctions are engineered local planes. Capping the plane gradient avoids
+  // turning noisy DEM samples into folded triangle fans on very steep blocks.
+  const magnitude = Math.hypot(slopeX, slopeZ);
+  const maximumSlope = 0.3;
+  if (magnitude > maximumSlope) {
+    slopeX *= maximumSlope / magnitude;
+    slopeZ *= maximumSlope / magnitude;
+  }
+  return {
+    centerY,
+    slopeX,
+    slopeZ,
+    yAt(x, z) {
+      return centerY + slopeX * (x - intersection.x) + slopeZ * (z - intersection.z);
+    }
+  };
+}
+
 function buildRoadJunctionEnvelope(intersection, roads = []) {
   if (!intersection) return null;
   const branches = Array.isArray(intersection.roads) ? intersection.roads : [];
@@ -77,14 +121,24 @@ function buildRoadJunctionEnvelope(intersection, roads = []) {
   const centerY = centerSamples.length > 0
     ? centerSamples.reduce((sum, value) => sum + value, 0) / centerSamples.length
     : hull.reduce((sum, point) => sum + point.y, 0) / hull.length;
+  const plane = fitJunctionPlane(intersection, corners, centerY);
+  const planarHull = hull.map((point) => ({
+    ...point,
+    y: plane.yAt(point.x, point.z) + JUNCTION_SURFACE_LIFT
+  }));
   return {
     center: {
       x: Number(intersection.x),
-      y: centerY + JUNCTION_SURFACE_LIFT,
+      y: plane.centerY + JUNCTION_SURFACE_LIFT,
       z: Number(intersection.z)
     },
-    polygon: hull,
-    branchCount: branches.length
+    polygon: planarHull,
+    branchCount: branches.length,
+    plane: {
+      centerY: plane.centerY,
+      slopeX: plane.slopeX,
+      slopeZ: plane.slopeZ
+    }
   };
 }
 
@@ -114,9 +168,11 @@ function groupBranchesBySurfaceHeight(intersection, roads = [], tolerance = 0.7)
   return groups.filter((group) => group.branches.length >= 2);
 }
 
-function appendRoadJunctionGeometry({ intersections = [], roads = [], verts = [], indices = [] } = {}) {
+function prepareRoadJunctionEnvelopes(intersections = [], roads = []) {
+  for (const road of roads) {
+    if (road) road.junctionTransitions = [];
+  }
   let count = 0;
-  let triangleCount = 0;
   for (const intersection of intersections) {
     const envelopes = [];
     const groups = groupBranchesBySurfaceHeight(intersection, roads);
@@ -127,6 +183,40 @@ function appendRoadJunctionGeometry({ intersections = [], roads = [], verts = []
         hasGradeSeparatedRoad: false
       }, roads);
       if (!envelope) continue;
+      const radius = Math.max(
+        2,
+        ...envelope.polygon.map((point) =>
+          Math.hypot(point.x - intersection.x, point.z - intersection.z))
+      );
+      const transition = Object.freeze({
+        x: Number(intersection.x),
+        z: Number(intersection.z),
+        radius,
+        plane: Object.freeze({ ...envelope.plane })
+      });
+      const visited = new Set();
+      for (const branch of group.branches) {
+        const road = roads[branch?.roadIdx];
+        if (!road || visited.has(road)) continue;
+        visited.add(road);
+        road.junctionTransitions.push(transition);
+      }
+      envelopes.push(envelope);
+      count += 1;
+    }
+    intersection.junctionEnvelopes = envelopes;
+  }
+  return count;
+}
+
+function appendRoadJunctionGeometry({ intersections = [], roads = [], verts = [], indices = [] } = {}) {
+  let count = 0;
+  let triangleCount = 0;
+  for (const intersection of intersections) {
+    const envelopes = Array.isArray(intersection.junctionEnvelopes)
+      ? intersection.junctionEnvelopes
+      : [];
+    for (const envelope of envelopes) {
       const base = verts.length / 3;
       verts.push(envelope.center.x, envelope.center.y, envelope.center.z);
       for (const point of envelope.polygon) verts.push(point.x, point.y, point.z);
@@ -134,10 +224,8 @@ function appendRoadJunctionGeometry({ intersections = [], roads = [], verts = []
         indices.push(base, base + 1 + index, base + 1 + ((index + 1) % envelope.polygon.length));
         triangleCount += 1;
       }
-      envelopes.push(envelope);
       count += 1;
     }
-    intersection.junctionEnvelopes = envelopes;
   }
   return { count, triangleCount };
 }
@@ -147,5 +235,7 @@ export {
   appendRoadJunctionGeometry,
   buildRoadJunctionEnvelope,
   convexHull,
-  groupBranchesBySurfaceHeight
+  fitJunctionPlane,
+  groupBranchesBySurfaceHeight,
+  prepareRoadJunctionEnvelopes
 };

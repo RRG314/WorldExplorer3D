@@ -1,13 +1,16 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=2";
-import { detectRoadIntersections } from "./intersections.js?v=1";
-import { appendRoadJunctionGeometry } from "./road-junctions.js?v=1";
+import { detectRoadIntersections } from "./intersections.js?v=2";
+import {
+  appendRoadJunctionGeometry,
+  prepareRoadJunctionEnvelopes
+} from "./road-junctions.js?v=3";
 import {
   buildFeatureRibbonEdges,
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=30";
+} from "../structure-semantics.js?v=37";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -237,6 +240,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
   };
 
   const intersections = detectRoadIntersections(baseRoads);
+  prepareRoadJunctionEnvelopes(intersections, baseRoads);
 
   const roadMainBatchVerts = [];
   const roadMainBatchIdx = [];
@@ -312,9 +316,11 @@ export function publishCompiledTransportMeshes(deps = {}) {
       buildingCandidates.length >= 12 ||
       (buildingCandidates.length >= 8 && width >= 9) ||
       (nearbyUrbanLanduses >= 1 && buildingCandidates.length >= 5);
-    const shouldBuildSidewalks =
-      roadSupportsSidewalks(road) &&
-      explicitSidewalkHint;
+    // The detached sidewalk extrusion has no junction/topology authority and
+    // produces pale floating strips on steep or fragmented OSM ways. Preserve
+    // the mapped sidewalk hint for navigation, but do not publish competing
+    // geometry until it can share the road/junction surface contract.
+    const shouldBuildSidewalks = false;
     const sidewalkWidth = shouldBuildSidewalks ? roadBaseSidewalkWidth(road, denseUrbanContext) : 0;
     const nearbyIntersections = shouldBuildSidewalks ? intersections.filter((intersection) =>
       !intersection?.hasGradeSeparatedRoad &&

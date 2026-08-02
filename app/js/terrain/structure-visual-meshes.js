@@ -91,12 +91,13 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
         const nz = Number(ring.tangentX || 0);
         for (const side of [-1, 1]) {
           const lateral = side * shell.halfWidth;
+          const terrainY = side < 0 ? ring.rightTerrainY : ring.leftTerrainY;
           positions.push(
             ring.x + nx * lateral,
             ring.y,
             ring.z + nz * lateral,
             ring.x + nx * lateral,
-            ring.terrainY,
+            terrainY,
             ring.z + nz * lateral
           );
         }

@@ -148,21 +148,63 @@ function sampleSmoothAnchors(anchors, distance) {
   return last.offset;
 }
 
-function applyStationInfluence(feature, semantics, distance, initialOffset) {
+function endpointTransitionGate(feature, distance, totalDistance) {
+  const anchors = Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors
+    : [];
+  let gate = 1;
+  for (const anchor of anchors) {
+    const span = Math.max(1, finiteNumber(anchor?.span, 1));
+    if (anchor?.endpoint === 'start') {
+      gate = Math.min(gate, smoothstep01(clamp(distance / span, 0, 1)));
+    } else if (anchor?.endpoint === 'end') {
+      gate = Math.min(gate, smoothstep01(clamp((totalDistance - distance) / span, 0, 1)));
+    }
+  }
+  return gate;
+}
+
+function applyStationInfluence(feature, semantics, distance, totalDistance, initialOffset) {
   let offset = initialOffset;
+  const transitionGate = endpointTransitionGate(feature, distance, totalDistance);
   const stations = Array.isArray(feature?.structureStations) ? feature.structureStations : [];
   for (const station of stations) {
     const span = Math.max(1, finiteNumber(station?.span, 1));
     const delta = Math.abs(distance - finiteNumber(station?.distance));
     if (delta > span) continue;
     const weight = 1 - smoothstep01(delta / span);
-    const magnitude = Math.abs(finiteNumber(station?.targetOffset)) * weight;
+    const magnitude = Math.abs(finiteNumber(station?.targetOffset)) * weight * transitionGate;
     const contribution = semantics?.terrainMode === 'subgrade' ? -magnitude : magnitude;
     offset = contribution >= 0
       ? Math.max(offset, contribution)
       : Math.min(offset, contribution);
   }
   return semantics?.terrainMode === 'at_grade' ? 0 : offset;
+}
+
+function applyEndpointTieIns(feature, heights, distances, endpointGroundStart, endpointGroundEnd, surfaceBias) {
+  const anchors = Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors.filter((anchor) =>
+        anchor?.endpoint === 'start' || anchor?.endpoint === 'end')
+    : [];
+  if (anchors.length === 0 || heights.length === 0) return heights;
+  const total = finiteNumber(distances[distances.length - 1]);
+  const corrected = new Float64Array(heights);
+  for (const anchor of anchors) {
+    const atStart = anchor.endpoint === 'start';
+    const endpointIndex = atStart ? 0 : corrected.length - 1;
+    const endpointGround = atStart ? endpointGroundStart : endpointGroundEnd;
+    const desired = endpointGround + finiteNumber(anchor.targetOffset) + surfaceBias;
+    const correction = desired - corrected[endpointIndex];
+    const span = Math.max(1, Math.min(total, finiteNumber(anchor.span, total * 0.35)));
+    for (let index = 0; index < corrected.length; index += 1) {
+      const fromEndpoint = atStart ? distances[index] : total - distances[index];
+      if (fromEndpoint > span) continue;
+      const weight = 1 - smoothstep01(clamp(fromEndpoint / span, 0, 1));
+      corrected[index] += correction * weight;
+    }
+  }
+  return new Float32Array(corrected);
 }
 
 function enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade) {
@@ -391,6 +433,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       feature,
       semantics,
       distance,
+      total,
       sampleSmoothAnchors(anchors, distance)
     );
     // Grade-separated structures have an engineered vertical alignment.
@@ -464,7 +507,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     }
   }
 
-  const centerHeights = mode === 'at_grade'
+  let centerHeights = mode === 'at_grade'
     ? smoothSignedCutFillProfile(
         terrainEnvelope,
         centerLowerBounds,
@@ -479,6 +522,16 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         sampleDistances,
         maximumGrade
       );
+  if (mode !== 'at_grade') {
+    centerHeights = applyEndpointTieIns(
+      feature,
+      centerHeights,
+      sampleDistances,
+      endpointGroundStart,
+      endpointGroundEnd,
+      surfaceBias
+    );
+  }
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating
   // incompatible lateral terrain folds.
@@ -494,6 +547,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     width: halfWidth * 2,
     surfaceBias,
     maximumGrade,
+    endpointPolicy: mode === 'at_grade' ? 'terrain_draped' : 'hard_transition_tie_in',
     cutFillPolicy: Object.freeze({
       signed: mode === 'at_grade',
       maximumCutMeters: mode === 'at_grade' ? maximumAtGradeCut : 0,
@@ -550,11 +604,10 @@ function roadSkirtDepth(feature) {
   const semantics = feature?.structureSemantics || null;
   if (semantics?.terrainMode === 'elevated') return 0;
   if (semantics?.terrainMode === 'subgrade') return 0.3;
-  const maximumFill = Number(feature?.transportSurfaceModel?.stats?.maximumFill);
-  if (semantics?.terrainMode !== 'at_grade' || !Number.isFinite(maximumFill) || maximumFill <= 2.5) {
-    return 0;
-  }
-  return Math.max(3.6, maximumFill + 0.6);
+  // Ordinary streets follow their terrain profile. Tall vertical skirts made
+  // steep city streets read as elevated slabs and are reserved for actual
+  // grade-separated/subgrade structures.
+  return 0;
 }
 
 export {

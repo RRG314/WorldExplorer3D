@@ -4,7 +4,7 @@ import {
 } from "../world/shortbread-source.js?v=9";
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
-const FAR_FIELD_OUTER_DISTANCE_METERS = 15000;
+const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
 const FAR_FIELD_GRID_INTERVAL_METERS = 320;
 const FAR_FIELD_SEAM_BLEND_METERS = 550;
 const FAR_CONTEXT_ZOOM = 13;
@@ -670,9 +670,11 @@ function createFarFieldTerrainApi(deps = {}) {
     generation += 1;
     const requestGeneration = generation;
     const inner = innerWorldBounds(z, centerX, centerY, ring);
+    // A square terrain patch must extend beyond the circular camera far plane
+    // even along its diagonal. Otherwise aircraft expose its hard outer edge.
     const outerHalfExtent = Math.max(
       FAR_FIELD_OUTER_DISTANCE_METERS * Number(appCtx.WORLD_UNITS_PER_METER || 1),
-      Number(appCtx.camera?.far || 0) * 1.2
+      Number(appCtx.camera?.far || 0) * 1.6
     );
     const actorX = Number(options.actorX) || 0;
     const actorZ = Number(options.actorZ) || 0;

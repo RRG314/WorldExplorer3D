@@ -270,12 +270,21 @@ function updateSkyPositions() {
   if (appCtx.sunSphere?.userData?.glow) appCtx.sunSphere.userData.glow.scale.setScalar(1);
   if (!appCtx.onMoon && appCtx.moonSphere) appCtx.moonSphere.visible = true;
 
+  // Earth celestial discs must sit behind the full terrain draw distance.
+  // Keeping them at the old 1.4 km distance made a low sun render in front of
+  // distant hills and gave it an unrealistically large angular diameter.
+  const earthCelestialDistance = 11000;
+
   // Sun - anchored to the current astronomical direction relative to the camera.
   if (appCtx.sunSphere) {
     const dirX = Number.isFinite(sunDir?.x) ? sunDir.x : 0.52;
     const dirY = Number.isFinite(sunDir?.y) ? sunDir.y : 0.82;
     const dirZ = Number.isFinite(sunDir?.z) ? sunDir.z : 0.22;
-    appCtx.sunSphere.position.set(cameraX + dirX * 1400, cameraY + dirY * 1400, cameraZ + dirZ * 1400);
+    appCtx.sunSphere.position.set(
+      cameraX + dirX * earthCelestialDistance,
+      cameraY + dirY * earthCelestialDistance,
+      cameraZ + dirZ * earthCelestialDistance
+    );
     // Keep sun glow in sync
     if (appCtx.sunSphere.userData.glow) {
       appCtx.sunSphere.userData.glow.position.copy(appCtx.sunSphere.position);
@@ -295,7 +304,11 @@ function updateSkyPositions() {
     const dirX = Number.isFinite(moonDir?.x) ? moonDir.x : -0.42;
     const dirY = Number.isFinite(moonDir?.y) ? moonDir.y : 0.78;
     const dirZ = Number.isFinite(moonDir?.z) ? moonDir.z : -0.22;
-    appCtx.moonSphere.position.set(cameraX + dirX * 1400, cameraY + dirY * 1400, cameraZ + dirZ * 1400);
+    appCtx.moonSphere.position.set(
+      cameraX + dirX * earthCelestialDistance,
+      cameraY + dirY * earthCelestialDistance,
+      cameraZ + dirZ * earthCelestialDistance
+    );
     appCtx.moonSphere.lookAt(cameraX, cameraY, cameraZ);
     appCtx.moonSphere.rotateZ(-(skyState?.moon?.parallacticAngle || 0));
     // Keep moon glow in sync

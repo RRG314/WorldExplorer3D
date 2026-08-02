@@ -3,15 +3,15 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=30";
+} from "../structure-semantics.js?v=37";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=6";
+} from "./structure-visual-meshes.js?v=13";
 import {
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=9";
+} from "./structure-tunnel-visuals.js?v=15";
 import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {

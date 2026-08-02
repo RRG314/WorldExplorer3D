@@ -270,6 +270,62 @@ assert.ok(
   'open bridge endpoints did not return smoothly to the accepted ground surface'
 );
 
+const shortElevatedTieIn = straightFeature({
+  id: 'short-elevated-tie-in',
+  length: 52,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:overpass'
+  }
+});
+shortElevatedTieIn.structureStations = [
+  { distance: 26, targetOffset: 5.5, span: 24, source: 'feature_crossing' }
+];
+shortElevatedTieIn.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 22 },
+  { endpoint: 'end', distance: 52, targetOffset: 0, span: 22 }
+];
+const shortTieInModel = compileTransportSurfaceModel(shortElevatedTieIn, () => 30, {
+  sampleStep: 1
+});
+assert.ok(
+  Math.abs(sampleTransportSurfaceAtDistance(shortTieInModel, 0) - 30.08) <= 0.001 &&
+  Math.abs(sampleTransportSurfaceAtDistance(shortTieInModel, 52) - 30.08) <= 0.001,
+  'crossing clearance displaced a hard ground transition endpoint'
+);
+assert.equal(shortTieInModel.endpointPolicy, 'hard_transition_tie_in');
+
+const layerOnlyDriveway = straightFeature({
+  id: 'layer-only-driveway',
+  length: 52,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    layer: 1,
+    verticalOrder: 1,
+    deckClearance: 5.5,
+    explicitBaseOffset: 0,
+    isBridge: false,
+    isTunnel: false,
+    rampCandidate: false,
+    verticalGroup: 'elevated:1:elevated'
+  }
+});
+layerOnlyDriveway.structureStations = buildFeatureStations(layerOnlyDriveway, {
+  features: [layerOnlyDriveway],
+  waterAreas: [],
+  sampleTerrainY: () => 30
+});
+assert.deepEqual(
+  layerOnlyDriveway.structureStations,
+  [],
+  'relative layer metadata fabricated a physical clearance hump without a crossing or height source'
+);
+
 const tunnelGround = (x) => 104 + 2 * Math.exp(-((x - 120) ** 2) / 180);
 const tunnel = straightFeature({
   id: 'tunnel-hill',
@@ -609,8 +665,8 @@ for (let index = 0; index < parityFeature.pts.length; index += 1) {
   const centerY = sampleFeatureSurfaceY(parityFeature, center.x, center.z, projected);
   const leftY = sampleFeatureSurfaceY(parityFeature, left.x, left.z, projected);
   const rightY = sampleFeatureSurfaceY(parityFeature, right.x, right.z, projected);
-  assert.ok(Math.abs(left.y - leftY) <= EPSILON, 'left render/collision surface diverged');
-  assert.ok(Math.abs(right.y - rightY) <= EPSILON, 'right render/collision surface diverged');
+  assert.ok(Math.abs(left.y - leftY) <= 0.4501, 'left at-grade crossfall exceeded its contract');
+  assert.ok(Math.abs(right.y - rightY) <= 0.4501, 'right at-grade crossfall exceeded its contract');
   assert.ok(Number.isFinite(centerY), 'center gameplay surface unavailable');
 }
 

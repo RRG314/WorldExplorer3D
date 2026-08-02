@@ -2,7 +2,7 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=5';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=9';
 
 function compatibleTunnelFeature(feature) {
   const semantics = feature?.structureSemantics;
@@ -61,6 +61,33 @@ function interpolateCoverBoundary(left, right) {
   return left.distance + (right.distance - left.distance) * t;
 }
 
+function contiguousCoveredRanges(samples, total, continuesAtStart, continuesAtEnd) {
+  const ranges = [];
+  let coveredStartIndex = null;
+  for (let index = 0; index <= samples.length; index += 1) {
+    const covered = index < samples.length && samples[index].cover >= 0;
+    if (covered && coveredStartIndex === null) coveredStartIndex = index;
+    if (covered || coveredStartIndex === null) continue;
+
+    const coveredEndIndex = index - 1;
+    let start = samples[coveredStartIndex].distance;
+    let end = samples[coveredEndIndex].distance;
+    if (coveredStartIndex === 0) {
+      if (continuesAtStart) start = 0;
+    } else {
+      start = interpolateCoverBoundary(samples[coveredStartIndex - 1], samples[coveredStartIndex]);
+    }
+    if (coveredEndIndex === samples.length - 1) {
+      if (continuesAtEnd) end = total;
+    } else {
+      end = interpolateCoverBoundary(samples[coveredEndIndex], samples[coveredEndIndex + 1]);
+    }
+    if (end - start > 1.2) ranges.push({ start, end });
+    coveredStartIndex = null;
+  }
+  return ranges;
+}
+
 function crossingShellRanges(feature, features, pathDistances, total) {
   const ranges = [];
   const ownOrder = Number(feature?.structureSemantics?.verticalOrder) || -1;
@@ -108,7 +135,18 @@ function crossingShellRanges(feature, features, pathDistances, total) {
   return merged;
 }
 
-function compilePortalZones(shellRanges, total, width, portalDistances = []) {
+function surfaceIntersectionDistance(samples, portalDistance, endpoint, fallbackDistance) {
+  if (!Array.isArray(samples) || samples.length === 0) return fallbackDistance;
+  const ordered = endpoint === 'start' ? [...samples].reverse() : samples;
+  for (const sample of ordered) {
+    if (endpoint === 'start' && sample.distance >= portalDistance) continue;
+    if (endpoint === 'end' && sample.distance <= portalDistance) continue;
+    if (Number(sample.terrainGap) <= 0.12) return sample.distance;
+  }
+  return fallbackDistance;
+}
+
+function compilePortalZones(shellRanges, total, width, portalDistances = [], terrainSamples = []) {
   const portalSet = new Set(
     portalDistances.filter(Number.isFinite).map((distance) => Number(distance).toFixed(4))
   );
@@ -117,23 +155,35 @@ function compilePortalZones(shellRanges, total, width, portalDistances = []) {
   const zones = [];
   for (const range of shellRanges || []) {
     if (portalSet.has(Number(range.start).toFixed(4))) {
+      const surfaceDistance = surfaceIntersectionDistance(
+        terrainSamples,
+        range.start,
+        'start',
+        Math.max(0, range.start - transitionLength)
+      );
       zones.push(Object.freeze({
         distance: range.start,
         endpoint: 'start',
-        approachStart: Math.max(0, range.start - transitionLength),
+        approachStart: Math.max(0, surfaceDistance),
         approachEnd: range.start,
         shellInsetEnd: Math.min(range.end, range.start + shellInset),
-        transitionLength
+        transitionLength: range.start - Math.max(0, surfaceDistance)
       }));
     }
     if (portalSet.has(Number(range.end).toFixed(4))) {
+      const surfaceDistance = surfaceIntersectionDistance(
+        terrainSamples,
+        range.end,
+        'end',
+        Math.min(total, range.end + transitionLength)
+      );
       zones.push(Object.freeze({
         distance: range.end,
         endpoint: 'end',
         approachStart: range.end,
-        approachEnd: Math.min(total, range.end + transitionLength),
+        approachEnd: Math.min(total, surfaceDistance),
         shellInsetStart: Math.max(range.start, range.end - shellInset),
-        transitionLength
+        transitionLength: Math.min(total, surfaceDistance) - range.end
       }));
     }
   }
@@ -167,7 +217,8 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     if (!Number.isFinite(roadY) || !Number.isFinite(terrainY)) continue;
     samples.push({
       distance,
-      cover: terrainY - (roadY + clearance + roofThickness)
+      cover: terrainY - (roadY + clearance + roofThickness),
+      terrainGap: terrainY - roadY
     });
   }
 
@@ -219,17 +270,8 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     };
   }
 
-  let firstCovered = coveredIndices.length > 0 ? coveredIndices[0] : 0;
-  let lastCovered = coveredIndices.length > 0 ? coveredIndices[coveredIndices.length - 1] : samples.length - 1;
-  let shellStart = continuesAtStart ? 0 : samples[firstCovered]?.distance ?? 0;
-  let shellEnd = continuesAtEnd ? total : samples[lastCovered]?.distance ?? total;
-  if (!continuesAtStart && firstCovered > 0) {
-    shellStart = interpolateCoverBoundary(samples[firstCovered - 1], samples[firstCovered]);
-  }
-  if (!continuesAtEnd && lastCovered >= 0 && lastCovered < samples.length - 1) {
-    shellEnd = interpolateCoverBoundary(samples[lastCovered], samples[lastCovered + 1]);
-  }
-  if (!(shellEnd - shellStart > 1.2)) {
+  const shellRanges = contiguousCoveredRanges(samples, total, continuesAtStart, continuesAtEnd);
+  if (shellRanges.length === 0) {
     return {
       version: 3,
       visualKind: 'underpass',
@@ -246,26 +288,34 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     };
   }
 
-  const portalStart = !continuesAtStart && (shellStart > 1 || linkedSurfaceAt(feature, 'start')) ? shellStart : null;
-  const portalEnd = !continuesAtEnd && (shellEnd < total - 1 || linkedSurfaceAt(feature, 'end')) ? shellEnd : null;
+  const portalDistances = [];
+  for (const range of shellRanges) {
+    const beginsAtDatasetStart = range.start <= 1;
+    const endsAtDatasetEnd = range.end >= total - 1;
+    if (!beginsAtDatasetStart || (!continuesAtStart && linkedSurfaceAt(feature, 'start'))) {
+      portalDistances.push(range.start);
+    }
+    if (!endsAtDatasetEnd || (!continuesAtEnd && linkedSurfaceAt(feature, 'end'))) {
+      portalDistances.push(range.end);
+    }
+  }
+  const shellStart = shellRanges[0].start;
+  const shellEnd = shellRanges[shellRanges.length - 1].end;
+  const portalStart = portalDistances.includes(shellStart) ? shellStart : null;
+  const portalEnd = portalDistances.includes(shellEnd) ? shellEnd : null;
   return {
-    version: 3,
+    version: 6,
     visualKind: 'tunnel',
     total,
     clearance,
     roofThickness,
-    shellRanges: Object.freeze([{ start: shellStart, end: shellEnd }]),
+    shellRanges: Object.freeze(shellRanges.map((range) => Object.freeze(range))),
     shellStart,
     shellEnd,
     // A portal belongs at a real surface/tunnel boundary. Dataset clipping in
     // the middle of a tunnel has no connected surface way and gets no fake arch.
-    portalDistances: Object.freeze([portalStart, portalEnd].filter(Number.isFinite)),
-    portalZones: compilePortalZones(
-      [{ start: shellStart, end: shellEnd }],
-      total,
-      width,
-      [portalStart, portalEnd].filter(Number.isFinite)
-    ),
+    portalDistances: Object.freeze(portalDistances),
+    portalZones: compilePortalZones(shellRanges, total, width, portalDistances, samples),
     portalStart,
     portalEnd
   };
@@ -274,6 +324,45 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
 export function compileTunnelSystemModels(features = [], sampleTerrainY) {
   for (const feature of features) {
     feature.tunnelSystemModel = compileTunnelSystemModel(feature, sampleTerrainY, { features });
+  }
+  for (const feature of features) {
+    const model = feature?.tunnelSystemModel;
+    const profile = feature?.transportSurfaceModel;
+    const stationDistances = profile?.distances;
+    const pathDistances = profile?.pathDistances;
+    if (
+      model?.visualKind !== 'tunnel' ||
+      !(stationDistances instanceof Float32Array) ||
+      !(pathDistances instanceof Float32Array) ||
+      !(profile.centerHeights instanceof Float32Array)
+    ) continue;
+    const protectedRanges = [
+      ...(model.shellRanges || []),
+      ...(model.portalZones || []).map((zone) => ({
+        start: zone.approachStart,
+        end: zone.approachEnd
+      }))
+    ];
+    const halfWidth = Math.max(1.7, Number(feature.width || profile.width || 6) * 0.5);
+    for (let index = 0; index < stationDistances.length; index += 1) {
+      const distance = Number(stationDistances[index]);
+      if (protectedRanges.some((range) => distance >= range.start - 0.05 && distance <= range.end + 0.05)) continue;
+      const point = pointAtDistance(feature.pts, pathDistances, distance);
+      if (!point) continue;
+      let segmentIndex = 0;
+      while (segmentIndex < pathDistances.length - 2 && pathDistances[segmentIndex + 1] < distance) segmentIndex += 1;
+      const start = feature.pts[segmentIndex];
+      const end = feature.pts[segmentIndex + 1];
+      const length = Math.hypot(end.x - start.x, end.z - start.z) || 1;
+      const nx = -(end.z - start.z) / length;
+      const nz = (end.x - start.x) / length;
+      const centerY = Number(sampleTerrainY(point.x, point.z));
+      const leftY = Number(sampleTerrainY(point.x + nx * halfWidth, point.z + nz * halfWidth));
+      const rightY = Number(sampleTerrainY(point.x - nx * halfWidth, point.z - nz * halfWidth));
+      if (Number.isFinite(centerY)) profile.centerHeights[index] = centerY + 0.08;
+      if (profile.leftHeights instanceof Float32Array && Number.isFinite(leftY)) profile.leftHeights[index] = leftY + 0.08;
+      if (profile.rightHeights instanceof Float32Array && Number.isFinite(rightY)) profile.rightHeights[index] = rightY + 0.08;
+    }
   }
 }
 

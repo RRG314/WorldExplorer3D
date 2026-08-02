@@ -3,12 +3,12 @@ import {
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=5';
-import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
+} from './world/compiler/transport-surface-model.js?v=9';
+import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=2';
 import {
   assignFeatureConnections,
   assignStructureStackRanks as assignStructureStackRanksByGraph
-} from './structure-semantics/stacking.js?v=3';
+} from './structure-semantics/stacking.js?v=4';
 import {
   boundsIntersect,
   pointInPolygonXZ,
@@ -231,7 +231,18 @@ function buildFeatureStations(feature, context = {}) {
     }
   }
 
-  if (stations.length === 0 && total > 6) {
+  const requiresFallbackStructureHeight =
+    semantics?.isBridge === true ||
+    semantics?.isTunnel === true ||
+    semantics?.culvert === true ||
+    semantics?.skywalk === true ||
+    semantics?.rampCandidate === true ||
+    Math.abs(Number(semantics?.explicitBaseOffset) || 0) > 0.01;
+  // OSM layer is a relative stacking/topology tag, not a height measurement.
+  // Do not fabricate a full vehicle-clearance hump for a layer-only driveway
+  // or walkway. Real crossings add clearance stations above; explicit
+  // bridge/tunnel/level/height semantics retain a structural fallback.
+  if (stations.length === 0 && total > 6 && requiresFallbackStructureHeight) {
     addStation(total * 0.5, defaultTarget, Math.max(defaultSpan, total * 0.45), 'fallback_center');
   }
 
@@ -387,7 +398,7 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
   const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
-  return attachCompiledTransportSurface(
+  const compiledFeature = attachCompiledTransportSurface(
     feature,
     compileTransportSurfaceModel(feature, sampleTerrainY, {
       surfaceBias,
@@ -397,6 +408,35 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
         : 2
     })
   );
+  // Ordinary streets follow the live rendered terrain. Compiled profiles own
+  // only grade-separated structures; forcing city streets onto an engineered
+  // chord creates floating slabs and breaks steep terrain.
+  compiledFeature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade'
+    ? sampleTerrainY
+    : null;
+  return compiledFeature;
+}
+
+function applyJunctionTransitionY(feature, x, z, baseY) {
+  if (!Number.isFinite(baseY) || !Array.isArray(feature?.junctionTransitions)) return baseY;
+  let resolvedY = baseY;
+  let strongestWeight = 0;
+  for (const transition of feature.junctionTransitions) {
+    const radius = Math.max(0.1, Number(transition?.radius) || 0);
+    const distance = Math.hypot(Number(x) - Number(transition?.x), Number(z) - Number(transition?.z));
+    if (distance >= radius) continue;
+    const weight = 1 - smoothstep01(distance / radius);
+    if (weight <= strongestWeight) continue;
+    const plane = transition?.plane;
+    const planeY = Number(plane?.centerY) +
+      Number(plane?.slopeX || 0) * (Number(x) - Number(transition.x)) +
+      Number(plane?.slopeZ || 0) * (Number(z) - Number(transition.z)) +
+      0.006;
+    if (!Number.isFinite(planeY)) continue;
+    resolvedY = baseY + (planeY - baseY) * weight;
+    strongestWeight = weight;
+  }
+  return resolvedY;
 }
 
 function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, options = {}) {
@@ -475,40 +515,32 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceOffsets, profileDistance)) || 0 :
       0;
     const storedProfileY = Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceHeights, profileDistance));
-    const centerY = model
-      ? sampleTransportSurfaceAtDistance(model, profileDistance, 0)
-      : atGrade && Number.isFinite(terrainY)
-        ? terrainY + surfaceOffset + baseTopBias
+    const rawCenterY = atGrade && Number.isFinite(terrainY)
+      ? terrainY + surfaceOffset + baseTopBias
+      : model
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, 0)
         : Number.isFinite(storedProfileY)
           ? storedProfileY
           : terrainY + baseTopBias;
+    const centerY = applyJunctionTransitionY(feature, point.x, point.z, rawCenterY);
     centerlineHeights.push(centerY);
 
     const leftX = point.x + nx * (halfWidth + corridorCenterOffset) * joinFactor;
     const leftZ = point.z + nz * (halfWidth + corridorCenterOffset) * joinFactor;
     const rightX = point.x + nx * (-halfWidth + corridorCenterOffset) * joinFactor;
     const rightZ = point.z + nz * (-halfWidth + corridorCenterOffset) * joinFactor;
-    const maxCrossfall = Math.max(0.12, Math.min(0.45, halfWidth * 0.08));
-    const clampCrossfall = (terrainY) => {
-      const minimumY = Number(terrainY) + baseTopBias;
-      const crossfallY = centerY + Math.max(
-        -maxCrossfall,
-        Math.min(maxCrossfall, minimumY - centerY)
-      );
-      // Crossfall is a comfort/presentation constraint, never permission for
-      // an at-grade surface to pass through the accepted ground.
-      return Number.isFinite(minimumY) ? Math.max(minimumY, crossfallY) : crossfallY;
-    };
-    const leftY = model
-      ? sampleTransportSurfaceAtDistance(model, profileDistance, halfWidth)
-      : atGrade
-        ? clampCrossfall(sampleTerrainY(leftX, leftZ))
+    const rawLeftY = atGrade
+      ? Number(sampleTerrainY(leftX, leftZ)) + baseTopBias
+      : model
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, halfWidth)
         : centerY;
-    const rightY = model
-      ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
-      : atGrade
-        ? clampCrossfall(sampleTerrainY(rightX, rightZ))
+    const rawRightY = atGrade
+      ? Number(sampleTerrainY(rightX, rightZ)) + baseTopBias
+      : model
+        ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
         : centerY;
+    const leftY = applyJunctionTransitionY(feature, leftX, leftZ, rawLeftY);
+    const rightY = applyJunctionTransitionY(feature, rightX, rightZ, rawRightY);
     leftEdge.push({
       x: leftX,
       y: Number.isFinite(leftY) ? leftY : centerY,
@@ -563,18 +595,6 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
     ? model.pathDistances
     : distances;
   const distance = pathDistances[segIndex] + segLen * projectionT;
-  if (model) {
-    const sampleX = Number.isFinite(Number(projection.x))
-      ? Number(projection.x)
-      : p1.x + (p2.x - p1.x) * projectionT;
-    const sampleZ = Number.isFinite(Number(projection.z))
-      ? Number(projection.z)
-      : p1.z + (p2.z - p1.z) * projectionT;
-    const tangentX = (p2.x - p1.x) / Math.max(1e-6, segLen);
-    const tangentZ = (p2.z - p1.z) / Math.max(1e-6, segLen);
-    const lateralOffset = (x - sampleX) * -tangentZ + (z - sampleZ) * tangentX;
-    return sampleTransportSurfaceAtDistance(model, distance, lateralOffset);
-  }
   if (
     feature.structureSemantics?.terrainMode === 'at_grade' &&
     typeof feature.surfaceTerrainSampler === 'function'
@@ -596,8 +616,30 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
         ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0
         : 0;
       const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
-      return terrainY + structureOffset + surfaceBias;
+      return applyJunctionTransitionY(
+        feature,
+        sampleX,
+        sampleZ,
+        terrainY + structureOffset + surfaceBias
+      );
     }
+  }
+  if (model) {
+    const sampleX = Number.isFinite(Number(projection.x))
+      ? Number(projection.x)
+      : p1.x + (p2.x - p1.x) * projectionT;
+    const sampleZ = Number.isFinite(Number(projection.z))
+      ? Number(projection.z)
+      : p1.z + (p2.z - p1.z) * projectionT;
+    const tangentX = (p2.x - p1.x) / Math.max(1e-6, segLen);
+    const tangentZ = (p2.z - p1.z) / Math.max(1e-6, segLen);
+    const lateralOffset = (x - sampleX) * -tangentZ + (z - sampleZ) * tangentX;
+    return applyJunctionTransitionY(
+      feature,
+      x,
+      z,
+      sampleTransportSurfaceAtDistance(model, distance, lateralOffset)
+    );
   }
   return sampleProfileAtDistance(distances, heights, distance);
 }

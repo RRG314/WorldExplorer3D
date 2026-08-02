@@ -558,7 +558,6 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   if (typeof deps.applyHeightsToTerrainMesh === "function") {
     deps.applyHeightsToTerrainMesh(mesh);
   }
-
   return mesh;
 }
 

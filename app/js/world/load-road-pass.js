@@ -10,10 +10,13 @@ import {
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=30";
+} from "../structure-semantics.js?v=37";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
-import { detectRoadIntersections } from "../terrain/intersections.js?v=1";
-import { appendRoadJunctionGeometry } from "../terrain/road-junctions.js?v=1";
+import { detectRoadIntersections } from "../terrain/intersections.js?v=2";
+import {
+  appendRoadJunctionGeometry,
+  prepareRoadJunctionEnvelopes
+} from "../terrain/road-junctions.js?v=3";
 import {
   normalizeTransportSource
 } from "./compiler/transport-source-normalizer.js?v=1";
@@ -229,6 +232,7 @@ export function buildRoadGeometryPass(options = {}) {
   });
 
   const intersections = detectRoadIntersections(appCtx.roads);
+  prepareRoadJunctionEnvelopes(intersections, appCtx.roads);
   const junctionStats = appendRoadJunctionGeometry({
     intersections,
     roads: appCtx.roads,

@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=30";
+} from "./structure-semantics.js?v=37";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -60,7 +60,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=22";
+} from "./world/load-support.js?v=24";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -102,7 +102,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=15";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=17";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=29";
 import {
   batchLanduseMeshes,
@@ -162,8 +162,8 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=15";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=76";
+} from "./world/structure-aware.js?v=18";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=77";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
