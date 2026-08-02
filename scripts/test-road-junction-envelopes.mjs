@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import {
-  appendCompactIntersectionCap,
-  computeIntersectionCapRadius,
-  shouldBuildCompactIntersectionCap
+  appendCompactIntersectionCap
 } from '../app/js/terrain/rebuild.js';
+import {
+  buildRoadJunctionEnvelope,
+  computeIntersectionCapRadius,
+  prepareRoadJunctionEnvelopes,
+  shouldBuildCompactIntersectionCap
+} from '../app/js/terrain/road-junctions.js';
 import { detectRoadIntersections } from '../app/js/terrain/intersections.js';
 
 function road(points, width = 8, height = 12) {
@@ -46,6 +50,20 @@ const indices = [];
 assert.equal(shouldBuildCompactIntersectionCap(intersection), true);
 const compactRadius = computeIntersectionCapRadius(intersection);
 assert.ok(compactRadius <= intersection.maxWidth * 0.34);
+const loadEnvelope = buildRoadJunctionEnvelope(intersection, roads);
+assert.ok(loadEnvelope, 'initial road publication did not build the shared compact cap');
+assert.equal(loadEnvelope.polygon.length, 16);
+assert.ok(
+  loadEnvelope.polygon.every((point) =>
+    Math.hypot(point.x - intersection.x, point.z - intersection.z) <= compactRadius + 1e-6
+  ),
+  'initial road publication escaped the compact junction radius'
+);
+prepareRoadJunctionEnvelopes([intersection], roads);
+assert.ok(
+  roads.every((candidate) => candidate.junctionTransitions.length === 0),
+  'initial road publication reintroduced a competing fitted junction plane'
+);
 assert.equal(
   appendCompactIntersectionCap(intersection, verts, indices, (x, z) => 12 + x * 0.02 + z * 0.01),
   true

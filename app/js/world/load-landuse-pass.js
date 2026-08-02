@@ -1,4 +1,4 @@
-import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
+import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
 import { surfaceComposition } from './surface-contract.js?v=10';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
@@ -225,6 +225,7 @@ export function createWorldLandusePass(options = {}) {
     const isWater = landuseType === 'water';
     const isExplicitHardscape = landuseType === 'paved' || landuseType === 'parking';
     const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
+    const isMappedSurface = !!appCtx.LANDUSE_STYLES?.[landuseType];
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const composition = surfaceComposition(landuseType, isWater ? 'water' : 'land-cover');
     const waterBounds = { minX, maxX, minZ, maxZ };
@@ -338,7 +339,9 @@ export function createWorldLandusePass(options = {}) {
     mesh.position.y = surfaceBaseElevation;
     mesh.userData.landuseFootprint = ring;
     mesh.userData.avgElevation = surfaceBaseElevation;
-    mesh.userData.alwaysVisible = isWater || isExplicitHardscape || isMappedGroundCover;
+    // Mapped surface ownership must not pop in and out as the camera crosses
+    // an LOD radius. Geometry detail may change, but the land-use layer stays.
+    mesh.userData.alwaysVisible = isWater || isExplicitHardscape || isMappedGroundCover || isMappedSurface;
     mesh.userData.landuseType = landuseType;
     mesh.userData.waterFlattenFactor = waterFlattenFactor;
     mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;

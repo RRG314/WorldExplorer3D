@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=37";
+} from "./structure-semantics.js?v=38";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -102,7 +102,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=18";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=19";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=32";
 import {
   batchLanduseMeshes,

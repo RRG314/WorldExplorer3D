@@ -1,7 +1,7 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=37";
+} from "../structure-semantics.js?v=38";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {

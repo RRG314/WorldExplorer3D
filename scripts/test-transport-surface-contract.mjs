@@ -700,6 +700,21 @@ assert.ok(
   'corridor miter failed to preserve width through a right-angle curve'
 );
 
+const hairpinRoad = {
+  ...rightAngleRoad,
+  id: 'bounded-hairpin-miter',
+  pts: [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 8, z: 4 }]
+};
+updateFeatureSurfaceProfile(hairpinRoad, () => 10);
+const hairpinRibbon = buildFeatureRibbonEdges(hairpinRoad, hairpinRoad.pts, 5, () => 10);
+assert.ok(
+  Math.hypot(
+    hairpinRibbon.leftEdge[1].x - hairpinRoad.pts[1].x,
+    hairpinRibbon.leftEdge[1].z - hairpinRoad.pts[1].z
+  ) <= 7.5001,
+  'sharp road bend emitted an unbounded wedge beyond the carriageway edge'
+);
+
 const intersectionRoad = (id, endX, endZ) => ({
   sourceFeatureId: id,
   pts: [{ x: 0, z: 0 }, { x: endX, z: endZ }],

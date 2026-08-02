@@ -496,7 +496,10 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
         nz = miterZ / miterLength;
         const denominator = nx * nextNormalX + nz * nextNormalZ;
         if (Math.abs(denominator) >= 0.25) {
-          joinFactor = Math.max(-2.25, Math.min(2.25, 1 / denominator));
+          // A large miter is a long triangular spike, not usable road width.
+          // Preserve exact 90-degree joins while bounding sharper OSM bends.
+          const miter = 1 / denominator;
+          joinFactor = Math.sign(miter) * Math.min(Math.abs(miter), 1.5);
         } else {
           nx = nextNormalX;
           nz = nextNormalZ;

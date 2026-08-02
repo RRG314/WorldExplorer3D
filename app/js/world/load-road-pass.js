@@ -10,13 +10,13 @@ import {
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=37";
+} from "../structure-semantics.js?v=38";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
 import { detectRoadIntersections } from "../terrain/intersections.js?v=2";
 import {
   appendRoadJunctionGeometry,
   prepareRoadJunctionEnvelopes
-} from "../terrain/road-junctions.js?v=3";
+} from "../terrain/road-junctions.js?v=4";
 import {
   normalizeTransportSource
 } from "./compiler/transport-source-normalizer.js?v=1";

@@ -6,37 +6,16 @@ import {
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=37";
+} from "../structure-semantics.js?v=38";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
+import {
+  computeIntersectionCapRadius,
+  shouldBuildCompactIntersectionCap
+} from "./road-junctions.js?v=4";
 
 const ROAD_SURFACE_BIAS = 0.08;
 
 export { detectRoadIntersections };
-
-function computeIntersectionCapRadius(intersection) {
-  const maxWidth = Number(intersection?.maxWidth || 8);
-  const roads = Array.isArray(intersection?.roads) ? intersection.roads : [];
-  const branchCount = Math.max(2, roads.length);
-  const avgWidth = roads.length > 0 ?
-    roads.reduce((sum, r) => sum + Number(r?.width || maxWidth), 0) / roads.length :
-    maxWidth;
-
-  const halfWidth = Math.max(avgWidth * 0.28, maxWidth * 0.26);
-  const branchBoost = Math.min(0.04, Math.max(0, (branchCount - 4) * 0.02));
-  const unclamped = halfWidth * (1 + branchBoost);
-  const minRadius = maxWidth * 0.22;
-  const maxRadius = maxWidth * 0.34;
-  return Math.max(minRadius, Math.min(maxRadius, unclamped));
-}
-
-function shouldBuildCompactIntersectionCap(intersection) {
-  return !!(
-    intersection &&
-    intersection.hasGradeSeparatedRoad !== true &&
-    Array.isArray(intersection.roads) &&
-    intersection.roads.length >= 3
-  );
-}
 
 function appendCompactIntersectionCap(
   intersection,
