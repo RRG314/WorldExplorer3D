@@ -319,9 +319,10 @@ export function createWorldLandusePass(options = {}) {
       opacity: 1,
       side: THREE.DoubleSide,
       depthWrite: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -6,
-      polygonOffsetUnits: -6
+      // Water has a real vertical surface offset and a shoreline terrain mask.
+      // A negative depth bias makes an opaque water polygon win over adjacent
+      // land pixels in aerial views, creating the appearance of a raised slab.
+      polygonOffset: false
     } : mappedSurface.material);
 
     if (isWater) {

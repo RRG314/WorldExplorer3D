@@ -69,6 +69,7 @@ import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=4";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
+import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
   distanceToWaterBoundary,
   pointInWaterBody
@@ -217,9 +218,7 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
     // smoothly. A fixed cut makes an opaque water polygon read as a floating
     // slab at quays and beaches.
     const shorelineDistance = distanceToWaterBoundary(area, x, z);
-    const blend = Math.max(0, Math.min(1, shorelineDistance / 6));
-    const smoothBlend = blend * blend * (3 - 2 * blend);
-    const bedDepth = 0.06 + smoothBlend * 0.54;
+    const bedDepth = waterBedDepthAtShorelineDistance(shorelineDistance);
     resolvedY = Math.min(resolvedY, Number(area.surfaceY) - bedDepth);
   }
   return resolvedY;

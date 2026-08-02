@@ -10,6 +10,7 @@ import {
   pointInWaterBody
 } from '../app/js/world/water-surface-registry.js?v=3';
 import { waterSurfaceBaseElevation } from '../app/js/world/water-body-contract.js?v=3';
+import { waterBedDepthAtShorelineDistance } from '../app/js/terrain/water-terrain-mask.js?v=1';
 import {
   mappedWaterStructurePriority,
   mergeMappedWaterStructures
@@ -37,6 +38,13 @@ const rectangle = (minX, minZ, maxX, maxZ) => [
 assert.equal(pointInWaterBody(water, 50, 50), true);
 assert.equal(distanceToWaterBoundary(water, 5, 50), 5);
 assert.equal(distanceToWaterBoundary(water, 50, 50), 50);
+assert.equal(
+  waterBedDepthAtShorelineDistance(0),
+  0,
+  'Mapped water must meet terrain at the exact shoreline instead of exposing a raised slab edge.'
+);
+assert.equal(waterBedDepthAtShorelineDistance(3), 0.3);
+assert.equal(waterBedDepthAtShorelineDistance(6), 0.6);
 
 const submergedBuilding = classifyBuildingWaterRelationship(
   { building: 'yes' },
