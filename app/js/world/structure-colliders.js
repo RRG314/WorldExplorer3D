@@ -101,7 +101,10 @@ export function compileStructureColliderDescriptors(features = []) {
   for (const feature of features) {
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
     const semantics = feature.structureSemantics || {};
-    const tunnelLike = ['tunnel', 'underpass'].includes(feature?.tunnelSystemModel?.visualKind);
+    // Tunnel collider shells share the same incomplete aperture geometry as
+    // the withheld tunnel presentation. Do not publish invisible ceilings or
+    // walls that can snag a vehicle while no trustworthy portal exists.
+    const tunnelLike = false;
     const coveredLike = semantics.structureKind === 'covered';
     if (!tunnelLike && !coveredLike) continue;
     const profile = polylineDistances(feature.pts);

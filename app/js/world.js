@@ -68,7 +68,7 @@ import {
 } from "./world/load-reset.js?v=11";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=3";
+} from "./world/load-budgeting.js?v=4";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -102,7 +102,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=17";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=18";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=29";
 import {
   batchLanduseMeshes,
@@ -162,7 +162,7 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=18";
+} from "./world/structure-aware.js?v=19";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=77";
 import {
   fetchShortbreadWorldData
@@ -176,10 +176,11 @@ import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=
 
 const FEATURE_MIN_POLYGON_AREA = 8;
 const FEATURE_MIN_HOLE_AREA = 6;
-// Mapped pedestrian surfaces are terrain-draped. Rail and cycle overlays remain
-// disabled until they have dedicated intersection and rendering ownership.
+// Publish only drivable transport surfaces. Mapped pedestrian, rail, and cycle
+// data remain available from OSM for future validated systems, but they do not
+// become visible world geometry or competing traversal surfaces.
 const LINEAR_FEATURE_POLICY = Object.freeze({
-  footway: true,
+  footway: false,
   cycleway: false,
   railway: false
 });

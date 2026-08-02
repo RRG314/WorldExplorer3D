@@ -9,6 +9,12 @@ export function clearStructureVisualMeshesForContext(appCtx) {
   appCtx.replaceWorldCollection('structureVisualMeshes');
 }
 
+// Tunnel walls, roofs, portals, lights, and shells are intentionally withheld
+// until a provider-independent terrain aperture exists. Publishing partial
+// tunnel pieces caused clipping slabs and disconnected geometry in steep
+// locations. The drivable tunnel road and its topology remain available.
+export const PUBLISH_TUNNEL_STRUCTURE_VISUALS = false;
+
 export function buildStructureVisualMeshForContext(appCtx, instances, material, userData = {}) {
   if (!Array.isArray(instances) || instances.length === 0 || typeof THREE === "undefined") return null;
   const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -263,7 +269,7 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       { structureVisualType: "supports" }
     );
   }
-  if (wallInstances.length > 0) {
+  if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && wallInstances.length > 0) {
     buildStructureVisualMeshForContext(
       appCtx,
       wallInstances,
@@ -271,7 +277,7 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       { structureVisualType: "walls" }
     );
   }
-  if (roofInstances.length > 0) {
+  if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && roofInstances.length > 0) {
     buildStructureVisualMeshForContext(
       appCtx,
       roofInstances,
@@ -279,7 +285,7 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       { structureVisualType: "roofs" }
     );
   }
-  if (portalInstances.length > 0) {
+  if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && portalInstances.length > 0) {
     buildStructureVisualMeshForContext(
       appCtx,
       portalInstances,
@@ -287,13 +293,15 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       { structureVisualType: "portals" }
     );
   }
-  if (tunnelLightInstances.length > 0) {
+  if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && tunnelLightInstances.length > 0) {
     const material = createStructureVisualMaterial(0xfff2c7, 0.5, 0.02);
     material.emissive.setHex(0xffd98a);
     material.emissiveIntensity = 1.8;
     buildStructureVisualMeshForContext(appCtx, tunnelLightInstances, material, { structureVisualType: "tunnel_lights" });
   }
-  buildTunnelShellMeshForContext(appCtx, tunnelShells);
+  if (PUBLISH_TUNNEL_STRUCTURE_VISUALS) {
+    buildTunnelShellMeshForContext(appCtx, tunnelShells);
+  }
   buildElevatedRoadMeshForContext(appCtx, elevatedDeckShells, elevatedBarrierSegments);
   if (guardrailInstances.length > 0) {
     buildStructureVisualMeshForContext(

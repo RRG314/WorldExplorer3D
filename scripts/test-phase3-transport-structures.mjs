@@ -8,6 +8,8 @@ import { compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system
 import { compileTransportStructureModel } from '../app/js/world/compiler/transport-structure-model.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
+import { PUBLISH_TUNNEL_STRUCTURE_VISUALS } from '../app/js/terrain/structure-visual-meshes.js';
+import { applySafeTunnelRoadPresentation } from '../app/js/world/load-road-pass.js';
 import {
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
@@ -101,6 +103,13 @@ assert.equal(taxonomy.layerOnlyRoad.physicalStructureEvidence, false);
 assert.equal(taxonomy.layerOnlyFootway.terrainMode, 'at_grade');
 assert.equal(taxonomy.layerOnlyFootway.physicalStructureEvidence, false);
 assert.equal(taxonomy.indoorNo.indoor, false);
+const safeTunnelPresentation = applySafeTunnelRoadPresentation(taxonomy.tunnel);
+assert.equal(safeTunnelPresentation.isTunnel, true);
+assert.equal(safeTunnelPresentation.structureKind, 'tunnel');
+assert.equal(safeTunnelPresentation.terrainMode, 'at_grade');
+assert.equal(safeTunnelPresentation.gradeSeparated, false);
+assert.equal(safeTunnelPresentation.topologySeparated, true);
+assert.equal(safeTunnelPresentation.presentationFallback, 'terrain_draped_tunnel_road');
 assert.equal(
   shouldOmitUnmatchedElevatedPedestrianFeature(
     { kind: 'footway', subtype: 'footway' },
@@ -208,13 +217,9 @@ assert.equal(underpassModel.portalZones.length, 2);
 const tunnelColliders = compileStructureColliderDescriptors([underpass]);
 const tunnelWalls = tunnelColliders.filter((collider) => collider.structureColliderKind === 'side_wall');
 const tunnelCeilings = tunnelColliders.filter((collider) => collider.structureColliderKind === 'ceiling');
-assert.ok(tunnelWalls.length >= 2);
-assert.ok(tunnelCeilings.length >= 1);
-assert.ok(tunnelCeilings.every((collider) => collider.minY >= underpassModel.clearance));
-assert.ok(tunnelWalls.every((collider) => {
-  const centerZ = collider.pts.reduce((sum, point) => sum + point.z, 0) / collider.pts.length;
-  return Math.abs(centerZ) > underpass.width * 0.5;
-}), 'tunnel wall collider crossed the drivable centerline');
+assert.equal(PUBLISH_TUNNEL_STRUCTURE_VISUALS, false);
+assert.equal(tunnelWalls.length, 0);
+assert.equal(tunnelCeilings.length, 0);
 const underpassVisuals = collectTunnelVisualInstances(
   underpass,
   underpass.pts,
@@ -225,7 +230,7 @@ const underpassVisuals = collectTunnelVisualInstances(
   }
 );
 assert.equal(underpassVisuals.shells.length, 1);
-assert.equal(underpassVisuals.portals.length, 6);
+assert.equal(underpassVisuals.portals.length, 0);
 assert.equal(underpassVisuals.lights.length, 0);
 assert.equal(underpassVisuals.shells[0].visualKind, 'underpass');
 

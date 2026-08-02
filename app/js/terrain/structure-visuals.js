@@ -7,7 +7,7 @@ import {
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=13";
+} from "./structure-visual-meshes.js?v=14";
 import {
   collectCoveredVisualInstances,
   collectTunnelVisualInstances

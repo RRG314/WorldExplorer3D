@@ -23,6 +23,25 @@ import {
 
 const ROAD_SURFACE_BIAS = 0.08;
 
+export function applySafeTunnelRoadPresentation(structureSemantics) {
+  if (structureSemantics?.isTunnel !== true) return structureSemantics;
+  return {
+    ...structureSemantics,
+    // Keep the tunnel identity and separated topology, but present the route
+    // on the accepted terrain until a trustworthy terrain aperture exists.
+    // This prevents the player, road, and nearby world from being rendered
+    // below the terrain in an empty/inverted scene.
+    structureKind: 'tunnel',
+    terrainMode: 'at_grade',
+    gradeSeparated: false,
+    topologySeparated: true,
+    deckClearance: 0,
+    cutDepth: 0,
+    presentationFallback: 'terrain_draped_tunnel_road',
+    verticalGroup: `at_grade:${Number(structureSemantics.verticalOrder) || -1}:tunnel_fallback`
+  };
+}
+
 export function buildRoadGeometryPass(options = {}) {
   const roadWays = Array.isArray(options.roadWays) ? options.roadWays : [];
   const nodes = options.nodes || {};
@@ -78,10 +97,12 @@ export function buildRoadGeometryPass(options = {}) {
     if (pts.length < 2) return;
 
     const type = way.tags?.highway || 'residential';
-    const structureSemantics = classifyStructureSemantics(way.tags || {}, {
-      featureKind: 'road',
-      subtype: type
-    });
+    const structureSemantics = applySafeTunnelRoadPresentation(
+      classifyStructureSemantics(way.tags || {}, {
+        featureKind: 'road',
+        subtype: type
+      })
+    );
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
     const transportRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,

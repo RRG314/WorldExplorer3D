@@ -163,7 +163,7 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allStructureConnectorWays = data.elements.filter((element) => {
+  const allStructureConnectorWays = enableLinearFeatures ? data.elements.filter((element) => {
     if (element.type !== 'way') return false;
     const classification = classifyLinearFeatureTags(element.tags, { force: true });
     if (!classification || classification.kind !== 'footway') return false;
@@ -172,8 +172,8 @@ export function prepareWorldFeatureSelections(options = {}) {
       subtype: classification.subtype
     });
     return semantics.gradeSeparated || semantics.skywalk;
-  });
-  const structureConnectorWays = limitWaysByTileBudget(allStructureConnectorWays, nodes, {
+  }) : [];
+  const structureConnectorWays = enableLinearFeatures ? limitWaysByTileBudget(allStructureConnectorWays, nodes, {
     globalCap: Math.max(36, Math.floor(tileBudgetCfg.landusePerTile * 1.4)),
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
     minPerTile: 1,
@@ -186,7 +186,7 @@ export function prepareWorldFeatureSelections(options = {}) {
       const bScore = bSemantics.skywalk ? 4 : bSemantics.gradeSeparated ? 3 : 1;
       return bScore - aScore;
     }
-  });
+  }) : [];
 
   const allTreeNodes = data.elements.filter((element) =>
     element.type === 'node' &&

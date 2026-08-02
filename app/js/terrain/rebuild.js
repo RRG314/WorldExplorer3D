@@ -2,10 +2,6 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=2";
 import { detectRoadIntersections } from "./intersections.js?v=2";
 import {
-  appendRoadJunctionGeometry,
-  prepareRoadJunctionEnvelopes
-} from "./road-junctions.js?v=3";
-import {
   buildFeatureRibbonEdges,
   roadSkirtDepth,
   sampleFeatureSurfaceY,
@@ -32,6 +28,49 @@ function computeIntersectionCapRadius(intersection) {
   const maxRadius = maxWidth * 0.34;
   return Math.max(minRadius, Math.min(maxRadius, unclamped));
 }
+
+function shouldBuildCompactIntersectionCap(intersection) {
+  return !!(
+    intersection &&
+    intersection.hasGradeSeparatedRoad !== true &&
+    Array.isArray(intersection.roads) &&
+    intersection.roads.length >= 3
+  );
+}
+
+function appendCompactIntersectionCap(
+  intersection,
+  targetVerts,
+  targetIndices,
+  terrainHeightAt,
+  segments = 16
+) {
+  if (!shouldBuildCompactIntersectionCap(intersection)) return false;
+  const sampleTerrain = typeof terrainHeightAt === "function" ? terrainHeightAt : () => 0;
+  const radius = computeIntersectionCapRadius(intersection);
+  const base = targetVerts.length / 3;
+  targetVerts.push(
+    Number(intersection.x),
+    Number(sampleTerrain(intersection.x, intersection.z)) + ROAD_SURFACE_BIAS + 0.004,
+    Number(intersection.z)
+  );
+  for (let index = 0; index < segments; index += 1) {
+    const angle = index / segments * Math.PI * 2;
+    const x = Number(intersection.x) + Math.cos(angle) * radius;
+    const z = Number(intersection.z) + Math.sin(angle) * radius;
+    targetVerts.push(x, Number(sampleTerrain(x, z)) + ROAD_SURFACE_BIAS + 0.004, z);
+  }
+  for (let index = 0; index < segments; index += 1) {
+    targetIndices.push(base, base + 1 + index, base + 1 + ((index + 1) % segments));
+  }
+  return true;
+}
+
+export {
+  appendCompactIntersectionCap,
+  computeIntersectionCapRadius,
+  shouldBuildCompactIntersectionCap
+};
 
 function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   if (!Array.isArray(verts) || verts.length === 0) return;
@@ -240,7 +279,12 @@ export function publishCompiledTransportMeshes(deps = {}) {
   };
 
   const intersections = detectRoadIntersections(baseRoads);
-  prepareRoadJunctionEnvelopes(intersections, baseRoads);
+  // Do not bend road profiles into a separately fitted junction plane. Those
+  // large convex envelopes were wider than the actual carriageway and caused
+  // visible polygon fans and edge bumps on slopes. Continuous road ribbons
+  // remain authoritative; only a small terrain-draped center cap closes true
+  // three-or-more-way gaps.
+  for (const road of baseRoads) road.junctionTransitions = [];
 
   const roadMainBatchVerts = [];
   const roadMainBatchIdx = [];
@@ -426,12 +470,15 @@ export function publishCompiledTransportMeshes(deps = {}) {
     }
   });
 
-  const junctionStats = appendRoadJunctionGeometry({
-    intersections,
-    roads: baseRoads,
-    verts: roadMainBatchVerts,
-    indices: roadMainBatchIdx
-  });
+  let compactJunctionCount = 0;
+  for (const intersection of intersections) {
+    if (appendCompactIntersectionCap(
+      intersection,
+      roadMainBatchVerts,
+      roadMainBatchIdx,
+      cachedTerrainHeight
+    )) compactJunctionCount += 1;
+  }
 
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -496,7 +543,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
     transportGraphId: appCtx.transportNetworkModel?.id || null,
     roadCount: baseRoads.length,
     meshCount: appCtx.roadMeshes.length,
-    intersectionCount: junctionStats.count,
+    intersectionCount: compactJunctionCount,
     topologyIntersectionCount: intersections.filter((intersection) =>
       !intersection?.hasGradeSeparatedRoad
     ).length,
