@@ -32,6 +32,30 @@ function pointInWaterBody(body, x, z) {
   return !(body.holes || []).some((ring) => pointInRing(x, z, ring));
 }
 
+function distanceToRing(x, z, ring = []) {
+  if (!Array.isArray(ring) || ring.length < 2) return Infinity;
+  let best = Infinity;
+  for (let index = 0; index < ring.length; index += 1) {
+    const a = ring[index];
+    const b = ring[(index + 1) % ring.length];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const lengthSquared = dx * dx + dz * dz;
+    const t = lengthSquared > 1e-9
+      ? Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / lengthSquared))
+      : 0;
+    best = Math.min(best, Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t)));
+  }
+  return best;
+}
+
+function distanceToWaterBoundary(body, x, z) {
+  if (!pointInWaterBody(body, x, z)) return 0;
+  let best = distanceToRing(x, z, body?.pts || []);
+  for (const hole of body?.holes || []) best = Math.min(best, distanceToRing(x, z, hole));
+  return Number.isFinite(best) ? best : 0;
+}
+
 function sourcePriority(body) {
   const dataset = String(body?.provenance?.dataset || '').toLowerCase();
   const layer = String(body?.provenance?.layer || '').toLowerCase();
@@ -202,6 +226,7 @@ export {
   WATER_SURFACE_REGISTRY_SCHEMA_VERSION,
   compileWaterSurfaceProvenance,
   createWaterSurfaceRegistry,
+  distanceToWaterBoundary,
   pointInRing,
   pointInWaterBody,
   sourcePriority,

@@ -39,6 +39,10 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
     for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
       const mesh = appCtx.buildingMeshes[i];
       if (!mesh) continue;
+      if (mesh.userData?.isMappedVessel) {
+        keep.push(mesh);
+        continue;
+      }
       const tier = mesh.userData?.lodTier || 'near';
       if (!tierSet.has(tier) || mesh.userData?.isBuildingBatch) {
         keep.push(mesh);

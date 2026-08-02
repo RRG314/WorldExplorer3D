@@ -1,7 +1,7 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
 import { surfaceComposition } from './surface-contract.js?v=10';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
-import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=2';
+import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 
 const SOIL_LANDUSE_TYPES = new Set([
   'farmland', 'farmyard', 'orchard', 'vineyard', 'allotments',
@@ -53,6 +53,35 @@ function applyWorldSpaceSurfaceUvs(geometry, metersPerTile) {
     uvs[i * 2 + 1] = positions.getZ(i) * scale;
   }
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+}
+
+function pointInRing(x, z, ring = []) {
+  let inside = false;
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+    const a = ring[index];
+    const b = ring[previous];
+    const crosses = (a.z > z) !== (b.z > z) &&
+      x < (b.x - a.x) * (z - a.z) / ((b.z - a.z) || 1e-9) + a.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function sampleWaterPolygonInteriorHeights(appCtx, ring, holes, bounds) {
+  if (!bounds || !Array.isArray(ring) || ring.length < 3) return [];
+  const samples = [];
+  const gridSteps = 7;
+  for (let xi = 1; xi < gridSteps; xi += 1) {
+    for (let zi = 1; zi < gridSteps; zi += 1) {
+      const x = bounds.minX + (bounds.maxX - bounds.minX) * (xi / gridSteps);
+      const z = bounds.minZ + (bounds.maxZ - bounds.minZ) * (zi / gridSteps);
+      if (!pointInRing(x, z, ring)) continue;
+      if ((holes || []).some((hole) => pointInRing(x, z, hole))) continue;
+      const height = Number(appCtx.elevationWorldYAtWorldXZ(x, z));
+      if (Number.isFinite(height)) samples.push(height);
+    }
+  }
+  return samples;
 }
 
 function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
@@ -198,14 +227,14 @@ export function createWorldLandusePass(options = {}) {
     const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const composition = surfaceComposition(landuseType, isWater ? 'water' : 'land-cover');
-    const centerElevation = isWater ? appCtx.elevationWorldYAtWorldXZ(
-      (minX + maxX) * 0.5,
-      (minZ + maxZ) * 0.5
-    ) : NaN;
+    const waterBounds = { minX, maxX, minZ, maxZ };
+    const interiorWaterHeights = isWater
+      ? sampleWaterPolygonInteriorHeights(appCtx, ring, cleanedHoles, waterBounds)
+      : [];
     const surfaceBaseElevation = isWater
-      ? Number.isFinite(centerElevation) && centerElevation > 12
-        ? centerElevation
-        : waterSurfaceBaseElevation(sampledHeights)
+      ? featureMeta.layer === 'ocean'
+        ? 0
+        : waterSurfaceBaseElevation(interiorWaterHeights.length >= 3 ? interiorWaterHeights : sampledHeights)
       : avgElevation;
     const waterArea = isWater ? normalizeWaterBody({
       shape: 'area',
@@ -222,8 +251,9 @@ export function createWorldLandusePass(options = {}) {
       access: featureMeta.access,
       boatAccess: featureMeta.boatAccess,
       surfaceType: featureMeta.surfaceType || featureMeta.kindHint,
-      datumMethod: featureMeta.layer === 'ocean' ? 'sea-level' : 'dem-water-surface',
-      datumConfidence: featureMeta.layer === 'ocean' ? 0.98 : 0.82
+      datumMethod: featureMeta.layer === 'ocean' ? 'sea-level' :
+        interiorWaterHeights.length >= 3 ? 'interior-dem-water-surface' : 'shoreline-dem-water-surface',
+      datumConfidence: featureMeta.layer === 'ocean' ? 0.98 : interiorWaterHeights.length >= 3 ? 0.9 : 0.68
     }) : null;
     const waterFlattenFactor = isWater ? 0 : 1.0;
 

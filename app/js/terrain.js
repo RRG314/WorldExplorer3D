@@ -12,7 +12,7 @@ import {
 } from "./terrain/context-utils.js?v=1";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=6";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=10";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=11";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -69,7 +69,10 @@ import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=4";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
-import { pointInWaterBody } from "./world/water-surface-registry.js?v=2";
+import {
+  distanceToWaterBoundary,
+  pointInWaterBody
+} from "./world/water-surface-registry.js?v=3";
 // terrain.js - Accepted-ground artifact and terrain presentation system
 // ============================================================================
 
@@ -210,11 +213,14 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
     )) continue;
     if (!Number.isFinite(Number(area?.surfaceY))) continue;
     if (!pointInWaterBody(area, x, z)) continue;
-    // Accepted elevation rasters often report positive shoreline/DSM values
-    // across harbors. OSM hydrology owns these footprints, so keep the terrain
-    // bed below the registered flat water datum instead of rendering grass
-    // through the water surface.
-    resolvedY = Math.min(resolvedY, Number(area.surfaceY) - 0.45);
+    // Meet the terrain close to the registered shoreline, then deepen the bed
+    // smoothly. A fixed cut makes an opaque water polygon read as a floating
+    // slab at quays and beaches.
+    const shorelineDistance = distanceToWaterBoundary(area, x, z);
+    const blend = Math.max(0, Math.min(1, shorelineDistance / 6));
+    const smoothBlend = blend * blend * (3 - 2 * blend);
+    const bedDepth = 0.06 + smoothBlend * 0.54;
+    resolvedY = Math.min(resolvedY, Number(area.surfaceY) - bedDepth);
   }
   return resolvedY;
 }

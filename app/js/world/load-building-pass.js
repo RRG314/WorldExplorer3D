@@ -19,10 +19,14 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=4";
+} from "./building-batching.js?v=5";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=2';
+import {
+  classifyBuildingWaterRelationship,
+  createMappedVesselMesh
+} from './water-adjacent-structures.js?v=2';
 
 export function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -56,6 +60,11 @@ export function buildBuildingGeometryPass(options = {}) {
     farLod: 0,
     provenanceRejected: 0,
     renderedFeatures: 0
+  };
+  loadMetrics.buildingWater ||= {
+    vessels: 0,
+    explicitOverwaterStructures: 0,
+    suppressedOverlaps: 0
   };
   appCtx.buildingProvenanceRecords ||= [];
   appCtx.buildingProvenanceFeatureIds ||= new Set(
@@ -197,6 +206,26 @@ export function buildBuildingGeometryPass(options = {}) {
       loadMetrics.buildingPublication.invalidFootprint += 1;
       return;
     }
+    const waterRelationship = classifyBuildingWaterRelationship(
+      way.tags || {},
+      pts,
+      appCtx.waterAreas
+    );
+    // Ships are water-domain objects, not roadside building massing. Publish
+    // them before road proximity/overlap guards so dense harbors and detached
+    // piers cannot silently remove valid mapped vessels.
+    if (waterRelationship.action === 'render_vessel') {
+      const waterSurfaceY = Number(waterRelationship.coverage.primaryWater?.surfaceY);
+      const vesselMesh = createMappedVesselMesh(pts, waterSurfaceY, way.tags || {});
+      if (vesselMesh) {
+        vesselMesh.userData.waterRelationship = waterRelationship.kind;
+        appCtx.scene.add(vesselMesh);
+        appCtx.buildingMeshes.push(vesselMesh);
+        loadMetrics.buildingWater.vessels += 1;
+        loadMetrics.buildingPublication.renderedFeatures += 1;
+      }
+      return;
+    }
     if (!isBuildingNearLoadedRoad(pts)) {
       loadMetrics.buildingPublication.outsideRoadCoverage += 1;
       return;
@@ -235,6 +264,13 @@ export function buildBuildingGeometryPass(options = {}) {
     const footprintWidth = Math.max(0, maxFootprintX - minFootprintX);
     const footprintDepth = Math.max(0, maxFootprintZ - minFootprintZ);
     const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
+    if (waterRelationship.action === 'suppress_water_overlap') {
+      loadMetrics.buildingWater.suppressedOverlaps += 1;
+      return;
+    }
+    if (waterRelationship.action === 'render_structure') {
+      loadMetrics.buildingWater.explicitOverwaterStructures += 1;
+    }
     const centerDist = Math.hypot(centerX, centerZ);
     const lodTier = centerDist <= buildingDetailDist ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
     if (lodTier === 'far') {

@@ -4,7 +4,7 @@ import { registerWaterWaveMaterial } from "./water-materials.js?v=1";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=4";
+} from "./building-batching.js?v=5";
 import { batchLanduseMeshes } from "./landuse-batching.js?v=2";
 
 export function initWorldRenderSupport(options = {}) {

@@ -49,6 +49,8 @@
     "test:space-flight-controls": "node scripts/test-space-flight-controls.mjs",
     "test:session-lifecycle": "node scripts/test-session-lifecycle.mjs",
     "test:surface-contract": "node scripts/test-surface-contract.mjs",
+    "test:hydrology": "node scripts/test-hydrology-integration.mjs",
+    "test:hydrology-visual": "node scripts/test-hydrology-visual.mjs",
     "test:terrain-source": "node scripts/test-terrain-source-contract.mjs",
     "test:ground-provider": "node scripts/test-ground-provider-registry.mjs",
     "test:ground-artifact": "node scripts/test-ground-artifact.mjs",

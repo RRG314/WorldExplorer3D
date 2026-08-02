@@ -1,9 +1,9 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=31";
-import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=7";
-import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=16";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=32";
+import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
+import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=8";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=12";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=15";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
@@ -367,6 +367,8 @@ export function createWorldRoadLoader(deps = {}) {
           buildingMetadataCacheMeta,
           buildingMetadataQuery,
           buildingPublicationQuery,
+          waterStructureCacheMeta,
+          waterStructureQuery,
           featureRadius,
           loadDeadline,
           overpassCacheMeta,
@@ -547,6 +549,7 @@ export function createWorldRoadLoader(deps = {}) {
             limitWaysByTileBudget,
             loadMetrics,
             lodThresholds,
+            mappedWaterStructureData: data,
             maxBuildingWays,
             metadataCacheMeta: buildingMetadataCacheMeta,
             metadataDeadlineMs: Infinity,
@@ -563,6 +566,10 @@ export function createWorldRoadLoader(deps = {}) {
             startLoadPhase,
             tileBudgetCfg,
             timeoutMs: overpassTimeoutMs,
+            waterStructureCacheMeta,
+            waterStructureDeadlineMs: Infinity,
+            waterStructureQuery,
+            waterStructureTimeoutMs: 9000,
             updateWorldLod,
             useRdtBudgeting
           });

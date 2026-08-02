@@ -7,7 +7,7 @@ import {
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
-} from "./water-query.js?v=16";
+} from "./water-query.js?v=17";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";

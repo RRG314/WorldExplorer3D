@@ -165,6 +165,7 @@ function createTerrainReprojectionApi(deps = {}) {
     }
 
     appCtx.buildingMeshes.forEach((mesh) => {
+      if (mesh.userData?.isMappedVessel) return;
       const pts = mesh.userData.buildingFootprint;
       if (!pts || pts.length === 0) return;
 

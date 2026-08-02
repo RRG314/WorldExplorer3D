@@ -2,10 +2,14 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
 import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
+import {
+  mappedWaterStructurePriority,
+  mergeMappedWaterStructures
+} from './water-structure-source.js?v=3';
 
 function buildingDataPriority(way) {
   const tags = way?.tags || {};
-  let score = tags._geometrySource === 'overture' ? 2 : 0;
+  let score = mappedWaterStructurePriority(tags) + (tags._geometrySource === 'overture' ? 2 : 0);
   if (tags.height || tags['building:levels']) score += 4;
   if (tags['building:part']) score += 3;
   if (tags['roof:shape'] || tags['roof:height']) score += 1;
@@ -75,6 +79,29 @@ export async function loadBuildingDetailForPublication(options = {}) {
         options.recordLoadWarning?.('vector building detail', preferredErr);
       }
       const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
+      if (authoritativeMassing && options.waterStructureQuery) {
+        let waterStructureSummary = mergeMappedWaterStructures(
+          data,
+          options.mappedWaterStructureData,
+          { lat: options.location?.lat, lon: options.location?.lon }
+        );
+        try {
+          if (!waterStructureSummary.semanticVessels) {
+            const semanticData = await options.fetchOverpassJSON(
+              options.waterStructureQuery,
+              options.waterStructureTimeoutMs || options.timeoutMs,
+              options.waterStructureDeadlineMs || options.deadlineMs,
+              options.waterStructureCacheMeta
+            );
+            waterStructureSummary = mergeMappedWaterStructures(data, semanticData, {
+              lat: options.location?.lat,
+              lon: options.location?.lon
+            });
+          }
+        } catch (waterStructureError) {
+          options.recordLoadWarning?.('mapped water structures', waterStructureError);
+        }
+      }
       if (data && !authoritativeMassing) {
         const metadata = await fetchBuildingMetadata(options, metadataState);
         if (!isActiveLoadContext()) return;
@@ -158,6 +185,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
         endpoint: data._overpassEndpoint || null,
         metadata: data._buildingMetadata || metadataState,
         sourceDetails: data._overtureBuildings || data._shortbreadTiles || null,
+        waterStructures: data._waterStructureSemantics || null,
         inferredCoverage
       });
   } catch (err) {

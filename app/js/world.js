@@ -34,7 +34,7 @@ import {
   initWorldOsmLoader,
   invalidateOverpassCaches,
   sameLocation
-} from "./world/osm-loader.js?v=13";
+} from "./world/osm-loader.js?v=15";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -60,7 +60,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=24";
+} from "./world/load-support.js?v=25";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -103,12 +103,12 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=18";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=29";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=32";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=6";
+} from "./world/render-support.js?v=7";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -134,7 +134,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=7";
+} from "./world/vegetation.js?v=8";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -144,10 +144,10 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=21";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=22";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=12";
+} from "./world/furniture.js?v=13";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -163,7 +163,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=19";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=77";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=80";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
