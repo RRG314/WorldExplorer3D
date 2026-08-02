@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=4";
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -203,7 +204,7 @@ function setTravelMode(mode, options = {}) {
   }
 
   if (targetMode !== 'boat' && appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
-    if (typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, {
+    if (options.force !== true && typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, {
       showNotice: true,
       source: options.source || 'runtime_switch'
     })) {
@@ -316,10 +317,10 @@ function toggleDroneMode(options = {}) {
 
 function cyclePrimaryTravelMode(options = {}) {
   const currentMode = getCurrentTravelMode();
-  const nextMode = currentMode === 'drive' ? 'walk' : currentMode === 'walk' ? 'drone' : currentMode === 'drone' ? 'plane' : 'drive';
+  const nextMode = currentMode === 'boat' ? 'walk' : nextPrimaryTravelMode(currentMode);
   const resolvedMode = setTravelMode(nextMode, options);
-  if (currentMode === 'drone' && nextMode === 'plane' && resolvedMode === 'drone') {
-    return setTravelMode('drive', options);
+  if (nextMode === 'plane' && resolvedMode !== 'plane') {
+    return setTravelMode('drone', options);
   }
   return resolvedMode;
 }

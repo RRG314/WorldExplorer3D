@@ -1,4 +1,4 @@
-import { setupEngineInputHandlers } from "./input-handlers.js?v=4";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=6";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=6";
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {

@@ -1,12 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=38";
-import { updateDrone } from "./physics/drone-flight.js?v=5";
-import { updatePlane } from "./plane-mode.js?v=9";
+import { updateDrone } from "./physics/drone-flight.js?v=7";
+import { updatePlane } from "./plane-mode.js?v=13";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=2";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
+import { arcadeSteeringYawTarget, resolveCarDriveCommand } from "./controls/traversal-control-policy.js?v=4";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -113,8 +114,15 @@ function update(dt) {
   const reverseControl = Math.max(0, Number(actions.reverse) || 0);
   const brakeControl = Math.max(0, Number(actions.brake) || 0);
   const left = steerControl > 0.05, right = steerControl < -0.05;
-  const gas = throttleControl > 0.05, reverse = reverseControl > 0.05;
-  const braking = brakeControl > 0.05;
+  const driveCommand = resolveCarDriveCommand({
+    speed: appCtx.car.speed,
+    throttle: throttleControl,
+    reverse: reverseControl,
+    brake: brakeControl
+  });
+  const gas = driveCommand.forward > 0.05;
+  const reverse = driveCommand.reverse > 0.05;
+  const braking = driveCommand.handbrake;
   const boostKey = Number(actions.boost) > 0.05;
 
   // Ensure new handling state exists (safe even if car object persisted)
@@ -215,13 +223,20 @@ function update(dt) {
   const driftBrakeSpeed = 10;
   const earthDriftBrakeIntent = !isPlanetarySurface() && braking && (left || right) && spd > driftBrakeSpeed;
 
-  if (gas && !braking && canAccelerate) {
+  if (driveCommand.serviceBrake && canAccelerate) {
+    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18);
+    const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
+    appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
+    if (nextMagnitude < 0.5) appCtx.car.speed = 0;
+  }
+
+  if (gas && !braking && !driveCommand.serviceBrake && canAccelerate) {
     let throttleAccel = accel;
     if (isPlanetarySurface()) {
       const lowSpeedBoost = Math.max(0, 1 - spd / 14);
       throttleAccel *= 1 + lowSpeedBoost * 0.75;
     }
-    appCtx.car.speed += throttleAccel * throttleControl * (1 - spd / maxSpd * 0.7) * dt;
+    appCtx.car.speed += throttleAccel * driveCommand.forward * (1 - spd / maxSpd * 0.7) * dt;
   }
 
   if (braking && spd > 0.5 && canAccelerate) {
@@ -235,18 +250,13 @@ function update(dt) {
     if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
   }
 
-  if (reverse && !braking && canAccelerate) {
-    if (appCtx.car.speed > 10) {
-      appCtx.car.speed -= appCtx.CFG.brake * reverseControl * dt;
-      if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
-    } else {
-      const reverseAccelScale = isPlanetarySurface() ? 0.65 : 0.5;
-      appCtx.car.speed -= accel * reverseAccelScale * reverseControl * dt;
-    }
+  if (reverse && !braking && !driveCommand.serviceBrake && canAccelerate) {
+    const reverseAccelScale = isPlanetarySurface() ? 0.65 : 0.5;
+    appCtx.car.speed -= accel * reverseAccelScale * driveCommand.reverse * dt;
   }
 
   // Natural friction when coasting
-  if (!gas && !reverse && !braking) {
+  if (!gas && !reverse && !braking && !driveCommand.serviceBrake) {
     appCtx.car.speed *= 1 - friction * dt * 0.01;
     if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
   }
@@ -388,9 +398,13 @@ function update(dt) {
   if (!isPlanetarySurface() && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= 1.22;
   }
-  const rawYawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
   const maxYawRate = isPlanetarySurface() ? Infinity : 0.74 + 1.46 * clamp01(1 - spdAbs / 68);
-  const yawRateTarget = Math.max(-maxYawRate, Math.min(maxYawRate, rawYawRateTarget));
+  const yawRateTarget = arcadeSteeringYawTarget(
+    v,
+    steerAngle * steerAuthority,
+    wheelBase,
+    maxYawRate
+  );
 
   appCtx.car.yawRate += (yawRateTarget - appCtx.car.yawRate) * (1 - Math.exp(-dt * yawResponse));
   if (isPlanetarySurface()) {
@@ -400,13 +414,6 @@ function update(dt) {
   } else if (!isDrifting) {
     appCtx.car.yawRate *= Math.exp(-dt * yawDamp * 0.08);
   }
-  const parkingPivotIntent = !isPlanetarySurface() && steerMag >= 0.16 && spdAbs < 9.5 &&
-    (braking || reverse || throttleInput === 0 || spdAbs < 7.5);
-  if (parkingPivotIntent) {
-    const pivotBlend = clamp01(1 - spdAbs / 9.5);
-    appCtx.car.yawRate += appCtx.car.steerSm * driveDirection * 2.75 * pivotBlend * dt * 3.5;
-  }
-
   if (canAccelerate) {
     appCtx.car.angle += appCtx.car.yawRate * dt;
   } else {

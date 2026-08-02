@@ -110,6 +110,11 @@ export function createWorldLoadRuntimeSession(options = {}) {
   if (locationSelection.key === 'custom') {
     appCtx.setCustomLocation?.(locationSelection, { syncInputs: false });
   }
+  appCtx.setTravelMode?.('walk', {
+    source: 'location_load',
+    force: true,
+    emitTutorial: false
+  });
 
   const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;

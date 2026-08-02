@@ -50,12 +50,27 @@ function buttonValue(gamepad, index) {
   return clamp(button.value ?? (button.pressed ? 1 : 0), 0, 1);
 }
 
-function keyboardActions(mode) {
-  const keys = appCtx.keys || {};
-  const move = digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
-  const turn = digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
-  const lookYaw = digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
-  const lookPitch = digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
+function keyboardControlActions(keys = {}, mode = 'drive') {
+  const planeControls = mode === 'plane';
+  const droneControls = mode === 'drone';
+  const move = planeControls || droneControls
+    ? digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'))
+    : digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
+  const turn = planeControls
+    ? digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'))
+    : droneControls
+      ? digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'))
+      : digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
+  const lookYaw = planeControls
+    ? digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'))
+    : droneControls
+      ? digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'))
+      : digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
+  const lookPitch = planeControls
+    ? digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'))
+    : droneControls
+      ? digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'))
+      : digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
   const ascend = pressed(keys, 'Space', 'KeyR');
   const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
   return {
@@ -63,19 +78,26 @@ function keyboardActions(mode) {
     move,
     turn,
     steer: turn,
+    strafe: 0,
     lookYaw,
     lookPitch,
     throttle: Math.max(0, move),
     reverse: Math.max(0, -move),
-    brake: pressed(keys, 'Space') ? 1 : 0,
+    brake: pressed(keys, planeControls ? 'ControlLeft' : 'Space', planeControls ? 'ControlRight' : 'Space') ? 1 : 0,
     boost: pressed(keys, 'ControlLeft', 'ControlRight') ? 1 : 0,
     jump: pressed(keys, 'Space') ? 1 : 0,
     sprint: pressed(keys, 'ShiftLeft', 'ShiftRight') ? 1 : 0,
     vertical: digital(ascend, descend),
     pitch: mode === 'plane' ? -move : lookPitch,
     roll: turn,
-    throttleAdjust: digital(pressed(keys, 'KeyX'), pressed(keys, 'KeyZ'))
+    throttleAdjust: planeControls
+      ? digital(pressed(keys, 'Space'), pressed(keys, 'ShiftLeft', 'ShiftRight'))
+      : 0
   };
+}
+
+function keyboardActions(mode) {
+  return keyboardControlActions(appCtx.keys || {}, mode);
 }
 
 function mergeGamepad(actions, gamepad) {
@@ -106,7 +128,9 @@ function mergeGamepad(actions, gamepad) {
     actions.pitch = -leftY;
     actions.roll = leftX;
     actions.throttleAdjust = clamp(actions.throttleAdjust + rightTrigger - leftTrigger);
-  } else if (actions.mode === 'drone' || actions.mode === 'ocean') {
+  } else if (actions.mode === 'drone') {
+    actions.vertical = clamp(actions.vertical + rightShoulder - leftShoulder);
+  } else if (actions.mode === 'ocean') {
     actions.vertical = clamp(actions.vertical + rightShoulder - leftShoulder);
   } else {
     actions.throttle = Math.max(actions.throttle, rightTrigger, Math.max(0, leftY));
@@ -167,4 +191,4 @@ Object.assign(appCtx, {
   updateControlInput
 });
 
-export { clearControlInputState, getControlInputSnapshot, readControlActions, updateControlInput };
+export { clearControlInputState, getControlInputSnapshot, keyboardControlActions, readControlActions, updateControlInput };

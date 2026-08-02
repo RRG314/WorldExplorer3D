@@ -20,11 +20,11 @@ export function updateDrone(dt) {
   const forward = Number(actions.move) || 0;
   const turn = Number(actions.turn) || 0;
 
-  appCtx.drone.yaw += turn * turnSpeed;
+  appCtx.drone.yaw = wrapYaw(appCtx.drone.yaw + turn * turnSpeed);
   appCtx.drone.pitch += (Number(actions.lookPitch) || 0) * turnSpeed;
-  appCtx.drone.cameraYawOffset = Number(appCtx.drone.cameraYawOffset) || 0;
-  appCtx.drone.cameraYawOffset += (Number(actions.lookYaw) || 0) * turnSpeed;
-  appCtx.drone.cameraYawOffset = wrapYaw(appCtx.drone.cameraYawOffset);
+  appCtx.drone.cameraYawOffset = wrapYaw(
+    (Number(appCtx.drone.cameraYawOffset) || 0) + (Number(actions.lookYaw) || 0) * turnSpeed
+  );
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;

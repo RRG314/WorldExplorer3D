@@ -332,20 +332,20 @@ Graphics changes apply to the current session.
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
 <div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Drive / Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Drive / Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
 <div class="ctrl-section">Walking Mode</div>
-<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Walk Forward / Back</span></div>
-<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Turn Left / Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Walk Forward / Back</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Turn Left / Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
 <div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
@@ -353,16 +353,16 @@ Graphics changes apply to the current session.
 <div class="ctrl-section">Plane Controls</div>
 <div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">X / Z</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Wheel Brake</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
 <div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Plane</span></div>
 <div class="ctrl-section">Camera & View</div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Look Back</span></div>
 <div class="ctrl-section">Mode Switching</div>
-<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Drive / Walk / Drone / Plane</span></div>
+<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character / Car / Plane / Drone</span></div>
 <div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
 <div class="ctrl-section">Navigation & Map</div>
 <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
@@ -1477,22 +1477,22 @@ Explore the area
 <div id="controlsTab"><div id="ctrlHeader">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
-• Arrow Up/Down - Drive forward / reverse<br>
-• Arrow Left/Right - Steer left / right<br>
-• WASD - Look around; chase view recenters automatically<br>
+• W/S - Drive forward / reverse<br>
+• A/D - Steer left / right<br>
+• Arrow keys - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
 • C - Camera view<br>
-• F - Cycle drive / walk / drone<br>
+• F - Cycle character / car / plane / drone<br>
 • M - Toggle map<br>
 • N - Next city<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="boatControls" style="display:none">
 <b>🚤 Boat Mode:</b><br>
-• Arrow Up/Down - Throttle / Reverse<br>
-• Arrow Left/Right - Steer<br>
-• WASD - Look around<br>
+• W/S - Throttle / Reverse<br>
+• A/D - Steer<br>
+• Arrow keys - Look around<br>
 • Space - Brake / Hold position<br>
 • G - Enter / exit boat travel<br>
 • C - Camera view<br>
@@ -1503,35 +1503,36 @@ Explore the area
 </div>
 <div id="walkingControls" style="display:none">
 <b>🚶 Walking Mode:</b><br>
-• Arrow Up/Down - Move forward / back<br>
-• Arrow Left/Right - Turn left / right<br>
-• WASD - Look around<br>
+• W/S - Move forward / back<br>
+• A/D - Turn left / right<br>
+• Arrow keys - Look around<br>
 • E - Enter/exit building interior<br>
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
 • Shift - Run (2x speed)<br>
 • Right Click + Drag - Mouse look<br>
 • C - Camera view<br>
-• F - Cycle walk / drone / drive<br>
+• F - Cycle character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="droneControls" style="display:none">
 <b>🚁 Drone Mode:</b><br>
-• Arrow Up/Down - Fly forward / back<br>
-• Arrow Left/Right - Turn left / right<br>
-• WASD - Look around<br>
-• Mouse - Look around<br>
+• Arrow Up/Down - Fly forward / back relative to the drone<br>
+• Arrow Left/Right - Turn the drone<br>
+• WASD - Look around independently<br>
+• Mouse - Look around independently<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
-• F - Cycle drone / plane / drive / walk<br>
+• F - Cycle character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="planeControls" style="display:none">
 <b>✈️ Plane Mode:</b><br>
 • Arrow Up/Down - Nose down / pull up (inverted)<br>
 • Arrow Left/Right - Bank or ground steer<br>
-• X/Z - Increase / reduce throttle<br>
-• Space - Wheel brake on the ground<br>
+• Space/Shift - Increase / reduce throttle<br>
+• Hold pitch or bank controls for loops and barrel rolls<br>
+• Ctrl - Wheel brake on the ground<br>
 • WASD - Look around<br>
 • C - Chase / cockpit / overhead camera<br>
 • P - Enter / exit plane mode<br>
@@ -1578,5 +1579,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=379"></script>
+<script type="module" src="js/bootstrap.js?v=383"></script>
 </body></html>

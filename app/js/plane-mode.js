@@ -1,4 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
+import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=4';
 
 const state = {
   active: false,
@@ -8,6 +9,8 @@ const state = {
   yaw: 0,
   pitch: 0,
   roll: 0,
+  pitchRate: 0,
+  rollRate: 0,
   speed: 0,
   vx: 0,
   vy: 0,
@@ -37,6 +40,7 @@ const surfaceSample = {
   building: null,
   age: Infinity
 };
+let planeCameraUp = null;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -308,9 +312,12 @@ function startPlaneMode(options = {}) {
   state.launchKind = safeLaunch.required ? 'urban_airborne' : 'ground';
   state.launchClearanceY = safeLaunch.required ? safeLaunch.y : null;
   state.climbRate = 0;
+  state.pitchRate = 0;
+  state.rollRate = 0;
   state.vx = 0;
   state.vy = 0;
   state.vz = 0;
+  appCtx.camera?.up?.set?.(0, 1, 0);
   state.cameraYaw = 0;
   state.cameraPitch = 0;
   state.cameraLookTimer = 0;
@@ -330,9 +337,12 @@ function stopPlaneMode(options = {}) {
   state.speed = 0;
   state.throttle = 0;
   state.climbRate = 0;
+  state.pitchRate = 0;
+  state.rollRate = 0;
   state.vx = 0;
   state.vy = 0;
   state.vz = 0;
+  appCtx.camera?.up?.set?.(0, 1, 0);
 
   if (targetMode === 'drone') return exitState;
 
@@ -420,6 +430,8 @@ function updatePlane(dt) {
   if (!state.airborne) {
     state.pitch = damp(state.pitch, clamp(pitchInput * 0.16, -0.12, 0.18), 3.5, dt);
     state.roll = damp(state.roll, 0, 6, dt);
+    state.pitchRate = 0;
+    state.rollRate = 0;
     const steerScale = clamp(state.speed / 12, 0.3, 1);
     state.yaw += rollInput * dt * 1.02 * steerScale;
     state.y = damp(state.y, groundY + 0.72, 12, dt);
@@ -430,10 +442,17 @@ function updatePlane(dt) {
   } else {
     const controlAuthority = clamp(state.speed / 20, 0.3, 1.25);
     const stallBlend = clamp((13 - state.speed) / 5, 0, 1);
-    const pitchTarget = pitchInput * 0.52 - stallBlend * 0.18;
-    state.pitch = damp(state.pitch, pitchTarget, 2.35 * controlAuthority, dt);
-    state.roll = damp(state.roll, rollInput * 0.88, 2.8 * controlAuthority, dt);
-    state.yaw += Math.sin(state.roll) * dt * (0.55 + controlAuthority * 0.58);
+    const attitude = integrateAerobaticAttitude(state, {
+      pitch: pitchInput,
+      roll: rollInput,
+      authority: controlAuthority,
+      stallBlend
+    }, dt);
+    state.pitch = attitude.pitch;
+    state.roll = attitude.roll;
+    state.pitchRate = attitude.pitchRate;
+    state.rollRate = attitude.rollRate;
+    state.yaw += aircraftBankTurnFactor(state.roll, state.rollRate) * dt * (0.55 + controlAuthority * 0.58);
     const liftBalance = clamp((state.speed - 15) * 0.09, -2.4, 2.8);
     const stallSink = stallBlend * (2.2 + (13 - state.speed) * 0.32);
     const desiredClimb = Math.sin(state.pitch) * state.speed + liftBalance - 0.8 - stallSink;
@@ -446,12 +465,14 @@ function updatePlane(dt) {
       if (Math.abs(state.pitch) > 0.24 || Math.abs(state.roll) > 0.42) state.speed *= 0.42;
       state.pitch = 0;
       state.roll = 0;
+      state.pitchRate = 0;
+      state.rollRate = 0;
     }
   }
 
-  const horizontalSpeed = state.speed * Math.cos(state.pitch);
-  state.x += Math.sin(state.yaw) * horizontalSpeed * dt;
-  state.z += Math.cos(state.yaw) * horizontalSpeed * dt;
+  const flightForward = aircraftForwardVector(state.yaw, state.pitch);
+  state.x += flightForward.x * state.speed * dt;
+  state.z += flightForward.z * state.speed * dt;
   const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(state.x, state.z, { margin: 30 });
   if (bounded?.limited) {
     state.x = bounded.x;
@@ -473,6 +494,8 @@ function updatePlane(dt) {
     state.climbRate = Math.max(0, state.climbRate * 0.2);
     state.pitch = damp(state.pitch, 0, 8, dt);
     state.roll = damp(state.roll, 0, 8, dt);
+    state.pitchRate = 0;
+    state.rollRate = 0;
   }
   const localGround = groundY;
   state.y = clamp(state.y, localGround + 0.72, localGround + 1400);
@@ -511,27 +534,34 @@ function applyPlaneCamera(dt) {
     ? appCtx.presentationPose.plane
     : state;
   const viewYaw = flightPose.yaw + state.cameraYaw;
-  const forwardX = Math.sin(flightPose.yaw) * Math.cos(flightPose.pitch);
-  const forwardZ = Math.cos(flightPose.yaw) * Math.cos(flightPose.pitch);
-  const lookY = flightPose.y + 0.45 + Math.sin(flightPose.pitch) * 10 + Math.sin(state.cameraPitch) * 5;
+  if (appCtx.camMode === 1 && state.mesh && typeof THREE !== 'undefined') {
+    if (!planeCameraUp) planeCameraUp = new THREE.Vector3();
+    planeCameraUp.set(0, 1, 0).applyQuaternion(state.mesh.quaternion);
+    appCtx.camera.up.copy(planeCameraUp);
+  } else {
+    appCtx.camera.up.set(0, 1, 0);
+  }
+  const forward = aircraftForwardVector(flightPose.yaw, flightPose.pitch);
+  const lookY = flightPose.y + 0.45 + forward.y * 10 + Math.sin(state.cameraPitch) * 5;
   state.mesh.visible = appCtx.camMode !== 1;
 
   if (appCtx.camMode === 1) {
-    appCtx.camera.position.set(flightPose.x + forwardX * 0.65, flightPose.y + 0.62, flightPose.z + forwardZ * 0.65);
-    appCtx.camera.lookAt(flightPose.x + forwardX * 18, lookY, flightPose.z + forwardZ * 18);
+    appCtx.camera.position.set(flightPose.x + forward.x * 0.65, flightPose.y + 0.62, flightPose.z + forward.z * 0.65);
+    appCtx.camera.lookAt(flightPose.x + forward.x * 18, lookY, flightPose.z + forward.z * 18);
   } else if (appCtx.camMode === 2) {
     appCtx.camera.position.set(flightPose.x, flightPose.y + 24, flightPose.z - 2);
-    appCtx.camera.lookAt(flightPose.x + forwardX * 5, flightPose.y, flightPose.z + forwardZ * 5);
+    appCtx.camera.lookAt(flightPose.x + forward.x * 5, flightPose.y, flightPose.z + forward.z * 5);
   } else {
     const distance = 12 + clamp(state.speed / 18, 0, 4);
-    const targetX = flightPose.x - Math.sin(viewYaw) * distance;
-    const targetY = flightPose.y + 4.2 + Math.sin(state.cameraPitch) * 6;
-    const targetZ = flightPose.z - Math.cos(viewYaw) * distance;
+    const chaseOffset = aircraftChaseOffset(viewYaw, flightPose.pitch, distance, 4.2 + Math.sin(state.cameraPitch) * 6);
+    const targetX = flightPose.x + chaseOffset.x;
+    const targetY = flightPose.y + chaseOffset.y;
+    const targetZ = flightPose.z + chaseOffset.z;
     const blend = 1 - Math.exp(-6.5 * dt);
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * blend;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * blend;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * blend;
-    appCtx.camera.lookAt(flightPose.x + forwardX * 3, flightPose.y + 0.4, flightPose.z + forwardZ * 3);
+    appCtx.camera.lookAt(flightPose.x + forward.x * 3, flightPose.y + 0.4, flightPose.z + forward.z * 3);
   }
   return true;
 }
@@ -545,6 +575,8 @@ function getPlaneSnapshot() {
     yaw: state.yaw,
     pitch: state.pitch,
     roll: state.roll,
+    pitchRate: state.pitchRate,
+    rollRate: state.rollRate,
     speed: state.speed,
     vx: state.vx,
     vy: state.vy,

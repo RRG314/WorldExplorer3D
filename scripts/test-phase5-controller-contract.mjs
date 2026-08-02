@@ -2,26 +2,116 @@ import assert from 'node:assert/strict';
 import { ctx } from '../app/js/shared-context.js?v=55';
 import {
   clearControlInputState,
+  keyboardControlActions,
   readControlActions
 } from '../app/js/controls/action-input.js';
+import {
+  arcadeSteeringYawTarget,
+  aircraftBankTurnFactor,
+  aircraftChaseOffset,
+  aircraftForwardVector,
+  integrateAerobaticAttitude,
+  nextPrimaryTravelMode,
+  resolveCarDriveCommand
+} from '../app/js/controls/traversal-control-policy.js';
 import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
 import { shouldSuppressBoatTerrain } from '../app/js/boat-mode/surface-effects.js';
+import fs from 'node:fs';
 
 ctx.keys = {};
-ctx.keys.ArrowUp = true;
-ctx.keys.ArrowRight = true;
+ctx.keys.KeyW = true;
+ctx.keys.KeyD = true;
 let actions = readControlActions('drive');
 assert.equal(actions.throttle, 1);
 assert.equal(actions.reverse, 0);
 assert.equal(actions.steer, -1);
 
-ctx.keys.ArrowUp = false;
-ctx.keys.ArrowDown = true;
+ctx.keys.KeyW = false;
+ctx.keys.KeyS = true;
 actions = readControlActions('drive');
 assert.equal(actions.throttle, 0);
 assert.equal(actions.reverse, 1);
 assert.equal(actions.steer, -1);
+
+actions = keyboardControlActions({ ArrowLeft: true, ArrowUp: true }, 'drive');
+assert.equal(actions.move, 0);
+assert.equal(actions.turn, 0);
+assert.equal(actions.lookYaw, 1);
+assert.equal(actions.lookPitch, 1);
+
+actions = keyboardControlActions({ KeyA: true, ArrowLeft: true }, 'drone');
+assert.equal(actions.turn, 1);
+assert.equal(actions.strafe, 0);
+assert.equal(actions.lookYaw, 1);
+actions = keyboardControlActions({ KeyD: true, KeyW: true, ArrowRight: true, ArrowUp: true }, 'drone');
+assert.equal(actions.move, 1);
+assert.equal(actions.turn, -1);
+assert.equal(actions.lookYaw, -1);
+assert.equal(actions.lookPitch, 1);
+
+actions = keyboardControlActions({ ArrowDown: true, ArrowRight: true, Space: true }, 'plane');
+assert.equal(actions.pitch, 1);
+assert.equal(actions.roll, -1);
+assert.equal(actions.throttleAdjust, 1);
+assert.equal(actions.brake, 0);
+actions = keyboardControlActions({ ShiftLeft: true, ControlLeft: true }, 'plane');
+assert.equal(actions.throttleAdjust, -1);
+assert.equal(actions.brake, 1);
+
+assert.equal(nextPrimaryTravelMode('walk'), 'drive');
+assert.equal(nextPrimaryTravelMode('drive'), 'plane');
+assert.equal(nextPrimaryTravelMode('plane'), 'drone');
+assert.equal(nextPrimaryTravelMode('drone'), 'walk');
+
+let command = resolveCarDriveCommand({ speed: 12, reverse: 1 });
+assert.equal(command.serviceBrake, true);
+assert.equal(command.reverse, 0);
+command = resolveCarDriveCommand({ speed: 0, reverse: 1 });
+assert.equal(command.serviceBrake, false);
+assert.equal(command.reverse, 1);
+command = resolveCarDriveCommand({ speed: -8, throttle: 1 });
+assert.equal(command.serviceBrake, true);
+assert.equal(command.forward, 0);
+
+const forwardYawTarget = arcadeSteeringYawTarget(12, 0.25, 2.6, 2);
+const reverseYawTarget = arcadeSteeringYawTarget(-12, 0.25, 2.6, 2);
+assert.ok(forwardYawTarget > 0);
+assert.equal(reverseYawTarget, forwardYawTarget);
+
+const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
+let rollAttitude = { pitch: 0, roll: 0, pitchRate: 0, rollRate: 0 };
+let accumulatedRoll = 0;
+for (let index = 0; index < 360; index += 1) {
+  const next = integrateAerobaticAttitude(rollAttitude, { roll: 1, authority: 1.1 }, 1 / 60);
+  accumulatedRoll += angleDelta(rollAttitude.roll, next.roll);
+  rollAttitude = next;
+}
+assert.ok(accumulatedRoll > Math.PI * 2, `barrel roll authority only reached ${accumulatedRoll}`);
+assert.equal(aircraftBankTurnFactor(Math.PI / 2, 1.2), 0);
+assert.ok(aircraftBankTurnFactor(Math.PI / 4, 0) > 0.7);
+
+let loopAttitude = { pitch: 0, roll: 0, pitchRate: 0, rollRate: 0 };
+let accumulatedPitch = 0;
+for (let index = 0; index < 420; index += 1) {
+  const next = integrateAerobaticAttitude(loopAttitude, { pitch: 1, authority: 1.1 }, 1 / 60);
+  accumulatedPitch += angleDelta(loopAttitude.pitch, next.pitch);
+  loopAttitude = next;
+}
+assert.ok(accumulatedPitch > Math.PI * 2, `loop authority only reached ${accumulatedPitch}`);
+
+const uprightForward = aircraftForwardVector(0.7, 0.2, 0);
+const rolledForward = aircraftForwardVector(0.7, 0.2, Math.PI);
+assert.deepEqual(rolledForward, uprightForward);
+const loopTopForward = aircraftForwardVector(0, Math.PI);
+assert.ok(loopTopForward.z < -0.999, `loop-top forward vector reversed incorrectly: ${JSON.stringify(loopTopForward)}`);
+const uprightChase = aircraftChaseOffset(0, 0, 12, 4.2);
+const loopTopChase = aircraftChaseOffset(0, Math.PI, 12, 4.2);
+assert.deepEqual(loopTopChase, uprightChase, 'third-person loop camera must remain heading-locked');
+
+const planeSource = fs.readFileSync(new URL('../app/js/plane-mode.js', import.meta.url), 'utf8');
+assert.match(planeSource, /appCtx\.camMode === 1 && state\.mesh/);
+assert.match(planeSource, /else \{\s*appCtx\.camera\.up\.set\(0, 1, 0\)/);
 
 clearControlInputState('controller-contract');
 actions = readControlActions('drive');
@@ -92,6 +182,16 @@ console.log(JSON.stringify({
   contract: 'phase5-controller-input',
   staleKeyboardStateCleared: true,
   forwardReverseChannelsIndependent: true,
+  wasdMovementArrowCameraSeparated: true,
+  primaryModeOrderCharacterCarPlaneDrone: true,
+  directionChangesBrakeBeforeGearChange: true,
+  reverseSteeringKeepsInputSign: true,
+  droneUsesV31TurnAndIndependentCameraControls: true,
+  aerobaticRollAndLoopAuthority: true,
+  activeBarrelRollsDoNotChangeHeading: true,
+  aerobaticForwardVectorRemainsBodyRelative: true,
+  aerobaticChaseCameraRemainsLoopStable: true,
+  chaseAndOverheadPlaneCamerasRemainHorizonStable: true,
   boatLocksOffshoreModeSwitches: true,
   openOceanFallbackTerrainSuppressed: true,
   explicitNearShoreExitStillWorks: true,

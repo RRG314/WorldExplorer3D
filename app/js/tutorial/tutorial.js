@@ -283,7 +283,7 @@ function presentCurrentStage() {
   if (stage === STAGES.MOVE_HINT) {
     showPrompt(stage, {
       title: 'Try Moving Around',
-      body: 'Walk controls:\nArrow keys move, A/D turn, W/S look, Space jump, Shift run.',
+      body: 'Walk controls:\nW/S move, A/D turn, arrow keys look, Space jumps, and Shift runs.',
       autoHideMs: 9600
     });
     return;

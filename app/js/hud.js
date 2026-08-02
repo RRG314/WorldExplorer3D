@@ -386,11 +386,12 @@ function updateCamera(dt = 1 / 60) {
   const presentationCar = appCtx.presentationPose?.car || appCtx.car;
   appCtx.camera.userData.carLook = carLook;
   const cameraLookSpeed = 1.8 * clampValue(dt, 1 / 240, 0.05);
-  const manualCameraInput = appCtx.keys.KeyW || appCtx.keys.KeyA || appCtx.keys.KeyS || appCtx.keys.KeyD;
-  if (appCtx.keys.KeyA) carLook.yaw += cameraLookSpeed;
-  if (appCtx.keys.KeyD) carLook.yaw -= cameraLookSpeed;
-  if (appCtx.keys.KeyW) carLook.pitch += cameraLookSpeed;
-  if (appCtx.keys.KeyS) carLook.pitch -= cameraLookSpeed;
+  const cameraActions = appCtx.readControlActions?.('drive') || {};
+  const lookYaw = Number(cameraActions.lookYaw) || 0;
+  const lookPitch = Number(cameraActions.lookPitch) || 0;
+  const manualCameraInput = Math.abs(lookYaw) > 0.05 || Math.abs(lookPitch) > 0.05;
+  carLook.yaw += lookYaw * cameraLookSpeed;
+  carLook.pitch += lookPitch * cameraLookSpeed;
   if (manualCameraInput) carLook.lastInputAt = performance.now();
   const cameraIdleMs = performance.now() - (Number(carLook.lastInputAt) || 0);
   if (!manualCameraInput && cameraIdleMs > 900 && appCtx.camMode === 0) {
@@ -531,7 +532,7 @@ function updateHUD() {
     const bf = document.getElementById('boostFill');
     bf.style.width = `${Math.round(clampValue(plane.throttle, 0, 1) * 100)}%`;
     bf.classList.toggle('active', plane.throttle > 0.82);
-    document.getElementById('indBrake').classList.toggle('on', !!appCtx.keys.Space && !plane.airborne);
+    document.getElementById('indBrake').classList.toggle('on', Number(appCtx.readControlActions?.('plane')?.brake) > 0.05 && !plane.airborne);
     document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
     document.getElementById('indBoost').textContent = 'PWR';
     document.getElementById('indDrift').classList.toggle('on', plane.airborne);
