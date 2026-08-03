@@ -2,16 +2,20 @@ import assert from 'node:assert/strict';
 import { ctx } from '../app/js/shared-context.js?v=55';
 import {
   clearControlInputState,
+  consumePlaneBarrelRollTrigger,
   keyboardControlActions,
+  registerPlaneTurnTap,
   readControlActions
 } from '../app/js/controls/action-input.js';
 import {
+  MAX_STEERING_ANGLE_RAD,
   arcadeSteeringYawTarget,
   aircraftBankTurnFactor,
   aircraftChaseOffset,
   aircraftForwardVector,
   integrateAerobaticAttitude,
   nextPrimaryTravelMode,
+  projectSteeringArc,
   resolveCarDriveCommand
 } from '../app/js/controls/traversal-control-policy.js';
 import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
@@ -84,7 +88,23 @@ assert.equal(command.forward, 0);
 const forwardYawTarget = arcadeSteeringYawTarget(12, 0.25, 2.6, 2);
 const reverseYawTarget = arcadeSteeringYawTarget(-12, 0.25, 2.6, 2);
 assert.ok(forwardYawTarget > 0);
-assert.equal(reverseYawTarget, forwardYawTarget);
+assert.equal(reverseYawTarget, -forwardYawTarget);
+const forwardLeftArc = projectSteeringArc(12, 0.25, 0.25, 2.6);
+const reverseLeftArc = projectSteeringArc(-12, 0.25, 0.25, 2.6);
+assert.ok(forwardLeftArc.x > 0, `forward-left arc moved to the wrong side: ${JSON.stringify(forwardLeftArc)}`);
+assert.ok(reverseLeftArc.x > 0, `reverse-left rear trajectory moved to the wrong side: ${JSON.stringify(reverseLeftArc)}`);
+assert.ok(forwardLeftArc.angle > 0 && reverseLeftArc.angle < 0, 'reverse chassis yaw did not invert');
+assert.ok(MAX_STEERING_ANGLE_RAD < Math.PI / 2);
+assert.ok(arcadeSteeringYawTarget(-3, 1.8, 2.6, 3) < 0, 'extreme reverse steering crossed the tangent singularity');
+assert.ok(arcadeSteeringYawTarget(-3, -1.8, 2.6, 3) > 0, 'extreme reverse-right steering crossed the tangent singularity');
+
+clearControlInputState('double-tap-contract');
+assert.equal(registerPlaneTurnTap('ArrowRight', 1000), 0);
+assert.equal(registerPlaneTurnTap('ArrowRight', 1220), -1);
+assert.equal(consumePlaneBarrelRollTrigger(), -1);
+assert.equal(consumePlaneBarrelRollTrigger(), 0);
+assert.equal(registerPlaneTurnTap('ArrowLeft', 2000), 0);
+assert.equal(registerPlaneTurnTap('ArrowLeft', 2500), 0, 'slow plane turn taps must remain normal turns');
 
 const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 let rollAttitude = { pitch: 0, roll: 0, pitchRate: 0, rollRate: 0 };
@@ -202,10 +222,12 @@ console.log(JSON.stringify({
   wasdMovementArrowCameraSeparated: true,
   primaryModeOrderCharacterCarPlaneDrone: true,
   directionChangesBrakeBeforeGearChange: true,
-  reverseSteeringKeepsInputSign: true,
+  reverseSteeringKeepsPathDirection: true,
+  steeringAngleCannotCrossTangentSingularity: true,
   droneUsesV31TurnAndIndependentCameraControls: true,
   aerobaticRollAndLoopAuthority: true,
   normalPlaneTurnUsesBoundedCoordinatedBank: true,
+  planeDoubleTapTriggersBarrelRoll: true,
   fasterPlaneFlightEnvelope: true,
   activeBarrelRollsDoNotChangeHeading: true,
   aerobaticForwardVectorRemainsBodyRelative: true,

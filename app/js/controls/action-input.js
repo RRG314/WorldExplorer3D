@@ -4,8 +4,11 @@ const DEAD_ZONE = 0.16;
 const inputState = {
   gamepad: null,
   previousButtons: [],
-  updatedAt: 0
+  updatedAt: 0,
+  lastPlaneTurnTapAt: { ArrowLeft: -Infinity, ArrowRight: -Infinity },
+  pendingPlaneBarrelRoll: 0
 };
+const PLANE_DOUBLE_TAP_WINDOW_MS = 340;
 const HELD_CONTROL_CODES = Object.freeze([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
@@ -102,6 +105,26 @@ function keyboardActions(mode) {
   return keyboardControlActions(appCtx.keys || {}, mode);
 }
 
+function registerPlaneTurnTap(code, now = typeof performance !== 'undefined' ? performance.now() : Date.now()) {
+  if (code !== 'ArrowLeft' && code !== 'ArrowRight') return 0;
+  const timestamp = Number(now);
+  if (!Number.isFinite(timestamp)) return 0;
+  const previous = Number(inputState.lastPlaneTurnTapAt[code]);
+  inputState.lastPlaneTurnTapAt[code] = timestamp;
+  const elapsed = timestamp - previous;
+  if (!(elapsed >= 35 && elapsed <= PLANE_DOUBLE_TAP_WINDOW_MS)) return 0;
+  const direction = code === 'ArrowLeft' ? 1 : -1;
+  inputState.pendingPlaneBarrelRoll = direction;
+  inputState.lastPlaneTurnTapAt[code] = -Infinity;
+  return direction;
+}
+
+function consumePlaneBarrelRollTrigger() {
+  const direction = Number(inputState.pendingPlaneBarrelRoll) || 0;
+  inputState.pendingPlaneBarrelRoll = 0;
+  return direction;
+}
+
 function mergeGamepad(actions, gamepad) {
   if (!gamepad) return actions;
   const leftX = -axis(gamepad.axes?.[0]);
@@ -174,6 +197,9 @@ function clearControlInputState(reason = 'runtime') {
   });
   inputState.gamepad = null;
   inputState.previousButtons = [];
+  inputState.lastPlaneTurnTapAt.ArrowLeft = -Infinity;
+  inputState.lastPlaneTurnTapAt.ArrowRight = -Infinity;
+  inputState.pendingPlaneBarrelRoll = 0;
   inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return String(reason || 'runtime');
 }
@@ -190,8 +216,19 @@ function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'driv
 Object.assign(appCtx, {
   getControlInputSnapshot,
   clearControlInputState,
+  consumePlaneBarrelRollTrigger,
   readControlActions,
+  registerPlaneTurnTap,
   updateControlInput
 });
 
-export { clearControlInputState, getControlInputSnapshot, keyboardControlActions, readControlActions, updateControlInput };
+export {
+  PLANE_DOUBLE_TAP_WINDOW_MS,
+  clearControlInputState,
+  consumePlaneBarrelRollTrigger,
+  getControlInputSnapshot,
+  keyboardControlActions,
+  readControlActions,
+  registerPlaneTurnTap,
+  updateControlInput
+};

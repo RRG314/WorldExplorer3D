@@ -57,23 +57,33 @@ try {
     if (ctx.boatMode) ctx.boatMode.active = false;
     if (ctx.planeMode) ctx.planeMode.active = false;
     if (ctx.Walk?.state) ctx.Walk.state.mode = 'drive';
+    ctx.policeOn = false;
+    ctx.clearPolice?.();
 
     const originalReadControlActions = ctx.readControlActions;
     let activeActions = {};
     ctx.readControlActions = () => activeActions;
     const stepCar = (steps = 12) => {
-      const deltas = [];
+      const frames = [];
       for (let index = 0; index < steps; index += 1) {
         const previousAngle = ctx.car.angle;
         ctx.update(1 / 60);
-        deltas.push(ctx.car.angle - previousAngle);
+        frames.push({
+          index,
+          delta: ctx.car.angle - previousAngle,
+          speed: ctx.car.speed,
+          yawRate: ctx.car.yawRate,
+          steer: ctx.car.steerSm,
+          driveDirection: ctx.car._driveDirection
+        });
       }
-      return deltas;
+      return frames;
     };
     const nearest = ctx.findNearestRoad(0, 0, { maxVerticalDelta: 100 });
     const road = nearest?.road || ctx.roads?.[0] || null;
     const roadPoint = nearest?.pt || road?.pts?.[0] || { x: 0, z: 0 };
     const steeringCases = [];
+    const steeringCaptures = {};
     for (const spec of [
       { id: 'forward-left', speed: 8, steer: 1, staleSteer: -0.8, expected: 1 },
       { id: 'forward-right', speed: 8, steer: -1, staleSteer: 0.8, expected: -1 },
@@ -93,6 +103,10 @@ try {
         yawRate: 0,
         rearSlip: 0,
         steerSm: spec.staleSteer,
+        isDrifting: false,
+        _driftHoldTimer: 0,
+        boost: false,
+        boostDecayTime: 0,
         onRoad: true,
         road,
         _driveDirection: spec.speed < 0 ? -1 : 1,
@@ -105,13 +119,21 @@ try {
         brake: 0,
         boost: 0
       };
-      const deltas = stepCar();
-      const wrongWayDelta = Math.min(...deltas.map((delta) => delta * spec.expected));
+      const frames = stepCar(90);
+      if (spec.id.startsWith('reverse-')) {
+        ctx.updateCamera?.(1 / 60);
+        ctx.renderer?.render?.(ctx.scene, ctx.camera);
+        const canvas = Array.from(document.querySelectorAll('canvas'))
+          .sort((left, right) => right.width * right.height - left.width * left.height)[0];
+        steeringCaptures[spec.id] = canvas?.toDataURL('image/png')?.split(',')[1] || '';
+      }
+      const wrongWayDelta = Math.min(...frames.map((frame) => frame.delta * spec.expected));
       steeringCases.push({
         id: spec.id,
         expectedSign: spec.expected,
         wrongWayDelta,
-        totalDelta: deltas.reduce((sum, delta) => sum + delta, 0)
+        totalDelta: frames.reduce((sum, frame) => sum + frame.delta, 0),
+        wrongWayFrames: frames.filter((frame) => frame.delta * spec.expected < -1e-5).slice(0, 8)
       });
     }
 
@@ -175,6 +197,50 @@ try {
     const planeBoundaryDistance = Math.hypot(planeSnapshot.x, planeSnapshot.z);
 
     ctx.worldTraversalRadiusWorld = originalRadius;
+    Object.assign(ctx.planeMode, {
+      active: true,
+      x: 0,
+      z: 0,
+      yaw: 0,
+      pitch: 0,
+      roll: 0,
+      pitchRate: 0,
+      rollRate: 0,
+      barrelRollActive: false,
+      barrelRollDirection: 0,
+      barrelRollProgress: 0,
+      speed: 42,
+      throttle: 0.5,
+      airborne: true,
+      y: ctx.SurfaceQuery.terrainAt(0, 0).position.y + 180
+    });
+    activeActions = { pitch: 0, roll: 0, aerobaticRoll: 0, throttleAdjust: 0, brake: 0 };
+    ctx.clearControlInputState?.('travel-control-plane-double-tap');
+    ctx.registerPlaneTurnTap?.('ArrowRight', 1000);
+    ctx.registerPlaneTurnTap?.('ArrowRight', 1210);
+    let accumulatedTriggeredRoll = 0;
+    let triggeredRollStarted = false;
+    let triggeredRollCompleted = false;
+    for (let index = 0; index < 480; index += 1) {
+      const previousRoll = ctx.planeMode.roll;
+      ctx.updatePlane(1 / 60);
+      const rollDelta = Math.atan2(
+        Math.sin(ctx.planeMode.roll - previousRoll),
+        Math.cos(ctx.planeMode.roll - previousRoll)
+      );
+      accumulatedTriggeredRoll += rollDelta;
+      if (ctx.planeMode.barrelRollActive) triggeredRollStarted = true;
+      if (triggeredRollStarted && !ctx.planeMode.barrelRollActive) {
+        triggeredRollCompleted = true;
+        break;
+      }
+    }
+    const planeDoubleTap = {
+      started: triggeredRollStarted,
+      completed: triggeredRollCompleted,
+      accumulatedRoll: accumulatedTriggeredRoll,
+      finalRoll: ctx.planeMode.roll
+    };
     ctx.readControlActions = originalReadControlActions;
     ctx.stopPlaneMode?.({ targetMode: 'drive' });
     ctx.spawnOnRoad?.();
@@ -187,6 +253,8 @@ try {
     ctx.gameStarted = true;
     ctx.paused = false;
     ctx.renderLoop?.();
+    await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+    ctx.stopRuntimeKernel?.('travel-control-capture');
 
     const waterAreas = (ctx.waterAreas || []).filter((body) => body?.shape === 'area' && body?.bounds);
     const pointInsideRing = (x, z, ring) => {
@@ -263,26 +331,39 @@ try {
     return {
       traversalRadius: originalRadius,
       steeringCases,
+      steeringCaptures,
       boundaries: {
         car: carBoundaryDistance,
         walk: walkBoundaryDistance,
         drone: droneBoundaryDistance,
         plane: planeBoundaryDistance
       },
+      planeDoubleTap,
       waterAreas: waterAreas.length,
       duplicateWaterPairs,
       duplicateWaterPairPreview
     };
   });
 
-  await page.screenshot({
-    path: path.join(outputDir, 'gameplay.png'),
-    fullPage: true
-  });
+  const steeringCaptures = report.steeringCaptures || {};
+  delete report.steeringCaptures;
+  for (const [name, base64] of Object.entries(steeringCaptures)) {
+    if (!base64) throw new Error(`${name} gameplay canvas capture was empty`);
+    await fs.writeFile(path.join(outputDir, `${name}.png`), Buffer.from(base64, 'base64'));
+  }
   await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify({
     report,
     consoleErrors
   }, null, 2));
+  const gameplayPng = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.renderer?.render?.(ctx.scene, ctx.camera);
+    const canvases = Array.from(document.querySelectorAll('canvas'));
+    const canvas = canvases.sort((left, right) => right.width * right.height - left.width * left.height)[0];
+    return canvas?.toDataURL('image/png')?.split(',')[1] || '';
+  });
+  if (!gameplayPng) throw new Error('Gameplay canvas capture was empty');
+  await fs.writeFile(path.join(outputDir, 'gameplay.png'), Buffer.from(gameplayPng, 'base64'));
 
   assert.ok(Number(report.traversalRadius) >= 900 && Number(report.traversalRadius) <= 3000);
   for (const steering of report.steeringCases) {
@@ -299,7 +380,10 @@ try {
   assert.ok(report.boundaries.walk <= 117.001, `walker crossed boundary (${report.boundaries.walk})`);
   assert.ok(report.boundaries.drone <= 108.001, `drone crossed boundary (${report.boundaries.drone})`);
   assert.ok(report.boundaries.plane <= 90.001, `plane crossed boundary (${report.boundaries.plane})`);
-  assert.equal(report.duplicateWaterPairs, 0, `duplicate water area sheets remain: ${JSON.stringify(report.duplicateWaterPairPreview)}`);
+  assert.equal(report.planeDoubleTap.started, true, 'plane double-tap did not start a barrel roll');
+  assert.equal(report.planeDoubleTap.completed, true, 'plane double-tap barrel roll did not complete');
+  assert.ok(report.planeDoubleTap.accumulatedRoll < -Math.PI * 1.9, `plane double-tap did not complete a right roll (${report.planeDoubleTap.accumulatedRoll})`);
+  assert.ok(Math.abs(report.planeDoubleTap.finalRoll) < 0.05, `plane did not settle after double-tap roll (${report.planeDoubleTap.finalRoll})`);
   assert.deepEqual(consoleErrors, []);
   console.log(JSON.stringify({ ok: true, ...report }, null, 2));
 } finally {

@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=38";
 import { updateDrone } from "./physics/drone-flight.js?v=7";
-import { updatePlane } from "./plane-mode.js?v=15";
+import { updatePlane } from "./plane-mode.js?v=16";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=2";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
-import { arcadeSteeringYawTarget, resolveCarDriveCommand } from "./controls/traversal-control-policy.js?v=5";
+import { arcadeSteeringYawTarget, resolveCarDriveCommand } from "./controls/traversal-control-policy.js?v=6";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -323,7 +323,8 @@ function update(dt) {
   const lowSpeedTurnBoost = Math.max(parkingTurnBlend, reverseTurnBlend);
   const handbrakeTurnIntent = !isPlanetarySurface() && braking && steerMag >= 0.1 && spdAbs >= 16;
   const handbrakeSteerBoost = handbrakeTurnIntent ? 1 + (0.20 + 0.35 * speedNorm) : 1;
-  // Reverse steering keeps the same direction (arcade style).
+  // The signed-speed yaw target below reverses chassis rotation in reverse so
+  // the rear trajectory continues toward the requested A/D side.
   const steerAngle = appCtx.car.steerSm * Math.min(
     1.08,
     maxSteer * handbrakeSteerBoost * (1 + lowSpeedTurnBoost * 0.42)

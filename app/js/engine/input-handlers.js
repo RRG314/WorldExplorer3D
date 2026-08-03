@@ -31,6 +31,9 @@ export function setupEngineInputHandlers(appCtx) {
     if (appCtx.gameStarted && gameplayKeys.has(e.code)) {
       e.preventDefault();
     }
+    if (!e.repeat && appCtx.planeMode?.active && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+      appCtx.registerPlaneTurnTap?.(e.code, e.timeStamp);
+    }
     appCtx.keys[e.code] = true;
     appCtx.onKey(e.code, e);
   });

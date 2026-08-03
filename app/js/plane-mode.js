@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=5';
+import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=6';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -13,6 +13,10 @@ const state = {
   roll: 0,
   pitchRate: 0,
   rollRate: 0,
+  barrelRollActive: false,
+  barrelRollDirection: 0,
+  barrelRollProgress: 0,
+  barrelRollStart: 0,
   speed: 0,
   vx: 0,
   vy: 0,
@@ -316,6 +320,10 @@ function startPlaneMode(options = {}) {
   state.climbRate = 0;
   state.pitchRate = 0;
   state.rollRate = 0;
+  state.barrelRollActive = false;
+  state.barrelRollDirection = 0;
+  state.barrelRollProgress = 0;
+  state.barrelRollStart = state.roll;
   state.vx = 0;
   state.vy = 0;
   state.vz = 0;
@@ -341,6 +349,9 @@ function stopPlaneMode(options = {}) {
   state.climbRate = 0;
   state.pitchRate = 0;
   state.rollRate = 0;
+  state.barrelRollActive = false;
+  state.barrelRollDirection = 0;
+  state.barrelRollProgress = 0;
   state.vx = 0;
   state.vy = 0;
   state.vz = 0;
@@ -417,7 +428,15 @@ function updatePlane(dt) {
   const actions = appCtx.readControlActions?.('plane') || {};
   const pitchInput = Number(actions.pitch) || 0;
   const rollInput = Number(actions.roll) || 0;
-  const aerobaticRollInput = Number(actions.aerobaticRoll) || 0;
+  const triggeredBarrelRoll = Number(appCtx.consumePlaneBarrelRollTrigger?.()) || 0;
+  if (state.airborne && !state.barrelRollActive && Math.abs(triggeredBarrelRoll) > 0.05) {
+    state.barrelRollActive = true;
+    state.barrelRollDirection = Math.sign(triggeredBarrelRoll);
+    state.barrelRollProgress = 0;
+    state.barrelRollStart = state.roll;
+  }
+  const explicitAerobaticRoll = Number(actions.aerobaticRoll) || 0;
+  const aerobaticRollInput = state.barrelRollActive ? state.barrelRollDirection : explicitAerobaticRoll;
   const throttleAdjust = Number(actions.throttleAdjust) || 0;
   const brake = Number(actions.brake) > 0.05;
 
@@ -445,9 +464,10 @@ function updatePlane(dt) {
   } else {
     const controlAuthority = clamp(state.speed / 20, 0.3, 1.25);
     const stallBlend = clamp((13 - state.speed) / 5, 0, 1);
+    const previousRoll = state.roll;
     const attitude = integrateAerobaticAttitude(state, {
       pitch: pitchInput,
-      roll: rollInput,
+      roll: Math.abs(aerobaticRollInput) > 0.05 ? aerobaticRollInput : rollInput,
       aerobaticRoll: aerobaticRollInput,
       authority: controlAuthority,
       stallBlend
@@ -456,6 +476,17 @@ function updatePlane(dt) {
     state.roll = attitude.roll;
     state.pitchRate = attitude.pitchRate;
     state.rollRate = attitude.rollRate;
+    if (state.barrelRollActive) {
+      const rollDelta = Math.atan2(Math.sin(state.roll - previousRoll), Math.cos(state.roll - previousRoll));
+      state.barrelRollProgress += Math.max(0, rollDelta * state.barrelRollDirection);
+      if (state.barrelRollProgress >= Math.PI * 2) {
+        state.barrelRollActive = false;
+        state.barrelRollDirection = 0;
+        state.barrelRollProgress = 0;
+        state.roll = state.barrelRollStart;
+        state.rollRate = 0;
+      }
+    }
     const turnFactor = Math.abs(aerobaticRollInput) > 0.05
       ? aircraftBankTurnFactor(state.roll, state.rollRate)
       : Math.sin(state.roll);
@@ -474,6 +505,9 @@ function updatePlane(dt) {
       state.roll = 0;
       state.pitchRate = 0;
       state.rollRate = 0;
+      state.barrelRollActive = false;
+      state.barrelRollDirection = 0;
+      state.barrelRollProgress = 0;
     }
   }
 

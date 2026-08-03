@@ -1,4 +1,5 @@
 const PRIMARY_TRAVEL_MODE_ORDER = Object.freeze(['walk', 'drive', 'plane', 'drone']);
+const MAX_STEERING_ANGLE_RAD = 1.22;
 
 function nextPrimaryTravelMode(currentMode = 'walk') {
   const index = PRIMARY_TRAVEL_MODE_ORDER.indexOf(String(currentMode || ''));
@@ -88,11 +89,33 @@ function aircraftChaseOffset(yaw = 0, pitch = 0, distance = 12, height = 4.2) {
 }
 
 function arcadeSteeringYawTarget(speed = 0, steeringAngle = 0, wheelBase = 2.6, maxYawRate = Infinity) {
-  const target = Math.abs(Number(speed) || 0) /
+  // Steering rotates the chassis around the direction of travel. Reversing the
+  // velocity must therefore reverse chassis yaw so the rear of the vehicle
+  // continues toward the same requested screen-side as it did in forward gear.
+  // A bicycle-model tangent is undefined at 90 degrees and reverses sign
+  // beyond it. Low-speed handling boosts must never cross that singularity.
+  const requestedSteeringAngle = Number(steeringAngle) || 0;
+  const safeSteeringAngle = Math.max(
+    -MAX_STEERING_ANGLE_RAD,
+    Math.min(MAX_STEERING_ANGLE_RAD, requestedSteeringAngle)
+  );
+  const target = (Number(speed) || 0) /
     Math.max(0.1, Number(wheelBase) || 2.6) *
-    Math.tan(Number(steeringAngle) || 0);
+    Math.tan(safeSteeringAngle);
   const limit = Math.max(0, Number(maxYawRate));
   return Math.max(-limit, Math.min(limit, target));
+}
+
+function projectSteeringArc(speed = 0, steeringAngle = 0, dt = 0.25, wheelBase = 2.6) {
+  const step = Math.max(0, Number(dt) || 0);
+  const yawRate = arcadeSteeringYawTarget(speed, steeringAngle, wheelBase);
+  const angle = yawRate * step;
+  return Object.freeze({
+    angle,
+    yawRate,
+    x: Math.sin(angle) * (Number(speed) || 0) * step,
+    z: Math.cos(angle) * (Number(speed) || 0) * step
+  });
 }
 
 function aircraftBankTurnFactor(roll = 0, rollRate = 0) {
@@ -102,11 +125,13 @@ function aircraftBankTurnFactor(roll = 0, rollRate = 0) {
 
 export {
   PRIMARY_TRAVEL_MODE_ORDER,
+  MAX_STEERING_ANGLE_RAD,
   arcadeSteeringYawTarget,
   aircraftChaseOffset,
   aircraftBankTurnFactor,
   aircraftForwardVector,
   integrateAerobaticAttitude,
   nextPrimaryTravelMode,
+  projectSteeringArc,
   resolveCarDriveCommand
 };
