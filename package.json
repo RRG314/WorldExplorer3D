@@ -10,6 +10,7 @@
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
+    "test:building-coverage": "node scripts/test-building-publication-coverage.mjs",
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
     "test:maintainability": "node scripts/test-maintainability-guard.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",

@@ -7,13 +7,29 @@ import {
   mergeMappedWaterStructures
 } from './water-structure-source.js?v=3';
 
-function buildingDataPriority(way) {
-  const tags = way?.tags || {};
-  let score = mappedWaterStructurePriority(tags) + (tags._geometrySource === 'overture' ? 2 : 0);
-  if (tags.height || tags['building:levels']) score += 4;
-  if (tags['building:part']) score += 3;
-  if (tags['roof:shape'] || tags['roof:height']) score += 1;
-  return score;
+const COMPLETE_BUILDING_TILE_CAP = 1200;
+
+export function resolveBuildingPublicationSelection(options = {}) {
+  const configuredGlobalCap = Math.max(1, Math.floor(Number(options.maxBuildingWays) || 12000));
+  const configuredPerTile = Math.max(
+    1,
+    Math.floor(Number(options.tileBudgetCfg?.buildingsPerTile) || 1),
+    Math.floor(Number(options.tileBudgetCfg?.buildingsMinPerTile) || 1)
+  );
+  return Object.freeze({
+    globalCap: configuredGlobalCap,
+    // Building geometry is already spatially batched and runtime-culled. Do
+    // not apply the recursive-depth tile thinning used for roads and props:
+    // that policy intentionally retained as little as 62% of dense tiles and
+    // left visible holes between otherwise authoritative footprints.
+    basePerTile: Math.max(configuredPerTile, COMPLETE_BUILDING_TILE_CAP),
+    minPerTile: configuredPerTile,
+    useRdt: false,
+    spreadAcrossArea: true,
+    // If the source still exceeds the device-scaled global ceiling, preserve
+    // a contiguous center first and use the remainder for outer context.
+    coreRatio: 0.78
+  });
 }
 
 async function fetchBuildingMetadata(options, metadataState) {
@@ -130,24 +146,21 @@ export async function loadBuildingDetailForPublication(options = {}) {
       const requested = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
-      const provenancePublicationCap = Math.min(
-        Number(options.maxBuildingWays) || 12000,
-        12000
-      );
+      const publicationSelection = resolveBuildingPublicationSelection(options);
+      const provenancePublicationCap = publicationSelection.globalCap;
       const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
-        globalCap: provenancePublicationCap,
-        basePerTile: options.tileBudgetCfg.buildingsPerTile,
-        minPerTile: options.tileBudgetCfg.buildingsMinPerTile,
+        ...publicationSelection,
         tileDegrees: options.tileBudgetCfg.tileDegrees,
-        useRdt: options.useRdtBudgeting,
-        spreadAcrossArea: true,
-        coreRatio: options.useRdtBudgeting ? 0.35 : 0.45,
-        compareFn: (a, b) => buildingDataPriority(b) - buildingDataPriority(a)
+        // Vessels remain the only semantic exception to distance ordering.
+        // Ordinary height/roof metadata must not displace closer buildings.
+        compareFn: (a, b) =>
+          mappedWaterStructurePriority(b?.tags || {}) - mappedWaterStructurePriority(a?.tags || {})
       });
 
       options.loadMetrics.buildings.requested = requested.length;
       options.loadMetrics.buildings.selected = buildingWays.length;
       options.loadMetrics.buildings.provenancePublicationCap = provenancePublicationCap;
+      options.loadMetrics.buildings.publicationSelection = publicationSelection;
       options.buildBuildingGeometryPass({
         buildingGeometryGuards: options.buildingGeometryGuards,
         buildingWays,
@@ -177,9 +190,16 @@ export async function loadBuildingDetailForPublication(options = {}) {
       setBuildingDetailState('ready', {
         requested: requested.length,
         selected: buildingWays.length,
+        selectionRetention: requested.length > 0 ? buildingWays.length / requested.length : 1,
         meshes: appCtx.buildingMeshes.length,
         provenanceFeatures: appCtx.buildingProvenanceModel.featureCount,
         publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
+        coveragePolicy: {
+          globalCap: publicationSelection.globalCap,
+          basePerTile: publicationSelection.basePerTile,
+          recursiveTileThinning: publicationSelection.useRdt,
+          contiguousCoreRatio: publicationSelection.coreRatio
+        },
         durationMs: Math.round(performance.now() - startedAt),
         source: data._overpassSource || null,
         endpoint: data._overpassEndpoint || null,
