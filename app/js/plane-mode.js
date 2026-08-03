@@ -1,5 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=4';
+import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=5';
+
+const PLANE_MAX_SPEED_MPS = 84;
 
 const state = {
   active: false,
@@ -415,12 +417,13 @@ function updatePlane(dt) {
   const actions = appCtx.readControlActions?.('plane') || {};
   const pitchInput = Number(actions.pitch) || 0;
   const rollInput = Number(actions.roll) || 0;
+  const aerobaticRollInput = Number(actions.aerobaticRoll) || 0;
   const throttleAdjust = Number(actions.throttleAdjust) || 0;
   const brake = Number(actions.brake) > 0.05;
 
   state.throttle = clamp(state.throttle + throttleAdjust * dt * 0.66, 0, 1);
   if (!state.airborne && pitchInput > 0.2) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
-  const targetSpeed = state.throttle * 58;
+  const targetSpeed = state.throttle * PLANE_MAX_SPEED_MPS;
   const speedRate = state.airborne ? 0.72 : 1.35;
   state.speed = damp(state.speed, targetSpeed, speedRate, dt);
   if (brake && !state.airborne) state.speed *= Math.exp(-5.8 * dt);
@@ -445,6 +448,7 @@ function updatePlane(dt) {
     const attitude = integrateAerobaticAttitude(state, {
       pitch: pitchInput,
       roll: rollInput,
+      aerobaticRoll: aerobaticRollInput,
       authority: controlAuthority,
       stallBlend
     }, dt);
@@ -452,7 +456,10 @@ function updatePlane(dt) {
     state.roll = attitude.roll;
     state.pitchRate = attitude.pitchRate;
     state.rollRate = attitude.rollRate;
-    state.yaw += aircraftBankTurnFactor(state.roll, state.rollRate) * dt * (0.55 + controlAuthority * 0.58);
+    const turnFactor = Math.abs(aerobaticRollInput) > 0.05
+      ? aircraftBankTurnFactor(state.roll, state.rollRate)
+      : Math.sin(state.roll);
+    state.yaw += turnFactor * dt * (0.55 + controlAuthority * 0.58);
     const liftBalance = clamp((state.speed - 15) * 0.09, -2.4, 2.8);
     const stallSink = stallBlend * (2.2 + (13 - state.speed) * 0.32);
     const desiredClimb = Math.sin(state.pitch) * state.speed + liftBalance - 0.8 - stallSink;
@@ -602,3 +609,4 @@ Object.assign(appCtx, {
 });
 
 export { applyPlaneCamera, getPlaneSnapshot, startPlaneMode, stopPlaneMode, updatePlane };
+export { PLANE_MAX_SPEED_MPS };

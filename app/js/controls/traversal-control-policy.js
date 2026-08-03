@@ -35,14 +35,27 @@ function integrateAerobaticAttitude(state = {}, input = {}, dt = 0) {
   const authority = Math.max(0.3, Math.min(1.25, Number(input.authority) || 1));
   const pitchInput = Math.max(-1, Math.min(1, Number(input.pitch) || 0));
   const rollInput = Math.max(-1, Math.min(1, Number(input.roll) || 0));
+  const aerobaticRoll = Math.abs(Number(input.aerobaticRoll) || 0) > 0.05;
   const damp = (current, target, rate) => current + (target - current) * (1 - Math.exp(-rate * step));
   const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
   const pitchRate = damp(Number(state.pitchRate) || 0, pitchInput * 1.12 * authority, 4.2);
-  const rollRate = damp(Number(state.rollRate) || 0, rollInput * 1.72 * authority, 5.2);
   let pitch = wrap((Number(state.pitch) || 0) + pitchRate * step - Math.max(0, Number(input.stallBlend) || 0) * 0.12 * step);
-  let roll = wrap((Number(state.roll) || 0) + rollRate * step);
+  const currentRoll = wrap(Number(state.roll) || 0);
+  let rollRate;
+  let roll;
+  if (aerobaticRoll) {
+    rollRate = damp(Number(state.rollRate) || 0, rollInput * 1.72 * authority, 5.2);
+    roll = wrap(currentRoll + rollRate * step);
+  } else {
+    const bankTarget = rollInput * 0.62;
+    const bankError = wrap(bankTarget - currentRoll);
+    const bankRate = Math.abs(rollInput) > 0.05 ? 3.6 * authority : 4.8;
+    roll = wrap(currentRoll + bankError * (1 - Math.exp(-bankRate * step)));
+    // Normal bank is a turn command, not an active body-axis roll. Keeping its
+    // aerobatic rate at zero lets coordinated yaw begin as the bank develops.
+    rollRate = 0;
+  }
   if (Math.abs(pitchInput) < 0.05) pitch = damp(pitch, 0, 0.72);
-  if (Math.abs(rollInput) < 0.05) roll = damp(roll, 0, 1.05);
   return Object.freeze({ pitch, roll, pitchRate, rollRate });
 }
 

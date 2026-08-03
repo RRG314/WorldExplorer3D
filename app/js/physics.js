@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=38";
 import { updateDrone } from "./physics/drone-flight.js?v=7";
-import { updatePlane } from "./plane-mode.js?v=13";
+import { updatePlane } from "./plane-mode.js?v=15";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=2";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
-import { arcadeSteeringYawTarget, resolveCarDriveCommand } from "./controls/traversal-control-policy.js?v=4";
+import { arcadeSteeringYawTarget, resolveCarDriveCommand } from "./controls/traversal-control-policy.js?v=5";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;

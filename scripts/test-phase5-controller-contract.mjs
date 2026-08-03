@@ -18,6 +18,7 @@ import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
 import { shouldSuppressBoatTerrain } from '../app/js/boat-mode/surface-effects.js';
 import fs from 'node:fs';
+import { PLANE_MAX_SPEED_MPS } from '../app/js/plane-mode.js';
 
 ctx.keys = {};
 ctx.keys.KeyW = true;
@@ -53,16 +54,22 @@ assert.equal(actions.lookPitch, 1);
 actions = keyboardControlActions({ ArrowDown: true, ArrowRight: true, Space: true }, 'plane');
 assert.equal(actions.pitch, 1);
 assert.equal(actions.roll, -1);
+assert.equal(actions.aerobaticRoll, 0);
 assert.equal(actions.throttleAdjust, 1);
 assert.equal(actions.brake, 0);
 actions = keyboardControlActions({ ShiftLeft: true, ControlLeft: true }, 'plane');
 assert.equal(actions.throttleAdjust, -1);
 assert.equal(actions.brake, 1);
+actions = keyboardControlActions({ ControlLeft: true, ArrowRight: true }, 'plane');
+assert.equal(actions.roll, -1);
+assert.equal(actions.aerobaticRoll, -1);
 
 assert.equal(nextPrimaryTravelMode('walk'), 'drive');
 assert.equal(nextPrimaryTravelMode('drive'), 'plane');
 assert.equal(nextPrimaryTravelMode('plane'), 'drone');
 assert.equal(nextPrimaryTravelMode('drone'), 'walk');
+assert.equal(PLANE_MAX_SPEED_MPS, 84);
+assert.ok(PLANE_MAX_SPEED_MPS * 2.237 > 185, 'plane full-throttle speed did not reach the faster flight envelope');
 
 let command = resolveCarDriveCommand({ speed: 12, reverse: 1 });
 assert.equal(command.serviceBrake, true);
@@ -81,9 +88,19 @@ assert.equal(reverseYawTarget, forwardYawTarget);
 
 const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 let rollAttitude = { pitch: 0, roll: 0, pitchRate: 0, rollRate: 0 };
+let normalTurnHeading = 0;
+for (let index = 0; index < 360; index += 1) {
+  rollAttitude = integrateAerobaticAttitude(rollAttitude, { roll: 1, authority: 1.1 }, 1 / 60);
+  normalTurnHeading += Math.sin(rollAttitude.roll) * (1 / 60);
+}
+assert.ok(rollAttitude.roll > 0.58 && rollAttitude.roll < 0.64, `normal bank escaped its turn limit: ${rollAttitude.roll}`);
+assert.equal(rollAttitude.rollRate, 0);
+assert.ok(normalTurnHeading > 2.5, `bounded bank failed to produce a sustained coordinated turn: ${normalTurnHeading}`);
+
+rollAttitude = { pitch: 0, roll: 0, pitchRate: 0, rollRate: 0 };
 let accumulatedRoll = 0;
 for (let index = 0; index < 360; index += 1) {
-  const next = integrateAerobaticAttitude(rollAttitude, { roll: 1, authority: 1.1 }, 1 / 60);
+  const next = integrateAerobaticAttitude(rollAttitude, { roll: 1, aerobaticRoll: 1, authority: 1.1 }, 1 / 60);
   accumulatedRoll += angleDelta(rollAttitude.roll, next.roll);
   rollAttitude = next;
 }
@@ -188,6 +205,8 @@ console.log(JSON.stringify({
   reverseSteeringKeepsInputSign: true,
   droneUsesV31TurnAndIndependentCameraControls: true,
   aerobaticRollAndLoopAuthority: true,
+  normalPlaneTurnUsesBoundedCoordinatedBank: true,
+  fasterPlaneFlightEnvelope: true,
   activeBarrelRollsDoNotChangeHeading: true,
   aerobaticForwardVectorRemainsBodyRelative: true,
   aerobaticChaseCameraRemainsLoopStable: true,

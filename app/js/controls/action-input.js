@@ -73,6 +73,7 @@ function keyboardControlActions(keys = {}, mode = 'drive') {
       : digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
   const ascend = pressed(keys, 'Space', 'KeyR');
   const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
+  const planeRollModifier = planeControls && pressed(keys, 'ControlLeft', 'ControlRight');
   return {
     mode,
     move,
@@ -90,6 +91,7 @@ function keyboardControlActions(keys = {}, mode = 'drive') {
     vertical: digital(ascend, descend),
     pitch: mode === 'plane' ? -move : lookPitch,
     roll: turn,
+    aerobaticRoll: planeRollModifier ? turn : 0,
     throttleAdjust: planeControls
       ? digital(pressed(keys, 'Space'), pressed(keys, 'ShiftLeft', 'ShiftRight'))
       : 0
@@ -127,6 +129,7 @@ function mergeGamepad(actions, gamepad) {
   if (actions.mode === 'plane') {
     actions.pitch = -leftY;
     actions.roll = leftX;
+    actions.aerobaticRoll = north > 0.55 ? leftX : actions.aerobaticRoll;
     actions.throttleAdjust = clamp(actions.throttleAdjust + rightTrigger - leftTrigger);
   } else if (actions.mode === 'drone') {
     actions.vertical = clamp(actions.vertical + rightShoulder - leftShoulder);
