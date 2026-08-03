@@ -720,6 +720,7 @@ function initTitleScreenUi({
     getTitleLaunchMode: () => titleLaunchMode,
     setTitleLaunchMode: (mode) => setLaunchMode(mode),
     getGlobeSelector: () => globeSelector,
+    primeMultiplayerUi,
     isTouchPreferredClient
   };
 }

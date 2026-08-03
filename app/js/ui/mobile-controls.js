@@ -438,6 +438,11 @@ function initMobileControls() {
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
       ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
+      const controlsBarBtn = document.getElementById('controlsBarBtn');
+      const controlsBarLabel = controlsBarBtn?.querySelector('.btnText');
+      if (controlsBarLabel) controlsBarLabel.textContent = modeLabel;
+      controlsBarBtn?.setAttribute('aria-expanded', String(!ctrlContent?.classList.contains('hidden')));
+      controlsTab?.classList.toggle('bar-open', !ctrlContent?.classList.contains('hidden'));
     }
     updateMobileTouchControls(mode);
   }

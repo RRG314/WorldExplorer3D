@@ -4,11 +4,11 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=65";
+import { initMobileControls } from "./ui/mobile-controls.js?v=66";
 import { initShareUi } from "./ui/share-links.js?v=61";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=95";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=96";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -199,8 +199,7 @@ function setupUI() {
     travelBtn: 'travelMenu',
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
-    gameBtn: 'gameMenu',
-    multiplayerBtn: 'multiplayerMenu'
+    gameBtn: 'gameMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -251,14 +250,10 @@ function setupUI() {
   document.getElementById('travelBtn').addEventListener('click', () => toggleFloatMenuByButton('travelBtn'));
   document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
   document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
-  document.getElementById('gameBtn').addEventListener('click', () => toggleFloatMenuByButton('gameBtn'));
-  const multiplayerBtn = document.getElementById('multiplayerBtn');
-  if (multiplayerBtn) {
-    multiplayerBtn.addEventListener('click', () => {
-      primeMultiplayerUi();
-      toggleFloatMenuByButton('multiplayerBtn');
-    });
-  }
+  document.getElementById('gameBtn').addEventListener('click', () => {
+    toggleFloatMenuByButton('gameBtn');
+    void titleUi.primeMultiplayerUi?.();
+  });
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
@@ -317,6 +312,15 @@ function setupUI() {
       else if (typeof appCtx.openMemoryComposer === 'function') appCtx.openMemoryComposer('flower');
     });
   }
+  document.getElementById('fMemoryFlower')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    if (typeof appCtx.openMemoryComposer === 'function') appCtx.openMemoryComposer('flower');
+  });
+  document.getElementById('fFlowerChallenge')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    if (typeof appCtx.startFlowerChallenge === 'function') appCtx.startFlowerChallenge();
+    else if (typeof appCtx.toggleFlowerActionMenu === 'function') appCtx.toggleFlowerActionMenu();
+  });
   document.getElementById('fSatellite').addEventListener('click', () => {
     appCtx.satelliteView = !appCtx.satelliteView;
     document.getElementById('fSatellite').classList.toggle('on', appCtx.satelliteView);
@@ -537,6 +541,16 @@ function setupUI() {
       updateControlsModeUI();
     });
   }
+  const controlsBarBtn = document.getElementById('controlsBarBtn');
+  if (controlsBarBtn && ctrlContent) {
+    controlsBarBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
+      ctrlContent.classList.toggle('hidden');
+      controlsTab?.classList.toggle('bar-open', !ctrlContent.classList.contains('hidden'));
+      updateControlsModeUI();
+    });
+  }
 
   // Main Menu Button
   document.getElementById('mainMenuBtn').addEventListener('click', () => {
@@ -576,8 +590,9 @@ function setupUI() {
     {
       closeAllFloatMenus();
     }
-    if (controlsTab && !controlsTab.contains(e.target) && ctrlContent) {
+    if (controlsTab && !controlsTab.contains(e.target) && !controlsBarBtn?.contains(e.target) && ctrlContent) {
       ctrlContent.classList.add('hidden');
+      controlsTab.classList.remove('bar-open');
       updateControlsModeUI();
     }
   });
