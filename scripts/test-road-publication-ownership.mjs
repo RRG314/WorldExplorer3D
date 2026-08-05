@@ -6,12 +6,13 @@ import { ctx as appCtx } from '../app/js/shared-context.js?v=55';
 const root = process.cwd();
 const read = (relativePath) => fs.readFile(path.join(root, relativePath), 'utf8');
 
-const [featurePass, roadLoader, reset, finalizer, publisher] = await Promise.all([
+const [featurePass, roadLoader, reset, finalizer, publisher, roadRenderer] = await Promise.all([
   read('app/js/world/load-road-pass.js'),
   read('app/js/world/load-roads.js'),
   read('app/js/world/load-reset.js'),
   read('app/js/world/load-support.js'),
-  read('app/js/terrain/rebuild.js')
+  read('app/js/terrain/rebuild.js'),
+  read('app/js/road-render.js')
 ]);
 
 const failures = [];
@@ -64,6 +65,24 @@ requireContract(
 requireContract(
   (publisher.match(/appCtx\.refreshStructureAwareFeatureProfiles\(\)/g) || []).length === 1,
   'Final terrain publication must compile structure and network profiles exactly once.'
+);
+requireContract(
+  publisher.includes('const MAX_ROAD_BATCH_VERTICES = 60000;') &&
+    publisher.includes('roadMainBatches.forEach') &&
+    publisher.includes('flushRoadMainBatch();'),
+  'Dense cities must publish bounded road index buffers rather than one monolithic mesh.'
+);
+requireContract(
+  featurePass.includes('const ROAD_SURFACE_BIAS = 0.18;') &&
+    publisher.includes('const ROAD_SURFACE_BIAS = 0.18;'),
+  'Road contact and visual geometry must share enough terrain clearance to prevent mapped asphalt from being depth-covered.'
+);
+requireContract(
+  publisher.includes('buildIndexedBatchMesh({') &&
+    roadRenderer.includes('color: 0x303236') &&
+    !roadRenderer.includes('asphaltTex') &&
+    !roadRenderer.includes("geometry.setAttribute('uv'"),
+  'Compiled roads must use the stable flat-asphalt path instead of an invalid textured batch that exposes terrain.'
 );
 
 if (failures.length > 0) {

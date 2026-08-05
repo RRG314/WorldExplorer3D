@@ -24,7 +24,10 @@ for (const mode of ['baseline', 'rdt']) {
   for (const depth of [0, 4, 6]) {
     const profile = getAdaptiveLoadProfile(depth, mode, 1);
     assert.ok(profile.maxRoadWays >= 3400, 'initial publication must retain a traversable road network');
-    assert.ok(profile.maxBuildingWays >= 22000, 'initial publication must retain dense city massing');
+    assert.ok(
+      profile.maxBuildingWays >= 7000 && profile.maxBuildingWays <= 9000,
+      'initial publication must retain a nearby city district without blocking play'
+    );
     assert.ok(profile.maxLanduseWays >= 4200, 'initial publication must retain mapped surface coverage');
     assert.ok(profile.overpassTimeoutMs >= 19000, 'source requests must have enough time to avoid routine fallback degradation');
     assert.ok(profile.maxTotalLoadMs >= 44000, 'the load deadline must not silently trade away city completeness');
@@ -82,5 +85,5 @@ assert.ok(
 
 console.log(JSON.stringify({
   ok: true,
-  message: 'Initial Earth retains full district coverage while inactive space/ocean render families remain on demand.'
+  message: 'Initial Earth retains a complete nearby district while distant and inactive render families remain on demand.'
 }, null, 2));

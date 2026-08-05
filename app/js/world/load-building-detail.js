@@ -8,9 +8,13 @@ import {
 } from './water-structure-source.js?v=3';
 
 const COMPLETE_BUILDING_TILE_CAP = 1200;
+const MAX_INITIAL_BUILDING_WAYS = 9000;
 
 export function resolveBuildingPublicationSelection(options = {}) {
-  const configuredGlobalCap = Math.max(1, Math.floor(Number(options.maxBuildingWays) || 12000));
+  const configuredGlobalCap = Math.min(
+    MAX_INITIAL_BUILDING_WAYS,
+    Math.max(1, Math.floor(Number(options.maxBuildingWays) || MAX_INITIAL_BUILDING_WAYS))
+  );
   const configuredPerTile = Math.max(
     1,
     Math.floor(Number(options.tileBudgetCfg?.buildingsPerTile) || 1),
@@ -26,9 +30,10 @@ export function resolveBuildingPublicationSelection(options = {}) {
     minPerTile: configuredPerTile,
     useRdt: false,
     spreadAcrossArea: true,
-    // If the source still exceeds the device-scaled global ceiling, preserve
-    // a contiguous center first and use the remainder for outer context.
-    coreRatio: 0.78
+    // Initial play owns a complete nearby district. Distant city context is
+    // supplied by the streamed far field instead of blocking launch on tens
+    // of thousands of interactive collision meshes.
+    coreRatio: 0.9
   });
 }
 

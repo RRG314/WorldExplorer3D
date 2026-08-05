@@ -2,7 +2,7 @@ import {
   createRoadSurfaceMaterials,
   disposeRoadSurfaceMaterials,
   roadSurfaceMaterialCacheKey
-} from "../road-render.js?v=2";
+} from "../road-render.js?v=4";
 
 function createTerrainMaterialCacheApi(deps = {}) {
   const { appCtx, terrainState } = deps;
@@ -23,17 +23,12 @@ function createTerrainMaterialCacheApi(deps = {}) {
 
   function getSharedRoadMaterials() {
     const key = roadSurfaceMaterialCacheKey({
-      asphaltTex: appCtx.asphaltTex,
-      asphaltNormal: appCtx.asphaltNormal,
-      asphaltRoughness: appCtx.asphaltRoughness
+      includeMarkings: true
     });
     if (terrainState._roadMaterials && terrainState._roadMaterialCacheKey === key) return terrainState._roadMaterials;
 
     disposeRoadMaterialCache();
     const materials = createRoadSurfaceMaterials({
-      asphaltTex: appCtx.asphaltTex,
-      asphaltNormal: appCtx.asphaltNormal,
-      asphaltRoughness: appCtx.asphaltRoughness,
       includeMarkings: true
     });
 

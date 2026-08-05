@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=2";
+import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
 import { detectRoadIntersections } from "./intersections.js?v=2";
 import {
   buildFeatureRibbonEdges,
@@ -14,7 +14,8 @@ import {
   shouldBuildCompactIntersectionCap
 } from "./road-junctions.js?v=4";
 
-const ROAD_SURFACE_BIAS = 0.08;
+const ROAD_SURFACE_BIAS = 0.18;
+const MAX_ROAD_BATCH_VERTICES = 60000;
 
 export { detectRoadIntersections };
 
@@ -266,14 +267,31 @@ export function publishCompiledTransportMeshes(deps = {}) {
   // three-or-more-way gaps.
   for (const road of baseRoads) road.junctionTransitions = [];
 
-  const roadMainBatchVerts = [];
-  const roadMainBatchIdx = [];
+  const roadMainBatches = [];
+  let roadMainBatchVerts = [];
+  let roadMainBatchIdx = [];
   const roadSkirtBatchVerts = [];
   const roadSkirtBatchIdx = [];
   const roadMarkBatchVerts = [];
   const roadMarkBatchIdx = [];
   const sidewalkBatchVerts = [];
   const sidewalkBatchIdx = [];
+
+  const flushRoadMainBatch = () => {
+    if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
+      roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx });
+    }
+    roadMainBatchVerts = [];
+    roadMainBatchIdx = [];
+  };
+  const appendRoadMainGeometry = (verts, indices) => {
+    const incomingVertices = Array.isArray(verts) ? verts.length / 3 : 0;
+    const currentVertices = roadMainBatchVerts.length / 3;
+    if (currentVertices > 0 && currentVertices + incomingVertices > MAX_ROAD_BATCH_VERTICES) {
+      flushRoadMainBatch();
+    }
+    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
+  };
 
   const sharedRoadMaterials = typeof getSharedRoadMaterials === "function" ? getSharedRoadMaterials() : {};
   const roadMat = sharedRoadMaterials.roadMat;
@@ -323,7 +341,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
     rightEdge.push(...ribbonEdges.rightEdge);
 
     appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
-    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
+    appendRoadMainGeometry(verts, indices);
     appendRoadCenterMarkings(road, pts, roadMarkBatchVerts, roadMarkBatchIdx);
 
     if (shouldRenderRoadSkirts(road)) {
@@ -444,22 +462,35 @@ export function publishCompiledTransportMeshes(deps = {}) {
 
   let compactJunctionCount = 0;
   for (const intersection of intersections) {
+    const capVerts = [];
+    const capIndices = [];
     if (appendCompactIntersectionCap(
       intersection,
-      roadMainBatchVerts,
-      roadMainBatchIdx,
+      capVerts,
+      capIndices,
       cachedTerrainHeight
-    )) compactJunctionCount += 1;
+    )) {
+      appendRoadMainGeometry(capVerts, capIndices);
+      compactJunctionCount += 1;
+    }
   }
+  flushRoadMainBatch();
 
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadMainBatchVerts,
-    indices: roadMainBatchIdx,
-    material: roadMat,
-    renderOrder: 2,
-    userData: { isRoadBatch: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
+  roadMainBatches.forEach((batch, batchIndex) => {
+    buildIndexedBatchMesh({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      verts: batch.verts,
+      indices: batch.indices,
+      material: roadMat,
+      renderOrder: 2,
+      userData: {
+        isRoadBatch: true,
+        roadBatchIndex: batchIndex,
+        sharedRoadMaterial: true,
+        worldLoadSequence: appCtx._worldLoadSequence || 0
+      }
+    });
   });
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -522,7 +553,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
     compiledSampleCount: baseRoads.reduce((total, road) =>
       total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
     vertices:
-      roadMainBatchVerts.length / 3 +
+      roadMainBatches.reduce((sum, batch) => sum + batch.verts.length / 3, 0) +
       roadSkirtBatchVerts.length / 3 +
       roadMarkBatchVerts.length / 3,
     triangles:

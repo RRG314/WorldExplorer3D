@@ -4,7 +4,7 @@ import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=10";
 import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=1";
 import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
-const ROAD_SURFACE_BIAS = 0.08;
+const ROAD_SURFACE_BIAS = 0.18;
 
 export function applySafeTunnelRoadPresentation(structureSemantics) {
   if (structureSemantics?.isTunnel !== true) return structureSemantics;

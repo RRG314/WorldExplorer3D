@@ -27,9 +27,8 @@ export const COPERNICUS_DEM_90_LIABILITY_NOTICE =
   'WorldDEM™-90.';
 
 const NODATA = -32767;
-const FILTER_RADII = Object.freeze([1, 2, 3]);
-const MAXIMUM_CLASSIFIED_OBJECT_HEIGHT_METERS = 80;
-const FILTER_VERSION = 'worldexplorer-pmf-grid-v1';
+const FILTER_RADII = Object.freeze([1, 2, 3, 4, 5, 6]);
+const FILTER_VERSION = 'worldexplorer-pmf-grid-v2';
 
 function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
@@ -205,6 +204,8 @@ export function classifyCopernicusSurface({
   const ground = Float64Array.from(raw);
   const removed = new Uint8Array(raw.length);
   const localRelief = new Float64Array(raw.length);
+  const maximumNaturalTerrainStep = Number(spacingMeters) * 0.15;
+  const classifiedSurfaceStep = Number(spacingMeters) * 0.05;
   for (let row = 0; row < height; row += 1) {
     for (let column = 0; column < width; column += 1) {
       const index = row * width + column;
@@ -222,8 +223,11 @@ export function classifyCopernicusSurface({
         }
       }
       neighborDifferences.sort((left, right) => left - right);
-      localRelief[index] =
+      const observedStep =
         neighborDifferences[Math.min(1, neighborDifferences.length - 1)] || 0;
+      localRelief[index] = observedStep <= maximumNaturalTerrainStep
+        ? observedStep
+        : classifiedSurfaceStep;
     }
   }
   for (const radius of FILTER_RADII) {
@@ -231,15 +235,11 @@ export function classifyCopernicusSurface({
     const opening = boxFilter(erosion, width, height, radius, 'maximum');
     for (let index = 0; index < raw.length; index += 1) {
       const candidate = Math.min(ground[index], opening[index]);
-      const totalCorrection = raw[index] - candidate;
       const threshold =
         2.5 +
         radius * Number(spacingMeters) * 0.015 +
         localRelief[index] * radius * 2;
-      if (
-        ground[index] - candidate > threshold &&
-        totalCorrection <= MAXIMUM_CLASSIFIED_OBJECT_HEIGHT_METERS
-      ) {
+      if (ground[index] - candidate > threshold) {
         ground[index] = candidate;
         removed[index] = 1;
       }

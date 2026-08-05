@@ -158,12 +158,13 @@ assert.deepEqual(
   [4, 4, 1]
 );
 assert.throws(
-  () => chunkGroundPoints(plan.parts[0].points, 6),
-  /integer from 1 through 5/
+  () => chunkGroundPoints(plan.parts[0].points, 251),
+  /integer from 1 through 250/
 );
 
 const providerPayload = {
   samples: plan.parts[0].points.map((point, index) => ({
+    locationId: index,
     location: {
       x: point.longitude,
       y: point.latitude,
@@ -182,6 +183,7 @@ const providerPayload = {
     }
   }))
 };
+providerPayload.samples.reverse();
 let observedRequest;
 const rawSamples = await fetchUsgs3depSamples({
   points: plan.parts[0].points,

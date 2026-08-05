@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { appendUpwardRibbonGeometry } from "../road-render.js?v=2";
+import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
 import { generateStreetFurniture } from "./furniture.js?v=13";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {

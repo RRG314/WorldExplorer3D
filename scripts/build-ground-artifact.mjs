@@ -87,7 +87,7 @@ Commands:
     --width-m M --height-m M --spacing-m M --output FILE
 
   fetch-usgs
-    --plan FILE --output FILE [--batch-size 5] [--concurrency 12]
+    --plan FILE --output FILE [--batch-size 200] [--concurrency 6]
 
   fetch-usgs-export
     --plan FILE --source-template FILE --output FILE
@@ -162,10 +162,10 @@ function assertPlan(plan) {
 async function commandFetchUsgs() {
   const { value: plan } = await readJson(requiredFlag('--plan'));
   assertPlan(plan);
-  const batchSize = numberFlag('--batch-size', 5);
+  const batchSize = numberFlag('--batch-size', 200);
   const concurrency = Math.max(
     1,
-    Math.min(12, Math.floor(numberFlag('--concurrency', 12)))
+    Math.min(8, Math.floor(numberFlag('--concurrency', 6)))
   );
   const batches = plan.parts.flatMap((part) =>
     chunkGroundPoints(part.points, batchSize)
@@ -538,14 +538,15 @@ async function commandCompile() {
       artifactId,
       part,
       sourceRelease,
-      normalizedSamples: partSamples
+      normalizedSamples: partSamples,
+      compactArtifact: true
     });
     const partDirectory = raw.plan.partCount === 1
       ? outputDirectory
       : path.join(outputDirectory, part.id);
-    const artifactPath = await writeJson(
+    const artifactPath = await writeText(
       path.join(partDirectory, 'ground-artifact.json'),
-      bundle.artifact
+      bundle.artifactText
     );
     const manifestPath = await writeJson(
       path.join(partDirectory, 'ground-manifest.json'),

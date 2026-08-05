@@ -34,6 +34,24 @@ assert.ok(
 assert.equal(classified.removed[buildingCenter], 1);
 assert.ok(classified.removedCount >= 20);
 
+const skyscraperSurface = Float64Array.from(smoothSlope);
+for (let row = 8; row <= 12; row += 1) {
+  for (let column = 8; column <= 12; column += 1) {
+    skyscraperSurface[row * width + column] += 165;
+  }
+}
+const skyscraperResult = classifyCopernicusSurface({
+  values: skyscraperSurface,
+  width,
+  height,
+  spacingMeters: 60
+});
+assert.ok(
+  skyscraperResult.ground[buildingCenter] <= smoothSlope[buildingCenter] + 3,
+  'tall urban surface object was preserved as terrain'
+);
+assert.equal(skyscraperResult.removed[buildingCenter], 1);
+
 const mountain = Float64Array.from(
   { length: width * height },
   (_, index) => {
@@ -68,6 +86,7 @@ console.log(JSON.stringify({
   contract: 'copernicus-ground-builder',
   method: classified.method,
   removedObjectSamples: classified.removedCount,
+  removesTallUrbanObjects: true,
   preservesSlopedTerrain: true,
   tileAddressing: true
 }, null, 2));

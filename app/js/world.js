@@ -102,7 +102,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=23";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=24";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=38";
 import {
   batchLanduseMeshes,

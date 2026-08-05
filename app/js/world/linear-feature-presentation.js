@@ -1,4 +1,4 @@
-import { appendUpwardRibbonGeometry } from '../road-render.js?v=2';
+import { appendUpwardRibbonGeometry } from '../road-render.js?v=4';
 
 const FEATURE_COLORS = Object.freeze({
   cycleway: 0x8ca99a,

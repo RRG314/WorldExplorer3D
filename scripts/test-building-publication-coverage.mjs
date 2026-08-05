@@ -10,10 +10,10 @@ const desktopDense = resolveBuildingPublicationSelection({
   useRdtBudgeting: true
 });
 
-assert.equal(desktopDense.globalCap, 26000, 'desktop publication must not be truncated at the legacy 12k ceiling');
+assert.equal(desktopDense.globalCap, 9000, 'initial interactive publication must remain bounded');
 assert.equal(desktopDense.basePerTile, 1200, 'dense tiles must retain complete footprint coverage');
 assert.equal(desktopDense.useRdt, false, 'recursive-depth thinning must not punch holes in building coverage');
-assert.ok(desktopDense.coreRatio >= 0.75, 'global overflow must preserve a contiguous central district');
+assert.ok(desktopDense.coreRatio >= 0.9, 'global overflow must preserve a contiguous central district');
 
 const deviceScaled = resolveBuildingPublicationSelection({
   maxBuildingWays: 7000,
@@ -27,7 +27,7 @@ assert.equal(deviceScaled.globalCap, 7000, 'device-scaled global safety ceiling 
 console.log(JSON.stringify({
   ok: true,
   contract: 'building-publication-coverage',
-  legacyTwelveThousandCapRemoved: true,
+  interactivePublicationBounded: true,
   recursiveTileThinningDisabled: true,
   contiguousCenterReserved: true,
   deviceScaledGlobalCapPreserved: true
