@@ -49,6 +49,13 @@ const DEVELOPED_SURFACES = new Set([
 ]);
 const surfaceCompositionCache = new Map();
 
+function landusePresentationOwner(kind = '') {
+  const normalizedKind = String(kind || '').toLowerCase();
+  return normalizedKind === 'water' || normalizedKind === 'parking' || normalizedKind === 'paved'
+    ? 'mapped_geometry'
+    : 'terrain_worldcover';
+}
+
 function surfaceComposition(kind = '', role = 'land-cover') {
   const normalizedKind = String(kind || '').toLowerCase();
   const normalizedRole = String(role || '').toLowerCase();
@@ -397,6 +404,7 @@ export {
   createSurfaceSample,
   createSurfaceTileDescriptor,
   earthTraversalBounds,
+  landusePresentationOwner,
   provenanceFor,
   surfaceComposition
 };

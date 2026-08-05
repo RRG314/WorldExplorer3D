@@ -1,25 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import {
-  appendUpwardRibbonGeometry,
-  buildIndexedBatchMesh,
-  createRoadSurfaceMaterials
-} from "../road-render.js?v=2";
-import {
-  buildFeatureRibbonEdges,
-  roadSkirtDepth,
-  sampleFeatureSurfaceY,
-  shouldRenderRoadSkirts,
-  updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=38";
+import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=40";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
-import { detectRoadIntersections } from "../terrain/intersections.js?v=2";
-import {
-  appendRoadJunctionGeometry,
-  prepareRoadJunctionEnvelopes
-} from "../terrain/road-junctions.js?v=4";
-import {
-  normalizeTransportSource
-} from "./compiler/transport-source-normalizer.js?v=1";
+import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=1";
+import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.08;
 
@@ -42,7 +25,10 @@ export function applySafeTunnelRoadPresentation(structureSemantics) {
   };
 }
 
-export function buildRoadGeometryPass(options = {}) {
+// This pass owns transport feature compilation only. Visual publication is
+// intentionally deferred until accepted terrain and structure profiles are
+// ready, when the final terrain authority creates the sole road mesh set.
+export async function buildRoadGeometryPass(options = {}) {
   const roadWays = Array.isArray(options.roadWays) ? options.roadWays : [];
   const nodes = options.nodes || {};
   const geometryGuards = options.geometryGuards || {};
@@ -63,30 +49,18 @@ export function buildRoadGeometryPass(options = {}) {
   const getRoadSubdivisionStep = options.getRoadSubdivisionStep;
   const polylineBounds = options.polylineBounds;
   const worldBaseTerrainY = options.worldBaseTerrainY;
-  const appendIndexedGeometry = options.appendIndexedGeometry;
+  const yieldEveryRoads = Math.max(1, Math.floor(Number(options.yieldEveryRoads) || 32));
+  const yieldToMainThread = typeof options.yieldToMainThread === 'function'
+    ? options.yieldToMainThread
+    : defaultYieldToMainThread;
 
   showLoad(`Loading roads... (${roadWays.length})`);
   startLoadPhase('buildRoadGeometry');
 
-  const roadMainBatchVerts = [];
-  const roadMainBatchIdx = [];
-  const roadSkirtBatchVerts = [];
-  const roadSkirtBatchIdx = [];
-  const roadMarkBatchVerts = [];
-  const roadMarkBatchIdx = [];
-
-  const {
-    roadMainMaterial,
-    roadSkirtMaterial,
-    roadMarkMaterial
-  } = createRoadSurfaceMaterials({
-    asphaltTex: appCtx.asphaltTex,
-    asphaltNormal: appCtx.asphaltNormal,
-    asphaltRoughness: appCtx.asphaltRoughness,
-    includeMarkings: true
-  });
-
-  roadWays.forEach((way) => {
+  let yieldCount = 0;
+  for (let roadIndex = 0; roadIndex < roadWays.length; roadIndex += 1) {
+    const way = roadWays[roadIndex];
+    try {
     const rawNodeRecords = way.nodes
       .map((id) => ({ id: String(id), node: nodes[id] }))
       .filter((entry) => entry.node);
@@ -94,7 +68,7 @@ export function buildRoadGeometryPass(options = {}) {
       appCtx.geoToWorld(entry.node.lat, entry.node.lon)
     );
     const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-    if (pts.length < 2) return;
+    if (pts.length < 2) continue;
 
     const type = way.tags?.highway || 'residential';
     const structureSemantics = applySafeTunnelRoadPresentation(
@@ -130,7 +104,7 @@ export function buildRoadGeometryPass(options = {}) {
       structureSemantics?.rampCandidate ? Math.min(roadSubdivideStepBase, 0.65) :
       roadSubdivideStepBase;
     const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
-    if (decimatedRoadPts.length < 2) return;
+    if (decimatedRoadPts.length < 2) continue;
 
     const roadFeature = {
       pts: decimatedRoadPts,
@@ -168,148 +142,24 @@ export function buildRoadGeometryPass(options = {}) {
       registerBridgeGuardrails(roadFeature);
     }
 
-    const hw = width / 2;
-    const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
-      appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
-      decimatedRoadPts;
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
-    loadMetrics.roads.subdividedPoints += subdPts.length;
-
-    const verts = [];
-    const indices = [];
-    const { leftEdge, rightEdge } = buildFeatureRibbonEdges(roadFeature, subdPts, hw, worldBaseTerrainY, {
-      surfaceBias: ROAD_SURFACE_BIAS
-    });
-    appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
-    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
-    loadMetrics.roads.vertices += verts.length / 3;
-
-    if (typeof appCtx.buildRoadSkirts === 'function' && shouldRenderRoadSkirts(roadFeature)) {
-      const skirtDepth = roadSkirtDepth(roadFeature);
-      const skirtData = appCtx.buildRoadSkirts(
-        leftEdge,
-        rightEdge,
-        skirtDepth,
-        roadFeature.structureSemantics?.terrainMode === 'at_grade' ? worldBaseTerrainY : null
-      );
-      if (skirtData.verts.length > 0) {
-        appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
-        loadMetrics.roads.vertices += skirtData.verts.length / 3;
+    } finally {
+      if ((roadIndex + 1) % yieldEveryRoads === 0 && roadIndex + 1 < roadWays.length) {
+        yieldCount += 1;
+        await yieldToMainThread();
       }
     }
+  }
 
-    if (
-      roadFeature.structureSemantics?.terrainMode === 'at_grade' &&
-      width >= 8.4 &&
-      (type.includes('motorway') || type.includes('trunk') || type.includes('primary'))
-    ) {
-      const markVerts = [];
-      const markIdx = [];
-      const mw = 0.15;
-      const dashLen = 6;
-      const gapLen = 6;
-      let dist = 0;
-      for (let i = 0; i < decimatedRoadPts.length - 1; i++) {
-        const p1 = decimatedRoadPts[i];
-        const p2 = decimatedRoadPts[i + 1];
-        const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-        const dx = (p2.x - p1.x) / segLen;
-        const dz = (p2.z - p1.z) / segLen;
-        const nx = -dz;
-        const nz = dx;
-        let segDist = 0;
-        while (segDist < segLen) {
-          if (Math.floor((dist + segDist) / (dashLen + gapLen)) % 2 === 0) {
-            const x = p1.x + dx * segDist;
-            const z = p1.z + dz * segDist;
-            const len = Math.min(dashLen, segLen - segDist);
-            const endX = x + dx * len;
-            const endZ = z + dz * len;
-            const y = sampleFeatureSurfaceY(roadFeature, x, z) + 0.01;
-            const endY = sampleFeatureSurfaceY(roadFeature, endX, endZ) + 0.01;
-            if (!Number.isFinite(y) || !Number.isFinite(endY)) {
-              segDist += dashLen + gapLen;
-              continue;
-            }
-            const vi = markVerts.length / 3;
-            markVerts.push(
-              x + nx * mw, y, z + nz * mw,
-              x - nx * mw, y, z - nz * mw,
-              endX + nx * mw, endY, endZ + nz * mw,
-              endX - nx * mw, endY, endZ - nz * mw
-            );
-            markIdx.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3);
-          }
-          segDist += dashLen + gapLen;
-        }
-        dist += segLen;
-      }
-      if (markVerts.length > 0) {
-        appendIndexedGeometry(roadMarkBatchVerts, roadMarkBatchIdx, markVerts, markIdx);
-        loadMetrics.roads.vertices += markVerts.length / 3;
-      }
-    }
-  });
-
-  const intersections = detectRoadIntersections(appCtx.roads);
-  prepareRoadJunctionEnvelopes(intersections, appCtx.roads);
-  const junctionStats = appendRoadJunctionGeometry({
-    intersections,
-    roads: appCtx.roads,
-    verts: roadMainBatchVerts,
-    indices: roadMainBatchIdx
-  });
-
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadMainBatchVerts,
-    indices: roadMainBatchIdx,
-    material: roadMainMaterial,
-    renderOrder: 2,
-    userData: { isRoadBatch: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadSkirtBatchVerts,
-    indices: roadSkirtBatchIdx,
-    material: roadSkirtMaterial,
-    renderOrder: 1,
-    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadMarkBatchVerts,
-    indices: roadMarkBatchIdx,
-    material: roadMarkMaterial,
-    renderOrder: 3,
-    userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-
-  appCtx.transportSurfacePublication = Object.freeze({
-    authority: 'compiled_transport_surface',
-    transportGraphId: appCtx.transportNetworkModel?.id || null,
-    roadCount: appCtx.roads.length,
-    meshCount: appCtx.roadMeshes.length,
-    intersectionCount: junctionStats.count,
-    topologyIntersectionCount: intersections.filter((intersection) =>
-      !intersection?.hasGradeSeparatedRoad
-    ).length,
-    compiledSampleCount: appCtx.roads.reduce((total, road) =>
-      total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
-    vertices:
-      roadMainBatchVerts.length / 3 +
-      roadSkirtBatchVerts.length / 3 +
-      roadMarkBatchVerts.length / 3,
-    triangles:
-      roadMainBatchIdx.length / 3 +
-      roadSkirtBatchIdx.length / 3 +
-      roadMarkBatchIdx.length / 3,
-    worldLoadSequence: appCtx._worldLoadSequence || 0
-  });
-
+  loadMetrics.roads.initialMeshPublications = 0;
+  loadMetrics.roads.featureCompilationYieldCount = yieldCount;
+  loadMetrics.roads.featureCompilationChunkSize = yieldEveryRoads;
   endLoadPhase('buildRoadGeometry');
+  return Object.freeze({
+    roadCount: appCtx.roads.length,
+    meshCount: 0,
+    authority: 'transport_feature_compiler',
+    yieldCount
+  });
 }

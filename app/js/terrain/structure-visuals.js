@@ -3,7 +3,7 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=38";
+} from "../structure-semantics.js?v=40";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext

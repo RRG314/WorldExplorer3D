@@ -314,14 +314,10 @@ export async function fetchOvertureBuildingData(options = {}) {
 
 export async function fetchGlobalBuildingData(options = {}, onFallback = null) {
   try {
-    const data = await fetchOvertureBuildingData(options);
-    if (data?._overtureBuildings?.coverageComplete !== true) {
-      throw new Error(
-        `Overture building coverage incomplete (${data?._overtureBuildings?.loadedTiles || 0}/` +
-        `${data?._overtureBuildings?.requestedTiles || 0} tiles)`
-      );
-    }
-    return data;
+    // A partial archive response still contains authoritative footprints.
+    // Discarding every fulfilled tile because one neighboring tile failed
+    // turned dense locations into the much sparser fallback dataset.
+    return await fetchOvertureBuildingData(options);
   } catch (error) {
     if (typeof onFallback === 'function') onFallback(error);
     return fetchShortbreadBuildingData(options);

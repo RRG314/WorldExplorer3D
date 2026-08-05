@@ -1,4 +1,4 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=38";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
 
 function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY) {
   return { x, y, z, scaleX, scaleY, scaleZ, rotationY };

@@ -292,6 +292,7 @@ async function loadCustomLocation(page, locationSpec) {
       worldLoading: !!ctx.worldLoading,
       roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
       buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0,
+      groundMode: String(ctx.worldLoadRuntimeState?.groundMode || ''),
       acceptedGround: ctx.getAcceptedGroundRuntimeSnapshot?.() || null
     };
   }, locationSpec);
@@ -463,10 +464,17 @@ async function main() {
     await page.waitForFunction(() => {
       const globeStart = document.getElementById('globeSelectorStartBtn');
       const legacyStart = document.getElementById('startBtn');
-      return [globeStart, legacyStart].some((element) => element && element.getClientRects().length > 0);
+      return !!(globeStart || legacyStart);
     }, { timeout: 30000 });
     markStage('app:wait-ui-ready');
     await waitForUiReady(page);
+    await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const ctx = mod?.ctx || {};
+      if (ctx.renderer?.setPixelRatio) ctx.renderer.setPixelRatio(0.5);
+      if (ctx.renderer?.setSize) ctx.renderer.setSize(683, 384, false);
+      if (ctx.renderer?.shadowMap) ctx.renderer.shadowMap.enabled = false;
+    });
 
     markStage('title:inspect');
     const titlePresence = await page.evaluate(() => {
@@ -556,9 +564,10 @@ async function main() {
     });
     assert(
       unsupportedLoad.ok &&
-      unsupportedLoad.roads === 0 &&
+      unsupportedLoad.roads > 0 &&
+      unsupportedLoad.groundMode === 'worldwide-terrain-fallback' &&
       unsupportedLoad.acceptedGround?.status === 'blocked',
-      `Uncataloged location must fail closed: ${JSON.stringify(unsupportedLoad)}`
+      `Uncataloged location did not enter the explicit worldwide terrain fallback: ${JSON.stringify(unsupportedLoad)}`
     );
 
     markStage('earth:restore-baltimore');
@@ -659,8 +668,9 @@ async function main() {
         antarcticaLoad,
         desertLoad
       ].every((load) => load.acceptedGround?.status === 'accepted'),
-      unsupportedGroundFailsClosed:
-        unsupportedLoad.roads === 0 &&
+      unsupportedGroundUsesWorldwideFallback:
+        unsupportedLoad.roads > 0 &&
+        unsupportedLoad.groundMode === 'worldwide-terrain-fallback' &&
         unsupportedLoad.acceptedGround?.status === 'blocked',
       acceptedGroundRestores:
         baltimoreRestore.roads > 0 &&

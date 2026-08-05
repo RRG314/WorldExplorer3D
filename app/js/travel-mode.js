@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=6";
+import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=7";
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';

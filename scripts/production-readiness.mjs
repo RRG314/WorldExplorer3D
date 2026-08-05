@@ -24,6 +24,13 @@ export function evaluateRuntimeReadiness(report = {}, preWaterMetrics = {}) {
   const linearFeatureCount =
     Number(report.linearFeatures || 0) +
     Number(preWaterMetrics.linearFeatures || 0);
+  const linearFeaturePolicyDisabled = report.linearFeaturePolicyEnabled === false;
+  const disabledLinearFeaturePolicyHonored =
+    linearFeaturePolicyDisabled &&
+    linearFeatureCount === 0 &&
+    Number(report.linearFeatureMeshCount || 0) === 0 &&
+    !report.walkFeatureRoute &&
+    !report.walkSurfaceSample;
 
   return Object.freeze({
     roadCenterDriveable:
@@ -49,13 +56,15 @@ export function evaluateRuntimeReadiness(report = {}, preWaterMetrics = {}) {
         RUNTIME_READINESS_MINIMUMS.maximumLaneCollisionRatePct
       ),
     linearFeatureNavigationReady:
-      linearFeatureCount > 0 &&
-      finiteAtLeast(report.linearFeatureMeshCount, 1) &&
-      report.solidLinearMaterials === true &&
-      report.walkFeatureRoute?.ok === true &&
-      finiteAtLeast(report.walkFeatureRoute?.pointCount, 2) &&
-      Number.isFinite(Number(report.walkSurfaceSample?.yDelta)) &&
-      Math.abs(Number(report.walkSurfaceSample.yDelta)) <= 1,
+      disabledLinearFeaturePolicyHonored || (
+        linearFeatureCount > 0 &&
+        finiteAtLeast(report.linearFeatureMeshCount, 1) &&
+        report.solidLinearMaterials === true &&
+        report.walkFeatureRoute?.ok === true &&
+        finiteAtLeast(report.walkFeatureRoute?.pointCount, 2) &&
+        Number.isFinite(Number(report.walkSurfaceSample?.yDelta)) &&
+        Math.abs(Number(report.walkSurfaceSample.yDelta)) <= 1
+      ),
     acceptedGroundRuntimeReady:
       acceptedGround.prepareExposed === true &&
       acceptedGround.coverageGateExposed === true &&

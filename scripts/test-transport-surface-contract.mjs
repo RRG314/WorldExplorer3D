@@ -298,6 +298,60 @@ assert.ok(
 );
 assert.equal(shortTieInModel.endpointPolicy, 'hard_transition_tie_in');
 
+const infeasibleConnectedTieIn = straightFeature({
+  id: 'infeasible-connected-tie-in',
+  length: 18,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:2:bridge'
+  }
+});
+infeasibleConnectedTieIn.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 20, source: 'connected_feature' },
+  { endpoint: 'end', distance: 18, targetOffset: 11, span: 20, source: 'connected_feature' }
+];
+const infeasibleTieInModel = compileTransportSurfaceModel(infeasibleConnectedTieIn, () => 30, {
+  sampleStep: 0.5
+});
+assert.ok(
+  infeasibleTieInModel.stats.maximumGrade <= 0.1201,
+  'infeasible connected endpoint offsets bypassed the grade limit'
+);
+
+const clearanceConstrainedTieIn = straightFeature({
+  id: 'clearance-constrained-tie-in',
+  length: 67.44,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+clearanceConstrainedTieIn.minimumStructureSurfaceY = 42;
+clearanceConstrainedTieIn.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 58, source: 'connected_feature' },
+  { endpoint: 'end', distance: 67.44, targetOffset: 0, span: 58, source: 'connected_feature' }
+];
+const clearanceConstrainedModel = compileTransportSurfaceModel(
+  clearanceConstrainedTieIn,
+  () => 30,
+  { sampleStep: 1 }
+);
+assert.ok(
+  clearanceConstrainedModel.stats.minimumY >= 42 - EPSILON,
+  'an infeasible endpoint tie-in pulled the bridge below its clearance envelope'
+);
+assert.ok(
+  clearanceConstrainedModel.stats.maximumGrade <= 0.1201,
+  'an infeasible endpoint tie-in reintroduced an unsafe bridge grade'
+);
+
 const layerOnlyDriveway = straightFeature({
   id: 'layer-only-driveway',
   length: 52,
@@ -371,6 +425,29 @@ const rampModel = compileTransportSurfaceModel(ramp, () => 20, {
 assert.ok(rampModel.stats.maximumGrade <= 0.1001, 'ramp grade exceeded ten percent');
 assert.ok(rampModel.stats.maximumGradeDelta <= 0.02, 'ramp introduced an abrupt vertical kink');
 assert.ok(sampleTransportSurfaceAtDistance(rampModel, 139) > sampleTransportSurfaceAtDistance(rampModel, 1) + 7.7);
+
+const longTerrainConformingRoad = straightFeature({
+  id: 'long-terrain-conforming-road',
+  length: 1200,
+  semantics: {
+    terrainMode: 'at_grade',
+    gradeSeparated: false,
+    verticalGroup: 'at_grade:0:at_grade'
+  }
+});
+updateFeatureSurfaceProfile(longTerrainConformingRoad, () => 20);
+const longRoadDistances = longTerrainConformingRoad.transportSurfaceModel.distances;
+let maximumLongRoadSampleGap = 0;
+for (let index = 1; index < longRoadDistances.length; index += 1) {
+  maximumLongRoadSampleGap = Math.max(
+    maximumLongRoadSampleGap,
+    longRoadDistances[index] - longRoadDistances[index - 1]
+  );
+}
+assert.ok(
+  maximumLongRoadSampleGap <= 2.01,
+  'long at-grade roads were sampled too coarsely to remain above rendered terrain'
+);
 
 const stackGround = () => 40;
 const stackModels = [

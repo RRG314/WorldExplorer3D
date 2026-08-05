@@ -35,6 +35,15 @@ const blockedBaseline = evaluateRuntimeReadiness({
 assert.equal(blockedBaseline.roadCenterDriveable, false);
 assert.equal(blockedBaseline.laneEdgeReasonable, false);
 assert.equal(blockedBaseline.linearFeatureNavigationReady, false);
+
+const policyDisabled = evaluateRuntimeReadiness({
+  linearFeaturePolicyEnabled: false,
+  linearFeatures: 0,
+  linearFeatureMeshCount: 0,
+  walkFeatureRoute: null,
+  walkSurfaceSample: null
+});
+assert.equal(policyDisabled.linearFeatureNavigationReady, true);
 assert.equal(blockedBaseline.acceptedGroundRuntimeReady, false);
 
 const productionReady = evaluateRuntimeReadiness({

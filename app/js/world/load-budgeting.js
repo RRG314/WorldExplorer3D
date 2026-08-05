@@ -104,15 +104,13 @@ export function prepareWorldFeatureSelections(options = {}) {
     element.tags &&
     !!element.tags.waterway
   );
-  const waterwayWays = options.baselineFullWorld === true ?
-    allWaterwayWays :
-    limitWaysByTileBudget(allWaterwayWays, nodes, {
-      globalCap: Math.max(240, Math.floor(maxLanduseWays * 0.8)),
-      basePerTile: Math.max(20, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
-      minPerTile: Math.max(8, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
-      tileDegrees: tileBudgetCfg.tileDegrees,
-      useRdt: useRdtBudgeting
-    });
+  const waterwayWays = limitWaysByTileBudget(allWaterwayWays, nodes, {
+    globalCap: Math.max(120, Math.floor(maxLanduseWays * 0.8)),
+    basePerTile: Math.max(12, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
+    minPerTile: Math.max(6, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
+    tileDegrees: tileBudgetCfg.tileDegrees,
+    useRdt: useRdtBudgeting
+  });
 
   const allRailwayWays = enableLinearFeatures ? data.elements.filter((element) =>
     element.type === 'way' &&

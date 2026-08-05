@@ -182,19 +182,65 @@ function applyStationInfluence(feature, semantics, distance, totalDistance, init
   return semantics?.terrainMode === 'at_grade' ? 0 : offset;
 }
 
-function applyEndpointTieIns(feature, heights, distances, endpointGroundStart, endpointGroundEnd, surfaceBias) {
+function applyEndpointTieIns(
+  feature,
+  heights,
+  distances,
+  endpointGroundStart,
+  endpointGroundEnd,
+  surfaceBias,
+  maximumGrade
+) {
   const anchors = Array.isArray(feature?.structureTransitionAnchors)
     ? feature.structureTransitionAnchors.filter((anchor) =>
         anchor?.endpoint === 'start' || anchor?.endpoint === 'end')
     : [];
   if (anchors.length === 0 || heights.length === 0) return heights;
   const total = finiteNumber(distances[distances.length - 1]);
+  const grade = Math.max(0.01, finiteNumber(maximumGrade, DEFAULT_MAX_GRADE));
+  const anchorByEndpoint = new Map(anchors.map((anchor) => [anchor.endpoint, anchor]));
+  const desiredByEndpoint = new Map();
+  if (anchorByEndpoint.has('start')) {
+    desiredByEndpoint.set(
+      'start',
+      endpointGroundStart + finiteNumber(anchorByEndpoint.get('start').targetOffset) + surfaceBias
+    );
+  }
+  if (anchorByEndpoint.has('end')) {
+    desiredByEndpoint.set(
+      'end',
+      endpointGroundEnd + finiteNumber(anchorByEndpoint.get('end').targetOffset) + surfaceBias
+    );
+  }
+  if (desiredByEndpoint.has('start') && desiredByEndpoint.has('end')) {
+    const startAnchor = anchorByEndpoint.get('start');
+    const endAnchor = anchorByEndpoint.get('end');
+    const startDesired = desiredByEndpoint.get('start');
+    const endDesired = desiredByEndpoint.get('end');
+    const maximumDelta = grade * total;
+    if (Math.abs(endDesired - startDesired) > maximumDelta) {
+      const preserveStart =
+        startAnchor?.source === 'open_structure_transition' ||
+        endAnchor?.source !== 'open_structure_transition' &&
+          Math.abs(finiteNumber(startAnchor?.targetOffset)) <= Math.abs(finiteNumber(endAnchor?.targetOffset));
+      if (preserveStart) {
+        desiredByEndpoint.set(
+          'end',
+          startDesired + clamp(endDesired - startDesired, -maximumDelta, maximumDelta)
+        );
+      } else {
+        desiredByEndpoint.set(
+          'start',
+          endDesired + clamp(startDesired - endDesired, -maximumDelta, maximumDelta)
+        );
+      }
+    }
+  }
   const corrected = new Float64Array(heights);
   for (const anchor of anchors) {
     const atStart = anchor.endpoint === 'start';
     const endpointIndex = atStart ? 0 : corrected.length - 1;
-    const endpointGround = atStart ? endpointGroundStart : endpointGroundEnd;
-    const desired = endpointGround + finiteNumber(anchor.targetOffset) + surfaceBias;
+    const desired = desiredByEndpoint.get(anchor.endpoint);
     const correction = desired - corrected[endpointIndex];
     const span = Math.max(1, Math.min(total, finiteNumber(anchor.span, total * 0.35)));
     for (let index = 0; index < corrected.length; index += 1) {
@@ -203,6 +249,22 @@ function applyEndpointTieIns(feature, heights, distances, endpointGroundStart, e
       const weight = 1 - smoothstep01(clamp(fromEndpoint / span, 0, 1));
       corrected[index] += correction * weight;
     }
+  }
+  const startDesired = desiredByEndpoint.get('start');
+  const endDesired = desiredByEndpoint.get('end');
+  for (let index = 0; index < corrected.length; index += 1) {
+    let lower = Number.NEGATIVE_INFINITY;
+    let upper = Number.POSITIVE_INFINITY;
+    if (Number.isFinite(startDesired)) {
+      lower = Math.max(lower, startDesired - grade * distances[index]);
+      upper = Math.min(upper, startDesired + grade * distances[index]);
+    }
+    if (Number.isFinite(endDesired)) {
+      const fromEnd = total - distances[index];
+      lower = Math.max(lower, endDesired - grade * fromEnd);
+      upper = Math.min(upper, endDesired + grade * fromEnd);
+    }
+    corrected[index] = clamp(corrected[index], lower, upper);
   }
   return new Float32Array(corrected);
 }
@@ -529,8 +591,21 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       sampleDistances,
       endpointGroundStart,
       endpointGroundEnd,
-      surfaceBias
+      surfaceBias,
+      maximumGrade
     );
+    if (Number.isFinite(minimumStructureSurfaceY)) {
+      // Endpoint corrections can pull a clearance-constrained short structure
+      // below its compiled envelope and reintroduce an unsafe grade. Reconcile
+      // that failure class once, lifting the infeasible tie-in instead of
+      // publishing a deck that vehicles cannot remain on.
+      centerHeights = smoothGradeLimitedProfile(
+        centerHeights,
+        centerLowerBounds,
+        sampleDistances,
+        maximumGrade
+      );
+    }
   }
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating

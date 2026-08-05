@@ -30,4 +30,76 @@ export function updateVehicleSurface(appCtx, dt) {
   return car.surfaceDynamics;
 }
 
+export function sampleEarthVehicleGroundContact(appCtx, options = {}) {
+  const x = Number(options.x) || 0;
+  const z = Number(options.z) || 0;
+  const angle = Number(options.angle) || 0;
+  const currentY = Number.isFinite(Number(options.currentY)) ? Number(options.currentY) : NaN;
+  const preferRoad = options.preferRoad !== false;
+  const halfWheelBase = Math.max(0.5, Number(options.halfWheelBase) || 1.45);
+  const halfTrack = Math.max(0.35, Number(options.halfTrack) || 0.85);
+  const forwardX = Math.sin(angle);
+  const forwardZ = Math.cos(angle);
+  const rightX = Math.cos(angle);
+  const rightZ = -Math.sin(angle);
+  const points = [
+    { id: 'center', x, z },
+    { id: 'front', x: x + forwardX * halfWheelBase, z: z + forwardZ * halfWheelBase },
+    { id: 'rear', x: x - forwardX * halfWheelBase, z: z - forwardZ * halfWheelBase },
+    { id: 'right', x: x + rightX * halfTrack, z: z + rightZ * halfTrack },
+    { id: 'left', x: x - rightX * halfTrack, z: z - rightZ * halfTrack }
+  ];
+  const samples = points.map((point) => {
+    const sample = appCtx.SurfaceQuery?.driveAt?.(point.x, point.z, { preferRoad, currentY });
+    return {
+      ...point,
+      y: Number(sample?.position?.y),
+      kind: String(sample?.kind || ''),
+      feature: sample?.feature || null
+    };
+  }).filter((sample) => Number.isFinite(sample.y));
+  if (samples.length === 0) return null;
+  const rawById = Object.fromEntries(samples.map((sample) => [sample.id, sample]));
+  const center = rawById.center || samples[0];
+  const centerY = center.y;
+  // A narrow mountain road can put the left/right footprint probes just
+  // outside the asphalt. Those probes belong to the adjacent hillside, not
+  // the vehicle's suspension. Once the center owns a road deck, accept only
+  // road samples on the same vertically continuous deck.
+  const roadCentered = center.kind === 'road';
+  const supportSamples = roadCentered
+    ? samples.filter((sample) =>
+        sample.kind === 'road' &&
+        (
+          sample.feature === center.feature ||
+          Math.abs(sample.y - centerY) <= 2.5
+        )
+      )
+    : samples;
+  const byId = Object.fromEntries(supportSamples.map((sample) => [sample.id, sample]));
+  const frontY = Number.isFinite(byId.front?.y) ? byId.front.y : centerY;
+  const rearY = Number.isFinite(byId.rear?.y) ? byId.rear.y : centerY;
+  const rightY = Number.isFinite(byId.right?.y) ? byId.right.y : centerY;
+  const leftY = Number.isFinite(byId.left?.y) ? byId.left.y : centerY;
+  return Object.freeze({
+    centerY,
+    supportY: Math.max(centerY, ...supportSamples.map((sample) => sample.y)),
+    pitch: Math.max(-0.55, Math.min(0.55, -Math.atan2(frontY - rearY, halfWheelBase * 2))),
+    roll: Math.max(-0.45, Math.min(0.45, Math.atan2(rightY - leftY, halfTrack * 2))),
+    sampleCount: samples.length,
+    supportSampleCount: supportSamples.length,
+    roadCentered
+  });
+}
+
+export function stabilizeEarthVehicleSurfaceY(rawSurfaceY, previousSurfaceY, dt, speed = 0) {
+  const raw = Number(rawSurfaceY);
+  const previous = Number(previousSurfaceY);
+  if (!Number.isFinite(raw)) return Number.isFinite(previous) ? previous : 0;
+  if (!Number.isFinite(previous)) return raw;
+  const step = Math.max(0, Math.min(0.05, Number(dt) || 0));
+  const maximumDownwardStep = Math.max(0.35, step * (8 + Math.abs(Number(speed) || 0) * 0.45));
+  return Math.max(raw, previous - maximumDownwardStep);
+}
+
 export { SURFACE_PROFILES };

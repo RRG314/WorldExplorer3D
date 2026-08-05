@@ -5,6 +5,7 @@ import {
   createSurfaceQuery,
   createSurfaceSample,
   createSurfaceTileDescriptor,
+  landusePresentationOwner,
   provenanceFor,
   surfaceComposition
 } from '../app/js/world/surface-contract.js';
@@ -135,6 +136,12 @@ for (let index = 1; index < surfaceOrder.length; index += 1) {
   assert.ok(surfaceOrder[index].surfaceOffset > surfaceOrder[index - 1].surfaceOffset);
 }
 assert.ok(surfaceComposition('', 'road').layer > surfaceOrder.at(-1).layer);
+assert.equal(landusePresentationOwner('grass'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('farmland'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('residential'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('parking'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('paved'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('water'), 'mapped_geometry');
 
 const projectedPointSamples = [];
 const projectedAtGradeFeature = {

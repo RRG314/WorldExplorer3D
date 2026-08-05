@@ -1,11 +1,13 @@
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=38";
+} from "../structure-semantics.js?v=40";
 import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=5";
+
+const STRUCTURE_COLLIDER_POLICY = 'covered-only-tunnels-withheld-until-trustworthy-portals';
 
 function pointAtDistance(feature, profile, distance) {
   const points = feature?.pts;
@@ -189,5 +191,6 @@ export function refreshStructureColliders(appCtx, features = []) {
     addBuildingToSpatialIndex(collider);
   }
   appCtx.transportStructureColliders = colliders;
+  appCtx.transportStructureColliderPolicy = STRUCTURE_COLLIDER_POLICY;
   return colliders;
 }

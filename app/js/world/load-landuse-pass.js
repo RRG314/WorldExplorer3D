@@ -1,47 +1,7 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
-import { surfaceComposition } from './surface-contract.js?v=10';
+import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=11';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
-
-const SOIL_LANDUSE_TYPES = new Set([
-  'farmland', 'farmyard', 'orchard', 'vineyard', 'allotments',
-  'plant_nursery', 'greenhouse_horticulture'
-]);
-const ROCK_LANDUSE_TYPES = new Set(['barren', 'quarry', 'landfill']);
-const PAVED_LANDUSE_TYPES = new Set(['paved', 'parking']);
-
-function surfaceModeForLanduse(landuseType) {
-  if (landuseType === 'forest' || landuseType === 'wood') return 'forest';
-  if (landuseType === 'sand' || landuseType === 'dune') return 'sand';
-  if (landuseType === 'glacier') return 'snow';
-  if (SOIL_LANDUSE_TYPES.has(landuseType)) return 'soil';
-  if (ROCK_LANDUSE_TYPES.has(landuseType)) return 'rock';
-  if (PAVED_LANDUSE_TYPES.has(landuseType)) return 'pavement';
-  return 'grass';
-}
-
-function textureSetForLanduse(appCtx, landuseType) {
-  const mode = surfaceModeForLanduse(landuseType);
-  const registered = appCtx.surfaceTextureSets?.[mode];
-  if (registered?.map) return { ...registered, mode };
-  if (mode === 'pavement' && appCtx.pavementDiffuse) {
-    return {
-      map: appCtx.pavementDiffuse,
-      normalMap: appCtx.pavementNormal,
-      roughnessMap: appCtx.pavementRoughness,
-      mode
-    };
-  }
-  if (mode === 'grass' && appCtx.grassDiffuse) {
-    return {
-      map: appCtx.grassDiffuse,
-      normalMap: appCtx.grassNormal,
-      roughnessMap: appCtx.grassRoughness,
-      mode
-    };
-  }
-  return null;
-}
 
 function applyWorldSpaceSurfaceUvs(geometry, metersPerTile) {
   const positions = geometry?.attributes?.position;
@@ -84,16 +44,12 @@ function sampleWaterPolygonInteriorHeights(appCtx, ring, holes, bounds) {
   return samples;
 }
 
-function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
-  const textures = textureSetForLanduse(appCtx, landuseType);
-  const metersPerTile =
-    textures?.mode === 'pavement' ? 3.2 :
-    textures?.mode === 'forest' ? 5.5 :
-    textures?.mode === 'rock' ? 5 :
-    textures?.mode === 'soil' ? 6 :
-    textures?.mode === 'sand' ? 8 :
-    textures?.mode === 'snow' ? 9 :
-    7;
+function hardscapeMaterialOptions(appCtx, landuseType, composition) {
+  const textures = appCtx.surfaceTextureSets?.pavement?.map
+    ? appCtx.surfaceTextureSets.pavement
+    : appCtx.pavementDiffuse
+      ? { map: appCtx.pavementDiffuse, normalMap: appCtx.pavementNormal, roughnessMap: appCtx.pavementRoughness }
+      : null;
   return {
     material: {
       color: textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
@@ -101,7 +57,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
       normalScale: textures?.normalMap ? new THREE.Vector2(0.34, 0.34) : undefined,
-      roughness: textures?.mode === 'pavement' ? 0.9 : 0.95,
+      roughness: 0.9,
       metalness: 0.0,
       transparent: false,
       opacity: 1,
@@ -110,7 +66,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
       polygonOffsetFactor: composition.polygonOffsetFactor,
       polygonOffsetUnits: composition.polygonOffsetUnits
     },
-    metersPerTile
+    metersPerTile: 3.2
   };
 }
 
@@ -135,12 +91,6 @@ export function createWorldLandusePass(options = {}) {
     worldLinePointsFromLonLat
   } = options;
 
-  const visibleMappedSurfaceTypes = new Set([
-    'forest', 'wood', 'park', 'garden', 'grass', 'meadow', 'scrub',
-    'orchard', 'vineyard', 'allotments', 'farmland', 'farmyard',
-    'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
-    'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
-  ]);
   const ensureWaterSurfaceRegistry = () => appCtx.waterSurfaceRegistry ||
     (appCtx.waterSurfaceRegistry = createWaterSurfaceRegistry());
 
@@ -191,6 +141,18 @@ export function createWorldLandusePass(options = {}) {
       maxZ = Math.max(maxZ, point.z);
     });
 
+    if (landusePresentationOwner(landuseType) === 'terrain_worldcover') {
+      appCtx.landuses.push({
+        type: landuseType,
+        pts: ring,
+        bounds: { minX, maxX, minZ, maxZ },
+        semanticOnly: true,
+        presentationOwner: 'terrain_worldcover',
+        sourceFeatureId: featureMeta.sourceFeatureId || null
+      });
+      return true;
+    }
+
     const sampledHeights = [];
     let avgElevation = 0;
     ring.forEach((point) => {
@@ -223,9 +185,6 @@ export function createWorldLandusePass(options = {}) {
     }
 
     const isWater = landuseType === 'water';
-    const isExplicitHardscape = landuseType === 'paved' || landuseType === 'parking';
-    const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
-    const isMappedSurface = !!appCtx.LANDUSE_STYLES?.[landuseType];
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const composition = surfaceComposition(landuseType, isWater ? 'water' : 'land-cover');
     const waterBounds = { minX, maxX, minZ, maxZ };
@@ -307,7 +266,7 @@ export function createWorldLandusePass(options = {}) {
       );
     }
 
-    const mappedSurface = isWater ? null : mappedSurfaceMaterialOptions(appCtx, landuseType, composition);
+    const mappedSurface = isWater ? null : hardscapeMaterialOptions(appCtx, landuseType, composition);
     if (!isWater) applyWorldSpaceSurfaceUvs(geometry, mappedSurface.metersPerTile);
     const material = new THREE.MeshStandardMaterial(isWater ? {
       color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
@@ -342,7 +301,7 @@ export function createWorldLandusePass(options = {}) {
     mesh.userData.avgElevation = surfaceBaseElevation;
     // Mapped surface ownership must not pop in and out as the camera crosses
     // an LOD radius. Geometry detail may change, but the land-use layer stays.
-    mesh.userData.alwaysVisible = isWater || isExplicitHardscape || isMappedGroundCover || isMappedSurface;
+    mesh.userData.alwaysVisible = true;
     mesh.userData.landuseType = landuseType;
     mesh.userData.waterFlattenFactor = waterFlattenFactor;
     mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;

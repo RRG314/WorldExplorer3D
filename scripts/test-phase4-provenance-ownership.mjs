@@ -18,7 +18,7 @@ import {
   createBuildingRoadFootprintGuards
 } from '../app/js/world/building-road-footprint.js';
 
-const roadFootprintGuards = createBuildingRoadFootprintGuards({
+const roadFootprintGuards = await createBuildingRoadFootprintGuards({
   roads: [{
     pts: [{ x: -5, z: -8 }, { x: 5, z: -8 }],
     width: 8
@@ -30,16 +30,17 @@ const roadEnclosingFootprint = [
   { x: 50, z: 40 },
   { x: -50, z: 40 }
 ];
-const legacyRoadCoreSamples = roadFootprintGuards.sampleFootprintCoverage(
-  roadEnclosingFootprint,
-  roadFootprintGuards.pointOnRoadCore
-);
-assert.equal(legacyRoadCoreSamples.inside, 0);
-assert.equal(legacyRoadCoreSamples.centroidInside, false);
 assert.equal(
-  roadFootprintGuards.footprintContainsRoadCore(roadEnclosingFootprint),
+  roadFootprintGuards.footprintIntersectsRoadCenterline(roadEnclosingFootprint),
   true,
   'A building enclosing a road core must be rejected even when its boundary and centroid miss the road.'
+);
+assert.equal(
+  roadFootprintGuards.footprintIntersectsRoadCenterline([
+    { x: -8, z: -4 }, { x: 8, z: -4 }, { x: 8, z: 8 }, { x: -8, z: 8 }
+  ]),
+  false,
+  'An adjacent building must not be deleted merely because it shares a coarse road grid cell.'
 );
 
 const mappedBuilding = compileBuildingProvenance({

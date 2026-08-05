@@ -1,6 +1,16 @@
 const PRIMARY_TRAVEL_MODE_ORDER = Object.freeze(['walk', 'drive', 'plane', 'drone']);
 const MAX_STEERING_ANGLE_RAD = 1.22;
 
+function earthDrivingSteeringProfile(speed = 0) {
+  const speedAbs = Math.abs(Number(speed) || 0);
+  const steerBlend = Math.max(0, Math.min(1, (speedAbs - 5) / 105));
+  const yawBlend = Math.max(0, Math.min(1, 1 - speedAbs / 78));
+  return Object.freeze({
+    maxSteeringAngle: 1.02 + (0.42 - 1.02) * steerBlend,
+    maxYawRate: 1.08 + 1.46 * yawBlend
+  });
+}
+
 function nextPrimaryTravelMode(currentMode = 'walk') {
   const index = PRIMARY_TRAVEL_MODE_ORDER.indexOf(String(currentMode || ''));
   return PRIMARY_TRAVEL_MODE_ORDER[(index + 1 + PRIMARY_TRAVEL_MODE_ORDER.length) % PRIMARY_TRAVEL_MODE_ORDER.length];
@@ -130,6 +140,7 @@ export {
   aircraftChaseOffset,
   aircraftBankTurnFactor,
   aircraftForwardVector,
+  earthDrivingSteeringProfile,
   integrateAerobaticAttitude,
   nextPrimaryTravelMode,
   projectSteeringArc,

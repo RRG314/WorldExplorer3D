@@ -11,7 +11,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=30";
+} from "./surface-profiles.js?v=31";
 import { stitchTerrainMeshEdges } from "./seams.js?v=1";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
@@ -561,7 +561,7 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   return mesh;
 }
 
-export function applyHeightsToTerrainMesh(mesh, deps = {}) {
+export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   const info = mesh.userData?.terrainTile;
   if (!info) return;
 
@@ -581,6 +581,12 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   }
 
   const pos = mesh.geometry.attributes.position;
+  const cachedBaseElevations = mesh.userData?.baseTerrainWorldY;
+  const reuseBaseElevations = options.reuseBaseElevations === true &&
+    cachedBaseElevations?.length === pos.count;
+  const nextBaseElevations = reuseBaseElevations
+    ? cachedBaseElevations
+    : new Float64Array(pos.count);
   const latRange = bounds.latN - bounds.latS || 1;
   const lonRange = bounds.lonE - bounds.lonW || 1;
 
@@ -598,10 +604,15 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + mesh.position.x;
     const wz = pos.getZ(i) + mesh.position.z;
-    const { lat, lon } = worldToLatLon(wx, wz);
     let meters;
     let acceptedSample = null;
-    if (acceptedSampler) {
+    if (reuseBaseElevations) {
+      const unitsPerMeter =
+        (appCtx.WORLD_UNITS_PER_METER || 1) *
+        (appCtx.TERRAIN_Y_EXAGGERATION || 1);
+      meters = nextBaseElevations[i] / unitsPerMeter;
+    } else if (acceptedSampler) {
+      const { lat, lon } = worldToLatLon(wx, wz);
       acceptedSample = acceptedSampler(lat, lon);
       if (
         acceptedSample?.status !== 'available' ||
@@ -632,6 +643,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
         };
       }
     } else {
+      const { lat, lon } = worldToLatLon(wx, wz);
       if (i === 0) {
         mesh.userData.renderProvenance = {
           version: 1,
@@ -685,6 +697,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
     }
     elevationMetersSamples.push(meters);
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
+    if (!reuseBaseElevations) nextBaseElevations[i] = baseY;
     const structureY = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
     const y = typeof deps.resolveWaterTerrainY === "function"
       ? deps.resolveWaterTerrainY(wx, wz, structureY, waterTerrainContext)
@@ -704,6 +717,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   mesh.geometry.computeVertexNormals();
   stitchTerrainMeshEdges(appCtx, mesh);
   mesh.userData.pendingTerrainTile = false;
+  mesh.userData.baseTerrainWorldY = nextBaseElevations;
   mesh.userData.waterMaskedVertices = waterMaskedVertices;
   mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;

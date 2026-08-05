@@ -2,8 +2,8 @@ import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=34";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=9";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=16";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=13";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=18";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
@@ -92,7 +92,6 @@ export function createWorldRoadLoader(deps = {}) {
     addBuildingToSpatialIndex,
     addWaterwayRibbon,
     appCtx,
-    appendIndexedGeometry,
     applyBuildingContextSemanticsToFeature,
     batchLanduseMeshes,
     buildBuildingGeometryGuards,
@@ -380,6 +379,18 @@ export function createWorldRoadLoader(deps = {}) {
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         buildWaterGeometryGuards(geometryGuards);
+        // Buildings use an independent provider. Start that request while the
+        // transport source is in flight instead of serializing two network
+        // waits on the critical path.
+        const preferredBuildingDataPromise = fetchGlobalBuildingData({
+          lat: appCtx.LOC.lat,
+          lon: appCtx.LOC.lon,
+          radius: buildingPublicationCacheMeta.featureRadius
+        }, (error) => recordLoadWarning('Overture building massing prefetch', error))
+          .catch((error) => {
+            recordLoadWarning('Overture building massing prefetch', error);
+            return null;
+          });
         startLoadPhase('fetchOverpass');
         let data;
         try {
@@ -465,8 +476,7 @@ export function createWorldRoadLoader(deps = {}) {
               allowWorldwideTerrainFallback: worldwideFallback
             });
         }
-        buildRoadGeometryPass({
-          appendIndexedGeometry,
+        const roadFeatureCompilation = await buildRoadGeometryPass({
           classifyStructureSemantics,
           cloneStructureSemantics,
           decimateRoadCenterlineByDepth,
@@ -488,8 +498,12 @@ export function createWorldRoadLoader(deps = {}) {
           wayCenterLatLon,
           worldBaseTerrainY
         });
-        // Navigation requires graph identity even when terrain publication is deferred.
-        refreshStructureAwareFeatureProfiles();
+        if (roadFeatureCompilation?.meshCount !== 0 || appCtx.roadMeshes.length !== 0) {
+          throw new Error('Road feature compilation published visual meshes before final terrain authority');
+        }
+        if (runtimeState) {
+          runtimeState.roadFeatureCompilation = roadFeatureCompilation;
+        }
         // Building publication is deferred to the Phase 4 authority pass.
         // Publishing the district-source footprints here and then appending an
         // Overture/OSM detail pass creates two owners for the same buildings.
@@ -515,7 +529,9 @@ export function createWorldRoadLoader(deps = {}) {
           railwayWays: normalizedSelection.railwayWays,
           startLoadPhase,
           structureConnectorWays: normalizedSelection.structureConnectorWays,
-          deferStructureRefresh: false
+          // Roads, connectors, and buildings are all known only at finalization.
+          // Compiling here would publish a graph that is immediately discarded.
+          deferStructureRefresh: true
         });
         buildWorldDetailPasses({
           endLoadPhase,
@@ -539,11 +555,7 @@ export function createWorldRoadLoader(deps = {}) {
             endLoadPhase,
             fetchOverpassJSON,
             fetchPreferredMetadata: () => fetchBundledBuildingMetadata?.({ locationKey: appCtx.selLoc, lat: appCtx.LOC.lat, lon: appCtx.LOC.lon }),
-            fetchPreferredData: () => fetchGlobalBuildingData({
-                lat: appCtx.LOC.lat,
-                lon: appCtx.LOC.lon,
-                radius: buildingPublicationCacheMeta.featureRadius
-              }, (error) => recordLoadWarning('Overture building massing fallback', error)),
+            fetchPreferredData: () => preferredBuildingDataPromise,
             isActiveLoadContext,
             location: { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon },
             limitWaysByTileBudget,
@@ -559,7 +571,6 @@ export function createWorldRoadLoader(deps = {}) {
             query: buildingPublicationQuery,
             rdtLoadComplexity,
             recordLoadWarning,
-            refreshStructureAwareFeatureProfiles,
             registerBuildingCollision,
             sanitizeWorldFootprintPoints,
             signedPolygonAreaXZ,

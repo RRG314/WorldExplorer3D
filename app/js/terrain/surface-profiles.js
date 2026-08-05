@@ -416,12 +416,39 @@ function applyLoadedWorldCoverBaseline(mesh) {
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
     applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
-  mesh.userData.terrainDetailProvenance = null;
   if (result.texture) {
-    result.texture.dispose?.();
-    result.texture = null;
+    const detailMode =
+      result.dominantClass === 'built' ? 'urban' :
+      result.dominantClass === 'crop' ? 'soil' :
+      result.dominantClass === 'bare' ? (semanticProfile?.mode === 'sand' ? 'sand' : 'rock') :
+      result.dominantClass === 'snow' ? 'snow' :
+      result.dominantClass === 'tree' || result.dominantClass === 'mangrove' ? 'forest' :
+      'grass';
+    const detailTextures = ensureTerrainTextureSet(
+      mesh,
+      Number(mesh.userData.terrainTextureRepeats) || 12,
+      detailMode
+    );
+    material.map = result.texture;
+    material.normalMap = detailTextures?.normalMap || null;
+    material.roughnessMap = detailTextures?.roughnessMap || null;
+    if (material.normalMap) material.normalScale = new THREE.Vector2(0.28, 0.28);
+    material.color.setHex(0xffffff);
+    material.emissiveMap = null;
+    material.emissiveIntensity = 0;
+    material.roughness = 0.96;
+    material.metalness = 0;
+    material.needsUpdate = true;
+    mesh.userData.terrainDetailProvenance = {
+      kind: 'spatial-worldcover-pbr',
+      source: result.source,
+      mode: detailMode
+    };
+  } else {
+    mesh.userData.terrainDetailProvenance = null;
   }
-  mesh.userData.worldCoverTexture = null;
+  mesh.userData.worldCoverTexture = result.texture || null;
+  appCtx.scheduleWorldCoverVegetationRefresh?.();
   return true;
 }
 

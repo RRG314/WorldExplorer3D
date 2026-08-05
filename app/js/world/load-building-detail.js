@@ -161,7 +161,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
       options.loadMetrics.buildings.selected = buildingWays.length;
       options.loadMetrics.buildings.provenancePublicationCap = provenancePublicationCap;
       options.loadMetrics.buildings.publicationSelection = publicationSelection;
-      options.buildBuildingGeometryPass({
+      const buildingPublication = await options.buildBuildingGeometryPass({
         buildingGeometryGuards: options.buildingGeometryGuards,
         buildingWays,
         featureMinPolygonArea: options.featureMinPolygonArea,
@@ -178,13 +178,14 @@ export async function loadBuildingDetailForPublication(options = {}) {
         endLoadPhase: options.endLoadPhase,
         useRdtBudgeting: options.useRdtBudgeting
       });
+      options.loadMetrics.buildings.geometryPublication = buildingPublication;
       appCtx.buildingProvenanceModel = createBuildingProvenanceSnapshot(
         appCtx.buildingProvenanceRecords || []
       );
       if (!isActiveLoadContext()) return;
 
-      options.refreshStructureAwareFeatureProfiles?.();
-      appCtx.refreshTerrainSurfaceProfiles?.();
+      // Structure and terrain profiles are compiled once by final world
+      // publication after all bounded building data is present.
       appCtx.clearTerrainHeightCache?.();
       options.updateWorldLod?.(true);
       setBuildingDetailState('ready', {

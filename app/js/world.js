@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=38";
+} from "./structure-semantics.js?v=40";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -34,7 +34,7 @@ import {
   initWorldOsmLoader,
   invalidateOverpassCaches,
   sameLocation
-} from "./world/osm-loader.js?v=15";
+} from "./world/osm-loader.js?v=16";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -47,7 +47,7 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=6";
+} from "./world/budgets.js?v=9";
 import {
   initWorldLod,
   updateWorldLod
@@ -60,15 +60,15 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=25";
+} from "./world/load-support.js?v=27";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=11";
+} from "./world/load-reset.js?v=12";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=4";
+} from "./world/load-budgeting.js?v=5";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -102,13 +102,13 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=19";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=32";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=23";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=37";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=7";
+} from "./world/render-support.js?v=10";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -162,15 +162,15 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=19";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=83";
+} from "./world/structure-aware.js?v=21";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=89";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=7";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=24";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=9";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=13";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -185,6 +185,8 @@ const LINEAR_FEATURE_POLICY = Object.freeze({
   railway: false
 });
 const ENABLE_LINEAR_FEATURES = Object.values(LINEAR_FEATURE_POLICY).some(Boolean);
+appCtx.linearFeaturePolicy = LINEAR_FEATURE_POLICY;
+appCtx.linearFeaturePolicyEnabled = ENABLE_LINEAR_FEATURES;
 const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   ENABLE_LINEAR_FEATURES,
   LINEAR_FEATURE_POLICY,

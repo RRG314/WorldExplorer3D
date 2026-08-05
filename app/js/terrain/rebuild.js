@@ -6,7 +6,8 @@ import {
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=38";
+} from "../structure-semantics.js?v=40";
+
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 import {
   computeIntersectionCapRadius,
@@ -288,23 +289,13 @@ export function publishCompiledTransportMeshes(deps = {}) {
 
     const baseDetail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
     const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;
-    const detail =
+    const requestedDetail =
       road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade" ?
         Math.min(baseDetail, 0.55) :
         hasTransitionAnchors ?
           Math.min(baseDetail, 0.6) :
           baseDetail;
-    const basePts = subdivideRoadPoints(road.pts, detail);
-    const endpointIntersectionRefs = {
-      start: intersections.find((intersection) =>
-        !intersection?.hasGradeSeparatedRoad &&
-        intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === 0)
-      ) || null,
-      end: intersections.find((intersection) =>
-        !intersection?.hasGradeSeparatedRoad &&
-        intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === road.pts.length - 1)
-      ) || null
-    };
+    const basePts = subdivideRoadPoints(road.pts, requestedDetail);
     // Preserve the source road as one continuous ribbon. A separate
     // intersection-cap pass previously trimmed these endpoints and filled
     // junctions with fan polygons, exposing circles and triangle boundaries.
@@ -315,41 +306,12 @@ export function publishCompiledTransportMeshes(deps = {}) {
     const indices = [];
     const leftEdge = [];
     const rightEdge = [];
-    const roadBounds = road.bounds || pointsBoundsLocal(road.pts, width * 0.5 + URBAN_CONTEXT_PAD);
-    const contextBounds = expandBoundsLocal(roadBounds, URBAN_CONTEXT_PAD);
-    const contextCenterX = (contextBounds.minX + contextBounds.maxX) * 0.5;
-    const contextCenterZ = (contextBounds.minZ + contextBounds.maxZ) * 0.5;
-    const contextRadius = Math.max(
-      20,
-      Math.hypot(contextBounds.maxX - contextBounds.minX, contextBounds.maxZ - contextBounds.minZ) * 0.5
-    );
-    const nearbyBuildings = typeof appCtx.getNearbyBuildings === "function" ?
-      appCtx.getNearbyBuildings(contextCenterX, contextCenterZ, contextRadius) :
-      appCtx.buildings;
-    const buildingCandidates = Array.isArray(nearbyBuildings) ? nearbyBuildings.filter((building) =>
-      boundsIntersectLocal(building, contextBounds)
-    ) : [];
-    const nearbyLanduses = Array.isArray(appCtx.landuses) ? appCtx.landuses.filter((landuse) =>
-      boundsIntersectLocal(landuse.bounds || pointsBoundsLocal(landuse.pts || []), contextBounds)
-    ) : [];
-    const nearbyUrbanLanduses = nearbyLanduses.filter((landuse) => isUrbanLanduseType(landuse?.type)).length;
-    const explicitSidewalkHint = roadHasExplicitSidewalkHint(road);
-    const denseUrbanContext =
-      nearbyUrbanLanduses >= 2 ||
-      buildingCandidates.length >= 12 ||
-      (buildingCandidates.length >= 8 && width >= 9) ||
-      (nearbyUrbanLanduses >= 1 && buildingCandidates.length >= 5);
     // The detached sidewalk extrusion has no junction/topology authority and
     // produces pale floating strips on steep or fragmented OSM ways. Preserve
     // the mapped sidewalk hint for navigation, but do not publish competing
     // geometry until it can share the road/junction surface contract.
     const shouldBuildSidewalks = false;
-    const sidewalkWidth = shouldBuildSidewalks ? roadBaseSidewalkWidth(road, denseUrbanContext) : 0;
-    const nearbyIntersections = shouldBuildSidewalks ? intersections.filter((intersection) =>
-      !intersection?.hasGradeSeparatedRoad &&
-      boundsIntersectLocal(roadBounds, { minX: intersection.x, maxX: intersection.x, minZ: intersection.z, maxZ: intersection.z }, Math.max(width * 1.1, 8))
-    ) : [];
-    const endpointIntersections = shouldBuildSidewalks ? endpointIntersectionRefs : null;
+    const sidewalkWidth = 0;
 
     const roadTerrainSampler = road?.structureSemantics?.terrainMode === "at_grade" ?
       cachedTerrainHeight :
@@ -378,6 +340,37 @@ export function publishCompiledTransportMeshes(deps = {}) {
     }
 
     if (shouldBuildSidewalks) {
+      const roadBounds = road.bounds || pointsBoundsLocal(road.pts, width * 0.5 + URBAN_CONTEXT_PAD);
+      const contextBounds = expandBoundsLocal(roadBounds, URBAN_CONTEXT_PAD);
+      const contextCenterX = (contextBounds.minX + contextBounds.maxX) * 0.5;
+      const contextCenterZ = (contextBounds.minZ + contextBounds.maxZ) * 0.5;
+      const contextRadius = Math.max(
+        20,
+        Math.hypot(contextBounds.maxX - contextBounds.minX, contextBounds.maxZ - contextBounds.minZ) * 0.5
+      );
+      const nearbyBuildings = typeof appCtx.getNearbyBuildings === "function"
+        ? appCtx.getNearbyBuildings(contextCenterX, contextCenterZ, contextRadius)
+        : appCtx.buildings;
+      const buildingCandidates = Array.isArray(nearbyBuildings)
+        ? nearbyBuildings.filter((building) => boundsIntersectLocal(building, contextBounds))
+        : [];
+      const nearbyIntersections = intersections.filter((intersection) =>
+        !intersection?.hasGradeSeparatedRoad &&
+        boundsIntersectLocal(roadBounds, {
+          minX: intersection.x,
+          maxX: intersection.x,
+          minZ: intersection.z,
+          maxZ: intersection.z
+        }, Math.max(width * 1.1, 8))
+      );
+      const endpointIntersections = {
+        start: nearbyIntersections.find((intersection) =>
+          intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === 0)
+        ) || null,
+        end: nearbyIntersections.find((intersection) =>
+          intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === road.pts.length - 1)
+        ) || null
+      };
       const allowLeft = road.sidewalkHint !== "right";
       const allowRight = road.sidewalkHint !== "left";
       if (allowLeft) {
@@ -538,4 +531,5 @@ export function publishCompiledTransportMeshes(deps = {}) {
       roadMarkBatchIdx.length / 3,
     worldLoadSequence: appCtx._worldLoadSequence || 0
   });
+  return appCtx.transportSurfacePublication;
 }

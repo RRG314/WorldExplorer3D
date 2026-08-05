@@ -10,6 +10,7 @@ import {
 import {
   MAX_STEERING_ANGLE_RAD,
   arcadeSteeringYawTarget,
+  earthDrivingSteeringProfile,
   aircraftBankTurnFactor,
   aircraftChaseOffset,
   aircraftForwardVector,
@@ -21,6 +22,10 @@ import {
 import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
 import { shouldSuppressBoatTerrain } from '../app/js/boat-mode/surface-effects.js';
+import {
+  sampleEarthVehicleGroundContact,
+  stabilizeEarthVehicleSurfaceY
+} from '../app/js/physics/vehicle-surface.js';
 import fs from 'node:fs';
 import { PLANE_MAX_SPEED_MPS } from '../app/js/plane-mode.js';
 
@@ -97,6 +102,39 @@ assert.ok(forwardLeftArc.angle > 0 && reverseLeftArc.angle < 0, 'reverse chassis
 assert.ok(MAX_STEERING_ANGLE_RAD < Math.PI / 2);
 assert.ok(arcadeSteeringYawTarget(-3, 1.8, 2.6, 3) < 0, 'extreme reverse steering crossed the tangent singularity');
 assert.ok(arcadeSteeringYawTarget(-3, -1.8, 2.6, 3) > 0, 'extreme reverse-right steering crossed the tangent singularity');
+const highwaySteering = earthDrivingSteeringProfile(95);
+assert.ok(highwaySteering.maxSteeringAngle >= 0.4, 'high-speed steering angle is too weak for arcade driving');
+assert.ok(highwaySteering.maxYawRate >= 1.0, 'high-speed yaw authority is too weak for evasive turns');
+const steepGroundContact = sampleEarthVehicleGroundContact({
+  SurfaceQuery: {
+    driveAt: (x, z) => ({ position: { y: 20 + x * 0.7 + z * 0.25 } })
+  }
+}, { x: 0, z: 0, angle: 0, currentY: 20 });
+assert.equal(steepGroundContact.sampleCount, 5);
+assert.ok(steepGroundContact.supportY > steepGroundContact.centerY, 'vehicle footprint did not retain uphill support');
+assert.ok(Math.abs(steepGroundContact.pitch) > 0.1, 'vehicle did not align to the steep longitudinal grade');
+assert.ok(Math.abs(steepGroundContact.roll) > 0.1, 'vehicle did not align to the steep cross-grade');
+const mountainRoad = { id: 'mountain-road' };
+const mountainRoadContact = sampleEarthVehicleGroundContact({
+  SurfaceQuery: {
+    driveAt: (x, z) => {
+      const lateralTerrain = Math.abs(x) > 0.5;
+      return lateralTerrain
+        ? { kind: 'terrain', position: { y: x > 0 ? 48 : 8 } }
+        : { kind: 'road', feature: mountainRoad, position: { y: 20 + z * 0.12 } };
+    }
+  }
+}, { x: 0, z: 0, angle: 0, currentY: 20, preferRoad: true });
+assert.equal(mountainRoadContact.roadCentered, true);
+assert.equal(mountainRoadContact.sampleCount, 5);
+assert.equal(mountainRoadContact.supportSampleCount, 3);
+assert.ok(mountainRoadContact.supportY < 21, 'adjacent mountainside lifted the road-centered car');
+assert.ok(Math.abs(mountainRoadContact.roll) < 1e-9, 'adjacent mountainside rolled the road-centered car');
+assert.ok(Math.abs(mountainRoadContact.pitch) > 0.05, 'road grade was lost while filtering mountainside probes');
+assert.ok(
+  stabilizeEarthVehicleSurfaceY(0, 120, 1 / 60, 40) > 119,
+  'one transient low terrain sample could still drop the car through a steep surface'
+);
 
 clearControlInputState('double-tap-contract');
 assert.equal(registerPlaneTurnTap('ArrowRight', 1000), 0);

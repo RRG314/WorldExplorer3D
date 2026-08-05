@@ -1,13 +1,21 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=38";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=40";
 import { updateDrone } from "./physics/drone-flight.js?v=7";
 import { updatePlane } from "./plane-mode.js?v=16";
-import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
+import {
+  sampleEarthVehicleGroundContact,
+  stabilizeEarthVehicleSurfaceY,
+  updateVehicleSurface
+} from "./physics/vehicle-surface.js?v=4";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=2";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
-import { arcadeSteeringYawTarget, resolveCarDriveCommand } from "./controls/traversal-control-policy.js?v=6";
+import {
+  arcadeSteeringYawTarget,
+  earthDrivingSteeringProfile,
+  resolveCarDriveCommand
+} from "./controls/traversal-control-policy.js?v=7";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -304,16 +312,10 @@ function update(dt) {
     appCtx.car._driveDirection = driveDirection;
   }
 
-  const maxSteerLow = 1.02;
-  const maxSteerHigh = 0.28;
-  const steerFadeMin = 5;
-  const steerFadeMax = 95;
-
-  let steerAlpha = 0;
-  if (spdAbs > steerFadeMin) {
-    steerAlpha = Math.min(1, (spdAbs - steerFadeMin) / (steerFadeMax - steerFadeMin));
-  }
-  const maxSteer = maxSteerLow + (maxSteerHigh - maxSteerLow) * steerAlpha;
+  const earthSteering = earthDrivingSteeringProfile(spdAbs);
+  const maxSteer = isPlanetarySurface()
+    ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90))
+    : earthSteering.maxSteeringAngle;
 
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
@@ -399,7 +401,7 @@ function update(dt) {
   if (!isPlanetarySurface() && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= 1.22;
   }
-  const maxYawRate = isPlanetarySurface() ? Infinity : 0.74 + 1.46 * clamp01(1 - spdAbs / 68);
+  const maxYawRate = isPlanetarySurface() ? Infinity : earthSteering.maxYawRate;
   const yawRateTarget = arcadeSteeringYawTarget(
     v,
     steerAngle * steerAuthority,
@@ -580,10 +582,19 @@ function update(dt) {
     });
   } else if (appCtx.terrainEnabled) {
     const currentY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
-    let surfaceY = appCtx.SurfaceQuery.driveAt(appCtx.car.x, appCtx.car.z, {
-      preferRoad: !!appCtx.car.onRoad,
-      currentY
-    }).position.y;
+    const groundContact = sampleEarthVehicleGroundContact(appCtx, {
+      x: appCtx.car.x,
+      z: appCtx.car.z,
+      angle: appCtx.car.angle,
+      currentY,
+      preferRoad: !!appCtx.car.onRoad
+    });
+    let surfaceY = stabilizeEarthVehicleSurfaceY(
+      groundContact?.supportY,
+      appCtx.car._lastSurfaceY,
+      dt,
+      appCtx.car.speed
+    );
 
     if (typeof appCtx.getBuildVehicleSurfaceAtWorldXZ === 'function') {
       const carFeetY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : surfaceY;
@@ -591,19 +602,22 @@ function update(dt) {
       if (Number.isFinite(buildSurfaceY)) surfaceY = Math.max(surfaceY, buildSurfaceY);
     }
 
+    appCtx.car._lastSurfaceY = surfaceY;
     const targetY = surfaceY + 1.21;
     const speedAbs = Math.abs(appCtx.car.speed || 0);
     if (appCtx.car.y === undefined || appCtx.car.y === 0) {
       carY = targetY;
     } else {
       const diff = targetY - appCtx.car.y;
-      if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
+      if (diff > 20 || Math.abs(diff) < 0.01) {
         carY = targetY;
       } else {
         const baseLerp = 16;
         const speedBoost = Math.min(8, speedAbs * 0.08);
         const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
-        carY = appCtx.car.y + diff * lerpRate;
+        const smoothedY = appCtx.car.y + diff * lerpRate;
+        const maximumDownwardStep = Math.max(0.35, dt * (8 + speedAbs * 0.45));
+        carY = Math.max(smoothedY, appCtx.car.y - maximumDownwardStep);
       }
     }
     // Suspension smoothing may ease a downward change, but it must never lag
@@ -615,11 +629,20 @@ function update(dt) {
     appCtx.car.vy = 0;
     appCtx.car.isAirborne = false;
     appCtx.car._terrainAirTimer = 0;
-    appCtx.car._lastSurfaceY = null;
+    const attitudeBlend = 1 - Math.exp(-dt * 10);
+    appCtx.car.terrainPitch = Number(appCtx.car.terrainPitch || 0) +
+      (Number(groundContact?.pitch || 0) - Number(appCtx.car.terrainPitch || 0)) * attitudeBlend;
+    appCtx.car.terrainRoll = Number(appCtx.car.terrainRoll || 0) +
+      (Number(groundContact?.roll || 0) - Number(appCtx.car.terrainRoll || 0)) * attitudeBlend;
   }
 
   appCtx.carMesh.position.set(appCtx.car.x, carY, appCtx.car.z);
-  appCtx.carMesh.rotation.y = appCtx.car.angle;
+  appCtx.carMesh.rotation.order = 'YXZ';
+  appCtx.carMesh.rotation.set(
+    isPlanetarySurface() ? 0 : Number(appCtx.car.terrainPitch || 0),
+    appCtx.car.angle,
+    isPlanetarySurface() ? 0 : Number(appCtx.car.terrainRoll || 0)
+  );
 
   const wheelRot = appCtx.car.speed * dt * 0.5;
   appCtx.wheelMeshes.forEach((w) => w.rotation.x += wheelRot);

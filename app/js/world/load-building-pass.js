@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=38";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=40";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
@@ -19,16 +19,17 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=5";
+} from "./building-batching.js?v=8";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
-import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=2';
+import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=6';
 import {
   classifyBuildingWaterRelationship,
   createMappedVesselMesh
 } from './water-adjacent-structures.js?v=2';
+import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 
-export function buildBuildingGeometryPass(options = {}) {
+export async function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
   const nodes = options.nodes || {};
   const buildingGeometryGuards = options.buildingGeometryGuards || {};
@@ -82,6 +83,10 @@ export function buildBuildingGeometryPass(options = {}) {
   const signedPolygonAreaXZ = options.signedPolygonAreaXZ;
   const pickBuildingBaseColor = options.pickBuildingBaseColor;
   const registerBuildingCollision = options.registerBuildingCollision;
+  const yieldEveryBuildings = Math.max(1, Math.floor(Number(options.yieldEveryBuildings) || 8));
+  const yieldToMainThread = typeof options.yieldToMainThread === 'function'
+    ? options.yieldToMainThread
+    : defaultYieldToMainThread;
   const curatedLandmarkExclusions = curatedLandmarksNear(appCtx.LOC)
     .filter((landmark) => Number(landmark.hideRadiusMeters) > 0)
     .map((landmark) => ({
@@ -93,20 +98,21 @@ export function buildBuildingGeometryPass(options = {}) {
   showLoad(`Loading buildings... (${buildingWays.length})`);
   startLoadPhase('buildBuildingGeometry');
 
+  startLoadPhase('buildBuildingRoadGuards');
   const {
     expandFootprintForGroundApron,
-    footprintContainsRoadCore,
+    footprintIntersectsRoadCenterline,
     isBuildingNearLoadedRoad,
-    overlapsRoadCore,
     overlapsRoadCorridor,
-    pointOnRoadCore,
     pointOnRoadCorridor,
     sampleFootprintCoverage
-  } = createBuildingRoadFootprintGuards({
+  } = await createBuildingRoadFootprintGuards({
     roads: appCtx.roads,
     useRdtBudgeting,
-    rdtLoadComplexity
+    rdtLoadComplexity,
+    yieldToMainThread
   });
+  endLoadPhase('buildBuildingRoadGuards');
   const insetFootprintForUpperMass = (pts, insetMeters) => {
     if (!Array.isArray(pts) || pts.length < 3 || !Number.isFinite(insetMeters) || insetMeters <= 0) return null;
     let sumX = 0;
@@ -198,13 +204,16 @@ export function buildBuildingGeometryPass(options = {}) {
 
   const lodNearDist = lodThresholds.near;
   const buildingDetailDist = Math.min(lodNearDist, 300);
-  buildingWays.forEach((way) => {
+  let buildingYieldCount = 0;
+  for (let buildingIndex = 0; buildingIndex < buildingWays.length; buildingIndex += 1) {
+    const way = buildingWays[buildingIndex];
+    try {
     loadMetrics.buildingPublication.candidates += 1;
     const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
     const pts = sanitizeWorldFootprintPoints(rawPts, featureMinPolygonArea, buildingGeometryGuards);
     if (pts.length < 3) {
       loadMetrics.buildingPublication.invalidFootprint += 1;
-      return;
+      continue;
     }
     const waterRelationship = classifyBuildingWaterRelationship(
       way.tags || {},
@@ -224,19 +233,18 @@ export function buildBuildingGeometryPass(options = {}) {
         loadMetrics.buildingWater.vessels += 1;
         loadMetrics.buildingPublication.renderedFeatures += 1;
       }
-      return;
+      continue;
     }
     if (!isBuildingNearLoadedRoad(pts)) {
       loadMetrics.buildingPublication.outsideRoadCoverage += 1;
-      return;
+      continue;
     }
-    const roadCoreStats = sampleFootprintCoverage(pts, pointOnRoadCore);
-    if (overlapsRoadCore(roadCoreStats) || footprintContainsRoadCore(pts)) {
+    const roadCoreConflict = footprintIntersectsRoadCenterline(pts);
+    if (roadCoreConflict) {
       loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
       loadMetrics.buildingPublication.roadOverlap += 1;
-      return;
+      continue;
     }
-
     let centerX = 0;
     let centerZ = 0;
     let minFootprintX = Infinity;
@@ -259,14 +267,14 @@ export function buildBuildingGeometryPass(options = {}) {
     if (curatedExclusion) {
       loadMetrics.curatedLandmarkSuppressedBuildings =
         Number(loadMetrics.curatedLandmarkSuppressedBuildings || 0) + 1;
-      return;
+      continue;
     }
     const footprintWidth = Math.max(0, maxFootprintX - minFootprintX);
     const footprintDepth = Math.max(0, maxFootprintZ - minFootprintZ);
     const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
     if (waterRelationship.action === 'suppress_water_overlap') {
       loadMetrics.buildingWater.suppressedOverlaps += 1;
-      return;
+      continue;
     }
     if (waterRelationship.action === 'render_structure') {
       loadMetrics.buildingWater.explicitOverwaterStructures += 1;
@@ -276,7 +284,7 @@ export function buildBuildingGeometryPass(options = {}) {
     if (lodTier === 'far') {
       loadMetrics.lod.farSkipped += 1;
       loadMetrics.buildingPublication.farLod += 1;
-      return;
+      continue;
     }
 
     const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id, appCtx.rdtSeed);
@@ -348,9 +356,6 @@ export function buildBuildingGeometryPass(options = {}) {
       bt === 'office' ||
       bt === 'apartments' ||
       bt === 'hotel';
-    const roadCoreConflict =
-      roadCoreStats.centroidInside ||
-      (roadCoreStats.total > 0 && roadCoreStats.inside >= Math.max(3, Math.ceil(roadCoreStats.total * 0.22)));
     const suppressGroundApron =
       structureSemantics.terrainMode === 'elevated' ||
       roadCoreConflict;
@@ -419,7 +424,7 @@ export function buildBuildingGeometryPass(options = {}) {
       loadMetrics.buildingsRejectedProvenance =
         Number(loadMetrics.buildingsRejectedProvenance || 0) + 1;
       loadMetrics.buildingPublication.provenanceRejected += 1;
-      return;
+      continue;
     }
     if (buildingProvenance.landmark.mapped) way.tags._mappedLandmark = 'yes';
     if (!appCtx.buildingProvenanceFeatureIds.has(buildingProvenance.identity.featureId)) {
@@ -475,7 +480,7 @@ export function buildBuildingGeometryPass(options = {}) {
       }
       if (!geometryHasFinitePositions(geo)) {
         geo.dispose();
-        return;
+        continue;
       }
       const bldgMat = typeof appCtx.getBuildingMaterial === 'function' ?
         appCtx.getBuildingMaterial(bt, bSeed, baseColor, {
@@ -511,7 +516,7 @@ export function buildBuildingGeometryPass(options = {}) {
       mesh.receiveShadow = true;
     }
 
-    if (!mesh) return;
+    if (!mesh) continue;
     mesh.userData.terrainAvgElevation = avgElevation;
     mesh.userData.lodTier = lodTier;
     mesh.userData.sourceBuildingId = sourceBuildingId;
@@ -668,16 +673,32 @@ export function buildBuildingGeometryPass(options = {}) {
         appCtx.landuseMeshes.push(groundPatch);
       });
     }
-  });
+    } finally {
+      if ((buildingIndex + 1) % yieldEveryBuildings === 0 && buildingIndex + 1 < buildingWays.length) {
+        buildingYieldCount += 1;
+        await yieldToMainThread();
+      }
+    }
+  }
 
+  loadMetrics.buildings.geometryChunkSize = yieldEveryBuildings;
+  loadMetrics.buildings.geometryYieldCount = buildingYieldCount;
   endLoadPhase('buildBuildingGeometry');
   startLoadPhase('batchBuildingGeometry');
-  const batchedNearCount = appCtx.disableNearBuildingBatching ? 0 : batchNearLodBuildingMeshes();
+  const batchScheduling = { yieldToMainThread };
+  const batchedNearCount = appCtx.disableNearBuildingBatching
+    ? 0
+    : await batchNearLodBuildingMeshes(batchScheduling);
   if (batchedNearCount > 0) loadMetrics.lod.nearBatched = batchedNearCount;
-  const batchedMidCount = batchMidLodBuildingMeshes();
+  const batchedMidCount = await batchMidLodBuildingMeshes(batchScheduling);
   if (batchedMidCount > 0) loadMetrics.lod.midBatched = batchedMidCount;
   if (appCtx._lastBuildingBatchStats) {
     loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
   }
   endLoadPhase('batchBuildingGeometry');
+  return Object.freeze({
+    candidateCount: buildingWays.length,
+    renderedFeatureCount: Number(loadMetrics.buildingPublication.renderedFeatures || 0),
+    yieldCount: buildingYieldCount
+  });
 }

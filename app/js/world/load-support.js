@@ -60,7 +60,17 @@ export function finalizeLoadedWorld(options = {}) {
     runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
-    runFinalStep('publishCompiledTransportMeshes', () => appCtx.publishCompiledTransportMeshes());
+    const transportPublication = runFinalStep(
+      'publishCompiledTransportMeshes',
+      () => appCtx.publishCompiledTransportMeshes()
+    );
+    if (transportPublication && loadMetrics.roads) {
+      loadMetrics.roads.subdividedPoints = Number(transportPublication.compiledSampleCount || 0);
+      loadMetrics.roads.vertices = Number(transportPublication.vertices || 0);
+      loadMetrics.roads.triangles = Number(transportPublication.triangles || 0);
+      loadMetrics.roads.finalMeshPublications = 1;
+      loadMetrics.structureProfileCompilations = 1;
+    }
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
     runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
@@ -81,14 +91,6 @@ export function finalizeLoadedWorld(options = {}) {
   }
   markLoaded();
   if (finalizePresentation) appCtx.hideLoad();
-  if (typeof appCtx.refreshAstronomicalSky === 'function') {
-    runFinalStep('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
-  } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
-    runFinalStep('alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
-  }
-  if (typeof appCtx.refreshLiveWeather === 'function') {
-    runFinalStep('refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
-  }
   if (finalizePresentation && appCtx.gameStarted) {
     runFinalStep('startMode', () => appCtx.startMode());
   }
