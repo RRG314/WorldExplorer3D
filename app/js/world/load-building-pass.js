@@ -15,7 +15,7 @@ import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
   resolveMappedRoof
-} from "./mapped-roof-geometry.js?v=3";
+} from "./mapped-roof-geometry.js?v=4";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
@@ -532,7 +532,8 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.heightSource = buildingSemantics.heightSource;
     mesh.userData.levels = resolvedLevels;
     mesh.userData.levelsSource = levelsSource;
-    mesh.userData.roofShape = roofShape;
+    mesh.userData.roofShape = mappedRoof?.shape || roofShape;
+    mesh.userData.roofShapeSource = mappedRoof?.roofShapeSource || (roofShape ? 'mapped' : null);
     mesh.userData.facadeMaterial = way.tags['building:material'] || '';
     mesh.userData.roofMaterial = way.tags['roof:material'] || '';
     mesh.userData.geometrySource = way.tags._geometrySource || 'osm';
@@ -566,7 +567,8 @@ export async function buildBuildingGeometryPass(options = {}) {
       levels: resolvedLevels,
       levelsSource,
       heightSource: buildingSemantics.heightSource,
-      roofShape,
+      roofShape: mappedRoof?.shape || roofShape,
+      roofShapeSource: mappedRoof?.roofShapeSource || (roofShape ? 'mapped' : null),
       roofHeight: mappedRoof?.roofHeight,
       roofHeightSource: mappedRoof?.roofHeightSource || null,
       geometrySource: way.tags._geometrySource || 'osm',

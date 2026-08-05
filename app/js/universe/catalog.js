@@ -47,6 +47,11 @@ const SOURCES = Object.freeze({
     id: 'nasa-galex-spitzer-andromeda',
     label: 'NASA GALEX / Spitzer Andromeda composite',
     url: 'https://science.nasa.gov/photojournal/amazing-andromeda-galaxy/'
+  }),
+  nasaMilkyWay: Object.freeze({
+    id: 'nasa-spitzer-milky-way-plane',
+    label: 'NASA Spitzer Galactic Legacy Infrared Mid-Plane Survey Extraordinaire',
+    url: 'https://science.nasa.gov/photojournal/a-glimpse-of-the-milky-way/'
   })
 });
 
@@ -85,7 +90,7 @@ const CATALOG = [
     objectClass: 'universe',
     parentId: null,
     address: 'universe',
-    accuracy: 'model-derived',
+    accuracy: 'observed panorama / model-derived exterior',
     visualProfile: { kind: 'cosmic-web', seed: 1447 },
     provenance: [SOURCES.ned]
   }),
@@ -110,8 +115,18 @@ const CATALOG = [
     accuracy: 'model-derived',
     canonicalPosition: { frame: 'galactocentric', xLy: 0, yLy: 0, zLy: 0 },
     physical: { radiusLy: 50000, thicknessLy: 1000 },
-    visualProfile: { kind: 'barred-spiral', arms: 4, seed: 271828 },
-    provenance: [SOURCES.gaia]
+    visualProfile: {
+      kind: 'barred-spiral',
+      arms: 4,
+      seed: 271828,
+      image: 'assets/textures/universe/milky-way-spitzer.jpg',
+      imageAspect: 4.511,
+      imageCredit: 'NASA/JPL-Caltech/University of Wisconsin',
+      imageSourceUrl: SOURCES.nasaMilkyWay.url,
+      imageRole: 'inside-galaxy-observed-plane'
+    },
+    generatedFlags: ['exterior-spiral-structure', 'display-scaled-rotation'],
+    provenance: [SOURCES.gaia, SOURCES.nasaMilkyWay]
   }),
   entity({
     id: 'sol',
@@ -307,7 +322,7 @@ const CATALOG = [
       tint: 0x89a7ff,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['volumetric-density-model', 'display-time-acceleration'],
+    generatedFlags: ['image-derived-depth-model'],
     uncertainty: { distance: 'Published estimates vary by method and sub-region.' },
     provenance: [SOURCES.nasaOrion]
   }),
@@ -330,7 +345,7 @@ const CATALOG = [
       tint: 0xff9a73,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['volumetric-density-model', 'display-time-acceleration'],
+    generatedFlags: ['image-derived-depth-model'],
     uncertainty: { distance: 'Representative distance to the Carina star-forming complex.' },
     provenance: [SOURCES.nasaCarina]
   }),
@@ -353,7 +368,7 @@ const CATALOG = [
       tint: 0x7ee0b7,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['volumetric-density-model', 'display-time-acceleration'],
+    generatedFlags: ['image-derived-depth-model'],
     provenance: [SOURCES.nasaCrab]
   }),
   entity({

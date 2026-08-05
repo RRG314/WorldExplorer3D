@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
+import { displayScaledGravityMu } from "./gravity-model.js?v=1";
 
 let injectedThree = null;
 let math = null;
@@ -180,53 +181,11 @@ export function forceSpaceFlightLanding(target, deps = {}) {
   return startLandingSequence(body.mesh, body.radius, body.name, deps, duration);
 }
 
-function nearestLandableDistance(rocket, bodies) {
-  let minDist = Infinity;
-  for (let i = 0; i < bodies.length; i++) {
-    const b = bodies[i];
-    if (!b.landable || !b.position) continue;
-    const d = rocket.position.distanceTo(b.position);
-    if (d < minDist) minDist = d;
-  }
-  return minDist;
-}
-
-function sunGravityWeightByLocalBodies(nearestLandableDist) {
-  if (!Number.isFinite(nearestLandableDist)) return 1.0;
-  if (nearestLandableDist <= 2200) return 0;
-  if (nearestLandableDist >= 7000) return 1.0;
-  return (nearestLandableDist - 2200) / (7000 - 2200);
-}
-
-function sunGravityRangeByLocalBodies(nearestLandableDist) {
-  if (!Number.isFinite(nearestLandableDist)) return 35000;
-  if (nearestLandableDist <= 2200) return 0;
-  if (nearestLandableDist >= 7000) return 35000;
-  const t = sunGravityWeightByLocalBodies(nearestLandableDist);
-  return 9000 + t * (35000 - 9000);
-}
-
-function bodyGravityRange(body, nearestLandableDist) {
-  if (!body || !body.name) return 0;
-  if (body.name === 'Sun') return sunGravityRangeByLocalBodies(nearestLandableDist);
-  return Math.max((body.radius || 20) * 95, 900);
-}
-
-function bodyGravityScale(body, nearestLandableDist) {
-  if (!body || !body.name) return 1;
-  if (body.name === 'Sun') return sunGravityWeightByLocalBodies(nearestLandableDist);
-  return 1;
-}
-
-function computeBodyGravityAccel(body, distSq, nearestLandableDist) {
-  const mu = getBodyGravityMu(body);
+function computeBodyGravityAccel(body, distSq) {
+  const mu = displayScaledGravityMu(body);
   if (mu <= 0) return 0;
-
-  const scale = bodyGravityScale(body, nearestLandableDist);
-  if (scale <= 0) return 0;
-
   const accel = mu / (distSq + SPACE_CONSTANTS.GRAVITY_SOFTENING);
-  return Math.min(SPACE_CONSTANTS.MAX_GRAVITY_ACCEL, accel * scale);
+  return Math.min(SPACE_CONSTANTS.MAX_GRAVITY_ACCEL, accel);
 }
 
 function clampTotalGravity(sumVec) {
@@ -249,35 +208,8 @@ function integrateGravityVelocity(gravitySum) {
   return true;
 }
 
-function getBodyGravityMu(body) {
-  const name = String(body?.name || '').toLowerCase();
-  if (name === 'sun') return 3200;
-  if (name === 'jupiter') return 5600;
-  if (name === 'saturn') return 3900;
-  if (name === 'neptune') return 2500;
-  if (name === 'uranus') return 2300;
-  if (name === 'earth') return 1800;
-  if (name === 'venus') return 1400;
-  if (name === 'mars') return 900;
-  if (name === 'mercury') return 700;
-  if (name === 'moon') return 300;
-  if (body?.landable) return 600;
-  return 0;
-}
-
 function shouldApplyGravityFromBody(body) {
-  if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') return false;
-  if (!body || !body.position) return false;
-  const name = String(body.name || '').toLowerCase();
-  if (name === 'sun') return true;
-  if (body.landable) return true;
-  return name === 'mercury' ||
-    name === 'venus' ||
-    name === 'mars' ||
-    name === 'jupiter' ||
-    name === 'saturn' ||
-    name === 'uranus' ||
-    name === 'neptune';
+  return !!body?.position && Number(body.massKg) > 0 && Number(body.physicalRadiusKm) > 0;
 }
 
 function getLaunchAssistState(rocket) {
@@ -315,8 +247,9 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
     return;
   }
 
-  const bodies = appCtx.getAllSpaceBodies();
-  const nearLandableDist = nearestLandableDistance(rocket, bodies);
+  const bodies = appCtx.universeRuntime?.current?.id !== 'sol' ?
+    (appCtx.getUniverseGravityBodies?.() || []) :
+    appCtx.getAllSpaceBodies();
   _sfGravitySum.set(0, 0, 0);
 
   for (let i = 0; i < bodies.length; i++) {
@@ -328,10 +261,7 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
     if (distSq < 1) continue;
 
     const dist = Math.sqrt(distSq);
-    const range = bodyGravityRange(body, nearLandableDist);
-    if (dist > range) continue;
-
-    let accel = computeBodyGravityAccel(body, distSq, nearLandableDist);
+    let accel = computeBodyGravityAccel(body, distSq);
     if (launchAssist && accel > 0) {
       const bodyName = String(body.name || '').toLowerCase();
       if (bodyName === 'sun') {

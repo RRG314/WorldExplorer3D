@@ -37,6 +37,36 @@ function initSolarSystemModel(context, spaceScene) {
   solarSystem.sunMesh.position.set(0, 0, 0);
   solarSystem.group.add(solarSystem.sunMesh);
 
+  new THREE.TextureLoader().load('/app/assets/textures/universe/sun-sdo-2025.jpg', (sourceTexture) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const context2d = canvas.getContext('2d', { willReadFrequently: true });
+    context2d.drawImage(sourceTexture.image, 0, 0, canvas.width, canvas.height);
+    const imageData = context2d.getImageData(0, 0, canvas.width, canvas.height);
+    for (let offset = 0; offset < imageData.data.length; offset += 4) {
+      const brightness = Math.max(imageData.data[offset], imageData.data[offset + 1], imageData.data[offset + 2]);
+      imageData.data[offset + 3] = Math.max(0, Math.min(255, (brightness - 4) * 10));
+    }
+    context2d.putImageData(imageData, 0, 0);
+    const observedTexture = new THREE.CanvasTexture(canvas);
+    if (typeof THREE.SRGBColorSpace !== 'undefined') observedTexture.colorSpace = THREE.SRGBColorSpace;
+    const observedDisk = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: observedTexture,
+      transparent: true,
+      depthWrite: false
+    }));
+    observedDisk.scale.set(solarSystem.SUN_SIZE * 2.06, solarSystem.SUN_SIZE * 2.06, 1);
+    observedDisk.name = 'Sun — NASA SDO observed disk';
+    observedDisk.userData = {
+      imageCredit: 'NASA/GSFC/Solar Dynamics Observatory',
+      imageSourceUrl: 'https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/',
+      observationDate: '2025-09-10'
+    };
+    solarSystem.sunMesh.add(observedDisk);
+    sourceTexture.dispose();
+  });
+
   const glow1Geo = new THREE.SphereGeometry(solarSystem.SUN_SIZE * 1.5, 24, 24);
   const glow1Mat = new THREE.MeshBasicMaterial({
     color: 0xffaa22, transparent: true, opacity: 0.2, side: THREE.BackSide
