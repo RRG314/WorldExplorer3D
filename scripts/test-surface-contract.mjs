@@ -47,11 +47,7 @@ assert.equal(query.getSourceProfile(), SOURCE_PROFILE.LOCATION_OSM);
 assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 2700, originRebase: false });
 appCtx.worldTraversalRadiusWorld = 1800;
 assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 1800, originRebase: false });
-assert.deepEqual(
-  query.clampTraversalPoint(2000, 0, { margin: 5 }),
-  { x: 1795, z: 0, radius: 1795, distance: 2000, limited: true }
-);
-assert.equal(query.clampTraversalPoint(300, 400).limited, false);
+assert.equal('clampTraversalPoint' in query, false, 'Earth traversal must not publish a hidden finite-radius clamp');
 appCtx.worldTraversalRadiusWorld = null;
 assert.equal(query.terrainAt(1, 2).kind, SURFACE_KIND.TERRAIN);
 assert.equal(query.walkAt(1, 2).kind, SURFACE_KIND.ROAD);

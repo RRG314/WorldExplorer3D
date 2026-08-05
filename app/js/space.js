@@ -3,7 +3,7 @@ import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=11";
-import { createSpaceFlightScene, destroySpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=19";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=21";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
@@ -126,6 +126,7 @@ function startSpaceFlightToMoon() {
   hideGameUI();
 
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
@@ -173,14 +174,18 @@ function startSpaceFlightToEarth() {
   if (worldCanvas) worldCanvas.style.display = 'none';
 
   hideGameUI();
-  if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) {
+    createSpaceFlightScene({ includeExtendedSpace: false });
+  }
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
   animateSpaceFlight();
 
-  if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
-  appCtx.showUniverseUI?.();
+  if (appCtx.spaceFlight._extendedSpaceLoaded) {
+    appCtx.showSolarSystemUI?.();
+    appCtx.showUniverseUI?.();
+  }
 
   spaceSessionScope.timeout(() => {
     if (!isCurrentSpaceFlightSession(sessionId, 'earth')) return;
@@ -221,6 +226,7 @@ function startSpaceFlightToMars() {
   hideGameUI();
 
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMars();

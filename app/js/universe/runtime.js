@@ -1,12 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
-import { getGalaxyEntryDestination, resolveUniverseAddress } from './catalog.js?v=6';
+import { getGalaxyEntryDestination, resolveUniverseAddress } from './catalog.js?v=9';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=2';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
-import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=14';
+import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=16';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
@@ -98,7 +98,7 @@ function positionRocketForFrame(entity) {
     rocket.position.copy(earthPosition).add(new THREE.Vector3(0, 180, 420));
     _forward.copy(earthPosition).sub(rocket.position).normalize();
   } else {
-    const distance = entity.objectClass === 'nebula' ? 6500
+    const distance = entity.objectClass === 'nebula' ? 4800
       : entity.objectClass === 'stellar_region' ? 1400
         : entity.objectClass === 'black_hole' ? 1900
           : entity.objectClass === 'galaxy_cluster' ? 2200 : 1100;

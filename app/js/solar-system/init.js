@@ -54,10 +54,12 @@ function initSolarSystemModel(context, spaceScene) {
     const observedDisk = new THREE.Sprite(new THREE.SpriteMaterial({
       map: observedTexture,
       transparent: true,
+      depthTest: false,
       depthWrite: false
     }));
     observedDisk.scale.set(solarSystem.SUN_SIZE * 2.06, solarSystem.SUN_SIZE * 2.06, 1);
     observedDisk.name = 'Sun — NASA SDO observed disk';
+    observedDisk.renderOrder = 20;
     observedDisk.userData = {
       imageCredit: 'NASA/GSFC/Solar Dynamics Observatory',
       imageSourceUrl: 'https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/',

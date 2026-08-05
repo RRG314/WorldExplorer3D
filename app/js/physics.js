@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=40";
-import { updateDrone } from "./physics/drone-flight.js?v=7";
-import { updatePlane } from "./plane-mode.js?v=16";
+import { updateDrone } from "./physics/drone-flight.js?v=8";
+import { updatePlane } from "./plane-mode.js?v=17";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
@@ -561,21 +561,6 @@ function update(dt) {
       appCtx.car.vLat *= 0.08;
       appCtx.car.vx *= 0.08;
       appCtx.car.vz *= 0.08;
-    }
-  }
-
-  if (!isPlanetarySurface()) {
-    const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(nx, nz, { margin: 5 });
-    if (bounded?.limited) {
-      nx = bounded.x;
-      nz = bounded.z;
-      appCtx.car.speed = 0;
-      appCtx.car.vFwd = 0;
-      appCtx.car.vLat = 0;
-      appCtx.car.vx = 0;
-      appCtx.car.vz = 0;
-      appCtx.car.yawRate = 0;
-      appCtx.car.rearSlip = 0;
     }
   }
 

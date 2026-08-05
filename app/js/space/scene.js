@@ -7,9 +7,9 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=16";
+import { initUniverseRuntime } from "../universe/runtime.js?v=18";
 
-export function createSpaceFlightScene() {
+export function createSpaceFlightScene(options = {}) {
   console.log("Creating space flight scene...");
 
   appCtx.spaceFlight.scene = new THREE.Scene();
@@ -58,13 +58,22 @@ export function createSpaceFlightScene() {
   createSpaceMoon();
   createSpaceRocket();
 
+  appCtx.spaceFlight._extendedSpaceLoaded = false;
+  if (options.includeExtendedSpace !== false) ensureExtendedSpaceScene();
+
+  resetSpaceFlightForMoon();
+  console.log("Space flight scene ready!");
+}
+
+export function ensureExtendedSpaceScene() {
+  if (!appCtx.spaceFlight?.scene) return false;
+  if (appCtx.spaceFlight._extendedSpaceLoaded) return true;
   if (typeof appCtx.initSolarSystem === 'function') {
     appCtx.initSolarSystem(appCtx.spaceFlight.scene);
   }
   initUniverseRuntime(appCtx.spaceFlight.scene);
-
-  resetSpaceFlightForMoon();
-  console.log("Space flight scene ready!");
+  appCtx.spaceFlight._extendedSpaceLoaded = true;
+  return true;
 }
 
 function createSpaceEarth() {
@@ -334,6 +343,7 @@ export function destroySpaceFlightScene() {
   appCtx.spaceFlight.renderer?.clear?.();
   appCtx.spaceFlight.renderer = disposeThreeRenderer(appCtx.spaceFlight.renderer);
   appCtx.spaceFlight.scene = null;
+  appCtx.spaceFlight._extendedSpaceLoaded = false;
   appCtx.spaceFlight.camera = null;
   appCtx.spaceFlight.rocket = null;
   appCtx.spaceFlight.earth = null;

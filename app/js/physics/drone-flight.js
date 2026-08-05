@@ -57,12 +57,6 @@ export function updateDrone(dt) {
       appCtx.drone.x *= scale;
       appCtx.drone.z *= scale;
     }
-  } else {
-    const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(appCtx.drone.x, appCtx.drone.z, { margin: 12 });
-    if (bounded?.limited) {
-      appCtx.drone.x = bounded.x;
-      appCtx.drone.z = bounded.z;
-    }
   }
   const elapsed = Math.max(0.001, dt);
   appCtx.drone.vx = (appCtx.drone.x - previousX) / elapsed;

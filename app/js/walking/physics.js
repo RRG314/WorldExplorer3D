@@ -263,14 +263,6 @@ function createWalkingPhysicsHelpers({
 
       let newX = state.walker.x + moveX;
       let newZ = state.walker.z + moveZ;
-      if (!isPlanetarySurface()) {
-        const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(newX, newZ, { margin: 3 });
-        if (bounded?.limited) {
-          newX = bounded.x;
-          newZ = bounded.z;
-        }
-      }
-
       const checkBuildings = !isPlanetarySurface() && (getBuildingsArray || getNearbyBuildings);
       const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === "function";
       if (checkBuildings || checkBuildBlocks) {

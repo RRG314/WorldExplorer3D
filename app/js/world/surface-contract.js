@@ -278,25 +278,6 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
   const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
 
-  function clampTraversalPoint(x, z, options = {}) {
-    const safeX = finiteOr(x, 0);
-    const safeZ = finiteOr(z, 0);
-    const margin = Math.max(0, finiteOr(options.margin, 0));
-    const radius = Math.max(50, finiteOr(traversalBounds().horizontalRadius, 2700) - margin);
-    const distance = Math.hypot(safeX, safeZ);
-    if (distance <= radius || distance <= 1e-6) {
-      return { x: safeX, z: safeZ, radius, distance, limited: false };
-    }
-    const scale = radius / distance;
-    return {
-      x: safeX * scale,
-      z: safeZ * scale,
-      radius,
-      distance,
-      limited: true
-    };
-  }
-
   function terrainAt(x, z) {
     return createSurfaceSample({
       x,
@@ -381,7 +362,6 @@ function createSurfaceQuery(appCtx, GroundHeight) {
 
   return Object.freeze({
     at,
-    clampTraversalPoint,
     createTileDescriptor: (options = {}) => createSurfaceTileDescriptor({ ...options, profile: options.profile || profile() }),
     driveAt,
     getSourceProfile: profile,

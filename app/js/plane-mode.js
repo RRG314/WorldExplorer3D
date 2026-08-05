@@ -514,13 +514,6 @@ function updatePlane(dt) {
   const flightForward = aircraftForwardVector(state.yaw, state.pitch);
   state.x += flightForward.x * state.speed * dt;
   state.z += flightForward.z * state.speed * dt;
-  const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(state.x, state.z, { margin: 30 });
-  if (bounded?.limited) {
-    state.x = bounded.x;
-    state.z = bounded.z;
-    state.speed = Math.min(state.speed, 4);
-    state.throttle = 0;
-  }
   const horizontalMovement = Math.hypot(state.x - previousX, state.z - previousZ);
   const impact = horizontalMovement > 0.05 && state.y - groundY < 520 ?
     buildingImpactAt(state.x, state.y, state.z) :
