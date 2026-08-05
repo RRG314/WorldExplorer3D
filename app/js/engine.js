@@ -103,7 +103,7 @@ function getRenderQualityLevel() {
 }
 
 const CFG = {
-  maxSpd: 120, accel: 12, boostAccel: 25, brake: 150, friction: 25,
+  maxSpd: 120, accel: 18, boostAccel: 36, brake: 150, friction: 25,
   boostMax: 140, boostDur: 2.5,
   brakeForce: 4.0,
   gripRoad: 0.96,
