@@ -6,16 +6,12 @@ import {
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
 import { createMidLodBuildingMesh } from "./load-geometry.js?v=21";
-import {
-  appendGeometryWithTransform,
-  buildMergedGeometry,
-  geometryHasFinitePositions
-} from "./geometry-batching.js?v=4";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
   resolveMappedRoof
-} from "./mapped-roof-geometry.js?v=4";
+} from "./mapped-roof-geometry.js?v=5";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
@@ -28,6 +24,7 @@ import {
   createMappedVesselMesh
 } from './water-adjacent-structures.js?v=2';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
+import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 
 export async function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -59,6 +56,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     outsideRoadCoverage: 0,
     roadOverlap: 0,
     farLod: 0,
+    implausibleGeometry: 0,
     provenanceRejected: 0,
     renderedFeatures: 0
   };
@@ -113,95 +111,6 @@ export async function buildBuildingGeometryPass(options = {}) {
     yieldToMainThread
   });
   endLoadPhase('buildBuildingRoadGuards');
-  const insetFootprintForUpperMass = (pts, insetMeters) => {
-    if (!Array.isArray(pts) || pts.length < 3 || !Number.isFinite(insetMeters) || insetMeters <= 0) return null;
-    let sumX = 0;
-    let sumZ = 0;
-    for (let i = 0; i < pts.length; i++) {
-      sumX += pts[i].x;
-      sumZ += pts[i].z;
-    }
-    const cx = sumX / pts.length;
-    const cz = sumZ / pts.length;
-    const scaled = pts.map((point) => {
-      const dx = cx - point.x;
-      const dz = cz - point.z;
-      const dist = Math.hypot(dx, dz) || 1;
-      const push = Math.min(insetMeters, dist * 0.3);
-      return {
-        x: point.x + dx / dist * push,
-        z: point.z + dz / dist * push
-      };
-    });
-    const cleaned = sanitizeWorldFootprintPoints(scaled, Math.max(12, featureMinPolygonArea), buildingGeometryGuards);
-    if (cleaned.length < 3) return null;
-    const originalArea = Math.abs(signedPolygonAreaXZ(pts));
-    const nextArea = Math.abs(signedPolygonAreaXZ(cleaned));
-    if (!(nextArea > Math.max(18, originalArea * 0.32) && nextArea < originalArea * 0.94)) return null;
-    return cleaned;
-  };
-  const shouldUseTieredMassing = (buildingType, height, footprintArea, footprintWidth, footprintDepth, denseUrbanContext, lodTier, buildingSemantics, tags = {}) => {
-    if (lodTier !== 'near') return false;
-    if (buildingSemantics?.partKind && buildingSemantics.partKind !== 'full') return false;
-    if (tags._geometrySource === 'overture' || tags._mappedLandmark === 'yes') return false;
-    const type = String(buildingType || '').toLowerCase();
-    if (['industrial', 'warehouse', 'church', 'cathedral', 'stadium', 'school', 'hospital'].includes(type)) return false;
-    const minSpan = Math.min(Math.max(0, footprintWidth || 0), Math.max(0, footprintDepth || 0));
-    if (height < 11 || height > 34) return false;
-    if (footprintArea < 720 || minSpan < 18) return false;
-    if (!denseUrbanContext && footprintArea < 1100) return false;
-    return ['yes', 'apartments', 'commercial', 'office', 'retail', 'residential', 'hotel'].includes(type);
-  };
-  const createTieredBuildingGeometry = (pts, height, options = {}) => {
-    const footprintWidth = Number(options.footprintWidth || 0);
-    const footprintDepth = Number(options.footprintDepth || 0);
-    const footprintArea = Number(options.footprintArea || 0);
-    const minSpan = Math.min(Math.max(0, footprintWidth), Math.max(0, footprintDepth));
-    const insetMeters = Math.max(1.25, Math.min(4.6, minSpan * 0.085));
-    const upperFootprint = insetFootprintForUpperMass(pts, insetMeters);
-    if (!upperFootprint) return null;
-
-    const podiumShare =
-      footprintArea >= 1800 ? 0.3 :
-      footprintArea >= 1100 ? 0.36 :
-      0.42;
-    const podiumHeight = Math.max(5.8, Math.min(15, height * podiumShare));
-    const upperHeight = height - podiumHeight;
-    if (upperHeight < 4.2) return null;
-
-    const batch = { positions: [], normals: [], uvs: [], indices: [] };
-    const appendExtrusion = (footprint, extrusionHeight, translateY = 0) => {
-      const shape = new THREE.Shape();
-      footprint.forEach((p, i) => {
-        if (i === 0) shape.moveTo(p.x, -p.z);
-        else shape.lineTo(p.x, -p.z);
-      });
-      shape.closePath();
-
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: extrusionHeight, bevelEnabled: false });
-      geo.rotateX(-Math.PI / 2);
-      if (!geometryHasFinitePositions(geo)) {
-        geo.dispose();
-        return false;
-      }
-      const appended = appendGeometryWithTransform(batch, geo, new THREE.Matrix4().makeTranslation(0, translateY, 0));
-      geo.dispose();
-      return appended > 0;
-    };
-
-    if (!appendExtrusion(pts, podiumHeight, 0)) return null;
-    if (!appendExtrusion(upperFootprint, upperHeight, podiumHeight)) return null;
-    const merged = buildMergedGeometry(batch);
-    if (!merged || !geometryHasFinitePositions(merged)) return null;
-    return {
-      geometry: merged,
-      podiumHeight,
-      upperHeight,
-      upperFootprint,
-      insetMeters
-    };
-  };
-
   const lodNearDist = lodThresholds.near;
   const buildingDetailDist = Math.min(lodNearDist, 300);
   let buildingYieldCount = 0;
@@ -304,6 +213,18 @@ export async function buildBuildingGeometryPass(options = {}) {
       footprintDepth
     });
     const height = buildingSemantics.heightMeters;
+    if (isImplausibleTallBuildingFootprint({
+      heightMeters: height,
+      widthMeters: footprintWidth,
+      depthMeters: footprintDepth,
+      footprintAreaMeters: footprintArea,
+      intentionalVerticalStructure:
+        buildingSemantics.intentionalVerticalStructure ||
+        way.tags._mappedLandmark === 'yes'
+    })) {
+      loadMetrics.buildingPublication.implausibleGeometry += 1;
+      continue;
+    }
     const buildingLevels = Number.parseFloat(way.tags['building:levels']);
     const resolvedLevels = Number.isFinite(buildingLevels) ?
       Math.max(1, Math.round(buildingLevels)) :
@@ -456,28 +377,14 @@ export async function buildBuildingGeometryPass(options = {}) {
         buildingSemantics
       });
     } else {
-      let geo = null;
-      let tieredMassing = null;
-      if (shouldUseTieredMassing(bt, height, footprintArea, footprintWidth, footprintDepth, denseUrbanContext, lodTier, buildingSemantics, way.tags)) {
-        tieredMassing = createTieredBuildingGeometry(pts, bodyHeight, {
-          footprintArea,
-          footprintWidth,
-          footprintDepth
-        });
-      }
-      if (tieredMassing?.geometry) {
-        geo = tieredMassing.geometry;
-      } else {
-        const shape = new THREE.Shape();
-        pts.forEach((p, i) => {
-          if (i === 0) shape.moveTo(p.x, -p.z);
-          else shape.lineTo(p.x, -p.z);
-        });
-        shape.closePath();
-
-        geo = new THREE.ExtrudeGeometry(shape, { depth: bodyHeight, bevelEnabled: false });
-        geo.rotateX(-Math.PI / 2);
-      }
+      const shape = new THREE.Shape();
+      pts.forEach((p, i) => {
+        if (i === 0) shape.moveTo(p.x, -p.z);
+        else shape.lineTo(p.x, -p.z);
+      });
+      shape.closePath();
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: bodyHeight, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2);
       if (!geometryHasFinitePositions(geo)) {
         geo.dispose();
         continue;
@@ -506,12 +413,6 @@ export async function buildBuildingGeometryPass(options = {}) {
       mesh.userData.structureBaseOffset = structureBaseOffset;
       mesh.userData.structureSemantics = structureSemantics;
       mesh.userData.buildingSemantics = buildingSemantics;
-      if (tieredMassing) {
-        mesh.userData.massingStyle = 'tiered_podium';
-        mesh.userData.podiumHeight = tieredMassing.podiumHeight;
-        mesh.userData.upperHeight = tieredMassing.upperHeight;
-        mesh.userData.massingInsetMeters = tieredMassing.insetMeters;
-      }
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     }

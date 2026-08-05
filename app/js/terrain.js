@@ -67,7 +67,7 @@ import {
 } from "./terrain/debug-tools.js?v=5";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=13";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=4";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=5";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {

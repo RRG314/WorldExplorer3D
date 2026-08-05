@@ -2,6 +2,7 @@ import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
 } from "../world/shortbread-source.js?v=9";
+import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
@@ -417,13 +418,6 @@ function createFarFieldTerrainApi(deps = {}) {
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let published = 0;
 
-    const identityFraction = (identity) => {
-      let hash = 2166136261;
-      const text = String(identity || '');
-      for (let i = 0; i < text.length; i += 1) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-      return (hash >>> 0) / 4294967295;
-    };
-
     for (const building of mappedContext?.buildings || []) {
       const rawRing = building.ring || [];
       const withoutClosure = rawRing.length > 1 &&
@@ -463,17 +457,10 @@ function createFarFieldTerrainApi(deps = {}) {
       const sourceMeters = sampleSourceMeters(center.lat, center.lon, spec.sourceZoom, loadedTiles);
       if (!Number.isFinite(sourceMeters)) continue;
       const baseY = (sourceMeters + offsetMeters) * unitsPerMeter * yExaggeration + 0.25;
-      const props = building.properties || {};
-      const mappedHeight = Number.parseFloat(props.height ?? props.render_height ?? props['building:height']);
-      const kind = String(props.kind || props.type || '').toLowerCase();
-      const random = identityFraction(building.identity);
-      const inferredHeight = /commercial|office|apartments|hotel/.test(kind)
-        ? 12 + random * 28
-        : 5.5 + random * 11;
-      const heightMeters = Math.max(3, Math.min(180, Number.isFinite(mappedHeight) ? mappedHeight : inferredHeight));
+      const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter);
+      if (!massing) continue;
+      const { heightMeters, color } = massing;
       const topY = baseY + heightMeters * unitsPerMeter;
-      const shade = 0.44 + random * 0.12;
-      const color = [shade * 1.02, shade, shade * 0.95];
       const baseIndex = positions.length / 3;
 
       for (const point of footprint) {

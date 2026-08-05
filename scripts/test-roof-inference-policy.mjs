@@ -31,4 +31,26 @@ assert.equal(
   'high-rise residential footprints must not receive inferred pitched roofs'
 );
 
+assert.equal(
+  resolveMappedRoof(
+    { building: 'office', 'building:levels': '40', 'roof:shape': 'pyramidal' },
+    150,
+    semantics,
+    footprint
+  ),
+  null,
+  'generic apex geometry must not create a point on a tall building'
+);
+
+assert.equal(
+  resolveMappedRoof(
+    { 'building:part': 'roof', 'roof:shape': 'pyramid' },
+    8,
+    { baseOffsetMeters: 110 },
+    footprint
+  ),
+  null,
+  'elevated building parts must not create generic skyscraper needles'
+);
+
 console.log(JSON.stringify({ ok: true, inferredHouse: house, mappedOverride: mappedHouse.shape }, null, 2));

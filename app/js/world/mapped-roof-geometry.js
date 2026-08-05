@@ -27,6 +27,9 @@ const INFERRED_GABLED_BUILDINGS = new Set([
 ]);
 
 const INFERRED_SKILLION_BUILDINGS = new Set(['garage', 'garages', 'shed']);
+const GENERIC_ROOF_MAX_HEIGHT_METERS = 24;
+const GENERIC_ROOF_MAX_LEVELS = 6;
+const GENERIC_ROOF_MAX_TOP_METERS = 32;
 
 function inferredRoofShape(tags, heightMeters, buildingSemantics) {
   const buildingType = String(tags.building || '').trim().toLowerCase();
@@ -252,6 +255,14 @@ function inferredRoofHeight(shape, heightMeters, pts, fullPartRoof) {
 }
 
 export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics = null, pts = []) {
+  const resolvedHeight = Math.max(0, Number(heightMeters) || 0);
+  const baseOffset = Math.max(0, Number(buildingSemantics?.baseOffsetMeters) || 0);
+  const mappedLevels = numericValue(tags['building:levels']);
+  if (
+    resolvedHeight > GENERIC_ROOF_MAX_HEIGHT_METERS ||
+    baseOffset + resolvedHeight > GENERIC_ROOF_MAX_TOP_METERS ||
+    (Number.isFinite(mappedLevels) && mappedLevels > GENERIC_ROOF_MAX_LEVELS)
+  ) return null;
   const mappedShape = String(tags['roof:shape'] || '').trim().toLowerCase();
   const shape = NON_FLAT_ROOF_SHAPES.has(mappedShape) ?
     mappedShape :
@@ -260,7 +271,7 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
   const mappedRoofHeight = numericValue(tags['roof:height']);
   const fullPartRoof = !!tags['building:part'] && Number(buildingSemantics?.baseOffsetMeters || 0) > 0.4;
   const roofHeight = Math.min(
-    Math.max(0.3, Number(heightMeters) || 0.3),
+    Math.max(0.3, resolvedHeight || 0.3),
     Number.isFinite(mappedRoofHeight) && mappedRoofHeight > 0 ?
       mappedRoofHeight :
       inferredRoofHeight(shape, heightMeters, pts, fullPartRoof)
