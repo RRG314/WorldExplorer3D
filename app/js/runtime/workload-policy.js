@@ -18,7 +18,6 @@ function runWhenIdle(task, timeout) {
   }
   globalThis.setTimeout(task, Math.min(250, Math.max(32, timeout)));
 }
-
 function dispatchQueuedWork() {
   if (!firstPlayReady) return;
   for (const [id, entry] of queued) {
@@ -64,4 +63,3 @@ export function getWorkloadPolicySnapshot() {
     completed: Object.freeze([...completed])
   });
 }
-

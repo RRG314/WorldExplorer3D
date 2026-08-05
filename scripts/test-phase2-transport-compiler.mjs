@@ -354,7 +354,7 @@ assert.ok(
 
 const loadRoadsSource = fs.readFileSync(path.join(root, 'app/js/world/load-roads.js'), 'utf8');
 const overpassPosition = loadRoadsSource.indexOf(
-  'data = await fetchOverpassJSON(primaryQuery'
+  'data = await fetchOverpassJSON('
 );
 const shortbreadPosition = loadRoadsSource.indexOf(
   'data = await fetchShortbreadWorldData({',

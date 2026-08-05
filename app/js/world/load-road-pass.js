@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=40";
-import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
+import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=10";
 import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=1";
 import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 

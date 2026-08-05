@@ -185,7 +185,8 @@ function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegment
     if (!(length > 0.2)) continue;
     const nx = -dz / length;
     const nz = dx / length;
-    for (const side of [-1, 1]) {
+    const sides = Array.isArray(segment.sides) ? segment.sides : [-1, 1];
+    for (const side of sides) {
       const base = positions.length / 3;
       const lateral = Number(segment.halfWidth) * side;
       const height = Number(segment.height) || 0.72;

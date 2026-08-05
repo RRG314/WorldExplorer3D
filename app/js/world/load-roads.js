@@ -6,6 +6,7 @@ import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=18";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
+import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -379,23 +380,20 @@ export function createWorldRoadLoader(deps = {}) {
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         buildWaterGeometryGuards(geometryGuards);
-        // Buildings use an independent provider. Start that request while the
-        // transport source is in flight instead of serializing two network
-        // waits on the critical path.
-        const preferredBuildingDataPromise = fetchGlobalBuildingData({
-          lat: appCtx.LOC.lat,
-          lon: appCtx.LOC.lon,
-          radius: buildingPublicationCacheMeta.featureRadius
-        }, (error) => recordLoadWarning('Overture building massing prefetch', error))
-          .catch((error) => {
-            recordLoadWarning('Overture building massing prefetch', error);
-            return null;
-          });
         startLoadPhase('fetchOverpass');
         let data;
         try {
           try {
-            data = await fetchOverpassJSON(primaryQuery, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
+            // Do not hold an empty world behind the full publication timeout.
+            // Dense responses normally win quickly; after this bounded probe,
+            // the global vector source supplies deterministic sparse coverage.
+            const primaryTransportTimeoutMs = Math.min(overpassTimeoutMs, 9000);
+            data = await fetchOverpassJSON(
+              primaryQuery,
+              primaryTransportTimeoutMs,
+              loadDeadline,
+              overpassCacheMeta
+            );
           } catch (overpassErr) {
             recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
             appCtx.showLoad('Loading generalized mapped data...');
@@ -448,6 +446,10 @@ export function createWorldRoadLoader(deps = {}) {
         const selection = normalized.rawSelection;
         endLoadPhase('featureBudgeting');
         const { worldSurfaceProfile } = selection;
+        const buildingLoadPolicy = shouldLoadDetailedBuildings(data, {
+          worldSurfaceProfile
+        });
+        loadMetrics.buildings.loadPolicy = buildingLoadPolicy;
         const normalizedSelection = normalized.selection;
         appCtx._worldLoadNodes = normalizedSelection.nodes;
         if (runtimeState) {
@@ -555,7 +557,16 @@ export function createWorldRoadLoader(deps = {}) {
             endLoadPhase,
             fetchOverpassJSON,
             fetchPreferredMetadata: () => fetchBundledBuildingMetadata?.({ locationKey: appCtx.selLoc, lat: appCtx.LOC.lat, lon: appCtx.LOC.lon }),
-            fetchPreferredData: () => preferredBuildingDataPromise,
+            fetchPreferredData: buildingLoadPolicy.shouldLoad
+              ? () => fetchGlobalBuildingData({
+                  lat: appCtx.LOC.lat,
+                  lon: appCtx.LOC.lon,
+                  radius: buildingPublicationCacheMeta.featureRadius
+                }, (error) => recordLoadWarning('Overture building massing', error))
+              : null,
+            skipReason: buildingLoadPolicy.shouldLoad
+              ? ''
+              : 'no-settlement-evidence',
             isActiveLoadContext,
             location: { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon },
             limitWaysByTileBudget,
@@ -605,6 +616,17 @@ export function createWorldRoadLoader(deps = {}) {
             );
             appCtx.showLoad('Open water detected. Finalizing water world...');
             await markLoaded('water_only_world');
+            continue;
+          }
+          if (!buildingLoadPolicy.shouldLoad) {
+            console.warn(
+              '[WorldLoad] No transport or settlement evidence found. Finalizing sparse terrain without expanding the query.'
+            );
+            await finalizeNoRoadsWorld({
+              sparseReason: 'no_settlement_sparse',
+              sparseWarning: '[WorldLoad] Sparse real-data location detected; skipping larger settlement queries.',
+              syntheticReason: 'synthetic_no_settlement'
+            });
             continue;
           }
           console.warn('No roads found in data, trying larger area...');

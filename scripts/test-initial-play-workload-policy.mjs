@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { getAdaptiveLoadProfile } from '../app/js/world/budgets.js';
+import { shouldLoadDetailedBuildings } from '../app/js/world/settlement-density-policy.js';
 
 const root = process.cwd();
 const read = (file) => fs.readFile(`${root}/${file}`, 'utf8');
-const [entry, onDemand, bootstrap, loadSession, budgeting, terrain, tiles, osmLoader, roadLoader, overtureBuildings] = await Promise.all([
+const [entry, onDemand, bootstrap, loadSession, budgeting, terrain, tiles, osmLoader, roadLoader, overtureBuildings, settlementPolicy, weather] = await Promise.all([
   read('app/js/app-entry.js'),
   read('app/js/runtime/on-demand-modes.js'),
   read('app/js/bootstrap.js'),
@@ -14,7 +15,9 @@ const [entry, onDemand, bootstrap, loadSession, budgeting, terrain, tiles, osmLo
   read('app/js/terrain/tiles.js'),
   read('app/js/world/osm-loader.js'),
   read('app/js/world/load-roads.js'),
-  read('app/js/world/overture-building-source.js')
+  read('app/js/world/overture-building-source.js'),
+  read('app/js/world/settlement-density-policy.js'),
+  read('app/js/weather.js')
 ]);
 
 for (const mode of ['baseline', 'rdt']) {
@@ -42,9 +45,36 @@ assert.ok(!budgeting.includes('options.baselineFullWorld === true ?\n    allWate
 assert.ok(terrain.includes('{ reuseBaseElevations: true }'));
 assert.ok(tiles.includes('mesh.userData.baseTerrainWorldY = nextBaseElevations'));
 assert.ok(osmLoader.includes("0.022") && osmLoader.includes("roadsRadius * 1.2"));
-assert.ok(roadLoader.indexOf('const preferredBuildingDataPromise = fetchGlobalBuildingData') <
+assert.ok(!roadLoader.includes('const preferredBuildingDataPromise'));
+assert.ok(roadLoader.includes('shouldLoadDetailedBuildings(data, {'));
+assert.ok(roadLoader.indexOf('shouldLoadDetailedBuildings(data, {') >
   roadLoader.indexOf("startLoadPhase('fetchOverpass')"));
-assert.ok(roadLoader.includes('fetchPreferredData: () => preferredBuildingDataPromise'));
+assert.ok(roadLoader.includes('Math.min(overpassTimeoutMs, 9000)'));
+assert.ok(roadLoader.includes("sparseReason: 'no_settlement_sparse'"));
+assert.ok(settlementPolicy.includes('!sparseBiome && evidence.driveableRoads >= 12'));
+assert.ok(weather.includes('MIN_EARTH_EXPOSURE = 0.92'));
+assert.ok(weather.includes('MIN_EARTH_AMBIENT_INTENSITY = 0.32'));
+const emptyBiomePolicy = shouldLoadDetailedBuildings({
+  elements: [
+    { type: 'way', tags: { natural: 'sand' } },
+    { type: 'way', tags: { highway: 'track' } },
+    { type: 'way', tags: { natural: 'glacier' } }
+  ]
+});
+assert.equal(emptyBiomePolicy.shouldLoad, false);
+const mappedDesertRoads = Array.from({ length: 20 }, (_, index) => ({
+  id: index,
+  type: 'way',
+  tags: { highway: 'secondary' }
+}));
+assert.equal(shouldLoadDetailedBuildings(
+  { elements: mappedDesertRoads },
+  { worldSurfaceProfile: { terrainModeHint: 'sand' } }
+).shouldLoad, false);
+const cityPolicy = shouldLoadDetailedBuildings({
+  elements: [{ type: 'way', tags: { landuse: 'residential' } }]
+}, { worldSurfaceProfile: { terrainModeHint: 'sand' } });
+assert.equal(cityPolicy.shouldLoad, true);
 assert.ok(
   !overtureBuildings.includes('Overture building coverage incomplete'),
   'partial Overture tile coverage must publish fulfilled authoritative building tiles'

@@ -66,6 +66,68 @@ export function isVehicleBuildingCollisionBlocking(
   );
 }
 
+function queryVehicleBuildingCollision(appCtx, checkBuildingCollision, x, z, carFeetY) {
+  const buildingCheck = checkBuildingCollision(x, z, 2.0, {
+    actorBaseY: carFeetY,
+    actorHeight: 1.9
+  });
+  if (!buildingCheck?.collision) return null;
+  const nearestRoad = typeof appCtx.findNearestRoad === 'function'
+    ? appCtx.findNearestRoad(x, z, {
+        y: Number.isFinite(carFeetY) ? carFeetY + 1.2 : NaN,
+        maxVerticalDelta: 18,
+        preferredRoad: appCtx.car?.road || null
+      })
+    : null;
+  return isVehicleBuildingCollisionBlocking(buildingCheck, nearestRoad)
+    ? { buildingCheck, nearestRoad }
+    : null;
+}
+
+export function findSweptVehicleBuildingCollision(
+  appCtx,
+  checkBuildingCollision,
+  startX,
+  startZ,
+  endX,
+  endZ,
+  carFeetY
+) {
+  const dx = endX - startX;
+  const dz = endZ - startZ;
+  const distance = Math.hypot(dx, dz);
+  // Sampling below the collider radius prevents a fast vehicle from crossing
+  // an entire narrow wall between two physics positions.
+  const steps = Math.max(1, Math.min(64, Math.ceil(distance / 0.75)));
+  let lastSafeX = startX;
+  let lastSafeZ = startZ;
+  for (let step = 1; step <= steps; step += 1) {
+    const t = step / steps;
+    const x = startX + dx * t;
+    const z = startZ + dz * t;
+    const collision = queryVehicleBuildingCollision(
+      appCtx,
+      checkBuildingCollision,
+      x,
+      z,
+      carFeetY
+    );
+    if (collision) {
+      return {
+        ...collision,
+        x,
+        z,
+        t,
+        lastSafeX,
+        lastSafeZ
+      };
+    }
+    lastSafeX = x;
+    lastSafeZ = z;
+  }
+  return null;
+}
+
 export function resolveVehicleBuildingCollision(
   appCtx,
   checkBuildingCollision,
@@ -75,21 +137,19 @@ export function resolveVehicleBuildingCollision(
   const carFeetY = Number.isFinite(appCtx.car.y)
     ? appCtx.car.y - 1.2
     : NaN;
-  const buildingCheck = checkBuildingCollision(nextX, nextZ, 2.0, {
-    actorBaseY: carFeetY,
-    actorHeight: 1.9
-  });
-  const nearestRoad = typeof appCtx.findNearestRoad === 'function'
-    ? appCtx.findNearestRoad(nextX, nextZ, {
-        y: Number.isFinite(carFeetY) ? carFeetY + 1.2 : NaN,
-        maxVerticalDelta: 18,
-        preferredRoad: appCtx.car?.road || null
-      })
-    : null;
-
-  if (!isVehicleBuildingCollisionBlocking(buildingCheck, nearestRoad)) {
+  const sweptCollision = findSweptVehicleBuildingCollision(
+    appCtx,
+    checkBuildingCollision,
+    appCtx.car.x,
+    appCtx.car.z,
+    nextX,
+    nextZ,
+    carFeetY
+  );
+  if (!sweptCollision) {
     return { x: nextX, z: nextZ };
   }
+  const { buildingCheck } = sweptCollision;
 
   if (buildingCheck.inside) {
     if (buildingCheck.nearestPoint) {
@@ -105,8 +165,8 @@ export function resolveVehicleBuildingCollision(
   }
 
   const pushDistance = buildingCheck.penetration + 1;
-  const pushedX = nextX + buildingCheck.pushX * pushDistance;
-  const pushedZ = nextZ + buildingCheck.pushZ * pushDistance;
+  const pushedX = sweptCollision.x + buildingCheck.pushX * pushDistance;
+  const pushedZ = sweptCollision.z + buildingCheck.pushZ * pushDistance;
   const hitAngle = Math.atan2(appCtx.car.vz, appCtx.car.vx);
   const wallAngle = Math.atan2(buildingCheck.pushZ, buildingCheck.pushX);
   let angleDifference = Math.abs(hitAngle - wallAngle);
@@ -115,5 +175,9 @@ export function resolveVehicleBuildingCollision(
   }
   const headOnFactor = Math.abs(Math.cos(angleDifference));
   slowVehicle(appCtx.car, 0.1 + (1 - headOnFactor) * 0.3);
-  return { x: pushedX, z: pushedZ };
+  const pushedPastSafePoint =
+    Math.hypot(pushedX - sweptCollision.lastSafeX, pushedZ - sweptCollision.lastSafeZ) > 3.5;
+  return pushedPastSafePoint
+    ? { x: sweptCollision.lastSafeX, z: sweptCollision.lastSafeZ }
+    : { x: pushedX, z: pushedZ };
 }

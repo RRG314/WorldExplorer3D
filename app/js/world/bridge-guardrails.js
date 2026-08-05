@@ -1,7 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
-import { elevatedSegmentSafety, isProtectedRoadFeature } from "./bridge-safety.js?v=2";
+import {
+  barrierPointConflictsWithDriveableRoad,
+  elevatedSegmentSafety,
+  isProtectedRoadFeature
+} from "./bridge-safety.js?v=3";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];
@@ -86,6 +90,16 @@ export function registerBridgeGuardrails(road, owner = null) {
     for (const side of [-1, 1]) {
       const x = midX + nx * offset * side;
       const z = midZ + nz * offset * side;
+      const sidePoints = [a, { x: midX, z: midZ }, b];
+      const crossesDriveableCorridor = sidePoints.some((point) =>
+        barrierPointConflictsWithDriveableRoad(road, {
+          x: point.x + nx * offset * side,
+          z: point.z + nz * offset * side,
+          deckY: surfaceY,
+          roads: appCtx.roads
+        })
+      );
+      if (crossesDriveableCorridor) continue;
       const pts = barrierFootprint(x, z, dx, dz, length + 0.3, thickness);
       const collider = {
         pts,

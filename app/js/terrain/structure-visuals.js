@@ -12,7 +12,10 @@ import {
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
 } from "./structure-tunnel-visuals.js?v=15";
-import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
+import {
+  barrierPointConflictsWithDriveableRoad,
+  elevatedSegmentSafety
+} from "../world/bridge-safety.js?v=3";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -247,6 +250,12 @@ export function collectStructureVisualInstances({
         if (guardrailSafety.protected && (isConnectorLike || isSkywalk)) {
           const railOffset = width * 0.5 + 0.28;
           for (const side of [-1, 1]) {
+            if (barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * railOffset * side,
+              z: midZ + nz * railOffset * side,
+              deckY,
+              roads: appCtx.roads
+            })) continue;
             addBeam(
               guardrailInstances,
               midX + nx * railOffset * side,
@@ -281,12 +290,24 @@ export function collectStructureVisualInstances({
             );
           }
         } else if (guardrailSafety.protected) {
-          elevatedBarrierSegments.push({
-            p1: { x: p1.x, y: startY, z: p1.z },
-            p2: { x: p2.x, y: endY, z: p2.z },
-            halfWidth: width * 0.5 + 0.18,
-            height: Number(structureSpecification.barrierHeight) || 1.25
-          });
+          const barrierHalfWidth = width * 0.5 + 0.18;
+          const barrierSides = [-1, 1].filter((side) =>
+            !barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * barrierHalfWidth * side,
+              z: midZ + nz * barrierHalfWidth * side,
+              deckY,
+              roads: appCtx.roads
+            })
+          );
+          if (barrierSides.length > 0) {
+            elevatedBarrierSegments.push({
+              p1: { x: p1.x, y: startY, z: p1.z },
+              p2: { x: p2.x, y: endY, z: p2.z },
+              halfWidth: barrierHalfWidth,
+              sides: barrierSides,
+              height: Number(structureSpecification.barrierHeight) || 1.25
+            });
+          }
         }
 
         const sideOffset = Math.max(0.7, width * 0.34);

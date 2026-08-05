@@ -73,6 +73,14 @@ function setBuildingDetailState(status, extra = {}) {
 }
 
 export async function loadBuildingDetailForPublication(options = {}) {
+  if (options.skipReason) {
+    setBuildingDetailState('skipped', {
+      reason: String(options.skipReason),
+      requested: 0,
+      selected: 0
+    });
+    return appCtx.worldDetailState.buildings;
+  }
   const query = String(options.query || '');
   const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
   const fetchPreferredData = typeof options.fetchPreferredData === 'function' ? options.fetchPreferredData : null;

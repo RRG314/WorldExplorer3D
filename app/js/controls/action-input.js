@@ -56,24 +56,12 @@ function buttonValue(gamepad, index) {
 function keyboardControlActions(keys = {}, mode = 'drive') {
   const planeControls = mode === 'plane';
   const droneControls = mode === 'drone';
-  const move = planeControls || droneControls
-    ? digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'))
-    : digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
-  const turn = planeControls
-    ? digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'))
-    : droneControls
-      ? digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'))
-      : digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
-  const lookYaw = planeControls
-    ? digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'))
-    : droneControls
-      ? digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'))
-      : digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
-  const lookPitch = planeControls
-    ? digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'))
-    : droneControls
-      ? digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'))
-      : digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
+  // Preserve the v3.1 Earth controls: arrows move/steer and WASD looks.
+  // Plane and drone controls intentionally retain their existing mappings.
+  const move = digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
+  const turn = digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
+  const lookYaw = digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
+  const lookPitch = digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
   const ascend = pressed(keys, 'Space', 'KeyR');
   const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
   const planeRollModifier = planeControls && pressed(keys, 'ControlLeft', 'ControlRight');

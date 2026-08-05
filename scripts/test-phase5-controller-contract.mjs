@@ -26,29 +26,53 @@ import {
   sampleEarthVehicleGroundContact,
   stabilizeEarthVehicleSurfaceY
 } from '../app/js/physics/vehicle-surface.js';
+import { findSweptVehicleBuildingCollision } from '../app/js/physics/building-collision-response.js';
 import fs from 'node:fs';
 import { PLANE_MAX_SPEED_MPS } from '../app/js/plane-mode.js';
 
 ctx.keys = {};
-ctx.keys.KeyW = true;
-ctx.keys.KeyD = true;
+ctx.keys.ArrowUp = true;
+ctx.keys.ArrowRight = true;
 let actions = readControlActions('drive');
 assert.equal(actions.throttle, 1);
 assert.equal(actions.reverse, 0);
 assert.equal(actions.steer, -1);
 
-ctx.keys.KeyW = false;
-ctx.keys.KeyS = true;
+ctx.keys.ArrowUp = false;
+ctx.keys.ArrowDown = true;
 actions = readControlActions('drive');
 assert.equal(actions.throttle, 0);
 assert.equal(actions.reverse, 1);
 assert.equal(actions.steer, -1);
 
-actions = keyboardControlActions({ ArrowLeft: true, ArrowUp: true }, 'drive');
+actions = keyboardControlActions({ KeyA: true, KeyW: true }, 'drive');
 assert.equal(actions.move, 0);
 assert.equal(actions.turn, 0);
 assert.equal(actions.lookYaw, 1);
 assert.equal(actions.lookPitch, 1);
+
+const sweptCar = { x: 0, y: 1.2, z: 0, road: null };
+const sweptCollision = findSweptVehicleBuildingCollision(
+  { car: sweptCar },
+  (x) => x >= 9.5 && x <= 10.5
+    ? {
+        collision: true,
+        inside: false,
+        penetration: 0.2,
+        pushX: -1,
+        pushZ: 0,
+        building: { colliderDetail: 'full' }
+      }
+    : { collision: false },
+  0,
+  0,
+  20,
+  0,
+  0
+);
+assert.ok(sweptCollision, 'swept collision missed a thin building between frame endpoints');
+assert.ok(sweptCollision.x >= 9.5 && sweptCollision.x <= 10.5);
+assert.ok(sweptCollision.lastSafeX < 9.5);
 
 actions = keyboardControlActions({ KeyA: true, ArrowLeft: true }, 'drone');
 assert.equal(actions.turn, 1);
@@ -257,7 +281,7 @@ console.log(JSON.stringify({
   contract: 'phase5-controller-input',
   staleKeyboardStateCleared: true,
   forwardReverseChannelsIndependent: true,
-  wasdMovementArrowCameraSeparated: true,
+  v31ArrowMovementWasdCameraRestored: true,
   primaryModeOrderCharacterCarPlaneDrone: true,
   directionChangesBrakeBeforeGearChange: true,
   reverseSteeringKeepsPathDirection: true,
