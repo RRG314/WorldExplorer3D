@@ -3,7 +3,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
 } from "./structure-semantics.js?v=40";
-import { createSurfaceQuery } from './world/surface-contract.js?v=11';
+import { createSurfaceQuery } from './world/surface-contract.js?v=12';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
@@ -405,22 +405,44 @@ const GroundHeight = {
   },
 
   // Ground used for driving, including the selected feature and provenance input.
-  driveSurfaceInfo(x, z, preferRoad = true, currentY = NaN) {
+  driveSurfaceInfo(x, z, preferRoad = true, currentY = NaN, options = {}) {
     const terrainY = this.terrainY(x, z);
     let nearestRoad = null;
     if (preferRoad) {
-      nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
-        y: Number.isFinite(currentY) ? currentY : NaN,
-        maxVerticalDelta: 18,
-        preferredRoad: appCtx.car?.road || null
-      }) : null;
+      if (options.nearestRoad) {
+        nearestRoad = options.nearestRoad;
+      } else if (options.preferredRoadOnly && appCtx.car?.road) {
+        const road = appCtx.car.road;
+        const projection = this._projectPointToFeature(road, x, z);
+        const reuseRadius = Math.max(5, (Number(road.width) || 7) * 0.5 + 2.5);
+        if (projection && projection.dist <= reuseRadius) {
+          const profileY = sampleFeatureSurfaceY(road, projection.pt.x, projection.pt.z, projection);
+          nearestRoad = {
+            road,
+            dist: projection.dist,
+            pt: projection.pt,
+            segIndex: projection.segIndex,
+            t: projection.t,
+            y: profileY,
+            verticalDelta: Number.isFinite(currentY) ? Math.abs(profileY - currentY) : 0
+          };
+        }
+      } else {
+        nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+          y: Number.isFinite(currentY) ? currentY : NaN,
+          maxVerticalDelta: 18,
+          preferredRoad: appCtx.car?.road || null
+        }) : null;
+      }
       if (isRoadSurfaceReachable(nearestRoad, {
         currentRoad: appCtx.car?.road || null,
         extraVerticalAllowance: 0.5
       })) {
         const sampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
         const sampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
-        const meshY = this.roadMeshY(sampleX, sampleZ, currentY, nearestRoad);
+        const meshY = options.sampleRenderedMesh === false
+          ? Number(nearestRoad?.y)
+          : this.roadMeshY(sampleX, sampleZ, currentY, nearestRoad);
         if (this._shouldUseRoadMeshHeight(nearestRoad?.road, meshY, nearestRoad?.y)) {
           return {
             y: this._resolveRoadSurfaceY(nearestRoad?.road, meshY, nearestRoad?.y),

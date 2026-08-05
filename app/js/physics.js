@@ -3,10 +3,10 @@ import { isRoadSurfaceReachable } from "./structure-semantics.js?v=40";
 import { updateDrone } from "./physics/drone-flight.js?v=7";
 import { updatePlane } from "./plane-mode.js?v=16";
 import {
-  sampleEarthVehicleGroundContact,
+  createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
   updateVehicleSurface
-} from "./physics/vehicle-surface.js?v=4";
+} from "./physics/vehicle-surface.js?v=5";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=3";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
@@ -19,13 +19,18 @@ import {
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
-let _rdtRoadSkipInterval = 1; // 1 = check every frame, 2 = every other, etc.
+let _rdtRoadSkipInterval = 2; // 2 = every other rendered frame, etc.
 let _cachedNearRoad = null;
+let _rdtLastFrameToken;
+
+const earthVehicleGroundContactSampler = createEarthVehicleGroundContactSampler(appCtx);
 
 // Invalidate road cache - must be called on road reload, mode change, teleport
 function invalidateRoadCache() {
   _cachedNearRoad = null;
   _rdtPhysFrame = 0;
+  _rdtLastFrameToken = undefined;
+  earthVehicleGroundContactSampler.reset();
 }
 
 // Reusable raycaster and vectors (avoid GC pressure from per-frame allocations)
@@ -60,17 +65,25 @@ function getNearestRoadThrottled(x, z, forceCheck = false, currentY = NaN) {
     return { road: null, dist: Infinity, pt: { x, z } };
   }
 
-  _rdtPhysFrame++;
+  const frameToken = Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined;
+  const sameRenderedFrame = frameToken !== undefined && frameToken === _rdtLastFrameToken;
+  if (!sameRenderedFrame) {
+    _rdtPhysFrame++;
+    _rdtLastFrameToken = frameToken;
+  }
   _rdtRoadSkipInterval = typeof appCtx.rdtComplexity === 'number' ?
-  appCtx.rdtComplexity >= 6 ? 3 : appCtx.rdtComplexity >= 4 ? 2 : 1 :
-  1;
+  appCtx.rdtComplexity >= 6 ? 3 : 2 :
+  2;
 
   let nr;
-  const shouldCheck = forceCheck ||
-  _rdtRoadSkipInterval <= 1 ||
-  _rdtPhysFrame % _rdtRoadSkipInterval === 0 ||
-  !_cachedNearRoad ||
-  (Number.isFinite(currentY) && Number.isFinite(_cachedNearRoad?.y) && Math.abs(_cachedNearRoad.y - currentY) > 6);
+  const movedBeyondCache = Number.isFinite(_cachedNearRoad?.queryX) &&
+    Math.hypot(x - _cachedNearRoad.queryX, z - _cachedNearRoad.queryZ) > 4;
+  const shouldCheck = !_cachedNearRoad || (!sameRenderedFrame && (
+    forceCheck ||
+    _rdtPhysFrame % _rdtRoadSkipInterval === 0 ||
+    movedBeyondCache ||
+    (Number.isFinite(currentY) && Number.isFinite(_cachedNearRoad?.y) && Math.abs(_cachedNearRoad.y - currentY) > 6)
+  ));
 
   if (shouldCheck) {
     nr = appCtx.findNearestRoad(x, z, {
@@ -87,7 +100,9 @@ function getNearestRoadThrottled(x, z, forceCheck = false, currentY = NaN) {
       verticalDelta: Number.isFinite(nr?.verticalDelta) ? nr.verticalDelta : Infinity,
       distanceAlong: Number.isFinite(nr?.distanceAlong) ? nr.distanceAlong : NaN,
       distanceToEndpoint: Number.isFinite(nr?.distanceToEndpoint) ? nr.distanceToEndpoint : Infinity,
-      distanceToTransitionZone: Number.isFinite(nr?.distanceToTransitionZone) ? nr.distanceToTransitionZone : Infinity
+      distanceToTransitionZone: Number.isFinite(nr?.distanceToTransitionZone) ? nr.distanceToTransitionZone : Infinity,
+      queryX: x,
+      queryZ: z
     };
   } else {
     nr = _cachedNearRoad;
@@ -190,9 +205,7 @@ function update(dt) {
     friction = appCtx.CFG.friction; // same as Earth road
     accel = appCtx.car.boost ? moonBoostAccel : moonBaseAccel;
   } else {
-    const isSteering = left || right;
-    const isHighSpeed = Math.abs(appCtx.car.speed) > 40;
-    const forceCheck = isHighSpeed || isSteering || !_cachedNearRoad;
+    const forceCheck = !_cachedNearRoad;
 
     nr = getNearestRoadThrottled(
       appCtx.car.x,
@@ -582,13 +595,14 @@ function update(dt) {
     });
   } else if (appCtx.terrainEnabled) {
     const currentY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
-    const groundContact = sampleEarthVehicleGroundContact(appCtx, {
+    const groundContact = earthVehicleGroundContactSampler.sample({
       x: appCtx.car.x,
       z: appCtx.car.z,
       angle: appCtx.car.angle,
       currentY,
-      preferRoad: !!appCtx.car.onRoad
-    });
+      preferRoad: !!appCtx.car.onRoad,
+      nearestRoad: appCtx.car.onRoad ? nr : null
+    }, dt, Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined);
     let surfaceY = stabilizeEarthVehicleSurfaceY(
       groundContact?.supportY,
       appCtx.car._lastSurfaceY,

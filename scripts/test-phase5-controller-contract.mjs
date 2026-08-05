@@ -23,6 +23,7 @@ import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
 import { shouldSuppressBoatTerrain } from '../app/js/boat-mode/surface-effects.js';
 import {
+  createEarthVehicleGroundContactSampler,
   sampleEarthVehicleGroundContact,
   stabilizeEarthVehicleSurfaceY
 } from '../app/js/physics/vehicle-surface.js';
@@ -159,6 +160,31 @@ assert.ok(
   stabilizeEarthVehicleSurfaceY(0, 120, 1 / 60, 40) > 119,
   'one transient low terrain sample could still drop the car through a steep surface'
 );
+
+let cachedGroundQueries = 0;
+const cachedGroundOptions = [];
+const cachedGroundSampler = createEarthVehicleGroundContactSampler({
+  SurfaceQuery: {
+    driveAt: (x, z, options) => {
+      cachedGroundQueries += 1;
+      cachedGroundOptions.push(options);
+      return { kind: 'road', position: { y: 12 + z * 0.1 } };
+    }
+  }
+});
+cachedGroundSampler.sample({ x: 0, z: 0, angle: 0 }, 1 / 45, 100);
+assert.equal(cachedGroundQueries, 5, 'initial vehicle footprint did not sample all contact points');
+assert.ok(cachedGroundOptions.every((options) => options.sampleRenderedMesh === false), 'vehicle footprint still requested rendered road-mesh raycasts');
+assert.equal(cachedGroundOptions.filter((options) => options.preferredRoadOnly).length, 4, 'wheelbase probes did not reuse the current compiled road');
+cachedGroundSampler.sample({ x: 0.5, z: 0, angle: 0.02 }, 1 / 45, 100);
+assert.equal(cachedGroundQueries, 5, 'recursive physics substep repeated the rendered-frame footprint query');
+cachedGroundSampler.sample({ x: 0.8, z: 0, angle: 0.03 }, 1 / 60, 101);
+assert.equal(cachedGroundQueries, 10, 'elapsed ground-contact cache did not refresh on the next eligible frame');
+cachedGroundSampler.sample({ x: 5, z: 0, angle: 0.03 }, 1 / 240, 102);
+assert.equal(cachedGroundQueries, 15, 'large vehicle movement did not refresh ground contact immediately');
+cachedGroundSampler.reset();
+cachedGroundSampler.sample({ x: 5, z: 0, angle: 0.03 }, 0, 103);
+assert.equal(cachedGroundQueries, 20, 'ground-contact cache reset did not force a fresh sample');
 
 clearControlInputState('double-tap-contract');
 assert.equal(registerPlaneTurnTap('ArrowRight', 1000), 0);

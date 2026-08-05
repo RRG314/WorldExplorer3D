@@ -50,7 +50,13 @@ export function sampleEarthVehicleGroundContact(appCtx, options = {}) {
     { id: 'left', x: x - rightX * halfTrack, z: z - rightZ * halfTrack }
   ];
   const samples = points.map((point) => {
-    const sample = appCtx.SurfaceQuery?.driveAt?.(point.x, point.z, { preferRoad, currentY });
+    const sample = appCtx.SurfaceQuery?.driveAt?.(point.x, point.z, {
+      preferRoad,
+      currentY,
+      sampleRenderedMesh: false,
+      nearestRoad: point.id === 'center' ? options.nearestRoad : null,
+      preferredRoadOnly: point.id !== 'center' && preferRoad
+    });
     return {
       ...point,
       y: Number(sample?.position?.y),
@@ -90,6 +96,56 @@ export function sampleEarthVehicleGroundContact(appCtx, options = {}) {
     supportSampleCount: supportSamples.length,
     roadCentered
   });
+}
+
+export function createEarthVehicleGroundContactSampler(appCtx, options = {}) {
+  const refreshInterval = Math.max(1 / 60, Number(options.refreshInterval) || 1 / 30);
+  const movementThreshold = Math.max(0.5, Number(options.movementThreshold) || 3.5);
+  const turnThreshold = Math.max(0.02, Number(options.turnThreshold) || 0.14);
+  let cachedContact = null;
+  let hasSample = false;
+  let elapsed = Infinity;
+  let lastX = NaN;
+  let lastZ = NaN;
+  let lastAngle = NaN;
+  let lastFrameToken;
+
+  function reset() {
+    cachedContact = null;
+    hasSample = false;
+    elapsed = Infinity;
+    lastX = NaN;
+    lastZ = NaN;
+    lastAngle = NaN;
+    lastFrameToken = undefined;
+  }
+
+  function sample(sampleOptions = {}, dt = 0, frameToken) {
+    elapsed += Math.max(0, Number(dt) || 0);
+    const sameRenderedFrame = frameToken !== undefined && frameToken === lastFrameToken;
+    if (hasSample && sameRenderedFrame) return cachedContact;
+
+    const x = Number(sampleOptions.x) || 0;
+    const z = Number(sampleOptions.z) || 0;
+    const angle = Number(sampleOptions.angle) || 0;
+    const moved = Number.isFinite(lastX) && Math.hypot(x - lastX, z - lastZ) >= movementThreshold;
+    const turned = Number.isFinite(lastAngle) &&
+      Math.abs(Math.atan2(Math.sin(angle - lastAngle), Math.cos(angle - lastAngle))) >= turnThreshold;
+    const shouldRefresh = !hasSample || elapsed >= refreshInterval || moved || turned;
+
+    lastFrameToken = frameToken;
+    if (!shouldRefresh) return cachedContact;
+
+    cachedContact = sampleEarthVehicleGroundContact(appCtx, sampleOptions);
+    hasSample = true;
+    elapsed = 0;
+    lastX = x;
+    lastZ = z;
+    lastAngle = angle;
+    return cachedContact;
+  }
+
+  return Object.freeze({ reset, sample });
 }
 
 export function stabilizeEarthVehicleSurfaceY(rawSurfaceY, previousSurfaceY, dt, speed = 0) {

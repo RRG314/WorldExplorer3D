@@ -1,5 +1,5 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
-import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=11';
+import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=12';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 

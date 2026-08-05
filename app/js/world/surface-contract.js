@@ -330,7 +330,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   function driveAt(x, z, options = {}) {
     const preferRoad = options.preferRoad !== false;
     const currentY = Number.isFinite(Number(options.currentY)) ? Number(options.currentY) : NaN;
-    const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY);
+    const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY, options);
     const road = info.source === 'road';
     return createSurfaceSample({
       x,
