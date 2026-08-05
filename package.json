@@ -30,6 +30,7 @@
     "test:production-setup": "node scripts/prepare-production-test-toolchain.mjs",
     "test:production-readiness": "node scripts/test-production-readiness-contract.mjs",
     "test:player-drive-input": "node scripts/test-player-input-drive.mjs",
+    "test:vehicle-speed-scale": "node scripts/test-vehicle-speed-scale.mjs",
     "test:production-candidate": "npm run test:production-readiness && npm run test:player-drive-input && npm run test:runtime && npm run test:world-matrix",
     "test:production-gate": "node scripts/verify-production-gate.mjs",
     "test:release-candidate": "node scripts/test-release-candidate.mjs",

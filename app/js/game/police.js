@@ -1,8 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { carSpeedToMph } from "../physics/vehicle-speed-units.js?v=1";
 
 export function updatePolice(dt) {
   if (!appCtx.policeOn || appCtx.police.length === 0) return;
-  const mph = Math.abs(appCtx.car.speed * 0.5);
+  const mph = Math.abs(carSpeedToMph(appCtx.car.speed));
   const limit = appCtx.car.road?.limit || 25;
   const speeding = mph > limit;
 

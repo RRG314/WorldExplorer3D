@@ -1,3 +1,5 @@
+import { carSpeedToMph } from "../physics/vehicle-speed-units.js?v=1";
+
 function createTerrainStreamingApi(deps = {}) {
   const {
     appCtx,
@@ -92,7 +94,7 @@ function createTerrainStreamingApi(deps = {}) {
     if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === "walk") {
       return Math.max(0, Math.abs(appCtx.Walk.state.walker?.speedMph || 0));
     }
-    return Math.max(0, Math.abs((appCtx.car?.speed || 0) * 0.5));
+    return Math.max(0, Math.abs(carSpeedToMph(appCtx.car?.speed || 0)));
   }
 
   function getDynamicTerrainRing() {

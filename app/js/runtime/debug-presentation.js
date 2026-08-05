@@ -1,3 +1,5 @@
+import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
+
 function createDebugPresentationSystem(appCtx) {
   function actorDebugState() {
     const actor = appCtx.activeTransportActor?.();
@@ -11,7 +13,7 @@ function createDebugPresentationSystem(appCtx) {
         actor.mode === 'drone' ? Math.round(Math.abs((appCtx.drone?.speed || 0) * 1.8)) :
         actor.mode === 'boat' ? Math.round(Math.abs((appCtx.boat?.speed || 0) * 0.43)) :
         actor.mode === 'walk' ? Math.round(Math.abs(appCtx.Walk?.state?.walker?.speedMph || 0)) :
-        Math.round(Math.abs((appCtx.car?.speed || 0) * 0.5))
+        Math.round(Math.abs(carSpeedToMph(appCtx.car?.speed || 0)))
     };
   }
 

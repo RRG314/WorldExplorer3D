@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { clearPolice, spawnPolice, updatePolice } from "./game/police.js?v=1";
+import { clearPolice, spawnPolice, updatePolice } from "./game/police.js?v=2";
 import {
   clearObjectives,
   getActiveGameplayLeaderboard,
@@ -13,7 +13,7 @@ import {
   startMode,
   stopGameplayPlugin,
   updateMode
-} from "./game/modes.js?v=3";
+} from "./game/modes.js?v=4";
 import {
   applyPaintTownRemoteClaimsFromSync,
   clearPaintTownMultiplayerConfig,

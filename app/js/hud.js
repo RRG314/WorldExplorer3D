@@ -2,6 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { updateNightLighting } from "./engine/night-lighting.js?v=6";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
+import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -633,7 +634,7 @@ function updateHUD() {
   }
 
   // Normal car HUD
-  const mph = Math.abs(Math.round(appCtx.car.speed * 0.5));
+  const mph = Math.abs(Math.round(carSpeedToMph(appCtx.car.speed)));
   const limit = appCtx.onMars ? 15 : appCtx.onMoon ? 12 : appCtx.car.road?.limit || 25;
   const locName = locationName();
   setHudUnitLabels('MPH', 'LIMIT');

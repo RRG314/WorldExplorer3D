@@ -16,6 +16,10 @@ import {
   earthDrivingSteeringProfile,
   resolveCarDriveCommand
 } from "./controls/traversal-control-policy.js?v=7";
+import {
+  carSpeedToMph,
+  carSpeedToWorldUnitsPerSecond
+} from "./physics/vehicle-speed-units.js?v=1";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -325,7 +329,7 @@ function update(dt) {
     appCtx.car._driveDirection = driveDirection;
   }
 
-  const earthSteering = earthDrivingSteeringProfile(spdAbs);
+  const earthSteering = earthDrivingSteeringProfile(carSpeedToMph(spdAbs));
   const maxSteer = isPlanetarySurface()
     ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90))
     : earthSteering.maxSteeringAngle;
@@ -406,7 +410,9 @@ function update(dt) {
   }
 
   const wheelBase = 2.6;
-  const v = appCtx.car.speed;
+  const v = isPlanetarySurface()
+    ? appCtx.car.speed
+    : carSpeedToWorldUnitsPerSecond(appCtx.car.speed, appCtx.METERS_PER_WORLD_UNIT);
   let steerAuthority = 1.08;
   if (!isPlanetarySurface() && lowSpeedTurnBoost > 0) {
     steerAuthority *= 1 + lowSpeedTurnBoost * 0.48;
@@ -497,8 +503,14 @@ function update(dt) {
   const lateralVelForPosition = !isPlanetarySurface() && isDrifting ?
     appCtx.car.vLat * 0.34 :
     appCtx.car.vLat;
-  appCtx.car.vx = sinA * appCtx.car.vFwd + cosA * lateralVelForPosition;
-  appCtx.car.vz = cosA * appCtx.car.vFwd - sinA * lateralVelForPosition;
+  const worldForwardVelocity = isPlanetarySurface()
+    ? appCtx.car.vFwd
+    : carSpeedToWorldUnitsPerSecond(appCtx.car.vFwd, appCtx.METERS_PER_WORLD_UNIT);
+  const worldLateralVelocity = isPlanetarySurface()
+    ? lateralVelForPosition
+    : carSpeedToWorldUnitsPerSecond(lateralVelForPosition, appCtx.METERS_PER_WORLD_UNIT);
+  appCtx.car.vx = sinA * worldForwardVelocity + cosA * worldLateralVelocity;
+  appCtx.car.vz = cosA * worldForwardVelocity - sinA * worldLateralVelocity;
 
   const velMag = Math.hypot(appCtx.car.vx, appCtx.car.vz);
   if (velMag > 5) {
@@ -517,8 +529,8 @@ function update(dt) {
     const frontPivotDist = wheelBase * 0.42;
     const frontX = appCtx.car.x + sinA * frontPivotDist;
     const frontZ = appCtx.car.z + cosA * frontPivotDist;
-    const frontVx = sinA * appCtx.car.vFwd + cosA * (lateralVelForPosition * 0.35);
-    const frontVz = cosA * appCtx.car.vFwd - sinA * (lateralVelForPosition * 0.35);
+    const frontVx = sinA * worldForwardVelocity + cosA * (worldLateralVelocity * 0.35);
+    const frontVz = cosA * worldForwardVelocity - sinA * (worldLateralVelocity * 0.35);
     const nextFrontX = frontX + frontVx * dt;
     const nextFrontZ = frontZ + frontVz * dt;
     nx = nextFrontX - Math.sin(appCtx.car.angle) * frontPivotDist;
@@ -643,7 +655,10 @@ function update(dt) {
     isPlanetarySurface() ? 0 : Number(appCtx.car.terrainRoll || 0)
   );
 
-  const wheelRot = appCtx.car.speed * dt * 0.5;
+  const wheelSpeed = isPlanetarySurface()
+    ? appCtx.car.speed
+    : carSpeedToWorldUnitsPerSecond(appCtx.car.speed, appCtx.METERS_PER_WORLD_UNIT);
+  const wheelRot = wheelSpeed * dt * 0.5;
   appCtx.wheelMeshes.forEach((w) => w.rotation.x += wheelRot);
 
   appCtx.updateTrack();
