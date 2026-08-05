@@ -46,7 +46,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
-        appCtx.updateEarthWorldStreaming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();
         if (!appCtx.onMars) appCtx.refreshAstronomicalSky?.(false);
         appCtx.updateWaterWaveVisuals?.();
@@ -124,7 +123,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         lodTimer += frame.dt;
         if (lodTimer > 0.2) {
           lodTimer = 0;
-          appCtx.updateWorldLod?.(false);
           appCtx.enforceEnvironmentSceneOwnership?.();
         }
       }

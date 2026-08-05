@@ -104,9 +104,6 @@ function updateAlternateTravelMode(appCtx, dt, options = {}) {
   } else if (activeId === 'drone') {
     appCtx.updateMode?.(dt);
     appCtx.updateInteriorInteraction?.();
-    if (!options.isPlanetarySurface?.() && !appCtx.worldLoading) {
-      appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
-    }
   }
   return true;
 }

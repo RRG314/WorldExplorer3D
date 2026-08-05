@@ -9,7 +9,7 @@ import {
 } from "./physics/vehicle-surface.js?v=5";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=3";
-import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
+import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 import {
   arcadeSteeringYawTarget,
@@ -667,9 +667,6 @@ function update(dt) {
   appCtx.updateNearbyPOI();
   appCtx.updateNavigationRoute();
 
-  if (!isPlanetarySurface() && !appCtx.worldLoading) {
-    appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z);
-  }
 }
 
 Object.assign(appCtx, {

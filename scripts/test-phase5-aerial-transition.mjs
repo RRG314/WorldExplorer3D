@@ -168,5 +168,5 @@ console.log(JSON.stringify({
   regionalMapPlane: 'deleted',
   fogPolicy: 'mode-independent',
   nearTerrain: 'unchanged-uniform-z15-grid',
-  farTerrain: 'continuous-elevation-clipmap'
+  farTerrain: 'fixed-location-elevation-horizon'
 }, null, 2));

@@ -1,5 +1,3 @@
-import { carSpeedToMph } from "../physics/vehicle-speed-units.js?v=1";
-
 function createTerrainStreamingApi(deps = {}) {
   const {
     appCtx,
@@ -21,7 +19,6 @@ function createTerrainStreamingApi(deps = {}) {
   } = deps;
 
   let lastTerrainCenterKey = null;
-  let lastDynamicTerrainRing = appCtx.TERRAIN_RING;
   let terrainMeshGeneration = 0;
   let desiredTerrainMeshKeys = new Set();
   const pendingTerrainMeshes = new Map();
@@ -76,7 +73,6 @@ function createTerrainStreamingApi(deps = {}) {
 
   function resetTerrainStreamingState() {
     lastTerrainCenterKey = null;
-    lastDynamicTerrainRing = appCtx.TERRAIN_RING;
     terrainMeshGeneration += 1;
     desiredTerrainMeshKeys = new Set();
     pendingTerrainMeshes.clear();
@@ -86,30 +82,6 @@ function createTerrainStreamingApi(deps = {}) {
     terrainState._lastRoadCount = 0;
     resetFarTerrainClipmap?.();
     clearTerrainHeightCache();
-  }
-
-  function getStreamingSpeedMph() {
-    if (appCtx.planeMode?.active) return Math.max(0, Math.abs((appCtx.planeMode.speed || 0) * 2.237));
-    if (appCtx.droneMode && appCtx.drone) return Math.max(0, Math.abs((appCtx.drone.speed || 0) * 1.8));
-    if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === "walk") {
-      return Math.max(0, Math.abs(appCtx.Walk.state.walker?.speedMph || 0));
-    }
-    return Math.max(0, Math.abs(carSpeedToMph(appCtx.car?.speed || 0)));
-  }
-
-  function getDynamicTerrainRing() {
-    const baseRing = Math.max(1, appCtx.TERRAIN_RING);
-    const mode = typeof appCtx.getPerfMode === "function" ? appCtx.getPerfMode() : appCtx.perfMode || "rdt";
-    if (mode === "baseline") return baseRing;
-
-    // Aerial travel needs a stable horizon. Shrinking the terrain ring while the
-    // aircraft accelerates exposes tile edges and makes the backdrop pulse.
-    if (appCtx.planeMode?.active || appCtx.droneMode) return baseRing;
-
-    const mph = getStreamingSpeedMph();
-    if (mph >= 120) return Math.max(1, baseRing - 2);
-    if (mph >= 70) return Math.max(1, baseRing - 1);
-    return baseRing;
   }
 
   function updateTerrainAround(x, z) {
@@ -132,19 +104,17 @@ function createTerrainStreamingApi(deps = {}) {
     const { lat, lon } = geographic;
     const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
     const centerKey = `${appCtx.TERRAIN_ZOOM}/${t.x}/${t.y}`;
-    const activeRing = getDynamicTerrainRing();
-    const ringChanged = activeRing !== lastDynamicTerrainRing;
-    lastDynamicTerrainRing = activeRing;
+    const activeRing = Math.max(1, appCtx.TERRAIN_RING);
     if (typeof appCtx.setPerfLiveStat === "function") appCtx.setPerfLiveStat("terrainRing", activeRing);
 
     if (lastTerrainCenterKey !== null) {
       const dx = x - terrainState._lastUpdatePos.x;
       const dz = z - terrainState._lastUpdatePos.z;
       const distMoved = Math.sqrt(dx * dx + dz * dz);
-      if (centerKey === lastTerrainCenterKey && distMoved < 5.0 && !ringChanged) return;
+      if (centerKey === lastTerrainCenterKey && distMoved < 5.0) return;
     }
 
-    const tilesChanged = centerKey !== lastTerrainCenterKey || ringChanged;
+    const tilesChanged = centerKey !== lastTerrainCenterKey;
     lastTerrainCenterKey = centerKey;
     terrainState._lastUpdatePos.x = x;
     terrainState._lastUpdatePos.z = z;

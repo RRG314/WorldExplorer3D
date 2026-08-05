@@ -156,20 +156,6 @@ export function createBoatRuntimeDynamics(deps = {}) {
     updateBoatMesh();
     updateBoatFoamFx(dt, profile);
 
-    if (!Number.isFinite(appCtx.boatMode._terrainTimer)) appCtx.boatMode._terrainTimer = 0;
-    appCtx.boatMode._terrainTimer += dt;
-    const terrainInterval =
-      appCtx.boatMode.detailBias <= 0.4 ? 1.6 :
-      appCtx.boatMode.detailBias <= 0.58 ? 1.15 :
-      appCtx.boatMode.detailBias <= 0.76 ? 0.9 : 0.65;
-    if (appCtx.boatMode._terrainTimer > terrainInterval) {
-      appCtx.boatMode._terrainTimer = 0;
-      if (typeof appCtx.updateTerrainAround === 'function' && !appCtx.worldLoading) {
-        appCtx.updateTerrainAround(appCtx.boat.x, appCtx.boat.z);
-      }
-      if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(false);
-    }
-
     appCtx.appendTrackPoint?.(appCtx.boat.x, appCtx.boat.z);
     return true;
   };
