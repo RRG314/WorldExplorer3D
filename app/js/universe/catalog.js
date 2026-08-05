@@ -125,7 +125,7 @@ const CATALOG = [
       imageSourceUrl: SOURCES.nasaMilkyWay.url,
       imageRole: 'inside-galaxy-observed-plane'
     },
-    generatedFlags: ['exterior-spiral-structure', 'display-scaled-rotation'],
+    generatedFlags: ['observational-sky-projection'],
     provenance: [SOURCES.gaia, SOURCES.nasaMilkyWay]
   }),
   entity({
@@ -322,7 +322,7 @@ const CATALOG = [
       tint: 0x89a7ff,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['image-derived-depth-model'],
+    generatedFlags: ['observational-image-projection'],
     uncertainty: { distance: 'Published estimates vary by method and sub-region.' },
     provenance: [SOURCES.nasaOrion]
   }),
@@ -345,7 +345,7 @@ const CATALOG = [
       tint: 0xff9a73,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['image-derived-depth-model'],
+    generatedFlags: ['observational-image-projection'],
     uncertainty: { distance: 'Representative distance to the Carina star-forming complex.' },
     provenance: [SOURCES.nasaCarina]
   }),
@@ -368,7 +368,7 @@ const CATALOG = [
       tint: 0x7ee0b7,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['image-derived-depth-model'],
+    generatedFlags: ['observational-image-projection'],
     provenance: [SOURCES.nasaCrab]
   }),
   entity({

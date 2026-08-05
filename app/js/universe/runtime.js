@@ -6,7 +6,7 @@ import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
-import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=13';
+import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=14';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,

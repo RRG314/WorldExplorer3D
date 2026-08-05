@@ -11,6 +11,21 @@ function seededRandom(seed = 1) {
   };
 }
 
+function createFeatheredAlphaMap() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 192;
+  const context = canvas.getContext('2d');
+  const gradient = context.createRadialGradient(128, 96, 42, 128, 96, 132);
+  gradient.addColorStop(0, '#ffffff');
+  gradient.addColorStop(0.58, '#ffffff');
+  gradient.addColorStop(0.82, '#9a9a9a');
+  gradient.addColorStop(1, '#000000');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  return new THREE.CanvasTexture(canvas);
+}
+
 function createLabel(text, width = 320) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -148,134 +163,93 @@ function createDustVolume(seed, count, radius, color, pointSize = 3.2) {
   }));
 }
 
-function createObservationPointMap() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const context = canvas.getContext('2d');
-  const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 31);
-  gradient.addColorStop(0, 'rgba(255,255,255,0.95)');
-  gradient.addColorStop(0.34, 'rgba(255,255,255,0.72)');
-  gradient.addColorStop(1, 'rgba(255,255,255,0)');
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(canvas);
-}
-
-function populateObservationVolume(points, image, options) {
-  const aspect = Number(options.aspect || image.width / image.height || 1);
-  const sampleWidth = Math.min(420, image.width);
-  const sampleHeight = Math.max(1, Math.round(sampleWidth / aspect));
-  const canvas = document.createElement('canvas');
-  canvas.width = sampleWidth;
-  canvas.height = sampleHeight;
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  context.drawImage(image, 0, 0, sampleWidth, sampleHeight);
-  const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
-  const positions = [];
-  const colors = [];
-  const random = seededRandom(Number(options.seed || 1) + 104729);
-  const width = Number(options.width || 9000);
-  const height = width / aspect;
-  const depth = Number(options.depth || width * 0.4);
-  for (let y = 0; y < sampleHeight; y += 1) {
-    for (let x = 0; x < sampleWidth; x += 1) {
-      const offset = (y * sampleWidth + x) * 4;
-      const red = pixels[offset] / 255;
-      const green = pixels[offset + 1] / 255;
-      const blue = pixels[offset + 2] / 255;
-      const alpha = pixels[offset + 3] / 255;
-      const luminance = Math.max(red, green, blue) * 0.62 + (red + green + blue) / 3 * 0.38;
-      if (alpha < 0.1 || luminance < 0.035 || random() > Math.min(1, 0.28 + luminance * 1.2)) continue;
-      const normalizedX = (x + random() - 0.5) / sampleWidth - 0.5;
-      const normalizedY = 0.5 - (y + random() - 0.5) / sampleHeight;
-      const coherentDepth = Math.sin(normalizedX * Math.PI * 5) * Math.cos(normalizedY * Math.PI * 4);
-      const z = ((random() - 0.5) * 0.78 + coherentDepth * 0.22) * depth * (0.2 + luminance * 0.8);
-      positions.push(normalizedX * width, normalizedY * height, z);
-      colors.push(Math.min(1, red * 1.12), Math.min(1, green * 1.12), Math.min(1, blue * 1.12));
-    }
-  }
-  points.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  points.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  points.geometry.computeBoundingSphere();
-  points.userData.observationSampleCount = positions.length / 3;
-}
-
-function createObservationVolume(entity, options = {}) {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute([], 3));
-  const points = new THREE.Points(geometry, new THREE.PointsMaterial({
-    map: createObservationPointMap(),
-    size: Number(options.pointSize || 72),
-    sizeAttenuation: true,
-    vertexColors: true,
-    transparent: true,
-    opacity: Number(options.opacity || 0.82),
-    alphaTest: 0.015,
-    depthWrite: false,
-    blending: THREE.NormalBlending,
-    fog: false
-  }));
-  points.name = `Observation-derived volume: ${entity.name}`;
-  new THREE.TextureLoader().load(entity.visualProfile.image, (texture) => {
-    populateObservationVolume(points, texture.image, {
-      aspect: entity.visualProfile.imageAspect,
-      seed: entity.visualProfile.seed,
-      ...options
-    });
-    texture.dispose();
-  });
-  points.userData = {
-    accuracy: 'observational color and projected density; deterministic modeled depth',
-    imageCredit: entity.visualProfile.imageCredit,
-    source: entity.visualProfile.imageSourceUrl || entity.provenance?.[0]?.url,
-    generatedDepth: true
-  };
-  return points;
-}
-
-function createInsideGalaxyObservationBand(entity) {
+function loadObservationTexture(entity) {
   const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
   if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  const geometry = new THREE.CylinderGeometry(3200, 3200, 760, 128, 1, true);
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
+  return texture;
+}
+
+function createObservationSprite(entity, definition) {
+  const material = new THREE.SpriteMaterial({
+    map: definition.texture,
+    alphaMap: createFeatheredAlphaMap(),
     transparent: true,
-    opacity: 0.72,
-    side: THREE.BackSide,
+    opacity: definition.opacity,
     depthWrite: false,
+    blending: THREE.AdditiveBlending,
     fog: false
   });
-  const band = new THREE.Mesh(geometry, material);
-  band.name = `Inside-galaxy observation: ${entity.name}`;
-  band.rotation.y = Math.PI * 0.34;
-  band.userData = {
-    accuracy: 'observational infrared panorama viewed from inside the Milky Way',
+  const sprite = new THREE.Sprite(material);
+  sprite.position.z = definition.z || 0;
+  sprite.scale.set(
+    definition.width,
+    definition.width / Number(entity.visualProfile.imageAspect || 1.39),
+    1
+  );
+  return sprite;
+}
+
+function createInsideGalaxySky(entity) {
+  const texture = loadObservationTexture(entity);
+  texture.wrapS = THREE.RepeatWrapping;
+  const geometry = new THREE.SphereGeometry(18000, 96, 48);
+  const material = new THREE.ShaderMaterial({
+    uniforms: { observation: { value: texture } },
+    vertexShader: `
+      varying vec2 observationUv;
+      void main() {
+        observationUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D observation;
+      varying vec2 observationUv;
+      void main() {
+        float latitude = abs(observationUv.y - 0.5);
+        const float bandHalfHeight = 0.16;
+        if (latitude >= bandHalfHeight) discard;
+        float imageY = (observationUv.y - (0.5 - bandHalfHeight)) / (bandHalfHeight * 2.0);
+        vec4 observed = texture2D(observation, vec2(observationUv.x, imageY));
+        float edgeFade = 1.0 - smoothstep(0.105, bandHalfHeight, latitude);
+        gl_FragColor = vec4(observed.rgb, observed.a * edgeFade * 0.78);
+      }
+    `,
+    transparent: true,
+    side: THREE.BackSide,
+    depthWrite: false,
+    depthTest: false,
+    fog: false
+  });
+  const sky = new THREE.Mesh(geometry, material);
+  sky.name = `Inside-galaxy sky observation: ${entity.name}`;
+  sky.rotation.set(0.12, 0, -0.22);
+  sky.renderOrder = -1000;
+  sky.userData = {
+    accuracy: 'NASA GLIMPSE 360-degree infrared Galactic Plane panorama projected at sky distance',
     imageCredit: entity.visualProfile.imageCredit,
     source: entity.visualProfile.imageSourceUrl
   };
-  return band;
+  return sky;
 }
 
 function createNebula(entity) {
   const group = new THREE.Group();
-  const observationVolume = createObservationVolume(entity, {
-    width: 9000,
-    depth: 4300,
-    pointSize: 170,
-    opacity: 0.42
-  });
-  group.add(observationVolume);
+  const texture = loadObservationTexture(entity);
+  const layers = [
+    { z: 0, width: 9000, opacity: 0.54 },
+    { z: -4200, width: 11200, opacity: 0.14 },
+    { z: 3200, width: 7600, opacity: 0.09 }
+  ].map((definition) => createObservationSprite(entity, { ...definition, texture }));
+  layers.forEach((layer) => group.add(layer));
   const label = createLabel(entity.name, 420);
   label.position.y = 4700;
   group.add(label);
-  group.userData.nebulaObservationVolume = observationVolume;
+  group.userData.nebulaObservationLayers = layers;
   group.userData.observationalImage = {
     credit: entity.visualProfile.imageCredit,
     accuracy: entity.accuracy,
-    generatedDepth: 'deterministic image-derived point depth'
+    generatedDepth: 'three deterministic view planes; not asserted as physical volumetric data'
   };
   return group;
 }
@@ -344,18 +318,19 @@ function createGalaxyPoints(entity, count = 5200, radius = 900) {
 
 function createGalaxy(entity) {
   const group = new THREE.Group();
+  if (entity.visualProfile?.imageRole === 'inside-galaxy-observed-plane') {
+    group.add(createInsideGalaxySky(entity));
+    group.userData.insideGalaxyView = true;
+    return group;
+  }
   const starField = createGalaxyPoints(entity);
   if (entity.visualProfile?.image) {
-    if (entity.visualProfile.imageRole === 'inside-galaxy-observed-plane') {
-      group.add(createInsideGalaxyObservationBand(entity));
-    } else {
-      group.add(createObservationVolume(entity, {
-        width: 1680,
-        depth: 95,
-        pointSize: 18,
-        opacity: 0.9
-      }));
-    }
+    group.add(createObservationSprite(entity, {
+      texture: loadObservationTexture(entity),
+      width: 1680,
+      opacity: 0.88,
+      z: 0
+    }));
     starField.material.opacity = 0.24;
     starField.material.size = 2.25;
   }
@@ -423,7 +398,9 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
     entry.body.position.copy(orbitalDisplayPosition(entry, angle));
     entry.body.rotation.y += 0.006 * frameScale;
   });
-  if (group.userData.universeEntity?.objectClass === 'galaxy') group.rotation.y += 0.00012 * frameScale;
+  if (group.userData.universeEntity?.objectClass === 'galaxy' && !group.userData.insideGalaxyView) {
+    group.rotation.y += 0.00012 * frameScale;
+  }
   if (group.userData.stellarRegionField) group.userData.stellarRegionField.rotation.y += 0.00022 * frameScale;
 }
 
