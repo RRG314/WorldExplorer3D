@@ -3,7 +3,7 @@ import { createWorldLandusePass } from "./load-landuse-pass.js?v=34";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=13";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=18";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=20";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
@@ -158,7 +158,7 @@ export function createWorldRoadLoader(deps = {}) {
     signedPolygonAreaXZ,
     spawnOnRoad,
     updateFeatureSurfaceProfile,
-    updateWorldLod,
+    publishLocationWorld,
     vectorTileRangeForBounds,
     waterSurfaceBaseElevation,
     wayCenterLatLon,
@@ -288,7 +288,7 @@ export function createWorldRoadLoader(deps = {}) {
         finalizePresentation: false,
         reason,
         spawnOnRoad,
-        updateWorldLod,
+        publishLocationWorld,
         startLoadPhase,
         endLoadPhase
       });
@@ -592,7 +592,7 @@ export function createWorldRoadLoader(deps = {}) {
             waterStructureDeadlineMs: Infinity,
             waterStructureQuery,
             waterStructureTimeoutMs: 9000,
-            updateWorldLod,
+            publishLocationWorld,
             useRdtBudgeting
           });
           appCtx.showLoad('Loading buildings and preparing the world...');
@@ -605,7 +605,7 @@ export function createWorldRoadLoader(deps = {}) {
             recordLoadWarning,
             registerBuildingCollision,
             sanitizeWorldFootprintPoints,
-            updateWorldLod
+            publishLocationWorld
           });
           await markLoaded('primary');
         } else {

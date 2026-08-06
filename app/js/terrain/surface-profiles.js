@@ -6,7 +6,7 @@ import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=10";
+} from "./worldcover-baseline.js?v=11";
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -397,6 +397,37 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
   };
 }
 
+function applyWorldCoverVertexTints(mesh, result) {
+  const geometry = mesh?.geometry;
+  const uvs = geometry?.attributes?.uv;
+  const tints = result?.surfaceTints;
+  const size = Number(result?.surfaceTintSize || 0);
+  const encodingScale = Number(result?.surfaceTintEncodingScale || 170);
+  if (!geometry || !uvs || !tints || size < 2 || encodingScale <= 0) return false;
+
+  const colors = new Float32Array(uvs.count * 3);
+  const sample = (x, y, channel) => tints[(y * size + x) * 3 + channel] / encodingScale;
+  for (let index = 0; index < uvs.count; index += 1) {
+    const sourceX = Math.max(0, Math.min(size - 1, uvs.getX(index) * (size - 1)));
+    const sourceY = Math.max(0, Math.min(size - 1, (1 - uvs.getY(index)) * (size - 1)));
+    const x0 = Math.floor(sourceX);
+    const y0 = Math.floor(sourceY);
+    const x1 = Math.min(size - 1, x0 + 1);
+    const y1 = Math.min(size - 1, y0 + 1);
+    const tx = sourceX - x0;
+    const ty = sourceY - y0;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const north = sample(x0, y0, channel) * (1 - tx) + sample(x1, y0, channel) * tx;
+      const south = sample(x0, y1, channel) * (1 - tx) + sample(x1, y1, channel) * tx;
+      colors[index * 3 + channel] = north * (1 - ty) + south * ty;
+    }
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.attributes.color.needsUpdate = true;
+  mesh.material.vertexColors = true;
+  return true;
+}
+
 function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
   const material = mesh?.material;
@@ -418,7 +449,7 @@ function applyLoadedWorldCoverBaseline(mesh) {
   }
   if (result.texture) {
     const detailMode =
-      result.dominantClass === 'built' ? 'urban' :
+      result.dominantClass === 'built' ? 'grass' :
       result.dominantClass === 'crop' ? 'soil' :
       result.dominantClass === 'bare' ? (semanticProfile?.mode === 'sand' ? 'sand' : 'rock') :
       result.dominantClass === 'snow' ? 'snow' :
@@ -429,10 +460,19 @@ function applyLoadedWorldCoverBaseline(mesh) {
       Number(mesh.userData.terrainTextureRepeats) || 12,
       detailMode
     );
-    material.map = result.texture;
+    material.map = detailTextures?.map || null;
     material.normalMap = detailTextures?.normalMap || null;
     material.roughnessMap = detailTextures?.roughnessMap || null;
-    if (material.normalMap) material.normalScale = new THREE.Vector2(0.28, 0.28);
+    if (material.normalMap) {
+      const normalStrength =
+        detailMode === 'sand' ? [0.78, 0.42] :
+        detailMode === 'rock' ? [0.56, 0.56] :
+        detailMode === 'soil' ? [0.48, 0.48] :
+        detailMode === 'forest' ? [0.48, 0.48] :
+        [0.6, 0.6];
+      material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
+    }
+    applyWorldCoverVertexTints(mesh, result);
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
@@ -440,7 +480,7 @@ function applyLoadedWorldCoverBaseline(mesh) {
     material.metalness = 0;
     material.needsUpdate = true;
     mesh.userData.terrainDetailProvenance = {
-      kind: 'spatial-worldcover-pbr',
+      kind: 'smoothed-worldcover-tinted-pbr',
       source: result.source,
       mode: detailMode
     };
@@ -550,16 +590,20 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.metalness = 0.0;
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.78, 0.42);
   } else if (nextMode === "built") {
-    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 0.7, "built");
+    // A city classification describes the surrounding settlement; it does
+    // not mean every unmapped square metre is concrete. Roads, parking and
+    // mapped hardscape have their own geometry, while the base terrain should
+    // remain natural until the spatial WorldCover texture arrives.
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats, "grass");
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(mat.map ? 0xffffff : URBAN_GROUND_HEX);
+    mat.color.setHex(mat.map ? 0xffffff : TERRAIN_GRASS_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
-    mat.roughness = 0.9;
+    mat.roughness = 0.95;
     mat.metalness = 0;
-    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.18, 0.18);
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.6, 0.6);
   } else if (nextMode === "urban") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.1, "urban");
     mat.map = textures?.map || null;

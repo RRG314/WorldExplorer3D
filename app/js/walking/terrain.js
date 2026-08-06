@@ -7,10 +7,6 @@ function getPlanetarySurfaceMesh() {
 }
 
 function createWalkingTerrainHelpers({ car, state, CFG }) {
-  let lastWalkTerrainUpdateAt = 0;
-  let lastWalkTerrainX = NaN;
-  let lastWalkTerrainZ = NaN;
-
   function finiteOr(value, fallback) {
     return Number.isFinite(value) ? value : fallback;
   }
@@ -74,41 +70,11 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
     return finiteOr(fallbackY, 0);
   }
 
-  function nowMs() {
-    return typeof performance !== "undefined" && typeof performance.now === "function"
-      ? performance.now()
-      : Date.now();
-  }
-
-  function syncWalkTerrain(force = false) {
-    if (appCtx.onMoon || appCtx.onMars) return;
-    if (appCtx.activeInterior) return;
-    if (typeof appCtx.terrainEnabled !== "undefined" && !appCtx.terrainEnabled) return;
-    if (typeof appCtx.worldLoading !== "undefined" && appCtx.worldLoading) return;
-    if (typeof appCtx.updateTerrainAround !== "function") return;
-
-    const x = state.walker.x;
-    const z = state.walker.z;
-    const t = nowMs();
-    const moved = Number.isFinite(lastWalkTerrainX) && Number.isFinite(lastWalkTerrainZ)
-      ? Math.hypot(x - lastWalkTerrainX, z - lastWalkTerrainZ)
-      : Infinity;
-
-    if (!force && moved < 3.5 && t - lastWalkTerrainUpdateAt < 160) return;
-
-    appCtx.updateTerrainAround(x, z);
-    lastWalkTerrainUpdateAt = t;
-    lastWalkTerrainX = x;
-    lastWalkTerrainZ = z;
-
-  }
-
   return {
     finiteOr,
     getSafeDriveY,
     getWalkGroundY,
     syncCarFromWalker,
-    syncWalkTerrain,
     syncWalkerFromCar
   };
 }

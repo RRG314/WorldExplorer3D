@@ -332,8 +332,7 @@ async function runScenario(browser, baseUrl, scenario) {
         return ctx.forceSpaceFlightLanding?.('Earth') === true;
       });
       assert(staleLandingStarted, 'Could not start the stale-landing cancellation regression scenario');
-      await page.click('#mainMenuBtn');
-      await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 30000 });
+      await openMainMenu(page);
       const titleAfterCancelledLanding = await readState(page);
       assert(titleAfterCancelledLanding.env === 'EARTH', 'Main Menu left the cancelled flight environment active');
       assert(!titleAfterCancelledLanding.spaceFlightActive, 'Main Menu retained the cancelled flight runtime');

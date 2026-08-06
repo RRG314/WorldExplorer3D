@@ -47,11 +47,8 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=9";
-import {
-  initWorldLod,
-  updateWorldLod
-} from "./world/lod.js?v=16";
+} from "./world/budgets.js?v=10";
+import { publishLocationWorld } from "./world/publication.js?v=1";
 import {
   buildPoiGeometryPass,
   buildStreetFurniturePass,
@@ -163,7 +160,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=21";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=89";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=91";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
@@ -266,7 +263,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   signedPolygonAreaXZ,
   spawnOnRoad,
   updateFeatureSurfaceProfile,
-  updateWorldLod,
+  publishLocationWorld,
   vectorTileRangeForBounds,
   waterSurfaceBaseElevation,
   wayCenterLatLon,
@@ -309,11 +306,6 @@ initWorldBudgets({
   limitNodesByDistance,
   limitWaysByDistance,
   nodeDistanceSq
-});
-initWorldLod({
-  getPerfModeValue,
-  getRuntimeDynamicBudget,
-  getWorldLodThresholds
 });
 initWorldStructureAwareness({
   enableLinearFeatures: () => ENABLE_LINEAR_FEATURES,
@@ -377,7 +369,7 @@ Object.assign(appCtx, {
   spawnOnRoad,
   terrainYAtWorld,
   teleportToLocation,
-  updateWorldLod,
+  publishLocationWorld,
   verifyWorldPublicationStable: () =>
     verifyWorldPublicationStable(appCtx, appCtx.worldPublication)
 });
@@ -409,4 +401,4 @@ export {
   spawnOnRoad,
   terrainYAtWorld,
   teleportToLocation,
-  updateWorldLod };
+  publishLocationWorld };

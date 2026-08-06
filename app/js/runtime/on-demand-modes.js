@@ -31,8 +31,8 @@ export function ensureSpaceRuntime() {
     modeLoads.space = (async () => {
       // Solar-system and universe code is intentionally outside the Earth
       // startup graph. It is evaluated only after a space action.
-      await import('../solar-system.js?v=75');
-      return import('../space.js?v=96');
+      await import('../solar-system.js?v=79');
+      return import('../space.js?v=97');
     })().catch((error) => {
       modeLoads.space = null;
       throw error;

@@ -8,13 +8,31 @@ import {
 } from './water-structure-source.js?v=3';
 
 const COMPLETE_BUILDING_TILE_CAP = 1200;
-const MAX_INITIAL_BUILDING_WAYS = 9000;
+const BUILDING_COVERAGE_TARGET = 0.85;
+const EXPANDED_COVERAGE_FLOOR = 9001;
 
 export function resolveBuildingPublicationSelection(options = {}) {
-  const configuredGlobalCap = Math.min(
-    MAX_INITIAL_BUILDING_WAYS,
-    Math.max(1, Math.floor(Number(options.maxBuildingWays) || MAX_INITIAL_BUILDING_WAYS))
+  const configuredSafetyCap = Math.max(
+    1,
+    Math.floor(Number(options.maxBuildingWays) || 12000)
   );
+  const requestedBuildingWays = Math.max(
+    0,
+    Math.floor(Number(options.requestedBuildingWays) || 0)
+  );
+  // Retain approximately 85% of mapped footprints. The one-feature floor
+  // above the retired 9,000 cap ensures a dense source cannot silently fall
+  // back to the exact coverage level the user rejected.
+  const coverageTargetCap = requestedBuildingWays > 0
+    ? Math.min(
+        requestedBuildingWays,
+        Math.max(
+          requestedBuildingWays > 9000 ? EXPANDED_COVERAGE_FLOOR : 1,
+          Math.ceil(requestedBuildingWays * BUILDING_COVERAGE_TARGET)
+        )
+      )
+    : configuredSafetyCap;
+  const configuredGlobalCap = Math.min(configuredSafetyCap, coverageTargetCap);
   const configuredPerTile = Math.max(
     1,
     Math.floor(Number(options.tileBudgetCfg?.buildingsPerTile) || 1),
@@ -30,10 +48,11 @@ export function resolveBuildingPublicationSelection(options = {}) {
     minPerTile: configuredPerTile,
     useRdt: false,
     spreadAcrossArea: true,
-    // Initial play owns a complete nearby district. Distant city context is
-    // supplied by the streamed far field instead of blocking launch on tens
-    // of thousands of interactive collision meshes.
-    coreRatio: 0.9
+    coverageTarget: BUILDING_COVERAGE_TARGET,
+    requestedBuildingWays,
+    // Preserve the broad mapped district when a global cap is reached instead
+    // of concentrating nearly every retained footprint in the center.
+    coreRatio: 0.78
   });
 }
 
@@ -159,7 +178,10 @@ export async function loadBuildingDetailForPublication(options = {}) {
       const requested = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
-      const publicationSelection = resolveBuildingPublicationSelection(options);
+      const publicationSelection = resolveBuildingPublicationSelection({
+        ...options,
+        requestedBuildingWays: requested.length
+      });
       const provenancePublicationCap = publicationSelection.globalCap;
       const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
         ...publicationSelection,
@@ -200,7 +222,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
       // Structure and terrain profiles are compiled once by final world
       // publication after all bounded building data is present.
       appCtx.clearTerrainHeightCache?.();
-      options.updateWorldLod?.(true);
+      options.publishLocationWorld?.();
       setBuildingDetailState('ready', {
         requested: requested.length,
         selected: buildingWays.length,
@@ -210,6 +232,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
         publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
         coveragePolicy: {
           globalCap: publicationSelection.globalCap,
+          targetRatio: publicationSelection.coverageTarget,
           basePerTile: publicationSelection.basePerTile,
           recursiveTileThinning: publicationSelection.useRdt,
           contiguousCoreRatio: publicationSelection.coreRatio

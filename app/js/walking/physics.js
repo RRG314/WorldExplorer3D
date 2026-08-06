@@ -22,8 +22,7 @@ function createWalkingPhysicsHelpers({
   getWalkGroundY,
   isPointInPolygon,
   keys,
-  state,
-  syncWalkTerrain
+  state
 }) {
   function isInsideBuilding(x, z, b) {
     if (!b || b.collisionDisabled) return false;

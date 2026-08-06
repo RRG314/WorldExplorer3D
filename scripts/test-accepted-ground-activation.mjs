@@ -21,7 +21,7 @@ function harness(groundState) {
     initialEarthWorldReady: true,
     prepareAcceptedGroundFromCatalog: async () => groundState,
     showLoad: (message, options) => messages.push({ message, options }),
-    updateTerrainAround: () => { terrainUpdates += 1; }
+    publishLocationTerrain: () => { terrainUpdates += 1; }
   };
   return {
     appCtx,

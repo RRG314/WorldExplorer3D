@@ -12,7 +12,6 @@ export function createBoatRuntimeDynamics(deps = {}) {
     minimumBoatShorelineDistance,
     resolveBoatSpawnPoint,
     setBoatActorPose,
-    syncBoatTerrainSuppression,
     updateBoatFoamFx,
     updateBoatLodBias,
     updateBoatMesh,
@@ -151,7 +150,6 @@ export function createBoatRuntimeDynamics(deps = {}) {
     }
 
     updateBoatLodBias();
-    syncBoatTerrainSuppression();
     updateBoatWaterPatch(appCtx.boatMode.currentWater || null);
     updateBoatMesh();
     updateBoatFoamFx(dt, profile);

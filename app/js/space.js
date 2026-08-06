@@ -2,8 +2,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=11";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=21";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=12";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=22";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
@@ -131,6 +131,7 @@ function startSpaceFlightToMoon() {
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
 
+  appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
 
   if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
@@ -180,6 +181,7 @@ function startSpaceFlightToEarth() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
+  appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
 
   if (appCtx.spaceFlight._extendedSpaceLoaded) {
@@ -230,6 +232,7 @@ function startSpaceFlightToMars() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMars();
+  appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
@@ -305,6 +308,7 @@ function exitSpaceFlight(source = 'runtime') {
   if (worldCanvas) worldCanvas.style.display = 'block';
 
   showGameUI();
+  appCtx.renderLoop?.();
   appCtx.spaceFlight.keys = {};
   appCtx.spaceFlight._manualLandingTarget = null;
   appCtx.spaceFlight._autopilotTarget = null;

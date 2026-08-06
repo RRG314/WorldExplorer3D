@@ -32,13 +32,12 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=31";
+} from "./terrain/surface-profiles.js?v=33";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
   clearTerrainMeshes,
   decodeTerrariumRGB,
-  disposeTerrainMesh,
   getTerrainMeshKey,
   ensureTerrainGroup,
   getOrLoadTerrainTile,
@@ -54,7 +53,7 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=40";
+} from "./terrain/tiles.js?v=41";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -66,7 +65,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=5";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=13";
+import { createLocationTerrainApi } from "./terrain/location-world.js?v=2";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=5";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
@@ -90,8 +89,6 @@ const terrain = {
   _roadMaterials: null,
   _urbanSurfaceMaterialCacheKey: '',
   _urbanSurfaceMaterials: null,
-  // Performance optimization caching
-  _lastUpdatePos: { x: 0, z: 0 },
   _lastTerrainTileCount: 0
 };
 const acceptedGroundRuntime = createAcceptedGroundRuntime({ worldToLatLon });
@@ -233,7 +230,12 @@ const terrainTileDeps = {
   createWaterTerrainContext,
   resolveWaterTerrainY,
   computeElevationStatsMeters: (samplesMeters) => computeElevationStatsMeters(samplesMeters),
-  reapplyTerrainMeshHeights: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps),
+  reapplyTerrainMeshHeights: (mesh) => {
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps);
+    if (mesh?.userData?.pendingTerrainTile === false) {
+      appCtx.retireGroundFallbackPlaceholder?.();
+    }
+  },
   applyHeightsToTerrainMesh: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps)
 };
 
@@ -361,11 +363,10 @@ const {
 });
 
 const {
-  resetTerrainStreamingState,
-  updateTerrainAround
-} = createTerrainStreamingApi({
+  publishLocationTerrain,
+  resetLocationTerrainPublication
+} = createLocationTerrainApi({
   appCtx,
-  terrainState: terrain,
   ensureTerrainGroup,
   worldToLatLon,
   latLonToTileXY,
@@ -373,7 +374,6 @@ const {
   terrainTileDeps,
   getTerrainMeshKey,
   terrainTileMeshKey,
-  disposeTerrainMesh,
   getOrLoadTerrainTile,
   pruneTerrainTileCache,
   terrainTileCacheSnapshot,
@@ -396,8 +396,6 @@ async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoade
       };
     }
   }
-  updateTerrainAround(x, z);
-
   const deadline = performance.now() + Math.max(500, Number(timeoutMs) || 5000);
   const requiredRatio = Math.max(0.5, Math.min(1, Number(minLoadedRatio) || 0.72));
   let snapshot = { ready: false, loaded: 0, total: 0 };
@@ -509,7 +507,7 @@ Object.assign(appCtx, {
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
   resetFarTerrainClipmap,
-  resetTerrainStreamingState,
+  resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
   terrainSourceSampleAtLatLon: (lat, lon) =>
@@ -523,7 +521,7 @@ Object.assign(appCtx, {
   terrainMeshHeightAt,
   tileXYToLatLonBounds,
   toggleRoadDebugMode,
-  updateTerrainAround,
+  publishLocationTerrain,
   validateRoadTerrainConformance,
   verifyAcceptedGroundCoverage,
   waitForTerrainCoverageAt,
@@ -562,7 +560,7 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
-  resetTerrainStreamingState,
+  resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
   terrainSourceSampleAtLatLon,
@@ -573,7 +571,7 @@ export {
   terrainMeshHeightAt,
   tileXYToLatLonBounds,
   toggleRoadDebugMode,
-  updateTerrainAround,
+  publishLocationTerrain,
   validateRoadTerrainConformance,
   verifyAcceptedGroundCoverage,
   waitForTerrainCoverageAt,

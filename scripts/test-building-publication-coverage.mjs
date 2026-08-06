@@ -3,6 +3,7 @@ import { resolveBuildingPublicationSelection } from '../app/js/world/load-buildi
 
 const desktopDense = resolveBuildingPublicationSelection({
   maxBuildingWays: 26000,
+  requestedBuildingWays: 24000,
   tileBudgetCfg: {
     buildingsPerTile: 460,
     buildingsMinPerTile: 130
@@ -10,13 +11,15 @@ const desktopDense = resolveBuildingPublicationSelection({
   useRdtBudgeting: true
 });
 
-assert.equal(desktopDense.globalCap, 9000, 'initial interactive publication must remain bounded');
+assert.equal(desktopDense.globalCap, 20400, 'dense locations must target 85% mapped building retention');
+assert.equal(desktopDense.coverageTarget, 0.85, 'the requested building coverage target must remain explicit');
 assert.equal(desktopDense.basePerTile, 1200, 'dense tiles must retain complete footprint coverage');
 assert.equal(desktopDense.useRdt, false, 'recursive-depth thinning must not punch holes in building coverage');
-assert.ok(desktopDense.coreRatio >= 0.9, 'global overflow must preserve a contiguous central district');
+assert.equal(desktopDense.coreRatio, 0.78, 'global overflow must retain broad mapped coverage around its contiguous core');
 
 const deviceScaled = resolveBuildingPublicationSelection({
   maxBuildingWays: 7000,
+  requestedBuildingWays: 10000,
   tileBudgetCfg: {
     buildingsPerTile: 220,
     buildingsMinPerTile: 120
@@ -24,10 +27,24 @@ const deviceScaled = resolveBuildingPublicationSelection({
 });
 assert.equal(deviceScaled.globalCap, 7000, 'device-scaled global safety ceiling must remain authoritative');
 
+const justAboveLegacyCap = resolveBuildingPublicationSelection({
+  maxBuildingWays: 26000,
+  requestedBuildingWays: 10000,
+  tileBudgetCfg: { buildingsPerTile: 460, buildingsMinPerTile: 130 }
+});
+assert.equal(justAboveLegacyCap.globalCap, 9001, 'dense sources must no longer collapse to the old 9,000-building ceiling');
+
+const safetyBoundedDense = resolveBuildingPublicationSelection({
+  maxBuildingWays: 26000,
+  requestedBuildingWays: 40000,
+  tileBudgetCfg: { buildingsPerTile: 460, buildingsMinPerTile: 130 }
+});
+assert.equal(safetyBoundedDense.globalCap, 26000, 'the earlier proven safety ceiling must bound unusually large sources');
+
 console.log(JSON.stringify({
   ok: true,
   contract: 'building-publication-coverage',
-  interactivePublicationBounded: true,
+  mappedCoverageTarget: 0.85,
   recursiveTileThinningDisabled: true,
   contiguousCenterReserved: true,
   deviceScaledGlobalCapPreserved: true

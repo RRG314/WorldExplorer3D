@@ -7,7 +7,7 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=18";
+import { initUniverseRuntime } from "../universe/runtime.js?v=19";
 
 export function createSpaceFlightScene(options = {}) {
   console.log("Creating space flight scene...");

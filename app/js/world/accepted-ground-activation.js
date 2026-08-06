@@ -36,7 +36,7 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
   if (state?.status === 'accepted') {
     runtimeState.acceptedGround = state;
     runtimeState.groundMode = 'accepted-ground';
-    appCtx.updateTerrainAround?.(0, 0);
+    appCtx.publishLocationTerrain?.();
     return true;
   }
 
@@ -74,6 +74,6 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
   runtimeState.groundMode = 'worldwide-terrain-fallback';
   loadMetrics.acceptedGround = fallback;
   appCtx.showLoad('Loading worldwide terrain and OpenStreetMap data...');
-  appCtx.updateTerrainAround?.(0, 0);
+  appCtx.publishLocationTerrain?.();
   return true;
 }

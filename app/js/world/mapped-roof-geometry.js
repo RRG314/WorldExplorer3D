@@ -12,38 +12,9 @@ const NON_FLAT_ROOF_SHAPES = new Set([
   'skillion'
 ]);
 
-const INFERRED_GABLED_BUILDINGS = new Set([
-  'barn',
-  'bungalow',
-  'cabin',
-  'chapel',
-  'church',
-  'cottage',
-  'detached',
-  'farm',
-  'farm_auxiliary',
-  'house',
-  'semidetached_house'
-]);
-
-const INFERRED_SKILLION_BUILDINGS = new Set(['garage', 'garages', 'shed']);
 const GENERIC_ROOF_MAX_HEIGHT_METERS = 24;
 const GENERIC_ROOF_MAX_LEVELS = 6;
 const GENERIC_ROOF_MAX_TOP_METERS = 32;
-
-function inferredRoofShape(tags, heightMeters, buildingSemantics) {
-  const buildingType = String(tags.building || '').trim().toLowerCase();
-  if (!buildingType || tags['building:part']) return '';
-  const levels = numericValue(tags['building:levels']);
-  const resolvedLevels = Number.isFinite(levels) ? levels : Number(heightMeters) / 3.1;
-  if (!Number.isFinite(resolvedLevels) || resolvedLevels > 3.2) return '';
-  if (Number(buildingSemantics?.baseOffsetMeters || 0) > 0.4) return '';
-  if (INFERRED_GABLED_BUILDINGS.has(buildingType)) return 'gabled';
-  if (INFERRED_SKILLION_BUILDINGS.has(buildingType)) return 'skillion';
-  // Ambiguous residential, terraces/rowhomes, apartments, commercial,
-  // industrial and civic footprints stay flat unless the source maps a roof.
-  return '';
-}
 
 function numericValue(value, fallback = NaN) {
   const parsed = Number.parseFloat(String(value ?? '').trim());
@@ -264,9 +235,7 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
     (Number.isFinite(mappedLevels) && mappedLevels > GENERIC_ROOF_MAX_LEVELS)
   ) return null;
   const mappedShape = String(tags['roof:shape'] || '').trim().toLowerCase();
-  const shape = NON_FLAT_ROOF_SHAPES.has(mappedShape) ?
-    mappedShape :
-    inferredRoofShape(tags, heightMeters, buildingSemantics);
+  const shape = NON_FLAT_ROOF_SHAPES.has(mappedShape) ? mappedShape : '';
   if (!NON_FLAT_ROOF_SHAPES.has(shape) || !stableRoofFootprint(shape, pts)) return null;
   const mappedRoofHeight = numericValue(tags['roof:height']);
   const fullPartRoof = !!tags['building:part'] && Number(buildingSemantics?.baseOffsetMeters || 0) > 0.4;
@@ -279,10 +248,8 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
   return {
     shape,
     roofHeight,
-    roofHeightSource: Number.isFinite(mappedRoofHeight) && mappedRoofHeight > 0 ?
-      'mapped' :
-      mappedShape ? 'shape_inferred' : 'building_type_inferred',
-    roofShapeSource: mappedShape ? 'mapped' : 'building_type_inferred',
+    roofHeightSource: Number.isFinite(mappedRoofHeight) && mappedRoofHeight > 0 ? 'mapped' : 'shape_inferred',
+    roofShapeSource: 'mapped',
     wallHeight: Math.max(0, heightMeters - roofHeight),
     fullPartRoof
   };
@@ -319,8 +286,8 @@ export function createMappedRoofMesh(pts, baseElevation, wallHeight, roofSpec, t
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.isRoofDetail = true;
-  mesh.userData.isMappedRoof = roofSpec.roofShapeSource === 'mapped';
-  mesh.userData.isInferredRoof = roofSpec.roofShapeSource === 'building_type_inferred';
+  mesh.userData.isMappedRoof = true;
+  mesh.userData.isInferredRoof = false;
   mesh.userData.roofShape = roofSpec.shape;
   mesh.userData.roofShapeSource = roofSpec.roofShapeSource;
   mesh.userData.roofHeight = roofSpec.roofHeight;

@@ -30,7 +30,6 @@ import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
   resetBoatFoamFx,
-  syncBoatTerrainSuppression,
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
@@ -293,7 +292,6 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
   setPromptSignature: (value) => { _boatPromptSignature = value; },
   showBoatPrompt,
   startBoatMode: (options) => startBoatMode(options),
-  syncBoatTerrainSuppression,
   updateBoatMenuUi,
   updateWaterWaveVisuals
 });
@@ -370,13 +368,11 @@ function startBoatMode(options = {}) {
   if (appCtx.carMesh) appCtx.carMesh.visible = false;
   if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
   updateBoatLodBias();
-  syncBoatTerrainSuppression();
   updateWaterWaveVisuals();
   updateBoatMenuUi();
   appCtx.boatMode.promptMessage = `Boat Mode Active • ${boatHudLabel()}`;
   syncBoatPromptState(false);
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-  if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(true);
   if (typeof appCtx.clearStarSelection === 'function') appCtx.clearStarSelection();
   return true;
 }
@@ -411,12 +407,10 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     updateBoatWaterPatch(activeCandidate);
     snapBoatChaseCamera();
     updateBoatLodBias();
-    syncBoatTerrainSuppression();
     updateBoatMesh();
     updateWaterWaveVisuals();
     appCtx.boatMode.promptMessage = `Boat Mode Active • ${boatHudLabel()}`;
     syncBoatPromptState(false);
-    if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(true);
     return true;
   }
 
@@ -545,14 +539,12 @@ function stopBoatMode(options = {}) {
   if (appCtx.Walk?.state?.characterMesh) {
     appCtx.Walk.state.characterMesh.visible = exitMode === 'walk';
   }
-  syncBoatTerrainSuppression();
   updateWaterWaveVisuals();
   updateBoatMenuUi();
   hideBoatPrompt();
   if (typeof appCtx.updateInteriorInteraction === 'function') {
     appCtx.updateInteriorInteraction();
   }
-  if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(true);
   syncBoatPromptState(true);
   return true;
 }
@@ -604,7 +596,6 @@ const updateBoatMode = createBoatRuntimeDynamics({
   minimumBoatShorelineDistance,
   resolveBoatSpawnPoint,
   setBoatActorPose,
-  syncBoatTerrainSuppression,
   updateBoatFoamFx,
   updateBoatLodBias,
   updateBoatMesh,
@@ -658,7 +649,6 @@ Object.assign(appCtx, {
   setBoatWaveIntensity,
   transferBoatToSubmarine,
   transferSubmarineToBoat,
-  syncBoatTerrainSuppression,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,
@@ -684,7 +674,6 @@ export {
   setBoatWaveIntensity,
   transferBoatToSubmarine,
   transferSubmarineToBoat,
-  syncBoatTerrainSuppression,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,

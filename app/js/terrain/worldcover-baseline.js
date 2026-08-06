@@ -12,18 +12,63 @@ const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PARALLEL_REQUESTS = 6;
 
 const WORLD_COVER_CLASSES = [
-  { id: 10, name: 'tree', source: [0, 100, 0], display: [58, 92, 50] },
-  { id: 20, name: 'shrub', source: [255, 187, 34], display: [112, 116, 67] },
-  { id: 30, name: 'grass', source: [255, 255, 76], display: [106, 137, 76] },
-  { id: 40, name: 'crop', source: [240, 150, 255], display: [137, 128, 75] },
-  { id: 50, name: 'built', source: [250, 0, 0], display: [127, 130, 136] },
-  { id: 60, name: 'bare', source: [180, 180, 180], display: [153, 137, 108] },
-  { id: 70, name: 'snow', source: [240, 240, 240], display: [224, 232, 239] },
-  { id: 80, name: 'water', source: [0, 100, 200], display: [58, 111, 153] },
-  { id: 90, name: 'wetland', source: [0, 150, 160], display: [73, 119, 105] },
-  { id: 95, name: 'mangrove', source: [0, 207, 117], display: [50, 99, 67] },
-  { id: 100, name: 'moss', source: [250, 230, 160], display: [137, 130, 91] }
+  { id: 10, name: 'tree', source: [0, 100, 0], display: [58, 92, 50], tint: [0.76, 0.88, 0.72] },
+  { id: 20, name: 'shrub', source: [255, 187, 34], display: [112, 116, 67], tint: [0.96, 0.98, 0.78] },
+  { id: 30, name: 'grass', source: [255, 255, 76], display: [106, 137, 76], tint: [1.03, 1.05, 0.94] },
+  { id: 40, name: 'crop', source: [240, 150, 255], display: [137, 128, 75], tint: [1.08, 0.97, 0.74] },
+  { id: 50, name: 'built', source: [250, 0, 0], display: [127, 130, 136], tint: [0.92, 0.96, 0.92] },
+  { id: 60, name: 'bare', source: [180, 180, 180], display: [153, 137, 108], tint: [1.08, 0.94, 0.76] },
+  { id: 70, name: 'snow', source: [240, 240, 240], display: [224, 232, 239], tint: [1.32, 1.34, 1.38] },
+  { id: 80, name: 'water', source: [0, 100, 200], display: [58, 111, 153], tint: [0.82, 0.91, 0.96] },
+  { id: 90, name: 'wetland', source: [0, 150, 160], display: [73, 119, 105], tint: [0.78, 0.94, 0.82] },
+  { id: 95, name: 'mangrove', source: [0, 207, 117], display: [50, 99, 67], tint: [0.70, 0.86, 0.72] },
+  { id: 100, name: 'moss', source: [250, 230, 160], display: [137, 130, 91], tint: [1.02, 0.98, 0.78] }
 ];
+
+const SURFACE_TINT_ENCODING_SCALE = 170;
+
+function buildSmoothedSurfaceTints(classes, size) {
+  const encoded = new Uint8Array(size * size * 3);
+  for (let pixel = 0; pixel < classes.length; pixel += 1) {
+    const tint = classes[pixel]?.tint || [1, 1, 1];
+    const offset = pixel * 3;
+    encoded[offset] = Math.round(Math.min(1.5, Math.max(0, tint[0])) * SURFACE_TINT_ENCODING_SCALE);
+    encoded[offset + 1] = Math.round(Math.min(1.5, Math.max(0, tint[1])) * SURFACE_TINT_ENCODING_SCALE);
+    encoded[offset + 2] = Math.round(Math.min(1.5, Math.max(0, tint[2])) * SURFACE_TINT_ENCODING_SCALE);
+  }
+
+  // WorldCover is categorical 10 m data. Blend only the macro transition
+  // between classes; the visible fine detail comes from repeating PBR ground
+  // maps, so class pixels never become the terrain's diffuse texels.
+  const radius = 3;
+  const horizontal = new Uint8Array(encoded.length);
+  const smoothed = new Uint8Array(encoded.length);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const from = Math.max(0, x - radius);
+      const to = Math.min(size - 1, x + radius);
+      const count = to - from + 1;
+      for (let channel = 0; channel < 3; channel += 1) {
+        let sum = 0;
+        for (let sx = from; sx <= to; sx += 1) sum += encoded[(y * size + sx) * 3 + channel];
+        horizontal[(y * size + x) * 3 + channel] = Math.round(sum / count);
+      }
+    }
+  }
+  for (let y = 0; y < size; y += 1) {
+    const from = Math.max(0, y - radius);
+    const to = Math.min(size - 1, y + radius);
+    const count = to - from + 1;
+    for (let x = 0; x < size; x += 1) {
+      for (let channel = 0; channel < 3; channel += 1) {
+        let sum = 0;
+        for (let sy = from; sy <= to; sy += 1) sum += horizontal[(sy * size + x) * 3 + channel];
+        smoothed[(y * size + x) * 3 + channel] = Math.round(sum / count);
+      }
+    }
+  }
+  return smoothed;
+}
 
 let databasePromise = null;
 let activeRequests = 0;
@@ -329,6 +374,7 @@ async function createSemanticTexture(blob, size) {
       }
       if (nearbyBuilt >= 12) entry = builtClass;
     }
+    classes[pixel] = entry;
     const display = entry?.display || [102, 119, 90];
     const variation = entry ? ((x * 17 + y * 31 + entry.id * 13) % 5) - 2 : 0;
     const index = pixel * 4;
@@ -367,6 +413,9 @@ async function createSemanticTexture(blob, size) {
   }
   return {
     texture,
+    surfaceTints: buildSmoothedSurfaceTints(classes, size),
+    surfaceTintSize: size,
+    surfaceTintEncodingScale: SURFACE_TINT_ENCODING_SCALE,
     counts,
     recognizedPixels: recognized,
     totalPixels: size * size,

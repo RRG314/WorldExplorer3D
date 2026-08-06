@@ -10,11 +10,10 @@ const footprint = [
 const semantics = { baseOffsetMeters: 0 };
 
 const house = resolveMappedRoof({ building: 'house', 'building:levels': '2' }, 7, semantics, footprint);
-assert.equal(house?.shape, 'gabled');
-assert.equal(house?.roofShapeSource, 'building_type_inferred');
+assert.equal(house, null, 'building type alone must not invent a roof shape');
 
 const mappedHouse = resolveMappedRoof({ building: 'house', 'roof:shape': 'hipped' }, 7, semantics, footprint);
-assert.equal(mappedHouse?.shape, 'hipped', 'mapped roof shape must override inference');
+assert.equal(mappedHouse?.shape, 'hipped', 'mapped roof shape must remain authoritative');
 assert.equal(mappedHouse?.roofShapeSource, 'mapped');
 
 for (const building of ['apartments', 'commercial', 'industrial', 'office', 'residential', 'retail', 'terrace', 'warehouse', 'yes']) {
@@ -53,4 +52,4 @@ assert.equal(
   'elevated building parts must not create generic skyscraper needles'
 );
 
-console.log(JSON.stringify({ ok: true, inferredHouse: house, mappedOverride: mappedHouse.shape }, null, 2));
+console.log(JSON.stringify({ ok: true, inferredHouse: house, mappedRoof: mappedHouse.shape }, null, 2));

@@ -10,6 +10,13 @@ import {
   showSunInfo
 } from "./info-panel.js?v=2";
 
+function formatKilometers(km) {
+  if (km >= 1e9) return (km / 1e9).toFixed(1) + 'B';
+  if (km >= 1e6) return (km / 1e6).toFixed(1) + 'M';
+  if (km >= 1e3) return (km / 1e3).toFixed(0) + 'K';
+  return Math.round(km).toString();
+}
+
 export function onSolarSystemClick(ctx, event) {
   if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.visible || !ctx.solarSystem.group) return;
 
@@ -341,7 +348,7 @@ export function updateSolarSystem(ctx) {
     const distKM = dist * 149597870.7;
     const el = document.getElementById('ssInfoDistEarth');
     if (el) {
-      el.textContent = dist.toFixed(3) + ' AU (' + formatKM(distKM) + ' km)';
+      el.textContent = dist.toFixed(3) + ' AU (' + formatKilometers(distKM) + ' km)';
     }
   }
 }

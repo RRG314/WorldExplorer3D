@@ -130,7 +130,7 @@ async function runModeCycles(page, mode, lifecycleEvents) {
       await page.screenshot({ path: path.join(outputDir, `${mode}-cycle-${cycle}.png`), fullPage: false });
     }
 
-    await page.click('#mainMenuBtn');
+    await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
     await waitForHubExit(page, mode);
     const exited = await readLifecycleState(page, mode);
     cycles.push({ observed, active, exited, events: lifecycleEvents.splice(0) });

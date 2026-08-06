@@ -1,142 +1,12 @@
 import { createBlackHoleVisual } from './black-hole.js?v=2';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
 
-const UNIVERSE_ORBIT_DAYS_PER_SECOND = 0.25;
-
 function seededRandom(seed = 1) {
   let state = Math.abs(Math.floor(Number(seed) || 1)) >>> 0;
   return () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     return state / 4294967296;
   };
-}
-
-function dataConstrainedPlanetClass(planet, host) {
-  const radius = Math.max(0.1, Number(planet.radiusEarth || 1));
-  const mass = Math.max(0.01, Number(planet.massEarth || radius ** 3));
-  const densityEarth = mass / (radius ** 3);
-  const axisAu = Math.max(0.001, Number(planet.semiMajorAxisAu || 1));
-  const hostMass = Math.max(0.05, Number(host.physical?.hostMassSolar || 1));
-  const luminositySolar = Math.pow(hostMass, 3.5);
-  const equilibriumTemperatureK = 278 * Math.pow(luminositySolar, 0.25) / Math.sqrt(axisAu);
-  const appearanceClass = radius >= 6 ? 'gas-giant'
-    : radius >= 2.2 ? 'volatile-rich'
-      : equilibriumTemperatureK >= 700 ? 'hot-rocky'
-        : equilibriumTemperatureK <= 190 ? 'cold-rocky'
-          : densityEarth < 0.55 ? 'low-density-terrestrial' : 'rocky';
-  return { appearanceClass, densityEarth, equilibriumTemperatureK };
-}
-
-function createSimulatedBodyTexture(seed, simulation) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const context = canvas.getContext('2d');
-  const random = seededRandom(seed || 1);
-  const palettes = {
-    'gas-giant': ['#b6906c', '#e4c9a5', '#87634f', '#d7aa77'],
-    'volatile-rich': ['#456c88', '#89b5c5', '#d5e5df', '#315166'],
-    'hot-rocky': ['#321812', '#a64021', '#f08a32', '#6a2518'],
-    'cold-rocky': ['#7d8790', '#c3ccd0', '#52636d', '#e0e4df'],
-    'low-density-terrestrial': ['#6f7f73', '#9aab91', '#4e675e', '#bdad83'],
-    rocky: ['#735d4d', '#aa8767', '#514944', '#c0a17d']
-  };
-  const palette = palettes[simulation.appearanceClass] || palettes.rocky;
-  context.fillStyle = palette[0];
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  if (simulation.appearanceClass === 'gas-giant' || simulation.appearanceClass === 'volatile-rich') {
-    for (let y = 0; y < canvas.height; y += 8) {
-      context.fillStyle = palette[Math.floor(random() * palette.length)];
-      context.globalAlpha = 0.24 + random() * 0.42;
-      context.fillRect(0, y, canvas.width, 5 + random() * 8);
-    }
-  } else {
-    for (let i = 0; i < 340; i++) {
-      context.fillStyle = palette[Math.floor(random() * palette.length)];
-      context.globalAlpha = 0.12 + random() * 0.3;
-      context.beginPath();
-      context.ellipse(
-        random() * canvas.width,
-        random() * canvas.height,
-        3 + random() * 30,
-        2 + random() * 14,
-        random() * Math.PI,
-        0,
-        Math.PI * 2
-      );
-      context.fill();
-    }
-  }
-  context.globalAlpha = 1;
-  const texture = new THREE.CanvasTexture(canvas);
-  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-  texture.userData = {
-    source: 'data-constrained-simulation',
-    appearanceClass: simulation.appearanceClass,
-    densityEarth: simulation.densityEarth,
-    equilibriumTemperatureK: simulation.equilibriumTemperatureK
-  };
-  return texture;
-}
-
-function createSimulatedStarTexture(entity, color) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const context = canvas.getContext('2d');
-  const random = seededRandom(entity.visualProfile?.seed || 5772);
-  const base = new THREE.Color(color);
-  context.fillStyle = `#${base.getHexString()}`;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < 720; i++) {
-    const light = base.clone().lerp(new THREE.Color(i % 3 ? 0xffffff : 0x3b1608), 0.08 + random() * 0.2);
-    context.fillStyle = `#${light.getHexString()}`;
-    context.globalAlpha = 0.12 + random() * 0.22;
-    context.beginPath();
-    context.arc(random() * canvas.width, random() * canvas.height, 1 + random() * 5, 0, Math.PI * 2);
-    context.fill();
-  }
-  context.globalAlpha = 1;
-  const texture = new THREE.CanvasTexture(canvas);
-  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-  texture.userData = {
-    source: 'temperature-colored stellar surface simulation',
-    hostTemperatureK: Number(entity.physical?.hostTemperatureK || 0)
-  };
-  return texture;
-}
-
-function addObservedSolarDisk(star, radius) {
-  new THREE.TextureLoader().load('/app/assets/textures/universe/sun-sdo-2025.jpg', (sourceTexture) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    context.drawImage(sourceTexture.image, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    for (let offset = 0; offset < imageData.data.length; offset += 4) {
-      const brightness = Math.max(imageData.data[offset], imageData.data[offset + 1], imageData.data[offset + 2]);
-      imageData.data[offset + 3] = Math.max(0, Math.min(255, (brightness - 4) * 10));
-    }
-    context.putImageData(imageData, 0, 0);
-    const observedTexture = new THREE.CanvasTexture(canvas);
-    if (typeof THREE.SRGBColorSpace !== 'undefined') observedTexture.colorSpace = THREE.SRGBColorSpace;
-    const disk = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: observedTexture,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false
-    }));
-    disk.scale.set(radius * 2.08, radius * 2.08, 1);
-    disk.renderOrder = 20;
-    disk.name = 'Sun — NASA SDO observed disk';
-    disk.userData = {
-      imageCredit: 'NASA/GSFC/Solar Dynamics Observatory',
-      imageSourceUrl: 'https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/'
-    };
-    star.add(disk);
-    sourceTexture.dispose();
-  });
 }
 
 function createFeatheredAlphaMap() {
@@ -175,25 +45,11 @@ function createLabel(text, width = 320) {
   return sprite;
 }
 
-function orbitalDisplayPosition(orbit, meanAngle) {
-  const eccentricity = Math.max(0, Math.min(0.95, Number(orbit.eccentricity || 0)));
-  const inclination = Number(orbit.inclinationDeg || 0) * Math.PI / 180;
-  const ascendingNode = Number(orbit.ascendingNodeDeg || 0) * Math.PI / 180;
-  const radius = orbit.orbitRadius * (1 - eccentricity * eccentricity) /
-    Math.max(0.05, 1 + eccentricity * Math.cos(meanAngle));
-  const orbitalX = Math.cos(meanAngle) * radius;
-  const orbitalZ = Math.sin(meanAngle) * radius;
-  return new THREE.Vector3(
-    Math.cos(ascendingNode) * orbitalX - Math.sin(ascendingNode) * Math.cos(inclination) * orbitalZ,
-    Math.sin(inclination) * orbitalZ,
-    Math.sin(ascendingNode) * orbitalX + Math.cos(ascendingNode) * Math.cos(inclination) * orbitalZ
-  );
-}
-
-function makeOrbit(orbit, color = 0x53677e) {
+function makeOrbit(radius, color = 0x53677e) {
   const points = [];
-  for (let i = 0; i < 128; i++) {
-    points.push(orbitalDisplayPosition(orbit, i / 128 * Math.PI * 2));
+  for (let i = 0; i < 96; i++) {
+    const angle = i / 96 * Math.PI * 2;
+    points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
   }
   return new THREE.LineLoop(
     new THREE.BufferGeometry().setFromPoints(points),
@@ -202,21 +58,19 @@ function makeOrbit(orbit, color = 0x53677e) {
 }
 
 function createPlanetarySystem(entity) {
+  if (entity.id === 'sol') {
+    throw new Error('Sol visuals are owned by the authoritative solar-system runtime.');
+  }
   const group = new THREE.Group();
   const color = entity.visualProfile?.color || 0xfff0c2;
   const starRadius = Math.max(18, Math.min(38, 24 + Number(entity.physical?.hostMassSolar || 1) * 8));
   const star = new THREE.Mesh(
     new THREE.SphereGeometry(starRadius, 32, 24),
-    new THREE.MeshBasicMaterial({ map: createSimulatedStarTexture(entity, color), color: 0xffffff })
+    new THREE.MeshBasicMaterial({ color })
   );
   star.name = entity.name;
-  star.userData = {
-    universeEntityId: entity.id,
-    massKg: Number(entity.physical?.hostMassSolar || 0) * 1.98847e30,
-    physicalRadiusKm: Math.pow(Math.max(0.01, Number(entity.physical?.hostMassSolar || 1)), 0.8) * 695700
-  };
+  star.userData = { universeEntityId: entity.id };
   group.add(star);
-  if (entity.id === 'sol') addObservedSolarDisk(star, starRadius);
   const glow = new THREE.Mesh(
     new THREE.SphereGeometry(starRadius * 1.55, 24, 16),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.11, depthWrite: false })
@@ -234,46 +88,20 @@ function createPlanetarySystem(entity) {
   children.forEach((planet, index) => {
     const axis = Math.max(0.005, Number(planet.semiMajorAxisAu || (index + 1) * 0.1));
     const orbitRadius = 70 + Math.sqrt(axis / maxAxis) * 290;
-    const orbit = {
-      orbitRadius,
-      eccentricity: Number(planet.eccentricity || 0),
-      inclinationDeg: Number(planet.inclinationDeg || 0),
-      ascendingNodeDeg: Number(planet.ascendingNodeDeg || 0)
-    };
-    group.add(makeOrbit(orbit));
+    group.add(makeOrbit(orbitRadius));
     const radius = Math.max(3.5, Math.min(10, Number(planet.radiusEarth || 1) * 4.5));
-    const simulation = dataConstrainedPlanetClass(planet, entity);
+    const hue = 0.05 + random() * 0.55;
     const body = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 20, 14),
-      new THREE.MeshPhongMaterial({
-        map: createSimulatedBodyTexture((entity.visualProfile?.seed || 1) + index * 997, simulation),
-        color: 0xffffff,
-        shininess: simulation.appearanceClass.includes('volatile') ? 18 : 5
-      })
+      new THREE.MeshPhongMaterial({ color: new THREE.Color().setHSL(hue, 0.42, 0.54), shininess: 8 })
     );
     body.name = planet.name;
-    body.userData = {
-      universeEntityId: planet.id,
-      planet,
-      appearance: {
-        ...simulation,
-        claim: 'inferred from measured mass, radius, orbit, and host-star properties; not direct surface imaging'
-      },
-      massKg: Number(planet.massEarth || 0) * 5.97237e24,
-      physicalRadiusKm: Number(planet.radiusEarth || 0) * 6371
-    };
+    body.userData = { universeEntityId: planet.id, planet };
     const phase = random() * Math.PI * 2;
-    body.position.copy(orbitalDisplayPosition(orbit, phase));
+    body.position.set(Math.cos(phase) * orbitRadius, (random() - 0.5) * 8, Math.sin(phase) * orbitRadius);
     group.add(body);
-    group.userData.orbitingPlanets.push({
-      body,
-      ...orbit,
-      phase,
-      orbitDays: Number(planet.orbitDays || 365),
-      orbitalPlaneAccuracy: Number.isFinite(Number(planet.inclinationDeg)) ? 'catalog-derived' : 'unknown-coplanar-display'
-    });
+    group.userData.orbitingPlanets.push({ body, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
   });
-  group.userData.gravityBodies = [star, ...group.userData.orbitingPlanets.map((entry) => entry.body)];
   return group;
 }
 
@@ -300,48 +128,100 @@ function createDustVolume(seed, count, radius, color, pointSize = 3.2) {
   }));
 }
 
-function loadObservationTexture(entity) {
-  const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
-  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+function createNebulaCloudTexture(seed) {
+  const random = seededRandom(seed);
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, 128, 128);
+  for (let i = 0; i < 18; i++) {
+    const x = 18 + random() * 92;
+    const y = 18 + random() * 92;
+    const radius = 12 + random() * 34;
+    const alpha = 0.08 + random() * 0.14;
+    const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
+    gradient.addColorStop(0, `rgba(255,255,255,${alpha})`);
+    gradient.addColorStop(0.55, `rgba(255,255,255,${alpha * 0.42})`);
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = gradient;
+    context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  }
+  return new THREE.CanvasTexture(canvas);
 }
 
-function createObservationSprite(entity, definition) {
-  const material = new THREE.SpriteMaterial({
-    map: definition.texture,
-    alphaMap: createFeatheredAlphaMap(),
-    transparent: true,
-    opacity: definition.opacity,
-    depthWrite: false,
-    blending: definition.blending || THREE.NormalBlending,
-    fog: false
-  });
-  const sprite = new THREE.Sprite(material);
-  sprite.position.z = definition.z || 0;
-  sprite.scale.set(
-    definition.width,
-    definition.width / Number(entity.visualProfile.imageAspect || 1.39),
-    1
-  );
-  return sprite;
+function createNebulaCloudVolume(entity) {
+  const group = new THREE.Group();
+  const random = seededRandom(entity.visualProfile.seed + 104729);
+  const cloudMap = createNebulaCloudTexture(entity.visualProfile.seed);
+  const tint = new THREE.Color(entity.visualProfile.tint || 0x9bbcff);
+  for (let i = 0; i < 42; i++) {
+    const material = new THREE.SpriteMaterial({
+      map: cloudMap,
+      color: tint.clone().offsetHSL((random() - 0.5) * 0.08, -0.08, (random() - 0.5) * 0.12),
+      transparent: true,
+      opacity: 0.09 + random() * 0.09,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false
+    });
+    const cloud = new THREE.Sprite(material);
+    const radial = Math.pow(random(), 0.62) * 7200;
+    const azimuth = random() * Math.PI * 2;
+    const elevation = (random() - 0.5) * 5200;
+    cloud.position.set(Math.cos(azimuth) * radial, elevation, Math.sin(azimuth) * radial);
+    const size = 850 + random() * 2600;
+    cloud.scale.set(size * (0.75 + random() * 0.7), size, 1);
+    cloud.userData = { baseOpacity: material.opacity, phase: random() * Math.PI * 2 };
+    group.add(cloud);
+  }
+  group.userData.cloudMap = cloudMap;
+  return group;
 }
 
 function createNebula(entity) {
   const group = new THREE.Group();
-  const texture = loadObservationTexture(entity);
-  const observation = createObservationSprite(entity, {
-    texture,
-    z: 0,
-    width: Number(entity.visualProfile.displayWidth || 18000),
-    opacity: 0.96
+  const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
+  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
+  const tint = entity.visualProfile.tint || 0xffffff;
+  const layers = [];
+  [
+    { z: 0, width: 9000, opacity: 0.38 },
+    { z: -4200, width: 11500, opacity: 0.16 },
+    { z: 3200, width: 7800, opacity: 0.1 }
+  ].forEach((definition, index) => {
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      alphaMap: createFeatheredAlphaMap(),
+      color: tint,
+      transparent: true,
+      opacity: definition.opacity,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false
+    });
+    const sprite = new THREE.Sprite(material);
+    sprite.position.z = definition.z;
+    sprite.scale.set(
+      definition.width,
+      definition.width / Number(entity.visualProfile.imageAspect || 1.39),
+      1
+    );
+    sprite.userData = { baseOpacity: definition.opacity, phase: index * 1.7 };
+    group.add(sprite);
+    layers.push(sprite);
   });
-  observation.name = `${entity.name} — full-frame observation`;
-  group.add(observation);
-  group.userData.nebulaObservation = observation;
+  const cloudVolume = createNebulaCloudVolume(entity);
+  group.add(cloudVolume);
+  const label = createLabel(entity.name, 420);
+  label.position.y = 4700;
+  group.add(label);
+  group.userData.nebulaLayers = layers;
+  group.userData.nebulaClouds = cloudVolume.children;
   group.userData.observationalImage = {
     credit: entity.visualProfile.imageCredit,
     accuracy: entity.accuracy,
-    presentation: 'single full-frame feathered observation; no invented volumetric geometry'
+    generatedDepth: 'layered image projection'
   };
   return group;
 }
@@ -410,30 +290,27 @@ function createGalaxyPoints(entity, count = 5200, radius = 900) {
 
 function createGalaxy(entity) {
   const group = new THREE.Group();
-  if (entity.visualProfile?.imageRole === 'inside-galaxy-observed-plane') {
-    const observation = createObservationSprite(entity, {
-      texture: loadObservationTexture(entity),
-      width: Number(entity.visualProfile.displayWidth || 9000),
-      opacity: 0.96,
-      z: 0
-    });
-    observation.name = `${entity.name} — NASA observed panorama`;
-    group.add(observation);
-    group.userData.observationalImage = {
-      credit: entity.visualProfile.imageCredit,
-      source: entity.visualProfile.imageSourceUrl,
-      presentation: 'single full-frame observational panorama; no generated ring or spiral'
-    };
-    return group;
-  }
   const starField = createGalaxyPoints(entity);
   if (entity.visualProfile?.image) {
-    group.add(createObservationSprite(entity, {
-      texture: loadObservationTexture(entity),
-      width: 1680,
+    const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
+    if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
+    const image = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      alphaMap: createFeatheredAlphaMap(),
+      transparent: true,
       opacity: 0.88,
-      z: 0
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false
     }));
+    const width = 1680;
+    image.scale.set(width, width / Number(entity.visualProfile.imageAspect || 2.5), 1);
+    image.userData = {
+      accuracy: 'observational multiwavelength image',
+      imageCredit: entity.visualProfile.imageCredit,
+      source: entity.visualProfile.imageSourceUrl
+    };
+    group.add(image);
     starField.material.opacity = 0.24;
     starField.material.size = 2.25;
   }
@@ -497,14 +374,23 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
   const orbiters = group.userData.orbitingPlanets || [];
   orbiters.forEach((entry) => {
     const period = Math.max(1, entry.orbitDays);
-    const angle = entry.phase + elapsedSeconds * Math.PI * 2 * UNIVERSE_ORBIT_DAYS_PER_SECOND / period;
-    entry.body.position.copy(orbitalDisplayPosition(entry, angle));
+    const angle = entry.phase + elapsedSeconds * Math.PI * 2 / Math.max(8, Math.sqrt(period) * 9);
+    entry.body.position.x = Math.cos(angle) * entry.orbitRadius;
+    entry.body.position.z = Math.sin(angle) * entry.orbitRadius;
     entry.body.rotation.y += 0.006 * frameScale;
   });
-  if (group.userData.universeEntity?.objectClass === 'galaxy' && !group.userData.insideGalaxyView) {
-    group.rotation.y += 0.00012 * frameScale;
-  }
+  if (group.userData.universeEntity?.objectClass === 'galaxy') group.rotation.y += 0.00012 * frameScale;
   if (group.userData.stellarRegionField) group.userData.stellarRegionField.rotation.y += 0.00022 * frameScale;
+  (group.userData.nebulaLayers || []).forEach((layer) => {
+    layer.material.opacity = layer.userData.baseOpacity * (
+      0.92 + Math.sin(elapsedSeconds * 0.2 + layer.userData.phase) * 0.08
+    );
+  });
+  (group.userData.nebulaClouds || []).forEach((cloud) => {
+    cloud.material.opacity = cloud.userData.baseOpacity * (
+      0.88 + Math.sin(elapsedSeconds * 0.08 + cloud.userData.phase) * 0.12
+    );
+  });
 }
 
 export { createUniverseFrameVisual, updateUniverseFrameVisual };

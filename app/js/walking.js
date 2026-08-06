@@ -53,7 +53,6 @@ function createWalkingModule(opts) {
     getSafeDriveY,
     getWalkGroundY,
     syncCarFromWalker,
-    syncWalkTerrain,
     syncWalkerFromCar
   } = createWalkingTerrainHelpers({ car, state, CFG });
   const { resolveWalkGroundState, updateWalkPhysics } = createWalkingPhysicsHelpers({
@@ -64,8 +63,7 @@ function createWalkingModule(opts) {
     getWalkGroundY,
     isPointInPolygon,
     keys,
-    state,
-    syncWalkTerrain
+    state
   });
   const {
     getMapRefPosition,
@@ -89,7 +87,6 @@ function createWalkingModule(opts) {
     scene,
     state,
     syncCarFromWalker,
-    syncWalkTerrain,
     syncWalkerFromCar
   });
 
@@ -109,9 +106,6 @@ function createWalkingModule(opts) {
     },
     applyCameraIfWalking() {
       return updateWalkCamera();
-    },
-    syncTerrain(force = false) {
-      return syncWalkTerrain(force);
     },
     getMapRefPosition
   };

@@ -165,7 +165,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   }
 
   if (appCtx.terrainEnabled && !appCtx.onMoon) {
-    if (typeof appCtx.resetTerrainStreamingState === 'function') appCtx.resetTerrainStreamingState();
+    if (typeof appCtx.resetLocationTerrainPublication === 'function') appCtx.resetLocationTerrainPublication();
     if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
   }
 

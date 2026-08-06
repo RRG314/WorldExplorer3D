@@ -78,14 +78,17 @@ assert.match(batchingSource, /material\.customProgramCacheKey = group\.material\
 const terrainProfilesSource = read('app/js/terrain/surface-profiles.js');
 assert.match(terrainProfilesSource, /LinearMipmapLinearFilter/);
 assert.match(terrainProfilesSource, /anisotropy\s*=\s*Math\.max\(1,\s*Math\.min\(8/);
+assert.match(terrainProfilesSource, /material\.map = detailTextures\?\.map \|\| null/);
+assert.match(terrainProfilesSource, /applyWorldCoverVertexTints\(mesh, result\)/);
+assert.doesNotMatch(terrainProfilesSource, /material\.map = result\.texture/);
 assert.doesNotMatch(terrainProfilesSource, /updateTerrainAerialDetail|terrainAerialDetailSuppressed|terrainSurfaceDetailState/);
 assert.equal(
   fs.existsSync(path.join(root, 'app/js/world/aerial-surface-context.js')),
   false,
   'aerial mode must not own a regional replacement ground plane'
 );
-const worldLodSource = read('app/js/world/lod.js');
-assert.doesNotMatch(worldLodSource, /aerial-surface-context|syncAerialSurfaceContext|syncAerialFog/);
+const worldPublicationSource = read('app/js/world/publication.js');
+assert.doesNotMatch(worldPublicationSource, /aerial-surface-context|syncAerialSurfaceContext|syncAerialFog|planeMode|droneMode/);
 
 const landmarkCatalogSource = read('app/js/world/landmark-catalog.js');
 for (const landmark of [

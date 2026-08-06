@@ -620,15 +620,7 @@ function initTitleScreenUi({
       explorationMsg.style.display = 'none';
     }
 
-    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-      const startRef = appCtx.Walk?.state?.walker || appCtx.car;
-      appCtx.updateTerrainAround(startRef.x || 0, startRef.z || 0);
-    }
     await appCtx.loadRoads();
-    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-      const postLoadRef = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker ? appCtx.Walk.state.walker : appCtx.car;
-      appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
-    }
     let customSpawn = null;
     if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
       customSpawn = appCtx.applyCustomLocationSpawn('walk', {

@@ -15,7 +15,6 @@ function createWalkingRuntimeHelpers({
   scene,
   state,
   syncCarFromWalker,
-  syncWalkTerrain,
   syncWalkerFromCar
 }) {
   function setModeWalk(options = {}) {
@@ -49,10 +48,6 @@ function createWalkingRuntimeHelpers({
       appliedSafeWalkSpawn = true;
     }
     if (!appliedSafeWalkSpawn) syncWalkerFromCar();
-    if (options.deferWorldSync !== true) {
-      syncWalkTerrain(true);
-    }
-
     if (carMesh) {
       carMesh.visible = false;
     }
@@ -69,9 +64,6 @@ function createWalkingRuntimeHelpers({
       state.characterMesh.visible = state.view !== "first";
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
-      if (options.deferWorldSync !== true) {
-        syncWalkTerrain(true);
-      }
     } else {
       console.error("ERROR: Character mesh is still null after creation!");
     }

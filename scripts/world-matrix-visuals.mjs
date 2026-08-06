@@ -114,7 +114,7 @@ export async function captureDroneView(page, spec, result, outputDir) {
       ctx.drone.y = Math.max(groundY + 80, nearbyMaximumY + 100);
       ctx.drone.pitch = -0.48;
     }
-    ctx.updateWorldLod?.(true);
+    ctx.publishLocationWorld?.();
     await new Promise((resolve) => window.setTimeout(resolve, 900));
     const allMeshes = (ctx.buildingMeshes || []).filter((mesh) => mesh?.isMesh);
     const meshes = allMeshes.filter((mesh) => mesh.visible !== false);

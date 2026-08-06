@@ -14,9 +14,9 @@ assert.equal(
 const configSource = read('app/js/config.js');
 const terrainSource = read('app/js/terrain/surface-profiles.js');
 const terrainRuntimeSource = read('app/js/terrain.js');
-const lodSource = read('app/js/world/lod.js');
+const publicationSource = read('app/js/world/publication.js');
 const diagnosticsSource = read('app/js/runtime-diagnostics.js');
-const streamingSource = read('app/js/terrain/streaming.js');
+const locationTerrainSource = read('app/js/terrain/location-world.js');
 const farFieldSource = read('app/js/terrain/far-field.js');
 const hudSource = read('app/js/hud.js');
 const {
@@ -40,30 +40,22 @@ assert.doesNotMatch(
   'terrain runtime must expose only one mode-independent material pipeline'
 );
 assert.doesNotMatch(
-  lodSource,
+  publicationSource,
   /aerial-surface-context|syncAerialSurfaceContext|aerialSurfaceContextState/,
   'LOD must not publish or reveal a replacement aerial surface'
 );
 assert.doesNotMatch(
-  lodSource,
+  publicationSource,
   /scene\.fog\s*=\s*null|syncAerialFog|savedGroundFog/,
   'travel-mode changes must not replace the Earth fog model'
 );
-assert.match(
-  lodSource,
-  /const aerialMode = !!\(appCtx\.planeMode\?\.active \|\| appCtx\.droneMode\);/,
-  'the shared LOD pass must resolve aerial state before applying building hysteresis'
-);
-assert.match(
-  lodSource,
-  /if \(alwaysVisible\) \{\s*setEarthMeshVisible\(mesh, true\);\s*continue;/,
-  'persistent mapped land-use and water must survive every traversal mode'
-);
+assert.doesNotMatch(publicationSource, /planeMode|droneMode|boatMode|walker|lodReferenceActor/, 'fixed world publication must not depend on traversal mode or actor');
+assert.match(publicationSource, /mesh\.userData\?\.alwaysVisible \|\| appCtx\.landUseVisible === true/, 'persistent mapped land-use and water must remain in the fixed world');
 assert.match(diagnosticsSource, /aerialReplacementMeshes/);
 assert.match(diagnosticsSource, /suppressedTerrainMeshes/);
-assert.match(streamingSource, /for \(let dx = -activeRing; dx <= activeRing; dx\+\+\)/);
-assert.match(streamingSource, /z: appCtx\.TERRAIN_ZOOM/);
-assert.doesNotMatch(streamingSource, /childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
+assert.match(locationTerrainSource, /for \(let dx = -activeRing; dx <= activeRing; dx \+= 1\)/);
+assert.match(locationTerrainSource, /z: appCtx\.TERRAIN_ZOOM/);
+assert.doesNotMatch(locationTerrainSource, /actor|speed|childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
 assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);
@@ -95,7 +87,7 @@ assert.match(diagnosticsSource, /farTerrainClipmap/);
 assert.match(diagnosticsSource, /farMappedContexts/);
 
 const { ctx } = await import('../app/js/shared-context.js?v=55');
-const { initWorldLod, updateWorldLod } = await import('../app/js/world/lod.js?v=16');
+const { publishLocationWorld } = await import('../app/js/world/publication.js?v=1');
 const scene = {
   add(mesh) {
     mesh.parent = this;
@@ -144,22 +136,17 @@ Object.assign(ctx, {
   camMode: 0,
   setPerfLiveStat: () => {}
 });
-initWorldLod({
-  getPerfModeValue: () => 'full',
-  getRuntimeDynamicBudget: () => ({ lodScale: 1, budgetScale: 1 }),
-  getWorldLodThresholds: () => ({ mid: 900, farVisible: 1600 })
-});
-updateWorldLod(true);
-assert.equal(persistentGrass.parent, scene, 'driving LOD must restore persistent mapped grass');
-assert.equal(persistentWater.parent, scene, 'driving LOD must restore persistent mapped water');
+publishLocationWorld();
+assert.equal(persistentGrass.parent, scene, 'fixed publication must restore persistent mapped grass');
+assert.equal(persistentWater.parent, scene, 'fixed publication must restore persistent mapped water');
 ctx.droneMode = true;
 persistentGrass.visible = false;
 persistentGrass.parent = null;
 persistentWater.visible = false;
 persistentWater.parent = null;
-updateWorldLod(true);
-assert.equal(persistentGrass.parent, scene, 'drone LOD must restore persistent mapped grass');
-assert.equal(persistentWater.parent, scene, 'drone LOD must restore persistent mapped water');
+publishLocationWorld();
+assert.equal(persistentGrass.parent, scene, 'drone mode must not change persistent mapped grass');
+assert.equal(persistentWater.parent, scene, 'drone mode must not change persistent mapped water');
 
 console.log(JSON.stringify({
   ok: true,

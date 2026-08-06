@@ -119,9 +119,7 @@ function stampLoadedSelection() {
 }
 
 function canResumeEarthSession() {
-  const state = getEarthSessionState();
   if (!hasLoadedEarthWorld()) return false;
-  if (appCtx.worldDetailState?.buildings?.status === 'loading') return false;
   return appCtx.isLoadedLocationSelectionCurrent?.() === true;
 }
 
@@ -204,16 +202,8 @@ function restorePoseFromSession() {
 
 async function finalizeEarthResume(resolved, isCurrent = () => true, options = {}) {
   if (!isCurrent()) return false;
-  markEarthResumePhase('terrain_streaming');
-  const x = Number.isFinite(resolved?.x) ? resolved.x : Number(appCtx.car?.x) || 0;
-  const z = Number.isFinite(resolved?.z) ? resolved.z : Number(appCtx.car?.z) || 0;
-  if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-    appCtx.updateTerrainAround(x, z);
-  }
-  markEarthResumePhase('world_lod');
-  appCtx.resumeEarthStreaming?.(1400);
-  appCtx.updateEarthWorldStreaming?.(1);
-  appCtx.updateWorldLod?.(true);
+  markEarthResumePhase('restore_world_visibility');
+  appCtx.setEarthSceneVisible?.(true);
   if (typeof appCtx.refreshBoatAvailability === 'function') {
     appCtx.refreshBoatAvailability(true);
   }
@@ -227,11 +217,9 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
     appCtx.updateControlsModeUI();
   }
   appCtx.earthResumeRenderReady = true;
-  appCtx.setEarthSceneVisible?.(true);
   markEarthResumePhase('render_frames');
   await waitForRenderedFrames();
   if (!isCurrent()) return false;
-  appCtx.updateWorldLod?.(true);
   appCtx.lastTime = performance.now();
   stampLoadedSelection();
   markEarthResumePhase('finalized');

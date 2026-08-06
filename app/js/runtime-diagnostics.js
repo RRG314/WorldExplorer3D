@@ -515,7 +515,6 @@ function publishRuntimeDiagnostics() {
   output.textContent = JSON.stringify(getWorldExplorerRuntimeDiagnostics());
 }
 
-publishRuntimeDiagnostics();
-globalThis.setInterval(publishRuntimeDiagnostics, 1000);
+globalThis.publishWorldExplorerRuntimeDiagnostics = publishRuntimeDiagnostics;
 
 export { getWorldExplorerRuntimeDiagnostics };

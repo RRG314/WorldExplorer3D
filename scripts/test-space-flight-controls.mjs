@@ -40,9 +40,9 @@ try {
 
   const report = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const runtime = await import('/app/js/space/runtime.js?v=9');
+    const runtime = await import('/app/js/space/runtime.js?v=11');
     if (!ctx.getEnv?.()) ctx.commitEnvironment?.(ctx.ENV.EARTH, { source: 'space-control-test' });
-    if (!ctx.startSpaceFlightToMoon()) throw new Error('Space flight did not start');
+    if (!await ctx.startSpaceFlightToMoon()) throw new Error('Space flight did not start');
     await new Promise((resolve) => setTimeout(resolve, 800));
 
     cancelAnimationFrame(ctx.spaceFlight.animationId);
@@ -66,7 +66,7 @@ try {
     let maximumForwardStep = 0;
     let maximumCameraStep = 0;
     let minimumBasisOrthogonality = 1;
-    let minimumCameraUpAlignment = 1;
+    let minimumCameraWorldUpAlignment = 1;
     let samples = 0;
 
     const step = (keys) => {
@@ -91,9 +91,9 @@ try {
         1 - Math.abs(currentForward.dot(up)),
         1 - Math.abs(right.dot(up))
       );
-      minimumCameraUpAlignment = Math.min(
-        minimumCameraUpAlignment,
-        camera.up.clone().normalize().dot(up)
+      minimumCameraWorldUpAlignment = Math.min(
+        minimumCameraWorldUpAlignment,
+        camera.up.clone().normalize().dot(new THREE.Vector3(0, 1, 0))
       );
       samples += 1;
     };
@@ -119,7 +119,7 @@ try {
       maximumForwardStep,
       maximumCameraStep,
       minimumBasisOrthogonality,
-      minimumCameraUpAlignment,
+      minimumCameraWorldUpAlignment,
       flightCameraDistance,
       cameraQuaternionContinuity,
       quaternionLength: rocket.quaternion.length(),
@@ -142,10 +142,10 @@ try {
   assert.ok(report.maximumForwardStep <= 0.027, `spacecraft steering jumped ${report.maximumForwardStep} radians`);
   assert.ok(report.maximumCameraStep <= 0.16, `space camera flipped ${report.maximumCameraStep} radians`);
   assert.ok(report.minimumBasisOrthogonality >= 0.9999, 'spacecraft local axes lost orthogonality');
-  assert.ok(report.minimumCameraUpAlignment >= 0.9999, 'camera up stopped following spacecraft local up');
+  assert.ok(report.minimumCameraWorldUpAlignment >= 0.9999, 'space camera stopped using stable world up');
   assert.ok(
-    report.flightCameraDistance >= 72 && report.flightCameraDistance <= 77,
-    `space chase camera did not restore the v3 distance (${report.flightCameraDistance})`
+    report.flightCameraDistance >= 44 && report.flightCameraDistance <= 96,
+    `world-up chase camera left its bounded follow envelope (${report.flightCameraDistance})`
   );
   assert.ok(report.canvasVisible, 'space flight canvas is hidden');
   assert.deepEqual(consoleErrors, []);

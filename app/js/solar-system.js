@@ -5,7 +5,7 @@ import {
   createMoonSystems as createSolarSystemMoonSystems
 } from "./solar-system/minor-bodies.js?v=9";
 import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=2";
-import { initSolarSystemModel } from "./solar-system/init.js?v=3";
+import { initSolarSystemModel } from "./solar-system/init.js?v=5";
 import {
   createInfoPanel as createSolarSystemInfoPanel,
   createToggleButton as createSolarSystemToggleButton,
@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=13";
+} from "./solar-system/ui.js?v=16";
 import {
   ASTEROID_BELT,
   AU_TO_SCENE,

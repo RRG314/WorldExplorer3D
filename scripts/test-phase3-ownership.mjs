@@ -117,7 +117,7 @@ const markIndex = finalizerSource.lastIndexOf(
 for (const requiredStep of [
   "runFinalStep('buildTraversalNetworks'",
   "runFinalStep('spawnOnRoad'",
-  "runFinalStep('updateWorldLod'"
+  "runFinalStep('publishLocationWorld'"
 ]) {
   const stepIndex = finalizerSource.indexOf(requiredStep);
   assert(stepIndex >= 0 && stepIndex < markIndex, `${requiredStep} must complete before publication`);
