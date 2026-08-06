@@ -307,6 +307,8 @@ export function createWorldLandusePass(options = {}) {
     mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;
     if (isWater) mesh.userData.waterSurfaceBase = surfaceBaseElevation;
     if (isWater) {
+      mesh.userData.waterSourceLayer = featureMeta.layer || null;
+      mesh.userData.waterDatumMethod = waterArea?.datum?.method || null;
       mesh.userData.waterRegistryId = waterArea.registryId;
       mesh.userData.waterSurfaceProvenance = waterArea.registryProvenance;
     }
@@ -376,7 +378,7 @@ export function createWorldLandusePass(options = {}) {
       if (hole && Math.abs(signedPolygonAreaXZ(hole)) > FEATURE_MIN_HOLE_AREA) holes.push(hole);
     }
 
-    addLandusePolygon(runtime, outer, 'water', holes, null, featureMeta);
+    addLandusePolygon(runtime, outer, 'water', holes, runtime.waterGeometryGuards, featureMeta);
     return true;
   }
 
@@ -594,7 +596,7 @@ export function createWorldLandusePass(options = {}) {
         .map((id) => runtime.nodes[id])
         .filter((node) => node)
         .map((node) => appCtx.geoToWorld(node.lat, node.lon));
-      const guard = landuseType === 'water' ? null : runtime.landuseGeometryGuards;
+      const guard = landuseType === 'water' ? runtime.waterGeometryGuards : runtime.landuseGeometryGuards;
       cacheSurfaceFeatureHint(pts, landuseType, guard);
       addLandusePolygon(runtime, pts, landuseType, [], guard, landuseType === 'water' ? {
         kindHint: way.tags?.natural || way.tags?.water || way.tags?.landuse,

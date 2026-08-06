@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clampNumber } from "./budgets.js?v=10";
-import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=21";
+import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=22";
 import { registerWaterWaveMaterial } from "./render-support.js?v=10";
 import { decimatePoints } from "./world-geometry.js?v=3";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";

@@ -81,7 +81,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=21";
+} from "./world/load-geometry.js?v=22";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -160,7 +160,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=21";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=91";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=92";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";

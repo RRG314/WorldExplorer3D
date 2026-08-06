@@ -1,5 +1,5 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=34";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=35";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=13";
@@ -379,7 +379,7 @@ export function createWorldRoadLoader(deps = {}) {
           buildFeatureGeometryGuards(buildingPublicationCacheMeta.featureRadius)
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
-        buildWaterGeometryGuards(geometryGuards);
+        const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
         startLoadPhase('fetchOverpass');
         let data;
         try {
@@ -515,6 +515,7 @@ export function createWorldRoadLoader(deps = {}) {
           endLoadPhase,
           featureRadius,
           landuseGeometryGuards,
+          waterGeometryGuards,
           landuseWays: normalizedSelection.landuseWays,
           loadMetrics,
           nodes: normalizedSelection.nodes,

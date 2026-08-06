@@ -60,7 +60,8 @@ function smoothstep01(value) {
   return t * t * (3 - 2 * t);
 }
 
-function farFieldSurfaceColor(meters, latitude, longitude) {
+function farFieldSurfaceColor(meters, latitude, longitude, isWater = false) {
+  if (isWater) return [0.23, 0.44, 0.61];
   const broadVariation = Math.sin(latitude * 41.7 + longitude * 27.3) * 0.5 + 0.5;
   if (meters >= 2200) return [0.82, 0.85, 0.87];
   if (meters >= 900) return [0.43, 0.45, 0.43];
@@ -85,6 +86,20 @@ function polygonRings(geometry) {
   if (geometry?.type === 'Polygon') return geometry.coordinates?.[0] ? [geometry.coordinates[0]] : [];
   if (geometry?.type === 'MultiPolygon') {
     return (geometry.coordinates || []).map((polygon) => polygon?.[0]).filter(Array.isArray);
+  }
+  return [];
+}
+
+function polygonAreas(geometry) {
+  if (geometry?.type === 'Polygon') {
+    return geometry.coordinates?.[0]
+      ? [{ outer: geometry.coordinates[0], holes: geometry.coordinates.slice(1) }]
+      : [];
+  }
+  if (geometry?.type === 'MultiPolygon') {
+    return (geometry.coordinates || [])
+      .filter((polygon) => Array.isArray(polygon?.[0]))
+      .map((polygon) => ({ outer: polygon[0], holes: polygon.slice(1) }));
   }
   return [];
 }
@@ -159,6 +174,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null) {
     ({ x, y }) => fetchShortbreadTile(FAR_CONTEXT_ZOOM, x, y)
   );
   const landByTile = new Map();
+  const waterByTile = new Map();
   const buildings = [];
   let skippedNearBuildings = 0;
 
@@ -180,6 +196,26 @@ async function loadFarMappedContext(bounds, excludedBounds = null) {
       }
     }
     landByTile.set(tileKey, landPolygons);
+
+    const waterPolygons = [];
+    for (const layerName of ['ocean', 'water_polygons']) {
+      const layer = tileRecord.tile.layers[layerName];
+      if (!layer) continue;
+      for (let index = 0; index < layer.length; index += 1) {
+        const feature = layer.feature(index);
+        const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
+        for (const area of polygonAreas(geojson?.geometry)) {
+          if (!Array.isArray(area.outer) || area.outer.length < 4) continue;
+          waterPolygons.push({
+            outer: area.outer,
+            holes: (area.holes || []).filter((hole) => Array.isArray(hole) && hole.length >= 4),
+            bounds: ringBounds(area.outer),
+            kind: layerName === 'ocean' ? 'ocean' : 'inland'
+          });
+        }
+      }
+    }
+    waterByTile.set(tileKey, waterPolygons);
 
     const buildingLayer = tileRecord.tile.layers.buildings;
     if (!buildingLayer) continue;
@@ -214,10 +250,32 @@ async function loadFarMappedContext(bounds, excludedBounds = null) {
   return {
     buildings: buildings.slice(0, FAR_CONTEXT_MAX_BUILDINGS),
     landByTile,
+    waterByTile,
+    waterPolygons: Array.from(waterByTile.values()).reduce((total, polygons) => total + polygons.length, 0),
     skippedNearBuildings,
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length
   };
+}
+
+function mappedWaterKindAt(latitude, longitude, mappedContext) {
+  if (!mappedContext?.waterByTile) return null;
+  const n = 2 ** FAR_CONTEXT_ZOOM;
+  const safeLat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
+  const x = Math.floor((longitude + 180) / 360 * n);
+  const y = Math.floor((1 - Math.log(
+    Math.tan(safeLat * Math.PI / 180) + 1 / Math.cos(safeLat * Math.PI / 180)
+  ) / Math.PI) / 2 * n);
+  const candidates = mappedContext.waterByTile.get(`${x}/${y}`) || [];
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const candidate = candidates[index];
+    if (latitude < candidate.bounds.minLat || latitude > candidate.bounds.maxLat ||
+        longitude < candidate.bounds.minLon || longitude > candidate.bounds.maxLon) continue;
+    if (!pointInLonLatRing(longitude, latitude, candidate.outer)) continue;
+    if ((candidate.holes || []).some((hole) => pointInLonLatRing(longitude, latitude, hole))) continue;
+    return candidate.kind;
+  }
+  return null;
 }
 
 function mappedSurfaceColor(latitude, longitude, mappedContext) {
@@ -374,9 +432,10 @@ function createFarFieldTerrainApi(deps = {}) {
         const { lat, lon } = worldToLatLon(x, z);
         const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
         if (!Number.isFinite(sourceMeters)) return null;
-        // This square clipmap owns terrain continuity only. Water is published
-        // exclusively by the mapped polygon/ribbon pipeline, so the clipmap
-        // can never turn its rectangular bounds into a blue city moat.
+        // Elevation is not a water classification. Only mapped Shortbread
+        // polygons can color the far field as water.
+        const waterKind = mappedWaterKindAt(lat, lon, mappedContext);
+        const isWater = waterKind !== null;
         let meters = sourceMeters + offsetMeters;
         const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
         if (distanceFromSeam <= seamBlendWorld) {
@@ -387,11 +446,12 @@ function createFarFieldTerrainApi(deps = {}) {
             meters = acceptedMeters + (meters - acceptedMeters) * blend;
           }
         }
+        if (waterKind === 'ocean') meters = 0;
         minElevationMeters = Math.min(minElevationMeters, meters);
         maxElevationMeters = Math.max(maxElevationMeters, meters);
         positions.push(x, meters * Number(appCtx.WORLD_UNITS_PER_METER || 1) * Number(appCtx.TERRAIN_Y_EXAGGERATION || 1), z);
-        const mappedColor = mappedSurfaceColor(lat, lon, mappedContext);
-        colors.push(...(mappedColor || farFieldSurfaceColor(meters, lat, lon)));
+        const mappedColor = !isWater ? mappedSurfaceColor(lat, lon, mappedContext) : null;
+        colors.push(...(mappedColor || farFieldSurfaceColor(meters, lat, lon, isWater)));
         uvs.push((x - spec.outer.minX) / xRange, 1 - (z - spec.outer.minZ) / zRange);
       }
     }
@@ -621,11 +681,11 @@ function createFarFieldTerrainApi(deps = {}) {
       triangles: built.geometry.index.count / 3,
       minElevationMeters: built.minElevationMeters,
       maxElevationMeters: built.maxElevationMeters,
-      surfaceColor: 'mapped-land-with-elevation-fallback',
+      surfaceColor: 'mapped-land-and-water-with-elevation-fallback',
       contextSource: 'openstreetmap-shortbread',
       contextTilesLoaded: mappedContext.loadedTiles,
       contextTilesRequested: mappedContext.requestedTiles,
-      waterOwner: 'mapped-polygon-and-ribbon-pipeline',
+      mappedWaterPolygons: mappedContext.waterPolygons,
       skippedDuplicateNearBuildings: mappedContext.skippedNearBuildings,
       geometryBuildPasses: 1,
       farBuildings: builtBuildings?.buildings || 0,
@@ -681,5 +741,6 @@ export {
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
   buildClipmapAxis,
   cellInsideHole,
-  createFarFieldTerrainApi
+  createFarFieldTerrainApi,
+  mappedWaterKindAt
 };

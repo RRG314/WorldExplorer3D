@@ -11,6 +11,7 @@ import {
 } from '../app/js/world/water-surface-registry.js?v=3';
 import { waterSurfaceBaseElevation } from '../app/js/world/water-body-contract.js?v=3';
 import { waterBedDepthAtShorelineDistance } from '../app/js/terrain/water-terrain-mask.js?v=1';
+import { mappedWaterReprojectionBase } from '../app/js/terrain/reprojection.js?v=12';
 import {
   mappedWaterStructurePriority,
   mergeMappedWaterStructures
@@ -98,6 +99,26 @@ assert.equal(
   waterSurfaceBaseElevation([182, 183, 183, 184, 185]),
   182,
   'Elevated inland water retains its DEM datum.'
+);
+assert.equal(
+  mappedWaterReprojectionBase({
+    userData: {
+      waterSourceLayer: 'ocean',
+      waterSurfaceBase: 52
+    }
+  }, [41, 48, 54]),
+  0,
+  'Ocean reprojection must restore sea level instead of lifting mapped water to shoreline terrain.'
+);
+assert.equal(
+  mappedWaterReprojectionBase({
+    userData: {
+      waterSourceLayer: 'water_polygons',
+      waterSurfaceBase: 182
+    }
+  }, [205, 209, 214]),
+  182,
+  'Inland water reprojection must preserve its published interior datum instead of replacing it with boundary land.'
 );
 
 const overtureData = {
