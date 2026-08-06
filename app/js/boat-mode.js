@@ -25,22 +25,21 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=14";
+} from "./boat-mode/water-query.js?v=17";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
   resetBoatFoamFx,
-  syncBoatTerrainSuppression,
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=9";
+} from "./boat-mode/surface-effects.js?v=12";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=5";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=8";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
-import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
+import { createBoatModePolicy } from "./boat-mode/policy.js?v=2";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -229,7 +228,7 @@ function syncBoatPromptState(force = false) {
     return appCtx.boatMode.currentWater || null;
   }
 
-  if (appCtx.droneMode || appCtx.activeInterior || !appCtx.isEnv?.(appCtx.ENV.EARTH)) {
+  if (appCtx.activeInterior || !appCtx.isEnv?.(appCtx.ENV.EARTH)) {
     appCtx.boatMode.available = false;
     appCtx.boatMode.candidate = null;
     _boatPromptSignature = '';
@@ -244,7 +243,10 @@ function syncBoatPromptState(force = false) {
     updateBoatMenuUi();
     return null;
   }
-  const candidate = findNearestBoatCandidate(ref.x, ref.z);
+  const candidate = findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
+    referenceY: ref.y,
+    structureTerrainMode: ref.structureTerrainMode
+  });
   appCtx.boatMode.candidate = candidate;
   appCtx.boatMode.available = !!candidate;
   if (candidate) {
@@ -290,7 +292,6 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
   setPromptSignature: (value) => { _boatPromptSignature = value; },
   showBoatPrompt,
   startBoatMode: (options) => startBoatMode(options),
-  syncBoatTerrainSuppression,
   updateBoatMenuUi,
   updateWaterWaveVisuals
 });
@@ -301,6 +302,7 @@ function startBoatMode(options = {}) {
   if (appCtx.oceanMode?.active || appCtx.onMoon || appCtx.travelingToMoon) return false;
   const baseRef = getReferencePosition();
   if (!baseRef) return false;
+  if (baseRef.structureTerrainMode === 'subgrade') return false;
   const ref = {
     ...baseRef,
     x: Number.isFinite(options.spawnX) ? options.spawnX : baseRef.x,
@@ -311,7 +313,9 @@ function startBoatMode(options = {}) {
     appCtx.boatMode?.candidate ||
     findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
       allowSynthetic: options.allowSynthetic === true,
-      waterKind: options.waterKind || 'open_ocean'
+      waterKind: options.waterKind || 'open_ocean',
+      referenceY: ref.y,
+      structureTerrainMode: ref.structureTerrainMode
     });
   if (!candidate) return false;
 
@@ -364,13 +368,11 @@ function startBoatMode(options = {}) {
   if (appCtx.carMesh) appCtx.carMesh.visible = false;
   if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
   updateBoatLodBias();
-  syncBoatTerrainSuppression();
   updateWaterWaveVisuals();
   updateBoatMenuUi();
   appCtx.boatMode.promptMessage = `Boat Mode Active • ${boatHudLabel()}`;
   syncBoatPromptState(false);
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-  if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(true);
   if (typeof appCtx.clearStarSelection === 'function') appCtx.clearStarSelection();
   return true;
 }
@@ -405,12 +407,10 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     updateBoatWaterPatch(activeCandidate);
     snapBoatChaseCamera();
     updateBoatLodBias();
-    syncBoatTerrainSuppression();
     updateBoatMesh();
     updateWaterWaveVisuals();
     appCtx.boatMode.promptMessage = `Boat Mode Active • ${boatHudLabel()}`;
     syncBoatPromptState(false);
-    if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(true);
     return true;
   }
 
@@ -539,14 +539,12 @@ function stopBoatMode(options = {}) {
   if (appCtx.Walk?.state?.characterMesh) {
     appCtx.Walk.state.characterMesh.visible = exitMode === 'walk';
   }
-  syncBoatTerrainSuppression();
   updateWaterWaveVisuals();
   updateBoatMenuUi();
   hideBoatPrompt();
   if (typeof appCtx.updateInteriorInteraction === 'function') {
     appCtx.updateInteriorInteraction();
   }
-  if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(true);
   syncBoatPromptState(true);
   return true;
 }
@@ -598,7 +596,6 @@ const updateBoatMode = createBoatRuntimeDynamics({
   minimumBoatShorelineDistance,
   resolveBoatSpawnPoint,
   setBoatActorPose,
-  syncBoatTerrainSuppression,
   updateBoatFoamFx,
   updateBoatLodBias,
   updateBoatMesh,
@@ -652,7 +649,6 @@ Object.assign(appCtx, {
   setBoatWaveIntensity,
   transferBoatToSubmarine,
   transferSubmarineToBoat,
-  syncBoatTerrainSuppression,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,
@@ -678,7 +674,6 @@ export {
   setBoatWaveIntensity,
   transferBoatToSubmarine,
   transferSubmarineToBoat,
-  syncBoatTerrainSuppression,
   startBoatMode,
   stopBoatMode,
   waterSurfaceYAt,

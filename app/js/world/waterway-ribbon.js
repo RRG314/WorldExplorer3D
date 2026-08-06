@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { clampNumber } from "./budgets.js?v=6";
-import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=20";
-import { registerWaterWaveMaterial } from "./render-support.js?v=6";
+import { clampNumber } from "./budgets.js?v=10";
+import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=22";
+import { registerWaterWaveMaterial } from "./render-support.js?v=10";
 import { decimatePoints } from "./world-geometry.js?v=3";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=25";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=40";
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
+import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 
 function waterwayWidthFromTags(tags) {
   const explicit = Number.parseFloat(tags?.width);
@@ -38,8 +39,23 @@ export function addWaterwayRibbon(pts, tags) {
   const structureSemantics = classifyStructureSemantics(tags, { featureKind: 'waterway' });
   const surfaceVisible = structureSemantics.terrainMode !== 'subgrade';
   const navigable = surfaceVisible && waterwayIsNavigable(tags);
+  const waterSurfaceRegistry = appCtx.waterSurfaceRegistry ||
+    (appCtx.waterSurfaceRegistry = createWaterSurfaceRegistry());
+  const removeReplacedWaterway = (waterway) => {
+    const meshIndex = appCtx.landuseMeshes.findIndex((mesh) =>
+      mesh?.userData?.waterwayRef === waterway
+    );
+    if (meshIndex >= 0) {
+      const [mesh] = appCtx.landuseMeshes.splice(meshIndex, 1);
+      mesh.parent?.remove?.(mesh);
+      mesh.geometry?.dispose?.();
+      mesh.material?.dispose?.();
+    }
+    const index = appCtx.waterways.indexOf(waterway);
+    if (index >= 0) appCtx.waterways.splice(index, 1);
+  };
   if (!surfaceVisible) {
-    appCtx.waterways.push(normalizeWaterBody({
+    const hiddenBody = normalizeWaterBody({
       shape: 'waterway',
       type: tags?.kind || tags?.waterway || 'waterway',
       width,
@@ -48,9 +64,17 @@ export function addWaterwayRibbon(pts, tags) {
       navigable: false,
       structureSemantics,
       kindHint: tags?.kind || tags?.waterway,
+      sourceFeatureId: tags?._sourceFeatureId || null,
       geometrySource: tags?._geometrySource || 'osm-overpass',
+      access: tags?.access,
+      boatAccess: tags?.boat || tags?.motorboat || tags?.ship,
       datumMethod: 'subgrade-hidden'
-    }));
+    });
+    const registration = waterSurfaceRegistry.register(hiddenBody);
+    if (registration.accepted) {
+      registration.replacements.forEach(removeReplacedWaterway);
+      appCtx.waterways.push(hiddenBody);
+    }
     return;
   }
   const waterVisualProfile = resolveWaterSurfaceVisualProfile();
@@ -110,6 +134,29 @@ export function addWaterwayRibbon(pts, tags) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
 
+  const waterway = normalizeWaterBody({
+    shape: 'waterway',
+    type: tags?.kind || tags?.waterway || 'waterway',
+    width,
+    surfaceY: null,
+    surfaceProfile,
+    pts: centerline,
+    navigable,
+    structureSemantics,
+    kindHint: tags?.kind || tags?.waterway,
+    sourceFeatureId: tags?._sourceFeatureId || null,
+    geometrySource: tags?._geometrySource || 'osm-overpass',
+    access: tags?.access,
+    boatAccess: tags?.boat || tags?.motorboat || tags?.ship,
+    datumMethod: 'terrain-profile'
+  });
+  const registration = waterSurfaceRegistry.register(waterway);
+  if (!registration.accepted) {
+    geometry.dispose();
+    return;
+  }
+  registration.replacements.forEach(removeReplacedWaterway);
+
   const material = new THREE.MeshStandardMaterial({
     color: waterVisualProfile.color,
     emissive: waterVisualProfile.mode === 'ice' ? 0x8fa6bd : 0x0d2b4f,
@@ -142,20 +189,11 @@ export function addWaterwayRibbon(pts, tags) {
   mesh.userData.waterwayBias = verticalBias;
   mesh.userData.surfaceVariant = waterVisualProfile.mode;
   mesh.userData.structureSemantics = structureSemantics;
+  mesh.userData.waterwayRef = waterway;
+  mesh.userData.waterRegistryId = waterway.registryId;
+  mesh.userData.waterSurfaceProvenance = waterway.registryProvenance;
   mesh.visible = true;
   appCtx.scene.add(mesh);
   appCtx.landuseMeshes.push(mesh);
-  appCtx.waterways.push(normalizeWaterBody({
-    shape: 'waterway',
-    type: tags?.kind || tags?.waterway || 'waterway',
-    width,
-    surfaceY: null,
-    surfaceProfile,
-    pts: centerline,
-    navigable,
-    structureSemantics,
-    kindHint: tags?.kind || tags?.waterway,
-    geometrySource: tags?._geometrySource || 'osm-overpass',
-    datumMethod: 'terrain-profile'
-  }));
+  appCtx.waterways.push(waterway);
 }

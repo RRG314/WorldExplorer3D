@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { appendUpwardRibbonGeometry } from "../road-render.js?v=2";
-import { generateStreetFurniture } from "./furniture.js?v=11";
+import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
+import { generateStreetFurniture } from "./furniture.js?v=13";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
   const message = `${label}: ${err?.message || err}`;
@@ -26,7 +26,7 @@ export function finalizeLoadedWorld(options = {}) {
   const hideEarthSceneMeshes = typeof options.hideEarthSceneMeshes === 'function' ? options.hideEarthSceneMeshes : () => {};
   const buildTraversalNetworks = typeof options.buildTraversalNetworks === 'function' ? options.buildTraversalNetworks : () => {};
   const spawnOnRoad = typeof options.spawnOnRoad === 'function' ? options.spawnOnRoad : () => {};
-  const updateWorldLod = typeof options.updateWorldLod === 'function' ? options.updateWorldLod : null;
+  const publishLocationWorld = typeof options.publishLocationWorld === 'function' ? options.publishLocationWorld : null;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
   const finalizePresentation = options.finalizePresentation !== false;
@@ -53,14 +53,30 @@ export function finalizeLoadedWorld(options = {}) {
     loadMetrics.partialRecovery = true;
   }
 
-  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
-    runFinalStep('updateTerrainAround', () => appCtx.updateTerrainAround(0, 0));
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
+    runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
+  }
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.applyWaterTerrainMask === 'function') {
+    runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
-    runFinalStep('publishCompiledTransportMeshes', () => appCtx.publishCompiledTransportMeshes());
+    const transportPublication = runFinalStep(
+      'publishCompiledTransportMeshes',
+      () => appCtx.publishCompiledTransportMeshes()
+    );
+    if (transportPublication && loadMetrics.roads) {
+      loadMetrics.roads.subdividedPoints = Number(transportPublication.compiledSampleCount || 0);
+      loadMetrics.roads.vertices = Number(transportPublication.vertices || 0);
+      loadMetrics.roads.triangles = Number(transportPublication.triangles || 0);
+      loadMetrics.roads.finalMeshPublications = 1;
+      loadMetrics.structureProfileCompilations = 1;
+    }
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
     runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
+  }
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.retireGroundFallbackPlaceholder === 'function') {
+    runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   runFinalStep('spawnOnRoad', () => spawnOnRoad());
@@ -70,19 +86,14 @@ export function finalizeLoadedWorld(options = {}) {
   if (typeof appCtx.refreshBlockBuilderForCurrentLocation === 'function') {
     runFinalStep('refreshBlockBuilderForCurrentLocation', () => appCtx.refreshBlockBuilderForCurrentLocation());
   }
-  if (typeof updateWorldLod === 'function') {
-    runFinalStep('updateWorldLod', () => updateWorldLod(true));
+  if (typeof appCtx.refreshApprovedEditorContributions === 'function') {
+    runFinalStep('refreshApprovedEditorContributions', () => appCtx.refreshApprovedEditorContributions());
+  }
+  if (typeof publishLocationWorld === 'function') {
+    runFinalStep('publishLocationWorld', () => publishLocationWorld());
   }
   markLoaded();
   if (finalizePresentation) appCtx.hideLoad();
-  if (typeof appCtx.refreshAstronomicalSky === 'function') {
-    runFinalStep('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
-  } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
-    runFinalStep('alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
-  }
-  if (typeof appCtx.refreshLiveWeather === 'function') {
-    runFinalStep('refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
-  }
   if (finalizePresentation && appCtx.gameStarted) {
     runFinalStep('startMode', () => appCtx.startMode());
   }

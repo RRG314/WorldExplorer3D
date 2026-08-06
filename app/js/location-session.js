@@ -9,7 +9,10 @@ function cloneCustomLocation(location) {
   return {
     lat: Math.max(-90, Math.min(90, lat)),
     lon: ((lon + 180) % 360 + 360) % 360 - 180,
-    name: String(location?.name || 'Custom Location').trim().slice(0, 80) || 'Custom Location'
+    name: String(location?.name || 'Custom Location').trim().slice(0, 80) || 'Custom Location',
+    arrivalMode: location?.arrivalMode === 'boat' || location?.arrivalMode === 'walk'
+      ? location.arrivalMode
+      : 'auto'
   };
 }
 

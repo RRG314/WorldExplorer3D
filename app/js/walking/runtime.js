@@ -15,7 +15,6 @@ function createWalkingRuntimeHelpers({
   scene,
   state,
   syncCarFromWalker,
-  syncWalkTerrain,
   syncWalkerFromCar
 }) {
   function setModeWalk(options = {}) {
@@ -27,6 +26,7 @@ function createWalkingRuntimeHelpers({
     }
 
     state.mode = "walk";
+    state.walker._resolvedGroundState = null;
     state.walker.lookYawOffset = 0;
     let appliedSafeWalkSpawn = options.preserveResolvedSpawn === true;
     if (!appliedSafeWalkSpawn && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
@@ -48,10 +48,6 @@ function createWalkingRuntimeHelpers({
       appliedSafeWalkSpawn = true;
     }
     if (!appliedSafeWalkSpawn) syncWalkerFromCar();
-    if (options.deferWorldSync !== true) {
-      syncWalkTerrain(true);
-    }
-
     if (carMesh) {
       carMesh.visible = false;
     }
@@ -68,9 +64,6 @@ function createWalkingRuntimeHelpers({
       state.characterMesh.visible = state.view !== "first";
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
-      if (options.deferWorldSync !== true) {
-        syncWalkTerrain(true);
-      }
     } else {
       console.error("ERROR: Character mesh is still null after creation!");
     }
@@ -86,6 +79,7 @@ function createWalkingRuntimeHelpers({
 
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
+    state.walker._resolvedGroundState = null;
     let resolvedDriveSpawn = null;
     if (typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
       const targetX = wasWalk ? finiteOr(state.walker.x, car.x) : finiteOr(car.x, state.walker.x);

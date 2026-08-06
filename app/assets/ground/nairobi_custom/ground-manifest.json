@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "nairobi_custom-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "9c72e3c493e8864451cfccd210844cefca990daec4e0750bb7f07a948705fa0d",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": -1.3193288834834453,
+    "north": -1.2538582127785858,
+    "west": 36.784393917183024,
+    "east": 36.84988110139534
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_S02_00_E036_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S02_00_E036_00_DEM/Copernicus_DSM_COG_10_S02_00_E036_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 38977060,
+        "contentSha256": "e7984d6826564293fff54b518250b9e3f8b0fd68b119d618ae6f66a515d145ed",
+        "etag": "2cac31b2ce2652c211fcbb94972fd3f1",
+        "lastModified": "Mon, 09 May 2022 14:52:46 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

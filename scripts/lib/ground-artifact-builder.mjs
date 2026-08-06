@@ -7,7 +7,7 @@ import {
 } from '../../app/js/terrain/source-contract.js';
 import {
   compileGroundArtifact
-} from '../../app/js/terrain/ground-artifact.js?v=1';
+} from '../../app/js/terrain/ground-artifact.js?v=4';
 
 export const USGS_3DEP_SAMPLES_URL =
   'https://elevation.nationalmap.gov/arcgis/rest/services/' +
@@ -218,10 +218,10 @@ export function createGroundBuildPlan(options = {}) {
   });
 }
 
-export function chunkGroundPoints(points, batchSize = 500) {
+export function chunkGroundPoints(points, batchSize = 200) {
   if (!Array.isArray(points)) throw new TypeError('points must be an array');
-  if (!Number.isInteger(batchSize) || batchSize <= 0 || batchSize > 1000) {
-    throw new RangeError('batchSize must be an integer from 1 through 1000');
+  if (!Number.isInteger(batchSize) || batchSize <= 0 || batchSize > 250) {
+    throw new RangeError('batchSize must be an integer from 1 through 250');
   }
   const chunks = [];
   for (let index = 0; index < points.length; index += batchSize) {
@@ -279,8 +279,19 @@ export async function fetchUsgs3depSamples({
       `USGS 3DEP returned ${payload.samples?.length || 0} of ${points.length} samples`
     );
   }
-  return Object.freeze(payload.samples.map((sample, index) => {
-    const point = points[index];
+  const samplesByLocation = new Map();
+  for (const [responseIndex, sample] of payload.samples.entries()) {
+    const locationId = Number(sample?.locationId);
+    const pointIndex = Number.isInteger(locationId) && locationId >= 0
+      ? locationId
+      : responseIndex;
+    if (pointIndex >= points.length || samplesByLocation.has(pointIndex)) {
+      throw new Error('USGS 3DEP returned invalid sample location identifiers');
+    }
+    samplesByLocation.set(pointIndex, sample);
+  }
+  return Object.freeze(points.map((point, index) => {
+    const sample = samplesByLocation.get(index);
     const elevationMeters = Number(sample?.value);
     const latitude = Number(sample?.location?.y);
     const longitude = Number(sample?.location?.x);
@@ -387,7 +398,12 @@ export function createGroundArtifactBundle({
   part,
   sourceRelease,
   normalizedSamples,
-  licenseAttested = true
+  licenseAttested = true,
+  providerId = 'usgs-3dep-best-available',
+  correctionAttested = false,
+  sourceEvidence = null,
+  attribution = null,
+  compactArtifact = false
 } = {}) {
   if (!part?.grid || !part?.coverage) {
     throw new TypeError('a ground build plan part is required');
@@ -396,7 +412,7 @@ export function createGroundArtifactBundle({
     schemaVersion: 1,
     artifactId: String(artifactId || part.id),
     districtId: part.id,
-    providerId: 'usgs-3dep-best-available',
+    providerId: String(providerId),
     sourceRelease: String(sourceRelease || ''),
     verticalDatum: 'EGM2008',
     coverage: part.coverage,
@@ -404,7 +420,9 @@ export function createGroundArtifactBundle({
     grid: part.grid,
     samples: normalizedSamples
   };
-  const artifactText = canonicalJson(artifact);
+  const artifactText = compactArtifact
+    ? `${JSON.stringify(artifact)}\n`
+    : canonicalJson(artifact);
   const manifest = {
     schemaVersion: 1,
     artifactId: artifact.artifactId,
@@ -419,7 +437,10 @@ export function createGroundArtifactBundle({
       0,
       part.grid.sampleCount - normalizedSamples.length
     ),
-    licenseAttested
+    licenseAttested,
+    correctionAttested,
+    ...(sourceEvidence ? { sourceEvidence } : {}),
+    ...(attribution ? { attribution } : {})
   };
   const compiled = compileGroundArtifact({ manifest, artifact });
   if (compiled.status !== 'accepted') {

@@ -3,7 +3,7 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
-import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=5';
+import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=6';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
@@ -16,6 +16,7 @@ export function createGlobeSelectorScene(options = {}) {
     getOpenState,
     cityMatchesSelection,
     onFavoritePick,
+    onFavoriteActivate,
     onGlobePick
   } = options;
 
@@ -34,6 +35,7 @@ export function createGlobeSelectorScene(options = {}) {
   let savedFavoriteMaterial = null;
   let favoriteMarkerNodes = [];
   let cameraDistance = 2.8;
+  let targetCameraDistance = 2.8;
   let pointerActive = false;
   let pointerDragDistance = 0;
   let pointerDownX = 0;
@@ -43,11 +45,11 @@ export function createGlobeSelectorScene(options = {}) {
   let dragLastY = 0;
   let eventsBound = false;
 
-  const minDistance = 1.08;
+  const minDistance = 1.06;
   const maxDistance = 4.4;
 
   function getMarkerScale() {
-    return Math.max(0.34, Math.min(1, cameraDistance / 2.8));
+    return Math.max(0.055, Math.min(1, (cameraDistance - 1) * 0.56));
   }
 
   function applyMarkerScales() {
@@ -77,11 +79,27 @@ export function createGlobeSelectorScene(options = {}) {
     if (renderer && scene && camera) renderer.render(scene, camera);
   }
 
+  function updateCameraZoom() {
+    const delta = targetCameraDistance - cameraDistance;
+    let changed = false;
+    if (Math.abs(delta) < 0.00015) {
+      if (cameraDistance !== targetCameraDistance) {
+        cameraDistance = targetCameraDistance;
+        changed = true;
+      }
+    } else {
+      cameraDistance += delta * 0.16;
+      changed = true;
+    }
+    if (camera) camera.position.z = cameraDistance;
+  }
+
   function loopRender() {
     if (!getOpenState()) {
       renderLoopId = 0;
       return;
     }
+    updateCameraZoom();
     renderFrame();
     renderLoopId = requestAnimationFrame(loopRender);
   }
@@ -144,9 +162,10 @@ export function createGlobeSelectorScene(options = {}) {
     renderFrame();
   }
 
-  function setCameraDistance(nextDistance) {
+  function setCameraDistance(nextDistance, options = {}) {
     if (!Number.isFinite(nextDistance)) return;
-    cameraDistance = Math.max(minDistance, Math.min(maxDistance, Number(nextDistance)));
+    targetCameraDistance = Math.max(minDistance, Math.min(maxDistance, Number(nextDistance)));
+    if (options.immediate !== false) cameraDistance = targetCameraDistance;
     if (camera) {
       camera.position.z = cameraDistance;
       camera.updateProjectionMatrix();
@@ -154,7 +173,7 @@ export function createGlobeSelectorScene(options = {}) {
     }
   }
 
-  function handlePick(clientX, clientY) {
+  function handlePick(clientX, clientY, activate = false) {
     if (!renderer || !camera || !raycaster || !earthMesh) return;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
@@ -167,7 +186,8 @@ export function createGlobeSelectorScene(options = {}) {
       const markerHit = raycaster.intersectObjects(favoriteMarkerNodes.map((entry) => entry.mesh), false)?.[0];
       const favoriteCity = markerHit?.object?.userData?.favoriteCity;
       if (favoriteCity) {
-        onFavoritePick(favoriteCity);
+        if (activate) onFavoriteActivate?.(favoriteCity);
+        else onFavoritePick(favoriteCity);
         return;
       }
     }
@@ -176,7 +196,7 @@ export function createGlobeSelectorScene(options = {}) {
     if (!hit) return;
     const localPoint = hit.point.clone();
     earthMesh.worldToLocal(localPoint);
-    onGlobePick(localPointToLatLon(localPoint));
+    onGlobePick(localPointToLatLon(localPoint), { activate });
   }
 
   function bindEvents() {
@@ -199,8 +219,12 @@ export function createGlobeSelectorScene(options = {}) {
       dragLastX = event.clientX;
       dragLastY = event.clientY;
       pointerDragDistance += Math.hypot(dx, dy);
-      globeRoot.rotation.y += dx * 0.0055;
-      globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, globeRoot.rotation.x + dy * 0.0038));
+      const zoomRatio = Math.max(0, Math.min(1, (cameraDistance - minDistance) / (maxDistance - minDistance)));
+      const zoomSensitivity = Math.pow(zoomRatio, 0.7);
+      const yawSensitivity = 0.00065 + zoomSensitivity * 0.00485;
+      const pitchSensitivity = 0.0005 + zoomSensitivity * 0.0033;
+      globeRoot.rotation.y += dx * yawSensitivity;
+      globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, globeRoot.rotation.x + dy * pitchSensitivity));
       renderFrame();
     });
     canvas.addEventListener('pointerup', (event) => {
@@ -216,9 +240,16 @@ export function createGlobeSelectorScene(options = {}) {
     });
     canvas.addEventListener('wheel', (event) => {
       event.preventDefault();
-      setCameraDistance(cameraDistance + Math.sign(event.deltaY || 0) * 0.16);
-      renderFrame();
+      const direction = Math.sign(event.deltaY || 0);
+      if (!direction) return;
+      const proximity = Math.max(0, Math.min(1, (targetCameraDistance - minDistance) / (maxDistance - minDistance)));
+      const step = 0.035 + 0.22 * Math.pow(proximity, 0.68);
+      setCameraDistance(targetCameraDistance + direction * step, { immediate: false });
     }, { passive: false });
+    canvas.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      handlePick(event.clientX, event.clientY, true);
+    });
     window.addEventListener('resize', ensureSize);
   }
 
@@ -271,8 +302,9 @@ export function createGlobeSelectorScene(options = {}) {
     globeRoot.add(earthMesh);
     markerMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.018, 14, 12),
-      new THREE.MeshBasicMaterial({ color: 0xff3b30 })
+      new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false })
     );
+    markerMesh.renderOrder = 4;
     markerMesh.visible = false;
     globeRoot.add(markerMesh);
     favoriteMarkerGroup = new THREE.Group();
@@ -313,6 +345,10 @@ export function createGlobeSelectorScene(options = {}) {
     sceneReady = false;
     if (scene) disposeThreeObjectTree(scene);
     renderer = disposeThreeRenderer(renderer);
+    if (canvas) {
+      canvas.width = 1;
+      canvas.height = 1;
+    }
     scene = null;
     camera = null;
     globeRoot = null;

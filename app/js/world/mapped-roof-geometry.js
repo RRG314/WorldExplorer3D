@@ -12,6 +12,10 @@ const NON_FLAT_ROOF_SHAPES = new Set([
   'skillion'
 ]);
 
+const GENERIC_ROOF_MAX_HEIGHT_METERS = 24;
+const GENERIC_ROOF_MAX_LEVELS = 6;
+const GENERIC_ROOF_MAX_TOP_METERS = 32;
+
 function numericValue(value, fallback = NaN) {
   const parsed = Number.parseFloat(String(value ?? '').trim());
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -222,12 +226,21 @@ function inferredRoofHeight(shape, heightMeters, pts, fullPartRoof) {
 }
 
 export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics = null, pts = []) {
-  const shape = String(tags['roof:shape'] || '').trim().toLowerCase();
+  const resolvedHeight = Math.max(0, Number(heightMeters) || 0);
+  const baseOffset = Math.max(0, Number(buildingSemantics?.baseOffsetMeters) || 0);
+  const mappedLevels = numericValue(tags['building:levels']);
+  if (
+    resolvedHeight > GENERIC_ROOF_MAX_HEIGHT_METERS ||
+    baseOffset + resolvedHeight > GENERIC_ROOF_MAX_TOP_METERS ||
+    (Number.isFinite(mappedLevels) && mappedLevels > GENERIC_ROOF_MAX_LEVELS)
+  ) return null;
+  const mappedShape = String(tags['roof:shape'] || '').trim().toLowerCase();
+  const shape = NON_FLAT_ROOF_SHAPES.has(mappedShape) ? mappedShape : '';
   if (!NON_FLAT_ROOF_SHAPES.has(shape) || !stableRoofFootprint(shape, pts)) return null;
   const mappedRoofHeight = numericValue(tags['roof:height']);
   const fullPartRoof = !!tags['building:part'] && Number(buildingSemantics?.baseOffsetMeters || 0) > 0.4;
   const roofHeight = Math.min(
-    Math.max(0.3, Number(heightMeters) || 0.3),
+    Math.max(0.3, resolvedHeight || 0.3),
     Number.isFinite(mappedRoofHeight) && mappedRoofHeight > 0 ?
       mappedRoofHeight :
       inferredRoofHeight(shape, heightMeters, pts, fullPartRoof)
@@ -236,6 +249,7 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
     shape,
     roofHeight,
     roofHeightSource: Number.isFinite(mappedRoofHeight) && mappedRoofHeight > 0 ? 'mapped' : 'shape_inferred',
+    roofShapeSource: 'mapped',
     wallHeight: Math.max(0, heightMeters - roofHeight),
     fullPartRoof
   };
@@ -273,7 +287,9 @@ export function createMappedRoofMesh(pts, baseElevation, wallHeight, roofSpec, t
   mesh.receiveShadow = true;
   mesh.userData.isRoofDetail = true;
   mesh.userData.isMappedRoof = true;
+  mesh.userData.isInferredRoof = false;
   mesh.userData.roofShape = roofSpec.shape;
+  mesh.userData.roofShapeSource = roofSpec.roofShapeSource;
   mesh.userData.roofHeight = roofSpec.roofHeight;
   mesh.userData.roofHeightSource = roofSpec.roofHeightSource;
   return mesh;

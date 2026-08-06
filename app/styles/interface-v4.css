@@ -224,7 +224,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: 0;
   gap: 0;
   grid-template-columns: 136px minmax(0, 1fr) 332px;
-  grid-template-rows: 72px minmax(0, 1fr) 104px 58px;
+  grid-template-rows: 72px minmax(0, 1fr) 104px;
   color: var(--wx-text);
   background: var(--wx-bg);
   border: 0;
@@ -256,7 +256,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .globe-selector-subtitle { color: var(--wx-muted); text-align: left; }
 .globe-app-rail {
   grid-column: 1;
-  grid-row: 2 / 5;
+  grid-row: 2 / 4;
   display: flex;
   flex-direction: column;
   background: #03090e;
@@ -332,7 +332,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   background: rgba(3, 9, 14, 0.98);
-  border-top: 1px solid var(--wx-line-soft);
+  border-top: 0;
 }
 .globe-destination-bar button {
   display: flex;
@@ -343,27 +343,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   color: var(--wx-muted);
   background: transparent;
   border: 0;
-  border-right: 1px solid var(--wx-line-soft);
-  border-bottom: 4px solid transparent;
+  border: 0;
   border-radius: 0;
   font: 600 11px/1 Orbitron, sans-serif;
   text-transform: uppercase;
   cursor: pointer;
 }
 .globe-destination-bar button span { font-size: 28px; line-height: 1; }
-.globe-destination-bar button:hover, .globe-destination-bar button.active { color: var(--wx-text); border-bottom-color: var(--wx-blue); background: rgba(45, 125, 255, 0.08); }
+.globe-destination-bar button:hover, .globe-destination-bar button.active { color: var(--wx-text); background: rgba(45, 125, 255, 0.08); }
 .globe-selector-shortcut { position: static; width: auto; height: auto; box-shadow: none; }
-.globe-system-bar {
-  grid-column: 2 / 4;
-  grid-row: 4;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  background: #03090e;
-  border-top: 1px solid var(--wx-line-soft);
-}
-.globe-system-bar span { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 14px; border-right: 1px solid var(--wx-line-soft); text-transform: uppercase; }
-.globe-system-bar b { overflow: hidden; color: var(--wx-muted); font: 500 9px/1.2 Orbitron, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
-.globe-system-bar em { margin-top: 5px; color: var(--wx-green); font: normal 600 10px/1 Orbitron, sans-serif; }
 
 /* Runtime desktop HUD */
 #hud { top: 0; left: 0; }
@@ -382,7 +370,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   backdrop-filter: blur(8px);
 }
 .hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 14px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 Orbitron, sans-serif; }
-.hud-box::after { content: 'V4.1.1'; position: absolute; top: 18px; right: 16px; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; }
+.hud-box::after { content: 'V4.1.2'; position: absolute; top: 18px; right: 16px; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; }
 #hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
 #speed { color: var(--wx-text); font-family: Orbitron, sans-serif; }
 .hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }
@@ -418,7 +406,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   right: 310px;
   bottom: 14px;
   width: auto;
-  max-width: 680px;
+  max-width: 760px;
   margin: 0 auto;
   transform: none;
   display: none;
@@ -430,7 +418,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .floatMenuContainer.show { display: grid; }
 .floatMenuRow { display: contents; }
 .floatMenu { min-width: 0; }
-#multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
 .floatBtn {
   height: 66px;
   padding: 7px 4px;
@@ -479,6 +466,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font: 600 11px/1.3 Orbitron, sans-serif;
 }
 .floatItem:hover, .floatItem.on { color: var(--wx-text); background: rgba(45, 125, 255, 0.12); transform: none; box-shadow: inset 4px 0 var(--wx-blue); }
+.floatItemSection {
+  padding: 18px 12px 8px;
+  color: var(--wx-blue);
+  border-bottom: 1px solid var(--wx-line-soft);
+  font: 600 9px/1 Orbitron, sans-serif;
+  letter-spacing: 0.1em;
+}
 .mainMenuBtn {
   top: 0;
   right: 0;
@@ -495,9 +489,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .mainMenuBtn:hover { color: #fff; background: #101921; border-color: var(--wx-line-soft); transform: none; box-shadow: none; }
 #gameShareFloatBtn { top: 0; right: 132px; bottom: auto; left: auto; width: 58px; height: 58px; border-radius: 0; background: var(--wx-panel); border-color: var(--wx-line-soft); }
-#memoryFlowerFloatBtn { left: 250px; bottom: 14px; width: 46px; height: 46px; border-radius: 50%; background: #a62867; }
-#controlsTab { top: 66px; right: 14px; bottom: auto; left: auto; transform: none; color: var(--wx-text); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); border-radius: 0; box-shadow: none; }
-#ctrlHeader { color: var(--wx-blue); }
+#memoryFlowerFloatBtn { display: none !important; }
+#controlsTab { top: auto; right: 310px; bottom: 88px; left: auto; transform: none; color: var(--wx-text); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); border-radius: 0; box-shadow: none; }
+#controlsTab.show { display: none; }
+#controlsTab.show.bar-open { display: block; }
+#ctrlHeader { display: none; color: var(--wx-blue); }
+#controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); }
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {
@@ -527,8 +524,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .globe-destination-bar button { font-size: 8px; }
   .globe-destination-bar button span { font-size: 21px; }
   .globe-selector-side { order: 3; flex: 0 0 auto; padding: 12px 12px 82px; overflow: visible; border-top: 1px solid var(--wx-line-soft); border-left: 0; }
-  .globe-system-bar { display: none; }
-
   #hud { top: 0; left: 0; right: 0; }
   .hud-box {
     width: 100%;

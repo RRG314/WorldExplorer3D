@@ -80,68 +80,48 @@ function hasMappedDimension(tags = {}) {
 
 export function mergeBuildingMetadata(footprintData, metadataData, options = {}) {
   if (!footprintData?.elements || !metadataData?.elements) return footprintData;
-  const originLat = Number(options.lat);
-  const originLon = Number(options.lon);
-  if (!Number.isFinite(originLat) || !Number.isFinite(originLon)) return footprintData;
-
-  const nodes = new Map();
-  const footprintWays = [];
-  footprintData.elements.forEach((element) => {
-    if (element?.type === 'node') nodes.set(element.id, element);
-    if (element?.type === 'way' && element.tags?.building) footprintWays.push(element);
+  const footprintWays = footprintData.elements.filter((element) =>
+    element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
+  );
+  const metadataWays = metadataData.elements.filter((element) =>
+    element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
+  );
+  const metadataByStableId = new Map();
+  metadataWays.forEach((way) => {
+    const id = String(way.id ?? '').trim();
+    if (id) metadataByStableId.set(`osm:way:${id}`, way);
+    const sourceId = String(way.tags?._sourceFeatureId || '').trim();
+    if (sourceId) metadataByStableId.set(sourceId, way);
   });
 
-  const records = footprintWays
-    .map((way, index) => polygonRecord(way, nodes, originLat, originLon, index))
-    .filter(Boolean);
-  const grid = new Map();
-  records.forEach((record) => {
-    const key = gridKey(record.x, record.z);
-    if (!grid.has(key)) grid.set(key, []);
-    grid.get(key).push(record);
-  });
-
-  const candidates = [];
-  metadataData.elements.forEach((element) => {
-    if (element?.type !== 'way' || !element.tags?.building || !element.center) return;
-    const lat = Number(element.center.lat);
-    const lon = Number(element.center.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const center = localMeters(lat, lon, originLat, originLon);
-    nearbyRecords(grid, center.x, center.z).forEach((record) => {
-      const distance = Math.hypot(record.x - center.x, record.z - center.z);
-      if (distance > record.matchRadius) return;
-      candidates.push({
-        distance,
-        normalizedDistance: distance / record.matchRadius,
-        metadata: element,
-        record
-      });
-    });
-  });
-  candidates.sort((a, b) => a.normalizedDistance - b.normalizedDistance || a.distance - b.distance);
-
-  const usedFootprints = new Set();
-  const usedMetadata = new Set();
   let matched = 0;
   let mappedDimensions = 0;
   let mappedTypes = 0;
   let mappedRoofs = 0;
   let mappedNames = 0;
-  for (let i = 0; i < candidates.length; i++) {
-    const candidate = candidates[i];
-    const metadataId = String(candidate.metadata.id);
-    if (usedFootprints.has(candidate.record.index) || usedMetadata.has(metadataId)) continue;
-    usedFootprints.add(candidate.record.index);
-    usedMetadata.add(metadataId);
-
-    const tags = candidate.metadata.tags || {};
-    candidate.record.way.tags = {
-      ...candidate.record.way.tags,
+  let rejectedAmbiguous = 0;
+  const usedMetadata = new Set();
+  for (const footprint of footprintWays) {
+    const geometryId = String(footprint.tags?._sourceFeatureId || '').trim();
+    const explicitOsmId = String(
+      footprint.tags?._osmFeatureId ||
+      (geometryId.startsWith('osm:way:') ? geometryId : '')
+    ).trim();
+    if (!explicitOsmId) {
+      rejectedAmbiguous += 1;
+      continue;
+    }
+    const metadata = metadataByStableId.get(explicitOsmId);
+    if (!metadata || usedMetadata.has(explicitOsmId)) continue;
+    usedMetadata.add(explicitOsmId);
+    const tags = metadata.tags || {};
+    footprint.tags = {
+      ...footprint.tags,
       ...tags,
-      _sourceFeatureId: candidate.record.way.tags._sourceFeatureId,
-      _buildingMetadataSourceId: `osm:way:${metadataId}`,
-      _buildingMetadataMatchMeters: candidate.distance.toFixed(2)
+      _sourceFeatureId: geometryId,
+      _buildingMetadataSourceId: explicitOsmId,
+      _buildingMetadataGeometryId: geometryId,
+      _buildingMetadataMapping: 'explicit_stable_id'
     };
     matched += 1;
     if (hasMappedDimension(tags)) mappedDimensions += 1;
@@ -153,10 +133,12 @@ export function mergeBuildingMetadata(footprintData, metadataData, options = {})
   footprintData._buildingMetadata = {
     source: metadataData._overpassSource || 'overpass',
     endpoint: metadataData._overpassEndpoint || null,
-    requested: metadataData.elements.filter((element) => element?.type === 'way').length,
+    policy: 'explicit_stable_identity_only',
+    requested: metadataWays.length,
     matched,
-    unmatched: Math.max(0, metadataData.elements.filter((element) => element?.type === 'way').length - matched),
-    footprintCount: records.length,
+    unmatched: Math.max(0, metadataWays.length - matched),
+    rejectedAmbiguous,
+    footprintCount: footprintWays.length,
     mappedDimensions,
     mappedTypes,
     mappedRoofs,

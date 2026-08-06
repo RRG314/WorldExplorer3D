@@ -58,6 +58,9 @@ function makeOrbit(radius, color = 0x53677e) {
 }
 
 function createPlanetarySystem(entity) {
+  if (entity.id === 'sol') {
+    throw new Error('Sol visuals are owned by the authoritative solar-system runtime.');
+  }
   const group = new THREE.Group();
   const color = entity.visualProfile?.color || 0xfff0c2;
   const starRadius = Math.max(18, Math.min(38, 24 + Number(entity.physical?.hostMassSolar || 1) * 8));

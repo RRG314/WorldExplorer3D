@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createWalkingCharacterHelpers } from "./walking/character.js?v=1";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
-import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=5";
+import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=7";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=3";
 import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=3";
 
@@ -53,7 +53,6 @@ function createWalkingModule(opts) {
     getSafeDriveY,
     getWalkGroundY,
     syncCarFromWalker,
-    syncWalkTerrain,
     syncWalkerFromCar
   } = createWalkingTerrainHelpers({ car, state, CFG });
   const { resolveWalkGroundState, updateWalkPhysics } = createWalkingPhysicsHelpers({
@@ -64,8 +63,7 @@ function createWalkingModule(opts) {
     getWalkGroundY,
     isPointInPolygon,
     keys,
-    state,
-    syncWalkTerrain
+    state
   });
   const {
     getMapRefPosition,
@@ -89,7 +87,6 @@ function createWalkingModule(opts) {
     scene,
     state,
     syncCarFromWalker,
-    syncWalkTerrain,
     syncWalkerFromCar
   });
 

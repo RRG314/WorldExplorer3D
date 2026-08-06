@@ -4,11 +4,9 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from './geometry.js?v=1';
-
-function connectionEndpointKey(point) {
-  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return '';
-  return `${Math.round(point.x * 10)},${Math.round(point.z * 10)}`;
-}
+import {
+  compileTransportNetworkModel
+} from '../world/compiler/transport-network-model.js?v=2';
 
 function structureFeatureStableKey(candidate) {
   const sourceId = String(candidate?.sourceFeatureId || candidate?.id || '').trim();
@@ -49,7 +47,7 @@ function featureCrossingsAwayFromSharedEndpoint(feature, other, areRoadsConnecte
       const atFeatureEndpointB =
         (segB === 0 && intersection.u <= 0.02) ||
         (segB === otherPoints.length - 2 && intersection.u >= 0.98);
-      if (atFeatureEndpointA && atFeatureEndpointB && areRoadsConnected(feature, other)) continue;
+      if ((atFeatureEndpointA || atFeatureEndpointB) && areRoadsConnected(feature, other)) continue;
       crossings.push({ ...intersection, segA, segB });
     }
   }
@@ -60,6 +58,9 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
   const areRoadsConnected = typeof options.areRoadsConnected === 'function'
     ? options.areRoadsConnected
     : () => false;
+  const areRoadsStackContinuous = typeof options.areRoadsStackContinuous === 'function'
+    ? options.areRoadsStackContinuous
+    : areRoadsConnected;
   const structureFeatures = features.filter((feature) =>
     feature?.structureSemantics?.gradeSeparated &&
     Array.isArray(feature?.pts) &&
@@ -103,7 +104,7 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
     };
     for (let leftIndex = 0; leftIndex < group.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < group.length; rightIndex += 1) {
-        if (areRoadsConnected(group[leftIndex], group[rightIndex])) {
+        if (areRoadsStackContinuous(group[leftIndex], group[rightIndex])) {
           union(group[leftIndex], group[rightIndex]);
         }
       }
@@ -225,40 +226,8 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
   return structureFeatures;
 }
 
-function assignFeatureConnections(features = []) {
-  const endpointGroups = new Map();
-  for (const feature of features) {
-    const points = Array.isArray(feature?.pts) ? feature.pts : null;
-    if (!points || points.length < 2) continue;
-    feature.connectedFeatures = { start: [], end: [] };
-    const endpoints = [
-      { endpoint: 'start', endpointIndex: 0, point: points[0] },
-      { endpoint: 'end', endpointIndex: points.length - 1, point: points[points.length - 1] }
-    ];
-    for (const entry of endpoints) {
-      const key = connectionEndpointKey(entry.point);
-      if (!key) continue;
-      if (!endpointGroups.has(key)) endpointGroups.set(key, []);
-      endpointGroups.get(key).push({ feature, ...entry });
-    }
-  }
-
-  endpointGroups.forEach((entries) => {
-    for (const entry of entries) {
-      const target = entry.feature?.connectedFeatures?.[entry.endpoint];
-      if (!Array.isArray(target)) continue;
-      target.length = 0;
-      for (const other of entries) {
-        if (other === entry || other.feature === entry.feature) continue;
-        target.push({
-          feature: other.feature,
-          endpoint: other.endpoint,
-          endpointIndex: other.endpointIndex,
-          point: other.point
-        });
-      }
-    }
-  });
+function assignFeatureConnections(features = [], options = {}) {
+  return compileTransportNetworkModel(features, options);
 }
 
 export { assignFeatureConnections, assignStructureStackRanks };

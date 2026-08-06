@@ -1,7 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=25";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
-import { elevatedSegmentSafety, isProtectedRoadFeature } from "./bridge-safety.js?v=2";
+import {
+  barrierPointConflictsWithDriveableRoad,
+  elevatedSegmentSafety,
+  isProtectedRoadFeature
+} from "./bridge-safety.js?v=3";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];
@@ -48,7 +52,9 @@ export function registerBridgeGuardrails(road, owner = null) {
   if (Array.isArray(road.guardrailColliders) && road.guardrailColliders.length > 0) return road.guardrailColliders;
   const colliders = [];
   const width = Math.max(3, Number(road.width) || 5);
-  const offset = width * 0.5 + 0.3;
+  const specification = road?.transportStructureRef?.specification || {};
+  const offset = Number(specification.barrierOffset) || width * 0.5 + 0.3;
+  const barrierHeight = Number(specification.barrierHeight) || 1.25;
   const thickness = 0.24;
   const distances = new Float32Array(road.pts.length);
   for (let i = 1; i < road.pts.length; i += 1) {
@@ -84,14 +90,24 @@ export function registerBridgeGuardrails(road, owner = null) {
     for (const side of [-1, 1]) {
       const x = midX + nx * offset * side;
       const z = midZ + nz * offset * side;
+      const sidePoints = [a, { x: midX, z: midZ }, b];
+      const crossesDriveableCorridor = sidePoints.some((point) =>
+        barrierPointConflictsWithDriveableRoad(road, {
+          x: point.x + nx * offset * side,
+          z: point.z + nz * offset * side,
+          deckY: surfaceY,
+          roads: appCtx.roads
+        })
+      );
+      if (crossesDriveableCorridor) continue;
       const pts = barrierFootprint(x, z, dx, dz, length + 0.3, thickness);
       const collider = {
         pts,
         ...colliderBounds(pts),
         baseY: surfaceY,
         minY: surfaceY,
-        maxY: surfaceY + 1.25,
-        height: 1.25,
+        maxY: surfaceY + barrierHeight,
+        height: barrierHeight,
         buildingType: 'bridge_guardrail',
         collisionKind: 'barrier',
         geometrySource: 'road_guardrail',

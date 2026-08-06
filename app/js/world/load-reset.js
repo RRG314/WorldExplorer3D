@@ -76,6 +76,10 @@ export function resetWorldForReload(options = {}) {
 
   disposeSceneMeshes(appCtx.roadMeshes);
   appCtx.clearWorldCollections(['roadMeshes', 'roads']);
+  // A publication belongs to exactly one world-load sequence. Clearing it here
+  // prevents the next feature compilation pass from appearing authoritative
+  // before final terrain-aligned meshes have been created.
+  appCtx.transportSurfacePublication = null;
   if (appCtx.car) {
     appCtx.car.road = null;
     appCtx.car.onRoad = false;
@@ -112,6 +116,7 @@ export function resetWorldForReload(options = {}) {
   } else {
     appCtx.worldSurfaceProfile = null;
   }
+  appCtx.worldTraversalRadiusWorld = null;
 
   disposeSceneMeshes(appCtx.linearFeatureMeshes);
   appCtx.clearWorldCollections(['linearFeatureMeshes', 'linearFeatures']);

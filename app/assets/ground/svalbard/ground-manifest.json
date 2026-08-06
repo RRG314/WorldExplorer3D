@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "svalbard-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "94b26c180ef80fff3bd008d23b43029371e6ba68db4efe8e7683fc4b530e616c",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 78.21672912330949,
+    "north": 78.22976496116327,
+    "west": 15.615055257736003,
+    "east": 15.678925474436937
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N78_00_E015_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N78_00_E015_00_DEM/Copernicus_DSM_COG_10_N78_00_E015_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 10958897,
+        "contentSha256": "4d211ea7b9d074eda9dd893a430bc9661069ea98ea4735d9d9dbf94c2bd2ef68",
+        "etag": "f2b386f77380f9b7469573bdc938fff3",
+        "lastModified": "Mon, 09 May 2022 14:50:29 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

@@ -13,7 +13,6 @@ export function createBoatOceanTransferApi(options = {}) {
     setPromptSignature,
     showBoatPrompt,
     startBoatMode,
-    syncBoatTerrainSuppression,
     updateBoatMenuUi,
     updateWaterWaveVisuals
   } = options;
@@ -29,7 +28,6 @@ function suspendBoatModeForOceanTransfer() {
   resetBoatFoamFx();
   if (appCtx.boatMode.mesh) appCtx.boatMode.mesh.visible = false;
   if (appCtx.boatMode.waterPatch) appCtx.boatMode.waterPatch.visible = false;
-  syncBoatTerrainSuppression();
   updateWaterWaveVisuals();
   updateBoatMenuUi();
   hideBoatPrompt();

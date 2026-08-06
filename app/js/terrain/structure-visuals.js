@@ -3,13 +3,19 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=25";
+} from "../structure-semantics.js?v=40";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=6";
-import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=7";
-import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
+} from "./structure-visual-meshes.js?v=14";
+import {
+  collectCoveredVisualInstances,
+  collectTunnelVisualInstances
+} from "./structure-tunnel-visuals.js?v=15";
+import {
+  barrierPointConflictsWithDriveableRoad,
+  elevatedSegmentSafety
+} from "../world/bridge-safety.js?v=3";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -155,7 +161,9 @@ export function collectStructureVisualInstances({
         nearbyElevatedCount <= 3;
       const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
       const width = Math.max(2, Number(feature.width) || 4);
-      const deckThickness = isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11));
+      const structureSpecification = feature?.transportStructureRef?.specification || {};
+      const deckThickness = Number(structureSpecification.deckThickness) ||
+        (isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11)));
       const girderDepth = isConnectorLike ? Math.max(0.34, deckThickness * 0.65) : Math.max(0.58, deckThickness * 0.72);
       for (let segIndex = 0; segIndex < structurePts.length - 1; segIndex++) {
         const p1 = structurePts[segIndex];
@@ -242,10 +250,16 @@ export function collectStructureVisualInstances({
         if (guardrailSafety.protected && (isConnectorLike || isSkywalk)) {
           const railOffset = width * 0.5 + 0.28;
           for (const side of [-1, 1]) {
+            if (barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * railOffset * side,
+              z: midZ + nz * railOffset * side,
+              deckY,
+              roads: appCtx.roads
+            })) continue;
             addBeam(
               guardrailInstances,
               midX + nx * railOffset * side,
-              deckY + 1.02,
+              deckY + (Number(structureSpecification.barrierHeight) || 1.1) - 0.08,
               midZ + nz * railOffset * side,
               0.14,
               0.16,
@@ -276,12 +290,24 @@ export function collectStructureVisualInstances({
             );
           }
         } else if (guardrailSafety.protected) {
-          elevatedBarrierSegments.push({
-            p1: { x: p1.x, y: startY, z: p1.z },
-            p2: { x: p2.x, y: endY, z: p2.z },
-            halfWidth: width * 0.5 + 0.18,
-            height: 0.72
-          });
+          const barrierHalfWidth = width * 0.5 + 0.18;
+          const barrierSides = [-1, 1].filter((side) =>
+            !barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * barrierHalfWidth * side,
+              z: midZ + nz * barrierHalfWidth * side,
+              deckY,
+              roads: appCtx.roads
+            })
+          );
+          if (barrierSides.length > 0) {
+            elevatedBarrierSegments.push({
+              p1: { x: p1.x, y: startY, z: p1.z },
+              p2: { x: p2.x, y: endY, z: p2.z },
+              halfWidth: barrierHalfWidth,
+              sides: barrierSides,
+              height: Number(structureSpecification.barrierHeight) || 1.25
+            });
+          }
         }
 
         const sideOffset = Math.max(0.7, width * 0.34);
@@ -385,10 +411,12 @@ export function collectStructureVisualInstances({
         }
       }
 
-      const supportSpacing =
-        isConnectorLike ?
-          Math.max(16, width * 3.6) :
-          Math.max(26, width * 3.8 + nearbyElevatedCount * 5);
+      const supportSpacing = Math.max(
+        Number(structureSpecification.supportSpacing) || 0,
+        isConnectorLike
+          ? Math.max(16, width * 3.6)
+          : Math.max(26, width * 3.8 + nearbyElevatedCount * 5)
+      );
       const skipNear = Math.max(8, width * 0.9);
       const skipDistance = (distance) => {
         if (distance < skipNear || distance > total - skipNear) return true;
@@ -553,6 +581,13 @@ export function collectStructureVisualInstances({
       roofInstances.push(...tunnel.roofs);
       tunnelLightInstances.push(...tunnel.lights);
       tunnelShells.push(...tunnel.shells);
+    } else if (semantics.structureKind === "covered") {
+      const covered = collectCoveredVisualInstances(feature, structurePts, {
+        samplePointAlongPolyline
+      });
+      portalInstances.push(...covered.portals);
+      wallInstances.push(...covered.walls);
+      roofInstances.push(...covered.roofs);
     }
   }
 

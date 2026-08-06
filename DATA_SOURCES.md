@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-07-28 for version 4.1.1.
+Last reviewed: 2026-07-30 for version 4.1.2.
 
 World Explorer keeps source identity and truth type in its runtime contracts. Observations, forecasts/models, predictions, mapped features, and visual fallbacks are not interchangeable.
 
@@ -14,7 +14,9 @@ World Explorer keeps source identity and truth type in its runtime contracts. Ob
 | Nominatim | Forward and reverse place lookup | Community-mapped service | OSMF Nominatim policy |
 | Overture Maps Foundation | Bounded building-massing fallback when selected-location OSM building coverage is unavailable | Compiled mapped data | Overture source licenses and attribution |
 | ESA WorldCover 2021 | Global semantic surface classification and land-cover fallback | Remote-sensing classification | CC BY 4.0; contains modified Copernicus Sentinel data |
-| Mapzen Terrarium elevation tiles | Earth terrain height sampling | Elevation model | Provider/source terms |
+| USGS 3DEP accepted-ground artifact | Baltimore bare-earth terrain height and collision | Government elevation model normalized to EGM2008 | Public USGS data |
+| Copernicus DEM GLO-30 classified-ground artifacts | Accepted terrain for the documented worldwide release fixtures | Public DEM-derived, correction-attested ground normalized to EGM2008 | Public free use with required attribution |
+| Mapzen Terrarium elevation tiles | Legacy visual fallback only; never accepted-ground authority | Elevation model | Provider/source terms |
 | GEBCO 2020 via OpenTopodata | Bundled Great Barrier Reef bathymetry seed | Bathymetric model | CC BY 4.0 |
 
 Required map attribution: `© OpenStreetMap contributors`.

@@ -1,87 +1,135 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
-import { chromium } from 'playwright';
-import { startStaticRootServer } from './test-static-server.mjs';
 
-const rootDir = process.cwd();
-const outputDir = path.join(rootDir, 'output', 'playwright', 'phase5-aerial-transition');
+const root = process.cwd();
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-await fs.mkdir(outputDir, { recursive: true });
-const server = await startStaticRootServer({
-  rootDir,
-  host: '127.0.0.1',
-  candidatePorts: [4173, 4174, 4175, 4176, 4177]
+assert.equal(
+  fs.existsSync(path.join(root, 'app/js/world/aerial-surface-context.js')),
+  false,
+  'a regional aerial map plane must not exist'
+);
+
+const configSource = read('app/js/config.js');
+const terrainSource = read('app/js/terrain/surface-profiles.js');
+const terrainRuntimeSource = read('app/js/terrain.js');
+const publicationSource = read('app/js/world/publication.js');
+const diagnosticsSource = read('app/js/runtime-diagnostics.js');
+const locationTerrainSource = read('app/js/terrain/location-world.js');
+const hudSource = read('app/js/hud.js');
+
+assert.match(configSource, /const TERRAIN_ZOOM = 15;/, 'near terrain resolution must remain at zoom 15');
+assert.doesNotMatch(
+  terrainSource,
+  /terrainAerialDetailSuppressed|terrainSurfaceDetailState|updateTerrainAerialDetail/,
+  'terrain materials must not change at an aerial altitude threshold'
+);
+assert.doesNotMatch(
+  terrainRuntimeSource,
+  /updateTerrainAerialDetail/,
+  'terrain runtime must expose only one mode-independent material pipeline'
+);
+assert.doesNotMatch(
+  publicationSource,
+  /aerial-surface-context|syncAerialSurfaceContext|aerialSurfaceContextState/,
+  'LOD must not publish or reveal a replacement aerial surface'
+);
+assert.doesNotMatch(
+  publicationSource,
+  /scene\.fog\s*=\s*null|syncAerialFog|savedGroundFog/,
+  'travel-mode changes must not replace the Earth fog model'
+);
+assert.doesNotMatch(publicationSource, /planeMode|droneMode|boatMode|walker|lodReferenceActor/, 'fixed world publication must not depend on traversal mode or actor');
+assert.match(publicationSource, /mesh\.userData\?\.alwaysVisible \|\| appCtx\.landUseVisible === true/, 'persistent mapped land-use and water must remain in the fixed world');
+assert.match(diagnosticsSource, /aerialReplacementMeshes/);
+assert.match(diagnosticsSource, /suppressedTerrainMeshes/);
+assert.match(locationTerrainSource, /for \(let dx = -activeRing; dx <= activeRing; dx \+= 1\)/);
+assert.match(locationTerrainSource, /z: appCtx\.TERRAIN_ZOOM/);
+assert.doesNotMatch(locationTerrainSource, /actor|speed|childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
+assert.equal(
+  fs.existsSync(path.join(root, 'app/js/terrain/far-field.js')),
+  false,
+  'The post-v4.1.1 square far-field clipmap owner must be removed, not hidden or recolored.'
+);
+assert.doesNotMatch(terrainRuntimeSource, /createFarFieldTerrainApi|far-field\.js|updateFarTerrainClipmap/);
+assert.doesNotMatch(locationTerrainSource, /FarTerrain|farTerrain|updateFarTerrainClipmap/);
+assert.match(hudSource, /const earthCelestialDistance = 11000/);
+assert.doesNotMatch(
+  hudSource,
+  /cameraX \+ dirX \* 1400, cameraY \+ dirY \* 1400, cameraZ \+ dirZ \* 1400/,
+  'Earth sun or moon remained in front of the distant terrain field'
+);
+assert.doesNotMatch(diagnosticsSource, /farTerrainClipmap|farMappedContexts/);
+
+const { ctx } = await import('../app/js/shared-context.js?v=55');
+const { publishLocationWorld } = await import('../app/js/world/publication.js?v=1');
+const scene = {
+  add(mesh) {
+    mesh.parent = this;
+    mesh.visible = true;
+  },
+  remove(mesh) {
+    if (mesh.parent === this) mesh.parent = null;
+  }
+};
+const building = {
+  visible: true,
+  parent: scene,
+  userData: { lodCenter: { x: 20, z: 20 }, lodTier: 'near' }
+};
+const persistentGrass = {
+  visible: false,
+  parent: null,
+  userData: { alwaysVisible: true, landuseType: 'grass' }
+};
+const persistentWater = {
+  visible: false,
+  parent: null,
+  userData: { alwaysVisible: true, landuseType: 'water' }
+};
+Object.assign(ctx, {
+  scene,
+  onMoon: false,
+  travelingToMoon: false,
+  isEnv: null,
+  ENV: null,
+  planeMode: { active: false },
+  droneMode: false,
+  car: { x: 0, z: 0 },
+  drone: { x: 0, z: 0 },
+  boatMode: { active: false },
+  roadMeshes: [],
+  urbanSurfaceMeshes: [],
+  buildingMeshes: [building],
+  landuseMeshes: [persistentGrass, persistentWater],
+  poiMeshes: [],
+  streetFurnitureMeshes: [],
+  linearFeatureMeshes: [],
+  landUseVisible: true,
+  poiMode: false,
+  renderQualityLevel: 'med',
+  camMode: 0,
+  setPerfLiveStat: () => {}
 });
-const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
-const errors = [];
-page.on('pageerror', (error) => errors.push(String(error?.message || error)));
-page.on('console', (message) => {
-  if (message.type() === 'error' && !/Failed to load resource/.test(message.text())) errors.push(message.text());
-});
+publishLocationWorld();
+assert.equal(persistentGrass.parent, scene, 'fixed publication must restore persistent mapped grass');
+assert.equal(persistentWater.parent, scene, 'fixed publication must restore persistent mapped water');
+ctx.droneMode = true;
+persistentGrass.visible = false;
+persistentGrass.parent = null;
+persistentWater.visible = false;
+persistentWater.parent = null;
+publishLocationWorld();
+assert.equal(persistentGrass.parent, scene, 'drone mode must not change persistent mapped grass');
+assert.equal(persistentWater.parent, scene, 'drone mode must not change persistent mapped water');
 
-try {
-  await page.goto(`http://127.0.0.1:${server.port}/app/`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 120000
-  });
-  const report = await page.evaluate(async () => {
-    const deadline = performance.now() + 120000;
-    let ctx = null;
-    while (performance.now() < deadline) {
-      ({ ctx } = await import('/app/js/shared-context.js?v=55'));
-      if (ctx?.loadRoads && ctx?.ENV?.EARTH && ctx?.updateTerrainAerialDetail) break;
-      await new Promise((resolve) => window.setTimeout(resolve, 200));
-    }
-    if (!ctx?.ENV?.EARTH) throw new Error('Earth runtime unavailable');
-    ctx.gameMode = 'free';
-    ctx.gameStarted = true;
-    ctx.paused = false;
-    ctx.switchEnv(ctx.ENV.EARTH);
-    ctx.customLoc = { lat: 23.4162, lon: 25.6628, name: 'Sahara transition probe' };
-    ctx.customLocTransient = false;
-    ctx.selLoc = 'custom';
-    document.getElementById('titleScreen')?.classList.add('hidden');
-    await ctx.loadRoads();
-
-    const terrainMeshes = () => (ctx.terrainGroup?.children || []).filter((mesh) =>
-      mesh?.userData?.isTerrainMesh && mesh.material && !Array.isArray(mesh.material)
-    );
-    const snapshot = (label) => ({
-      label,
-      meshes: terrainMeshes().length,
-      mapped: terrainMeshes().filter((mesh) => Boolean(mesh.material.map)).length,
-      normalMapped: terrainMeshes().filter((mesh) => Boolean(mesh.material.normalMap)).length,
-      suppressed: terrainMeshes().filter((mesh) => mesh.userData.terrainAerialDetailSuppressed === true).length,
-      mapIds: terrainMeshes().map((mesh) => mesh.material.map?.uuid || null)
-    });
-
-    const close = snapshot('close');
-    ctx.updateTerrainAerialDetail(true, 160);
-    const high = snapshot('high');
-    ctx.updateTerrainAerialDetail(true, 120);
-    const hysteresis = snapshot('hysteresis');
-    ctx.updateTerrainAerialDetail(true, 90);
-    const restored = snapshot('restored');
-    return { close, high, hysteresis, restored };
-  });
-
-  report.errors = errors;
-  await page.screenshot({ path: path.join(outputDir, 'restored-close-detail.png') });
-  await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
-
-  assert.ok(report.close.meshes > 0, 'terrain mesh unavailable');
-  assert.equal(report.close.mapped, report.close.meshes, 'close terrain detail maps missing');
-  assert.equal(report.high.mapped, 0, 'aerial color maps were not suppressed');
-  assert.equal(report.high.normalMapped, 0, 'aerial normal maps were not suppressed');
-  assert.equal(report.high.suppressed, report.high.meshes, 'aerial suppression state incomplete');
-  assert.equal(report.hysteresis.suppressed, report.hysteresis.meshes, 'aerial hysteresis released too early');
-  assert.deepEqual(report.restored.mapIds, report.close.mapIds, 'descent did not restore the original close-detail maps');
-  assert.equal(report.restored.suppressed, 0, 'descent left terrain suppressed');
-  assert.deepEqual(errors, [], 'browser errors during aerial transition');
-  console.log(JSON.stringify({ ok: true, ...report }, null, 2));
-} finally {
-  await browser.close();
-  await server.close();
-}
+console.log(JSON.stringify({
+  ok: true,
+  terrainZoom: 15,
+  terrainMaterials: 'mode-independent',
+  regionalMapPlane: 'deleted',
+  fogPolicy: 'mode-independent',
+  nearTerrain: 'unchanged-uniform-z15-grid',
+  farTerrain: 'post-v4.1.1-square-clipmap-removed'
+}, null, 2));

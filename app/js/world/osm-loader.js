@@ -211,6 +211,19 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'building-metadata'
     },
+    waterStructureCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius: buildingRadius,
+      poiRadius,
+      kind: 'water-structures'
+    },
+    waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+                way["building"="ship"]${buildingBounds};
+                way["historic"="ship"]${buildingBounds};
+                way["building"="houseboat"]${buildingBounds};
+            );out body;>;out skel qt;`,
     buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
             );out tags center qt;`,
@@ -233,8 +246,12 @@ export function buildWorldOverpassPlan({
                 way["place"="square"]${featureBounds};
                 way["surface"~"^(paved|asphalt|concrete|concrete:plates|paving_stones|sett|cobblestone)$"]["area"="yes"]${featureBounds};
                 way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${featureBounds};
+                node["natural"="tree"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
+                way["building"="ship"]${buildingBounds};
+                way["historic"="ship"]${buildingBounds};
+                way["building"="houseboat"]${buildingBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
             );out body;>;out skel qt;`,

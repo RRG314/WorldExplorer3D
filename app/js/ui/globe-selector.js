@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=6';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=14';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
-import { CURATED_DESTINATIONS, MAJOR_CITY_DESTINATIONS, fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=1';
-import { bindCityListInteractions, renderLibraryCityItems, renderNearbyCityItems } from './globe-selector/city-list-view.js?v=1';
+import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
+import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
 import {
   addSelectionToSavedFavorites,
   addRecentPlace,
@@ -20,16 +20,17 @@ import {
   normalizeCityRecord,
   parseReverseAddress,
   persistSavedFavoriteCities as persistSavedFavoriteCitiesToStorage,
+  resolveCoordinateWaterKind,
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=5";
+} from "./globe-selector/helpers.js?v=6";
 
 function createGlobeSelector(options = {}) {
   const {
     root, stage, canvas, latLonReadout, placeReadout, searchInput, mobileSearchInput,
     mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
-    spaceBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
+    spaceBtn, oceanBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
     liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn, saveFavoriteBtn,
     cityListHint, cityList
@@ -48,6 +49,7 @@ function createGlobeSelector(options = {}) {
   }
 
   let openState = false, selected = null, searchInFlight = false;
+  let selectionResolvePromise = Promise.resolve();
   let coordinateInputsDirty = false, reverseLookupToken = 0;
   let activeCityTab = 'nearby';
   let nearbyCities = [], mappedNearbyCities = [], liveNearbyCity = null;
@@ -70,11 +72,17 @@ function createGlobeSelector(options = {}) {
       setSelection(city.lat, city.lon, { name: city.name, focus: true, arrivalMode: 'walk' });
       if (searchInput) searchInput.value = city.name;
     },
-    onGlobePick(next) {
+    onFavoriteActivate(city) {
+      setSelection(city.lat, city.lon, { name: city.name, focus: true, arrivalMode: 'walk' });
+      if (searchInput) searchInput.value = city.name;
+      void triggerStartHere();
+    },
+    onGlobePick(next, interaction = {}) {
       const fallbackName = `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
       setSelection(next.lat, next.lon, { name: fallbackName, fetchNearby: true });
-      reverseLookupPlace(next.lat, next.lon);
+      beginReverseLookup(next.lat, next.lon);
       if (searchInput) searchInput.value = fallbackName;
+      if (interaction.activate === true) void triggerStartHere();
     }
   });
 
@@ -83,11 +91,7 @@ function createGlobeSelector(options = {}) {
   }
 
   function getLibraryPresets() {
-    return [
-      ...CURATED_DESTINATIONS,
-      ...MAJOR_CITY_DESTINATIONS,
-      ...getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {})
-    ];
+    return getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {});
   }
 
   function selectionIsSaved() { return savedFavoriteCities.some((city) => cityMatchesGlobeSelection(selected, city)); }
@@ -131,7 +135,7 @@ function createGlobeSelector(options = {}) {
     favoritesTabBtn?.classList.toggle('active', activeCityTab === 'favorites');
     if (cityListHint) {
       cityListHint.textContent = activeCityTab === 'favorites' ?
-      'Saved places, recent trips, major cities, and world destinations.' :
+      'The original World Explorer city presets. Double-click to explore.' :
       'Major cities within 100 miles of the selected point, from OpenStreetMap.';
     }
     renderCityList();
@@ -148,14 +152,12 @@ function createGlobeSelector(options = {}) {
       return;
     }
 
-    const groups = getFavoriteCityGroupsFromData({
+    favoritePresetList = getFavoriteCityGroupsFromData({
       menuFavoriteCities: getLibraryPresets(),
-      savedFavoriteCities
-    });
-    favoritePresetList = groups.presets;
-    favoriteSavedList = groups.saved;
-
-    renderLibraryCityItems(cityList, favoritePresetList, favoriteSavedList, favoriteRecentList, cityMatchesSelection);
+      savedFavoriteCities: []
+    }).presets;
+    favoriteSavedList = [];
+    renderPresetCityItems(cityList, favoritePresetList, cityMatchesSelection);
   }
 
   function focusOnSelection(lat, lon) {
@@ -239,6 +241,7 @@ function createGlobeSelector(options = {}) {
     if (coordsChanged) {
       liveNearbyCity = null;
       mappedNearbyCities = [];
+      selectionResolvePromise = Promise.resolve();
     }
     const named = typeof meta.name === 'string' ? meta.name.trim() : '';
     selected = {
@@ -290,7 +293,13 @@ function createGlobeSelector(options = {}) {
     if (searchInput && typeof meta.searchLabel === 'string' && meta.searchLabel.trim()) {
       searchInput.value = meta.searchLabel.trim();
     }
-    if (selected) reverseLookupPlace(selected.lat, selected.lon);
+    if (selected) beginReverseLookup(selected.lat, selected.lon);
+  }
+
+  function beginReverseLookup(lat, lon) {
+    const lookup = reverseLookupPlace(lat, lon);
+    selectionResolvePromise = Promise.resolve(lookup).catch(() => null);
+    return selectionResolvePromise;
   }
 
   async function reverseLookupPlace(lat, lon) {
@@ -300,6 +309,10 @@ function createGlobeSelector(options = {}) {
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
       selected.locationDetails = cached.details || null;
+      if (cached.waterKind) {
+        selected.arrivalMode = 'boat';
+        selected.waterKind = cached.waterKind;
+      }
       liveNearbyCity = normalizeCityRecord({
         key: 'live-nearby',
         name: cached.queryLabel || cached.display,
@@ -316,6 +329,14 @@ function createGlobeSelector(options = {}) {
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
 
       const parsed = parseReverseAddress(payload);
+      parsed.waterKind = parsed.waterKind || await resolveCoordinateWaterKind(lat, lon, payload);
+      if (parsed.waterKind) {
+        parsed.details = { ...(parsed.details || {}), waterKind: parsed.waterKind };
+        parsed.display ||= `Open Ocean ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+        parsed.queryLabel ||= 'Open Ocean';
+      }
+      if (!openState || requestToken !== reverseLookupToken || !selected) return;
+      if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
       if (parsed.display) {
         reverseLookupCache.set(cacheKey, parsed);
         const payloadLat = toFiniteNumber(payload?.lat ?? payload?.latitude);
@@ -329,6 +350,10 @@ function createGlobeSelector(options = {}) {
         if (liveCandidate) liveNearbyCity = liveCandidate;
         selected.name = parsed.display;
         selected.locationDetails = parsed.details;
+        if (parsed.waterKind) {
+          selected.arrivalMode = 'boat';
+          selected.waterKind = parsed.waterKind;
+        }
         syncLegacyCustomState(selected);
         renderSelection();
         if (searchInput && !searchInput.value.trim()) searchInput.value = parsed.queryLabel || parsed.display;
@@ -386,7 +411,7 @@ function createGlobeSelector(options = {}) {
           fetchNearby: true,
           arrivalMode: result.arrivalMode || 'walk'
         });
-        reverseLookupPlace(result.lat, result.lon);
+        beginReverseLookup(result.lat, result.lon);
       } else {
         throw new Error('Search function unavailable');
       }
@@ -420,7 +445,7 @@ function createGlobeSelector(options = {}) {
     }
     setSelection(lat, lon, { name: 'Manual Coordinates', fetchNearby: true });
     coordinateInputsDirty = false;
-    reverseLookupPlace(lat, lon);
+    beginReverseLookup(lat, lon);
     return true;
   }
 
@@ -441,6 +466,7 @@ function createGlobeSelector(options = {}) {
     setShortcutButtonsBusy(isBusy) {
       if (moonBtn) moonBtn.disabled = isBusy;
       if (spaceBtn) spaceBtn.disabled = isBusy;
+      if (oceanBtn) oceanBtn.disabled = isBusy;
     },
     setStartButtonBusy,
     setStatus(message, color) {
@@ -450,8 +476,37 @@ function createGlobeSelector(options = {}) {
     }
   });
 
-  function triggerStartHere() {
+  async function triggerStartHere() {
+    if (coordinateInputsDirty && !applySelectionFromInputs()) return false;
+    await selectionResolvePromise;
     return launchCoordinator.startHere();
+  }
+
+  function startSelectedOcean() {
+    if (coordinateInputsDirty && !applySelectionFromInputs()) {
+      return Promise.resolve(false);
+    }
+    if (!selected) {
+      if (searchStatus) {
+        searchStatus.textContent = 'Choose an ocean point on the globe first.';
+        searchStatus.style.color = '#dc2626';
+      }
+      return Promise.resolve(false);
+    }
+    setSelection(selected.lat, selected.lon, {
+      name: selected.name,
+      arrivalMode: 'boat'
+    });
+    if (typeof options.onOceanShortcut === 'function') {
+      recentPlaces = addRecentPlace(selected, recentPlaces);
+      favoriteRecentList = recentPlaces;
+      syncLegacyCustomState(selected);
+      return launchCoordinator.startEnvironment(
+        () => options.onOceanShortcut({ ...selected }),
+        'Ocean'
+      );
+    }
+    return triggerStartHere();
   }
 
   function bindLiveEarthBridge() {
@@ -546,7 +601,7 @@ function createGlobeSelector(options = {}) {
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
     if (mobileSearchInput) mobileSearchInput.value = searchInput?.value || appCtx.customLoc?.name || '';
-    if (selected) reverseLookupPlace(selected.lat, selected.lon);
+    if (selected) beginReverseLookup(selected.lat, selected.lon);
 
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
       appCtx.liveEarth.onSelectorOpen();
@@ -583,6 +638,7 @@ function createGlobeSelector(options = {}) {
   });
   moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
+  oceanBtn?.addEventListener('click', () => void startSelectedOcean());
   for (const coordinateInput of [latInput, lonInput]) {
     coordinateInput?.addEventListener('input', () => {
       coordinateInputsDirty = true;

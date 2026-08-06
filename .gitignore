@@ -5,6 +5,7 @@ node_modules/
 functions/node_modules/
 .datum-venv/
 .datum-grids/
+.ground-datum-grids/
 __pycache__/
 *.pyc
 output/

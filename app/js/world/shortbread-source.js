@@ -84,24 +84,49 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
 function roadTags(properties = {}) {
   const kind = String(properties.kind || '').toLowerCase();
   if (!kind) return null;
+  const raw = (key) => properties[key] == null ? '' : String(properties[key]);
+  const booleanTag = (key) => properties[key] === true
+    ? 'yes'
+    : properties[key] === false || properties[key] == null
+      ? ''
+      : String(properties[key]);
   if (properties.rail === true) {
-    return { railway: kind, tunnel: properties.tunnel ? 'yes' : '', bridge: properties.bridge ? 'yes' : '' };
+    return {
+      railway: kind,
+      tunnel: booleanTag('tunnel'),
+      bridge: booleanTag('bridge'),
+      layer: raw('layer'),
+      _sourceCompleteness: 'generalized'
+    };
   }
   const highway = properties.link === true && !kind.endsWith('_link') ? `${kind}_link` : kind;
   return {
     highway,
-    bridge: properties.bridge ? 'yes' : '',
-    tunnel: properties.tunnel ? 'yes' : '',
-    layer: properties.bridge ? '1' : properties.tunnel ? '-1' : '',
+    bridge: booleanTag('bridge'),
+    tunnel: booleanTag('tunnel'),
+    covered: booleanTag('covered'),
+    layer: raw('layer'),
+    level: raw('level'),
+    location: raw('location'),
+    cutting: booleanTag('cutting'),
+    embankment: booleanTag('embankment'),
+    incline: raw('incline'),
+    lanes: raw('lanes'),
+    placement: raw('placement'),
     oneway: properties.oneway ? (properties.oneway_reverse ? '-1' : 'yes') : '',
-    service: properties.service || '',
-    surface: properties.surface || '',
-    width: properties.width || '',
-    footway: properties.footway || '',
-    sidewalk: properties.sidewalk || '',
-    tracktype: properties.tracktype || '',
-    bicycle: properties.bicycle || '',
-    horse: properties.horse || ''
+    service: raw('service'),
+    surface: raw('surface'),
+    width: raw('width'),
+    access: raw('access'),
+    maxheight: raw('maxheight'),
+    destination: raw('destination'),
+    junction: raw('junction'),
+    footway: raw('footway'),
+    sidewalk: raw('sidewalk'),
+    tracktype: raw('tracktype'),
+    bicycle: raw('bicycle'),
+    horse: raw('horse'),
+    _sourceCompleteness: 'generalized'
   };
 }
 
@@ -336,12 +361,24 @@ export async function fetchShortbreadBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
   const { tiles, requestedTiles, bounds } = await fetchTileCoverage(lat, lon, options.radius, SHORTBREAD_ZOOM);
+  const elements = convertTilesToElements(tiles, ['buildings'], bounds);
+  const coverageComplete = tiles.length === requestedTiles;
+  elements.forEach((element) => {
+    if (element?.type === 'way' && element.tags) {
+      element.tags._geometryCoverageComplete = coverageComplete ? 'yes' : 'no';
+    }
+  });
   return {
-    elements: convertTilesToElements(tiles, ['buildings'], bounds),
+    elements,
     _overpassSource: 'shortbread-vector-buildings',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
-    _shortbreadTiles: { loaded: tiles.length, requested: requestedTiles, zoom: SHORTBREAD_ZOOM }
+    _shortbreadTiles: {
+      loaded: tiles.length,
+      requested: requestedTiles,
+      zoom: SHORTBREAD_ZOOM,
+      coverageComplete
+    }
   };
 }
 

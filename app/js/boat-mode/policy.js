@@ -3,6 +3,14 @@ export function createBoatModePolicy(options = {}) {
 
 function canExitBoatMode(targetMode = 'walk', options = {}) {
   if (!appCtx.boatMode?.active) return true;
+  if (options.source !== 'boat_prompt_exit') {
+    if (options.showNotice !== false) {
+      setPromptSignature(`blocked_mode_switch:${targetMode}`);
+      showBoatPrompt('Boat Mode is locked on the water • Use Exit Boat near shore', 'notice', promptDurationMs);
+    }
+    updateBoatMenuUi();
+    return false;
+  }
   const maxShoreline = targetMode === 'drive' ? exitMaxShorelineDrive : exitMaxShorelineWalk;
   const shoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
   if (Number.isFinite(shoreline) && shoreline <= maxShoreline) return true;

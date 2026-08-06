@@ -1,9 +1,5 @@
-import { createRenderInterpolator } from './render-interpolation.js?v=1';
-
 function createCoreFrameSystems(appCtx, hooks = {}) {
-  const renderInterpolator = createRenderInterpolator(appCtx);
-  appCtx.getRenderInterpolationSnapshot = () => renderInterpolator.snapshot();
-  appCtx.resetRenderInterpolation = () => renderInterpolator.reset();
+  appCtx.presentationPose = null;
   let hudTimer = 0;
   let mapTimer = 0;
   let lodTimer = 0;
@@ -30,7 +26,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'engine',
       phase: 'input',
       enabled: () => !!appCtx.gameStarted,
-      fixedUpdate() {
+      update() {
         appCtx.updateControlInput?.();
       }
     },
@@ -39,10 +35,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'engine',
       phase: 'simulation',
       enabled: () => !!appCtx.gameStarted,
-      fixedUpdate(frame) {
-        renderInterpolator.beginFixedStep();
-        appCtx.update(frame.fixedDelta);
-        renderInterpolator.endFixedStep();
+      update(frame) {
+        appCtx.update(frame.dt);
       }
     },
     {
@@ -52,7 +46,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
-        appCtx.updateEarthWorldStreaming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();
         if (!appCtx.onMars) appCtx.refreshAstronomicalSky?.(false);
         appCtx.updateWaterWaveVisuals?.();
@@ -77,7 +70,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'camera',
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
-        renderInterpolator.apply(frame.interpolation);
         appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
       }
@@ -117,7 +109,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         }
 
         mapTimer += frame.dt;
-        const interval = appCtx.planeMode?.active ? 0.25 : appCtx.droneMode ? 0.16 : 0.1;
+        // Five updates per second keeps the navigation display responsive
+        // without rebuilding every vector layer ten times per second.
+        const interval = appCtx.planeMode?.active ? 0.25 : 0.2;
         if (mapTimer > interval) {
           mapTimer = 0;
           if (!workspaceOpen()) {
@@ -129,7 +123,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         lodTimer += frame.dt;
         if (lodTimer > 0.2) {
           lodTimer = 0;
-          appCtx.updateWorldLod?.(false);
           appCtx.enforceEnvironmentSceneOwnership?.();
         }
       }

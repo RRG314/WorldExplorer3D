@@ -169,7 +169,9 @@ function toggleTrackRecording() {
   appCtx.isRecording = !appCtx.isRecording;
   document.getElementById('fTrack').classList.toggle('recording', appCtx.isRecording);
   document.getElementById('fTrack').textContent = appCtx.isRecording ? '⏹️ Stop Recording' : '🏁 Record Track';
-  if (appCtx.isRecording) appCtx.customTrack = [];
+  if (appCtx.isRecording) {
+    appCtx.customTrack = [];
+  }
 }
 
 function eraseTrack() {
@@ -177,44 +179,22 @@ function eraseTrack() {
   appCtx.isRecording = false;
   document.getElementById('fTrack').classList.remove('recording');
   document.getElementById('fTrack').textContent = '🏁 Record Track';
-  if (appCtx.trackMesh) {appCtx.scene.remove(appCtx.trackMesh);appCtx.trackMesh = null;}
+}
+
+function appendTrackPoint(x, z) {
+  if (!appCtx.isRecording || !Number.isFinite(x) || !Number.isFinite(z)) return false;
+  const last = appCtx.customTrack[appCtx.customTrack.length - 1];
+  if (last && Math.hypot(x - last.x, z - last.z) < 8) return false;
+  appCtx.customTrack.push({ x, z });
+  if (appCtx.customTrack.length > 4096) {
+    const retained = appCtx.customTrack.filter((_point, index) => index % 2 === 0);
+    appCtx.customTrack.splice(0, appCtx.customTrack.length, ...retained);
+  }
+  return true;
 }
 
 function updateTrack() {
-  if (!appCtx.isRecording) return;
-  const last = appCtx.customTrack[appCtx.customTrack.length - 1];
-  if (!last || Math.hypot(appCtx.car.x - last.x, appCtx.car.z - last.z) > 5) {
-    appCtx.customTrack.push({ x: appCtx.car.x, z: appCtx.car.z });
-    rebuildTrackMesh();
-  }
-}
-
-function rebuildTrackMesh() {
-  if (appCtx.trackMesh) appCtx.scene.remove(appCtx.trackMesh);
-  if (appCtx.customTrack.length < 2) return;
-  const hw = 8;
-  const verts = [],indices = [];
-  for (let i = 0; i < appCtx.customTrack.length; i++) {
-    const p = appCtx.customTrack[i];
-    let dx, dz;
-    if (i === 0) {dx = appCtx.customTrack[1].x - p.x;dz = appCtx.customTrack[1].z - p.z;} else
-    if (i === appCtx.customTrack.length - 1) {dx = p.x - appCtx.customTrack[i - 1].x;dz = p.z - appCtx.customTrack[i - 1].z;} else
-    {dx = appCtx.customTrack[i + 1].x - appCtx.customTrack[i - 1].x;dz = appCtx.customTrack[i + 1].z - appCtx.customTrack[i - 1].z;}
-    const len = Math.sqrt(dx * dx + dz * dz) || 1;
-    const nx = -dz / len,nz = dx / len;
-    verts.push(p.x + nx * hw, 0.03, p.z + nz * hw);
-    verts.push(p.x - nx * hw, 0.03, p.z - nz * hw);
-    if (i < appCtx.customTrack.length - 1) {
-      const vi = i * 2;
-      indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  appCtx.trackMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: appCtx.isRecording ? 0xff6644 : 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }));
-  appCtx.scene.add(appCtx.trackMesh);
+  appendTrackPoint(appCtx.car.x, appCtx.car.z);
 }
 
 function nextCity() {
@@ -430,6 +410,19 @@ async function searchLocation() {
 
       // Debug log removed
     } // Debug log removed
+
+    // The title screen only needs the side effects above, while the globe
+    // selector needs the resolved location as an explicit handoff. Returning
+    // the canonical result keeps both entry points on the same geocoder
+    // contract instead of making the overlay infer success from status text.
+    return {
+      lat,
+      lon,
+      name: locationName,
+      country,
+      displayName: result.display_name || query,
+      arrivalMode: 'walk'
+    };
   } catch (e) {
     console.error('=== SEARCH LOCATION DEBUG END - ERROR ===');
     console.error('Search error:', e);
@@ -440,20 +433,20 @@ async function searchLocation() {
 }
 
 Object.assign(appCtx, {
+  appendTrackPoint,
   eraseTrack,
   nextCity,
   onKey,
-  rebuildTrackMesh,
   searchLocation,
   toggleTrackRecording,
   updateTrack
 });
 
 export {
+  appendTrackPoint,
   eraseTrack,
   nextCity,
   onKey,
-  rebuildTrackMesh,
   searchLocation,
   toggleTrackRecording,
   updateTrack };

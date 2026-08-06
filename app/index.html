@@ -26,8 +26,8 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=10">
-<link rel="stylesheet" href="styles/start-hub.css?v=10">
+<link rel="stylesheet" href="styles/interface-v4.css?v=11">
+<link rel="stylesheet" href="styles/start-hub.css?v=11">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -332,20 +332,20 @@ Graphics changes apply to the current session.
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
 <div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Drive / Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Drive / Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
 <div class="ctrl-section">Walking Mode</div>
-<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Walk Forward / Back</span></div>
-<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Turn Left / Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Walk Forward / Back</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Turn Left / Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
 <div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
@@ -353,16 +353,18 @@ Graphics changes apply to the current session.
 <div class="ctrl-section">Plane Controls</div>
 <div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">X / Z</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl + ← / →</span><span class="ctrl-action">Barrel Roll</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">Up to ~188 MPH</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Wheel Brake</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
 <div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Plane</span></div>
 <div class="ctrl-section">Camera & View</div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Look Back</span></div>
 <div class="ctrl-section">Mode Switching</div>
-<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Drive / Walk / Drone / Plane</span></div>
+<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character / Car / Plane / Drone</span></div>
 <div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
 <div class="ctrl-section">Navigation & Map</div>
 <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
@@ -437,7 +439,7 @@ Graphics changes apply to the current session.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · Ground artifacts produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30. · Global ocean-floor elevations from the GEBCO_2024 Grid, GEBCO Compilation Group · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
 </div>
 </div>
 </div>
@@ -460,6 +462,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
 <button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
+<button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
 <button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
 <button id="globeHubFullscreenBtn" type="button" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
@@ -494,7 +497,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-selector-city-tabs" role="tablist" aria-label="City lists">
 <button id="globeNearbyTabBtn" class="globe-selector-city-tab active" type="button" data-city-tab="nearby">Nearby</button>
-<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">My Places</button>
+<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Featured Cities</button>
 </div>
 <div id="globeCityListHint" class="globe-selector-stat-label">Pick a point to see nearby cities.</div>
 <ul id="globeCityList" class="globe-selector-city-list">
@@ -519,19 +522,11 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 <div class="globe-destination-bar" aria-label="World destinations">
-  <button id="globeSelectorEarthBtn" class="active" type="button"><span class="destination-thumb earth" aria-hidden="true"></span>Earth</button>
-  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Go to Moon" aria-label="Launch Moon"><span class="destination-thumb moon" aria-hidden="true"></span>Moon</button>
-  <button id="globeSelectorMarsBtn" type="button" title="Go to Mars"><span class="destination-thumb mars" aria-hidden="true"></span>Mars</button>
-  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Go to Space" aria-label="Launch Space"><span class="destination-thumb space" aria-hidden="true"></span>Space</button>
-  <button id="globeSelectorOceanBtn" type="button" title="Explore the ocean"><span class="destination-thumb ocean" aria-hidden="true"></span>Ocean</button>
-</div>
-<div class="globe-system-bar" aria-label="Data status">
-  <span><b>Satellites</b><em>Observed</em></span>
-  <span><b>Aircraft</b><em>OpenSky</em></span>
-  <span><b>Marine traffic</b><em>Reference</em></span>
-  <span><b>Weather</b><em>Current</em></span>
-  <span><b>USGS earthquakes</b><em>Live data</em></span>
-  <span><b>OSM data</b><em>Up to date</em></span>
+  <button id="globeSelectorEarthBtn" class="active" type="button" title="Explore Earth" aria-label="Explore Earth"><span class="destination-thumb earth" aria-hidden="true"></span></button>
+  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
+  <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
+  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
   <header class="globe-hub-overlay-header">
@@ -572,7 +567,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div id="boostBar"><div id="boostFill"></div></div>
 <div id="street">Loading...</div>
 <div id="locationLine"></div>
-<div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span><span class="ind" id="indOff" hidden></span></div>
+<div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
 </div>
 </div></div>
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a></div>
@@ -640,7 +635,6 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
 </div>
-<div id="offRoadWarn"></div>
 <canvas id="minimap" width="150" height="150"></canvas>
 <div id="minimapZoomControls" aria-label="Minimap zoom controls">
   <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
@@ -949,12 +943,21 @@ Explore the area
 <div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fRoomGames">👥 Room Games</div>
 <div class="floatItem" id="fActivityCreator">🧩 Create Game</div>
+<div class="floatItem" id="fMemoryFlower">🌸 Place Memory Flower</div>
+<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
 <div class="floatItem" id="fPolice">🚔 Police</div>
 <div class="floatItem" id="fTrack">🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack">🗑️ Erase Track</div>
 <div class="floatItem" id="fRespawn">🎯 Respawn</div>
 <div class="floatItem" id="fRespawnRand">🎲 Random Respawn</div>
+<div class="floatItemSection" role="separator">MULTIPLAYER</div>
+<div class="floatItem" id="fMpCreate">🆕 Create Room</div>
+<div class="floatItem" id="fMpJoin">🔑 Join Room</div>
+<div class="floatItem" id="fMpInvite">🔗 Invite Link</div>
+<div class="floatItem" id="fMpLeave">🚪 Leave Room</div>
+<div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
+<div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
 </div>
 </div>
 
@@ -972,17 +975,8 @@ Explore the area
 </div>
 </div>
 <div class="floatMenuRow">
-<div class="floatMenu" id="multiplayerMenu">
-<button class="floatBtn multiplayer" id="multiplayerBtn" type="button" title="Multiplayer" aria-label="Multiplayer" data-mobile-label="Social"><span class="btnIcon">👥</span><span class="btnText">Multiplayer</span></button>
-<div class="floatItems">
-<div class="floatItem" id="fMpCreate">🆕 Create Room</div>
-<div class="floatItem" id="fMpJoin">🔑 Join Room</div>
-<div class="floatItem" id="fMpInvite">🔗 Invite Link</div>
-<div class="floatItem" id="fMpLeave">🚪 Leave Room</div>
-<div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
-<div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
-</div>
-</div>
+<div class="floatMenu" id="controlsMenu">
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open controls" aria-expanded="false" data-mobile-label="Controls"><span class="btnIcon">⚙️</span><span class="btnText">Driving Mode</span></button>
 </div>
 </div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
@@ -1491,7 +1485,7 @@ Explore the area
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
 • C - Camera view<br>
-• F - Cycle drive / walk / drone<br>
+• F - Cycle character / car / plane / drone<br>
 • M - Toggle map<br>
 • N - Next city<br>
 • B - Open / close Build with Blocks<br>
@@ -1520,26 +1514,29 @@ Explore the area
 • Shift - Run (2x speed)<br>
 • Right Click + Drag - Mouse look<br>
 • C - Camera view<br>
-• F - Cycle walk / drone / drive<br>
+• F - Cycle character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="droneControls" style="display:none">
 <b>🚁 Drone Mode:</b><br>
-• Arrow Up/Down - Fly forward / back<br>
-• Arrow Left/Right - Turn left / right<br>
-• WASD - Look around<br>
-• Mouse - Look around<br>
+• Arrow Up/Down - Fly forward / back relative to the drone<br>
+• Arrow Left/Right - Turn the drone<br>
+• WASD - Look around independently<br>
+• Mouse - Look around independently<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
-• F - Cycle drone / plane / drive / walk<br>
+• F - Cycle character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="planeControls" style="display:none">
 <b>✈️ Plane Mode:</b><br>
 • Arrow Up/Down - Nose down / pull up (inverted)<br>
 • Arrow Left/Right - Bank or ground steer<br>
-• X/Z - Increase / reduce throttle<br>
-• Space - Wheel brake on the ground<br>
+• Double-tap Arrow Left/Right - Deliberate barrel roll while airborne<br>
+• Space/Shift - Increase / reduce throttle<br>
+• Full throttle - Up to about 188 MPH<br>
+• Hold pitch for loops; ordinary left/right banks into a coordinated turn<br>
+• Ctrl - Wheel brake on the ground<br>
 • WASD - Look around<br>
 • C - Chase / cockpit / overhead camera<br>
 • P - Enter / exit plane mode<br>
@@ -1554,11 +1551,11 @@ Explore the area
 </div>
 <div id="oceanControls" style="display:none">
 <b>🌊 Submarine Mode:</b><br>
-• W/S - Forward / Reverse thrust<br>
-• A/D - Turn left / right<br>
+• Arrow Up/Down - Forward / Reverse thrust<br>
+• Arrow Left/Right - Turn left / right<br>
 • Space - Ascend<br>
 • Shift/Ctrl - Descend<br>
-• Arrow keys - Alternate steering controls<br>
+• WASD - Look around<br>
 • Explore the reef shelf and open deep ocean
 </div>
 </div></div>
@@ -1586,5 +1583,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=320"></script>
+<script type="module" src="js/bootstrap.js?v=413"></script>
 </body></html>

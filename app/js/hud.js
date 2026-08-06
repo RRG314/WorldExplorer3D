@@ -2,6 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { updateNightLighting } from "./engine/night-lighting.js?v=6";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
+import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -30,11 +31,15 @@ let chaseCameraCollisionLookZ = NaN;
 
 function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targetY, targetZ) {
   if (typeof THREE === 'undefined') return { x: targetX, y: targetY, z: targetZ, collided: false };
-  const targets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
+  const structureTargets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
     if (!mesh?.visible) return false;
     const type = String(mesh.userData?.structureVisualType || '');
     return /^(decks|girders|caps|walls|roofs|portals|tunnel_shells|elevated_road_shells)$/.test(type);
   });
+  const buildingTargets = (appCtx.buildingMeshes || []).filter((mesh) =>
+    mesh?.visible && mesh?.geometry
+  );
+  const targets = [...structureTargets, ...buildingTargets];
   if (targets.length === 0) {
     chaseCameraCollisionCacheValid = false;
     return { x: targetX, y: targetY, z: targetZ, collided: false };
@@ -134,7 +139,7 @@ function setStreetAndLocation(roadLabel, locationLabel) {
     }
   }
 
-  if (!normalizedRoad) normalizedRoad = 'Off Road';
+  if (!normalizedRoad) normalizedRoad = 'Exploring';
 
   if (streetEl) streetEl.textContent = clampText(normalizedRoad, 32);
   if (locationEl) {
@@ -266,12 +271,21 @@ function updateSkyPositions() {
   if (appCtx.sunSphere?.userData?.glow) appCtx.sunSphere.userData.glow.scale.setScalar(1);
   if (!appCtx.onMoon && appCtx.moonSphere) appCtx.moonSphere.visible = true;
 
+  // Earth celestial discs must sit behind the full terrain draw distance.
+  // Keeping them at the old 1.4 km distance made a low sun render in front of
+  // distant hills and gave it an unrealistically large angular diameter.
+  const earthCelestialDistance = 11000;
+
   // Sun - anchored to the current astronomical direction relative to the camera.
   if (appCtx.sunSphere) {
     const dirX = Number.isFinite(sunDir?.x) ? sunDir.x : 0.52;
     const dirY = Number.isFinite(sunDir?.y) ? sunDir.y : 0.82;
     const dirZ = Number.isFinite(sunDir?.z) ? sunDir.z : 0.22;
-    appCtx.sunSphere.position.set(cameraX + dirX * 1400, cameraY + dirY * 1400, cameraZ + dirZ * 1400);
+    appCtx.sunSphere.position.set(
+      cameraX + dirX * earthCelestialDistance,
+      cameraY + dirY * earthCelestialDistance,
+      cameraZ + dirZ * earthCelestialDistance
+    );
     // Keep sun glow in sync
     if (appCtx.sunSphere.userData.glow) {
       appCtx.sunSphere.userData.glow.position.copy(appCtx.sunSphere.position);
@@ -291,7 +305,11 @@ function updateSkyPositions() {
     const dirX = Number.isFinite(moonDir?.x) ? moonDir.x : -0.42;
     const dirY = Number.isFinite(moonDir?.y) ? moonDir.y : 0.78;
     const dirZ = Number.isFinite(moonDir?.z) ? moonDir.z : -0.22;
-    appCtx.moonSphere.position.set(cameraX + dirX * 1400, cameraY + dirY * 1400, cameraZ + dirZ * 1400);
+    appCtx.moonSphere.position.set(
+      cameraX + dirX * earthCelestialDistance,
+      cameraY + dirY * earthCelestialDistance,
+      cameraZ + dirZ * earthCelestialDistance
+    );
     appCtx.moonSphere.lookAt(cameraX, cameraY, cameraZ);
     appCtx.moonSphere.rotateZ(-(skyState?.moon?.parallacticAngle || 0));
     // Keep moon glow in sync
@@ -369,11 +387,12 @@ function updateCamera(dt = 1 / 60) {
   const presentationCar = appCtx.presentationPose?.car || appCtx.car;
   appCtx.camera.userData.carLook = carLook;
   const cameraLookSpeed = 1.8 * clampValue(dt, 1 / 240, 0.05);
-  const manualCameraInput = appCtx.keys.KeyW || appCtx.keys.KeyA || appCtx.keys.KeyS || appCtx.keys.KeyD;
-  if (appCtx.keys.KeyA) carLook.yaw += cameraLookSpeed;
-  if (appCtx.keys.KeyD) carLook.yaw -= cameraLookSpeed;
-  if (appCtx.keys.KeyW) carLook.pitch += cameraLookSpeed;
-  if (appCtx.keys.KeyS) carLook.pitch -= cameraLookSpeed;
+  const cameraActions = appCtx.readControlActions?.('drive') || {};
+  const lookYaw = Number(cameraActions.lookYaw) || 0;
+  const lookPitch = Number(cameraActions.lookPitch) || 0;
+  const manualCameraInput = Math.abs(lookYaw) > 0.05 || Math.abs(lookPitch) > 0.05;
+  carLook.yaw += lookYaw * cameraLookSpeed;
+  carLook.pitch += lookPitch * cameraLookSpeed;
   if (manualCameraInput) carLook.lastInputAt = performance.now();
   const cameraIdleMs = performance.now() - (Number(carLook.lastInputAt) || 0);
   if (!manualCameraInput && cameraIdleMs > 900 && appCtx.camMode === 0) {
@@ -388,7 +407,16 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const insideTunnel = appCtx.car?.road?.structureSemantics?.terrainMode === 'subgrade';
+  const activeRoadSemantics = appCtx.car?.road?.structureSemantics || null;
+  const activeStructureKind = String(
+    appCtx.car?.road?.transportStructureRef?.kind ||
+    activeRoadSemantics?.structureKind ||
+    ''
+  );
+  const insideTunnel =
+    activeRoadSemantics?.terrainMode === 'subgrade' ||
+    activeRoadSemantics?.structureKind === 'covered' ||
+    ['covered', 'indoor_covered', 'building_passage'].includes(activeStructureKind);
   const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
   const d = insideTunnel ? 6.5 : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
   const h = insideTunnel ? 2.35 : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
@@ -488,8 +516,6 @@ function updateHUD() {
     document.getElementById('indBoost').textContent = 'WAKE';
     document.getElementById('indDrift').classList.toggle('on', Math.abs(appCtx.boat.roll) > 0.06 || Math.abs(appCtx.boat.pitch) > 0.05);
     document.getElementById('indDrift').textContent = 'SEA';
-    document.getElementById('indOff').classList.remove('on', 'warn');
-    document.getElementById('offRoadWarn').classList.toggle('active', false);
     updateCoordinatesHud(appCtx.boat.x, appCtx.boat.z, appCtx.boat.angle);
     return;
   }
@@ -507,14 +533,11 @@ function updateHUD() {
     const bf = document.getElementById('boostFill');
     bf.style.width = `${Math.round(clampValue(plane.throttle, 0, 1) * 100)}%`;
     bf.classList.toggle('active', plane.throttle > 0.82);
-    document.getElementById('indBrake').classList.toggle('on', !!appCtx.keys.Space && !plane.airborne);
+    document.getElementById('indBrake').classList.toggle('on', Number(appCtx.readControlActions?.('plane')?.brake) > 0.05 && !plane.airborne);
     document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
     document.getElementById('indBoost').textContent = 'PWR';
     document.getElementById('indDrift').classList.toggle('on', plane.airborne);
     document.getElementById('indDrift').textContent = plane.airborne ? 'AIR' : 'GEAR';
-    document.getElementById('indOff').classList.remove('on', 'warn');
-    document.getElementById('indOff').textContent = `${altitude} M`;
-    document.getElementById('offRoadWarn').classList.remove('active');
     updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }
@@ -551,10 +574,6 @@ function updateHUD() {
     document.getElementById('indBoost').classList.remove('on');
     document.getElementById('indDrift').classList.remove('on');
     document.getElementById('indDrift').textContent = 'DRONE';
-    const droneOffIndicator = document.getElementById('indOff');
-    droneOffIndicator.textContent = appCtx.onMars ? '0.38g' : appCtx.onMoon ? '0.17g' : 'OFF';
-    droneOffIndicator.classList.remove('on', 'warn');
-    document.getElementById('offRoadWarn').classList.remove('active');
     updateCoordinatesHud(appCtx.drone.x, appCtx.drone.z, appCtx.drone.yaw);
 
     return;
@@ -588,7 +607,7 @@ function updateHUD() {
     const walkLabel = planetaryWalkLabel || (
       walkSurface && typeof appCtx.surfaceDisplayName === 'function'
         ? appCtx.surfaceDisplayName(walkSurface)
-        : walkSurface?.name || 'Off Road'
+        : walkSurface?.name || 'Terrain'
     );
     setStreetAndLocation(
       activeInterior ?
@@ -603,10 +622,6 @@ function updateHUD() {
     document.getElementById('indBoost').classList.remove('on');
     document.getElementById('indDrift').textContent = running ? 'RUN' : 'WALK';
     document.getElementById('indDrift').classList.toggle('on', running);
-    const walkOffIndicator = document.getElementById('indOff');
-    walkOffIndicator.textContent = appCtx.onMars ? '0.38g' : appCtx.onMoon ? '0.17g' : 'OFF';
-    walkOffIndicator.classList.remove('on', 'warn');
-    document.getElementById('offRoadWarn').classList.remove('active');
 
     // Use WALKER position for coordinates
     updateCoordinatesHud(
@@ -619,7 +634,7 @@ function updateHUD() {
   }
 
   // Normal car HUD
-  const mph = Math.abs(Math.round(appCtx.car.speed * 0.5));
+  const mph = Math.abs(Math.round(carSpeedToMph(appCtx.car.speed)));
   const limit = appCtx.onMars ? 15 : appCtx.onMoon ? 12 : appCtx.car.road?.limit || 25;
   const locName = locationName();
   setHudUnitLabels('MPH', 'LIMIT');
@@ -627,7 +642,7 @@ function updateHUD() {
   document.getElementById('speed').classList.toggle('fast', mph > limit || appCtx.car.boost);
   document.getElementById('limit').textContent = limit;
   const planetarySurfaceLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
-  setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Off Road', locName);
+  setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Exploring', locName);
   const bf = document.getElementById('boostFill');
   bf.style.width = appCtx.car.boost ? appCtx.car.boostTime / appCtx.CFG.boostDur * 100 + '%' : appCtx.car.boostReady ? '100%' : '0%';
   bf.classList.toggle('active', appCtx.car.boost);
@@ -637,11 +652,6 @@ function updateHUD() {
   document.getElementById('indDrift').classList.toggle('on', isDrifting);
   if (isDrifting) document.getElementById('indDrift').textContent = 'DRIFT ' + Math.round(Math.abs(appCtx.car.driftAngle) * 180 / Math.PI) + '°';else
   document.getElementById('indDrift').textContent = 'DRIFT';
-  const planetaryDrive = !!(appCtx.onMoon || appCtx.onMars);
-  const offIndicator = document.getElementById('indOff');
-  offIndicator.textContent = appCtx.onMars ? '0.38g' : appCtx.onMoon ? '0.17g' : String(appCtx.car.surfaceDynamics?.label || 'ROAD');
-  offIndicator.classList.remove('on', 'warn');
-  document.getElementById('offRoadWarn').classList.remove('active');
   updateCoordinatesHud(appCtx.car.x, appCtx.car.z, appCtx.car.angle);
 
 }

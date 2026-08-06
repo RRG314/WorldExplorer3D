@@ -5,16 +5,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Drive',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'ArrowUp' },
-      down: { channel: 'earth', key: 'ArrowDown' },
-      left: { channel: 'earth', key: 'ArrowLeft' },
-      right: { channel: 'earth', key: 'ArrowRight' }
-    },
-    look: {
       up: { channel: 'earth', key: 'KeyW' },
       down: { channel: 'earth', key: 'KeyS' },
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
     },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
@@ -22,16 +22,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Throttle',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'ArrowUp' },
-      down: { channel: 'earth', key: 'ArrowDown' },
-      left: { channel: 'earth', key: 'ArrowLeft' },
-      right: { channel: 'earth', key: 'ArrowRight' }
-    },
-    look: {
       up: { channel: 'earth', key: 'KeyW' },
       down: { channel: 'earth', key: 'KeyS' },
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
     },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
@@ -39,16 +39,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Move',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'ArrowUp' },
-      down: { channel: 'earth', key: 'ArrowDown' },
-      left: { channel: 'earth', key: 'ArrowLeft' },
-      right: { channel: 'earth', key: 'ArrowRight' }
-    },
-    look: {
       up: { channel: 'earth', key: 'KeyW' },
       down: { channel: 'earth', key: 'KeyS' },
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
     },
     actions: [
       { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
@@ -59,16 +59,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Move',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'ArrowUp' },
-      down: { channel: 'earth', key: 'ArrowDown' },
-      left: { channel: 'earth', key: 'ArrowLeft' },
-      right: { channel: 'earth', key: 'ArrowRight' }
-    },
-    look: {
       up: { channel: 'earth', key: 'KeyW' },
       down: { channel: 'earth', key: 'KeyS' },
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: null,
+      right: null
     },
     actions: [
       { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
@@ -91,8 +91,8 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'KeyD' }
     },
     actions: [
-      { label: 'Throttle +', binding: { channel: 'earth', key: 'KeyX' } },
-      { label: 'Throttle -', binding: { channel: 'earth', key: 'KeyZ' } }
+      { label: 'Throttle +', binding: { channel: 'earth', key: 'Space' } },
+      { label: 'Throttle -', binding: { channel: 'earth', key: 'ShiftLeft' } }
     ]
   },
   rocket: {
@@ -114,16 +114,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Sub Move',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'ArrowUp' },
-      down: { channel: 'earth', key: 'ArrowDown' },
-      left: { channel: 'earth', key: 'ArrowLeft' },
-      right: { channel: 'earth', key: 'ArrowRight' }
-    },
-    look: {
       up: { channel: 'earth', key: 'KeyW' },
       down: { channel: 'earth', key: 'KeyS' },
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
     },
     actions: [
       { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
@@ -438,6 +438,11 @@ function initMobileControls() {
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
       ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
+      const controlsBarBtn = document.getElementById('controlsBarBtn');
+      const controlsBarLabel = controlsBarBtn?.querySelector('.btnText');
+      if (controlsBarLabel) controlsBarLabel.textContent = modeLabel;
+      controlsBarBtn?.setAttribute('aria-expanded', String(!ctrlContent?.classList.contains('hidden')));
+      controlsTab?.classList.toggle('bar-open', !ctrlContent?.classList.contains('hidden'));
     }
     updateMobileTouchControls(mode);
   }

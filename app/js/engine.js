@@ -18,8 +18,8 @@ import {
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=19";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=8";
+} from "./engine/materials-runtime.js?v=20";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=11";
 
 const RENDER_QUALITY_LOW = 'low';
 const RENDER_QUALITY_MED = 'med';
@@ -103,8 +103,10 @@ function getRenderQualityLevel() {
 }
 
 const CFG = {
-  maxSpd: 120, offMax: 60, accel: 12, boostAccel: 25, brake: 150, friction: 25, offFriction: 120,
-  boostMax: 140, boostDur: 2.5,
+  // Simulation speed is 2 units per displayed MPH. Keep the road-car
+  // envelope explicit here so the HUD and geospatial movement stay truthful.
+  maxSpd: 180, accel: 80, boostAccel: 120, brake: 150, friction: 25,
+  boostMax: 240, boostDur: 2.5,
   brakeForce: 4.0,
   gripRoad: 0.96,
   gripOff: 0.70,

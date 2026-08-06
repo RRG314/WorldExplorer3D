@@ -219,6 +219,9 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
 }
 
 export async function fetchVectorTileWater(z, x, y) {
+  // A full parent tile is not a valid substitute for one missing child: it
+  // expands the mapped footprint and can publish a square of water outside the
+  // requested area. Accuracy wins over substituting coarser geometry here.
   return fetchShortbreadTile(z, x, y);
 }
 

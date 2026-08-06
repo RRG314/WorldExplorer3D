@@ -32,7 +32,11 @@ const SURFACE_CONTRACT_CONSUMERS = new Set([
   'world/spawn-surface.js'
 ]);
 
-const LEGACY_LINE_BUDGETS = Object.freeze({});
+const LEGACY_LINE_BUDGETS = Object.freeze({
+  // Phase 3 baseline: prevent further growth while the structure classifier is
+  // split along semantic/compiler boundaries in its owning phase.
+  'structure-semantics.js': 757
+});
 
 function listJavaScriptFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

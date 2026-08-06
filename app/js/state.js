@@ -155,7 +155,7 @@ let earthPosition = null; // Store Earth position before moon travel
 let policeOn = false,police = [],policeMeshes = [],policeHits = 0;
 let checkpoints = [],cpMeshes = [],cpCollected = 0;
 let destination = null,destMesh = null,trialDone = false;
-let customTrack = [],trackMesh = null,isRecording = false;
+let customTrack = [],isRecording = false;
 let lastTime = 0;
 // Drone camera variables
 let droneMode = false;
@@ -333,7 +333,6 @@ Object.assign(appCtx, {
   sun,
   sunSphere,
   timeOfDay,
-  trackMesh,
   traversalNetworks,
   travelingToMoon,
   trialDone,
@@ -464,7 +463,6 @@ export {
   sun,
   sunSphere,
   timeOfDay,
-  trackMesh,
   traversalNetworks,
   travelingToMoon,
   trialDone,

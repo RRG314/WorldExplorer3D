@@ -14,6 +14,14 @@
 - `uranus_jpl.jpg`: JPL/Caltech Uranus map. JPL documents it as a synthesized solid atmospheric color because available global detail is limited. Source: https://space.jpl.nasa.gov/tmaps/uranus.html
 - `neptune_jpl.jpg`: Don Davis/JPL-Caltech synthesized Neptune cloud map for NASA 3D resources. It is documented by NASA as fictional. Source: https://science.nasa.gov/3d-resources/neptune/
 
+## Universe Observations
+
+- `universe/sun-sdo-2025.jpg`: NASA/GSFC Solar Dynamics Observatory image of the Sun, observed September 10, 2025. Source: https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/
+- `universe/orion-nebula-nasa.jpg`: NASA/ESA Hubble Orion Treasury Project mosaic, resized to 2000 × 960 for interactive use. Source: https://science.nasa.gov/asset/hubble/orion-nebula-3/
+- `universe/carina-nebula-webb.jpg`: NASA/ESA/CSA/STScI Webb NIRCam and MIRI Cosmic Cliffs composite, resized to 2000 × 692 for interactive use. Source: https://science.nasa.gov/asset/webb/cosmic-cliffs-in-the-carina-nebula-nircam-and-miri-composite-image/
+- `universe/crab-nebula-webb.jpg`: NASA/ESA/CSA/STScI Webb NIRCam and MIRI Crab Nebula composite; image processing by Joseph DePasquale (STScI), resized to 2000 × 1741 for interactive use. Source: https://science.nasa.gov/asset/webb/crab-nebula-nircam-and-miri-image/
+- `universe/milky-way-spitzer.jpg`: NASA/JPL-Caltech/University of Wisconsin Spitzer GLIMPSE Galactic Plane panorama. Source: https://science.nasa.gov/photojournal/glimpse-the-galaxy-all-the-way-around/
+
 ## Earth Surface Materials
 
 The diffuse, OpenGL normal, and roughness maps under `earth/` are resized local copies of CC0 materials:

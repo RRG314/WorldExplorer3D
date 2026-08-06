@@ -22,7 +22,6 @@ const ENV = Object.freeze({
 
 let _activeEnv = null; // null until first switchEnv
 let _transitioning = false; // guard against re-entrant transitions
-let _envDebugEl = null; // debug HUD element
 
 // Valid transitions: which env can switch to which
 const _validTransitions = {
@@ -83,8 +82,6 @@ function switchEnv(newEnv) {
 
   _transitioning = false;
 
-  // Update debug HUD
-  _updateEnvDebug();
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }
@@ -120,23 +117,6 @@ function _syncLegacyFlags(env) {
       setEnvironmentTransitionActive(false);
       break;
   }
-}
-
-// Lightweight debug overlay (top-left, unobtrusive)
-function _updateEnvDebug() {
-  if (!_envDebugEl) {
-    _envDebugEl = document.getElementById('envDebug');
-    if (!_envDebugEl) {
-      _envDebugEl = document.createElement('div');
-      _envDebugEl.id = 'envDebug';
-      _envDebugEl.style.cssText =
-      'position:fixed;top:4px;left:4px;z-index:9999;' +
-      'font:10px monospace;color:rgba(255,255,255,0.5);' +
-      'pointer-events:none;text-shadow:0 0 2px #000';
-      document.body.appendChild(_envDebugEl);
-    }
-  }
-  _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
 }
 
 Object.defineProperty(appCtx, 'ENV', {

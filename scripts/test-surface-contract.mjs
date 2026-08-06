@@ -5,6 +5,7 @@ import {
   createSurfaceQuery,
   createSurfaceSample,
   createSurfaceTileDescriptor,
+  landusePresentationOwner,
   provenanceFor,
   surfaceComposition
 } from '../app/js/world/surface-contract.js';
@@ -20,7 +21,8 @@ import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
 import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
 import {
   buildFeatureRibbonEdges,
-  enforceAtGradeRibbonClearance,
+  roadSkirtDepth,
+  shouldRenderRoadSkirts,
   sampleFeatureSurfaceY
 } from '../app/js/structure-semantics.js';
 import { createLinearFeatureRuntime } from '../app/js/world/load-linear-runtime.js';
@@ -42,7 +44,11 @@ const GroundHeight = {
 
 const query = createSurfaceQuery(appCtx, GroundHeight);
 assert.equal(query.getSourceProfile(), SOURCE_PROFILE.LOCATION_OSM);
-assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 5000, originRebase: false });
+assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 2700, originRebase: false });
+appCtx.worldTraversalRadiusWorld = 1800;
+assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 1800, originRebase: false });
+assert.equal('clampTraversalPoint' in query, false, 'Earth traversal must not publish a hidden finite-radius clamp');
+appCtx.worldTraversalRadiusWorld = null;
 assert.equal(query.terrainAt(1, 2).kind, SURFACE_KIND.TERRAIN);
 assert.equal(query.walkAt(1, 2).kind, SURFACE_KIND.ROAD);
 assert.deepEqual(query.walkAt(1, 2).contact, { x: 1.2, y: 13, z: 2.1 });
@@ -126,6 +132,12 @@ for (let index = 1; index < surfaceOrder.length; index += 1) {
   assert.ok(surfaceOrder[index].surfaceOffset > surfaceOrder[index - 1].surfaceOffset);
 }
 assert.ok(surfaceComposition('', 'road').layer > surfaceOrder.at(-1).layer);
+assert.equal(landusePresentationOwner('grass'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('farmland'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('residential'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('parking'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('paved'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('water'), 'mapped_geometry');
 
 const projectedPointSamples = [];
 const projectedAtGradeFeature = {
@@ -165,22 +177,30 @@ const steepEdges = buildFeatureRibbonEdges(
 );
 for (const point of [...steepEdges.leftEdge, ...steepEdges.rightEdge]) {
   assert.ok(
-    point.y + 1e-5 >= steepCrossSlopeTerrain(point.x, point.z) + 0.08,
-    `at-grade road edge fell below terrain: ${JSON.stringify(point)}`
+    Number.isFinite(point.y),
+    `at-grade compiled edge unavailable: ${JSON.stringify(point)}`
   );
 }
-steepEdges.leftEdge[0].y =
-  steepCrossSlopeTerrain(steepEdges.leftEdge[0].x, steepEdges.leftEdge[0].z) - 1;
-assert.equal(
-  enforceAtGradeRibbonClearance(
-    steepAtGradeRoad,
-    steepEdges.leftEdge,
-    steepEdges.rightEdge,
-    steepCrossSlopeTerrain,
-    0.08
-  ),
-  1
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <=
+    steepAtGradeRoad.transportSurfaceModel.cutFillPolicy.maximumCutMeters + 1e-5
 );
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <= 1e-5 &&
+    steepAtGradeRoad.transportSurfaceModel.stats.maximumFill > 0,
+  'at-grade ribbon was not kept above the rendered cross-section'
+);
+assert.equal(
+  shouldRenderRoadSkirts({ structureSemantics: { terrainMode: 'at_grade' } }),
+  false,
+  'ordinary at-grade road unexpectedly gained a retaining skirt'
+);
+assert.equal(
+  shouldRenderRoadSkirts(steepAtGradeRoad),
+  false,
+  'steep ordinary road gained an artificial elevated-slab wall'
+);
+assert.equal(roadSkirtDepth(steepAtGradeRoad), 0);
 
 const hiddenPathContext = {
   linearFeatures: [],
@@ -330,7 +350,7 @@ console.log(JSON.stringify({
   surfaceLayers: surfaceOrder.map((entry) => entry.layer),
   gradeSeparatedWalkAttachment: 'vertical-and-transition-aware',
   buildingEntryAttachment: 'vertical-occupancy-aware',
-  atGradeRoadClearance: 'terrain-floor-after-crossfall-and-smoothing',
+  atGradeRoadClearance: 'rendered-cross-section-clearance-with-bounded-grade',
   mappedFootwayPresentation: 'navigation-data-only',
   worldLoadCommit: 'reconcile-before-reveal'
 }, null, 2));

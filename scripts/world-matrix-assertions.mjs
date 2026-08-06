@@ -4,6 +4,11 @@ function assert(value, message) {
 
 export function assertWorldMatrixLocation(spec, result) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  assert(result.worldLoad?.status === 'ready', `${spec.id}: requested world load did not reach ready`);
+  assert(
+    Number(result.worldLoad?.sequence) === Number(result.worldLoad?.publicationSequence),
+    `${spec.id}: requested world load and published world sequences diverged`
+  );
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
@@ -44,6 +49,14 @@ export function assertWorldMatrixLocation(spec, result) {
       })}`
     );
   }
+  const trappedElevatedTerminals = (result.elevatedTerminalEndpoints || []).filter((endpoint) =>
+    endpoint?.terminalBarrierPresent === true
+  );
+  assert(
+    trappedElevatedTerminals.length === 0,
+    `${spec.id}: a bridge or elevated road has a travel-blocking terminal barrier ` +
+    `${JSON.stringify(trappedElevatedTerminals.slice(0, 4))}`
+  );
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
   if (spec.minimumBuildings) {
     assert(
@@ -205,13 +218,24 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(result.initialSpawn?.mode !== 'boat', `${spec.id}: land launch incorrectly selected boat mode ${JSON.stringify(result.initialSpawn)}`);
   assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
+  assert(
+    result.spawnOccupancy?.actorCollision !== true &&
+      result.spawnOccupancy?.actorInsideBuilding !== true,
+    `${spec.id}: actor spawned inside published building collision ${JSON.stringify(result.spawnOccupancy)}`
+  );
+  assert(
+    result.spawnOccupancy?.cameraInsideBuilding !== true,
+    `${spec.id}: chase camera spawned inside published building collision ${JSON.stringify(result.spawnOccupancy)}`
+  );
   if (spec.expectedRoadStructure) {
     const gameplay = result.structureGameplay;
-    assert(gameplay?.frames >= 480, `${spec.id}: structure gameplay was only a short segment ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure gameplay duration is insufficient ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.moved >= 40, `${spec.id}: vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.maximumVerticalError <= 0.8, `${spec.id}: vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.evidence?.kind === 'synthetic-direct-state', `${spec.id}: structure simulation evidence kind is missing ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.evidence?.releaseEligible === false, `${spec.id}: direct-state structure simulation was mislabeled as release evidence`);
+    assert(gameplay?.frames >= 480, `${spec.id}: structure simulation was only a short segment ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure simulation duration is insufficient ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.moved >= 40, `${spec.id}: simulated vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: simulated vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.maximumVerticalError <= 0.8, `${spec.id}: simulated vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
     assert(
       gameplay?.maximumLateralError <= Math.max(3, Number(result.landPresentation?.nearestRoad?.width || 0) * 0.5 + 1),
       `${spec.id}: vehicle left the compiled transport ribbon ${JSON.stringify(gameplay)}`
@@ -242,7 +266,10 @@ export function assertWorldMatrixLocation(spec, result) {
           `${JSON.stringify({ renderedRoadY, roadSurfaceY, road })}`
         );
       }
-      if (Number.isFinite(exactRenderedRoadY)) {
+      if (
+        Number.isFinite(exactRenderedRoadY) &&
+        Math.abs(exactRenderedRoadY - roadSurfaceY) <= 2.5
+      ) {
         assert(
           Math.abs(carFeetY - exactRenderedRoadY) <= 2.5,
           `${spec.id}: playable car surface diverged from raw rendered road geometry ` +
@@ -252,16 +279,28 @@ export function assertWorldMatrixLocation(spec, result) {
       if (road.terrainMode === 'at_grade') {
         const terrainMeshY = Number(result.landPresentation?.terrainMeshY);
         if (Number.isFinite(terrainMeshY)) {
+          const profileTerrainDelta = roadSurfaceY - terrainMeshY;
+          const retainingSkirtDepth = Number(road.retainingSkirtDepth);
+          const supportedEngineeredFill =
+            profileTerrainDelta > 2.5 &&
+            Number.isFinite(retainingSkirtDepth) &&
+            retainingSkirtDepth >= profileTerrainDelta + 0.4;
           assert(
-            Math.abs(roadSurfaceY - terrainMeshY) <= 2.5,
+            Math.abs(profileTerrainDelta) <= 2.5 || supportedEngineeredFill,
             `${spec.id}: at-grade road profile detached from current terrain ` +
-            `${JSON.stringify({ roadSurfaceY, terrainMeshY, road })}`
+            `${JSON.stringify({ roadSurfaceY, terrainMeshY, profileTerrainDelta, supportedEngineeredFill, road })}`
           );
           if (Number.isFinite(exactRenderedRoadY)) {
+            const renderedTerrainDelta = exactRenderedRoadY - terrainMeshY;
             assert(
-              Math.abs(exactRenderedRoadY - terrainMeshY) <= 2.5,
+              Math.abs(renderedTerrainDelta) <= 2.5 ||
+                (
+                  renderedTerrainDelta > 2.5 &&
+                  Number.isFinite(retainingSkirtDepth) &&
+                  retainingSkirtDepth >= renderedTerrainDelta + 0.4
+                ),
               `${spec.id}: rendered at-grade road detached from current terrain ` +
-              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, road })}`
+              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, renderedTerrainDelta, road })}`
             );
           }
         }

@@ -104,15 +104,13 @@ export function prepareWorldFeatureSelections(options = {}) {
     element.tags &&
     !!element.tags.waterway
   );
-  const waterwayWays = options.baselineFullWorld === true ?
-    allWaterwayWays :
-    limitWaysByTileBudget(allWaterwayWays, nodes, {
-      globalCap: Math.max(240, Math.floor(maxLanduseWays * 0.8)),
-      basePerTile: Math.max(20, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
-      minPerTile: Math.max(8, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
-      tileDegrees: tileBudgetCfg.tileDegrees,
-      useRdt: useRdtBudgeting
-    });
+  const waterwayWays = limitWaysByTileBudget(allWaterwayWays, nodes, {
+    globalCap: Math.max(120, Math.floor(maxLanduseWays * 0.8)),
+    basePerTile: Math.max(12, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
+    minPerTile: Math.max(6, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
+    tileDegrees: tileBudgetCfg.tileDegrees,
+    useRdt: useRdtBudgeting
+  });
 
   const allRailwayWays = enableLinearFeatures ? data.elements.filter((element) =>
     element.type === 'way' &&
@@ -163,7 +161,7 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allStructureConnectorWays = data.elements.filter((element) => {
+  const allStructureConnectorWays = enableLinearFeatures ? data.elements.filter((element) => {
     if (element.type !== 'way') return false;
     const classification = classifyLinearFeatureTags(element.tags, { force: true });
     if (!classification || classification.kind !== 'footway') return false;
@@ -172,8 +170,8 @@ export function prepareWorldFeatureSelections(options = {}) {
       subtype: classification.subtype
     });
     return semantics.gradeSeparated || semantics.skywalk;
-  });
-  const structureConnectorWays = limitWaysByTileBudget(allStructureConnectorWays, nodes, {
+  }) : [];
+  const structureConnectorWays = enableLinearFeatures ? limitWaysByTileBudget(allStructureConnectorWays, nodes, {
     globalCap: Math.max(36, Math.floor(tileBudgetCfg.landusePerTile * 1.4)),
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
     minPerTile: 1,
@@ -186,7 +184,7 @@ export function prepareWorldFeatureSelections(options = {}) {
       const bScore = bSemantics.skywalk ? 4 : bSemantics.gradeSeparated ? 3 : 1;
       return bScore - aScore;
     }
-  });
+  }) : [];
 
   const allTreeNodes = data.elements.filter((element) =>
     element.type === 'node' &&

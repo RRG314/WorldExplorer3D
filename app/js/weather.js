@@ -25,6 +25,9 @@ const WEATHER_MODES = ['live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'f
 const WEATHER_FOG_COLOR = 0x9aa4b2;
 const WEATHER_CLOUD_COLOR = 0xc5cdd6;
 const WEATHER_CLEAR_COLOR = 0xf5fbff;
+const MIN_EARTH_EXPOSURE = 0.92;
+const MIN_EARTH_AMBIENT_INTENSITY = 0.32;
+const MIN_EARTH_HEMISPHERE_INTENSITY = 0.34;
 const _weatherColorA = new THREE.Color();
 const _weatherColorB = new THREE.Color();
 let _lastWeatherVisualSignature = '';
@@ -307,6 +310,7 @@ function applyWeatherPresentation() {
 
   const weatherCloudFactor = clamp01((Number(profile.cloudCover) || 0) / 100);
   const weatherFogBlend = clamp01((profile.haze - 0.9) / 1.4);
+  const fogWeatherActive = state?.category === 'fog' || appCtx.weatherMode === 'fog';
   const precipitationBoost = state?.category === 'rain' || state?.category === 'storm' || state?.category === 'snow' ? 0.12 : 0;
   const skyVisual = skyState.visual;
 
@@ -314,13 +318,19 @@ function applyWeatherPresentation() {
     appCtx.sun.intensity = skyVisual.sunIntensity * profile.sunFactor;
   }
   if (appCtx.fillLight) {
-    appCtx.fillLight.intensity = skyVisual.fillIntensity * profile.fillFactor;
+    appCtx.fillLight.intensity = Math.max(0.2, skyVisual.fillIntensity * profile.fillFactor);
   }
   if (appCtx.ambientLight) {
-    appCtx.ambientLight.intensity = skyVisual.ambientIntensity * Math.min(1.15, 0.95 + weatherFogBlend * 0.18);
+    appCtx.ambientLight.intensity = Math.max(
+      MIN_EARTH_AMBIENT_INTENSITY,
+      skyVisual.ambientIntensity * Math.min(1.15, 0.95 + weatherFogBlend * 0.18)
+    );
   }
   if (appCtx.renderer) {
-    appCtx.renderer.toneMappingExposure = skyVisual.exposure * profile.exposureFactor;
+    appCtx.renderer.toneMappingExposure = Math.max(
+      MIN_EARTH_EXPOSURE,
+      skyVisual.exposure * profile.exposureFactor
+    );
   }
   if (appCtx.sun?.color) {
     appCtx.sun.color.setHex(mixColorHex(skyVisual.sunColor || 0xfff5e1, profile.cloudColor, Math.max(weatherCloudFactor * 0.45, precipitationBoost * 1.9)));
@@ -333,13 +343,19 @@ function applyWeatherPresentation() {
   }
   if (appCtx.scene?.fog?.isFogExp2) {
     appCtx.scene.fog.color.setHex(mixColorHex(skyVisual.fogColor, WEATHER_FOG_COLOR, weatherFogBlend));
-    appCtx.scene.fog.density = skyVisual.fogDensity * Math.max(0.85, profile.haze + precipitationBoost + weatherCloudFactor * 0.08);
+    appCtx.scene.fog.density = fogWeatherActive
+      ? skyVisual.fogDensity * Math.max(0.85, profile.haze)
+      : 0;
   }
   if (appCtx.scene?.background?.isColor) {
     const skyBlend = Math.max(weatherCloudFactor * 0.56, weatherFogBlend * 0.76, precipitationBoost * 2.1);
     appCtx.scene.background.setHex(mixColorHex(skyVisual.skyColor, profile.skyTint || WEATHER_FOG_COLOR, skyBlend));
   }
   if (appCtx.hemiLight) {
+    appCtx.hemiLight.intensity = Math.max(
+      MIN_EARTH_HEMISPHERE_INTENSITY,
+      Number(skyVisual.hemiIntensity) || 0
+    );
     const upperBlend = Math.max(weatherCloudFactor * 0.38, weatherFogBlend * 0.58, precipitationBoost * 1.6);
     appCtx.hemiLight.color.setHex(mixColorHex(skyVisual.skyColor, profile.skyTint || WEATHER_FOG_COLOR, upperBlend));
     if (appCtx.hemiLight.groundColor) {

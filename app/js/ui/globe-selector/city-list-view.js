@@ -1,4 +1,4 @@
-import { cityLocationLabel } from './helpers.js?v=5';
+import { cityLocationLabel } from './helpers.js?v=6';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -67,7 +67,20 @@ export function renderLibraryCityItems(cityList, presets, saved, recent, cityMat
   cityList.innerHTML = html.join('');
 }
 
+export function renderPresetCityItems(cityList, cities, cityMatchesSelection) {
+  if (!cityList) return;
+  if (!Array.isArray(cities) || cities.length === 0) {
+    cityList.innerHTML = '<li class="globe-selector-city-empty">No featured cities are available.</li>';
+    return;
+  }
+  const html = [];
+  pushCityRows(html, cities, 'preset', cityMatchesSelection);
+  cityList.innerHTML = html.join('');
+}
+
 export function bindCityListInteractions(cityList, options = {}) {
+  let lastClickKey = '';
+  let lastClickAt = 0;
   const resolveCity = (event) => {
     const element = event.target instanceof Element ? event.target : null;
     if (element?.closest('[data-delete-saved-index]')) return null;
@@ -91,7 +104,18 @@ export function bindCityListInteractions(cityList, options = {}) {
     }
 
     const city = resolveCity(event);
-    if (city) options.onSelect?.(city);
+    if (city) {
+      const target = element?.closest('[data-city-source][data-city-index]');
+      const clickKey = target instanceof HTMLElement
+        ? `${target.dataset.citySource || ''}:${target.dataset.cityIndex || ''}`
+        : '';
+      const clickedAt = performance.now();
+      const isDoubleClick = !!clickKey && clickKey === lastClickKey && clickedAt - lastClickAt <= 450;
+      lastClickKey = clickKey;
+      lastClickAt = clickedAt;
+      options.onSelect?.(city);
+      if (isDoubleClick) options.onActivate?.(city);
+    }
   });
 
   cityList?.addEventListener('dblclick', (event) => {

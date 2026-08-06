@@ -1,13 +1,12 @@
-import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
-import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
-import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=7";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=11";
-import {
-  diagnoseDistrictGroundSource,
-  prepareSelectedLocationSource
-} from "./compiler/selected-location-source-adapter.js?v=2";
+import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=35";
+import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
+import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=13";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=20";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
+import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -94,7 +93,6 @@ export function createWorldRoadLoader(deps = {}) {
     addBuildingToSpatialIndex,
     addWaterwayRibbon,
     appCtx,
-    appendIndexedGeometry,
     applyBuildingContextSemanticsToFeature,
     batchLanduseMeshes,
     buildBuildingGeometryGuards,
@@ -160,7 +158,7 @@ export function createWorldRoadLoader(deps = {}) {
     signedPolygonAreaXZ,
     spawnOnRoad,
     updateFeatureSurfaceProfile,
-    updateWorldLod,
+    publishLocationWorld,
     vectorTileRangeForBounds,
     waterSurfaceBaseElevation,
     wayCenterLatLon,
@@ -179,6 +177,7 @@ export function createWorldRoadLoader(deps = {}) {
   const linearRuntime = createLinearFeatureRuntime({
     appCtx,
     applyBuildingContextSemanticsToFeature,
+    buildFeatureRibbonEdges,
     classifyLinearFeatureTags,
     classifyStructureSemantics,
     cloneStructureSemantics,
@@ -231,6 +230,7 @@ export function createWorldRoadLoader(deps = {}) {
       sameLocation
     });
     if (session.aborted) return;
+    appCtx.showGroundFallbackPlaceholder?.();
     const {
       endLoadPhase,
       finalizePerfLoad,
@@ -246,6 +246,11 @@ export function createWorldRoadLoader(deps = {}) {
       useRdtBudgeting,
       useSyntheticFallbackRoads
     } = session;
+    const acceptedGroundReady = await activateAcceptedGroundForWorldLoad({
+      appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
+      startLoadPhase
+    });
+    if (!acceptedGroundReady) return;
     const radii = loadProfile.radii.slice();
     const featureRadiusScale = loadProfile.featureRadiusScale;
     const poiRadiusScale = loadProfile.poiRadiusScale;
@@ -283,7 +288,7 @@ export function createWorldRoadLoader(deps = {}) {
         finalizePresentation: false,
         reason,
         spawnOnRoad,
-        updateWorldLod,
+        publishLocationWorld,
         startLoadPhase,
         endLoadPhase
       });
@@ -334,6 +339,14 @@ export function createWorldRoadLoader(deps = {}) {
     for (const radius of radii) {
       if (loaded) break;
       loadMetrics.activeRadiusDeg = radius;
+      // Keep travel actors just inside the district that is actually loaded;
+      // this does not change world loading, the visible horizon, map coverage,
+      // atmosphere, or sky; it only keeps controllers off clipped data edges.
+      const loadedRadiusWorld = radius * Number(appCtx.SCALE || 100000);
+      appCtx.worldTraversalRadiusWorld = Math.max(
+        900,
+        loadedRadiusWorld - Math.max(45, Math.min(80, loadedRadiusWorld * 0.03))
+      );
       try {
         if (performance.now() - loadStartedAt > maxTotalLoadMs) {
           console.warn('[Overpass] Max load budget reached, switching to fallback world.');
@@ -354,6 +367,8 @@ export function createWorldRoadLoader(deps = {}) {
           buildingMetadataCacheMeta,
           buildingMetadataQuery,
           buildingPublicationQuery,
+          waterStructureCacheMeta,
+          waterStructureQuery,
           featureRadius,
           loadDeadline,
           overpassCacheMeta,
@@ -364,21 +379,30 @@ export function createWorldRoadLoader(deps = {}) {
           buildFeatureGeometryGuards(buildingPublicationCacheMeta.featureRadius)
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
-        buildWaterGeometryGuards(geometryGuards);
+        const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
         startLoadPhase('fetchOverpass');
         let data;
         try {
           try {
+            // Do not hold an empty world behind the full publication timeout.
+            // Dense responses normally win quickly; after this bounded probe,
+            // the global vector source supplies deterministic sparse coverage.
+            const primaryTransportTimeoutMs = Math.min(overpassTimeoutMs, 9000);
+            data = await fetchOverpassJSON(
+              primaryQuery,
+              primaryTransportTimeoutMs,
+              loadDeadline,
+              overpassCacheMeta
+            );
+          } catch (overpassErr) {
+            recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
+            appCtx.showLoad('Loading generalized mapped data...');
             data = await fetchShortbreadWorldData({
               lat: appCtx.LOC.lat,
               lon: appCtx.LOC.lon,
               radius: Math.max(radius, featureRadius),
               includeBuildings: false
             });
-          } catch (vectorErr) {
-            recordLoadWarning('vector map data', vectorErr);
-            appCtx.showLoad('Loading alternate mapped data...');
-            data = await fetchOverpassJSON(primaryQuery, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
           }
         } finally {
           endLoadPhase('fetchOverpass');
@@ -400,9 +424,12 @@ export function createWorldRoadLoader(deps = {}) {
         const baselineFullWorld = perfModeNow === 'baseline';
         startLoadPhase('featureBudgeting');
         const normalized = prepareSelectedLocationSource({
+          allowWorldwideTerrainFallback:
+            runtimeState?.groundMode === 'worldwide-terrain-fallback',
           data,
           location: appCtx.LOC,
           nodes,
+          sampleGroundAtLatLon: appCtx.sampleAcceptedGroundAtLatLon,
           prepareSelection: prepareWorldFeatureSelections,
           selectionOptions: {
             baselineFullWorld, classifyLinearFeatureTags,
@@ -419,6 +446,10 @@ export function createWorldRoadLoader(deps = {}) {
         const selection = normalized.rawSelection;
         endLoadPhase('featureBudgeting');
         const { worldSurfaceProfile } = selection;
+        const buildingLoadPolicy = shouldLoadDetailedBuildings(data, {
+          worldSurfaceProfile
+        });
+        loadMetrics.buildings.loadPolicy = buildingLoadPolicy;
         const normalizedSelection = normalized.selection;
         appCtx._worldLoadNodes = normalizedSelection.nodes;
         if (runtimeState) {
@@ -437,15 +468,17 @@ export function createWorldRoadLoader(deps = {}) {
           await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         if (runtimeState) {
           runtimeState.transportGroundCoverageReady = transportGroundCoverageReady;
-          const centerTerrainSource = appCtx.terrainSourceSampleAtLatLon?.(
-            appCtx.LOC.lat,
-            appCtx.LOC.lon
-          ) || null;
+          const worldwideFallback =
+            runtimeState.groundMode === 'worldwide-terrain-fallback';
+          const centerTerrainSource = worldwideFallback
+            ? appCtx.terrainSourceSampleAtLatLon?.(appCtx.LOC.lat, appCtx.LOC.lon) || null
+            : appCtx.sampleAcceptedGroundAtLatLon?.(appCtx.LOC.lat, appCtx.LOC.lon) || null;
           runtimeState.districtGroundModel =
-            diagnoseDistrictGroundSource(centerTerrainSource);
+            diagnoseDistrictGroundSource(centerTerrainSource, {
+              allowWorldwideTerrainFallback: worldwideFallback
+            });
         }
-        buildRoadGeometryPass({
-          appendIndexedGeometry,
+        const roadFeatureCompilation = await buildRoadGeometryPass({
           classifyStructureSemantics,
           cloneStructureSemantics,
           decimateRoadCenterlineByDepth,
@@ -467,30 +500,22 @@ export function createWorldRoadLoader(deps = {}) {
           wayCenterLatLon,
           worldBaseTerrainY
         });
-        if (normalizedSelection.buildingWays.length > 0) {
-          buildBuildingGeometryPass({
-            buildingGeometryGuards,
-            buildingWays: normalizedSelection.buildingWays,
-            featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
-            loadMetrics,
-            lodThresholds,
-            nodes: normalizedSelection.nodes,
-            pickBuildingBaseColor,
-            rdtLoadComplexity,
-            registerBuildingCollision,
-            sanitizeWorldFootprintPoints,
-            showLoad: appCtx.showLoad,
-            signedPolygonAreaXZ,
-            startLoadPhase,
-            endLoadPhase,
-            useRdtBudgeting
-          });
+        if (roadFeatureCompilation?.meshCount !== 0 || appCtx.roadMeshes.length !== 0) {
+          throw new Error('Road feature compilation published visual meshes before final terrain authority');
         }
+        if (runtimeState) {
+          runtimeState.roadFeatureCompilation = roadFeatureCompilation;
+        }
+        // Building publication is deferred to the Phase 4 authority pass.
+        // Publishing the district-source footprints here and then appending an
+        // Overture/OSM detail pass creates two owners for the same buildings.
+        loadMetrics.buildings.deferredSourceWays = normalizedSelection.buildingWays.length;
         await landusePass.buildLanduseGeometryPass({
           classifyLanduseType,
           endLoadPhase,
           featureRadius,
           landuseGeometryGuards,
+          waterGeometryGuards,
           landuseWays: normalizedSelection.landuseWays,
           loadMetrics,
           nodes: normalizedSelection.nodes,
@@ -507,7 +532,9 @@ export function createWorldRoadLoader(deps = {}) {
           railwayWays: normalizedSelection.railwayWays,
           startLoadPhase,
           structureConnectorWays: normalizedSelection.structureConnectorWays,
-          deferStructureRefresh: false
+          // Roads, connectors, and buildings are all known only at finalization.
+          // Compiling here would publish a graph that is immediately discarded.
+          deferStructureRefresh: true
         });
         buildWorldDetailPasses({
           endLoadPhase,
@@ -531,16 +558,22 @@ export function createWorldRoadLoader(deps = {}) {
             endLoadPhase,
             fetchOverpassJSON,
             fetchPreferredMetadata: () => fetchBundledBuildingMetadata?.({ locationKey: appCtx.selLoc, lat: appCtx.LOC.lat, lon: appCtx.LOC.lon }),
-            fetchPreferredData: () => fetchGlobalBuildingData({
-                lat: appCtx.LOC.lat,
-                lon: appCtx.LOC.lon,
-                radius: buildingPublicationCacheMeta.featureRadius
-              }, (error) => recordLoadWarning('Overture building massing fallback', error)),
+            fetchPreferredData: buildingLoadPolicy.shouldLoad
+              ? () => fetchGlobalBuildingData({
+                  lat: appCtx.LOC.lat,
+                  lon: appCtx.LOC.lon,
+                  radius: buildingPublicationCacheMeta.featureRadius
+                }, (error) => recordLoadWarning('Overture building massing', error))
+              : null,
+            skipReason: buildingLoadPolicy.shouldLoad
+              ? ''
+              : 'no-settlement-evidence',
             isActiveLoadContext,
             location: { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon },
             limitWaysByTileBudget,
             loadMetrics,
             lodThresholds,
+            mappedWaterStructureData: data,
             maxBuildingWays,
             metadataCacheMeta: buildingMetadataCacheMeta,
             metadataDeadlineMs: Infinity,
@@ -550,20 +583,21 @@ export function createWorldRoadLoader(deps = {}) {
             query: buildingPublicationQuery,
             rdtLoadComplexity,
             recordLoadWarning,
-            refreshStructureAwareFeatureProfiles,
             registerBuildingCollision,
             sanitizeWorldFootprintPoints,
             signedPolygonAreaXZ,
             startLoadPhase,
             tileBudgetCfg,
             timeoutMs: overpassTimeoutMs,
-            updateWorldLod,
+            waterStructureCacheMeta,
+            waterStructureDeadlineMs: Infinity,
+            waterStructureQuery,
+            waterStructureTimeoutMs: 9000,
+            publishLocationWorld,
             useRdtBudgeting
           });
-          if (appCtx.buildingMeshes.length === 0) {
-            appCtx.showLoad('Loading buildings and preparing the world...');
-            await loadBuildingDetail();
-          }
+          appCtx.showLoad('Loading buildings and preparing the world...');
+          await loadBuildingDetail();
           await loadLandmarksForPublication({
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             geometryGuards: buildingGeometryGuards,
@@ -572,7 +606,7 @@ export function createWorldRoadLoader(deps = {}) {
             recordLoadWarning,
             registerBuildingCollision,
             sanitizeWorldFootprintPoints,
-            updateWorldLod
+            publishLocationWorld
           });
           await markLoaded('primary');
         } else {
@@ -583,6 +617,17 @@ export function createWorldRoadLoader(deps = {}) {
             );
             appCtx.showLoad('Open water detected. Finalizing water world...');
             await markLoaded('water_only_world');
+            continue;
+          }
+          if (!buildingLoadPolicy.shouldLoad) {
+            console.warn(
+              '[WorldLoad] No transport or settlement evidence found. Finalizing sparse terrain without expanding the query.'
+            );
+            await finalizeNoRoadsWorld({
+              sparseReason: 'no_settlement_sparse',
+              sparseWarning: '[WorldLoad] Sparse real-data location detected; skipping larger settlement queries.',
+              syntheticReason: 'synthetic_no_settlement'
+            });
             continue;
           }
           console.warn('No roads found in data, trying larger area...');
@@ -664,8 +709,16 @@ export function createWorldRoadLoader(deps = {}) {
       appCtx.stopBoatMode({ targetMode: 'walk' });
     }
     const signature = getWorldLoadSignature();
-    if (activeWorldLoad && activeWorldLoad.signature === signature) {
-      return activeWorldLoad.promise;
+    if (activeWorldLoad) {
+      if (activeWorldLoad.signature === signature) {
+        return activeWorldLoad.promise;
+      }
+      // A different selection must not reset or publish the world while the
+      // current selection is still loading. Wait for that load to settle, then
+      // resolve the latest global selection and either join or start its load.
+      return activeWorldLoad.promise
+        .catch(() => undefined)
+        .then(() => loadRoads(0));
     }
 
     const promise = loadRoadsInternal(0).finally(() => {

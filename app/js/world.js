@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=25";
+} from "./structure-semantics.js?v=40";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=21";
+} from "./world/spawn.js?v=28";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -34,7 +34,7 @@ import {
   initWorldOsmLoader,
   invalidateOverpassCaches,
   sameLocation
-} from "./world/osm-loader.js?v=13";
+} from "./world/osm-loader.js?v=16";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -47,11 +47,8 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=6";
-import {
-  initWorldLod,
-  updateWorldLod
-} from "./world/lod.js?v=13";
+} from "./world/budgets.js?v=10";
+import { publishLocationWorld } from "./world/publication.js?v=1";
 import {
   buildPoiGeometryPass,
   buildStreetFurniturePass,
@@ -60,15 +57,15 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=20";
+} from "./world/load-support.js?v=27";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=10";
+} from "./world/load-reset.js?v=12";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=3";
+} from "./world/load-budgeting.js?v=5";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -84,7 +81,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=20";
+} from "./world/load-geometry.js?v=22";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -102,13 +99,13 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=11";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=27";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=24";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=39";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=6";
+} from "./world/render-support.js?v=10";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -134,7 +131,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=6";
+} from "./world/vegetation.js?v=8";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -144,10 +141,10 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=19";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=22";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=11";
+} from "./world/furniture.js?v=13";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -162,28 +159,31 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=12";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=60";
+} from "./world/structure-aware.js?v=21";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=92";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=7";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=24";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=7";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=13";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
 const FEATURE_MIN_POLYGON_AREA = 8;
 const FEATURE_MIN_HOLE_AREA = 6;
-// Mapped pedestrian surfaces are terrain-draped. Rail and cycle overlays remain
-// disabled until they have dedicated intersection and rendering ownership.
+// Publish only drivable transport surfaces. Mapped pedestrian, rail, and cycle
+// data remain available from OSM for future validated systems, but they do not
+// become visible world geometry or competing traversal surfaces.
 const LINEAR_FEATURE_POLICY = Object.freeze({
-  footway: true,
+  footway: false,
   cycleway: false,
   railway: false
 });
 const ENABLE_LINEAR_FEATURES = Object.values(LINEAR_FEATURE_POLICY).some(Boolean);
+appCtx.linearFeaturePolicy = LINEAR_FEATURE_POLICY;
+appCtx.linearFeaturePolicyEnabled = ENABLE_LINEAR_FEATURES;
 const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   ENABLE_LINEAR_FEATURES,
   LINEAR_FEATURE_POLICY,
@@ -263,7 +263,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   signedPolygonAreaXZ,
   spawnOnRoad,
   updateFeatureSurfaceProfile,
-  updateWorldLod,
+  publishLocationWorld,
   vectorTileRangeForBounds,
   waterSurfaceBaseElevation,
   wayCenterLatLon,
@@ -307,11 +307,6 @@ initWorldBudgets({
   limitWaysByDistance,
   nodeDistanceSq
 });
-initWorldLod({
-  getPerfModeValue,
-  getRuntimeDynamicBudget,
-  getWorldLodThresholds
-});
 initWorldStructureAwareness({
   enableLinearFeatures: () => ENABLE_LINEAR_FEATURES,
   getNearbyBuildings,
@@ -347,6 +342,7 @@ initWorldLoadGeometry({
 });
 
 Object.assign(appCtx, {
+  areRoadsConnected,
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,
@@ -373,7 +369,7 @@ Object.assign(appCtx, {
   spawnOnRoad,
   terrainYAtWorld,
   teleportToLocation,
-  updateWorldLod,
+  publishLocationWorld,
   verifyWorldPublicationStable: () =>
     verifyWorldPublicationStable(appCtx, appCtx.worldPublication)
 });
@@ -405,4 +401,4 @@ export {
   spawnOnRoad,
   terrainYAtWorld,
   teleportToLocation,
-  updateWorldLod };
+  publishLocationWorld };

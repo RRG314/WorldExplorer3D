@@ -15,6 +15,7 @@ function getGlobeSelectorElements() {
     backBtn: document.getElementById('globeSelectorBackBtn'),
     moonBtn: document.getElementById('globeSelectorMoonBtn'),
     spaceBtn: document.getElementById('globeSelectorSpaceBtn'),
+    oceanBtn: document.getElementById('globeSelectorOceanBtn'),
     searchBtn: document.getElementById('globeLocationSearchBtn'),
     locateBtn: document.getElementById('globeSelectorLocateBtn'),
     exploreModeBtn: document.getElementById('globeSelectorExploreModeBtn'),

@@ -1,4 +1,4 @@
-import { setupEngineInputHandlers } from "./input-handlers.js?v=4";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=7";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=6";
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {
@@ -314,6 +314,23 @@ function addSkyVisuals(appCtx, gpuTier) {
   ground.position.y = -0.1;
   ground.receiveShadow = true;
   ground.userData.isGroundPlane = true;
+  ground.userData.isLoadingPlaceholder = true;
+  appCtx.groundFallbackMesh = ground;
+  appCtx.showGroundFallbackPlaceholder = () => {
+    const parent = appCtx.earthSceneRoot || appCtx.scene;
+    if (!ground.parent && parent) parent.add(ground);
+    ground.visible = true;
+    return true;
+  };
+  appCtx.retireGroundFallbackPlaceholder = () => {
+    const hasReadyTerrain = (appCtx.terrainGroup?.children || []).some((mesh) =>
+      mesh?.userData?.isTerrainMesh && mesh.userData.pendingTerrainTile === false
+    );
+    if (!hasReadyTerrain) return false;
+    ground.visible = false;
+    ground.parent?.remove?.(ground);
+    return true;
+  };
   appCtx.scene.add(ground);
 }
 

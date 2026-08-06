@@ -1,12 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
-import { getGalaxyEntryDestination, resolveUniverseAddress } from './catalog.js?v=5';
+import { getGalaxyEntryDestination, resolveUniverseAddress } from './catalog.js?v=9';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=2';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
-import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=11';
+import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=17';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
@@ -98,7 +98,7 @@ function positionRocketForFrame(entity) {
     rocket.position.copy(earthPosition).add(new THREE.Vector3(0, 180, 420));
     _forward.copy(earthPosition).sub(rocket.position).normalize();
   } else {
-    const distance = entity.objectClass === 'nebula' ? 6500
+    const distance = entity.objectClass === 'nebula' ? 4800
       : entity.objectClass === 'stellar_region' ? 1400
         : entity.objectClass === 'black_hole' ? 1900
           : entity.objectClass === 'galaxy_cluster' ? 2200 : 1100;
@@ -369,6 +369,25 @@ function getUniverseHudTarget() {
   };
 }
 
+function getUniverseGravityBodies() {
+  if (universeRuntime.current.objectClass !== 'planetary_system') return [];
+  return (universeRuntime.frameGroup?.userData?.gravityBodies || []).map((mesh) => {
+    const position = new THREE.Vector3();
+    mesh.getWorldPosition(position);
+    const planet = mesh.userData.planet;
+    return {
+      name: mesh.name,
+      position,
+      radius: planet ? Math.max(3.5, Math.min(10, Number(planet.radiusEarth || 1) * 4.5)) :
+        Math.max(18, Math.min(38, 24 + Number(universeRuntime.current.physical?.hostMassSolar || 1) * 8)),
+      massKg: mesh.userData.massKg,
+      physicalRadiusKm: mesh.userData.physicalRadiusKm,
+      mesh,
+      landable: false
+    };
+  });
+}
+
 function updateUniverseRuntime(frameSeconds = 1 / 60) {
   if (!universeRuntime.initialized || !appCtx.spaceFlight?.active) return;
   const frameScale = appCtx.spaceFlight._frameScale || 1;
@@ -430,6 +449,7 @@ function hideUniverseUI() {
 
 Object.assign(appCtx, {
   getUniverseHudTarget,
+  getUniverseGravityBodies,
   hideUniverseUI,
   initUniverseRuntime,
   returnToEarthFromUniverse,
@@ -444,6 +464,7 @@ Object.assign(appCtx, {
 
 export {
   getUniverseHudTarget,
+  getUniverseGravityBodies,
   hideUniverseUI,
   initUniverseRuntime,
   returnToEarthFromUniverse,

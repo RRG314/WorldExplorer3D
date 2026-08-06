@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGameplayPluginRegistry } from "../gameplay/plugin-registry.js?v=1";
-import { clearPolice, spawnPolice } from "./police.js?v=1";
+import { clearPolice, spawnPolice } from "./police.js?v=2";
 import { resetPaintTownMode, startPaintTownMode, updateActivePaintTownMode } from "./paint-town.js?v=1";
 
 const gameplayRegistry = createGameplayPluginRegistry({

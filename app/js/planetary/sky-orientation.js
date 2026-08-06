@@ -69,6 +69,11 @@ function clearPlanetarySky() {
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
   if (marsAtmosphere) marsAtmosphere.visible = false;
   appCtx.planetarySkyOrientation = null;
+  // Planetary modes directly restyle the shared star materials. Invalidate
+  // Earth's cached sky signature so the next forced astronomical refresh
+  // reapplies visibility and opacity even when the player returns to the same
+  // location and time-of-day bucket.
+  appCtx.invalidateSkyVisualCache?.();
 }
 
 function updatePlanetarySky() {

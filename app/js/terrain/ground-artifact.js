@@ -1,10 +1,10 @@
 import {
   GROUND_ARTIFACT_SCHEMA_VERSION,
   validateGroundArtifactManifest
-} from './ground-provider-registry.js?v=2';
+} from './ground-provider-registry.js?v=3';
 import {
   compileDistrictGroundModel
-} from '../world/compiler/district-ground-model.js?v=1';
+} from '../world/compiler/district-ground-model.js?v=2';
 
 function rejection(reason, diagnostics = {}) {
   return Object.freeze({
@@ -106,7 +106,10 @@ export function compileGroundArtifact({ manifest = {}, artifact = {} } = {}) {
       providerLabel: manifestValidation.provider.label,
       sourceKind: manifestValidation.provider.sourceKind,
       sourceClassification: manifestValidation.provider.sourceClassification,
-      runtimeDelivery: manifestValidation.provider.runtimeDelivery
+      runtimeDelivery: manifestValidation.provider.runtimeDelivery,
+      attribution: manifest.attribution
+        ? Object.freeze({ ...manifest.attribution })
+        : null
     })
   });
 }

@@ -89,6 +89,11 @@ const _moonDir = new THREE.Vector3(-0.4, 0.8, -0.2).normalize();
 const _fillDir = new THREE.Vector3(-0.3, 0.6, -0.7).normalize();
 let _lastAppliedSkySignature = "";
 let _lastStarOpacitySignature = "";
+
+export function invalidateSkyVisualCache() {
+  _lastAppliedSkySignature = "";
+  _lastStarOpacitySignature = "";
+}
 let _lastMoonPhaseSignature = "";
 
 function buildSkyCacheKey(lat, lon, timestamp) {
@@ -362,9 +367,8 @@ function applySkyVisualState(config, state) {
 
   if (appCtx.scene.fog?.isFogExp2) {
     appCtx.scene.fog.color.setHex(config.fogColor);
-    appCtx.scene.fog.density = config.fogDensity;
   } else {
-    appCtx.scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
+    appCtx.scene.fog = new THREE.FogExp2(config.fogColor, 0);
   }
 
   if (appCtx.renderer) {

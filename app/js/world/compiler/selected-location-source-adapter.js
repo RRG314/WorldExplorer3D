@@ -4,7 +4,10 @@ import {
 } from './district-source.js?v=1';
 import {
   DISTRICT_GROUND_MODEL_SCHEMA_VERSION
-} from './district-ground-model.js?v=1';
+} from './district-ground-model.js?v=2';
+import {
+  filterSelectionToAcceptedGround
+} from './accepted-ground-selection.js?v=1';
 
 function featureBudgetWarning(selection) {
   const requested = selection.requestedCounts || {};
@@ -24,7 +27,7 @@ function featureBudgetWarning(selection) {
     `pois ${selected.pois}/${requested.pois || 0}).`;
 }
 
-export function diagnoseDistrictGroundSource(sample = null) {
+export function diagnoseDistrictGroundSource(sample = null, options = {}) {
   const base = {
     schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
     status: 'blocked'
@@ -35,10 +38,46 @@ export function diagnoseDistrictGroundSource(sample = null) {
       reason: 'approved-ground-provider-adapter-required'
     });
   }
+  if (
+    sample.status === 'available' &&
+    Number.isFinite(Number(sample.groundElevationMeters)) &&
+    String(sample.artifactId || '') &&
+    String(sample.providerId || '') &&
+    String(sample.verticalDatum || '')
+  ) {
+    return Object.freeze({
+      schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
+      status: 'accepted',
+      reason: null,
+      sourceClassification: 'accepted-ground',
+      sampleStatus: 'available',
+      artifactId: String(sample.artifactId),
+      providerId: String(sample.providerId),
+      sourceRelease: String(sample.sourceRelease || ''),
+      verticalDatum: String(sample.verticalDatum)
+    });
+  }
   const sampleStatus = String(sample.status || 'failed');
   const sourceClassification = String(
     sample.provenance?.runtimeClassification || 'rejected'
   );
+  if (
+    options.allowWorldwideTerrainFallback === true &&
+    sampleStatus === 'available' &&
+    Number.isFinite(Number(sample.elevationMeters)) &&
+    sourceClassification === 'legacy-ground-fallback-only'
+  ) {
+    return Object.freeze({
+      schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
+      status: 'fallback',
+      reason: 'worldwide-terrain-fallback',
+      sourceClassification: 'worldwide-terrain-fallback',
+      sampleStatus,
+      providerId: 'mapzen-terrarium',
+      confidence: Number.isFinite(sample.confidence) ? Number(sample.confidence) : null,
+      verticalDatum: String(sample.provenance?.verticalDatum || 'mixed-source')
+    });
+  }
   if (sampleStatus !== 'available') {
     return Object.freeze({
       ...base,
@@ -145,7 +184,7 @@ export function adaptSelectedLocationSource(options = {}) {
         provider: districtSource.provider.name
       }),
       districtGroundModel:
-        diagnoseDistrictGroundSource(options.terrainSourceSample)
+        diagnoseDistrictGroundSource(options.terrainSourceSample, options)
     })
   });
 }
@@ -154,11 +193,38 @@ export function prepareSelectedLocationSource(options = {}) {
   if (typeof options.prepareSelection !== 'function') {
     throw new TypeError('prepareSelection must be a function');
   }
-  const selection = options.prepareSelection({
+  const preparedSelection = options.prepareSelection({
     ...(options.selectionOptions || {}),
     centerLat: options.location?.lat,
     data: options.data,
     nodes: options.nodes
   });
-  return adaptSelectedLocationSource({ ...options, selection });
+  const groundFiltered = options.allowWorldwideTerrainFallback === true
+    ? Object.freeze({
+        selection: preparedSelection,
+        diagnostics: Object.freeze({
+          status: 'fallback',
+          reason: 'worldwide-terrain-fallback',
+          acceptedNodeCount: 0,
+          rejectedNodeCount: 0,
+          rejectedWayCount: 0,
+          rejectedPointFeatureCount: 0
+        })
+      })
+    : filterSelectionToAcceptedGround(
+        preparedSelection,
+        options.nodes,
+        options.sampleGroundAtLatLon
+      );
+  const adapted = adaptSelectedLocationSource({
+    ...options,
+    selection: groundFiltered.selection
+  });
+  return Object.freeze({
+    ...adapted,
+    diagnostics: Object.freeze({
+      ...adapted.diagnostics,
+      acceptedGroundSelection: groundFiltered.diagnostics
+    })
+  });
 }

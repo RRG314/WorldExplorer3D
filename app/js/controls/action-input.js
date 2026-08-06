@@ -4,8 +4,16 @@ const DEAD_ZONE = 0.16;
 const inputState = {
   gamepad: null,
   previousButtons: [],
-  updatedAt: 0
+  updatedAt: 0,
+  lastPlaneTurnTapAt: { ArrowLeft: -Infinity, ArrowRight: -Infinity },
+  pendingPlaneBarrelRoll: 0
 };
+const PLANE_DOUBLE_TAP_WINDOW_MS = 340;
+const HELD_CONTROL_CODES = Object.freeze([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyX', 'KeyZ'
+]);
 
 function clamp(value, min = -1, max = 1) {
   return Math.max(min, Math.min(max, Number(value) || 0));
@@ -45,32 +53,64 @@ function buttonValue(gamepad, index) {
   return clamp(button.value ?? (button.pressed ? 1 : 0), 0, 1);
 }
 
-function keyboardActions(mode) {
-  const keys = appCtx.keys || {};
+function keyboardControlActions(keys = {}, mode = 'drive') {
+  const planeControls = mode === 'plane';
+  const droneControls = mode === 'drone';
+  // Preserve the v3.1 Earth controls: arrows move/steer and WASD looks.
+  // Plane and drone controls intentionally retain their existing mappings.
   const move = digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
   const turn = digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
   const lookYaw = digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
   const lookPitch = digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
   const ascend = pressed(keys, 'Space', 'KeyR');
   const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
+  const planeRollModifier = planeControls && pressed(keys, 'ControlLeft', 'ControlRight');
   return {
     mode,
     move,
     turn,
     steer: turn,
+    strafe: 0,
     lookYaw,
     lookPitch,
     throttle: Math.max(0, move),
     reverse: Math.max(0, -move),
-    brake: pressed(keys, 'Space') ? 1 : 0,
+    brake: pressed(keys, planeControls ? 'ControlLeft' : 'Space', planeControls ? 'ControlRight' : 'Space') ? 1 : 0,
     boost: pressed(keys, 'ControlLeft', 'ControlRight') ? 1 : 0,
     jump: pressed(keys, 'Space') ? 1 : 0,
     sprint: pressed(keys, 'ShiftLeft', 'ShiftRight') ? 1 : 0,
     vertical: digital(ascend, descend),
     pitch: mode === 'plane' ? -move : lookPitch,
     roll: turn,
-    throttleAdjust: digital(pressed(keys, 'KeyX'), pressed(keys, 'KeyZ'))
+    aerobaticRoll: planeRollModifier ? turn : 0,
+    throttleAdjust: planeControls
+      ? digital(pressed(keys, 'Space'), pressed(keys, 'ShiftLeft', 'ShiftRight'))
+      : 0
   };
+}
+
+function keyboardActions(mode) {
+  return keyboardControlActions(appCtx.keys || {}, mode);
+}
+
+function registerPlaneTurnTap(code, now = typeof performance !== 'undefined' ? performance.now() : Date.now()) {
+  if (code !== 'ArrowLeft' && code !== 'ArrowRight') return 0;
+  const timestamp = Number(now);
+  if (!Number.isFinite(timestamp)) return 0;
+  const previous = Number(inputState.lastPlaneTurnTapAt[code]);
+  inputState.lastPlaneTurnTapAt[code] = timestamp;
+  const elapsed = timestamp - previous;
+  if (!(elapsed >= 35 && elapsed <= PLANE_DOUBLE_TAP_WINDOW_MS)) return 0;
+  const direction = code === 'ArrowLeft' ? 1 : -1;
+  inputState.pendingPlaneBarrelRoll = direction;
+  inputState.lastPlaneTurnTapAt[code] = -Infinity;
+  return direction;
+}
+
+function consumePlaneBarrelRollTrigger() {
+  const direction = Number(inputState.pendingPlaneBarrelRoll) || 0;
+  inputState.pendingPlaneBarrelRoll = 0;
+  return direction;
 }
 
 function mergeGamepad(actions, gamepad) {
@@ -100,8 +140,11 @@ function mergeGamepad(actions, gamepad) {
   if (actions.mode === 'plane') {
     actions.pitch = -leftY;
     actions.roll = leftX;
+    actions.aerobaticRoll = north > 0.55 ? leftX : actions.aerobaticRoll;
     actions.throttleAdjust = clamp(actions.throttleAdjust + rightTrigger - leftTrigger);
-  } else if (actions.mode === 'drone' || actions.mode === 'ocean') {
+  } else if (actions.mode === 'drone') {
+    actions.vertical = clamp(actions.vertical + rightShoulder - leftShoulder);
+  } else if (actions.mode === 'ocean') {
     actions.vertical = clamp(actions.vertical + rightShoulder - leftShoulder);
   } else {
     actions.throttle = Math.max(actions.throttle, rightTrigger, Math.max(0, leftY));
@@ -135,6 +178,20 @@ function updateControlInput() {
   return true;
 }
 
+function clearControlInputState(reason = 'runtime') {
+  const keys = appCtx.keys || {};
+  HELD_CONTROL_CODES.forEach((code) => {
+    keys[code] = false;
+  });
+  inputState.gamepad = null;
+  inputState.previousButtons = [];
+  inputState.lastPlaneTurnTapAt.ArrowLeft = -Infinity;
+  inputState.lastPlaneTurnTapAt.ArrowRight = -Infinity;
+  inputState.pendingPlaneBarrelRoll = 0;
+  inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return String(reason || 'runtime');
+}
+
 function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'drive') {
   return {
     device: inputState.gamepad ? 'gamepad' : 'keyboard_touch',
@@ -146,8 +203,20 @@ function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'driv
 
 Object.assign(appCtx, {
   getControlInputSnapshot,
+  clearControlInputState,
+  consumePlaneBarrelRollTrigger,
   readControlActions,
+  registerPlaneTurnTap,
   updateControlInput
 });
 
-export { getControlInputSnapshot, readControlActions, updateControlInput };
+export {
+  PLANE_DOUBLE_TAP_WINDOW_MS,
+  clearControlInputState,
+  consumePlaneBarrelRollTrigger,
+  getControlInputSnapshot,
+  keyboardControlActions,
+  readControlActions,
+  registerPlaneTurnTap,
+  updateControlInput
+};

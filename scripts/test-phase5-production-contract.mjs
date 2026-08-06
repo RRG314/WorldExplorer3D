@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRenderInterpolator } from '../app/js/runtime/render-interpolation.js';
 
 const root = process.cwd();
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -79,11 +78,17 @@ assert.match(batchingSource, /material\.customProgramCacheKey = group\.material\
 const terrainProfilesSource = read('app/js/terrain/surface-profiles.js');
 assert.match(terrainProfilesSource, /LinearMipmapLinearFilter/);
 assert.match(terrainProfilesSource, /anisotropy\s*=\s*Math\.max\(1,\s*Math\.min\(8/);
-assert.match(terrainProfilesSource, /export function updateTerrainAerialDetail/);
-assert.match(terrainProfilesSource, /alreadySuppressed \? 105 : 145/);
-assert.match(terrainProfilesSource, /terrainSurfaceDetailState/);
-assert.match(terrainProfilesSource, /material\.map = state\.map \|\| null/);
-assert.match(read('app/js/world/lod.js'), /updateTerrainAerialDetail\?\.\(aerialMode, aerialAltitude\)/);
+assert.match(terrainProfilesSource, /material\.map = detailTextures\?\.map \|\| null/);
+assert.match(terrainProfilesSource, /applyWorldCoverVertexTints\(mesh, result\)/);
+assert.doesNotMatch(terrainProfilesSource, /material\.map = result\.texture/);
+assert.doesNotMatch(terrainProfilesSource, /updateTerrainAerialDetail|terrainAerialDetailSuppressed|terrainSurfaceDetailState/);
+assert.equal(
+  fs.existsSync(path.join(root, 'app/js/world/aerial-surface-context.js')),
+  false,
+  'aerial mode must not own a regional replacement ground plane'
+);
+const worldPublicationSource = read('app/js/world/publication.js');
+assert.doesNotMatch(worldPublicationSource, /aerial-surface-context|syncAerialSurfaceContext|syncAerialFog|planeMode|droneMode/);
 
 const landmarkCatalogSource = read('app/js/world/landmark-catalog.js');
 for (const landmark of [
@@ -103,8 +108,10 @@ assert.match(buildingLoadSource, /hideRadiusMeters/);
 assert.match(buildingLoadSource, /curatedLandmarkSuppressedBuildings/);
 
 const landuseSource = read('app/js/world/load-landuse-pass.js');
-assert.match(landuseSource, /renderOwner:\s*'terrain-profile'/);
-assert.match(landuseSource, /geometryRendered:\s*false/);
+assert.match(landuseSource, /buildTerrainConformingPolygonGeometry/);
+assert.match(landuseSource, /landusePresentationOwner\(landuseType\) === 'terrain_worldcover'/);
+assert.match(landuseSource, /semanticOnly:\s*true/);
+assert.doesNotMatch(landuseSource, /visibleMappedSurfaceTypes/);
 assert.match(landuseSource, /props\.kind[\s\S]*'glacier'/);
 
 const shadowSource = read('app/js/engine/shadow-policy.js');
@@ -114,93 +121,17 @@ assert.match(shadowSource, /engine\/shadow-policy/);
 assert.doesNotMatch(read('app/js/engine/scene-bootstrap.js'), /shadow\.bias|shadow\.normalBias|shadow\.camera\.(left|right|top|bottom)/);
 assert.doesNotMatch(read('app/js/engine/quality.js'), /shadow\.bias|shadow\.normalBias|shadow\.camera\.(left|right|top|bottom)/);
 
-function mesh() {
-  return {
-    position: {
-      x: 0, y: 0, z: 0,
-      set(x, y, z) { this.x = x; this.y = y; this.z = z; }
-    },
-    rotation: {
-      x: 0, y: 0, z: 0, order: 'XYZ',
-      set(x, y, z) { this.x = x; this.y = y; this.z = z; }
-    }
-  };
-}
+assert.equal(
+  fs.existsSync(path.join(root, 'app/js/runtime/render-interpolation.js')),
+  false,
+  'the pose-rewriting interpolation layer must stay deleted'
+);
+const coreFrameSource = read('app/js/runtime/core-frame-systems.js');
+assert.ok(coreFrameSource.includes('appCtx.update(frame.dt)'));
+assert.ok(!coreFrameSource.includes('fixedUpdate(frame)'));
+assert.ok(!coreFrameSource.includes('presentationPose = {'));
 
-const carMesh = mesh();
-const characterMesh = mesh();
-carMesh.position.y = 1.2;
-characterMesh.position.y = 0;
-const appCtx = {
-  car: { x: 0, y: 1.2, z: 0, angle: 0 },
-  carMesh,
-  droneMode: false,
-  drone: { x: 0, y: 45, z: 0, yaw: 0, pitch: 0, roll: 0, cameraYawOffset: 0 },
-  planeMode: { active: false, x: 0, y: 0.72, z: 0, yaw: 0, pitch: 0, roll: 0, cameraYaw: 0, cameraPitch: 0, mesh: mesh() },
-  Walk: {
-    state: {
-      mode: 'drive',
-      walker: { x: 0, y: 1.7, z: 0, angle: 0, yaw: 0, pitch: 0, lookYawOffset: 0 },
-      characterMesh
-    }
-  }
-};
-const interpolator = createRenderInterpolator(appCtx);
-interpolator.beginFixedStep();
-appCtx.car.x = 10;
-appCtx.car.y = 3.2;
-appCtx.car.z = 4;
-appCtx.car.angle = Math.PI / 2;
-carMesh.position.set(10, 3.2, 4);
-interpolator.endFixedStep();
-const halfway = interpolator.apply(0.5);
-assert.equal(halfway.car.x, 5);
-assert.equal(halfway.car.y, 2.2);
-assert.equal(halfway.car.z, 2);
-assert.ok(Math.abs(halfway.car.angle - Math.PI / 4) < 1e-9);
-assert.equal(carMesh.position.x, 5);
-
-interpolator.beginFixedStep();
-appCtx.car.x = 500;
-carMesh.position.set(500, 3.2, 4);
-interpolator.endFixedStep();
-const teleported = interpolator.apply(0.2);
-assert.equal(teleported.car.x, 500, 'teleports must not smear through the world');
-assert.equal(interpolator.snapshot().owner, 'runtime/render-interpolation');
-
-appCtx.droneMode = true;
-interpolator.reset();
-interpolator.beginFixedStep();
-appCtx.drone.x = 12;
-appCtx.drone.y = 49;
-appCtx.drone.z = -6;
-appCtx.drone.yaw = Math.PI / 2;
-interpolator.endFixedStep();
-const droneHalfway = interpolator.apply(0.5);
-assert.equal(droneHalfway.mode, 'drone');
-assert.equal(droneHalfway.drone.x, 6);
-assert.equal(droneHalfway.drone.y, 47);
-assert.equal(droneHalfway.drone.z, -3);
-assert.ok(Math.abs(droneHalfway.drone.yaw - Math.PI / 4) < 1e-9);
-
-appCtx.droneMode = false;
-appCtx.planeMode.active = true;
-interpolator.reset();
-interpolator.beginFixedStep();
-appCtx.planeMode.x = 20;
-appCtx.planeMode.y = 10.72;
-appCtx.planeMode.z = 8;
-appCtx.planeMode.yaw = -Math.PI / 2;
-interpolator.endFixedStep();
-const planeHalfway = interpolator.apply(0.5);
-assert.equal(planeHalfway.mode, 'plane');
-assert.equal(planeHalfway.plane.x, 10);
-assert.equal(planeHalfway.plane.y, 5.72);
-assert.equal(planeHalfway.plane.z, 4);
-assert.ok(Math.abs(planeHalfway.plane.yaw + Math.PI / 4) < 1e-9);
-assert.equal(appCtx.planeMode.mesh.position.x, 10);
-
-const releaseNotes = read('RELEASE_NOTES_4.1.1.md');
+const releaseNotes = read('RELEASE_NOTES_4.1.2.md');
 const knownIssues = read('KNOWN_ISSUES.md');
 assert.match(releaseNotes, /## Verification/);
 assert.match(releaseNotes, /representative locations worldwide/i);
@@ -212,10 +143,10 @@ console.log(JSON.stringify({
   facadeOwner: 'engine/building-facade-materials',
   facadeAtlases: facadeAssets.length,
   facadeAssetBytes,
-  aerialTerrainDetail: 'hysteretic-map-suppression',
+  aerialTerrainDetail: 'same-materials-as-ground',
   measuredBaltimoreLandmarks: 2,
-  naturalGroundOwner: 'terrain-profile',
+  naturalGroundOwner: 'terrain-with-conforming-osm-landcover',
   shadowOwner: 'engine/shadow-policy',
-  interpolationOwner: interpolator.snapshot().owner,
-  publicReleaseRecord: '4.1.1'
+  movementPresentation: 'v3.1-direct-frame-pose',
+  publicReleaseRecord: '4.1.2'
 }, null, 2));

@@ -2,6 +2,59 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.1.2] - 2026-08-06
+
+### Added
+
+- Integrity-checked accepted-ground artifacts for the documented worldwide
+  release scenarios, with explicit datum, provenance, coverage, uncertainty,
+  and fail-closed loading.
+- One provenance-preserving OSM transport graph and surface shared by road
+  rendering, collision, navigation, bridges, tunnels, ramps, and stacked
+  structures.
+- Building and water authority registries that retain source identity,
+  mapped/inferred status, foundation datum, navigability, and publication
+  ownership.
+- Settlement-aware building publication with dense-city coverage targets,
+  conservative real-data roof inference, and footprint-aware road exclusion.
+- Mapped WorldCover terrain semantics and reusable PBR surface materials for
+  vegetation, built-up land, bare ground, snow, and water-adjacent terrain.
+- Observation-derived space imagery, physical body metadata, and stable local
+  flight axes for consistent controls throughout space.
+
+### Changed
+
+- Reworked walk, drive, drone, plane, boat, and space transitions around one
+  location-based world while preserving valid accepted-surface pose.
+- Restored responsive vehicle acceleration and steering, reduced repeated
+  terrain/road queries, and aligned speed presentation with world scale.
+- Improved road junctions, bridge and tunnel transitions, watercraft entry,
+  aerial travel, worldwide coordinate selection, and regional building
+  coverage.
+- Made the generated hosting manifest bind the exact commit, dependency lock,
+  source-release manifests, asset manifest, content hash, Firebase environment,
+  and immutable deployment target.
+
+### Fixed
+
+- Eliminated missing-elevation-as-zero publication, duplicate road/building/
+  water ownership, proximity-only boat selection, tunnel/bridge authority
+  divergence, slow presentation-mesh queries, and leaked environment sessions.
+- Removed the post-4.1.1 square far-terrain clipmap that created false blue
+  city borders and terrain bands; water now remains owned by mapped water
+  geometry instead of elevation or rectangular fallback classification.
+- Removed disabled sidewalk publication and its unused loading/batching path,
+  along with duplicate far-terrain build work that was immediately discarded.
+- Fixed city terrain composition so mapped built-up areas surround buildings
+  without inventing additional OSM sidewalks or footpaths.
+
+### Removed
+
+- The experimental rectangular far-field terrain owner introduced after
+  4.1.1, including its diagnostics, water coloring, and runtime update hooks.
+- Superseded streaming, sidewalk batching, interpolation, and terrain-overlay
+  paths that competed with the selected-location world.
+
 ## [4.1.1] - 2026-07-28
 
 ### Added

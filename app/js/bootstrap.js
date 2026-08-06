@@ -4,7 +4,7 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=317';
+} from './modules/manifest.js?v=410';
 import { loadScriptList } from './modules/script-loader.js?v=56';
 import {
   initStartupDiagnostics,
@@ -12,6 +12,7 @@ import {
   showStartupDiagnostics,
   summarizeStartupError
 } from './startup-diagnostics.js?v=2';
+import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
 
 initStartupDiagnostics();
 recordStartupDiagnostic('bootstrap', 'bootstrap script loaded');
@@ -92,7 +93,8 @@ async function boot() {
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
     if (vendorScriptsOptional.length > 0) {
-      loadScriptList(vendorScriptsOptional, { timeoutMs: 10000, parallel: true })
+      scheduleAfterFirstPlay('optional-rendering-vendors', () =>
+        loadScriptList(vendorScriptsOptional, { timeoutMs: 10000, parallel: true })
         .then(() => {
           recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
           if (typeof appApi?.tryEnablePostProcessing === 'function') {
@@ -105,7 +107,7 @@ async function boot() {
           if (typeof appApi?.tryEnablePostProcessing === 'function') {
             appApi.tryEnablePostProcessing();
           }
-        });
+        }), { timeout: 2400 });
     }
   } catch (error) {
     recordStartupDiagnostic('bootstrap', 'fatal load error', summarizeStartupError(error));

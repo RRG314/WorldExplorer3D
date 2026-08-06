@@ -96,20 +96,20 @@ fixedKernel.runFrame(0);
 fixedKernel.runFrame(100);
 assert.deepEqual(fixedCalls, [
   'input',
-  'simulation:0.01',
+  'simulation:0',
   'input',
-  'simulation:0.01'
+  'simulation:0.1'
 ]);
 const fixedSnapshot = fixedKernel.snapshot();
-assert.equal(fixedSnapshot.phases.input[0].updates, 0);
-assert.equal(fixedSnapshot.phases.input[0].fixedUpdates, 2);
-assert.equal(fixedSnapshot.phases.simulation[0].updates, 0);
-assert.equal(fixedSnapshot.phases.simulation[0].fixedUpdates, 2);
+assert.equal(fixedSnapshot.phases.input[0].updates, 2);
+assert.equal(fixedSnapshot.phases.input[0].fixedUpdates, 0);
+assert.equal(fixedSnapshot.phases.simulation[0].updates, 2);
+assert.equal(fixedSnapshot.phases.simulation[0].fixedUpdates, 0);
 
 console.log(JSON.stringify({
   ok: true,
   phases: RUNTIME_PHASES,
   frameNumber: snapshot.frameNumber,
   systems: Object.values(snapshot.phases).flat().map((system) => system.id),
-  fixedSimulationCatchUpLimit: fixedSnapshot.phases.simulation[0].fixedUpdates
+  directFrameSimulationUpdates: fixedSnapshot.phases.simulation[0].updates
 }, null, 2));

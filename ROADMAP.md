@@ -2,6 +2,20 @@
 
 This roadmap describes the current product direction. Priorities may change as performance, data licensing, and platform requirements are evaluated.
 
+## Completed in 4.1.2
+
+- Activated integrity-checked accepted-ground artifacts with explicit datum,
+  provenance, coverage, uncertainty, and fail-closed behavior.
+- Made one compiled OSM transport graph/surface authoritative for rendering,
+  collision, navigation, bridges, tunnels, ramps, and stacked structures.
+- Added provenance-owned building and water publication with stable identity,
+  mapped/inferred fields, accepted-ground foundations, and navigable-surface
+  boat selection.
+- Made controller transitions and space/ocean renderer lifecycles
+  deterministic, measurable, and repeatable without resource-owner growth.
+- Added outcome-based production gates, real-input journeys, sustained
+  controller evidence, lifecycle stress tests, and immutable artifact hashes.
+
 ## Completed in 4.1.1
 
 - Removed Continuous World and its duplicate streaming renderers.

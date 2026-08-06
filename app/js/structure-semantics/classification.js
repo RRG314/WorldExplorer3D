@@ -80,15 +80,19 @@ function classifyStructureSemantics(tags = {}, options = {}) {
   const placement = normalizedTagValue(tags?.placement);
   const rampTag = normalizedTagValue(tags?.ramp);
   const passage = normalizedTagValue(tags?.passage || tags?.building_passage);
+  const cutting = isTruthyTag(tags?.cutting);
+  const embankment = isTruthyTag(tags?.embankment);
   const layer = parseIntegerTag(tags?.layer, 0);
   const level = parseNumericTag(tags?.level, NaN);
   const minHeight = parseNumericTag(tags?.min_height, NaN);
   const buildingMinLevel = parseNumericTag(tags?.['building:min_level'], NaN);
   const culvert = tunnelTag === 'culvert' || normalizedTagValue(tags?.culvert) === 'yes';
   const isBridge = isTruthyTag(bridgeTag) || manMade === 'bridge';
-  const isTunnel = (isTruthyTag(tunnelTag) && tunnelTag !== 'building_passage') || location === 'underground' || location === 'underwater';
-  const isCovered = isTruthyTag(coveredTag) || tunnelTag === 'building_passage' || passage === 'yes';
-  const isIndoor = !!indoorTag;
+  const buildingPassage = tunnelTag === 'building_passage' || passage === 'yes';
+  const underground = location === 'underground' || location === 'underwater';
+  const isTunnel = (isTruthyTag(tunnelTag) && !buildingPassage) || underground;
+  const isCovered = isTruthyTag(coveredTag) || buildingPassage;
+  const isIndoor = isTruthyTag(indoorTag);
   const isPedestrianConnector = /^(footway|pedestrian|path|corridor|steps)$/.test(highway) || featureCategory === 'connector';
   const rampCandidate =
     rampTag === 'yes' ||
@@ -128,6 +132,19 @@ function classifyStructureSemantics(tags = {}, options = {}) {
       location === 'roof'
     );
 
+  // `layer` describes relative ordering, not a physical deck height. Keep it
+  // available to topology, but require an explicit bridge/level/roof signal
+  // before publishing pedestrian structure geometry. This prevents incomplete
+  // OSM tagging from becoming invented skywalks worldwide.
+  const physicalStructureEvidence =
+    isBridge ||
+    isTunnel ||
+    culvert ||
+    explicitBaseOffset > 0 ||
+    location === 'roof' ||
+    underground ||
+    buildingPassage;
+
   const skywalk =
     elevatedConnectorCandidate &&
     (isBridge || isIndoor || isCovered || location === 'roof' || explicitBaseOffset > 2.5);
@@ -146,9 +163,14 @@ function classifyStructureSemantics(tags = {}, options = {}) {
   } else if (isBridge) {
     structureKind = 'bridge';
     terrainMode = 'elevated';
-  } else if (verticalOrder > 0 || explicitBaseOffset > 2.5 || location === 'roof') {
+  } else if (explicitBaseOffset > 2.5 || location === 'roof') {
     structureKind = isPedestrianConnector ? 'connector' : 'elevated';
     terrainMode = 'elevated';
+  } else if (verticalOrder > 0) {
+    // A positive layer without bridge/level/min-height evidence is only an
+    // ordering hint. Preserve that order for topology while draping the way
+    // to terrain so incomplete OSM tags cannot fabricate a floating deck.
+    structureKind = 'layer';
   } else if (isCovered || isIndoor) {
     structureKind = 'covered';
   }
@@ -158,11 +180,16 @@ function classifyStructureSemantics(tags = {}, options = {}) {
     structureKind,
     terrainMode,
     gradeSeparated: terrainMode !== 'at_grade',
+    topologySeparated: terrainMode !== 'at_grade' || layer !== 0,
     isBridge,
     isTunnel,
     culvert,
     covered: isCovered,
     indoor: isIndoor,
+    buildingPassage,
+    underground,
+    cutting,
+    embankment,
     skywalk,
     placement,
     layer,
@@ -171,6 +198,7 @@ function classifyStructureSemantics(tags = {}, options = {}) {
     deckClearance,
     cutDepth,
     explicitBaseOffset,
+    physicalStructureEvidence,
     elevatedConnectorCandidate,
     rampCandidate,
     verticalGroup: `${terrainMode}:${verticalOrder}:${structureKind}`

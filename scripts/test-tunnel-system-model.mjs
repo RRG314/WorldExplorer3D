@@ -43,6 +43,32 @@ assert.ok(tunnelModel.shellStart >= 14 && tunnelModel.shellStart <= 22);
 assert.ok(tunnelModel.shellEnd >= 78 && tunnelModel.shellEnd <= 86);
 assert.equal(tunnelModel.portalStart, tunnelModel.shellStart);
 assert.equal(tunnelModel.portalEnd, tunnelModel.shellEnd);
+assert.equal(tunnelModel.version, 6);
+assert.equal(tunnelModel.portalZones.length, 2);
+assert.ok(tunnelModel.portalZones.every((zone) => zone.transitionLength <= 11));
+assert.ok(tunnelModel.portalZones[0].approachStart > 0, 'entrance transition must be local to the cover boundary');
+assert.ok(tunnelModel.portalZones[1].approachEnd < 100, 'exit transition must be local to the cover boundary');
+
+const splitCoverTunnel = tunnelFeature(0, 120, 'Split Cover Tunnel');
+splitCoverTunnel.connectedFeatures.start.push({ feature: surfaceStart });
+splitCoverTunnel.connectedFeatures.end.push({ feature: surfaceEnd });
+const splitCoverModel = compileTunnelSystemModel(
+  splitCoverTunnel,
+  (x) => ((x >= 12 && x <= 42) || (x >= 72 && x <= 108) ? 8 : 0)
+);
+assert.equal(splitCoverModel.shellRanges.length, 2, 'separate hills must create separate tunnel shells');
+assert.equal(splitCoverModel.portalDistances.length, 4, 'every verified terrain crossing needs a portal');
+assert.ok(splitCoverModel.shellRanges[0].end < splitCoverModel.shellRanges[1].start);
+assert.equal(splitCoverModel.portalZones.length, 4);
+
+const exposedProfileTunnel = tunnelFeature(0, 100, 'Exposed Approach Tunnel');
+exposedProfileTunnel.connectedFeatures.start.push({ feature: surfaceStart });
+exposedProfileTunnel.connectedFeatures.end.push({ feature: surfaceEnd });
+compileTunnelSystemModels([exposedProfileTunnel], coveredTerrain);
+assert.ok(
+  Math.abs(exposedProfileTunnel.transportSurfaceModel.centerHeights[0] - 0.08) < 0.001,
+  'road beyond the excavated tunnel approach must return to terrain'
+);
 
 const shortUnderpass = tunnelFeature(0, 32, 'Short Underpass');
 const underpassModel = compileTunnelSystemModel(shortUnderpass, () => 0);
@@ -84,7 +110,8 @@ console.log(JSON.stringify({
   ok: true,
   portalModel: {
     start: Number(tunnelModel.shellStart.toFixed(2)),
-    end: Number(tunnelModel.shellEnd.toFixed(2))
+    end: Number(tunnelModel.shellEnd.toFixed(2)),
+    transitionZones: tunnelModel.portalZones.length
   },
   shortUnderpass: underpassModel.visualKind,
   continuousChain: true,

@@ -150,8 +150,28 @@ async function sourceFingerprint(sourceFiles, environment, config) {
   return sha256(canonicalJson(records));
 }
 
+async function sourceReleaseFingerprint(sourceFiles) {
+  const records = [];
+  for (const [relative, absolute] of sourceFiles) {
+    if (
+      relative === 'app/assets/ground/manifest-catalog.json' ||
+      /\/ground-manifest\.json$/.test(relative)
+    ) {
+      records.push([relative, await hashFile(absolute)]);
+    }
+  }
+  return {
+    sha256: sha256(canonicalJson(records)),
+    manifestCount: records.length
+  };
+}
+
 async function readPackage() {
   return JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
+}
+
+async function packageLockSha256() {
+  return hashFile(path.join(ROOT, 'package-lock.json'));
 }
 
 async function buildArtifact(environment) {
@@ -166,23 +186,35 @@ async function buildArtifact(environment) {
   const shortCommit = commit.slice(0, 12);
   const contentHash = sha256(canonicalJson(files));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
-  const dirty = git(['status', '--porcelain', '--untracked-files=no'], '').length > 0;
+  const dirty = git(['status', '--porcelain'], '').length > 0;
   const commitTime = git(['show', '-s', '--format=%cI', 'HEAD'], 'unknown');
+  const dependencyLockSha256 = await packageLockSha256();
   const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
+  const assetManifest = { schemaVersion: 1, files };
+  const assetManifestSha256 = sha256(canonicalJson(assetManifest));
+  const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
 
-  await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson({ schemaVersion: 1, files }));
+  await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson(assetManifest));
   await fs.writeFile(path.join(OUTPUT_DIR, BUILD_MANIFEST), canonicalJson({
-    schemaVersion: 1,
+    schemaVersion: 2,
     product: packageJson.name,
     version: packageJson.version,
     buildId,
+    candidateId: buildId,
     commit,
     commitTime,
+    buildTimestamp: commitTime,
     sourceDirty: dirty,
     sourceFingerprint: fingerprint,
+    sourceReleaseManifestSha256: sourceReleases.sha256,
+    sourceReleaseManifestCount: sourceReleases.manifestCount,
     contentHash,
+    assetManifestSha256,
+    dependencyLockSha256,
+    nodeVersion: process.version,
     firebaseEnvironment: environment,
     firebaseProjectId: String(config.projectId || ''),
+    deploymentTarget: `${String(config.projectId || '')}:live`,
     fileCount: Object.keys(files).length
   }));
 
@@ -232,14 +264,26 @@ async function verifyArtifact() {
   }
   const contentHash = sha256(canonicalJson(expectedFiles));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
+  const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
+  const dependencyLockSha256 = await packageLockSha256();
   const commit = git(['rev-parse', 'HEAD'], 'unknown');
   const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
+  const assetManifestSha256 = sha256(canonicalJson(assetManifest));
   if (
+    buildManifest.schemaVersion !== 2 ||
     buildManifest.buildId !== buildId ||
+    buildManifest.candidateId !== buildId ||
     buildManifest.contentHash !== contentHash ||
     buildManifest.sourceFingerprint !== fingerprint ||
+    buildManifest.sourceReleaseManifestSha256 !== sourceReleases.sha256 ||
+    buildManifest.sourceReleaseManifestCount !== sourceReleases.manifestCount ||
+    buildManifest.assetManifestSha256 !== assetManifestSha256 ||
+    buildManifest.dependencyLockSha256 !== dependencyLockSha256 ||
+    buildManifest.nodeVersion !== process.version ||
     buildManifest.commit !== commit ||
+    buildManifest.commitTime !== buildManifest.buildTimestamp ||
     buildManifest.firebaseProjectId !== String(config.projectId || '') ||
+    buildManifest.deploymentTarget !== `${String(config.projectId || '')}:live` ||
     buildManifest.fileCount !== expectedNames.length
   ) {
     throw new Error('Hosting build identity no longer matches the current source and artifact.');
@@ -251,6 +295,11 @@ async function verifyArtifact() {
     firebaseEnvironment: environment,
     firebaseProjectId: buildManifest.firebaseProjectId,
     sourceDirty: buildManifest.sourceDirty,
+    sourceReleaseManifestSha256: sourceReleases.sha256,
+    sourceReleaseManifestCount: sourceReleases.manifestCount,
+    assetManifestSha256,
+    dependencyLockSha256,
+    nodeVersion: process.version,
     fileCount: expectedNames.length
   };
   console.log(JSON.stringify(result, null, 2));

@@ -20,7 +20,7 @@ const VERTICAL_DATUM = Object.freeze({
 });
 
 const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
-  [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 5000, originRebase: false })
+  [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 2700, originRebase: false })
 });
 
 const SURFACE_COMPOSITION_LAYER = Object.freeze({
@@ -48,6 +48,13 @@ const DEVELOPED_SURFACES = new Set([
   'industrial', 'retail', 'parking', 'paved'
 ]);
 const surfaceCompositionCache = new Map();
+
+function landusePresentationOwner(kind = '') {
+  const normalizedKind = String(kind || '').toLowerCase();
+  return normalizedKind === 'water' || normalizedKind === 'parking' || normalizedKind === 'paved'
+    ? 'mapped_geometry'
+    : 'terrain_worldcover';
+}
 
 function surfaceComposition(kind = '', role = 'land-cover') {
   const normalizedKind = String(kind || '').toLowerCase();
@@ -87,8 +94,12 @@ function activeSourceProfile() {
   return SOURCE_PROFILE.LOCATION_OSM;
 }
 
-function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM) {
-  return EARTH_TRAVERSAL_BOUNDS[profile] || EARTH_TRAVERSAL_BOUNDS[SOURCE_PROFILE.LOCATION_OSM];
+function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM, appCtx = null) {
+  const configured = EARTH_TRAVERSAL_BOUNDS[profile] || EARTH_TRAVERSAL_BOUNDS[SOURCE_PROFILE.LOCATION_OSM];
+  const runtimeRadius = Number(appCtx?.worldTraversalRadiusWorld);
+  return Number.isFinite(runtimeRadius) && runtimeRadius > 0
+    ? Object.freeze({ ...configured, horizontalRadius: runtimeRadius })
+    : configured;
 }
 
 function normalizedSourceName(feature = null, fallback = '') {
@@ -232,19 +243,32 @@ function surfaceKindFromWalkInfo(info = {}) {
 }
 
 function terrainProvenance(appCtx) {
-  const hasLoadedElevation = [...(appCtx.terrainTileCache?.values?.() || [])].some((tile) => tile?.loaded && tile?.elev);
-  return hasLoadedElevation ? {
-    provider: 'Amazon Web Services Open Data',
-    dataset: 'Mapzen Terrarium elevation tiles',
-    source: 'terrarium',
-    confidence: 0.88,
+  const ground = appCtx.getAcceptedGroundRuntimeSnapshot?.() || null;
+  if (ground?.status === 'accepted') return {
+    provider: ground.providerId,
+    dataset: ground.artifactId,
+    source: 'accepted_ground_artifact',
+    sourceRelease: ground.sourceRelease,
+    verticalDatum: ground.verticalDatum,
+    confidence: 1,
     fallback: false
-  } : {
+  };
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    return {
+      provider: 'mapzen-terrarium',
+      dataset: 'Mapzen Terrain Tiles',
+      source: 'worldwide_terrain_fallback',
+      verticalDatum: 'mixed-source',
+      confidence: 0.35,
+      fallback: true
+    };
+  }
+  return {
     provider: 'World Explorer 3D',
-    dataset: 'terrain fallback',
-    source: 'terrain_fallback',
-    confidence: 0.35,
-    fallback: true
+    dataset: 'accepted ground unavailable',
+    source: 'accepted_ground_unavailable',
+    confidence: 0,
+    fallback: false
   };
 }
 
@@ -252,6 +276,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   if (!appCtx || !GroundHeight) throw new TypeError('SurfaceQuery requires app context and GroundHeight.');
   const profile = () => activeSourceProfile(appCtx);
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
+  const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
 
   function terrainAt(x, z) {
     return createSurfaceSample({
@@ -266,7 +291,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   }
 
   function walkAt(x, z, options = {}) {
-    const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY);
+    const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY, options);
     const kind = surfaceKindFromWalkInfo(info);
     return createSurfaceSample({
       x,
@@ -286,7 +311,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   function driveAt(x, z, options = {}) {
     const preferRoad = options.preferRoad !== false;
     const currentY = Number.isFinite(Number(options.currentY)) ? Number(options.currentY) : NaN;
-    const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY);
+    const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY, options);
     const road = info.source === 'road';
     return createSurfaceSample({
       x,
@@ -340,7 +365,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
     createTileDescriptor: (options = {}) => createSurfaceTileDescriptor({ ...options, profile: options.profile || profile() }),
     driveAt,
     getSourceProfile: profile,
-    getTraversalBounds: () => earthTraversalBounds(profile()),
+    getTraversalBounds: traversalBounds,
     terrainAt,
     walkAt,
     waterAt
@@ -359,6 +384,7 @@ export {
   createSurfaceSample,
   createSurfaceTileDescriptor,
   earthTraversalBounds,
+  landusePresentationOwner,
   provenanceFor,
   surfaceComposition
 };

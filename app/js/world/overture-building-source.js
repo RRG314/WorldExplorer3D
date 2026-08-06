@@ -7,6 +7,7 @@ import {
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl
 } from './overture-tile-source.js?v=1';
+import { shouldSuppressBuildingParent } from './building-provenance-model.js?v=1';
 
 const OVERTURE_BUILDING_ZOOM = 14;
 
@@ -78,7 +79,9 @@ function featureTags(layerName, properties = {}, tileIdentity = '') {
   tags._overtureFeatureId = stableId;
   tags._overtureParentBuildingId = parentId;
   tags._overtureHasParts = properties.has_parts === true || properties.has_parts === 'true' ? 'yes' : '';
-  tags._buildingMetadataSourceId = stableId || parentId || tileIdentity;
+  tags._buildingMetadataSourceId = tags._sourceFeatureId;
+  tags._buildingMetadataGeometryId = tags._sourceFeatureId;
+  tags._buildingMetadataMapping = 'same_source_feature';
   return tags;
 }
 
@@ -115,7 +118,7 @@ function geometrySignature(layerName, stableId, coords) {
   ].join(':');
 }
 
-function convertTilesToElements(tiles, bounds) {
+function convertTilesToElements(tiles, bounds, options = {}) {
   const elements = [];
   const nodesByCoordinate = new Map();
   const signatures = new Set();
@@ -172,8 +175,12 @@ function convertTilesToElements(tiles, bounds) {
     const hasParts = candidate.properties.has_parts === true || candidate.properties.has_parts === 'true';
     if (
       candidate.layerName === 'building' &&
-      hasParts &&
-      parentIdsWithParts.has(candidate.stableId)
+      shouldSuppressBuildingParent({
+        coverageComplete: options.coverageComplete === true,
+        hasParts,
+        stableId: candidate.stableId,
+        parentIdsWithParts
+      })
     ) {
       suppressedParents += 1;
       continue;
@@ -181,15 +188,17 @@ function convertTilesToElements(tiles, bounds) {
     const nodeIds = candidate.coords.map(nodeIdFor).filter(Number.isFinite);
     if (nodeIds.length < 4) continue;
     if (nodeIds[0] !== nodeIds[nodeIds.length - 1]) nodeIds.push(nodeIds[0]);
+    const tags = featureTags(
+      candidate.layerName,
+      candidate.properties,
+      candidate.tileIdentity
+    );
+    tags._geometryCoverageComplete = options.coverageComplete === true ? 'yes' : 'no';
     elements.push({
       type: 'way',
       id: nextWayId--,
       nodes: nodeIds,
-      tags: featureTags(
-        candidate.layerName,
-        candidate.properties,
-        candidate.tileIdentity
-      )
+      tags
     });
   }
 
@@ -273,7 +282,8 @@ export async function fetchOvertureBuildingData(options = {}) {
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Overture building coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  const converted = convertTilesToElements(tiles, bounds);
+  const coverageComplete = tiles.length === coordinates.length;
+  const converted = convertTilesToElements(tiles, bounds, { coverageComplete });
   const ways = converted.elements.filter((element) => element.type === 'way');
   const parts = ways.filter((way) => way.tags?.['building:part']);
   const mappedHeights = ways.filter((way) => way.tags?.height || way.tags?.['building:levels']);
@@ -289,6 +299,7 @@ export async function fetchOvertureBuildingData(options = {}) {
       attempts,
       loadedTiles: tiles.length,
       requestedTiles: coordinates.length,
+      coverageComplete,
       radiusDegrees: radius,
       approximateRadiusMeters: Math.round(radius * 111320),
       buildingsAndParts: ways.length,
@@ -303,6 +314,9 @@ export async function fetchOvertureBuildingData(options = {}) {
 
 export async function fetchGlobalBuildingData(options = {}, onFallback = null) {
   try {
+    // A partial archive response still contains authoritative footprints.
+    // Discarding every fulfilled tile because one neighboring tile failed
+    // turned dense locations into the much sparser fallback dataset.
     return await fetchOvertureBuildingData(options);
   } catch (error) {
     if (typeof onFallback === 'function') onFallback(error);

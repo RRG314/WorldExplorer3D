@@ -293,11 +293,33 @@ export function parseReverseAddress(payload = {}) {
   const display =
     parts.join(", ") ||
     String(payload?.display_name || "").split(",").slice(0, 4).map((v) => String(v || "").trim()).filter(Boolean).join(", ");
+  const waterText = [
+    payload?.category,
+    payload?.type,
+    payload?.addresstype,
+    payload?.name,
+    payload?.display_name,
+    addr.ocean,
+    addr.sea,
+    addr.water,
+    addr.bay,
+    addr.strait,
+    addr.lake,
+    addr.reservoir,
+    addr.river,
+    addr.canal
+  ].filter(Boolean).join(' ');
+  const waterKind = /\b(lake|reservoir|pond|loch)\b/i.test(waterText) ? 'lake' :
+    /\b(harbour|harbor|marina|port)\b/i.test(waterText) ? 'harbor' :
+    /\b(river|canal|channel)\b/i.test(waterText) ? 'channel' :
+    /\b(bay|gulf|strait|sound|lagoon|estuary|coast)\b/i.test(waterText) ? 'coastal' :
+    /\b(ocean|sea|open water|water)\b/i.test(waterText) ? 'open_ocean' : null;
 
   return {
     display,
     queryLabel: city || county || region || country || "",
-    details: { city, county, region, country }
+    details: { city, county, region, country, waterKind },
+    waterKind
   };
 }
 
@@ -310,6 +332,52 @@ async function fetchJsonWithTimeout(url, timeoutMs = 6000) {
     return await response.json();
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchGebcoElevationMeters(lat, lon, timeoutMs = 6500) {
+  const halfSpan = 0.01;
+  const params = new URLSearchParams({
+    SERVICE: 'WMS',
+    VERSION: '1.1.1',
+    REQUEST: 'GetFeatureInfo',
+    LAYERS: 'GEBCO_LATEST_2',
+    QUERY_LAYERS: 'GEBCO_LATEST_2',
+    STYLES: '',
+    SRS: 'EPSG:4326',
+    BBOX: `${lon - halfSpan},${lat - halfSpan},${lon + halfSpan},${lat + halfSpan}`,
+    WIDTH: '64',
+    HEIGHT: '64',
+    FORMAT: 'image/png',
+    INFO_FORMAT: 'text/plain',
+    X: '32',
+    Y: '32'
+  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`https://wms.gebco.net/mapserv?${params.toString()}`, {
+      cache: 'force-cache',
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`GEBCO WMS HTTP ${response.status}`);
+    const payload = await response.text();
+    const match = payload.match(/value_list\s*=\s*'(-?\d+(?:\.\d+)?)/i);
+    const elevation = match ? Number(match[1]) : NaN;
+    return Number.isFinite(elevation) ? elevation : null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function resolveCoordinateWaterKind(lat, lon, reversePayload = null) {
+  const parsedKind = parseReverseAddress(reversePayload || {}).waterKind;
+  if (parsedKind) return parsedKind;
+  try {
+    const elevation = await fetchGebcoElevationMeters(lat, lon);
+    return Number.isFinite(elevation) && elevation <= -5 ? 'open_ocean' : null;
+  } catch {
+    return null;
   }
 }
 

@@ -88,6 +88,7 @@ def download(url: str, destination: Path) -> None:
 
 
 def prepare_grids(grid_directory: Path) -> dict:
+    grid_directory = grid_directory.resolve()
     grid_directory.mkdir(parents=True, exist_ok=True)
     geoid_path = grid_directory / GEOID18["filename"]
     if not geoid_path.exists():
@@ -179,12 +180,14 @@ def validate_attestations(request: dict, attestations: dict) -> dict[str, dict]:
         raster_id = require_text(record.get("rasterId"), "attestation rasterId")
         if raster_id in by_id:
             raise ValueError(f"duplicate raster attestation: {raster_id}")
-        if record.get("sourceHorizontalFrame") != "NAD83_2011":
-            raise ValueError(f"raster {raster_id} is not proven NAD83_2011")
+        source_horizontal_frame = record.get("sourceHorizontalFrame")
+        if source_horizontal_frame not in {"NAD83", "NAD83_2011"}:
+            raise ValueError(f"raster {raster_id} is not proven NAD83")
         if record.get("sourceVerticalDatum") != "NAVD88":
             raise ValueError(f"raster {raster_id} is not proven NAVD88")
-        if record.get("sourceGeoidModel") != "GEOID18":
-            raise ValueError(f"raster {raster_id} is not proven GEOID18")
+        source_geoid_model = record.get("sourceGeoidModel")
+        if source_geoid_model not in {"GEOID18", "unspecified"}:
+            raise ValueError(f"raster {raster_id} has an unsupported source geoid")
         metadata_hash = require_text(
             record.get("metadataSha256"), f"raster {raster_id} metadata SHA-256"
         )
@@ -198,6 +201,33 @@ def validate_attestations(request: dict, attestations: dict) -> dict[str, dict]:
         accuracy = float(record.get("verticalAccuracyRmseMeters", math.nan))
         if not math.isfinite(accuracy) or accuracy <= 0 or accuracy > 1:
             raise ValueError(f"raster {raster_id} vertical accuracy is invalid")
+        sampling_uncertainty = float(record.get("samplingUncertaintyMeters", 0))
+        if (
+            not math.isfinite(sampling_uncertainty)
+            or sampling_uncertainty < 0
+            or sampling_uncertainty > 0.75
+        ):
+            raise ValueError(
+                f"raster {raster_id} sampling uncertainty is invalid"
+            )
+        reference_frame_uncertainty = float(
+            record.get("referenceFrameUncertaintyMeters", 0)
+        )
+        if (
+            not math.isfinite(reference_frame_uncertainty)
+            or reference_frame_uncertainty < 0
+            or reference_frame_uncertainty > 0.5
+        ):
+            raise ValueError(
+                f"raster {raster_id} reference-frame uncertainty is invalid"
+            )
+        if (
+            (source_horizontal_frame != "NAD83_2011" or source_geoid_model != "GEOID18")
+            and reference_frame_uncertainty <= 0
+        ):
+            raise ValueError(
+                f"raster {raster_id} requires reference-frame uncertainty"
+            )
         by_id[raster_id] = record
     return by_id
 
@@ -306,10 +336,18 @@ def operation_pipeline(geoid_path: Path, egm_path: Path) -> str:
     )
 
 
-def uncertainty_95_meters(source_accuracy_rmse_meters: float) -> float:
+def uncertainty_95_meters(
+    source_accuracy_rmse_meters: float,
+    sampling_uncertainty_meters: float = 0,
+    reference_frame_uncertainty_meters: float = 0,
+) -> float:
     source_sigma = source_accuracy_rmse_meters
     sigma = math.hypot(source_sigma, *NOAA_COMPONENT_STANDARD_UNCERTAINTY_METERS)
-    return sigma * 1.96
+    return math.hypot(
+        sigma * 1.96,
+        sampling_uncertainty_meters,
+        reference_frame_uncertainty_meters,
+    )
 
 
 def dataset_sha256() -> str:
@@ -323,6 +361,7 @@ def normalize(
     grid_directory: Path,
     output_path: Path,
 ) -> dict:
+    grid_directory = grid_directory.resolve()
     request = read_json(request_path)
     attestation_document = read_json(attestation_path)
     attestations = validate_attestations(request, attestation_document)
@@ -352,7 +391,9 @@ def normalize(
         if not all(math.isfinite(value) for value in values):
             raise ValueError(f"normalization failed for {sample['key']}")
         uncertainty = uncertainty_95_meters(
-            float(attestations[raster_id]["verticalAccuracyRmseMeters"])
+            float(attestations[raster_id]["verticalAccuracyRmseMeters"]),
+            float(attestations[raster_id].get("samplingUncertaintyMeters", 0)),
+            float(attestations[raster_id].get("referenceFrameUncertaintyMeters", 0)),
         )
         outputs.append(
             {

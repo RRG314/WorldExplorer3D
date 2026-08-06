@@ -2,11 +2,14 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   assignFeatureConnections,
   assignStructureStackRanks,
+  areRoadsConnected,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=25";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=2";
+} from "../structure-semantics.js?v=40";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=7";
+import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
+import { refreshStructureColliders } from "./structure-colliders.js?v=3";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -37,7 +40,10 @@ function worldRenderedTerrainY(x, z) {
 
 function structureAwareLinearFeatures() {
   if (!Array.isArray(appCtx.linearFeatures)) return [];
-  return appCtx.linearFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+  return appCtx.linearFeatures.filter((feature) =>
+    feature?.structureSemantics?.gradeSeparated ||
+    feature?.structureSemantics?.structureKind === 'covered'
+  );
 }
 
 function featureBuildingContainmentStats(feature) {
@@ -171,16 +177,62 @@ export function refreshStructureAwareFeatureProfiles() {
   }
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
-  assignFeatureConnections(transportFeatures);
-  assignStructureStackRanks(structureFeatures, worldBaseTerrainY);
+  appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
+  appCtx.transportStructureModel = compileTransportStructureModel(transportFeatures, {
+    transportGraphId: appCtx.transportNetworkModel.id
+  });
+  if (appCtx.transportSurfacePublication?.authority === 'compiled_transport_surface') {
+    appCtx.transportSurfacePublication = Object.freeze({
+      ...appCtx.transportSurfacePublication,
+      transportGraphId: appCtx.transportNetworkModel.id,
+      roadCount: roadFeatures.length
+    });
+  }
+  assignStructureStackRanks(structureFeatures, worldBaseTerrainY, { areRoadsConnected });
 
   for (let i = 0; i < structureFeatures.length; i++) {
     const feature = structureFeatures[i];
     if (!feature?.structureSemantics?.gradeSeparated) continue;
     feature.structureStations = buildFeatureStations(feature, {
-      features: structureFeatures,
-      waterAreas: appCtx.waterAreas
+      features: transportFeatures,
+      waterAreas: appCtx.waterAreas,
+      sampleTerrainY: worldBaseTerrainY
     });
+  }
+
+  // Connection anchors must read surfaces compiled from the current graph and
+  // stack ranks. Reusing the pre-refresh models makes a merge target sample a
+  // stale deck height and leaves visible steps or open-air ramp ends.
+  for (let i = 0; i < transportFeatures.length; i++) {
+    const feature = transportFeatures[i];
+    if (!feature) continue;
+    feature.structureTransitionAnchors = [];
+    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
+      ? worldRenderedTerrainY
+      : worldBaseTerrainY;
+    updateFeatureSurfaceProfile(feature, sampleTerrainY, {
+      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+    });
+  }
+
+  // Resolve crossing clearances once against the first compiled world-space
+  // surfaces. Nominal layer offsets alone are insufficient when two ramps
+  // have different endpoint-ground chords on sloped terrain.
+  for (let refinement = 0; refinement < 3; refinement += 1) {
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      feature.structureStations = buildFeatureStations(feature, {
+        features: transportFeatures,
+        waterAreas: appCtx.waterAreas,
+        sampleTerrainY: worldBaseTerrainY
+      });
+    }
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+        surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+      });
+    }
   }
 
   for (let i = 0; i < transportFeatures.length; i++) {
@@ -196,21 +248,22 @@ export function refreshStructureAwareFeatureProfiles() {
   for (let i = 0; i < transportFeatures.length; i++) {
     const feature = transportFeatures[i];
     if (!feature) continue;
-    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade' ?
-      worldRenderedTerrainY :
-      worldBaseTerrainY;
+    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
+      ? worldRenderedTerrainY
+      : worldBaseTerrainY;
     updateFeatureSurfaceProfile(feature, sampleTerrainY, {
       surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
     });
   }
 
   compileTunnelSystemModels(transportFeatures, worldBaseTerrainY);
+  refreshStructureColliders(appCtx, transportFeatures);
   appCtx.refreshBridgeGuardrails?.(roadFeatures);
 
-  // Terrain remains the terrain roof above a tunnel. Portal placement and the
-  // tunnel interior come from the compiled tunnel model; lowering an entire
-  // corridor creates an open trench and exposes box geometry above ground.
+  // Terrain remains the roof above tunnels. Road and tunnel renderers must not
+  // mutate the shared ground surface.
   appCtx.structureTerrainCuts = [];
+  appCtx.structureTerrainCutIndex = null;
 }
 
 export function syncLinearFeatureOverlayVisibility() {

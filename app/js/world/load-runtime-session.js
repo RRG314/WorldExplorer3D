@@ -1,3 +1,9 @@
+import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
+import {
+  markFirstPlayReady,
+  scheduleAfterFirstPlay
+} from '../runtime/workload-policy.js?v=1';
+
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
     appCtx,
@@ -43,6 +49,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
     phases: {}
   };
+  const traceWorldLoad = typeof globalThis.location?.search === 'string' &&
+    new URLSearchParams(globalThis.location.search).get('worldLoadTrace') === '1';
+  const traceLoadPhase = (event, name, details = {}) => {
+    if (!traceWorldLoad) return;
+    console.warn(`[WorldLoadTrace] ${event} ${name}`, JSON.stringify(details));
+  };
 
   appCtx._lastBuildingBatchStats = null;
   appCtx._lastLanduseBatchStats = null;
@@ -65,6 +77,10 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const startLoadPhase = (name) => {
     if (!name) return;
     phaseStartedAt[name] = performance.now();
+    traceLoadPhase('start', name, {
+      roads: Number(appCtx.roads?.length || 0),
+      roadMeshes: Number(appCtx.roadMeshes?.length || 0)
+    });
     if (runtimeState) {
       runtimeState.activePhases = Object.keys(phaseStartedAt);
       runtimeState.updatedAt = performance.now();
@@ -76,6 +92,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     if (!Number.isFinite(startedAt)) return;
     const dt = performance.now() - startedAt;
     phaseTotals[name] = (phaseTotals[name] || 0) + dt;
+    traceLoadPhase('end', name, { durationMs: Math.round(dt) });
     delete phaseStartedAt[name];
     if (runtimeState) {
       runtimeState.activePhases = Object.keys(phaseStartedAt);
@@ -92,6 +109,11 @@ export function createWorldLoadRuntimeSession(options = {}) {
   });
   appCtx.initialEarthWorldReady = false;
   appCtx.worldDetailState = {};
+  appCtx.buildingProvenanceRecords = [];
+  appCtx.buildingProvenanceFeatureIds = new Set();
+  appCtx.buildingProvenanceModel = null;
+  appCtx.waterSurfaceRegistry = null;
+  appCtx.waterSurfaceRegistrySnapshot = null;
 
   if (!locationSelection) {
     appCtx.showLoad('Choose a valid location');
@@ -103,6 +125,11 @@ export function createWorldLoadRuntimeSession(options = {}) {
   if (locationSelection.key === 'custom') {
     appCtx.setCustomLocation?.(locationSelection, { syncInputs: false });
   }
+  appCtx.setTravelMode?.('walk', {
+    source: 'location_load',
+    force: true,
+    emitTutorial: false
+  });
 
   const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
@@ -138,9 +165,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
   }
 
   if (appCtx.terrainEnabled && !appCtx.onMoon) {
-    if (typeof appCtx.resetTerrainStreamingState === 'function') appCtx.resetTerrainStreamingState();
+    if (typeof appCtx.resetLocationTerrainPublication === 'function') appCtx.resetLocationTerrainPublication();
     if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
-    if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(0, 0);
   }
 
   appCtx.rdtSeed = appCtx.hashGeoToInt(
@@ -292,8 +318,14 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     loadMetrics.phases = Object.fromEntries(
       Object.entries(phaseTotals).map(([name, ms]) => [name, Math.round(ms)])
     );
+    if (runtimeState) runtimeState.phaseTotals = { ...loadMetrics.phases };
   }
   loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
+  appCtx.buildingProvenanceModel = createBuildingProvenanceSnapshot(
+    appCtx.buildingProvenanceRecords || []
+  );
+  appCtx.waterSurfaceRegistrySnapshot =
+    appCtx.waterSurfaceRegistry?.snapshot?.() || null;
   appCtx.reconcileActorsAfterSurfaceRebuild?.();
   const publication = Object.freeze({
     sequence: Number(runtimeState?.sequence || appCtx._worldLoadSequence || 0),
@@ -307,6 +339,15 @@ export function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.worldPublication = publication;
   appCtx.worldLoading = false;
   appCtx.hideLoad?.();
+  scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
+    appCtx.refreshAstronomicalSky?.(true);
+    return appCtx.refreshLiveWeather?.(true);
+  }, { timeout: 1200 });
+  markFirstPlayReady({
+    environment: 'earth',
+    loadDurationMs: Math.round(performance.now() - Number(runtimeState?.startedAt || performance.now())),
+    publicationSequence: publication.sequence
+  });
   if (runtimeState) {
     runtimeState.status = loaded ? 'ready' : 'failed';
     runtimeState.updatedAt = performance.now();

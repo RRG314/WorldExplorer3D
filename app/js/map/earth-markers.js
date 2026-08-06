@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getMapReferencePosition } from "./tiles.js?v=2";
+import { getMapReferencePosition } from "./tiles.js?v=3";
 
 function drawEarthMarkerLayers(ctx, w, h, isLarge, view) {
   const { worldToScreen, latLonToScreen, mx, my } = view;
@@ -344,7 +344,7 @@ function drawNavigation(ctx, isLarge, worldToScreen) {
 }
 
 function drawCustomTrack(ctx, isLarge, worldToScreen) {
-  if (appCtx.mapLayers.customTrack && appCtx.customTrack.length >= 2) {
+  if (isLarge && appCtx.mapLayers.customTrack && appCtx.customTrack.length >= 2) {
     ctx.strokeStyle = appCtx.isRecording ? "#f64" : "#fa0";
     ctx.lineWidth = isLarge ? 5 : 3;
     ctx.beginPath();

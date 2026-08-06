@@ -766,30 +766,6 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
 #proAccessStatus{min-height:16px;font-size:11px;color:#93c5fd}
 .pro-access-panel[hidden]{display:none!important}
 
-.floatBtn.multiplayer{
-  width:46px;
-  height:46px;
-  min-width:46px;
-  padding:0;
-  border-radius:50%;
-  background:linear-gradient(135deg,#16a34a,#15803d);
-  color:#ffffff;
-  box-shadow:0 10px 24px rgba(22,163,74,0.34);
-  font-size:20px;
-}
-#multiplayerMenu{
-  position:fixed;
-  left:252px;
-  bottom:78px;
-  z-index:104;
-}
-#multiplayerBtn .btnText{display:none}
-#multiplayerBtn .btnIcon{display:block;font-size:20px;line-height:1}
-#multiplayerMenu.open .floatItems{
-  left:145px;
-  right:auto;
-  bottom:182px;
-}
 .floatItem.disabled{opacity:0.45;pointer-events:none}
 
 .mp-card{background:#f8fafc;border:2px solid #dbe5f5;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}

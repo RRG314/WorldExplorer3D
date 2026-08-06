@@ -117,6 +117,20 @@ function quantizedColor(baseColor, fallback) {
   return new THREE.Color().setHSL(hue, saturation, lightness);
 }
 
+function deterministicFacadeTone(color, buildingSeed = 0) {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  const seed = (Number(buildingSeed) || 0) >>> 0;
+  const tone = (seed >>> 3) & 3;
+  const lightnessOffsets = [-0.065, -0.02, 0.025, 0.065];
+  const hueOffsets = [-0.012, 0.008, -0.004, 0.016];
+  return new THREE.Color().setHSL(
+    (hsl.h + hueOffsets[tone] + 1) % 1,
+    Math.max(0, Math.min(0.62, hsl.s + (tone === 1 ? 0.035 : tone === 2 ? -0.025 : 0))),
+    Math.max(0.22, Math.min(0.72, hsl.l + lightnessOffsets[tone]))
+  );
+}
+
 function materialPoolKey(family, color, lodTier, variant) {
   return `${lodTier === 'mid' ? 'mid' : 'near'}:${family}:v${variant}:${color.getHexString()}`;
 }
@@ -307,7 +321,8 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
   const family = mappedFamily || 'neutral';
   const profile = mappedFamily ? MATERIAL_PROFILES[family] : neutralProfileForType(buildingType);
   const mappedColor = options.facadeColorMapped === true;
-  const color = quantizedColor(mappedColor ? baseColorHex : null, profile.color);
+  const baseColor = quantizedColor(mappedColor ? baseColorHex : null, profile.color);
+  const color = mappedColor ? baseColor : deterministicFacadeTone(baseColor, buildingSeed);
   const lodTier = options.lodTier === 'mid' ? 'mid' : 'near';
   const presentation = facadePresentation(family, buildingType, options, buildingSeed);
   const roof = roofPresentation(options.roofMaterial, options.roofColor, buildingType, buildingSeed);
@@ -320,7 +335,7 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
   );
   const key = materialPoolKey(
     `${family}:${facadeAtlasStyle}:${facadeStyle}:roof-${roof.key}`,
-    mappedColor ? tint : new THREE.Color(0xffffff),
+    tint,
     lodTier,
     facadeVariant
   );

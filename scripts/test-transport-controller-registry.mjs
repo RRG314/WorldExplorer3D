@@ -39,5 +39,6 @@ const snapshot = registry.snapshot();
 assert(snapshot.activeId === 'plane', 'Snapshot should identify the authoritative controller.');
 assert(snapshot.activeCandidates.join(',') === 'plane,walk', 'Snapshot should expose conflicting candidates in priority order.');
 assert(snapshot.controllers.find((controller) => controller.id === 'plane').updates === 2, 'Controller update counts should be tracked.');
+assert(snapshot.controllers.find((controller) => controller.id === 'plane').updateDurationP95Ms === 1, 'Controller p95 duration should be tracked.');
 
 console.log(JSON.stringify({ ok: true, activeId: snapshot.activeId, conflicts: snapshot.conflicts }, null, 2));

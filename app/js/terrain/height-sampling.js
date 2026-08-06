@@ -1,17 +1,12 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=25";
+} from "../structure-semantics.js?v=40";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
     appCtx,
     terrainTileDeps,
-    worldToLatLon,
-    latLonToTileXY,
-    getOrLoadTerrainTile,
-    sampleTileElevationMeters,
-    clampElevationMeters,
     elevationWorldYAtWorldXZ
   } = deps;
 
@@ -29,6 +24,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
     for (let c = 0; c < appCtx.terrainGroup.children.length; c++) {
       const mesh = appCtx.terrainGroup.children[c];
+      if (mesh?.visible === false || mesh?.userData?.pendingTerrainTile) {
+        continue;
+      }
       const info = mesh.userData?.terrainTile;
       if (!info) continue;
 
@@ -65,18 +63,11 @@ function createTerrainHeightSamplingApi(deps = {}) {
   }
 
   function baseTerrainHeightAt(x, z) {
-    const { lat, lon } = worldToLatLon(x, z);
-    const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-    const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y, terrainTileDeps);
-    if (tile.loaded) {
-      const u = t.xf - t.x;
-      const v = t.yf - t.y;
-      const meters = sampleTileElevationMeters(tile, u, v, clampElevationMeters);
-      return meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
-    }
+    const authoritativeY = elevationWorldYAtWorldXZ(x, z);
+    if (Number.isFinite(authoritativeY)) return authoritativeY;
     const meshY = terrainMeshHeightAt(x, z);
     if (Number.isFinite(meshY)) return meshY;
-    return elevationWorldYAtWorldXZ(x, z, terrainTileDeps);
+    return null;
   }
 
   function cachedBaseTerrainHeight(x, z) {
@@ -93,13 +84,15 @@ function createTerrainHeightSamplingApi(deps = {}) {
     }
 
     let adjustedY = terrainY;
-    for (let i = 0; i < appCtx.structureTerrainCuts.length; i++) {
-      const cut = appCtx.structureTerrainCuts[i];
+    const candidates = appCtx.structureTerrainCuts;
+    for (let i = 0; i < candidates.length; i++) {
+      const cut = candidates[i];
       if (!cut?.feature || !cut?.bounds) continue;
       if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
 
       const projected = projectPointToFeature(cut.feature, worldX, worldZ);
       if (!projected) continue;
+
       const width = Math.max(4.5, Number(cut.width) || Number(cut.feature?.width) || 6);
       const influenceRadius = width * 0.82 + 3.4;
       if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;

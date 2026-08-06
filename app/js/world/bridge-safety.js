@@ -1,4 +1,36 @@
-import { pointInPolygonXZ } from "../structure-semantics.js?v=25";
+import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
+
+function distanceToRoadCenterline(road, x, z) {
+  let best = Infinity;
+  for (let index = 0; index < (road?.pts?.length || 0) - 1; index += 1) {
+    const a = road.pts[index];
+    const b = road.pts[index + 1];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const lengthSquared = dx * dx + dz * dz;
+    if (!(lengthSquared > 0)) continue;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / lengthSquared));
+    best = Math.min(best, Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t)));
+  }
+  return best;
+}
+
+export function barrierPointConflictsWithDriveableRoad(feature, options = {}) {
+  const x = Number(options.x);
+  const z = Number(options.z);
+  const deckY = Number(options.deckY);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+  for (const road of options.roads || []) {
+    if (!road || road === feature || road.driveable === false || !Array.isArray(road.pts)) continue;
+    const corridorRadius = Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
+    if (distanceToRoadCenterline(road, x, z) > corridorRadius) continue;
+    const otherY = sampleFeatureSurfaceY(road, x, z);
+    if (!Number.isFinite(deckY) || !Number.isFinite(otherY) || Math.abs(otherY - deckY) <= 1.8) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;

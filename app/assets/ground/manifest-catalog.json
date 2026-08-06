@@ -1,0 +1,1706 @@
+{
+  "schemaVersion": 1,
+  "manifests": [
+    {
+      "schemaVersion": 1,
+      "artifactId": "amazon_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "f5f3e278d4594d67d6a363ca8cf0eeff7b8ed434091ebc2411cb2208c211f1af",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": -3.497751599131262,
+        "north": -3.4323841399973958,
+        "west": -62.2483982869486,
+        "east": -62.182911102736284
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_S04_00_W063_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S04_00_W063_00_DEM/Copernicus_DSM_COG_10_S04_00_W063_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 46839008,
+            "contentSha256": "83fe2ec6743c71e323292dad7bbff9b3161d1dab8a9a755ccb93ea09ea6bab30",
+            "etag": "50c85d7b021fe41a85c657dbd553b991",
+            "lastModified": "Mon, 09 May 2022 14:53:54 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./amazon_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "antarctica-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "0bef6158ec20c567f79d0956f204d81a5128d84d5fe75c398db226a7af1e0e20",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": -77.85269927558262,
+        "north": -77.83925201442595,
+        "west": 166.63577840513142,
+        "east": 166.69964862183224
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_S78_00_E166_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S78_00_E166_00_DEM/Copernicus_DSM_COG_10_S78_00_E166_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 6744167,
+            "contentSha256": "9328bf6be57a39adeedc709e909c4c10a8c65d1d9b8f03204e8eea46e4399aa9",
+            "etag": "567f4df64591ab6e4e46d4db45714c7d",
+            "lastModified": "Mon, 09 May 2022 15:13:27 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./antarctica/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "baltimore-ground",
+      "providerId": "usgs-3dep-best-available",
+      "sourceRelease": "USGS-3DEP:20260511",
+      "contentSha256": "a3b3c9372f4873e77336c4c25e0b4ba28d24fddded59e50cd1b9d9f7100140f0",
+      "spacingMeters": 60,
+      "coverage": {
+        "south": 39.26568195116693,
+        "north": 39.31490556731849,
+        "west": -76.64372105190711,
+        "east": -76.58065931896192
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "url": "./baltimore/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "chapel_hill_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "c8c9a0696be9479583bfe7cea334be3790241be706d7a6633c715a23f0c73c13",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 39.37596978288268,
+        "north": 39.426573002515745,
+        "west": -76.63294126849769,
+        "east": -76.56745408428537
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N39_00_W077_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N39_00_W077_00_DEM/Copernicus_DSM_COG_10_N39_00_W077_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 43599143,
+            "contentSha256": "57620f4279d45e91895daf961107678fd141f2da615b12eb363f20cc497f6f8d",
+            "etag": "8c0e719bd64d075deba09fdb11a60a48",
+            "lastModified": "Mon, 09 May 2022 14:20:57 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./chapel_hill_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "chicago-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "b4296772e49fbb551e36ad20cb7753de9facb4d5bb81a72099840b0f94edf65a",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 41.85370305267472,
+        "north": 41.9024626422047,
+        "west": -87.66227666386033,
+        "east": -87.59678947964801
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N41_00_W088_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N41_00_W088_00_DEM/Copernicus_DSM_COG_10_N41_00_W088_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 34539516,
+            "contentSha256": "ff2eaadf2e73ea5e52fb3029cdb15dfaf7da76a134736ec9709d7ddd3551560d",
+            "etag": "d4e2218539afcfae09de0ae064c381d9",
+            "lastModified": "Mon, 09 May 2022 14:22:27 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./chicago/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "dead-sea-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "e614b6324df25c8e7589715795501390b1e5ac998a922aeff943e8abbde348ef",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 31.472917581176457,
+        "north": 31.52737580421035,
+        "west": 35.46818236289107,
+        "east": 35.53205257959189
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N31_00_E035_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N31_00_E035_00_DEM/Copernicus_DSM_COG_10_N31_00_E035_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 41402019,
+            "contentSha256": "29baca4a170117c090c2ab1f2a4ade53ed1dd085cdbbfaa005631049462221cf",
+            "etag": "e505be5b031c34ed397bbcf1e866c5b9",
+            "lastModified": "Mon, 09 May 2022 14:15:01 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./dead-sea/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "dubai-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "abed3037fed7cc2f11460f359699040ab3f15ac640d1901b2c79987719679b95",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 25.175204983480818,
+        "north": 25.234457204265272,
+        "west": 55.238035641208285,
+        "east": 55.3035228254206
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N25_00_E055_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N25_00_E055_00_DEM/Copernicus_DSM_COG_10_N25_00_E055_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 22291663,
+            "contentSha256": "eef300a92e416071e8cf9fdba8018126de8a7af1fae7b0068a1b360f9ff522fd",
+            "etag": "79b97efc5d013554f652d9b195afc2bd",
+            "lastModified": "Mon, 09 May 2022 14:11:00 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./dubai/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "dubai-desert-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "a0e1c63f3e8234c9784dcfca4da09cc1792c1a33326b4764a1d50aa1cd13ba35",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 24.893180924530462,
+        "north": 24.951103621995596,
+        "west": 55.73606163472414,
+        "east": 55.79912336766938
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N24_00_E055_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N24_00_E055_00_DEM/Copernicus_DSM_COG_10_N24_00_E055_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 43713741,
+            "contentSha256": "bb98178567b880aa6b66fcf48ec11bade94c13236ae63ec8e8c0e894b54225b3",
+            "etag": "559b39e9c0b0e096f7dd29c36ead3804",
+            "lastModified": "Mon, 09 May 2022 14:10:24 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./dubai-desert/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "everglades_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "6df58389baa75431da955790b81d4c85049245b82848b07ab1a143f4c81de299",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 25.257126345302023,
+        "north": 25.31633864096866,
+        "west": -80.93164939759481,
+        "east": -80.8661622133825
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N25_00_W081_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N25_00_W081_00_DEM/Copernicus_DSM_COG_10_N25_00_W081_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 33001807,
+            "contentSha256": "35640d472b6ea9da3ed42ff988f77cd156077021878106e13120abf05f78121b",
+            "etag": "2bf6080d251e4482d507a3ef0035c17c",
+            "lastModified": "Mon, 09 May 2022 14:11:20 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./everglades_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "four-tile-corner-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "2548d4c444e00d6da0bf753ae556ea573321ab5ea8804bcc90dc3921d1530aa6",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 45.97803492502848,
+        "north": 46.02184133130501,
+        "west": 7.968415896253873,
+        "east": 8.031477629199003
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N45_00_E007_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E007_00_DEM/Copernicus_DSM_COG_10_N45_00_E007_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 42594792,
+            "contentSha256": "638c155dd9a5f0b7ee818146def740093da33cee4606071b2bbf7ce3fa00ab95",
+            "etag": "9419a0784d0c7b90c48754dc8901bf49",
+            "lastModified": "Mon, 09 May 2022 14:24:54 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N45_00_E008_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E008_00_DEM/Copernicus_DSM_COG_10_N45_00_E008_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 43016696,
+            "contentSha256": "02fac5d646f443f4f288a3d59b4cb995300e1c4fcbe4b5c1c6078a165a3d9ad4",
+            "etag": "d2b0f9583fc4222fbff560edf7463fa6",
+            "lastModified": "Mon, 09 May 2022 14:24:55 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N46_00_E007_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N46_00_E007_00_DEM/Copernicus_DSM_COG_10_N46_00_E007_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 41776750,
+            "contentSha256": "426e3d1492d94e4f23d444843f852ff5be675da5c4c14e661b5642006864047d",
+            "etag": "d75ca33280e101b7e83b2fbef81e853b",
+            "lastModified": "Mon, 09 May 2022 14:25:45 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N46_00_E008_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N46_00_E008_00_DEM/Copernicus_DSM_COG_10_N46_00_E008_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 42038015,
+            "contentSha256": "47769664394ee1ff3b51f5c1b43a3441d7f7bce8d086d0ed2f3a892b895fae3e",
+            "etag": "0e7068e0cc74d941c7af5cda6a640a7b",
+            "lastModified": "Mon, 09 May 2022 14:25:46 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./four-tile-corner/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "golden-gate-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "da406a877fca8414b13c32dc1f5360a17e32ccfb8d28efef7613070a69731651",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 37.79488267476738,
+        "north": 37.84533630041809,
+        "west": -122.51035198612368,
+        "east": -122.4464817694228
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N37_00_W123_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_W123_00_DEM/Copernicus_DSM_COG_10_N37_00_W123_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 20060161,
+            "contentSha256": "82343318fbf7265c32342d9cace0fda4eb48d4b567a1a3335cc37488d4a9a7d5",
+            "etag": "6283cf0e490d2ac5d9f849eb3b9cffa9",
+            "lastModified": "Mon, 09 May 2022 14:19:44 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./golden-gate/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "great_pyramids_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "ba7efa5d15e073c1117963302907f0ca234715ddedc01be84ef1bb24e8a34194",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 29.950743891640013,
+        "north": 30.00746938937056,
+        "west": 31.101561598314447,
+        "east": 31.167048782526763
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N29_00_E031_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N29_00_E031_00_DEM/Copernicus_DSM_COG_10_N29_00_E031_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 45238261,
+            "contentSha256": "88daaeb7722323e58aa9386fcd520fe6c46fcd6aacfffdb4025ab98bd0a77bc5",
+            "etag": "121e45e0522a40d0c5b4ddd3614f9250",
+            "lastModified": "Mon, 09 May 2022 14:13:41 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N30_00_E031_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N30_00_E031_00_DEM/Copernicus_DSM_COG_10_N30_00_E031_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 49536822,
+            "contentSha256": "6c3d160e09942c9bf865e640ae2d21d436260c1929a3edb36c2bdea3bfb730b6",
+            "etag": "65da170d004a9089881b7cfbf399bb33",
+            "lastModified": "Mon, 09 May 2022 14:14:22 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./great_pyramids_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "great_wall_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "98318be90ade13d499c692cc6d0ffc05e253781e68c24f792cf863f1430fe55a",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 40.40690505392501,
+        "north": 40.45675246371025,
+        "west": 116.53727399895615,
+        "east": 116.60276118316847
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N40_00_E116_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N40_00_E116_00_DEM/Copernicus_DSM_COG_10_N40_00_E116_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 46764581,
+            "contentSha256": "e1f33db5ab07cb6ee5d3fbba83da030cb4156f8be5e0b2cb84744919fef7527e",
+            "etag": "f864fde13e9923a4b29898a8ffa64089",
+            "lastModified": "Mon, 09 May 2022 14:21:33 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./great_wall_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "holland-tunnel-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "af7e3bdf0605407b3b07a69d257321e9ae5e54a10bff48a1d6c00c050010a107",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 40.70237046521202,
+        "north": 40.75077334502318,
+        "west": -74.04579325023343,
+        "east": -73.98192303353255
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N40_00_W075_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N40_00_W075_00_DEM/Copernicus_DSM_COG_10_N40_00_W075_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 48213610,
+            "contentSha256": "1db5d9d32c1aac7a7362e0375b4640a2f80e54963e4cde2f602f1be981ab353f",
+            "etag": "daac3d54d256a967b9974327233de3ec",
+            "lastModified": "Mon, 09 May 2022 14:21:40 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N40_00_W074_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N40_00_W074_00_DEM/Copernicus_DSM_COG_10_N40_00_W074_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 15806993,
+            "contentSha256": "6a0f4273de0bbc0709cc9db4793a89ac40c811388f59f23f644c0304b66ab94d",
+            "etag": "b376f35f17c3f045fb4cfebb3c55acfc",
+            "lastModified": "Mon, 09 May 2022 14:21:40 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./holland-tunnel/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "hollywood-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "30432113917bf238fc7873a044ce9ab0e201430096521284ef54c91aa93cbfc7",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 34.0653476669721,
+        "north": 34.119579831464016,
+        "west": -118.36121335183242,
+        "east": -118.29572616762016
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N34_00_W119_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N34_00_W119_00_DEM/Copernicus_DSM_COG_10_N34_00_W119_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 42718799,
+            "contentSha256": "eb5f76ce3183a33c76e24d00fd854598b490523f6cb325e3f234203a3bc011a8",
+            "etag": "7159b3ec2537eebe6eb1c8430bb07403",
+            "lastModified": "Mon, 09 May 2022 14:17:35 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./hollywood/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "iowa_farmland_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "7625420477d2092b0664b5f3d7d69c6944c197d16df1c18c349b9e7045bf9817",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 42.05572208383063,
+        "north": 42.104327292214464,
+        "west": -93.90296277416707,
+        "east": -93.83747558995475
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N42_00_W094_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N42_00_W094_00_DEM/Copernicus_DSM_COG_10_N42_00_W094_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 39892566,
+            "contentSha256": "ed03509b743e06be040cb2ec8e8e623270a12d7232fcc9da09e23938d6a44fa0",
+            "etag": "c96d97ab3b67940670368f10f0c7200b",
+            "lastModified": "Mon, 09 May 2022 14:23:13 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./iowa_farmland_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "lake_tahoe_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "2d63447ebf4ae19dddc2060559c7bcff35156cfab0ac8fca8ef79fc4ab845d89",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 39.07158009763476,
+        "north": 39.12240335620342,
+        "west": -120.06549710886401,
+        "east": -120.00000992465169
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N39_00_W121_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N39_00_W121_00_DEM/Copernicus_DSM_COG_10_N39_00_W121_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 39783792,
+            "contentSha256": "5140a11966cdefd4b5a46c45baa9f4c0b8e6bab0f1bca9f39ceb84adacddf097",
+            "etag": "ae1ccc52d64cda619fa2165a96bb451b",
+            "lastModified": "Mon, 09 May 2022 14:21:06 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N39_00_W120_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N39_00_W120_00_DEM/Copernicus_DSM_COG_10_N39_00_W120_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 38347132,
+            "contentSha256": "b565a326f452f54938c3300c0d81399dab4e226aba207fd467d51978cfa6807e",
+            "etag": "202fb8067384f57fb2cffefd7239fb1f",
+            "lastModified": "Mon, 09 May 2022 14:21:06 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./lake_tahoe_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "lasvegas-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "5f2c4ad858b2363ea4733e65b1c681fd5f77b1f884957f1dc28a83101dae58d3",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 36.14332039698904,
+        "north": 36.1961863621207,
+        "west": -115.17255341932179,
+        "east": -115.10706623510947
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N36_00_W116_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N36_00_W116_00_DEM/Copernicus_DSM_COG_10_N36_00_W116_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 39921927,
+            "contentSha256": "4bf2408ee5018b86b7bbec30c95764d5af628c78ee4879be63f82d9749c4f1b5",
+            "etag": "15412bffa5503a2d14e80128a98db48c",
+            "lastModified": "Mon, 09 May 2022 14:19:02 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./lasvegas/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "lhasa-plateau-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "138f688ef2f4266d863372b7c4207e96fb5abaa62fb248c186002a1c4d94aa81",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 29.624472183407057,
+        "north": 29.67997823011354,
+        "west": 91.14037378091427,
+        "east": 91.20424399761521
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N29_00_E091_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N29_00_E091_00_DEM/Copernicus_DSM_COG_10_N29_00_E091_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 38500243,
+            "contentSha256": "16a6e20e81594429ee66def68c321d66ee71b81a59f5db71abf284a0cc5f8f9e",
+            "etag": "14562d345e9a55dc14e40344e86e524f",
+            "lastModified": "Mon, 09 May 2022 14:13:56 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./lhasa-plateau/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "london-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "a8b00430c605ba3f098779afd280badee098124308dddfd299f867e6511a7da0",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 51.486917632326914,
+        "north": 51.52767783131608,
+        "west": -0.1608882673858716,
+        "east": -0.09540108317355589
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N51_00_W001_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N51_00_W001_00_DEM/Copernicus_DSM_COG_10_N51_00_W001_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 32682214,
+            "contentSha256": "bdd0e7522e84cb434450d6f6f5b7c1889eefb0f8c28abaeddbaad77048c3961e",
+            "etag": "6a9f702479b4d415478d0c63fc78d605",
+            "lastModified": "Mon, 09 May 2022 14:30:24 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./london/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "losangeles-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "a1de574e923aa5643435e4d9d060810569bf0ae69d6724ada85617ca4be2a6ea",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 34.02515329969381,
+        "north": 34.07941119382479,
+        "west": -118.27632255748313,
+        "east": -118.21083537327081
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N34_00_W119_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N34_00_W119_00_DEM/Copernicus_DSM_COG_10_N34_00_W119_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 42718799,
+            "contentSha256": "eb5f76ce3183a33c76e24d00fd854598b490523f6cb325e3f234203a3bc011a8",
+            "etag": "7159b3ec2537eebe6eb1c8430bb07403",
+            "lastModified": "Mon, 09 May 2022 14:17:35 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./losangeles/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "miami-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "6e905e83ecc1e0c658bdcaae663134e81d4ad19e91ee7011a0f8c81c7076a552",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 25.732196802223278,
+        "north": 25.79117518594061,
+        "west": -80.22422611135067,
+        "east": -80.15873892713842
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N25_00_W081_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N25_00_W081_00_DEM/Copernicus_DSM_COG_10_N25_00_W081_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 33001807,
+            "contentSha256": "35640d472b6ea9da3ed42ff988f77cd156077021878106e13120abf05f78121b",
+            "etag": "2bf6080d251e4482d507a3ef0035c17c",
+            "lastModified": "Mon, 09 May 2022 14:11:20 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./miami/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "miami-beach-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "1db8b751c1b8887408f53f8870edb6cbcfe4fafb2d2abb11ed215c03948dcc39",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 25.761325591725605,
+        "north": 25.820289501212184,
+        "west": -80.16278134591693,
+        "east": -80.09729416170461
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N25_00_W081_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N25_00_W081_00_DEM/Copernicus_DSM_COG_10_N25_00_W081_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 33001807,
+            "contentSha256": "35640d472b6ea9da3ed42ff988f77cd156077021878106e13120abf05f78121b",
+            "etag": "2bf6080d251e4482d507a3ef0035c17c",
+            "lastModified": "Mon, 09 May 2022 14:11:20 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./miami-beach/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "monaco-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "637ebefae1034da68d8b7e08a985ca91e00a412e040c1b74c093831174640cfa",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 43.71543381300917,
+        "north": 43.76158021084081,
+        "west": 7.392775462190002,
+        "east": 7.456645678890936
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N43_00_E007_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N43_00_E007_00_DEM/Copernicus_DSM_COG_10_N43_00_E007_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 12574196,
+            "contentSha256": "234bb778988bde3a554a45184b8328e67accd8187d2b8745a4c456d41edd6466",
+            "etag": "56c2005c1f153d360ebada68a36a3538",
+            "lastModified": "Mon, 09 May 2022 14:23:23 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./monaco/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "nairobi_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "9c72e3c493e8864451cfccd210844cefca990daec4e0750bb7f07a948705fa0d",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": -1.3193288834834453,
+        "north": -1.2538582127785858,
+        "west": 36.784393917183024,
+        "east": 36.84988110139534
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_S02_00_E036_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S02_00_E036_00_DEM/Copernicus_DSM_COG_10_S02_00_E036_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 38977060,
+            "contentSha256": "e7984d6826564293fff54b518250b9e3f8b0fd68b119d618ae6f66a515d145ed",
+            "etag": "2cac31b2ce2652c211fcbb94972fd3f1",
+            "lastModified": "Mon, 09 May 2022 14:52:46 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./nairobi_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "newyork-ground",
+      "providerId": "usgs-3dep-best-available",
+      "sourceRelease": "USGS-3DEP:20200330+https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/TIFF/USGS_one_meter_x58y451_NJ_SdL5_2014.tif+https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/TIFF/USGS_one_meter_x58y452_NJ_SdL5_2014.tif+https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NY_CMPG_2013/TIFF/USGS_one_meter_x58y451_NY_CMPG_2013.tif",
+      "contentSha256": "5514c64171a155d7cae76f4cc32fb1f10cf5c172de1af2482b0f0f8667761558",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 40.733621921524986,
+        "north": 40.78200207273416,
+        "west": -74.01749631878369,
+        "east": -73.95362610208281
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": false,
+      "url": "./newyork/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "nurburgring-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "c208b30ab2d81e8f8fc36441a8b22037a2e6c9243d014f7bfe540ab503ef4c2c",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 50.31478163056207,
+        "north": 50.356581346323615,
+        "west": 6.914961562566873,
+        "east": 6.980448746779189
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N50_00_E006_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E006_00_DEM/Copernicus_DSM_COG_10_N50_00_E006_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 30359565,
+            "contentSha256": "41f820867a2823b124dd2cc097101fa83f166652b9b95154ce9f557281ddb9d4",
+            "etag": "9d5bfd04e92be7c5731f2424863661fe",
+            "lastModified": "Mon, 09 May 2022 14:29:05 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./nurburgring/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "panama_canal_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "dc55f7744c1eec456e3128620a211494ab6bbe313a9568f5afac7135a59ad6d5",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 9.133320383701356,
+        "north": 9.197971420736513,
+        "west": -79.97602159834844,
+        "east": -79.91053441413612
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N09_00_W080_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N09_00_W080_00_DEM/Copernicus_DSM_COG_10_N09_00_W080_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 25029275,
+            "contentSha256": "3f680f7b6fdf15f10182c5d869024e74a2eeb3bb4981f50a792f59f884283215",
+            "etag": "84b7beb83710a0b869d14c985cfe31c3",
+            "lastModified": "Mon, 09 May 2022 14:03:21 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./panama_canal_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "paris-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "cebd0a41f8a3625a81e0293d7f180198018f3db25ca26794680e2e328961e79e",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 48.83493743972565,
+        "north": 48.87802456027757,
+        "west": 2.31953989512499,
+        "east": 2.3850270793373056
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N48_00_E002_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N48_00_E002_00_DEM/Copernicus_DSM_COG_10_N48_00_E002_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 46017718,
+            "contentSha256": "1a79b2992645954ac7d7a5ab5e0b0ee5c53a124a74e13b5dcdf01f41b96fe25a",
+            "etag": "207f962b7e9228481b87cd422df840f1",
+            "lastModified": "Mon, 09 May 2022 14:27:26 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./paris/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "pregerson-interchange-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "2575b4ec34f9b3643e31eac219b026774765b6db77c7cc7b73bb84ed4a21169d",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 33.90244288997947,
+        "north": 33.95543795060266,
+        "west": -118.31270432649,
+        "east": -118.24883410978907
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N33_00_W119_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N33_00_W119_00_DEM/Copernicus_DSM_COG_10_N33_00_W119_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 7151713,
+            "contentSha256": "4f89b9bacf44683774085b34eda7889b4414b83903ed8236a52823aa60e6f910",
+            "etag": "589ba555eec6cef8977c514663b7185c",
+            "lastModified": "Mon, 09 May 2022 14:16:50 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./pregerson-interchange/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "sahara_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "79cd6a531070fc8dd47484e6295a4bd7f040dd55c69e9422ea75dd8e05450c40",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 31.106054409088713,
+        "north": 31.162108794492315,
+        "west": -4.044844229804994,
+        "east": -3.9793570455926783
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N31_00_W005_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N31_00_W005_00_DEM/Copernicus_DSM_COG_10_N31_00_W005_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 38955922,
+            "contentSha256": "1a30be66a62a25fe3d59f2a70d9876b1dfafe793e726433d2f077b446056fdab",
+            "etag": "0edeb4ec1af51eb80b66017dfac7b0fa",
+            "lastModified": "Mon, 09 May 2022 14:15:23 GMT"
+          },
+          {
+            "tileId": "Copernicus_DSM_COG_10_N31_00_W004_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N31_00_W004_00_DEM/Copernicus_DSM_COG_10_N31_00_W004_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 37669921,
+            "contentSha256": "018be675e634f4f89742c74436cfe14a1d91f6eb07a17a399caa64d6a5d783cf",
+            "etag": "4f7cc0b1ef6356c0f29b0c2d1251973e",
+            "lastModified": "Mon, 09 May 2022 14:15:23 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./sahara_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "sanfrancisco-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "f538095ea3ebed77ef4158e5ef0e54f02b967d1014b4ff1465d0ce15dfd841ee",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 37.748869590999064,
+        "north": 37.800632296736104,
+        "west": -122.45214115571275,
+        "east": -122.38665397150044
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N37_00_W123_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_W123_00_DEM/Copernicus_DSM_COG_10_N37_00_W123_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 20060161,
+            "contentSha256": "82343318fbf7265c32342d9cace0fda4eb48d4b567a1a3335cc37488d4a9a7d5",
+            "etag": "6283cf0e490d2ac5d9f849eb3b9cffa9",
+            "lastModified": "Mon, 09 May 2022 14:19:44 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./sanfrancisco/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "saopaulo_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "aff8d5179de82372a191a6fb76f599239e1be9e29529d98b70652e52b92f2edb",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": -23.580229213886575,
+        "north": -23.520196443559797,
+        "west": -46.66568237944091,
+        "east": -46.60019519522859
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_S24_00_W047_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S24_00_W047_00_DEM/Copernicus_DSM_COG_10_S24_00_W047_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 42276212,
+            "contentSha256": "cc3b187c19e797e3068dd6d68e962ba961f021a243513964b84659056b5cfe29",
+            "etag": "6cc391d3ef3bce5c4f1aaa3eba6fde91",
+            "lastModified": "Mon, 09 May 2022 15:01:18 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./saopaulo_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "seattle-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "b0a902c2f7b0537c35acbdc9a62eb69b9ee9202914087f444e7e7bb6b446b662",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 47.58397456077559,
+        "north": 47.62812761418583,
+        "west": -122.36482491009633,
+        "east": -122.29933772588402
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N47_00_W123_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N47_00_W123_00_DEM/Copernicus_DSM_COG_10_N47_00_W123_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 39786033,
+            "contentSha256": "51b92a67a23666a7b688b1c844406ea4416d736b3b4769a71fb9f69aaccec666",
+            "etag": "1fc6b8ff9866072475dc8703a201d1fd",
+            "lastModified": "Mon, 09 May 2022 14:27:25 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./seattle/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "shenandoah_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "fede7ea1530a70c603eaf267fab91cc557e65bf77606582ca67af63d9a49e221",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 50.30600418103723,
+        "north": 50.34781161577599,
+        "west": 6.906876725009738,
+        "east": 6.972363909222054
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N50_00_E006_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E006_00_DEM/Copernicus_DSM_COG_10_N50_00_E006_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 30359565,
+            "contentSha256": "41f820867a2823b124dd2cc097101fa83f166652b9b95154ce9f557281ddb9d4",
+            "etag": "9d5bfd04e92be7c5731f2424863661fe",
+            "lastModified": "Mon, 09 May 2022 14:29:05 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./shenandoah_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "svalbard-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "94b26c180ef80fff3bd008d23b43029371e6ba68db4efe8e7683fc4b530e616c",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 78.21672912330949,
+        "north": 78.22976496116327,
+        "west": 15.615055257736003,
+        "east": 15.678925474436937
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N78_00_E015_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N78_00_E015_00_DEM/Copernicus_DSM_COG_10_N78_00_E015_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 10958897,
+            "contentSha256": "4d211ea7b9d074eda9dd893a430bc9661069ea98ea4735d9d9dbf94c2bd2ef68",
+            "etag": "f2b386f77380f9b7469573bdc938fff3",
+            "lastModified": "Mon, 09 May 2022 14:50:29 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./svalbard/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "swiss_alps_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "0ec81068f59ac5287c4f21580048dd1ef6cbc4261a555b13efe3213de9d64652",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 46.51422145821381,
+        "north": 46.559269383248456,
+        "west": 7.929608675979807,
+        "east": 7.995095860192123
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N46_00_E007_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N46_00_E007_00_DEM/Copernicus_DSM_COG_10_N46_00_E007_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 41776750,
+            "contentSha256": "426e3d1492d94e4f23d444843f852ff5be675da5c4c14e661b5642006864047d",
+            "etag": "d75ca33280e101b7e83b2fbef81e853b",
+            "lastModified": "Mon, 09 May 2022 14:25:45 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./swiss_alps_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "swiss-alps-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "2f94fe8ac8c6c35f7d3dd5992b9d12236f13c7b2dcf80c66ea19979b37cd3008",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 46.79668006459156,
+        "north": 46.839834137657604,
+        "west": 8.195599831607637,
+        "east": 8.259470048308458
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N46_00_E008_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N46_00_E008_00_DEM/Copernicus_DSM_COG_10_N46_00_E008_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 42038015,
+            "contentSha256": "47769664394ee1ff3b51f5c1b43a3441d7f7bce8d086d0ed2f3a892b895fae3e",
+            "etag": "0e7068e0cc74d941c7af5cda6a640a7b",
+            "lastModified": "Mon, 09 May 2022 14:25:46 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./swiss-alps/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "sydney_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "5bf68075961750e4495e9a375041cde69247c3fdc466ebdd1e1f67e7891015df",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": -33.89573230368451,
+        "north": -33.84135709608507,
+        "west": 151.17676051224703,
+        "east": 151.24224769645934
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_S34_00_E151_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S34_00_E151_00_DEM/Copernicus_DSM_COG_10_S34_00_E151_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 20882213,
+            "contentSha256": "6e20871096986cd00fc3903ea95670a0d83860236a0e4f1360ac9ac67def485d",
+            "etag": "ec0056ce8007b6f7a7a2c805ac6337f8",
+            "lastModified": "Mon, 09 May 2022 15:04:28 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./sydney_custom/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "tokyo-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "d3802b73f17c6ebc7cc12063a36502bfb8cf660b78e04353d6a8bbc219b414e8",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 35.64950238673167,
+        "north": 35.702699381699134,
+        "west": 139.61786825689592,
+        "east": 139.68335544110823
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N35_00_E139_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N35_00_E139_00_DEM/Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 36863907,
+            "contentSha256": "a4a8dd95b4d3a9f06d7bd09d5125e3196efd7e142fc5b4c6a85431a46f1905fc",
+            "etag": "1e0020384f857e90e0ecf3ecc806f28c",
+            "lastModified": "Mon, 09 May 2022 14:18:06 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./tokyo/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "tokyo_shinjuku_custom-ground",
+      "providerId": "copernicus-dem-classified-ground-v1",
+      "sourceRelease": "COP-DEM-2021:GLO-30",
+      "contentSha256": "fcd98672dfa6761f46a9d0d1cd493459103219b5d6b2415943f5f5fe04f6ed5a",
+      "spacingMeters": 90,
+      "coverage": {
+        "south": 35.66329760501967,
+        "north": 35.716485405878636,
+        "west": 139.65910092843694,
+        "east": 139.72458811264926
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": true,
+      "sourceEvidence": {
+        "sourceClassification": "digital-surface-model",
+        "correctionMethod": "worldexplorer-pmf-grid-v1",
+        "sourceTiles": [
+          {
+            "tileId": "Copernicus_DSM_COG_10_N35_00_E139_00_DEM",
+            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N35_00_E139_00_DEM/Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif",
+            "resolutionMeters": 30,
+            "contentLength": 36863907,
+            "contentSha256": "a4a8dd95b4d3a9f06d7bd09d5125e3196efd7e142fc5b4c6a85431a46f1905fc",
+            "etag": "1e0020384f857e90e0ecf3ecc806f28c",
+            "lastModified": "Mon, 09 May 2022 14:18:06 GMT"
+          }
+        ]
+      },
+      "attribution": {
+        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "modified": true
+      },
+      "url": "./tokyo_shinjuku_custom/ground-artifact.json"
+    }
+  ]
+}

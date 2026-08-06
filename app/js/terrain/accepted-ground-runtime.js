@@ -1,15 +1,15 @@
 import {
   selectGroundArtifact
-} from './ground-provider-registry.js?v=2';
+} from './ground-provider-registry.js?v=3';
 import {
   loadGroundArtifact
-} from './ground-artifact.js?v=2';
+} from './ground-artifact.js?v=4';
 import {
   geographicToWebMercatorMeters
 } from './source-contract.js?v=2';
 import {
   sampleDistrictGroundMeters
-} from '../world/compiler/district-ground-model.js?v=1';
+} from '../world/compiler/district-ground-model.js?v=2';
 
 function freezeState(state) {
   return Object.freeze({

@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { resolveMappedRoof } from '../app/js/world/mapped-roof-geometry.js';
+
+const footprint = [
+  { x: 0, z: 0 },
+  { x: 12, z: 0 },
+  { x: 12, z: 8 },
+  { x: 0, z: 8 }
+];
+const semantics = { baseOffsetMeters: 0 };
+
+const house = resolveMappedRoof({ building: 'house', 'building:levels': '2' }, 7, semantics, footprint);
+assert.equal(house, null, 'building type alone must not invent a roof shape');
+
+const mappedHouse = resolveMappedRoof({ building: 'house', 'roof:shape': 'hipped' }, 7, semantics, footprint);
+assert.equal(mappedHouse?.shape, 'hipped', 'mapped roof shape must remain authoritative');
+assert.equal(mappedHouse?.roofShapeSource, 'mapped');
+
+for (const building of ['apartments', 'commercial', 'industrial', 'office', 'residential', 'retail', 'terrace', 'warehouse', 'yes']) {
+  assert.equal(
+    resolveMappedRoof({ building, 'building:levels': '2' }, 7, semantics, footprint),
+    null,
+    `${building} must remain flat without mapped roof evidence`
+  );
+}
+
+assert.equal(
+  resolveMappedRoof({ building: 'house', 'building:levels': '5' }, 16, semantics, footprint),
+  null,
+  'high-rise residential footprints must not receive inferred pitched roofs'
+);
+
+assert.equal(
+  resolveMappedRoof(
+    { building: 'office', 'building:levels': '40', 'roof:shape': 'pyramidal' },
+    150,
+    semantics,
+    footprint
+  ),
+  null,
+  'generic apex geometry must not create a point on a tall building'
+);
+
+assert.equal(
+  resolveMappedRoof(
+    { 'building:part': 'roof', 'roof:shape': 'pyramid' },
+    8,
+    { baseOffsetMeters: 110 },
+    footprint
+  ),
+  null,
+  'elevated building parts must not create generic skyscraper needles'
+);
+
+console.log(JSON.stringify({ ok: true, inferredHouse: house, mappedRoof: mappedHouse.shape }, null, 2));

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { ENV, getEnv } from '../env.js?v=57';
+import { ENV, getEnv } from '../env.js?v=58';
 import { commitEnvironment, exitCurrentEnvironmentSync } from '../session-coordinator.js?v=2';
 
 export function hidePlanetaryReturnControls() {
@@ -11,7 +11,6 @@ export function hidePlanetaryReturnControls() {
 export function suspendEarthModesForPlanetaryEntry(targetEnvironment = ENV.EARTH) {
   appCtx.cancelPendingEarthArrival?.();
   exitCurrentEnvironmentSync(targetEnvironment, { source: 'planetary_entry' });
-  appCtx.pauseEarthStreaming?.('planetary_entry');
   if (targetEnvironment !== ENV.EARTH) appCtx.setEarthSceneVisible?.(false);
   hidePlanetaryReturnControls();
   if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {

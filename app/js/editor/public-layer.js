@@ -5,13 +5,11 @@ import { computeOverlayAreaKey } from './schema.js?v=1';
 import { featureWorldCenter, geometryToWorldData } from './geometry.js?v=1';
 
 const PUBLISHED_RENDER_RANGE = 3600;
-const PUBLISHED_POLL_MS = 2600;
 
 const state = {
   areaSignature: '',
   unsub: null,
   group: null,
-  pollId: 0,
   hiddenBaseBuildingMeshes: new Map(),
   retryAfterMs: 0
 };
@@ -324,17 +322,6 @@ function refreshApprovedEditorContributions() {
 function initEditorPublicLayer() {
   clearPublishedObjects();
   updateListener();
-  if (state.pollId) clearInterval(state.pollId);
-  state.pollId = window.setInterval(() => {
-    updateListener();
-    if (state.group) {
-      const visible = appCtx.mapLayers?.contributions !== false;
-      state.group.visible = visible;
-      state.group.children.forEach((child) => {
-        child.visible = visible;
-      });
-    }
-  }, PUBLISHED_POLL_MS);
 
   Object.assign(appCtx, {
     getApprovedEditorContributionSnapshot,

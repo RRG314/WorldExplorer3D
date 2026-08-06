@@ -1,4 +1,4 @@
-const WATER_BODY_SCHEMA_VERSION = 1;
+const WATER_BODY_SCHEMA_VERSION = 2;
 
 const WATER_BODY_SHAPE = Object.freeze({
   AREA: 'area',
@@ -129,14 +129,30 @@ function waterSurfaceBaseElevation(heights) {
 function normalizeWaterBody(options = {}) {
   const shape = options.shape === WATER_BODY_SHAPE.WATERWAY ? WATER_BODY_SHAPE.WATERWAY : WATER_BODY_SHAPE.AREA;
   const points = Array.isArray(options.pts) ? options.pts : [];
+  const holes = Array.isArray(options.holes)
+    ? options.holes.filter((ring) => Array.isArray(ring) && ring.length >= 3)
+    : [];
   const metrics = shape === WATER_BODY_SHAPE.AREA ? polygonMetrics(points) : null;
   const length = shape === WATER_BODY_SHAPE.WATERWAY ? polylineLength(points) : 0;
   const kind = shape === WATER_BODY_SHAPE.AREA ? classifyAreaKind(options, metrics) : classifyWaterwayKind(options, length);
   const bounds = options.bounds || metrics?.bounds || null;
   const sourceFeatureId = options.sourceFeatureId || options.id || null;
   const surfaceY = finiteNumber(options.surfaceY);
-  const navigable = options.navigable !== false && (
-    shape === WATER_BODY_SHAPE.AREA || finiteNumber(options.width, 0) >= 12 || options.navigable === true
+  const access = String(options.access || '').trim().toLowerCase();
+  const boatAccess = String(options.boatAccess || options.boat || '').trim().toLowerCase();
+  const surfaceType = String(options.surfaceType || options.type || options.kindHint || '').trim().toLowerCase();
+  const accessDenied =
+    ['no', 'private'].includes(access) ||
+    ['no', 'private'].includes(boatAccess);
+  const explicitlyNavigable = ['yes', 'designated', 'permissive'].includes(boatAccess);
+  const excludedSurface = /swimming_pool|wastewater|basin|ditch|drain/.test(surfaceType);
+  const areaNavigable =
+    Number(metrics?.area || 0) >= 18000 ||
+    Number(metrics?.span || 0) >= 120;
+  const navigable = !accessDenied && !excludedSurface && options.navigable !== false && (
+    options.navigable === true ||
+    explicitlyNavigable ||
+    (shape === WATER_BODY_SHAPE.AREA ? areaNavigable : finiteNumber(options.width, 0) >= 12)
   );
   return {
     ...options,
@@ -144,6 +160,7 @@ function normalizeWaterBody(options = {}) {
     shape,
     type: shape === WATER_BODY_SHAPE.AREA ? 'water' : String(options.type || 'waterway'),
     pts: points,
+    holes,
     area: finiteNumber(options.area, metrics?.area || 0),
     centerX: finiteNumber(options.centerX, metrics?.centerX || 0),
     centerZ: finiteNumber(options.centerZ, metrics?.centerZ || 0),
@@ -156,6 +173,8 @@ function normalizeWaterBody(options = {}) {
     kind,
     label: waterKindLabel(kind),
     navigable,
+    access: access || null,
+    boatAccess: boatAccess || null,
     shorelineModel: shape === WATER_BODY_SHAPE.AREA ? 'polygon-boundary' : 'centerline-width',
     depthConfidence: options.depthConfidence || 'unknown',
     datum: {

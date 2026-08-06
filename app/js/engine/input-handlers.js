@@ -1,4 +1,7 @@
+import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
+
 export function setupEngineInputHandlers(appCtx) {
+  const inputScope = createLifecycleScope('engine-input');
   const wrapYaw = (angle = 0) => Math.atan2(Math.sin(angle), Math.cos(angle));
   const gameplayKeys = new Set([
     'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
@@ -9,7 +12,7 @@ export function setupEngineInputHandlers(appCtx) {
     ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)
   );
 
-  addEventListener('resize', () => {
+  inputScope.listen(globalThis, 'resize', () => {
     appCtx.camera.aspect = innerWidth / innerHeight;
     appCtx.camera.updateProjectionMatrix();
     appCtx.renderer.setSize(innerWidth, innerHeight);
@@ -23,16 +26,27 @@ export function setupEngineInputHandlers(appCtx) {
     }
   });
 
-  addEventListener('keydown', (e) => {
+  inputScope.listen(globalThis, 'keydown', (e) => {
     if (isFormControl(e.target)) return;
     if (appCtx.gameStarted && gameplayKeys.has(e.code)) {
       e.preventDefault();
     }
+    if (!e.repeat && appCtx.planeMode?.active && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+      appCtx.registerPlaneTurnTap?.(e.code, e.timeStamp);
+    }
     appCtx.keys[e.code] = true;
     appCtx.onKey(e.code, e);
   });
-  addEventListener('keyup', (e) => {
+  inputScope.listen(globalThis, 'keyup', (e) => {
     appCtx.keys[e.code] = false;
+  });
+  const clearHeldInput = () => {
+    appCtx.clearControlInputState?.('focus-lost');
+    if (appCtx.spaceFlight?.keys) appCtx.spaceFlight.keys = {};
+  };
+  inputScope.listen(globalThis, 'blur', clearHeldInput);
+  inputScope.listen(document, 'visibilitychange', () => {
+    if (document.hidden) clearHeldInput();
   });
 
   let lastMouseX = 0;
@@ -40,7 +54,7 @@ export function setupEngineInputHandlers(appCtx) {
   let mouseActive = false;
   window.walkMouseLookActive = false;
 
-  addEventListener('mousedown', (e) => {
+  inputScope.listen(globalThis, 'mousedown', (e) => {
     if (!appCtx.gameStarted) return;
 
     if (e.button === 0 && appCtx.onMoon && appCtx.apollo11Flag) {
@@ -66,13 +80,13 @@ export function setupEngineInputHandlers(appCtx) {
     }
   });
 
-  addEventListener('mouseup', (e) => {
+  inputScope.listen(globalThis, 'mouseup', (e) => {
     if (e.button === 2 || e.button === 1) {
       mouseActive = false;
     }
   });
 
-  addEventListener('mousemove', (e) => {
+  inputScope.listen(globalThis, 'mousemove', (e) => {
     if (!appCtx.gameStarted) return;
 
     const walkLookActive = appCtx.Walk && appCtx.Walk.state.mode === 'walk' && window.walkMouseLookActive;
@@ -95,13 +109,13 @@ export function setupEngineInputHandlers(appCtx) {
     }
   });
 
-  addEventListener('contextmenu', (e) => {
+  inputScope.listen(globalThis, 'contextmenu', (e) => {
     if (appCtx.gameStarted && (appCtx.droneMode || appCtx.Walk && appCtx.Walk.state.mode === 'walk')) {
       e.preventDefault();
     }
   });
 
-  addEventListener('click', (e) => {
+  inputScope.listen(globalThis, 'click', (e) => {
     if (!appCtx.gameStarted) return;
 
     if (typeof appCtx.handleBlockBuilderClick === 'function' && appCtx.handleBlockBuilderClick(e)) {
@@ -111,7 +125,7 @@ export function setupEngineInputHandlers(appCtx) {
     appCtx.checkStarClick(e.clientX, e.clientY);
   });
 
-  addEventListener('touchend', (e) => {
+  inputScope.listen(globalThis, 'touchend', (e) => {
     if (!appCtx.gameStarted) return;
     if (typeof appCtx.handleBlockBuilderClick !== 'function') return;
     if (!e.changedTouches || e.changedTouches.length === 0) return;
@@ -121,4 +135,5 @@ export function setupEngineInputHandlers(appCtx) {
       e.stopPropagation();
     }
   }, { passive: false });
+  return inputScope;
 }

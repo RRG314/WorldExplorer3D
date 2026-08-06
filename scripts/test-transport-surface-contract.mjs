@@ -17,8 +17,8 @@ import {
   updateFeatureSurfaceProfile
 } from '../app/js/structure-semantics.js';
 import { detectRoadIntersections } from '../app/js/terrain/intersections.js';
-import { compileIntersectionTopologyGeometry } from '../app/js/terrain/intersection-geometry.js';
 import { roadHeadingAtSegment } from '../app/js/world/spawn-surface.js';
+import { resolveVehicleSurface } from '../app/js/physics/vehicle-surface.js';
 
 const EPSILON = 1e-4;
 const SURFACE_BIAS = 0.08;
@@ -104,21 +104,22 @@ for (const terrain of terrainFamilies) {
   assert.equal(model.schemaVersion, TRANSPORT_SURFACE_SCHEMA_VERSION);
   assert.equal(model.authority, 'compiled_transport_surface');
   assert.ok(model.stats.maximumGrade <= 0.1201, `${terrain.id}: grade limit exceeded`);
-
-  for (let index = 0; index < model.distances.length; index += 1) {
-    const x = model.distances[index];
-    const centerGround = terrain.sample(x, 0);
-    const leftGround = terrain.sample(x, 5);
-    const rightGround = terrain.sample(x, -5);
-    assert.ok(model.centerHeights[index] + EPSILON >= centerGround + SURFACE_BIAS, `${terrain.id}: center clipped`);
-    assert.ok(model.leftHeights[index] + EPSILON >= leftGround + SURFACE_BIAS, `${terrain.id}: left edge clipped`);
-    assert.ok(model.rightHeights[index] + EPSILON >= rightGround + SURFACE_BIAS, `${terrain.id}: right edge clipped`);
+  assert.equal(model.cutFillPolicy.signed, true, `${terrain.id}: terrain-relative profile disabled`);
+  assert.ok(
+    model.stats.maximumCut <= model.cutFillPolicy.maximumCutMeters + EPSILON,
+    `${terrain.id}: cut bound exceeded`
+  );
+  if (terrain.id === 'rolling_inland' || terrain.id === 'high_mountain') {
+    assert.ok(model.stats.maximumCut <= EPSILON, `${terrain.id}: road can be buried without a published terrain cut`);
+    assert.ok(model.stats.maximumFill > 0.02, `${terrain.id}: road did not fill terrain dips`);
   }
 
   geographyResults.push({
     id: terrain.id,
     samples: model.distances.length,
-    maximumGrade: Number(model.stats.maximumGrade.toFixed(5))
+    maximumGrade: Number(model.stats.maximumGrade.toFixed(5)),
+    maximumCut: Number(model.stats.maximumCut.toFixed(4)),
+    maximumFill: Number(model.stats.maximumFill.toFixed(4))
   });
 }
 
@@ -236,6 +237,149 @@ assert.ok(
 );
 assert.ok(connectedBridgeModel.stats.maximumGrade <= 0.1201, 'connected bridge approach exceeded grade limit');
 
+const openBridge = straightFeature({
+  id: 'open-bridge-transition',
+  length: 180,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+assignFeatureConnections([openBridge]);
+openBridge.structureStations = buildFeatureStations(openBridge, {
+  features: [openBridge],
+  waterAreas: []
+});
+const openBridgeAnchors = buildFeatureTransitionAnchors(openBridge, () => 30);
+assert.deepEqual(
+  openBridgeAnchors.map((anchor) => [anchor.endpoint, anchor.targetOffset, anchor.source]),
+  [
+    ['start', 0, 'open_structure_transition'],
+    ['end', 0, 'open_structure_transition']
+  ],
+  'an incomplete bridge did not receive shared ground transitions at both open ends'
+);
+updateFeatureSurfaceProfile(openBridge, () => 30);
+assert.ok(
+  Math.abs(sampleTransportSurfaceAtDistance(openBridge.transportSurfaceModel, 0) - 30.08) <= 0.02 &&
+  Math.abs(sampleTransportSurfaceAtDistance(openBridge.transportSurfaceModel, 180) - 30.08) <= 0.02,
+  'open bridge endpoints did not return smoothly to the accepted ground surface'
+);
+
+const shortElevatedTieIn = straightFeature({
+  id: 'short-elevated-tie-in',
+  length: 52,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:overpass'
+  }
+});
+shortElevatedTieIn.structureStations = [
+  { distance: 26, targetOffset: 5.5, span: 24, source: 'feature_crossing' }
+];
+shortElevatedTieIn.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 22 },
+  { endpoint: 'end', distance: 52, targetOffset: 0, span: 22 }
+];
+const shortTieInModel = compileTransportSurfaceModel(shortElevatedTieIn, () => 30, {
+  sampleStep: 1
+});
+assert.ok(
+  Math.abs(sampleTransportSurfaceAtDistance(shortTieInModel, 0) - 30.08) <= 0.001 &&
+  Math.abs(sampleTransportSurfaceAtDistance(shortTieInModel, 52) - 30.08) <= 0.001,
+  'crossing clearance displaced a hard ground transition endpoint'
+);
+assert.equal(shortTieInModel.endpointPolicy, 'hard_transition_tie_in');
+
+const infeasibleConnectedTieIn = straightFeature({
+  id: 'infeasible-connected-tie-in',
+  length: 18,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:2:bridge'
+  }
+});
+infeasibleConnectedTieIn.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 20, source: 'connected_feature' },
+  { endpoint: 'end', distance: 18, targetOffset: 11, span: 20, source: 'connected_feature' }
+];
+const infeasibleTieInModel = compileTransportSurfaceModel(infeasibleConnectedTieIn, () => 30, {
+  sampleStep: 0.5
+});
+assert.ok(
+  infeasibleTieInModel.stats.maximumGrade <= 0.1201,
+  'infeasible connected endpoint offsets bypassed the grade limit'
+);
+
+const clearanceConstrainedTieIn = straightFeature({
+  id: 'clearance-constrained-tie-in',
+  length: 67.44,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+clearanceConstrainedTieIn.minimumStructureSurfaceY = 42;
+clearanceConstrainedTieIn.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 58, source: 'connected_feature' },
+  { endpoint: 'end', distance: 67.44, targetOffset: 0, span: 58, source: 'connected_feature' }
+];
+const clearanceConstrainedModel = compileTransportSurfaceModel(
+  clearanceConstrainedTieIn,
+  () => 30,
+  { sampleStep: 1 }
+);
+assert.ok(
+  clearanceConstrainedModel.stats.minimumY >= 42 - EPSILON,
+  'an infeasible endpoint tie-in pulled the bridge below its clearance envelope'
+);
+assert.ok(
+  clearanceConstrainedModel.stats.maximumGrade <= 0.1201,
+  'an infeasible endpoint tie-in reintroduced an unsafe bridge grade'
+);
+
+const layerOnlyDriveway = straightFeature({
+  id: 'layer-only-driveway',
+  length: 52,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    layer: 1,
+    verticalOrder: 1,
+    deckClearance: 5.5,
+    explicitBaseOffset: 0,
+    isBridge: false,
+    isTunnel: false,
+    rampCandidate: false,
+    verticalGroup: 'elevated:1:elevated'
+  }
+});
+layerOnlyDriveway.structureStations = buildFeatureStations(layerOnlyDriveway, {
+  features: [layerOnlyDriveway],
+  waterAreas: [],
+  sampleTerrainY: () => 30
+});
+assert.deepEqual(
+  layerOnlyDriveway.structureStations,
+  [],
+  'relative layer metadata fabricated a physical clearance hump without a crossing or height source'
+);
+
 const tunnelGround = (x) => 104 + 2 * Math.exp(-((x - 120) ** 2) / 180);
 const tunnel = straightFeature({
   id: 'tunnel-hill',
@@ -281,6 +425,29 @@ const rampModel = compileTransportSurfaceModel(ramp, () => 20, {
 assert.ok(rampModel.stats.maximumGrade <= 0.1001, 'ramp grade exceeded ten percent');
 assert.ok(rampModel.stats.maximumGradeDelta <= 0.02, 'ramp introduced an abrupt vertical kink');
 assert.ok(sampleTransportSurfaceAtDistance(rampModel, 139) > sampleTransportSurfaceAtDistance(rampModel, 1) + 7.7);
+
+const longTerrainConformingRoad = straightFeature({
+  id: 'long-terrain-conforming-road',
+  length: 1200,
+  semantics: {
+    terrainMode: 'at_grade',
+    gradeSeparated: false,
+    verticalGroup: 'at_grade:0:at_grade'
+  }
+});
+updateFeatureSurfaceProfile(longTerrainConformingRoad, () => 20);
+const longRoadDistances = longTerrainConformingRoad.transportSurfaceModel.distances;
+let maximumLongRoadSampleGap = 0;
+for (let index = 1; index < longRoadDistances.length; index += 1) {
+  maximumLongRoadSampleGap = Math.max(
+    maximumLongRoadSampleGap,
+    longRoadDistances[index] - longRoadDistances[index - 1]
+  );
+}
+assert.ok(
+  maximumLongRoadSampleGap <= 2.01,
+  'long at-grade roads were sampled too coarsely to remain above rendered terrain'
+);
 
 const stackGround = () => 40;
 const stackModels = [
@@ -373,6 +540,28 @@ for (const connected of [connectedElevatedA, connectedElevatedB]) {
     'connected elevated road segments were mistaken for a crossing and given an artificial hump'
   );
 }
+
+const nearEndpointFragmentA = {
+  ...connectedElevatedA,
+  sourceFeatureId: 'near-endpoint-a',
+  pts: [{ x: -100, z: 20 }, { x: 0, z: 20 }]
+};
+const nearEndpointFragmentB = {
+  ...connectedElevatedB,
+  sourceFeatureId: 'near-endpoint-b',
+  pts: [{ x: 0.42, z: 20 }, { x: 100, z: 20 }]
+};
+assignFeatureConnections([nearEndpointFragmentA, nearEndpointFragmentB]);
+assert.equal(
+  nearEndpointFragmentA.connectedFeatures.end?.[0]?.feature,
+  nearEndpointFragmentB,
+  'sub-meter vector-tile endpoint drift broke a continuous elevated road'
+);
+assert.equal(
+  nearEndpointFragmentB.connectedFeatures.start?.[0]?.feature,
+  nearEndpointFragmentA,
+  'near-endpoint connection ownership was not reciprocal'
+);
 
 const connectedDeckCrossing = {
   ...straightFeature({
@@ -553,10 +742,55 @@ for (let index = 0; index < parityFeature.pts.length; index += 1) {
   const centerY = sampleFeatureSurfaceY(parityFeature, center.x, center.z, projected);
   const leftY = sampleFeatureSurfaceY(parityFeature, left.x, left.z, projected);
   const rightY = sampleFeatureSurfaceY(parityFeature, right.x, right.z, projected);
-  assert.ok(Math.abs(left.y - leftY) <= EPSILON, 'left render/collision surface diverged');
-  assert.ok(Math.abs(right.y - rightY) <= EPSILON, 'right render/collision surface diverged');
+  assert.ok(Math.abs(left.y - leftY) <= 0.4501, 'left at-grade crossfall exceeded its contract');
+  assert.ok(Math.abs(right.y - rightY) <= 0.4501, 'right at-grade crossfall exceeded its contract');
   assert.ok(Number.isFinite(centerY), 'center gameplay surface unavailable');
 }
+
+const rightAngleRoad = {
+  ...straightFeature({
+    id: 'right-angle-miter',
+    length: 40,
+    width: 10,
+    semantics: {
+      terrainMode: 'at_grade',
+      gradeSeparated: false,
+      verticalGroup: 'at_grade:0:at_grade'
+    }
+  }),
+  pts: [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 20, z: 20 }]
+};
+updateFeatureSurfaceProfile(rightAngleRoad, () => 10);
+const rightAngleRibbon = buildFeatureRibbonEdges(
+  rightAngleRoad,
+  rightAngleRoad.pts,
+  5,
+  () => 10
+);
+const cornerLeft = rightAngleRibbon.leftEdge[1];
+const cornerRight = rightAngleRibbon.rightEdge[1];
+assert.ok(
+  Math.abs(Math.abs(cornerLeft.z) - 5) <= EPSILON &&
+    Math.abs(Math.abs(cornerLeft.x - 20) - 5) <= EPSILON &&
+    Math.abs(Math.abs(cornerRight.z) - 5) <= EPSILON &&
+    Math.abs(Math.abs(cornerRight.x - 20) - 5) <= EPSILON,
+  'corridor miter failed to preserve width through a right-angle curve'
+);
+
+const hairpinRoad = {
+  ...rightAngleRoad,
+  id: 'bounded-hairpin-miter',
+  pts: [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 8, z: 4 }]
+};
+updateFeatureSurfaceProfile(hairpinRoad, () => 10);
+const hairpinRibbon = buildFeatureRibbonEdges(hairpinRoad, hairpinRoad.pts, 5, () => 10);
+assert.ok(
+  Math.hypot(
+    hairpinRibbon.leftEdge[1].x - hairpinRoad.pts[1].x,
+    hairpinRibbon.leftEdge[1].z - hairpinRoad.pts[1].z
+  ) <= 7.5001,
+  'sharp road bend emitted an unbounded wedge beyond the carriageway edge'
+);
 
 const intersectionRoad = (id, endX, endZ) => ({
   sourceFeatureId: id,
@@ -579,35 +813,23 @@ intersectionRoads.forEach((road) => updateFeatureSurfaceProfile(road, () => 10))
 const detectedIntersection = detectRoadIntersections(intersectionRoads)
   .find((intersection) => intersection.roads.length === 4);
 assert.ok(detectedIntersection, 'four-branch graph intersection was not detected');
-const intersectionGeometry = compileIntersectionTopologyGeometry(
-  detectedIntersection,
-  intersectionRoads,
-  {
-    computeRadius: () => 3,
-    projectPointToFeature: (feature, x, z) => {
-      const end = feature.pts[1];
-      const lengthSquared = end.x ** 2 + end.z ** 2;
-      const t = Math.max(0, Math.min(1, (x * end.x + z * end.z) / lengthSquared));
-      const px = end.x * t;
-      const pz = end.z * t;
-      return { x: px, z: pz, dist: Math.hypot(x - px, z - pz), segIndex: 0, t };
-    },
-    sampleFeatureSurfaceY,
-    sampleGroundY: () => 10,
-    surfaceBias: SURFACE_BIAS
-  }
-);
-assert.ok(intersectionGeometry.polygon.length >= 4, 'intersection topology polygon is incomplete');
-assert.ok(intersectionGeometry.area >= 90, 'intersection topology polygon left a central hole');
 assert.equal(
-  intersectionGeometry.indices.length,
-  intersectionGeometry.polygon.length * 3,
-  'intersection topology was not triangulated once'
+  fs.existsSync(path.join(repositoryRoot, 'app', 'js', 'terrain', 'intersection-geometry.js')),
+  false,
+  'separate intersection fill geometry must not compete with continuous road ribbons'
 );
-for (let vertexIndex = 1; vertexIndex < intersectionGeometry.verts.length / 3; vertexIndex += 1) {
-  const y = intersectionGeometry.verts[vertexIndex * 3 + 1];
-  assert.ok(Math.abs(y - 10.08) <= EPSILON, 'intersection render surface diverged from connected road authority');
-}
+const earthRoadProfile = resolveVehicleSurface({
+  onMars: false,
+  onMoon: false,
+  car: { onRoad: true, road: { surfaceTag: 'asphalt' } }
+});
+const earthTerrainProfile = resolveVehicleSurface({
+  onMars: false,
+  onMoon: false,
+  car: { onRoad: false, road: { surfaceTag: 'sand' } }
+});
+assert.equal(earthRoadProfile, earthTerrainProfile, 'Earth handling changed away from mapped road geometry');
+assert.equal(earthRoadProfile.kind, 'asphalt', 'Earth did not retain its neutral driving profile');
 
 const separatedCrossingRoads = [
   {
@@ -684,6 +906,21 @@ assert.equal(
   false,
   'bridge and tunnel primary roads lost their compiled center markings'
 );
+const retiredEarthDrivingTerms = /\b(?:offRoad|offroad|off-road|offMax|offFriction|indOff)\b/i;
+for (const relativePath of [
+  'app/index.html',
+  'app/js/engine.js',
+  'app/js/hud.js',
+  'app/js/physics.js',
+  'app/js/physics/vehicle-surface.js'
+]) {
+  const source = fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
+  assert.equal(
+    retiredEarthDrivingTerms.test(source),
+    false,
+    `${relativePath} restored retired Earth off-road behavior`
+  );
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -699,6 +936,7 @@ console.log(JSON.stringify({
   parity: 'compiled-render-query-width-aware',
   ownership: {
     compiledPublicationCallers: publicationCallers,
-    forbiddenRuntimeOwners
+    forbiddenRuntimeOwners,
+    earthDrivingProfile: earthRoadProfile.kind
   }
 }, null, 2));

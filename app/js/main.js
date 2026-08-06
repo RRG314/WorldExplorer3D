@@ -1,6 +1,6 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=2';
-import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=3';
+import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=2';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 
 let perfPanelTimer = 0;

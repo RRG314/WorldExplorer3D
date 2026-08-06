@@ -3,6 +3,10 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { WORLD_TEST_LOCATIONS } from './world-test-locations.mjs';
 import { captureDroneView, captureViewport } from './world-matrix-visuals.mjs';
+import {
+  classifyEvidence,
+  verifyVisualReview
+} from './production-readiness.mjs';
 import { assertWorldMatrixLocation } from './world-matrix-assertions.mjs';
 import { startStaticRootServer } from './test-static-server.mjs';
 
@@ -24,6 +28,8 @@ const buildingDetailWaitLimitMs = 32000;
 const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT_NAME || '')) ?
   String(process.env.WORLD_MATRIX_REPORT_NAME) :
   'report.json';
+const visualReviewFile = String(process.env.WORLD_MATRIX_VISUAL_REVIEW_FILE || '').trim();
+const headed = process.env.WORLD_MATRIX_HEADED === '1';
 const requestedLocationIds = new Set(
   String(process.env.WORLD_MATRIX_IDS || '')
     .split(',')
@@ -146,8 +152,44 @@ async function loadLocation(page, spec) {
       ctx.selLoc = String(locationSpec.key);
     }
 
+    const requestedSelection = ctx.resolveLocationSelection?.() || null;
+    if (
+      !requestedSelection ||
+      !Number.isFinite(Number(requestedSelection.lat)) ||
+      !Number.isFinite(Number(requestedSelection.lon))
+    ) {
+      throw new Error(`${locationSpec.id}: requested location did not resolve`);
+    }
+    const sequenceBeforeLoad = Number(ctx._worldLoadSequence || 0);
     await ctx.loadRoads();
     const loadMs = performance.now() - startedAt;
+    const completedLoad = ctx.worldLoadRuntimeState || null;
+    const publication = ctx.worldPublication || null;
+    const coordinateDelta = (left, right) => {
+      const raw = Math.abs(Number(left) - Number(right));
+      return Math.min(raw, Math.abs(raw - 360));
+    };
+    const completedRequestedLocation = !!(
+      completedLoad &&
+      Number(completedLoad.sequence) > sequenceBeforeLoad &&
+      completedLoad.status === 'ready' &&
+      Math.abs(Number(completedLoad.location?.lat) - Number(requestedSelection.lat)) <= 1e-7 &&
+      coordinateDelta(completedLoad.location?.lon, requestedSelection.lon) <= 1e-7 &&
+      Number(publication?.sequence) === Number(completedLoad.sequence) &&
+      Math.abs(Number(publication?.location?.lat) - Number(requestedSelection.lat)) <= 1e-7 &&
+      coordinateDelta(publication?.location?.lon, requestedSelection.lon) <= 1e-7
+    );
+    if (!completedRequestedLocation) {
+      throw new Error(
+        `${locationSpec.id}: load resolved without publishing the requested location ` +
+        JSON.stringify({
+          requested: requestedSelection,
+          sequenceBeforeLoad,
+          completedLoad,
+          publication
+        })
+      );
+    }
     await new Promise((resolve) => window.setTimeout(resolve, 1200));
     const buildingDetailWaitStartedAt = performance.now();
     while (
@@ -343,6 +385,121 @@ async function loadLocation(page, spec) {
       if (waterway?.navigable === false) structurePresentation.nonNavigableWaterways += 1;
     }
 
+    const elevatedTerminalEndpoints = [];
+    const elevatedInteriorConnections = [];
+    const traversalRadius = Number(ctx.worldTraversalRadiusWorld || 0);
+    for (const road of ctx.roads || []) {
+      if (
+        road?.structureSemantics?.terrainMode !== 'elevated' ||
+        !Array.isArray(road?.pts) ||
+        road.pts.length < 2
+      ) continue;
+      for (const endpoint of ['start', 'end']) {
+        const connections = Array.isArray(road.connectedFeatures?.[endpoint]) ?
+          road.connectedFeatures[endpoint] :
+          [];
+        for (const connection of connections) {
+          if (connection?.endpoint !== 'interior') continue;
+          elevatedInteriorConnections.push({
+            sourceFeatureId: String(road.sourceFeatureId || ''),
+            name: String(road.name || road.type || ''),
+            endpoint,
+            targetFeatureId: String(connection.feature?.sourceFeatureId || ''),
+            targetName: String(connection.feature?.name || connection.feature?.type || ''),
+            targetSegmentIndex: Number(connection.segmentIndex),
+            lateralGap: Number((Number(connection.distance) || 0).toFixed(3))
+          });
+        }
+        if (connections.length > 0) continue;
+        const point = endpoint === 'start' ? road.pts[0] : road.pts[road.pts.length - 1];
+        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(road, point.x, point.z));
+        const terrainY = Number(
+          ctx.baseTerrainHeightAt?.(point.x, point.z) ??
+          ctx.terrainMeshHeightAt?.(point.x, point.z) ??
+          0
+        );
+        const heightAboveTerrain = surfaceY - terrainY;
+        if (!(heightAboveTerrain > 2.5)) continue;
+        let nearestRoadEndpoint = null;
+        let nearestRoadSegment = null;
+        for (const otherRoad of ctx.roads || []) {
+          if (otherRoad === road || !Array.isArray(otherRoad?.pts) || otherRoad.pts.length < 2) continue;
+          for (const otherEndpoint of ['start', 'end']) {
+            const otherPoint = otherEndpoint === 'start' ?
+              otherRoad.pts[0] :
+              otherRoad.pts[otherRoad.pts.length - 1];
+            const distance = Math.hypot(otherPoint.x - point.x, otherPoint.z - point.z);
+            if (!nearestRoadEndpoint || distance < nearestRoadEndpoint.distance) {
+              nearestRoadEndpoint = {
+                distance,
+                sourceFeatureId: String(otherRoad.sourceFeatureId || ''),
+                name: String(otherRoad.name || otherRoad.type || ''),
+                type: String(otherRoad.type || ''),
+                endpoint: otherEndpoint,
+                terrainMode: String(otherRoad.structureSemantics?.terrainMode || '')
+              };
+            }
+          }
+          for (let segmentIndex = 0; segmentIndex < otherRoad.pts.length - 1; segmentIndex += 1) {
+            const a = otherRoad.pts[segmentIndex];
+            const b = otherRoad.pts[segmentIndex + 1];
+            const dx = b.x - a.x;
+            const dz = b.z - a.z;
+            const lengthSq = dx * dx + dz * dz;
+            if (!(lengthSq > 1e-6)) continue;
+            const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.z - a.z) * dz) / lengthSq));
+            const projectedX = a.x + dx * t;
+            const projectedZ = a.z + dz * t;
+            const distance = Math.hypot(projectedX - point.x, projectedZ - point.z);
+            if (!nearestRoadSegment || distance < nearestRoadSegment.distance) {
+              nearestRoadSegment = {
+                distance,
+                sourceFeatureId: String(otherRoad.sourceFeatureId || ''),
+                name: String(otherRoad.name || otherRoad.type || ''),
+                type: String(otherRoad.type || ''),
+                segmentIndex,
+                t,
+                terrainMode: String(otherRoad.structureSemantics?.terrainMode || '')
+              };
+            }
+          }
+        }
+        elevatedTerminalEndpoints.push({
+          sourceFeatureId: String(road.sourceFeatureId || ''),
+          name: String(road.name || road.type || ''),
+          type: String(road.type || ''),
+          endpoint,
+          x: Number(point.x.toFixed(2)),
+          z: Number(point.z.toFixed(2)),
+          distance: Number(Math.hypot(point.x, point.z).toFixed(2)),
+          insideTraversalBoundary: traversalRadius > 0 ?
+            Math.hypot(point.x, point.z) < traversalRadius - 30 :
+            null,
+          surfaceY: Number(surfaceY.toFixed(2)),
+          terrainY: Number(terrainY.toFixed(2)),
+          heightAboveTerrain: Number(heightAboveTerrain.toFixed(2)),
+          layer: String(road.structureTags?.layer || ''),
+          bridge: String(road.structureTags?.bridge || ''),
+          terminalBarrierPresent: (ctx.buildings || []).some((building) =>
+            building?.geometrySource === 'road_terminal_guardrail' &&
+            String(building?.sourceBuildingId || '').startsWith(
+              `${String(road.sourceFeatureId || '')}:guardrail:terminal:${endpoint}`
+            )
+          ),
+          nearestRoadEndpoint: nearestRoadEndpoint ? {
+            ...nearestRoadEndpoint,
+            distance: Number(nearestRoadEndpoint.distance.toFixed(3))
+          } : null,
+          nearestRoadSegment: nearestRoadSegment ? {
+            ...nearestRoadSegment,
+            distance: Number(nearestRoadSegment.distance.toFixed(3)),
+            t: Number(nearestRoadSegment.t.toFixed(3))
+          } : null
+        });
+      }
+    }
+    elevatedTerminalEndpoints.sort((a, b) => a.distance - b.distance);
+
     let stackedRoadCrossings = null;
     if (Number.isFinite(locationSpec.expectedStackedRoadClearance)) {
       const elevatedRoads = (ctx.roads || []).filter((road) =>
@@ -473,10 +630,14 @@ async function loadLocation(page, spec) {
         }
         const start = targetRoad.pts[segmentIndex];
         const end = targetRoad.pts[segmentIndex + 1];
-        const x = (start.x + end.x) * 0.5;
-        const z = (start.z + end.z) * 0.5;
-        const angle = Math.atan2(-(end.x - start.x), -(end.z - start.z));
-        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(targetRoad, x, z, { segIndex: segmentIndex, t: 0.5 }));
+        const probeSegmentT = 0.08;
+        const x = start.x + (end.x - start.x) * probeSegmentT;
+        const z = start.z + (end.z - start.z) * probeSegmentT;
+        const angle = Math.atan2(end.x - start.x, end.z - start.z);
+        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(targetRoad, x, z, {
+          segIndex: segmentIndex,
+          t: probeSegmentT
+        }));
         const renderedY = Number.isFinite(surfaceY) && ctx.GroundHeight?._raycastMeshY ?
           ctx.GroundHeight._raycastMeshY(ctx.roadMeshes || [], x, z, surfaceY + 2.2, 5) :
           null;
@@ -512,7 +673,8 @@ async function loadLocation(page, spec) {
             KeyA: !!ctx.keys?.KeyA,
             ArrowLeft: !!ctx.keys?.ArrowLeft,
             KeyD: !!ctx.keys?.KeyD,
-            ArrowRight: !!ctx.keys?.ArrowRight
+            ArrowRight: !!ctx.keys?.ArrowRight,
+            Space: !!ctx.keys?.Space
           };
 
           if (ctx.keys && typeof ctx.update === 'function') {
@@ -522,7 +684,16 @@ async function loadLocation(page, spec) {
             ctx.keys.ArrowLeft = false;
             ctx.keys.KeyD = false;
             ctx.keys.ArrowRight = false;
+            ctx.keys.Space = false;
             for (let frame = 0; frame < frameCount; frame += 1) {
+              const distanceFromStart = Math.hypot(
+                Number(ctx.car?.x) - startX,
+                Number(ctx.car?.z) - startZ
+              );
+              const traversedProbeDistance = distanceFromStart >= 45;
+              ctx.keys.KeyW = !traversedProbeDistance;
+              ctx.keys.ArrowUp = !traversedProbeDistance;
+              ctx.keys.Space = traversedProbeDistance;
               ctx.update(1 / 60);
               const carFeetY = Number(ctx.car?.y) - 1.2;
               const currentRoad = ctx.findNearestRoad?.(Number(ctx.car?.x), Number(ctx.car?.z), {
@@ -560,6 +731,14 @@ async function loadLocation(page, spec) {
           const endX = Number(ctx.car?.x);
           const endZ = Number(ctx.car?.z);
           structureGameplay = {
+            evidence: {
+              kind: 'synthetic-direct-state',
+              realInput: false,
+              wallClockSeconds: 0,
+              softwareRenderer: false,
+              visualReviewApproved: false,
+              releaseEligible: false
+            },
             simulatedSeconds: Number((frameCount / 60).toFixed(1)),
             frames: frameCount,
             moved: Number(Math.hypot(endX - startX, endZ - startZ).toFixed(2)),
@@ -843,6 +1022,8 @@ async function loadLocation(page, spec) {
     // Keep actor pose and road evidence from the same frame. The nearest-road API
     // reuses one result object, and the diagnostics above can yield while the game
     // continues to reconcile streamed terrain.
+    let finalActorCollision = null;
+    let finalCameraBuilding = null;
     if (expectedStart !== 'water') {
       actorX = Number.isFinite(ctx.car?.x) ? ctx.car.x : Number(ctx.Walk?.state?.walker?.x || 0);
       actorZ = Number.isFinite(ctx.car?.z) ? ctx.car.z : Number(ctx.Walk?.state?.walker?.z || 0);
@@ -867,6 +1048,20 @@ async function loadLocation(page, spec) {
       roadSegments = Array.isArray(nearestRoad?.road?.pts) ? nearestRoad.road.pts.slice(0, -1).map((point, index) =>
         Math.hypot(nearestRoad.road.pts[index + 1].x - point.x, nearestRoad.road.pts[index + 1].z - point.z)
       ) : [];
+      finalActorCollision = ctx.checkBuildingCollision?.(actorX, actorZ, 2, {
+        actorBaseY: actorFeetY,
+        actorHeight: 1.9
+      }) || { collision: false, inside: false };
+      finalCameraBuilding = ctx.buildingContainingPoint?.(
+        Number(ctx.camera?.position?.x),
+        Number(ctx.camera?.position?.z),
+        0.1,
+        {
+          y: Number(ctx.camera?.position?.y),
+          actorHeight: 0.2,
+          tolerance: 0.05
+        }
+      ) || null;
       roadProfileY = Number(nearestRoad?.y);
       exactRenderedRoadY = ctx.GroundHeight?._raycastMeshY ?
         ctx.GroundHeight._raycastMeshY(
@@ -889,6 +1084,12 @@ async function loadLocation(page, spec) {
       category: locationSpec.category,
       expectedStart,
       loadMs: Number(loadMs.toFixed(1)),
+      worldLoad: {
+        sequence: Number(completedLoad.sequence),
+        status: String(completedLoad.status || ''),
+        location: { ...(completedLoad.location || {}) },
+        publicationSequence: Number(publication.sequence)
+      },
       buildingDetailWaitMs: Number(buildingDetailWaitMs.toFixed(1)),
       landmarkWaitMs: Number(landmarkWaitMs.toFixed(1)),
       baselineWaitMs: Number(baselineWaitMs.toFixed(1)),
@@ -933,6 +1134,8 @@ async function loadLocation(page, spec) {
       },
       landusePresentation,
       structurePresentation,
+      elevatedTerminalEndpoints,
+      elevatedInteriorConnections,
       stackedRoadCrossings,
       buildingPresentation,
       buildingDimensions,
@@ -948,6 +1151,13 @@ async function loadLocation(page, spec) {
         z: Number(actorZ.toFixed(2)),
         currentMode: typeof ctx.getCurrentTravelMode === 'function' ? ctx.getCurrentTravelMode() : (ctx.droneMode ? 'drone' : ctx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive')
       },
+      spawnOccupancy: expectedStart !== 'water' ? {
+        actorCollision: finalActorCollision?.collision === true,
+        actorInsideBuilding: finalActorCollision?.inside === true,
+        actorBuildingSourceId: String(finalActorCollision?.building?.sourceId || ''),
+        cameraInsideBuilding: !!finalCameraBuilding,
+        cameraBuildingSourceId: String(finalCameraBuilding?.sourceId || '')
+      } : null,
       initialSpawn: initialSpawn ? {
         valid: initialSpawn.valid !== false,
         mode: initialSpawn.mode || null,
@@ -1000,6 +1210,11 @@ async function loadLocation(page, spec) {
           terrainSamplerY: typeof nearestRoad.road.surfaceTerrainSampler === 'function' && nearestRoad.pt ?
             Number(Number(nearestRoad.road.surfaceTerrainSampler(nearestRoad.pt.x, nearestRoad.pt.z)).toFixed(2)) :
             null,
+          maximumFill: Number.isFinite(nearestRoad.road.transportSurfaceModel?.stats?.maximumFill) ?
+            Number(nearestRoad.road.transportSurfaceModel.stats.maximumFill.toFixed(2)) :
+            null,
+          retainingSkirtDepth:
+            nearestRoad.road.structureSemantics?.terrainMode === 'subgrade' ? 0.3 : 0,
           verticalDelta: Number.isFinite(nearestRoad.verticalDelta) ? Number(nearestRoad.verticalDelta.toFixed(2)) : null,
           surfaceY: Number.isFinite(roadProfileY) ? Number(roadProfileY.toFixed(2)) : null,
           surfaceMinY: Number(Number(nearestRoad.road.structureSurfaceMinY || 0).toFixed(2)),
@@ -1037,7 +1252,7 @@ async function main() {
   await mkdirp(outputDir);
   const server = externalBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts });
   const baseUrl = externalBaseUrl || `http://${host}:${server.port}`;
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: !headed });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   if (blockWorldCover) await page.route('https://titiler.terrascope.be/**', (route) => route.abort('blockedbyclient'));
   const consoleErrors = [];
@@ -1124,10 +1339,8 @@ async function main() {
         }
       } catch (err) {
         result.screenshotWarning = String(err?.message || err);
-        if (/drone LOD hid nearby building neighborhoods/.test(result.screenshotWarning)) {
-          result.assertionError = result.screenshotWarning;
-          locationFailures.push(result.screenshotWarning);
-        }
+        result.assertionError = result.screenshotWarning;
+        locationFailures.push(`${spec.id}: screenshot capture failed: ${result.screenshotWarning}`);
       }
       console.log(`[world-matrix] ready ${spec.id} (${result.loadMs}ms, ${result.counts.roads} roads)`);
       if (locationDelayMs > 0) await page.waitForTimeout(locationDelayMs);
@@ -1138,7 +1351,37 @@ async function main() {
     report.requestFailures = requestFailures;
     report.fatalConsoleErrors = fatalConsoleErrors;
     report.locationFailures = locationFailures;
-    report.pass = fatalConsoleErrors.length === 0 && locationFailures.length === 0;
+    report.automatedPass =
+      fatalConsoleErrors.length === 0 &&
+      locationFailures.length === 0;
+    const expectedScreenshots = report.locations.flatMap((result) => {
+      const spec = testLocations.find((candidate) => candidate.id === result.id);
+      const files = [path.join(outputDir, `${result.id}.png`)];
+      if (captureDroneViews && result.expectedStart !== 'water') {
+        files.push(path.join(outputDir, `${result.id}-drone.png`));
+      }
+      if (result.landmarkOverview) {
+        files.push(path.join(outputDir, `${result.id}-landmark.png`));
+      }
+      return spec ? files : [];
+    });
+    report.visualReview = await verifyVisualReview({
+      manifestPath: visualReviewFile ?
+        path.resolve(rootDir, visualReviewFile) :
+        '',
+      outputDir,
+      expectedFiles: expectedScreenshots
+    });
+    report.releaseEvidence = classifyEvidence({
+      kind: 'world-matrix',
+      realInput: false,
+      wallClockSeconds: 0,
+      softwareRenderer: false,
+      visualReviewApproved: report.visualReview.approved
+    });
+    report.pass =
+      report.automatedPass &&
+      report.visualReview.approved;
     await fs.writeFile(path.join(outputDir, reportName), JSON.stringify(report, null, 2));
   } finally {
     await browser.close();

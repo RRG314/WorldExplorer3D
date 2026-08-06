@@ -3,6 +3,21 @@ function terrainSample(sampler, x, z) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function terrainNormal(sampler, x, z, step = 1.5) {
+  const left = terrainSample(sampler, x - step, z);
+  const right = terrainSample(sampler, x + step, z);
+  const back = terrainSample(sampler, x, z - step);
+  const front = terrainSample(sampler, x, z + step);
+  let nx = left - right;
+  let ny = step * 2;
+  let nz = back - front;
+  const length = Math.hypot(nx, ny, nz) || 1;
+  nx /= length;
+  ny /= length;
+  nz /= length;
+  return { x: nx, y: ny, z: nz };
+}
+
 function edgeLength(a, b) {
   return Math.hypot(b.x - a.x, b.z - a.z);
 }
@@ -92,17 +107,20 @@ export function buildTerrainConformingPolygonGeometry(outer, holes, sampler, opt
   const baseY = Number(options.baseY) || 0;
   const offset = Number(options.surfaceOffset) || 0;
   const positions = [];
+  const normals = [];
   const uvs = [];
   triangles.forEach((triangle) => {
     upwardTriangle(triangle).forEach((point) => {
       positions.push(point.x, point.y - baseY + offset, point.z);
+      const normal = terrainNormal(sampler, point.x, point.z);
+      normals.push(normal.x, normal.y, normal.z);
       uvs.push(point.x * 0.02, point.z * 0.02);
     });
   });
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

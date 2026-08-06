@@ -9,7 +9,8 @@ import {
 } from '../app/js/world/compiler/district-ground-model.js';
 import {
   adaptSelectedLocationSource,
-  diagnoseDistrictGroundSource
+  diagnoseDistrictGroundSource,
+  prepareSelectedLocationSource
 } from '../app/js/world/compiler/selected-location-source-adapter.js';
 
 const nodes = {
@@ -98,6 +99,39 @@ const adapted = adaptSelectedLocationSource({
 assert.equal(adapted.selection.roadWays[0].sourceId, 'osm:way:20');
 assert.equal(adapted.diagnostics.districtSource.wayCount, 2);
 assert.equal(adapted.diagnostics.districtGroundModel.status, 'blocked');
+const worldwideSelection = prepareSelectedLocationSource({
+  allowWorldwideTerrainFallback: true,
+  location: { lat: 39, lon: -77 },
+  data: { _overpassSource: 'fixture' },
+  nodes,
+  prepareSelection: () => ({
+    roadWays: [road],
+    buildingWays: [building],
+    landuseWays: [],
+    waterwayWays: [],
+    railwayWays: [],
+    footwayWays: [],
+    cyclewayWays: [],
+    structureConnectorWays: [],
+    treeNodes: [nodes[3]],
+    treeRowWays: [],
+    poiNodes: [],
+    requestedCounts: { roads: 1, buildings: 1, landuse: 0, pois: 0 }
+  }),
+  terrainSourceSample: {
+    status: 'available',
+    elevationMeters: 22,
+    confidence: 0.35,
+    provenance: {
+      runtimeClassification: 'legacy-ground-fallback-only',
+      verticalDatum: 'mixed-source'
+    }
+  }
+});
+assert.equal(worldwideSelection.selection.roadWays.length, 1);
+assert.equal(worldwideSelection.selection.buildingWays.length, 1);
+assert.equal(worldwideSelection.diagnostics.acceptedGroundSelection.status, 'fallback');
+assert.equal(worldwideSelection.diagnostics.districtGroundModel.status, 'fallback');
 assert.equal(
   diagnoseDistrictGroundSource({
     status: 'pending',

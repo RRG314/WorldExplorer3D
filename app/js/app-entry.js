@@ -6,52 +6,51 @@ import './config.js?v=60';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
-import './runtime-diagnostics.js?v=21';
+import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
+import './runtime-diagnostics.js?v=22';
 import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=2';
-import './controls/action-input.js?v=1';
+import './location-session.js?v=3';
+import './controls/action-input.js?v=6';
 import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
-import './perf.js?v=56';
-import './env.js?v=57';
+import './perf.js?v=57';
+import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=75';
-import './terrain.js?v=149';
-import './world.js?v=230';
+import './ground.js?v=80';
+import './terrain.js?v=197';
+import './world.js?v=303';
 import './building-entry.js?v=5';
 import './interiors.js?v=9';
-import { init, tryEnablePostProcessing } from './engine.js?v=81';
-import './physics.js?v=81';
-import './walking.js?v=67';
-import './travel-mode.js?v=11';
-import { initBoatMode } from './boat-mode.js?v=29';
+import { init, tryEnablePostProcessing } from './engine.js?v=86';
+import './physics.js?v=98';
+import './walking.js?v=69';
+import './travel-mode.js?v=19';
+import { initBoatMode } from './boat-mode.js?v=36';
 import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=80';
-import './weather.js?v=4';
+import './sky.js?v=82';
+import './weather.js?v=5';
 import './live-earth/controller.js?v=21';
-import './solar-system.js?v=71';
-import './space.js?v=90';
+import './runtime/on-demand-modes.js?v=8';
 import './planetary/scene-ownership.js?v=9';
 import './planetary/vehicles.js?v=2';
 import './planetary/astronaut.js?v=1';
-import './planetary/sky-orientation.js?v=9';
+import './planetary/sky-orientation.js?v=10';
 import './planetary/moon-sky.js?v=1';
 import './planetary/mars-world.js?v=17';
 import './planetary/tracks.js?v=1';
-import './ocean.js?v=5';
-import './game.js?v=58';
-import './input.js?v=59';
-import './hud.js?v=72';
-import './map.js?v=58';
-import { renderLoop } from './main.js?v=68';
+import './game.js?v=59';
+import './input.js?v=60';
+import './hud.js?v=76';
+import './map.js?v=59';
+import { renderLoop } from './main.js?v=70';
 import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=104';
+import { setupUI } from './ui.js?v=116';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -193,10 +192,10 @@ function scheduleActivityDiscoveryWarmup(timeout = 2600) {
 function scheduleAnalyticsWarmup(timeout = 2800) {
     if (_analyticsWarmupScheduled || platformServices.isReady('analytics')) return;
     _analyticsWarmupScheduled = true;
-    scheduleIdleTask(() => {
+    scheduleAfterFirstPlay('analytics-runtime', () => {
         _analyticsWarmupScheduled = false;
-        void ensureAnalyticsModule();
-    }, timeout);
+        return ensureAnalyticsModule();
+    }, { timeout });
 }
 
 async function ensureOverlayRuntimeLayer() {
@@ -231,7 +230,7 @@ async function ensureMultiplayerPlatformReady() {
 function scheduleTutorialInit() {
     if (_tutorialInitPromise) return _tutorialInitPromise;
     _tutorialInitPromise = new Promise((resolve) => {
-        scheduleIdleTask(async () => {
+        scheduleAfterFirstPlay('tutorial-runtime', async () => {
             try {
                 const mod = await import('./tutorial/tutorial.js?v=2');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
@@ -240,7 +239,7 @@ function scheduleTutorialInit() {
             } finally {
                 resolve(true);
             }
-        }, 2200);
+        }, { timeout: 2200 });
     });
     return _tutorialInitPromise;
 }
