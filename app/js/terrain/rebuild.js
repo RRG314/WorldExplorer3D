@@ -8,7 +8,6 @@ import {
   shouldRenderRoadSkirts
 } from "../structure-semantics.js?v=40";
 
-import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 import {
   computeIntersectionCapRadius,
   shouldBuildCompactIntersectionCap
@@ -182,22 +181,9 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeigh
 
 export function publishCompiledTransportMeshes(deps = {}) {
   const {
-    constants = {},
     disableRoadDebugMode,
     clearTerrainHeightCache,
     getSharedRoadMaterials,
-    getSharedUrbanSurfaceMaterials,
-    boundsIntersectLocal,
-    expandBoundsLocal,
-    pointsBoundsLocal,
-    isUrbanLanduseType,
-    roadHasExplicitSidewalkHint,
-    roadSupportsSidewalks,
-    roadBaseSidewalkWidth,
-    resolveSidewalkWidth,
-    computeSidewalkCornerScale,
-    clampSidewalkWidthTransitions,
-    smoothSidewalkOuterHeights,
     cachedTerrainHeight,
     cachedBaseTerrainHeight,
     subdivideRoadPoints,
@@ -206,15 +192,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
     rebuildStructureVisualMeshes,
     validateRoadTerrainConformance
   } = deps;
-
-  const {
-    SIDEWALK_INNER_GAP = 0.18,
-    SIDEWALK_MIN_WIDTH = 0.9,
-    SIDEWALK_SEGMENT_MIN_WIDTH = 0.62,
-    SIDEWALK_CURB_LIFT = 0.05,
-    SIDEWALK_HEIGHT_BIAS = 0.13,
-    URBAN_CONTEXT_PAD = 26
-  } = constants;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
   const baseRoads = appCtx.roads;
@@ -274,9 +251,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
   const roadSkirtBatchIdx = [];
   const roadMarkBatchVerts = [];
   const roadMarkBatchIdx = [];
-  const sidewalkBatchVerts = [];
-  const sidewalkBatchIdx = [];
-
   const flushRoadMainBatch = () => {
     if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
       roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx });
@@ -297,10 +271,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
   const markMat = sharedRoadMaterials.markMat;
-  const urbanSurfaceMaterials = typeof getSharedUrbanSurfaceMaterials === "function" ? getSharedUrbanSurfaceMaterials() : {};
-  const sidewalkMat = urbanSurfaceMaterials.sidewalkMat;
-
-  baseRoads.forEach((road, roadIdx) => {
+  baseRoads.forEach((road) => {
     if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return;
     const { width } = road;
     const hw = width / 2;
@@ -324,13 +295,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
     const indices = [];
     const leftEdge = [];
     const rightEdge = [];
-    // The detached sidewalk extrusion has no junction/topology authority and
-    // produces pale floating strips on steep or fragmented OSM ways. Preserve
-    // the mapped sidewalk hint for navigation, but do not publish competing
-    // geometry until it can share the road/junction surface contract.
-    const shouldBuildSidewalks = false;
-    const sidewalkWidth = 0;
-
     const roadTerrainSampler = road?.structureSemantics?.terrainMode === "at_grade" ?
       cachedTerrainHeight :
       cachedBaseTerrainHeight;
@@ -357,107 +321,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
       }
     }
 
-    if (shouldBuildSidewalks) {
-      const roadBounds = road.bounds || pointsBoundsLocal(road.pts, width * 0.5 + URBAN_CONTEXT_PAD);
-      const contextBounds = expandBoundsLocal(roadBounds, URBAN_CONTEXT_PAD);
-      const contextCenterX = (contextBounds.minX + contextBounds.maxX) * 0.5;
-      const contextCenterZ = (contextBounds.minZ + contextBounds.maxZ) * 0.5;
-      const contextRadius = Math.max(
-        20,
-        Math.hypot(contextBounds.maxX - contextBounds.minX, contextBounds.maxZ - contextBounds.minZ) * 0.5
-      );
-      const nearbyBuildings = typeof appCtx.getNearbyBuildings === "function"
-        ? appCtx.getNearbyBuildings(contextCenterX, contextCenterZ, contextRadius)
-        : appCtx.buildings;
-      const buildingCandidates = Array.isArray(nearbyBuildings)
-        ? nearbyBuildings.filter((building) => boundsIntersectLocal(building, contextBounds))
-        : [];
-      const nearbyIntersections = intersections.filter((intersection) =>
-        !intersection?.hasGradeSeparatedRoad &&
-        boundsIntersectLocal(roadBounds, {
-          minX: intersection.x,
-          maxX: intersection.x,
-          minZ: intersection.z,
-          maxZ: intersection.z
-        }, Math.max(width * 1.1, 8))
-      );
-      const endpointIntersections = {
-        start: nearbyIntersections.find((intersection) =>
-          intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === 0)
-        ) || null,
-        end: nearbyIntersections.find((intersection) =>
-          intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === road.pts.length - 1)
-        ) || null
-      };
-      const allowLeft = road.sidewalkHint !== "right";
-      const allowRight = road.sidewalkHint !== "left";
-      if (allowLeft) {
-        buildSidewalkStripBatch({
-          pts,
-          edgePoints: leftEdge,
-          sideSign: 1,
-          halfWidth: hw,
-          desiredWidth: sidewalkWidth,
-          roadFeature: road,
-          buildingCandidates,
-          nearbyIntersections,
-          endpointIntersections,
-          constants: {
-            SIDEWALK_INNER_GAP,
-            SIDEWALK_MIN_WIDTH,
-            SIDEWALK_SEGMENT_MIN_WIDTH,
-            SIDEWALK_CURB_LIFT,
-            SIDEWALK_HEIGHT_BIAS
-          },
-          deps: {
-            appendIndexedGeometry,
-            cachedTerrainHeight,
-            clampSidewalkWidthTransitions,
-            computeIntersectionCapRadius,
-            computeSidewalkCornerScale,
-            resolveSidewalkWidth,
-            smoothSidewalkOuterHeights
-          },
-          targets: {
-            sidewalkBatchVerts,
-            sidewalkBatchIdx
-          }
-        });
-      }
-      if (allowRight) {
-        buildSidewalkStripBatch({
-          pts,
-          edgePoints: rightEdge,
-          sideSign: -1,
-          halfWidth: hw,
-          desiredWidth: sidewalkWidth,
-          roadFeature: road,
-          buildingCandidates,
-          nearbyIntersections,
-          endpointIntersections,
-          constants: {
-            SIDEWALK_INNER_GAP,
-            SIDEWALK_MIN_WIDTH,
-            SIDEWALK_SEGMENT_MIN_WIDTH,
-            SIDEWALK_CURB_LIFT,
-            SIDEWALK_HEIGHT_BIAS
-          },
-          deps: {
-            appendIndexedGeometry,
-            cachedTerrainHeight,
-            clampSidewalkWidthTransitions,
-            computeIntersectionCapRadius,
-            computeSidewalkCornerScale,
-            resolveSidewalkWidth,
-            smoothSidewalkOuterHeights
-          },
-          targets: {
-            sidewalkBatchVerts,
-            sidewalkBatchIdx
-          }
-        });
-      }
-    }
   });
 
   let compactJunctionCount = 0;
@@ -511,29 +374,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
     receiveShadow: false,
     userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
-  if (sidewalkBatchVerts.length > 0 && sidewalkBatchIdx.length > 0) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(sidewalkBatchVerts, 3));
-    const vertexCount = sidewalkBatchVerts.length / 3;
-    const indexArray = vertexCount > 65535 ? new Uint32Array(sidewalkBatchIdx) : new Uint16Array(sidewalkBatchIdx);
-    geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
-    geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, sidewalkMat);
-    mesh.renderOrder = 2;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-    Object.assign(mesh.userData, {
-      isUrbanSurfaceBatch: true,
-      isSidewalkBatch: true,
-      sharedUrbanSurfaceMaterial: true
-    });
-    appCtx.scene.add(mesh);
-    appCtx.urbanSurfaceMeshes.push(mesh);
-    appCtx.urbanSurfaceStats.sidewalkBatchCount += 1;
-    appCtx.urbanSurfaceStats.sidewalkVertices += vertexCount;
-    appCtx.urbanSurfaceStats.sidewalkTriangles += sidewalkBatchIdx.length / 3;
-  }
-
   rebuildStructureVisualMeshes({
     boundsIntersect: boundsIntersectLocal,
     cachedTerrainHeight,

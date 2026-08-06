@@ -12,17 +12,17 @@ const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PARALLEL_REQUESTS = 6;
 
 const WORLD_COVER_CLASSES = [
-  { id: 10, name: 'tree', source: [0, 100, 0], display: [58, 92, 50], tint: [0.76, 0.88, 0.72] },
-  { id: 20, name: 'shrub', source: [255, 187, 34], display: [112, 116, 67], tint: [0.96, 0.98, 0.78] },
-  { id: 30, name: 'grass', source: [255, 255, 76], display: [106, 137, 76], tint: [1.03, 1.05, 0.94] },
-  { id: 40, name: 'crop', source: [240, 150, 255], display: [137, 128, 75], tint: [1.08, 0.97, 0.74] },
-  { id: 50, name: 'built', source: [250, 0, 0], display: [127, 130, 136], tint: [0.92, 0.96, 0.92] },
-  { id: 60, name: 'bare', source: [180, 180, 180], display: [153, 137, 108], tint: [1.08, 0.94, 0.76] },
-  { id: 70, name: 'snow', source: [240, 240, 240], display: [224, 232, 239], tint: [1.32, 1.34, 1.38] },
-  { id: 80, name: 'water', source: [0, 100, 200], display: [58, 111, 153], tint: [0.82, 0.91, 0.96] },
-  { id: 90, name: 'wetland', source: [0, 150, 160], display: [73, 119, 105], tint: [0.78, 0.94, 0.82] },
-  { id: 95, name: 'mangrove', source: [0, 207, 117], display: [50, 99, 67], tint: [0.70, 0.86, 0.72] },
-  { id: 100, name: 'moss', source: [250, 230, 160], display: [137, 130, 91], tint: [1.02, 0.98, 0.78] }
+  { id: 10, name: 'tree', source: [0, 100, 0], tint: [0.76, 0.88, 0.72] },
+  { id: 20, name: 'shrub', source: [255, 187, 34], tint: [0.96, 0.98, 0.78] },
+  { id: 30, name: 'grass', source: [255, 255, 76], tint: [1.03, 1.05, 0.94] },
+  { id: 40, name: 'crop', source: [240, 150, 255], tint: [1.08, 0.97, 0.74] },
+  { id: 50, name: 'built', source: [250, 0, 0], tint: [0.92, 0.96, 0.92] },
+  { id: 60, name: 'bare', source: [180, 180, 180], tint: [1.08, 0.94, 0.76] },
+  { id: 70, name: 'snow', source: [240, 240, 240], tint: [1.32, 1.34, 1.38] },
+  { id: 80, name: 'water', source: [0, 100, 200], tint: [0.82, 0.91, 0.96] },
+  { id: 90, name: 'wetland', source: [0, 150, 160], tint: [0.78, 0.94, 0.82] },
+  { id: 95, name: 'mangrove', source: [0, 207, 117], tint: [0.70, 0.86, 0.72] },
+  { id: 100, name: 'moss', source: [250, 230, 160], tint: [1.02, 0.98, 0.78] }
 ];
 
 const SURFACE_TINT_ENCODING_SCALE = 170;
@@ -405,28 +405,8 @@ async function createSemanticTexture(blob, size) {
       if (nearbyBuilt >= 12) entry = builtClass;
     }
     classes[pixel] = entry;
-    const display = entry?.display || [102, 119, 90];
-    const variation = entry ? ((x * 17 + y * 31 + entry.id * 13) % 5) - 2 : 0;
-    const index = pixel * 4;
-    imageData.data[index] = Math.max(0, Math.min(255, display[0] + variation));
-    imageData.data[index + 1] = Math.max(0, Math.min(255, display[1] + variation));
-    imageData.data[index + 2] = Math.max(0, Math.min(255, display[2] + variation));
-    imageData.data[index + 3] = 255;
   }
-  context.putImageData(imageData, 0, 0);
   if (recognized < size * size * 0.2) throw new Error('WorldCover tile contained insufficient classified coverage');
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.generateMipmaps = true;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  if (typeof texture.colorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
-    texture.colorSpace = THREE.SRGBColorSpace;
-  } else if (typeof texture.encoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {
-    texture.encoding = THREE.sRGBEncoding;
-  }
-  texture.needsUpdate = true;
   const vegetationSamples = [];
   const vegetationKinds = new Set(['tree', 'shrub', 'wetland', 'mangrove']);
   const sampleStep = Math.max(6, Math.round(size / 16));
@@ -442,7 +422,6 @@ async function createSemanticTexture(blob, size) {
     }
   }
   return {
-    texture,
     surfaceTints: buildSmoothedSurfaceTints(classes, size),
     surfaceTintSize: size,
     surfaceTintEncodingScale: SURFACE_TINT_ENCODING_SCALE,
@@ -457,7 +436,7 @@ async function createSemanticTexture(blob, size) {
 }
 
 export async function loadWorldCoverBaseline(bounds, options = {}) {
-  if (!worldCoverSupportsBounds(bounds) || typeof document === 'undefined' || typeof THREE === 'undefined') return null;
+  if (!worldCoverSupportsBounds(bounds) || typeof document === 'undefined') return null;
   const size = Math.max(32, Math.min(128, Math.round(Number(options.size) || DEFAULT_TEXTURE_SIZE)));
   const key = String(options.key || worldCoverTileKey(bounds, size));
   const loaded = await fetchWorldCoverBlob(

@@ -6,7 +6,7 @@ import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=12";
+} from "./worldcover-baseline.js?v=13";
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -552,7 +552,7 @@ function applyLoadedWorldCoverBaseline(mesh) {
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
     applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
-  if (result.texture) {
+  if (result.surfaceTints) {
     const detailMode =
       result.dominantClass === 'built' ? 'grass' :
       result.dominantClass === 'crop' ? 'soil' :
@@ -600,7 +600,6 @@ function applyLoadedWorldCoverBaseline(mesh) {
   } else {
     mesh.userData.terrainDetailProvenance = null;
   }
-  mesh.userData.worldCoverTexture = result.texture || null;
   appCtx.scheduleWorldCoverVegetationRefresh?.();
   return true;
 }
@@ -635,7 +634,6 @@ function queueWorldCoverBaseline(mesh, bounds) {
       mesh.userData.worldCoverPromise = null;
       mesh.userData.worldCoverAbortController = null;
       if (!result || mesh.userData.terrainDisposed) {
-        result?.texture?.dispose?.();
         return;
       }
       mesh.userData.worldCoverResult = result;

@@ -25,7 +25,8 @@ const {
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_ZOOM,
   buildClipmapAxis,
-  cellInsideHole
+  cellInsideHole,
+  mappedWaterKindAt
 } = await import('../app/js/terrain/far-field.js');
 
 assert.match(configSource, /const TERRAIN_ZOOM = 15;/, 'near terrain resolution must remain at zoom 15');
@@ -76,15 +77,49 @@ assert.ok(axis.every((value, index) => index === 0 || value > axis[index - 1]), 
 assert.equal(cellInsideHole(0, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), true);
 assert.equal(cellInsideHole(31, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), false);
 assert.match(farFieldSource, /Mapzen Terrarium elevation-derived landscape/);
-assert.match(farFieldSource, /mapped-landuse-with-elevation-fallback/);
+assert.match(farFieldSource, /mapped-land-and-water-with-elevation-fallback/);
 assert.match(farFieldSource, /openstreetmap-shortbread/);
 assert.match(farFieldSource, /isFarMappedContext/);
 assert.doesNotMatch(farFieldSource, /loadWorldCoverBaseline/);
-assert.match(farFieldSource, /const isWater = sourceMeters <= 0\.75/);
-assert.match(farFieldSource, /if \(isWater\) meters = 0/);
+assert.doesNotMatch(farFieldSource, /sourceMeters\s*<=\s*0\.75/);
+assert.match(farFieldSource, /mappedWaterKindAt\(lat, lon, mappedContext\)/);
+assert.match(farFieldSource, /if \(waterKind === 'ocean'\) meters = 0/);
+assert.match(farFieldSource, /\['ocean', 'water_polygons'\]/);
 assert.match(farFieldSource, /isFarTerrainClipmap/);
+assert.doesNotMatch(
+  farFieldSource,
+  /buildGeometry\(spec, loadedTiles, offsetMeters, null\)/,
+  'Far terrain must not build a temporary unclassified mesh that is immediately discarded.'
+);
+assert.equal(
+  (farFieldSource.match(/const built = buildGeometry\(spec, loadedTiles, offsetMeters, mappedContext\)/g) || []).length,
+  1,
+  'Far terrain must have exactly one mapped geometry build pass.'
+);
+assert.match(farFieldSource, /loadFarMappedContext\(spec\.geographic, spec\.innerGeographic\)/);
+assert.match(farFieldSource, /skippedDuplicateNearBuildings/);
+assert.match(farFieldSource, /geometryBuildPasses:\s*1/);
 assert.match(diagnosticsSource, /farTerrainClipmap/);
 assert.match(diagnosticsSource, /farMappedContexts/);
+
+const tileFor = (latitude, longitude) => {
+  const n = 2 ** FAR_CONTEXT_ZOOM;
+  return `${Math.floor((longitude + 180) / 360 * n)}/${Math.floor((1 - Math.log(
+    Math.tan(latitude * Math.PI / 180) + 1 / Math.cos(latitude * Math.PI / 180)
+  ) / Math.PI) / 2 * n)}`;
+};
+const baltimoreTile = tileFor(39.28, -76.64);
+const mappedWaterContext = {
+  waterByTile: new Map([[baltimoreTile, [{
+    outer: [[-76.65, 39.27], [-76.56, 39.27], [-76.56, 39.33], [-76.65, 39.33], [-76.65, 39.27]],
+    holes: [[[-76.62, 39.29], [-76.60, 39.29], [-76.60, 39.31], [-76.62, 39.31], [-76.62, 39.29]]],
+    bounds: { minLat: 39.27, maxLat: 39.33, minLon: -76.65, maxLon: -76.56 },
+    kind: 'inland'
+  }]]])
+};
+assert.equal(mappedWaterKindAt(39.28, -76.64, mappedWaterContext), 'inland');
+assert.equal(mappedWaterKindAt(39.30, -76.61, mappedWaterContext), null, 'mapped island hole must remain land');
+assert.equal(mappedWaterKindAt(39.30, -76.50, mappedWaterContext), null, 'unmapped low land must never become water');
 
 const { ctx } = await import('../app/js/shared-context.js?v=55');
 const { publishLocationWorld } = await import('../app/js/world/publication.js?v=1');

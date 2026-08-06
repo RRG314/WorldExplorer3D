@@ -3,15 +3,8 @@ import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
 } from "./terrain/structure-visuals.js?v=24";
-import {
-  boundsIntersectLocal,
-  expandBoundsLocal,
-  isGreenLanduseType,
-  isUrbanLanduseType,
-  pointsBoundsLocal
-} from "./terrain/context-utils.js?v=1";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=6";
-import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
+import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=11";
 import {
   groundProviderCatalogSnapshot
@@ -32,7 +25,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=34";
+} from "./terrain/surface-profiles.js?v=35";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -58,15 +51,14 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=26";
+} from "./terrain/rebuild.js?v=27";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=5";
-import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=2";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=5";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=7";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -87,8 +79,6 @@ const terrain = {
   _rayDir: null,
   _roadMaterialCacheKey: '',
   _roadMaterials: null,
-  _urbanSurfaceMaterialCacheKey: '',
-  _urbanSurfaceMaterials: null,
   _lastTerrainTileCount: 0
 };
 const acceptedGroundRuntime = createAcceptedGroundRuntime({ worldToLatLon });
@@ -131,13 +121,6 @@ const verifyAcceptedGroundCoverage = (locations) =>
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
-const SIDEWALK_INNER_GAP = 0.18;
-const SIDEWALK_MIN_WIDTH = 0.9;
-const SIDEWALK_SEGMENT_MIN_WIDTH = 0.62;
-const SIDEWALK_CLEARANCE = 0.4;
-const SIDEWALK_HEIGHT_BIAS = 0.13;
-const SIDEWALK_CURB_LIFT = 0.05;
-const URBAN_CONTEXT_PAD = 26;
 const MIN_VALID_ELEVATION_METERS = -500;
 const MAX_VALID_ELEVATION_METERS = 9000;
 
@@ -278,10 +261,7 @@ const {
   elevationWorldYAtWorldXZ
 });
 
-const {
-  getSharedRoadMaterials,
-  getSharedUrbanSurfaceMaterials
-} = createTerrainMaterialCacheApi({
+const { getSharedRoadMaterials } = createTerrainMaterialCacheApi({
   appCtx,
   terrainState: terrain
 });
@@ -293,50 +273,10 @@ const { repositionBuildingsWithTerrain } = createTerrainReprojectionApi({
   elevationWorldYAtWorldXZ
 });
 
-const {
-  clampSidewalkWidthTransitions,
-  computeSidewalkCornerScale,
-  resolveSidewalkWidth,
-  roadBaseSidewalkWidth,
-  roadConnectedSidewalkContinuity,
-  roadHasExplicitSidewalkHint,
-  roadSupportsInferredUrbanSidewalks,
-  roadSupportsSidewalks,
-  smoothSidewalkOuterHeights
-} = createTerrainSidewalkApi({
-  SIDEWALK_CLEARANCE,
-  SIDEWALK_MIN_WIDTH,
-  SIDEWALK_SEGMENT_MIN_WIDTH
-});
-
 const transportPublicationDeps = {
-  terrain,
-  constants: {
-    SIDEWALK_INNER_GAP,
-    SIDEWALK_MIN_WIDTH,
-    SIDEWALK_SEGMENT_MIN_WIDTH,
-    SIDEWALK_CURB_LIFT,
-    SIDEWALK_HEIGHT_BIAS,
-    URBAN_CONTEXT_PAD
-  },
   disableRoadDebugMode,
   clearTerrainHeightCache,
   getSharedRoadMaterials,
-  getSharedUrbanSurfaceMaterials,
-  boundsIntersectLocal,
-  expandBoundsLocal,
-  pointsBoundsLocal,
-  isUrbanLanduseType,
-  isGreenLanduseType,
-  roadHasExplicitSidewalkHint,
-  roadConnectedSidewalkContinuity,
-  roadSupportsInferredUrbanSidewalks,
-  roadSupportsSidewalks,
-  roadBaseSidewalkWidth,
-  resolveSidewalkWidth,
-  computeSidewalkCornerScale,
-  clampSidewalkWidthTransitions,
-  smoothSidewalkOuterHeights,
   cachedTerrainHeight,
   cachedBaseTerrainHeight,
   subdivideRoadPoints,

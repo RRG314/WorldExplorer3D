@@ -11,7 +11,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=34";
+} from "./surface-profiles.js?v=35";
 import { stitchTerrainMeshEdges } from "./seams.js?v=1";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
@@ -476,13 +476,10 @@ export function disposeTerrainMesh(mesh) {
     if (!textureSet || typeof textureSet !== "object") return;
     Object.values(textureSet).forEach(registerTexture);
   };
-  registerTexture(mesh?.userData?.worldCoverTexture);
-  registerTexture(mesh?.userData?.worldCoverResult?.texture);
   registerTextureSet(mesh?.userData?.terrainTextureSet);
   Object.values(mesh?.userData?.terrainTextureSetsByMode || {}).forEach(registerTextureSet);
   ownedTextures.forEach((texture) => texture.dispose());
   if (mesh.userData) {
-    mesh.userData.worldCoverTexture = null;
     mesh.userData.worldCoverResult = null;
     mesh.userData.terrainTextureSet = null;
     mesh.userData.terrainTextureSetsByMode = {};

@@ -90,6 +90,20 @@ function polygonRings(geometry) {
   return [];
 }
 
+function polygonAreas(geometry) {
+  if (geometry?.type === 'Polygon') {
+    return geometry.coordinates?.[0]
+      ? [{ outer: geometry.coordinates[0], holes: geometry.coordinates.slice(1) }]
+      : [];
+  }
+  if (geometry?.type === 'MultiPolygon') {
+    return (geometry.coordinates || [])
+      .filter((polygon) => Array.isArray(polygon?.[0]))
+      .map((polygon) => ({ outer: polygon[0], holes: polygon.slice(1) }));
+  }
+  return [];
+}
+
 function ringBounds(ring) {
   const bounds = { minLat: Infinity, maxLat: -Infinity, minLon: Infinity, maxLon: -Infinity };
   for (const coordinate of ring || []) {
@@ -152,7 +166,7 @@ async function fetchWithConcurrency(items, concurrency, worker) {
   return results.filter(Boolean);
 }
 
-async function loadFarMappedContext(bounds) {
+async function loadFarMappedContext(bounds, excludedBounds = null) {
   const coordinates = contextTileCoordinates(bounds);
   const tiles = await fetchWithConcurrency(
     coordinates,
@@ -160,7 +174,9 @@ async function loadFarMappedContext(bounds) {
     ({ x, y }) => fetchShortbreadTile(FAR_CONTEXT_ZOOM, x, y)
   );
   const landByTile = new Map();
+  const waterByTile = new Map();
   const buildings = [];
+  let skippedNearBuildings = 0;
 
   for (const tileRecord of tiles) {
     const tileKey = `${tileRecord.x}/${tileRecord.y}`;
@@ -181,6 +197,26 @@ async function loadFarMappedContext(bounds) {
     }
     landByTile.set(tileKey, landPolygons);
 
+    const waterPolygons = [];
+    for (const layerName of ['ocean', 'water_polygons']) {
+      const layer = tileRecord.tile.layers[layerName];
+      if (!layer) continue;
+      for (let index = 0; index < layer.length; index += 1) {
+        const feature = layer.feature(index);
+        const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
+        for (const area of polygonAreas(geojson?.geometry)) {
+          if (!Array.isArray(area.outer) || area.outer.length < 4) continue;
+          waterPolygons.push({
+            outer: area.outer,
+            holes: (area.holes || []).filter((hole) => Array.isArray(hole) && hole.length >= 4),
+            bounds: ringBounds(area.outer),
+            kind: layerName === 'ocean' ? 'ocean' : 'inland'
+          });
+        }
+      }
+    }
+    waterByTile.set(tileKey, waterPolygons);
+
     const buildingLayer = tileRecord.tile.layers.buildings;
     if (!buildingLayer) continue;
     const tileBuildings = [];
@@ -190,6 +226,14 @@ async function loadFarMappedContext(bounds) {
       for (const ring of polygonRings(geojson?.geometry)) {
         if (ring.length < 4) continue;
         const bounds = ringBounds(ring);
+        const centerLat = (bounds.minLat + bounds.maxLat) * 0.5;
+        const centerLon = (bounds.minLon + bounds.maxLon) * 0.5;
+        if (excludedBounds &&
+            centerLat >= excludedBounds.latS && centerLat <= excludedBounds.latN &&
+            centerLon >= excludedBounds.lonW && centerLon <= excludedBounds.lonE) {
+          skippedNearBuildings += 1;
+          continue;
+        }
         const span = Math.max(bounds.maxLat - bounds.minLat, bounds.maxLon - bounds.minLon);
         tileBuildings.push({
           ring,
@@ -206,6 +250,9 @@ async function loadFarMappedContext(bounds) {
   return {
     buildings: buildings.slice(0, FAR_CONTEXT_MAX_BUILDINGS),
     landByTile,
+    waterByTile,
+    waterPolygons: Array.from(waterByTile.values()).reduce((total, polygons) => total + polygons.length, 0),
+    skippedNearBuildings,
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length
   };
@@ -227,6 +274,26 @@ function mappedSurfaceColor(latitude, longitude, mappedContext) {
     if (pointInLonLatRing(longitude, latitude, candidate.ring)) {
       return FAR_LAND_COLORS[candidate.landClass] || null;
     }
+  }
+  return null;
+}
+
+function mappedWaterKindAt(latitude, longitude, mappedContext) {
+  if (!mappedContext?.waterByTile) return null;
+  const n = 2 ** FAR_CONTEXT_ZOOM;
+  const safeLat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
+  const x = Math.floor((longitude + 180) / 360 * n);
+  const y = Math.floor((1 - Math.log(
+    Math.tan(safeLat * Math.PI / 180) + 1 / Math.cos(safeLat * Math.PI / 180)
+  ) / Math.PI) / 2 * n);
+  const candidates = mappedContext.waterByTile.get(`${x}/${y}`) || [];
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const candidate = candidates[index];
+    if (latitude < candidate.bounds.minLat || latitude > candidate.bounds.maxLat ||
+        longitude < candidate.bounds.minLon || longitude > candidate.bounds.maxLon) continue;
+    if (!pointInLonLatRing(longitude, latitude, candidate.outer)) continue;
+    if ((candidate.holes || []).some((hole) => pointInLonLatRing(longitude, latitude, hole))) continue;
+    return candidate.kind;
   }
   return null;
 }
@@ -365,7 +432,12 @@ function createFarFieldTerrainApi(deps = {}) {
         const { lat, lon } = worldToLatLon(x, z);
         const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
         if (!Number.isFinite(sourceMeters)) return null;
-        const isWater = sourceMeters <= 0.75;
+        // Elevation is not a water classification. Low-lying cities and
+        // reclaimed land can sit at or below sea level; treating DEM height as
+        // hydrology creates a fake blue ring around the detailed terrain hole.
+        // Only mapped Shortbread water polygons may color far-field water.
+        const waterKind = mappedWaterKindAt(lat, lon, mappedContext);
+        const isWater = waterKind !== null;
         let meters = sourceMeters + offsetMeters;
         const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
         if (distanceFromSeam <= seamBlendWorld) {
@@ -376,7 +448,7 @@ function createFarFieldTerrainApi(deps = {}) {
             meters = acceptedMeters + (meters - acceptedMeters) * blend;
           }
         }
-        if (isWater) meters = 0;
+        if (waterKind === 'ocean') meters = 0;
         minElevationMeters = Math.min(minElevationMeters, meters);
         maxElevationMeters = Math.max(maxElevationMeters, meters);
         positions.push(x, meters * Number(appCtx.WORLD_UNITS_PER_METER || 1) * Number(appCtx.TERRAIN_Y_EXAGGERATION || 1), z);
@@ -502,11 +574,13 @@ function createFarFieldTerrainApi(deps = {}) {
 
   async function buildAndPublish(spec, requestGeneration) {
     const sourceTiles = sourceTileRange(spec.geographic, spec.sourceZoom);
-    setState({ status: 'loading-elevation', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length });
-    const mappedContextPromise = loadFarMappedContext(spec.geographic);
-    const ready = await Promise.all(
-      sourceTiles.map((tile) => waitForTerrainTileReadyAtZoom(tile.z, tile.tx, tile.ty, 10000, deps))
-    );
+    setState({ status: 'loading-elevation-and-context', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length });
+    const [ready, mappedContext] = await Promise.all([
+      Promise.all(sourceTiles.map((tile) =>
+        waitForTerrainTileReadyAtZoom(tile.z, tile.tx, tile.ty, 10000, deps)
+      )),
+      loadFarMappedContext(spec.geographic, spec.innerGeographic)
+    ]);
     if (requestGeneration !== generation) return;
     if (!ready.every(Boolean)) {
       setState({ status: 'unavailable', reason: 'far-field-elevation-unavailable' });
@@ -520,12 +594,15 @@ function createFarFieldTerrainApi(deps = {}) {
     }
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
-    const built = buildGeometry(spec, loadedTiles, offsetMeters, null);
+    const built = buildGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    const builtBuildings = buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     if (requestGeneration !== generation) {
       built?.geometry?.dispose?.();
+      builtBuildings?.geometry?.dispose?.();
       return;
     }
     if (!built) {
+      builtBuildings?.geometry?.dispose?.();
       setState({ status: 'unavailable', reason: 'far-field-elevation-sampling-failed' });
       return;
     }
@@ -568,36 +645,6 @@ function createFarFieldTerrainApi(deps = {}) {
     removeCurrentMesh();
     farFieldMesh = mesh;
     appCtx.terrainGroup.add(mesh);
-    setState({
-      status: 'terrain-ready-context-loading',
-      sourceZoom: spec.sourceZoom,
-      sourceTiles: sourceTiles.length,
-      offsetMeters,
-      columns: built.columns,
-      rows: built.rows,
-      vertices: built.geometry.attributes.position.count,
-      triangles: built.geometry.index.count / 3,
-      minElevationMeters: built.minElevationMeters,
-      maxElevationMeters: built.maxElevationMeters,
-      surfaceColor: 'elevation-fallback-pending-mapped-context',
-      farBuildings: 0,
-      outerDistanceMeters: FAR_FIELD_OUTER_DISTANCE_METERS
-    });
-
-    const mappedContext = await mappedContextPromise;
-    if (requestGeneration !== generation || farFieldMesh !== mesh) return;
-    const contextualTerrain = buildGeometry(spec, loadedTiles, offsetMeters, mappedContext);
-    const builtBuildings = buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
-    if (requestGeneration !== generation || farFieldMesh !== mesh) {
-      contextualTerrain?.geometry?.dispose?.();
-      builtBuildings?.geometry?.dispose?.();
-      return;
-    }
-    if (contextualTerrain) {
-      const previousGeometry = mesh.geometry;
-      mesh.geometry = contextualTerrain.geometry;
-      previousGeometry?.dispose?.();
-    }
     if (builtBuildings) {
       const buildingMaterial = new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -625,22 +672,24 @@ function createFarFieldTerrainApi(deps = {}) {
       };
       appCtx.terrainGroup.add(farContextMesh);
     }
-    const finalTerrain = contextualTerrain || built;
     setState({
       status: 'ready',
       sourceZoom: spec.sourceZoom,
       sourceTiles: sourceTiles.length,
       offsetMeters,
-      columns: finalTerrain.columns,
-      rows: finalTerrain.rows,
-      vertices: finalTerrain.geometry.attributes.position.count,
-      triangles: finalTerrain.geometry.index.count / 3,
-      minElevationMeters: finalTerrain.minElevationMeters,
-      maxElevationMeters: finalTerrain.maxElevationMeters,
-      surfaceColor: 'mapped-landuse-with-elevation-fallback',
+      columns: built.columns,
+      rows: built.rows,
+      vertices: built.geometry.attributes.position.count,
+      triangles: built.geometry.index.count / 3,
+      minElevationMeters: built.minElevationMeters,
+      maxElevationMeters: built.maxElevationMeters,
+      surfaceColor: 'mapped-land-and-water-with-elevation-fallback',
       contextSource: 'openstreetmap-shortbread',
       contextTilesLoaded: mappedContext.loadedTiles,
       contextTilesRequested: mappedContext.requestedTiles,
+      mappedWaterPolygons: mappedContext.waterPolygons,
+      skippedDuplicateNearBuildings: mappedContext.skippedNearBuildings,
+      geometryBuildPasses: 1,
       farBuildings: builtBuildings?.buildings || 0,
       outerDistanceMeters: FAR_FIELD_OUTER_DISTANCE_METERS
     });
@@ -673,7 +722,13 @@ function createFarFieldTerrainApi(deps = {}) {
     };
     const sourceZoom = Math.max(0, z - FAR_FIELD_SOURCE_ZOOM_OFFSET);
     setState({ status: 'queued', sourceZoom });
-    void buildAndPublish({ inner, outer, geographic: geographicBounds(outer), sourceZoom }, requestGeneration);
+    void buildAndPublish({
+      inner,
+      innerGeographic: geographicBounds(inner),
+      outer,
+      geographic: geographicBounds(outer),
+      sourceZoom
+    }, requestGeneration);
   }
 
   return { resetFarTerrainClipmap, updateFarTerrainClipmap };
@@ -688,5 +743,6 @@ export {
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
   buildClipmapAxis,
   cellInsideHole,
-  createFarFieldTerrainApi
+  createFarFieldTerrainApi,
+  mappedWaterKindAt
 };

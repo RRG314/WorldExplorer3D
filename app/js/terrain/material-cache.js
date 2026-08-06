@@ -5,20 +5,13 @@ import {
 } from "../road-render.js?v=4";
 
 function createTerrainMaterialCacheApi(deps = {}) {
-  const { appCtx, terrainState } = deps;
+  const { terrainState } = deps;
 
   function disposeRoadMaterialCache() {
     if (!terrainState._roadMaterials) return;
     disposeRoadSurfaceMaterials(terrainState._roadMaterials);
     terrainState._roadMaterials = null;
     terrainState._roadMaterialCacheKey = "";
-  }
-
-  function disposeUrbanSurfaceMaterialCache() {
-    if (!terrainState._urbanSurfaceMaterials) return;
-    disposeRoadSurfaceMaterials(terrainState._urbanSurfaceMaterials);
-    terrainState._urbanSurfaceMaterials = null;
-    terrainState._urbanSurfaceMaterialCacheKey = "";
   }
 
   function getSharedRoadMaterials() {
@@ -41,32 +34,8 @@ function createTerrainMaterialCacheApi(deps = {}) {
     return terrainState._roadMaterials;
   }
 
-  function getSharedUrbanSurfaceMaterials() {
-    const key = roadSurfaceMaterialCacheKey({
-      sidewalkTex: appCtx.pavementDiffuse || appCtx.concreteDiffuse,
-      sidewalkNormal: appCtx.pavementNormal || appCtx.concreteNormal,
-      sidewalkRoughness: appCtx.pavementRoughness || appCtx.concreteRoughness,
-      includeSidewalk: true
-    });
-    if (terrainState._urbanSurfaceMaterials && terrainState._urbanSurfaceMaterialCacheKey === key) {
-      return terrainState._urbanSurfaceMaterials;
-    }
-
-    disposeUrbanSurfaceMaterialCache();
-    const materials = createRoadSurfaceMaterials({
-      sidewalkTex: appCtx.pavementDiffuse || appCtx.concreteDiffuse,
-      sidewalkNormal: appCtx.pavementNormal || appCtx.concreteNormal,
-      sidewalkRoughness: appCtx.pavementRoughness || appCtx.concreteRoughness,
-      includeSidewalk: true
-    });
-    terrainState._urbanSurfaceMaterialCacheKey = key;
-    terrainState._urbanSurfaceMaterials = { sidewalkMat: materials.sidewalkMaterial };
-    return terrainState._urbanSurfaceMaterials;
-  }
-
   return {
-    getSharedRoadMaterials,
-    getSharedUrbanSurfaceMaterials
+    getSharedRoadMaterials
   };
 }
 

@@ -4,7 +4,7 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=405';
+} from './modules/manifest.js?v=407';
 import { loadScriptList } from './modules/script-loader.js?v=56';
 import {
   initStartupDiagnostics,
