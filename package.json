@@ -12,6 +12,7 @@
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
     "test:building-coverage": "node scripts/test-building-publication-coverage.mjs",
     "test:building-geometry-quality": "node scripts/test-building-geometry-quality.mjs",
+    "test:city-surface-semantics": "node scripts/test-city-surface-semantics.mjs",
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
     "test:maintainability": "node scripts/test-maintainability-guard.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",

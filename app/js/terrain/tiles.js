@@ -11,7 +11,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=33";
+} from "./surface-profiles.js?v=34";
 import { stitchTerrainMeshEdges } from "./seams.js?v=1";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;

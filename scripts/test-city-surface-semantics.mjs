@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = (relativePath) => fs.readFileSync(path.join(sourceRoot, relativePath), 'utf8');
+
+const baselineSource = read('app/js/terrain/worldcover-baseline.js');
+const profileSource = read('app/js/terrain/surface-profiles.js');
+const transportSource = read('app/js/terrain/rebuild.js');
+const surfaceContractSource = read('app/js/world/surface-contract.js');
+
+assert.match(
+  baselineSource,
+  /surfaceBuiltWeights:\s*buildSmoothedClassWeight\(classes, size, 'built'\)/,
+  'WorldCover must publish a smoothed, per-pixel built-up weight instead of making a whole terrain tile urban.'
+);
+assert.match(
+  profileSource,
+  /geometry\.setAttribute\('surfaceBuiltWeight'/,
+  'Terrain vertices must receive the mapped built-up weight.'
+);
+assert.match(
+  profileSource,
+  /mix\(naturalTexelColor, builtTexelColor, surfaceBuiltBlend\(\)\)/,
+  'The accepted terrain shader must blend natural and built PBR detail locally.'
+);
+assert.doesNotMatch(
+  profileSource,
+  /result\.dominantClass === 'built'\s*\?\s*'urban'/,
+  'A built-dominant classification must not turn the entire terrain tile into a gray urban square.'
+);
+assert.match(
+  transportSource,
+  /const shouldBuildSidewalks = false;/,
+  'OSM-derived sidewalk extrusion must remain disabled.'
+);
+assert.match(
+  surfaceContractSource,
+  /:\s*'terrain_worldcover';/,
+  'Broad land-use polygons must stay semantic-only unless they are an explicit paved, parking, or water surface.'
+);
+
+console.log('City surface semantics contract passed.');

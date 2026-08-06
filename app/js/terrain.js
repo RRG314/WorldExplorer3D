@@ -32,7 +32,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=33";
+} from "./terrain/surface-profiles.js?v=34";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
