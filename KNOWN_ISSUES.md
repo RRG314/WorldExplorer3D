@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-07-30 for version 4.1.2.
+Last reviewed: 2026-08-06 for version 4.1.2.
 
 ## Map Coverage
 
@@ -14,6 +14,10 @@ Last reviewed: 2026-07-30 for version 4.1.2.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
 - Provider latency can make the same location load at different speeds even when the generated world is unchanged.
+- The current Baltimore runtime-readiness sample reports 3 blocked service-road
+  journeys out of 24. The source and GitHub PR checks remain valid, but final
+  production promotion stays gated until those journeys are resolved or
+  explicitly accepted with recorded review evidence.
 
 ## External Services
 

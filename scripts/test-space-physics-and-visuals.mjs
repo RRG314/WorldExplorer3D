@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 
 const runtime = await readFile(new URL('../app/js/space/runtime.js', import.meta.url), 'utf8');
 const solarSource = await readFile(new URL('../app/js/solar-system.js', import.meta.url), 'utf8');
@@ -9,6 +9,11 @@ const spaceScene = await readFile(new URL('../app/js/space/scene.js', import.met
 const spaceMode = await readFile(new URL('../app/js/space.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(runtime, /gravity-model|displayScaledGravityMu/, 'space flight must use the established compatibility gravity model');
+await assert.rejects(
+  access(new URL('../app/js/space/gravity-model.js', import.meta.url)),
+  /ENOENT/,
+  'the unused physical-gravity experiment must not ship as an orphan module'
+);
 assert.match(runtime, /name === 'sun'\) return 3200/, 'legacy Sun gravity tuning must remain stable');
 assert.match(runtime, /name === 'earth'\) return 1800/, 'legacy Earth gravity tuning must remain stable');
 assert.match(runtime, /name === 'moon'\) return 300/, 'legacy Moon gravity tuning must remain stable');
