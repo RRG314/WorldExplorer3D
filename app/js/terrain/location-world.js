@@ -11,9 +11,7 @@ function createLocationTerrainApi(deps = {}) {
     getOrLoadTerrainTile,
     pruneTerrainTileCache,
     terrainTileCacheSnapshot,
-    clearTerrainHeightCache,
-    resetFarTerrainClipmap,
-    updateFarTerrainClipmap
+    clearTerrainHeightCache
   } = deps;
 
   let publishedLocationKey = null;
@@ -55,7 +53,6 @@ function createLocationTerrainApi(deps = {}) {
     publishedLocationKey = null;
     publicationGeneration += 1;
     pendingTerrainMeshes.clear();
-    resetFarTerrainClipmap?.();
     clearTerrainHeightCache();
   }
 
@@ -135,12 +132,6 @@ function createLocationTerrainApi(deps = {}) {
       : typeof terrainTileCacheSnapshot === 'function' ? terrainTileCacheSnapshot() : null;
     if (cacheSnapshot) appCtx.setPerfLiveStat?.('terrainCache', cacheSnapshot);
     appCtx.setPerfLiveStat?.('terrainMeshQueue', pendingTerrainMeshes.size);
-    updateFarTerrainClipmap?.({
-      z: appCtx.TERRAIN_ZOOM,
-      centerX: centerTile.x,
-      centerY: centerTile.y,
-      ring: activeRing
-    });
     return true;
   }
 

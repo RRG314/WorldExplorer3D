@@ -51,14 +51,13 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=27";
+} from "./terrain/rebuild.js?v=28";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=5";
-import { createLocationTerrainApi } from "./terrain/location-world.js?v=2";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=9";
+} from "./terrain/debug-tools.js?v=6";
+import { createLocationTerrainApi } from "./terrain/location-world.js?v=3";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -287,22 +286,6 @@ const transportPublicationDeps = {
 };
 
 const {
-  resetFarTerrainClipmap,
-  updateFarTerrainClipmap
-} = createFarFieldTerrainApi({
-  appCtx,
-  clampElevationMeters,
-  getOrLoadTerrainTile,
-  latLonToTileXY,
-  sampleAcceptedGroundAtLatLon,
-  sampleTileElevationMeters,
-  terrainTileDeps,
-  tileXYToLatLonBounds,
-  waitForTerrainTileReadyAtZoom,
-  worldToLatLon
-});
-
-const {
   publishLocationTerrain,
   resetLocationTerrainPublication
 } = createLocationTerrainApi({
@@ -317,9 +300,7 @@ const {
   getOrLoadTerrainTile,
   pruneTerrainTileCache,
   terrainTileCacheSnapshot,
-  clearTerrainHeightCache,
-  resetFarTerrainClipmap,
-  updateFarTerrainClipmap
+  clearTerrainHeightCache
 });
 
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
@@ -446,7 +427,6 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
-  resetFarTerrainClipmap,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
@@ -455,7 +435,6 @@ Object.assign(appCtx, {
   terrainSourceSampleAtWorldXZ: (x, z) =>
     terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps),
   terrainTileCacheSnapshot,
-  updateFarTerrainClipmap,
   setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,

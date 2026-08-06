@@ -5,9 +5,6 @@ import path from 'node:path';
 const root = path.resolve('app/js');
 const allowedRawConsumers = new Set([
   'terrain.js',
-  // The far-field clipmap is part of the explicitly authorized worldwide
-  // Terrarium fallback and owns its lower-resolution horizon sampling.
-  'terrain/far-field.js',
   'terrain/location-world.js',
   'terrain/tiles.js'
 ]);
