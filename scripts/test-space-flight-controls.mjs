@@ -40,7 +40,7 @@ try {
 
   const report = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const runtime = await import('/app/js/space/runtime.js?v=11');
+    const runtime = await import('/app/js/space/runtime.js?v=13');
     if (!ctx.getEnv?.()) ctx.commitEnvironment?.(ctx.ENV.EARTH, { source: 'space-control-test' });
     if (!await ctx.startSpaceFlightToMoon()) throw new Error('Space flight did not start');
     await new Promise((resolve) => setTimeout(resolve, 800));
@@ -62,11 +62,19 @@ try {
     const currentForward = new THREE.Vector3();
     const right = new THREE.Vector3();
     const up = new THREE.Vector3();
+    const cameraRight = new THREE.Vector3();
+    const cameraUp = new THREE.Vector3();
+    const cameraRightBefore = new THREE.Vector3();
+    const cameraUpBefore = new THREE.Vector3();
+    const controlResponse = new THREE.Vector3();
     const previousCameraQuaternion = camera.quaternion.clone();
     let maximumForwardStep = 0;
     let maximumCameraStep = 0;
     let minimumBasisOrthogonality = 1;
-    let minimumCameraWorldUpAlignment = 1;
+    let minimumScreenRightAlignment = 1;
+    let maximumScreenRightAlignment = -1;
+    let minimumScreenUpAlignment = 1;
+    let minimumDirectionalResponse = 1;
     let samples = 0;
 
     const step = (keys) => {
@@ -74,12 +82,16 @@ try {
       ctx.spaceFlight.gravityVelocity?.set(0, 0, 0);
       previousForward.copy(localForward).applyQuaternion(rocket.quaternion);
       const cameraBefore = camera.quaternion.clone();
+      cameraRightBefore.set(1, 0, 0).applyQuaternion(cameraBefore).normalize();
+      cameraUpBefore.set(0, 1, 0).applyQuaternion(cameraBefore).normalize();
       runtime.updateSpaceFlightPhysics();
       runtime.updateSpaceFlightCamera();
       camera.updateMatrixWorld(true);
       currentForward.copy(localForward).applyQuaternion(rocket.quaternion).normalize();
       right.copy(localRight).applyQuaternion(rocket.quaternion).normalize();
       up.copy(localUp).applyQuaternion(rocket.quaternion).normalize();
+      cameraRight.set(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+      cameraUp.set(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
       maximumForwardStep = Math.max(maximumForwardStep, previousForward.angleTo(currentForward));
       maximumCameraStep = Math.max(
         maximumCameraStep,
@@ -91,10 +103,19 @@ try {
         1 - Math.abs(currentForward.dot(up)),
         1 - Math.abs(right.dot(up))
       );
-      minimumCameraWorldUpAlignment = Math.min(
-        minimumCameraWorldUpAlignment,
-        camera.up.clone().normalize().dot(new THREE.Vector3(0, 1, 0))
-      );
+      minimumScreenRightAlignment = Math.min(minimumScreenRightAlignment, cameraRight.dot(right));
+      maximumScreenRightAlignment = Math.max(maximumScreenRightAlignment, cameraRight.dot(right));
+      minimumScreenUpAlignment = Math.min(minimumScreenUpAlignment, cameraUp.dot(up));
+      controlResponse.copy(currentForward).sub(previousForward).normalize();
+      if (keys.arrowup && !keys.arrowleft && !keys.arrowright) {
+        minimumDirectionalResponse = Math.min(minimumDirectionalResponse, controlResponse.dot(cameraUpBefore));
+      } else if (keys.arrowdown && !keys.arrowleft && !keys.arrowright) {
+        minimumDirectionalResponse = Math.min(minimumDirectionalResponse, -controlResponse.dot(cameraUpBefore));
+      } else if (keys.arrowleft && !keys.arrowup && !keys.arrowdown) {
+        minimumDirectionalResponse = Math.min(minimumDirectionalResponse, -controlResponse.dot(cameraRightBefore));
+      } else if (keys.arrowright && !keys.arrowup && !keys.arrowdown) {
+        minimumDirectionalResponse = Math.min(minimumDirectionalResponse, controlResponse.dot(cameraRightBefore));
+      }
       samples += 1;
     };
 
@@ -102,6 +123,8 @@ try {
     // even when the chase camera is upside down relative to world Y.
     for (let index = 0; index < 440; index += 1) step({ arrowup: true });
     for (let index = 0; index < 400; index += 1) step({ arrowleft: true });
+    for (let index = 0; index < 160; index += 1) step({ arrowdown: true });
+    for (let index = 0; index < 160; index += 1) step({ arrowright: true });
     for (let index = 0; index < 520; index += 1) step({ arrowup: true, arrowright: true });
 
     for (let index = 0; index < 90; index += 1) {
@@ -119,7 +142,10 @@ try {
       maximumForwardStep,
       maximumCameraStep,
       minimumBasisOrthogonality,
-      minimumCameraWorldUpAlignment,
+      minimumScreenRightAlignment,
+      maximumScreenRightAlignment,
+      minimumScreenUpAlignment,
+      minimumDirectionalResponse,
       flightCameraDistance,
       cameraQuaternionContinuity,
       quaternionLength: rocket.quaternion.length(),
@@ -137,12 +163,13 @@ try {
     JSON.stringify({ report, consoleErrors }, null, 2)
   );
 
-  assert.equal(report.samples, 1360);
+  assert.equal(report.samples, 1680);
   assert.ok(Math.abs(report.quaternionLength - 1) < 1e-5, 'spacecraft quaternion drifted');
   assert.ok(report.maximumForwardStep <= 0.027, `spacecraft steering jumped ${report.maximumForwardStep} radians`);
   assert.ok(report.maximumCameraStep <= 0.16, `space camera flipped ${report.maximumCameraStep} radians`);
   assert.ok(report.minimumBasisOrthogonality >= 0.9999, 'spacecraft local axes lost orthogonality');
-  assert.ok(report.minimumCameraWorldUpAlignment >= 0.9999, 'space camera stopped using stable world up');
+  assert.ok(report.minimumScreenUpAlignment > 0, 'spacecraft up became screen-down after an axis crossing');
+  assert.ok(report.minimumDirectionalResponse >= 0.65, 'an arrow key reversed its visible steering direction');
   assert.ok(
     report.flightCameraDistance >= 44 && report.flightCameraDistance <= 96,
     `world-up chase camera left its bounded follow envelope (${report.flightCameraDistance})`

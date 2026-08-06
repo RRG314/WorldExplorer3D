@@ -23,9 +23,10 @@ function createSpaceControlMath(three) {
     gravitySum: new three.Vector3(),
     launchRadial: new three.Vector3(),
     localForward: Object.freeze({ x: 0, y: 1, z: 0 }),
-    localRight: new three.Vector3(1, 0, 0),
-    localUp: new three.Vector3(0, 0, -1),
-    worldUp: new three.Vector3(0, 1, 0)
+    controlRight: new three.Vector3(),
+    controlUp: new three.Vector3(),
+    controlYawAxis: new three.Vector3(),
+    controlPitchAxis: new three.Vector3()
   });
 }
 
@@ -366,8 +367,10 @@ export function updateSpaceFlightPhysics() {
     forward: _sfForward,
     gravitySum: _sfGravitySum,
     gravityTemporary: _sfGravityTmp,
-    localRight: _sfLocalRight,
-    localUp: _sfLocalUp,
+    controlRight: _sfControlRight,
+    controlUp: _sfControlUp,
+    controlYawAxis: _sfControlYawAxis,
+    controlPitchAxis: _sfControlPitchAxis,
     temporaryQuaternion: _sfTempQuat,
     temporaryVector: _sfTempVec
   } = getSpaceControlMath();
@@ -377,18 +380,26 @@ export function updateSpaceFlightPhysics() {
   const launchAssist = getLaunchAssistState(rocket);
   const frameScale = appCtx.spaceFlight._frameScale || 1;
 
+  // Read the axes the player is looking through before applying either turn.
+  // These remain continuous with the chase view and have no world-axis pole.
+  _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+  _sfControlRight.set(1, 0, 0).applyQuaternion(appCtx.spaceFlight.camera.quaternion);
+  _sfControlRight.addScaledVector(_sfForward, -_sfControlRight.dot(_sfForward)).normalize();
+  _sfControlUp.set(0, 1, 0).applyQuaternion(appCtx.spaceFlight.camera.quaternion);
+  _sfControlUp.addScaledVector(_sfForward, -_sfControlUp.dot(_sfForward)).normalize();
+  _sfControlYawAxis.crossVectors(_sfForward, _sfControlRight).normalize();
+  _sfControlPitchAxis.crossVectors(_sfForward, _sfControlUp).normalize();
+
   if (keys['arrowleft'] || keys['arrowright']) {
-    const yawDir = keys['arrowleft'] ? 1 : -1;
-    _sfTempQuat.setFromAxisAngle(_sfLocalUp, SPACE_CONSTANTS.TURN_SPEED * yawDir * frameScale);
-    // Post-multiply so steering is always expressed in spacecraft-local axes.
-    // Camera axes invert when the chase view crosses a world axis.
-    rocket.quaternion.multiply(_sfTempQuat);
+    const yawDir = keys['arrowleft'] ? -1 : 1;
+    _sfTempQuat.setFromAxisAngle(_sfControlYawAxis, SPACE_CONSTANTS.TURN_SPEED * yawDir * frameScale);
+    rocket.quaternion.premultiply(_sfTempQuat);
   }
 
   if (keys['arrowup'] || keys['arrowdown']) {
     const pitchDir = keys['arrowup'] ? 1 : -1;
-    _sfTempQuat.setFromAxisAngle(_sfLocalRight, SPACE_CONSTANTS.PITCH_SPEED * pitchDir * frameScale);
-    rocket.quaternion.multiply(_sfTempQuat);
+    _sfTempQuat.setFromAxisAngle(_sfControlPitchAxis, SPACE_CONSTANTS.PITCH_SPEED * pitchDir * frameScale);
+    rocket.quaternion.premultiply(_sfTempQuat);
   }
 
   rocket.quaternion.normalize();
@@ -486,8 +497,7 @@ export function updateSpaceFlightCamera() {
     forward: _sfForward,
     launchRadial: _sfLaunchRadial,
     targetPosition: _sfTargetPos,
-    temporaryVector: _sfTempVec,
-    worldUp: _sfWorldUp
+    temporaryVector: _sfTempVec
   } = getSpaceControlMath();
   const rocket = appCtx.spaceFlight.rocket;
   if (appCtx.spaceFlight.overviewMode) {
@@ -519,8 +529,11 @@ export function updateSpaceFlightCamera() {
   }
 
   appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);
-  appCtx.spaceFlight.camera.up.copy(_sfWorldUp);
-  cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, rocket.position, _sfWorldUp);
+  // Follow the spacecraft's transported up vector rather than a fixed world-up
+  // pole. Physics reads the resulting camera axes, so arrows retain the same
+  // visible direction through every world-axis crossing.
+  appCtx.spaceFlight.camera.up.copy(_sfTempVec);
+  cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, rocket.position, _sfTempVec);
   cameraQuaternion.setFromRotationMatrix(cameraLookMatrix);
   appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, 0.045).normalize();
 }

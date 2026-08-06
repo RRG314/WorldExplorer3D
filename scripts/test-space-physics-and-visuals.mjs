@@ -12,8 +12,8 @@ assert.doesNotMatch(runtime, /gravity-model|displayScaledGravityMu/, 'space flig
 assert.match(runtime, /name === 'sun'\) return 3200/, 'legacy Sun gravity tuning must remain stable');
 assert.match(runtime, /name === 'earth'\) return 1800/, 'legacy Earth gravity tuning must remain stable');
 assert.match(runtime, /name === 'moon'\) return 300/, 'legacy Moon gravity tuning must remain stable');
-assert.match(runtime, /worldUp: new three\.Vector3\(0, 1, 0\)/, 'the restored runtime must retain stable world-up camera framing');
-assert.match(runtime, /camera\.up\.copy\(_sfWorldUp\)/, 'chase camera up must not roll with the spacecraft');
+assert.doesNotMatch(runtime, /worldUp: new three\.Vector3\(0, 1, 0\)/, 'chase controls must not retain a world-up pole');
+assert.match(runtime, /camera\.up\.copy\(_sfTempVec\)/, 'chase camera and controls must share the spacecraft-local frame');
 
 assert.doesNotMatch(solarSource, /pos\.z \* scale \* 0\.3/, 'the retained JPL inclination correction must not be flattened');
 assert.match(solarSource, /MOON_TIME_SCALE: 1/, 'the retained Moon timing correction must remain');
@@ -32,5 +32,5 @@ console.log(JSON.stringify({
   ok: true,
   compatibilityGravity: true,
   compatibilityDeepSpace: true,
-  retainedImprovements: ['world-up-camera', 'one-spherical-sun', 'lazy-extended-space', 'jpl-inclination', 'moon-time-scale']
+  retainedImprovements: ['axis-stable-space-controls', 'one-spherical-sun', 'lazy-extended-space', 'jpl-inclination', 'moon-time-scale']
 }, null, 2));
