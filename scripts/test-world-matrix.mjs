@@ -532,6 +532,10 @@ async function loadLocation(page, spec) {
           const upperCandidate = elevatedRoads[bIndex];
           const lowerOrder = Number(lowerCandidate.structureSemantics.verticalOrder);
           const upperOrder = Number(upperCandidate.structureSemantics.verticalOrder);
+          // The clearance contract applies to explicitly different mapped
+          // layers. Same-layer ways can be adjacent lanes or merges on one
+          // elevated deck; forcing clearance between them fabricates ramps.
+          if (lowerOrder === upperOrder) continue;
           if (ctx.areRoadsConnected?.(lowerCandidate, upperCandidate)) continue;
           for (let aSegment = 0; aSegment < lowerCandidate.pts.length - 1; aSegment += 1) {
             for (let bSegment = 0; bSegment < upperCandidate.pts.length - 1; bSegment += 1) {
