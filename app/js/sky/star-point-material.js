@@ -1,5 +1,18 @@
 let starTexture = null;
 
+export function configureSkyBackgroundMaterial(material) {
+  if (!material) return material;
+  // Catalog stars are an astronomical background. Render them before Earth
+  // geometry, with additive blending but without touching depth. Terrain and
+  // buildings then overwrite the sky wherever they are visible.
+  material.depthTest = false;
+  material.depthWrite = false;
+  material.transparent = false;
+  material.userData.skyBackgroundMaterial = true;
+  material.needsUpdate = true;
+  return material;
+}
+
 function getRoundStarTexture() {
   if (starTexture) return starTexture;
   const canvas = document.createElement('canvas');
@@ -49,11 +62,14 @@ function getRoundStarTexture() {
 }
 
 export function createRoundStarMaterial(options = {}) {
-  return new THREE.PointsMaterial({
-    ...options,
-    map: options.map || getRoundStarTexture(),
-    color: options.color || 0xffffff,
-    alphaTest: Number.isFinite(options.alphaTest) ? options.alphaTest : 0.04,
+  const { skyBackground = false, ...materialOptions } = options;
+  const material = new THREE.PointsMaterial({
+    ...materialOptions,
+    map: materialOptions.map || getRoundStarTexture(),
+    color: materialOptions.color || 0xffffff,
+    alphaTest: Number.isFinite(materialOptions.alphaTest) ? materialOptions.alphaTest : 0.04,
+    depthTest: !skyBackground,
     depthWrite: false
   });
+  return skyBackground ? configureSkyBackgroundMaterial(material) : material;
 }

@@ -5,6 +5,9 @@ import path from 'node:path';
 const root = path.resolve('app/js');
 const allowedRawConsumers = new Set([
   'terrain.js',
+  // The fixed far-world renderer is an authorized lower-resolution horizon
+  // consumer. It never owns mapped water semantics or near collision ground.
+  'terrain/far-field.js',
   'terrain/location-world.js',
   'terrain/tiles.js'
 ]);

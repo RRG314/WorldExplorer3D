@@ -1,4 +1,4 @@
-import { createRoundStarMaterial } from './star-point-material.js?v=2';
+import { createRoundStarMaterial } from './star-point-material.js?v=4';
 
 const GAIA_CSV_URL = new URL('../../assets/data/universe/gaia-dr3-nearby-bright.csv', import.meta.url);
 let catalogPromise = null;
@@ -72,6 +72,7 @@ function createPointLayer(name, size, opacity) {
   const points = new THREE.Points(
     new THREE.BufferGeometry(),
     createRoundStarMaterial({
+      skyBackground: true,
       size,
       sizeAttenuation: false,
       vertexColors: true,
@@ -83,6 +84,7 @@ function createPointLayer(name, size, opacity) {
     })
   );
   points.name = name;
+  points.renderOrder = -1000;
   points.frustumCulled = false;
   points.userData = {
     accuracy: 'catalog-derived',

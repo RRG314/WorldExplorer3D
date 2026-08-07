@@ -1,6 +1,6 @@
 {
   "name": "worldexplorer3d",
-  "version": "4.1.2",
+  "version": "4.1.3",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "type": "module",
   "main": "three.js",
@@ -91,6 +91,9 @@
     "test:phase5-production": "node scripts/test-phase5-production-contract.mjs",
     "test:phase5-controls": "node scripts/test-phase5-controller-contract.mjs",
     "test:phase5-aerial-transition": "node scripts/test-phase5-aerial-transition.mjs",
+    "test:loading-transition": "node scripts/test-loading-transition-contract.mjs",
+    "test:loading-transition-browser": "node scripts/test-loading-transition-browser.mjs",
+    "test:far-world-global": "node scripts/test-far-world-global-contract.mjs",
     "diag:phase5-sustained": "node scripts/test-phase5-sustained-earth.mjs",
     "diag:minimap-sustained-drive": "node scripts/test-minimap-sustained-drive.mjs",
     "test:overture-source": "node scripts/test-overture-tile-source.mjs",

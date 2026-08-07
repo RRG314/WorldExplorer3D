@@ -182,12 +182,12 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       if (appCtx.spaceFlight?.active) return true;
       setStatus(`Syncing room world ${room.code} to Space...`);
       if (appCtx.onMoon && typeof appCtx.startSpaceFlightToEarth === "function") {
-        appCtx.startSpaceFlightToEarth();
-        return false;
+        await appCtx.startSpaceFlightToEarth();
+        return appCtx.spaceFlight?.active === true;
       }
       if (typeof appCtx.startSpaceFlightToMoon === "function") {
-        appCtx.startSpaceFlightToMoon();
-        return false;
+        await appCtx.startSpaceFlightToMoon();
+        return appCtx.spaceFlight?.active === true;
       }
       return false;
     }

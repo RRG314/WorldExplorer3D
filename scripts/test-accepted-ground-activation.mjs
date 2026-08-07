@@ -11,6 +11,7 @@ function harness(groundState) {
   const finalizations = [];
   const phases = [];
   let terrainUpdates = 0;
+  let groundSuppressions = 0;
   const runtimeState = {};
   const loadMetrics = {};
   const appCtx = {
@@ -21,7 +22,8 @@ function harness(groundState) {
     initialEarthWorldReady: true,
     prepareAcceptedGroundFromCatalog: async () => groundState,
     showLoad: (message, options) => messages.push({ message, options }),
-    publishLocationTerrain: () => { terrainUpdates += 1; }
+    publishLocationTerrain: () => { terrainUpdates += 1; },
+    suppressGroundFallbackPlaceholder: () => { groundSuppressions += 1; }
   };
   return {
     appCtx,
@@ -30,6 +32,7 @@ function harness(groundState) {
     messages,
     phases,
     runtimeState,
+    groundSuppressions: () => groundSuppressions,
     terrainUpdates: () => terrainUpdates,
     run: () => activateAcceptedGroundForWorldLoad({
       appCtx,
@@ -101,6 +104,7 @@ assert.equal(openOcean.finalizations.length, 0);
 assert.equal(openOcean.runtimeState.groundMode, 'open-ocean-surface-only');
 assert.equal(openOcean.runtimeState.acceptedGround.status, 'not-applicable');
 assert.equal(openOcean.runtimeState.acceptedGround.waterKind, 'open_ocean');
+assert.equal(openOcean.groundSuppressions(), 1);
 
 assert.equal(setCustomLocation({
   lat: 30,
@@ -129,6 +133,7 @@ explicitBoat.appCtx.customLoc = {
 assert.equal(await explicitBoat.run(), true);
 assert.equal(explicitBoat.runtimeState.groundMode, 'open-ocean-surface-only');
 assert.equal(explicitBoat.runtimeState.acceptedGround.requestedBoatArrival, true);
+assert.equal(explicitBoat.groundSuppressions(), 1);
 
 console.log(JSON.stringify({
   ok: true,

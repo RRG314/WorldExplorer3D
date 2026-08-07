@@ -2,6 +2,45 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.1.3] - 2026-08-07
+
+### Added
+
+- A fixed, one-time selected-location background that extends mapped land and
+  up to 10,000 additional building masses toward a 22 km terrain horizon.
+- Tile-exact ownership between detailed accepted ground and the coarse horizon
+  mesh, retaining fallback terrain only beneath unavailable edge tiles.
+
+### Changed
+
+- Astronomical catalog stars render as the sky background while preserving
+  their mapped positions, observer orientation, time-of-day visibility, and
+  brightness; Earth geometry now reliably occludes them at the horizon.
+- The initial location transaction waits for the fixed background to finish.
+  Actor movement does not stream, rebuild, or recenter that background.
+- Large mapped water polygons now continue through the fixed far context at
+  worldwide locations; glaciers remain terrain and only mapped geometry may
+  publish water.
+
+### Fixed
+
+- Restored terrain and mapped building context beyond the detailed city grid
+  without restoring the false blue square, elevation-derived water, or a
+  competing water publisher.
+- Removed terrain holes, square seams, coarse/detailed z-fighting stripes, and
+  stars drawing through distant ground.
+- Reconciled infeasible connected bridge tie-ins against the engineered grade
+  ceiling while preserving structural clearance bounds.
+- Restored the v3.1 movement/look mapping on mobile touch pads and made the
+  visible mobile Main Menu control reliably tappable above the HUD and canvas.
+- Made multiplayer Space room synchronization await the lazy-loaded flight
+  runtime before reporting completion, preventing Moon/Space/Earth races.
+- Kept the transition screen opaque while a new location loads, prevented a
+  previous location name from surviving publication, and removed the green
+  bootstrap ground from open-ocean destinations.
+- Improved custom-city arrivals by checking a usable terrain corridor along
+  the selected mapped road instead of validating only the spawn point.
+
 ## [4.1.2] - 2026-08-06
 
 ### Added

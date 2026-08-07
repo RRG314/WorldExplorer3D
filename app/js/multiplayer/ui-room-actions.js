@@ -22,7 +22,7 @@ import {
   sendInviteToFriend
 } from "./social.js?v=55";
 import { createUiRoomRoomActionsApi } from "./ui-room-room-actions.js?v=1";
-import { createUiRoomRuntime } from "./ui-room-runtime.js?v=1";
+import { createUiRoomRuntime } from "./ui-room-runtime.js?v=2";
 import { createUiRoomSession } from "./ui-room-session.js?v=1";
 
 export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, callbacks }) {

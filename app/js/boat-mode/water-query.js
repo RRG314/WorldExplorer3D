@@ -98,6 +98,7 @@ function buildSyntheticBoatCandidate(x, z, options = {}) {
     inside: true,
     distanceToWater: 0,
     shorelineDistance: radius,
+    shorelineDistanceKnown: false,
     entryPoint: { x: x + radius, z },
     tangent: { x: 0, z: 1 },
     spawnX: x,
@@ -343,6 +344,10 @@ function buildAreaCandidate(area, x, z) {
     inside,
     distanceToWater: inside ? 0 : nearest.dist,
     shorelineDistance: localShorelineDistance,
+    // Vector-ocean polygons are clipped into source tiles, so the nearest
+    // polygon edge is not necessarily a coastline and must not be presented
+    // as a measured distance to shore.
+    shorelineDistanceKnown: classification.kind !== 'open_ocean',
     entryPoint: nearest.point,
     tangent: nearest.tangent,
     spawnX,

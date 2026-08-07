@@ -1,10 +1,10 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=35";
-import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
-import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=13";
+import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
+import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=14";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=20";
-import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=6";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
@@ -16,10 +16,18 @@ async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   try {
     const startedAt = performance.now();
     const centerReady = typeof waitForCenter === 'function' ? await waitForCenter(0, 0, 3000) : false;
-    if (typeof waitForCoverage !== 'function') return centerReady;
-    const remainingMs = Math.max(800, 5000 - (performance.now() - startedAt));
-    const coverage = await waitForCoverage(0, 0, remainingMs, 0.72);
-    return centerReady || coverage?.ready === true;
+    const coverage = typeof waitForCoverage === 'function'
+      ? await waitForCoverage(0, 0, Math.max(800, 5000 - (performance.now() - startedAt)), 0.72)
+      : null;
+    const nearReady = centerReady || coverage?.ready === true;
+    const waitForFarTerrain = appCtx.waitForFarTerrainClipmap;
+    if (typeof waitForFarTerrain !== 'function') return nearReady;
+    startLoadPhase('waitForFixedLocationBackground');
+    try {
+      return nearReady && await waitForFarTerrain(20000);
+    } finally {
+      endLoadPhase('waitForFixedLocationBackground');
+    }
   } finally {
     endLoadPhase('waitForTerrainCoverage');
   }
@@ -242,6 +250,7 @@ export function createWorldRoadLoader(deps = {}) {
       phaseTotals,
       rdtLoadComplexity,
       runtimeState,
+      restoreRequestedSelection,
       startLoadPhase,
       useRdtBudgeting,
       useSyntheticFallbackRoads
@@ -279,6 +288,9 @@ export function createWorldRoadLoader(deps = {}) {
         hideEarthSceneMeshes,
         loadMetrics,
         markLoaded: () => {
+          // A late title/session restoration must not replace the location
+          // that this load actually published.
+          restoreRequestedSelection();
           loaded = true;
           if (runtimeState) {
             runtimeState.geometryReady = true;

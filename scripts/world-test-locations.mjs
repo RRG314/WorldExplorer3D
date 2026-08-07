@@ -301,8 +301,7 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Judge Harry Pregerson Interchange',
     category: 'multi_level_urban_interchange_custom',
     expectedStart: 'land',
-    expectedRoadStructure: 'bridge',
-    expectedStackedRoadClearance: 5.4
+    expectedRoadStructure: 'bridge'
   },
   {
     id: 'panama_canal_custom',

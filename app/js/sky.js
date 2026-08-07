@@ -7,7 +7,7 @@ import {
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=3";
+} from "./sky/astronomical-state.js?v=4";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -16,7 +16,7 @@ import {
   createStarField,
   highlightConstellation,
   showStarInfo
-} from "./sky/starfield-ui.js?v=11";
+} from "./sky/starfield-ui.js?v=13";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
 import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";

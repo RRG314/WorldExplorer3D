@@ -3,7 +3,7 @@ import {
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=10';
+} from './world/compiler/transport-surface-model.js?v=11';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=2';
 import {
   assignFeatureConnections,

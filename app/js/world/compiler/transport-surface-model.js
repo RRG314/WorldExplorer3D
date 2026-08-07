@@ -594,11 +594,14 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       surfaceBias,
       maximumGrade
     );
-    if (Number.isFinite(minimumStructureSurfaceY)) {
-      // Endpoint corrections can pull a clearance-constrained short structure
-      // below its compiled envelope and reintroduce an unsafe grade. Reconcile
-      // that failure class once, lifting the infeasible tie-in instead of
-      // publishing a deck that vehicles cannot remain on.
+    const tiedProfileMaximumGrade = profileStats(sampleDistances, centerHeights).maximumGrade;
+    const hasConnectedEndpointTieIn = Array.isArray(feature?.structureTransitionAnchors) &&
+      feature.structureTransitionAnchors.some((anchor) => anchor?.source === 'connected_feature');
+    if (
+      Number.isFinite(minimumStructureSurfaceY) ||
+      (hasConnectedEndpointTieIn && tiedProfileMaximumGrade > maximumGrade + 1e-6)
+    ) {
+      // Reconcile infeasible connected tie-ins without lowering structural bounds.
       centerHeights = smoothGradeLimitedProfile(
         centerHeights,
         centerLowerBounds,

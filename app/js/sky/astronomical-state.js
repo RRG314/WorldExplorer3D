@@ -288,7 +288,9 @@ function applyStarVisibility(state) {
       child.userData.baseOpacity = material.opacity;
     }
     material.opacity = child.userData.baseOpacity * opacity;
-    material.transparent = material.opacity < 0.999 || material.transparent;
+    if (!material.userData?.skyBackgroundMaterial) {
+      material.transparent = material.opacity < 0.999 || material.transparent;
+    }
     material.needsUpdate = true;
   });
 

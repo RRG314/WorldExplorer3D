@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=28";
+} from "./world/spawn.js?v=29";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -131,7 +131,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=8";
+} from "./world/vegetation.js?v=9";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -160,14 +160,14 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=21";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=92";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=94";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=7";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=24";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=13";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=14";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

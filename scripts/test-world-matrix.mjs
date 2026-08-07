@@ -532,6 +532,10 @@ async function loadLocation(page, spec) {
           const upperCandidate = elevatedRoads[bIndex];
           const lowerOrder = Number(lowerCandidate.structureSemantics.verticalOrder);
           const upperOrder = Number(upperCandidate.structureSemantics.verticalOrder);
+          // The clearance contract applies to explicitly different mapped
+          // layers. Same-layer ways can be adjacent lanes or merges on one
+          // elevated deck; forcing clearance between them fabricates ramps.
+          if (lowerOrder === upperOrder) continue;
           if (ctx.areRoadsConnected?.(lowerCandidate, upperCandidate)) continue;
           for (let aSegment = 0; aSegment < lowerCandidate.pts.length - 1; aSegment += 1) {
             for (let bSegment = 0; bSegment < upperCandidate.pts.length - 1; bSegment += 1) {
@@ -1151,6 +1155,22 @@ async function loadLocation(page, spec) {
         z: Number(actorZ.toFixed(2)),
         currentMode: typeof ctx.getCurrentTravelMode === 'function' ? ctx.getCurrentTravelMode() : (ctx.droneMode ? 'drone' : ctx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive')
       },
+      locationPresentation: {
+        selected: ctx.selLoc || null,
+        customName: String(ctx.customLoc?.name || ''),
+        origin: {
+          lat: Number(ctx.LOC?.lat),
+          lon: Number(ctx.LOC?.lon)
+        },
+        placeState: ctx.livePlaceState ? {
+          display: String(ctx.livePlaceState.display || ''),
+          lat: Number(ctx.livePlaceState.lat),
+          lon: Number(ctx.livePlaceState.lon)
+        } : null,
+        resolvedHudLabel: typeof ctx.getHudLocationLabel === 'function' ?
+          String(ctx.getHudLocationLabel() || '') : '',
+        renderedHudLabel: String(document.getElementById('location')?.textContent || '')
+      },
       spawnOccupancy: expectedStart !== 'water' ? {
         actorCollision: finalActorCollision?.collision === true,
         actorInsideBuilding: finalActorCollision?.inside === true,
@@ -1166,7 +1186,9 @@ async function loadLocation(page, spec) {
         terrainMode: initialSpawn.road?.structureSemantics?.terrainMode || null,
         featureEndpointClearance: Number.isFinite(initialSpawn.featureEndpointClearance) ?
           Number(initialSpawn.featureEndpointClearance.toFixed(2)) : null,
-        endpointConnected: initialSpawn.endpointConnected ?? null
+        endpointConnected: initialSpawn.endpointConnected ?? null,
+        terrainCorridorMaxDelta: Number.isFinite(initialSpawn.terrainCorridorMaxDelta) ?
+          Number(initialSpawn.terrainCorridorMaxDelta.toFixed(2)) : null
       } : null,
       customStructureProbe,
       structureGameplay,

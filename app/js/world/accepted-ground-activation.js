@@ -58,6 +58,7 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
     runtimeState.acceptedGround = exemption;
     runtimeState.groundMode = 'open-ocean-surface-only';
     loadMetrics.acceptedGround = exemption;
+    appCtx.suppressGroundFallbackPlaceholder?.();
     appCtx.showLoad('Loading open-ocean surface data...');
     return true;
   }

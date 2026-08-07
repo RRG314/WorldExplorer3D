@@ -163,7 +163,16 @@ function weatherVisualProfile(state) {
 }
 
 function getHudLocationLabel() {
-  const detailed = String(appCtx.livePlaceState?.display || '').trim();
+  const placeLat = Number(appCtx.livePlaceState?.lat);
+  const placeLon = Number(appCtx.livePlaceState?.lon);
+  const locationLat = Number(appCtx.LOC?.lat);
+  const locationLon = Number(appCtx.LOC?.lon);
+  const longitudeDelta = Math.abs(placeLon - locationLon);
+  const placeMatchesLoadedLocation =
+    [placeLat, placeLon, locationLat, locationLon].every(Number.isFinite) &&
+    Math.abs(placeLat - locationLat) <= 0.05 &&
+    Math.min(longitudeDelta, Math.abs(longitudeDelta - 360)) <= 0.05;
+  const detailed = placeMatchesLoadedLocation ? String(appCtx.livePlaceState?.display || '').trim() : '';
   if (detailed) return detailed;
   return getActiveWeatherLocationLabel();
 }

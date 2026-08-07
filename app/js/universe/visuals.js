@@ -1,5 +1,5 @@
 import { createBlackHoleVisual } from './black-hole.js?v=2';
-import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 
 function seededRandom(seed = 1) {
   let state = Math.abs(Math.floor(Number(seed) || 1)) >>> 0;

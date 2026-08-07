@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { normalizeAngle, siderealTime, toDays } from "../astro.js?v=1";
-import { createRoundStarMaterial } from "./star-point-material.js?v=2";
-import { createGaiaSkyLayers } from "./gaia-catalog.js?v=1";
+import { createRoundStarMaterial } from "./star-point-material.js?v=4";
+import { createGaiaSkyLayers } from "./gaia-catalog.js?v=3";
 
 const STARFIELD_RADIUS = 5000;
 const _skyMatrix = new THREE.Matrix4();
@@ -85,6 +85,7 @@ export function createStarField() {
   const brightGeometry = new THREE.BufferGeometry();
   brightGeometry.setAttribute('position', new THREE.Float32BufferAttribute(brightPositions, 3));
   const brightMaterial = createRoundStarMaterial({
+    skyBackground: true,
     size: 6.2,
     sizeAttenuation: false,
     vertexColors: false,
@@ -96,6 +97,7 @@ export function createStarField() {
   });
   const brightStars = new THREE.Points(brightGeometry, brightMaterial);
   brightStars.name = BRIGHT_STAR_LAYER_NAME;
+  brightStars.renderOrder = -1000;
   brightStars.userData.baseOpacity = brightMaterial.opacity;
   group.add(brightStars);
 

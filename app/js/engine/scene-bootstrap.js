@@ -322,6 +322,11 @@ function addSkyVisuals(appCtx, gpuTier) {
     ground.visible = true;
     return true;
   };
+  appCtx.suppressGroundFallbackPlaceholder = () => {
+    ground.visible = false;
+    ground.parent?.remove?.(ground);
+    return true;
+  };
   appCtx.retireGroundFallbackPlaceholder = () => {
     const hasReadyTerrain = (appCtx.terrainGroup?.children || []).some((mesh) =>
       mesh?.userData?.isTerrainMesh && mesh.userData.pendingTerrainTile === false

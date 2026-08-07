@@ -10,12 +10,12 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.1.2
+## Version 4.1.3
 
-Version 4.1.2 completes the production-architecture release train: accepted
-ground, compiled transport and structures, provenance-owned buildings and
-water, deterministic controllers, and environment lifecycle cleanup now have
-one tested owner apiece.
+Version 4.1.3 restores a complete fixed-location Earth horizon without
+restoring continuous streaming or the false blue city square. Detailed ground,
+mapped water, roads, dense buildings, distant land/building context, and the
+astronomical sky retain explicit, non-overlapping render ownership.
 
 Highlights:
 
@@ -98,6 +98,7 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
+- [Regression ledger](docs/REGRESSION_LEDGER.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

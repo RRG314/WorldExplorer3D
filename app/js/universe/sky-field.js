@@ -1,5 +1,5 @@
 import { icrsToCartesian } from './catalog.js?v=9';
-import { createGaiaSkyLayers, rebuildGaiaSkyLayers } from '../sky/gaia-catalog.js?v=1';
+import { createGaiaSkyLayers, rebuildGaiaSkyLayers } from '../sky/gaia-catalog.js?v=3';
 
 const SKY_RADIUS = 185000;
 
