@@ -16,10 +16,18 @@ async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   try {
     const startedAt = performance.now();
     const centerReady = typeof waitForCenter === 'function' ? await waitForCenter(0, 0, 3000) : false;
-    if (typeof waitForCoverage !== 'function') return centerReady;
-    const remainingMs = Math.max(800, 5000 - (performance.now() - startedAt));
-    const coverage = await waitForCoverage(0, 0, remainingMs, 0.72);
-    return centerReady || coverage?.ready === true;
+    const coverage = typeof waitForCoverage === 'function'
+      ? await waitForCoverage(0, 0, Math.max(800, 5000 - (performance.now() - startedAt)), 0.72)
+      : null;
+    const nearReady = centerReady || coverage?.ready === true;
+    const waitForFarTerrain = appCtx.waitForFarTerrainClipmap;
+    if (typeof waitForFarTerrain !== 'function') return nearReady;
+    startLoadPhase('waitForFixedLocationBackground');
+    try {
+      return nearReady && await waitForFarTerrain(20000);
+    } finally {
+      endLoadPhase('waitForFixedLocationBackground');
+    }
   } finally {
     endLoadPhase('waitForTerrainCoverage');
   }

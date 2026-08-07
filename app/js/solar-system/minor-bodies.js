@@ -298,4 +298,4 @@ export function createNamedAsteroids(ctx) {
     });
   });
 }
-import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';

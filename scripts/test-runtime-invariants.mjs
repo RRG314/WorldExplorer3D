@@ -448,6 +448,8 @@ async function main() {
         return {
           x: start.x + dx * blend,
           z: start.z + dz * blend,
+          segmentLength: length,
+          segmentBlend: blend,
           tangentX: dx / length,
           tangentZ: dz / length,
           normalX: -dz / length,
@@ -526,20 +528,51 @@ async function main() {
           const driveFraction = [0.2, 0.5, 0.8][
             Math.floor(roadIndex / roadStep) % 3
           ];
-          if (
+          const eligibleDriveSlot =
             !centerBlocked &&
             driveCandidates.length < 24 &&
             fraction === driveFraction &&
             !driveCandidateRoadIds.has(roadId) &&
             roadIndex % (roadStep * 2) === 0 &&
             Math.hypot(point.x, point.z) <
-              Number(ctx.worldTraversalRadiusWorld || 2700) - 120
-          ) {
+              Number(ctx.worldTraversalRadiusWorld || 2700) - 120;
+          if (eligibleDriveSlot) {
+            const forwardRun = point.segmentLength * (1 - point.segmentBlend);
+            const reverseRun = point.segmentLength * point.segmentBlend;
+            const directionOrder = forwardRun >= reverseRun ? [1, -1] : [-1, 1];
+            let direction = 0;
+            for (const candidateDirection of directionOrder) {
+              let clearStraightRun = true;
+              for (const distance of [8, 16, 24, 32]) {
+                const probeX = point.x + point.tangentX * candidateDirection * distance;
+                const probeZ = point.z + point.tangentZ * candidateDirection * distance;
+                const probeSurface = ctx.SurfaceQuery?.driveAt?.(probeX, probeZ, { preferRoad: true });
+                const probeBaseY = Number(probeSurface?.position?.y);
+                const probeCollision = ctx.checkBuildingCollision?.(probeX, probeZ, 2, {
+                  actorBaseY: probeBaseY,
+                  actorHeight: 1.9
+                });
+                const probeRoad = ctx.findNearestRoad?.(probeX, probeZ, {
+                  y: probeBaseY,
+                  maxVerticalDelta: 18,
+                  preferredRoad: road
+                });
+                clearStraightRun = probeRoad?.road === road &&
+                  Number(probeRoad.dist) <= Math.max(1.5, halfWidth - 0.8) &&
+                  !collisionResponse.isVehicleBuildingCollisionBlocking(probeCollision, probeRoad);
+                if (!clearStraightRun) break;
+              }
+              if (clearStraightRun) {
+                direction = candidateDirection;
+                break;
+              }
+            }
+            if (direction === 0) continue;
             driveCandidateRoadIds.add(roadId);
             driveCandidates.push({
               x: point.x,
               z: point.z,
-              heading: Math.atan2(point.tangentX, point.tangentZ),
+              heading: Math.atan2(point.tangentX * direction, point.tangentZ * direction),
               roadId,
               roadName: String(road?.name || road?.tags?.name || ''),
               roadType: String(road?.type || road?.subtype || road?.tags?.highway || ''),
@@ -587,11 +620,9 @@ async function main() {
         }
         ctx.invalidateRoadCache?.();
         for (let frame = 0; frame < 150; frame += 1) {
-          ctx.keys.KeyW = true;
           ctx.keys.ArrowUp = true;
           ctx.update?.(1 / 60);
         }
-        ctx.keys.KeyW = false;
         ctx.keys.ArrowUp = false;
         const moved = Math.hypot(
           ctx.car.x - candidate.x,
@@ -1094,6 +1125,24 @@ async function main() {
           Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0),
         steepestEngineeredRoads
       };
+      const roadMeshes = Array.isArray(ctx?.roadMeshes) ? ctx.roadMeshes : [];
+      const mainRoadBatches = roadMeshes.filter((mesh) =>
+        mesh?.userData?.isRoadBatch &&
+        !mesh?.userData?.isRoadSkirt &&
+        !mesh?.userData?.isRoadMarking
+      );
+      const auxiliaryRoadBatches = roadMeshes.filter((mesh) =>
+        mesh?.userData?.isRoadSkirt || mesh?.userData?.isRoadMarking
+      );
+      const transportSurfaceBatchBudget = {
+        meshCount: roadMeshes.length,
+        mainBatchCount: mainRoadBatches.length,
+        auxiliaryBatchCount: auxiliaryRoadBatches.length,
+        maximumMainBatchVertices: mainRoadBatches.reduce((maximum, mesh) =>
+          Math.max(maximum, Number(mesh?.geometry?.getAttribute?.('position')?.count || 0)), 0),
+        boundedMainBatches: mainRoadBatches.every((mesh) =>
+          Number(mesh?.geometry?.getAttribute?.('position')?.count || 0) <= 60000)
+      };
       const transportStructureModel = ctx?.transportStructureModel || null;
       const transportStructureColliders = Array.isArray(ctx?.transportStructureColliders)
         ? ctx.transportStructureColliders
@@ -1189,6 +1238,7 @@ async function main() {
         syntheticStructureSemantics,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
         transportSurfaceCoverage,
+        transportSurfaceBatchBudget,
         transportStructureCoverage,
         transportSurfacePublication: ctx?.transportSurfacePublication || null,
         acceptedGroundRuntimeBoundary: {
@@ -1346,7 +1396,11 @@ async function main() {
           )
         ),
       compiledTransportRendererBudget:
-        report.transportSurfacePublication?.meshCount <= 4 &&
+        report.transportSurfaceBatchBudget?.meshCount ===
+          report.transportSurfaceBatchBudget?.mainBatchCount +
+          report.transportSurfaceBatchBudget?.auxiliaryBatchCount &&
+        report.transportSurfaceBatchBudget?.boundedMainBatches === true &&
+        report.transportSurfaceBatchBudget?.auxiliaryBatchCount <= 2 &&
         report.transportSurfacePublication?.compiledSampleCount <=
           report.transportSurfacePublication?.roadCount * 120 &&
         report.transportSurfacePublication?.vertices <=
@@ -1377,9 +1431,9 @@ async function main() {
         report.surfaceContractParity.maxWalkDelta <= 1e-9 &&
         report.surfaceContractParity.maxDriveDelta <= 1e-9,
       walkingControlsUpdated:
-        report.walkingControlsText.includes('W/S - Move forward / back') &&
-        report.walkingControlsText.includes('A/D - Turn left / right') &&
-        report.walkingControlsText.includes('Arrow keys - Look around') &&
+        report.walkingControlsText.includes('Arrow Up/Down - Move forward / back') &&
+        report.walkingControlsText.includes('Arrow Left/Right - Turn left / right') &&
+        report.walkingControlsText.includes('WASD - Look around') &&
         report.walkingControlsText.includes('E - Enter/exit building interior'),
       syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:

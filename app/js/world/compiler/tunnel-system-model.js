@@ -2,7 +2,7 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=10';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=11';
 
 function compatibleTunnelFeature(feature) {
   const semantics = feature?.structureSemantics;

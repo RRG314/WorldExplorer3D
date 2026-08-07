@@ -17,7 +17,21 @@ const terrainRuntimeSource = read('app/js/terrain.js');
 const publicationSource = read('app/js/world/publication.js');
 const diagnosticsSource = read('app/js/runtime-diagnostics.js');
 const locationTerrainSource = read('app/js/terrain/location-world.js');
+const farFieldSource = read('app/js/terrain/far-field.js');
+const starMaterialSource = read('app/js/sky/star-point-material.js');
+const starFieldSource = read('app/js/sky/starfield-ui.js');
+const gaiaSource = read('app/js/sky/gaia-catalog.js');
 const hudSource = read('app/js/hud.js');
+const {
+  FAR_FIELD_OUTER_DISTANCE_METERS,
+  FAR_CONTEXT_HALF_EXTENT_METERS,
+  FAR_FIELD_SOURCE_ZOOM_OFFSET,
+  FAR_CONTEXT_MAX_BUILDINGS,
+  FAR_CONTEXT_ZOOM,
+  buildClipmapAxis,
+  cellInsideDetailedCoverage,
+  cellInsideHole
+} = await import('../app/js/terrain/far-field.js');
 
 assert.match(configSource, /const TERRAIN_ZOOM = 15;/, 'near terrain resolution must remain at zoom 15');
 assert.doesNotMatch(
@@ -47,20 +61,52 @@ assert.match(diagnosticsSource, /suppressedTerrainMeshes/);
 assert.match(locationTerrainSource, /for \(let dx = -activeRing; dx <= activeRing; dx \+= 1\)/);
 assert.match(locationTerrainSource, /z: appCtx\.TERRAIN_ZOOM/);
 assert.doesNotMatch(locationTerrainSource, /actor|speed|childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
-assert.equal(
-  fs.existsSync(path.join(root, 'app/js/terrain/far-field.js')),
-  false,
-  'The post-v4.1.1 square far-field clipmap owner must be removed, not hidden or recolored.'
+assert.equal(fs.existsSync(path.join(root, 'app/js/terrain/far-field.js')), true);
+assert.match(terrainRuntimeSource, /createFarFieldTerrainApi|far-field\.js|updateFarTerrainClipmap/);
+assert.match(locationTerrainSource, /updateFarTerrainClipmap/);
+assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
+assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
+assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 6500);
+assert.equal(FAR_CONTEXT_ZOOM, 14);
+assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
+const axis = buildClipmapAxis(-100, -20, 30, 100, 15);
+assert.equal(axis[0], -100);
+assert.equal(axis.at(-1), 100);
+assert.ok(axis.includes(-20) && axis.includes(30), 'far terrain must meet both exact near-grid seams');
+assert.ok(axis.every((value, index) => index === 0 || value > axis[index - 1]));
+assert.equal(cellInsideHole(0, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), true);
+assert.equal(cellInsideDetailedCoverage(0, 0, [{ minX: -20, maxX: 30, minZ: -10, maxZ: 10 }]), true);
+assert.doesNotMatch(
+  farFieldSource,
+  /if \(cellInsideHole\(centerX, centerZ, spec\.inner\)\) continue/,
+  'far terrain must remain continuous below unavailable detailed edge tiles'
 );
-assert.doesNotMatch(terrainRuntimeSource, /createFarFieldTerrainApi|far-field\.js|updateFarTerrainClipmap/);
-assert.doesNotMatch(locationTerrainSource, /FarTerrain|farTerrain|updateFarTerrainClipmap/);
+assert.match(farFieldSource, /cellInsideDetailedCoverage\(centerX, centerZ, spec\.detailedCoverage\)/);
+assert.match(farFieldSource, /completeDetailedTileCoverage/);
+assert.match(starMaterialSource, /skyBackgroundMaterial/);
+assert.match(starMaterialSource, /material\.depthTest = false/);
+assert.match(starMaterialSource, /material\.transparent = false/);
+assert.match(starFieldSource, /skyBackground:\s*true/);
+assert.match(starFieldSource, /renderOrder = -1000/);
+assert.match(gaiaSource, /skyBackground:\s*true/);
+assert.match(gaiaSource, /renderOrder = -1000/);
+assert.match(farFieldSource, /FarMappedBuildingContext/);
+assert.match(farFieldSource, /waitForFarTerrainClipmap/);
+assert.match(farFieldSource, /contextGeographic/);
+assert.doesNotMatch(farFieldSource, /actorX|actorZ/);
+assert.match(farFieldSource, /mapped-land-with-elevation-fallback/);
+assert.match(farFieldSource, /openstreetmap-shortbread/);
+assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);
+assert.doesNotMatch(farFieldSource, /waterByTile|mappedWater|water_polygons|sourceMeters\s*<=\s*0\.75/);
+assert.doesNotMatch(farFieldSource, /0\.23,\s*0\.44,\s*0\.61|if \(waterKind === 'ocean'\)|surfaceColor:\s*'mapped-land-and-water/);
 assert.match(hudSource, /const earthCelestialDistance = 11000/);
 assert.doesNotMatch(
   hudSource,
   /cameraX \+ dirX \* 1400, cameraY \+ dirY \* 1400, cameraZ \+ dirZ \* 1400/,
   'Earth sun or moon remained in front of the distant terrain field'
 );
-assert.doesNotMatch(diagnosticsSource, /farTerrainClipmap|farMappedContexts/);
+assert.match(diagnosticsSource, /farTerrainClipmap/);
+assert.match(diagnosticsSource, /farMappedContexts/);
 
 const { ctx } = await import('../app/js/shared-context.js?v=55');
 const { publishLocationWorld } = await import('../app/js/world/publication.js?v=1');
@@ -131,5 +177,6 @@ console.log(JSON.stringify({
   regionalMapPlane: 'deleted',
   fogPolicy: 'mode-independent',
   nearTerrain: 'unchanged-uniform-z15-grid',
-  farTerrain: 'post-v4.1.1-square-clipmap-removed'
+  farTerrain: 'continuous-fixed-location-land-and-building-horizon',
+  farWaterOwner: 'mapped-water-publisher-only'
 }, null, 2));

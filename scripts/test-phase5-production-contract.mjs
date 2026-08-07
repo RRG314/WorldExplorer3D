@@ -131,7 +131,7 @@ assert.ok(coreFrameSource.includes('appCtx.update(frame.dt)'));
 assert.ok(!coreFrameSource.includes('fixedUpdate(frame)'));
 assert.ok(!coreFrameSource.includes('presentationPose = {'));
 
-const releaseNotes = read('RELEASE_NOTES_4.1.2.md');
+const releaseNotes = read('RELEASE_NOTES_4.1.3.md');
 const knownIssues = read('KNOWN_ISSUES.md');
 assert.match(releaseNotes, /## Verification/);
 assert.match(releaseNotes, /representative locations worldwide/i);
@@ -148,5 +148,5 @@ console.log(JSON.stringify({
   naturalGroundOwner: 'terrain-with-conforming-osm-landcover',
   shadowOwner: 'engine/shadow-policy',
   movementPresentation: 'v3.1-direct-frame-pose',
-  publicReleaseRecord: '4.1.2'
+  publicReleaseRecord: '4.1.3'
 }, null, 2));
