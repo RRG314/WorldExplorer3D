@@ -524,7 +524,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .globe-destination-bar button { font-size: 8px; }
   .globe-destination-bar button span { font-size: 21px; }
   .globe-selector-side { order: 3; flex: 0 0 auto; padding: 12px 12px 82px; overflow: visible; border-top: 1px solid var(--wx-line-soft); border-left: 0; }
-  #hud { top: 0; left: 0; right: 0; }
+  #hud { top: 0; left: 0; right: 0; pointer-events: none; }
   .hud-box {
     width: 100%;
     max-width: none;
@@ -547,7 +547,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   #weatherTimeLine, #weatherMetaLine { display: none; }
   #hudDetails { display: contents; }
   #street { grid-column: 2; grid-row: 1; overflow: hidden; font: 600 10px/1.2 Orbitron, sans-serif; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-  .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; }
+  .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; pointer-events: auto; z-index: 10020; }
   .mainMenuBtn::before { content: '☰'; font: 28px/1 Inter, sans-serif; }
   #gameShareFloatBtn { top: 74px; right: 10px; width: 46px; height: 46px; border-radius: 50%; }
   #minimap { top: 78px; bottom: auto; left: 10px; width: min(190px, 48vw); height: min(190px, 48vw); border-radius: 8px; }

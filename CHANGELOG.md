@@ -28,6 +28,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   stars drawing through distant ground.
 - Reconciled infeasible connected bridge tie-ins against the engineered grade
   ceiling while preserving structural clearance bounds.
+- Restored the v3.1 movement/look mapping on mobile touch pads and made the
+  visible mobile Main Menu control reliably tappable above the HUD and canvas.
 
 ## [4.1.2] - 2026-08-06
 

@@ -153,14 +153,14 @@ async function assertHeldMovement(page) {
   const button = page.locator('#mobileMoveUp');
   const box = await button.boundingBox();
   assert(box, 'Mobile movement control is not visible');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
+  const pointer = { pointerId: 41, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1 };
+  await button.dispatchEvent('pointerdown', pointer);
   await page.waitForTimeout(120);
   const held = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return !!ctx.keys?.ArrowUp && document.getElementById('mobileMoveUp')?.classList.contains('active');
   });
-  await page.mouse.up();
+  await button.dispatchEvent('pointerup', { ...pointer, buttons: 0 });
   await page.waitForTimeout(60);
   const released = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -171,20 +171,29 @@ async function assertHeldMovement(page) {
 
 async function assertDockMenus(page) {
   const cases = [
-    ['#travelBtn', 'travelMenu'],
-    ['#gameBtn', 'gameMenu'],
-    ['#realEstateFloatBtn', 'realEstateMenu'],
-    ['#multiplayerBtn', 'multiplayerMenu']
+    ['#travelBtn', 'travelMenu', []],
+    ['#gameBtn', 'gameMenu', ['fMpCreate', 'fMpJoin', 'fMpInvite', 'fMpLeave']],
+    ['#realEstateFloatBtn', 'realEstateMenu', []]
   ];
-  for (const [selector, menuId] of cases) {
+  for (const [selector, menuId, requiredItems] of cases) {
     await page.locator(selector).tap();
-    const state = await page.evaluate((id) => {
+    const state = await page.evaluate(({ id, requiredIds }) => {
       const dock = document.getElementById('floatMenuContainer').getBoundingClientRect();
       const menu = document.getElementById(id);
       const panel = menu?.querySelector('.floatItems')?.getBoundingClientRect();
-      return { open: !!menu?.classList.contains('open'), panelBottom: panel?.bottom || 0, dockTop: dock.top };
-    }, menuId);
+      const missingItems = requiredIds.filter((requiredId) => {
+        const item = document.getElementById(requiredId);
+        return !item || item.closest('.floatMenu') !== menu || getComputedStyle(item).display === 'none';
+      });
+      return {
+        open: !!menu?.classList.contains('open'),
+        panelBottom: panel?.bottom || 0,
+        dockTop: dock.top,
+        missingItems
+      };
+    }, { id: menuId, requiredIds: requiredItems });
     assert(state.open && state.panelBottom <= state.dockTop, `${menuId} did not open above the dock: ${JSON.stringify(state)}`);
+    assert(state.missingItems.length === 0, `${menuId} is missing consolidated multiplayer controls: ${JSON.stringify(state)}`);
     await page.locator(selector).tap();
   }
 }

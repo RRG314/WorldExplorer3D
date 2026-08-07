@@ -24,6 +24,9 @@ in 4.1.2.
   behind Earth geometry, preventing stars from appearing through distant land.
 - Connected bridge transition profiles are reconciled against the existing 12%
   engineered grade ceiling when endpoint and interior constraints conflict.
+- Mobile movement pads now use the same arrow-key movement and WASD camera
+  contract as desktop controls, and the mobile Main Menu remains touchable
+  above the informational HUD.
 
 ## Loading and budgets
 
