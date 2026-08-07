@@ -25,7 +25,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=17";
+} from "./boat-mode/water-query.js?v=18";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
@@ -33,7 +33,7 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=12";
+} from "./boat-mode/surface-effects.js?v=13";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";

@@ -114,6 +114,48 @@ assert.match(landuseSource, /semanticOnly:\s*true/);
 assert.doesNotMatch(landuseSource, /visibleMappedSurfaceTypes/);
 assert.match(landuseSource, /props\.kind[\s\S]*'glacier'/);
 
+const worldSpawnSource = read('app/js/world/spawn.js');
+assert.match(
+  worldSpawnSource,
+  /const mappedWalkApproach = mode === "walk" \? searchNearestSafeRoadSpawn\(0, 0/,
+  'custom city arrivals must look for a safe mapped walking surface'
+);
+assert.match(
+  worldSpawnSource,
+  /Math\.hypot\(mappedWalkApproach\.x, mappedWalkApproach\.z\) <= 160/,
+  'custom walking arrivals must remain close to the selected coordinate'
+);
+assert.match(
+  worldSpawnSource,
+  /const distances = \[8, 16, 28, 40\]/,
+  'mapped arrivals must inspect a usable terrain corridor beyond the spawn point'
+);
+assert.match(
+  worldSpawnSource,
+  /terrainCorridor\.penalty \+/,
+  'mapped arrivals must prefer a flatter usable corridor rather than a local terrain trough'
+);
+
+const weatherSource = read('app/js/weather.js');
+assert.match(
+  weatherSource,
+  /placeMatchesLoadedLocation/,
+  'the HUD must reject a reverse-geocoded label retained from the previous location'
+);
+
+const loadRuntimeSource = read('app/js/world/load-runtime-session.js');
+const loadRoadsSource = read('app/js/world/load-roads.js');
+assert.match(
+  loadRuntimeSource,
+  /const restoreRequestedSelection = \(\) =>/,
+  'each world load must retain the exact selection it started with'
+);
+assert.match(
+  loadRoadsSource,
+  /restoreRequestedSelection\(\);[\s\S]*loaded = true/,
+  'the published world must restore its own selection before becoming ready'
+);
+
 const shadowSource = read('app/js/engine/shadow-policy.js');
 assert.match(shadowSource, /normalBias/);
 assert.match(shadowSource, /texelWorldSize/);

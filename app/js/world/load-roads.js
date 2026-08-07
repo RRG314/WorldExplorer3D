@@ -1,10 +1,10 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=35";
-import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=8";
-import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=17";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=13";
+import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
+import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=14";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=20";
-import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=6";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
@@ -250,6 +250,7 @@ export function createWorldRoadLoader(deps = {}) {
       phaseTotals,
       rdtLoadComplexity,
       runtimeState,
+      restoreRequestedSelection,
       startLoadPhase,
       useRdtBudgeting,
       useSyntheticFallbackRoads
@@ -287,6 +288,9 @@ export function createWorldRoadLoader(deps = {}) {
         hideEarthSceneMeshes,
         loadMetrics,
         markLoaded: () => {
+          // A late title/session restoration must not replace the location
+          // that this load actually published.
+          restoreRequestedSelection();
           loaded = true;
           if (runtimeState) {
             runtimeState.geometryReady = true;

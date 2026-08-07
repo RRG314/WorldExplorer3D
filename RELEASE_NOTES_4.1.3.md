@@ -18,8 +18,15 @@ in 4.1.2.
   the detailed district. Near-city building publication and its 85% coverage
   target remain unchanged.
 - Mapped polygon and ribbon geometry remains the only visible water authority.
-  The horizon mesh contains no water decoding, elevation-as-water heuristic,
-  blue square, sea-level flattening, or duplicate water surface.
+  A low-detail pass extends large mapped water through the fixed horizon while
+  excluding glaciers. The terrain mesh contains no elevation-as-water
+  heuristic, blue square, sea-level flattening, or duplicate water surface.
+- Open-ocean destinations retire the temporary green ground immediately and
+  use one fixed ocean surface to the horizon without movement-based streaming
+  or invented shoreline-distance claims.
+- Location changes retain an opaque loading screen until the new world is
+  ready, restore the exact requested selection, and reject stale place labels
+  that do not match the published origin.
 - Catalog stars retain their astronomical coordinates and visibility but render
   behind Earth geometry, preventing stars from appearing through distant land.
 - Connected bridge transition profiles are reconciled against the existing 12%
@@ -29,6 +36,8 @@ in 4.1.2.
   above the informational HUD.
 - Multiplayer room travel now waits for lazy Space-flight startup before room
   synchronization resolves, keeping Moon, Space, and Earth cleanup ordered.
+- Custom-city arrival scoring checks a 40 m terrain corridor along mapped roads
+  to avoid placing the player against a steep or enclosed segment.
 
 ## Loading and budgets
 
@@ -52,6 +61,11 @@ Automated verification covers representative locations worldwide and includes
 terrain-source, accepted-ground, hydrology, building coverage, transport,
 controller, space-flight, security, browser boot, module identity, hosted-source
 reachability, and runtime lifecycle contracts.
+
+The worldwide source contract includes coastal, inland, mountainous, desert,
+tropical, glacial, lake, and open-ocean locations across multiple continents.
+Same-session location changes verify that prior geometry and labels do not leak
+through the transition.
 
 The Baltimore runtime journey completed all production checks with zero
 application or WebGL console errors. Engineered road grade remained within the

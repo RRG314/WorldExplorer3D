@@ -502,7 +502,9 @@ function updateHUD() {
   if (appCtx.boatMode?.active) {
     const knots = Math.max(0, Math.round(Math.abs(appCtx.boat.speed) * 0.43));
     const seaLabel = typeof appCtx.boatHudLabel === 'function' ? appCtx.boatHudLabel() : 'Boat Travel';
-    const shoreline = Number.isFinite(appCtx.boatMode.shorelineDistance) ? Math.round(appCtx.boatMode.shorelineDistance) : null;
+    const shorelineKnown = appCtx.boatMode.currentWater?.shorelineDistanceKnown !== false;
+    const shoreline = shorelineKnown && Number.isFinite(appCtx.boatMode.shorelineDistance) ?
+      Math.round(appCtx.boatMode.shorelineDistance) : null;
     setHudUnitLabels('KTS', 'SEA');
     document.getElementById('speed').textContent = `${knots}`;
     document.getElementById('speed').classList.toggle('fast', knots >= 18);

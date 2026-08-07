@@ -208,6 +208,38 @@ function findGradeSeparatedRoadAt(x, z) {
   return result.best;
 }
 
+function terrainCorridorAssessment(x, z, angle) {
+  const baseY = terrainYAtWorld(x, z);
+  if (!Number.isFinite(baseY) || !Number.isFinite(angle)) {
+    return { penalty: 0, reverseHeading: false, maxDelta: 0 };
+  }
+
+  const forwardX = Math.sin(angle);
+  const forwardZ = Math.cos(angle);
+  const distances = [8, 16, 28, 40];
+  const directionDelta = (direction) => {
+    let maxDelta = 0;
+    for (const distance of distances) {
+      const sampleY = terrainYAtWorld(
+        x + forwardX * distance * direction,
+        z + forwardZ * distance * direction
+      );
+      if (Number.isFinite(sampleY)) maxDelta = Math.max(maxDelta, Math.abs(sampleY - baseY));
+    }
+    return maxDelta;
+  };
+
+  const forwardDelta = directionDelta(1);
+  const reverseDelta = directionDelta(-1);
+  const reverseHeading = reverseDelta + 0.75 < forwardDelta;
+  const maxDelta = reverseHeading ? reverseDelta : forwardDelta;
+  return {
+    penalty: Math.max(0, maxDelta - 2) * 18 + maxDelta * 1.5,
+    reverseHeading,
+    maxDelta
+  };
+}
+
 function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   const requestedMode = options.mode === "walk" ? "walk" : "drive";
   const traversableFeatures = worldSpawnDeps.traversableFeaturesForMode(requestedMode);
@@ -297,6 +329,13 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             });
           if (!evaluated.valid) continue;
 
+          const terrainCorridor = terrainCorridorAssessment(
+            candidate.x,
+            candidate.z,
+            evaluated.angle
+          );
+          if (terrainCorridor.reverseHeading) evaluated.angle += Math.PI;
+
           const departure = spawnDepartureAssessment(
             candidate.x,
             candidate.z,
@@ -320,10 +359,12 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             slopePenaltyAt(candidate.x, candidate.z) +
             spawnSlopePenalty +
             endpointPenalty +
+            terrainCorridor.penalty +
             departure.penalty;
           pushCandidate(evaluated, feature, score, {
             featureEndpointClearance: endpointClearance,
             endpointConnected,
+            terrainCorridorMaxDelta: terrainCorridor.maxDelta,
             departureClearance: {
               forwardBlocked: departure.forwardBlocked,
               reverseBlocked: departure.reverseBlocked,
@@ -631,6 +672,16 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
   const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
   const requestedBoatArrival = appCtx.customLoc?.arrivalMode === "boat";
   if (!inferredWaterKind && !requestedBoatArrival && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
+    const mappedWalkApproach = mode === "walk" ? searchNearestSafeRoadSpawn(0, 0, {
+      mode: "walk",
+      angle: appCtx.Walk?.state?.walker?.angle,
+      maxDistance: 160
+    }) : null;
+    if (mappedWalkApproach?.valid && Math.hypot(mappedWalkApproach.x, mappedWalkApproach.z) <= 160 &&
+      !isSubgradeArrival(mappedWalkApproach)) {
+      mappedWalkApproach.source = options.source || "custom_mapped_walk_approach";
+      return applyResolvedWorldSpawn(mappedWalkApproach, options);
+    }
     const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
       ...options,
       mode,

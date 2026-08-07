@@ -18,6 +18,9 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   brightness; Earth geometry now reliably occludes them at the horizon.
 - The initial location transaction waits for the fixed background to finish.
   Actor movement does not stream, rebuild, or recenter that background.
+- Large mapped water polygons now continue through the fixed far context at
+  worldwide locations; glaciers remain terrain and only mapped geometry may
+  publish water.
 
 ### Fixed
 
@@ -32,6 +35,11 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   visible mobile Main Menu control reliably tappable above the HUD and canvas.
 - Made multiplayer Space room synchronization await the lazy-loaded flight
   runtime before reporting completion, preventing Moon/Space/Earth races.
+- Kept the transition screen opaque while a new location loads, prevented a
+  previous location name from surviving publication, and removed the green
+  bootstrap ground from open-ocean destinations.
+- Improved custom-city arrivals by checking a usable terrain corridor along
+  the selected mapped road instead of validating only the spawn point.
 
 ## [4.1.2] - 2026-08-06
 

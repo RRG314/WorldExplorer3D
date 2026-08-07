@@ -7,7 +7,7 @@ import {
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
-} from "./water-query.js?v=17";
+} from "./water-query.js?v=18";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";
@@ -76,7 +76,9 @@ function updateBoatWaterPatch(candidate = null) {
     waterKind === 'harbor' ? 110 :
     waterKind === 'channel' ? 90 :
     waterKind === 'lake' ? 150 :
-    waterKind === 'open_ocean' ? 320 : 210;
+    // One fixed open-ocean location surface reaches the horizon without
+    // terrain streaming or a moving ring of newly loaded tiles.
+    waterKind === 'open_ocean' ? 14000 : 210;
   patch.visible = true;
   patch.position.set(
     appCtx.boat.x,

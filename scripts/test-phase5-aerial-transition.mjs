@@ -28,10 +28,13 @@ const {
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_ZOOM,
+  FAR_WATER_CONTEXT_ZOOM,
+  FAR_WATER_MIN_SPAN_METERS,
   buildClipmapAxis,
   cellInsideDetailedCoverage,
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
+const { pointInLonLatRing } = await import('../app/js/terrain/far-field-mapped-context.js');
 
 assert.match(configSource, /const TERRAIN_ZOOM = 15;/, 'near terrain resolution must remain at zoom 15');
 assert.doesNotMatch(
@@ -68,6 +71,8 @@ assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
 assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 6500);
 assert.equal(FAR_CONTEXT_ZOOM, 14);
+assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
+assert.equal(FAR_WATER_MIN_SPAN_METERS, 200);
 assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
 const axis = buildClipmapAxis(-100, -20, 30, 100, 15);
 assert.equal(axis[0], -100);
@@ -97,8 +102,22 @@ assert.doesNotMatch(farFieldSource, /actorX|actorZ/);
 assert.match(farFieldSource, /mapped-land-with-elevation-fallback/);
 assert.match(farFieldSource, /openstreetmap-shortbread/);
 assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);
-assert.doesNotMatch(farFieldSource, /waterByTile|mappedWater|water_polygons|sourceMeters\s*<=\s*0\.75/);
-assert.doesNotMatch(farFieldSource, /0\.23,\s*0\.44,\s*0\.61|if \(waterKind === 'ocean'\)|surfaceColor:\s*'mapped-land-and-water/);
+assert.doesNotMatch(farFieldSource, /sourceMeters\s*<=\s*0\.75/);
+assert.doesNotMatch(farFieldSource, /surfaceColor:\s*'mapped-land-and-water/);
+assert.match(farFieldSource, /FarMappedWaterContext/);
+assert.match(farFieldSource, /isFarMappedWaterContext/);
+assert.match(farFieldSource, /far-mapped-water-polygon-lod/);
+assert.match(farFieldSource, /loadFarMappedContext\(spec\.contextGeographic, spec\.innerGeographic, spec\.geographic\)/);
+
+const mappedWaterFixture = {
+  outer: [[-76.8, 39.1], [-76.4, 39.1], [-76.4, 39.5], [-76.8, 39.5], [-76.8, 39.1]],
+  holes: [[[-76.65, 39.25], [-76.55, 39.25], [-76.55, 39.35], [-76.65, 39.35], [-76.65, 39.25]]],
+  bounds: { minLat: 39.1, maxLat: 39.5, minLon: -76.8, maxLon: -76.4 },
+  kind: 'water'
+};
+assert.equal(pointInLonLatRing(-76.7, 39.2, mappedWaterFixture.outer), true, 'mapped water must retain its polygon boundary');
+assert.equal(pointInLonLatRing(-76.6, 39.3, mappedWaterFixture.holes[0]), true, 'mapped islands must retain their water holes');
+assert.equal(pointInLonLatRing(-76.6, 39.6, mappedWaterFixture.outer), false, 'unmapped space must never become water');
 assert.match(hudSource, /const earthCelestialDistance = 11000/);
 assert.doesNotMatch(
   hudSource,
@@ -178,5 +197,5 @@ console.log(JSON.stringify({
   fogPolicy: 'mode-independent',
   nearTerrain: 'unchanged-uniform-z15-grid',
   farTerrain: 'continuous-fixed-location-land-and-building-horizon',
-  farWaterOwner: 'mapped-water-publisher-only'
+  farWaterOwner: 'exact-mapped-water-polygon-lod'
 }, null, 2));

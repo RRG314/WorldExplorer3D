@@ -172,7 +172,14 @@ function showLoad(text, options = {}) {
   const selectedMode = options.mode || appCtx.loadingScreenMode || 'earth';
   const background = options.background || LOADING_BG_BY_MODE[selectedMode] || DEFAULT_LOADING_BG;
   const overlay = Number.isFinite(options.overlay) ? options.overlay : 0.32;
-  loading.style.background = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}') center center / cover no-repeat`;
+  // Keep the overlay opaque while a fresh browser decodes the image. Using
+  // the background shorthand reset the CSS black fallback to transparent and
+  // briefly exposed the previously rendered city during location changes.
+  loading.style.backgroundColor = '#000';
+  loading.style.backgroundImage = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}')`;
+  loading.style.backgroundPosition = 'center center';
+  loading.style.backgroundSize = 'cover';
+  loading.style.backgroundRepeat = 'no-repeat';
   loadText.textContent = text || 'Loading...';
   loadText.style.fontWeight = options.bold ? '700' : '500';
   loadText.style.letterSpacing = options.letterSpacing || '';
@@ -190,7 +197,11 @@ function hideLoad() {
   loadText.style.fontWeight = '';
   loadText.style.letterSpacing = '';
   loadText.style.textShadow = '';
-  loading.style.background = '';
+  loading.style.backgroundColor = '';
+  loading.style.backgroundImage = '';
+  loading.style.backgroundPosition = '';
+  loading.style.backgroundSize = '';
+  loading.style.backgroundRepeat = '';
   loading.classList.remove('show');
 }
 

@@ -132,6 +132,13 @@ export function createWorldLoadRuntimeSession(options = {}) {
   });
 
   const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };
+  const restoreRequestedSelection = () => {
+    if (locationSelection.key === 'custom') {
+      appCtx.setCustomLocation?.(locationSelection, { transient: false, syncInputs: false });
+    } else {
+      appCtx.selectPresetLocation?.(locationSelection.key);
+    }
+  };
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   runtimeState = appCtx.worldLoadRuntimeState = {
     sequence: loadSequence,
@@ -227,6 +234,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     phaseTotals,
     rdtLoadComplexity,
     runtimeState,
+    restoreRequestedSelection,
     startLoadPhase,
     useRdtBudgeting,
     useSyntheticFallbackRoads:

@@ -98,6 +98,7 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
+- [Regression ledger](docs/REGRESSION_LEDGER.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

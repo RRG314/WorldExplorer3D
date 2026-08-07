@@ -1155,6 +1155,22 @@ async function loadLocation(page, spec) {
         z: Number(actorZ.toFixed(2)),
         currentMode: typeof ctx.getCurrentTravelMode === 'function' ? ctx.getCurrentTravelMode() : (ctx.droneMode ? 'drone' : ctx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive')
       },
+      locationPresentation: {
+        selected: ctx.selLoc || null,
+        customName: String(ctx.customLoc?.name || ''),
+        origin: {
+          lat: Number(ctx.LOC?.lat),
+          lon: Number(ctx.LOC?.lon)
+        },
+        placeState: ctx.livePlaceState ? {
+          display: String(ctx.livePlaceState.display || ''),
+          lat: Number(ctx.livePlaceState.lat),
+          lon: Number(ctx.livePlaceState.lon)
+        } : null,
+        resolvedHudLabel: typeof ctx.getHudLocationLabel === 'function' ?
+          String(ctx.getHudLocationLabel() || '') : '',
+        renderedHudLabel: String(document.getElementById('location')?.textContent || '')
+      },
       spawnOccupancy: expectedStart !== 'water' ? {
         actorCollision: finalActorCollision?.collision === true,
         actorInsideBuilding: finalActorCollision?.inside === true,
@@ -1170,7 +1186,9 @@ async function loadLocation(page, spec) {
         terrainMode: initialSpawn.road?.structureSemantics?.terrainMode || null,
         featureEndpointClearance: Number.isFinite(initialSpawn.featureEndpointClearance) ?
           Number(initialSpawn.featureEndpointClearance.toFixed(2)) : null,
-        endpointConnected: initialSpawn.endpointConnected ?? null
+        endpointConnected: initialSpawn.endpointConnected ?? null,
+        terrainCorridorMaxDelta: Number.isFinite(initialSpawn.terrainCorridorMaxDelta) ?
+          Number(initialSpawn.terrainCorridorMaxDelta.toFixed(2)) : null
       } : null,
       customStructureProbe,
       structureGameplay,

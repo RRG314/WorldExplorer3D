@@ -4,8 +4,12 @@ import {
 } from "../world/shortbread-source.js?v=9";
 
 const FAR_CONTEXT_ZOOM = 14;
+const FAR_WATER_CONTEXT_ZOOM = 11;
 const FAR_CONTEXT_MAX_BUILDINGS = 10000;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
+const FAR_WATER_MIN_SPAN_METERS = 200;
+const FAR_WATER_VERTEX_SPACING_METERS = 45;
+const FAR_WATER_MAX_RING_POINTS = 384;
 
 const FAR_LAND_COLORS = Object.freeze({
   forest: [0.16, 0.25, 0.14],
@@ -35,6 +39,14 @@ function polygonRings(geometry) {
   return [];
 }
 
+function polygonAreas(geometry) {
+  if (geometry?.type === 'Polygon') return geometry.coordinates?.[0] ? [geometry.coordinates] : [];
+  if (geometry?.type === 'MultiPolygon') {
+    return (geometry.coordinates || []).filter((polygon) => Array.isArray(polygon?.[0]));
+  }
+  return [];
+}
+
 function ringBounds(ring) {
   const bounds = { minLat: Infinity, maxLat: -Infinity, minLon: Infinity, maxLon: -Infinity };
   for (const coordinate of ring || []) {
@@ -47,6 +59,40 @@ function ringBounds(ring) {
     bounds.maxLon = Math.max(bounds.maxLon, lon);
   }
   return bounds;
+}
+
+function ringSpanMeters(ring) {
+  const bounds = ringBounds(ring);
+  const centerLatitude = (bounds.minLat + bounds.maxLat) * 0.5;
+  const northSouth = (bounds.maxLat - bounds.minLat) * 110540;
+  const eastWest = (bounds.maxLon - bounds.minLon) * 111320 * Math.cos(centerLatitude * Math.PI / 180);
+  return Math.max(northSouth, eastWest);
+}
+
+function coordinateDistanceMeters(a, b) {
+  const latitude = (Number(a?.[1]) + Number(b?.[1])) * 0.5;
+  const dx = (Number(a?.[0]) - Number(b?.[0])) * 111320 * Math.cos(latitude * Math.PI / 180);
+  const dy = (Number(a?.[1]) - Number(b?.[1])) * 110540;
+  return Math.hypot(dx, dy);
+}
+
+function simplifyFarWaterRing(ring) {
+  const source = ring?.length > 1 &&
+    ring[0]?.[0] === ring.at(-1)?.[0] && ring[0]?.[1] === ring.at(-1)?.[1]
+    ? ring.slice(0, -1)
+    : (ring || []).slice();
+  if (source.length <= 4) return [...source, source[0]].filter(Boolean);
+  const spaced = [source[0]];
+  for (let index = 1; index < source.length; index += 1) {
+    if (coordinateDistanceMeters(source[index], spaced.at(-1)) >= FAR_WATER_VERTEX_SPACING_METERS) {
+      spaced.push(source[index]);
+    }
+  }
+  if (spaced.length < 3) return [...source, source[0]];
+  const stride = Math.max(1, Math.ceil(spaced.length / FAR_WATER_MAX_RING_POINTS));
+  const simplified = stride === 1 ? spaced : spaced.filter((_, index) => index % stride === 0);
+  if (simplified.length < 3) return [...source, source[0]];
+  return [...simplified, simplified[0]];
 }
 
 function pointInLonLatRing(lon, lat, ring) {
@@ -64,13 +110,13 @@ function pointInLonLatRing(lon, lat, ring) {
   return inside;
 }
 
-function contextTileCoordinates(bounds) {
+function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
   const range = vectorTileRangeForBounds(
     bounds.latS,
     bounds.lonW,
     bounds.latN,
     bounds.lonE,
-    FAR_CONTEXT_ZOOM
+    zoom
   );
   const coordinates = [];
   for (let x = range.xMin; x <= range.xMax; x += 1) {
@@ -97,13 +143,69 @@ async function fetchWithConcurrency(items, concurrency, worker) {
   return results.filter(Boolean);
 }
 
-async function loadFarMappedContext(bounds, excludedBounds = null) {
-  const coordinates = contextTileCoordinates(bounds);
+async function loadFarMappedWaterContext(bounds) {
+  const coordinates = contextTileCoordinates(bounds, FAR_WATER_CONTEXT_ZOOM);
   const tiles = await fetchWithConcurrency(
     coordinates,
     FAR_CONTEXT_TILE_CONCURRENCY,
-    ({ x, y }) => fetchShortbreadTile(FAR_CONTEXT_ZOOM, x, y)
+    ({ x, y }) => fetchShortbreadTile(FAR_WATER_CONTEXT_ZOOM, x, y)
   );
+  const waterAreas = [];
+
+  for (const tileRecord of tiles) {
+    for (const layerName of ['ocean', 'water_polygons']) {
+      const layer = tileRecord.tile.layers[layerName];
+      if (!layer) continue;
+      for (let index = 0; index < layer.length; index += 1) {
+        const feature = layer.feature(index);
+        const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
+        for (const [polygonIndex, rings] of polygonAreas(geojson?.geometry).entries()) {
+          const outer = rings?.[0];
+          if (!Array.isArray(outer) || outer.length < 4) continue;
+          const kind = layerName === 'ocean' ? 'ocean' : String(geojson?.properties?.kind || 'water');
+          // Shortbread carries glaciers in water_polygons, but the detailed
+          // pipeline correctly publishes them as glacier terrain, not water.
+          if (kind.toLowerCase() === 'glacier') continue;
+          const spanMeters = ringSpanMeters(outer);
+          // At a 320 m horizon grid, smaller polygons are sub-pixel visual
+          // noise but expensive to triangulate. Keep every ocean polygon and
+          // only mapped inland water large enough to be visible at this LOD.
+          if (kind !== 'ocean' && spanMeters < FAR_WATER_MIN_SPAN_METERS) continue;
+          const simplifiedOuter = simplifyFarWaterRing(outer);
+          if (simplifiedOuter.length < 4) continue;
+          waterAreas.push({
+            outer: simplifiedOuter,
+            holes: (rings || []).slice(1)
+              .filter((ring) => Array.isArray(ring) && ring.length >= 4 && ringSpanMeters(ring) >= FAR_WATER_MIN_SPAN_METERS * 0.5)
+              .map(simplifyFarWaterRing),
+            bounds: ringBounds(simplifiedOuter),
+            kind,
+            spanMeters,
+            identity: `${tileRecord.z}/${tileRecord.x}/${tileRecord.y}/${layerName}/${feature.id ?? index}/${polygonIndex}`
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    waterAreas,
+    waterTilesLoaded: tiles.length,
+    waterTilesRequested: coordinates.length,
+    waterZoom: FAR_WATER_CONTEXT_ZOOM
+  };
+}
+
+async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds) {
+  const coordinates = contextTileCoordinates(bounds, FAR_CONTEXT_ZOOM);
+  const [tiles, waterContext] = await Promise.all([
+    fetchWithConcurrency(
+      coordinates,
+      FAR_CONTEXT_TILE_CONCURRENCY,
+      ({ x, y }) => fetchShortbreadTile(FAR_CONTEXT_ZOOM, x, y)
+    ),
+    loadFarMappedWaterContext(waterBounds)
+  ]);
   const landByTile = new Map();
   const buildings = [];
   let skippedNearBuildings = 0;
@@ -160,6 +262,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null) {
   return {
     buildings: buildings.slice(0, FAR_CONTEXT_MAX_BUILDINGS),
     landByTile,
+    ...waterContext,
     skippedNearBuildings,
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length
@@ -189,6 +292,10 @@ function mappedSurfaceColor(latitude, longitude, mappedContext) {
 export {
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_ZOOM,
+  FAR_WATER_CONTEXT_ZOOM,
+  FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
-  mappedSurfaceColor
+  loadFarMappedWaterContext,
+  mappedSurfaceColor,
+  pointInLonLatRing
 };
