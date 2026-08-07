@@ -16,14 +16,47 @@ async function launchBaltimore(page, baseUrl) {
     waitUntil: 'domcontentloaded',
     timeout: 90000
   });
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.runtimeReady === true && document.getElementById('globeSelectorScreen')?.classList.contains('show');
-  }, null, { timeout: 90000 });
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
+  const runtimeDeadline = Date.now() + 90000;
+  let runtimeReady = false;
+  while (Date.now() < runtimeDeadline) {
+    runtimeReady = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.runtimeReady === true;
+    });
+    if (runtimeReady) break;
+    await page.waitForTimeout(200);
+  }
+  if (!runtimeReady) throw new Error('Runtime did not become ready before selecting Baltimore');
   await page.locator('#globeCustomLat').fill('39.2904');
   await page.locator('#globeCustomLon').fill('-76.6122');
+  const previousSequence = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return Number(ctx.worldPublication?.sequence || ctx._worldLoadSequence || 0);
+  });
   await page.locator('#globeSelectorStartBtn').click();
-  await page.locator('#loading').waitFor({ state: 'hidden', timeout: 180000 });
+  await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 15000 });
+  const publicationDeadline = Date.now() + 180000;
+  let consecutiveReadySamples = 0;
+  while (Date.now() < publicationDeadline && consecutiveReadySamples < 6) {
+    const ready = await page.evaluate(async (minimumSequence) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const loading = document.getElementById('loading');
+      const publication = ctx.worldPublication;
+      return Number(publication?.sequence || 0) > minimumSequence &&
+        Math.abs(Number(publication?.location?.lat) - 39.2904) < 0.001 &&
+        Math.abs(Number(publication?.location?.lon) + 76.6122) < 0.001 &&
+        ctx.gameStarted === true && ctx.worldLoading !== true &&
+        (ctx.buildings?.length || 0) > 0 &&
+        !loading?.classList.contains('show') &&
+        getComputedStyle(loading).display === 'none';
+    }, previousSequence);
+    consecutiveReadySamples = ready ? consecutiveReadySamples + 1 : 0;
+    if (consecutiveReadySamples < 6) await page.waitForTimeout(250);
+  }
+  if (consecutiveReadySamples < 6) {
+    throw new Error('Baltimore publication did not reach a stable interactive state');
+  }
 }
 
 async function exerciseLifecycle(page) {
@@ -37,14 +70,29 @@ async function exerciseLifecycle(page) {
       }
       return Math.abs(area * 0.5);
     };
-    const candidates = (ctx.buildings || [])
-      .filter((building) => {
+    const resolvedCandidates = (ctx.buildings || [])
+      .map((building) => {
         const support = ctx.resolveBuildingEntrySupport?.(building, { allowSynthetic: true });
-        return support?.enterable && Number.isFinite(building.maxY) && polygonArea(building.pts) > 220;
-      })
-      .sort((a, b) => polygonArea(b.pts) - polygonArea(a.pts));
-    const building = candidates.find((item) => Math.min(item.maxX - item.minX, item.maxZ - item.minZ) > 12) || candidates[0];
-    if (!building) throw new Error('No large enterable building was available');
+        return { building, support, area: polygonArea(support?.footprint) };
+      });
+    const candidates = resolvedCandidates
+      .filter((candidate) => candidate.support?.enterable &&
+        Number.isFinite(candidate.building.maxY) && candidate.area > 220)
+      .sort((a, b) => b.area - a.area);
+    const selected = candidates.find(({ building }) =>
+      Math.min(building.maxX - building.minX, building.maxZ - building.minZ) > 12) || candidates[0];
+    if (!selected) {
+      const diagnostics = {
+        total: resolvedCandidates.length,
+        enterable: resolvedCandidates.filter((candidate) => candidate.support?.enterable).length,
+        finiteRoof: resolvedCandidates.filter((candidate) => Number.isFinite(candidate.building.maxY)).length,
+        maximumEnterableArea: resolvedCandidates.reduce((maximum, candidate) =>
+          Math.max(maximum, candidate.support?.enterable ? candidate.area : 0), 0),
+        publication: ctx.worldPublication || null
+      };
+      throw new Error(`No large enterable building was available: ${JSON.stringify(diagnostics)}`);
+    }
+    const { building, support: selectedSupport, area: selectedArea } = selected;
 
     const center = { x: building.centerX, z: building.centerZ };
     const roofY = building.maxY;
@@ -78,15 +126,15 @@ async function exerciseLifecycle(page) {
     ctx.keys.ControlLeft = false;
     ctx.keys.ArrowDown = false;
     const controlChordThrottle = ctx.planeMode.throttle;
-    ctx.keys.KeyZ = true;
+    ctx.keys.ShiftLeft = true;
     for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
-    ctx.keys.KeyZ = false;
-    const zThrottle = ctx.planeMode.throttle;
+    ctx.keys.ShiftLeft = false;
+    const reducedThrottle = ctx.planeMode.throttle;
     ctx.planeMode.throttle = 0.4;
-    ctx.keys.KeyX = true;
+    ctx.keys.Space = true;
     for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
-    ctx.keys.KeyX = false;
-    const xThrottle = ctx.planeMode.throttle;
+    ctx.keys.Space = false;
+    const increasedThrottle = ctx.planeMode.throttle;
     const gameplayArrow = new KeyboardEvent('keydown', {
       code: 'ArrowLeft',
       key: 'ArrowLeft',
@@ -211,7 +259,7 @@ async function exerciseLifecycle(page) {
     };
     ctx.setTravelMode('walk', { source: 'plane_interior_acceptance', force: true, emitTutorial: false });
 
-    const support = ctx.resolveBuildingEntrySupport(building, { allowSynthetic: true });
+    const support = selectedSupport;
     const bboxSupport = ctx.resolveBuildingEntrySupport({
       sourceBuildingId: 'acceptance-bbox-footprint',
       buildingType: 'commercial',
@@ -276,7 +324,7 @@ async function exerciseLifecycle(page) {
       building: {
         id: building.sourceBuildingId,
         type: building.buildingType,
-        area: polygonArea(building.pts),
+        area: selectedArea,
         width: building.maxX - building.minX,
         depth: building.maxZ - building.minZ,
         roofY
@@ -296,7 +344,7 @@ async function exerciseLifecycle(page) {
         altitudeDelta: drone.y - beforeDrone.y
       },
       impact,
-      planeControls: { pullUpPitch, noseDownPitch, controlChordThrottle, zThrottle, xThrottle, inputOwnership, gamepadActions },
+      planeControls: { pullUpPitch, noseDownPitch, controlChordThrottle, reducedThrottle, increasedThrottle, inputOwnership, gamepadActions },
       driveExit,
       interior: {
         entered: !!entered && !!active,
@@ -348,8 +396,8 @@ async function main() {
     assert(report.planeControls.pullUpPitch > 0.1, `Arrow Down did not pull the plane nose up: ${JSON.stringify(report.planeControls)}`);
     assert(report.planeControls.noseDownPitch < -0.1, `Arrow Up did not push the plane nose down: ${JSON.stringify(report.planeControls)}`);
     assert(Math.abs(report.planeControls.controlChordThrottle - 0.6) < 0.02, `Control changed plane throttle: ${JSON.stringify(report.planeControls)}`);
-    assert(report.planeControls.zThrottle < 0.5, `Z did not reduce plane throttle: ${JSON.stringify(report.planeControls)}`);
-    assert(report.planeControls.xThrottle > 0.5, `X did not increase plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.reducedThrottle < 0.5, `Shift did not reduce plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.increasedThrottle > 0.5, `Space did not increase plane throttle: ${JSON.stringify(report.planeControls)}`);
     assert(report.planeControls.inputOwnership.gameplayArrowClaimed, 'Gameplay arrow key was not claimed from the browser');
     assert(!report.planeControls.inputOwnership.formArrowClaimed, 'Form control arrow key was incorrectly claimed');
     assert(report.planeControls.inputOwnership.scrollY === 0, 'Gameplay arrow key scrolled the page');
