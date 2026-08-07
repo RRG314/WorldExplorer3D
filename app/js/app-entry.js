@@ -152,7 +152,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=74');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=75');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;

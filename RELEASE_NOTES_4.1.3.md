@@ -27,6 +27,8 @@ in 4.1.2.
 - Mobile movement pads now use the same arrow-key movement and WASD camera
   contract as desktop controls, and the mobile Main Menu remains touchable
   above the informational HUD.
+- Multiplayer room travel now waits for lazy Space-flight startup before room
+  synchronization resolves, keeping Moon, Space, and Earth cleanup ordered.
 
 ## Loading and budgets
 

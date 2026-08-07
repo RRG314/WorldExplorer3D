@@ -30,6 +30,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   ceiling while preserving structural clearance bounds.
 - Restored the v3.1 movement/look mapping on mobile touch pads and made the
   visible mobile Main Menu control reliably tappable above the HUD and canvas.
+- Made multiplayer Space room synchronization await the lazy-loaded flight
+  runtime before reporting completion, preventing Moon/Space/Earth races.
 
 ## [4.1.2] - 2026-08-06
 
