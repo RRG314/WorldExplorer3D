@@ -93,7 +93,7 @@ export function publishLinearFeaturePresentation(options = {}) {
     mesh.userData.linearFeatureKind = kind;
     mesh.userData.batchCount = groupedFeatures.length;
     mesh.userData.compiledSurfacePresentation = true;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.linearFeatureMeshes.push(mesh);
     published += 1;
   }

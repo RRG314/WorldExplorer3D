@@ -7,6 +7,7 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
     finalizePerfLoad = () => {},
     loadMetrics = {},
     runtimeState = {},
+    signal = null,
     startLoadPhase = () => {}
   } = options;
   if (!appCtx?.terrainEnabled || appCtx.onMoon) return true;
@@ -22,7 +23,8 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
           coverageProbes: [{
             latitude: appCtx.LOC.lat,
             longitude: appCtx.LOC.lon
-          }]
+          }],
+          signal
         })
       : {
           status: 'blocked',

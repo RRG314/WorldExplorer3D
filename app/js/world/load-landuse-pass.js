@@ -314,7 +314,7 @@ export function createWorldLandusePass(options = {}) {
     }
     mesh.receiveShadow = false;
     mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.landuseMeshes.push(mesh);
     appCtx.landuses.push({
       type: landuseType,
@@ -465,17 +465,20 @@ export function createWorldLandusePass(options = {}) {
     return false;
   }
 
-  async function loadVectorTileWaterCoverage(runtime, latMin, lonMin, latMax, lonMax) {
+  async function loadVectorTileWaterCoverage(runtime, latMin, lonMin, latMax, lonMax, signal = null) {
     const tr = vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, WATER_VECTOR_TILE_ZOOM);
     const tileJobs = [];
     for (let tx = tr.xMin; tx <= tr.xMax; tx++) {
       for (let ty = tr.yMin; ty <= tr.yMax; ty++) {
-        tileJobs.push(fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty));
+        tileJobs.push(fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty, { signal }));
       }
     }
     if (tileJobs.length === 0) return { polygons: 0, lines: 0, tiles: 0, okTiles: 0 };
 
     const settled = await Promise.allSettled(tileJobs);
+    if (signal?.aborted) throw signal.reason instanceof Error
+      ? signal.reason
+      : new DOMException(String(signal.reason || 'Mapped water coverage aborted'), 'AbortError');
     let polygons = 0;
     let lines = 0;
     let okTiles = 0;
@@ -565,18 +568,23 @@ export function createWorldLandusePass(options = {}) {
         appCtx.showLoad('Loading water...');
       }
       try {
-        const waterSummary = await loadVectorTileWaterCoverage(
+        const fetchCoverage = (signal) => loadVectorTileWaterCoverage(
           runtime,
           appCtx.LOC.lat - runtime.featureRadius,
           appCtx.LOC.lon - runtime.featureRadius,
           appCtx.LOC.lat + runtime.featureRadius,
-          appCtx.LOC.lon + runtime.featureRadius
+          appCtx.LOC.lon + runtime.featureRadius,
+          signal
         );
+        const waterSummary = typeof runtime.runProviderWork === 'function'
+          ? await runtime.runProviderWork('openstreetmap-shortbread', 'mapped-water', fetchCoverage)
+          : await fetchCoverage(runtime.signal || null);
         runtime.loadMetrics.vectorWater = { ...waterSummary };
         if (waterSummary.polygons === 0 && waterSummary.lines === 0 && showStatus) {
           console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
         }
       } catch (waterErr) {
+        if (waterErr?.name === 'AbortError' || runtime.isActiveLoadContext?.() === false) throw waterErr;
         console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
       }
       if (injectFallback && ensureWaterFallbackIfEmpty(runtime)) {

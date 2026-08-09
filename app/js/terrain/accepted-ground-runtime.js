@@ -162,7 +162,8 @@ export function createAcceptedGroundRuntime(options = {}) {
     latitude,
     longitude,
     manifests = [],
-    coverageProbes = null
+    coverageProbes = null,
+    signal = null
   } = {}) => {
     const location = locationRecord(latitude, longitude);
     const requestGeneration = ++generation;
@@ -204,9 +205,11 @@ export function createAcceptedGroundRuntime(options = {}) {
     try {
       loaded = await loadArtifact({
         manifest: selection.manifest,
-        url: artifactUrl
+        url: artifactUrl,
+        signal
       });
-    } catch {
+    } catch (error) {
+      if (signal?.aborted) throw error;
       if (requestGeneration !== generation) {
         return freezeState({
           generation: requestGeneration,
@@ -226,6 +229,9 @@ export function createAcceptedGroundRuntime(options = {}) {
         providerId: selection.manifest.providerId
       });
     }
+    if (signal?.aborted) throw signal.reason instanceof Error
+      ? signal.reason
+      : new DOMException(String(signal.reason || 'Accepted ground load aborted'), 'AbortError');
     if (requestGeneration !== generation) {
       return freezeState({
         generation: requestGeneration,

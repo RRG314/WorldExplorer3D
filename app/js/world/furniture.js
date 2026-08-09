@@ -186,7 +186,7 @@ function createStreetSign(x, z, name, roadAngle) {
   group.position.set(x, terrainHeightAt(x, z), z);
   group.rotation.y = roadAngle;
   group.userData.furniturePos = { x, z };
-  appCtx.scene.add(group);
+  appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
 }
 
@@ -227,7 +227,7 @@ function createLightPost(x, z) {
 
   group.position.set(x, terrainHeightAt(x, z), z);
   group.userData.furniturePos = { x, z };
-  appCtx.scene.add(group);
+  appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
   registerStreetLamp(group, head);
 }
@@ -245,7 +245,7 @@ function createTrashCan(x, z) {
 
   group.position.set(x, terrainHeightAt(x, z), z);
   group.userData.furniturePos = { x, z };
-  appCtx.scene.add(group);
+  appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
 }
 

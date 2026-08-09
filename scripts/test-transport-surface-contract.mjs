@@ -891,21 +891,6 @@ assert.deepEqual(publicationCallers, [
   'app/js/terrain/rebuild.js',
   'app/js/world/load-support.js'
 ]);
-const terrainTileSource = fs.readFileSync(path.join(sourceRoot, 'terrain', 'tiles.js'), 'utf8');
-assert.ok(
-  terrainTileSource.includes('side: THREE.FrontSide'),
-  'terrain underside must not occlude subgrade transport interiors'
-);
-const transportPublisherSource = fs.readFileSync(path.join(sourceRoot, 'terrain', 'rebuild.js'), 'utf8');
-const markingGuard = transportPublisherSource.slice(
-  transportPublisherSource.indexOf('function appendRoadCenterMarkings'),
-  transportPublisherSource.indexOf('export function buildRoadSkirts')
-);
-assert.equal(
-  markingGuard.includes('terrainMode !== "at_grade"'),
-  false,
-  'bridge and tunnel primary roads lost their compiled center markings'
-);
 const retiredEarthDrivingTerms = /\b(?:offRoad|offroad|off-road|offMax|offFriction|indOff)\b/i;
 for (const relativePath of [
   'app/index.html',

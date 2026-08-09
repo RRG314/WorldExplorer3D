@@ -458,8 +458,8 @@ export function buildWorldVegetationInstancing(
   canopyMesh.userData.isVegetationBatch = true;
   trunkMesh.frustumCulled = false;
   canopyMesh.frustumCulled = false;
-  appCtx.scene.add(trunkMesh);
-  appCtx.scene.add(canopyMesh);
+  appCtx.addEarthWorldObject(trunkMesh);
+  appCtx.addEarthWorldObject(canopyMesh);
   appCtx.vegetationMeshes.push(trunkMesh, canopyMesh);
   appCtx.replaceWorldCollection('vegetationFeatures', placements);
   return placements.length;

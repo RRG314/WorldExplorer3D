@@ -106,7 +106,7 @@ export function createBridgeStructuralDetails(options) {
     instanceCount: beams.length,
     source: 'official-dimensions-and-osm-alignment'
   };
-  appCtx.scene.add(mesh);
+  appCtx.addEarthWorldObject(mesh);
   appCtx.historicMarkers.push(mesh);
   return mesh;
 }

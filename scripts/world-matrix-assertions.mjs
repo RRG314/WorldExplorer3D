@@ -2,6 +2,58 @@ function assert(value, message) {
   if (!value) throw new Error(message);
 }
 
+function clampHudLocation(value, maxLen = 52) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.length > maxLen ? `${text.slice(0, Math.max(8, maxLen - 1)).trim()}…` : text;
+}
+
+export function assertWorldLocationIdentity(spec, result) {
+  const locationPresentation = result.locationPresentation || {};
+  const expectedSelection = spec.kind === 'custom' ? 'custom' : spec.key;
+  assert(
+    String(locationPresentation.selected || '') === String(expectedSelection || ''),
+    `${spec.id}: published selection does not match the requested location ${JSON.stringify(locationPresentation)}`
+  );
+  assert(
+    String(locationPresentation.resolvedHudLabel || '').trim().length > 0 &&
+      String(locationPresentation.renderedHudLabel || '').trim().length > 0,
+    `${spec.id}: published location has no resolved and rendered HUD identity ${JSON.stringify(locationPresentation)}`
+  );
+  const resolvedHudLabel = String(locationPresentation.resolvedHudLabel || '').trim();
+  const renderedHudLabel = String(locationPresentation.renderedHudLabel || '').trim();
+  const exactRenderedLabel = clampHudLocation(resolvedHudLabel);
+  const contextualRenderedPrefix = resolvedHudLabel.length < 51 ? `${resolvedHudLabel} • ` : null;
+  assert(
+    renderedHudLabel === exactRenderedLabel ||
+      (contextualRenderedPrefix !== null && renderedHudLabel.startsWith(contextualRenderedPrefix)),
+    `${spec.id}: rendered HUD identity differs from the current loaded location ${JSON.stringify(locationPresentation)}`
+  );
+  if (spec.kind === 'custom') {
+    assert(
+      Math.abs(Number(locationPresentation.origin?.lat) - Number(spec.lat)) <= 1e-6 &&
+        Math.abs(Number(locationPresentation.origin?.lon) - Number(spec.lon)) <= 1e-6,
+      `${spec.id}: custom world origin differs from the requested coordinates ${JSON.stringify(locationPresentation)}`
+    );
+    assert(
+      String(locationPresentation.customName || '') === String(spec.label || ''),
+      `${spec.id}: custom location name was replaced during publication ${JSON.stringify(locationPresentation)}`
+    );
+  }
+  const placeState = locationPresentation.placeState;
+  if (
+    placeState &&
+    String(placeState.display || '').trim() === String(locationPresentation.resolvedHudLabel || '').trim()
+  ) {
+    const longitudeDelta = Math.abs(Number(placeState.lon) - Number(locationPresentation.origin?.lon));
+    assert(
+      Math.abs(Number(placeState.lat) - Number(locationPresentation.origin?.lat)) <= 0.05 &&
+        Math.min(longitudeDelta, Math.abs(longitudeDelta - 360)) <= 0.05,
+      `${spec.id}: HUD accepted a place label from another loaded location ${JSON.stringify(locationPresentation)}`
+    );
+  }
+}
+
 export function assertWorldMatrixLocation(spec, result) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
   assert(result.worldLoad?.status === 'ready', `${spec.id}: requested world load did not reach ready`);
@@ -9,7 +61,25 @@ export function assertWorldMatrixLocation(spec, result) {
     Number(result.worldLoad?.sequence) === Number(result.worldLoad?.publicationSequence),
     `${spec.id}: requested world load and published world sequences diverged`
   );
+  assertWorldLocationIdentity(spec, result);
+  if (!/open_ocean/.test(String(spec.category || ''))) {
+    assert(
+      result.farTerrainClipmap?.status === 'ready',
+      `${spec.id}: fixed location finalized without horizon terrain ${JSON.stringify(result.farTerrainClipmap)}`
+    );
+  }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
+  if (Number(result.worldCover?.status?.ready || 0) > 0) {
+    assert(
+      String(result.terrainSurface?.locationBaseDetailMode || '').length > 0,
+      `${spec.id}: WorldCover published without one location PBR owner ${JSON.stringify(result.terrainSurface)}`
+    );
+    assert(
+      (result.terrainSurface?.publishedDetailModes || []).length === 1 &&
+        result.terrainSurface.publishedDetailModes[0] === result.terrainSurface.locationBaseDetailMode,
+      `${spec.id}: WorldCover exposed per-tile PBR mode boundaries ${JSON.stringify(result.terrainSurface)}`
+    );
+  }
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
     const acceptableTerrainModes = spec.acceptableTerrainModes || [spec.expectedTerrainMode];

@@ -11,8 +11,12 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=35";
+} from "./surface-profiles.js?v=40";
 import { stitchTerrainMeshEdges } from "./seams.js?v=1";
+import {
+  cancelTerrainTileRequest as cancelTileRequest,
+  waitForTerrainTileRequest
+} from './tile-request-lifecycle.js?v=1';
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
@@ -279,40 +283,19 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   return terrainTileCacheSnapshot();
 }
 
-async function waitForTerrainTileReady(z, x, y, deadline, deps) {
-  while (terrainNow() < deadline) {
-    const tile = getOrLoadTerrainTile(z, x, y, deps);
-    if (tile.loaded) return true;
-    if (tile.failed) {
-      if (tile.attempts >= TERRAIN_TILE_MAX_ATTEMPTS) return false;
-      const delay = Math.min(Math.max(0, tile.nextRetryAt - terrainNow()), deadline - terrainNow());
-      if (delay > 0) await new Promise((resolve) => globalThis.setTimeout(resolve, delay));
-      continue;
-    }
-    if (!(tile.ready instanceof Promise)) return false;
-    const remaining = Math.max(0, deadline - terrainNow());
-    const attemptTimeout = Math.min(TERRAIN_TILE_ATTEMPT_TIMEOUT_MS, remaining);
-    const timedOut = Symbol("terrain-timeout");
-    const result = await Promise.race([
-      tile.ready,
-      new Promise((resolve) => globalThis.setTimeout(() => resolve(timedOut), attemptTimeout))
-    ]);
-    if (result === true) return true;
-    if (result === timedOut) {
-      if (tile.img) {
-        tile.img.onload = null;
-        tile.img.onerror = null;
-        tile.img.src = "";
-      }
-      failTerrainTileAttempt(tile, `terrain tile request timed out after ${Math.round(attemptTimeout)}ms`);
-    }
-  }
-  return false;
+function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
+  return waitForTerrainTileRequest({
+    z, x, y, deadline, deps, signal: options.signal,
+    getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
+    cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
+    maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
+    attemptTimeoutMs: TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
+  });
 }
 
-export async function waitForTerrainTileReadyAtZoom(z, x, y, timeoutMs = 6000, deps = {}) {
+export async function waitForTerrainTileReadyAtZoom(z, x, y, timeoutMs = 6000, deps = {}, options = {}) {
   const timeout = Math.max(0, Number(timeoutMs) || 0);
-  return waitForTerrainTileReady(z, x, y, terrainNow() + timeout, deps);
+  return waitForTerrainTileReady(z, x, y, terrainNow() + timeout, deps, options);
 }
 
 export async function waitForTerrainReadyAt(x, z, timeoutMs = 3000, deps = {}) {
@@ -450,7 +433,7 @@ export function ensureTerrainGroup() {
   if (!appCtx.terrainGroup) {
     appCtx.terrainGroup = new THREE.Group();
     appCtx.terrainGroup.name = "TerrainGroup";
-    appCtx.scene.add(appCtx.terrainGroup);
+    appCtx.addEarthWorldObject(appCtx.terrainGroup);
   }
 }
 
@@ -489,6 +472,9 @@ export function disposeTerrainMesh(mesh) {
 }
 
 export function clearTerrainMeshes() {
+  appCtx.worldCoverBaseDetailMode = null;
+  appCtx.worldCoverBaseDetailModeOwnerDistance = Infinity;
+  appCtx.worldCoverDetailModeRefreshQueued = false;
   if (!appCtx.terrainGroup) return;
   while (appCtx.terrainGroup.children.length) {
     const mesh = appCtx.terrainGroup.children.pop();
@@ -549,8 +535,6 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
     sources: [],
     fallback: false
   };
-
-  applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds), repeats);
 
   if (typeof deps.applyHeightsToTerrainMesh === "function") {
     deps.applyHeightsToTerrainMesh(mesh);

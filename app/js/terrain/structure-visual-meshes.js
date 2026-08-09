@@ -41,7 +41,7 @@ export function buildStructureVisualMeshForContext(appCtx, instances, material, 
   mesh.receiveShadow = true;
   mesh.frustumCulled = false;
   Object.assign(mesh.userData, userData, { isStructureVisual: true });
-  appCtx.scene.add(mesh);
+  appCtx.addEarthWorldObject(mesh);
   appCtx.structureVisualMeshes.push(mesh);
   return mesh;
 }
@@ -135,7 +135,7 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
     structureVisualType: "tunnel_shells",
     tunnelShellOwner: "compiled-tunnel-system"
   });
-  appCtx.scene.add(mesh);
+  appCtx.addEarthWorldObject(mesh);
   appCtx.structureVisualMeshes.push(mesh);
   return mesh;
 }
@@ -215,7 +215,7 @@ function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegment
     structureVisualType: "elevated_road_shells",
     elevatedRoadOwner: "compiled-transport-surface"
   });
-  appCtx.scene.add(mesh);
+  appCtx.addEarthWorldObject(mesh);
   appCtx.structureVisualMeshes.push(mesh);
   return mesh;
 }

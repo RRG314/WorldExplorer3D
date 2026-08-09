@@ -227,7 +227,7 @@ export function createSyntheticFallbackWorld(options = {}) {
     mesh.renderOrder = 2;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.roadMeshes.push(mesh);
   };
 
@@ -299,7 +299,7 @@ export function createSyntheticFallbackWorld(options = {}) {
 
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.buildingMeshes.push(mesh);
 
     if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
@@ -312,7 +312,7 @@ export function createSyntheticFallbackWorld(options = {}) {
         groundPatch.userData.terrainAvgElevation = avgElevation;
         groundPatch.userData.alwaysVisible = true;
         groundPatch.visible = true;
-        appCtx.scene.add(groundPatch);
+        appCtx.addEarthWorldObject(groundPatch);
         appCtx.landuseMeshes.push(groundPatch);
       });
     }
@@ -372,7 +372,7 @@ export function buildPoiGeometryPass(options = {}) {
         mesh.userData.lodTier = poiTier;
         mesh.castShadow = false;
         mesh.visible = !!appCtx.poiMode;
-        appCtx.scene.add(mesh);
+        appCtx.addEarthWorldObject(mesh);
         appCtx.poiMeshes.push(mesh);
 
         if (poiTier === 'near') {
@@ -389,7 +389,7 @@ export function buildPoiGeometryPass(options = {}) {
           cap.userData.isPOIMarker = true;
           cap.userData.lodTier = 'near';
           cap.visible = !!appCtx.poiMode;
-          appCtx.scene.add(cap);
+          appCtx.addEarthWorldObject(cap);
           appCtx.poiMeshes.push(cap);
         }
       }

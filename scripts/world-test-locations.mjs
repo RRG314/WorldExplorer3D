@@ -186,6 +186,18 @@ export const WORLD_TEST_LOCATIONS = [
     acceptableStartTerrainModes: ['snow', 'snowRock']
   },
   {
+    id: 'antarctica_glacier_custom',
+    kind: 'custom',
+    lat: -77.846,
+    lon: 166.668,
+    label: 'Antarctica Glacier',
+    category: 'polar_glacier_custom',
+    expectedStart: 'land',
+    expectedTerrainMode: 'snowRock',
+    acceptableTerrainModes: ['snow', 'snowRock'],
+    acceptableStartTerrainModes: ['snow', 'snowRock']
+  },
+  {
     id: 'sahara_custom',
     kind: 'custom',
     lat: 31.1342,

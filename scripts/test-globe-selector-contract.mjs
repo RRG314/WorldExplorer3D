@@ -55,14 +55,7 @@ assert.deepEqual(receivedSelection, {
 assert.equal(parseReverseAddress({ type: 'sea', display_name: 'North Atlantic Ocean' }).waterKind, 'open_ocean');
 assert.equal(parseReverseAddress({ address: { lake: 'Lake Erie' } }).waterKind, 'lake');
 
-const selectorSource = fs.readFileSync(new URL('../app/js/ui/globe-selector.js', import.meta.url), 'utf8');
 const sceneSource = fs.readFileSync(new URL('../app/js/ui/globe-selector/scene.js', import.meta.url), 'utf8');
-const titleSource = fs.readFileSync(new URL('../app/js/ui/title-screen.js', import.meta.url), 'utf8');
-assert.match(selectorSource, /onOceanShortcut\(\{ \.\.\.selected \}\)/);
-assert.match(sceneSource, /addEventListener\('dblclick'/);
-assert.match(titleSource, /await globeSelector\?\.startHere\?\.\(\)/);
-assert.match(titleSource, /startOceanMode\(\{\s*launchSite:/);
-assert.match(selectorSource, /await selectionResolvePromise/);
 assert.match(sceneSource, /earth_atmos_2048\.jpg/);
 assert.doesNotMatch(sceneSource, /createGlobeDetailTiles|detailTiles|World_Imagery/);
 assert.equal(fs.existsSync(new URL('../app/js/ui/globe-selector/detail-tiles.js', import.meta.url)), false);
@@ -71,8 +64,7 @@ console.log(JSON.stringify({
   ok: true,
   featuredCities: Object.keys(expectedV3Cities).length,
   coordinateAuthority: 'selected-coordinates-through-launch',
-  globeActivation: 'double-click',
-  globeDetailZooms: 'smooth-camera-on-original-globe',
+  browserActivationOwner: 'test-globe-selector-browser',
   globeImagery: 'original-earth-texture-only',
-  oceanLaunch: 'selected-coordinate-launch-site'
+  oceanLaunchOwner: 'test-globe-selector-browser'
 }, null, 2));

@@ -278,7 +278,7 @@ function renderLandmarks(data, options) {
       options.geometryGuards
     ), options.registerBuildingCollision);
     if (!mesh) continue;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.historicMarkers.push(mesh);
     createdMeshes.push(mesh);
     pyramids += 1;
@@ -286,7 +286,7 @@ function renderLandmarks(data, options) {
   for (const way of wallWays) {
     const mesh = createWallMesh(way, nodes);
     if (!mesh) continue;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.historicMarkers.push(mesh);
     createdMeshes.push(mesh);
     walls += 1;
@@ -313,23 +313,30 @@ function renderLandmarks(data, options) {
 
 export async function loadLandmarksForPublication(options = {}) {
   if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
-  try {
+  const execute = async (signal = null) => {
     const data = await fetchBundledLandmarkData({
       lat: appCtx.LOC?.lat,
-      lon: appCtx.LOC?.lon
+      lon: appCtx.LOC?.lon,
+      signal
     });
     if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
     const metrics = data
       ? renderLandmarks(data, options)
       : { pyramids: 0, walls: 0, suspensionBridge: null };
-    metrics.curatedModels = await renderCuratedLandmarkModels(options);
+    metrics.curatedModels = await renderCuratedLandmarkModels({ ...options, signal });
     if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
     metrics.source = data?._overpassSource || null;
     metrics.packId = data?._landmarkPackId || null;
     options.loadMetrics.landmarks = metrics;
     if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
     return { status: 'ready', metrics };
+  };
+  try {
+    return typeof options.runProviderWork === 'function'
+      ? await options.runProviderWork('bundled-landmarks', 'publication', execute)
+      : await execute(options.signal || null);
   } catch (err) {
+    if (err?.name === 'AbortError' || options.isActiveLoadContext?.() === false) throw err;
     options.recordLoadWarning?.('landmark publication', err);
     return { status: 'error', error: err?.message || String(err) };
   }

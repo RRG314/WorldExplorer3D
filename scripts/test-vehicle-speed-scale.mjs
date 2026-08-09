@@ -6,9 +6,10 @@ import {
   mphToCarSpeed,
   mphToWorldUnitsPerSecond
 } from '../app/js/physics/vehicle-speed-units.js';
+import { ROAD_CAR_CONFIG } from '../app/js/physics/vehicle-config.js';
 
 const metersPerWorldUnit = 1.11;
-const topSimulationSpeed = 180;
+const topSimulationSpeed = ROAD_CAR_CONFIG.maxSpd;
 const topMph = carSpeedToMph(topSimulationSpeed);
 const topWorldSpeed = carSpeedToWorldUnitsPerSecond(topSimulationSpeed, metersPerWorldUnit);
 
@@ -32,15 +33,17 @@ assert.ok(
 );
 
 const physicsSource = await fs.readFile(new URL('../app/js/physics.js', import.meta.url), 'utf8');
-const engineSource = await fs.readFile(new URL('../app/js/engine.js', import.meta.url), 'utf8');
-assert.match(engineSource, /maxSpd:\s*180,\s*accel:\s*80,\s*boostAccel:\s*120/);
-assert.match(engineSource, /boostMax:\s*240/);
+assert.equal(ROAD_CAR_CONFIG.accel, 80);
+assert.equal(ROAD_CAR_CONFIG.boostAccel, 120);
+assert.equal(ROAD_CAR_CONFIG.boostMax, 240);
+assert.equal(Object.isFrozen(ROAD_CAR_CONFIG), true);
 
 let accelerationSpeed = 0;
 let accelerationSeconds = 0;
 const accelerationStep = 1 / 120;
 while (carSpeedToMph(accelerationSpeed) < 60 && accelerationSeconds < 10) {
-  accelerationSpeed += 80 * (1 - accelerationSpeed / topSimulationSpeed * 0.7) * accelerationStep;
+  accelerationSpeed += ROAD_CAR_CONFIG.accel *
+    (1 - accelerationSpeed / topSimulationSpeed * 0.7) * accelerationStep;
   accelerationSeconds += accelerationStep;
 }
 assert.ok(

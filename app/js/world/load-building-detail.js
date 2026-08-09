@@ -1,7 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
-import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
 import {
   mappedWaterStructurePriority,
   mergeMappedWaterStructures
@@ -66,6 +65,9 @@ async function fetchBuildingMetadata(options, metadataState) {
       try {
         metadata = await options.fetchPreferredMetadata();
       } catch (preferredMetadataErr) {
+        if (preferredMetadataErr?.name === 'AbortError' || options.isActiveLoadContext?.() === false) {
+          throw preferredMetadataErr;
+        }
         options.recordLoadWarning?.('bundled building metadata', preferredMetadataErr);
       }
     }
@@ -80,6 +82,9 @@ async function fetchBuildingMetadata(options, metadataState) {
     metadataState.status = 'ready';
     return metadata;
   } catch (metadataErr) {
+    if (metadataErr?.name === 'AbortError' || options.isActiveLoadContext?.() === false) {
+      throw metadataErr;
+    }
     metadataState.status = 'error';
     metadataState.error = metadataErr?.message || String(metadataErr);
     options.recordLoadWarning?.('building metadata enrichment', metadataErr);
@@ -124,6 +129,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
       try {
         data = fetchPreferredData ? await fetchPreferredData() : null;
       } catch (preferredErr) {
+        if (preferredErr?.name === 'AbortError' || !isActiveLoadContext()) throw preferredErr;
         options.recordLoadWarning?.('vector building detail', preferredErr);
       }
       const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
@@ -147,6 +153,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
             });
           }
         } catch (waterStructureError) {
+          if (waterStructureError?.name === 'AbortError' || !isActiveLoadContext()) throw waterStructureError;
           options.recordLoadWarning?.('mapped water structures', waterStructureError);
         }
       }
@@ -214,21 +221,20 @@ export async function loadBuildingDetailForPublication(options = {}) {
         useRdtBudgeting: options.useRdtBudgeting
       });
       options.loadMetrics.buildings.geometryPublication = buildingPublication;
-      appCtx.buildingProvenanceModel = createBuildingProvenanceSnapshot(
-        appCtx.buildingProvenanceRecords || []
-      );
       if (!isActiveLoadContext()) return;
 
-      // Structure and terrain profiles are compiled once by final world
-      // publication after all bounded building data is present.
+      // Terrain-dependent caches are invalidated here, but visibility,
+      // provenance, traversal, and presentation publish exactly once in the
+      // final world-publication owner after landmarks are also complete.
       appCtx.clearTerrainHeightCache?.();
-      options.publishLocationWorld?.();
       setBuildingDetailState('ready', {
         requested: requested.length,
         selected: buildingWays.length,
         selectionRetention: requested.length > 0 ? buildingWays.length / requested.length : 1,
         meshes: appCtx.buildingMeshes.length,
-        provenanceFeatures: appCtx.buildingProvenanceModel.featureCount,
+        provenanceFeatures: Array.isArray(appCtx.buildingProvenanceRecords)
+          ? appCtx.buildingProvenanceRecords.length
+          : 0,
         publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
         coveragePolicy: {
           globalCap: publicationSelection.globalCap,
@@ -246,6 +252,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
         inferredCoverage
       });
   } catch (err) {
+    if (err?.name === 'AbortError' || !isActiveLoadContext()) throw err;
     options.recordLoadWarning?.('building publication', err);
     setBuildingDetailState('error', {
       durationMs: Math.round(performance.now() - startedAt),

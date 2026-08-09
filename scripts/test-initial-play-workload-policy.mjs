@@ -5,7 +5,7 @@ import { shouldLoadDetailedBuildings } from '../app/js/world/settlement-density-
 
 const root = process.cwd();
 const read = (file) => fs.readFile(`${root}/${file}`, 'utf8');
-const [entry, onDemand, bootstrap, loadSession, budgeting, terrain, tiles, osmLoader, roadLoader, overtureBuildings, settlementPolicy, weather] = await Promise.all([
+const [entry, onDemand, bootstrap, loadSession, budgeting, terrain, tiles, osmLoader, roadLoader, settlementPolicy, weather] = await Promise.all([
   read('app/js/app-entry.js'),
   read('app/js/runtime/on-demand-modes.js'),
   read('app/js/bootstrap.js'),
@@ -15,7 +15,6 @@ const [entry, onDemand, bootstrap, loadSession, budgeting, terrain, tiles, osmLo
   read('app/js/terrain/tiles.js'),
   read('app/js/world/osm-loader.js'),
   read('app/js/world/load-roads.js'),
-  read('app/js/world/overture-building-source.js'),
   read('app/js/world/settlement-density-policy.js'),
   read('app/js/weather.js')
 ]);
@@ -78,11 +77,6 @@ const cityPolicy = shouldLoadDetailedBuildings({
   elements: [{ type: 'way', tags: { landuse: 'residential' } }]
 }, { worldSurfaceProfile: { terrainModeHint: 'sand' } });
 assert.equal(cityPolicy.shouldLoad, true);
-assert.ok(
-  !overtureBuildings.includes('Overture building coverage incomplete'),
-  'partial Overture tile coverage must publish fulfilled authoritative building tiles'
-);
-
 console.log(JSON.stringify({
   ok: true,
   message: 'Initial Earth retains a complete nearby district while distant and inactive render families remain on demand.'

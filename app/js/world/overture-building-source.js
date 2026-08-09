@@ -1,13 +1,17 @@
 import {
   fetchShortbreadBuildingData,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=9";
+} from "./shortbread-source.js?v=10";
 import {
   OVERTURE_RELEASE,
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl
 } from './overture-tile-source.js?v=1';
 import { shouldSuppressBuildingParent } from './building-provenance-model.js?v=1';
+import {
+  throwIfWorldLoadAborted,
+  waitForWorldLoadDelay
+} from '../earth-core/request-cancellation.js?v=1';
 
 const OVERTURE_BUILDING_ZOOM = 14;
 
@@ -241,9 +245,15 @@ function isTimeoutFailure(entry) {
   return reason?.name === 'AbortError' || /abort|timeout/i.test(String(reason?.message || reason || ''));
 }
 
-async function fetchArchiveTileBatch(coordinates) {
+async function fetchArchiveTileBatch(coordinates, options = {}) {
+  const fetchTile = typeof options.fetchTile === 'function'
+    ? options.fetchTile
+    : fetchOvertureThemeTile;
+  throwIfWorldLoadAborted(options.signal, 'Overture building coverage aborted');
   return Promise.allSettled(
-    coordinates.map(({ x, y }) => fetchOvertureThemeTile('buildings', OVERTURE_BUILDING_ZOOM, x, y))
+    coordinates.map(({ x, y }) => fetchTile(
+      'buildings', OVERTURE_BUILDING_ZOOM, x, y, { signal: options.signal }
+    ))
   );
 }
 
@@ -267,15 +277,17 @@ export async function fetchOvertureBuildingData(options = {}) {
   );
   const coordinates = orderedTileCoordinates(range, lat, lon);
   let attempts = 1;
-  let settled = await fetchArchiveTileBatch(coordinates);
+  let settled = await fetchArchiveTileBatch(coordinates, options);
+  throwIfWorldLoadAborted(options.signal, 'Overture building coverage aborted');
   let tiles = fulfilledTiles(settled);
   const fastTransientFailure = tiles.length === 0 &&
     settled.some((entry) => entry.status === 'rejected') &&
     !settled.some(isTimeoutFailure);
   if (fastTransientFailure) {
     attempts += 1;
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
-    settled = await fetchArchiveTileBatch(coordinates);
+    await waitForWorldLoadDelay(250, options.signal, 'Overture building retry aborted');
+    settled = await fetchArchiveTileBatch(coordinates, options);
+    throwIfWorldLoadAborted(options.signal, 'Overture building coverage aborted');
     tiles = fulfilledTiles(settled);
   }
   if (tiles.length === 0) {
@@ -319,6 +331,7 @@ export async function fetchGlobalBuildingData(options = {}, onFallback = null) {
     // turned dense locations into the much sparser fallback dataset.
     return await fetchOvertureBuildingData(options);
   } catch (error) {
+    throwIfWorldLoadAborted(options.signal, 'Global building coverage aborted');
     if (typeof onFallback === 'function') onFallback(error);
     return fetchShortbreadBuildingData(options);
   }

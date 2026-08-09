@@ -84,24 +84,49 @@ function hideGenericVisuals(landmark, world) {
   }
 }
 
-function loadModel(url) {
+function loadModel(url, signal = null) {
   return new Promise((resolve, reject) => {
     if (!THREE.GLTFLoader) {
       reject(new Error('GLTFLoader is unavailable'));
       return;
     }
-    new THREE.GLTFLoader().load(url, (gltf) => resolve(gltf.scene), undefined, reject);
+    let settled = false;
+    let request = null;
+    const cleanup = () => signal?.removeEventListener?.('abort', abort);
+    const complete = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const abort = () => {
+      request?.abort?.();
+      complete(reject, signal?.reason instanceof Error
+        ? signal.reason
+        : new DOMException(String(signal?.reason || 'Landmark model load aborted'), 'AbortError'));
+    };
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+    signal?.addEventListener?.('abort', abort, { once: true });
+    request = new THREE.GLTFLoader().load(
+      url,
+      (gltf) => complete(resolve, gltf.scene),
+      undefined,
+      (error) => complete(reject, error)
+    );
   });
 }
 
-async function loadCuratedLandmark(landmark, isActiveLoadContext) {
+async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null) {
   let model;
   if (landmark.builder === 'measured-eiffel-tower') model = createMeasuredEiffelTower();
   else if (landmark.builder === 'measured-elizabeth-tower') model = createMeasuredElizabethTower();
   else if (landmark.builder === 'measured-khufu-pyramid') model = createMeasuredKhufuPyramid();
   else if (landmark.builder === 'measured-ten-light-street') model = createMeasuredTenLightStreet();
   else if (landmark.builder === 'measured-commerce-place') model = createMeasuredCommercePlace();
-  else model = await loadModel(landmark.modelUrl);
+  else model = await loadModel(landmark.modelUrl, signal);
   if (!isActiveLoadContext?.()) {
     disposeModel(model);
     return null;
@@ -122,7 +147,7 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext) {
   const placement = placeAtRealScale(root, landmark);
   addEiffelAntenna(root, placement, landmark);
   hideGenericVisuals(landmark, placement.world);
-  appCtx.scene.add(root);
+  appCtx.addEarthWorldObject(root);
   appCtx.historicMarkers.push(root);
   appCtx.historicSites.push({
     x: placement.world.x,
@@ -156,9 +181,17 @@ export async function renderCuratedLandmarkModels(options = {}) {
   const failed = [];
   for (const landmark of landmarks) {
     try {
-      const result = await loadCuratedLandmark(landmark, options.isActiveLoadContext);
+      if (options.signal?.aborted) throw options.signal.reason instanceof Error
+        ? options.signal.reason
+        : new DOMException(String(options.signal.reason || 'Landmark publication aborted'), 'AbortError');
+      const result = await loadCuratedLandmark(
+        landmark,
+        options.isActiveLoadContext,
+        options.signal || null
+      );
       if (result) loaded.push(result);
     } catch (error) {
+      if (error?.name === 'AbortError' || options.signal?.aborted) throw error;
       failed.push({ id: landmark.id, message: String(error?.message || error) });
     }
   }

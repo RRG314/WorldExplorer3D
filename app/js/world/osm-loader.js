@@ -122,8 +122,21 @@ function orderedOverpassEndpoints() {
   return [lastOverpassEndpoint, ...rest];
 }
 
-function delayMs(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delayMs(ms, signal = null) {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  if (signal.aborted) return Promise.reject(externalAbortError(signal));
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', abort);
+      reject(externalAbortError(signal));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function firstSuccessful(promises) {
@@ -259,7 +272,15 @@ export function buildWorldOverpassPlan({
   };
 }
 
-export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null) {
+function externalAbortError(signal) {
+  return signal?.reason instanceof Error
+    ? signal.reason
+    : new DOMException(String(signal?.reason || 'World load provider request aborted'), 'AbortError');
+}
+
+export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, options = {}) {
+  const externalSignal = options.signal || null;
+  if (externalSignal?.aborted) throw externalAbortError(externalSignal);
   const cached = findOverpassMemoryCache(cacheMeta);
   if (cached?.data?.elements) {
     cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
@@ -280,11 +301,24 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
 
   const controllers = [];
   const errors = [];
-  const endpoints = orderedOverpassEndpoints();
+  const configuredEndpoints = Array.isArray(options.endpoints)
+    ? options.endpoints.map((endpoint) => String(endpoint || '').trim()).filter(Boolean)
+    : [];
+  const endpoints = configuredEndpoints.length > 0 ? configuredEndpoints : orderedOverpassEndpoints();
+  const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
+  if (typeof fetchImpl !== 'function') throw new TypeError('Overpass fetch implementation is unavailable');
+  const staggerIntervalMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
+    ? Number(options.staggerMs)
+    : OVERPASS_STAGGER_MS);
+  const requestController = new AbortController();
+  const abortRequest = () => requestController.abort(externalAbortError(externalSignal));
+  externalSignal?.addEventListener?.('abort', abortRequest, { once: true });
   let requestSettled = false;
   const attempts = endpoints.map((endpoint, idx) => (async () => {
-    const staggerMs = idx * OVERPASS_STAGGER_MS;
-    if (staggerMs > 0) await delayMs(staggerMs);
+    const staggerMs = idx * staggerIntervalMs;
+    if (staggerMs > 0) await delayMs(staggerMs, requestController.signal);
+    if (externalSignal?.aborted) throw externalAbortError(externalSignal);
+    if (requestController.signal.aborted) throw externalAbortError(requestController.signal);
     if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
 
     const now = performance.now();
@@ -302,11 +336,15 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     );
 
     const controller = new AbortController();
+    const relayAbort = () => controller.abort(externalAbortError(externalSignal));
+    const relayRequestAbort = () => controller.abort(externalAbortError(requestController.signal));
+    externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
+    requestController.signal.addEventListener('abort', relayRequestAbort, { once: true });
     controllers.push(controller);
     const timeoutId = setTimeout(() => controller.abort(), timeoutForEndpointMs);
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetchImpl(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
         body: 'data=' + encodeURIComponent(query),
@@ -338,6 +376,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
     } catch (err) {
+      if (externalSignal?.aborted) throw externalAbortError(externalSignal);
       const reason = err?.name === 'AbortError' ?
         `timeout after ${Math.floor(timeoutForEndpointMs)}ms` :
         err?.message || String(err);
@@ -346,15 +385,19 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       throw wrapped;
     } finally {
       clearTimeout(timeoutId);
+      externalSignal?.removeEventListener?.('abort', relayAbort);
+      requestController.signal.removeEventListener('abort', relayRequestAbort);
     }
   })());
 
   try {
     const data = await firstSuccessful(attempts);
     requestSettled = true;
+    requestController.abort(new DOMException('Overpass request satisfied', 'AbortError'));
     controllers.forEach((controller) => controller.abort());
     return data;
-  } catch {
+  } catch (error) {
+    if (externalSignal?.aborted) throw externalAbortError(externalSignal);
     const fallback = await readPersistentOverpassFallback(cacheMeta);
     if (fallback?.data?.elements) {
       fallback.data._overpassEndpoint = fallback.endpoint ? `${fallback.endpoint} (persistent-fallback)` : 'persistent-fallback';
@@ -363,7 +406,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
       return fallback.data;
     }
-    throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
+    throw error?.message?.startsWith?.('All Overpass endpoints failed:')
+      ? error
+      : new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
+  } finally {
+    externalSignal?.removeEventListener?.('abort', abortRequest);
+    if (!requestController.signal.aborted) {
+      requestController.abort(new DOMException('Overpass request finished', 'AbortError'));
+    }
   }
 }
 

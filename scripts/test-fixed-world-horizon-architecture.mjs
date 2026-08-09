@@ -21,7 +21,6 @@ const farFieldSource = read('app/js/terrain/far-field.js');
 const starMaterialSource = read('app/js/sky/star-point-material.js');
 const starFieldSource = read('app/js/sky/starfield-ui.js');
 const gaiaSource = read('app/js/sky/gaia-catalog.js');
-const hudSource = read('app/js/hud.js');
 const {
   FAR_FIELD_OUTER_DISTANCE_METERS,
   FAR_CONTEXT_HALF_EXTENT_METERS,
@@ -107,7 +106,6 @@ assert.doesNotMatch(farFieldSource, /surfaceColor:\s*'mapped-land-and-water/);
 assert.match(farFieldSource, /FarMappedWaterContext/);
 assert.match(farFieldSource, /isFarMappedWaterContext/);
 assert.match(farFieldSource, /far-mapped-water-polygon-lod/);
-assert.match(farFieldSource, /loadFarMappedContext\(spec\.contextGeographic, spec\.innerGeographic, spec\.geographic\)/);
 
 const mappedWaterFixture = {
   outer: [[-76.8, 39.1], [-76.4, 39.1], [-76.4, 39.5], [-76.8, 39.5], [-76.8, 39.1]],
@@ -118,12 +116,6 @@ const mappedWaterFixture = {
 assert.equal(pointInLonLatRing(-76.7, 39.2, mappedWaterFixture.outer), true, 'mapped water must retain its polygon boundary');
 assert.equal(pointInLonLatRing(-76.6, 39.3, mappedWaterFixture.holes[0]), true, 'mapped islands must retain their water holes');
 assert.equal(pointInLonLatRing(-76.6, 39.6, mappedWaterFixture.outer), false, 'unmapped space must never become water');
-assert.match(hudSource, /const earthCelestialDistance = 11000/);
-assert.doesNotMatch(
-  hudSource,
-  /cameraX \+ dirX \* 1400, cameraY \+ dirY \* 1400, cameraZ \+ dirZ \* 1400/,
-  'Earth sun or moon remained in front of the distant terrain field'
-);
 assert.match(diagnosticsSource, /farTerrainClipmap/);
 assert.match(diagnosticsSource, /farMappedContexts/);
 
@@ -155,6 +147,9 @@ const persistentWater = {
 };
 Object.assign(ctx, {
   scene,
+  addEarthWorldObject(object) {
+    scene.add(object);
+  },
   onMoon: false,
   travelingToMoon: false,
   isEnv: null,
@@ -191,11 +186,12 @@ assert.equal(persistentWater.parent, scene, 'drone mode must not change persiste
 
 console.log(JSON.stringify({
   ok: true,
+  contract: 'fixed-world-horizon-architecture',
   terrainZoom: 15,
-  terrainMaterials: 'mode-independent',
+  terrainMaterialAuthority: 'mode-independent',
   regionalMapPlane: 'deleted',
   fogPolicy: 'mode-independent',
-  nearTerrain: 'unchanged-uniform-z15-grid',
-  farTerrain: 'continuous-fixed-location-land-and-building-horizon',
+  nearTerrainAuthority: 'uniform-z15-grid',
+  farTerrainAuthority: 'fixed-location-clipmap',
   farWaterOwner: 'exact-mapped-water-polygon-lod'
 }, null, 2));

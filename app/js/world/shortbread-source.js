@@ -306,7 +306,7 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
   return elements;
 }
 
-async function fetchTileCoverage(lat, lon, radius, zoom) {
+async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
   const safeRadius = Math.max(0.004, Math.min(0.04, Number(radius) || 0.012));
   const bounds = {
     minLat: lat - safeRadius,
@@ -323,9 +323,16 @@ async function fetchTileCoverage(lat, lon, radius, zoom) {
   );
   const jobs = [];
   for (let x = range.xMin; x <= range.xMax; x++) {
-    for (let y = range.yMin; y <= range.yMax; y++) jobs.push(fetchShortbreadTile(zoom, x, y));
+    for (let y = range.yMin; y <= range.yMax; y++) {
+      jobs.push(fetchShortbreadTile(zoom, x, y, { signal: options.signal }));
+    }
   }
   const settled = await Promise.allSettled(jobs);
+  if (options.signal?.aborted) {
+    throw options.signal.reason instanceof Error
+      ? options.signal.reason
+      : new DOMException(String(options.signal.reason || 'Shortbread coverage aborted'), 'AbortError');
+  }
   const tiles = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
   if (tiles.length === 0) {
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
@@ -343,7 +350,8 @@ export async function fetchShortbreadWorldData(options = {}) {
     lat,
     lon,
     options.radius,
-    SHORTBREAD_ZOOM
+    SHORTBREAD_ZOOM,
+    options
   );
   const layerNames = ['streets', 'land', 'sites', 'street_polygons'];
   if (includeBuildings) layerNames.push('buildings');
@@ -360,7 +368,9 @@ export async function fetchShortbreadWorldData(options = {}) {
 export async function fetchShortbreadBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
-  const { tiles, requestedTiles, bounds } = await fetchTileCoverage(lat, lon, options.radius, SHORTBREAD_ZOOM);
+  const { tiles, requestedTiles, bounds } = await fetchTileCoverage(
+    lat, lon, options.radius, SHORTBREAD_ZOOM, options
+  );
   const elements = convertTilesToElements(tiles, ['buildings'], bounds);
   const coverageComplete = tiles.length === requestedTiles;
   elements.forEach((element) => {

@@ -58,6 +58,7 @@ export function resetWorldForReload(options = {}) {
 
   appCtx.showLoad(`Loading ${locName}...`);
   appCtx.worldLoading = true;
+  appCtx.beginEarthWorldSceneLoad?.(options.loadSequence);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,

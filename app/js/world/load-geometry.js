@@ -7,7 +7,7 @@ import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=9";
+} from "./shortbread-source.js?v=10";
 
 const WATER_VECTOR_TILE_ZOOM = 13;
 const FEATURE_CLIP_RADIUS_SCALE = 1.75;
@@ -218,11 +218,11 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
   }
 }
 
-export async function fetchVectorTileWater(z, x, y) {
+export async function fetchVectorTileWater(z, x, y, options = {}) {
   // A full parent tile is not a valid substitute for one missing child: it
   // expands the mapped footprint and can publish a square of water outside the
   // requested area. Accuracy wins over substituting coarser geometry here.
-  return fetchShortbreadTile(z, x, y);
+  return fetchShortbreadTile(z, x, y, { signal: options.signal });
 }
 
 export function normalizeWorldRingFromLonLat(coords, maxPoints = 900, guardOptions = null) {

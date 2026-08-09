@@ -20,6 +20,7 @@ import {
   syncTextureGlobals as syncTextureGlobalsRuntime
 } from "./engine/materials-runtime.js?v=20";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=12";
+import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
 const RENDER_QUALITY_LOW = 'low';
 const RENDER_QUALITY_MED = 'med';
@@ -102,25 +103,7 @@ function getRenderQualityLevel() {
   return engineState.renderQualityLevel;
 }
 
-const CFG = {
-  // Simulation speed is 2 units per displayed MPH. Keep the road-car
-  // envelope explicit here so the HUD and geospatial movement stay truthful.
-  maxSpd: 180, accel: 80, boostAccel: 120, brake: 150, friction: 25,
-  boostMax: 240, boostDur: 2.5,
-  brakeForce: 4.0,
-  gripRoad: 0.96,
-  gripOff: 0.70,
-  gripBrake: 0.48,
-  gripDrift: 0.3,
-  driftRec: 3.8,
-  turnLow: 1.8,
-  turnHigh: 0.8,
-  turnMin: 30,
-  roadForce: 0.93,
-  roadPushback: 0.3,
-  maxOffDist: 15,
-  cpRadius: 25, trialTime: 120, policeSpd: 140, policeAccel: 60, policeDist: 800
-};
+const CFG = ROAD_CAR_CONFIG;
 
 Object.assign(appCtx, { CFG });
 

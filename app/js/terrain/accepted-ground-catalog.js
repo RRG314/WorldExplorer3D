@@ -50,15 +50,17 @@ export function parseAcceptedGroundCatalog(value, { url = '' } = {}) {
 
 export async function loadAcceptedGroundCatalog({
   url = DEFAULT_ACCEPTED_GROUND_CATALOG_URL,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  signal = null
 } = {}) {
   if (typeof fetchImpl !== 'function') {
     return result('rejected', 'catalog-fetch-unavailable', { url });
   }
   let response;
   try {
-    response = await fetchImpl(String(url), { cache: 'no-store' });
-  } catch {
+    response = await fetchImpl(String(url), { cache: 'no-store', signal });
+  } catch (error) {
+    if (signal?.aborted) throw error;
     return result('rejected', 'catalog-fetch-failed', { url });
   }
   if (!response?.ok) {

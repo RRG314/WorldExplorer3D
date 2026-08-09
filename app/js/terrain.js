@@ -25,7 +25,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=35";
+} from "./terrain/surface-profiles.js?v=40";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -46,7 +46,7 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=41";
+} from "./terrain/tiles.js?v=42";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -58,7 +58,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=6";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=15";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=21";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -97,7 +97,8 @@ const prepareAcceptedGroundForLocation = (options) =>
 const prepareAcceptedGroundFromCatalog = async (options = {}) => {
   acceptedGroundCatalogState = await loadAcceptedGroundCatalog({
     url: options.catalogUrl,
-    fetchImpl: options.fetchImpl
+    fetchImpl: options.fetchImpl,
+    signal: options.signal
   });
   if (acceptedGroundCatalogState.status !== 'accepted') {
     return acceptedGroundRuntime.clear(
@@ -108,7 +109,8 @@ const prepareAcceptedGroundFromCatalog = async (options = {}) => {
     latitude: options.latitude,
     longitude: options.longitude,
     manifests: acceptedGroundCatalogState.manifests,
-    coverageProbes: options.coverageProbes
+    coverageProbes: options.coverageProbes,
+    signal: options.signal
   });
 };
 const getAcceptedGroundCatalogSnapshot = () => acceptedGroundCatalogState;
@@ -287,7 +289,9 @@ const transportPublicationDeps = {
 };
 
 const {
+  refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
+  scheduleFarTerrainSurfaceRefresh,
   updateFarTerrainClipmap,
   waitForFarTerrainClipmap
 } = createFarFieldTerrainApi({
@@ -447,10 +451,12 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
+  scheduleFarTerrainSurfaceRefresh,
   terrainSourceSampleAtLatLon: (lat, lon) =>
     terrainSourceSampleAtLatLon(lat, lon, terrainTileDeps),
   terrainSourceSampleAtWorldXZ: (x, z) =>

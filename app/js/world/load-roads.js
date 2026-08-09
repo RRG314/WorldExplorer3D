@@ -2,92 +2,24 @@ import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=35";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=14";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=20";
+import {
+  createWorldLoadRuntimeSession,
+  finishSupersededWorldLoadRuntimeSession,
+  finishWorldLoadRuntimeSession
+} from "./load-runtime-session.js?v=17";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=21";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=6";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
-async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
-  const waitForCoverage = appCtx.waitForTerrainCoverageAt;
-  const waitForCenter = appCtx.waitForTerrainReadyAt;
-  if (typeof waitForCoverage !== 'function' && typeof waitForCenter !== 'function') return false;
-  startLoadPhase('waitForTerrainCoverage');
-  try {
-    const startedAt = performance.now();
-    const centerReady = typeof waitForCenter === 'function' ? await waitForCenter(0, 0, 3000) : false;
-    const coverage = typeof waitForCoverage === 'function'
-      ? await waitForCoverage(0, 0, Math.max(800, 5000 - (performance.now() - startedAt)), 0.72)
-      : null;
-    const nearReady = centerReady || coverage?.ready === true;
-    const waitForFarTerrain = appCtx.waitForFarTerrainClipmap;
-    if (typeof waitForFarTerrain !== 'function') return nearReady;
-    startLoadPhase('waitForFixedLocationBackground');
-    try {
-      return nearReady && await waitForFarTerrain(20000);
-    } finally {
-      endLoadPhase('waitForFixedLocationBackground');
-    }
-  } finally {
-    endLoadPhase('waitForTerrainCoverage');
-  }
-}
-
-function selectedRoadGeographicBounds(roadWays = [], nodes = {}) {
-  let latN = -Infinity;
-  let latS = Infinity;
-  const longitudes = [];
-  for (const way of roadWays) {
-    for (const nodeId of way?.nodes || []) {
-      const node = nodes[nodeId];
-      const lat = Number(node?.lat);
-      const lon = Number(node?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-      latN = Math.max(latN, lat);
-      latS = Math.min(latS, lat);
-      longitudes.push(((lon % 360) + 360) % 360);
-    }
-  }
-  if (!Number.isFinite(latN) || !Number.isFinite(latS) || longitudes.length === 0) return null;
-
-  longitudes.sort((left, right) => left - right);
-  let largestGap = -Infinity;
-  let gapIndex = 0;
-  for (let index = 0; index < longitudes.length; index += 1) {
-    const next = index === longitudes.length - 1
-      ? longitudes[0] + 360
-      : longitudes[index + 1];
-    const gap = next - longitudes[index];
-    if (gap > largestGap) {
-      largestGap = gap;
-      gapIndex = index;
-    }
-  }
-  const arcStart = longitudes[(gapIndex + 1) % longitudes.length];
-  const arcEnd = longitudes[gapIndex];
-  const toSignedLongitude = (value) => value > 180 ? value - 360 : value;
-  const padding = 0.00002;
-  return {
-    latN: Math.min(85.05112878, latN + padding),
-    latS: Math.max(-85.05112878, latS - padding),
-    lonW: toSignedLongitude((arcStart - padding + 360) % 360),
-    lonE: toSignedLongitude((arcEnd + padding) % 360)
-  };
-}
-
-async function waitForSelectedRoadTerrain(appCtx, roadWays, nodes, startLoadPhase, endLoadPhase) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || typeof appCtx.waitForTerrainReadyBounds !== 'function') {
-    return false;
-  }
-  const bounds = selectedRoadGeographicBounds(roadWays, nodes);
-  if (!bounds) return false;
-  startLoadPhase('waitForTransportGround');
-  try {
-    return await appCtx.waitForTerrainReadyBounds(bounds, 8000);
-  } finally {
-    endLoadPhase('waitForTransportGround');
-  }
-}
+import {
+  waitForInitialTerrain,
+  waitForTerrainSurfaceMaterials,
+  waitForSelectedRoadTerrain
+} from "./load-terrain-readiness.js?v=1";
+import {
+  createWorldLoadCancellationSlot,
+  createWorldLoadCoordinator
+} from "./world-load-coordinator.js?v=2";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -173,7 +105,7 @@ export function createWorldRoadLoader(deps = {}) {
     worldBaseTerrainY,
     worldLinePointsFromLonLat
   } = deps;
-  let activeWorldLoad = null;
+  const cancellationSlot = createWorldLoadCancellationSlot();
   const classifyLinearFeatureTags = (tags = {}, options = {}) => {
     const classification = classifyLinearFeatureTagsBase(tags, {
       ...options,
@@ -232,6 +164,7 @@ export function createWorldRoadLoader(deps = {}) {
       getRuntimeDynamicBudget,
       getWorldLodThresholds,
       invalidateTraversalNetworks,
+      registerWorldLoadCancellation: cancellationSlot.register,
       resetWorldForReload,
       resetWorldFurnitureCaches,
       retryPass,
@@ -248,17 +181,24 @@ export function createWorldRoadLoader(deps = {}) {
       lodThresholds,
       perfModeNow,
       phaseTotals,
+      releaseWorldLoadCancellation,
       rdtLoadComplexity,
       runtimeState,
       restoreRequestedSelection,
+      runProviderWork,
       startLoadPhase,
+      syncWorldSessionState,
       useRdtBudgeting,
-      useSyntheticFallbackRoads
+      useSyntheticFallbackRoads,
+      worldSession
     } = session;
-    const acceptedGroundReady = await activateAcceptedGroundForWorldLoad({
-      appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
-      startLoadPhase
-    });
+    const acceptedGroundReady = await runProviderWork('accepted-ground', 'activate', (signal) =>
+      activateAcceptedGroundForWorldLoad({
+        appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
+        signal, startLoadPhase
+      })
+    );
+    if (!isActiveLoadContext()) return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-ground-activation');
     if (!acceptedGroundReady) return;
     const radii = loadProfile.radii.slice();
     const featureRadiusScale = loadProfile.featureRadiusScale;
@@ -304,6 +244,12 @@ export function createWorldRoadLoader(deps = {}) {
         startLoadPhase,
         endLoadPhase
       });
+      loadMetrics.terrainSurfaceMaterials = await waitForTerrainSurfaceMaterials(
+        appCtx,
+        startLoadPhase,
+        endLoadPhase,
+        { radiusWorld: 1500, timeoutMs: 7000 }
+      );
     };
     const createSyntheticWorld = () => {
       createSyntheticFallbackWorld({
@@ -350,6 +296,8 @@ export function createWorldRoadLoader(deps = {}) {
     const { addLinearFeatureRecord, buildImmediateLinearFeatureDataPass } = linearRuntime;
     for (const radius of radii) {
       if (loaded) break;
+      worldSession.transition('fetching', 'fetch-location-providers');
+      syncWorldSessionState();
       loadMetrics.activeRadiusDeg = radius;
       // Keep travel actors just inside the district that is actually loaded;
       // this does not change world loading, the visible horizon, map coverage,
@@ -400,21 +348,30 @@ export function createWorldRoadLoader(deps = {}) {
             // Dense responses normally win quickly; after this bounded probe,
             // the global vector source supplies deterministic sparse coverage.
             const primaryTransportTimeoutMs = Math.min(overpassTimeoutMs, 9000);
-            data = await fetchOverpassJSON(
-              primaryQuery,
-              primaryTransportTimeoutMs,
-              loadDeadline,
-              overpassCacheMeta
+            data = await runProviderWork(
+              'osm-overpass',
+              'transport-and-surface',
+              (signal) => fetchOverpassJSON(
+                primaryQuery,
+                primaryTransportTimeoutMs,
+                loadDeadline,
+                overpassCacheMeta,
+                { signal }
+              )
             );
           } catch (overpassErr) {
+            if (!isActiveLoadContext()) throw overpassErr;
             recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
             appCtx.showLoad('Loading generalized mapped data...');
-            data = await fetchShortbreadWorldData({
-              lat: appCtx.LOC.lat,
-              lon: appCtx.LOC.lon,
-              radius: Math.max(radius, featureRadius),
-              includeBuildings: false
-            });
+            data = await runProviderWork('openstreetmap-shortbread', 'transport-fallback', (signal) =>
+              fetchShortbreadWorldData({
+                lat: appCtx.LOC.lat,
+                lon: appCtx.LOC.lon,
+                radius: Math.max(radius, featureRadius),
+                includeBuildings: false,
+                signal
+              })
+            );
           }
         } finally {
           endLoadPhase('fetchOverpass');
@@ -424,16 +381,17 @@ export function createWorldRoadLoader(deps = {}) {
         if (Number.isFinite(data?._overpassCacheAgeMs)) {
           loadMetrics.overpassCacheAgeMs = Math.floor(data._overpassCacheAgeMs);
         }
-        if (earthSceneSuppressed()) {
-          loaded = true;
+        if (!isActiveLoadContext()) {
           loadMetrics.recoveryReason = 'env_changed_during_fetch';
           loadMetrics.partialRecovery = true;
           hideEarthSceneMeshes();
-          break;
+          return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-provider-fetch');
         }
         const nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         const baselineFullWorld = perfModeNow === 'baseline';
+        worldSession.transition('compiling', 'compile-selected-location');
+        syncWorldSessionState();
         startLoadPhase('featureBudgeting');
         const normalized = prepareSelectedLocationSource({
           allowWorldwideTerrainFallback:
@@ -531,6 +489,8 @@ export function createWorldRoadLoader(deps = {}) {
           landuseWays: normalizedSelection.landuseWays,
           loadMetrics,
           nodes: normalizedSelection.nodes,
+          isActiveLoadContext,
+          runProviderWork,
           startLoadPhase,
           waterwayWays: normalizedSelection.waterwayWays,
           worldSurfaceProfile
@@ -568,14 +528,28 @@ export function createWorldRoadLoader(deps = {}) {
             cacheMeta: buildingPublicationCacheMeta,
             deadlineMs: performance.now() + Math.max(12000, overpassTimeoutMs + 2500),
             endLoadPhase,
-            fetchOverpassJSON,
-            fetchPreferredMetadata: () => fetchBundledBuildingMetadata?.({ locationKey: appCtx.selLoc, lat: appCtx.LOC.lat, lon: appCtx.LOC.lon }),
+            fetchOverpassJSON: (...args) => runProviderWork(
+              'osm-overpass', 'building-detail', (signal) => fetchOverpassJSON(...args, { signal })
+            ),
+            fetchPreferredMetadata: () => runProviderWork(
+              'bundled-building-pack',
+              'building-metadata',
+              (signal) => fetchBundledBuildingMetadata?.({
+                locationKey: appCtx.selLoc,
+                lat: appCtx.LOC.lat,
+                lon: appCtx.LOC.lon,
+                signal
+              })
+            ),
             fetchPreferredData: buildingLoadPolicy.shouldLoad
-              ? () => fetchGlobalBuildingData({
-                  lat: appCtx.LOC.lat,
-                  lon: appCtx.LOC.lon,
-                  radius: buildingPublicationCacheMeta.featureRadius
-                }, (error) => recordLoadWarning('Overture building massing', error))
+              ? () => runProviderWork('overture', 'building-detail', (signal) =>
+                  fetchGlobalBuildingData({
+                    lat: appCtx.LOC.lat,
+                    lon: appCtx.LOC.lon,
+                    radius: buildingPublicationCacheMeta.featureRadius,
+                    signal
+                  }, (error) => recordLoadWarning('Overture building massing', error))
+                )
               : null,
             skipReason: buildingLoadPolicy.shouldLoad
               ? ''
@@ -605,11 +579,13 @@ export function createWorldRoadLoader(deps = {}) {
             waterStructureDeadlineMs: Infinity,
             waterStructureQuery,
             waterStructureTimeoutMs: 9000,
-            publishLocationWorld,
             useRdtBudgeting
           });
           appCtx.showLoad('Loading buildings and preparing the world...');
           await loadBuildingDetail();
+          if (!isActiveLoadContext()) {
+            return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-building-publication');
+          }
           await loadLandmarksForPublication({
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             geometryGuards: buildingGeometryGuards,
@@ -617,8 +593,8 @@ export function createWorldRoadLoader(deps = {}) {
             loadMetrics,
             recordLoadWarning,
             registerBuildingCollision,
-            sanitizeWorldFootprintPoints,
-            publishLocationWorld
+            runProviderWork,
+            sanitizeWorldFootprintPoints
           });
           await markLoaded('primary');
         } else {
@@ -646,6 +622,9 @@ export function createWorldRoadLoader(deps = {}) {
           appCtx.showLoad('No roads found, trying larger area...');
         }
       } catch (err) {
+        if (!isActiveLoadContext()) {
+          return finishSupersededWorldLoadRuntimeSession(session, 'superseded-after-provider-error');
+        }
         if (String(err?.message || err).includes('All Overpass endpoints failed')) {
           providerUnavailable = true;
           loadMetrics.providerUnavailable = true;
@@ -691,6 +670,9 @@ export function createWorldRoadLoader(deps = {}) {
       console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
       appCtx.showLoad('Retrying map data...');
       appCtx.worldLoading = false;
+      worldSession.fail('automatic-retry');
+      syncWorldSessionState();
+      releaseWorldLoadCancellation();
       return loadRoadsInternal(retryPass + 1);
     }
     if (!loaded) {
@@ -705,42 +687,28 @@ export function createWorldRoadLoader(deps = {}) {
       }
     }
 
-    finishWorldLoadRuntimeSession({
+    if (!isActiveLoadContext()) {
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-publication');
+    }
+    return finishWorldLoadRuntimeSession({
       appCtx,
       finalizePerfLoad,
       loadMetrics,
       loaded,
       phaseTotals,
-      runtimeState
+      releaseWorldLoadCancellation,
+      runtimeState,
+      syncWorldSessionState,
+      worldSession
     });
   }
 
-  async function loadRoads(retryPass = 0) {
-    if (retryPass > 0) return loadRoadsInternal(retryPass);
-    if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
-      appCtx.stopBoatMode({ targetMode: 'walk' });
-    }
-    const signature = getWorldLoadSignature();
-    if (activeWorldLoad) {
-      if (activeWorldLoad.signature === signature) {
-        return activeWorldLoad.promise;
-      }
-      // A different selection must not reset or publish the world while the
-      // current selection is still loading. Wait for that load to settle, then
-      // resolve the latest global selection and either join or start its load.
-      return activeWorldLoad.promise
-        .catch(() => undefined)
-        .then(() => loadRoads(0));
-    }
-
-    const promise = loadRoadsInternal(0).finally(() => {
-      if (activeWorldLoad?.promise === promise) {
-        activeWorldLoad = null;
-      }
-    });
-    activeWorldLoad = { signature, promise };
-    return promise;
-  }
+  const { loadWorld: loadRoads } = createWorldLoadCoordinator({
+    appCtx,
+    cancelActive: cancellationSlot.cancel,
+    getWorldLoadSignature,
+    loadWorld: loadRoadsInternal
+  });
 
   return {
     isInsideWaterArea,

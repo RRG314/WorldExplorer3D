@@ -1081,6 +1081,12 @@ async function loadLocation(page, spec) {
         null;
     }
 
+    // The location identity contract includes the player-visible HUD, so drive the
+    // real HUD presentation owner before reading its output. World loading alone
+    // does not guarantee that an animation frame has presented the resolved label.
+    if (typeof ctx.updateHUD === 'function') ctx.updateHUD();
+    const renderedHudLabel = String(document.getElementById('locationLine')?.textContent || '');
+
     return {
       id: locationSpec.id,
       label: locationSpec.label,
@@ -1094,6 +1100,7 @@ async function loadLocation(page, spec) {
         location: { ...(completedLoad.location || {}) },
         publicationSequence: Number(publication.sequence)
       },
+      farTerrainClipmap: ctx.farTerrainClipmapState ? { ...ctx.farTerrainClipmapState } : null,
       buildingDetailWaitMs: Number(buildingDetailWaitMs.toFixed(1)),
       landmarkWaitMs: Number(landmarkWaitMs.toFixed(1)),
       baselineWaitMs: Number(baselineWaitMs.toFixed(1)),
@@ -1129,6 +1136,11 @@ async function loadLocation(page, spec) {
       terrainSurface: {
         imageryOwners: terrainImageryOwners,
         rasterUrls: terrainRasterUrls,
+        locationBaseDetailMode: String(ctx.worldCoverBaseDetailMode || ''),
+        publishedDetailModes: [...new Set(worldCoverMeshes
+          .filter((mesh) => mesh?.userData?.worldCoverStatus === 'ready')
+          .map((mesh) => String(mesh?.userData?.terrainDetailProvenance?.mode || ''))
+          .filter(Boolean))],
         samples: worldCoverMeshes.slice(0, 5).map((mesh) => ({
           key: mesh?.userData?.terrainTileKey || null,
           visualMode: mesh?.userData?.terrainVisualProfile?.visualMode || mesh?.userData?.terrainVisualProfile?.mode || null,
@@ -1169,7 +1181,7 @@ async function loadLocation(page, spec) {
         } : null,
         resolvedHudLabel: typeof ctx.getHudLocationLabel === 'function' ?
           String(ctx.getHudLocationLabel() || '') : '',
-        renderedHudLabel: String(document.getElementById('location')?.textContent || '')
+        renderedHudLabel
       },
       spawnOccupancy: expectedStart !== 'water' ? {
         actorCollision: finalActorCollision?.collision === true,

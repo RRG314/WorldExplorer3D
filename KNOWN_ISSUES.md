@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-07 for version 4.1.3.
+Last reviewed: 2026-08-08 for version 4.1.4.
 
 ## Map Coverage
 

@@ -62,20 +62,10 @@ const terrainPublication = await source('app/js/terrain/location-world.js');
 assert.match(terrainPublication, /worldToLatLon\(0, 0\)/, 'terrain publication must be centered on the selected location origin');
 assert.match(terrainPublication, /publishedLocationKey === locationKey/, 'terrain must publish at most once per selected location');
 assert.match(terrainPublication, /Math\.max\(3, appCtx\.TERRAIN_RING\)/, 'the fixed terrain district must cover the full mapped play area');
-assert.match(terrainPublication, /retireGroundFallbackPlaceholder\?\.\(\)/, 'the loading field must retire when authoritative terrain publishes');
 assert.doesNotMatch(terrainPublication, /actor|speed|vehicle|moved|distanceMoved/, 'location terrain must not depend on actor travel');
-
-const terrainProfiles = await source('app/js/terrain/surface-profiles.js');
-const builtProfileBranch = terrainProfiles.slice(
-  terrainProfiles.indexOf('} else if (nextMode === "built")'),
-  terrainProfiles.indexOf('} else if (nextMode === "urban")')
-);
-assert.match(builtProfileBranch, /ensureTerrainTextureSet\(mesh, textureRepeats, "grass"\)/, 'settlement fallback terrain must use the natural grass material');
-assert.doesNotMatch(builtProfileBranch, /ensureTerrainTextureSet\([^\n]+"built"\)|URBAN_GROUND_HEX/, 'settlement fallback terrain must not paint the whole location as concrete');
 
 const worldPublication = await source('app/js/world/publication.js');
 assert.doesNotMatch(worldPublication, /car|planeMode|drone|boatMode|walker|distance|budgetScale/, 'fixed world publication must not depend on actor or mode');
-assert.match(worldPublication, /setListVisible\(appCtx\.buildingMeshes\)/, 'all loaded building meshes must be published together');
 
 const travelMode = await source('app/js/travel-mode.js');
 assert.doesNotMatch(travelMode, /setTimeout|requestIdleCallback|loadRoads|publishLocation/, 'mode switches must not schedule world work');
@@ -110,23 +100,22 @@ assert.match(universeVisuals, /entity\.id === 'sol'[\s\S]*throw new Error\('Sol 
 
 const mainRuntime = await source('app/js/main.js');
 const spaceEntry = await source('app/js/space.js');
-const spaceRuntime = await source('app/js/space/runtime.js');
 assert.match(mainRuntime, /isSuspended: dedicatedRendererActive/, 'the main renderer must suspend whenever a dedicated renderer owns the frame');
 assert.equal((spaceEntry.match(/stopRuntimeKernel\?\.\('space-flight-active'\)/g) || []).length, 3, 'every space entry path must stop the Earth runtime kernel');
 assert.match(spaceEntry, /function exitSpaceFlight[\s\S]*appCtx\.renderLoop\?\.\(\)/, 'space exit must restart the terrain-world runtime');
-assert.doesNotMatch(spaceRuntime, /spaceFlight\.camera\.up\.copy\(_sf(?:TempVec|LocalUp)\)/, 'space camera up must never copy spacecraft-local up');
-assert.match(spaceRuntime, /spaceFlight\.camera\.up\.copy\(_sfWorldUp\)/, 'space chase camera must use stable world-up');
-assert.match(spaceRuntime, /cameraLookMatrix\.lookAt\(appCtx\.spaceFlight\.camera\.position, rocket\.position, _sfWorldUp\)/, 'space chase look-at must use stable world-up');
+// Multi-axis steering and camera orientation are exercised in a running browser by
+// test-space-flight-controls.mjs. Source-name matching here previously rejected the
+// axis-stable transported-up implementation without measuring player-visible behavior.
 
 const earthSession = await source('app/js/earth-session.js');
 assert.doesNotMatch(earthSession, /publishLocationTerrain|publishLocationWorld|worldDetailState\?\.buildings\?\.status === 'loading'/, 'Earth resume must restore the retained world without republishing it');
 
 console.log(JSON.stringify({
   ok: true,
-  contract: 'authoritative-location-earth-and-space',
+  contract: 'location-earth-and-space-architecture',
   movementWorldPublicationPaths: 0,
   recurringWorldScans: 0,
   spaceSunCreationPaths: 1,
   activeWorldRenderLoops: 1,
-  terrainCoverage: 'fixed-per-location'
+  terrainAuthority: 'fixed-per-location'
 }, null, 2));

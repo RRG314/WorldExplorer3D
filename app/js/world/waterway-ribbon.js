@@ -193,7 +193,7 @@ export function addWaterwayRibbon(pts, tags) {
   mesh.userData.waterRegistryId = waterway.registryId;
   mesh.userData.waterSurfaceProvenance = waterway.registryProvenance;
   mesh.visible = true;
-  appCtx.scene.add(mesh);
+  appCtx.addEarthWorldObject(mesh);
   appCtx.landuseMeshes.push(mesh);
   appCtx.waterways.push(waterway);
 }

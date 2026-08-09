@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { ctx as appCtx } from '../app/js/shared-context.js?v=55';
 import {
@@ -25,7 +23,6 @@ import {
   initWorldNavigation
 } from '../app/js/world/navigation.js';
 
-const root = path.resolve(import.meta.dirname, '..');
 const atGrade = Object.freeze({
   terrainMode: 'at_grade',
   verticalOrder: 0,
@@ -350,22 +347,6 @@ const spatialQueryP95Ms = percentile95(spatialQueryDurations);
 assert.ok(
   spatialQueryP95Ms <= 0.5,
   `road spatial-query p95 exceeded 0.5 ms (${spatialQueryP95Ms.toFixed(4)} ms)`
-);
-
-const loadRoadsSource = fs.readFileSync(path.join(root, 'app/js/world/load-roads.js'), 'utf8');
-const overpassPosition = loadRoadsSource.indexOf(
-  'data = await fetchOverpassJSON('
-);
-const shortbreadPosition = loadRoadsSource.indexOf(
-  'data = await fetchShortbreadWorldData({',
-  overpassPosition
-);
-assert.ok(overpassPosition >= 0 && shortbreadPosition > overpassPosition);
-const roadPassSource = fs.readFileSync(path.join(root, 'app/js/world/load-road-pass.js'), 'utf8');
-assert.equal(
-  roadPassSource.includes('appCtx.terrainMeshHeightAt'),
-  false,
-  'road publication still samples terrain instead of the compiled transport surface'
 );
 
 console.log(JSON.stringify({

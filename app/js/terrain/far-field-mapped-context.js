@@ -1,7 +1,8 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=9";
+} from "../world/shortbread-source.js?v=10";
+import { throwIfWorldLoadAborted } from '../earth-core/request-cancellation.js?v=1';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
@@ -125,16 +126,18 @@ function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
   return coordinates;
 }
 
-async function fetchWithConcurrency(items, concurrency, worker) {
+async function fetchWithConcurrency(items, concurrency, worker, signal = null) {
   const results = new Array(items.length);
   let cursor = 0;
   const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (cursor < items.length) {
+      throwIfWorldLoadAborted(signal, 'Far mapped context aborted');
       const index = cursor;
       cursor += 1;
       try {
-        results[index] = await worker(items[index]);
-      } catch {
+        results[index] = await worker(items[index], signal);
+      } catch (error) {
+        throwIfWorldLoadAborted(signal, 'Far mapped context aborted');
         results[index] = null;
       }
     }
@@ -143,12 +146,14 @@ async function fetchWithConcurrency(items, concurrency, worker) {
   return results.filter(Boolean);
 }
 
-async function loadFarMappedWaterContext(bounds) {
+async function loadFarMappedWaterContext(bounds, options = {}) {
   const coordinates = contextTileCoordinates(bounds, FAR_WATER_CONTEXT_ZOOM);
+  const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const tiles = await fetchWithConcurrency(
     coordinates,
     FAR_CONTEXT_TILE_CONCURRENCY,
-    ({ x, y }) => fetchShortbreadTile(FAR_WATER_CONTEXT_ZOOM, x, y)
+    ({ x, y }, signal) => fetchTile(FAR_WATER_CONTEXT_ZOOM, x, y, { signal }),
+    options.signal
   );
   const waterAreas = [];
 
@@ -196,15 +201,17 @@ async function loadFarMappedWaterContext(bounds) {
   };
 }
 
-async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds) {
+async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds, options = {}) {
   const coordinates = contextTileCoordinates(bounds, FAR_CONTEXT_ZOOM);
+  const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const [tiles, waterContext] = await Promise.all([
     fetchWithConcurrency(
       coordinates,
       FAR_CONTEXT_TILE_CONCURRENCY,
-      ({ x, y }) => fetchShortbreadTile(FAR_CONTEXT_ZOOM, x, y)
+      ({ x, y }, signal) => fetchTile(FAR_CONTEXT_ZOOM, x, y, { signal }),
+      options.signal
     ),
-    loadFarMappedWaterContext(waterBounds)
+    loadFarMappedWaterContext(waterBounds, { ...options, fetchTile })
   ]);
   const landByTile = new Map();
   const buildings = [];

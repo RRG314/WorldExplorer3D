@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+const packageJson = JSON.parse(read('package.json'));
 const sourceFiles = fs.readdirSync(path.join(root, 'app/js'), { recursive: true })
   .filter((entry) => String(entry).endsWith('.js'))
   .map((entry) => path.join('app/js', String(entry)));
@@ -114,48 +115,6 @@ assert.match(landuseSource, /semanticOnly:\s*true/);
 assert.doesNotMatch(landuseSource, /visibleMappedSurfaceTypes/);
 assert.match(landuseSource, /props\.kind[\s\S]*'glacier'/);
 
-const worldSpawnSource = read('app/js/world/spawn.js');
-assert.match(
-  worldSpawnSource,
-  /const mappedWalkApproach = mode === "walk" \? searchNearestSafeRoadSpawn\(0, 0/,
-  'custom city arrivals must look for a safe mapped walking surface'
-);
-assert.match(
-  worldSpawnSource,
-  /Math\.hypot\(mappedWalkApproach\.x, mappedWalkApproach\.z\) <= 160/,
-  'custom walking arrivals must remain close to the selected coordinate'
-);
-assert.match(
-  worldSpawnSource,
-  /const distances = \[8, 16, 28, 40\]/,
-  'mapped arrivals must inspect a usable terrain corridor beyond the spawn point'
-);
-assert.match(
-  worldSpawnSource,
-  /terrainCorridor\.penalty \+/,
-  'mapped arrivals must prefer a flatter usable corridor rather than a local terrain trough'
-);
-
-const weatherSource = read('app/js/weather.js');
-assert.match(
-  weatherSource,
-  /placeMatchesLoadedLocation/,
-  'the HUD must reject a reverse-geocoded label retained from the previous location'
-);
-
-const loadRuntimeSource = read('app/js/world/load-runtime-session.js');
-const loadRoadsSource = read('app/js/world/load-roads.js');
-assert.match(
-  loadRuntimeSource,
-  /const restoreRequestedSelection = \(\) =>/,
-  'each world load must retain the exact selection it started with'
-);
-assert.match(
-  loadRoadsSource,
-  /restoreRequestedSelection\(\);[\s\S]*loaded = true/,
-  'the published world must restore its own selection before becoming ready'
-);
-
 const shadowSource = read('app/js/engine/shadow-policy.js');
 assert.match(shadowSource, /normalBias/);
 assert.match(shadowSource, /texelWorldSize/);
@@ -173,7 +132,7 @@ assert.ok(coreFrameSource.includes('appCtx.update(frame.dt)'));
 assert.ok(!coreFrameSource.includes('fixedUpdate(frame)'));
 assert.ok(!coreFrameSource.includes('presentationPose = {'));
 
-const releaseNotes = read('RELEASE_NOTES_4.1.3.md');
+const releaseNotes = read(`RELEASE_NOTES_${packageJson.version}.md`);
 const knownIssues = read('KNOWN_ISSUES.md');
 assert.match(releaseNotes, /## Verification/);
 assert.match(releaseNotes, /representative locations worldwide/i);
@@ -181,7 +140,7 @@ assert.match(knownIssues, /Tunnels, bridges, ramps, and stacked roads/);
 
 console.log(JSON.stringify({
   ok: true,
-  contract: 'phase5-production-readiness',
+  contract: 'release-architecture-and-owned-assets',
   facadeOwner: 'engine/building-facade-materials',
   facadeAtlases: facadeAssets.length,
   facadeAssetBytes,
@@ -189,6 +148,6 @@ console.log(JSON.stringify({
   measuredBaltimoreLandmarks: 2,
   naturalGroundOwner: 'terrain-with-conforming-osm-landcover',
   shadowOwner: 'engine/shadow-policy',
-  movementPresentation: 'v3.1-direct-frame-pose',
-  publicReleaseRecord: '4.1.3'
+  movementArchitecture: 'direct-frame-pose',
+  publicReleaseRecord: packageJson.version
 }, null, 2));

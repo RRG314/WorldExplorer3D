@@ -137,7 +137,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       const vesselMesh = createMappedVesselMesh(pts, waterSurfaceY, way.tags || {});
       if (vesselMesh) {
         vesselMesh.userData.waterRelationship = waterRelationship.kind;
-        appCtx.scene.add(vesselMesh);
+        appCtx.addEarthWorldObject(vesselMesh);
         appCtx.buildingMeshes.push(vesselMesh);
         loadMetrics.buildingWater.vessels += 1;
         loadMetrics.buildingPublication.renderedFeatures += 1;
@@ -491,7 +491,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       colliderRef.maxY = collisionBaseElevation + height;
     }
 
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.buildingMeshes.push(mesh);
     loadMetrics.buildingPublication.renderedFeatures += 1;
 
@@ -508,7 +508,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       mappedRoofMesh.userData.geometrySource = way.tags._geometrySource || 'osm';
       mappedRoofMesh.userData.buildingProvenance = buildingProvenance;
       mappedRoofMesh.userData.lodTier = lodTier;
-      appCtx.scene.add(mappedRoofMesh);
+      appCtx.addEarthWorldObject(mappedRoofMesh);
       appCtx.buildingMeshes.push(mappedRoofMesh);
     }
 
@@ -527,7 +527,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       roofDetailMesh.userData.buildingSemantics = buildingSemantics;
       roofDetailMesh.userData.structureSemantics = structureSemantics;
       roofDetailMesh.userData.buildingProvenance = buildingProvenance;
-      appCtx.scene.add(roofDetailMesh);
+      appCtx.addEarthWorldObject(roofDetailMesh);
       appCtx.buildingMeshes.push(roofDetailMesh);
     }
 
@@ -572,7 +572,7 @@ export async function buildBuildingGeometryPass(options = {}) {
         groundPatch.userData.terrainAvgElevation = avgElevation;
         groundPatch.userData.alwaysVisible = true;
         groundPatch.visible = true;
-        appCtx.scene.add(groundPatch);
+        appCtx.addEarthWorldObject(groundPatch);
         appCtx.landuseMeshes.push(groundPatch);
       });
     }

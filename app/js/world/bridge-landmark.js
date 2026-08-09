@@ -463,7 +463,7 @@ export function renderSuspensionBridgeLandmark(data) {
   for (const way of towerWays) {
     const part = createTowerPartMesh(way, nodes);
     if (!part) continue;
-    appCtx.scene.add(part.mesh);
+    appCtx.addEarthWorldObject(part.mesh);
     appCtx.historicMarkers.push(part.mesh);
     createdMeshes.push(part.mesh);
     towerParts.push(part);
@@ -473,21 +473,21 @@ export function renderSuspensionBridgeLandmark(data) {
   if (towers.length === 2) {
     const cables = createCableMeshes(path, metrics, towers);
     for (const mesh of createDeckSurfaceMeshes(path, metrics)) {
-      appCtx.scene.add(mesh);
+      appCtx.addEarthWorldObject(mesh);
       appCtx.historicMarkers.push(mesh);
       createdMeshes.push(mesh);
     }
     for (const mesh of cables.cableMeshes) {
-      appCtx.scene.add(mesh);
+      appCtx.addEarthWorldObject(mesh);
       appCtx.historicMarkers.push(mesh);
       createdMeshes.push(mesh);
     }
     for (const mesh of cables.girderMeshes) {
-      appCtx.scene.add(mesh);
+      appCtx.addEarthWorldObject(mesh);
       appCtx.historicMarkers.push(mesh);
       createdMeshes.push(mesh);
     }
-    appCtx.scene.add(cables.suspenders);
+    appCtx.addEarthWorldObject(cables.suspenders);
     appCtx.historicMarkers.push(cables.suspenders);
     createdMeshes.push(cables.suspenders);
     structuralDetails = createBridgeStructuralDetails({

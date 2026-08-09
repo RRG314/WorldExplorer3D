@@ -1,6 +1,20 @@
 import { spawnSync } from 'node:child_process';
 
 const steps = [
+  ['Earth-core isolation boundary', 'scripts/test-earth-core-boundaries.mjs'],
+  ['Immutable world-load request', 'scripts/test-world-load-request.mjs'],
+  ['Published world location identity', 'scripts/test-world-location-identity.mjs'],
+  ['World-load session state machine', 'scripts/test-world-load-session.mjs'],
+  ['World-load coordinator', 'scripts/test-world-load-coordinator.mjs'],
+  ['Immutable WorldSnapshot and atomic store', 'scripts/test-world-snapshot.mjs'],
+  ['Live WorldSnapshot publication adapter', 'scripts/test-world-publication-snapshot.mjs'],
+  ['Provider session cancellation', 'scripts/test-provider-cancellation.mjs'],
+  ['Far-terrain elevation request budget', 'scripts/test-far-field-elevation-loader.mjs'],
+  ['Far-terrain mapped surface continuity', 'scripts/test-far-field-surface-color.mjs'],
+  ['WorldCover mixed-tile material authority', 'scripts/test-worldcover-detail-mode.mjs'],
+  ['Terrain-tile generation cancellation', 'scripts/test-terrain-tile-cancellation.mjs'],
+  ['World-load cancellation browser', 'scripts/test-world-load-cancellation-browser.mjs'],
+  ['City-surface structural ownership', 'scripts/test-city-surface-semantics.mjs'],
   ['Production readiness semantics', 'scripts/test-production-readiness-contract.mjs'],
   ['Build hosting artifact', 'scripts/hosting-artifact.mjs', ['build', '--firebase-env', 'staging']],
   ['Hosting artifact parity', 'scripts/hosting-artifact.mjs', ['verify']],
@@ -16,6 +30,8 @@ const steps = [
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
   ['Overture building fallback source', 'scripts/test-overture-tile-source.mjs'],
   ['Inferred building coverage', 'scripts/test-inferred-building-coverage.mjs'],
+  ['Multi-axis space-flight controls', 'scripts/test-space-flight-controls.mjs'],
+  ['Space physics and visual ownership', 'scripts/test-space-physics-and-visuals.mjs'],
   ['Local data safety', 'scripts/test-local-data-safety.mjs'],
   ['Block builder contracts', 'scripts/test-block-builder-contract.mjs']
 ];

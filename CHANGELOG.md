@@ -2,6 +2,36 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.1.4] - 2026-08-08
+
+### Added
+
+- Atomic publication of six immutable selected-location products for terrain,
+  water, transport, buildings, land use, and places.
+- Release checks for provider cancellation/failure behavior, 30-second drive
+  and flight, fixed-world boundary traversal, Space return, and cold/warm load
+  performance against the exact 4.1.3 release.
+
+### Changed
+
+- One location-wide PBR base material now spans WorldCover tiles while mapped
+  per-pixel tint retains local grass, built, sand, rock, soil, and snow detail.
+- Far terrain reuses mapped surface colors at the detailed seam and retries a
+  missing elevation child through one bounded parent tile instead of dropping
+  the complete horizon.
+- Location changes cancel superseded provider work and reveal the replacement
+  scene only after its matching immutable snapshot commits.
+
+### Fixed
+
+- Removed rectangular land-cover color changes in farmland and dense cities.
+- Prevented a missing far elevation tile from producing a flat or empty inland
+  horizon.
+- Prevented travel-mode changes, ready-world movement, and Space return from
+  reloading or republishing the selected Earth world.
+- Preserved the requested location label and aircraft pose through publication
+  and Earth→Space→Earth transitions.
+
 ## [4.1.3] - 2026-08-07
 
 ### Added
