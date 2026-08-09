@@ -182,9 +182,9 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Status: resolved locally for the 4.1.4 candidate; sustained travel and fixed-world network evidence pass.
 - Symptom: farmland could show one rectangular grass tile inside brown fields, Monaco hills could break into categorical color blocks, and Lake Tahoe could finalize with a flat empty horizon when one coarse elevation tile failed.
 - Root cause: each WorldCover tile selected its own grass/soil/forest PBR color map even though spatial WorldCover tint already owned land-cover variation. Separately, the far clipmap treated one failed z12 elevation tile as failure of the entire fixed horizon.
-- Resolution: the nearest ready WorldCover tile selects one location-wide PBR base mode; all ready neighbors reuse it while retaining spatial tint and built-surface blending. The far clipmap uses one coarse WorldCover color baseline and reuses loaded near-tile colors at its seam. Missing z12 far-elevation tiles retry through unique z11 parent tiles under the same 12-worker scheduler; non-ocean matrix locations cannot finalize unless horizon terrain is ready.
-- Guard: `npm run test:worldcover-detail-mode`, `npm run test:far-field-surface-color`, `npm run test:far-field-elevation-loader`, and the eight-class world matrix assertion that `publishedDetailModes` has exactly one location owner and non-ocean `farTerrainClipmap.status` is `ready`.
-- Never reintroduce: per-tile categorical albedo ownership, a second terrain renderer, an unconditional extra elevation pass, or silent fixed-world publication after far terrain becomes unavailable.
+- Resolution: the nearest ready WorldCover tile selects one location-wide PBR base mode; all ready neighbors reuse it while retaining natural-surface tint. Fixed-location outer geometry uses that same PBR/tint authority. Missing z12 outer-elevation tiles retry through unique z11 parent tiles under the same 12-worker scheduler; non-ocean matrix locations cannot finalize unless horizon terrain is ready.
+- Guard: `npm run test:worldcover-detail-mode`, `npm run test:fixed-location-terrain-material`, `npm run test:far-field-elevation-loader`, and the eight-class world matrix assertion that `publishedDetailModes` has exactly one location owner and non-ocean `farTerrainClipmap.status` is `ready`.
+- Never reintroduce: per-tile categorical albedo ownership, a second terrain presentation/material authority, an unconditional extra elevation pass, or silent fixed-world publication after outer terrain becomes unavailable.
 
 ## 2026-08-08 — Movement or Space return reloads the selected Earth world
 
@@ -199,10 +199,19 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 
 - Status: resolved locally for the 4.1.4 candidate; not released or deployed.
 - Symptom: at drone altitude, a rectangular gray city surface was visibly surrounded by pale or differently colored far land even though both surfaces represented one fixed location.
-- Root cause: ESA WorldCover `surfaceTints` are multiplicative PBR tint factors, but the far-field renderer used them as final RGB colors. The detailed terrain retained its grass/built PBR base while the far field became pale. Locations outside WorldCover coverage also fell back to generic elevation colors instead of the selected location's semantic surface.
-- Resolution: far terrain now composes mapped/fallback base color with the same WorldCover tint and smoothed built weight used by detailed terrain. Sparse-data snow and sand locations use their fixed-location semantic fallback instead of generic green-gray ground. No cover plane, second renderer, or streaming owner was added.
-- Guard: `npm run test:far-field-surface-color`; the release world matrix must capture forced-daylight drone views so city-scale and natural-surface boundaries are part of the hash-bound visual review.
-- Never reintroduce: absolute use of `surfaceTints`, a generic green fallback in a known snow/sand location, or a street-level-only terrain release gate.
+- Root cause: the detailed 7×7 terrain footprint converted coarse WorldCover `built` pixels into a gray hardscape shader, while separately authored outer geometry could not reproduce that detailed raster. A prior attempted fix also treated multiplicative WorldCover tints as final far-field RGB. Together those independent presentation authorities exposed the detailed tile boundary as an asphalt square inside pale land.
+- Resolution: detailed and outer fixed-location geometry now share the same PBR texture, physical repeat scale, natural-surface tint, shadow behavior, and location detail mode. Coarse `built` land-cover pixels are neutral and no longer allocate a hardscape raster or terrain shader; exact mapped roads, hardscape landuse, water, and building geometry own city surfaces. The obsolete far-color and WorldCover-built-shader modules were deleted. No cover plane, streaming owner, or cosmetic boundary overlay was added.
+- Guard: `npm run test:fixed-location-terrain-material`; the release world matrix must capture forced-daylight drone views so city-scale and natural-surface boundaries are part of the hash-bound visual review. The production-shaped artifact was also loaded with installed Google Chrome 151 from port 4193: Baltimore published 24,678 buildings, 3,526 roads, 69 mapped water areas, and 49 detailed terrain tiles; the inspected drone frame has mapped water and continuous terrain with no gray city rectangle.
+- Never reintroduce: absolute use of `surfaceTints`, coarse built-up classification as terrain hardscape, a separate background material authority, a generic green fallback in a known snow/sand location, or a street-level-only terrain release gate.
+
+## 2026-08-09 — Polar fixed-location terrain requests expand without bound
+
+- Status: resolved locally for the 4.1.4 candidate; not released or deployed.
+- Symptom: Antarctica spent far longer loading than ordinary locations and initially requested 529 outer elevation tiles, 676 mapped-context tiles, and 144 mapped-water tiles for one fixed location.
+- Root cause: a fixed Web Mercator zoom was combined with a fixed physical radius. Longitude spans expand near the Mercator latitude limit, so the same 22 km location multiplied into hundreds of tile requests.
+- Resolution: fixed-location terrain, mapped context, and mapped water now select a latitude-aware source zoom bounded to at most 81 tiles while retaining the same physical horizon. Antarctica resolves to 36 elevation, 49 context, and 36 water tiles; its outer terrain inherits the selected snow/rock material rather than a generic green fallback.
+- Guard: `npm run test:fixed-location-terrain-material`, `node scripts/test-fixed-world-horizon-architecture.mjs`, and the Antarctica world-matrix visual/state capture.
+- Never reintroduce: fixed zoom for a fixed-meter polar extent, raising concurrency to hide an oversized request set, or a second polar-only terrain renderer.
 
 ## 2026-08-09 — Fixed-world flight test rejects a successful boundary crossing
 

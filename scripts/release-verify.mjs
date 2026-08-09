@@ -13,7 +13,7 @@ const steps = [
   { name: 'Live WorldSnapshot publication adapter', cmd: [process.execPath, 'scripts/test-world-publication-snapshot.mjs'] },
   { name: 'Provider session cancellation', cmd: [process.execPath, 'scripts/test-provider-cancellation.mjs'] },
   { name: 'Far-terrain elevation request budget', cmd: [process.execPath, 'scripts/test-far-field-elevation-loader.mjs'] },
-  { name: 'Far-terrain mapped surface continuity', cmd: [process.execPath, 'scripts/test-far-field-surface-color.mjs'] },
+  { name: 'Fixed-location shared terrain material', cmd: [process.execPath, 'scripts/test-fixed-location-terrain-material.mjs'] },
   { name: 'WorldCover mixed-tile material authority', cmd: [process.execPath, 'scripts/test-worldcover-detail-mode.mjs'] },
   { name: 'Terrain-tile generation cancellation', cmd: [process.execPath, 'scripts/test-terrain-tile-cancellation.mjs'] },
   { name: 'World-load cancellation browser', cmd: [process.execPath, 'scripts/test-world-load-cancellation-browser.mjs'] },

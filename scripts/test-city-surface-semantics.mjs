@@ -27,10 +27,15 @@ assert.equal(
   'The disabled sidewalk extrusion policy must not ship.'
 );
 
+assert.doesNotMatch(
+  baselineSource,
+  /surfaceBuiltWeights|surfaceBuiltWeightSize|buildSmoothedClassWeight/,
+  'Coarse built-up pixels must not publish a second hardscape presentation pipeline.'
+);
 assert.match(
   baselineSource,
-  /surfaceBuiltWeights:\s*buildSmoothedClassWeight\(classes, size, 'built'\)/,
-  'WorldCover must publish a smoothed, per-pixel built-up weight instead of making a whole terrain tile urban.'
+  /name: 'built'.*tint: \[1, 1, 1\]/,
+  'Built-up classification must leave base terrain neutral; exact mapped geometry owns hardscape.'
 );
 assert.doesNotMatch(
   baselineSource,
@@ -39,8 +44,8 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   profileSource,
-  /result\.dominantClass === 'built'\s*\?\s*'urban'/,
-  'A built-dominant classification must not turn the entire terrain tile into a gray urban square.'
+  /applyWorldCoverBuiltSurfaceMaterial|worldCoverBuiltBlend|surfaceBuiltWeight/,
+  'A built-dominant classification must not turn the detailed terrain footprint into a gray city square.'
 );
 assert.match(
   transportSource,

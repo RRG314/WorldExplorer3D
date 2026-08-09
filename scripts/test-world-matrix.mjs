@@ -30,6 +30,7 @@ const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT
   'report.json';
 const visualReviewFile = String(process.env.WORLD_MATRIX_VISUAL_REVIEW_FILE || '').trim();
 const headed = process.env.WORLD_MATRIX_HEADED === '1';
+const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const requestedLocationIds = new Set(
   String(process.env.WORLD_MATRIX_IDS || '')
     .split(',')
@@ -1286,7 +1287,10 @@ async function main() {
   await mkdirp(outputDir);
   const server = externalBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts });
   const baseUrl = externalBaseUrl || `http://${host}:${server.port}`;
-  const browser = await chromium.launch({ headless: !headed });
+  const browser = await chromium.launch({
+    headless: !headed,
+    ...(browserChannel ? { channel: browserChannel } : {})
+  });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   if (blockWorldCover) await page.route('https://titiler.terrascope.be/**', (route) => route.abort('blockedbyclient'));
   const consoleErrors = [];

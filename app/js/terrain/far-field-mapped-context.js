@@ -12,26 +12,6 @@ const FAR_WATER_MIN_SPAN_METERS = 200;
 const FAR_WATER_VERTEX_SPACING_METERS = 45;
 const FAR_WATER_MAX_RING_POINTS = 384;
 
-const FAR_LAND_COLORS = Object.freeze({
-  forest: [0.16, 0.25, 0.14],
-  grass: [0.32, 0.42, 0.22],
-  farmland: [0.43, 0.40, 0.27],
-  developed: [0.39, 0.41, 0.40],
-  industrial: [0.34, 0.35, 0.34],
-  sand: [0.66, 0.58, 0.41]
-});
-
-function farLandClass(kind = '') {
-  const value = String(kind || '').toLowerCase();
-  if (/forest|wood|nature_reserve/.test(value)) return 'forest';
-  if (/park|garden|grass|meadow|recreation|cemetery|village_green|golf|scrub|heath/.test(value)) return 'grass';
-  if (/farm|orchard|vineyard|allotment|nursery/.test(value)) return 'farmland';
-  if (/industrial|railway|quarry|landfill|construction|brownfield/.test(value)) return 'industrial';
-  if (/residential|commercial|retail|school|university|hospital|parking/.test(value)) return 'developed';
-  if (/sand|beach|dune|bare_rock|scree|shingle/.test(value)) return 'sand';
-  return null;
-}
-
 function polygonRings(geometry) {
   if (geometry?.type === 'Polygon') return geometry.coordinates?.[0] ? [geometry.coordinates[0]] : [];
   if (geometry?.type === 'MultiPolygon') {
@@ -111,6 +91,23 @@ function pointInLonLatRing(lon, lat, ring) {
   return inside;
 }
 
+function contextTileCount(bounds, zoom) {
+  const range = vectorTileRangeForBounds(
+    bounds.latS,
+    bounds.lonW,
+    bounds.latN,
+    bounds.lonE,
+    zoom
+  );
+  return (range.xMax - range.xMin + 1) * (range.yMax - range.yMin + 1);
+}
+
+function selectContextZoomForTileBudget(bounds, preferredZoom, maxTiles = 81, minimumZoom = 8) {
+  let zoom = Math.max(minimumZoom, Math.floor(Number(preferredZoom) || minimumZoom));
+  while (zoom > minimumZoom && contextTileCount(bounds, zoom) > maxTiles) zoom -= 1;
+  return zoom;
+}
+
 function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
   const range = vectorTileRangeForBounds(
     bounds.latS,
@@ -147,12 +144,15 @@ async function fetchWithConcurrency(items, concurrency, worker, signal = null) {
 }
 
 async function loadFarMappedWaterContext(bounds, options = {}) {
-  const coordinates = contextTileCoordinates(bounds, FAR_WATER_CONTEXT_ZOOM);
+  const waterZoom = Number.isFinite(Number(options.waterZoom))
+    ? Number(options.waterZoom)
+    : selectContextZoomForTileBudget(bounds, FAR_WATER_CONTEXT_ZOOM);
+  const coordinates = contextTileCoordinates(bounds, waterZoom);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const tiles = await fetchWithConcurrency(
     coordinates,
     FAR_CONTEXT_TILE_CONCURRENCY,
-    ({ x, y }, signal) => fetchTile(FAR_WATER_CONTEXT_ZOOM, x, y, { signal }),
+    ({ x, y }, signal) => fetchTile(waterZoom, x, y, { signal }),
     options.signal
   );
   const waterAreas = [];
@@ -197,45 +197,29 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     waterAreas,
     waterTilesLoaded: tiles.length,
     waterTilesRequested: coordinates.length,
-    waterZoom: FAR_WATER_CONTEXT_ZOOM
+    waterZoom
   };
 }
 
 async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds, options = {}) {
-  const coordinates = contextTileCoordinates(bounds, FAR_CONTEXT_ZOOM);
+  const contextZoom = Number.isFinite(Number(options.contextZoom))
+    ? Number(options.contextZoom)
+    : selectContextZoomForTileBudget(bounds, FAR_CONTEXT_ZOOM);
+  const coordinates = contextTileCoordinates(bounds, contextZoom);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const [tiles, waterContext] = await Promise.all([
     fetchWithConcurrency(
       coordinates,
       FAR_CONTEXT_TILE_CONCURRENCY,
-      ({ x, y }, signal) => fetchTile(FAR_CONTEXT_ZOOM, x, y, { signal }),
+      ({ x, y }, signal) => fetchTile(contextZoom, x, y, { signal }),
       options.signal
     ),
     loadFarMappedWaterContext(waterBounds, { ...options, fetchTile })
   ]);
-  const landByTile = new Map();
   const buildings = [];
   let skippedNearBuildings = 0;
 
   for (const tileRecord of tiles) {
-    const tileKey = `${tileRecord.x}/${tileRecord.y}`;
-    const landPolygons = [];
-    for (const layerName of ['land', 'sites']) {
-      const layer = tileRecord.tile.layers[layerName];
-      if (!layer) continue;
-      for (let index = 0; index < layer.length; index += 1) {
-        const feature = layer.feature(index);
-        const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
-        const landClass = farLandClass(geojson?.properties?.kind);
-        if (!landClass) continue;
-        for (const ring of polygonRings(geojson.geometry)) {
-          if (ring.length < 4) continue;
-          landPolygons.push({ landClass, ring, bounds: ringBounds(ring) });
-        }
-      }
-    }
-    landByTile.set(tileKey, landPolygons);
-
     const buildingLayer = tileRecord.tile.layers.buildings;
     if (!buildingLayer) continue;
     const tileBuildings = [];
@@ -268,32 +252,12 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
 
   return {
     buildings: buildings.slice(0, FAR_CONTEXT_MAX_BUILDINGS),
-    landByTile,
     ...waterContext,
     skippedNearBuildings,
+    contextZoom,
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length
   };
-}
-
-function mappedSurfaceColor(latitude, longitude, mappedContext) {
-  if (!mappedContext) return null;
-  const n = 2 ** FAR_CONTEXT_ZOOM;
-  const safeLat = Math.max(-85.05112878, Math.min(85.05112878, latitude));
-  const x = Math.floor((longitude + 180) / 360 * n);
-  const y = Math.floor((1 - Math.log(
-    Math.tan(safeLat * Math.PI / 180) + 1 / Math.cos(safeLat * Math.PI / 180)
-  ) / Math.PI) / 2 * n);
-  const candidates = mappedContext.landByTile.get(`${x}/${y}`) || [];
-  for (let index = candidates.length - 1; index >= 0; index -= 1) {
-    const candidate = candidates[index];
-    if (latitude < candidate.bounds.minLat || latitude > candidate.bounds.maxLat ||
-        longitude < candidate.bounds.minLon || longitude > candidate.bounds.maxLon) continue;
-    if (pointInLonLatRing(longitude, latitude, candidate.ring)) {
-      return FAR_LAND_COLORS[candidate.landClass] || null;
-    }
-  }
-  return null;
 }
 
 export {
@@ -303,6 +267,6 @@ export {
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
   loadFarMappedWaterContext,
-  mappedSurfaceColor,
-  pointInLonLatRing
+  pointInLonLatRing,
+  selectContextZoomForTileBudget
 };

@@ -341,7 +341,17 @@ try {
   assert.equal(restored.scene?.rootVisible, true, 'Earth scene root was not visible after return');
   assert.deepEqual(earthReturnWorldDataRequests, [], 'Earth return reloaded fixed-world data');
   assert.deepEqual(consoleErrors, []);
-  console.log(JSON.stringify({ ok: true, ...report }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    durationSeconds,
+    driveMeters: Number(drive.pathDistance.toFixed(1)),
+    flightMeters: Number(flight.displacement.toFixed(1)),
+    crossedDetailedTerrainBoundary: flight.boundaryCrossed,
+    movementWorldDataRequests: movementWorldDataRequests.length,
+    earthReturnWorldDataRequests: earthReturnWorldDataRequests.length,
+    restoredRequestId: restored.requestId,
+    consoleErrors: consoleErrors.length
+  }, null, 2));
 } finally {
   await browser.close();
   await server.close();

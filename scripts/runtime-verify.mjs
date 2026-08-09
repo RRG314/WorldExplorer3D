@@ -10,7 +10,7 @@ const steps = [
   ['Live WorldSnapshot publication adapter', 'scripts/test-world-publication-snapshot.mjs'],
   ['Provider session cancellation', 'scripts/test-provider-cancellation.mjs'],
   ['Far-terrain elevation request budget', 'scripts/test-far-field-elevation-loader.mjs'],
-  ['Far-terrain mapped surface continuity', 'scripts/test-far-field-surface-color.mjs'],
+  ['Fixed-location shared terrain material', 'scripts/test-fixed-location-terrain-material.mjs'],
   ['WorldCover mixed-tile material authority', 'scripts/test-worldcover-detail-mode.mjs'],
   ['Terrain-tile generation cancellation', 'scripts/test-terrain-tile-cancellation.mjs'],
   ['World-load cancellation browser', 'scripts/test-world-load-cancellation-browser.mjs'],

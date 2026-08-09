@@ -6,8 +6,7 @@ import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=13";
-import { applyWorldCoverBuiltSurfaceMaterial } from "./worldcover-surface-material.js?v=1";
+} from "./worldcover-baseline.js?v=14";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 
 const SNOW_COLOR_HEX = 0xffffff;
@@ -225,7 +224,7 @@ function getProceduralTerrainTextureBase(mode = "snow") {
   return proceduralTerrainTextureBases[key];
 }
 
-function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
+export function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   if (!mesh || !mesh.userData) return null;
   if (!mesh.userData.terrainTextureSetsByMode) mesh.userData.terrainTextureSetsByMode = {};
   const modeKey =
@@ -399,7 +398,7 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
   };
 }
 
-function applyWorldCoverVertexTints(mesh, result) {
+export function applyWorldCoverVertexTints(mesh, result) {
   const geometry = mesh?.geometry;
   const uvs = geometry?.attributes?.uv;
   const tints = result?.surfaceTints;
@@ -466,11 +465,6 @@ function applyLoadedWorldCoverBaseline(mesh) {
       Number(mesh.userData.terrainTextureRepeats) || 12,
       detailMode
     );
-    const builtTextures = ensureTerrainTextureSet(
-      mesh,
-      Number(mesh.userData.terrainTextureRepeats) || 12,
-      'built'
-    );
     mesh.userData.terrainTextureSet = detailTextures;
     // One center-tile PBR mode owns the whole fixed location. WorldCover's
     // spatial tint still varies within each tile, but neighboring tiles cannot
@@ -488,7 +482,6 @@ function applyLoadedWorldCoverBaseline(mesh) {
       material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
     }
     applyWorldCoverVertexTints(mesh, result);
-    const builtSurfaceBlended = applyWorldCoverBuiltSurfaceMaterial(mesh, result, builtTextures);
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
@@ -496,10 +489,10 @@ function applyLoadedWorldCoverBaseline(mesh) {
     material.metalness = 0;
     material.needsUpdate = true;
     mesh.userData.terrainDetailProvenance = {
-      kind: builtSurfaceBlended ? 'smoothed-worldcover-built-blended-pbr' : 'smoothed-worldcover-tinted-pbr',
+      kind: 'smoothed-worldcover-natural-terrain-pbr',
       source: result.source,
       mode: detailMode,
-      builtSurfaceBlended
+      hardscapeOwner: 'exact-mapped-surface-geometry'
     };
     if (becomesLocationOwner && previousLocationDetailMode !== ownDetailMode &&
         !appCtx.worldCoverDetailModeRefreshQueued) {
@@ -723,4 +716,5 @@ export function refreshTerrainSurfaceProfiles(profile = null) {
 export function setWorldSurfaceProfile(profile = null) {
   appCtx.worldSurfaceProfile = profile || null;
   refreshTerrainSurfaceProfiles(profile || null);
+  appCtx.scheduleFarTerrainSurfaceRefresh?.();
 }

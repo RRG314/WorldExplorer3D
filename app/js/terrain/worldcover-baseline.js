@@ -16,7 +16,9 @@ const WORLD_COVER_CLASSES = [
   { id: 20, name: 'shrub', source: [255, 187, 34], tint: [0.96, 0.98, 0.78] },
   { id: 30, name: 'grass', source: [255, 255, 76], tint: [1.03, 1.05, 0.94] },
   { id: 40, name: 'crop', source: [240, 150, 255], tint: [1.08, 0.97, 0.74] },
-  { id: 50, name: 'built', source: [250, 0, 0], tint: [0.92, 0.96, 0.92] },
+  // Built-up classification is context, not proof that the ground is asphalt.
+  // Exact roads, hardscape, landuse, and building footprints own that surface.
+  { id: 50, name: 'built', source: [250, 0, 0], tint: [1, 1, 1] },
   { id: 60, name: 'bare', source: [180, 180, 180], tint: [1.08, 0.94, 0.76] },
   { id: 70, name: 'snow', source: [240, 240, 240], tint: [1.32, 1.34, 1.38] },
   { id: 80, name: 'water', source: [0, 100, 200], tint: [0.82, 0.91, 0.96] },
@@ -26,36 +28,6 @@ const WORLD_COVER_CLASSES = [
 ];
 
 const SURFACE_TINT_ENCODING_SCALE = 170;
-
-function buildSmoothedClassWeight(classes, size, className) {
-  const encoded = new Uint8Array(size * size);
-  for (let pixel = 0; pixel < classes.length; pixel += 1) {
-    encoded[pixel] = classes[pixel]?.name === className ? 255 : 0;
-  }
-
-  const radius = 3;
-  const horizontal = new Uint8Array(encoded.length);
-  const smoothed = new Uint8Array(encoded.length);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const from = Math.max(0, x - radius);
-      const to = Math.min(size - 1, x + radius);
-      let sum = 0;
-      for (let sx = from; sx <= to; sx += 1) sum += encoded[y * size + sx];
-      horizontal[y * size + x] = Math.round(sum / (to - from + 1));
-    }
-  }
-  for (let y = 0; y < size; y += 1) {
-    const from = Math.max(0, y - radius);
-    const to = Math.min(size - 1, y + radius);
-    for (let x = 0; x < size; x += 1) {
-      let sum = 0;
-      for (let sy = from; sy <= to; sy += 1) sum += horizontal[sy * size + x];
-      smoothed[y * size + x] = Math.round(sum / (to - from + 1));
-    }
-  }
-  return smoothed;
-}
 
 function buildSmoothedSurfaceTints(classes, size) {
   const encoded = new Uint8Array(size * size * 3);
@@ -425,8 +397,6 @@ async function createSemanticTexture(blob, size) {
     surfaceTints: buildSmoothedSurfaceTints(classes, size),
     surfaceTintSize: size,
     surfaceTintEncodingScale: SURFACE_TINT_ENCODING_SCALE,
-    surfaceBuiltWeights: buildSmoothedClassWeight(classes, size, 'built'),
-    surfaceBuiltWeightSize: size,
     counts,
     recognizedPixels: recognized,
     totalPixels: size * size,

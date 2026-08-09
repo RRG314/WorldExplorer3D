@@ -9,6 +9,10 @@ const allowedRawConsumers = new Set([
   // consumer. It never owns mapped water semantics or near collision ground.
   'terrain/far-field.js',
   'terrain/location-world.js',
+  // The request lifecycle receives the private loader as an injected
+  // dependency solely to coordinate retries, timeouts, and cancellation. It
+  // never reads elevation samples or publishes ground.
+  'terrain/tile-request-lifecycle.js',
   'terrain/tiles.js'
 ]);
 

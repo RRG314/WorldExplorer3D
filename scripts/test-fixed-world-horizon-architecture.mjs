@@ -33,7 +33,10 @@ const {
   cellInsideDetailedCoverage,
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
-const { pointInLonLatRing } = await import('../app/js/terrain/far-field-mapped-context.js');
+const {
+  pointInLonLatRing,
+  selectContextZoomForTileBudget
+} = await import('../app/js/terrain/far-field-mapped-context.js');
 
 assert.match(configSource, /const TERRAIN_ZOOM = 15;/, 'near terrain resolution must remain at zoom 15');
 assert.doesNotMatch(
@@ -73,6 +76,16 @@ assert.equal(FAR_CONTEXT_ZOOM, 14);
 assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
 assert.equal(FAR_WATER_MIN_SPAN_METERS, 200);
 assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
+const polarBounds = { latS: -78.05, latN: -77.65, lonW: 165.7, lonE: 167.65 };
+assert.ok(
+  selectContextZoomForTileBudget(polarBounds, FAR_CONTEXT_ZOOM) < FAR_CONTEXT_ZOOM,
+  'polar fixed-location context must step down from a tile-exploding Web Mercator zoom'
+);
+assert.equal(
+  selectContextZoomForTileBudget({ latS: 39.23, latN: 39.35, lonW: -76.70, lonE: -76.52 }, FAR_CONTEXT_ZOOM),
+  FAR_CONTEXT_ZOOM,
+  'ordinary city context must retain its preferred detail zoom'
+);
 const axis = buildClipmapAxis(-100, -20, 30, 100, 15);
 assert.equal(axis[0], -100);
 assert.equal(axis.at(-1), 100);
@@ -98,7 +111,8 @@ assert.match(farFieldSource, /FarMappedBuildingContext/);
 assert.match(farFieldSource, /waitForFarTerrainClipmap/);
 assert.match(farFieldSource, /contextGeographic/);
 assert.doesNotMatch(farFieldSource, /actorX|actorZ/);
-assert.match(farFieldSource, /mapped-land-with-elevation-fallback/);
+assert.match(farFieldSource, /surfaceMaterialOwner: 'fixed-location-shared-pbr'/);
+assert.match(farFieldSource, /sourceZoomForTileBudget/);
 assert.match(farFieldSource, /openstreetmap-shortbread/);
 assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);
 assert.doesNotMatch(farFieldSource, /sourceMeters\s*<=\s*0\.75/);

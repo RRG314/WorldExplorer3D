@@ -3,9 +3,8 @@ import {
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
-  loadFarMappedContext,
-  mappedSurfaceColor
-} from './far-field-mapped-context.js?v=2';
+  loadFarMappedContext
+} from './far-field-mapped-context.js?v=3';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
@@ -13,12 +12,15 @@ import {
   cellInsideDetailedCoverage,
   cellInsideHole
 } from './far-field-coverage.js?v=1';
-import { loadWorldCoverBaseline } from './worldcover-baseline.js?v=13';
 import {
-  resolveFarFieldFallbackColor,
-  resolveFarFieldSurfaceColor,
-  sampleDetailedWorldCoverSurface
-} from './far-field-surface-color.js?v=3';
+  classifyWorldCoverSurface,
+  loadWorldCoverBaseline
+} from './worldcover-baseline.js?v=14';
+import {
+  applyWorldCoverVertexTints,
+  ensureTerrainTextureSet
+} from './surface-profiles.js?v=43';
+import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
@@ -73,6 +75,11 @@ function parentTerrainTile(tile, levels = 1) {
 function disposeFarFieldMesh(mesh) {
   if (!mesh) return;
   mesh.userData.farFieldDisposed = true;
+  for (const textures of Object.values(mesh.userData?.terrainTextureSetsByMode || {})) {
+    textures?.map?.dispose?.();
+    textures?.normalMap?.dispose?.();
+    textures?.roughnessMap?.dispose?.();
+  }
   mesh.geometry?.dispose?.();
   if (mesh.material && !Array.isArray(mesh.material)) {
     mesh.material.dispose?.();
@@ -102,17 +109,7 @@ function createFarFieldTerrainApi(deps = {}) {
   let elevationAbortController = null;
   let farFieldSurfaceState = null;
   let surfaceRefreshTimer = null;
-  let lastDetailedSurfaceCount = -1;
-
-  function detailedWorldCoverSurfaces() {
-    return (appCtx.terrainGroup?.children || [])
-      .filter((mesh) => mesh?.userData?.isTerrainMesh && mesh.userData?.worldCoverResult)
-      .map((mesh) => ({
-        bounds: mesh.userData.terrainTile?.bounds || null,
-        result: mesh.userData.worldCoverResult
-      }))
-      .filter((surface) => surface.bounds);
-  }
+  let lastAppliedDetailMode = '';
 
   function waitForGenerationDrain(buildPromise) {
     if (!buildPromise) return Promise.resolve();
@@ -140,7 +137,7 @@ function createFarFieldTerrainApi(deps = {}) {
       farWaterMesh = null;
     }
     farFieldSurfaceState = null;
-    lastDetailedSurfaceCount = -1;
+    lastAppliedDetailMode = '';
   }
 
   function resetFarTerrainClipmap() {
@@ -241,6 +238,12 @@ function createFarFieldTerrainApi(deps = {}) {
     return tiles;
   }
 
+  function sourceZoomForTileBudget(bounds, preferredZoom, maxTiles = 81, minimumZoom = 8) {
+    let zoom = Math.max(minimumZoom, Math.floor(Number(preferredZoom) || minimumZoom));
+    while (zoom > minimumZoom && sourceTileRange(bounds, zoom).length > maxTiles) zoom -= 1;
+    return zoom;
+  }
+
   function sampleSourceMeters(latitude, longitude, zoom, loadedTiles) {
     for (let sampleZoom = zoom; sampleZoom >= Math.max(0, zoom - 1); sampleZoom -= 1) {
       const point = latLonToTileXY(latitude, longitude, sampleZoom);
@@ -299,7 +302,7 @@ function createFarFieldTerrainApi(deps = {}) {
     }
   }
 
-  function buildGeometry(spec, loadedTiles, offsetMeters, mappedContext = null, worldCoverResult = null) {
+  function buildGeometry(spec, loadedTiles, offsetMeters) {
     const interval = FAR_FIELD_GRID_INTERVAL_METERS * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const xValues = addCoverageEdges(
       buildClipmapAxis(spec.outer.minX, spec.inner.minX, spec.inner.maxX, spec.outer.maxX, interval),
@@ -322,7 +325,6 @@ function createFarFieldTerrainApi(deps = {}) {
     const seamBlendWorld = FAR_FIELD_SEAM_BLEND_METERS * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     let minElevationMeters = Infinity;
     let maxElevationMeters = -Infinity;
-    const detailedSurfaces = detailedWorldCoverSurfaces();
 
     for (const z of zValues) {
       for (const x of xValues) {
@@ -345,25 +347,10 @@ function createFarFieldTerrainApi(deps = {}) {
         minElevationMeters = Math.min(minElevationMeters, meters);
         maxElevationMeters = Math.max(maxElevationMeters, meters);
         positions.push(x, meters * Number(appCtx.WORLD_UNITS_PER_METER || 1) * Number(appCtx.TERRAIN_Y_EXAGGERATION || 1), z);
-        const mappedColor = mappedSurfaceColor(lat, lon, mappedContext);
-        colors.push(...resolveFarFieldSurfaceColor({
-          detailedWorldCoverSurface: sampleDetailedWorldCoverSurface(
-            detailedSurfaces,
-            lat,
-            lon
-          ),
-          mappedColor,
-          worldCoverResult,
-          worldCoverBounds: spec.geographic,
-          latitude: lat,
-          longitude: lon,
-          fallbackColor: resolveFarFieldFallbackColor({
-            meters,
-            latitude: lat,
-            longitude: lon,
-            locationMode: appCtx.worldSurfaceProfile?.terrainModeHint
-          })
-        }));
+        // The fixed-location LOD uses the same PBR base, WorldCover tint, and
+        // built-surface shader as detailed terrain. White is the neutral vertex
+        // multiplier until that shared presentation is applied to the mesh.
+        colors.push(1, 1, 1);
         uvs.push((x - spec.outer.minX) / xRange, 1 - (z - spec.outer.minZ) / zRange);
       }
     }
@@ -390,6 +377,75 @@ function createFarFieldTerrainApi(deps = {}) {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
     return { geometry, columns: xValues.length, rows: zValues.length, minElevationMeters, maxElevationMeters };
+  }
+
+  function fixedLocationDetailMode(worldCoverResult = null) {
+    const publishedMode = String(appCtx.worldCoverBaseDetailMode || '');
+    if (publishedMode) return publishedMode;
+    const nearestDetailedTerrain = (appCtx.terrainGroup?.children || [])
+      .filter((mesh) => mesh?.userData?.isTerrainMesh && !mesh.userData?.isFixedLocationTerrainLod)
+      .sort((left, right) =>
+        Math.hypot(Number(left.position?.x || 0), Number(left.position?.z || 0)) -
+        Math.hypot(Number(right.position?.x || 0), Number(right.position?.z || 0))
+      )[0];
+    const detailedMode = String(
+      nearestDetailedTerrain?.userData?.terrainVisualProfile?.visualMode ||
+      nearestDetailedTerrain?.userData?.terrainVisualProfile?.mode ||
+      ''
+    );
+    if (['snow', 'snowRock', 'sand', 'soil', 'rock', 'forest', 'grass'].includes(detailedMode)) {
+      return detailedMode;
+    }
+    const worldHint = String(appCtx.worldSurfaceProfile?.terrainModeHint || '');
+    if (worldHint === 'snow' || worldHint === 'sand') return worldHint;
+    const semantic = classifyWorldCoverSurface(worldCoverResult, Number(appCtx.LOC?.lat || 0));
+    return resolveWorldCoverDetailMode(semantic, worldCoverResult);
+  }
+
+  function applyFixedLocationSurfaceMaterial(mesh, worldCoverResult, spec) {
+    const material = mesh?.material;
+    if (!mesh || !material || Array.isArray(material)) return false;
+    const detailMode = fixedLocationDetailMode(worldCoverResult);
+    const unitsPerMeter = Math.max(1e-6, Number(appCtx.WORLD_UNITS_PER_METER || 1));
+    const spanMeters = Math.max(
+      Number(spec?.outer?.maxX || 0) - Number(spec?.outer?.minX || 0),
+      Number(spec?.outer?.maxZ || 0) - Number(spec?.outer?.minZ || 0)
+    ) / unitsPerMeter;
+    // Detailed z15 tiles use roughly one repeat per 80 m. The location LOD
+    // keeps that physical scale instead of stretching one texture across the
+    // entire 44 km background square.
+    const repeats = Math.max(12, spanMeters / 80);
+    const detailTextures = ensureTerrainTextureSet(mesh, repeats, detailMode);
+    material.map = detailTextures?.map || null;
+    material.normalMap = detailTextures?.normalMap || null;
+    material.roughnessMap = detailTextures?.roughnessMap || null;
+    if (material.normalMap) {
+      const normalStrength =
+        detailMode === 'sand' ? [0.78, 0.42] :
+        detailMode === 'rock' ? [0.56, 0.56] :
+        detailMode === 'soil' ? [0.48, 0.48] :
+        detailMode === 'forest' ? [0.48, 0.48] :
+        [0.6, 0.6];
+      material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
+    }
+    const tinted = worldCoverResult
+      ? applyWorldCoverVertexTints(mesh, worldCoverResult)
+      : false;
+    material.color.setHex(0xffffff);
+    material.roughness = 0.96;
+    material.metalness = 0;
+    material.needsUpdate = true;
+    mesh.userData.terrainTextureRepeats = repeats;
+    mesh.userData.terrainDetailProvenance = {
+      kind: tinted
+        ? 'fixed-location-smoothed-worldcover-natural-terrain-pbr'
+        : 'fixed-location-semantic-pbr',
+      source: worldCoverResult?.source || 'fixed-location-profile',
+      mode: detailMode,
+      hardscapeOwner: 'exact-mapped-surface-geometry'
+    };
+    lastAppliedDetailMode = detailMode;
+    return true;
   }
 
   function buildFarWaterGeometry(mappedContext) {
@@ -579,7 +635,7 @@ function createFarFieldTerrainApi(deps = {}) {
     prepareMappedWaterSurfaces(mappedContext, spec.sourceZoom, loadedTiles, offsetMeters);
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
-    const built = buildGeometry(spec, loadedTiles, offsetMeters, mappedContext, worldCoverContext);
+    const built = buildGeometry(spec, loadedTiles, offsetMeters);
     const builtBuildings = buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const builtWater = buildFarWaterGeometry(mappedContext);
     if (requestGeneration !== generation) {
@@ -595,6 +651,10 @@ function createFarFieldTerrainApi(deps = {}) {
       return;
     }
 
+    // Retire the prior location LOD before publishing state for its replacement.
+    // Clearing after material setup erased the new surface authority and left the
+    // outer terrain frozen on its initial coarse fallback.
+    removeCurrentMesh();
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       vertexColors: true,
@@ -603,36 +663,33 @@ function createFarFieldTerrainApi(deps = {}) {
       side: THREE.FrontSide,
       // Fog participation is allowed, but scene fog density is owned entirely
       // by the weather system and is zero outside an actual fog condition.
-      fog: true,
-      polygonOffset: true,
-      polygonOffsetFactor: 2,
-      polygonOffsetUnits: 2
+      fog: true
     });
     const mesh = new THREE.Mesh(built.geometry, material);
-    mesh.name = 'FarTerrainClipmap';
-    mesh.renderOrder = -1;
+    mesh.name = 'FixedLocationTerrainLod';
+    mesh.renderOrder = 0;
     mesh.frustumCulled = false;
-    mesh.receiveShadow = false;
+    mesh.receiveShadow = true;
     mesh.castShadow = false;
     mesh.userData.isFarTerrainClipmap = true;
-    farFieldSurfaceState = { spec, mappedContext, worldCoverResult: worldCoverContext };
-    lastDetailedSurfaceCount = detailedWorldCoverSurfaces().length;
+    mesh.userData.isFixedLocationTerrainLod = true;
+    farFieldSurfaceState = { spec, worldCoverResult: worldCoverContext };
+    applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     mesh.userData.renderProvenance = {
       version: 1,
-      profile: 'far-field-terrain-clipmap',
+      profile: 'fixed-location-terrain-lod',
       provider: 'mapzen-terrarium',
       dataset: 'Mapzen Terrarium elevation-derived landscape',
       verticalDatum: sampleAcceptedGroundAtLatLon(appCtx.LOC.lat, appCtx.LOC.lon)?.verticalDatum || null,
       normalizationOffsetMeters: offsetMeters,
       layer: 'terrain',
-      role: 'far-field-terrain',
+      role: 'fixed-location-terrain-lod',
       sources: ['mapzen-terrarium', 'openstreetmap-shortbread', ...(worldCoverContext ? ['esa-worldcover-2021'] : [])],
       fallback: offsetMeters === 0 &&
         typeof terrainTileDeps?.usesAcceptedGround === 'function' &&
         !terrainTileDeps.usesAcceptedGround()
     };
 
-    removeCurrentMesh();
     farFieldMesh = mesh;
     appCtx.terrainGroup.add(mesh);
     if (builtBuildings) {
@@ -696,6 +753,7 @@ function createFarFieldTerrainApi(deps = {}) {
     setState({
       status: 'ready',
       sourceZoom: spec.sourceZoom,
+      preferredSourceZoom: spec.preferredSourceZoom,
       sourceTiles: sourceTiles.length,
       elevationRequestsStarted: elevation.primary.started,
       elevationMaxInFlight: elevation.primary.maxInFlight,
@@ -710,12 +768,13 @@ function createFarFieldTerrainApi(deps = {}) {
       triangles: built.geometry.index.count / 3,
       minElevationMeters: built.minElevationMeters,
       maxElevationMeters: built.maxElevationMeters,
-      surfaceColor: worldCoverContext ? 'worldcover-with-mapped-land-fallback' : 'mapped-land-with-elevation-fallback',
+      surfaceColor: worldCoverContext ? 'shared-worldcover-pbr' : 'shared-semantic-pbr',
+      surfaceMaterialOwner: 'fixed-location-shared-pbr',
+      surfaceDetailMode: lastAppliedDetailMode,
       worldCoverSurfaceStatus: worldCoverContext ? 'ready' : 'unavailable',
-      detailedWorldCoverSurfacesReused: (appCtx.terrainGroup?.children || [])
-        .filter((candidate) => candidate?.userData?.isTerrainMesh && candidate.userData?.worldCoverResult)
-        .length,
+      detailedWorldCoverSurfacesReused: 0,
       contextSource: 'openstreetmap-shortbread',
+      contextZoom: mappedContext.contextZoom,
       contextTilesLoaded: mappedContext.loadedTiles,
       contextTilesRequested: mappedContext.requestedTiles,
       waterOwner: 'exact-mapped-polygon-pipelines',
@@ -734,40 +793,16 @@ function createFarFieldTerrainApi(deps = {}) {
 
   function refreshFarTerrainSurfaceColors() {
     if (!farFieldMesh || !farFieldSurfaceState || farFieldMesh.userData?.farFieldDisposed) return false;
-    const surfaces = detailedWorldCoverSurfaces();
-    if (surfaces.length === lastDetailedSurfaceCount) return false;
-    const positions = farFieldMesh.geometry?.attributes?.position;
-    const colors = farFieldMesh.geometry?.attributes?.color;
-    if (!positions || !colors || positions.count !== colors.count) return false;
-    const { spec, mappedContext, worldCoverResult } = farFieldSurfaceState;
-    const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
-    const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
-    for (let index = 0; index < positions.count; index += 1) {
-      const x = positions.getX(index) + Number(farFieldMesh.position?.x || 0);
-      const z = positions.getZ(index) + Number(farFieldMesh.position?.z || 0);
-      const { lat, lon } = worldToLatLon(x, z);
-      const meters = positions.getY(index) / Math.max(1e-6, unitsPerMeter * yExaggeration);
-      const color = resolveFarFieldSurfaceColor({
-        detailedWorldCoverSurface: sampleDetailedWorldCoverSurface(surfaces, lat, lon),
-        mappedColor: mappedSurfaceColor(lat, lon, mappedContext),
-        worldCoverResult,
-        worldCoverBounds: spec.geographic,
-        latitude: lat,
-        longitude: lon,
-        fallbackColor: resolveFarFieldFallbackColor({
-          meters,
-          latitude: lat,
-          longitude: lon,
-          locationMode: appCtx.worldSurfaceProfile?.terrainModeHint
-        })
-      });
-      colors.setXYZ(index, color[0], color[1], color[2]);
-    }
-    colors.needsUpdate = true;
-    lastDetailedSurfaceCount = surfaces.length;
+    const nextMode = fixedLocationDetailMode(farFieldSurfaceState.worldCoverResult);
+    if (nextMode === lastAppliedDetailMode) return false;
+    if (!applyFixedLocationSurfaceMaterial(
+      farFieldMesh,
+      farFieldSurfaceState.worldCoverResult,
+      farFieldSurfaceState.spec
+    )) return false;
     setState({
       ...appCtx.farTerrainClipmapState,
-      detailedWorldCoverSurfacesReused: surfaces.length,
+      surfaceDetailMode: nextMode,
       surfaceRefreshes: Number(appCtx.farTerrainClipmapState?.surfaceRefreshes || 0) + 1
     });
     return true;
@@ -819,7 +854,9 @@ function createFarFieldTerrainApi(deps = {}) {
       minZ: -contextHalfExtent,
       maxZ: contextHalfExtent
     };
-    const sourceZoom = Math.max(0, z - FAR_FIELD_SOURCE_ZOOM_OFFSET);
+    const geographic = geographicBounds(outer);
+    const preferredSourceZoom = Math.max(0, z - FAR_FIELD_SOURCE_ZOOM_OFFSET);
+    const sourceZoom = sourceZoomForTileBudget(geographic, preferredSourceZoom);
     const detailedCoverage = completeDetailedTileCoverage(z, centerX, centerY, ring);
     setState({ status: 'queued', sourceZoom });
     const beginBuild = () => {
@@ -829,9 +866,10 @@ function createFarFieldTerrainApi(deps = {}) {
         detailedCoverage,
         innerGeographic: geographicBounds(inner),
         outer,
-        geographic: geographicBounds(outer),
+        geographic,
         contextGeographic: geographicBounds(contextOuter),
-        sourceZoom
+        sourceZoom,
+        preferredSourceZoom
       }, requestGeneration, generationSignal);
     };
     pendingBuildPromise = (retiringBuildPromise
