@@ -58,7 +58,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=6";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=21";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=23";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {

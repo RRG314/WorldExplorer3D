@@ -67,7 +67,14 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
+  {
+    name: 'World matrix with elevated terrain-boundary evidence',
+    cmd: [process.execPath, 'scripts/test-world-matrix.mjs'],
+    env: {
+      WORLD_MATRIX_CAPTURE_DRONE: '1',
+      WORLD_MATRIX_FORCE_DAYLIGHT: '1'
+    }
+  },
   {
     name: 'Hardware real-input 10-minute drive',
     cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'],

@@ -17,6 +17,9 @@ add a competing terrain, water, road, or building pipeline.
 - The fixed far horizon reuses mapped surface color at the detailed seam. A
   missing elevation child retries through one unique parent tile under the
   existing 12-worker ceiling instead of removing the complete inland horizon.
+- WorldCover values tint the same semantic near/far ground instead of replacing
+  far terrain with pale absolute colors; polar fallback terrain uses the fixed
+  location's snow surface rather than a generic green-gray elevation color.
 - Driving, flying, and crossing the former detailed-terrain boundary do not
   reload or republish fixed-world data. Space return restores the same Earth
   request, selected location, scene root, travel mode, and aircraft pose.

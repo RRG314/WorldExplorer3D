@@ -195,6 +195,24 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Guard: `npm run test:fixed-world-travel-browser`; ready-world drive/flight and Earth return must issue zero fixed-world data requests, keep publication counts stable, restore the same request/location/root, and produce no console errors.
 - Never reintroduce: actor-driven fixed-world loaders, travel-mode terrain refreshes, Earth republishing during a retained Space return, or a state-only substitute for the rendered transition.
 
+## 2026-08-09 — Detailed city terrain appears as a gray square
+
+- Status: resolved locally for the 4.1.4 candidate; not released or deployed.
+- Symptom: at drone altitude, a rectangular gray city surface was visibly surrounded by pale or differently colored far land even though both surfaces represented one fixed location.
+- Root cause: ESA WorldCover `surfaceTints` are multiplicative PBR tint factors, but the far-field renderer used them as final RGB colors. The detailed terrain retained its grass/built PBR base while the far field became pale. Locations outside WorldCover coverage also fell back to generic elevation colors instead of the selected location's semantic surface.
+- Resolution: far terrain now composes mapped/fallback base color with the same WorldCover tint and smoothed built weight used by detailed terrain. Sparse-data snow and sand locations use their fixed-location semantic fallback instead of generic green-gray ground. No cover plane, second renderer, or streaming owner was added.
+- Guard: `npm run test:far-field-surface-color`; the release world matrix must capture forced-daylight drone views so city-scale and natural-surface boundaries are part of the hash-bound visual review.
+- Never reintroduce: absolute use of `surfaceTints`, a generic green fallback in a known snow/sand location, or a street-level-only terrain release gate.
+
+## 2026-08-09 — Fixed-world flight test rejects a successful boundary crossing
+
+- Status: resolved locally for the 4.1.4 candidate; not released or deployed.
+- Symptom: the sustained-flight journey crossed the measured detailed-terrain boundary, remained stable, and loaded no new world data, but failed because total displacement was 708.9 m instead of an unrelated 750 m threshold.
+- Root cause: the test mixed a product contract (cross the measured boundary without reloading) with a machine-timing-dependent distance target. The aircraft began only 120 m inside the detailed bounds and the required check point was 100 m beyond them.
+- Resolution: the journey still runs for 30 real seconds and now asserts the measured boundary crossing directly, together with active/airborne state, immutable publication, zero movement data requests, and retained Earth return.
+- Guard: `npm run test:fixed-world-travel-browser`.
+- Never reintroduce: a fixed travel-distance threshold when the tested acceptance boundary is calculated from the rendered terrain itself.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

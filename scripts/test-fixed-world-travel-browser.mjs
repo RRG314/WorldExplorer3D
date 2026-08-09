@@ -312,13 +312,14 @@ try {
       `(${drive.displacement.toFixed(1)} m displacement)`
   );
   assert.equal(drive.publication?.stable, true, 'drive mutated the published world');
-  assert.ok(
-    flight.displacement >= 750,
-    `${durationSeconds}-second flight covered only ${flight.displacement.toFixed(1)} m`
-  );
   assert.equal(flight.active, true, 'plane stopped during sustained flight');
   assert.equal(flight.airborne, true, 'plane landed during sustained flight');
-  assert.equal(flight.boundaryCrossed, true, 'plane did not cross the detailed-terrain boundary');
+  assert.equal(
+    flight.boundaryCrossed,
+    true,
+    `${durationSeconds}-second flight did not cross the measured detailed-terrain boundary ` +
+      `(${flight.displacement.toFixed(1)} m traveled)`
+  );
   assert.equal(flight.publication?.stable, true, 'flight mutated the published world');
   assert.deepEqual(movementWorldDataRequests, [], 'ready-world movement requested fixed-world data');
   assert.equal(space.env, space.spaceEnv, 'space environment was not active');

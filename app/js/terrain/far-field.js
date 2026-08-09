@@ -15,9 +15,10 @@ import {
 } from './far-field-coverage.js?v=1';
 import { loadWorldCoverBaseline } from './worldcover-baseline.js?v=13';
 import {
+  resolveFarFieldFallbackColor,
   resolveFarFieldSurfaceColor,
-  sampleDetailedWorldCoverSurfaceTint
-} from './far-field-surface-color.js?v=1';
+  sampleDetailedWorldCoverSurface
+} from './far-field-surface-color.js?v=3';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
@@ -67,16 +68,6 @@ function parentTerrainTile(tile, levels = 1) {
     tx: Math.floor(Number(tile?.tx || 0) / divisor),
     ty: Math.floor(Number(tile?.ty || 0) / divisor)
   };
-}
-
-function farFieldSurfaceColor(meters, latitude, longitude) {
-  const broadVariation = Math.sin(latitude * 41.7 + longitude * 27.3) * 0.5 + 0.5;
-  if (meters >= 2200) return [0.82, 0.85, 0.87];
-  if (meters >= 900) return [0.43, 0.45, 0.43];
-  if (meters >= 240) {
-    return [0.27 + broadVariation * 0.05, 0.36 + broadVariation * 0.08, 0.24 + broadVariation * 0.04];
-  }
-  return [0.43 + broadVariation * 0.08, 0.47 + broadVariation * 0.07, 0.42 + broadVariation * 0.05];
 }
 
 function disposeFarFieldMesh(mesh) {
@@ -356,7 +347,7 @@ function createFarFieldTerrainApi(deps = {}) {
         positions.push(x, meters * Number(appCtx.WORLD_UNITS_PER_METER || 1) * Number(appCtx.TERRAIN_Y_EXAGGERATION || 1), z);
         const mappedColor = mappedSurfaceColor(lat, lon, mappedContext);
         colors.push(...resolveFarFieldSurfaceColor({
-          detailedWorldCoverColor: sampleDetailedWorldCoverSurfaceTint(
+          detailedWorldCoverSurface: sampleDetailedWorldCoverSurface(
             detailedSurfaces,
             lat,
             lon
@@ -366,7 +357,12 @@ function createFarFieldTerrainApi(deps = {}) {
           worldCoverBounds: spec.geographic,
           latitude: lat,
           longitude: lon,
-          fallbackColor: farFieldSurfaceColor(meters, lat, lon)
+          fallbackColor: resolveFarFieldFallbackColor({
+            meters,
+            latitude: lat,
+            longitude: lon,
+            locationMode: appCtx.worldSurfaceProfile?.terrainModeHint
+          })
         }));
         uvs.push((x - spec.outer.minX) / xRange, 1 - (z - spec.outer.minZ) / zRange);
       }
@@ -752,13 +748,18 @@ function createFarFieldTerrainApi(deps = {}) {
       const { lat, lon } = worldToLatLon(x, z);
       const meters = positions.getY(index) / Math.max(1e-6, unitsPerMeter * yExaggeration);
       const color = resolveFarFieldSurfaceColor({
-        detailedWorldCoverColor: sampleDetailedWorldCoverSurfaceTint(surfaces, lat, lon),
+        detailedWorldCoverSurface: sampleDetailedWorldCoverSurface(surfaces, lat, lon),
         mappedColor: mappedSurfaceColor(lat, lon, mappedContext),
         worldCoverResult,
         worldCoverBounds: spec.geographic,
         latitude: lat,
         longitude: lon,
-        fallbackColor: farFieldSurfaceColor(meters, lat, lon)
+        fallbackColor: resolveFarFieldFallbackColor({
+          meters,
+          latitude: lat,
+          longitude: lon,
+          locationMode: appCtx.worldSurfaceProfile?.terrainModeHint
+        })
       });
       colors.setXYZ(index, color[0], color[1], color[2]);
     }

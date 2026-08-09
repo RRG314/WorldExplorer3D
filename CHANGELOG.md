@@ -24,7 +24,9 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
-- Removed rectangular land-cover color changes in farmland and dense cities.
+- Removed rectangular land-cover color changes in farmland, dense cities, and
+  sparse-data polar terrain by giving detailed and far ground one semantic
+  color composition.
 - Prevented a missing far elevation tile from producing a flat or empty inland
   horizon.
 - Prevented travel-mode changes, ready-world movement, and Space return from
