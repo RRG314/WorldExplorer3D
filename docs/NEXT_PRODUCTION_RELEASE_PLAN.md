@@ -1,5 +1,58 @@
 # Next Production Release Plan
 
+## Current release train — truthful loading and regression gates (2026-08-11)
+
+**Target:** the next patch release may be nominated only after the accepted
+4.1.4 one-location terrain/building presentation remains intact and the
+runtime-loading regressions below are closed. This is a local implementation
+train; it does not authorize a push or deployment.
+
+Completed in the current tranche:
+
+- Runtime diagnostics are cache-only and cannot initiate terrain requests.
+- Automated `advanceTime(ms)` now advances the runtime kernel by the requested
+  deterministic duration instead of waiting one unrelated browser frame.
+- The title workload is measured in Chromium. The gate covers runtime-ready
+  time, request/script counts, encoded local bytes, long tasks, provider
+  requests, request failures, page errors, and diagnostic cache mutation.
+- Full-resolution destination images are no longer downloaded for 58-pixel
+  title thumbnails. Measured local transfer fell from 11.95 MB to 7.64 MB.
+- The false source-text startup test is now a pure policy test plus the browser
+  workload gate. The stale test requiring fixed far-building massing to be
+  deleted was replaced with current deterministic geometry-quality behavior.
+- `verify:pr` is a bounded deterministic/player-contract tier with one browser
+  startup measurement. Stable pushes retain `runtime:verify`; manual release
+  verification additionally owns provider matrices and browser journeys.
+
+Remaining exit conditions, in order:
+
+1. Split title shell from location runtime. The current measured baseline still
+   imports 335 scripts, transfers 7.64 MB, eagerly reaches interiors, fishing,
+   challenges, block builder, Live Earth, and planetary modules, loads the Gaia
+   catalog and terrain PBR assets, and produces a roughly 2.2-second long task.
+   The next checkpoint must lazy-load those owners without changing selector or
+   gameplay visuals.
+2. Bound Shortbread and Overture tile concurrency and classify provider
+   capabilities so an authoritative empty result is not followed by duplicate
+   fallback work. Preserve OSM for roads/hydrology/landuse and Overture for
+   building massing; do not replace the application with Overture-only data.
+3. Fix movement-boundary hitches by removing the per-frame full-road fallback
+   and separating minimap tile decode/redraw from actor-frame work. Require the
+   existing cross-boundary car/walk/drone/plane diagnostic to prove the fix.
+4. Make feature timers/listeners disposable and active only while their owner is
+   active, beginning with weather and touch controls.
+5. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
+   one-writer service API and lifecycle tests. Do not attempt a full rewrite.
+6. Run the extended release suite, worldwide visual matrix, hardware-eligible
+   Chrome performance session, immutable production artifact verification, and
+   explicit human visual acceptance. Only then nominate the version/deployment.
+
+Current measured budgets are regression ceilings, not production targets:
+10 s runtime-ready, 400 requests, 340 local scripts, 8.0 MB local encoded data,
+and a 3.0 s maximum title long task. Each architecture checkpoint must lower a
+ceiling when its verified baseline improves; ceilings must never be raised to
+hide a regression.
+
 **Plan status:** Phase 6 blocked by failed visual acceptance; affected Phase 1–5
 exit conditions are reopened
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  

@@ -337,16 +337,16 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   border-radius: 50%;
   box-shadow: 0 0 18px rgba(45,125,255,0.12);
 }
-.destination-thumb.earth { background-image: url('../assets/textures/earth_atmos_2048.jpg'); background-position: 28% 50%; }
-.destination-thumb.moon { background-image: url('../assets/textures/moon_lroc_2048.jpg'); background-position: 38% 50%; }
-.destination-thumb.mars { background-image: url('../assets/textures/mars_viking_4096.jpg'); background-position: 42% 50%; }
+.destination-thumb.earth { background-image: url('../assets/textures/ui-thumbnails/earth.jpg'); background-position: 28% 50%; }
+.destination-thumb.moon { background-image: url('../assets/textures/ui-thumbnails/moon.jpg'); background-position: 38% 50%; }
+.destination-thumb.mars { background-image: url('../assets/textures/ui-thumbnails/mars.jpg'); background-position: 42% 50%; }
 .globe-destination-bar button .destination-thumb.space {
   width: 76px;
   border-radius: 8px;
-  background-image: url('../assets/textures/universe/andromeda-galex-spitzer.jpg');
+  background-image: url('../assets/textures/ui-thumbnails/space.jpg');
   background-size: contain;
 }
-.destination-thumb.ocean { background-image: url('../../assets/screenshots/ocean-mode-great-barrier-reef.png'); background-position: 40% 58%; }
+.destination-thumb.ocean { background-image: url('../assets/textures/ui-thumbnails/ocean.png'); background-position: 40% 58%; }
 .globe-destination-bar button:hover .destination-thumb,
 .globe-destination-bar button.active .destination-thumb {
   border-color: var(--hub-blue);

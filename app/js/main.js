@@ -1,7 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=3';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=2';
-import { createRuntimeKernel } from './runtime/kernel.js?v=1';
+import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
@@ -164,6 +164,11 @@ function registerRuntimeSystem(definition) {
   return runtimeKernel.registerSystem(definition);
 }
 
+function advanceRuntimeTime(milliseconds = 0) {
+  registerRuntimeSystems();
+  return runtimeKernel.advanceBy(milliseconds, { source: 'automation' });
+}
+
 function showLoad(text, options = {}) {
   const loading = document.getElementById('loading');
   const loadText = document.getElementById('loadText');
@@ -225,6 +230,7 @@ window.addEventListener('resize', () => {
 }, { passive: true });
 
 Object.assign(appCtx, {
+  advanceRuntimeTime,
   getRuntimeKernelSnapshot: () => runtimeKernel.snapshot(),
   hideLoad,
   positionTopOverlays,
@@ -238,6 +244,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  advanceRuntimeTime,
   hideLoad,
   positionTopOverlays,
   registerRuntimeSystem,

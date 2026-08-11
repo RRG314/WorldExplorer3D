@@ -78,6 +78,25 @@ assert.equal(kernel.unregisterSystem('test.disabled'), false);
 assert.equal(kernel.dispose('test-dispose'), true);
 assert.equal(kernel.dispose('test-dispose'), false);
 
+const advancedDeltas = [];
+const advanceKernel = createRuntimeKernel({
+  fixedDelta: 0.01,
+  maxDelta: 0.05,
+  now: () => 1000
+});
+advanceKernel.registerSystem({
+  id: 'test.manual-advance',
+  phase: 'simulation',
+  update: (frame) => advancedDeltas.push(frame.dt)
+});
+const advanceResult = advanceKernel.advanceBy(50);
+assert.equal(advanceResult.requestedMs, 50);
+assert.equal(advanceResult.simulatedMs, 50);
+assert.equal(advanceResult.frames, 5);
+assert.equal(advanceResult.suspendedFrames, 0);
+assert.equal(advanceKernel.snapshot().frameNumber, 5);
+assert.equal(Number(advancedDeltas.reduce((sum, value) => sum + value, 0).toFixed(6)), 0.05);
+
 const fixedCalls = [];
 const fixedAppCtx = {
   gameStarted: true,
@@ -111,5 +130,6 @@ console.log(JSON.stringify({
   phases: RUNTIME_PHASES,
   frameNumber: snapshot.frameNumber,
   systems: Object.values(snapshot.phases).flat().map((system) => system.id),
-  directFrameSimulationUpdates: fixedSnapshot.phases.simulation[0].updates
+  directFrameSimulationUpdates: fixedSnapshot.phases.simulation[0].updates,
+  manualAdvance: advanceResult
 }, null, 2));

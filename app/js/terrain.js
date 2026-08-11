@@ -35,6 +35,8 @@ import {
   ensureTerrainGroup,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  peekTerrainSourceSampleAtLatLon,
+  peekTerrainSourceSampleAtWorldXZ,
   pruneTerrainTileCache,
   sampleTileElevationMeters,
   terrainSourceSampleAtLatLon,
@@ -46,7 +48,7 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=42";
+} from "./terrain/tiles.js?v=43";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -161,6 +163,27 @@ function elevationWorldYAtWorldXZ(x, z) {
   return clampElevationMeters(Number(sample.groundElevationMeters)) *
     appCtx.WORLD_UNITS_PER_METER *
     appCtx.TERRAIN_Y_EXAGGERATION;
+}
+
+function peekElevationMetersAtLatLon(latitude, longitude) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    const sample = peekTerrainSourceSampleAtLatLon(latitude, longitude, terrainTileDeps);
+    return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
+      ? clampElevationMeters(Number(sample.elevationMeters))
+      : null;
+  }
+  const sample = acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
+  return sample.status === 'available' && Number.isFinite(Number(sample.groundElevationMeters))
+    ? clampElevationMeters(Number(sample.groundElevationMeters))
+    : null;
+}
+
+function peekElevationWorldYAtWorldXZ(x, z) {
+  const { lat, lon } = worldToLatLon(x, z);
+  const meters = peekElevationMetersAtLatLon(lat, lon);
+  return Number.isFinite(meters)
+    ? meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION
+    : null;
 }
 
 function createWaterTerrainContext(tileBounds = null) {
@@ -442,6 +465,12 @@ Object.assign(appCtx, {
   getAcceptedGroundCatalogSnapshot,
   getAcceptedGroundRuntimeSnapshot,
   latLonToTileXY,
+  peekElevationMetersAtLatLon,
+  peekElevationWorldYAtWorldXZ,
+  peekTerrainSourceSampleAtLatLon: (lat, lon) =>
+    peekTerrainSourceSampleAtLatLon(lat, lon, terrainTileDeps),
+  peekTerrainSourceSampleAtWorldXZ: (x, z) =>
+    peekTerrainSourceSampleAtWorldXZ(x, z, terrainTileDeps),
   loadGroundArtifact,
   prepareAcceptedGroundForLocation,
   prepareAcceptedGroundFromCatalog,
@@ -500,6 +529,10 @@ export {
   getAcceptedGroundRuntimeSnapshot,
   getAcceptedGroundCatalogSnapshot,
   latLonToTileXY,
+  peekElevationMetersAtLatLon,
+  peekElevationWorldYAtWorldXZ,
+  peekTerrainSourceSampleAtLatLon,
+  peekTerrainSourceSampleAtWorldXZ,
   pruneTerrainTileCache,
   prepareAcceptedGroundForLocation,
   prepareAcceptedGroundFromCatalog,

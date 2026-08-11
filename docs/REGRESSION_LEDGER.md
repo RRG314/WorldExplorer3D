@@ -4,6 +4,29 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-11 — startup policy and far-building tests passed for the wrong reasons
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: the startup workload test passed by finding expected strings in
+  source while Chrome loaded hundreds of scripts and optional systems. A
+  building-quality test failed solely because the currently required fixed
+  far-building massing module existed.
+- Root cause: tests encoded an earlier implementation shape rather than an
+  observable product contract. The title also used full-resolution gameplay
+  images for five tiny destination thumbnails and automatically contacted
+  location providers for the default selection.
+- Resolution: startup policy is tested as pure behavior and Chromium enforces
+  measured budgets plus a no-Earth-provider-on-idle rule. Diagnostics use
+  cache-only terrain peeks. The default selector no longer performs automatic
+  reverse-geocode/bathymetry work. Dedicated 256-pixel UI thumbnails preserve
+  the title presentation while reducing local transfer from 11.95 MB to
+  7.64 MB. The far-building test now verifies stable-identity determinism,
+  mapped height preservation, and tall-sliver rejection.
+- Guard: `npm run verify:pr` owns the measured title gate and recurring
+  player-facing contracts. Provider/world matrices and browser journeys remain
+  in `release:verify`; do not move live provider matrices into the fast PR tier
+  or restore source-string assertions as evidence of runtime behavior.
+
 ## 2026-08-08 — Source-pattern tests claim player-visible behavior
 
 - Status: resolved on the local `steven/earth-core-recovery` branch; not released or deployed.

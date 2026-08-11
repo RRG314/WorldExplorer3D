@@ -222,6 +222,11 @@ export function getOrLoadTerrainTile(z, x, y, deps = {}) {
   return startTerrainTileAttempt(tile, z, x, y, deps);
 }
 
+export function peekTerrainTile(z, x, y) {
+  if (![z, x, y].every(Number.isFinite)) return null;
+  return appCtx.terrainTileCache.get(`${z}/${x}/${y}`) || null;
+}
+
 export function terrainTileCacheSnapshot() {
   let loaded = 0;
   let pending = 0;
@@ -416,9 +421,32 @@ export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
   });
 }
 
+export function peekTerrainSourceSampleAtLatLon(lat, lon, deps = {}) {
+  const preflight = adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile: null
+  });
+  if (preflight.status === "outside-coverage") return preflight;
+  const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
+  return adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile: peekTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y),
+    clampElevationMeters: deps.clampElevationMeters
+  });
+}
+
 export function terrainSourceSampleAtWorldXZ(x, z, deps = {}) {
   const { lat, lon } = worldToLatLon(x, z);
   return terrainSourceSampleAtLatLon(lat, lon, deps);
+}
+
+export function peekTerrainSourceSampleAtWorldXZ(x, z, deps = {}) {
+  const { lat, lon } = worldToLatLon(x, z);
+  return peekTerrainSourceSampleAtLatLon(lat, lon, deps);
 }
 
 export function elevationWorldYAtWorldXZ(x, z, deps = {}) {

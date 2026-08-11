@@ -601,8 +601,6 @@ function createGlobeSelector(options = {}) {
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
     if (mobileSearchInput) mobileSearchInput.value = searchInput?.value || appCtx.customLoc?.name || '';
-    if (selected) beginReverseLookup(selected.lat, selected.lon);
-
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
       appCtx.liveEarth.onSelectorOpen();
     }

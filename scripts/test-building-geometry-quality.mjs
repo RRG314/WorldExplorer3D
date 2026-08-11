@@ -4,6 +4,7 @@ import {
   assessTallBuildingFootprint,
   isImplausibleTallBuildingFootprint
 } from '../app/js/world/building-geometry-quality.js';
+import { resolveFarBuildingMassing } from '../app/js/terrain/far-building-massing.js';
 
 assert.equal(
   isImplausibleTallBuildingFootprint({
@@ -59,11 +60,31 @@ const rejection = assessTallBuildingFootprint({
 assert.equal(rejection.reason, 'implausible-tall-sliver');
 assert.ok(rejection.requiredSpanMeters > rejection.minSpanMeters);
 
-await assert.rejects(
-  fs.access(new URL('../app/js/terrain/far-building-massing.js', import.meta.url)),
-  /ENOENT/,
-  'far-field building massing must not survive after its only runtime owner is removed'
-);
+const plausibleFarBuilding = {
+  identity: 'overture:building:quality-fixture',
+  properties: { kind: 'office', height: 42 }
+};
+const plausibleFootprint = [
+  { x: 0, z: 0 },
+  { x: 24, z: 0 },
+  { x: 24, z: 20 },
+  { x: 0, z: 20 }
+];
+const farMassingA = resolveFarBuildingMassing(plausibleFarBuilding, plausibleFootprint, 480, 1);
+const farMassingB = resolveFarBuildingMassing(plausibleFarBuilding, plausibleFootprint, 480, 1);
+assert.deepEqual(farMassingA, farMassingB, 'far massing must be deterministic for a stable source identity');
+assert.equal(farMassingA?.heightMeters, 42, 'far massing must preserve a valid mapped height');
+
+const rejectedFarSliver = resolveFarBuildingMassing({
+  identity: 'overture:building:sliver-fixture',
+  properties: { kind: 'office', height: 180 }
+}, [
+  { x: 0, z: 0 },
+  { x: 3, z: 0 },
+  { x: 3, z: 10 },
+  { x: 0, z: 10 }
+], 30, 1);
+assert.equal(rejectedFarSliver, null, 'far massing must reject the same implausible tall slivers as detailed buildings');
 
 const buildingPassSource = await fs.readFile(
   new URL('../app/js/world/load-building-pass.js', import.meta.url),
@@ -78,5 +99,6 @@ assert.doesNotMatch(
 console.log(JSON.stringify({
   ok: true,
   contract: 'building-geometry-quality',
-  rejection
+  rejection,
+  farMassing: farMassingA
 }, null, 2));
