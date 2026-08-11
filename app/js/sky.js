@@ -15,8 +15,9 @@ import {
   clearStarSelection,
   createStarField,
   highlightConstellation,
-  showStarInfo
-} from "./sky/starfield-ui.js?v=13";
+  showStarInfo,
+  ensureStarCatalogLoaded
+} from "./sky/starfield-ui.js?v=14";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
 import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
@@ -448,6 +449,7 @@ Object.assign(appCtx, {
   clearStarSelection,
   createMoonSurface,
   createStarField,
+  ensureStarCatalogLoaded,
   cycleTimeOfDay,
   directTravelToMoon,
   hideReturnToEarthButton,
@@ -476,6 +478,7 @@ export {
   clearStarSelection,
   createMoonSurface,
   createStarField,
+  ensureStarCatalogLoaded,
   cycleTimeOfDay,
   directTravelToMoon,
   hideReturnToEarthButton,

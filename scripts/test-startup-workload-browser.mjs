@@ -10,9 +10,9 @@ const outputDir = path.join(rootDir, 'output', 'playwright', 'startup-workload')
 const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const budgets = Object.freeze({
   runtimeReadyMs: Number(process.env.WE3D_STARTUP_READY_BUDGET_MS || 10000),
-  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 400),
-  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 340),
-  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 8_000_000),
+  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 360),
+  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 330),
+  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 4_500_000),
   maximumLongTaskMs: Number(process.env.WE3D_STARTUP_LONG_TASK_BUDGET_MS || 3000)
 });
 const forbiddenTitleHosts = [
@@ -27,6 +27,10 @@ const forbiddenTitleHosts = [
   'nominatim.openstreetmap.org',
   'api.open-meteo.com',
   'tile.openstreetmap.org'
+];
+const forbiddenTitlePaths = [
+  '/app/assets/data/universe/gaia-dr3-nearby-bright.csv',
+  '/app/assets/textures/earth/'
 ];
 const optionalFamilies = Object.freeze({
   interiors: /\/app\/js\/interiors(?:\/|\.js)/,
@@ -145,6 +149,11 @@ try {
     localScripts.filter((entry) => pattern.test(new URL(entry.url).pathname)).length
   ]));
   const forbiddenRequests = requests.filter((entry) => forbiddenTitleHosts.includes(entry.hostname));
+  const forbiddenLocalAssetRequests = requests.filter((entry) => {
+    if (!entry.url.startsWith(baseUrl)) return false;
+    const pathname = new URL(entry.url).pathname;
+    return forbiddenTitlePaths.some((prefix) => pathname.startsWith(prefix));
+  });
   const report = {
     generatedAt: new Date().toISOString(),
     browser: browserChannel || 'playwright-chromium',
@@ -171,12 +180,12 @@ try {
       terrainRequestsAfter: terrainRequestsAfterDiagnostics
     },
     forbiddenRequests,
+    forbiddenLocalAssetRequests,
     localFailures,
     pageErrors
   };
 
   await page.screenshot({ path: path.join(outputDir, 'title.png'), fullPage: true });
-  await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
 
   assert.ok(report.measurements.runtimeReadyMs <= budgets.runtimeReadyMs,
     `title runtime-ready exceeded ${budgets.runtimeReadyMs} ms: ${report.measurements.runtimeReadyMs}`);
@@ -188,13 +197,47 @@ try {
     `title local bytes exceeded ${budgets.localEncodedBytes}: ${report.measurements.localEncodedBytes}`);
   assert.ok(report.measurements.maximumLongTaskMs <= budgets.maximumLongTaskMs,
     `title long task exceeded ${budgets.maximumLongTaskMs} ms: ${report.measurements.maximumLongTaskMs}`);
+  assert.equal(report.measurements.eagerOptionalFamilies.interiors, 0,
+    'idle title loaded the on-demand interiors implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.fishing, 0,
+    'idle title loaded the on-demand fishing implementation');
   assert.deepEqual(forbiddenRequests, [], `idle title requested Earth/location providers: ${JSON.stringify(forbiddenRequests)}`);
+  assert.deepEqual(forbiddenLocalAssetRequests, [], `idle title requested deferred gameplay assets: ${JSON.stringify(forbiddenLocalAssetRequests)}`);
   assert.deepEqual(localFailures, [], `idle title had local request failures: ${JSON.stringify(localFailures)}`);
   assert.deepEqual(pageErrors, [], `idle title emitted page errors: ${JSON.stringify(pageErrors)}`);
   assert.equal(afterDiagnostics.terrain?.entries, beforeDiagnostics.terrain?.entries,
     'runtime diagnostics changed the terrain cache');
   assert.equal(terrainRequestsAfterDiagnostics, terrainRequestsBeforeDiagnostics,
     'runtime diagnostics initiated a Terrarium request');
+
+  const deferredActivationStartedAt = performance.now();
+  await page.locator('#globeSelectorStartBtn').click();
+  let gaiaRequested = false;
+  let earthPbrRequested = false;
+  for (let attempt = 0; attempt < 40 && (!gaiaRequested || !earthPbrRequested); attempt += 1) {
+    gaiaRequested = requests.some((entry) => new URL(entry.url).pathname === forbiddenTitlePaths[0]);
+    earthPbrRequested = requests.some((entry) => new URL(entry.url).pathname.startsWith(forbiddenTitlePaths[1]));
+    if (!gaiaRequested || !earthPbrRequested) await page.waitForTimeout(100);
+  }
+  report.deferredGameplayActivation = {
+    elapsedMs: Number((performance.now() - deferredActivationStartedAt).toFixed(2)),
+    gaiaRequested,
+    earthPbrRequested
+  };
+  const deferredSubsystemActivation = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    await Promise.all([ctx.ensureInteriorsReady?.(), ctx.ensureFishingReady?.()]);
+    return {
+      interiorActionReady: typeof ctx.enterInteriorForSupport === 'function',
+      fishingActionReady: typeof ctx.openFishingGame === 'function'
+    };
+  });
+  report.deferredSubsystemActivation = deferredSubsystemActivation;
+  await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
+  assert.equal(gaiaRequested, true, 'Explore did not start the deferred Gaia catalog request');
+  assert.equal(earthPbrRequested, true, 'Explore did not start deferred Earth PBR requests');
+  assert.equal(deferredSubsystemActivation.interiorActionReady, true, 'on-demand interiors did not initialize');
+  assert.equal(deferredSubsystemActivation.fishingActionReady, true, 'on-demand fishing did not initialize');
 
   console.log(JSON.stringify({ ok: true, ...report }, null, 2));
 } finally {

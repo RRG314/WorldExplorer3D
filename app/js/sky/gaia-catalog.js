@@ -105,17 +105,24 @@ function createGaiaSkyLayers(options = {}) {
     brightPoints: createPointLayer(options.brightName || 'Gaia DR3 bright stars', options.brightSize || 5.2, 0.98),
     faintPoints: createPointLayer(options.faintName || 'Gaia DR3 faint stars', options.faintSize || 2.8, 0.84),
     stars: [],
-    ready: null
+    ready: Promise.resolve(0),
+    load: null
   };
   group.add(state.faintPoints, state.brightPoints);
-  state.ready = loadGaiaCatalog().then((stars) => {
-    state.stars = stars;
-    rebuildGaiaSkyLayers(state);
-    return stars.length;
-  }).catch((error) => {
-    console.warn('[Sky] Gaia DR3 catalog snapshot unavailable.', error);
-    return 0;
-  });
+  state.load = () => {
+    if (state.loadStarted) return state.ready;
+    state.loadStarted = true;
+    state.ready = loadGaiaCatalog().then((stars) => {
+      state.stars = stars;
+      rebuildGaiaSkyLayers(state);
+      return stars.length;
+    }).catch((error) => {
+      console.warn('[Sky] Gaia DR3 catalog snapshot unavailable.', error);
+      return 0;
+    });
+    return state.ready;
+  };
+  if (options.autoload !== false) state.load();
   return state;
 }
 

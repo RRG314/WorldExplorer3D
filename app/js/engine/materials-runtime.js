@@ -472,6 +472,14 @@ function initPbrTextures(ctx, maxAniso) {
   });
 }
 
+export function ensureEnginePbrTextures(ctx) {
+  const { state } = ctx;
+  if (state.pbrTextureLoadStarted) return false;
+  state.pbrTextureLoadStarted = true;
+  initPbrTextures(ctx, state.textureMaxAnisotropy || 1);
+  return true;
+}
+
 export function initEngineTextures(ctx, renderer) {
   const { state } = ctx;
   state.asphaltTex = createAsphaltTexture();
@@ -479,12 +487,12 @@ export function initEngineTextures(ctx, renderer) {
   state.asphaltRoughness = createRoughnessMap();
 
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  state.textureMaxAnisotropy = maxAniso;
   const aniso = Math.min(maxAniso, 8);
   if (state.asphaltTex) state.asphaltTex.anisotropy = aniso;
   if (state.asphaltNormal) state.asphaltNormal.anisotropy = aniso;
   if (state.asphaltRoughness) state.asphaltRoughness.anisotropy = aniso;
 
-  initPbrTextures(ctx, maxAniso);
   syncTextureGlobals(ctx);
 }
 

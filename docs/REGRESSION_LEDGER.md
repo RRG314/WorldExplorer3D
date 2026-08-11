@@ -22,6 +22,10 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   the title presentation while reducing local transfer from 11.95 MB to
   7.64 MB. The far-building test now verifies stable-identity determinism,
   mapped height preservation, and tall-sliver rejection.
+- Follow-up: the same gate now forbids idle Gaia and Earth PBR requests and
+  requires Explore to activate them. Interiors and fishing use complete lazy
+  facades, are absent from the idle title graph, and are explicitly initialized
+  by the browser gate. Runtime and plane/interior journeys remain green.
 - Guard: `npm run verify:pr` owns the measured title gate and recurring
   player-facing contracts. Provider/world matrices and browser journeys remain
   in `release:verify`; do not move live provider matrices into the fast PR tier

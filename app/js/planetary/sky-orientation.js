@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=13';
+import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=14';
 import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);

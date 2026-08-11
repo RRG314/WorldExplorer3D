@@ -570,6 +570,7 @@ function initTitleScreenUi({
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
+    if (requestedLaunchMode !== 'ocean') void appCtx.ensureStarCatalogLoaded?.();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
@@ -596,6 +597,7 @@ function initTitleScreenUi({
 
     if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return true;
 
+    appCtx.ensureEnginePbrTextures?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
     const explorationMsg = document.getElementById('explorationModeMsg');

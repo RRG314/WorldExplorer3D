@@ -17,6 +17,11 @@ Completed in the current tranche:
   requests, request failures, page errors, and diagnostic cache mutation.
 - Full-resolution destination images are no longer downloaded for 58-pixel
   title thumbnails. Measured local transfer fell from 11.95 MB to 7.64 MB.
+- Gaia catalog data and all 27 Earth PBR images now start only after an
+  applicable environment is selected. Interiors and fishing initialize through
+  explicit on-demand facades. Idle-title transfer is now 4.27 MB across 324
+  scripts and 352 requests, while browser activation checks prove each deferred
+  owner still becomes available.
 - The false source-text startup test is now a pure policy test plus the browser
   workload gate. The stale test requiring fixed far-building massing to be
   deleted was replaced with current deterministic geometry-quality behavior.
@@ -26,12 +31,11 @@ Completed in the current tranche:
 
 Remaining exit conditions, in order:
 
-1. Split title shell from location runtime. The current measured baseline still
-   imports 335 scripts, transfers 7.64 MB, eagerly reaches interiors, fishing,
-   challenges, block builder, Live Earth, and planetary modules, loads the Gaia
-   catalog and terrain PBR assets, and produces a roughly 2.2-second long task.
-   The next checkpoint must lazy-load those owners without changing selector or
-   gameplay visuals.
+1. Continue splitting title shell from location runtime. The improved measured
+   baseline still imports 324 scripts, transfers 4.27 MB, and eagerly reaches
+   challenges, block builder, Live Earth, and planetary modules while producing
+   a roughly 2.1-second long task. The next checkpoint must lazy-load those
+   remaining owners without changing selector or gameplay visuals.
 2. Bound Shortbread and Overture tile concurrency and classify provider
    capabilities so an authoritative empty result is not followed by duplicate
    fallback work. Preserve OSM for roads/hydrology/landuse and Overture for
@@ -48,7 +52,7 @@ Remaining exit conditions, in order:
    explicit human visual acceptance. Only then nominate the version/deployment.
 
 Current measured budgets are regression ceilings, not production targets:
-10 s runtime-ready, 400 requests, 340 local scripts, 8.0 MB local encoded data,
+10 s runtime-ready, 360 requests, 330 local scripts, 4.5 MB local encoded data,
 and a 3.0 s maximum title long task. Each architecture checkpoint must lower a
 ceiling when its verified baseline improves; ceilings must never be raised to
 hide a regression.

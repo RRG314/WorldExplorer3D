@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { normalizeAngle, siderealTime, toDays } from "../astro.js?v=1";
 import { createRoundStarMaterial } from "./star-point-material.js?v=4";
-import { createGaiaSkyLayers } from "./gaia-catalog.js?v=3";
+import { createGaiaSkyLayers } from "./gaia-catalog.js?v=4";
 
 const STARFIELD_RADIUS = 5000;
 const _skyMatrix = new THREE.Matrix4();
@@ -132,13 +132,19 @@ export function createStarField() {
     brightName: 'Gaia DR3 supplemental bright stars',
     faintName: FAINT_STAR_LAYER_NAME,
     brightSize: 4.8,
-    faintSize: 3.1
+    faintSize: 3.1,
+    autoload: false
   });
   group.add(gaiaSky.group);
   group.userData.gaiaSky = gaiaSky;
   group.visible = false;
   appCtx.scene.add(group);
   return group;
+}
+
+export function ensureStarCatalogLoaded() {
+  const gaiaSky = appCtx.starField?.userData?.gaiaSky;
+  return typeof gaiaSky?.load === 'function' ? gaiaSky.load() : Promise.resolve(0);
 }
 
 export function alignStarFieldToLocation(lat, lng) {

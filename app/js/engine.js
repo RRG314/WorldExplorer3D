@@ -15,10 +15,11 @@ import {
 } from "./engine/quality.js?v=1";
 import {
   createBuildingGroundPatch as createBuildingGroundPatchRuntime,
+  ensureEnginePbrTextures as ensureEnginePbrTexturesRuntime,
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=20";
+} from "./engine/materials-runtime.js?v=21";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=12";
 import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
@@ -62,7 +63,9 @@ const engineState = {
     soil: false,
     rock: false,
     snow: false
-  }
+  },
+  pbrTextureLoadStarted: false,
+  textureMaxAnisotropy: 1
 };
 
 function readStorage(key) {
@@ -187,6 +190,10 @@ function initEngineTextures(renderer) {
   return initEngineTexturesRuntime(buildEngineModuleContext(), renderer);
 }
 
+function ensureEnginePbrTextures() {
+  return ensureEnginePbrTexturesRuntime(buildEngineModuleContext());
+}
+
 function createBuildingGroundPatch(pts, avgElevation, options = {}) {
   return createBuildingGroundPatchRuntime(buildEngineModuleContext(), pts, avgElevation, options);
 }
@@ -204,6 +211,7 @@ syncTextureGlobals();
 Object.assign(appCtx, {
   canUseSsao,
   createBuildingGroundPatch,
+  ensureEnginePbrTextures,
   getHighQualityEnabled,
   getBuildingMaterial,
   getRenderQualityLevel,
@@ -220,6 +228,7 @@ Object.assign(appCtx, {
 export {
   canUseSsao,
   createBuildingGroundPatch,
+  ensureEnginePbrTextures,
   getHighQualityEnabled,
   getBuildingMaterial,
   getRenderQualityLevel,

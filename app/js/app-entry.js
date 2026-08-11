@@ -24,14 +24,12 @@ import './ground.js?v=80';
 import './terrain.js?v=209';
 import './world.js?v=305';
 import './building-entry.js?v=5';
-import './interiors.js?v=9';
-import { init, tryEnablePostProcessing } from './engine.js?v=87';
+import { init, tryEnablePostProcessing } from './engine.js?v=88';
 import './physics.js?v=98';
 import './walking.js?v=69';
 import './travel-mode.js?v=19';
 import { initBoatMode } from './boat-mode.js?v=37';
-import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=84';
+import './sky.js?v=85';
 import './weather.js?v=6';
 import './live-earth/controller.js?v=21';
 import './runtime/on-demand-modes.js?v=8';
@@ -50,7 +48,7 @@ import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=117';
+import { setupUI } from './ui.js?v=118';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -60,6 +58,8 @@ let _editorWarmupScheduled = false;
 let _activityDiscoveryWarmupScheduled = false;
 let _analyticsWarmupScheduled = false;
 let _platformServicesRegistered = false;
+let _interiorsModulePromise = null;
+let _fishingModulePromise = null;
 const platformServices = createPlatformServiceRegistry({
     onEvent(event) {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
@@ -165,6 +165,51 @@ function ensurePlatformService(id) {
     return platformServices.ensure(id);
 }
 
+function ensureInteriorsReady() {
+    if (!_interiorsModulePromise) {
+        _interiorsModulePromise = import('./interiors.js?v=9').catch((error) => {
+            _interiorsModulePromise = null;
+            throw error;
+        });
+    }
+    return _interiorsModulePromise;
+}
+
+function ensureFishingReady() {
+    if (!_fishingModulePromise) {
+        _fishingModulePromise = import('./fishing-game.js?v=2').then((fishing) => {
+            fishing.setupFishingGame?.();
+            return fishing;
+        }).catch((error) => {
+            _fishingModulePromise = null;
+            throw error;
+        });
+    }
+    return _fishingModulePromise;
+}
+
+function registerLazyFishingEntrypoints() {
+    appCtx.fishingGame = { open: false, active: false };
+    appCtx.ensureFishingReady = ensureFishingReady;
+    appCtx.openFishingGame = async (...args) => {
+        const fishing = await ensureFishingReady();
+        return fishing.openFishingGame?.(...args) ?? false;
+    };
+    appCtx.closeFishingGame = () => false;
+    appCtx.updateFishingGame = () => false;
+    const dockButton = document.getElementById('fishingDockBtn');
+    const menuButton = document.getElementById('fFishing');
+    const activate = async (event) => {
+        event?.preventDefault?.();
+        dockButton?.removeEventListener('click', activate);
+        menuButton?.removeEventListener('click', activate);
+        const fishing = await ensureFishingReady();
+        fishing.openFishingGame?.();
+    };
+    dockButton?.addEventListener('click', activate);
+    menuButton?.addEventListener('click', activate);
+}
+
 const ensureEditorSessionModule = () => ensurePlatformService('editor');
 const ensureActivityCreatorModule = () => ensurePlatformService('activity-creator');
 const ensureActivityDiscoveryModule = () => ensurePlatformService('activity-discovery');
@@ -246,6 +291,23 @@ function scheduleTutorialInit() {
 
 function registerLazySubsystemEntrypoints() {
     registerPlatformServices();
+    appCtx.ensureInteriorsReady = ensureInteriorsReady;
+    appCtx.handleInteriorAction = async (...args) => {
+        const interiors = await ensureInteriorsReady();
+        return interiors.handleInteriorAction?.(...args) ?? false;
+    };
+    appCtx.enterInteriorForSupport = async (...args) => {
+        const interiors = await ensureInteriorsReady();
+        return interiors.enterInteriorForSupport?.(...args) ?? false;
+    };
+    appCtx.scanNearbyInteriorSupport = async (...args) => {
+        const interiors = await ensureInteriorsReady();
+        return interiors.scanNearbyInteriorSupport?.(...args) ?? [];
+    };
+    appCtx.listSupportedInteriorsNear = () => [];
+    appCtx.sampleInteriorWalkSurface = () => null;
+    appCtx.updateInteriorInteraction = () => false;
+    appCtx.clearActiveInterior = () => false;
     if (typeof appCtx.getEditorSnapshot !== 'function') {
         appCtx.getEditorSnapshot = () => ({
             active: false,
@@ -483,7 +545,7 @@ function bootApp() {
     runBootStep('registerLazySubsystemEntrypoints', () => registerLazySubsystemEntrypoints());
     runBootStep('setupUI', () => setupUI());
     runBootStep('initBoatMode', () => initBoatMode());
-    runBootStep('setupFishingGame', () => setupFishingGame());
+    runBootStep('registerLazyFishingEntrypoints', () => registerLazyFishingEntrypoints());
     runBootStep('scheduleTutorialInit', () => scheduleTutorialInit());
     runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
     runBootStep('renderLoop', () => renderLoop());
