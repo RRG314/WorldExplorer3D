@@ -27,12 +27,19 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   facades, are absent from the idle title graph, and are explicitly initialized
   by the browser gate. The block builder is likewise absent until its UI or B
   control is used, and the Mars world is absent until direct Mars or
-  Space-to-Mars intent. Runtime, plane/interior, block-builder, and Mars return
-  journeys remain green.
+  Space-to-Mars intent. Challenge and Live Earth implementations remain absent
+  until Missions/leaderboard or Live Data intent; their real controls and the
+  complete nine-layer Live Earth registry are verified after activation.
+  Runtime, plane/interior, block-builder, and Mars return journeys remain green.
 - Guard: `npm run verify:pr` owns the measured title gate and recurring
   player-facing contracts. Provider/world matrices and browser journeys remain
   in `release:verify`; do not move live provider matrices into the fast PR tier
   or restore source-string assertions as evidence of runtime behavior.
+
+- Never reintroduce: importing an optional feature solely to bind one title
+  button, loading Live Earth on ordinary Explore selector open, or replacing a
+  deferred feature with an inert stub that cannot prove its real UI/registry
+  after intent.
 
 ## 2026-08-11 — planetary return test observed an intermediate state as completion
 

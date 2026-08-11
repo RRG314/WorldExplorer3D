@@ -10,9 +10,9 @@ const outputDir = path.join(rootDir, 'output', 'playwright', 'startup-workload')
 const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const budgets = Object.freeze({
   runtimeReadyMs: Number(process.env.WE3D_STARTUP_READY_BUDGET_MS || 10000),
-  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 350),
-  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 325),
-  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 4_400_000),
+  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 330),
+  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 305),
+  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 4_200_000),
   maximumLongTaskMs: Number(process.env.WE3D_STARTUP_LONG_TASK_BUDGET_MS || 3000)
 });
 const forbiddenTitleHosts = [
@@ -202,8 +202,12 @@ try {
     'idle title loaded the on-demand interiors implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.fishing, 0,
     'idle title loaded the on-demand fishing implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.challenges, 0,
+    'idle title loaded the on-demand Challenge implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.blockBuilder, 0,
     'idle title loaded the on-demand block-builder implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.liveEarth, 0,
+    'idle title loaded the on-demand Live Earth implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.planetaryWorlds, 4,
     'idle title loaded a planetary world outside the retained Moon support modules');
   assert.deepEqual(forbiddenRequests, [], `idle title requested Earth/location providers: ${JSON.stringify(forbiddenRequests)}`);
@@ -214,6 +218,45 @@ try {
     'runtime diagnostics changed the terrain cache');
   assert.equal(terrainRequestsAfterDiagnostics, terrainRequestsBeforeDiagnostics,
     'runtime diagnostics initiated a Terrarium request');
+
+  await page.locator('.globe-app-rail [data-globe-destination="games"]').click();
+  await page.locator('#flowerChallengeToggleBtn').click();
+  await page.locator('#flowerChallengePanel.open').waitFor({ state: 'visible', timeout: 10000 });
+  const deferredChallengeActivation = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      challengeReady: typeof ctx.startFlowerChallenge === 'function' &&
+        ctx.getFlowerChallengeBackendStatus?.().backend !== 'not-loaded',
+      panelOpen: document.getElementById('flowerChallengePanel')?.classList.contains('open') === true
+    };
+  });
+  report.deferredChallengeActivation = deferredChallengeActivation;
+  await page.screenshot({ path: path.join(outputDir, 'challenge-panel.png'), fullPage: true });
+  await page.locator('#flowerChallengeToggleBtn').click();
+
+  await page.locator('.globe-app-rail [data-globe-destination="live-earth"]').click();
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    await ctx.ensureLiveEarthReady?.();
+  });
+  await page.waitForFunction(() =>
+    globalThis.__WE3D_RUNTIME_READY__ === true &&
+      document.getElementById('globeSelectorLiveEarthPanel')?.hidden === false &&
+      document.querySelectorAll('.globe-selector-live-chip').length > 0,
+  null, { timeout: 15000 });
+  const deferredLiveEarthActivation = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      ready: ctx.liveEarth?.ready === true,
+      panelMode: ctx.liveEarth?.getPanelMode?.() || '',
+      categoryCount: ctx.liveEarth?.categories?.length || 0,
+      layerCount: Object.keys(ctx.liveEarth?.layers || {}).length
+    };
+  });
+  report.deferredLiveEarthActivation = deferredLiveEarthActivation;
+  await page.screenshot({ path: path.join(outputDir, 'live-earth-panel.png'), fullPage: true });
+  await page.locator('.globe-app-rail [data-globe-destination="location"]').click();
+  await page.locator('#globeSelectorStartBtn').waitFor({ state: 'visible', timeout: 10000 });
 
   const deferredActivationStartedAt = performance.now();
   await page.locator('#globeSelectorStartBtn').click();
@@ -256,6 +299,12 @@ try {
   await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   assert.equal(gaiaRequested, true, 'Explore did not start the deferred Gaia catalog request');
   assert.equal(earthPbrRequested, true, 'Explore did not start deferred Earth PBR requests');
+  assert.equal(deferredChallengeActivation.challengeReady, true, 'on-demand Challenge runtime did not initialize');
+  assert.equal(deferredChallengeActivation.panelOpen, true, 'Challenge title control did not open its panel');
+  assert.equal(deferredLiveEarthActivation.ready, true, 'on-demand Live Earth runtime did not initialize');
+  assert.equal(deferredLiveEarthActivation.panelMode, 'live-earth', 'Live Earth intent did not activate its panel mode');
+  assert.ok(deferredLiveEarthActivation.categoryCount > 0, 'Live Earth intent did not render its category controls');
+  assert.equal(deferredLiveEarthActivation.layerCount, 9, 'Live Earth intent did not expose the complete layer registry');
   assert.equal(deferredSubsystemActivation.interiorActionReady, true, 'on-demand interiors did not initialize');
   assert.equal(deferredSubsystemActivation.fishingActionReady, true, 'on-demand fishing did not initialize');
   assert.equal(deferredSubsystemActivation.blockBuilderReady, true, 'on-demand block builder did not initialize');
