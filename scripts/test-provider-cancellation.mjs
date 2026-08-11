@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { loadAcceptedGroundCatalog } from '../app/js/terrain/accepted-ground-catalog.js';
 import { activateAcceptedGroundForWorldLoad } from '../app/js/world/accepted-ground-activation.js';
 import { loadFarMappedContext } from '../app/js/terrain/far-field-mapped-context.js';
+import { runBoundedProviderBatch } from '../app/js/earth-core/bounded-provider-batch.js';
 import { fetchOverpassJSON } from '../app/js/world/osm-loader.js';
+import {
+  fetchShortbreadBuildingData,
+  SHORTBREAD_TILE_CONCURRENCY
+} from '../app/js/world/shortbread-source.js';
 import {
   BUNDLED_BUILDING_SCHEMA_VERSION,
   fetchBundledBuildingMetadata
@@ -14,6 +19,7 @@ import {
 import {
   fetchGlobalBuildingData,
   fetchOvertureBuildingData,
+  OVERTURE_TILE_CONCURRENCY,
   OVERTURE_RELEASE
 } from '../app/js/world/overture-building-source.js';
 
@@ -61,6 +67,22 @@ function jsonResponse(value, status = 200) {
     status,
     json: async () => value
   };
+}
+
+{
+  let active = 0;
+  let observedMax = 0;
+  const values = Array.from({ length: 13 }, (_, index) => index);
+  const batch = await runBoundedProviderBatch(values, async (value) => {
+    active += 1;
+    observedMax = Math.max(observedMax, active);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    active -= 1;
+    return value * 2;
+  }, { concurrency: 3 });
+  assert.equal(observedMax, 3);
+  assert.equal(batch.metrics.maxInFlight, 3);
+  assert.deepEqual(batch.settled.map((entry) => entry.value), values.map((value) => value * 2));
 }
 
 {
@@ -175,6 +197,82 @@ function jsonResponse(value, status = 200) {
   assert.equal(partial._overpassSource, 'overture-buildings-pmtiles');
   assert.ok(partial.elements.some((element) => element.type === 'way'));
   assert.ok(partial.elements.some((element) => element.tags?.height === '18'));
+}
+
+{
+  let active = 0;
+  let observedMax = 0;
+  let fallbackCalled = false;
+  let requestCount = 0;
+  const empty = await fetchGlobalBuildingData({
+    lat: 43.7384,
+    lon: 7.4246,
+    radius: 0.04,
+    fetchTile: async () => {
+      requestCount += 1;
+      active += 1;
+      observedMax = Math.max(observedMax, active);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      active -= 1;
+      return null;
+    }
+  }, () => { fallbackCalled = true; });
+  assert.equal(empty.elements.length, 0);
+  assert.equal(empty._overtureBuildings.status, 'authoritative-empty');
+  assert.equal(empty._overtureBuildings.loadedTiles, empty._overtureBuildings.requestedTiles);
+  assert.equal(empty._overtureBuildings.emptyTiles, empty._overtureBuildings.requestedTiles);
+  assert.equal(
+    empty._overtureBuildings.maxInFlight,
+    Math.min(empty._overtureBuildings.requestedTiles, OVERTURE_TILE_CONCURRENCY)
+  );
+  assert.ok(empty._overtureBuildings.maxInFlight <= OVERTURE_TILE_CONCURRENCY);
+  assert.equal(empty._buildingProviderDecision.fallbackStarted, false);
+  assert.equal(fallbackCalled, false, 'authoritative empty Overture coverage must not start Shortbread');
+  assert.equal(requestCount, empty._overtureBuildings.requestedTiles);
+  assert.equal(observedMax, empty._overtureBuildings.maxInFlight);
+}
+
+{
+  const overtureRequests = [];
+  let fallbackCalled = false;
+  const fallback = await fetchGlobalBuildingData({
+    lat: 43.7384,
+    lon: 7.4246,
+    radius: 0.012,
+    fetchTile: async (_theme, z, x, y) => {
+      overtureRequests.push(`${z}/${x}/${y}`);
+      throw new Error('fixture Overture unavailable');
+    },
+    shortbreadFetchTile: async (z, x, y) => emptyVectorTile(z, x, y)
+  }, () => { fallbackCalled = true; });
+  assert.equal(fallbackCalled, true);
+  assert.equal(fallback._buildingProviderDecision.selected, 'shortbread');
+  assert.equal(fallback._buildingProviderDecision.reason, 'overture-unavailable');
+  assert.equal(fallback._buildingProviderDecision.fallbackStarted, true);
+  assert.equal(new Set(overtureRequests).size, overtureRequests.length,
+    'an unavailable Overture batch must not retry the same tiles before fallback');
+}
+
+{
+  let active = 0;
+  let observedMax = 0;
+  const data = await fetchShortbreadBuildingData({
+    lat: 43.7384,
+    lon: 7.4246,
+    radius: 0.04,
+    concurrency: 2,
+    shortbreadFetchTile: async (z, x, y) => {
+      active += 1;
+      observedMax = Math.max(observedMax, active);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      active -= 1;
+      return emptyVectorTile(z, x, y);
+    }
+  });
+  assert.equal(data._shortbreadTiles.status, 'authoritative-empty');
+  assert.equal(data._shortbreadTiles.maxInFlight, 2);
+  assert.ok(data._shortbreadTiles.maxInFlight <= SHORTBREAD_TILE_CONCURRENCY);
+  assert.equal(observedMax, 2);
 }
 
 {
@@ -388,13 +486,18 @@ console.log(JSON.stringify({
   verified: [
     'accepted-ground-catalog-signal',
     'accepted-ground-no-fallback-after-abort',
+    'shared-bounded-provider-scheduler',
     'overture-tile-signal',
     'no-building-provider-fallback-after-abort',
     'bounded-far-context-generation-abort',
     'overture-partial-authoritative-coverage',
+    'overture-authoritative-empty-no-fallback',
+    'overture-concurrency-budget',
+    'overture-unavailable-single-fallback',
     'overture-timeout-no-duplicate-retry',
     'overture-release-and-forward-compatible-properties',
     'shortbread-partial-context-coverage',
+    'shortbread-concurrency-budget',
     'overpass-success-provenance',
     'overpass-schema-change-rejection',
     'overpass-timeout-classification',

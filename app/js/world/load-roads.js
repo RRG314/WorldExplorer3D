@@ -1,5 +1,5 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=35";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=36";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
 import {

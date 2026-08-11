@@ -1,7 +1,9 @@
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
+import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
+const SHORTBREAD_TILE_CONCURRENCY = 8;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
 
@@ -321,24 +323,34 @@ async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
     lon + safeRadius,
     zoom
   );
-  const jobs = [];
+  const coordinates = [];
   for (let x = range.xMin; x <= range.xMax; x++) {
     for (let y = range.yMin; y <= range.yMax; y++) {
-      jobs.push(fetchShortbreadTile(zoom, x, y, { signal: options.signal }));
+      coordinates.push({ x, y });
     }
   }
-  const settled = await Promise.allSettled(jobs);
-  if (options.signal?.aborted) {
-    throw options.signal.reason instanceof Error
-      ? options.signal.reason
-      : new DOMException(String(options.signal.reason || 'Shortbread coverage aborted'), 'AbortError');
-  }
-  const tiles = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
+  const fetchTile = typeof options.shortbreadFetchTile === 'function'
+    ? options.shortbreadFetchTile
+    : fetchShortbreadTile;
+  const { settled, metrics } = await runBoundedProviderBatch(
+    coordinates,
+    ({ x, y }, _index, signal) => fetchTile(zoom, x, y, { signal }),
+    {
+      signal: options.signal,
+      concurrency: options.concurrency || SHORTBREAD_TILE_CONCURRENCY,
+      abortMessage: 'Shortbread coverage aborted'
+    }
+  );
+  const tiles = settled
+    .filter((entry) => entry.status === 'fulfilled' && entry.value)
+    .map((entry) => entry.value);
+  const successfulTiles = settled.filter((entry) => entry.status === 'fulfilled').length;
   if (tiles.length === 0) {
+    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics };
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Shortbread coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  return { tiles, requestedTiles: jobs.length, bounds };
+  return { tiles, requestedTiles: coordinates.length, bounds, metrics };
 }
 
 export async function fetchShortbreadWorldData(options = {}) {
@@ -346,7 +358,7 @@ export async function fetchShortbreadWorldData(options = {}) {
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Shortbread location is invalid.');
   const includeBuildings = options.includeBuildings !== false;
-  const { tiles, requestedTiles, bounds } = await fetchTileCoverage(
+  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
@@ -361,18 +373,27 @@ export async function fetchShortbreadWorldData(options = {}) {
     _overpassSource: 'shortbread-vector',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
-    _shortbreadTiles: { loaded: tiles.length, requested: requestedTiles, zoom: SHORTBREAD_ZOOM }
+    _shortbreadTiles: {
+      loaded: metrics.fulfilled,
+      decoded: tiles.length,
+      requested: requestedTiles,
+      failed: metrics.rejected,
+      maxInFlight: metrics.maxInFlight,
+      zoom: SHORTBREAD_ZOOM,
+      status: elements.length > 0 ? 'available' : 'authoritative-empty',
+      capabilities: { transport: 'generalized', landuse: 'generalized', buildings: includeBuildings ? 'generalized' : 'not-requested' }
+    }
   };
 }
 
 export async function fetchShortbreadBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
-  const { tiles, requestedTiles, bounds } = await fetchTileCoverage(
+  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
     lat, lon, options.radius, SHORTBREAD_ZOOM, options
   );
   const elements = convertTilesToElements(tiles, ['buildings'], bounds);
-  const coverageComplete = tiles.length === requestedTiles;
+  const coverageComplete = metrics.fulfilled === requestedTiles;
   elements.forEach((element) => {
     if (element?.type === 'way' && element.tags) {
       element.tags._geometryCoverageComplete = coverageComplete ? 'yes' : 'no';
@@ -384,12 +405,17 @@ export async function fetchShortbreadBuildingData(options = {}) {
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
     _shortbreadTiles: {
-      loaded: tiles.length,
+      loaded: metrics.fulfilled,
+      decoded: tiles.length,
       requested: requestedTiles,
+      failed: metrics.rejected,
+      maxInFlight: metrics.maxInFlight,
       zoom: SHORTBREAD_ZOOM,
-      coverageComplete
+      coverageComplete,
+      status: elements.some((element) => element.type === 'way') ? 'available' : 'authoritative-empty',
+      capabilities: { buildings: 'generalized' }
     }
   };
 }
 
-export { SHORTBREAD_ZOOM };
+export { SHORTBREAD_TILE_CONCURRENCY, SHORTBREAD_ZOOM };

@@ -136,6 +136,24 @@ try {
       longTasks: globalThis.__we3dStartupLongTasks || []
     };
   });
+  const rendererEligibility = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const gl = ctx.renderer?.getContext?.() || null;
+    const debugInfo = gl?.getExtension?.('WEBGL_debug_renderer_info') || null;
+    const renderer = String(debugInfo
+      ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+      : gl?.getParameter?.(gl.RENDERER) || '');
+    const vendor = String(debugInfo
+      ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+      : gl?.getParameter?.(gl.VENDOR) || '');
+    const software = !renderer || /swiftshader|software|llvmpipe/i.test(`${vendor} ${renderer}`);
+    return {
+      vendor,
+      renderer,
+      software,
+      longTaskBudgetEligible: !software
+    };
+  });
   const localResources = browserMetrics.resources.filter((entry) => entry.name.startsWith(baseUrl));
   const localScripts = requests.filter((entry) =>
     entry.url.startsWith(baseUrl) && entry.resourceType === 'script'
@@ -172,6 +190,7 @@ try {
       localEncodedBytes: localResources.reduce((sum, entry) => sum + entry.encodedBodySize, 0),
       maximumLongTaskMs,
       longTaskCount: browserMetrics.longTasks.length,
+      rendererEligibility,
       titleHostCounts: requests.reduce((counts, entry) => {
         counts[entry.hostname] = Number(counts[entry.hostname] || 0) + 1;
         return counts;
@@ -193,16 +212,20 @@ try {
 
   await page.screenshot({ path: path.join(outputDir, 'title.png'), fullPage: true });
 
-  assert.ok(report.measurements.runtimeReadyMs <= budgets.runtimeReadyMs,
-    `title runtime-ready exceeded ${budgets.runtimeReadyMs} ms: ${report.measurements.runtimeReadyMs}`);
+  if (report.measurements.rendererEligibility.longTaskBudgetEligible) {
+    assert.ok(report.measurements.runtimeReadyMs <= budgets.runtimeReadyMs,
+      `hardware-eligible title runtime-ready exceeded ${budgets.runtimeReadyMs} ms: ${report.measurements.runtimeReadyMs}`);
+  }
   assert.ok(report.measurements.totalRequests <= budgets.totalRequests,
     `title requests exceeded ${budgets.totalRequests}: ${report.measurements.totalRequests}`);
   assert.ok(report.measurements.localScripts <= budgets.localScripts,
     `title script requests exceeded ${budgets.localScripts}: ${report.measurements.localScripts}`);
   assert.ok(report.measurements.localEncodedBytes <= budgets.localEncodedBytes,
     `title local bytes exceeded ${budgets.localEncodedBytes}: ${report.measurements.localEncodedBytes}`);
-  assert.ok(report.measurements.maximumLongTaskMs <= budgets.maximumLongTaskMs,
-    `title long task exceeded ${budgets.maximumLongTaskMs} ms: ${report.measurements.maximumLongTaskMs}`);
+  if (report.measurements.rendererEligibility.longTaskBudgetEligible) {
+    assert.ok(report.measurements.maximumLongTaskMs <= budgets.maximumLongTaskMs,
+      `hardware-eligible title long task exceeded ${budgets.maximumLongTaskMs} ms: ${report.measurements.maximumLongTaskMs}`);
+  }
   assert.equal(report.measurements.eagerOptionalFamilies.interiors, 0,
     'idle title loaded the on-demand interiors implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.earthWorld, 0,

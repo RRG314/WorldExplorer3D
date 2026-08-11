@@ -4,7 +4,7 @@ import {
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext
-} from './far-field-mapped-context.js?v=3';
+} from './far-field-mapped-context.js?v=4';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {

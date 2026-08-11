@@ -36,20 +36,26 @@ Completed in the current tranche:
 - `verify:pr` is a bounded deterministic/player-contract tier with one browser
   startup measurement. Stable pushes retain `runtime:verify`; manual release
   verification additionally owns provider matrices and browser journeys.
+- Shortbread, Overture, mapped-context, and mapped-water tile batches now share
+  one bounded scheduler. Overture authoritative-empty coverage is terminal and
+  does not start a duplicate Shortbread pipeline; true Overture unavailability
+  starts exactly one classified fallback. Installed hardware Chrome preserves
+  the accepted 4.1.4 Baltimore world, and the saved-reference load comparison
+  passes at 0.97× cold and 0.83× warm elapsed time.
 
 Remaining exit conditions, in order:
 
-1. Bound Shortbread and Overture tile concurrency and classify provider
-   capabilities so an authoritative empty result is not followed by duplicate
-   fallback work. Preserve OSM for roads/hydrology/landuse and Overture for
-   building massing; do not replace the application with Overture-only data.
-2. Fix movement-boundary hitches by removing the per-frame full-road fallback
+1. Fix movement-boundary hitches by removing the per-frame full-road fallback
    and separating minimap tile decode/redraw from actor-frame work. Require the
    existing cross-boundary car/walk/drone/plane diagnostic to prove the fix.
-3. Make feature timers/listeners disposable and active only while their owner is
+2. Make feature timers/listeners disposable and active only while their owner is
    active, beginning with weather and touch controls.
-4. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
+3. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
    one-writer service API and lifecycle tests. Do not attempt a full rewrite.
+4. Resolve or explicitly degrade the WorldCover/Titiler cold-load failure path.
+   A Baltimore hardware-Chrome verification reached the correct published world
+   but took about 54 seconds while 50 Titiler requests failed; no production
+   nomination may rely on that behavior meeting the 15-second cold-load budget.
 5. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
    explicit human visual acceptance. Only then nominate the version/deployment.

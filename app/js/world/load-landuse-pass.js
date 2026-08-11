@@ -2,6 +2,9 @@ import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-poly
 import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=13';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
+import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
+
+const WATER_VECTOR_TILE_CONCURRENCY = 8;
 
 function applyWorldSpaceSurfaceUvs(geometry, metersPerTile) {
   const positions = geometry?.attributes?.position;
@@ -467,18 +470,26 @@ export function createWorldLandusePass(options = {}) {
 
   async function loadVectorTileWaterCoverage(runtime, latMin, lonMin, latMax, lonMax, signal = null) {
     const tr = vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, WATER_VECTOR_TILE_ZOOM);
-    const tileJobs = [];
+    const coordinates = [];
     for (let tx = tr.xMin; tx <= tr.xMax; tx++) {
       for (let ty = tr.yMin; ty <= tr.yMax; ty++) {
-        tileJobs.push(fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty, { signal }));
+        coordinates.push({ tx, ty });
       }
     }
-    if (tileJobs.length === 0) return { polygons: 0, lines: 0, tiles: 0, okTiles: 0 };
+    if (coordinates.length === 0) {
+      return { polygons: 0, lines: 0, tiles: 0, okTiles: 0, failedTiles: 0, maxInFlight: 0 };
+    }
 
-    const settled = await Promise.allSettled(tileJobs);
-    if (signal?.aborted) throw signal.reason instanceof Error
-      ? signal.reason
-      : new DOMException(String(signal.reason || 'Mapped water coverage aborted'), 'AbortError');
+    const { settled, metrics } = await runBoundedProviderBatch(
+      coordinates,
+      ({ tx, ty }, _index, batchSignal) =>
+        fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty, { signal: batchSignal }),
+      {
+        signal,
+        concurrency: WATER_VECTOR_TILE_CONCURRENCY,
+        abortMessage: 'Mapped water coverage aborted'
+      }
+    );
     let polygons = 0;
     let lines = 0;
     let okTiles = 0;
@@ -489,6 +500,7 @@ export function createWorldLandusePass(options = {}) {
         if (errors.length < 4) errors.push(result.reason?.message || String(result.reason || 'tile rejected'));
         return;
       }
+      if (!result.value) return;
       okTiles++;
       const { tile, x, y, z } = result.value;
       const polygonLayers = ['ocean', 'water_polygons'];
@@ -530,7 +542,15 @@ export function createWorldLandusePass(options = {}) {
       });
     });
 
-    return { polygons, lines, tiles: tileJobs.length, okTiles, errors };
+    return {
+      polygons,
+      lines,
+      tiles: coordinates.length,
+      okTiles,
+      failedTiles: metrics.rejected,
+      maxInFlight: metrics.maxInFlight,
+      errors
+    };
   }
 
   async function buildLanduseGeometryPass(runtime = {}) {

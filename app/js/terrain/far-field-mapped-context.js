@@ -1,8 +1,8 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=10";
-import { throwIfWorldLoadAborted } from '../earth-core/request-cancellation.js?v=1';
+} from "../world/shortbread-source.js?v=11";
+import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
@@ -124,23 +124,17 @@ function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
 }
 
 async function fetchWithConcurrency(items, concurrency, worker, signal = null) {
-  const results = new Array(items.length);
-  let cursor = 0;
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (cursor < items.length) {
-      throwIfWorldLoadAborted(signal, 'Far mapped context aborted');
-      const index = cursor;
-      cursor += 1;
-      try {
-        results[index] = await worker(items[index], signal);
-      } catch (error) {
-        throwIfWorldLoadAborted(signal, 'Far mapped context aborted');
-        results[index] = null;
-      }
-    }
-  });
-  await Promise.all(runners);
-  return results.filter(Boolean);
+  const { settled, metrics } = await runBoundedProviderBatch(
+    items,
+    (item, _index, batchSignal) => worker(item, batchSignal),
+    { signal, concurrency, abortMessage: 'Far mapped context aborted' }
+  );
+  return {
+    values: settled
+      .filter((entry) => entry.status === 'fulfilled' && entry.value)
+      .map((entry) => entry.value),
+    metrics
+  };
 }
 
 async function loadFarMappedWaterContext(bounds, options = {}) {
@@ -149,12 +143,13 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     : selectContextZoomForTileBudget(bounds, FAR_WATER_CONTEXT_ZOOM);
   const coordinates = contextTileCoordinates(bounds, waterZoom);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
-  const tiles = await fetchWithConcurrency(
+  const waterBatch = await fetchWithConcurrency(
     coordinates,
     FAR_CONTEXT_TILE_CONCURRENCY,
     ({ x, y }, signal) => fetchTile(waterZoom, x, y, { signal }),
     options.signal
   );
+  const tiles = waterBatch.values;
   const waterAreas = [];
 
   for (const tileRecord of tiles) {
@@ -197,6 +192,7 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     waterAreas,
     waterTilesLoaded: tiles.length,
     waterTilesRequested: coordinates.length,
+    waterMaxInFlight: waterBatch.metrics.maxInFlight,
     waterZoom
   };
 }
@@ -207,7 +203,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     : selectContextZoomForTileBudget(bounds, FAR_CONTEXT_ZOOM);
   const coordinates = contextTileCoordinates(bounds, contextZoom);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
-  const [tiles, waterContext] = await Promise.all([
+  const [contextBatch, waterContext] = await Promise.all([
     fetchWithConcurrency(
       coordinates,
       FAR_CONTEXT_TILE_CONCURRENCY,
@@ -216,6 +212,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     ),
     loadFarMappedWaterContext(waterBounds, { ...options, fetchTile })
   ]);
+  const tiles = contextBatch.values;
   const buildings = [];
   let skippedNearBuildings = 0;
 
@@ -256,7 +253,8 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     skippedNearBuildings,
     contextZoom,
     loadedTiles: tiles.length,
-    requestedTiles: coordinates.length
+    requestedTiles: coordinates.length,
+    contextMaxInFlight: contextBatch.metrics.maxInFlight
   };
 }
 

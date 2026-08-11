@@ -4,6 +4,35 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-11 — Provider tile bursts and authoritative-empty fallback duplication
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: one fixed location could start every Shortbread or Overture tile at
+  once. A successful Overture query containing no building tile payload was
+  misclassified as provider failure and followed by a second Shortbread batch.
+- Root cause: each provider owned a separate `Promise.allSettled` fan-out, and
+  Overture decided availability from decoded payload count instead of completed
+  coverage. Successful empty coverage and unavailable coverage were therefore
+  indistinguishable.
+- Resolution: one pure shared scheduler limits provider batches to eight
+  in-flight tiles while retaining ordered settled results and world-load
+  cancellation. Successful empty Overture coverage now publishes
+  `authoritative-empty`; only zero successful tile responses can start exactly
+  one Shortbread fallback. Provider decisions and maximum observed concurrency
+  are recorded in diagnostics.
+- Test correction: startup timing is a release budget only with a hardware WebGL
+  renderer. SwiftShader continues to enforce request, byte, activation, provider,
+  error, and cache-mutation correctness, but is explicitly ineligible for
+  runtime-ready and long-task budgets. Installed Chrome still enforces both.
+- Guard: `npm run test:provider-cancellation`, `npm run test:earth-core-boundaries`,
+  `npm run test:load-performance-comparison`, and the hardware-Chrome startup
+  gate. Tests require concurrency never exceed eight, each Overture tile be
+  requested once, authoritative empty never invoke fallback, and true
+  unavailability invoke one fallback.
+- Never reintroduce: unbounded per-provider fan-out, transient duplicate whole
+  batches, fallback based on decoded feature count, or treating SwiftShader
+  latency as hardware production evidence.
+
 ## 2026-08-11 — title imported the complete Earth world before location intent
 
 - Status: resolved locally; not pushed or deployed.

@@ -163,8 +163,8 @@ import {
 import { createWorldRoadLoader } from "./world/load-roads.js?v=98";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=10";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=7";
+} from "./world/shortbread-source.js?v=11";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=8";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=24";
 import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=17";
