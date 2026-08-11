@@ -83,6 +83,12 @@ function initTitleScreenUi({
     return multiplayerWarmupPromise;
   };
   const hasLoadedEarthWorld = () => appCtx.worldLoading || (Array.isArray(appCtx.roads) && appCtx.roads.length > 0) || (Array.isArray(appCtx.roadMeshes) && appCtx.roadMeshes.length > 0) || (Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0) || (Array.isArray(appCtx.buildingMeshes) && appCtx.buildingMeshes.length > 0);
+  const ensureEarthWorldRuntime = async () => {
+    await appCtx.ensureEarthRuntimeReady?.();
+    if (typeof appCtx.loadRoads !== 'function') {
+      throw new Error('Earth world runtime did not install its location loader.');
+    }
+  };
   const emitTutorialEvent = (eventName, payload = {}) => {
     if (typeof appCtx.tutorialOnEvent === 'function') appCtx.tutorialOnEvent(eventName, payload);
   };
@@ -348,6 +354,7 @@ function initTitleScreenUi({
       if (!appCtx.gameStarted) {
         return appCtx.triggerTitleStart({ bypassCustomGate: true });
       } else if (typeof appCtx.loadRoads === 'function') {
+        await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
         await appCtx.loadRoads();
         let customSpawn = null;
@@ -597,6 +604,7 @@ function initTitleScreenUi({
 
     if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return true;
 
+    await ensureEarthWorldRuntime();
     appCtx.ensureEnginePbrTextures?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');

@@ -10,9 +10,9 @@ const outputDir = path.join(rootDir, 'output', 'playwright', 'startup-workload')
 const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const budgets = Object.freeze({
   runtimeReadyMs: Number(process.env.WE3D_STARTUP_READY_BUDGET_MS || 10000),
-  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 330),
-  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 305),
-  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 4_200_000),
+  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 220),
+  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 190),
+  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 3_100_000),
   maximumLongTaskMs: Number(process.env.WE3D_STARTUP_LONG_TASK_BUDGET_MS || 3000)
 });
 const forbiddenTitleHosts = [
@@ -31,9 +31,14 @@ const forbiddenTitleHosts = [
 const forbiddenTitlePaths = [
   '/app/assets/data/universe/gaia-dr3-nearby-bright.csv',
   '/app/assets/textures/earth/',
-  '/app/js/planetary/mars-world.js'
+  '/app/js/planetary/mars-world.js',
+  '/app/js/runtime/earth-runtime.js',
+  '/app/js/ground.js',
+  '/app/js/terrain.js',
+  '/app/js/world.js'
 ];
 const optionalFamilies = Object.freeze({
+  earthWorld: /\/app\/js\/(?:runtime\/earth-runtime|ground|terrain|world)\.js/,
   interiors: /\/app\/js\/interiors(?:\/|\.js)/,
   fishing: /\/app\/js\/fishing(?:\/|-game\.js)/,
   challenges: /\/app\/js\/flower-challenge(?:\/|\.js)/,
@@ -200,6 +205,8 @@ try {
     `title long task exceeded ${budgets.maximumLongTaskMs} ms: ${report.measurements.maximumLongTaskMs}`);
   assert.equal(report.measurements.eagerOptionalFamilies.interiors, 0,
     'idle title loaded the on-demand interiors implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.earthWorld, 0,
+    'idle title loaded the on-demand Earth world implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.fishing, 0,
     'idle title loaded the on-demand fishing implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.challenges, 0,
@@ -262,16 +269,27 @@ try {
   await page.locator('#globeSelectorStartBtn').click();
   let gaiaRequested = false;
   let earthPbrRequested = false;
-  for (let attempt = 0; attempt < 40 && (!gaiaRequested || !earthPbrRequested); attempt += 1) {
+  let earthRuntimeRequested = false;
+  for (let attempt = 0; attempt < 80 && (!gaiaRequested || !earthPbrRequested || !earthRuntimeRequested); attempt += 1) {
     gaiaRequested = requests.some((entry) => new URL(entry.url).pathname === forbiddenTitlePaths[0]);
     earthPbrRequested = requests.some((entry) => new URL(entry.url).pathname.startsWith(forbiddenTitlePaths[1]));
-    if (!gaiaRequested || !earthPbrRequested) await page.waitForTimeout(100);
+    earthRuntimeRequested = requests.some((entry) => new URL(entry.url).pathname === forbiddenTitlePaths[3]);
+    if (!gaiaRequested || !earthPbrRequested || !earthRuntimeRequested) await page.waitForTimeout(100);
   }
   report.deferredGameplayActivation = {
     elapsedMs: Number((performance.now() - deferredActivationStartedAt).toFixed(2)),
     gaiaRequested,
-    earthPbrRequested
+    earthPbrRequested,
+    earthRuntimeRequested
   };
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.getEarthRuntimeSnapshot?.().ready === true;
+  }, null, { timeout: 15000 });
+  report.deferredGameplayActivation.earthRuntimeReady = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.getEarthRuntimeSnapshot?.().ready === true;
+  });
   const deferredSubsystemActivation = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     await Promise.all([
@@ -299,6 +317,9 @@ try {
   await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   assert.equal(gaiaRequested, true, 'Explore did not start the deferred Gaia catalog request');
   assert.equal(earthPbrRequested, true, 'Explore did not start deferred Earth PBR requests');
+  assert.equal(earthRuntimeRequested, true, 'Explore did not start the deferred Earth world runtime');
+  assert.equal(report.deferredGameplayActivation.earthRuntimeReady, true,
+    'Explore requested the Earth world runtime but did not finish installing it');
   assert.equal(deferredChallengeActivation.challengeReady, true, 'on-demand Challenge runtime did not initialize');
   assert.equal(deferredChallengeActivation.panelOpen, true, 'Challenge title control did not open its panel');
   assert.equal(deferredLiveEarthActivation.ready, true, 'on-demand Live Earth runtime did not initialize');

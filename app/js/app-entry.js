@@ -20,10 +20,6 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import './ground.js?v=80';
-import './terrain.js?v=209';
-import './world.js?v=305';
-import './building-entry.js?v=5';
 import { init, tryEnablePostProcessing } from './engine.js?v=88';
 import './physics.js?v=98';
 import './walking.js?v=69';
@@ -32,6 +28,7 @@ import { initBoatMode } from './boat-mode.js?v=37';
 import './sky.js?v=85';
 import './weather.js?v=6';
 import './runtime/on-demand-modes.js?v=8';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=1';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=1';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -539,6 +536,7 @@ function bootApp() {
         return result;
     };
 
+    runBootStep('installOnDemandEarth', () => installOnDemandEarth(appCtx));
     const initOk = runBootStep('init', () => init());
     if (initOk === false || appCtx.engineInitFailed === true || !appCtx.renderer) {
         console.warn('[boot] init aborted before full app startup');

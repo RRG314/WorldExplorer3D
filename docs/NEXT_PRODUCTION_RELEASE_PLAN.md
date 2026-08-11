@@ -25,6 +25,11 @@ Completed in the current tranche:
   respectively. Installed Chrome now measures 4.00 MB across 298 scripts and 325
   requests, while browser activation checks prove each deferred owner still
   becomes available.
+- The complete ground/terrain/world compiler now sits behind one Earth-intent
+  boundary. Idle installed Chrome measures 2.88 MB across 175 scripts and 202
+  requests; Explore installs the real runtime before loading the selected
+  location. Direct Moon, Mars, and Space launches perform zero Earth road loads,
+  and their Earth return paths still publish mapped worlds.
 - The false source-text startup test is now a pure policy test plus the browser
   workload gate. The stale test requiring fixed far-building massing to be
   deleted was replaced with current deterministic geometry-quality behavior.
@@ -34,28 +39,23 @@ Completed in the current tranche:
 
 Remaining exit conditions, in order:
 
-1. Define and implement the larger title-shell/Earth-runtime boundary. The
-   optional leaf owners are now deferred, but the title still loads 298 scripts
-   because most Earth simulation/publication code is imported before location
-   intent. Move that graph behind one explicit Earth-runtime initializer with a
-   tested boot/readiness contract; do not continue shaving isolated leaf files.
-2. Bound Shortbread and Overture tile concurrency and classify provider
+1. Bound Shortbread and Overture tile concurrency and classify provider
    capabilities so an authoritative empty result is not followed by duplicate
    fallback work. Preserve OSM for roads/hydrology/landuse and Overture for
    building massing; do not replace the application with Overture-only data.
-3. Fix movement-boundary hitches by removing the per-frame full-road fallback
+2. Fix movement-boundary hitches by removing the per-frame full-road fallback
    and separating minimap tile decode/redraw from actor-frame work. Require the
    existing cross-boundary car/walk/drone/plane diagnostic to prove the fix.
-4. Make feature timers/listeners disposable and active only while their owner is
+3. Make feature timers/listeners disposable and active only while their owner is
    active, beginning with weather and touch controls.
-5. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
+4. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
    one-writer service API and lifecycle tests. Do not attempt a full rewrite.
-6. Run the extended release suite, worldwide visual matrix, hardware-eligible
+5. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
    explicit human visual acceptance. Only then nominate the version/deployment.
 
 Current measured budgets are regression ceilings, not production targets:
-10 s runtime-ready, 330 requests, 305 local scripts, 4.2 MB local encoded data,
+10 s runtime-ready, 220 requests, 190 local scripts, 3.1 MB local encoded data,
 and a 3.0 s maximum title long task. Each architecture checkpoint must lower a
 ceiling when its verified baseline improves; ceilings must never be raised to
 hide a regression.

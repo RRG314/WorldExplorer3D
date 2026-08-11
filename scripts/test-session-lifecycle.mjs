@@ -205,14 +205,27 @@ try {
   await fs.writeFile(path.join(outputDir, 'plateau-report.json'), `${JSON.stringify({ ok: false, report }, null, 2)}\n`);
   assertPlateau('space', report.space);
   assertPlateau('ocean', report.ocean);
-  const registered = report.ocean.at(-1).exited.coordinator.registeredEnvironments;
-  assert(registered.length === 5, `Expected five environment adapters, found ${registered.length}`);
+  const idleRegistered = report.ocean.at(-1).exited.coordinator.registeredEnvironments;
+  assert(
+    JSON.stringify(idleRegistered) === JSON.stringify(['EARTH', 'MOON', 'SPACE_FLIGHT', 'OCEAN']),
+    `Idle lifecycle adapters do not match the title and exercised runtimes: ${JSON.stringify(idleRegistered)}`
+  );
+  const registeredAfterMarsIntent = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    await ctx.ensureMarsRuntimeReady?.();
+    return ctx.getSessionCoordinatorDebugState?.().registeredEnvironments || [];
+  });
+  assert(
+    JSON.stringify(registeredAfterMarsIntent) === JSON.stringify(['EARTH', 'MOON', 'SPACE_FLIGHT', 'OCEAN', 'MARS']),
+    `Mars intent did not install the fifth lifecycle adapter: ${JSON.stringify(registeredAfterMarsIntent)}`
+  );
   assert(consoleErrors.length === 0, `Lifecycle cycles logged errors: ${consoleErrors.join(' | ')}`);
 
   await fs.writeFile(path.join(outputDir, 'plateau-report.json'), `${JSON.stringify({ ok: true, report }, null, 2)}\n`);
   console.log(JSON.stringify({
     ok: true,
-    registeredEnvironments: registered,
+    idleRegisteredEnvironments: idleRegistered,
+    registeredEnvironmentsAfterMarsIntent: registeredAfterMarsIntent,
     spaceWarmGpu: report.space.at(-1).active.gpu,
     oceanWarmGpu: report.ocean.at(-1).active.gpu,
     consoleErrors

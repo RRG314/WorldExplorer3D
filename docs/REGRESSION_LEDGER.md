@@ -4,6 +4,34 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-11 — title imported the complete Earth world before location intent
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: the title made 298 script requests and transferred about 4.00 MB of
+  local data even when the player had not chosen Earth. Ground, terrain, and
+  world compilation code was evaluated before it could produce a visible
+  location.
+- Root cause: `app-entry.js` directly imported the four legacy Earth roots.
+  `world.js` alone reached 106 modules and `terrain.js` reached 52; there was no
+  single readiness boundary between the title shell and location publication.
+- Resolution: a small idempotent facade owns `ensureEarthRuntimeReady()` and a
+  compatible `loadRoads()` entry. It imports the ground → terrain → world →
+  building-entry cohort exactly once after Earth intent. Idle Chrome now makes
+  175 script requests and transfers 2.88 MB, while Explore installs the real
+  loader before location compilation.
+- Test correction: the lifecycle plateau test still required all five
+  environment adapters at idle even though Mars was deliberately deferred. It
+  now requires the four title/exercised adapters at idle, explicitly activates
+  Mars intent, and then requires the fifth adapter.
+- Guard: the startup browser gate forbids the Earth runtime roots on idle,
+  requires requested and ready states after Explore, and uses ceilings of 220
+  requests, 190 scripts, and 3.1 MB. The title planetary journey proves no
+  Earth road load precedes Moon, Mars, or Space and proves Earth return still
+  publishes a real road world. The 20-cycle lifecycle plateau remains green.
+- Never reintroduce: direct Earth compiler imports in the title entry, a lazy
+  stub that does not install the real world loader, or an adapter-count test
+  that mistakes an intentionally deferred environment for missing behavior.
+
 ## 2026-08-11 — startup policy and far-building tests passed for the wrong reasons
 
 - Status: resolved locally; not pushed or deployed.
