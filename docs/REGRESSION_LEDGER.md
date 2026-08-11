@@ -25,11 +25,29 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Follow-up: the same gate now forbids idle Gaia and Earth PBR requests and
   requires Explore to activate them. Interiors and fishing use complete lazy
   facades, are absent from the idle title graph, and are explicitly initialized
-  by the browser gate. Runtime and plane/interior journeys remain green.
+  by the browser gate. The block builder is likewise absent until its UI or B
+  control is used, and the Mars world is absent until direct Mars or
+  Space-to-Mars intent. Runtime, plane/interior, block-builder, and Mars return
+  journeys remain green.
 - Guard: `npm run verify:pr` owns the measured title gate and recurring
   player-facing contracts. Provider/world matrices and browser journeys remain
   in `release:verify`; do not move live provider matrices into the fast PR tier
   or restore source-string assertions as evidence of runtime behavior.
+
+## 2026-08-11 — planetary return test observed an intermediate state as completion
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: the Mars browser journey reported that returning to Earth failed to
+  restore Earth scene ownership even though the asynchronous restoration was
+  still running.
+- Root cause: the test treated `ENV.EARTH` plus retained road data as completion.
+  The environment commits before the selected Earth world finishes resuming,
+  and old road arrays can already be populated at that intermediate point.
+- Resolution: Earth return readiness now requires visible Earth scene
+  ownership, no active Moon/Mars state, hidden Mars surface, and published roads.
+- Guard: the Mars title journey now passes direct launch, cancelled return,
+  relaunch, and return to visibly restored Baltimore. Never use an environment
+  enum alone as proof that an asynchronous environment handoff is complete.
 
 ## 2026-08-08 — Source-pattern tests claim player-visible behavior
 

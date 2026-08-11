@@ -10,9 +10,9 @@ const outputDir = path.join(rootDir, 'output', 'playwright', 'startup-workload')
 const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const budgets = Object.freeze({
   runtimeReadyMs: Number(process.env.WE3D_STARTUP_READY_BUDGET_MS || 10000),
-  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 360),
-  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 330),
-  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 4_500_000),
+  totalRequests: Number(process.env.WE3D_STARTUP_REQUEST_BUDGET || 350),
+  localScripts: Number(process.env.WE3D_STARTUP_SCRIPT_BUDGET || 325),
+  localEncodedBytes: Number(process.env.WE3D_STARTUP_LOCAL_BYTES_BUDGET || 4_400_000),
   maximumLongTaskMs: Number(process.env.WE3D_STARTUP_LONG_TASK_BUDGET_MS || 3000)
 });
 const forbiddenTitleHosts = [
@@ -30,7 +30,8 @@ const forbiddenTitleHosts = [
 ];
 const forbiddenTitlePaths = [
   '/app/assets/data/universe/gaia-dr3-nearby-bright.csv',
-  '/app/assets/textures/earth/'
+  '/app/assets/textures/earth/',
+  '/app/js/planetary/mars-world.js'
 ];
 const optionalFamilies = Object.freeze({
   interiors: /\/app\/js\/interiors(?:\/|\.js)/,
@@ -201,6 +202,10 @@ try {
     'idle title loaded the on-demand interiors implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.fishing, 0,
     'idle title loaded the on-demand fishing implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.blockBuilder, 0,
+    'idle title loaded the on-demand block-builder implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.planetaryWorlds, 4,
+    'idle title loaded a planetary world outside the retained Moon support modules');
   assert.deepEqual(forbiddenRequests, [], `idle title requested Earth/location providers: ${JSON.stringify(forbiddenRequests)}`);
   assert.deepEqual(forbiddenLocalAssetRequests, [], `idle title requested deferred gameplay assets: ${JSON.stringify(forbiddenLocalAssetRequests)}`);
   assert.deepEqual(localFailures, [], `idle title had local request failures: ${JSON.stringify(localFailures)}`);
@@ -226,18 +231,36 @@ try {
   };
   const deferredSubsystemActivation = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    await Promise.all([ctx.ensureInteriorsReady?.(), ctx.ensureFishingReady?.()]);
+    await Promise.all([
+      ctx.ensureInteriorsReady?.(),
+      ctx.ensureFishingReady?.(),
+      ctx.ensureBlockBuilderReady?.(),
+      ctx.ensureMarsRuntimeReady?.()
+    ]);
     return {
       interiorActionReady: typeof ctx.enterInteriorForSupport === 'function',
-      fishingActionReady: typeof ctx.openFishingGame === 'function'
+      fishingActionReady: typeof ctx.openFishingGame === 'function',
+      blockBuilderReady: typeof ctx.placeBuildBlock === 'function',
+      marsRuntimeReady: typeof ctx.directTravelToMars === 'function' && typeof ctx.arriveAtMars === 'function'
     };
   });
   report.deferredSubsystemActivation = deferredSubsystemActivation;
+  await page.keyboard.press('b');
+  await page.waitForTimeout(100);
+  const blockBuilderInteraction = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.getBlockBuilderSnapshot?.() || null;
+  });
+  await page.keyboard.press('b');
+  report.blockBuilderInteraction = blockBuilderInteraction;
   await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   assert.equal(gaiaRequested, true, 'Explore did not start the deferred Gaia catalog request');
   assert.equal(earthPbrRequested, true, 'Explore did not start deferred Earth PBR requests');
   assert.equal(deferredSubsystemActivation.interiorActionReady, true, 'on-demand interiors did not initialize');
   assert.equal(deferredSubsystemActivation.fishingActionReady, true, 'on-demand fishing did not initialize');
+  assert.equal(deferredSubsystemActivation.blockBuilderReady, true, 'on-demand block builder did not initialize');
+  assert.equal(deferredSubsystemActivation.marsRuntimeReady, true, 'on-demand Mars runtime did not initialize');
+  assert.equal(blockBuilderInteraction?.enabled, true, 'B did not enable the deferred block builder');
 
   console.log(JSON.stringify({ ok: true, ...report }, null, 2));
 } finally {

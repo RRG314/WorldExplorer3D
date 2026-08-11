@@ -33,11 +33,12 @@ import './sky.js?v=85';
 import './weather.js?v=6';
 import './live-earth/controller.js?v=21';
 import './runtime/on-demand-modes.js?v=8';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=1';
+import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
 import './planetary/vehicles.js?v=2';
 import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=12';
 import './planetary/moon-sky.js?v=1';
-import './planetary/mars-world.js?v=17';
 import './planetary/tracks.js?v=1';
 import './game.js?v=59';
 import './input.js?v=60';
@@ -45,8 +46,6 @@ import './hud.js?v=77';
 import './map.js?v=59';
 import { renderLoop } from './main.js?v=71';
 import './memory.js?v=55';
-import './blocks.js?v=60';
-import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
 import { setupUI } from './ui.js?v=118';
 
@@ -291,6 +290,8 @@ function scheduleTutorialInit() {
 
 function registerLazySubsystemEntrypoints() {
     registerPlatformServices();
+    installOnDemandBlockBuilder(appCtx);
+    installOnDemandMars(appCtx);
     appCtx.ensureInteriorsReady = ensureInteriorsReady;
     appCtx.handleInteriorAction = async (...args) => {
         const interiors = await ensureInteriorsReady();

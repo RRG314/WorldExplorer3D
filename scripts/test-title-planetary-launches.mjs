@@ -180,7 +180,14 @@ async function waitForEarthReturn(page, timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
   let state = await readState(page);
   while (Date.now() < deadline) {
-    if (state.env === 'EARTH' && !state.onMoon && state.roads > 0) return state;
+    if (
+      state.env === 'EARTH' &&
+      !state.onMoon &&
+      !state.onMars &&
+      state.roads > 0 &&
+      state.sceneOwnership.earthVisible &&
+      !state.sceneOwnership.marsSurfaceVisible
+    ) return state;
     await page.waitForTimeout(250);
     state = await readState(page);
   }
