@@ -4,6 +4,32 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-11 — Movement outside road coverage scans the entire city every frame
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: car and walking movement became visibly uneven after crossing the
+  detailed-location boundary. Monaco outer-region walking reached 69–100 ms p95
+  frames even though the fixed world itself was no longer loading.
+- Root cause: a miss in the three bounded road-index radii silently fell back to
+  evaluating every road segment. Each ordinary off-coverage lookup cost roughly
+  15–22 ms and movement/ground queries could invoke it repeatedly in one frame.
+- Resolution: an indexed miss is authoritative for normal gameplay. The active
+  road membership set is built with the spatial index, continuity candidates
+  remain bounded, and the all-road path now requires `forceFullScan: true` for
+  diagnostics. This also prevents selecting a road kilometres from the actor.
+- Evidence: installed Chrome loaded Monaco with 1,794 roads, 6,633 buildings,
+  52 terrain children, and a stable world publication. Off-coverage lookup p95
+  fell to 0.1 ms or less; car, walk, drone, and plane outer-region frame p95 was
+  17.6–17.7 ms. Minimap redraws were 4–10.5 ms, disproving the earlier theory
+  that another minimap pipeline was required.
+- Guard: `npm run test:movement-query-bounds`, the existing transport compiler
+  performance contract, and the installed-Chrome movement-boundary diagnostic.
+  The contract proves an ordinary miss evaluates zero segments while the
+  explicit diagnostic scan remains available.
+- Never reintroduce: an implicit full-city fallback after an indexed miss, a
+  per-frame allocation of the full road list, or a second minimap/preload system
+  without measured evidence that the existing bounded redraw is the bottleneck.
+
 ## 2026-08-11 — Provider tile bursts and authoritative-empty fallback duplication
 
 - Status: resolved locally; not pushed or deployed.

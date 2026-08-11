@@ -12,6 +12,7 @@ const steps = [
   ['Immutable WorldSnapshot store', 'scripts/test-world-snapshot.mjs'],
   ['WorldSnapshot publication adapter', 'scripts/test-world-publication-snapshot.mjs'],
   ['Provider cancellation', 'scripts/test-provider-cancellation.mjs'],
+  ['Bounded movement road query', 'scripts/test-movement-query-bounds.mjs'],
   ['Runtime kernel and deterministic stepping', 'scripts/test-runtime-kernel.mjs'],
   ['Terrain source behavior', 'scripts/test-terrain-source-contract.mjs'],
   ['Fixed-location terrain material ownership', 'scripts/test-fixed-location-terrain-material.mjs'],

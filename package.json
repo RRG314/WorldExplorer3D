@@ -23,6 +23,7 @@
     "test:world-snapshot": "node scripts/test-world-snapshot.mjs",
     "test:world-publication-snapshot": "node scripts/test-world-publication-snapshot.mjs",
     "test:provider-cancellation": "node scripts/test-provider-cancellation.mjs",
+    "test:movement-query-bounds": "node scripts/test-movement-query-bounds.mjs",
     "test:world-load-cancellation-browser": "node scripts/test-world-load-cancellation-browser.mjs",
     "test:far-field-elevation-loader": "node scripts/test-far-field-elevation-loader.mjs",
     "test:fixed-location-terrain-material": "node scripts/test-fixed-location-terrain-material.mjs",

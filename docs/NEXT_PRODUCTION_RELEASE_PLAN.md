@@ -42,21 +42,24 @@ Completed in the current tranche:
   starts exactly one classified fallback. Installed hardware Chrome preserves
   the accepted 4.1.4 Baltimore world, and the saved-reference load comparison
   passes at 0.97× cold and 0.83× warm elapsed time.
+- Normal nearest-road queries now stop after the bounded spatial-index search.
+  The former all-city fallback remains explicit diagnostic behavior only. A
+  hardware-Chrome Monaco sweep reduced off-coverage road queries from roughly
+  15–22 ms to 0.01–0.1 ms and held car, walk, drone, and plane outer-region p95
+  frame time to 17.6–17.7 ms with stable publication. Minimap redraws remained
+  bounded at 4–10.5 ms, so no additional preload or map pipeline was added.
 
 Remaining exit conditions, in order:
 
-1. Fix movement-boundary hitches by removing the per-frame full-road fallback
-   and separating minimap tile decode/redraw from actor-frame work. Require the
-   existing cross-boundary car/walk/drone/plane diagnostic to prove the fix.
-2. Make feature timers/listeners disposable and active only while their owner is
+1. Make feature timers/listeners disposable and active only while their owner is
    active, beginning with weather and touch controls.
-3. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
+2. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
    one-writer service API and lifecycle tests. Do not attempt a full rewrite.
-4. Resolve or explicitly degrade the WorldCover/Titiler cold-load failure path.
+3. Resolve or explicitly degrade the WorldCover/Titiler cold-load failure path.
    A Baltimore hardware-Chrome verification reached the correct published world
    but took about 54 seconds while 50 Titiler requests failed; no production
    nomination may rely on that behavior meeting the 15-second cold-load budget.
-5. Run the extended release suite, worldwide visual matrix, hardware-eligible
+4. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
    explicit human visual acceptance. Only then nominate the version/deployment.
 
