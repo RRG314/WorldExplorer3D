@@ -39,16 +39,17 @@ const steps = [
   ['Initial Earth quality policy', 'scripts/test-initial-play-workload-policy.mjs'],
   ['Maintainability ownership boundaries', 'scripts/test-maintainability-guard.mjs'],
   ['ES module URL identity', 'scripts/test-module-version-consistency.mjs'],
+  ['Hosting asset reachability', 'scripts/audit-hosting-assets.mjs', ['--strict']],
   ['Measured title startup workload', 'scripts/test-startup-workload-browser.mjs']
 ];
 
 const startedAt = performance.now();
 const results = [];
 
-for (const [name, script] of steps) {
+for (const [name, script, args = []] of steps) {
   console.log(`\n=== ${name} ===`);
   const stepStartedAt = performance.now();
-  const result = spawnSync(process.execPath, [script], {
+  const result = spawnSync(process.execPath, [script, ...args], {
     cwd: process.cwd(),
     env: process.env,
     stdio: 'inherit'

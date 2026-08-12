@@ -38,7 +38,9 @@
     "firebase:config:staging": "node scripts/apply-firebase-config.mjs staging",
     "build:hosting": "node scripts/hosting-artifact.mjs build",
     "verify:hosting": "node scripts/hosting-artifact.mjs verify",
+    "test:hosting-browser": "node scripts/test-hosting-artifact-browser.mjs",
     "audit:reachability": "node scripts/audit-hosting-reachability.mjs --strict",
+    "audit:assets": "node scripts/audit-hosting-assets.mjs --strict",
     "audit:terrain-provider": "node scripts/audit-terrain-provider.mjs",
     "ground:artifact": "node scripts/build-ground-artifact.mjs",
     "ground:catalog": "node scripts/rebuild-ground-catalog.mjs",
@@ -157,6 +159,7 @@
   "homepage": "https://worldexplorer3d.io",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
+    "esbuild": "^0.25.12",
     "firebase": "^12.9.0",
     "geotiff": "^3.0.5",
     "playwright": "^1.61.0"

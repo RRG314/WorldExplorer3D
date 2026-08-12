@@ -1,6 +1,9 @@
 export const ACCEPTED_GROUND_CATALOG_SCHEMA_VERSION = 1;
 export const DEFAULT_ACCEPTED_GROUND_CATALOG_URL =
-  '/app/assets/ground/manifest-catalog.json';
+  String(
+    globalThis.__WORLD_EXPLORER_PRODUCTION__?.groundCatalogUrl ||
+    '/app/assets/ground/manifest-catalog.json'
+  );
 
 function result(status, reason, details = {}) {
   return Object.freeze({
