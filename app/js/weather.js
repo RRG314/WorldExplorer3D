@@ -12,8 +12,9 @@ import {
   refreshLivePlace,
   uniqueNonEmptyParts,
   weatherCacheKey
-} from './weather/place-resolver.js?v=1';
+} from './weather/place-resolver.js?v=2';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
+import { weatherStateService } from './weather/state-service.js?v=1';
 import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
@@ -445,9 +446,9 @@ function buildManualWeatherState(mode) {
 
 function syncActiveWeatherState() {
   if ((appCtx.weatherMode || 'live') === 'live') {
-    appCtx.weatherState = appCtx.liveWeatherState || null;
+    weatherStateService.setActiveState(appCtx.liveWeatherState || null);
   } else {
-    appCtx.weatherState = buildManualWeatherState(appCtx.weatherMode);
+    weatherStateService.setActiveState(buildManualWeatherState(appCtx.weatherMode));
   }
   applyWeatherPresentation();
   return appCtx.weatherState;
@@ -475,15 +476,15 @@ async function fetchWeatherForLocation(lat, lon, { ocean = false, force = false 
 
 async function getResolvedPlaceForLocation(lat, lon, force = false) {
   const key = placeCacheKey(lat, lon);
-  const cache = appCtx.placeCache instanceof Map ? appCtx.placeCache : (appCtx.placeCache = new Map());
-  if (!force && cache.has(key)) return cache.get(key);
+  const cached = weatherStateService.getCachedPlace(key);
+  if (!force && cached) return cached;
   try {
     const place = await fetchPlaceForLocation(lat, lon);
-    cache.set(key, place);
+    weatherStateService.setCachedPlace(key, place);
     return place;
   } catch {
     const fallback = getFallbackPlaceLabel({ lat, lon });
-    cache.set(key, fallback);
+    weatherStateService.setCachedPlace(key, fallback);
     return fallback;
   }
 }
@@ -493,9 +494,8 @@ async function getWeatherSnapshotForLocation(lat, lon, { force = false, ocean = 
   const safeLon = Number(lon);
   if (!Number.isFinite(safeLat) || !Number.isFinite(safeLon)) return null;
   const cacheKey = weatherCacheKey(safeLat, safeLon);
-  const cache = appCtx.weatherCache instanceof Map ? appCtx.weatherCache : (appCtx.weatherCache = new Map());
   const now = Date.now();
-  const cached = cache.get(cacheKey) || null;
+  const cached = weatherStateService.getCachedWeather(cacheKey);
   if (!force && cached && (now - Number(cached.fetchedAtMs || 0)) < WEATHER_REFRESH_INTERVAL_MS) {
     return { ...cached };
   }
@@ -506,7 +506,7 @@ async function getWeatherSnapshotForLocation(lat, lon, { force = false, ocean = 
   const state = buildLiveWeatherState({ lat: safeLat, lon: safeLon, source: 'live_earth_lookup' }, payload);
   state.locationDisplay = String(place?.display || '').trim();
   state.locationShortLabel = String(place?.shortLabel || '').trim();
-  cache.set(cacheKey, state);
+  weatherStateService.setCachedWeather(cacheKey, state);
   return { ...state };
 }
 
@@ -540,19 +540,11 @@ async function refreshLiveWeather(force = false) {
   }
 
   const cacheKey = weatherCacheKey(location.lat, location.lon);
-  const cache = appCtx.weatherCache instanceof Map ? appCtx.weatherCache : (appCtx.weatherCache = new Map());
-  const cached = cache.get(cacheKey) || null;
+  const cached = weatherStateService.getCachedWeather(cacheKey);
   if (!force && cached && (now - Number(cached.fetchedAtMs || 0)) < WEATHER_REFRESH_INTERVAL_MS) {
-    appCtx.liveWeatherState = cached;
+    weatherStateService.setLiveState(cached);
     void refreshLivePlace(location, false).then(() => {
-      if (appCtx.liveWeatherState) {
-        appCtx.liveWeatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.liveWeatherState.locationDisplay || '').trim();
-        appCtx.liveWeatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.liveWeatherState.locationShortLabel || '').trim();
-      }
-      if (appCtx.weatherState) {
-        appCtx.weatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.weatherState.locationDisplay || '').trim();
-        appCtx.weatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.weatherState.locationShortLabel || '').trim();
-      }
+      weatherStateService.updatePlaceLabels();
       updateWeatherUi();
     });
     if ((appCtx.weatherMode || 'live') === 'live') syncActiveWeatherState();
@@ -572,22 +564,15 @@ async function refreshLiveWeather(force = false) {
 
   const ocean = !!appCtx.oceanMode?.active;
   void refreshLivePlace(location, force).then(() => {
-    if (appCtx.liveWeatherState) {
-      appCtx.liveWeatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.liveWeatherState.locationDisplay || '').trim();
-      appCtx.liveWeatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.liveWeatherState.locationShortLabel || '').trim();
-    }
-    if (appCtx.weatherState) {
-      appCtx.weatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.weatherState.locationDisplay || '').trim();
-      appCtx.weatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.weatherState.locationShortLabel || '').trim();
-    }
+    weatherStateService.updatePlaceLabels();
     updateWeatherUi();
   });
   const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean, force }).then((payload) => {
     const state = buildLiveWeatherState(location, payload);
     state.locationDisplay = String(appCtx.livePlaceState?.display || state.locationDisplay || '').trim();
     state.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || state.locationShortLabel || '').trim();
-    appCtx.liveWeatherState = state;
-    cache.set(cacheKey, state);
+    weatherStateService.setLiveState(state);
+    weatherStateService.setCachedWeather(cacheKey, state);
     return state;
   }).catch((err) => {
     console.warn('[weather] live weather fetch failed:', err?.message || err);
@@ -604,7 +589,7 @@ async function refreshLiveWeather(force = false) {
 
 function setWeatherMode(mode = 'live') {
   const nextMode = WEATHER_MODES.includes(mode) ? mode : 'live';
-  appCtx.weatherMode = nextMode;
+  weatherStateService.setMode(nextMode);
   if (nextMode === 'live') {
     syncActiveWeatherState();
     void refreshLiveWeather(false);

@@ -1,3 +1,5 @@
+import { createProviderOutageCircuit } from '../earth-core/provider-outage-circuit.js?v=1';
+
 const WORLDCOVER_WMS_ENDPOINT = 'https://titiler.terrascope.be/wms';
 const WORLDCOVER_LAYER = 'esa-worldcover-map-10m-2021-v2_map';
 const WORLDCOVER_DATE = '2021-01-01';
@@ -10,6 +12,11 @@ const CACHE_STORE_NAME = 'tiles';
 const CACHE_MAX_ENTRIES = 160;
 const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PARALLEL_REQUESTS = 6;
+const PROVIDER_OUTAGE_COOLDOWN_MS = 60 * 1000;
+const providerCircuit = createProviderOutageCircuit({
+  provider: 'esa-worldcover-titiler',
+  cooldownMs: PROVIDER_OUTAGE_COOLDOWN_MS
+});
 
 const WORLD_COVER_CLASSES = [
   { id: 10, name: 'tree', source: [0, 100, 0], tint: [0.76, 0.88, 0.72] },
@@ -95,6 +102,12 @@ function drainRequestQueue() {
       entry.reject(new DOMException('WorldCover request aborted', 'AbortError'));
       continue;
     }
+    try {
+      providerCircuit.assertAvailable();
+    } catch (error) {
+      entry.reject(error);
+      continue;
+    }
     activeRequests += 1;
     Promise.resolve()
       .then(entry.task)
@@ -114,6 +127,12 @@ function scheduleRequestDrain() {
 
 function withRequestSlot(task, signal, priority = 0) {
   return new Promise((resolve, reject) => {
+    try {
+      providerCircuit.assertAvailable();
+    } catch (error) {
+      reject(error);
+      return;
+    }
     requestQueue.push({ task, signal, priority: Number(priority) || 0, resolve, reject });
     scheduleRequestDrain();
   });
@@ -262,7 +281,14 @@ function buildWorldCoverUrl(bounds, size) {
   return `${WORLDCOVER_WMS_ENDPOINT}?${params.toString()}`;
 }
 
-async function fetchWorldCoverBlob(bounds, size, key, signal = null, priority = 0) {
+async function fetchWorldCoverBlob(
+  bounds,
+  size,
+  key,
+  signal = null,
+  priority = 0,
+  requestTimeoutMs = REQUEST_TIMEOUT_MS
+) {
   const memoryBlob = memoryBlobCache.get(key);
   if (memoryBlob) {
     rememberBlob(key, memoryBlob);
@@ -276,9 +302,15 @@ async function fetchWorldCoverBlob(bounds, size, key, signal = null, priority = 
   return withRequestSlot(async () => {
     if (signal?.aborted) throw new DOMException('WorldCover request aborted', 'AbortError');
     const controller = new AbortController();
+    const untrackController = providerCircuit.track(controller);
     const relayAbort = () => controller.abort();
     signal?.addEventListener?.('abort', relayAbort, { once: true });
-    const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let timedOut = false;
+    const timeoutMs = Math.max(25, Number(requestTimeoutMs) || REQUEST_TIMEOUT_MS);
+    const timeoutId = globalThis.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       const response = await fetch(buildWorldCoverUrl(bounds, size), {
         mode: 'cors',
@@ -286,15 +318,34 @@ async function fetchWorldCoverBlob(bounds, size, key, signal = null, priority = 
         cache: 'default',
         signal: controller.signal
       });
-      if (!response.ok) throw new Error(`WorldCover WMS HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = new Error(`WorldCover WMS HTTP ${response.status}`);
+        error.status = Number(response.status);
+        throw error;
+      }
       const blob = await response.blob();
       if (!String(blob.type || '').startsWith('image/')) throw new Error('WorldCover WMS returned a non-image response');
       rememberBlob(key, blob);
       void writeCachedBlob(key, blob);
       return { blob, source: 'network' };
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason || error;
+      if (providerCircuit.isOpen()) throw providerCircuit.unavailableError();
+      const status = Number(error?.status || 0);
+      const outage = timedOut || error instanceof TypeError || status === 429 || status >= 500;
+      if (outage) {
+        const reason = timedOut
+          ? `request timed out after ${timeoutMs} ms`
+          : status
+            ? `HTTP ${status}`
+            : String(error?.message || 'network request failed');
+        throw providerCircuit.trip(reason, controller);
+      }
+      throw error;
     } finally {
       globalThis.clearTimeout(timeoutId);
       signal?.removeEventListener?.('abort', relayAbort);
+      untrackController();
     }
   }, signal, priority);
 }
@@ -414,10 +465,15 @@ export async function loadWorldCoverBaseline(bounds, options = {}) {
     size,
     key,
     options.signal || null,
-    Number(options.priority) || 0
+    Number(options.priority) || 0,
+    Number(options.timeoutMs) || REQUEST_TIMEOUT_MS
   );
   const result = await createSemanticTexture(loaded.blob, size);
   return { ...result, key, source: loaded.source };
+}
+
+export function worldCoverProviderSnapshot() {
+  return providerCircuit.snapshot();
 }
 
 export const WORLD_COVER_ATTRIBUTION =

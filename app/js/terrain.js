@@ -25,7 +25,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=43";
+} from "./terrain/surface-profiles.js?v=44";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,

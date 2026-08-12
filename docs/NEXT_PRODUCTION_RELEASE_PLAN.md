@@ -137,19 +137,28 @@ honest unknown handling and visual comparison against the accepted baseline.
 
 Remaining exit conditions, in order:
 
-1. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
-   one-writer service API and lifecycle tests. During 4.1.4 this is limited to a
-   visual-neutral boundary; semantic behavior migration belongs to 4.2. Do not
-   attempt a full rewrite.
-2. Audit the remaining browser waits that dynamically import runtime modules in
-   repeated predicates. Keep predicates that demonstrably observe the live page
-   realm; replace ambiguous ones with a page-owned readiness signal followed by
-   one awaited outcome assertion. This is an outcome-test correction, not a
-   blanket source-text rewrite.
-3. Resolve or explicitly degrade the WorldCover/Titiler cold-load failure path.
-   A Baltimore hardware-Chrome verification reached the correct published world
-   but took about 54 seconds while 50 Titiler requests failed; no production
-   nomination may rely on that behavior meeting the 15-second cold-load budget.
+1. **Completed locally:** weather mode, live/active weather, resolved place and
+   both weather caches now have one writer in `weather/state-service.js`. The
+   compatibility fields remain readable through `ctx`, and the maintainability
+   gate rejects new direct writers. This is visual-neutral; semantic weather and
+   land-cover behavior did not change.
+2. **Completed for the current release tests:** the browser-wait inventory found
+   one broken/redundant world-matrix readiness path. It passed the timeout object
+   as a predicate argument and then polled the same runtime a second time. The
+   duplicate predicate is removed; one page-owned awaited outcome now owns world
+   readiness. The other 13 asynchronous waits each observe a distinct live-page
+   lifecycle outcome with the correct Playwright signature; they are not
+   mechanically rewritten.
+3. **WorldCover failure fan-out resolved; cold budget still open:** the Titiler
+   owner now opens one provider circuit on timeout/network/429/5xx failure,
+   aborts sibling work, rejects queued work, retains cache reads and retries
+   after a bounded cooldown. Fifty simulated tile requests now complete their
+   unavailable path in about 70 ms after at most six provider calls, instead of
+   draining 50 failed requests in waves. Installed Chrome with WorldCover
+   blocked published Baltimore in 35.8 seconds with 5,125 roads, 26,163
+   buildings, mapped water and all 49 terrain tiles. That proves graceful
+   degradation, but it does not satisfy the 15-second production cold-load
+   budget; the remaining time must be measured and attributed on hardware.
 4. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
    explicit human visual acceptance. Only then nominate the version/deployment.

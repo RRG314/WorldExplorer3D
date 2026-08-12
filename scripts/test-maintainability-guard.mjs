@@ -105,6 +105,16 @@ for (const file of files) {
     failures.push(`${relative}: writes drone mode instead of using travel-mode.js`);
   }
 
+  if (
+    relative !== 'weather/state-service.js' &&
+    (
+      /(?:appCtx|ctx\.appCtx|ctx)\.(?:weatherMode|liveWeatherState|weatherState|livePlaceState|weatherCache|placeCache)\s*=(?!=)/.test(source) ||
+      /Object\.assign\(\s*(?:appCtx|ctx\.appCtx|ctx)\s*,\s*\{[\s\S]{0,600}?\b(?:weatherMode|liveWeatherState|weatherState|livePlaceState|weatherCache|placeCache)\s*[,}]/.test(source)
+    )
+  ) {
+    failures.push(`${relative}: writes weather state instead of using weather/state-service.js`);
+  }
+
   if (relative !== 'env.js' && /appCtx\.travelingToMoon\s*=(?!=)/.test(source)) {
     failures.push(`${relative}: writes environment transition state instead of using env.js`);
   }
@@ -166,7 +176,7 @@ if (failures.length > 0) {
 
 const legacyCount = Object.keys(LEGACY_LINE_BUDGETS).length;
 console.log(`[maintainability] ${files.length} modules checked; ownership boundaries passed.`);
-console.log('[maintainability] Environment, travel-state, collection, world-publication, scene-root, and migrated surface-query ownership checks passed.');
+console.log('[maintainability] Environment, travel-state, weather-state, collection, world-publication, scene-root, and migrated surface-query ownership checks passed.');
 if (sizeAdvisories.length > 0) {
   console.warn(`[maintainability] ${sizeAdvisories.length} size advisories (non-blocking; line count alone is not a release failure):`);
   sizeAdvisories.forEach((advisory) => console.warn(`  - ${advisory}`));

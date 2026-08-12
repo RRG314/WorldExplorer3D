@@ -15,11 +15,11 @@ import {
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
-} from './worldcover-baseline.js?v=14';
+} from './worldcover-baseline.js?v=15';
 import {
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=43';
+} from './surface-profiles.js?v=44';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;

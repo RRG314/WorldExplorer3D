@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { weatherStateService } from './state-service.js?v=1';
 
 const PLACE_API_TIMEOUT_MS = 6500;
 const PLACE_LOCATION_PRECISION = 2;
@@ -117,20 +118,18 @@ function getFallbackPlaceLabel(location) {
 
 function assignResolvedPlace(place, location) {
   const resolved = place?.display ? place : getFallbackPlaceLabel(location);
-  appCtx.livePlaceState = {
+  return weatherStateService.setPlaceState({
     ...resolved,
     lat: location.lat,
     lon: location.lon,
     key: placeCacheKey(location.lat, location.lon)
-  };
-  return appCtx.livePlaceState;
+  });
 }
 
 async function refreshLivePlace(location, force = false) {
   if (!Number.isFinite(location?.lat) || !Number.isFinite(location?.lon)) return appCtx.livePlaceState || null;
   const key = placeCacheKey(location.lat, location.lon);
-  const cache = appCtx.placeCache instanceof Map ? appCtx.placeCache : (appCtx.placeCache = new Map());
-  const cached = cache.get(key) || null;
+  const cached = weatherStateService.getCachedPlace(key);
   if (!force && cached) return assignResolvedPlace(cached, location);
   if (_pendingPlaceRequest?.key === key && !force) {
     try {
@@ -141,7 +140,7 @@ async function refreshLivePlace(location, force = false) {
     return appCtx.livePlaceState || null;
   }
   const promise = fetchPlaceForLocation(location.lat, location.lon).then((place) => {
-    cache.set(key, place);
+    weatherStateService.setCachedPlace(key, place);
     return assignResolvedPlace(place, location);
   }).catch(() => assignResolvedPlace(getFallbackPlaceLabel(location), location)).finally(() => {
     if (_pendingPlaceRequest?.key === key) _pendingPlaceRequest = null;

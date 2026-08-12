@@ -4,6 +4,50 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-12 — WorldCover outage serializes a location through 50 failures
+
+- Status: resolved locally; not pushed or deployed. Overall cold-load budget
+  remains an independent release condition.
+- Symptom: Baltimore eventually published the correct fallback world, but a
+  Titiler outage stretched the load to about 54 seconds while all 50
+  WorldCover requests failed in six-request waves.
+- Root cause: concurrency was bounded, but provider availability was not. Each
+  failed request merely opened another queue slot, so a known-down endpoint was
+  retried once for every terrain tile.
+- Resolution: the WorldCover owner now uses one provider outage circuit. A
+  timeout, network error, HTTP 429 or 5xx response opens a 60-second cooldown,
+  aborts sibling requests and rejects queued/new network work as unavailable.
+  Cached blobs remain usable, caller cancellation does not poison the provider,
+  and the normal mapped/PBR fallback remains unchanged.
+- Evidence: the 50-request browser contract finishes in about 70 ms after six
+  provider calls, one circuit trip and five sibling aborts. A real installed
+  Chrome run with Titiler blocked still published Baltimore with 5,125 roads,
+  26,163 buildings, mapped water, 49 terrain tiles and no fatal console errors.
+- Guard: `npm run test:provider-outage-circuit`,
+  `npm run test:worldcover-provider-outage`, and the blocked-WorldCover world
+  matrix provider snapshot.
+- Never reintroduce: per-tile retries after endpoint availability is already
+  known, a second WorldCover loader, fallback removal, or a higher cold-load
+  budget used to conceal provider-failure fan-out.
+
+## 2026-08-12 — Weather state has multiple mutable-context writers
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: weather mode, live/active weather, reverse-geocoded place labels and
+  caches could be initialized or replaced from multiple modules, making state
+  transitions and lifecycle tests dependent on import order.
+- Root cause: `state.js`, `weather.js`, and the place resolver all treated
+  shared `ctx` fields as writable ownership rather than a compatibility view.
+- Resolution: one weather-state service owns those fields and caches. Existing
+  consumers retain read compatibility, while all mutations use service methods.
+- Evidence: the behavioral service contract, lifecycle contract, mobile
+  portrait/landscape gameplay, module identity, maintainability gate and full
+  PR tier pass.
+- Guard: `npm run test:weather-state` plus `npm run test:maintainability`; the
+  latter rejects direct weather-state writers outside the service.
+- Never reintroduce: import-order initialization of weather state, ad hoc cache
+  replacement, or direct `ctx` assignments from UI/provider modules.
+
 ## 2026-08-11 — Movement outside road coverage scans the entire city every frame
 
 - Status: resolved locally; not pushed or deployed.

@@ -86,17 +86,6 @@ async function ensureRuntime(page) {
 
 async function bootstrapRuntime(page, baseUrl) {
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction(async () => {
-    const mod = await import('/app/js/shared-context.js?v=55');
-    const ctx = mod?.ctx || {};
-    return !!(
-      ctx &&
-      typeof ctx.loadRoads === 'function' &&
-      typeof ctx.switchEnv === 'function' &&
-      ctx.ENV?.EARTH
-    );
-  }, { timeout: 120000 });
-
   await page.evaluate(async () => {
     const deadline = performance.now() + 60000;
     let ctx = null;
@@ -1128,6 +1117,7 @@ async function loadLocation(page, spec) {
       terrainProfileSamples: terrainProfileSamples.slice(0, 5),
       worldCover: {
         stats: ctx.worldCoverStats ? JSON.parse(JSON.stringify(ctx.worldCoverStats)) : null,
+        provider: ctx.getWorldCoverProviderSnapshot?.() || null,
         status: worldCoverStatus,
         samples: worldCoverMeshes
           .filter((mesh) => mesh?.userData?.worldCoverSummary)

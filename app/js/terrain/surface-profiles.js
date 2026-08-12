@@ -5,8 +5,9 @@ import {
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
+  worldCoverProviderSnapshot,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=14";
+} from "./worldcover-baseline.js?v=15";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 
 const SNOW_COLOR_HEX = 0xffffff;
@@ -718,3 +719,5 @@ export function setWorldSurfaceProfile(profile = null) {
   refreshTerrainSurfaceProfiles(profile || null);
   appCtx.scheduleFarTerrainSurfaceRefresh?.();
 }
+
+appCtx.getWorldCoverProviderSnapshot = worldCoverProviderSnapshot;
