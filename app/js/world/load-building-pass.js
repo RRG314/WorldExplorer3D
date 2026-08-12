@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=40";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=41";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,

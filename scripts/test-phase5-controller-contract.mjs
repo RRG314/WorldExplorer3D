@@ -231,6 +231,11 @@ assert.ok(
   stabilizeEarthVehicleSurfaceY(0, 120, 1 / 60, 40) > 119,
   'one transient low terrain sample could still drop the car through a steep surface'
 );
+assert.equal(
+  stabilizeEarthVehicleSurfaceY(-6.07, null, 1 / 60, 0),
+  -6.07,
+  'a reset vehicle surface must accept a below-sea-level tunnel spawn immediately'
+);
 
 let cachedGroundQueries = 0;
 const cachedGroundOptions = [];

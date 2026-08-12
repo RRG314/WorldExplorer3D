@@ -2,7 +2,7 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=11';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=12';
 
 function compatibleTunnelFeature(feature) {
   const semantics = feature?.structureSemantics;
@@ -24,9 +24,10 @@ function linkedTunnelAt(feature, endpoint) {
     if (!compatibleTunnelFeature(other)) return false;
     const ownLayer = Number(feature?.structureSemantics?.layer) || 0;
     const otherLayer = Number(other?.structureSemantics?.layer) || 0;
-    const ownName = String(feature?.name || '').trim().toLowerCase();
-    const otherName = String(other?.name || '').trim().toLowerCase();
-    return ownLayer === otherLayer && (!ownName || !otherName || ownName === otherName);
+    // Exact graph connectivity, tunnel semantics, and layer are the physical
+    // continuity authority. OSM commonly changes the road name/ref within one
+    // tunnel, so requiring matching names created false portals at way seams.
+    return ownLayer === otherLayer;
   });
 }
 

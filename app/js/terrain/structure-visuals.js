@@ -3,20 +3,21 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=40";
+} from "../structure-semantics.js?v=41";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=14";
+} from "./structure-visual-meshes.js?v=15";
 import {
+  canPublishTunnelVisual,
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=15";
+} from "./structure-tunnel-visuals.js?v=17";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety
-} from "../world/bridge-safety.js?v=4";
+} from "../world/bridge-safety.js?v=6";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -61,6 +62,10 @@ export function collectStructureVisualInstances({
   const roadConflictIndex = createDriveableRoadConflictIndex(appCtx.roads);
   const elevatedVisualFeatures = elevatedFeatures.filter((feature) =>
     feature?.structureSemantics?.terrainMode === "elevated" &&
+    (
+      feature?.networkKind !== 'road' ||
+      feature?.transportRecord?.completeness === 'lossless'
+    ) &&
     Array.isArray(feature?.pts) &&
     feature.pts.length >= 2
   );
@@ -108,6 +113,11 @@ export function collectStructureVisualInstances({
     const semantics = feature?.structureSemantics;
     if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || !semantics) continue;
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
+    if (
+      category === 'road' &&
+      feature?.transportRecord?.completeness !== 'lossless' &&
+      !canPublishTunnelVisual(feature)
+    ) continue;
     const isConnectorLike = category === "connector" || category === "footway";
     const isSkywalk = semantics.skywalk || semantics.covered || semantics.indoor;
     const suppressExteriorVisuals = semantics.embeddedInBuilding === true;
@@ -307,7 +317,10 @@ export function collectStructureVisualInstances({
               p2: { x: p2.x, y: endY, z: p2.z },
               halfWidth: barrierHalfWidth,
               sides: barrierSides,
-              height: Number(structureSpecification.barrierHeight) || 1.25
+              // Road bridges use a low concrete parapet. The collision owner
+              // remains full protective height, but a 1.25 m solid visual wall
+              // made ordinary ramps read as narrow trenches.
+              height: 0.58
             });
           }
         }

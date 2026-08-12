@@ -5,11 +5,13 @@ import {
   areRoadsConnected,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
+  sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=40";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=7";
+} from "../structure-semantics.js?v=41";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=8";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { refreshStructureColliders } from "./structure-colliders.js?v=3";
+import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=1";
+import { refreshStructureColliders } from "./structure-colliders.js?v=4";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -272,30 +274,49 @@ export function refreshStructureAwareFeatureProfiles() {
     }
   });
 
-  measure('buildTransitionAnchors', () => {
-    for (let i = 0; i < transportFeatures.length; i++) {
-      const feature = transportFeatures[i];
-      if (!feature) continue;
-      if (feature.structureSemantics?.terrainMode === 'at_grade') {
-        feature.structureTransitionAnchors = [];
-        continue;
+  // A ramp endpoint and the interior freeway segment it joins are one physical
+  // surface. A single anchor pass reads the target's provisional profile and
+  // then recompiles both roads independently, which left real merge steps over
+  // two metres high. Compile one shared graph-node constraint set from the
+  // refined profiles, then rebuild only the grade-separated roads once.
+  // Repeatedly deriving constraints from already-constrained profiles creates
+  // positive feedback through stacked interchanges and lifts decks skyward.
+  // Ordinary roads are not rebuilt here.
+  measure('compileJunctionProfiles', () => {
+    const junctionPasses = 1;
+    let junctionProfile = null;
+    for (let pass = 0; pass < junctionPasses; pass += 1) {
+      for (let i = 0; i < transportFeatures.length; i++) {
+        const feature = transportFeatures[i];
+        if (!feature) continue;
+        if (feature.structureSemantics?.terrainMode === 'at_grade') {
+          feature.structureTransitionAnchors = [];
+          continue;
+        }
+        buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
       }
-      buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
+      junctionProfile = buildTransportJunctionProfileAnchors(
+        transportFeatures,
+        appCtx.transportNetworkModel,
+        worldBaseTerrainY,
+        sampleFeatureSurfaceY
+      );
+      for (const [feature, anchors] of junctionProfile.anchorsByFeature) {
+        feature.structureTransitionAnchors.push(...anchors);
+      }
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        });
+      }
     }
-  });
-
-  measure('buildFinalProfiles', () => {
-    for (let i = 0; i < transportFeatures.length; i++) {
-      const feature = transportFeatures[i];
-      if (!feature) continue;
-      // At-grade profiles were finalized by buildInitialProfiles and receive
-      // no structure stations or transition anchors. Rebuilding all 5,000+
-      // of them here produced an identical model that was immediately replaced.
-      if (feature.structureSemantics?.terrainMode === 'at_grade') continue;
-      updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
-        surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
-      });
-    }
+    appCtx.transportJunctionProfile = Object.freeze({
+      authority: 'compiled_transport_graph_nodes',
+      nodeCount: junctionProfile?.nodeCount || 0,
+      constrainedFeatureCount: junctionProfile?.constrainedFeatureCount || 0,
+      junctionPasses
+    });
   });
 
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));

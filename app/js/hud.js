@@ -37,9 +37,16 @@ function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targ
     return /^(decks|girders|caps|walls|roofs|portals|tunnel_shells|elevated_road_shells)$/.test(type);
   });
   const buildingTargets = (appCtx.buildingMeshes || []).filter((mesh) =>
-    mesh?.visible && mesh?.geometry
+    mesh?.visible && mesh?.geometry?.attributes?.position
   );
-  const targets = [...structureTargets, ...buildingTargets];
+  // A convex elevated road can rise between the car and its nominal chase
+  // point. Buildings/structure shells alone do not catch that, leaving the
+  // camera below the deck and the road filling the whole viewport.
+  const roadTargets = (appCtx.roadMeshes || []).filter((mesh) =>
+    mesh?.visible && mesh?.geometry?.attributes?.position
+  );
+  const targets = [...structureTargets, ...buildingTargets, ...roadTargets]
+    .filter((mesh) => mesh?.geometry?.attributes?.position);
   if (targets.length === 0) {
     chaseCameraCollisionCacheValid = false;
     return { x: targetX, y: targetY, z: targetZ, collided: false };

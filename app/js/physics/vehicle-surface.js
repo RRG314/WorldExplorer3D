@@ -150,9 +150,11 @@ export function createEarthVehicleGroundContactSampler(appCtx, options = {}) {
 
 export function stabilizeEarthVehicleSurfaceY(rawSurfaceY, previousSurfaceY, dt, speed = 0) {
   const raw = Number(rawSurfaceY);
-  const previous = Number(previousSurfaceY);
-  if (!Number.isFinite(raw)) return Number.isFinite(previous) ? previous : 0;
-  if (!Number.isFinite(previous)) return raw;
+  const hasPrevious = previousSurfaceY !== null && previousSurfaceY !== undefined &&
+    previousSurfaceY !== '' && Number.isFinite(Number(previousSurfaceY));
+  const previous = hasPrevious ? Number(previousSurfaceY) : NaN;
+  if (!Number.isFinite(raw)) return hasPrevious ? previous : 0;
+  if (!hasPrevious) return raw;
   const step = Math.max(0, Math.min(0.05, Number(dt) || 0));
   const maximumDownwardStep = Math.max(0.35, step * (8 + Math.abs(Number(speed) || 0) * 0.45));
   return Math.max(raw, previous - maximumDownwardStep);

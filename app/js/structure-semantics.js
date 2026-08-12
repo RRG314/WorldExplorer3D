@@ -3,12 +3,12 @@ import {
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=11';
+} from './world/compiler/transport-surface-model.js?v=12';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=2';
 import {
   assignFeatureConnections,
   assignStructureStackRanks as assignStructureStackRanksByGraph
-} from './structure-semantics/stacking.js?v=5';
+} from './structure-semantics/stacking.js?v=6';
 import {
   boundsIntersect,
   pointInPolygonXZ,

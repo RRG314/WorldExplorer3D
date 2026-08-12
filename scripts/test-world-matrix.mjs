@@ -392,14 +392,43 @@ async function loadLocation(page, spec) {
           [];
         for (const connection of connections) {
           if (connection?.endpoint !== 'interior') continue;
+          const sourcePoint = endpoint === 'start' ? road.pts[0] : road.pts[road.pts.length - 1];
+          const targetRoad = connection.feature || null;
+          const sourceSurfaceY = Number(ctx.sampleFeatureSurfaceY?.(
+            road,
+            Number(sourcePoint?.x),
+            Number(sourcePoint?.z)
+          ));
+          const targetSurfaceY = Number(ctx.sampleFeatureSurfaceY?.(
+            targetRoad,
+            Number(connection?.point?.x ?? sourcePoint?.x),
+            Number(connection?.point?.z ?? sourcePoint?.z),
+            {
+              segIndex: Number(connection.segmentIndex),
+              t: Number(connection.segmentT)
+            }
+          ));
           elevatedInteriorConnections.push({
             sourceFeatureId: String(road.sourceFeatureId || ''),
             name: String(road.name || road.type || ''),
+            sourceWidth: Number(Number(road.width || 0).toFixed(3)),
+            sourceDriveable: road.driveable !== false,
+            sourceRouteState: String(road.transportRecord?.routeState || ''),
+            sourceCompleteness: String(road.transportRecord?.completeness || ''),
             endpoint,
             targetFeatureId: String(connection.feature?.sourceFeatureId || ''),
             targetName: String(connection.feature?.name || connection.feature?.type || ''),
+            targetWidth: Number(Number(targetRoad?.width || 0).toFixed(3)),
+            targetDriveable: targetRoad?.driveable !== false,
+            targetRouteState: String(targetRoad?.transportRecord?.routeState || ''),
+            targetCompleteness: String(targetRoad?.transportRecord?.completeness || ''),
             targetSegmentIndex: Number(connection.segmentIndex),
-            lateralGap: Number((Number(connection.distance) || 0).toFixed(3))
+            connectionMethod: String(connection.provenance?.method || ''),
+            connectionConfidence: Number(Number(connection.provenance?.confidence || 0).toFixed(3)),
+            lateralGap: Number((Number(connection.distance) || 0).toFixed(3)),
+            verticalGap: Number.isFinite(sourceSurfaceY) && Number.isFinite(targetSurfaceY)
+              ? Number(Math.abs(sourceSurfaceY - targetSurfaceY).toFixed(3))
+              : null
           });
         }
         if (connections.length > 0) continue;
@@ -607,6 +636,8 @@ async function loadLocation(page, spec) {
       const targetRoad = (ctx.roads || [])
         .filter((road) =>
           road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
+          road?.transportStructureRef?.driveable === true &&
+          road?.transportRecord?.routeState === 'complete' &&
           Array.isArray(road.pts) &&
           road.pts.length >= 2
         )

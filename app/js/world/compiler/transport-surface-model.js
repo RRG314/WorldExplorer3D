@@ -93,7 +93,7 @@ function normalizeAnchors(feature, semantics, totalDistance) {
     anchors.push({
       distance: clamp(finiteNumber(anchor?.distance), 0, total),
       offset,
-      priority: 2
+      priority: anchor?.source === 'transport_graph_node' ? 3 : 2
     });
   }
 
@@ -267,6 +267,29 @@ function applyEndpointTieIns(
     corrected[index] = clamp(corrected[index], lower, upper);
   }
   return new Float32Array(corrected);
+}
+
+function applyExactGraphNodeConstraints(feature, heights, distances) {
+  const anchors = Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors.filter((anchor) =>
+        anchor?.source === 'transport_graph_node' && Number.isFinite(Number(anchor?.targetSurfaceY)))
+    : [];
+  if (anchors.length === 0 || heights.length === 0) return heights;
+  const corrected = new Float32Array(heights);
+  for (const anchor of anchors) {
+    const targetDistance = Math.max(0, finiteNumber(anchor.distance));
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+    for (let index = 0; index < distances.length; index += 1) {
+      const delta = Math.abs(finiteNumber(distances[index]) - targetDistance);
+      if (delta < nearestDistance) {
+        nearestDistance = delta;
+        nearestIndex = index;
+      }
+    }
+    corrected[nearestIndex] = Number(anchor.targetSurfaceY);
+  }
+  return corrected;
 }
 
 function enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade) {
@@ -609,6 +632,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         maximumGrade
       );
     }
+    centerHeights = applyExactGraphNodeConstraints(feature, centerHeights, sampleDistances);
   }
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating

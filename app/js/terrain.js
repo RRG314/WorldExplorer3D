@@ -2,10 +2,10 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=25";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=6";
+} from "./terrain/structure-visuals.js?v=30";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=7";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=12";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=13";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -53,12 +53,12 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=29";
+} from "./terrain/rebuild.js?v=30";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=6";
+} from "./terrain/debug-tools.js?v=7";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=27";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";

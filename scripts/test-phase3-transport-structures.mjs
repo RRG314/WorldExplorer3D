@@ -6,11 +6,13 @@ import {
 import { classifyStructureSemantics } from '../app/js/structure-semantics/classification.js';
 import { compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system-model.js';
 import { compileTransportStructureModel } from '../app/js/world/compiler/transport-structure-model.js';
+import { buildTransportJunctionProfileAnchors } from '../app/js/world/compiler/transport-junction-profile.js';
+import { isProtectedRoadFeature } from '../app/js/world/bridge-safety.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
 import { PUBLISH_TUNNEL_STRUCTURE_VISUALS } from '../app/js/terrain/structure-visual-meshes.js';
-import { applySafeTunnelRoadPresentation } from '../app/js/world/load-road-pass.js';
 import {
+  canPublishTunnelVisual,
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
 } from '../app/js/terrain/structure-tunnel-visuals.js';
@@ -42,6 +44,7 @@ function structureFeature(id, points, tags, options = {}) {
     }),
     transportRecord: {
       identity: id,
+      completeness: options.completeness || 'lossless',
       routeState: options.routeState || 'complete',
       safeForDriving: options.driveable !== false,
       maxHeightMeters: options.maxHeightMeters || null
@@ -103,13 +106,10 @@ assert.equal(taxonomy.layerOnlyRoad.physicalStructureEvidence, false);
 assert.equal(taxonomy.layerOnlyFootway.terrainMode, 'at_grade');
 assert.equal(taxonomy.layerOnlyFootway.physicalStructureEvidence, false);
 assert.equal(taxonomy.indoorNo.indoor, false);
-const safeTunnelPresentation = applySafeTunnelRoadPresentation(taxonomy.tunnel);
-assert.equal(safeTunnelPresentation.isTunnel, true);
-assert.equal(safeTunnelPresentation.structureKind, 'tunnel');
-assert.equal(safeTunnelPresentation.terrainMode, 'at_grade');
-assert.equal(safeTunnelPresentation.gradeSeparated, false);
-assert.equal(safeTunnelPresentation.topologySeparated, true);
-assert.equal(safeTunnelPresentation.presentationFallback, 'terrain_draped_tunnel_road');
+assert.equal(taxonomy.tunnel.isTunnel, true);
+assert.equal(taxonomy.tunnel.terrainMode, 'subgrade');
+assert.equal(taxonomy.tunnel.gradeSeparated, true);
+assert.equal(taxonomy.tunnel.topologySeparated, true);
 assert.equal(
   shouldOmitUnmatchedElevatedPedestrianFeature(
     { kind: 'footway', subtype: 'footway' },
@@ -180,6 +180,71 @@ assert.ok(
   bridgeA.transportStructureRef.specification.barrierOffset > bridgeA.width * 0.5,
   'bridge barrier was not constrained to the deck side'
 );
+bridgeA.transportRecord.completeness = 'lossless';
+assert.equal(isProtectedRoadFeature(bridgeA), true);
+const generalizedBridgeVisual = structureFeature(
+  'shortbread:generalized-bridge',
+  [{ x: 0, z: 10 }, { x: 60, z: 10 }],
+  { highway: 'primary', bridge: 'yes', layer: '1' }
+);
+generalizedBridgeVisual.transportRecord.completeness = 'generalized';
+assert.equal(
+  isProtectedRoadFeature(generalizedBridgeVisual),
+  false,
+  'generalized structure geometry must not publish hard guardrail collision'
+);
+assert.equal(canPublishTunnelVisual(generalizedBridgeVisual), false);
+
+const mergeMainline = structureFeature(
+  'osm:way:merge-mainline',
+  [{ x: 0, z: 20 }, { x: 100, z: 20 }],
+  { highway: 'motorway' },
+  { width: 10.8, surfaceY: 4 }
+);
+mergeMainline.structureSemantics = classifyStructureSemantics(
+  { highway: 'motorway' },
+  { featureKind: 'road', subtype: 'motorway' }
+);
+const mergeRamp = structureFeature(
+  'osm:way:merge-ramp',
+  [{ x: 50, z: 80 }, { x: 50, z: 20 }],
+  { highway: 'motorway_link', bridge: 'yes', layer: '1' },
+  { width: 6.2, surfaceY: 12 }
+);
+mergeMainline.transportGraphRef = { featureId: mergeMainline.sourceFeatureId };
+mergeRamp.transportGraphRef = { featureId: mergeRamp.sourceFeatureId };
+const mergeConnection = Object.freeze({
+  left: Object.freeze({
+    featureId: mergeRamp.sourceFeatureId,
+    endpoint: 'end',
+    segmentIndex: 0,
+    segmentT: 1,
+    distanceAlong: 60,
+    point: Object.freeze({ x: 50, z: 20 })
+  }),
+  right: Object.freeze({
+    featureId: mergeMainline.sourceFeatureId,
+    endpoint: 'interior',
+    segmentIndex: 0,
+    segmentT: 0.5,
+    distanceAlong: 50,
+    point: Object.freeze({ x: 50, z: 20 })
+  })
+});
+const mergeAnchors = buildTransportJunctionProfileAnchors(
+  [mergeMainline, mergeRamp],
+  { connections: [mergeConnection] },
+  () => 0,
+  (feature) => feature === mergeMainline ? 4 : 12
+);
+assert.equal(mergeAnchors.nodeCount, 1);
+assert.equal(mergeAnchors.constrainedFeatureCount, 1);
+assert.equal(mergeAnchors.anchorsByFeature.get(mergeRamp)[0].targetSurfaceY, 4);
+assert.equal(
+  mergeAnchors.anchorsByFeature.get(mergeRamp)[0].ownerFeatureId,
+  mergeMainline.sourceFeatureId,
+  'ramp merge did not inherit its interior mainline surface'
+);
 
 const incompleteRamp = structureFeature(
   'osm:way:incomplete-ramp',
@@ -217,7 +282,7 @@ assert.equal(underpassModel.portalZones.length, 2);
 const tunnelColliders = compileStructureColliderDescriptors([underpass]);
 const tunnelWalls = tunnelColliders.filter((collider) => collider.structureColliderKind === 'side_wall');
 const tunnelCeilings = tunnelColliders.filter((collider) => collider.structureColliderKind === 'ceiling');
-assert.equal(PUBLISH_TUNNEL_STRUCTURE_VISUALS, false);
+assert.equal(PUBLISH_TUNNEL_STRUCTURE_VISUALS, true);
 assert.equal(tunnelWalls.length, 0);
 assert.equal(tunnelCeilings.length, 0);
 const underpassVisuals = collectTunnelVisualInstances(
@@ -233,6 +298,18 @@ assert.equal(underpassVisuals.shells.length, 1);
 assert.equal(underpassVisuals.portals.length, 0);
 assert.equal(underpassVisuals.lights.length, 0);
 assert.equal(underpassVisuals.shells[0].visualKind, 'underpass');
+
+const generalizedTunnel = structureFeature(
+  'shortbread:generalized-tunnel',
+  [{ x: 0, z: 20 }, { x: 100, z: 20 }],
+  { highway: 'primary', tunnel: 'yes', layer: '-1' },
+  { completeness: 'generalized' }
+);
+generalizedTunnel.tunnelSystemModel = compileTunnelSystemModel(generalizedTunnel, () => 8);
+assert.equal(generalizedTunnel.tunnelSystemModel.visualKind, 'tunnel');
+assert.equal(canPublishTunnelVisual(generalizedTunnel), true);
+generalizedTunnel.transportRecord.routeState = 'incomplete';
+assert.equal(canPublishTunnelVisual(generalizedTunnel), false);
 
 const buildingPassage = structureFeature(
   'osm:way:building-passage',

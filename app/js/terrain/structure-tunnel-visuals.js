@@ -1,7 +1,19 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=41";
 
 function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY) {
   return { x, y, z, scaleX, scaleY, scaleZ, rotationY };
+}
+
+export function canPublishTunnelVisual(feature) {
+  const model = feature?.tunnelSystemModel;
+  const record = feature?.transportRecord;
+  if (feature?.structureSemantics?.terrainMode !== 'subgrade') return false;
+  if (record?.routeState !== 'complete' || record?.safeForDriving === false) return false;
+  if (record?.completeness === 'lossless') return true;
+  // Generalized geometry cannot own collision or engineered bridge details,
+  // but a mapped tunnel centerline plus measured terrain cover can own a
+  // non-colliding shell. Without it fallback routes render beneath raw terrain.
+  return record?.completeness === 'generalized' && model?.visualKind === 'tunnel';
 }
 
 export function collectCoveredVisualInstances(feature, structurePts, deps = {}) {
@@ -91,6 +103,7 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
   if (!Array.isArray(structurePts) || structurePts.length < 2) return { portals, walls, roofs, lights, shells, portalMasks };
 
   const model = feature?.tunnelSystemModel || null;
+  if (!canPublishTunnelVisual(feature)) return { portals, walls, roofs, lights, shells, portalMasks };
   if (!['tunnel', 'underpass'].includes(model?.visualKind)) return { portals, walls, roofs, lights, shells, portalMasks };
   const width = Math.max(3.4, Number(feature?.width) || 6);
   const clearance = Number(model.clearance) || Math.max(3.2, Math.min(4.8, Number(feature?.structureSemantics?.cutDepth || 4.6) - 0.35));

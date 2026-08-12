@@ -368,6 +368,13 @@ export async function fetchShortbreadWorldData(options = {}) {
   const layerNames = ['streets', 'land', 'sites', 'street_polygons'];
   if (includeBuildings) layerNames.push('buildings');
   const elements = convertTilesToElements(tiles, layerNames, bounds);
+  if (metrics.rejected > 0) {
+    for (const element of elements) {
+      if (element?.type === 'way' && element?.tags?.highway) {
+        element.tags._sourceTruncated = 'yes';
+      }
+    }
+  }
   return {
     elements,
     _overpassSource: 'shortbread-vector',

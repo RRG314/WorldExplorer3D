@@ -1,31 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=40";
+import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=41";
 // Installs the final-publication guardrail owner. Guardrails are compiled once
 // after the complete transport graph and accepted terrain are ready.
-import "./bridge-guardrails.js?v=11";
-import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=1";
+import "./bridge-guardrails.js?v=13";
+import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=3";
 import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.18;
-
-export function applySafeTunnelRoadPresentation(structureSemantics) {
-  if (structureSemantics?.isTunnel !== true) return structureSemantics;
-  return {
-    ...structureSemantics,
-    // Keep the tunnel identity and separated topology, but present the route
-    // on the accepted terrain until a trustworthy terrain aperture exists.
-    // This prevents the player, road, and nearby world from being rendered
-    // below the terrain in an empty/inverted scene.
-    structureKind: 'tunnel',
-    terrainMode: 'at_grade',
-    gradeSeparated: false,
-    topologySeparated: true,
-    deckClearance: 0,
-    cutDepth: 0,
-    presentationFallback: 'terrain_draped_tunnel_road',
-    verticalGroup: `at_grade:${Number(structureSemantics.verticalOrder) || -1}:tunnel_fallback`
-  };
-}
 
 // This pass owns transport feature compilation only. Visual publication is
 // intentionally deferred until accepted terrain and structure profiles are
@@ -73,12 +54,10 @@ export async function buildRoadGeometryPass(options = {}) {
     if (pts.length < 2) continue;
 
     const type = way.tags?.highway || 'residential';
-    const structureSemantics = applySafeTunnelRoadPresentation(
-      classifyStructureSemantics(way.tags || {}, {
-        featureKind: 'road',
-        subtype: type
-      })
-    );
+    const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+      featureKind: 'road',
+      subtype: type
+    });
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
     const transportRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,

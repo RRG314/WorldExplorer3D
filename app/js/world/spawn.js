@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=40";
-import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=5";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=41";
+import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=6";
 import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
 
 let worldSpawnDeps = {

@@ -1,4 +1,4 @@
-import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
+import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=41";
 
 function distanceToRoadCenterline(road, x, z) {
   let best = Infinity;
@@ -92,6 +92,10 @@ export function barrierPointConflictsWithDriveableRoad(feature, options = {}) {
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;
   if (semantics?.terrainMode !== 'elevated' || feature?.driveable === false) return false;
+  // Barriers are hard collision geometry. Generalized vector roads preserve
+  // useful mapped centerlines but not enough edge/topology detail to place a
+  // trustworthy barrier, so only lossless structures may own guardrails.
+  if (feature?.transportRecord?.completeness !== 'lossless') return false;
   if (semantics.skywalk || semantics.covered || semantics.indoor || semantics.embeddedInBuilding) return false;
   const category = String(semantics.featureCategory || feature.networkKind || 'road').toLowerCase();
   const type = String(feature?.type || '').toLowerCase();

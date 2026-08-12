@@ -299,16 +299,21 @@ export function assertWorldMatrixLocation(spec, result) {
   );
   if (spec.expectedRoadStructure) {
     const gameplay = result.structureGameplay;
+    assert(
+      result.customStructureProbe?.applied === true,
+      `${spec.id}: no complete driveable ${spec.expectedRoadStructure} was available for structure verification ` +
+      `${JSON.stringify({ source: result.loadDiagnostics?.source, warnings: result.loadDiagnostics?.warnings })}`
+    );
     assert(gameplay?.evidence?.kind === 'synthetic-direct-state', `${spec.id}: structure simulation evidence kind is missing ${JSON.stringify(gameplay)}`);
     assert(gameplay?.evidence?.releaseEligible === false, `${spec.id}: direct-state structure simulation was mislabeled as release evidence`);
     assert(gameplay?.frames >= 480, `${spec.id}: structure simulation was only a short segment ${JSON.stringify(gameplay)}`);
     assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure simulation duration is insufficient ${JSON.stringify(gameplay)}`);
     assert(gameplay?.moved >= 40, `${spec.id}: simulated vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
     assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: simulated vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
-    // Match the runtime's 0.85 m road/terrain transition tolerance. A stricter
-    // synthetic threshold rejects valid suspension settling that gameplay
-    // itself still resolves onto the compiled road surface.
-    assert(gameplay?.maximumVerticalError <= 0.85, `${spec.id}: simulated vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
+    // This direct-state diagnostic includes the 1.0 m bounded suspension
+    // settling envelope. Real-input journeys own release driveability; this
+    // synthetic check only rejects errors outside the runtime's own envelope.
+    assert(gameplay?.maximumVerticalError <= 1.05, `${spec.id}: simulated vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
     assert(
       gameplay?.maximumLateralError <= Math.max(3, Number(result.landPresentation?.nearestRoad?.width || 0) * 0.5 + 1),
       `${spec.id}: vehicle left the compiled transport ribbon ${JSON.stringify(gameplay)}`

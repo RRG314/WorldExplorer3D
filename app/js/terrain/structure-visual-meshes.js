@@ -9,11 +9,10 @@ export function clearStructureVisualMeshesForContext(appCtx) {
   appCtx.replaceWorldCollection('structureVisualMeshes');
 }
 
-// Tunnel walls, roofs, portals, lights, and shells are intentionally withheld
-// until a provider-independent terrain aperture exists. Publishing partial
-// tunnel pieces caused clipping slabs and disconnected geometry in steep
-// locations. The drivable tunnel road and its topology remain available.
-export const PUBLISH_TUNNEL_STRUCTURE_VISUALS = false;
+// Only the compiled tunnel system may publish tunnel enclosure geometry. Its
+// shell ranges are limited to portions with measured terrain cover and its
+// portal approaches are tied to the accepted terrain at both road edges.
+export const PUBLISH_TUNNEL_STRUCTURE_VISUALS = true;
 
 export function buildStructureVisualMeshForContext(appCtx, instances, material, userData = {}) {
   if (!Array.isArray(instances) || instances.length === 0 || typeof THREE === "undefined") return null;

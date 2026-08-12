@@ -4,6 +4,46 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-12 — Ramps snag vehicles and tunnel ways create false portals
+
+- Status: resolved locally; not pushed or deployed. Hardware-Chrome visual
+  acceptance and a clean exact-commit extended release run remain open.
+- Symptom: motorway ramps were narrower than the vehicle/barrier envelope,
+  joined freeways with visible height steps, and could stop the car. Tunnels
+  were flattened to the surface or showed exposed shells at internal OSM way
+  boundaries. The chase camera could also pass below an elevated road.
+- Root cause: link roads shared a 4.2 m fallback width; each structure profile
+  independently chose its merge height; generalized tile topology was treated
+  like exact OSM node topology; a temporary tunnel-presentation fallback erased
+  subgrade semantics; tunnel shell publication was disabled; `Number(null)`
+  reset vehicle elevation to zero; tunnel continuity required matching names;
+  and road meshes were absent from camera obstruction ownership.
+- Resolution: link classes now own complete cross-sections (6.2 m motorway,
+  5.8 m trunk, 5.5 m primary, and 5.2 m secondary/tertiary). One compiled
+  graph-node profile owns merge elevation. Exact OSM nodes remain authoritative;
+  generalized connections require metric and vertical compatibility. Complete
+  fallback roads stay driveable, but generalized bridges cannot publish hard
+  engineered barriers/supports. Measured generalized tunnels may publish only
+  non-colliding shells. Exact tunnel semantics and shell publication are
+  restored, connected tunnel ways remain continuous across name changes, null
+  elevation reset is handled explicitly, and chase-camera obstruction includes
+  live road meshes.
+- Evidence: real ArrowUp Pregerson fallback travel moved 7.18 m with 0.054 m
+  maximum surface error and no collision. Holland exact OSM tunnel, underpass,
+  covered-road, and building-passage journeys passed. The corrected Shortbread
+  tunnel fallback crossed a real measured-cover portal with 0.151 m maximum
+  surface error, zero lateral error/collision, 2.32 m minimum camera height, and
+  no console errors. Inspected interior/exterior frames keep the car visible and
+  the shell below the city surface. `npm run verify:pr` passes all 36 checks.
+- Guard: `npm run test:phase2-transport`, `npm run test:phase3-structures`,
+  `node scripts/test-tunnel-system-model.mjs`, focused real-input structure
+  journeys, the world matrix, and `npm run verify:pr`.
+- Never reintroduce: a universal link width, per-feature merge-height ownership,
+  source node IDs from generalized tiles, name matching as physical tunnel
+  continuity, terrain-draping every tunnel, generalized hard structure collision,
+  a disabled tunnel publisher, or a structure test that teleports onto an
+  explicitly non-driveable route.
+
 ## 2026-08-12 — Completed primary OSM coverage triggers a duplicate vessel query
 
 - Status: resolved locally; not pushed or deployed.

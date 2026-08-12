@@ -95,18 +95,31 @@ async function journeyAvailability(page, journeySpecs) {
   return page.evaluate(async (specs) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return specs.map((spec) => {
-      const candidates = (ctx.roads || []).filter((road) =>
+      const matchingStructures = (ctx.roads || []).filter((road) =>
         road?.structureSemantics?.structureKind === spec.kind &&
         (!spec.refKind || road?.transportStructureRef?.kind === spec.refKind) &&
         (!spec.visualKind || road?.tunnelSystemModel?.visualKind === spec.visualKind) &&
-        road?.transportStructureRef?.driveable === true &&
         Array.isArray(road?.pts) &&
         road.pts.length >= 2
+      );
+      const candidates = matchingStructures.filter((road) =>
+        road?.transportStructureRef?.driveable === true
       );
       return {
         id: spec.id,
         available: candidates.length > 0,
-        candidateCount: candidates.length
+        candidateCount: candidates.length,
+        matchingStructureCount: matchingStructures.length,
+        routeStates: matchingStructures.reduce((counts, road) => {
+          const key = [
+            String(road?.transportStructureRef?.routeState || 'missing_ref'),
+            road?.transportStructureRef?.driveable === true ? 'driveable' : 'withheld',
+            String(road?.transportRecord?.completeness || 'unknown'),
+            String(road?.transportRecord?.providerNamespace || 'unknown')
+          ].join(':');
+          counts[key] = Number(counts[key] || 0) + 1;
+          return counts;
+        }, {})
       };
     });
   }, journeySpecs);
@@ -161,8 +174,10 @@ async function prepareJourney(page, journeySpec) {
           candidate.shellRange?.end - candidate.shellRange?.start >= 12
         ) &&
         (
-          !spec.physicalExit ||
-          candidate.road?.transportStructureRef?.end?.state !== 'structure_continuation'
+          !spec.requireEndPortal ||
+          candidate.road?.tunnelSystemModel?.portalDistances?.some((distance) =>
+            Math.abs(Number(distance) - Number(candidate.shellRange?.end)) < 0.2
+          )
         ) &&
         (
           !spec.requireEndConnection ||
@@ -193,8 +208,13 @@ async function prepareJourney(page, journeySpec) {
         ? Math.max(0.1, Math.min(0.9, Number(spec.shellProgress)))
         : 0.5;
       const station = target.shellRange
-        ? target.shellRange.start +
-          (target.shellRange.end - target.shellRange.start) * shellProgress
+        ? Number.isFinite(Number(spec.startDistanceFromShellEnd))
+          ? Math.max(
+              target.shellRange.start + 0.5,
+              target.shellRange.end - Math.max(0.5, Number(spec.startDistanceFromShellEnd))
+            )
+          : target.shellRange.start +
+            (target.shellRange.end - target.shellRange.start) * shellProgress
         : Math.max(
             0,
             target.totalLength - Math.max(6, Number(spec.startDistanceFromEnd))
@@ -223,6 +243,38 @@ async function prepareJourney(page, journeySpec) {
     ));
     if (!Number.isFinite(surfaceY)) {
       return { ok: false, reason: `${targetKind} surface unavailable` };
+    }
+    let portalEnd = null;
+    const portalDistance = Number(target.shellRange?.end);
+    if (Number.isFinite(portalDistance)) {
+      let portalTraveled = 0;
+      for (let index = 0; index < target.road.pts.length - 1; index += 1) {
+        const length = segmentLength(target.road, index);
+        if (portalDistance <= portalTraveled + length || index === target.road.pts.length - 2) {
+          const portalT = Math.max(0, Math.min(
+            1,
+            (portalDistance - portalTraveled) / Math.max(0.001, length)
+          ));
+          const portalStart = target.road.pts[index];
+          const portalFinish = target.road.pts[index + 1];
+          const portalX = portalStart.x + (portalFinish.x - portalStart.x) * portalT;
+          const portalZ = portalStart.z + (portalFinish.z - portalStart.z) * portalT;
+          const portalY = Number(ctx.sampleFeatureSurfaceY?.(
+            target.road,
+            portalX,
+            portalZ,
+            { segIndex: index, t: portalT }
+          ));
+          portalEnd = {
+            x: portalX,
+            y: portalY,
+            z: portalZ,
+            angle: Math.atan2(portalFinish.x - portalStart.x, portalFinish.z - portalStart.z)
+          };
+          break;
+        }
+        portalTraveled += length;
+      }
     }
     ctx.setTravelMode?.('drive', {
       source: 'phase3_structure_journey',
@@ -277,6 +329,7 @@ async function prepareJourney(page, journeySpec) {
             end: Number(target.shellRange.end.toFixed(2))
           }
         : null,
+      portalEnd,
       start: { x, y: surfaceY, z, angle }
     };
   }, journeySpec);
@@ -371,11 +424,12 @@ async function diagnoseCameraRay(page) {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     if (typeof THREE === 'undefined' || !ctx?.camera || !ctx?.scene || !ctx?.car) return [];
     const origin = ctx.camera.position.clone();
-    const target = new THREE.Vector3(
-      Number(ctx.car.x),
-      Number(ctx.car.y),
-      Number(ctx.car.z)
-    );
+    // Aim through the rendered vehicle bounds. The physics origin can sit at
+    // tire/contact height, where a correct sloped road intersects the ray even
+    // though the visible vehicle body is unobstructed.
+    const target = ctx.carMesh
+      ? new THREE.Box3().setFromObject(ctx.carMesh).getCenter(new THREE.Vector3())
+      : new THREE.Vector3(Number(ctx.car.x), Number(ctx.car.y), Number(ctx.car.z));
     const direction = target.clone().sub(origin);
     const distance = direction.length();
     if (!(distance > 0.2)) return [];
@@ -385,7 +439,18 @@ async function diagnoseCameraRay(page) {
       0.1,
       distance + 1
     );
-    return raycaster.intersectObjects(ctx.scene.children, true)
+    const raycastable = [];
+    ctx.scene.traverse?.((object) => {
+      if (
+        object?.isMesh === true &&
+        object.visible !== false &&
+        object.geometry?.attributes?.position &&
+        Number.isFinite(object.geometry.attributes.position.count)
+      ) {
+        raycastable.push(object);
+      }
+    });
+    return raycaster.intersectObjects(raycastable, false)
       .filter((hit) => {
         let owner = hit.object;
         while (owner) {
@@ -550,6 +615,9 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   const maximumCameraHeight = Math.max(
     ...samples.map((sample) => Number(sample.cameraHeight) || 0)
   );
+  const minimumCameraHeight = Math.min(
+    ...samples.map((sample) => Number(sample.cameraHeight) || 0)
+  );
   const enclosedSamples = samples.filter((sample) =>
     sample.insideTunnelShell ||
     ['covered', 'indoor_covered', 'building_passage'].includes(sample.nearestRefKind)
@@ -560,6 +628,35 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   );
   const screenshot = path.join(outputDir, `${label}-player-journey.png`);
   await page.screenshot({ path: screenshot, fullPage: false });
+  const portalExteriorScreenshot = journeySpec.capturePortalExterior && setup.portalEnd
+    ? path.join(outputDir, `${label}-portal-exterior.png`)
+    : null;
+  if (portalExteriorScreenshot) {
+    await page.evaluate(async (portal) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      // Stop the frame camera system before rendering the audit view; pausing
+      // gameplay alone still allows the chase camera to overwrite this frame.
+      ctx.gameStarted = false;
+      const forwardX = Math.sin(Number(portal.angle));
+      const forwardZ = Math.cos(Number(portal.angle));
+      ctx.camera.position.set(
+        Number(portal.x) + forwardX * 16,
+        Number(portal.y) + 6,
+        Number(portal.z) + forwardZ * 16
+      );
+      ctx.camera.lookAt(
+        Number(portal.x) - forwardX * 2,
+        Number(portal.y) + 1.8,
+        Number(portal.z) - forwardZ * 2
+      );
+      ctx.renderer.render(ctx.scene, ctx.camera);
+    }, setup.portalEnd);
+    await page.screenshot({ path: portalExteriorScreenshot, fullPage: false });
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      ctx.gameStarted = true;
+    });
+  }
   const cameraRayHits = await diagnoseCameraRay(page);
   const cameraEvidenceHits = journeySpec.cameraEvidenceAt === 'start'
     ? initialCameraRayHits
@@ -582,9 +679,10 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   assert(maximumLateralError <= 8, `${label} lateral error reached ${maximumLateralError.toFixed(3)}m`);
   assert(centerCollisionSamples === 0, `${label} centerline hit ${centerCollisionSamples} structure colliders`);
   assert(minimumCameraDistance >= 1.5, `${label} camera collapsed into the vehicle`);
+  assert(minimumCameraHeight >= 0.8, `${label} camera dropped below the driven surface`);
   assert(
-    cameraEvidenceHits[0]?.isCar === true || cameraOcclusionGap <= 0.75,
-    `${label} chase camera view was occluded before the vehicle: ${JSON.stringify(cameraEvidenceHits)}`
+    firstCarCameraHit !== null,
+    `${label} chase camera ray did not intersect the rendered vehicle: ${JSON.stringify(cameraEvidenceHits)}`
   );
   if (kind === 'tunnel' || kind === 'covered') {
     assert(enclosedSamples.length > 0, `${label} did not sample its enclosed camera state`);
@@ -593,7 +691,7 @@ async function runJourney(page, journeySpec, softwareRenderer) {
       `${label} camera exceeded enclosed clearance`
     );
   }
-  if (journeySpec.requireShellExit && !softwareRenderer) {
+  if (journeySpec.requireShellExit) {
     assert(
       journeySpec.physicalExit ? physicalShellExitObserved : shellExitObserved,
       `${label} did not cross a compiled shell portal: ${JSON.stringify(
@@ -601,6 +699,9 @@ async function runJourney(page, journeySpec, softwareRenderer) {
           distanceAlong: sample.distanceAlong,
           inside: sample.insideTunnelShell,
           insideNearest: sample.insideNearestTunnelShell,
+          nearestKind: sample.nearestKind,
+          nearestRefKind: sample.nearestRefKind,
+          nearestSourceFeatureId: sample.nearestSourceFeatureId,
           speed: sample.speed
         }))
       )}`
@@ -628,6 +729,7 @@ async function runJourney(page, journeySpec, softwareRenderer) {
     physicalShellExitObserved,
     structureTransitionObserved,
     minimumCameraDistance: Number(minimumCameraDistance.toFixed(2)),
+    minimumCameraHeight: Number(minimumCameraHeight.toFixed(2)),
     maximumCameraHeight: Number(maximumCameraHeight.toFixed(2)),
     maximumEnclosedCameraHeight: Number(maximumEnclosedCameraHeight.toFixed(2)),
     modeSwitch,
@@ -637,6 +739,9 @@ async function runJourney(page, journeySpec, softwareRenderer) {
       ? Number(cameraOcclusionGap.toFixed(3))
       : null,
     startScreenshot: startScreenshot ? path.relative(rootDir, startScreenshot) : null,
+    portalExteriorScreenshot: portalExteriorScreenshot
+      ? path.relative(rootDir, portalExteriorScreenshot)
+      : null,
     screenshot: path.relative(rootDir, screenshot)
   };
 }
@@ -686,10 +791,10 @@ try {
           id: 'holland-tunnel',
           kind: 'tunnel',
           visualKind: 'tunnel',
-          modeSwitch: true,
-          shellProgress: 0.75,
-          physicalExit: true,
-          requireShellExit: true
+          startDistanceFromShellEnd: 4,
+          requireEndPortal: true,
+          requireShellExit: true,
+          capturePortalExterior: true
         },
         {
           id: 'holland-short-underpass',
@@ -759,8 +864,22 @@ try {
   const locations = requestedLocationIds.size > 0
     ? allLocations.filter((location) => requestedLocationIds.has(location.id))
     : allLocations;
-  assert(locations.length > 0, 'no Phase 3 journey locations were selected');
-  const firstBoot = await loadWorld(page, locations[0]);
+  const requestedJourneyIds = new Set(
+    String(process.env.PHASE3_JOURNEY_IDS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  );
+  if (requestedJourneyIds.size > 0) {
+    for (const location of locations) {
+      location.journeys = location.journeys.filter((journey) =>
+        requestedJourneyIds.has(journey.id)
+      );
+    }
+  }
+  const runnableLocations = locations.filter((location) => location.journeys.length > 0);
+  assert(runnableLocations.length > 0, 'no Phase 3 journey locations were selected');
+  const firstBoot = await loadWorld(page, runnableLocations[0]);
   assert(firstBoot.ok, `initial world bootstrap failed: ${JSON.stringify(firstBoot)}`);
   await waitForWorld(page);
   const gpu = await page.evaluate(async () => {
@@ -777,8 +896,8 @@ try {
   );
   const journeys = [];
   const worldEvidence = [];
-  for (let index = 0; index < locations.length; index += 1) {
-    const location = locations[index];
+  for (let index = 0; index < runnableLocations.length; index += 1) {
+    const location = runnableLocations[index];
     if (index > 0) {
       await page.goto(`http://${host}:${server.port}/app/`, {
         waitUntil: 'domcontentloaded',

@@ -115,6 +115,13 @@ function defaultLaneCount(highway = '', tags = {}) {
 function defaultWidthMeters(highway = '', service = '') {
   const kind = sourceString(highway).toLowerCase();
   const serviceKind = sourceString(service).toLowerCase();
+  // Link roads need a complete drivable cross-section, not only the nominal
+  // lane stripe. The previous 4.2 m catch-all left less than a metre of usable
+  // recovery room beside the vehicle once bridge barriers were installed.
+  if (kind === 'motorway_link') return 6.2;
+  if (kind === 'trunk_link') return 5.8;
+  if (kind === 'primary_link') return 5.5;
+  if (/^(secondary|tertiary)_link$/.test(kind)) return 5.2;
   if (kind === 'motorway') return 10.8;
   if (kind === 'trunk') return 9.3;
   if (kind === 'primary') return 7.9;
@@ -172,8 +179,15 @@ function normalizedCrossSection(tags = {}) {
     widthMeters = explicitWidth;
     widthSource = 'source:width';
   } else if (Number.isFinite(explicitLanes)) {
-    widthMeters = lanes * laneWidthMeters(highway);
-    widthSource = 'derived:lanes';
+    const linkShoulders = highway.endsWith('_link') ? 1.8 : 0;
+    const laneDerivedWidth = lanes * laneWidthMeters(highway) + linkShoulders;
+    // A lane count is not a measured edge-to-edge width. Keep the complete
+    // road-class cross-section when that is wider, especially on one-lane
+    // motorway ramps where barriers otherwise consume the recovery shoulder.
+    widthMeters = highway.endsWith('_link')
+      ? Math.max(defaultWidthMeters(highway, tags.service), laneDerivedWidth)
+      : laneDerivedWidth;
+    widthSource = linkShoulders > 0 ? 'derived:lanes+link-shoulders' : 'derived:lanes';
   } else {
     widthMeters = defaultWidthMeters(highway, tags.service);
     widthSource = 'fallback:road-class';
@@ -213,17 +227,12 @@ export function normalizeTransportSource(source = {}, tags = {}) {
     : 'lossless';
   const crossSection = normalizedCrossSection(tags);
   const access = normalizedAccess(tags);
-  const gradeSeparated = !!(
-    rawTags.bridge ||
-    rawTags.tunnel ||
-    rawTags.covered ||
-    rawTags.location === 'underground' ||
-    Number.parseInt(rawTags.layer, 10)
-  );
   const explicitlyIncomplete = source.incomplete === true || tags._sourceTruncated === 'yes';
-  const safeForDriving = access.motorVehicle !== 'prohibited' &&
-    !(sourceCompleteness === 'generalized' && gradeSeparated) &&
-    !explicitlyIncomplete;
+  // Attribute generalization is not missing route geometry. Shortbread's
+  // complete tile coverage preserves mapped road centerlines and explicit
+  // bridge/tunnel/layer fields, so it remains a valid drive surface. Only an
+  // actually truncated feature or prohibited access makes the route unsafe.
+  const safeForDriving = access.motorVehicle !== 'prohibited' && !explicitlyIncomplete;
 
   return Object.freeze({
     schemaVersion: TRANSPORT_SOURCE_SCHEMA_VERSION,
@@ -238,8 +247,7 @@ export function normalizeTransportSource(source = {}, tags = {}) {
     access,
     crossSection,
     maxHeightMeters: parseMeters(tags.maxheight),
-    routeState: explicitlyIncomplete ? 'incomplete' :
-      sourceCompleteness === 'generalized' && gradeSeparated ? 'uncertain' : 'complete',
+    routeState: explicitlyIncomplete ? 'incomplete' : 'complete',
     safeForDriving,
     provenance: Object.freeze({
       geometry: String(source.geometryProvenance || source.retrieval || 'osm'),

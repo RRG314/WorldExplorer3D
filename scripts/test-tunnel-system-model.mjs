@@ -77,7 +77,7 @@ assert.equal(underpassModel.shellStart, null);
 assert.equal(underpassModel.portalStart, null);
 
 const chainA = tunnelFeature(0, 50, 'Continuous Tunnel');
-const chainB = tunnelFeature(50, 100, 'Continuous Tunnel');
+const chainB = tunnelFeature(50, 100, 'Changed Route Name');
 chainA.connectedFeatures.start.push({ feature: surfaceStart });
 chainA.connectedFeatures.end.push({ feature: chainB });
 chainB.connectedFeatures.start.push({ feature: chainA });

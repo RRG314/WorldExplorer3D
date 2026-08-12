@@ -35,6 +35,45 @@ function verticalCompatible(left, right) {
     finite(a.verticalOrder) === finite(b.verticalOrder);
 }
 
+function sourceTopologyIsAuthoritative(feature) {
+  return feature?.transportRecord?.completeness === 'lossless';
+}
+
+function featureIsLink(feature) {
+  return /_link$/i.test(String(feature?.type || ''));
+}
+
+function sampleCompiledSurface(feature, distance) {
+  const model = feature?.transportSurfaceModel;
+  const distances = model?.distances;
+  const heights = model?.centerHeights;
+  if (!distances?.length || distances.length !== heights?.length) return NaN;
+  const target = Math.max(0, Math.min(finite(distances[distances.length - 1]), finite(distance)));
+  let index = 0;
+  while (index < distances.length - 2 && finite(distances[index + 1]) < target) index += 1;
+  const startDistance = finite(distances[index]);
+  const endDistance = finite(distances[index + 1], startDistance);
+  const span = Math.max(1e-6, endDistance - startDistance);
+  const t = Math.max(0, Math.min(1, (target - startDistance) / span));
+  return finite(heights[index]) + (finite(heights[index + 1]) - finite(heights[index])) * t;
+}
+
+function metricConnectionCompatible(leftDescriptor, rightDescriptor, leftDistance, segmentT, distanceAlong, snapDistance) {
+  const leftFeature = leftDescriptor.feature;
+  const rightFeature = rightDescriptor.feature;
+  if (!verticalCompatible(leftFeature, rightFeature)) {
+    // Generalized vector geometry does not retain OSM node identities. A
+    // cross-mode tie-in is still valid at a near-exact ramp endpoint, but a
+    // generic nearby crossing is not topology.
+    return snapDistance <= 0.35 &&
+      (segmentT <= 0.001 || segmentT >= 0.999 || featureIsLink(leftFeature) || featureIsLink(rightFeature));
+  }
+  if (leftFeature?.structureSemantics?.terrainMode === 'at_grade') return true;
+  const leftY = sampleCompiledSurface(leftFeature, leftDistance);
+  const rightY = sampleCompiledSurface(rightFeature, distanceAlong);
+  return !Number.isFinite(leftY) || !Number.isFinite(rightY) || Math.abs(leftY - rightY) <= 3.5;
+}
+
 function occurrenceIsEndpoint(occurrence) {
   return occurrence?.topologyIndex === 0 ||
     occurrence?.topologyIndex === occurrence?.topologyCount - 1;
@@ -106,7 +145,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
     const points = Array.isArray(feature?.pts) ? feature.pts : [];
     if (points.length < 2) continue;
     const profile = polylineDistances(points);
-    const sourceNodeIds = Array.isArray(feature?.sourceNodeIds)
+    const sourceNodeIds = sourceTopologyIsAuthoritative(feature) && Array.isArray(feature?.sourceNodeIds)
       ? feature.sourceNodeIds.map(String)
       : [];
     const baseFeatureId = featureIdentity(feature, index);
@@ -196,7 +235,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
 
   const sourceNodeOccurrences = new Map();
   for (const descriptor of descriptors) {
-    const topologyNodes = Array.isArray(descriptor.feature?.sourceTopologyNodes)
+    const topologyNodes = sourceTopologyIsAuthoritative(descriptor.feature) && Array.isArray(descriptor.feature?.sourceTopologyNodes)
       ? descriptor.feature.sourceTopologyNodes
       : [];
     for (let index = 0; index < topologyNodes.length; index += 1) {
@@ -296,7 +335,6 @@ function compileTransportNetworkModel(features = [], options = {}) {
       const bestByFeature = new Map();
       for (const candidate of candidates) {
         if (candidate.descriptor === descriptor) continue;
-        if (!verticalCompatible(descriptor.feature, candidate.descriptor.feature)) continue;
         const dx = candidate.b.x - candidate.a.x;
         const dz = candidate.b.z - candidate.a.z;
         const lengthSq = dx * dx + dz * dz;
@@ -315,13 +353,23 @@ function compileTransportNetworkModel(features = [], options = {}) {
           projected.z - endpoint.point.z
         );
         if (distance > tolerance) continue;
+        const candidateDistanceAlong = candidate.distanceBefore + Math.sqrt(lengthSq) * segmentT;
+        if (!metricConnectionCompatible(
+          descriptor,
+          candidate.descriptor,
+          endpoint.endpoint === 'start' ? 0 : descriptor.totalDistance,
+          segmentT,
+          candidateDistanceAlong,
+          distance
+        )) continue;
         const previous = bestByFeature.get(candidate.descriptor);
         if (!previous || distance < previous.distance) {
           bestByFeature.set(candidate.descriptor, {
             candidate,
             segmentT,
             projected,
-            distance
+            distance,
+            distanceAlong: candidateDistanceAlong
           });
         }
       }
@@ -354,7 +402,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
             : match.candidate.segmentIndex,
           segmentIndex: match.candidate.segmentIndex,
           segmentT: match.segmentT,
-          distanceAlong: match.candidate.distanceBefore + segmentLength * match.segmentT,
+          distanceAlong: match.distanceAlong ?? match.candidate.distanceBefore + segmentLength * match.segmentT,
           point: match.projected
         };
         const key = connectionKey(left, right);

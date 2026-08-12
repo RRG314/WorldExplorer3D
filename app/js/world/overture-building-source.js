@@ -1,7 +1,7 @@
 import {
   fetchShortbreadBuildingData,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=11";
+} from "./shortbread-source.js?v=12";
 import {
   OVERTURE_RELEASE,
   fetchOvertureThemeTile,
