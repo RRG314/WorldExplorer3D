@@ -4,6 +4,10 @@ import {
   createWorldLoadRequest,
   isWorldLoadRequestActive
 } from '../app/js/earth-core/world-load-request.js';
+import {
+  captureEarthLoadIntent,
+  restoreEarthLoadIntent
+} from '../app/js/runtime/on-demand-earth.js';
 
 const sourceSelection = {
   key: 'custom',
@@ -69,11 +73,40 @@ assert.equal(createWorldLoadRequest({ key: 'bad', lat: 91, lon: 0 }, 1), null);
 assert.equal(createWorldLoadRequest({ key: 'bad', lat: 0, lon: 'invalid' }, 1), null);
 assert.equal(createWorldLoadRequest({ key: 'bad', lat: 0, lon: 0 }, 0), null);
 
+const lazySelectionState = {
+  key: 'baltimore',
+  name: 'Baltimore',
+  lat: 39.2904,
+  lon: -76.6122
+};
+const lazyAppCtx = {
+  resolveLocationSelection: () => lazySelectionState,
+  selectPresetLocation(key) {
+    lazySelectionState.key = key;
+    lazySelectionState.name = key === 'baltimore' ? 'Baltimore' : 'Monaco';
+    lazySelectionState.lat = key === 'baltimore' ? 39.2904 : 43.7384;
+    lazySelectionState.lon = key === 'baltimore' ? -76.6122 : 7.4246;
+    return true;
+  },
+  setCustomLocation(selection) {
+    Object.assign(lazySelectionState, selection);
+    return true;
+  }
+};
+const capturedLazyIntent = captureEarthLoadIntent(lazyAppCtx);
+lazyAppCtx.selectPresetLocation('monaco');
+assert.equal(capturedLazyIntent.key, 'baltimore');
+assert.equal(capturedLazyIntent.lat, 39.2904);
+assert.equal(restoreEarthLoadIntent(lazyAppCtx, capturedLazyIntent), true);
+assert.equal(lazySelectionState.key, 'baltimore');
+assert.equal(lazySelectionState.lon, -76.6122);
+
 console.log(JSON.stringify({
   ok: true,
   contract: 'immutable-world-load-request',
   behaviors: [
     'selection-snapshot-is-immutable',
+    'lazy-runtime-request-boundary-is-immutable',
     'custom-and-preset-restoration-commands',
     'sequence-and-location-cancellation',
     'suppressed-scene-rejection',
