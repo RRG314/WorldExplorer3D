@@ -17,6 +17,7 @@ import {
   mappedWaterStructurePriority,
   mergeMappedWaterStructures
 } from '../app/js/world/water-structure-source.js?v=3';
+import { shouldFetchSupplementalWaterStructures } from '../app/js/world/load-building-detail.js?v=22';
 
 const water = {
   shape: 'area',
@@ -80,6 +81,24 @@ assert.equal(ship.coverage.primaryWater, water);
 assert.equal(classifyMappedWaterStructure({ historic: 'ship' }).vessel, true);
 assert.equal(mappedWaterStructurePriority({ historic: 'ship' }), 1000);
 assert.equal(mappedWaterStructurePriority({ building: 'yes' }), 0);
+assert.equal(shouldFetchSupplementalWaterStructures({
+  authoritativeMassing: true,
+  waterStructureQueryAvailable: true,
+  primaryCoverageComplete: true,
+  semanticVessels: 0
+}), false, 'A completed primary OSM vessel query must not be requested a second time.');
+assert.equal(shouldFetchSupplementalWaterStructures({
+  authoritativeMassing: true,
+  waterStructureQueryAvailable: true,
+  primaryCoverageComplete: false,
+  semanticVessels: 0
+}), true, 'Shortbread fallback coverage still requires the exact supplemental vessel query.');
+assert.equal(shouldFetchSupplementalWaterStructures({
+  authoritativeMassing: true,
+  waterStructureQueryAvailable: true,
+  primaryCoverageComplete: false,
+  semanticVessels: 1
+}), false, 'Existing mapped vessel evidence must not trigger a duplicate provider request.');
 
 const vesselProfile = mappedVesselVerticalProfile(water.surfaceY);
 assert.equal(vesselProfile.hullBottomY, water.surfaceY - 0.42);

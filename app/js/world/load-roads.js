@@ -7,7 +7,7 @@ import {
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=17";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=21";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=22";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=6";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
@@ -342,6 +342,7 @@ export function createWorldRoadLoader(deps = {}) {
         const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
         startLoadPhase('fetchOverpass');
         let data;
+        let mappedWaterStructureCoverageComplete = false;
         try {
           try {
             // Do not hold an empty world behind the full publication timeout.
@@ -359,6 +360,7 @@ export function createWorldRoadLoader(deps = {}) {
                 { signal }
               )
             );
+            mappedWaterStructureCoverageComplete = true;
           } catch (overpassErr) {
             if (!isActiveLoadContext()) throw overpassErr;
             recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
@@ -560,6 +562,7 @@ export function createWorldRoadLoader(deps = {}) {
             loadMetrics,
             lodThresholds,
             mappedWaterStructureData: data,
+            mappedWaterStructureCoverageComplete,
             maxBuildingWays,
             metadataCacheMeta: buildingMetadataCacheMeta,
             metadataDeadlineMs: Infinity,

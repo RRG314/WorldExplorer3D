@@ -10,6 +10,13 @@ const COMPLETE_BUILDING_TILE_CAP = 1200;
 const BUILDING_COVERAGE_TARGET = 0.85;
 const EXPANDED_COVERAGE_FLOOR = 9001;
 
+export function shouldFetchSupplementalWaterStructures(options = {}) {
+  return options.authoritativeMassing === true &&
+    options.waterStructureQueryAvailable === true &&
+    options.primaryCoverageComplete !== true &&
+    Number(options.semanticVessels || 0) === 0;
+}
+
 export function resolveBuildingPublicationSelection(options = {}) {
   const configuredSafetyCap = Math.max(
     1,
@@ -140,7 +147,12 @@ export async function loadBuildingDetailForPublication(options = {}) {
           { lat: options.location?.lat, lon: options.location?.lon }
         );
         try {
-          if (!waterStructureSummary.semanticVessels) {
+          if (shouldFetchSupplementalWaterStructures({
+            authoritativeMassing,
+            waterStructureQueryAvailable: true,
+            primaryCoverageComplete: options.mappedWaterStructureCoverageComplete,
+            semanticVessels: waterStructureSummary.semanticVessels
+          })) {
             const semanticData = await options.fetchOverpassJSON(
               options.waterStructureQuery,
               options.waterStructureTimeoutMs || options.timeoutMs,

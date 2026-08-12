@@ -166,7 +166,13 @@ Remaining exit conditions, in order:
    hardware-eligible samples and provider-latency attribution remain required.
 4. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
-   explicit human visual acceptance. Only then nominate the version/deployment.
+   explicit human visual acceptance. The bounded `runtime:verify` gate passes
+   at local commit `4ff6207`: its clean staging artifact contains 659 files and
+   all 453 hosted JavaScript sources are reachable with zero orphans. A second
+   duplicate-provider fix now treats the completed primary OSM ship/houseboat
+   query as authoritative even when empty; the Monaco replacement journey uses
+   one Overpass request instead of two and measured 11.27 s while retaining the
+   same published counts. Only then nominate the version/deployment.
 
 The 4.2 semantic-authority train then proceeds in this order:
 

@@ -4,6 +4,31 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-12 — Completed primary OSM coverage triggers a duplicate vessel query
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: locations without mapped ships issued a second Overpass request
+  after Overture buildings loaded, delaying publication even though the first
+  successful OSM response had already queried the same ship and houseboat
+  categories over the same building bounds.
+- Root cause: the building-detail owner treated zero matching vessels as
+  unknown coverage. It did not distinguish a complete exact OSM query that
+  returned zero from the generalized Shortbread fallback, where those semantic
+  categories are genuinely unavailable.
+- Resolution: primary-query coverage is now explicit load-session evidence. A
+  complete zero is terminal; the supplemental exact vessel query runs only
+  after generalized fallback coverage or another incomplete source. Existing
+  mapped vessel records continue to merge into Overture footprints first.
+- Evidence: the replacement-location Chrome journey now records one completed
+  Monaco Overpass request instead of two, while retaining 1,794 roads, 6,633
+  building records, 42 water areas and a published immutable world snapshot.
+  The measured journey fell from about 18.50 s to 11.27 s in these live runs.
+- Guard: `npm run test:hydrology`, `npm run test:provider-cancellation`, and
+  `node scripts/test-world-load-cancellation-browser.mjs`.
+- Never reintroduce: equating an authoritative empty result with unavailable
+  coverage, or issuing a second narrower query whose categories and bounds were
+  already included in the completed primary request.
+
 ## 2026-08-12 — Building publication rescans every mapped water body
 
 - Status: resolved locally; not pushed or deployed. Release-wide cold p95 and
