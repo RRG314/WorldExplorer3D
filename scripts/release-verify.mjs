@@ -26,6 +26,7 @@ const steps = [
   { name: 'Mapped-only roof policy', cmd: [process.execPath, 'scripts/test-roof-inference-policy.mjs'] },
   { name: 'Mapped hydrology integration', cmd: [process.execPath, 'scripts/test-hydrology-integration.mjs'] },
   { name: 'Road junction envelopes', cmd: [process.execPath, 'scripts/test-road-junction-envelopes.mjs'] },
+  { name: 'Indexed bridge-road conflict queries', cmd: [process.execPath, 'scripts/test-bridge-road-conflict-index.mjs'] },
   { name: 'Tunnel-system model', cmd: [process.execPath, 'scripts/test-tunnel-system-model.mjs'] },
   { name: 'Fixed-world horizon ownership', cmd: [process.execPath, 'scripts/test-fixed-world-horizon-architecture.mjs'] },
   { name: 'Global far-world provider matrix', cmd: [process.execPath, 'scripts/test-far-world-global-contract.mjs'] },

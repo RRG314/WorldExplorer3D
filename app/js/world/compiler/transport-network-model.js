@@ -130,6 +130,9 @@ function compileTransportNetworkModel(features = [], options = {}) {
     descriptors.push(descriptor);
   }
   descriptors.sort((left, right) => left.featureId.localeCompare(right.featureId));
+  const descriptorByFeatureId = new Map(
+    descriptors.map((descriptor) => [descriptor.featureId, descriptor])
+  );
 
   const cellKey = (x, z) => `${x},${z}`;
   const segmentCells = new Map();
@@ -444,8 +447,8 @@ function compileTransportNetworkModel(features = [], options = {}) {
   const featureModelById = new Map(featureModels.map((model) => [model.featureId, model]));
 
   for (const connection of connections) {
-    const leftDescriptor = descriptors.find((entry) => entry.featureId === connection.left.featureId);
-    const rightDescriptor = descriptors.find((entry) => entry.featureId === connection.right.featureId);
+    const leftDescriptor = descriptorByFeatureId.get(connection.left.featureId);
+    const rightDescriptor = descriptorByFeatureId.get(connection.right.featureId);
     if (!leftDescriptor || !rightDescriptor) continue;
     const compatibilityEntry = (targetDescriptor, side) => ({
       feature: targetDescriptor.feature,

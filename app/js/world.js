@@ -99,8 +99,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=24";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=39";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=25";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=40";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -159,7 +159,7 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=21";
+} from "./world/structure-aware.js?v=22";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=98";
 import {
   fetchShortbreadWorldData

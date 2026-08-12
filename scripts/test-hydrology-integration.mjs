@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import {
   classifyBuildingWaterRelationship,
   classifyMappedWaterStructure,
+  createWaterAreaSpatialIndex,
   footprintWaterCoverage,
   mappedVesselVerticalProfile
-} from '../app/js/world/water-adjacent-structures.js?v=2';
+} from '../app/js/world/water-adjacent-structures.js?v=3';
 import {
   distanceToWaterBoundary,
   pointInWaterBody
@@ -89,6 +90,37 @@ const adjacentShipCoverage = footprintWaterCoverage(
   [water]
 );
 assert.equal(adjacentShipCoverage.primaryWater, water, 'A mapped ship beside a water polygon hole inherits the nearby datum.');
+
+const distantWaterAreas = Array.from({ length: 500 }, (_, index) => {
+  const minX = 1000 + index * 150;
+  return {
+    shape: 'area',
+    surfaceY: index,
+    bounds: { minX, maxX: minX + 40, minZ: 1000, maxZ: 1040 },
+    pts: rectangle(minX, 1000, minX + 40, 1040),
+    holes: []
+  };
+});
+const indexedWaterAreas = [water, ...distantWaterAreas];
+const waterAreaIndex = createWaterAreaSpatialIndex(indexedWaterAreas);
+const indexedSubmergedBuilding = classifyBuildingWaterRelationship(
+  { building: 'yes' },
+  rectangle(20, 20, 30, 30),
+  indexedWaterAreas,
+  { waterAreaIndex }
+);
+assert.equal(indexedSubmergedBuilding.action, submergedBuilding.action);
+assert.equal(indexedSubmergedBuilding.coverage.primaryWater, water);
+const indexedAdjacentCoverage = footprintWaterCoverage(
+  rectangle(102, 40, 112, 48),
+  indexedWaterAreas,
+  { waterAreaIndex }
+);
+assert.equal(indexedAdjacentCoverage.primaryWater, adjacentShipCoverage.primaryWater);
+assert(
+  waterAreaIndex.snapshot().averageCandidatesPerQuery < indexedWaterAreas.length * 0.05,
+  'Mapped-water lookup should remain local instead of scanning every location water polygon.'
+);
 
 assert.equal(
   waterSurfaceBaseElevation([0, 0, 0.1, 0.2, 7, 9]),

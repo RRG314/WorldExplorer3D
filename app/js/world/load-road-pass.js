@@ -1,6 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=40";
-import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=10";
+// Installs the final-publication guardrail owner. Guardrails are compiled once
+// after the complete transport graph and accepted terrain are ready.
+import "./bridge-guardrails.js?v=11";
 import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=1";
 import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
@@ -138,10 +140,6 @@ export async function buildRoadGeometryPass(options = {}) {
     };
     appCtx.roads.push(roadFeature);
     updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: ROAD_SURFACE_BIAS });
-    if (roadFeature.structureSemantics?.terrainMode === 'elevated') {
-      registerBridgeGuardrails(roadFeature);
-    }
-
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
     } finally {

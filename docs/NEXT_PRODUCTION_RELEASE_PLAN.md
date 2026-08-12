@@ -149,16 +149,21 @@ Remaining exit conditions, in order:
    readiness. The other 13 asynchronous waits each observe a distinct live-page
    lifecycle outcome with the correct Playwright signature; they are not
    mechanically rewritten.
-3. **WorldCover failure fan-out resolved; cold budget still open:** the Titiler
+3. **WorldCover failure fan-out and local cold-load CPU blockers resolved:** the Titiler
    owner now opens one provider circuit on timeout/network/429/5xx failure,
    aborts sibling work, rejects queued work, retains cache reads and retries
    after a bounded cooldown. Fifty simulated tile requests now complete their
    unavailable path in about 70 ms after at most six provider calls, instead of
-   draining 50 failed requests in waves. Installed Chrome with WorldCover
-   blocked published Baltimore in 35.8 seconds with 5,125 roads, 26,163
-   buildings, mapped water and all 49 terrain tiles. That proves graceful
-   degradation, but it does not satisfy the 15-second production cold-load
-   budget; the remaining time must be measured and attributed on hardware.
+   draining 50 failed requests in waves. Subphase traces then found exhaustive
+   per-building mapped-water searches, exhaustive bridge-conflict searches,
+   duplicate structure work and linear transport-descriptor lookup. Indexed
+   queries and removal of temporary/identical publication reduced the identical
+   Baltimore building pass from 7.99 s to 2.00 s and the measured blocked-
+   WorldCover cold load from 23.08 s to 15.59 s while retaining 5,125 roads,
+   26,163 building records, 74 mapped water areas and all 49 terrain tiles.
+   Miami, Tokyo and London browser matrices also pass. The single run is close
+   to the 15-second target but does not establish cold-load p95; repeated
+   hardware-eligible samples and provider-latency attribution remain required.
 4. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
    explicit human visual acceptance. Only then nominate the version/deployment.

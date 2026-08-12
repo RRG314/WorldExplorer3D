@@ -4,6 +4,38 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-12 — Building publication rescans every mapped water body
+
+- Status: resolved locally; not pushed or deployed. Release-wide cold p95 and
+  final visual acceptance remain open.
+- Symptom: the correct 85% building publication took about eight seconds in
+  dense Baltimore even after provider-failure fan-out was fixed.
+- Root cause: every sample of every building footprint linearly searched every
+  mapped water area, including water bodies on the opposite side of the fixed
+  location. The same transport publication also rebuilt bridge guardrail
+  conflicts with exhaustive road scans, recompiled unchanged at-grade profiles,
+  and linearly searched all transport descriptors for each compiled connection.
+- Resolution: one location-scoped water-area index now preserves source-order
+  classification and the exact 45-metre nearby-water rule while returning only
+  spatial candidates. Bridge barriers use an indexed road-conflict query. The
+  initial throwaway guardrail pass and identical final at-grade profile rebuild
+  are removed. Transport connection publication resolves descriptors through
+  its existing unique-ID map.
+- Evidence: on identical Baltimore output (5,125 roads, 26,163 building
+  records, 74 water areas and 49 terrain tiles), mapped-water classification
+  fell from about 5.51 s to 0.18 s, building geometry from 7.99 s to 2.00 s,
+  and the measured cold load from 23.08 s to 15.59 s. The earlier exhaustive
+  bridge visual pass fell from 7.37 s to about 0.12 s. Miami, Tokyo and London
+  browser matrices retained mapped water/building publication with local water
+  classification between 0.10 s and 0.25 s. Transport, hydrology and spatial
+  parity contracts pass.
+- Guard: `npm run test:hydrology`,
+  `npm run test:bridge-road-conflict-index`, `npm run test:phase2-transport`,
+  `npm run test:phase3-structures`, and the blocked-WorldCover Chrome matrix.
+- Never reintroduce: an all-water or all-road scan inside a per-feature loop,
+  temporary guardrail/collider publication before the final compiled graph, an
+  identical second profile pass, or descriptor lookup by repeated array scan.
+
 ## 2026-08-12 — WorldCover outage serializes a location through 50 failures
 
 - Status: resolved locally; not pushed or deployed. Overall cold-load budget

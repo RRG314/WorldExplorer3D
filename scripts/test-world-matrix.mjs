@@ -1124,6 +1124,12 @@ async function loadLocation(page, spec) {
           .slice(0, 5)
           .map((mesh) => ({ ...mesh.userData.worldCoverSummary }))
       },
+      transportPublication: ctx.transportSurfacePublication
+        ? JSON.parse(JSON.stringify(ctx.transportSurfacePublication))
+        : null,
+      structureProfileCompilation: ctx.structureProfileCompilation
+        ? JSON.parse(JSON.stringify(ctx.structureProfileCompilation))
+        : null,
       terrainSurface: {
         imageryOwners: terrainImageryOwners,
         rasterUrls: terrainRasterUrls,

@@ -14,8 +14,9 @@ import {
 } from "./structure-tunnel-visuals.js?v=15";
 import {
   barrierPointConflictsWithDriveableRoad,
+  createDriveableRoadConflictIndex,
   elevatedSegmentSafety
-} from "../world/bridge-safety.js?v=3";
+} from "../world/bridge-safety.js?v=4";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -57,6 +58,7 @@ export function collectStructureVisualInstances({
   const elevatedFeatures = []
     .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
     .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
+  const roadConflictIndex = createDriveableRoadConflictIndex(appCtx.roads);
   const elevatedVisualFeatures = elevatedFeatures.filter((feature) =>
     feature?.structureSemantics?.terrainMode === "elevated" &&
     Array.isArray(feature?.pts) &&
@@ -254,7 +256,7 @@ export function collectStructureVisualInstances({
               x: midX + nx * railOffset * side,
               z: midZ + nz * railOffset * side,
               deckY,
-              roads: appCtx.roads
+              roadIndex: roadConflictIndex
             })) continue;
             addBeam(
               guardrailInstances,
@@ -296,7 +298,7 @@ export function collectStructureVisualInstances({
               x: midX + nx * barrierHalfWidth * side,
               z: midZ + nz * barrierHalfWidth * side,
               deckY,
-              roads: appCtx.roads
+              roadIndex: roadConflictIndex
             })
           );
           if (barrierSides.length > 0) {

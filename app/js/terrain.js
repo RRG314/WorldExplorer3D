@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=24";
+} from "./terrain/structure-visuals.js?v=25";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=6";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=12";
@@ -53,7 +53,7 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=28";
+} from "./terrain/rebuild.js?v=29";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,

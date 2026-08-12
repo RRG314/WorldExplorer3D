@@ -29,6 +29,7 @@ const steps = [
   ['Building geometry quality', 'scripts/test-building-geometry-quality.mjs'],
   ['Mapped-only roof policy', 'scripts/test-roof-inference-policy.mjs'],
   ['Road junction envelopes', 'scripts/test-road-junction-envelopes.mjs'],
+  ['Indexed bridge-road conflict queries', 'scripts/test-bridge-road-conflict-index.mjs'],
   ['Globe selector contract', 'scripts/test-globe-selector-contract.mjs'],
   ['Loading transition contract', 'scripts/test-loading-transition-contract.mjs'],
   ['Fixed-world horizon ownership', 'scripts/test-fixed-world-horizon-architecture.mjs'],

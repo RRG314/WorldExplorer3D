@@ -106,6 +106,7 @@
     "test:startup-workload-browser": "node scripts/test-startup-workload-browser.mjs",
     "test:initial-play-workload": "npm run test:initial-play-policy && npm run test:startup-workload-browser",
     "test:road-junctions": "node scripts/test-road-junction-envelopes.mjs",
+    "test:bridge-road-conflict-index": "node scripts/test-bridge-road-conflict-index.mjs",
     "test:globe-selector": "node scripts/test-globe-selector-contract.mjs",
     "test:globe-selector-browser": "node scripts/test-globe-selector-browser.mjs",
     "test:ocean-global-bathymetry": "node scripts/test-ocean-global-bathymetry.mjs",
