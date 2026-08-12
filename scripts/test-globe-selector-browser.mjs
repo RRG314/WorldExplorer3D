@@ -176,6 +176,15 @@ const geolocationLaunch = (await page.evaluate(() => window.__selectorLaunchCapt
 assertCoordinate(geolocationLaunch.customLoc.lat, 39.123456, 'geolocation latitude');
 assertCoordinate(geolocationLaunch.customLoc.lon, -76.654321, 'geolocation longitude');
 
+let globalBathymetryRequests = 0;
+await page.route('https://wms.gebco.net/mapserv?*', (route) => {
+  globalBathymetryRequests += 1;
+  return route.fulfill({
+    status: 200,
+    contentType: 'text/plain',
+    body: "GetFeatureInfo results:\nvalue_list = '-4300'"
+  });
+});
 const oceanStarted = await page.evaluate(async () => {
   const { ctx } = await import('/app/js/shared-context.js?v=55');
   ctx.globeSelector?.close?.();
@@ -188,7 +197,9 @@ const oceanStarted = await page.evaluate(async () => {
 assert.equal(oceanStarted, true);
 await page.waitForFunction(async () => {
   const { ctx } = await import('/app/js/shared-context.js?v=55');
-  return ctx.oceanMode?.globalBathymetryReady === true;
+  const grid = ctx.oceanMode?.globalBathymetryGrid;
+  return ctx.oceanMode?.globalBathymetryReady === true &&
+    grid?.dataset === 'GEBCO_2024 Grid' && grid?.values?.length === 25;
 }, null, { timeout: 60000 });
 const globalBathymetry = await page.evaluate(async () => {
   const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -203,6 +214,8 @@ const globalBathymetry = await page.evaluate(async () => {
 assert.equal(globalBathymetry.dataset, 'GEBCO_2024 Grid');
 assert.equal(globalBathymetry.sampleCount, 25);
 assert(globalBathymetry.negativeDepths >= 20);
+assert.equal(globalBathymetryRequests, 25);
+await page.unroute('https://wms.gebco.net/mapserv?*');
 await page.screenshot({ path: path.join(outputDir, 'pacific-global-bathymetry.png'), fullPage: true });
 
 assert.deepEqual(errors, [], `selector emitted errors: ${JSON.stringify(errors)}`);
