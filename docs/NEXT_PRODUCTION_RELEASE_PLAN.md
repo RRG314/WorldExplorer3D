@@ -48,13 +48,104 @@ Completed in the current tranche:
   15–22 ms to 0.01–0.1 ms and held car, walk, drone, and plane outer-region p95
   frame time to 17.6–17.7 ms with stable publication. Minimap redraws remained
   bounded at 4–10.5 ms, so no additional preload or map pipeline was added.
+- Weather and touch-control listeners now have named disposable lifecycle
+  owners. The redundant permanent weather-clock and 220 ms touch polling
+  intervals were removed; the active gameplay presentation scheduler owns the
+  one-second weather clock update, while existing state changes and HUD updates
+  refresh touch controls. Behavioral tests prove disposal and browser tests
+  prove both feature owners retain zero intervals.
+
+### Version boundary and solid release goals
+
+The work is split into two release trains so a broad data-model change cannot
+silently alter the accepted 4.1.4 presentation while the patch is being made
+production-ready:
+
+- **4.1.4 patch candidate — stabilize the accepted world.** Preserve the
+  accepted one-location terrain, mapped water, building coverage, horizon and
+  controls. Finish bounded loading, lifecycle ownership, the WorldCover failure
+  path, truthful tests, Chrome gameplay verification and immutable artifact
+  verification. Only visual-neutral provenance or precedence guards may enter
+  this train.
+- **4.2 semantic-authority train — make every world classification
+  explainable.** Centralize the source hierarchy and migrate one domain at a
+  time behind fixtures. This is not a rewrite and it is not permission to swap
+  OSM for Overture everywhere. It may start only from the accepted and measured
+  4.1.4 patch baseline.
+
+The current production goal is therefore concrete: nominate the 4.1.4 patch
+only when its four remaining exit conditions below pass without changing the
+accepted visuals. The following 4.2 goal is to make a rendered building, road,
+terrain, land-cover or water decision traceable to source evidence and a
+versioned rule, with inferred content unable to override mapped content.
+
+### Semantic authority policy
+
+External datasets provide geographic facts. Application rules remain necessary
+for rendering, collision, navigation, level of detail and honest missing-data
+fallbacks. A source must not be treated as a complete renderer, and a renderer
+must not invent geography and present it as mapped truth.
+
+Every semantic decision uses this precedence, from strongest to weakest:
+
+1. explicit mapped measurement;
+2. explicit mapped category;
+3. value derived from the documented source schema;
+4. constrained application fallback;
+5. unknown or unavailable.
+
+A weaker result may fill an absent field, but it may never replace a stronger
+result. Every normalized or derived output must retain `source`, source release
+or schema identity, source feature ID when available, semantic rule-pack
+version, confidence and one of `mapped`, `derived`, or `inferred`. Unknown must
+remain representable; it must not be converted to zero, water, asphalt, a roof
+shape or a fabricated building merely to fill the view.
+
+| Domain | Primary authority | Secondary/fallback authority | Non-negotiable rule |
+|---|---|---|---|
+| Building footprints | Overture Buildings for broad global coverage | OSM building parts and metadata; conservative extrusion only when measurements are absent | Do not merge two equal footprint owners or let inferred footprints replace mapped footprints |
+| Building height and roofs | Explicit OSM/Overture measurements and categories | OSM Simple 3D Buildings derivation; labeled height fallback | Unknown roofs are flat; no invented roof shape may be presented as mapped |
+| Roads | Current normalized OSM transport product | Evaluate Overture Transportation later behind the same compiler; conservative width fallback | One topology provider owns each publication; source `level` is ordering, not exact elevation |
+| Terrain height | Accepted, datum-normalized DEM artifact/provider | Worldwide DEM fallback with explicit uncertainty | Missing height remains unavailable, never numeric zero |
+| Land cover | ESA WorldCover baseline | Exact OSM `natural`, `landuse`, and mapped surface areas | Latitude, weather, density and aesthetic ratios cannot override mapped classification |
+| Water | Mapped polygons and waterways, plus accepted ocean/bathymetry evidence | Explicit unavailable state | Never fabricate water presence, city-wide water planes or boundary-filling water |
+| Parks and hardscape | Exact mapped areas over the land-cover baseline | Neutral natural fallback | No city-wide asphalt or grass decision based only on building/road density |
+| Decorative detail | Renderer-owned, deterministic and seeded | None | Mark non-authoritative; decoration cannot affect geographic truth, collision or routing |
+
+The existing transport source normalizer, building provenance model, surface
+contract, accepted-ground authority and mapped-water ownership are foundations
+to keep. The following current heuristic owners require controlled 4.2 review,
+not deletion during the patch train:
+
+- `app/js/surface-rules.js`: latitude, elevation, weather and hand-tuned surface
+  ratios;
+- `app/js/building-semantics.js`: inferred heights and caps;
+- `app/js/world/inferred-building-footprints.js`: manufactured road-frontage
+  footprints;
+- `app/js/world/roof-details.js`: procedural rooftop equipment;
+- `app/js/structure-semantics/classification.js`: inferred bridge clearances and
+  tunnel depth;
+- `app/js/world/settlement-density-policy.js`: hand-authored density thresholds.
+
+For 4.2, introduce one versioned semantic rule pack and a read-only decision
+record before migrating behavior. Then migrate land cover, buildings, transport
+vertical semantics and decorative detail separately. Inferred buildings must be
+an explicitly enabled approximate-coverage fallback, and should be disabled
+where Overture coverage is sufficient. No domain migration passes without
+worldwide fixtures proving mapped-over-derived precedence, stable provenance,
+honest unknown handling and visual comparison against the accepted baseline.
 
 Remaining exit conditions, in order:
 
-1. Make feature timers/listeners disposable and active only while their owner is
-   active, beginning with weather and touch controls.
-2. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
-   one-writer service API and lifecycle tests. Do not attempt a full rewrite.
+1. Migrate one high-change domain at a time out of shared mutable `ctx`, with a
+   one-writer service API and lifecycle tests. During 4.1.4 this is limited to a
+   visual-neutral boundary; semantic behavior migration belongs to 4.2. Do not
+   attempt a full rewrite.
+2. Audit the remaining browser waits that dynamically import runtime modules in
+   repeated predicates. Keep predicates that demonstrably observe the live page
+   realm; replace ambiguous ones with a page-owned readiness signal followed by
+   one awaited outcome assertion. This is an outcome-test correction, not a
+   blanket source-text rewrite.
 3. Resolve or explicitly degrade the WorldCover/Titiler cold-load failure path.
    A Baltimore hardware-Chrome verification reached the correct published world
    but took about 54 seconds while 50 Titiler requests failed; no production
@@ -62,6 +153,28 @@ Remaining exit conditions, in order:
 4. Run the extended release suite, worldwide visual matrix, hardware-eligible
    Chrome performance session, immutable production artifact verification, and
    explicit human visual acceptance. Only then nominate the version/deployment.
+
+The 4.2 semantic-authority train then proceeds in this order:
+
+1. Add a versioned semantic decision record and source-precedence contract,
+   initially as an observation-only path beside accepted 4.1.4 behavior.
+2. Replace tests that assert filenames, line counts or source text with
+   behavior tests for precedence, provenance, unknown handling and single-owner
+   publication. Audit browser waits that dynamically import application modules
+   inside repeated predicates; prefer a page-owned readiness signal followed by
+   one awaited state assertion so readiness and evidence come from the same
+   application execution context.
+3. Make WorldCover the baseline land-cover authority and restrict OSM overlays
+   to exact mapped geometry; remove climate/weather/density overrides.
+4. Apply explicit building measurements first, documented schema derivation
+   second and labeled fallback last; make inferred footprint coverage opt-in.
+5. Preserve one normalized transport topology owner and explicitly distinguish
+   ordering, clearance, layer and measured elevation.
+6. Isolate seeded decorative roof/scene detail from authoritative geometry and
+   from collision/navigation products.
+7. Run the worldwide scenario matrix, provenance snapshots, Chrome visual
+   review and performance budgets after every domain migration. Promote only
+   domains whose evidence improves without a visual or gameplay regression.
 
 Current measured budgets are regression ceilings, not production targets:
 10 s runtime-ready, 220 requests, 190 local scripts, 3.1 MB local encoded data,

@@ -15,6 +15,7 @@ import {
 } from './weather/place-resolver.js?v=1';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
 import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
 const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const WEATHER_CHECK_INTERVAL_MS = 5000;
@@ -34,7 +35,7 @@ let _lastWeatherVisualSignature = '';
 let _lastWeatherUiSignature = '';
 let _lastWeatherCheckMs = 0;
 let _pendingWeatherRequest = null;
-let _weatherUiClockInterval = null;
+const weatherLifecycleScope = createLifecycleScope('weather-ui');
 
 const WEATHER_PRESETS = {
   clear: { label: 'Clear', icon: '☀️', category: 'clear', cloudCover: 8, haze: 0.92, sunFactor: 1, fillFactor: 1, exposureFactor: 1.02, cloudColor: WEATHER_CLEAR_COLOR, skyTint: 0xd8efff },
@@ -643,14 +644,6 @@ function getWeatherSnapshot() {
   };
 }
 
-function ensureWeatherUiClockTicker() {
-  if (_weatherUiClockInterval || typeof window === 'undefined') return;
-  _weatherUiClockInterval = window.setInterval(() => {
-    if (document?.hidden) return;
-    updateWeatherUi();
-  }, 1000);
-}
-
 function inspectWeatherDescriptor(weatherCode, cloudCover = 0, isDay = true) {
   const descriptor = weatherCodeDescriptor(weatherCode);
   return {
@@ -663,27 +656,33 @@ function inspectWeatherDescriptor(weatherCode, cloudCover = 0, isDay = true) {
   };
 }
 
+function disposeWeatherUi(reason = 'weather-ui-disposed') {
+  return weatherLifecycleScope.dispose(reason);
+}
+
 Object.assign(appCtx, {
   applyWeatherPresentation,
   cycleWeatherMode,
+  disposeWeatherUi,
   fetchWeatherSnapshotForLocation: getWeatherSnapshotForLocation,
   getHudLocationLabel,
   getWeatherSnapshot,
   inspectWeatherDescriptor,
+  updateWeatherUi,
   refreshLiveWeather,
   setWeatherMode,
   syncWeatherState: syncActiveWeatherState
 });
 
-ensureWeatherUiClockTicker();
 updateWeatherUi();
 if (typeof window !== 'undefined') {
-  window.addEventListener('resize', positionHudClock);
+  weatherLifecycleScope.listen(window, 'resize', positionHudClock);
 }
 
 export {
   applyWeatherPresentation,
   cycleWeatherMode,
+  disposeWeatherUi,
   getWeatherSnapshotForLocation,
   getHudLocationLabel,
   getWeatherSnapshot,

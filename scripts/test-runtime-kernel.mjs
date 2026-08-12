@@ -125,11 +125,31 @@ assert.equal(fixedSnapshot.phases.input[0].fixedUpdates, 0);
 assert.equal(fixedSnapshot.phases.simulation[0].updates, 2);
 assert.equal(fixedSnapshot.phases.simulation[0].fixedUpdates, 0);
 
+let weatherUiUpdates = 0;
+const presentationCtx = {
+  gameStarted: true,
+  showLargeMap: false,
+  updateHUD() {},
+  drawMinimap() {},
+  updateWeatherUi() { weatherUiUpdates += 1; }
+};
+const presentationSystem = createCoreFrameSystems(presentationCtx)
+  .find((system) => system.id === 'core.presentation');
+assert.equal(presentationSystem.enabled(), true);
+presentationSystem.update({ dt: 0.4, flags: {} });
+presentationSystem.update({ dt: 0.4, flags: {} });
+assert.equal(weatherUiUpdates, 0, 'Weather UI updated before its owned one-second cadence.');
+presentationSystem.update({ dt: 0.4, flags: {} });
+assert.equal(weatherUiUpdates, 1, 'Gameplay presentation did not own the weather clock update.');
+presentationCtx.gameStarted = false;
+assert.equal(presentationSystem.enabled(), false, 'Presentation scheduler remained active outside gameplay.');
+
 console.log(JSON.stringify({
   ok: true,
   phases: RUNTIME_PHASES,
   frameNumber: snapshot.frameNumber,
   systems: Object.values(snapshot.phases).flat().map((system) => system.id),
   directFrameSimulationUpdates: fixedSnapshot.phases.simulation[0].updates,
+  weatherUiUpdates,
   manualAdvance: advanceResult
 }, null, 2));

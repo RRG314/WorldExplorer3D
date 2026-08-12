@@ -35,7 +35,8 @@ function contextOptions(device) {
 }
 
 async function waitForRuntime(page) {
-  await page.waitForFunction(async () => {
+  await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 90000 });
+  const ready = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return typeof ctx?.loadRoads === 'function' &&
       typeof ctx?.setTravelMode === 'function' &&
@@ -43,7 +44,8 @@ async function waitForRuntime(page) {
       !!ctx?.ENV?.EARTH &&
       ctx.runtimeReady === true &&
       globalThis.__WE3D_RUNTIME_READY__ === true;
-  }, null, { timeout: 90000 });
+  });
+  assert(ready, 'Runtime-ready event fired before required mobile APIs were installed.');
 }
 
 async function selectBaltimoreAndExplore(page) {
@@ -55,6 +57,27 @@ async function selectBaltimoreAndExplore(page) {
 async function assertTitleTouch(page, baseUrl) {
   await page.goto(`${baseUrl}/app/?mobile-title=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await waitForRuntime(page);
+  const lifecycle = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    if (typeof ctx.getLifecycleRegistrySnapshot !== 'function') return null;
+    const scopes = ctx.getLifecycleRegistrySnapshot().scopes;
+    const owners = Object.fromEntries(['mobile-controls', 'weather-ui'].map((owner) => {
+      const owned = scopes.filter((scope) => scope.owner === owner);
+      return [owner, {
+        scopes: owned.length,
+        resources: owned.reduce((total, scope) => total + scope.resourceCount, 0),
+        intervals: owned.reduce((total, scope) => total + Number(scope.resources?.interval || 0), 0)
+      }];
+    }));
+    return owners;
+  });
+  assert(lifecycle, 'Lifecycle registry API was unavailable after runtime readiness.');
+  assert(lifecycle['mobile-controls'].scopes === 1 && lifecycle['mobile-controls'].resources > 0,
+    `Touch controls do not have one disposable listener owner: ${JSON.stringify(lifecycle)}`);
+  assert(lifecycle['mobile-controls'].intervals === 0,
+    `Touch controls retained the duplicate polling interval: ${JSON.stringify(lifecycle)}`);
+  assert(lifecycle['weather-ui'].scopes === 1 && lifecycle['weather-ui'].intervals === 0,
+    `Weather UI retained an unowned clock interval: ${JSON.stringify(lifecycle)}`);
   await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
   assert(await page.locator('#proAccessPanel').evaluate((el) => el.hidden), 'Touch title was blocked by the automatic donation panel');
   await page.locator('.globe-hub-tools [data-globe-destination="settings"]').tap();

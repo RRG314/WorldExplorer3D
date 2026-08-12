@@ -4,6 +4,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
   let mapTimer = 0;
   let lodTimer = 0;
   let weatherTimer = 0;
+  let weatherUiTimer = 0;
   let boatTimer = 0;
   let liveEarthTimer = 0;
   const workspaceOpen = () => hooks.isEditorWorkspaceOpen?.() || hooks.isActivityCreatorOpen?.();
@@ -98,6 +99,11 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'presentation',
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
+        weatherUiTimer += frame.dt;
+        if (weatherUiTimer >= 1) {
+          weatherUiTimer %= 1;
+          appCtx.updateWeatherUi?.();
+        }
         hudTimer += frame.dt;
         if (hudTimer > 0.066) {
           hudTimer = 0;

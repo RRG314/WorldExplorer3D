@@ -53,6 +53,7 @@
     "test:production-candidate": "npm run test:production-readiness && npm run test:player-drive-input && npm run test:runtime && npm run test:world-matrix",
     "test:production-gate": "node scripts/verify-production-gate.mjs",
     "test:release-candidate": "node scripts/test-release-candidate.mjs",
+    "test:lifecycle-scope": "node scripts/test-lifecycle-scope.mjs",
     "test:runtime-kernel": "node scripts/test-runtime-kernel.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",

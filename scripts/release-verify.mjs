@@ -48,6 +48,7 @@ const steps = [
   { name: 'Inferred building coverage', cmd: [process.execPath, 'scripts/test-inferred-building-coverage.mjs'] },
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
   { name: 'Local data safety', cmd: [process.execPath, 'scripts/test-local-data-safety.mjs'] },
+  { name: 'Disposable lifecycle resources', cmd: [process.execPath, 'scripts/test-lifecycle-scope.mjs'] },
   { name: 'Runtime kernel', cmd: [process.execPath, 'scripts/test-runtime-kernel.mjs'] },
   { name: 'Transport controller registry', cmd: [process.execPath, 'scripts/test-transport-controller-registry.mjs'] },
   { name: 'Platform service registry', cmd: [process.execPath, 'scripts/test-platform-service-registry.mjs'] },
