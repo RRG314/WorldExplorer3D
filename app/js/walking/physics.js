@@ -262,10 +262,13 @@ function createWalkingPhysicsHelpers({
 
       let newX = state.walker.x + moveX;
       let newZ = state.walker.z + moveZ;
-      const checkBuildings = !isPlanetarySurface() && (getBuildingsArray || getNearbyBuildings);
+      const sharedBuildingCollision = !isPlanetarySurface() && typeof appCtx.checkBuildingCollision === "function"
+        ? appCtx.checkBuildingCollision
+        : null;
+      const checkBuildingsFallback = !isPlanetarySurface() && !sharedBuildingCollision && (getBuildingsArray || getNearbyBuildings);
       const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === "function";
-      if (checkBuildings || checkBuildBlocks) {
-        const allBuildings = checkBuildings ? queryBuildings(newX, newZ, 32) || [] : [];
+      if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks) {
+        const allBuildings = checkBuildingsFallback ? queryBuildings(newX, newZ, 32) || [] : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
         const sampleRadius = 0.28;
         const collisionSamples = [
@@ -277,12 +280,20 @@ function createWalkingPhysicsHelpers({
         ];
 
         function isBlockedByWorld(px, pz) {
+          if (sharedBuildingCollision) {
+            const collision = sharedBuildingCollision(px, pz, sampleRadius, {
+              actorBaseY: walkerFeetY,
+              actorHeight: CFG.eyeHeight * 0.95
+            });
+            if (collision?.collision) return true;
+          }
+
           for (let s = 0; s < collisionSamples.length; s += 1) {
             const sample = collisionSamples[s];
             const sx = px + sample[0];
             const sz = pz + sample[1];
 
-            if (checkBuildings) {
+            if (checkBuildingsFallback) {
               for (let i = 0; i < allBuildings.length; i += 1) {
                 const b = allBuildings[i];
                 if (!b || b.collisionDisabled) continue;

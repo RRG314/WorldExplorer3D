@@ -27,6 +27,7 @@ import {
   stabilizeEarthVehicleSurfaceY
 } from '../app/js/physics/vehicle-surface.js';
 import { findSweptVehicleBuildingCollision } from '../app/js/physics/building-collision-response.js';
+import { createWalkingPhysicsHelpers } from '../app/js/walking/physics.js';
 import fs from 'node:fs';
 import { PLANE_MAX_SPEED_MPS } from '../app/js/plane-mode.js';
 
@@ -73,6 +74,77 @@ const sweptCollision = findSweptVehicleBuildingCollision(
 assert.ok(sweptCollision, 'swept collision missed a thin building between frame endpoints');
 assert.ok(sweptCollision.x >= 9.5 && sweptCollision.x <= 10.5);
 assert.ok(sweptCollision.lastSafeX < 9.5);
+
+const sharedCollisionBeforeWalkContract = ctx.checkBuildingCollision;
+const blockCollisionBeforeWalkContract = ctx.getBuildCollisionAtWorldXZ;
+const readActionsBeforeWalkContract = ctx.readControlActions;
+const onMoonBeforeWalkContract = ctx.onMoon;
+const onMarsBeforeWalkContract = ctx.onMars;
+let sharedWalkCollisionCalls = 0;
+const walkState = {
+  walker: {
+    x: 0,
+    y: 1.7,
+    z: 0,
+    angle: 0,
+    yaw: 0,
+    lookYawOffset: 0,
+    pitch: 0,
+    speedMph: 0,
+    vy: 0,
+    onGround: true,
+    wallJumpTimer: 0,
+    onBuilding: false
+  },
+  characterMesh: null
+};
+try {
+  ctx.checkBuildingCollision = () => {
+    sharedWalkCollisionCalls += 1;
+    return { collision: false };
+  };
+  ctx.getBuildCollisionAtWorldXZ = undefined;
+  ctx.readControlActions = () => ({ move: 1 });
+  ctx.onMoon = false;
+  ctx.onMars = false;
+  const walkingPhysics = createWalkingPhysicsHelpers({
+    CFG: {
+      walkSpeed: 6,
+      runSpeed: 12,
+      turnSpeed: 2.6,
+      eyeHeight: 1.7,
+      blockStepHeight: 0.65,
+      wallJumpVelocity: 7.2,
+      wallJumpOutward: 0.28,
+      wallDetectRadius: 1.65,
+      wallJumpCooldown: 0.18
+    },
+    animateCharacterWalk: () => {},
+    getBuildingsArray: () => [{
+      minX: -1,
+      maxX: 1,
+      minZ: -1,
+      maxZ: 1,
+      minY: 0,
+      maxY: 3,
+      pts: [{ x: -1, z: -1 }, { x: 1, z: -1 }, { x: 1, z: 1 }, { x: -1, z: 1 }]
+    }],
+    getNearbyBuildings: null,
+    getWalkGroundY: () => 0,
+    isPointInPolygon: () => true,
+    keys: {},
+    state: walkState
+  });
+  walkingPhysics.updateWalkPhysics(1 / 60, (value, fallback = 0) => Number.isFinite(value) ? value : fallback);
+} finally {
+  ctx.checkBuildingCollision = sharedCollisionBeforeWalkContract;
+  ctx.getBuildCollisionAtWorldXZ = blockCollisionBeforeWalkContract;
+  ctx.readControlActions = readActionsBeforeWalkContract;
+  ctx.onMoon = onMoonBeforeWalkContract;
+  ctx.onMars = onMarsBeforeWalkContract;
+}
+assert.ok(sharedWalkCollisionCalls > 0, 'walking bypassed the shared building collision authority');
+assert.ok(walkState.walker.z > 0.09, 'a duplicate walking collision path overruled the shared collision result');
 
 actions = keyboardControlActions({ KeyA: true, ArrowLeft: true }, 'drone');
 assert.equal(actions.turn, 1);
@@ -296,6 +368,7 @@ console.log(JSON.stringify({
   v31ArrowMovementWasdCameraRestored: true,
   primaryModeOrderCharacterCarPlaneDrone: true,
   directionChangesBrakeBeforeGearChange: true,
+  walkingUsesSharedCollisionAuthority: true,
   reverseSteeringKeepsPathDirection: true,
   steeringAngleCannotCrossTangentSingularity: true,
   droneUsesV31TurnAndIndependentCameraControls: true,
