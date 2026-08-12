@@ -2,8 +2,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { startStaticRootServer } from './test-static-server.mjs';
 
-const baseUrl = process.env.GLOBE_SELECTOR_URL || 'http://127.0.0.1:4302/app/?build=selector-browser-test';
+const rootDir = process.cwd();
+const externalBaseUrl = String(process.env.GLOBE_SELECTOR_URL || '').trim();
+const server = externalBaseUrl ? null : await startStaticRootServer({
+  rootDir,
+  host: '127.0.0.1',
+  candidatePorts: [4302, 4303, 4304, 4305]
+});
+const baseUrl = externalBaseUrl ||
+  `http://127.0.0.1:${server.port}/app/?build=selector-browser-test`;
 const origin = new URL(baseUrl).origin;
 const outputDir = path.resolve('output/playwright/globe-selector');
 await fs.mkdir(outputDir, { recursive: true });
@@ -47,6 +56,7 @@ async function stubTitleLaunch() {
   });
 }
 
+try {
 await openSelector();
 assert.equal(await page.locator('.globe-system-bar').count(), 0, 'legacy live status strip should be removed');
 const destinationButtons = page.locator('.globe-destination-bar button');
@@ -214,4 +224,7 @@ console.log(JSON.stringify({
   ]
 }, null, 2));
 
-await browser.close();
+} finally {
+  await browser.close();
+  await server?.close();
+}
