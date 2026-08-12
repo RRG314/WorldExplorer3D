@@ -158,6 +158,28 @@ async function settleVisualFrame(page) {
   await page.waitForTimeout(500);
 }
 
+async function readPanelVisualState(page, panelId) {
+  return page.evaluate((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return { exists: false };
+    const style = getComputedStyle(panel);
+    const rect = panel.getBoundingClientRect();
+    return {
+      exists: true,
+      rootedInBody: panel.parentElement === document.body,
+      show: panel.classList.contains('show'),
+      display: style.display,
+      visibility: style.visibility,
+      opacity: Number(style.opacity),
+      width: rect.width,
+      height: rect.height,
+      childCount: panel.children.length,
+      position: style.position,
+      inset: [style.top, style.right, style.bottom, style.left]
+    };
+  }, panelId);
+}
+
 async function runBlockBuilderAudit(page) {
   await page.waitForFunction(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -168,6 +190,7 @@ async function runBlockBuilderAudit(page) {
   const visual = await page.evaluate(async () => {
     const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod?.ctx || {};
+    await ctx.ensureBlockBuilderReady?.();
     ctx.Walk?.setModeWalk?.();
     ctx.setTimeOfDay?.('day');
     ctx.clearAllBuildBlocks?.({ persist: false });
@@ -329,6 +352,7 @@ async function runAudit(page, baseUrl) {
     return mod.ctx.getEditorSnapshot();
   });
   await settleVisualFrame(page);
+  report.editor.openVisual = await readPanelVisualState(page, 'editorPanel');
   await page.screenshot({ path: path.join(outputDir, 'editor-open.png') });
   console.log('[audit] close editor');
   await page.evaluate(async () => {
@@ -352,6 +376,7 @@ async function runAudit(page, baseUrl) {
     return mod.ctx.getActivityCreatorSnapshot();
   });
   await settleVisualFrame(page);
+  report.activityCreator.openVisual = await readPanelVisualState(page, 'activityCreatorPanel');
   await page.screenshot({ path: path.join(outputDir, 'activity-creator-open.png') });
   console.log('[audit] close activity creator');
   await page.evaluate(async () => {
@@ -546,8 +571,20 @@ function assertReport(report) {
   if (!report.multiplayer.init?.hasApi) throw new Error('Multiplayer API did not initialize.');
   if (!report.multiplayer.init?.methods?.syncRoomWorldContext) throw new Error('Multiplayer world sync API is missing.');
   if (report.editor.open?.active !== true) throw new Error('Editor did not open.');
+  if (report.editor.openVisual?.rootedInBody !== true || report.editor.openVisual?.show !== true ||
+    report.editor.openVisual?.display === 'none' ||
+    report.editor.openVisual?.visibility === 'hidden' || report.editor.openVisual?.opacity <= 0 ||
+    report.editor.openVisual?.width < 1 || report.editor.openVisual?.height < 1) {
+    throw new Error(`Editor panel is not visibly rendered: ${JSON.stringify(report.editor.openVisual)}`);
+  }
   if (report.editor.closed?.active !== false) throw new Error('Editor did not close cleanly.');
   if (report.activityCreator.open?.active !== true) throw new Error('Activity creator did not open.');
+  if (report.activityCreator.openVisual?.rootedInBody !== true || report.activityCreator.openVisual?.show !== true ||
+    report.activityCreator.openVisual?.display === 'none' ||
+    report.activityCreator.openVisual?.visibility === 'hidden' || report.activityCreator.openVisual?.opacity <= 0 ||
+    report.activityCreator.openVisual?.width < 1 || report.activityCreator.openVisual?.height < 1) {
+    throw new Error(`Activity creator panel is not visibly rendered: ${JSON.stringify(report.activityCreator.openVisual)}`);
+  }
   if (report.activityCreator.closed?.active !== false) throw new Error('Activity creator did not close cleanly.');
   if (!(report.creatorLibrary.afterSave > report.creatorLibrary.before)) throw new Error('Creator library save did not persist.');
   if (!(report.creatorLibrary.afterRemove <= report.creatorLibrary.afterSave - 1)) throw new Error('Creator library cleanup did not remove the saved draft.');
