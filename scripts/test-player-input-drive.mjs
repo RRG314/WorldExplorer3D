@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 import { classifyEvidence } from './production-readiness.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
 
 const rootDir = process.cwd();
 const outputDir = path.join(
@@ -13,6 +14,7 @@ const outputDir = path.join(
   'player-input-drive'
 );
 const reportPath = path.join(outputDir, 'report.json');
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 const requestedSeconds = Number(process.env.PLAYER_DRIVE_SECONDS || 60);
 const targetSeconds = Math.max(20, requestedSeconds);
 const headed = process.env.PLAYER_DRIVE_HEADED === '1';
@@ -772,6 +774,7 @@ try {
 
   report = {
     ok: false,
+    evidenceIdentity,
     generatedAt: new Date().toISOString(),
     location: 'Baltimore',
     targetSeconds,
@@ -915,6 +918,7 @@ try {
   await fs.writeFile(reportPath, JSON.stringify({
     ...(report || {}),
     ok: false,
+    evidenceIdentity,
     error: String(error?.message || error)
   }, null, 2));
   throw error;

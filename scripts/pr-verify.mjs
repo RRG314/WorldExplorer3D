@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 // plus one measured browser boot. Provider matrices, hosting artifacts, visual
 // review, and hardware performance belong to release:verify.
 const steps = [
+  ['Release evidence identity', 'scripts/test-release-evidence-identity.mjs'],
   ['Earth-core ownership boundaries', 'scripts/test-earth-core-boundaries.mjs'],
   ['Immutable world-load request', 'scripts/test-world-load-request.mjs'],
   ['Published world location identity', 'scripts/test-world-location-identity.mjs'],

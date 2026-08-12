@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { evaluateRuntimeReadiness } from './production-readiness.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
 import { exercisePlanetaryRoundTrip } from './runtime-planetary-check.mjs';
 import { mkdirp, startServer } from './runtime-test-server.mjs';
 
@@ -10,6 +11,7 @@ const rootDir = process.cwd();
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputDir = path.join(rootDir, 'output', 'playwright', 'runtime-invariants');
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 // Initial play budgets building candidates, then removes footprints that overlap
 // transport corridors. Assert useful scene density without requiring unsafe infill.
 const MINIMUM_RENDERED_BUILDINGS = 100;
@@ -1470,6 +1472,7 @@ async function main() {
 
     const fullReport = {
       ok,
+      evidenceIdentity,
       url: baseUrl,
       checks,
       metrics: report,
@@ -1620,6 +1623,7 @@ main().catch(async (err) => {
     await fs.writeFile(reportPath, JSON.stringify({
       ...existing,
       ok: false,
+      evidenceIdentity,
       error: err?.message || String(err)
     }, null, 2));
   } catch {

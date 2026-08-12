@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { verifyVisualReview } from './production-readiness.mjs';
+import {
+  evaluateReleaseEvidenceIdentity,
+  getReleaseEvidenceIdentity
+} from './release-evidence-identity.mjs';
 
 const rootDir = process.cwd();
 const outputLabel = /^[a-z0-9._-]+$/i.test(
@@ -16,6 +20,7 @@ const worldMatrixDir = path.join(
 const visualReviewFile = String(
   process.env.WORLD_MATRIX_VISUAL_REVIEW_FILE || ''
 ).trim();
+const currentEvidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 
 async function readReport(filePath, label) {
   try {
@@ -55,8 +60,24 @@ const visualReview = await verifyVisualReview({
   outputDir: worldMatrixDir,
   expectedFiles: screenshots
 });
+const runtimeIdentity = evaluateReleaseEvidenceIdentity(
+  runtime.evidenceIdentity,
+  currentEvidenceIdentity
+);
+const playerDriveIdentity = evaluateReleaseEvidenceIdentity(
+  playerDrive.evidenceIdentity,
+  currentEvidenceIdentity
+);
+const worldMatrixIdentity = evaluateReleaseEvidenceIdentity(
+  worldMatrix.evidenceIdentity,
+  currentEvidenceIdentity
+);
 
 const checks = {
+  candidateSourceClean: currentEvidenceIdentity.sourceDirty === false,
+  runtimeEvidenceCurrent: runtimeIdentity.ok,
+  playerDriveEvidenceCurrent: playerDriveIdentity.ok,
+  worldMatrixEvidenceCurrent: worldMatrixIdentity.ok,
   runtimeReady: runtime.ok === true,
   realInputDrivePassed:
     playerDrive.ok === true &&
@@ -80,6 +101,12 @@ const result = {
       path.join(worldMatrixDir, 'report.json')
     ),
     screenshotCount: screenshots.length,
+    currentEvidenceIdentity,
+    reportIdentities: {
+      runtime: runtimeIdentity,
+      playerDrive: playerDriveIdentity,
+      worldMatrix: worldMatrixIdentity
+    },
     reportErrors: [
       runtime.readError,
       playerDrive.readError,

@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const steps = [
+  { name: 'Release evidence identity', cmd: [process.execPath, 'scripts/test-release-evidence-identity.mjs'] },
   { name: 'Production readiness semantics', cmd: [process.execPath, 'scripts/test-production-readiness-contract.mjs'] },
   { name: 'Earth-core isolation boundary', cmd: [process.execPath, 'scripts/test-earth-core-boundaries.mjs'] },
   { name: 'Immutable world-load request', cmd: [process.execPath, 'scripts/test-world-load-request.mjs'] },

@@ -9,8 +9,10 @@ import {
 } from './production-readiness.mjs';
 import { assertWorldMatrixLocation } from './world-matrix-assertions.mjs';
 import { startStaticRootServer } from './test-static-server.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
 
 const rootDir = process.cwd();
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputLabel = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_OUTPUT_LABEL || '')) ?
@@ -1313,6 +1315,7 @@ async function main() {
   });
 
   const report = {
+    evidenceIdentity,
     generatedAt: new Date().toISOString(),
     baseUrl,
     locations: []
@@ -1444,6 +1447,7 @@ main().catch(async (err) => {
       JSON.stringify(
         {
           ...existingReport,
+          evidenceIdentity,
           generatedAt: new Date().toISOString(),
           pass: false,
           error: String(err?.message || err)
