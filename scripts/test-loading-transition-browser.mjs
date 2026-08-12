@@ -2,8 +2,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { startStaticRootServer } from './test-static-server.mjs';
 
-const baseUrl = process.env.TEST_BASE_URL || 'http://127.0.0.1:4192';
+const rootDir = process.cwd();
+const externalBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
+const server = externalBaseUrl ? null : await startStaticRootServer({
+  rootDir,
+  host: '127.0.0.1',
+  candidatePorts: [4192, 4194, 4195, 4196]
+});
+const baseUrl = externalBaseUrl || `http://127.0.0.1:${server.port}`;
 const outputDir = path.join(process.cwd(), 'output', 'playwright', 'loading-transition');
 fs.mkdirSync(outputDir, { recursive: true });
 
@@ -36,4 +44,5 @@ try {
   console.log(JSON.stringify({ ok: true, ...result }, null, 2));
 } finally {
   await browser.close();
+  await server?.close();
 }
