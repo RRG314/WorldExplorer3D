@@ -132,6 +132,9 @@ try {
         roads: ctx.roads?.length || 0,
         detailedBuildings: ctx.buildings?.length || 0,
         farBuildings: Number(ctx.farTerrainClipmapState?.farBuildings || 0),
+        farBuildingsAvailable: Number(ctx.farTerrainClipmapState?.farBuildingsAvailable || 0),
+        farBuildingSelectionCoverage: Number(ctx.farTerrainClipmapState?.farBuildingSelectionCoverage || 0),
+        farBuildingPublishedCoverage: Number(ctx.farTerrainClipmapState?.farBuildingPublishedCoverage || 0),
         farTerrainStatus: ctx.farTerrainClipmapState?.status || null,
         traversalRadius: Number(ctx.worldTraversalRadiusWorld || 0),
         regionalBridges: bridges.length,
@@ -176,7 +179,7 @@ try {
       `${scenario.id} is missing ${scenario.expectedBridge}: ${JSON.stringify(report.namedBridges.slice(0, 30))}`
     );
     assert.ok(
-      report.farBuildings >= 10000,
+      report.farBuildings >= 50000 && report.farBuildingPublishedCoverage >= 0.84,
       `${scenario.id} outer building coverage is too sparse: ${JSON.stringify(report)}`
     );
     assert.ok(

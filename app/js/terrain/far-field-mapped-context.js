@@ -6,7 +6,11 @@ import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
+// Preserve exact footprint geometry for the most visually important regional
+// buildings and publish the rest through one instanced low-detail owner.
 const FAR_CONTEXT_MAX_BUILDINGS = 26000;
+const FAR_CONTEXT_BUILDING_COVERAGE_TARGET = 0.85;
+const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 500000;
 const FAR_CONTEXT_BUILDING_MAX_TILES = 144;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
@@ -47,6 +51,74 @@ function ringSpanMeters(ring) {
   const northSouth = (bounds.maxLat - bounds.minLat) * 110540;
   const eastWest = (bounds.maxLon - bounds.minLon) * 111320 * Math.cos(centerLatitude * Math.PI / 180);
   return Math.max(northSouth, eastWest);
+}
+
+function farBuildingBoxDescriptor(ring, properties, identity) {
+  const bounds = ringBounds(ring);
+  const centerLat = (bounds.minLat + bounds.maxLat) * 0.5;
+  const centerLon = (bounds.minLon + bounds.maxLon) * 0.5;
+  if (![centerLat, centerLon].every(Number.isFinite)) return null;
+  const eastMetersPerDegree = Math.max(1000, 111320 * Math.cos(centerLat * Math.PI / 180));
+  const points = (ring || []).map((coordinate) => ({
+    x: (Number(coordinate?.[0]) - centerLon) * eastMetersPerDegree,
+    z: -(Number(coordinate?.[1]) - centerLat) * 110540
+  })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.z));
+  if (points.length < 3) return null;
+  let meanX = 0;
+  let meanZ = 0;
+  for (const point of points) {
+    meanX += point.x / points.length;
+    meanZ += point.z / points.length;
+  }
+  let xx = 0;
+  let xz = 0;
+  let zz = 0;
+  for (const point of points) {
+    const dx = point.x - meanX;
+    const dz = point.z - meanZ;
+    xx += dx * dx;
+    xz += dx * dz;
+    zz += dz * dz;
+  }
+  const axisAngle = 0.5 * Math.atan2(2 * xz, xx - zz);
+  const axisX = Math.cos(axisAngle);
+  const axisZ = Math.sin(axisAngle);
+  let minU = Infinity;
+  let maxU = -Infinity;
+  let minV = Infinity;
+  let maxV = -Infinity;
+  let signedArea = 0;
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+    const point = points[index];
+    const u = point.x * axisX + point.z * axisZ;
+    const v = -point.x * axisZ + point.z * axisX;
+    minU = Math.min(minU, u);
+    maxU = Math.max(maxU, u);
+    minV = Math.min(minV, v);
+    maxV = Math.max(maxV, v);
+    signedArea += points[previous].x * point.z - point.x * points[previous].z;
+  }
+  const areaMeters = Math.abs(signedArea) * 0.5;
+  const widthMeters = maxU - minU;
+  const depthMeters = maxV - minV;
+  if (![areaMeters, widthMeters, depthMeters].every(Number.isFinite) ||
+      areaMeters < 14 || areaMeters > 350000 || widthMeters <= 0.5 || depthMeters <= 0.5) return null;
+  const centerU = (minU + maxU) * 0.5;
+  const centerV = (minV + maxV) * 0.5;
+  const eastOffset = centerU * axisX - centerV * axisZ;
+  const southOffset = centerU * axisZ + centerV * axisX;
+  return {
+    ring,
+    properties,
+    priority: areaMeters,
+    centerLat: centerLat - southOffset / 110540,
+    centerLon: centerLon + eastOffset / eastMetersPerDegree,
+    widthMeters,
+    depthMeters,
+    areaMeters,
+    rotationY: -axisAngle,
+    identity
+  };
 }
 
 function retainFarWaterRing(ring) {
@@ -275,10 +347,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   const tiles = contextBatch.values;
   const buildingBuckets = [];
   let skippedNearBuildings = 0;
-  const buildingsPerTile = Math.max(
-    240,
-    Math.ceil(FAR_CONTEXT_MAX_BUILDINGS / Math.max(1, coordinates.length) * 1.35)
-  );
+  let availableBuildings = 0;
 
   for (const tileRecord of tiles) {
     const buildingLayer = tileRecord.tile.layers.buildings;
@@ -298,24 +367,39 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
           skippedNearBuildings += 1;
           continue;
         }
-        const span = Math.max(bounds.maxLat - bounds.minLat, bounds.maxLon - bounds.minLon);
-        tileBuildings.push({
+        const descriptor = farBuildingBoxDescriptor(
           ring,
-          properties: geojson.properties || {},
-          priority: span,
-          centerLat,
-          centerLon,
-          identity: `${tileRecord.x}/${tileRecord.y}/${feature.id ?? index}/${tileBuildings.length}`
-        });
+          geojson.properties || {},
+          `${tileRecord.x}/${tileRecord.y}/${feature.id ?? index}/${tileBuildings.length}`
+        );
+        if (descriptor) tileBuildings.push(descriptor);
       }
     }
-    buildingBuckets.push(selectSpatiallyDistributedBuildings(tileBuildings, buildingsPerTile));
+    availableBuildings += tileBuildings.length;
+    buildingBuckets.push(selectSpatiallyDistributedBuildings(
+      tileBuildings,
+      Math.ceil(tileBuildings.length * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)
+    ));
   }
 
-  const buildings = roundRobinSelect(buildingBuckets, FAR_CONTEXT_MAX_BUILDINGS);
+  const selectedBuildingTarget = Math.min(
+    FAR_CONTEXT_MAX_BUILDING_INSTANCES,
+    Math.ceil(availableBuildings * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)
+  );
+  const selectedBuildings = roundRobinSelect(buildingBuckets, selectedBuildingTarget);
+  const exactBuildingIds = new Set(selectSpatiallyDistributedBuildings(
+    selectedBuildings.slice(),
+    Math.min(FAR_CONTEXT_MAX_BUILDINGS, selectedBuildings.length)
+  ).map((building) => building.identity));
+  const buildings = selectedBuildings.map((building) => exactBuildingIds.has(building.identity)
+    ? building
+    : { ...building, ring: null });
 
   return {
     buildings,
+    availableBuildings,
+    selectedBuildingTarget,
+    selectedBuildingCoverage: availableBuildings > 0 ? buildings.length / availableBuildings : 1,
     ...waterContext,
     skippedNearBuildings,
     contextZoom,
@@ -326,7 +410,9 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
 }
 
 export {
+  FAR_CONTEXT_BUILDING_COVERAGE_TARGET,
   FAR_CONTEXT_MAX_BUILDINGS,
+  FAR_CONTEXT_MAX_BUILDING_INSTANCES,
   FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,

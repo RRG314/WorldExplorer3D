@@ -179,9 +179,18 @@ function disposeFarFieldMesh(mesh) {
     textures?.normalMap?.dispose?.();
     textures?.roughnessMap?.dispose?.();
   }
-  mesh.geometry?.dispose?.();
-  if (mesh.material && !Array.isArray(mesh.material)) {
-    mesh.material.dispose?.();
+  const geometries = new Set();
+  const materials = new Set();
+  const collect = (node) => {
+    if (node?.geometry) geometries.add(node.geometry);
+    const nodeMaterials = Array.isArray(node?.material) ? node.material : [node?.material];
+    nodeMaterials.filter(Boolean).forEach((material) => materials.add(material));
+  };
+  if (typeof mesh.traverse === 'function') mesh.traverse(collect);
+  else collect(mesh);
+  for (const geometry of geometries) geometry.dispose?.();
+  for (const material of materials) {
+    material.dispose?.();
   }
 }
 

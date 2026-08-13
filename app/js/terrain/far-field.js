@@ -1,12 +1,14 @@
 import {
+  FAR_CONTEXT_BUILDING_COVERAGE_TARGET,
   FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_CONTEXT_MAX_BUILDINGS,
+  FAR_CONTEXT_MAX_BUILDING_INSTANCES,
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=8';
+} from './far-field-mapped-context.js?v=9';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
@@ -19,7 +21,7 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=9';
+} from './far-field-geometry.js?v=10';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -318,11 +320,46 @@ function createFarFieldTerrainApi(deps = {}) {
     const positions = [];
     const colors = [];
     const indices = [];
+    const instances = [];
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
-    let published = 0;
+    let exactPublished = 0;
 
     for (const building of mappedContext?.buildings || []) {
+      if (!Array.isArray(building.ring)) {
+        const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
+        if (center.x < spec.outer.minX || center.x > spec.outer.maxX ||
+            center.z < spec.outer.minZ || center.z > spec.outer.maxZ) continue;
+        const sourceMeters = sampleSourceMeters(
+          building.centerLat,
+          building.centerLon,
+          spec.sourceZoom,
+          loadedTiles
+        );
+        if (!Number.isFinite(sourceMeters)) continue;
+        const widthWorld = Number(building.widthMeters) * unitsPerMeter;
+        const depthWorld = Number(building.depthMeters) * unitsPerMeter;
+        const areaWorld = Number(building.areaMeters) * unitsPerMeter * unitsPerMeter;
+        const footprint = [
+          { x: center.x - widthWorld * 0.5, z: center.z - depthWorld * 0.5 },
+          { x: center.x + widthWorld * 0.5, z: center.z - depthWorld * 0.5 },
+          { x: center.x + widthWorld * 0.5, z: center.z + depthWorld * 0.5 },
+          { x: center.x - widthWorld * 0.5, z: center.z + depthWorld * 0.5 }
+        ];
+        const massing = resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter);
+        if (!massing) continue;
+        instances.push({
+          x: center.x,
+          z: center.z,
+          baseY: (sourceMeters + offsetMeters) * unitsPerMeter * yExaggeration + 0.25,
+          width: widthWorld,
+          depth: depthWorld,
+          height: massing.heightMeters * unitsPerMeter,
+          rotationY: Number(building.rotationY) || 0,
+          color: massing.color
+        });
+        continue;
+      }
       const rawRing = building.ring || [];
       const withoutClosure = rawRing.length > 1 &&
         rawRing[0]?.[0] === rawRing.at(-1)?.[0] && rawRing[0]?.[1] === rawRing.at(-1)?.[1]
@@ -347,7 +384,6 @@ function createFarFieldTerrainApi(deps = {}) {
         lat: result.lat + point.lat / footprint.length,
         lon: result.lon + point.lon / footprint.length
       }), { x: 0, z: 0, lat: 0, lon: 0 });
-      if (cellInsideHole(center.x, center.z, spec.inner)) continue;
       if (center.x < spec.outer.minX || center.x > spec.outer.maxX ||
           center.z < spec.outer.minZ || center.z > spec.outer.maxZ) continue;
 
@@ -390,18 +426,26 @@ function createFarFieldTerrainApi(deps = {}) {
           baseIndex + triangle[2] * 2 + 1
         );
       }
-      published += 1;
-      if (published >= FAR_CONTEXT_MAX_BUILDINGS) break;
+      exactPublished += 1;
     }
 
-    if (published === 0) return null;
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    geometry.computeBoundingSphere();
-    return { geometry, buildings: published };
+    let geometry = null;
+    if (exactPublished > 0) {
+      geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+    }
+    if (!geometry && instances.length === 0) return null;
+    return {
+      geometry,
+      instances,
+      exactBuildings: exactPublished,
+      instancedBuildings: instances.length,
+      buildings: exactPublished + instances.length
+    };
   }
 
   async function buildAndPublish(spec, requestGeneration, signal) {
@@ -524,7 +568,9 @@ function createFarFieldTerrainApi(deps = {}) {
         side: THREE.DoubleSide,
         fog: true
       });
-      farContextMesh = new THREE.Mesh(builtBuildings.geometry, buildingMaterial);
+      farContextMesh = builtBuildings.geometry
+        ? new THREE.Mesh(builtBuildings.geometry, buildingMaterial)
+        : new THREE.Group();
       farContextMesh.name = 'FarMappedBuildingContext';
       farContextMesh.renderOrder = 1;
       farContextMesh.castShadow = false;
@@ -540,6 +586,46 @@ function createFarFieldTerrainApi(deps = {}) {
         sources: ['openstreetmap-shortbread'],
         fallback: false
       };
+      if (builtBuildings.instances.length > 0) {
+        const instanceGeometry = new THREE.BoxGeometry(1, 1, 1);
+        instanceGeometry.translate(0, 0.5, 0);
+        const instanceMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.94,
+          metalness: 0,
+          side: THREE.FrontSide,
+          fog: true
+        });
+        const instanceMesh = new THREE.InstancedMesh(
+          instanceGeometry,
+          instanceMaterial,
+          builtBuildings.instances.length
+        );
+        const matrix = new THREE.Matrix4();
+        const position = new THREE.Vector3();
+        const rotation = new THREE.Quaternion();
+        const scale = new THREE.Vector3();
+        const color = new THREE.Color();
+        const up = new THREE.Vector3(0, 1, 0);
+        builtBuildings.instances.forEach((building, index) => {
+          position.set(building.x, building.baseY, building.z);
+          rotation.setFromAxisAngle(up, building.rotationY);
+          scale.set(building.width, building.height, building.depth);
+          matrix.compose(position, rotation, scale);
+          instanceMesh.setMatrixAt(index, matrix);
+          color.setRGB(building.color[0], building.color[1], building.color[2]);
+          instanceMesh.setColorAt(index, color);
+        });
+        instanceMesh.instanceMatrix.needsUpdate = true;
+        if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
+        instanceMesh.name = 'FarMappedBuildingInstances';
+        instanceMesh.renderOrder = 1;
+        instanceMesh.castShadow = false;
+        instanceMesh.receiveShadow = false;
+        instanceMesh.frustumCulled = false;
+        instanceMesh.userData.isFarMappedBuildingInstances = true;
+        farContextMesh.add(instanceMesh);
+      }
       appCtx.terrainGroup.add(farContextMesh);
     }
     if (builtWater) {
@@ -613,6 +699,14 @@ function createFarFieldTerrainApi(deps = {}) {
       farWaterPolygons: builtWater?.polygons || 0,
       farWaterTriangles: builtWater?.triangles || 0,
       skippedDuplicateNearBuildings: mappedContext.skippedNearBuildings,
+      farBuildingsAvailable: mappedContext.availableBuildings,
+      farBuildingSelectionTarget: mappedContext.selectedBuildingTarget,
+      farBuildingSelectionCoverage: mappedContext.selectedBuildingCoverage,
+      farBuildingPublishedCoverage: mappedContext.availableBuildings > 0
+        ? (builtBuildings?.buildings || 0) / mappedContext.availableBuildings
+        : 1,
+      farExactBuildings: builtBuildings?.exactBuildings || 0,
+      farInstancedBuildings: builtBuildings?.instancedBuildings || 0,
       geometryBuildPasses: 1,
       farBuildings: builtBuildings?.buildings || 0,
       detailedTerrainTilesExcluded: spec.detailedCoverage?.length || 0,
@@ -764,10 +858,12 @@ function createFarFieldTerrainApi(deps = {}) {
 }
 
 export {
+  FAR_CONTEXT_BUILDING_COVERAGE_TARGET,
   FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_CONTEXT_HALF_EXTENT_METERS,
   FAR_WATER_SURFACE_CLEARANCE_WORLD,
   FAR_CONTEXT_MAX_BUILDINGS,
+  FAR_CONTEXT_MAX_BUILDING_INSTANCES,
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,

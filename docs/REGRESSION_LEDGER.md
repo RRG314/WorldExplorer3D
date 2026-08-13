@@ -599,8 +599,11 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   An exact San Francisco outer-grid endpoint could also round just outside its
   bounds and invalidate the whole fixed terrain mesh.
 - Resolution: one fixed 8 km location context now retains zoom-14 buildings
-  within a 144-tile ceiling and distributes a 26,000-building massing budget
-  geographically. Mapped bridge/tunnel/layer structures are protected from the
+  within a 144-tile ceiling and publishes 85% of eligible regional building
+  records in every source tile. Up to 26,000 geographically distributed
+  buildings retain simplified footprint geometry; the remainder use one
+  GPU-instanced oriented-box LOD, avoiding hundreds of thousands of meshes or
+  another loading pipeline. Mapped bridge/tunnel/layer structures are protected from the
   ordinary-road cap; only a bounded set of real endpoint approaches and a
   geographically spread general-road LOD are added. The publisher honors the
   regional subdivision selected upstream. Far-terrain endpoints use a small
@@ -610,12 +613,13 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   `node scripts/test-fixed-world-horizon-architecture.mjs`,
   `npm run test:new-york-regional-continuity-browser`, and
   `npm run test:regional-structures-browser`. The browser evidence requires at
-  least 15,000 outer buildings in New York, 10,000 in London/San Francisco,
-  hundreds of retained mapped structures, Tower Bridge and Golden Gate by
-  source name, and a finite driveable road surface at each landmark. Visual
+  at least 84% published regional building coverage, hundreds of retained
+  mapped structures, Tower Bridge and Golden Gate by source name, and a finite
+  driveable road surface at each landmark. Visual
   screenshots remain mandatory because record counts cannot prove a complete
   rendered neighborhood.
-- Never reintroduce: largest-N-per-tile building selection, silently selecting
+- Never reintroduce: largest-N-per-tile building selection, a second rectangular
+  terrain-hole exclusion after the exact building boundary already owns deduplication, silently selecting
   a zoom without the requested building layer, letting ordinary street budgets
   discard engineered transport, making a downstream renderer override its
   compiler's regional LOD, strict floating-point equality at clipmap endpoints,

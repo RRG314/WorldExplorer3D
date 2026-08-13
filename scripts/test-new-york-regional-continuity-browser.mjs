@@ -180,6 +180,10 @@ try {
       (mesh) => mesh?.userData?.isFarMappedContext
     );
     const positions = farBuildingMesh?.geometry?.attributes?.position;
+    const farBuildingInstances = (farBuildingMesh?.children || []).find(
+      (mesh) => mesh?.userData?.isFarMappedBuildingInstances
+    );
+    const instanceMatrix = new THREE.Matrix4();
     const targets = [
       { id: 'midtown', label: 'Midtown Manhattan', lat: 40.7580, lon: -73.9855 },
       { id: 'weehawken', label: 'Weehawken, New Jersey', lat: 40.7695, lon: -74.0204 },
@@ -200,6 +204,12 @@ try {
       for (let index = 0; index < Number(positions?.count || 0); index += 1) {
         if (Math.hypot(positions.getX(index) - world.x, positions.getZ(index) - world.z) <= 500) {
           nearbyFarBuildingVertices += 1;
+        }
+      }
+      for (let index = 0; index < Number(farBuildingInstances?.count || 0); index += 1) {
+        farBuildingInstances.getMatrixAt(index, instanceMatrix);
+        if (Math.hypot(instanceMatrix.elements[12] - world.x, instanceMatrix.elements[14] - world.z) <= 500) {
+          nearbyFarBuildingVertices += 8;
         }
       }
       return {
@@ -277,6 +287,9 @@ try {
           road?.structureSemantics?.terrainMode !== 'at_grade'
         )).length,
         farBuildings: Number(ctx.farTerrainClipmapState?.farBuildings || 0),
+        farBuildingsAvailable: Number(ctx.farTerrainClipmapState?.farBuildingsAvailable || 0),
+        farBuildingSelectionCoverage: Number(ctx.farTerrainClipmapState?.farBuildingSelectionCoverage || 0),
+        farBuildingPublishedCoverage: Number(ctx.farTerrainClipmapState?.farBuildingPublishedCoverage || 0),
         farBuildingsSkippedByTerrainRectangle: Number(
           ctx.farTerrainClipmapState?.skippedDuplicateNearBuildings || 0
         )
@@ -422,7 +435,7 @@ try {
     `New Jersey building continuity is missing: ${JSON.stringify(newJerseyTargets)}`
   );
   assert.ok(
-    report.counts.farBuildings >= 15000,
+    report.counts.farBuildings >= 50000 && report.counts.farBuildingPublishedCoverage >= 0.84,
     `Fixed regional building massing is too sparse: ${JSON.stringify(report.counts)}`
   );
   assert.ok(
