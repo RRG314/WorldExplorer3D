@@ -24,6 +24,7 @@ function setStarFieldObserverVisuals(observerBody = 'earth') {
   if (!appCtx.starField) return;
   const body = String(observerBody || 'earth').toLowerCase();
   const planetary = body === 'moon' || body === 'mars';
+  const earthSkyOpacity = Math.max(0, Math.min(1, Number(appCtx.skyState?.starsOpacity) || 0));
   const brightStars = appCtx.starField.getObjectByName(BRIGHT_STAR_LAYER_NAME);
   const faintStars = appCtx.starField.getObjectByName(FAINT_STAR_LAYER_NAME);
 
@@ -31,15 +32,18 @@ function setStarFieldObserverVisuals(observerBody = 'earth') {
     brightStars.material.size = planetary ? (body === 'mars' ? 5.0 : 5.4) : 6.2;
     brightStars.material.vertexColors = false;
     brightStars.material.color.setHex(0xffffff);
-    brightStars.material.opacity = Number(brightStars.userData?.baseOpacity) || 0.98;
+    const baseOpacity = Number(brightStars.userData?.baseOpacity) || 0.98;
+    brightStars.material.opacity = planetary ? baseOpacity : baseOpacity * earthSkyOpacity;
     brightStars.material.needsUpdate = true;
   }
   if (faintStars?.material) {
     faintStars.visible = true;
     faintStars.material.size = planetary ? (body === 'mars' ? 3.9 : 4.0) : 4.2;
-    faintStars.material.opacity = Number(faintStars.userData?.baseOpacity) || 0.92;
+    const baseOpacity = Number(faintStars.userData?.baseOpacity) || 0.92;
+    faintStars.material.opacity = planetary ? baseOpacity : baseOpacity * earthSkyOpacity;
     faintStars.material.needsUpdate = true;
   }
+  if (!planetary) appCtx.starField.visible = earthSkyOpacity > 0.015;
 }
 
 function raDecToVector(ra, dec, radius = STARFIELD_RADIUS) {

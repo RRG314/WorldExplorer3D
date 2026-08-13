@@ -57,11 +57,21 @@ function assertEarthStarStyle(state, label) {
   const expectedFaintOpacity = Number(stars.faintBaseOpacity || 0) * expectedOpacity;
   assert(
     Math.abs(Number(stars.brightOpacity || 0) - expectedBrightOpacity) <= 0.01,
-    `${label} retained planetary bright-star opacity`
+    `${label} retained planetary bright-star opacity: ${JSON.stringify({
+      actual: Number(stars.brightOpacity || 0),
+      base: Number(stars.brightBaseOpacity || 0),
+      sky: expectedOpacity,
+      expected: expectedBrightOpacity
+    })}`
   );
   assert(
     Math.abs(Number(stars.faintOpacity || 0) - expectedFaintOpacity) <= 0.01,
-    `${label} retained planetary faint-star opacity`
+    `${label} retained planetary faint-star opacity: ${JSON.stringify({
+      actual: Number(stars.faintOpacity || 0),
+      base: Number(stars.faintBaseOpacity || 0),
+      sky: expectedOpacity,
+      expected: expectedFaintOpacity
+    })}`
   );
 }
 
