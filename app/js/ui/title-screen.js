@@ -5,7 +5,11 @@ import { createGlobeSelector } from "./globe-selector.js?v=81";
 import { readSharedExperienceParams } from "./share-links.js?v=61";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
-
+import {
+  clampDetectedCoords,
+  geolocationErrorMessage,
+  requestCurrentPosition
+} from './title-screen/geolocation.js?v=1';
 function initTitleScreenUi({
   lastLocationStorageKey,
   shareExperienceStatus,
@@ -31,7 +35,6 @@ function initTitleScreenUi({
     space: spaceLaunchToggle,
     ocean: oceanLaunchToggle
   };
-  const geolocationOptions = { enableHighAccuracy: true, timeout: 12000, maximumAge: 120000 };
   const sharedExperienceParams = readSharedExperienceParams();
   let titleLaunchMode = 'earth';
   let globeSelector = null;
@@ -249,39 +252,6 @@ function initTitleScreenUi({
       titleUseMyLocationBtn.textContent = geolocationBusy ? 'Locating…' : 'Use My Location';
     }
     if (globeSelector && typeof globeSelector.setLocateButtonBusy === 'function') globeSelector.setLocateButtonBusy(geolocationBusy);
-  };
-  const geolocationErrorMessage = (error) => {
-    const code = Number(error?.code);
-    if (code === 1) return 'Location access denied. You can still pick a location manually.';
-    if (code === 2) return 'Could not determine your location. Try again or choose manually.';
-    if (code === 3) return 'Location request timed out. Try again or choose manually.';
-    return 'Could not determine your location. You can still choose manually.';
-  };
-  const requestCurrentPosition = () => new Promise((resolve, reject) => {
-    if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
-      reject({ userMessage: 'Geolocation is not supported in this browser.' });
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = Number(position?.coords?.latitude);
-        const lon = Number(position?.coords?.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          reject({ userMessage: 'Could not determine your location. Try again or choose manually.' });
-          return;
-        }
-        resolve({ lat, lon });
-      },
-      (error) => reject({ ...error, userMessage: geolocationErrorMessage(error) }),
-      geolocationOptions
-    );
-  });
-  const clampDetectedCoords = (lat, lon) => {
-    const safeLat = Math.max(-90, Math.min(90, Number(lat) || 0));
-    let safeLon = Number(lon) || 0;
-    while (safeLon > 180) safeLon -= 360;
-    while (safeLon < -180) safeLon += 360;
-    return { lat: safeLat, lon: safeLon };
   };
   const runUseMyLocation = async (source = 'menu') => {
     if (geolocationBusy) return;
@@ -726,5 +696,4 @@ function initTitleScreenUi({
     isTouchPreferredClient
   };
 }
-
 export { initTitleScreenUi };

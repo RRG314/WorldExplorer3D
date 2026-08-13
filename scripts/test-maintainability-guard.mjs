@@ -38,11 +38,8 @@ const LEGACY_LINE_BUDGETS = Object.freeze({
   'ocean.js': 718,
   'structure-semantics.js': 801,
   'terrain/surface-profiles.js': 809,
-  'terrain/tiles.js': 735,
   'ui/globe-selector.js': 744,
-  'ui/title-screen.js': 720,
-  'world/load-roads.js': 746,
-  'world/spawn.js': 705
+  'world/load-roads.js': 746
 });
 
 function listJavaScriptFiles(directory) {

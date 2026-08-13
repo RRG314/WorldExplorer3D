@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { runNodeVerificationSteps } from './lib/verification-runner.mjs';
 
 // Pull-request verification is deliberately bounded to deterministic contracts
 // plus one measured browser boot. Provider matrices, hosting artifacts, visual
@@ -32,6 +32,7 @@ const steps = [
   ['Road junction envelopes', 'scripts/test-road-junction-envelopes.mjs'],
   ['Indexed bridge-road conflict queries', 'scripts/test-bridge-road-conflict-index.mjs'],
   ['Globe selector contract', 'scripts/test-globe-selector-contract.mjs'],
+  ['Title geolocation adapter', 'scripts/test-title-geolocation.mjs'],
   ['Loading transition contract', 'scripts/test-loading-transition-contract.mjs'],
   ['Fixed-world horizon ownership', 'scripts/test-fixed-world-horizon-architecture.mjs'],
   ['Space controls', 'scripts/test-space-flight-controls.mjs'],
@@ -43,29 +44,14 @@ const steps = [
   ['Measured title startup workload', 'scripts/test-startup-workload-browser.mjs']
 ];
 
-const startedAt = performance.now();
-const results = [];
-
-for (const [name, script, args = []] of steps) {
-  console.log(`\n=== ${name} ===`);
-  const stepStartedAt = performance.now();
-  const result = spawnSync(process.execPath, [script, ...args], {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: 'inherit'
-  });
-  const durationMs = Math.round(performance.now() - stepStartedAt);
-  results.push({ name, script, durationMs, passed: result.status === 0 });
-  if (result.status !== 0) {
-    console.error(`\n[verify:pr] Failed at step: ${name}`);
-    console.error(JSON.stringify({ durationMs, completed: results }, null, 2));
-    process.exit(result.status || 1);
-  }
-}
+const report = runNodeVerificationSteps(steps, {
+  label: 'verify:pr',
+  recordDurations: true
+});
 
 console.log(JSON.stringify({
   ok: true,
   tier: 'pull-request',
-  durationMs: Math.round(performance.now() - startedAt),
-  steps: results
+  durationMs: report.durationMs,
+  steps: report.results
 }, null, 2));

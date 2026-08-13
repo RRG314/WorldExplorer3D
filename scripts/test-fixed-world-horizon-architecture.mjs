@@ -18,6 +18,7 @@ const publicationSource = read('app/js/world/publication.js');
 const diagnosticsSource = read('app/js/runtime-diagnostics.js');
 const locationTerrainSource = read('app/js/terrain/location-world.js');
 const farFieldSource = read('app/js/terrain/far-field.js');
+const farFieldGeometrySource = read('app/js/terrain/far-field-geometry.js');
 const starMaterialSource = read('app/js/sky/star-point-material.js');
 const starFieldSource = read('app/js/sky/starfield-ui.js');
 const gaiaSource = read('app/js/sky/gaia-catalog.js');
@@ -94,11 +95,12 @@ assert.ok(axis.every((value, index) => index === 0 || value > axis[index - 1]));
 assert.equal(cellInsideHole(0, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), true);
 assert.equal(cellInsideDetailedCoverage(0, 0, [{ minX: -20, maxX: 30, minZ: -10, maxZ: 10 }]), true);
 assert.doesNotMatch(
-  farFieldSource,
+  `${farFieldSource}\n${farFieldGeometrySource}`,
   /if \(cellInsideHole\(centerX, centerZ, spec\.inner\)\) continue/,
   'far terrain must remain continuous below unavailable detailed edge tiles'
 );
-assert.match(farFieldSource, /cellInsideDetailedCoverage\(centerX, centerZ, spec\.detailedCoverage\)/);
+assert.match(farFieldGeometrySource, /cellInsideDetailedCoverage\(centerX, centerZ, spec\.detailedCoverage\)/);
+assert.match(farFieldSource, /createFarFieldGeometryPlanner/);
 assert.match(farFieldSource, /completeDetailedTileCoverage/);
 assert.match(starMaterialSource, /skyBackgroundMaterial/);
 assert.match(starMaterialSource, /material\.depthTest = false/);

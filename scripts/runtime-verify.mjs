@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { runNodeVerificationSteps } from './lib/verification-runner.mjs';
 
 const steps = [
   ['Earth-core isolation boundary', 'scripts/test-earth-core-boundaries.mjs'],
@@ -38,17 +38,6 @@ const steps = [
   ['Block builder contracts', 'scripts/test-block-builder-contract.mjs']
 ];
 
-for (const [name, script, args = []] of steps) {
-  console.log(`\n=== ${name} ===`);
-  const result = spawnSync(process.execPath, [script, ...args], {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: 'inherit'
-  });
-  if (result.status !== 0) {
-    console.error(`\n[runtime-verify] Failed at step: ${name}`);
-    process.exit(result.status || 1);
-  }
-}
+runNodeVerificationSteps(steps, { label: 'runtime-verify' });
 
 console.log('\n[runtime-verify] All checks passed.');
