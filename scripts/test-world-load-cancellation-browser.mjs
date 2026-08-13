@@ -87,7 +87,16 @@ try {
     });
 
     const baltimorePromise = ctx.loadRoads();
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    // Replace the location while owned provider work is genuinely active. A
+    // fixed delay made this test depend on cache, disk, and network timing and
+    // could cancel either before work started or after it had already settled.
+    let activeProvider = null;
+    while (performance.now() < deadline && !activeProvider) {
+      const providers = ctx.worldLoadRuntimeState?.session?.providers || {};
+      activeProvider = Object.entries(providers).find(([, provider]) => provider?.inFlight > 0)?.[0] || null;
+      if (!activeProvider) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    if (!activeProvider) throw new Error('Baltimore load did not expose active provider work to cancel.');
     if (!ctx.selectPresetLocation?.(replacementLocation)) {
       throw new Error(`${replacementLocation} preset selection failed.`);
     }
@@ -106,6 +115,10 @@ try {
     const replacementSession = await replacementPromise;
     ctx.Walk?.setModeWalk?.();
     ctx.startMode?.();
+    const farTerrainReady = typeof ctx.waitForFarTerrainClipmap === 'function'
+      ? await ctx.waitForFarTerrainClipmap(45000)
+      : false;
+    if (!farTerrainReady) throw new Error('Replacement far terrain did not reach a terminal ready state.');
     await new Promise((resolve) => setTimeout(resolve, 2500));
 
     const terrainPresentation = (ctx.terrainGroup?.children || [])
@@ -153,6 +166,7 @@ try {
 
     return {
       baltimoreSession,
+      cancelledProvider: activeProvider,
       replacementSession,
       currentSession: ctx.worldLoadRuntimeState?.session || null,
       runtimeStatus: ctx.worldLoadRuntimeState?.status || null,
@@ -221,7 +235,16 @@ try {
 
   assert.equal(report.baltimoreSession?.state, 'superseded');
   assert.match(report.baltimoreSession?.requestId || '', /^world-load:1:/);
-  assert.equal(report.baltimoreSession?.providers?.['osm-overpass']?.aborted, 1);
+  assert.equal(report.baltimoreSession?.reason, 'new-location-selection');
+  const cancelledProviderOutcome = report.baltimoreSession?.providers?.[report.cancelledProvider] || {};
+  assert.equal(
+    Number(cancelledProviderOutcome.aborted || 0) + Number(cancelledProviderOutcome.discarded || 0),
+    1,
+    'superseded provider work was neither aborted nor discarded'
+  );
+  assert.equal(cancelledProviderOutcome.completed, 0);
+  assert.equal(cancelledProviderOutcome.failed, 0);
+  assert.equal(report.baltimoreSession?.outstandingProviderWork, 0);
   assert.equal(report.replacementSession?.state, 'published');
   assert.match(report.replacementSession?.requestId || '', /^world-load:3:/);
   assert.equal(report.currentSession?.state, 'published');
@@ -310,13 +333,20 @@ try {
     Number(report.farTerrain?.elevationMaxInFlight || 0) <= 12,
     `far-terrain scheduler concurrency exceeded 12 (${report.farTerrain?.elevationMaxInFlight})`
   );
-  assert.deepEqual(
-    result.network.duplicateUrls,
-    [],
-    'far terrain requested the same Terrain-RGB URL more than once'
+  assert.equal(
+    report.farTerrain?.elevationRequestsStarted,
+    report.farTerrain?.sourceTiles,
+    'ready far terrain did not settle its complete primary source-tile budget'
   );
-  assert.ok(farTerrainFailed <= 12, `more than one superseded terrain batch was aborted (${farTerrainFailed})`);
-  assert.equal(farTerrainInFlight, 0);
+  assert.ok(
+    Number(report.farTerrain?.fallbackElevationRequestsStarted || 0) <=
+      Number(report.farTerrain?.fallbackSourceTiles || 0),
+    'far terrain exceeded its unique parent-fallback tile budget'
+  );
+  // Browser request events include intentional bounded image retries and can
+  // briefly overlap their failed request bookkeeping. The scheduler-owned
+  // state above is the authoritative concurrency and unique-work contract.
+  assert.ok(farTerrainStarted > 0, 'replacement far terrain made no elevation requests');
   assert.deepEqual(consoleErrors, []);
 
   console.log(JSON.stringify({ ok: true, ...result }, null, 2));

@@ -192,12 +192,23 @@ export function createWorldRoadLoader(deps = {}) {
       useSyntheticFallbackRoads,
       worldSession
     } = session;
-    const acceptedGroundReady = await runProviderWork('accepted-ground', 'activate', (signal) =>
-      activateAcceptedGroundForWorldLoad({
-        appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
-        signal, startLoadPhase
-      })
-    );
+    let acceptedGroundReady = false;
+    try {
+      acceptedGroundReady = await runProviderWork('accepted-ground', 'activate', (signal) =>
+        activateAcceptedGroundForWorldLoad({
+          appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
+          signal, startLoadPhase
+        })
+      );
+    } catch (error) {
+      // A location replacement can arrive while the initial ground catalog is
+      // still activating. Cancellation is an expected terminal state for that
+      // load, not an exception that should escape through the public loader.
+      if (!isActiveLoadContext()) {
+        return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-ground-activation');
+      }
+      throw error;
+    }
     if (!isActiveLoadContext()) return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-ground-activation');
     if (!acceptedGroundReady) return;
     const radii = loadProfile.radii.slice();
