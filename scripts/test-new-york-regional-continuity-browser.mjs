@@ -217,7 +217,7 @@ try {
         })()
       };
     });
-    const radialBins = [0, 2000, 4000, 6500, 10000, 22000];
+    const radialBins = [0, 2000, 4000, 8000, 10000, 22000];
     const binFor = (distance) => {
       for (let index = 0; index < radialBins.length - 1; index += 1) {
         if (distance >= radialBins[index] && distance < radialBins[index + 1]) {
@@ -266,6 +266,16 @@ try {
         roads: ctx.roads?.length || 0,
         buildings: ctx.buildings?.length || 0,
         buildingMeshes: ctx.buildingMeshes?.length || 0,
+        fixedRegionalBridges: (ctx.roads || []).filter((road) => (
+          road?.fixedRegionalContext === true && road?.structureSemantics?.isBridge === true
+        )).length,
+        fixedRegionalTunnels: (ctx.roads || []).filter((road) => (
+          road?.fixedRegionalContext === true && road?.structureSemantics?.isTunnel === true
+        )).length,
+        fixedRegionalEngineeredRoads: (ctx.roads || []).filter((road) => (
+          road?.fixedRegionalContext === true &&
+          road?.structureSemantics?.terrainMode !== 'at_grade'
+        )).length,
         farBuildings: Number(ctx.farTerrainClipmapState?.farBuildings || 0),
         farBuildingsSkippedByTerrainRectangle: Number(
           ctx.farTerrainClipmapState?.skippedDuplicateNearBuildings || 0
@@ -274,7 +284,7 @@ try {
       radii: {
         initialEarthDetailRadius: Number(ctx.initialEarthDetailRadius || 0),
         worldTraversalRadiusWorld: Number(ctx.worldTraversalRadiusWorld || 0),
-        farContextHalfExtentMeters: 6500,
+        farContextHalfExtentMeters: 8000,
         farTerrainOuterDistanceMeters: Number(ctx.farTerrainClipmapState?.outerDistanceMeters || 0)
       },
       targets,
@@ -412,6 +422,14 @@ try {
     `New Jersey building continuity is missing: ${JSON.stringify(newJerseyTargets)}`
   );
   assert.ok(
+    report.counts.farBuildings >= 15000,
+    `Fixed regional building massing is too sparse: ${JSON.stringify(report.counts)}`
+  );
+  assert.ok(
+    report.counts.fixedRegionalBridges >= 400 && report.counts.fixedRegionalTunnels >= 200,
+    `Mapped New York bridges or tunnels were discarded: ${JSON.stringify(report.counts)}`
+  );
+  assert.ok(
     report.measuredLoadMs <= 45000,
     `New York fixed-location load exceeded 45 seconds: ${report.measuredLoadMs}ms`
   );
@@ -443,6 +461,8 @@ try {
     roads: report.counts.roads,
     buildings: report.counts.buildings,
     farBuildings: report.counts.farBuildings,
+    fixedRegionalBridges: report.counts.fixedRegionalBridges,
+    fixedRegionalTunnels: report.counts.fixedRegionalTunnels,
     traversalRadius: report.radii.worldTraversalRadiusWorld,
     maximumLoadLongTaskMs,
     traversalEvidence: report.traversalEvidence,

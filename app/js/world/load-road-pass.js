@@ -108,10 +108,16 @@ export async function buildRoadGeometryPass(options = {}) {
     const roadSubdivideStepBase = fixedRegionalRoad
       ? Math.max(20, getRoadSubdivisionStep(type, roadTileDepth, perfModeNow))
       : getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+    const engineeredRegionalStep = fixedRegionalRoad
+      ? structureSemantics?.isTunnel === true ? 4 : 2.5
+      : 0.55;
+    const regionalRampStep = fixedRegionalRoad ? 1.8 : 0.65;
     const roadSubdivideStep =
-      structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade' ? Math.min(roadSubdivideStepBase, 0.55) :
-      structureSemantics?.rampCandidate ? Math.min(roadSubdivideStepBase, 0.65) :
-      roadSubdivideStepBase;
+      structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade'
+        ? Math.min(roadSubdivideStepBase, engineeredRegionalStep)
+        : structureSemantics?.rampCandidate
+          ? Math.min(roadSubdivideStepBase, regionalRampStep)
+          : roadSubdivideStepBase;
     const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
     if (decimatedRoadPts.length < 2) continue;
 

@@ -181,6 +181,21 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeigh
   return { verts, indices };
 }
 
+export function resolveRoadRibbonSubdivisionStep(road) {
+  const baseDetail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
+  // The feature compiler already assigns a coarser but bounded subdivision to
+  // the fixed regional context. Replacing it here with core-city density turns
+  // a complete bridge/tunnel network into millions of unnecessary triangles.
+  if (road?.fixedRegionalContext === true) return baseDetail;
+  const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) &&
+    road.structureTransitionAnchors.length > 0;
+  if (road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade") {
+    return Math.min(baseDetail, 0.55);
+  }
+  if (hasTransitionAnchors) return Math.min(baseDetail, 0.6);
+  return baseDetail;
+}
+
 export async function publishCompiledTransportMeshes(deps = {}) {
   const {
     disableRoadDebugMode,
@@ -294,14 +309,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const { width } = road;
       const hw = width / 2;
 
-      const baseDetail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
-      const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;
-      const requestedDetail =
-        road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade" ?
-          Math.min(baseDetail, 0.55) :
-          hasTransitionAnchors ?
-            Math.min(baseDetail, 0.6) :
-            baseDetail;
+      const requestedDetail = resolveRoadRibbonSubdivisionStep(road);
       const basePts = subdivideRoadPoints(road.pts, requestedDetail);
       // Preserve the source road as one continuous ribbon. A separate
       // intersection-cap pass previously trimmed these endpoints and filled

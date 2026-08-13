@@ -26,6 +26,7 @@ const gaiaSource = read('app/js/sky/gaia-catalog.js');
 const {
   FAR_FIELD_OUTER_DISTANCE_METERS,
   FAR_CONTEXT_HALF_EXTENT_METERS,
+  FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_ZOOM,
@@ -37,14 +38,31 @@ const {
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
 const {
+  farFieldPointWithinOuterBounds,
+  insetFarFieldSamplePoint,
   mappedWaterBedMetersAt,
   normalizeMappedWaterSurfaceOwnership,
   sampleFarFieldGridWorldY
 } = await import('../app/js/terrain/far-field-geometry.js');
+assert.equal(
+  farFieldPointWithinOuterBounds(
+    100 + Number.EPSILON * 100,
+    -100 - Number.EPSILON * 100,
+    { minX: -100, maxX: 100, minZ: -100, maxZ: 100 }
+  ),
+  true,
+  'floating-point axis endpoints must remain inside their authored far-terrain bounds'
+);
+assert.deepEqual(
+  insetFarFieldSamplePoint(-100, 100, { minX: -100, maxX: 100, minZ: -100, maxZ: 100 }),
+  { x: -99.99, z: 99.99 },
+  'far terrain must sample the loaded interior side of exact outer tile boundaries'
+);
 const {
   pointInLonLatRing,
   pointInMappedWaterArea,
   retainFarWaterRing,
+  selectSpatiallyDistributedBuildings,
   selectContextZoomForTileBudget
 } = await import('../app/js/terrain/far-field-mapped-context.js');
 
@@ -133,11 +151,12 @@ assert.match(
 assert.match(locationTerrainSource, /updateFarTerrainClipmap/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
-assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 6500);
+assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 8000);
 assert.equal(FAR_CONTEXT_ZOOM, 14);
 assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
 assert.equal(FAR_WATER_MIN_SPAN_METERS, 200);
-assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
+assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 26000);
+assert.equal(FAR_CONTEXT_BUILDING_MAX_TILES, 144);
 const triangleSurfaceGrid = {
   xValues: [0, 10],
   zValues: [0, 10],
@@ -198,6 +217,27 @@ assert.equal(
   FAR_CONTEXT_ZOOM,
   'ordinary city context must retain its preferred detail zoom'
 );
+assert.equal(
+  selectContextZoomForTileBudget(
+    { latS: 51.4486, latN: 51.5663, lonW: -0.2217, lonE: -0.0339 },
+    FAR_CONTEXT_ZOOM,
+    FAR_CONTEXT_BUILDING_MAX_TILES
+  ),
+  FAR_CONTEXT_ZOOM,
+  'London building coverage must retain zoom 14 instead of requesting an empty generalized layer'
+);
+const distributedBuildings = selectSpatiallyDistributedBuildings([
+  { identity: 'nw-large', centerLat: 3, centerLon: 0, priority: 8 },
+  { identity: 'nw-small', centerLat: 2.9, centerLon: 0.1, priority: 1 },
+  { identity: 'ne', centerLat: 3, centerLon: 3, priority: 1 },
+  { identity: 'sw', centerLat: 0, centerLon: 0, priority: 1 },
+  { identity: 'se', centerLat: 0, centerLon: 3, priority: 1 }
+], 4);
+assert.equal(distributedBuildings.length, 4);
+assert.ok(distributedBuildings.some((building) => building.identity === 'nw-large'));
+assert.ok(distributedBuildings.some((building) => building.identity === 'ne'));
+assert.ok(distributedBuildings.some((building) => building.identity === 'sw'));
+assert.ok(distributedBuildings.some((building) => building.identity === 'se'));
 const axis = buildClipmapAxis(-100, -20, 30, 100, 15);
 assert.equal(axis[0], -100);
 assert.equal(axis.at(-1), 100);

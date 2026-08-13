@@ -1,4 +1,4 @@
-const FIXED_REGIONAL_CONTEXT_RADIUS_METERS = 6500;
+const FIXED_REGIONAL_CONTEXT_RADIUS_METERS = 8000;
 const LATITUDE_METERS_PER_DEGREE = 110540;
 const LONGITUDE_METERS_PER_DEGREE = 111320;
 
@@ -137,7 +137,7 @@ export function beginFixedRegionalTransportLoad(options = {}) {
       // Outer natural surfaces are already owned by the fixed terrain and
       // WorldCover. Decode only transport needed to close the regional gap.
       layerNames: ['streets'],
-      maxTiles: 81,
+      maxTiles: 144,
       minimumZoom: 10,
       signal
     })
@@ -202,7 +202,7 @@ export async function waitForFixedRegionalGround(
       typeof appCtx.waitForFarTerrainClipmap !== 'function') return false;
   startLoadPhase('waitForFixedRegionalGround');
   try {
-    loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(20000);
+    loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(35000);
     return loadMetrics.regionalGroundReady;
   } finally {
     endLoadPhase('waitForFixedRegionalGround');

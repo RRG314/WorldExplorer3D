@@ -582,6 +582,45 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Guard: `npm run test:fixed-regional-context`, `npm run test:phase5-aerial-transition`, and `npm run test:new-york-regional-continuity-browser`. The Chrome journey requires Midtown core density, roads within 120 m and far buildings around Weehawken/Hoboken/Jersey City, finite walk/drive surfaces in Hoboken, no new world sequence after crossing the river, zero duplicate Shortbread tile URLs, no console errors, and no load long task above five seconds. Its aerial Hoboken screenshot is a mandatory visual review artifact.
 - Never reintroduce: actor-driven streaming, an unbounded all-street regional compile, excluding far buildings by the terrain rectangle, requiring detailed accepted-ground under generalized regional roads, centroid-only water triangle deletion, a depth-biased water overlay, fixed sleep-based readiness, or an asynchronous predicate passed to Playwright's browser-side wait.
 
+## 2026-08-13 — Regional building gaps and missing engineered transport
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or
+  deployed.
+- Symptom: neighborhoods inside the visible fixed location had missing building
+  blocks, New York/London/San Francisco lost mapped bridges and tunnels outside
+  the detailed core, and the Golden Gate Bridge was beyond the fixed context.
+- Root cause: far buildings were chosen as the largest footprints per tile and
+  then globally capped, which concentrated the budget and emptied other
+  neighborhoods. London's 6.5 km request exceeded the old tile budget and fell
+  to zoom 13, where the requested building layer was absent. Bridges, tunnels,
+  and ramps were competing with ordinary streets for a generic road cap. The
+  final mesh publisher then ignored the regional subdivision assigned by the
+  feature compiler and rebuilt every retained structure at core-city density.
+  An exact San Francisco outer-grid endpoint could also round just outside its
+  bounds and invalidate the whole fixed terrain mesh.
+- Resolution: one fixed 8 km location context now retains zoom-14 buildings
+  within a 144-tile ceiling and distributes a 26,000-building massing budget
+  geographically. Mapped bridge/tunnel/layer structures are protected from the
+  ordinary-road cap; only a bounded set of real endpoint approaches and a
+  geographically spread general-road LOD are added. The publisher honors the
+  regional subdivision selected upstream. Far-terrain endpoints use a small
+  tolerant bounds check and sample the already-loaded interior side. This adds
+  no movement streaming or second location pipeline.
+- Guard: `npm run test:fixed-regional-context`,
+  `node scripts/test-fixed-world-horizon-architecture.mjs`,
+  `npm run test:new-york-regional-continuity-browser`, and
+  `npm run test:regional-structures-browser`. The browser evidence requires at
+  least 15,000 outer buildings in New York, 10,000 in London/San Francisco,
+  hundreds of retained mapped structures, Tower Bridge and Golden Gate by
+  source name, and a finite driveable road surface at each landmark. Visual
+  screenshots remain mandatory because record counts cannot prove a complete
+  rendered neighborhood.
+- Never reintroduce: largest-N-per-tile building selection, silently selecting
+  a zoom without the requested building layer, letting ordinary street budgets
+  discard engineered transport, making a downstream renderer override its
+  compiler's regional LOD, strict floating-point equality at clipmap endpoints,
+  or actor-driven regional loading.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

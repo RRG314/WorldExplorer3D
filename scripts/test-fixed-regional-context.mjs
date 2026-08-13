@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { resolveRoadRibbonSubdivisionStep } from '../app/js/terrain/rebuild.js';
 import {
   FIXED_REGIONAL_CONTEXT_RADIUS_METERS,
   beginFixedRegionalTransportLoad,
@@ -10,6 +11,10 @@ import {
   selectShortbreadZoomForBounds,
   shortbreadTileCountForBounds
 } from '../app/js/world/shortbread-source.js';
+import {
+  isFixedRegionalEngineeredRoad,
+  partitionFixedRegionalRoads
+} from '../app/js/world/load-budgeting.js';
 
 const mutableLocation = { lat: 40.758, lon: -73.9855 };
 let beginProviderWork;
@@ -31,10 +36,48 @@ await pendingRequest.outcome;
 assert.deepEqual(requestedLocation, { lat: 40.758, lon: -73.9855 });
 assert.deepEqual(pendingRequest.location, { lat: 40.758, lon: -73.9855 });
 
+const bridge = { id: 1, nodes: [1, 2], tags: { highway: 'primary', bridge: 'yes' } };
+const bridgeApproach = { id: 2, nodes: [2, 3], tags: { highway: 'primary_link' } };
+const ordinaryRoad = { id: 3, nodes: [4, 5], tags: { highway: 'residential' } };
+const tunnel = { id: 4, nodes: [6, 7], tags: { highway: 'secondary', tunnel: 'yes' } };
+const unrelatedIntersection = { id: 5, nodes: [2, 8], tags: { highway: 'service' } };
+assert.equal(isFixedRegionalEngineeredRoad(bridge), true);
+assert.equal(isFixedRegionalEngineeredRoad(tunnel), true);
+const regionalPartition = partitionFixedRegionalRoads([
+  bridge,
+  bridgeApproach,
+  ordinaryRoad,
+  tunnel,
+  unrelatedIntersection
+]);
+assert.deepEqual(regionalPartition.engineered.map((way) => way.id), [1, 4]);
+assert.deepEqual(regionalPartition.connectors.map((way) => way.id), [2]);
+assert.deepEqual(regionalPartition.general.map((way) => way.id), [3, 5]);
+
 const location = { lat: 40.758, lon: -73.9855 };
+
+assert.equal(
+  resolveRoadRibbonSubdivisionStep({
+    fixedRegionalContext: true,
+    subdivideMaxDist: 4,
+    structureSemantics: { terrainMode: 'tunnel' },
+    structureTransitionAnchors: [{ distance: 0 }]
+  }),
+  4,
+  'the final publisher must preserve the regional structure resolution assigned by the feature compiler'
+);
+assert.equal(
+  resolveRoadRibbonSubdivisionStep({
+    fixedRegionalContext: false,
+    subdivideMaxDist: 4,
+    structureSemantics: { terrainMode: 'bridge' }
+  }),
+  0.55,
+  'detailed core structures must retain their high-resolution surface profile'
+);
 const bounds = fixedRegionalContextBounds(location);
-const zoom = selectShortbreadZoomForBounds(bounds, { preferredZoom: 14, maxTiles: 81 });
-assert.ok(shortbreadTileCountForBounds(bounds, zoom) <= 81);
+const zoom = selectShortbreadZoomForBounds(bounds, { preferredZoom: 14, maxTiles: 144 });
+assert.ok(shortbreadTileCountForBounds(bounds, zoom) <= 144);
 
 const source = {
   elements: [

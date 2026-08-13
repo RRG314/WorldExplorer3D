@@ -65,7 +65,7 @@ import {
 } from "./world/load-reset.js?v=13";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=6";
+} from "./world/load-budgeting.js?v=10";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -99,7 +99,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=30";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=32";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=42";
 import {
   batchLanduseMeshes,
@@ -160,7 +160,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=26";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=102";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=104";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=14";

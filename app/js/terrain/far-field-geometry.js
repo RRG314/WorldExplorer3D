@@ -32,6 +32,21 @@ function distanceOutsideInnerBounds(x, z, innerBounds) {
   return Math.hypot(dx, dz);
 }
 
+function insetFarFieldSamplePoint(x, z, outer, insetWorld = 0.01) {
+  const inset = Math.max(1e-6, Number(insetWorld) || 0.01);
+  return {
+    x: Math.max(outer.minX + inset, Math.min(outer.maxX - inset, x)),
+    z: Math.max(outer.minZ + inset, Math.min(outer.maxZ - inset, z))
+  };
+}
+
+function farFieldPointWithinOuterBounds(x, z, outer, toleranceWorld = 0.05) {
+  const tolerance = Math.max(1e-6, Number(toleranceWorld) || 0.05);
+  return !!outer &&
+    x >= outer.minX - tolerance && x <= outer.maxX + tolerance &&
+    z >= outer.minZ - tolerance && z <= outer.maxZ + tolerance;
+}
+
 function smoothstep01(value) {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
@@ -346,12 +361,12 @@ function createFarFieldGeometryPlanner(deps = {}) {
     mappedContext = null,
     maskStats = null
   ) {
-    if (
-      !spec?.outer ||
-      x < spec.outer.minX || x > spec.outer.maxX ||
-      z < spec.outer.minZ || z > spec.outer.maxZ
-    ) return null;
-    const { lat, lon } = worldToLatLon(x, z);
+    if (!farFieldPointWithinOuterBounds(x, z, spec?.outer)) return null;
+    // Match the inward epsilon used to choose the bounded source-tile range.
+    // At an exact Web Mercator boundary, sampling the exterior side would ask
+    // for a deliberately unloaded neighbor and reject the entire fixed mesh.
+    const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
+    const { lat, lon } = worldToLatLon(samplePoint.x, samplePoint.z);
     const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
     if (!Number.isFinite(sourceMeters)) return null;
 
@@ -487,6 +502,8 @@ export {
   buildClipmapAxis,
   createFarFieldGeometryPlanner,
   disposeFarFieldMesh,
+  farFieldPointWithinOuterBounds,
+  insetFarFieldSamplePoint,
   mappedWaterBedMetersAt,
   normalizeMappedWaterSurfaceOwnership,
   parentTerrainTile,

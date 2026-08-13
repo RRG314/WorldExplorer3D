@@ -6,7 +6,8 @@ import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
-const FAR_CONTEXT_MAX_BUILDINGS = 10000;
+const FAR_CONTEXT_MAX_BUILDINGS = 26000;
+const FAR_CONTEXT_BUILDING_MAX_TILES = 144;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
 
@@ -118,6 +119,61 @@ function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
   return coordinates;
 }
 
+function roundRobinSelect(buckets, maxCount) {
+  const active = buckets.filter((bucket) => Array.isArray(bucket) && bucket.length > 0);
+  const selected = [];
+  let index = 0;
+  while (active.length > 0 && selected.length < maxCount) {
+    const bucket = active[index];
+    selected.push(bucket.shift());
+    if (bucket.length === 0) {
+      active.splice(index, 1);
+      if (active.length === 0) break;
+      index %= active.length;
+    } else {
+      index = (index + 1) % active.length;
+    }
+  }
+  return selected;
+}
+
+function selectSpatiallyDistributedBuildings(buildings, maxCount) {
+  if (buildings.length <= maxCount) return buildings;
+  const finite = buildings.filter((building) => (
+    Number.isFinite(building.centerLat) && Number.isFinite(building.centerLon)
+  ));
+  if (finite.length <= maxCount) return finite;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  for (const building of finite) {
+    minLat = Math.min(minLat, building.centerLat);
+    maxLat = Math.max(maxLat, building.centerLat);
+    minLon = Math.min(minLon, building.centerLon);
+    maxLon = Math.max(maxLon, building.centerLon);
+  }
+  const gridSize = 12;
+  const buckets = new Map();
+  for (const building of finite) {
+    const row = Math.min(gridSize - 1, Math.floor(
+      (building.centerLat - minLat) / Math.max(1e-9, maxLat - minLat) * gridSize
+    ));
+    const column = Math.min(gridSize - 1, Math.floor(
+      (building.centerLon - minLon) / Math.max(1e-9, maxLon - minLon) * gridSize
+    ));
+    const key = row * gridSize + column;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(building);
+  }
+  const orderedBuckets = [...buckets.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, bucket]) => bucket.sort((a, b) => (
+      b.priority - a.priority || String(a.identity).localeCompare(String(b.identity))
+    )));
+  return roundRobinSelect(orderedBuckets, maxCount);
+}
+
 async function fetchWithConcurrency(items, concurrency, worker, signal = null) {
   const { settled, metrics } = await runBoundedProviderBatch(
     items,
@@ -200,7 +256,11 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
 async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds, options = {}) {
   const contextZoom = Number.isFinite(Number(options.contextZoom))
     ? Number(options.contextZoom)
-    : selectContextZoomForTileBudget(bounds, FAR_CONTEXT_ZOOM);
+    : selectContextZoomForTileBudget(
+        bounds,
+        FAR_CONTEXT_ZOOM,
+        FAR_CONTEXT_BUILDING_MAX_TILES
+      );
   const coordinates = contextTileCoordinates(bounds, contextZoom);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const [contextBatch, waterContext] = await Promise.all([
@@ -213,8 +273,12 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     loadFarMappedWaterContext(waterBounds, { ...options, fetchTile })
   ]);
   const tiles = contextBatch.values;
-  const buildings = [];
+  const buildingBuckets = [];
   let skippedNearBuildings = 0;
+  const buildingsPerTile = Math.max(
+    240,
+    Math.ceil(FAR_CONTEXT_MAX_BUILDINGS / Math.max(1, coordinates.length) * 1.35)
+  );
 
   for (const tileRecord of tiles) {
     const buildingLayer = tileRecord.tile.layers.buildings;
@@ -239,16 +303,19 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
           ring,
           properties: geojson.properties || {},
           priority: span,
-          identity: `${tileRecord.x}/${tileRecord.y}/${feature.id ?? index}`
+          centerLat,
+          centerLon,
+          identity: `${tileRecord.x}/${tileRecord.y}/${feature.id ?? index}/${tileBuildings.length}`
         });
       }
     }
-    tileBuildings.sort((a, b) => b.priority - a.priority);
-    buildings.push(...tileBuildings.slice(0, 180));
+    buildingBuckets.push(selectSpatiallyDistributedBuildings(tileBuildings, buildingsPerTile));
   }
 
+  const buildings = roundRobinSelect(buildingBuckets, FAR_CONTEXT_MAX_BUILDINGS);
+
   return {
-    buildings: buildings.slice(0, FAR_CONTEXT_MAX_BUILDINGS),
+    buildings,
     ...waterContext,
     skippedNearBuildings,
     contextZoom,
@@ -260,6 +327,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
 
 export {
   FAR_CONTEXT_MAX_BUILDINGS,
+  FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
@@ -268,5 +336,7 @@ export {
   pointInLonLatRing,
   pointInMappedWaterArea,
   retainFarWaterRing,
+  roundRobinSelect,
+  selectSpatiallyDistributedBuildings,
   selectContextZoomForTileBudget
 };

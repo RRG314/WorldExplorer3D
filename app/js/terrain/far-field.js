@@ -1,11 +1,12 @@
 import {
+  FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=6';
+} from './far-field-mapped-context.js?v=8';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
@@ -18,7 +19,7 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=4';
+} from './far-field-geometry.js?v=9';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -33,7 +34,7 @@ const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
 const FAR_FIELD_GRID_INTERVAL_METERS = 320;
 const FAR_FIELD_SEAM_BLEND_METERS = 550;
-const FAR_CONTEXT_HALF_EXTENT_METERS = 6500;
+const FAR_CONTEXT_HALF_EXTENT_METERS = 8000;
 const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;
 
 function clipPolygonHalfPlane(points, axis, boundary, keepLess) {
@@ -763,6 +764,7 @@ function createFarFieldTerrainApi(deps = {}) {
 }
 
 export {
+  FAR_CONTEXT_BUILDING_MAX_TILES,
   FAR_CONTEXT_HALF_EXTENT_METERS,
   FAR_WATER_SURFACE_CLEARANCE_WORLD,
   FAR_CONTEXT_MAX_BUILDINGS,
