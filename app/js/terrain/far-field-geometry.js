@@ -37,6 +37,53 @@ function smoothstep01(value) {
   return t * t * (3 - 2 * t);
 }
 
+function intervalIndex(values, value) {
+  if (!Array.isArray(values) || values.length < 2 || !Number.isFinite(value)) return -1;
+  if (value < values[0] || value > values[values.length - 1]) return -1;
+  if (value === values[values.length - 1]) return values.length - 2;
+  let low = 0;
+  let high = values.length - 1;
+  while (low + 1 < high) {
+    const middle = Math.floor((low + high) * 0.5);
+    if (values[middle] <= value) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
+function sampleFarFieldGridWorldY(x, z, surfaceGrid) {
+  const xValues = surfaceGrid?.xValues;
+  const zValues = surfaceGrid?.zValues;
+  const worldYs = surfaceGrid?.worldYs;
+  const column = intervalIndex(xValues, Number(x));
+  const row = intervalIndex(zValues, Number(z));
+  if (column < 0 || row < 0 || !worldYs) return null;
+
+  const centerX = (xValues[column] + xValues[column + 1]) * 0.5;
+  const centerZ = (zValues[row] + zValues[row + 1]) * 0.5;
+  if (cellInsideDetailedCoverage(centerX, centerZ, surfaceGrid.detailedCoverage)) return null;
+
+  const columns = xValues.length;
+  const a = row * columns + column;
+  const b = a + 1;
+  const c = a + columns;
+  const d = c + 1;
+  const ax = xValues[column];
+  const az = zValues[row];
+  const u = (Number(x) - ax) / Math.max(1e-9, xValues[column + 1] - ax);
+  const v = (Number(z) - az) / Math.max(1e-9, zValues[row + 1] - az);
+  const ya = Number(worldYs[a]);
+  const yb = Number(worldYs[b]);
+  const yc = Number(worldYs[c]);
+  const yd = Number(worldYs[d]);
+  if (![ya, yb, yc, yd].every(Number.isFinite)) return null;
+
+  // Match the exact a-c-b / b-c-d triangle split published to WebGL.
+  return u + v <= 1
+    ? ya + u * (yb - ya) + v * (yc - ya)
+    : yd + (1 - u) * (yc - yd) + (1 - v) * (yb - yd);
+}
+
 function parentTerrainTile(tile, levels = 1) {
   const safeLevels = Math.max(1, Math.floor(Number(levels) || 1));
   const divisor = 2 ** safeLevels;
@@ -223,6 +270,30 @@ function createFarFieldGeometryPlanner(deps = {}) {
     }
   }
 
+  function sampleFarFieldSurfaceMeters(x, z, spec, loadedTiles, offsetMeters) {
+    if (
+      !spec?.outer ||
+      x < spec.outer.minX || x > spec.outer.maxX ||
+      z < spec.outer.minZ || z > spec.outer.maxZ
+    ) return null;
+    const { lat, lon } = worldToLatLon(x, z);
+    const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
+    if (!Number.isFinite(sourceMeters)) return null;
+
+    let meters = sourceMeters + offsetMeters;
+    const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
+    const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
+    if (distanceFromSeam <= seamBlendWorld) {
+      const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
+      const acceptedMeters = Number(accepted?.groundElevationMeters);
+      if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+        const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
+        meters = acceptedMeters + (meters - acceptedMeters) * blend;
+      }
+    }
+    return meters;
+  }
+
   function buildFarFieldGeometry(spec, loadedTiles, offsetMeters) {
     const interval = farFieldGridIntervalMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const xValues = addCoverageEdges(
@@ -238,36 +309,29 @@ function createFarFieldGeometryPlanner(deps = {}) {
       'maxZ'
     );
     const positions = [];
+    const surfaceWorldYs = [];
     const colors = [];
     const uvs = [];
     const indices = [];
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
     const zRange = spec.outer.maxZ - spec.outer.minZ || 1;
-    const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     let minElevationMeters = Infinity;
     let maxElevationMeters = -Infinity;
 
     for (const z of zValues) {
       for (const x of xValues) {
-        const { lat, lon } = worldToLatLon(x, z);
-        const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
-        if (!Number.isFinite(sourceMeters)) return null;
         // This square clipmap owns terrain continuity only. Water is published
         // exclusively by the mapped polygon/ribbon pipeline, so the clipmap
         // can never turn its rectangular bounds into a blue city moat.
-        let meters = sourceMeters + offsetMeters;
-        const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
-        if (distanceFromSeam <= seamBlendWorld) {
-          const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
-          const acceptedMeters = Number(accepted?.groundElevationMeters);
-          if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
-            const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
-            meters = acceptedMeters + (meters - acceptedMeters) * blend;
-          }
-        }
+        const meters = sampleFarFieldSurfaceMeters(x, z, spec, loadedTiles, offsetMeters);
+        if (!Number.isFinite(meters)) return null;
         minElevationMeters = Math.min(minElevationMeters, meters);
         maxElevationMeters = Math.max(maxElevationMeters, meters);
-        positions.push(x, meters * Number(appCtx.WORLD_UNITS_PER_METER || 1) * Number(appCtx.TERRAIN_Y_EXAGGERATION || 1), z);
+        const worldY = Math.fround(
+          meters * Number(appCtx.WORLD_UNITS_PER_METER || 1) * Number(appCtx.TERRAIN_Y_EXAGGERATION || 1)
+        );
+        positions.push(x, worldY, z);
+        surfaceWorldYs.push(worldY);
         // The fixed-location LOD uses the same PBR base, WorldCover tint, and
         // built-surface shader as detailed terrain. White is the neutral vertex
         // multiplier until that shared presentation is applied to the mesh.
@@ -297,7 +361,19 @@ function createFarFieldGeometryPlanner(deps = {}) {
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
-    return { geometry, columns: xValues.length, rows: zValues.length, minElevationMeters, maxElevationMeters };
+    return {
+      geometry,
+      columns: xValues.length,
+      rows: zValues.length,
+      minElevationMeters,
+      maxElevationMeters,
+      surfaceGrid: {
+        xValues,
+        zValues,
+        worldYs: new Float32Array(surfaceWorldYs),
+        detailedCoverage: spec.detailedCoverage
+      }
+    };
   }
 
   return {
@@ -307,6 +383,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     innerWorldBounds,
     normalizationOffset,
     prepareMappedWaterSurfaces,
+    sampleFarFieldSurfaceMeters,
     sampleSourceMeters,
     sourceTileRange,
     sourceZoomForTileBudget
@@ -317,5 +394,6 @@ export {
   buildClipmapAxis,
   createFarFieldGeometryPlanner,
   disposeFarFieldMesh,
-  parentTerrainTile
+  parentTerrainTile,
+  sampleFarFieldGridWorldY
 };

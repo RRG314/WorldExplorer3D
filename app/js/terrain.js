@@ -60,7 +60,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=7";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=27";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=30";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -159,7 +159,10 @@ function elevationWorldYAtWorldXZ(x, z) {
   if (
     sample.status !== 'available' ||
     !Number.isFinite(Number(sample.groundElevationMeters))
-  ) return null;
+  ) {
+    const farTerrainY = appCtx.sampleFarTerrainWorldYAt?.(x, z);
+    return Number.isFinite(farTerrainY) ? farTerrainY : null;
+  }
   return clampElevationMeters(Number(sample.groundElevationMeters)) *
     appCtx.WORLD_UNITS_PER_METER *
     appCtx.TERRAIN_Y_EXAGGERATION;
@@ -314,6 +317,7 @@ const transportPublicationDeps = {
 const {
   refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
+  sampleFarTerrainWorldYAt,
   scheduleFarTerrainSurfaceRefresh,
   updateFarTerrainClipmap,
   waitForFarTerrainClipmap
@@ -483,6 +487,7 @@ Object.assign(appCtx, {
   refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
   resetLocationTerrainPublication,
+  sampleFarTerrainWorldYAt,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
   scheduleFarTerrainSurfaceRefresh,

@@ -57,9 +57,13 @@ assert.match(
   /setWorldSurfaceProfile[\s\S]*scheduleFarTerrainSurfaceRefresh/,
   'late location classification must refresh the already-published outer terrain material'
 );
+const failedBuildBranch = farFieldSource.indexOf("reason: 'far-field-elevation-sampling-failed'");
+const replacementCleanup = farFieldSource.indexOf('removeCurrentMesh();', failedBuildBranch);
+const replacementStatePublication = farFieldSource.indexOf('farFieldSurfaceState = {', replacementCleanup);
 assert.ok(
-  farFieldSource.indexOf('removeCurrentMesh();', farFieldSource.indexOf("reason: 'far-field-elevation-sampling-failed'")) <
-    farFieldSource.indexOf('farFieldSurfaceState = { spec, worldCoverResult: worldCoverContext };'),
+  failedBuildBranch >= 0 &&
+    replacementCleanup > failedBuildBranch &&
+    replacementStatePublication > replacementCleanup,
   'replacement cleanup must happen before publishing the new location material state'
 );
 assert.doesNotMatch(

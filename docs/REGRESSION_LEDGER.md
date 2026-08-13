@@ -4,6 +4,81 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-12 — Monaco ground contact disappears outside detailed coverage
+
+- Status: resolved locally; not pushed or deployed. Hardware-Chrome acceptance
+  remains open.
+- Symptom: after changing locations or moving beyond the detailed city tiles,
+  an actor could fall through visible terrain. Switching travel modes snapped
+  the actor back to a surface but caused a long pause.
+- Root cause: the fixed 22 km location terrain was a render-only owner.
+  Ground/vehicle physics sampled only the smaller accepted-ground artifact and
+  returned no height where the visible fixed terrain continued. The replacement
+  browser check then hid this gap by switching to walk mode before measuring
+  the arrival.
+- Resolution: the already-built fixed terrain grid is now the unified height
+  fallback outside accepted detailed coverage. Physics interpolates the exact
+  `a-c-b / b-c-d` triangles published to WebGL, rather than independently
+  resampling the underlying DEM; it adds no streaming, fetch, or second
+  renderer. The replacement journey now records actor contact before any
+  test-owned mode switch or respawn.
+- Evidence: at a Monaco point 220 m outside the 25 available detailed tiles,
+  accepted ground reports `unavailable` while rendered and physical terrain
+  both report `301.3996886 m`. The grounded car stayed within `0.29 m` of that
+  surface with no console error. The 30-second fixed-world journey drove 39.5 m,
+  flew 708.9 m across the measured detailed boundary, issued zero movement data
+  requests, and retained finite fixed-terrain contact.
+- Guard: `npm run test:fixed-world-travel-browser`,
+  `npm run test:world-load-cancellation-browser`, and the fixed-world horizon
+  architecture contract. The fixed-world drive portion selects a measured,
+  collision-clear mapped-road segment instead of relying on provider ordering
+  or a longest-road endpoint.
+- Never reintroduce: render-only terrain beyond the physics domain, a mode
+  switch as arrival recovery, or a test respawn before measuring the published
+  actor/surface relationship.
+
+## 2026-08-12 — Aerial water striping from competing geometry owners
+
+- Status: resolved locally in software Chromium; hardware-Chrome acceptance
+  remains open.
+- Symptom: Monaco showed horizontal aerial bands and large triangular water
+  artifacts, especially looking across the coast from drone altitude.
+- Root cause: the far-water loader deleted vector-ring vertices by spacing and
+  stride before triangulation, which changed concave coastline topology. It
+  also published duplicate `ocean`/`water_polygons` triangles and continued
+  drawing far water through the inner area already owned by detailed water.
+- Resolution: preserve mapped vector-tile ring topology, discard overlapping
+  lower-priority far-water triangles, and geometrically clip far water to the
+  exact outside of the detailed-location bounds. Detailed water owns the inner
+  location; far water owns only the horizon continuation.
+- Evidence: layer-isolation renders proved the bands remained with far water
+  alone and disappeared when it was hidden. The corrected Monaco publication
+  has 76 far-water polygons, 10,320 clipped triangles, 38 detailed water
+  surfaces, and no console errors; the inner harbor/coast frame no longer
+  changes when far water is toggled.
+- Guard: `npm run test:phase5-aerial-transition`, `npm run test:hydrology`, and
+  coastal drone screenshots with far-water visibility A/B evidence.
+- Never reintroduce: point-count/stride polygon simplification, coplanar far and
+  detailed water in the same region, or polygon offset/fog as a substitute for
+  one geometric depth owner.
+
+## 2026-08-12 — Vehicle collision envelope wider than the rendered car
+
+- Status: resolved locally; real narrow-bridge Chrome driving remains open.
+- Symptom: cars stopped or snagged on some bridges and ramps that visibly had
+  enough room for the vehicle.
+- Root cause: the rendered car is 1.8 m wide by 3.5 m long, but building and
+  bridge-barrier collision treated it as one 2 m-radius circle—over 4 m wide.
+- Resolution: collision now uses a three-sample longitudinal capsule aligned to
+  the car heading, with a 0.92 m radius and a 3.52 m overall length. This keeps
+  the visible body dimensions while retaining swept wall/guardrail collision.
+- Guard: `npm run test:phase5-controls` now requires the 1.8 m vehicle to pass
+  a 3 m protected deck while the swept thin-wall test still blocks tunneling.
+  The real Pregerson ramp journey also completes with zero center-collision
+  samples and 0.074 m maximum surface error.
+- Never reintroduce: a center circle wider than the rendered vehicle, or global
+  widening of accurate mapped bridges to compensate for a false actor shape.
+
 ## 2026-08-12 — Ramps snag vehicles and tunnel ways create false portals
 
 - Status: resolved locally; not pushed or deployed. Hardware-Chrome visual

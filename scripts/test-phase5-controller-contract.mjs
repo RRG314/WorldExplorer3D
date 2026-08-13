@@ -26,7 +26,10 @@ import {
   sampleEarthVehicleGroundContact,
   stabilizeEarthVehicleSurfaceY
 } from '../app/js/physics/vehicle-surface.js';
-import { findSweptVehicleBuildingCollision } from '../app/js/physics/building-collision-response.js';
+import {
+  findSweptVehicleBuildingCollision,
+  VEHICLE_COLLISION_PROFILE
+} from '../app/js/physics/building-collision-response.js';
 import { createWalkingPhysicsHelpers } from '../app/js/walking/physics.js';
 import fs from 'node:fs';
 import { PLANE_MAX_SPEED_MPS } from '../app/js/plane-mode.js';
@@ -74,6 +77,37 @@ const sweptCollision = findSweptVehicleBuildingCollision(
 assert.ok(sweptCollision, 'swept collision missed a thin building between frame endpoints');
 assert.ok(sweptCollision.x >= 9.5 && sweptCollision.x <= 10.5);
 assert.ok(sweptCollision.lastSafeX < 9.5);
+
+const narrowBridgeCar = { x: 0, y: 1.2, z: 0, angle: 0, road: null };
+let largestBridgeProbeRadius = 0;
+const narrowBridgeCollision = findSweptVehicleBuildingCollision(
+  { car: narrowBridgeCar },
+  (x, z, radius) => {
+    largestBridgeProbeRadius = Math.max(largestBridgeProbeRadius, radius);
+    const touchesBarrier = Math.abs(x) + radius >= 1.5;
+    return touchesBarrier
+      ? {
+          collision: true,
+          inside: false,
+          penetration: 0.1,
+          pushX: x < 0 ? 1 : -1,
+          pushZ: 0,
+          building: { colliderDetail: 'full', buildingType: 'bridge_guardrail' }
+        }
+      : { collision: false };
+  },
+  0,
+  0,
+  0,
+  8,
+  0
+);
+assert.equal(narrowBridgeCollision, null, 'a 1.8 m car must fit within a 3 m protected bridge deck');
+assert.equal(largestBridgeProbeRadius, VEHICLE_COLLISION_PROFILE.radius);
+assert.ok(
+  VEHICLE_COLLISION_PROFILE.radius * 2 <= 1.9,
+  'vehicle collision width must remain aligned with the rendered 1.8 m body'
+);
 
 const sharedCollisionBeforeWalkContract = ctx.checkBuildingCollision;
 const blockCollisionBeforeWalkContract = ctx.getBuildCollisionAtWorldXZ;

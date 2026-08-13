@@ -9,8 +9,6 @@ const FAR_WATER_CONTEXT_ZOOM = 11;
 const FAR_CONTEXT_MAX_BUILDINGS = 10000;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
-const FAR_WATER_VERTEX_SPACING_METERS = 45;
-const FAR_WATER_MAX_RING_POINTS = 384;
 
 function polygonRings(geometry) {
   if (geometry?.type === 'Polygon') return geometry.coordinates?.[0] ? [geometry.coordinates[0]] : [];
@@ -50,30 +48,17 @@ function ringSpanMeters(ring) {
   return Math.max(northSouth, eastWest);
 }
 
-function coordinateDistanceMeters(a, b) {
-  const latitude = (Number(a?.[1]) + Number(b?.[1])) * 0.5;
-  const dx = (Number(a?.[0]) - Number(b?.[0])) * 111320 * Math.cos(latitude * Math.PI / 180);
-  const dy = (Number(a?.[1]) - Number(b?.[1])) * 110540;
-  return Math.hypot(dx, dy);
-}
-
-function simplifyFarWaterRing(ring) {
-  const source = ring?.length > 1 &&
-    ring[0]?.[0] === ring.at(-1)?.[0] && ring[0]?.[1] === ring.at(-1)?.[1]
-    ? ring.slice(0, -1)
-    : (ring || []).slice();
-  if (source.length <= 4) return [...source, source[0]].filter(Boolean);
-  const spaced = [source[0]];
-  for (let index = 1; index < source.length; index += 1) {
-    if (coordinateDistanceMeters(source[index], spaced.at(-1)) >= FAR_WATER_VERTEX_SPACING_METERS) {
-      spaced.push(source[index]);
-    }
-  }
-  if (spaced.length < 3) return [...source, source[0]];
-  const stride = Math.max(1, Math.ceil(spaced.length / FAR_WATER_MAX_RING_POINTS));
-  const simplified = stride === 1 ? spaced : spaced.filter((_, index) => index % stride === 0);
-  if (simplified.length < 3) return [...source, source[0]];
-  return [...simplified, simplified[0]];
+function retainFarWaterRing(ring) {
+  const source = (ring || []).filter((coordinate) => (
+    Number.isFinite(Number(coordinate?.[0])) &&
+    Number.isFinite(Number(coordinate?.[1]))
+  ));
+  if (source.length < 3) return [];
+  const first = source[0];
+  const last = source.at(-1);
+  return first[0] === last[0] && first[1] === last[1]
+    ? source.slice()
+    : [...source, first];
 }
 
 function pointInLonLatRing(lon, lat, ring) {
@@ -89,6 +74,16 @@ function pointInLonLatRing(lon, lat, ring) {
     if (intersects) inside = !inside;
   }
   return inside;
+}
+
+function pointInMappedWaterArea(lon, lat, area) {
+  const bounds = area?.bounds;
+  if (
+    bounds &&
+    (lon < bounds.minLon || lon > bounds.maxLon || lat < bounds.minLat || lat > bounds.maxLat)
+  ) return false;
+  if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
+  return !(area?.holes || []).some((hole) => pointInLonLatRing(lon, lat, hole));
 }
 
 function contextTileCount(bounds, zoom) {
@@ -171,14 +166,19 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
           // noise but expensive to triangulate. Keep every ocean polygon and
           // only mapped inland water large enough to be visible at this LOD.
           if (kind !== 'ocean' && spanMeters < FAR_WATER_MIN_SPAN_METERS) continue;
-          const simplifiedOuter = simplifyFarWaterRing(outer);
-          if (simplifiedOuter.length < 4) continue;
+          // These vector-tile rings are already bounded to one coarse tile.
+          // Deleting every Nth vertex can make a concave coastline cross
+          // itself, producing giant triangles and depth stripes. Preserve the
+          // mapped topology; the 200 m feature filter owns the far-LOD budget.
+          const retainedOuter = retainFarWaterRing(outer);
+          if (retainedOuter.length < 4) continue;
           waterAreas.push({
-            outer: simplifiedOuter,
+            outer: retainedOuter,
             holes: (rings || []).slice(1)
-              .filter((ring) => Array.isArray(ring) && ring.length >= 4 && ringSpanMeters(ring) >= FAR_WATER_MIN_SPAN_METERS * 0.5)
-              .map(simplifyFarWaterRing),
-            bounds: ringBounds(simplifiedOuter),
+              .filter((ring) => Array.isArray(ring) && ring.length >= 4)
+              .map(retainFarWaterRing)
+              .filter((ring) => ring.length >= 4),
+            bounds: ringBounds(retainedOuter),
             kind,
             spanMeters,
             identity: `${tileRecord.z}/${tileRecord.x}/${tileRecord.y}/${layerName}/${feature.id ?? index}/${polygonIndex}`
@@ -266,5 +266,7 @@ export {
   loadFarMappedContext,
   loadFarMappedWaterContext,
   pointInLonLatRing,
+  pointInMappedWaterArea,
+  retainFarWaterRing,
   selectContextZoomForTileBudget
 };

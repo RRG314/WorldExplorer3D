@@ -113,13 +113,40 @@ try {
       replacementSceneStage = ctx.getEarthScenePublicationState?.() || null;
     }
     const replacementSession = await replacementPromise;
-    ctx.Walk?.setModeWalk?.();
     ctx.startMode?.();
     const farTerrainReady = typeof ctx.waitForFarTerrainClipmap === 'function'
       ? await ctx.waitForFarTerrainClipmap(45000)
       : false;
     if (!farTerrainReady) throw new Error('Replacement far terrain did not reach a terminal ready state.');
     await new Promise((resolve) => setTimeout(resolve, 2500));
+
+    // Capture the actual replacement arrival before any test-owned respawn or
+    // travel-mode transition. Switching modes used to conceal an invalid
+    // actor/surface relationship here.
+    const arrivalMode = ctx.getCurrentTravelMode?.() || 'walk';
+    const arrivalActor = arrivalMode === 'plane'
+      ? ctx.planeMode
+      : arrivalMode === 'drone'
+        ? ctx.drone
+        : arrivalMode === 'walk'
+          ? ctx.Walk?.state?.walker
+          : ctx.car;
+    const arrivalX = Number(arrivalActor?.x);
+    const arrivalY = Number(arrivalActor?.y);
+    const arrivalZ = Number(arrivalActor?.z);
+    const arrivalSurfaceY = arrivalMode === 'drive'
+      ? Number(ctx.SurfaceQuery?.driveAt?.(arrivalX, arrivalZ, { currentY: arrivalY - 1.2 })?.position?.y)
+      : Number(ctx.SurfaceQuery?.walkAt?.(arrivalX, arrivalZ, { currentY: arrivalY - 1.7 })?.position?.y);
+    const arrivalFeetY = arrivalY - (arrivalMode === 'drive' ? 1.2 : arrivalMode === 'walk' ? 1.7 : 0);
+    const arrivalBeforeRecovery = {
+      mode: arrivalMode,
+      x: arrivalX,
+      y: arrivalY,
+      z: arrivalZ,
+      surfaceY: arrivalSurfaceY,
+      feetY: arrivalFeetY,
+      surfaceDelta: arrivalFeetY - arrivalSurfaceY
+    };
 
     const terrainPresentation = (ctx.terrainGroup?.children || [])
       .filter((mesh) => mesh?.userData?.isTerrainMesh)
@@ -209,7 +236,8 @@ try {
       scenePublication: ctx.getEarthScenePublicationState?.() || null,
       terrainPresentation,
       surfaceAuthorityEvidence,
-      farTerrain: ctx.farTerrainClipmapState || null
+      farTerrain: ctx.farTerrainClipmapState || null,
+      arrivalBeforeRecovery
     };
   }, { replacementLocation });
 
@@ -251,6 +279,11 @@ try {
   assert.equal(report.runtimeStatus, 'ready');
   assert.equal(report.selection, replacementLocation);
   assert.equal(report.worldLoading, false);
+  assert.ok(Number.isFinite(report.arrivalBeforeRecovery?.surfaceY), 'replacement arrival had no physical surface');
+  assert.ok(
+    Math.abs(Number(report.arrivalBeforeRecovery?.surfaceDelta)) <= 0.75,
+    `replacement actor was not grounded before mode recovery (${report.arrivalBeforeRecovery?.surfaceDelta})`
+  );
   assert.ok(report.roads > 0, 'replacement location published no roads');
   assert.ok(report.buildings > 0, 'replacement location published no buildings');
   assert.equal(report.publication?.type, 'WorldSnapshot');

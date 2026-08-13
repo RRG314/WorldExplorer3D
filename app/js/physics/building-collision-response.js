@@ -14,6 +14,14 @@ function slowVehicle(car, factor) {
   car.vz *= factor;
 }
 
+// The rendered car body is 1.8 m wide and 3.5 m long. Model it as a capsule
+// instead of the former 2 m-radius circle, which made a visually fitting car
+// behave as if it were more than 4 m wide on narrow mapped bridges.
+export const VEHICLE_COLLISION_PROFILE = Object.freeze({
+  radius: 0.92,
+  centerlineHalfLength: 0.84
+});
+
 function isRoadGhostCollision(buildingCheck, nearestRoad) {
   const roadDist = Number.isFinite(nearestRoad?.dist)
     ? nearestRoad.dist
@@ -67,11 +75,9 @@ export function isVehicleBuildingCollisionBlocking(
 }
 
 function queryVehicleBuildingCollision(appCtx, checkBuildingCollision, x, z, carFeetY) {
-  const buildingCheck = checkBuildingCollision(x, z, 2.0, {
-    actorBaseY: carFeetY,
-    actorHeight: 1.9
-  });
-  if (!buildingCheck?.collision) return null;
+  const angle = Number(appCtx.car?.angle) || 0;
+  const forwardX = Math.sin(angle);
+  const forwardZ = Math.cos(angle);
   const nearestRoad = typeof appCtx.findNearestRoad === 'function'
     ? appCtx.findNearestRoad(x, z, {
         y: Number.isFinite(carFeetY) ? carFeetY + 1.2 : NaN,
@@ -79,9 +85,30 @@ function queryVehicleBuildingCollision(appCtx, checkBuildingCollision, x, z, car
         preferredRoad: appCtx.car?.road || null
       })
     : null;
-  return isVehicleBuildingCollisionBlocking(buildingCheck, nearestRoad)
-    ? { buildingCheck, nearestRoad }
-    : null;
+  for (const longitudinalOffset of [
+    VEHICLE_COLLISION_PROFILE.centerlineHalfLength,
+    0,
+    -VEHICLE_COLLISION_PROFILE.centerlineHalfLength
+  ]) {
+    const probeX = x + forwardX * longitudinalOffset;
+    const probeZ = z + forwardZ * longitudinalOffset;
+    const buildingCheck = checkBuildingCollision(
+      probeX,
+      probeZ,
+      VEHICLE_COLLISION_PROFILE.radius,
+      {
+        actorBaseY: carFeetY,
+        actorHeight: 1.9
+      }
+    );
+    if (
+      buildingCheck?.collision &&
+      isVehicleBuildingCollisionBlocking(buildingCheck, nearestRoad)
+    ) {
+      return { buildingCheck, nearestRoad, longitudinalOffset };
+    }
+  }
+  return null;
 }
 
 export function findSweptVehicleBuildingCollision(

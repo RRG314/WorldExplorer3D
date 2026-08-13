@@ -19,6 +19,7 @@ const diagnosticsSource = read('app/js/runtime-diagnostics.js');
 const locationTerrainSource = read('app/js/terrain/location-world.js');
 const farFieldSource = read('app/js/terrain/far-field.js');
 const farFieldGeometrySource = read('app/js/terrain/far-field-geometry.js');
+const farMappedContextSource = read('app/js/terrain/far-field-mapped-context.js');
 const starMaterialSource = read('app/js/sky/star-point-material.js');
 const starFieldSource = read('app/js/sky/starfield-ui.js');
 const gaiaSource = read('app/js/sky/gaia-catalog.js');
@@ -31,11 +32,15 @@ const {
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   buildClipmapAxis,
+  clipTriangleOutsideBounds,
   cellInsideDetailedCoverage,
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
+const { sampleFarFieldGridWorldY } = await import('../app/js/terrain/far-field-geometry.js');
 const {
   pointInLonLatRing,
+  pointInMappedWaterArea,
+  retainFarWaterRing,
   selectContextZoomForTileBudget
 } = await import('../app/js/terrain/far-field-mapped-context.js');
 
@@ -45,6 +50,13 @@ assert.doesNotMatch(
   /terrainAerialDetailSuppressed|terrainSurfaceDetailState|updateTerrainAerialDetail/,
   'terrain materials must not change at an aerial altitude threshold'
 );
+const mappedWaterWithIsland = {
+  outer: [[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
+  holes: [[[1, 1], [2, 1], [2, 2], [1, 2], [1, 1]]],
+  bounds: { minLon: 0, maxLon: 4, minLat: 0, maxLat: 4 }
+};
+assert.equal(pointInMappedWaterArea(3, 3, mappedWaterWithIsland), true);
+assert.equal(pointInMappedWaterArea(1.5, 1.5, mappedWaterWithIsland), false);
 assert.doesNotMatch(
   terrainRuntimeSource,
   /updateTerrainAerialDetail/,
@@ -69,6 +81,11 @@ assert.match(locationTerrainSource, /z: appCtx\.TERRAIN_ZOOM/);
 assert.doesNotMatch(locationTerrainSource, /actor|speed|childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
 assert.equal(fs.existsSync(path.join(root, 'app/js/terrain/far-field.js')), true);
 assert.match(terrainRuntimeSource, /createFarFieldTerrainApi|far-field\.js|updateFarTerrainClipmap/);
+assert.match(
+  terrainRuntimeSource,
+  /sampleFarTerrainWorldYAt\?\.\(x, z\)/,
+  'rendered fixed-location terrain must remain the traversal fallback outside detailed accepted ground'
+);
 assert.match(locationTerrainSource, /updateFarTerrainClipmap/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
@@ -77,6 +94,56 @@ assert.equal(FAR_CONTEXT_ZOOM, 14);
 assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
 assert.equal(FAR_WATER_MIN_SPAN_METERS, 200);
 assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
+const triangleSurfaceGrid = {
+  xValues: [0, 10],
+  zValues: [0, 10],
+  worldYs: new Float32Array([0, 10, 20, 40]),
+  detailedCoverage: []
+};
+assert.equal(
+  sampleFarFieldGridWorldY(2, 3, triangleSurfaceGrid),
+  8,
+  'far traversal height must match the first rendered grid triangle'
+);
+assert.equal(
+  sampleFarFieldGridWorldY(8, 7, triangleSurfaceGrid),
+  27,
+  'far traversal height must match the second rendered grid triangle'
+);
+assert.equal(
+  sampleFarFieldGridWorldY(12, 5, triangleSurfaceGrid),
+  null,
+  'far traversal height must stop at the rendered fixed-location boundary'
+);
+const clippedOutside = clipTriangleOutsideBounds([
+  { x: -20, z: 0 },
+  { x: 20, z: -20 },
+  { x: 20, z: 20 }
+], { minX: -10, maxX: 10, minZ: -10, maxZ: 10 });
+assert.ok(clippedOutside.length > 0, 'water crossing the detailed bounds must retain its far portion');
+assert.equal(
+  clippedOutside.some((polygon) => polygon.some((point) => (
+    point.x > -10 && point.x < 10 && point.z > -10 && point.z < 10
+  ))),
+  false,
+  'far water must not overlap the inner detailed-water owner'
+);
+const detailedWaterRing = Array.from({ length: 500 }, (_, index) => {
+  const angle = index / 500 * Math.PI * 2;
+  const radius = index % 2 === 0 ? 1 : 0.55;
+  return [Math.cos(angle) * radius, Math.sin(angle) * radius];
+});
+const retainedWaterRing = retainFarWaterRing(detailedWaterRing);
+assert.equal(
+  retainedWaterRing.length,
+  detailedWaterRing.length + 1,
+  'far mapped water must preserve source topology instead of deleting vertices by stride'
+);
+assert.doesNotMatch(
+  farMappedContextSource,
+  /FAR_WATER_MAX_RING_POINTS|FAR_WATER_VERTEX_SPACING_METERS/,
+  'far mapped water must not use topology-breaking point-count simplification'
+);
 const polarBounds = { latS: -78.05, latN: -77.65, lonW: 165.7, lonE: 167.65 };
 assert.ok(
   selectContextZoomForTileBudget(polarBounds, FAR_CONTEXT_ZOOM) < FAR_CONTEXT_ZOOM,

@@ -131,15 +131,82 @@ try {
   phase = 'drive';
   const driveStart = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const route = (ctx.roads || [])
-      .filter((road) => Array.isArray(road?.pts) && road.pts.length >= 4)
-      .map((road) => ({
-        points: road.pts,
-        distance: road.pts.slice(1).reduce((sum, point, index) => (
-          sum + Math.hypot(point.x - road.pts[index].x, point.z - road.pts[index].z)
-        ), 0)
-      }))
-      .sort((left, right) => right.distance - left.distance)[0];
+    const collisionResponse = await import('/app/js/physics/building-collision-response.js?v=4');
+    const collisionProfile = collisionResponse.VEHICLE_COLLISION_PROFILE;
+    const sampleRoadPoint = (road, fraction) => {
+      if (!Array.isArray(road?.pts) || road.pts.length < 2) return null;
+      const segmentCount = road.pts.length - 1;
+      const target = Math.max(0, Math.min(segmentCount - 1e-6, fraction * segmentCount));
+      const index = Math.floor(target);
+      const blend = target - index;
+      const start = road.pts[index];
+      const end = road.pts[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const length = Math.hypot(dx, dz);
+      if (!(length > 0.1)) return null;
+      return {
+        x: start.x + dx * blend,
+        z: start.z + dz * blend,
+        tangentX: dx / length,
+        tangentZ: dz / length
+      };
+    };
+    const probeClear = (road, point, direction, distance) => {
+      const x = point.x + point.tangentX * direction * distance;
+      const z = point.z + point.tangentZ * direction * distance;
+      const surface = ctx.SurfaceQuery?.driveAt?.(x, z, { preferRoad: true });
+      const actorBaseY = Number(surface?.position?.y);
+      const nearestRoad = ctx.findNearestRoad?.(x, z, {
+        y: actorBaseY,
+        maxVerticalDelta: 18,
+        preferredRoad: road
+      });
+      if (nearestRoad?.road !== road || !Number.isFinite(actorBaseY)) return false;
+      const forwardX = point.tangentX * direction;
+      const forwardZ = point.tangentZ * direction;
+      return [
+        collisionProfile.centerlineHalfLength,
+        0,
+        -collisionProfile.centerlineHalfLength
+      ].every((longitudinalOffset) => {
+        const collision = ctx.checkBuildingCollision?.(
+          x + forwardX * longitudinalOffset,
+          z + forwardZ * longitudinalOffset,
+          collisionProfile.radius,
+          { actorBaseY, actorHeight: 1.9 }
+        );
+        return !collisionResponse.isVehicleBuildingCollisionBlocking(collision, nearestRoad);
+      });
+    };
+    let route = null;
+    const roads = (ctx.roads || []).filter((road) => road?.driveable !== false);
+    const roadStep = Math.max(1, Math.floor(roads.length / 320));
+    for (let index = 0; index < roads.length && !route; index += roadStep) {
+      const road = roads[index];
+      for (const fraction of [0.2, 0.5, 0.8]) {
+        const point = sampleRoadPoint(road, fraction);
+        if (!point) continue;
+        for (const direction of [1, -1]) {
+          if (![0, 8, 16, 24, 32].every((distance) => probeClear(road, point, direction, distance))) continue;
+          route = {
+            points: [
+              { x: point.x, z: point.z },
+              {
+                x: point.x + point.tangentX * direction * 32,
+                z: point.z + point.tangentZ * direction * 32
+              }
+            ],
+            distance: 32,
+            sourceFeatureId: road.sourceFeatureId || null,
+            type: road.type || null,
+            width: Number(road.width)
+          };
+          break;
+        }
+        if (route) break;
+      }
+    }
     if (!route) throw new Error('No real mapped drive route was available');
     const first = route.points[0];
     const second = route.points[1];
@@ -155,7 +222,8 @@ try {
       waypoint: 1,
       lastX: ctx.car.x,
       lastZ: ctx.car.z,
-      pathDistance: 0
+      pathDistance: 0,
+      completed: false
     };
     ctx.keys.ArrowUp = true;
     window.__fixedWorldDriveTimer = window.setInterval(() => {
@@ -166,6 +234,16 @@ try {
       state.lastX = actor.x;
       state.lastZ = actor.z;
       let target = state.route.points[Math.min(state.waypoint, state.route.points.length - 1)];
+      if (Math.hypot(target.x - actor.x, target.z - actor.z) < 3) {
+        state.completed = true;
+        ctx.keys.ArrowUp = false;
+        actor.speed = 0;
+        actor.vFwd = 0;
+        actor.vLat = 0;
+        actor.vx = 0;
+        actor.vz = 0;
+        return;
+      }
       while (
         state.waypoint < state.route.points.length - 1 &&
         Math.hypot(target.x - actor.x, target.z - actor.z) < 10
@@ -177,7 +255,14 @@ try {
       actor.yawRate = 0;
       actor.steerSm = 0;
     }, 100);
-    return { x: ctx.car.x, z: ctx.car.z, routeDistance: route.distance };
+    return {
+      x: ctx.car.x,
+      z: ctx.car.z,
+      routeDistance: route.distance,
+      routeSourceFeatureId: route.sourceFeatureId,
+      routeType: route.type,
+      routeWidth: route.width
+    };
   });
   await page.waitForTimeout(durationSeconds * 1000);
   const drive = await page.evaluate(async ({ seconds, start }) => {
@@ -190,6 +275,7 @@ try {
       end: { x: ctx.car.x, z: ctx.car.z },
       displacement: Math.hypot(ctx.car.x - start.x, ctx.car.z - start.z),
       pathDistance: Number(window.__fixedWorldDrive?.pathDistance || 0),
+      completed: window.__fixedWorldDrive?.completed === true,
       speed: Number(ctx.car.speed || 0),
       publication: ctx.verifyWorldPublicationStable?.() || null
     };
@@ -236,6 +322,9 @@ try {
   const flight = await page.evaluate(async ({ seconds, start }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const current = ctx.getPlaneSnapshot?.() || ctx.planeMode;
+    const acceptedGround = ctx.sampleAcceptedGroundAtWorldXZ?.(current.x, current.z) || null;
+    const fixedLocationTerrainY = ctx.sampleFarTerrainWorldYAt?.(current.x, current.z);
+    const traversalTerrainY = ctx.SurfaceQuery?.terrainAt?.(current.x, current.z)?.position?.y;
     return {
       seconds,
       start,
@@ -244,6 +333,9 @@ try {
       boundaryCrossed: current.x < start.bounds.minX - 100,
       active: current.active === true,
       airborne: current.airborne === true,
+      acceptedGroundStatus: acceptedGround?.status || null,
+      fixedLocationTerrainY: Number(fixedLocationTerrainY),
+      traversalTerrainY: Number(traversalTerrainY),
       publication: ctx.verifyWorldPublicationStable?.() || null
     };
   }, { seconds: durationSeconds, start: flightStart });
@@ -314,6 +406,20 @@ try {
   assert.equal(drive.publication?.stable, true, 'drive mutated the published world');
   assert.equal(flight.active, true, 'plane stopped during sustained flight');
   assert.equal(flight.airborne, true, 'plane landed during sustained flight');
+  assert.ok(
+    Number.isFinite(flight.fixedLocationTerrainY),
+    'fixed-location rendered terrain did not publish a traversal height at the aircraft position'
+  );
+  assert.ok(
+    Number.isFinite(flight.traversalTerrainY),
+    'traversal lost ground height after crossing the detailed terrain boundary'
+  );
+  if (flight.acceptedGroundStatus !== 'available') {
+    assert.ok(
+      Math.abs(flight.traversalTerrainY - flight.fixedLocationTerrainY) < 0.01,
+      'traversal did not use the fixed-location terrain height outside accepted detailed coverage'
+    );
+  }
   assert.equal(
     flight.boundaryCrossed,
     true,
