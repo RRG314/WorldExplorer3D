@@ -36,7 +36,11 @@ const {
   cellInsideDetailedCoverage,
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
-const { sampleFarFieldGridWorldY } = await import('../app/js/terrain/far-field-geometry.js');
+const {
+  mappedWaterBedMetersAt,
+  normalizeMappedWaterSurfaceOwnership,
+  sampleFarFieldGridWorldY
+} = await import('../app/js/terrain/far-field-geometry.js');
 const {
   pointInLonLatRing,
   pointInMappedWaterArea,
@@ -57,6 +61,46 @@ const mappedWaterWithIsland = {
 };
 assert.equal(pointInMappedWaterArea(3, 3, mappedWaterWithIsland), true);
 assert.equal(pointInMappedWaterArea(1.5, 1.5, mappedWaterWithIsland), false);
+assert.equal(
+  mappedWaterBedMetersAt(3, 3, 4, [{ ...mappedWaterWithIsland, surfaceMeters: 0 }], pointInMappedWaterArea),
+  -12,
+  'fixed regional terrain must form a physical bed beneath mapped water'
+);
+assert.equal(
+  mappedWaterBedMetersAt(1.5, 1.5, 4, [{ ...mappedWaterWithIsland, surfaceMeters: 0 }], pointInMappedWaterArea),
+  4,
+  'mapped islands must remain terrain instead of being cut into the water bed'
+);
+const normalizedOverlappingWater = [
+  {
+    kind: 'ocean',
+    spanMeters: 1000,
+    surfaceMeters: 0,
+    outer: [[0, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
+    holes: [],
+    bounds: { minLon: 0, maxLon: 4, minLat: 0, maxLat: 4 }
+  },
+  {
+    kind: 'water',
+    spanMeters: 500,
+    surfaceMeters: 3,
+    outer: [[2, 1], [5, 1], [5, 3], [2, 3], [2, 1]],
+    holes: [],
+    bounds: { minLon: 2, maxLon: 5, minLat: 1, maxLat: 3 }
+  }
+];
+normalizeMappedWaterSurfaceOwnership(normalizedOverlappingWater, pointInMappedWaterArea);
+assert.equal(
+  normalizedOverlappingWater[1].surfaceMeters,
+  0,
+  'overlapping mapped water sources must share one physical surface instead of deleting triangles'
+);
+assert.equal(normalizedOverlappingWater[1]._surfaceOwnerKind, 'ocean');
+assert.equal(
+  mappedWaterBedMetersAt(3, 2, 4, normalizedOverlappingWater, pointInMappedWaterArea),
+  -30,
+  'ocean-owned regional water needs enough depth clearance for the coarse horizon grid'
+);
 assert.doesNotMatch(
   terrainRuntimeSource,
   /updateTerrainAerialDetail/,
@@ -167,6 +211,17 @@ assert.doesNotMatch(
   'far terrain must remain continuous below unavailable detailed edge tiles'
 );
 assert.match(farFieldGeometrySource, /cellInsideDetailedCoverage\(centerX, centerZ, spec\.detailedCoverage\)/);
+assert.match(farFieldGeometrySource, /mappedWaterBedMetersAt/);
+assert.doesNotMatch(
+  farFieldSource,
+  /publishedAreas\.some/,
+  'far water must not carve partial-triangle holes from centroid-only overlap tests'
+);
+assert.match(
+  farFieldSource,
+  /polygonOffset: false/,
+  'far water must use physical terrain separation rather than a depth-biased overlapping sheet'
+);
 assert.match(farFieldSource, /createFarFieldGeometryPlanner/);
 assert.match(farFieldSource, /completeDetailedTileCoverage/);
 assert.match(starMaterialSource, /skyBackgroundMaterial/);

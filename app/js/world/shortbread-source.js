@@ -4,10 +4,13 @@ import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
 const SHORTBREAD_TILE_CONCURRENCY = 8;
+const SHORTBREAD_DECODED_TILE_CACHE_LIMIT = 160;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
 
 let vectorTileLibPromise = null;
+const decodedTileCache = new Map();
+const pendingTileRequests = new Map();
 
 function tileTemplate() {
   const configured =
@@ -61,26 +64,66 @@ export function vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, zoom) {
   };
 }
 
+function shortbreadAbortError(z, x, y) {
+  const error = new Error(`Shortbread tile ${z}/${x}/${y} aborted`);
+  error.name = 'AbortError';
+  return error;
+}
+
+function waitForSharedTileRequest(entry, signal, z, x, y) {
+  const consumer = {};
+  entry.consumers.add(consumer);
+  let rejectAbort = null;
+  const abortPromise = new Promise((resolve, reject) => {
+    rejectAbort = reject;
+  });
+  const onAbort = () => rejectAbort?.(shortbreadAbortError(z, x, y));
+  if (signal?.aborted) onAbort();
+  else signal?.addEventListener?.('abort', onAbort, { once: true });
+  return Promise.race([entry.promise, abortPromise]).finally(() => {
+    signal?.removeEventListener?.('abort', onAbort);
+    entry.consumers.delete(consumer);
+    if (!entry.settled && entry.consumers.size === 0) entry.controller.abort();
+  });
+}
+
 export async function fetchShortbreadTile(z, x, y, options = {}) {
-  const controller = new AbortController();
-  const externalSignal = options.signal || null;
-  const relayAbort = () => controller.abort();
-  if (externalSignal?.aborted) controller.abort();
-  else externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
-  const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
-  try {
-    const { Pbf, VectorTile } = await getVectorTileLib();
-    const response = await fetch(tileUrl(z, x, y), {
-      signal: controller.signal,
-      cache: 'default'
-    });
-    if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
-    const buffer = await response.arrayBuffer();
-    return { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
-  } finally {
-    clearTimeout(timeoutId);
-    externalSignal?.removeEventListener?.('abort', relayAbort);
+  const cacheKey = `${tileTemplate()}:${z}/${x}/${y}`;
+  const cached = decodedTileCache.get(cacheKey);
+  if (cached) {
+    decodedTileCache.delete(cacheKey);
+    decodedTileCache.set(cacheKey, cached);
+    return cached;
   }
+  const externalSignal = options.signal || null;
+  if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
+  let entry = pendingTileRequests.get(cacheKey);
+  if (!entry) {
+    const controller = new AbortController();
+    entry = { controller, consumers: new Set(), promise: null, settled: false };
+    const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
+    entry.promise = (async () => {
+      const { Pbf, VectorTile } = await getVectorTileLib();
+      const response = await fetch(tileUrl(z, x, y), {
+        signal: controller.signal,
+        cache: 'default'
+      });
+      if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      const record = { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
+      decodedTileCache.set(cacheKey, record);
+      while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
+        decodedTileCache.delete(decodedTileCache.keys().next().value);
+      }
+      return record;
+    })().finally(() => {
+      clearTimeout(timeoutId);
+      entry.settled = true;
+      if (pendingTileRequests.get(cacheKey) === entry) pendingTileRequests.delete(cacheKey);
+    });
+    pendingTileRequests.set(cacheKey, entry);
+  }
+  return waitForSharedTileRequest(entry, externalSignal, z, x, y);
 }
 
 function roadTags(properties = {}) {
@@ -308,19 +351,59 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
   return elements;
 }
 
-async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
-  const safeRadius = Math.max(0.004, Math.min(0.04, Number(radius) || 0.012));
-  const bounds = {
+function normalizeCoverageBounds(lat, lon, radius, explicitBounds = null, maxRadius = 0.04) {
+  if (explicitBounds) {
+    const bounds = {
+      minLat: Number(explicitBounds.minLat ?? explicitBounds.latS),
+      minLon: Number(explicitBounds.minLon ?? explicitBounds.lonW),
+      maxLat: Number(explicitBounds.maxLat ?? explicitBounds.latN),
+      maxLon: Number(explicitBounds.maxLon ?? explicitBounds.lonE)
+    };
+    if (Object.values(bounds).every(Number.isFinite) &&
+        bounds.minLat < bounds.maxLat && bounds.minLon < bounds.maxLon) return bounds;
+    throw new Error('Shortbread coverage bounds are invalid.');
+  }
+  const safeRadius = Math.max(0.004, Math.min(maxRadius, Number(radius) || 0.012));
+  return {
     minLat: lat - safeRadius,
     minLon: lon - safeRadius,
     maxLat: lat + safeRadius,
     maxLon: lon + safeRadius
   };
+}
+
+export function shortbreadTileCountForBounds(bounds, zoom = SHORTBREAD_ZOOM) {
   const range = vectorTileRangeForBounds(
-    lat - safeRadius,
-    lon - safeRadius,
-    lat + safeRadius,
-    lon + safeRadius,
+    bounds.minLat ?? bounds.latS,
+    bounds.minLon ?? bounds.lonW,
+    bounds.maxLat ?? bounds.latN,
+    bounds.maxLon ?? bounds.lonE,
+    zoom
+  );
+  return (range.xMax - range.xMin + 1) * (range.yMax - range.yMin + 1);
+}
+
+export function selectShortbreadZoomForBounds(bounds, options = {}) {
+  const minimumZoom = Math.max(8, Math.floor(Number(options.minimumZoom) || 10));
+  const maxTiles = Math.max(1, Math.floor(Number(options.maxTiles) || 81));
+  let zoom = Math.max(minimumZoom, Math.floor(Number(options.preferredZoom) || SHORTBREAD_ZOOM));
+  while (zoom > minimumZoom && shortbreadTileCountForBounds(bounds, zoom) > maxTiles) zoom -= 1;
+  return zoom;
+}
+
+async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
+  const bounds = normalizeCoverageBounds(
+    lat,
+    lon,
+    radius,
+    options.bounds,
+    Number(options.maxRadius) || 0.04
+  );
+  const range = vectorTileRangeForBounds(
+    bounds.minLat,
+    bounds.minLon,
+    bounds.maxLat,
+    bounds.maxLon,
     zoom
   );
   const coordinates = [];
@@ -358,15 +441,23 @@ export async function fetchShortbreadWorldData(options = {}) {
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Shortbread location is invalid.');
   const includeBuildings = options.includeBuildings !== false;
+  const coverageBounds = options.bounds || null;
+  const zoom = Number.isFinite(Number(options.zoom))
+    ? Math.floor(Number(options.zoom))
+    : coverageBounds
+      ? selectShortbreadZoomForBounds(coverageBounds, options)
+      : SHORTBREAD_ZOOM;
   const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
-    SHORTBREAD_ZOOM,
+    zoom,
     options
   );
-  const layerNames = ['streets', 'land', 'sites', 'street_polygons'];
-  if (includeBuildings) layerNames.push('buildings');
+  const layerNames = Array.isArray(options.layerNames)
+    ? options.layerNames.slice()
+    : ['streets', 'land', 'sites', 'street_polygons'];
+  if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
   const elements = convertTilesToElements(tiles, layerNames, bounds);
   if (metrics.rejected > 0) {
     for (const element of elements) {
@@ -386,7 +477,8 @@ export async function fetchShortbreadWorldData(options = {}) {
       requested: requestedTiles,
       failed: metrics.rejected,
       maxInFlight: metrics.maxInFlight,
-      zoom: SHORTBREAD_ZOOM,
+      zoom,
+      bounds,
       status: elements.length > 0 ? 'available' : 'authoritative-empty',
       capabilities: { transport: 'generalized', landuse: 'generalized', buildings: includeBuildings ? 'generalized' : 'not-requested' }
     }
@@ -425,4 +517,8 @@ export async function fetchShortbreadBuildingData(options = {}) {
   };
 }
 
-export { SHORTBREAD_TILE_CONCURRENCY, SHORTBREAD_ZOOM };
+export {
+  SHORTBREAD_DECODED_TILE_CACHE_LIMIT,
+  SHORTBREAD_TILE_CONCURRENCY,
+  SHORTBREAD_ZOOM
+};

@@ -64,7 +64,18 @@ export function prepareWorldFeatureSelections(options = {}) {
     element.type === 'way' &&
     isDriveableHighwayTag(element.tags?.highway)
   );
-  const roadWays = limitWaysByTileBudget(allRoadWays, nodes, {
+  const coreRoadWays = allRoadWays.filter(
+    (way) => way.tags?._regionalContext !== 'fixed-location'
+  );
+  const regionalRoadWays = allRoadWays.filter(
+    (way) => way.tags?._regionalContext === 'fixed-location'
+  );
+  const regionalRoadCap = regionalRoadWays.length > 0
+    ? Math.min(2400, Math.max(1000, Math.floor(maxRoadWays * 0.28)))
+    : 0;
+  const selectedCoreRoadWays = limitWaysByTileBudget(coreRoadWays, nodes, {
+    // The fixed outer context is additive. It must not consume the existing
+    // exact-city budget and silently reduce core road coverage.
     globalCap: maxRoadWays,
     basePerTile: tileBudgetCfg.roadsPerTile,
     minPerTile: tileBudgetCfg.roadsMinPerTile,
@@ -72,6 +83,18 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting,
     compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
   });
+  const regionalPerTile = Math.max(16, Math.floor(regionalRoadCap / 64));
+  const selectedRegionalRoadWays = limitWaysByTileBudget(regionalRoadWays, nodes, {
+    globalCap: regionalRoadCap,
+    basePerTile: regionalPerTile,
+    minPerTile: Math.max(12, Math.floor(regionalPerTile * 0.65)),
+    tileDegrees: tileBudgetCfg.tileDegrees,
+    useRdt: false,
+    spreadAcrossArea: true,
+    coreRatio: 0.2,
+    compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+  });
+  const roadWays = [...selectedCoreRoadWays, ...selectedRegionalRoadWays];
 
   const allBuildingWays = data.elements.filter((element) =>
     element.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
@@ -226,6 +249,14 @@ export function prepareWorldFeatureSelections(options = {}) {
 
   loadMetrics.roads.requested = allRoadWays.length;
   loadMetrics.roads.selected = roadWays.length;
+  loadMetrics.roads.selection = {
+    coreRequested: coreRoadWays.length,
+    coreSelected: selectedCoreRoadWays.length,
+    regionalRequested: regionalRoadWays.length,
+    regionalSelected: selectedRegionalRoadWays.length,
+    regionalCap: regionalRoadCap,
+    regionalPerTile
+  };
   loadMetrics.buildings.requested = allBuildingWays.length;
   loadMetrics.buildings.selected = buildingWays.length;
   loadMetrics.landuse.requested = allLanduseWays.length;

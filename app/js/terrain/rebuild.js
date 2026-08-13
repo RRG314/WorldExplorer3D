@@ -7,7 +7,8 @@ import {
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=41";
+} from "../structure-semantics.js?v=42";
+import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import {
   computeIntersectionCapRadius,
@@ -180,7 +181,7 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeigh
   return { verts, indices };
 }
 
-export function publishCompiledTransportMeshes(deps = {}) {
+export async function publishCompiledTransportMeshes(deps = {}) {
   const {
     disableRoadDebugMode,
     clearTerrainHeightCache,
@@ -216,6 +217,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
   if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
     measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
+    await yieldToMainThread();
   }
 
   measure('disposePreviousMeshes', () => {
@@ -251,6 +253,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
   };
 
   const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
+  await yieldToMainThread();
   // Do not bend road profiles into a separately fitted junction plane. Those
   // large convex envelopes were wider than the actual carriageway and caused
   // visible polygon fans and edge bumps on slopes. Continuous road ribbons
@@ -337,6 +340,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
       }
     });
   });
+  await yieldToMainThread();
 
   let compactJunctionCount = 0;
   measure('buildJunctionCaps', () => {
@@ -393,6 +397,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
       userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
   });
+  await yieldToMainThread();
   measure('rebuildStructureVisuals', () => rebuildStructureVisualMeshes({
     boundsIntersect: boundsIntersectLocal,
     cachedTerrainHeight,

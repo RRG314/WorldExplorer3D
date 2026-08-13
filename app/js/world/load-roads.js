@@ -6,20 +6,27 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=17";
+} from "./load-runtime-session.js?v=18";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=22";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=6";
-import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=7";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
   waitForInitialTerrain,
   waitForTerrainSurfaceMaterials,
   waitForSelectedRoadTerrain
-} from "./load-terrain-readiness.js?v=1";
+} from "./load-terrain-readiness.js?v=2";
 import {
   createWorldLoadCancellationSlot,
   createWorldLoadCoordinator
 } from "./world-load-coordinator.js?v=2";
+import {
+  beginFixedRegionalTransportLoad,
+  completeFixedRegionalTransportLoad,
+  fixedRegionalRoadGeometryGuards,
+  sampleFixedRegionalGround,
+  waitForFixedRegionalGround
+} from "./fixed-regional-context.js?v=3";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -233,7 +240,7 @@ export function createWorldRoadLoader(deps = {}) {
       if (!terrainCoverageReady && (appCtx.roads.length > 0 || appCtx.waterAreas.length > 0 || appCtx.waterways.length > 0)) {
         terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
       }
-      finalizeLoadedWorld({
+      await finalizeLoadedWorld({
         buildTraversalNetworks,
         earthSceneSuppressed,
         hideEarthSceneMeshes,
@@ -346,13 +353,17 @@ export function createWorldRoadLoader(deps = {}) {
           primaryQuery
         } = overpassPlan;
         const geometryGuards = buildFeatureGeometryGuards(featureRadius);
+        const regionalRoadGeometryGuards = fixedRegionalRoadGeometryGuards(geometryGuards);
         const buildingGeometryGuards = buildBuildingGeometryGuards(
           buildFeatureGeometryGuards(buildingPublicationCacheMeta.featureRadius)
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
+        startLoadPhase('fetchFixedRegionalContext');
+        const regionalRequest = beginFixedRegionalTransportLoad({ fetchWorldData: fetchShortbreadWorldData, location: appCtx.LOC, runProviderWork });
         startLoadPhase('fetchOverpass');
         let data;
+        let exactTransportLoaded = false;
         let mappedWaterStructureCoverageComplete = false;
         try {
           try {
@@ -371,23 +382,31 @@ export function createWorldRoadLoader(deps = {}) {
                 { signal }
               )
             );
+            exactTransportLoaded = true;
             mappedWaterStructureCoverageComplete = true;
           } catch (overpassErr) {
             if (!isActiveLoadContext()) throw overpassErr;
             recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
             appCtx.showLoad('Loading generalized mapped data...');
-            data = await runProviderWork('openstreetmap-shortbread', 'transport-fallback', (signal) =>
-              fetchShortbreadWorldData({
-                lat: appCtx.LOC.lat,
-                lon: appCtx.LOC.lon,
-                radius: Math.max(radius, featureRadius),
-                includeBuildings: false,
-                signal
-              })
-            );
           }
         } finally {
           endLoadPhase('fetchOverpass');
+        }
+        try {
+          data = await completeFixedRegionalTransportLoad({
+            appCtx,
+            coreRadiusMeters: loadedRadiusWorld * Number(appCtx.METERS_PER_WORLD_UNIT || 1),
+            exactData: data,
+            exactTransportLoaded,
+            loadMetrics,
+            request: regionalRequest
+          });
+        } catch (regionalError) {
+          if (!isActiveLoadContext()) throw regionalError;
+          recordLoadWarning('fixed regional OpenStreetMap context', regionalError);
+          if (!data) throw regionalError;
+        } finally {
+          endLoadPhase('fetchFixedRegionalContext');
         }
         if (data?._overpassSource) loadMetrics.overpassSource = data._overpassSource;
         if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
@@ -400,6 +419,7 @@ export function createWorldRoadLoader(deps = {}) {
           hideEarthSceneMeshes();
           return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-provider-fetch');
         }
+        await waitForFixedRegionalGround(appCtx, loadMetrics, startLoadPhase, endLoadPhase);
         const nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         const baselineFullWorld = perfModeNow === 'baseline';
@@ -413,6 +433,8 @@ export function createWorldRoadLoader(deps = {}) {
           location: appCtx.LOC,
           nodes,
           sampleGroundAtLatLon: appCtx.sampleAcceptedGroundAtLatLon,
+          sampleRegionalGroundAtLatLon: (latitude, longitude) =>
+            sampleFixedRegionalGround(appCtx, loadMetrics, latitude, longitude),
           prepareSelection: prepareWorldFeatureSelections,
           selectionOptions: {
             baselineFullWorld, classifyLinearFeatureTags,
@@ -467,7 +489,7 @@ export function createWorldRoadLoader(deps = {}) {
           decimateRoadCenterlineByDepth,
           endLoadPhase,
           featureTileKeyForLatLon,
-          geometryGuards,
+          geometryGuards: regionalRoadGeometryGuards,
           getRoadSubdivisionStep,
           loadMetrics,
           nodes: normalizedSelection.nodes,

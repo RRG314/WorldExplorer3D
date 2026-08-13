@@ -398,14 +398,18 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
   const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
+  const fixedRegionalAtGrade = feature.fixedRegionalContext === true && semantics.terrainMode === 'at_grade';
+  const surfaceSampleStep = fixedRegionalAtGrade
+    ? Math.min(20, Math.max(8, Number(feature.subdivideMaxDist) || 20))
+    : Number.isFinite(feature.subdivideMaxDist)
+      ? Math.min(2, Math.max(0.5, Number(feature.subdivideMaxDist)))
+      : 2;
   const compiledFeature = attachCompiledTransportSurface(
     feature,
     compileTransportSurfaceModel(feature, sampleTerrainY, {
       surfaceBias,
       width: Number.isFinite(options.width) ? Number(options.width) : undefined,
-      sampleStep: Number.isFinite(feature.subdivideMaxDist)
-        ? Math.min(2, Math.max(0.5, Number(feature.subdivideMaxDist)))
-        : 2
+      sampleStep: surfaceSampleStep
     })
   );
   // Ordinary streets follow the live rendered terrain. Compiled profiles own

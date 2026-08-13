@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=41";
+} from "./structure-semantics.js?v=42";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -57,15 +57,15 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=27";
+} from "./world/load-support.js?v=29";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=12";
+} from "./world/load-reset.js?v=13";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=5";
+} from "./world/load-budgeting.js?v=6";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -81,7 +81,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=22";
+} from "./world/load-geometry.js?v=23";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -99,8 +99,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=28";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=41";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=30";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=42";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -141,7 +141,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=23";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=24";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=13";
@@ -159,15 +159,15 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=25";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=99";
+} from "./world/structure-aware.js?v=26";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=102";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=12";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=8";
+} from "./world/shortbread-source.js?v=14";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=9";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=25";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=17";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=18";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

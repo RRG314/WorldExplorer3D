@@ -37,6 +37,68 @@ function smoothstep01(value) {
   return t * t * (3 - 2 * t);
 }
 
+function mappedWaterBedMetersAt(
+  longitude,
+  latitude,
+  terrainMeters,
+  waterAreas = [],
+  pointInMappedWaterArea = null,
+  bedDepthMeters = 12
+) {
+  if (!Number.isFinite(terrainMeters) || typeof pointInMappedWaterArea !== 'function') {
+    return terrainMeters;
+  }
+  let resolvedMeters = terrainMeters;
+  // The fixed location LOD uses a 320 m grid. A shallow sub-meter cut can
+  // still let one coarse terrain triangle cross the water plane between its
+  // vertices, especially with a 12 km camera depth range. Keep the regional
+  // bed safely below the mapped surface; the detailed terrain pipeline owns
+  // the fine shoreline feather close to the selected city.
+  for (const area of waterAreas || []) {
+    const surfaceMeters = Number(area?.surfaceMeters);
+    if (!Number.isFinite(surfaceMeters)) continue;
+    if (!pointInMappedWaterArea(longitude, latitude, area)) continue;
+    const coastalOwner = area?.kind === 'ocean' || area?._surfaceOwnerKind === 'ocean';
+    const depth = coastalOwner
+      ? Math.max(30, Number(bedDepthMeters) || 12)
+      : Math.max(2, Number(bedDepthMeters) || 12);
+    resolvedMeters = Math.min(resolvedMeters, surfaceMeters - depth);
+  }
+  return resolvedMeters;
+}
+
+function normalizeMappedWaterSurfaceOwnership(
+  waterAreas = [],
+  pointInMappedWaterArea = null
+) {
+  if (typeof pointInMappedWaterArea !== 'function') return waterAreas;
+  const ordered = [...waterAreas].sort((left, right) => {
+    const oceanPriority = Number(right?.kind === 'ocean') - Number(left?.kind === 'ocean');
+    return oceanPriority || Number(right?.spanMeters || 0) - Number(left?.spanMeters || 0);
+  });
+  const owners = [];
+  for (const area of ordered) {
+    const bounds = area?.bounds;
+    const longitude = bounds ? (Number(bounds.minLon) + Number(bounds.maxLon)) * 0.5 : NaN;
+    const latitude = bounds ? (Number(bounds.minLat) + Number(bounds.maxLat)) * 0.5 : NaN;
+    const owner = Number.isFinite(longitude) && Number.isFinite(latitude)
+      ? owners.find((candidate) => pointInMappedWaterArea(longitude, latitude, candidate))
+      : null;
+    if (owner && Number.isFinite(Number(owner.surfaceMeters))) {
+      // Shortbread can describe one estuary in both `ocean` and
+      // `water_polygons`. Sharing the established owner's physical height is
+      // safe; deleting only the overlapping triangles is not, because those
+      // triangles often cross a shoreline or tile boundary.
+      area.surfaceMeters = Number(owner.surfaceMeters);
+      area._surfaceOwnerKind = owner._surfaceOwnerKind || owner.kind || null;
+    } else {
+      area._surfaceOwnerKind = area.kind || null;
+    }
+    owners.push(area);
+  }
+  return waterAreas;
+}
+
 function intervalIndex(values, value) {
   if (!Array.isArray(values) || values.length < 2 || !Number.isFinite(value)) return -1;
   if (value < values[0] || value > values[values.length - 1]) return -1;
@@ -117,6 +179,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
     sampleTileElevationMeters,
+    pointInMappedWaterArea,
     terrainTileDeps,
     tileXYToLatLonBounds,
     worldToLatLon
@@ -268,9 +331,21 @@ function createFarFieldGeometryPlanner(deps = {}) {
       }
       area.surfaceMeters = representativeWaterSurfaceMeters(samples);
     }
+    normalizeMappedWaterSurfaceOwnership(
+      mappedContext?.waterAreas,
+      pointInMappedWaterArea
+    );
   }
 
-  function sampleFarFieldSurfaceMeters(x, z, spec, loadedTiles, offsetMeters) {
+  function sampleFarFieldSurfaceMeters(
+    x,
+    z,
+    spec,
+    loadedTiles,
+    offsetMeters,
+    mappedContext = null,
+    maskStats = null
+  ) {
     if (
       !spec?.outer ||
       x < spec.outer.minX || x > spec.outer.maxX ||
@@ -291,10 +366,18 @@ function createFarFieldGeometryPlanner(deps = {}) {
         meters = acceptedMeters + (meters - acceptedMeters) * blend;
       }
     }
-    return meters;
+    const resolvedMeters = mappedWaterBedMetersAt(
+      lon,
+      lat,
+      meters,
+      mappedContext?.waterAreas,
+      pointInMappedWaterArea
+    );
+    if (maskStats && resolvedMeters < meters - 1e-6) maskStats.waterMaskedVertices += 1;
+    return resolvedMeters;
   }
 
-  function buildFarFieldGeometry(spec, loadedTiles, offsetMeters) {
+  function buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext = null) {
     const interval = farFieldGridIntervalMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const xValues = addCoverageEdges(
       buildClipmapAxis(spec.outer.minX, spec.inner.minX, spec.inner.maxX, spec.outer.maxX, interval),
@@ -317,13 +400,22 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const zRange = spec.outer.maxZ - spec.outer.minZ || 1;
     let minElevationMeters = Infinity;
     let maxElevationMeters = -Infinity;
+    const maskStats = { waterMaskedVertices: 0 };
 
     for (const z of zValues) {
       for (const x of xValues) {
         // This square clipmap owns terrain continuity only. Water is published
         // exclusively by the mapped polygon/ribbon pipeline, so the clipmap
         // can never turn its rectangular bounds into a blue city moat.
-        const meters = sampleFarFieldSurfaceMeters(x, z, spec, loadedTiles, offsetMeters);
+        const meters = sampleFarFieldSurfaceMeters(
+          x,
+          z,
+          spec,
+          loadedTiles,
+          offsetMeters,
+          mappedContext,
+          maskStats
+        );
         if (!Number.isFinite(meters)) return null;
         minElevationMeters = Math.min(minElevationMeters, meters);
         maxElevationMeters = Math.max(maxElevationMeters, meters);
@@ -367,6 +459,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       rows: zValues.length,
       minElevationMeters,
       maxElevationMeters,
+      waterMaskedVertices: maskStats.waterMaskedVertices,
       surfaceGrid: {
         xValues,
         zValues,
@@ -394,6 +487,8 @@ export {
   buildClipmapAxis,
   createFarFieldGeometryPlanner,
   disposeFarFieldMesh,
+  mappedWaterBedMetersAt,
+  normalizeMappedWaterSurfaceOwnership,
   parentTerrainTile,
   sampleFarFieldGridWorldY
 };

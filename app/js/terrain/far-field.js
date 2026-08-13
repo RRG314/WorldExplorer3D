@@ -5,7 +5,7 @@ import {
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=5';
+} from './far-field-mapped-context.js?v=6';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
@@ -18,7 +18,7 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=3';
+} from './far-field-geometry.js?v=4';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -34,6 +34,7 @@ const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
 const FAR_FIELD_GRID_INTERVAL_METERS = 320;
 const FAR_FIELD_SEAM_BLEND_METERS = 550;
 const FAR_CONTEXT_HALF_EXTENT_METERS = 6500;
+const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;
 
 function clipPolygonHalfPlane(points, axis, boundary, keepLess) {
   const output = [];
@@ -173,7 +174,8 @@ function createFarFieldTerrainApi(deps = {}) {
     sampleTileElevationMeters,
     terrainTileDeps,
     tileXYToLatLonBounds,
-    worldToLatLon
+    worldToLatLon,
+    pointInMappedWaterArea
   });
 
   function fixedLocationDetailMode(worldCoverResult = null) {
@@ -251,7 +253,6 @@ function createFarFieldTerrainApi(deps = {}) {
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let polygons = 0;
-    const publishedAreas = [];
 
     const worldRing = (ring) => {
       const withoutClosure = ring?.length > 1 &&
@@ -279,24 +280,9 @@ function createFarFieldTerrainApi(deps = {}) {
       const triangles = THREE.ShapeUtils.triangulateShape(contour, holes);
       if (!triangles.length) continue;
       const points = [contour, ...holes].flat();
-      const y = area.surfaceMeters * unitsPerMeter * yExaggeration + 0.04;
+      const y = area.surfaceMeters * unitsPerMeter * yExaggeration + FAR_WATER_SURFACE_CLEARANCE_WORLD;
       let publishedTriangles = 0;
       for (const triangle of triangles) {
-        const centroidX = (
-          points[triangle[0]].x + points[triangle[1]].x + points[triangle[2]].x
-        ) / 3;
-        const centroidZ = (
-          points[triangle[0]].y + points[triangle[1]].y + points[triangle[2]].y
-        ) / 3;
-        const geographic = appCtx.worldToLatLon(centroidX, centroidZ);
-        // Shortbread can publish the same estuary in both `ocean` and
-        // `water_polygons`. Keep one depth owner for overlapping water instead
-        // of drawing coplanar triangles that stripe from aerial cameras.
-        if (publishedAreas.some((owner) => pointInMappedWaterArea(
-          geographic.lon,
-          geographic.lat,
-          owner
-        ))) continue;
         const outsidePolygons = clipTriangleOutsideBounds(
           triangle.map((pointIndex) => ({
             x: points[pointIndex].x,
@@ -315,7 +301,6 @@ function createFarFieldTerrainApi(deps = {}) {
       }
       if (publishedTriangles > 0) {
         polygons += 1;
-        publishedAreas.push(area);
       }
     }
 
@@ -432,7 +417,7 @@ function createFarFieldTerrainApi(deps = {}) {
       }),
       loadFarMappedContext(
         spec.contextGeographic,
-        spec.innerGeographic,
+        spec.detailExclusionGeographic,
         spec.geographic,
         { signal }
       ),
@@ -468,7 +453,7 @@ function createFarFieldTerrainApi(deps = {}) {
     prepareMappedWaterSurfaces(mappedContext, spec.sourceZoom, loadedTiles, offsetMeters);
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
-    const built = buildFarFieldGeometry(spec, loadedTiles, offsetMeters);
+    const built = buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const builtBuildings = buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const builtWater = buildFarWaterGeometry(mappedContext, spec);
     if (requestGeneration !== generation) {
@@ -557,17 +542,22 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx.terrainGroup.add(farContextMesh);
     }
     if (builtWater) {
-      const waterStyle = appCtx.LANDUSE_STYLES?.water || {};
+      const waterStyle = appCtx.resolveWaterSurfaceVisualProfile?.() ||
+        appCtx.LANDUSE_STYLES?.water || {};
       const waterMaterial = new THREE.MeshStandardMaterial({
         color: waterStyle.color || 0x2b6f9f,
-        emissive: 0x0f355a,
-        emissiveIntensity: 0.16,
-        roughness: 0.34,
-        metalness: 0.02,
+        emissive: waterStyle.emissive || 0x0f355a,
+        emissiveIntensity: waterStyle.emissiveIntensity ?? 0.14,
+        roughness: waterStyle.roughness ?? 0.44,
+        metalness: waterStyle.metalness ?? 0.02,
         side: THREE.DoubleSide,
         fog: true,
         transparent: false,
-        depthWrite: true
+        depthWrite: true,
+        // Detailed mapped water renders later at composition layer 7. Keep
+        // this fixed outer owner at its physical depth so an overlapping
+        // detailed polygon can replace it without a biased diagonal seam.
+        polygonOffset: false
       });
       farWaterMesh = new THREE.Mesh(builtWater.geometry, waterMaterial);
       farWaterMesh.name = 'FarMappedWaterContext';
@@ -605,6 +595,7 @@ function createFarFieldTerrainApi(deps = {}) {
       triangles: built.geometry.index.count / 3,
       minElevationMeters: built.minElevationMeters,
       maxElevationMeters: built.maxElevationMeters,
+      waterMaskedVertices: built.waterMaskedVertices,
       surfaceColor: worldCoverContext ? 'shared-worldcover-pbr' : 'shared-semantic-pbr',
       surfaceMaterialOwner: 'fixed-location-shared-pbr',
       surfaceDetailMode: lastAppliedDetailMode,
@@ -700,6 +691,16 @@ function createFarFieldTerrainApi(deps = {}) {
       minZ: -contextHalfExtent,
       maxZ: contextHalfExtent
     };
+    const plannedDetailRadius = Math.max(
+      800,
+      Number(appCtx.plannedEarthDetailRadiusWorld || appCtx.initialEarthDetailRadius || 0)
+    );
+    const detailExclusion = {
+      minX: -plannedDetailRadius,
+      maxX: plannedDetailRadius,
+      minZ: -plannedDetailRadius,
+      maxZ: plannedDetailRadius
+    };
     const geographic = geographicBounds(outer);
     const preferredSourceZoom = Math.max(0, z - FAR_FIELD_SOURCE_ZOOM_OFFSET);
     const sourceZoom = sourceZoomForTileBudget(geographic, preferredSourceZoom);
@@ -710,7 +711,7 @@ function createFarFieldTerrainApi(deps = {}) {
       return buildAndPublish({
         inner,
         detailedCoverage,
-        innerGeographic: geographicBounds(inner),
+        detailExclusionGeographic: geographicBounds(detailExclusion),
         outer,
         geographic,
         contextGeographic: geographicBounds(contextOuter),
@@ -763,6 +764,7 @@ function createFarFieldTerrainApi(deps = {}) {
 
 export {
   FAR_CONTEXT_HALF_EXTENT_METERS,
+  FAR_WATER_SURFACE_CLEARANCE_WORLD,
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,

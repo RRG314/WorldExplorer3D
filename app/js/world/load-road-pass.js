@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=41";
+import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=42";
 // Installs the final-publication guardrail owner. Guardrails are compiled once
 // after the complete transport graph and accepted terrain are ready.
 import "./bridge-guardrails.js?v=13";
@@ -41,6 +41,12 @@ export async function buildRoadGeometryPass(options = {}) {
   startLoadPhase('buildRoadGeometry');
 
   let yieldCount = 0;
+  const diagnostics = {
+    rejectedMissingNodes: 0,
+    rejectedByGeometryGuards: 0,
+    maximumSourceRadius: 0,
+    maximumPublishedRadius: 0
+  };
   for (let roadIndex = 0; roadIndex < roadWays.length; roadIndex += 1) {
     const way = roadWays[roadIndex];
     try {
@@ -50,8 +56,27 @@ export async function buildRoadGeometryPass(options = {}) {
     const rawPts = rawNodeRecords.map((entry) =>
       appCtx.geoToWorld(entry.node.lat, entry.node.lon)
     );
+    if (rawPts.length < 2) {
+      diagnostics.rejectedMissingNodes += 1;
+      continue;
+    }
+    for (const point of rawPts) {
+      diagnostics.maximumSourceRadius = Math.max(
+        diagnostics.maximumSourceRadius,
+        Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
+      );
+    }
     const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-    if (pts.length < 2) continue;
+    if (pts.length < 2) {
+      diagnostics.rejectedByGeometryGuards += 1;
+      continue;
+    }
+    for (const point of pts) {
+      diagnostics.maximumPublishedRadius = Math.max(
+        diagnostics.maximumPublishedRadius,
+        Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
+      );
+    }
 
     const type = way.tags?.highway || 'residential';
     const structureSemantics = classifyStructureSemantics(way.tags || {}, {
@@ -79,7 +104,10 @@ export async function buildRoadGeometryPass(options = {}) {
     const centerLatLon = wayCenterLatLon(way, nodes);
     const roadTileKey = centerLatLon ? featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees) : null;
     const roadTileDepth = useRdtBudgeting && roadTileKey ? rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees) : 0;
-    const roadSubdivideStepBase = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+    const fixedRegionalRoad = way.tags?._regionalContext === 'fixed-location';
+    const roadSubdivideStepBase = fixedRegionalRoad
+      ? Math.max(20, getRoadSubdivisionStep(type, roadTileDepth, perfModeNow))
+      : getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
     const roadSubdivideStep =
       structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade' ? Math.min(roadSubdivideStepBase, 0.55) :
       structureSemantics?.rampCandidate ? Math.min(roadSubdivideStepBase, 0.65) :
@@ -107,6 +135,7 @@ export async function buildRoadGeometryPass(options = {}) {
       litTag: String(way.tags?.lit || '').toLowerCase(),
       sidewalkHint: String(way.tags?.sidewalk || '').toLowerCase(),
       networkKind: 'road',
+      fixedRegionalContext: fixedRegionalRoad,
       walkable: transportRecord.access.pedestrian !== 'prohibited',
       driveable: transportRecord.safeForDriving,
       structureTags: transportRecord.rawTags,
@@ -132,6 +161,7 @@ export async function buildRoadGeometryPass(options = {}) {
   loadMetrics.roads.initialMeshPublications = 0;
   loadMetrics.roads.featureCompilationYieldCount = yieldCount;
   loadMetrics.roads.featureCompilationChunkSize = yieldEveryRoads;
+  loadMetrics.roads.compilationDiagnostics = diagnostics;
   endLoadPhase('buildRoadGeometry');
   return Object.freeze({
     roadCount: appCtx.roads.length,

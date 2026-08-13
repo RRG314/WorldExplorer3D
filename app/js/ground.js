@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=41";
+} from "./structure-semantics.js?v=42";
 import { createSurfaceQuery } from './world/surface-contract.js?v=13';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles

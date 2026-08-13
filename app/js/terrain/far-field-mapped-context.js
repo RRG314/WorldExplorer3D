@@ -1,7 +1,7 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=12";
+} from "../world/shortbread-source.js?v=14";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
 const FAR_CONTEXT_ZOOM = 14;

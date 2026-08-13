@@ -26,6 +26,8 @@
     "test:provider-outage-circuit": "node scripts/test-provider-outage-circuit.mjs",
     "test:movement-query-bounds": "node scripts/test-movement-query-bounds.mjs",
     "test:world-load-cancellation-browser": "node scripts/test-world-load-cancellation-browser.mjs",
+    "test:new-york-regional-continuity-browser": "node scripts/test-new-york-regional-continuity-browser.mjs",
+    "test:fixed-regional-context": "node scripts/test-fixed-regional-context.mjs",
     "test:far-field-elevation-loader": "node scripts/test-far-field-elevation-loader.mjs",
     "test:fixed-location-terrain-material": "node scripts/test-fixed-location-terrain-material.mjs",
     "test:worldcover-detail-mode": "node scripts/test-worldcover-detail-mode.mjs",

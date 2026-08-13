@@ -256,6 +256,10 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
   const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow, dynamicBudgetState.budgetScale);
   const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
+  const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
+  appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
+    ? Math.max(800, Math.round(plannedDetailRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
+    : 1050;
   appCtx.dynamicBudgetScale = dynamicBudgetState.budgetScale;
   appCtx.dynamicLodScale = dynamicBudgetState.lodScale;
 

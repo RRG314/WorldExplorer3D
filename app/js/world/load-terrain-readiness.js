@@ -138,6 +138,12 @@ export async function waitForSelectedRoadTerrain(appCtx, roadWays, nodes, startL
   if (!bounds) return false;
   startLoadPhase('waitForTransportGround');
   try {
+    const hasFixedRegionalRoads = roadWays.some(
+      (way) => way?.tags?._regionalContext === 'fixed-location'
+    );
+    if (hasFixedRegionalRoads && typeof appCtx.waitForFarTerrainClipmap === 'function') {
+      return await appCtx.waitForFarTerrainClipmap(20000);
+    }
     return await appCtx.waitForTerrainReadyBounds(bounds, 8000);
   } finally {
     endLoadPhase('waitForTransportGround');

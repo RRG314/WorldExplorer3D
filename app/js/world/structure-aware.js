@@ -7,7 +7,7 @@ import {
   buildFeatureTransitionAnchors,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=41";
+} from "../structure-semantics.js?v=42";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=8";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=1";

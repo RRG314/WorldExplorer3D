@@ -573,6 +573,15 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Guard: `npm run test:fixed-world-travel-browser`.
 - Never reintroduce: a fixed travel-distance threshold when the tested acceptance boundary is calculated from the rendered terrain itself.
 
+## 2026-08-13 — New York freezes and loses New Jersey regional continuity
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed.
+- Symptom: New York could freeze during publication, detailed roads and buildings ended about 1.8–1.9 km from Midtown, the visible New Jersey side of the Hudson became a blank band, and mapped water developed aerial stripes outside the detailed city.
+- Root cause: the exact OSM district remained capped to the detailed city while the far-building pass excluded the much larger terrain rectangle; simply compiling every generalized regional road produced an 18,042-road, 39.7-second transport publication. Regional roads were also rejected by a ground check that understood only detailed accepted-ground tiles. In water, the 320 m terrain grid was not physically masked beneath regional mapped water, overlapping OSM water records could use different heights, and a centroid-only duplicate rule deleted partial triangles.
+- Resolution: one bounded Shortbread request now loads a fixed 6.5 km location context concurrently with the exact core request. The exact core remains lossless; outer roads use a geographically spread 2,400-road generalized LOD, shared decoded and in-flight tile cache, coarser at-grade sampling, and the already loaded fixed terrain as their ground authority. The outer request decodes only streets because terrain/WorldCover already own generalized land. Far-building exclusion now follows the actual detailed building radius. Final geometry publication yields between major stages. Regional mapped water normalizes overlapping records to one physical surface and masks the coarse terrain beneath coastal and inland water without deleting partial triangles.
+- Guard: `npm run test:fixed-regional-context`, `npm run test:phase5-aerial-transition`, and `npm run test:new-york-regional-continuity-browser`. The Chrome journey requires Midtown core density, roads within 120 m and far buildings around Weehawken/Hoboken/Jersey City, finite walk/drive surfaces in Hoboken, no new world sequence after crossing the river, zero duplicate Shortbread tile URLs, no console errors, and no load long task above five seconds. Its aerial Hoboken screenshot is a mandatory visual review artifact.
+- Never reintroduce: actor-driven streaming, an unbounded all-street regional compile, excluding far buildings by the terrain rectangle, requiring detailed accepted-ground under generalized regional roads, centroid-only water triangle deletion, a depth-biased water overlay, fixed sleep-based readiness, or an asynchronous predicate passed to Playwright's browser-side wait.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

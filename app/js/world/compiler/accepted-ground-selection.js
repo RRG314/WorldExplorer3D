@@ -25,7 +25,8 @@ function nodeHasAcceptedGround(node, sampleGroundAtLatLon) {
 export function filterSelectionToAcceptedGround(
   selection = {},
   nodes = {},
-  sampleGroundAtLatLon
+  sampleGroundAtLatLon,
+  options = {}
 ) {
   if (typeof sampleGroundAtLatLon !== 'function') {
     throw new TypeError('sampleGroundAtLatLon must be a function');
@@ -33,6 +34,11 @@ export function filterSelectionToAcceptedGround(
 
   const acceptedNodeIds = new Set();
   const rejectedNodeIds = new Set();
+  const regionalNodeIds = new Set();
+  const rejectedRegionalNodeIds = new Set();
+  const sampleRegionalGroundAtLatLon = typeof options.sampleRegionalGroundAtLatLon === 'function'
+    ? options.sampleRegionalGroundAtLatLon
+    : null;
   const acceptsNode = (nodeId) => {
     const key = String(nodeId);
     if (acceptedNodeIds.has(key)) return true;
@@ -44,11 +50,25 @@ export function filterSelectionToAcceptedGround(
     (accepted ? acceptedNodeIds : rejectedNodeIds).add(key);
     return accepted;
   };
-  const acceptsWay = (way) => (
-    Array.isArray(way?.nodes) &&
-    way.nodes.length > 0 &&
-    way.nodes.every(acceptsNode)
-  );
+  const acceptsRegionalNode = (nodeId) => {
+    const key = String(nodeId);
+    if (regionalNodeIds.has(key)) return true;
+    if (rejectedRegionalNodeIds.has(key)) return false;
+    const node = nodes[nodeId] ?? nodes[key];
+    const latitude = Number(node?.lat);
+    const longitude = Number(node?.lon);
+    const accepted = Number.isFinite(latitude) && Number.isFinite(longitude) &&
+      sampleRegionalGroundAtLatLon?.(latitude, longitude)?.status === 'available';
+    (accepted ? regionalNodeIds : rejectedRegionalNodeIds).add(key);
+    return accepted;
+  };
+  const acceptsWay = (way) => {
+    if (!Array.isArray(way?.nodes) || way.nodes.length === 0) return false;
+    if (way.tags?._regionalContext === 'fixed-location' && sampleRegionalGroundAtLatLon) {
+      return way.nodes.every(acceptsRegionalNode);
+    }
+    return way.nodes.every(acceptsNode);
+  };
 
   const filtered = { ...selection };
   let rejectedWays = 0;
@@ -76,6 +96,8 @@ export function filterSelectionToAcceptedGround(
     diagnostics: Object.freeze({
       acceptedNodeCount: acceptedNodeIds.size,
       rejectedNodeCount: rejectedNodeIds.size,
+      regionalAcceptedNodeCount: regionalNodeIds.size,
+      regionalRejectedNodeCount: rejectedRegionalNodeIds.size,
       rejectedWayCount: rejectedWays,
       rejectedPointFeatureCount: rejectedPointFeatures
     })
