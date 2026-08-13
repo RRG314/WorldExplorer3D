@@ -225,7 +225,24 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         maximumGrade
       );
     }
-    centerHeights = applyExactGraphNodeConstraints(feature, centerHeights, sampleDistances);
+    const graphConstrainedHeights = applyExactGraphNodeConstraints(
+      feature,
+      centerHeights,
+      sampleDistances
+    );
+    if (graphConstrainedHeights !== centerHeights) {
+      // Graph-node elevations are sampled from provisional neighboring
+      // profiles. They are exact only when physically feasible for this
+      // feature's clearance envelope and grade budget. Reconcile a constrained
+      // profile so a stale or conflicting node cannot punch a one-sample
+      // vertical wall into a bridge deck or motorway ramp.
+      centerHeights = smoothGradeLimitedProfile(
+        graphConstrainedHeights,
+        centerLowerBounds,
+        sampleDistances,
+        maximumGrade
+      );
+    }
   }
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating

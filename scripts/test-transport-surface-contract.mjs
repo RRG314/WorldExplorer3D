@@ -352,6 +352,42 @@ assert.ok(
   'an infeasible endpoint tie-in reintroduced an unsafe bridge grade'
 );
 
+const conflictingGraphNodeTieIn = straightFeature({
+  id: 'conflicting-graph-node-tie-in',
+  length: 60,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+conflictingGraphNodeTieIn.minimumStructureSurfaceY = 42;
+conflictingGraphNodeTieIn.structureTransitionAnchors = [
+  {
+    distance: 60,
+    targetOffset: -20,
+    targetSurfaceY: 10,
+    graphEndpoint: 'end',
+    source: 'transport_graph_node'
+  }
+];
+const conflictingGraphNodeModel = compileTransportSurfaceModel(
+  conflictingGraphNodeTieIn,
+  () => 30,
+  { sampleStep: 1 }
+);
+assert.ok(
+  conflictingGraphNodeModel.stats.minimumY >= 42 - EPSILON,
+  'an infeasible graph-node constraint cut below the bridge clearance envelope'
+);
+assert.ok(
+  conflictingGraphNodeModel.stats.maximumGrade <= 0.1201,
+  'an infeasible graph-node constraint created a vertical bridge/ramp wall'
+);
+
 const layerOnlyDriveway = straightFeature({
   id: 'layer-only-driveway',
   length: 52,
