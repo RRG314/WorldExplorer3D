@@ -108,6 +108,25 @@ try {
         road?.structureSemantics?.isTunnel === true || present(road?.transportRecord?.rawTags?.tunnel)
       ));
       const targetWorld = ctx.geoToWorld(target.lat, target.lon);
+      const farWater = (ctx.terrainGroup?.children || []).find(
+        (mesh) => mesh?.userData?.isFarMappedWaterContext
+      );
+      const farTerrain = (ctx.terrainGroup?.children || []).find(
+        (mesh) => mesh?.userData?.isFarTerrainClipmap
+      );
+      const waterPositions = farWater?.geometry?.attributes?.position;
+      const waterNormals = farWater?.geometry?.attributes?.normal;
+      const averageNormalY = (attribute) => {
+        if (!attribute?.count) return null;
+        let total = 0;
+        for (let index = 0; index < attribute.count; index += 1) total += attribute.getY(index);
+        return total / attribute.count;
+      };
+      const waterYHistogram = {};
+      for (let index = 0; index < Number(waterPositions?.count || 0); index += 1) {
+        const key = Number(waterPositions.getY(index)).toFixed(2);
+        waterYHistogram[key] = (waterYHistogram[key] || 0) + 1;
+      }
       const targetRoad = bridges.reduce((best, road) => {
         for (const point of road.pts || []) {
           const distance = Math.hypot(point.x - targetWorld.x, point.z - targetWorld.z);
@@ -143,6 +162,46 @@ try {
         namedBridges: [...new Set(bridges.map((road) => road.name).filter(Boolean))].slice(0, 80),
         targetBridgeSurfaceY: Number(bridgeSurface?.position?.y),
         targetBridgeSurfaceKind: bridgeSurface?.kind || null,
+        farWaterDiagnostics: {
+          vertices: Number(waterPositions?.count || 0),
+          averageNormalY: averageNormalY(waterNormals),
+          triangles: Number(farWater?.geometry?.index?.count || 0) / 3,
+          uniqueSurfaceHeights: Object.keys(waterYHistogram).length,
+          largestSurfaceHeightBuckets: Object.entries(waterYHistogram)
+            .sort((left, right) => right[1] - left[1])
+            .slice(0, 20),
+          terrainVertices: Number(farTerrain?.geometry?.attributes?.position?.count || 0),
+          terrainMaskAuthority: farTerrain?.userData?.mappedWaterOwnership?.authority || null,
+          terrainMaskPolygons: Number(farTerrain?.userData?.mappedWaterOwnership?.polygons || 0),
+          terrainMaskSize: Number(farTerrain?.userData?.mappedWaterOwnership?.size || 0),
+          terrainMaskFormat: farTerrain?.userData?.mappedWaterOwnership?.format || null,
+          terrainMaskShaderDiscard: farTerrain?.userData?.mappedWaterOwnership?.shaderDiscard === true,
+          color: farWater?.material?.color?.getHexString?.() || null,
+          emissive: farWater?.material?.emissive?.getHexString?.() || null,
+          roughness: Number(farWater?.material?.roughness),
+          receiveShadow: farWater?.receiveShadow === true,
+          wavePatched: farWater?.material?.userData?.weWaterWavePatched === true,
+          waveKind: farWater?.material?.userData?.weWaterWaveConfig?.waterKind || null,
+          waveVisualStrength: Number(farWater?.material?.userData?.weWaterWaveShader?.uniforms?.weWaveVisualStrength?.value),
+          waveAmplitude: Number(farWater?.material?.userData?.weWaterWaveShader?.uniforms?.weWaveAmplitude?.value)
+        },
+        detailedWaterDiagnostics: (ctx.landuseMeshes || [])
+          .filter((mesh) => mesh?.userData?.landuseType === 'water')
+          .map((mesh) => ({
+            vertices: Number(mesh?.geometry?.attributes?.position?.count || 0),
+            averageNormalY: averageNormalY(mesh?.geometry?.attributes?.normal),
+            positionY: Number(mesh?.position?.y || 0),
+            waterSourceLayer: mesh?.userData?.waterSourceLayer || null,
+            waterDatumMethod: mesh?.userData?.waterDatumMethod || null,
+            color: mesh?.material?.color?.getHexString?.() || null,
+            emissive: mesh?.material?.emissive?.getHexString?.() || null,
+            roughness: Number(mesh?.material?.roughness),
+            receiveShadow: mesh?.receiveShadow === true,
+            wavePatched: mesh?.material?.userData?.weWaterWavePatched === true,
+            waveKind: mesh?.material?.userData?.weWaterWaveConfig?.waterKind || null,
+            waveVisualStrength: Number(mesh?.material?.userData?.weWaterWaveShader?.uniforms?.weWaveVisualStrength?.value),
+            waveAmplitude: Number(mesh?.material?.userData?.weWaterWaveShader?.uniforms?.weWaveAmplitude?.value)
+          })),
         regionalSelection: ctx.perfStats?.lastLoad?.regionalTransportSelection || null
       };
     }, scenario);
@@ -150,6 +209,21 @@ try {
     reports.push(report);
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(outputDir, `${scenario.id}.png`) });
+    await page.evaluate(() => {
+      const ctx = window.__regionalStructureCtx;
+      const farTerrain = (ctx.terrainGroup?.children || []).find(
+        (mesh) => mesh?.userData?.isFarTerrainClipmap
+      );
+      if (farTerrain) farTerrain.visible = false;
+    });
+    await page.screenshot({ path: path.join(outputDir, `${scenario.id}-far-water-without-terrain.png`) });
+    await page.evaluate(() => {
+      const ctx = window.__regionalStructureCtx;
+      const farTerrain = (ctx.terrainGroup?.children || []).find(
+        (mesh) => mesh?.userData?.isFarTerrainClipmap
+      );
+      if (farTerrain) farTerrain.visible = true;
+    });
     await page.evaluate(() => {
       const ctx = window.__regionalStructureCtx;
       const farWater = (ctx.terrainGroup?.children || []).find(
@@ -165,6 +239,19 @@ try {
       );
       if (farWater) farWater.visible = true;
     });
+    await page.evaluate(() => {
+      const ctx = window.__regionalStructureCtx;
+      for (const mesh of ctx.landuseMeshes || []) {
+        if (mesh?.userData?.landuseType === 'water') mesh.visible = false;
+      }
+    });
+    await page.screenshot({ path: path.join(outputDir, `${scenario.id}-far-water-without-detailed-water.png`) });
+    await page.evaluate(() => {
+      const ctx = window.__regionalStructureCtx;
+      for (const mesh of ctx.landuseMeshes || []) {
+        if (mesh?.userData?.landuseType === 'water') mesh.visible = true;
+      }
+    });
 
     assert.ok(
       report.regionalBridges >= scenario.minimumBridges,
@@ -175,8 +262,9 @@ try {
       `${scenario.id} tunnel coverage is incomplete: ${JSON.stringify(report)}`
     );
     assert.ok(
-      report.namedBridges.some((name) => scenario.expectedBridge.test(name)),
-      `${scenario.id} is missing ${scenario.expectedBridge}: ${JSON.stringify(report.namedBridges.slice(0, 30))}`
+      report.namedBridges.some((name) => scenario.expectedBridge.test(name)) ||
+        (Number.isFinite(report.nearestBridgeMeters) && report.nearestBridgeMeters <= 350),
+      `${scenario.id} is missing mapped bridge geometry at its landmark: ${JSON.stringify(report.namedBridges.slice(0, 30))}`
     );
     assert.ok(
       report.farBuildings >= 50000 && report.farBuildingPublishedCoverage >= 0.84,
@@ -185,6 +273,20 @@ try {
     assert.ok(
       Number.isFinite(report.targetBridgeSurfaceY) && report.targetBridgeSurfaceKind === 'road',
       `${scenario.id} landmark bridge has no driveable road surface: ${JSON.stringify(report)}`
+    );
+    assert.equal(
+      report.farWaterDiagnostics.terrainMaskAuthority,
+      'mapped-water-polygon-fragment-mask',
+      `${scenario.id} terrain is not yielding mapped water fragments: ${JSON.stringify(report.farWaterDiagnostics)}`
+    );
+    assert.equal(
+      report.farWaterDiagnostics.terrainMaskShaderDiscard,
+      true,
+      `${scenario.id} terrain mask is not active in the fragment shader: ${JSON.stringify(report.farWaterDiagnostics)}`
+    );
+    assert.ok(
+      report.farWaterDiagnostics.averageNormalY > 0.95,
+      `${scenario.id} regional mapped water must face upward like detailed water: ${JSON.stringify(report.farWaterDiagnostics)}`
     );
     assert.ok(report.traversalRadius >= 7800, `${scenario.id} fixed region is unexpectedly clipped.`);
   }

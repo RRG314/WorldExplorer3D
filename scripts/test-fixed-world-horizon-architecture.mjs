@@ -18,6 +18,7 @@ const publicationSource = read('app/js/world/publication.js');
 const diagnosticsSource = read('app/js/runtime-diagnostics.js');
 const locationTerrainSource = read('app/js/terrain/location-world.js');
 const farFieldSource = read('app/js/terrain/far-field.js');
+const farFieldWaterSource = read('app/js/terrain/far-field-water.js');
 const farFieldGeometrySource = read('app/js/terrain/far-field-geometry.js');
 const farMappedContextSource = read('app/js/terrain/far-field-mapped-context.js');
 const starMaterialSource = read('app/js/sky/star-point-material.js');
@@ -34,8 +35,8 @@ const {
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
+  FAR_WATER_TERRAIN_MASK_SIZE,
   buildClipmapAxis,
-  clipTriangleOutsideBounds,
   cellInsideDetailedCoverage,
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
@@ -157,6 +158,7 @@ assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 8000);
 assert.equal(FAR_CONTEXT_ZOOM, 14);
 assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
 assert.equal(FAR_WATER_MIN_SPAN_METERS, 200);
+assert.equal(FAR_WATER_TERRAIN_MASK_SIZE, 4096);
 assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 26000);
 assert.equal(FAR_CONTEXT_BUILDING_COVERAGE_TARGET, 0.85);
 assert.equal(FAR_CONTEXT_MAX_BUILDING_INSTANCES, 500000);
@@ -182,18 +184,25 @@ assert.equal(
   null,
   'far traversal height must stop at the rendered fixed-location boundary'
 );
-const clippedOutside = clipTriangleOutsideBounds([
-  { x: -20, z: 0 },
-  { x: 20, z: -20 },
-  { x: 20, z: 20 }
-], { minX: -10, maxX: 10, minZ: -10, maxZ: 10 });
-assert.ok(clippedOutside.length > 0, 'water crossing the detailed bounds must retain its far portion');
-assert.equal(
-  clippedOutside.some((polygon) => polygon.some((point) => (
-    point.x > -10 && point.x < 10 && point.z > -10 && point.z < 10
-  ))),
-  false,
-  'far water must not overlap the inner detailed-water owner'
+assert.match(
+  farFieldWaterSource,
+  /continuous-regional-baseline-with-detailed-refinement/,
+  'regional mapped water must remain continuous beneath detailed water instead of exposing an LOD rectangle'
+);
+assert.doesNotMatch(
+  farFieldWaterSource,
+  /clipTriangleOutsideBounds/,
+  'regional mapped water must not be cut at the rectangular detailed-terrain boundary'
+);
+assert.match(
+  farFieldWaterSource,
+  /attribute vec2 mappedWaterOwnershipUv/,
+  'far terrain mapped-water ownership must use an explicit geometry UV attribute'
+);
+assert.match(
+  farFieldWaterSource,
+  /texture2D\(mappedWaterTerrainOwnershipMask, vMappedWaterOwnershipUv\).*discard/,
+  'far terrain fragments inside exact mapped water polygons must be discarded by the terrain owner'
 );
 const detailedWaterRing = Array.from({ length: 500 }, (_, index) => {
   const angle = index / 500 * Math.PI * 2;
@@ -257,12 +266,12 @@ assert.doesNotMatch(
 assert.match(farFieldGeometrySource, /cellInsideDetailedCoverage\(centerX, centerZ, spec\.detailedCoverage\)/);
 assert.match(farFieldGeometrySource, /mappedWaterBedMetersAt/);
 assert.doesNotMatch(
-  farFieldSource,
+  farFieldWaterSource,
   /publishedAreas\.some/,
   'far water must not carve partial-triangle holes from centroid-only overlap tests'
 );
 assert.match(
-  farFieldSource,
+  farFieldWaterSource,
   /polygonOffset: false/,
   'far water must use physical terrain separation rather than a depth-biased overlapping sheet'
 );
@@ -285,9 +294,9 @@ assert.match(farFieldSource, /openstreetmap-shortbread/);
 assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);
 assert.doesNotMatch(farFieldSource, /sourceMeters\s*<=\s*0\.75/);
 assert.doesNotMatch(farFieldSource, /surfaceColor:\s*'mapped-land-and-water/);
-assert.match(farFieldSource, /FarMappedWaterContext/);
-assert.match(farFieldSource, /isFarMappedWaterContext/);
-assert.match(farFieldSource, /far-mapped-water-polygon-lod/);
+assert.match(farFieldWaterSource, /FarMappedWaterContext/);
+assert.match(farFieldWaterSource, /isFarMappedWaterContext/);
+assert.match(farFieldWaterSource, /far-mapped-water-polygon-lod/);
 
 const mappedWaterFixture = {
   outer: [[-76.8, 39.1], [-76.4, 39.1], [-76.4, 39.5], [-76.8, 39.5], [-76.8, 39.1]],

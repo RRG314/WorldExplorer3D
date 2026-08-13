@@ -442,6 +442,16 @@ try {
     report.counts.fixedRegionalBridges >= 400 && report.counts.fixedRegionalTunnels >= 200,
     `Mapped New York bridges or tunnels were discarded: ${JSON.stringify(report.counts)}`
   );
+  assert.equal(
+    report.farTerrain?.farWaterTerrainMaskAuthority,
+    'mapped-water-polygon-fragment-mask',
+    `New York far terrain is not yielding exact mapped water polygons: ${JSON.stringify(report.farTerrain)}`
+  );
+  assert.equal(
+    report.farTerrain?.farWaterTerrainMaskSize,
+    4096,
+    `New York mapped-water terrain ownership lost its shoreline resolution: ${JSON.stringify(report.farTerrain)}`
+  );
   assert.ok(
     report.measuredLoadMs <= 45000,
     `New York fixed-location load exceeded 45 seconds: ${report.measuredLoadMs}ms`

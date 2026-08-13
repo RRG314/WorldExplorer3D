@@ -625,6 +625,15 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   compiler's regional LOD, strict floating-point equality at clipmap endpoints,
   or actor-driven regional loading.
 
+## 2026-08-13 — Regional water bands and rectangular LOD seam
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed.
+- Symptom: the Thames was crossed by horizontal terrain bands, while San Francisco showed a large diagonal water slab aligned with the detailed-location boundary.
+- Root cause: the 320 m far-terrain grid decided water ownership only at terrain vertices, so triangles with no vertex inside a narrow river could still cover it. Regional water was separately cut at the rectangular detailed-terrain bounds. Its triangles also faced downward and its material used fallback defaults instead of the detailed-water profile, exposing the handoff through different lighting and color.
+- Resolution: exact mapped water polygons are rasterized once per fixed location into a 4096² one-channel ownership texture; the far-terrain fragment shader discards only fragments inside those mapped polygons. Regional mapped water remains a continuous baseline beneath the detailed refinement, uses the shared water profile and wave compiler directly, and reverses XY-to-XZ triangle winding so all water normals face upward. No water is inferred from elevation, no depth override or blue plane was added, and movement does not trigger loading.
+- Guard: `npm run test:phase5-aerial-transition`, `npm run test:regional-structures-browser`, and `npm run test:new-york-regional-continuity-browser`. London and San Francisco browser reports require the fragment-mask authority and upward regional-water normals; New York requires the same 4096² mapped-water ownership. A/B screenshots hide far terrain, far water, and detailed water independently so a future boundary can be assigned to its real owner before code changes.
+- Never reintroduce: vertex-only terrain masking as the sole water authority, clipping regional water at a rectangular LOD boundary, downward far-water winding, timing-dependent fallback water styles, `depthTest: false`, polygon-offset concealment, or synthetic water coverage.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

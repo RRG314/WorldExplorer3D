@@ -21,7 +21,7 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=10';
+} from './far-field-geometry.js?v=11';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -31,62 +31,20 @@ import {
   ensureTerrainTextureSet
 } from './surface-profiles.js?v=44';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
+import {
+  FAR_WATER_SURFACE_CLEARANCE_WORLD,
+  FAR_WATER_TERRAIN_MASK_SIZE,
+  applyMappedWaterTerrainOwnership,
+  buildFarWaterGeometry,
+  buildMappedWaterTerrainOwnershipMask,
+  createFarWaterMesh
+} from './far-field-water.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
 const FAR_FIELD_GRID_INTERVAL_METERS = 320;
 const FAR_FIELD_SEAM_BLEND_METERS = 550;
 const FAR_CONTEXT_HALF_EXTENT_METERS = 8000;
-const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;
-
-function clipPolygonHalfPlane(points, axis, boundary, keepLess) {
-  const output = [];
-  for (let index = 0; index < points.length; index += 1) {
-    const current = points[index];
-    const previous = points[(index + points.length - 1) % points.length];
-    const currentValue = current[axis];
-    const previousValue = previous[axis];
-    const currentInside = keepLess ? currentValue <= boundary : currentValue >= boundary;
-    const previousInside = keepLess ? previousValue <= boundary : previousValue >= boundary;
-    if (currentInside !== previousInside) {
-      const denominator = currentValue - previousValue;
-      const t = Math.abs(denominator) > 1e-9 ? (boundary - previousValue) / denominator : 0;
-      output.push({
-        x: previous.x + (current.x - previous.x) * t,
-        z: previous.z + (current.z - previous.z) * t
-      });
-    }
-    if (currentInside) output.push(current);
-  }
-  return output;
-}
-
-function clipTriangleOutsideBounds(points, bounds) {
-  if (!bounds || !Array.isArray(points) || points.length < 3) return [points || []];
-  const regions = [
-    [{ axis: 'x', boundary: bounds.minX, keepLess: true }],
-    [{ axis: 'x', boundary: bounds.maxX, keepLess: false }],
-    [
-      { axis: 'x', boundary: bounds.minX, keepLess: false },
-      { axis: 'x', boundary: bounds.maxX, keepLess: true },
-      { axis: 'z', boundary: bounds.minZ, keepLess: true }
-    ],
-    [
-      { axis: 'x', boundary: bounds.minX, keepLess: false },
-      { axis: 'x', boundary: bounds.maxX, keepLess: true },
-      { axis: 'z', boundary: bounds.maxZ, keepLess: false }
-    ]
-  ];
-  return regions.map((constraints) => constraints.reduce(
-    (polygon, constraint) => clipPolygonHalfPlane(
-      polygon,
-      constraint.axis,
-      constraint.boundary,
-      constraint.keepLess
-    ),
-    points
-  )).filter((polygon) => polygon.length >= 3);
-}
 
 function createFarFieldTerrainApi(deps = {}) {
   const {
@@ -248,72 +206,6 @@ function createFarFieldTerrainApi(deps = {}) {
     };
     lastAppliedDetailMode = detailMode;
     return true;
-  }
-
-  function buildFarWaterGeometry(mappedContext, spec) {
-    const positions = [];
-    const indices = [];
-    const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
-    const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
-    let polygons = 0;
-
-    const worldRing = (ring) => {
-      const withoutClosure = ring?.length > 1 &&
-        ring[0]?.[0] === ring.at(-1)?.[0] && ring[0]?.[1] === ring.at(-1)?.[1]
-        ? ring.slice(0, -1)
-        : (ring || []).slice();
-      return withoutClosure.map((coordinate) => {
-        const lon = Number(coordinate?.[0]);
-        const lat = Number(coordinate?.[1]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-        const world = appCtx.geoToWorld(lat, lon);
-        return new THREE.Vector2(world.x, world.z);
-      }).filter(Boolean);
-    };
-
-    const waterAreas = [...(mappedContext?.waterAreas || [])].sort((left, right) => {
-      const oceanPriority = Number(right?.kind === 'ocean') - Number(left?.kind === 'ocean');
-      return oceanPriority || Number(right?.spanMeters || 0) - Number(left?.spanMeters || 0);
-    });
-    for (const area of waterAreas) {
-      if (!Number.isFinite(area.surfaceMeters)) continue;
-      const contour = worldRing(area.outer);
-      const holes = (area.holes || []).map(worldRing).filter((ring) => ring.length >= 3);
-      if (contour.length < 3) continue;
-      const triangles = THREE.ShapeUtils.triangulateShape(contour, holes);
-      if (!triangles.length) continue;
-      const points = [contour, ...holes].flat();
-      const y = area.surfaceMeters * unitsPerMeter * yExaggeration + FAR_WATER_SURFACE_CLEARANCE_WORLD;
-      let publishedTriangles = 0;
-      for (const triangle of triangles) {
-        const outsidePolygons = clipTriangleOutsideBounds(
-          triangle.map((pointIndex) => ({
-            x: points[pointIndex].x,
-            z: points[pointIndex].y
-          })),
-          spec?.inner
-        );
-        for (const polygon of outsidePolygons) {
-          const baseIndex = positions.length / 3;
-          polygon.forEach((point) => positions.push(point.x, y, point.z));
-          for (let index = 1; index < polygon.length - 1; index += 1) {
-            indices.push(baseIndex, baseIndex + index, baseIndex + index + 1);
-            publishedTriangles += 1;
-          }
-        }
-      }
-      if (publishedTriangles > 0) {
-        polygons += 1;
-      }
-    }
-
-    if (!polygons) return null;
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    geometry.computeBoundingSphere();
-    return { geometry, polygons, triangles: indices.length / 3 };
   }
 
   function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext) {
@@ -498,18 +390,29 @@ function createFarFieldTerrainApi(deps = {}) {
     prepareMappedWaterSurfaces(mappedContext, spec.sourceZoom, loadedTiles, offsetMeters);
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
+    const geometryBuildStartedAt = performance.now();
     const built = buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    const terrainGeometryBuildMs = performance.now() - geometryBuildStartedAt;
+    const buildingBuildStartedAt = performance.now();
     const builtBuildings = buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
-    const builtWater = buildFarWaterGeometry(mappedContext, spec);
+    const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
+    const waterBuildStartedAt = performance.now();
+    const builtWater = buildFarWaterGeometry(appCtx, mappedContext);
+    const waterGeometryBuildMs = performance.now() - waterBuildStartedAt;
+    const waterMaskBuildStartedAt = performance.now();
+    const waterTerrainMask = buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec);
+    const waterTerrainMaskBuildMs = performance.now() - waterMaskBuildStartedAt;
     if (requestGeneration !== generation) {
       built?.geometry?.dispose?.();
       builtBuildings?.geometry?.dispose?.();
       builtWater?.geometry?.dispose?.();
+      waterTerrainMask?.texture?.dispose?.();
       return;
     }
     if (!built) {
       builtBuildings?.geometry?.dispose?.();
       builtWater?.geometry?.dispose?.();
+      waterTerrainMask?.texture?.dispose?.();
       setState({ status: 'unavailable', reason: 'far-field-elevation-sampling-failed' });
       return;
     }
@@ -542,6 +445,7 @@ function createFarFieldTerrainApi(deps = {}) {
       surfaceGrid: built.surfaceGrid
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
+    applyMappedWaterTerrainOwnership(mesh, material, waterTerrainMask);
     mesh.userData.renderProvenance = {
       version: 1,
       profile: 'fixed-location-terrain-lod',
@@ -628,40 +532,8 @@ function createFarFieldTerrainApi(deps = {}) {
       }
       appCtx.terrainGroup.add(farContextMesh);
     }
-    if (builtWater) {
-      const waterStyle = appCtx.resolveWaterSurfaceVisualProfile?.() ||
-        appCtx.LANDUSE_STYLES?.water || {};
-      const waterMaterial = new THREE.MeshStandardMaterial({
-        color: waterStyle.color || 0x2b6f9f,
-        emissive: waterStyle.emissive || 0x0f355a,
-        emissiveIntensity: waterStyle.emissiveIntensity ?? 0.14,
-        roughness: waterStyle.roughness ?? 0.44,
-        metalness: waterStyle.metalness ?? 0.02,
-        side: THREE.DoubleSide,
-        fog: true,
-        transparent: false,
-        depthWrite: true,
-        // Detailed mapped water renders later at composition layer 7. Keep
-        // this fixed outer owner at its physical depth so an overlapping
-        // detailed polygon can replace it without a biased diagonal seam.
-        polygonOffset: false
-      });
-      farWaterMesh = new THREE.Mesh(builtWater.geometry, waterMaterial);
-      farWaterMesh.name = 'FarMappedWaterContext';
-      farWaterMesh.renderOrder = 0;
-      farWaterMesh.castShadow = false;
-      farWaterMesh.receiveShadow = true;
-      farWaterMesh.userData.isFarMappedWaterContext = true;
-      farWaterMesh.userData.renderProvenance = {
-        version: 1,
-        profile: 'far-mapped-water-polygon-lod',
-        provider: 'openstreetmap',
-        dataset: 'Shortbread mapped ocean and water polygons',
-        layer: 'water',
-        role: 'far-context-water-lod',
-        sources: ['openstreetmap-shortbread'],
-        fallback: false
-      };
+    farWaterMesh = createFarWaterMesh(builtWater, FAR_CONTEXT_HALF_EXTENT_METERS);
+    if (farWaterMesh) {
       appCtx.terrainGroup.add(farWaterMesh);
     }
     setState({
@@ -698,6 +570,15 @@ function createFarFieldTerrainApi(deps = {}) {
       waterContextTilesRequested: mappedContext.waterTilesRequested,
       farWaterPolygons: builtWater?.polygons || 0,
       farWaterTriangles: builtWater?.triangles || 0,
+      farWaterTerrainMaskPolygons: waterTerrainMask?.polygons || 0,
+      farWaterTerrainMaskSize: waterTerrainMask?.size || 0,
+      farWaterTerrainMaskAuthority: waterTerrainMask
+        ? 'mapped-water-polygon-fragment-mask'
+        : null,
+      terrainGeometryBuildMs,
+      buildingGeometryBuildMs,
+      waterGeometryBuildMs,
+      waterTerrainMaskBuildMs,
       skippedDuplicateNearBuildings: mappedContext.skippedNearBuildings,
       farBuildingsAvailable: mappedContext.availableBuildings,
       farBuildingSelectionTarget: mappedContext.selectedBuildingTarget,
@@ -867,13 +748,13 @@ export {
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
+  FAR_WATER_TERRAIN_MASK_SIZE,
   FAR_FIELD_GRID_INTERVAL_METERS,
   FAR_FIELD_OUTER_DISTANCE_METERS,
   FAR_FIELD_SEAM_BLEND_METERS,
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
   parentTerrainTile,
   buildClipmapAxis,
-  clipTriangleOutsideBounds,
   cellInsideDetailedCoverage,
   cellInsideHole,
   createFarFieldTerrainApi

@@ -174,6 +174,7 @@ function parentTerrainTile(tile, levels = 1) {
 function disposeFarFieldMesh(mesh) {
   if (!mesh) return;
   mesh.userData.farFieldDisposed = true;
+  mesh.userData?.mappedWaterOwnershipMask?.dispose?.();
   for (const textures of Object.values(mesh.userData?.terrainTextureSetsByMode || {})) {
     textures?.map?.dispose?.();
     textures?.normalMap?.dispose?.();
