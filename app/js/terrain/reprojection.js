@@ -1,8 +1,8 @@
 import {
   buildFeatureRibbonEdges,
   isRoadSurfaceReachable
-} from "../structure-semantics.js?v=42";
-import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=23";
+} from "../structure-semantics.js?v=46";
+import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=24";
 import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=3';
 
 function mappedWaterReprojectionBase(mesh, sampledBoundaryHeights = []) {

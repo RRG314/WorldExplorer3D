@@ -1,11 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=42";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=46";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=23";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=24";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {

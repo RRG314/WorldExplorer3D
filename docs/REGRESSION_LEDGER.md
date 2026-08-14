@@ -4,6 +4,37 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-13 — Tunnel shells snag surface streets, steep camera clipping, and intermittent building pass-through
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: parts of tunnel shells appeared above Monaco streets and stopped the
+  car, the chase camera entered terrain on steep grades, and some building
+  collisions were intermittently ignored.
+- Root cause: tunnel cover was measured only at the centerline, internal terrain
+  cover gaps were incorrectly treated as physical portals, and tunnel ceilings
+  were registered as sideways vehicle obstacles. The vehicle query also stopped
+  after its first overlap even when policy rejected that overlap, hiding a solid
+  building later in the same spatial bucket. The chase camera ray owned roads,
+  structures and buildings but not the terrain between car and camera.
+- Resolution: shell publication now requires 0.75 m of cover across the full
+  outside wall width; only real graph endpoints create portals. Actor collision
+  contains side walls to the tunnel-driving height and does not publish lateral
+  ceiling colliders. Collision queries continue past rejected overlaps, swept
+  movement has no 64-sample distance hole, and the chase arm samples the shared
+  `SurfaceQuery` terrain segment before accepting its position.
+- Evidence: installed Chrome loaded 9,475 Monaco roads and 116 exact covered
+  tunnel routes. The least-buried sampled roof stayed 0.969 m below terrain;
+  240 street-level tunnel probes produced zero false blocks; 80 tunnel samples
+  produced zero centerline blocks; a real building blocked both point and
+  120 m swept collision. Real ArrowUp driving moved 11.14 m on a 17.99% grade
+  while the camera-to-car segment retained at least 1.48 m of terrain clearance.
+- Guard: `npm run test:monaco-tunnels-browser`, `npm run test:tunnel-system`,
+  `npm run test:phase3-structures`, and `npm run test:phase5-controls`.
+- Never reintroduce: centerline-only tunnel cover, portals at internal cover
+  fluctuations, ceiling AABBs in lateral actor collision, stopping collision
+  search after a rejected ghost, capped swept sampling, or a terrain-blind
+  chase camera.
+
 ## 2026-08-12 — Monaco ground contact disappears outside detailed coverage
 
 - Status: resolved locally; not pushed or deployed. Hardware-Chrome acceptance
@@ -634,6 +665,33 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Guard: `npm run test:phase5-aerial-transition`, `npm run test:regional-structures-browser`, and `npm run test:new-york-regional-continuity-browser`. London and San Francisco browser reports require the fragment-mask authority and upward regional-water normals; New York requires the same 4096² mapped-water ownership. A/B screenshots hide far terrain, far water, and detailed water independently so a future boundary can be assigned to its real owner before code changes.
 - Never reintroduce: vertex-only terrain masking as the sole water authority, clipping regional water at a rectangular LOD boundary, downward far-water winding, timing-dependent fallback water styles, `depthTest: false`, polygon-offset concealment, or synthetic water coverage.
 
+## 2026-08-13 — Bridge records exist but bridges, ramps, and tunnel mouths are absent
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed.
+- Symptom: New York retained hundreds of records tagged as bridges and tunnels, but named East River bridges could be visually absent, ramps could lose their connection to a major road, and tunnels either had no visible entrance or appeared to enter terrain at a guessed point. The old browser gate passed by counting records even when no structure mesh was published.
+- Root cause: the regional Shortbread street schema carries bridge/tunnel continuity but not the complete layer, lane, width, endpoint, and engineered geometry needed to compile a lossless structure. The visual publisher rejected generalized road bridges entirely, and exact bridge/tunnel ways outside the small core were never requested. Tunnel portal instances and masks were collected but not published. Terrain-height inference also treated underground cover changes as portal locations, producing false entrances under water or buildings. Finally, exact approaches competed with capped ordinary regional streets.
+- Resolution: one bounded fixed-location OSM adapter requests only driveable ways explicitly tagged as bridge or tunnel plus the exact surface mates at true tunnel endpoints. Those ways merge into the existing transport compiler before publication; they do not create another renderer, world, or actor-driven loading system. Exact structures and their required approaches have a protected budget. Complete generalized bridges retain a non-colliding continuity deck only when exact detail is unavailable. Exact tunnel way endpoints and exact surface connectivity now own portals, the portal beams are actually published, and a local fragment aperture reveals each mouth while preserving the mapped terrain roof over the rest of the tunnel.
+- Guard: `npm run test:fixed-regional-structures`, `npm run test:fixed-regional-context`, `npm run test:phase3-structures`, `npm run test:new-york-regional-continuity-browser`, and `npm run test:regional-structures-browser`. The New York browser journey resolves named bridge and tunnel targets by nearest road segment, requires lossless source geometry, finite drive surfaces, published bridge shells and tunnel portals, and focused screenshots of Brooklyn, Manhattan, Queensboro, Lincoln, and Holland. London supplies a non-New-York structure check and mandatory gameplay-frame review.
+- Never reintroduce: treating a bridge/tunnel tag count as rendered proof, using sparse vertex distance instead of segment distance, relying on generalized vector-tile streets as engineered-detail authority, inferring exact tunnel portals from terrain cover, cutting the whole tunnel corridor out of terrain, allowing ordinary-road budgets to discard exact approaches, or adding a second structure renderer/editor pipeline.
+
+## 2026-08-13 — Terrain work drifts from the accepted ground and counted bridges remain visually absent
+
+- Status: corrected locally; load-performance and London provider evidence remain open. Not pushed or deployed.
+- Symptom: work intended to close mountain seams changed the accepted fixed-ground mesh density; meanwhile tests counted exact bridge records and a merged elevated shell even though named road bridges still appeared as thin asphalt ribbons. Regional building facades also aliased to pale blocks at the user's aerial camera.
+- Root cause: the August 9 ground-material contract did not also guard the accepted fixed-mesh density. In the bridge publisher, `renderRoadFullDeckBody` and `renderRoadSupports` were computed from exact structure authority, but `renderDeckBody` and `renderSideGirders` ignored those decisions and emitted only connector/skywalk geometry. The regional facade shader used only window-scale cells, which disappear under aerial pixel filtering.
+- Resolution: retain the August 9 320 m fixed-location ground mesh and its single shared PBR/WorldCover presentation; later water masking remains a separate polygon authority and tunnels remain untouched. Lossless road bridges now publish the already-compiled deck body and girders beneath the drive surface. The existing regional facade owner blends to a larger antialiased floor/bay pattern at aerial distance; no second building renderer was added.
+- Guard: `npm run test:fixed-location-terrain-material`, `node scripts/test-fixed-world-horizon-architecture.mjs`, and `npm run test:phase3-structures`. The New York installed-Chrome journey captures the user's Central Park camera with detailed/regional A/B frames and named Brooklyn, Manhattan, and Queensboro bridge frames. It requires both regional building tiers to own the distance-adaptive facade and now records bridge deck/girder publication.
+- Never reintroduce: selecting terrain baselines from a candidate label instead of this ledger, changing ground geometry while fixing an unrelated renderer, accepting tag/mesh counts without a named gameplay frame, calculating a road-bridge visual decision without using it at publication, or adding a second facade/terrain/structure renderer to hide an ownership bug.
+
+## 2026-08-13 — Manhattan and visible New Jersey lose roads and buildings
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed.
+- Symptom: Midtown looked populated, but Upper Manhattan and the visible New Jersey side of the Hudson contained broad blank areas with few or no roads and buildings. The 22 km terrain continued beyond the mapped city context, making the missing data look like a city boundary. Increasing coverage initially introduced a seven-second Chrome freeze.
+- Root cause: the fixed mapped context ended at 8 km while terrain extended 22 km; a road selector named `spreadAcrossArea` still selected globally by priority instead of distributing records geographically; and the old 144-tile ceiling silently forced larger requests from zoom 14 to zoom 13, where street/building detail is insufficient. Once the source extent was corrected, destructive array shifting and global structure-versus-road comparisons exposed quadratic work, and all structure compiler phases ran inside one browser task.
+- Resolution: the one non-streaming fixed-location publication now requests a 14 km zoom-14 context (256 shared tiles under a 288-tile ceiling). A real geographic cell round-robin retains a 7,200-road general LOD while all exact mapped bridge/tunnel ways remain protected. The far-building owner publishes 85% of eligible mapped buildings up to a 750,000-instance ceiling. Building selection uses cursors, structure stacking and road candidate searches use spatial indexes, and structure compilation yields between its existing authoritative phases. No movement loader, second city renderer, or duplicate temporary pipeline was added.
+- Guard: `npm run test:fixed-regional-context`, `npm run test:building-coverage`, `npm run test:phase3-structures`, and `npm run test:new-york-regional-continuity-browser`. The installed-Chrome journey checks Lower Manhattan, Upper East Side, Harlem, Washington Heights, Inwood, Weehawken, North Bergen, Secaucus, Hoboken, Jersey City, and Kearny for mapped building evidence and a nearby road; it also requires at least 85% source selection, zero duplicate Shortbread URLs, traversal into Hoboken without a second world load, and no load-time browser task over five seconds. Lower Manhattan, Inwood, and Kearny screenshots require visual inspection.
+- Never reintroduce: an 8 km data boundary inside a 22 km visible world, silently degrading dense-city source zoom to satisfy a tile cap, a priority-only selector mislabeled as geographic spread, `Array.shift()` over hundreds of thousands of records, comparing every structure against every road, running all compilation phases in one browser task, or reducing exact bridge/tunnel coverage to meet a performance budget.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:
@@ -644,3 +702,52 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 4. Change locations once in the same session and confirm the old city never appears through the loading screen.
 5. Record screenshots, runtime state, and the exact commit tested.
 6. Include an ocean-only location, a mountainous location, and a city outside North America; confirm that glaciers are terrain, open ocean has no land placeholder, and location labels follow the published origin.
+# 2026-08-13 — Tunnel tags forced exposed tubes and parallel bores blocked cars
+
+- Status: resolved locally; user Chrome acceptance remains open. Not pushed or deployed.
+- Symptom: Monaco tunnel tubes appeared above terrain, closely spaced tunnels tangled together, and cars could pass through walls or be stopped on the valid centerline of a neighboring bore.
+- Root cause: the subgrade compiler used the chord between high endpoints, and exact `tunnel=yes` metadata forced a full-length shell regardless of measured terrain cover. Tunnel collision was deliberately withheld. The vehicle ghost rule also suppressed all building interiors on road cores, while indiscriminate tunnel-wall collision could block a close parallel mapped road.
+- Resolution: local terrain is now a hard upper bound for subgrade alignment, including physical roof cover. Exact mapped centerlines remain authoritative, but measured cover owns shell and portal ranges. Lossless compiled shells publish side-wall/ceiling collision; the active mapped road core suppresses only a neighboring transport shell, never an ordinary full-detail building, and walls outside road cores remain solid.
+- Evidence: the latest installed-Chrome Monaco guard retained 165 exact tunnel routes and sampled 1,308 covered stations. Maximum roof exposure is -0.012 m; 5,614 side walls and 2,836 ceilings are registered; 71/80 sampled wall probes hit; no sampled centerline is falsely blocked; a real Monaco commercial building remains solid; and there are no console errors.
+- Guard: `npm run test:monaco-tunnels-browser`, `npm run test:phase3-structures`, `npm run test:transport-surface`, and `npm run test:phase5-controls`.
+- Never reintroduce: endpoint-chord ownership for tunnel depth, full-shell publication based only on a tunnel tag, globally disabled exact tunnel collision, or a road-core exception that makes ordinary full-detail buildings non-solid.
+
+# 2026-08-13 — Regional crossings were recomputed as detailed junction caps
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: dense fixed locations spent excessive time compiling transport even though regional topology was already mapped, and loading varied badly with provider timing and machine load.
+- Root cause: the detailed renderer performed pairwise geometric crossing discovery across thousands of fixed regional LOD roads after their source-node junctions had already been registered. It duplicated topology work to create distant junction caps that are not visually resolvable.
+- Resolution: fixed regional roads retain canonical source-node junctions but skip the duplicate geometric crossing pass. Detailed core roads still receive geometric crossing discovery. Regional engineered profiles use four-to-eight metre samples while preserving exact source vertices and vehicle-grade continuity.
+- Evidence: the New York installed-Chrome run retained 13,017 roads, 1,333 bridges, 314 tunnels, and all twelve Manhattan/New Jersey continuity targets. Intersection detection measured 0.645 seconds; total transport publication 11.1 seconds; the full warm location load passed in 41.1 seconds with a 4.347-second maximum load task.
+- Guard: `npm run test:transport-surface` verifies regional source-node junction retention and the engineered-profile sample budget; `npm run test:new-york-regional-continuity-browser` verifies geographic coverage and load behavior.
+- Never reintroduce: geometric all-pairs crossing discovery for the regional LOD, deleting source-node junctions, or lowering the regional road/building coverage to hide compiler cost.
+
+# 2026-08-13 — Unpublished water polygons cut holes through mountain terrain
+
+- Status: water-ownership and facade fixes retained locally; the accompanying 100 m terrain experiment was rejected and superseded by the accepted August 9 ground contract. Not pushed or deployed.
+- Symptom: sky/water-colored strips appeared through solid slopes, and distant buildings lost visible facade detail before the edge of the fixed mapped location.
+- Root cause: the terrain ownership mask discarded every source water polygon even when that polygon failed triangulation and produced no water mesh. In the New York fixture this created 700 terrain cutouts for only 555 published water surfaces. The regional facade shader also faded out inside the 14 km fixed map. Mesh density was not the cause of either ownership defect.
+- Resolution: terrain delegates a water footprint only when that exact mapped identity successfully produced render geometry. The fixed ground remains the accepted 320 m, non-streaming, shared-PBR/WorldCover implementation recorded in the August 9 entry. Existing detailed facade atlases remain authoritative near the origin; the existing regional shader remains authoritative outside it and covers the full fixed map.
+- Evidence: the ownership run reported 85 published water surfaces / 85 terrain cutouts in Monaco and 555/555 in New York. All 1,034 detailed Monaco exterior materials and both regional building meshes reported facade ownership. The 100 m mesh and its 200,704-vertex measurement are rejected evidence and are not the candidate baseline.
+- Guard: `node scripts/test-fixed-world-horizon-architecture.mjs` asserts the accepted 320 m mesh; `npm run test:monaco-tunnels-browser`, `npm run test:new-york-regional-continuity-browser`, and `npm run test:module-versions` retain the water/facade checks.
+- Never reintroduce: masking terrain for an untriangulated water polygon, treating an unrelated mesh-density experiment as the ground fix, fading regional facades inside the fixed mapped extent, actor-driven terrain streaming, or a second background terrain/building renderer.
+
+# 2026-08-13 — London regional buildings disappear when the provider zoom is downgraded
+
+- Status: resolved locally; performance remains open. Not pushed or deployed.
+- Symptom: London loaded terrain, water, roads, 855 bridges, and 2,151 tunnels, yet the entire regional building owner published zero buildings and no far facades.
+- Root cause: the 28 km London context exceeded a New-York-sized 288-tile ceiling. Generic tile-budget logic silently selected zoom 13, but Shortbread's building layer is available at zoom 14; the loader therefore treated an unsupported generalized layer as a successful empty city.
+- Resolution: building coverage has its own provider-capability budget, separate from terrain and water. It retains zoom 14 for every shipped fixed-location preset through London's latitude. The same single regional-building owner publishes exact footprints plus its bounded instanced LOD; no fallback renderer or second request pipeline was added.
+- Evidence: the fresh installed-Chrome London run published 749,155 of 881,365 eligible regional buildings (85.0%), 855 bridges, and 2,151 tunnels; the landmark road surface was finite and the mapped-water terrain mask stayed active. Cold-cache load time was 106.5 seconds, so release performance remains open.
+- Guard: `node scripts/test-fixed-world-horizon-architecture.mjs` uses the full 28 km London bounds and requires zoom 14; `WE_STRUCTURE_SCENARIO=london npm run test:regional-structures-browser` requires at least 50,000 regional buildings and 84% published coverage.
+- Never reintroduce: using a terrain-style zoom downgrade for a source layer that does not exist at the downgraded zoom, interpreting authoritative zero as valid coverage, weakening the browser assertion, or adding another regional building renderer.
+
+# 2026-08-14 — London loads hundreds of thousands of invisible far-building details
+
+- Status: resolved locally; broader load performance remains open. Not pushed or deployed.
+- Symptom: the correct London visual took 106.5 seconds to become testable and published 749,155 regional buildings, even though most individual outer footprints are not resolvable at the aerial distance where that owner is used.
+- Root cause: regional roads silently selected Shortbread z13 while far buildings separately selected z14, preventing the shared in-flight tile owner from coalescing the requests. The decoded cache was also smaller than a London z14 set. After fetch, the far-building pass converted every one of roughly 931,000 source polygons before applying its publication cap.
+- Resolution: roads and buildings share one z14 tile identity and one London-sized decoded cache. Detailed buildings remain unchanged. The single far-building owner samples polygons spatially across every regional tile before descriptor/geometry creation, publishes at most 280,000 regional buildings, and retains exact footprint geometry for at most 9,000 of them; the remainder use the existing oriented-instance facade owner. No post-entry streaming or second renderer was added.
+- Evidence: the repeat installed-Chrome London journey completed in 53.9 seconds, a 49.4% reduction. It published 213,994 of 931,536 source regional polygons (23.0%), 11,157 roads, 16,490 detailed buildings, 288 bridges, and 508 tunnels; the landmark bridge surface was driveable, mapped-water terrain ownership remained active, the inspected frame retained metropolitan coverage, and the console was clean.
+- Guard: `node scripts/test-fixed-world-horizon-architecture.mjs` fixes the 280,000/9,000 far-LOD budgets and verifies distributed source sampling; `npm run test:fixed-regional-context` requires London roads to remain z14; `WE_STRUCTURE_SCENARIO=london npm run test:regional-structures-browser` requires at least 150,000 regional buildings, 20% published coverage, bridge/tunnel coverage, a driveable landmark surface, water ownership, and no console errors.
+- Never reintroduce: separate zoom identities for consumers of the same Shortbread region, a decoded cache smaller than the supported metropolitan request, converting every far polygon before selection, applying the far-LOD reduction to detailed city buildings, reducing exact bridge/tunnel authority to pay for buildings, or actor-driven building streaming.

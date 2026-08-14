@@ -8,8 +8,9 @@ import {
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=9';
+} from './far-field-mapped-context.js?v=13';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
+import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=3';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
   cellInsideDetailedCoverage,
@@ -21,7 +22,7 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=11';
+} from './far-field-geometry.js?v=12';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -38,13 +39,18 @@ import {
   buildFarWaterGeometry,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
-} from './far-field-water.js?v=1';
+} from './far-field-water.js?v=2';
+import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=7';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
 const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
+// Keep the accepted fixed-location ground mesh density. Ground appearance is
+// owned by the shared PBR/WorldCover presentation; structure and facade work
+// must not silently replace its geometry with a different terrain product.
 const FAR_FIELD_GRID_INTERVAL_METERS = 320;
 const FAR_FIELD_SEAM_BLEND_METERS = 550;
-const FAR_CONTEXT_HALF_EXTENT_METERS = 8000;
+const FAR_CONTEXT_HALF_EXTENT_METERS = FIXED_REGIONAL_CONTEXT_RADIUS_METERS;
 
 function createFarFieldTerrainApi(deps = {}) {
   const {
@@ -208,7 +214,7 @@ function createFarFieldTerrainApi(deps = {}) {
     return true;
   }
 
-  function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext) {
+  async function buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext) {
     const positions = [];
     const colors = [];
     const indices = [];
@@ -217,7 +223,10 @@ function createFarFieldTerrainApi(deps = {}) {
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let exactPublished = 0;
 
-    for (const building of mappedContext?.buildings || []) {
+    const mappedBuildings = mappedContext?.buildings || [];
+    for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
+      if (buildingIndex > 0 && buildingIndex % 8000 === 0) await yieldToMainThread();
+      const building = mappedBuildings[buildingIndex];
       if (!Array.isArray(building.ring)) {
         const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
         if (center.x < spec.outer.minX || center.x > spec.outer.maxX ||
@@ -391,16 +400,21 @@ function createFarFieldTerrainApi(deps = {}) {
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
     const geometryBuildStartedAt = performance.now();
-    const built = buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    const built = await buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const terrainGeometryBuildMs = performance.now() - geometryBuildStartedAt;
     const buildingBuildStartedAt = performance.now();
-    const builtBuildings = buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
+    const builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const builtWater = buildFarWaterGeometry(appCtx, mappedContext);
     const waterGeometryBuildMs = performance.now() - waterBuildStartedAt;
     const waterMaskBuildStartedAt = performance.now();
-    const waterTerrainMask = buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec);
+    const waterTerrainMask = buildMappedWaterTerrainOwnershipMask(
+      appCtx,
+      mappedContext,
+      spec,
+      builtWater?.publishedAreaIdentities
+    );
     const waterTerrainMaskBuildMs = performance.now() - waterMaskBuildStartedAt;
     if (requestGeneration !== generation) {
       built?.geometry?.dispose?.();
@@ -464,14 +478,14 @@ function createFarFieldTerrainApi(deps = {}) {
     farFieldMesh = mesh;
     appCtx.terrainGroup.add(mesh);
     if (builtBuildings) {
-      const buildingMaterial = new THREE.MeshStandardMaterial({
+      const buildingMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
         color: 0xffffff,
         vertexColors: true,
         roughness: 0.92,
         metalness: 0,
         side: THREE.DoubleSide,
         fog: true
-      });
+      }));
       farContextMesh = builtBuildings.geometry
         ? new THREE.Mesh(builtBuildings.geometry, buildingMaterial)
         : new THREE.Group();
@@ -493,13 +507,13 @@ function createFarFieldTerrainApi(deps = {}) {
       if (builtBuildings.instances.length > 0) {
         const instanceGeometry = new THREE.BoxGeometry(1, 1, 1);
         instanceGeometry.translate(0, 0.5, 0);
-        const instanceMaterial = new THREE.MeshStandardMaterial({
+        const instanceMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
           color: 0xffffff,
           roughness: 0.94,
           metalness: 0,
           side: THREE.FrontSide,
           fog: true
-        });
+        }));
         const instanceMesh = new THREE.InstancedMesh(
           instanceGeometry,
           instanceMaterial,
@@ -511,7 +525,8 @@ function createFarFieldTerrainApi(deps = {}) {
         const scale = new THREE.Vector3();
         const color = new THREE.Color();
         const up = new THREE.Vector3(0, 1, 0);
-        builtBuildings.instances.forEach((building, index) => {
+        for (let index = 0; index < builtBuildings.instances.length; index += 1) {
+          const building = builtBuildings.instances[index];
           position.set(building.x, building.baseY, building.z);
           rotation.setFromAxisAngle(up, building.rotationY);
           scale.set(building.width, building.height, building.depth);
@@ -519,7 +534,8 @@ function createFarFieldTerrainApi(deps = {}) {
           instanceMesh.setMatrixAt(index, matrix);
           color.setRGB(building.color[0], building.color[1], building.color[2]);
           instanceMesh.setColorAt(index, color);
-        });
+          if ((index + 1) % 12000 === 0) await yieldToMainThread();
+        }
         instanceMesh.instanceMatrix.needsUpdate = true;
         if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
         instanceMesh.name = 'FarMappedBuildingInstances';
@@ -573,7 +589,7 @@ function createFarFieldTerrainApi(deps = {}) {
       farWaterTerrainMaskPolygons: waterTerrainMask?.polygons || 0,
       farWaterTerrainMaskSize: waterTerrainMask?.size || 0,
       farWaterTerrainMaskAuthority: waterTerrainMask
-        ? 'mapped-water-polygon-fragment-mask'
+        ? 'published-water-geometry-fragment-mask'
         : null,
       terrainGeometryBuildMs,
       buildingGeometryBuildMs,

@@ -7,11 +7,12 @@ import {
   buildFeatureTransitionAnchors,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=42";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=8";
+} from "../structure-semantics.js?v=46";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=10";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=1";
-import { refreshStructureColliders } from "./structure-colliders.js?v=4";
+import { refreshStructureColliders } from "./structure-colliders.js?v=7";
+import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -46,6 +47,53 @@ function structureAwareLinearFeatures() {
     feature?.structureSemantics?.gradeSeparated ||
     feature?.structureSemantics?.structureKind === 'covered'
   );
+}
+
+function createFeatureBoundsIndex(features = [], cellSize = 240) {
+  const buckets = new Map();
+  const boundsByFeature = new Map();
+  const boundsFor = (feature) => {
+    if (boundsByFeature.has(feature)) return boundsByFeature.get(feature);
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    const padding = (Number(feature?.width) || 4) + 24;
+    const bounds = feature?.bounds || points.reduce((result, point) => ({
+      minX: Math.min(result.minX, Number(point?.x) - padding),
+      maxX: Math.max(result.maxX, Number(point?.x) + padding),
+      minZ: Math.min(result.minZ, Number(point?.z) - padding),
+      maxZ: Math.max(result.maxZ, Number(point?.z) + padding)
+    }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    boundsByFeature.set(feature, bounds);
+    return bounds;
+  };
+  for (const feature of features) {
+    const bounds = boundsFor(feature);
+    if (![bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ].every(Number.isFinite)) continue;
+    const minColumn = Math.floor(bounds.minX / cellSize);
+    const maxColumn = Math.floor(bounds.maxX / cellSize);
+    const minRow = Math.floor(bounds.minZ / cellSize);
+    const maxRow = Math.floor(bounds.maxZ / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        const key = `${column}:${row}`;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(feature);
+      }
+    }
+  }
+  return (feature) => {
+    const bounds = boundsFor(feature);
+    const candidates = new Set();
+    const minColumn = Math.floor((bounds.minX - 14) / cellSize);
+    const maxColumn = Math.floor((bounds.maxX + 14) / cellSize);
+    const minRow = Math.floor((bounds.minZ - 14) / cellSize);
+    const maxRow = Math.floor((bounds.maxZ + 14) / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (const candidate of buckets.get(`${column}:${row}`) || []) candidates.add(candidate);
+      }
+    }
+    return [...candidates];
+  };
 }
 
 function featureBuildingContainmentStats(feature) {
@@ -171,7 +219,7 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-export function refreshStructureAwareFeatureProfiles() {
+function* compileStructureAwareFeatureProfileSteps() {
   const now = () => globalThis.performance?.now?.() ?? Date.now();
   const compilationStartedAt = now();
   const phaseDurationsMs = Object.create(null);
@@ -186,12 +234,14 @@ export function refreshStructureAwareFeatureProfiles() {
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const connectorFeatures = structureAwareLinearFeatures();
   const transportFeatures = roadFeatures.concat(connectorFeatures);
+  const nearbyTransportFeatures = createFeatureBoundsIndex(transportFeatures);
 
   measure('buildingContext', () => {
     for (let i = 0; i < transportFeatures.length; i++) {
       applyBuildingContextSemanticsToFeature(transportFeatures[i]);
     }
   });
+  yield;
 
   if (Array.isArray(appCtx.linearFeatureMeshes)) {
     for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
@@ -210,6 +260,7 @@ export function refreshStructureAwareFeatureProfiles() {
       transportGraphId: appCtx.transportNetworkModel.id
     });
   });
+  yield;
   if (appCtx.transportSurfacePublication?.authority === 'compiled_transport_surface') {
     appCtx.transportSurfacePublication = Object.freeze({
       ...appCtx.transportSurfacePublication,
@@ -222,18 +273,20 @@ export function refreshStructureAwareFeatureProfiles() {
     worldBaseTerrainY,
     { areRoadsConnected }
   ));
+  yield;
 
   measure('buildInitialStations', () => {
     for (let i = 0; i < structureFeatures.length; i++) {
       const feature = structureFeatures[i];
       if (!feature?.structureSemantics?.gradeSeparated) continue;
       feature.structureStations = buildFeatureStations(feature, {
-        features: transportFeatures,
+        features: nearbyTransportFeatures(feature),
         waterAreas: appCtx.waterAreas,
         sampleTerrainY: worldBaseTerrainY
       });
     }
   });
+  yield;
 
   // Connection anchors must read surfaces compiled from the current graph and
   // stack ranks. Reusing the pre-refresh models makes a merge target sample a
@@ -251,6 +304,7 @@ export function refreshStructureAwareFeatureProfiles() {
       });
     }
   });
+  yield;
 
   // Resolve crossing clearances once against the first compiled world-space
   // surfaces. Nominal layer offsets alone are insufficient when two ramps
@@ -260,7 +314,7 @@ export function refreshStructureAwareFeatureProfiles() {
       for (let i = 0; i < structureFeatures.length; i++) {
         const feature = structureFeatures[i];
         feature.structureStations = buildFeatureStations(feature, {
-          features: transportFeatures,
+          features: nearbyTransportFeatures(feature),
           waterAreas: appCtx.waterAreas,
           sampleTerrainY: worldBaseTerrainY
         });
@@ -273,6 +327,7 @@ export function refreshStructureAwareFeatureProfiles() {
       }
     }
   });
+  yield;
 
   // A ramp endpoint and the interior freeway segment it joins are one physical
   // surface. A single anchor pass reads the target's provisional profile and
@@ -318,9 +373,12 @@ export function refreshStructureAwareFeatureProfiles() {
       junctionPasses
     });
   });
+  yield;
 
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
+  yield;
   measure('refreshStructureColliders', () => refreshStructureColliders(appCtx, transportFeatures));
+  yield;
   measure('refreshBridgeGuardrails', () => appCtx.refreshBridgeGuardrails?.(roadFeatures));
 
   // Terrain remains the roof above tunnels. Road and tunnel renderers must not
@@ -336,6 +394,23 @@ export function refreshStructureAwareFeatureProfiles() {
     })
   });
   return appCtx.structureProfileCompilation;
+}
+
+export function refreshStructureAwareFeatureProfiles() {
+  const steps = compileStructureAwareFeatureProfileSteps();
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+export async function refreshStructureAwareFeatureProfilesCooperatively() {
+  const steps = compileStructureAwareFeatureProfileSteps();
+  let result = steps.next();
+  while (!result.done) {
+    await yieldToMainThread();
+    result = steps.next();
+  }
+  return result.value;
 }
 
 export function syncLinearFeatureOverlayVisibility() {

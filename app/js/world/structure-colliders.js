@@ -1,13 +1,13 @@
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=42";
+} from "../structure-semantics.js?v=46";
 import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=5";
 
-const STRUCTURE_COLLIDER_POLICY = 'covered-only-tunnels-withheld-until-trustworthy-portals';
+const STRUCTURE_COLLIDER_POLICY = 'actor-height-bounded-lossless-tunnel-side-walls';
 
 function pointAtDistance(feature, profile, distance) {
   const points = feature?.pts;
@@ -84,6 +84,10 @@ function descriptor(feature, kind, points, minY, maxY, index) {
     levelsSource: 'not_applicable',
     colliderDetail: 'full',
     structureColliderKind: kind,
+    transportTerrainMode: String(feature?.structureSemantics?.terrainMode || ''),
+    transportStructureKind: String(feature?.structureSemantics?.structureKind || ''),
+    structureSurfaceY: kind === 'side_wall' ? minY + 0.2 : minY,
+    structureClearance: Math.max(0, maxY - minY),
     sourceBuildingId: `${sourceIdentity}:structure-collider:${kind}:${index}`
   };
 }
@@ -103,10 +107,15 @@ export function compileStructureColliderDescriptors(features = []) {
   for (const feature of features) {
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
     const semantics = feature.structureSemantics || {};
-    // Tunnel collider shells share the same incomplete aperture geometry as
-    // the withheld tunnel presentation. Do not publish invisible ceilings or
-    // walls that can snag a vehicle while no trustworthy portal exists.
-    const tunnelLike = false;
+    // Only lossless source geometry with a compiled tunnel system may own
+    // tunnel collision. Generalized centerlines remain non-colliding because
+    // their walls and portal boundaries are not exact enough for traversal.
+    const tunnelLike =
+      semantics.terrainMode === 'subgrade' &&
+      feature?.transportRecord?.completeness === 'lossless' &&
+      feature?.tunnelSystemModel?.visualKind === 'tunnel' &&
+      Array.isArray(feature?.tunnelSystemModel?.shellRanges) &&
+      feature.tunnelSystemModel.shellRanges.length > 0;
     const coveredLike = semantics.structureKind === 'covered';
     if (!tunnelLike && !coveredLike) continue;
     const profile = polylineDistances(feature.pts);
@@ -142,22 +151,11 @@ export function compileStructureColliderDescriptors(features = []) {
               feature,
               'side_wall',
               footprint,
-              roadY,
-              roadY + clearance,
+              roadY - 0.2,
+              roadY + Math.min(2.35, Math.max(2.05, clearance - 0.8)),
               colliderIndex++
             ));
           }
-        }
-        const ceilingFootprint = rectangleFootprint(start, end, 0, width * 0.5 + 0.55);
-        if (ceilingFootprint) {
-          colliders.push(descriptor(
-            feature,
-            'ceiling',
-            ceilingFootprint,
-            roadY + clearance,
-            roadY + clearance + 0.4,
-            colliderIndex++
-          ));
         }
       }
     }

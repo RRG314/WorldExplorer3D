@@ -1165,7 +1165,7 @@ async function main() {
         invalidColliderCount: transportStructureColliders.filter((collider) =>
           collider?.geometrySource !== 'compiled_transport_structures' ||
           collider?.heightSource !== 'compiled_transport_surface' ||
-          !['side_wall', 'ceiling'].includes(collider?.structureColliderKind) ||
+          collider?.structureColliderKind !== 'side_wall' ||
           !Number.isFinite(collider?.minY) ||
           !Number.isFinite(collider?.maxY) ||
           !(collider.maxY > collider.minY)
@@ -1388,7 +1388,7 @@ async function main() {
           (
             report.transportStructureCoverage?.colliderCount > 0 &&
             report.transportStructureCoverage?.sideWallCount > 0 &&
-            report.transportStructureCoverage?.ceilingCount > 0
+            report.transportStructureCoverage?.ceilingCount === 0
           ) ||
           (
             report.transportStructureCoverage?.coveredFeatureCount === 0 &&

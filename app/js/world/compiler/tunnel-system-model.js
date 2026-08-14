@@ -2,7 +2,12 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=13';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=15';
+
+// A shell roof that merely touches the sampled terrain is visibly exposed by
+// interpolation and precision differences. Require physical soil/road cover
+// before publishing the enclosed shell.
+const MINIMUM_TUNNEL_ROOF_COVER = 0.75;
 
 function compatibleTunnelFeature(feature) {
   const semantics = feature?.structureSemantics;
@@ -51,7 +56,9 @@ function pointAtDistance(points, distances, distance) {
   const t = Math.max(0, Math.min(1, (target - segmentStart) / segmentLength));
   return {
     x: p1.x + (p2.x - p1.x) * t,
-    z: p1.z + (p2.z - p1.z) * t
+    z: p1.z + (p2.z - p1.z) * t,
+    tangentX: (p2.x - p1.x) / Math.max(1e-6, Math.hypot(p2.x - p1.x, p2.z - p1.z)),
+    tangentZ: (p2.z - p1.z) / Math.max(1e-6, Math.hypot(p2.x - p1.x, p2.z - p1.z))
   };
 }
 
@@ -206,6 +213,9 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     Math.min(5.2, (Number(feature?.structureSemantics?.cutDepth) || 4.6) - 0.25)
   );
   const roofThickness = 0.32;
+  // Include the outside face of the published wall, not merely the interior
+  // roof edge, so a shell cannot escape from a steep downhill cross-slope.
+  const roofHalfWidth = width * 0.5 + 0.95;
   const stationStep = Math.max(1.5, Math.min(4, width * 0.42));
   const stationCount = Math.max(2, Math.ceil(total / stationStep));
   const samples = [];
@@ -214,11 +224,21 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     const point = pointAtDistance(feature.pts, pathDistances, distance);
     if (!point) continue;
     const roadY = sampleTransportSurfaceAtDistance(profile, distance, 0);
-    const terrainY = Number(sampleTerrainY(point.x, point.z));
-    if (!Number.isFinite(roadY) || !Number.isFinite(terrainY)) continue;
+    const normalX = -point.tangentZ;
+    const normalZ = point.tangentX;
+    const terrainSamples = [
+      Number(sampleTerrainY(point.x, point.z)),
+      Number(sampleTerrainY(point.x + normalX * roofHalfWidth, point.z + normalZ * roofHalfWidth)),
+      Number(sampleTerrainY(point.x - normalX * roofHalfWidth, point.z - normalZ * roofHalfWidth))
+    ];
+    if (!Number.isFinite(roadY) || !terrainSamples.every(Number.isFinite)) continue;
+    // The lowest terrain sample across the tunnel roof owns containment. A
+    // centerline-only sample let a shell emerge from the downhill side of a
+    // steep street even though its center remained underground.
+    const terrainY = Math.min(...terrainSamples);
     samples.push({
       distance,
-      cover: terrainY - (roadY + clearance + roofThickness),
+      cover: terrainY - (roadY + clearance + roofThickness) - MINIMUM_TUNNEL_ROOF_COVER,
       terrainGap: terrainY - roadY
     });
   }
@@ -229,6 +249,29 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
   }
   const continuesAtStart = linkedTunnelAt(feature, 'start');
   const continuesAtEnd = linkedTunnelAt(feature, 'end');
+  if (coveredIndices.length === 0) {
+    if (feature?.transportRecord?.completeness === 'lossless') {
+      // Exact tagging owns the centerline, but terrain cover owns whether a
+      // tunnel shell is physically hidden. Publishing a full shell solely
+      // because tunnel=yes is what exposed parking/access tunnels across
+      // Monaco. With no measurable cover, keep the road surface-connected and
+      // publish no shell rather than inventing an above-ground tube.
+      return {
+        version: 9,
+        visualKind: 'tunnel',
+        total,
+        clearance,
+        roofThickness,
+        shellRanges: Object.freeze([]),
+        portalDistances: Object.freeze([]),
+        portalZones: Object.freeze([]),
+        shellStart: null,
+        shellEnd: null,
+        portalStart: null,
+        portalEnd: null
+      };
+    }
+  }
   if (coveredIndices.length === 0 && !continuesAtStart && !continuesAtEnd) {
     const shellRanges = crossingShellRanges(
       feature,
@@ -289,23 +332,25 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     };
   }
 
+  // Portals belong only to real tunnel-to-surface graph endpoints. Terrain
+  // cover can briefly dip inside a tagged tunnel (especially beneath steep
+  // streets); treating each cover-range boundary as a portal created arches
+  // and collision walls in the street above.
   const portalDistances = [];
-  for (const range of shellRanges) {
-    const beginsAtDatasetStart = range.start <= 1;
-    const endsAtDatasetEnd = range.end >= total - 1;
-    if (!beginsAtDatasetStart || (!continuesAtStart && linkedSurfaceAt(feature, 'start'))) {
-      portalDistances.push(range.start);
-    }
-    if (!endsAtDatasetEnd || (!continuesAtEnd && linkedSurfaceAt(feature, 'end'))) {
-      portalDistances.push(range.end);
-    }
+  const firstRange = shellRanges[0];
+  const lastRange = shellRanges[shellRanges.length - 1];
+  if (!continuesAtStart && linkedSurfaceAt(feature, 'start')) {
+    portalDistances.push(firstRange.start);
+  }
+  if (!continuesAtEnd && linkedSurfaceAt(feature, 'end')) {
+    portalDistances.push(lastRange.end);
   }
   const shellStart = shellRanges[0].start;
   const shellEnd = shellRanges[shellRanges.length - 1].end;
   const portalStart = portalDistances.includes(shellStart) ? shellStart : null;
   const portalEnd = portalDistances.includes(shellEnd) ? shellEnd : null;
   return {
-    version: 6,
+    version: feature?.transportRecord?.completeness === 'lossless' ? 9 : 6,
     visualKind: 'tunnel',
     total,
     clearance,
@@ -368,3 +413,4 @@ export function compileTunnelSystemModels(features = [], sampleTerrainY) {
 }
 
 export { compilePortalZones };
+export { MINIMUM_TUNNEL_ROOF_COVER };

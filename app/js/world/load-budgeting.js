@@ -52,7 +52,13 @@ export function isFixedRegionalEngineeredRoad(way) {
 
 export function partitionFixedRegionalRoads(regionalRoadWays = []) {
   const engineered = regionalRoadWays.filter(isFixedRegionalEngineeredRoad);
-  const ordinary = regionalRoadWays.filter((way) => !isFixedRegionalEngineeredRoad(way));
+  const exactConnectors = regionalRoadWays.filter(
+    (way) => way?.tags?._fixedRegionalStructureConnector === 'exact'
+  );
+  const exactConnectorSet = new Set(exactConnectors);
+  const ordinary = regionalRoadWays.filter((way) =>
+    !isFixedRegionalEngineeredRoad(way) && !exactConnectorSet.has(way)
+  );
   const ordinaryByEndpoint = new Map();
   for (const way of ordinary) {
     const nodeIds = Array.isArray(way?.nodes) ? way.nodes : [];
@@ -84,9 +90,10 @@ export function partitionFixedRegionalRoads(regionalRoadWays = []) {
     }
   }
   const connectors = regionalRoadWays.filter((way) => connectorSet.has(way));
-  const protectedSet = new Set([...engineered, ...connectors]);
+  const protectedSet = new Set([...engineered, ...exactConnectors, ...connectors]);
   return Object.freeze({
     engineered,
+    exactConnectors,
     connectors,
     general: regionalRoadWays.filter((way) => !protectedSet.has(way))
   });
@@ -127,9 +134,38 @@ export function prepareWorldFeatureSelections(options = {}) {
     (way) => way.tags?._regionalContext === 'fixed-location'
   );
   const regionalRoadCap = regionalRoadWays.length > 0
-    ? Math.min(3200, Math.max(1400, Math.floor(maxRoadWays * 0.35)))
+    ? Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
     : 0;
   const regionalPartition = partitionFixedRegionalRoads(regionalRoadWays);
+  const exactRegionalEngineered = regionalPartition.engineered.filter((way) =>
+    way?.tags?._fixedRegionalStructure === 'exact' ||
+    way?.tags?._sourceCompleteness === 'lossless'
+  );
+  const exactRegionalEngineeredSet = new Set(exactRegionalEngineered);
+  const generalizedRegionalEngineered = regionalPartition.engineered.filter(
+    (way) => !exactRegionalEngineeredSet.has(way)
+  );
+  const selectedGeneralizedEngineered = limitWaysByTileBudget(
+    generalizedRegionalEngineered,
+    nodes,
+    {
+      // Exact structures are never capped. The generalized outer source is a
+      // geographically distributed continuity LOD; bounding it prevents the
+      // quadratic profile work of thousands of duplicate low-detail segments.
+      globalCap: 600,
+      basePerTile: 20,
+      minPerTile: 8,
+      tileDegrees: tileBudgetCfg.tileDegrees,
+      useRdt: false,
+      spreadAcrossArea: true,
+      coreRatio: 0.1,
+      compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+    }
+  );
+  const selectedRegionalEngineered = [
+    ...exactRegionalEngineered,
+    ...selectedGeneralizedEngineered
+  ];
   const regionalConnectorCap = Math.min(
     1200,
     Math.max(160, Math.ceil(regionalPartition.engineered.length * 0.5))
@@ -171,17 +207,23 @@ export function prepareWorldFeatureSelections(options = {}) {
   });
   const roadWays = [
     ...selectedCoreRoadWays,
-    ...regionalPartition.engineered,
+    ...selectedRegionalEngineered,
+    ...regionalPartition.exactConnectors,
     ...selectedRegionalConnectors,
     ...selectedRegionalRoadWays
   ];
   loadMetrics.regionalTransportSelection = {
     available: regionalRoadWays.length,
-    engineered: regionalPartition.engineered.length,
+    engineeredAvailable: regionalPartition.engineered.length,
+    exactEngineered: exactRegionalEngineered.length,
+    generalizedEngineeredSelected: selectedGeneralizedEngineered.length,
+    engineered: selectedRegionalEngineered.length,
+    exactStructureConnectors: regionalPartition.exactConnectors.length,
     structureConnectorsAvailable: regionalPartition.connectors.length,
     structureConnectors: selectedRegionalConnectors.length,
     generalSelected: selectedRegionalRoadWays.length,
-    selected: regionalPartition.engineered.length +
+    selected: selectedRegionalEngineered.length +
+      regionalPartition.exactConnectors.length +
       selectedRegionalConnectors.length + selectedRegionalRoadWays.length
   };
 

@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   clearStructureVisualMeshes,
-  rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=30";
+  rebuildStructureVisualMeshes,
+  rebuildStructureVisualMeshesCooperatively
+} from "./terrain/structure-visuals.js?v=34";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=7";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=14";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=15";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -53,14 +54,14 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=33";
+} from "./terrain/rebuild.js?v=36";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=8";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=50";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=57";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -311,6 +312,7 @@ const transportPublicationDeps = {
   pointAlongPolyline,
   polylineCurvatureMetric,
   rebuildStructureVisualMeshes,
+  rebuildStructureVisualMeshesCooperatively,
   validateRoadTerrainConformance
 };
 

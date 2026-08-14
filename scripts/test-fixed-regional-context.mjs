@@ -41,6 +41,11 @@ const bridgeApproach = { id: 2, nodes: [2, 3], tags: { highway: 'primary_link' }
 const ordinaryRoad = { id: 3, nodes: [4, 5], tags: { highway: 'residential' } };
 const tunnel = { id: 4, nodes: [6, 7], tags: { highway: 'secondary', tunnel: 'yes' } };
 const unrelatedIntersection = { id: 5, nodes: [2, 8], tags: { highway: 'service' } };
+const exactStructureConnector = {
+  id: 6,
+  nodes: [7, 9],
+  tags: { highway: 'primary_link', _fixedRegionalStructureConnector: 'exact' }
+};
 assert.equal(isFixedRegionalEngineeredRoad(bridge), true);
 assert.equal(isFixedRegionalEngineeredRoad(tunnel), true);
 const regionalPartition = partitionFixedRegionalRoads([
@@ -48,10 +53,12 @@ const regionalPartition = partitionFixedRegionalRoads([
   bridgeApproach,
   ordinaryRoad,
   tunnel,
-  unrelatedIntersection
+  unrelatedIntersection,
+  exactStructureConnector
 ]);
 assert.deepEqual(regionalPartition.engineered.map((way) => way.id), [1, 4]);
 assert.deepEqual(regionalPartition.connectors.map((way) => way.id), [2]);
+assert.deepEqual(regionalPartition.exactConnectors.map((way) => way.id), [6]);
 assert.deepEqual(regionalPartition.general.map((way) => way.id), [3, 5]);
 
 const location = { lat: 40.758, lon: -73.9855 };
@@ -76,8 +83,15 @@ assert.equal(
   'detailed core structures must retain their high-resolution surface profile'
 );
 const bounds = fixedRegionalContextBounds(location);
-const zoom = selectShortbreadZoomForBounds(bounds, { preferredZoom: 14, maxTiles: 144 });
-assert.ok(shortbreadTileCountForBounds(bounds, zoom) <= 144);
+const zoom = selectShortbreadZoomForBounds(bounds, { preferredZoom: 14, maxTiles: 512 });
+assert.equal(zoom, 14, 'metropolitan fixed context must retain local-street detail');
+assert.ok(shortbreadTileCountForBounds(bounds, zoom) <= 512);
+const londonBounds = fixedRegionalContextBounds({ lat: 51.5074, lon: -0.1278 });
+assert.equal(
+  selectShortbreadZoomForBounds(londonBounds, { preferredZoom: 14, maxTiles: 512 }),
+  14,
+  'London roads and buildings must share one zoom-14 provider tile identity'
+);
 
 const source = {
   elements: [

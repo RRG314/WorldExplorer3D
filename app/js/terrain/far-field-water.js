@@ -1,4 +1,4 @@
-import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=23';
+import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=24';
 import { registerWaterWaveMaterial } from '../world/water-materials.js?v=1';
 
 const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;
@@ -24,6 +24,7 @@ function buildFarWaterGeometry(appCtx, mappedContext) {
   const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
   const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
   let polygons = 0;
+  const publishedAreaIdentities = new Set();
   const waterAreas = [...(mappedContext?.waterAreas || [])].sort((left, right) => {
     const oceanPriority = Number(right?.kind === 'ocean') - Number(left?.kind === 'ocean');
     return oceanPriority || Number(right?.spanMeters || 0) - Number(left?.spanMeters || 0);
@@ -48,6 +49,7 @@ function buildFarWaterGeometry(appCtx, mappedContext) {
       indices.push(baseIndex, baseIndex + 1, baseIndex + 2);
     }
     polygons += 1;
+    if (area.identity) publishedAreaIdentities.add(String(area.identity));
   }
 
   if (!polygons) return null;
@@ -56,10 +58,10 @@ function buildFarWaterGeometry(appCtx, mappedContext) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
-  return { geometry, polygons, triangles: indices.length / 3 };
+  return { geometry, polygons, triangles: indices.length / 3, publishedAreaIdentities };
 }
 
-function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec) {
+function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publishedAreaIdentities = null) {
   if (!spec?.outer || typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
   const canvas = document.createElement('canvas');
   canvas.width = FAR_WATER_TERRAIN_MASK_SIZE;
@@ -100,6 +102,13 @@ function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec) {
   let polygons = 0;
   for (const area of mappedContext?.waterAreas || []) {
     if (!Number.isFinite(Number(area?.surfaceMeters))) continue;
+    // Terrain may delegate only to water geometry that was actually
+    // triangulated and published. Masking every source polygon created literal
+    // sky holes wherever malformed/unsupported rings produced no water mesh.
+    if (
+      publishedAreaIdentities instanceof Set &&
+      (!area?.identity || !publishedAreaIdentities.has(String(area.identity)))
+    ) continue;
     context.beginPath();
     if (!appendRing(area.outer)) continue;
     for (const hole of area.holes || []) appendRing(hole);
@@ -152,11 +161,12 @@ function applyMappedWaterTerrainOwnership(mesh, material, ownership) {
   material.needsUpdate = true;
   mesh.userData.mappedWaterOwnershipMask = ownership.texture;
   mesh.userData.mappedWaterOwnership = {
-    authority: 'mapped-water-polygon-fragment-mask',
+    authority: 'published-water-geometry-fragment-mask',
     polygons: ownership.polygons,
     size: ownership.size,
     format: 'red8',
-    shaderDiscard: true
+    shaderDiscard: true,
+    delegationRule: 'published-water-geometry-only'
   };
   return true;
 }

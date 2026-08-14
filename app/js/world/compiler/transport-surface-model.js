@@ -24,9 +24,26 @@ import {
   smoothGradeLimitedProfile,
   smoothSignedCutFillProfile,
   tangentAtDistance
-} from './transport-surface-profile.js?v=1';
+} from './transport-surface-profile.js?v=2';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
+
+function smoothUpperBoundedGradeProfile(initialHeights, upperBounds, distances, maximumGrade) {
+  // The shared smoother is lower-bounded because bridge clearance is a
+  // minimum. Tunnels have the inverse physical invariant: their surface must
+  // not rise above the local subgrade ceiling. Mirroring the profile lets the
+  // same deterministic grade solver enforce that upper bound without a
+  // second, divergent alignment algorithm.
+  const mirroredInitial = Float64Array.from(initialHeights, (height) => -height);
+  const mirroredLowerBounds = Float64Array.from(upperBounds, (height) => -height);
+  const mirrored = smoothGradeLimitedProfile(
+    mirroredInitial,
+    mirroredLowerBounds,
+    distances,
+    maximumGrade
+  );
+  return Float32Array.from(mirrored, (height) => -height);
+}
 
 function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) {
@@ -129,7 +146,15 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     const referenceY =
       mode === 'at_grade'
         ? atGradeReferenceY
-        : approachReference;
+        : mode === 'subgrade'
+          // A tunnel follows a below-ground corridor, not the straight chord
+          // between two portal elevations. Across a river that chord can sit
+          // above the water even though both endpoints are correctly on land.
+          // Use the lower of the engineered endpoint chord and the complete
+          // local terrain cross-section so every interior sample remains
+          // subgrade without introducing a separate city/tunnel renderer.
+          ? Math.min(approachReference, lowestCrossSectionGround)
+          : approachReference;
     const unconstrainedCenterY = referenceY + offset + surfaceBias;
     const centerY =
       mode === 'elevated' && Number.isFinite(minimumStructureSurfaceY)
@@ -154,7 +179,13 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         // but it must never average a required vehicle clearance back out.
         ? centerY
         : Number.NEGATIVE_INFINITY;
-    centerUpperBounds[index] = atGrade
+    centerUpperBounds[index] = mode === 'subgrade'
+      // Tunnel containment is an upper bound. If the approach elevations and
+      // the maximum grade are mutually infeasible, staying underground is
+      // safer and visually correct; a compiled portal transition can still
+      // own the deliberate emergence at a mapped entrance.
+      ? lowestCrossSectionGround + offset + surfaceBias
+      : atGrade
       ? Math.max(
           highestCrossSectionGround + surfaceBias,
           lowestCrossSectionGround + surfaceBias + maximumAtGradeFill
@@ -194,7 +225,14 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         maximumGrade,
         options.verticalFitRadius
       )
-    : smoothGradeLimitedProfile(
+    : mode === 'subgrade'
+      ? smoothUpperBoundedGradeProfile(
+          centerInitial,
+          centerUpperBounds,
+          sampleDistances,
+          maximumGrade
+        )
+      : smoothGradeLimitedProfile(
         centerInitial,
         centerLowerBounds,
         sampleDistances,
@@ -239,6 +277,17 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       centerHeights = smoothGradeLimitedProfile(
         graphConstrainedHeights,
         centerLowerBounds,
+        sampleDistances,
+        maximumGrade
+      );
+    }
+    if (mode === 'subgrade') {
+      // Endpoint and graph constraints may only expose a tunnel where an
+      // explicit compiled transition permits it. Reconcile the completed
+      // profile with the local subgrade ceiling everywhere else.
+      centerHeights = smoothUpperBoundedGradeProfile(
+        centerHeights,
+        centerUpperBounds,
         sampleDistances,
         maximumGrade
       );

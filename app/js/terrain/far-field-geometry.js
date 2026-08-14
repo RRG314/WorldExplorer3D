@@ -2,6 +2,7 @@ import {
   addCoverageEdges,
   cellInsideDetailedCoverage
 } from './far-field-coverage.js?v=1';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -402,7 +403,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     return resolvedMeters;
   }
 
-  function buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext = null) {
+  async function buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext = null) {
     const interval = farFieldGridIntervalMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const xValues = addCoverageEdges(
       buildClipmapAxis(spec.outer.minX, spec.inner.minX, spec.inner.maxX, spec.outer.maxX, interval),
@@ -427,7 +428,9 @@ function createFarFieldGeometryPlanner(deps = {}) {
     let maxElevationMeters = -Infinity;
     const maskStats = { waterMaskedVertices: 0 };
 
-    for (const z of zValues) {
+    for (let row = 0; row < zValues.length; row += 1) {
+      const z = zValues[row];
+      if (row > 0 && row % 12 === 0) await yieldToMainThread();
       for (const x of xValues) {
         // This square clipmap owns terrain continuity only. Water is published
         // exclusively by the mapped polygon/ribbon pipeline, so the clipmap

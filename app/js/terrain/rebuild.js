@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
-import { detectRoadIntersections } from "./intersections.js?v=2";
+import { detectRoadIntersections } from "./intersections.js?v=3";
 import { boundsIntersectLocal } from "./context-utils.js?v=1";
 import {
   buildFeatureRibbonEdges,
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=42";
+} from "../structure-semantics.js?v=46";
 import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import {
@@ -207,6 +207,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     pointAlongPolyline,
     polylineCurvatureMetric,
     rebuildStructureVisualMeshes,
+    rebuildStructureVisualMeshesCooperatively,
     validateRoadTerrainConformance
   } = deps;
 
@@ -224,13 +225,26 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
     }
   };
+  const measureAsync = async (name, task) => {
+    const startedAt = now();
+    try {
+      return await task();
+    } finally {
+      phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+    }
+  };
 
   if (typeof disableRoadDebugMode === "function") {
     disableRoadDebugMode();
   }
 
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
-  if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
+  if (typeof appCtx.refreshStructureAwareFeatureProfilesCooperatively === "function") {
+    await measureAsync(
+      'refreshStructureProfiles',
+      () => appCtx.refreshStructureAwareFeatureProfilesCooperatively()
+    );
+  } else if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
     measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
     await yieldToMainThread();
   }
@@ -406,7 +420,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     });
   });
   await yieldToMainThread();
-  measure('rebuildStructureVisuals', () => rebuildStructureVisualMeshes({
+  await measureAsync('rebuildStructureVisuals', () => (
+    typeof rebuildStructureVisualMeshesCooperatively === 'function'
+      ? rebuildStructureVisualMeshesCooperatively
+      : rebuildStructureVisualMeshes
+  )({
     boundsIntersect: boundsIntersectLocal,
     cachedTerrainHeight,
     pointAlongPolyline,

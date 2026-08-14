@@ -26,7 +26,11 @@ import {
   fixedRegionalRoadGeometryGuards,
   sampleFixedRegionalGround,
   waitForFixedRegionalGround
-} from "./fixed-regional-context.js?v=5";
+} from "./fixed-regional-context.js?v=7";
+import {
+  beginFixedRegionalStructureLoad,
+  completeFixedRegionalStructureLoad
+} from "./fixed-regional-structures.js?v=2";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -361,6 +365,14 @@ export function createWorldRoadLoader(deps = {}) {
         const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
         startLoadPhase('fetchFixedRegionalContext');
         const regionalRequest = beginFixedRegionalTransportLoad({ fetchWorldData: fetchShortbreadWorldData, location: appCtx.LOC, runProviderWork });
+        startLoadPhase('fetchFixedRegionalStructures');
+        const regionalStructureRequest = beginFixedRegionalStructureLoad({
+          deadlineMs: loadDeadline,
+          fetchOverpassJSON,
+          location: appCtx.LOC,
+          runProviderWork,
+          timeoutMs: Math.min(22000, overpassTimeoutMs)
+        });
         startLoadPhase('fetchOverpass');
         let data;
         let exactTransportLoaded = false;
@@ -407,6 +419,18 @@ export function createWorldRoadLoader(deps = {}) {
           if (!data) throw regionalError;
         } finally {
           endLoadPhase('fetchFixedRegionalContext');
+        }
+        try {
+          data = await completeFixedRegionalStructureLoad({
+            data,
+            loadMetrics,
+            request: regionalStructureRequest
+          });
+        } catch (regionalStructureError) {
+          if (!isActiveLoadContext()) throw regionalStructureError;
+          recordLoadWarning('exact fixed regional bridge and tunnel data', regionalStructureError);
+        } finally {
+          endLoadPhase('fetchFixedRegionalStructures');
         }
         if (data?._overpassSource) loadMetrics.overpassSource = data._overpassSource;
         if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;

@@ -3,6 +3,7 @@ import { updateNightLighting } from "./engine/night-lighting.js?v=6";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
 import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
+import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -451,12 +452,23 @@ function updateCamera(dt = 1 / 60) {
     const lookX = carX;
     const lookY = carGroundY + (planetaryChase ? 2.1 : 0.5);
     const lookZ = carZ;
-    const collisionTarget = planetaryChase
+    let collisionTarget = planetaryChase
       ? { x: targetX, y: targetY, z: targetZ, collided: false }
       : resolveChaseCameraStructureCollision(
           lookX, lookY, lookZ,
           targetX, targetY, targetZ
         );
+    if (!planetaryChase && !insideTunnel) {
+      const terrainTarget = resolveChaseCameraTerrainCollision(
+        { x: lookX, y: lookY, z: lookZ },
+        collisionTarget,
+        (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+      );
+      collisionTarget = {
+        ...terrainTarget,
+        collided: collisionTarget.collided || terrainTarget.collided
+      };
+    }
     targetX = collisionTarget.x;
     targetY = collisionTarget.y;
     targetZ = collisionTarget.z;

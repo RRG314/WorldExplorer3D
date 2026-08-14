@@ -3,7 +3,7 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=42";
+} from "../structure-semantics.js?v=46";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
@@ -12,12 +12,14 @@ import {
   canPublishTunnelVisual,
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=17";
+} from "./structure-tunnel-visuals.js?v=18";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety
 } from "../world/bridge-safety.js?v=6";
+import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -33,12 +35,28 @@ function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect,
   return count;
 }
 
-export function collectStructureVisualInstances({
-  boundsIntersect,
-  cachedTerrainHeight,
-  pointAlongPolyline,
-  polylineCurvatureMetric
-} = {}) {
+export function canPublishElevatedStructureVisual(feature) {
+  if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;
+  if (!Array.isArray(feature?.pts) || feature.pts.length < 2) return false;
+  if (feature?.networkKind !== 'road') return true;
+  const record = feature?.transportRecord;
+  if (record?.completeness === 'lossless') return true;
+  // A generalized mapped bridge owns visual continuity only. Hard collision,
+  // supports, parapets, and engineered detail remain restricted to lossless
+  // source geometry elsewhere in this publisher.
+  return record?.completeness === 'generalized' &&
+    record?.routeState === 'complete' &&
+    record?.safeForDriving !== false &&
+    feature?.structureSemantics?.isBridge === true;
+}
+
+export function collectStructureVisualInstances(deps = {}) {
+  const {
+    boundsIntersect,
+    cachedTerrainHeight,
+    pointAlongPolyline,
+    polylineCurvatureMetric
+  } = deps;
   const intersectBounds = typeof boundsIntersect === "function" ? boundsIntersect : () => false;
   const sampleTerrainHeight = typeof cachedTerrainHeight === "function" ? cachedTerrainHeight : () => 0;
   const samplePointAlongPolyline = typeof pointAlongPolyline === "function" ? pointAlongPolyline : () => null;
@@ -53,22 +71,22 @@ export function collectStructureVisualInstances({
   const roofInstances = [];
   const tunnelLightInstances = [];
   const tunnelShells = [];
+  const tunnelPortalMasks = [];
   const elevatedDeckShells = [];
   const elevatedBarrierSegments = [];
   const guardrailInstances = [];
-  const elevatedFeatures = []
-    .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
-    .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
-  const roadConflictIndex = createDriveableRoadConflictIndex(appCtx.roads);
-  const elevatedVisualFeatures = elevatedFeatures.filter((feature) =>
-    feature?.structureSemantics?.terrainMode === "elevated" &&
-    (
-      feature?.networkKind !== 'road' ||
-      feature?.transportRecord?.completeness === 'lossless'
-    ) &&
-    Array.isArray(feature?.pts) &&
-    feature.pts.length >= 2
-  );
+  const elevatedFeatures = Array.isArray(deps.allElevatedFeatures)
+    ? deps.allElevatedFeatures
+    : []
+      .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
+      .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
+  const featuresToProcess = Array.isArray(deps.featuresToProcess)
+    ? deps.featuresToProcess
+    : elevatedFeatures;
+  const roadConflictIndex = deps.roadConflictIndex || createDriveableRoadConflictIndex(appCtx.roads);
+  const elevatedVisualFeatures = Array.isArray(deps.elevatedVisualFeatures)
+    ? deps.elevatedVisualFeatures
+    : elevatedFeatures.filter(canPublishElevatedStructureVisual);
 
   const addSupportInstance = (instance) => {
     if (!instance || !(instance.scaleY > 0.5)) return;
@@ -108,16 +126,17 @@ export function collectStructureVisualInstances({
     return { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w, length };
   };
 
-  for (let i = 0; i < elevatedFeatures.length; i++) {
-    const feature = elevatedFeatures[i];
+  for (let i = 0; i < featuresToProcess.length; i++) {
+    const feature = featuresToProcess[i];
     const semantics = feature?.structureSemantics;
     if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || !semantics) continue;
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
-    if (
+    const generalizedRoadVisual =
       category === 'road' &&
-      feature?.transportRecord?.completeness !== 'lossless' &&
-      !canPublishTunnelVisual(feature)
-    ) continue;
+      feature?.transportRecord?.completeness !== 'lossless';
+    if (generalizedRoadVisual && semantics.terrainMode !== 'elevated' && !canPublishTunnelVisual(feature)) {
+      continue;
+    }
     const isConnectorLike = category === "connector" || category === "footway";
     const isSkywalk = semantics.skywalk || semantics.covered || semantics.indoor;
     const suppressExteriorVisuals = semantics.embeddedInBuilding === true;
@@ -128,7 +147,12 @@ export function collectStructureVisualInstances({
       /^(service|residential|unclassified|living_street|track)$/.test(localRoadType);
     const visualDetail =
       semantics.terrainMode === "elevated" ?
-        (isConnectorLike || isSkywalk ? 2.4 : 4.2) :
+        (
+          isConnectorLike || isSkywalk ? 2.4 :
+            generalizedRoadVisual && feature?.fixedRegionalContext === true ? 12 :
+            feature?.fixedRegionalContext === true && !roadLinkFeature ? 7.5 :
+              4.2
+        ) :
         10;
     const visualPts =
       typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
@@ -161,11 +185,13 @@ export function collectStructureVisualInstances({
           (transitionAnchorDistances.length >= 2 && nearbyElevatedCount >= 2)
         );
       const renderRoadFullDeckBody =
+        !generalizedRoadVisual &&
         !isConnectorLike &&
         !isSkywalk &&
         !clutteredInterchange &&
         total >= 42;
       const renderRoadSupports =
+        !generalizedRoadVisual &&
         !isConnectorLike &&
         !isSkywalk &&
         !clutteredInterchange &&
@@ -214,12 +240,18 @@ export function collectStructureVisualInstances({
           isConnectorLike || isSkywalk ?
             1 :
             Math.max(0.24, 1 - Math.max(0, slopeRatio - 0.01) / 0.065);
-        const renderDeckBody = isConnectorLike || isSkywalk;
+        // The compiled road ribbon owns the drive surface; this publisher owns
+        // the visible engineered body beneath it. The former condition only
+        // emitted bodies for foot connectors, so lossless road bridges were
+        // reduced to thin asphalt ribbons even though their exact geometry had
+        // already passed the structure authority gate.
+        const renderDeckBody = isConnectorLike || isSkywalk || renderRoadFullDeckBody;
         const renderSideGirders =
           !nearTransitionVisual &&
           (
             isConnectorLike ||
-            isSkywalk
+            isSkywalk ||
+            renderRoadFullDeckBody
           );
         const deckBodyThickness =
           isConnectorLike || isSkywalk ?
@@ -596,6 +628,7 @@ export function collectStructureVisualInstances({
       roofInstances.push(...tunnel.roofs);
       tunnelLightInstances.push(...tunnel.lights);
       tunnelShells.push(...tunnel.shells);
+      tunnelPortalMasks.push(...tunnel.portalMasks);
     } else if (semantics.structureKind === "covered") {
       const covered = collectCoveredVisualInstances(feature, structurePts, {
         samplePointAlongPolyline
@@ -616,10 +649,39 @@ export function collectStructureVisualInstances({
     roofInstances,
     tunnelLightInstances,
     tunnelShells,
+    tunnelPortalMasks,
     elevatedDeckShells,
     elevatedBarrierSegments,
     guardrailInstances
   };
+}
+
+export async function collectStructureVisualInstancesCooperatively(deps = {}) {
+  const allElevatedFeatures = []
+    .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
+    .concat(Array.isArray(appCtx.linearFeatures)
+      ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true)
+      : []);
+  const roadConflictIndex = createDriveableRoadConflictIndex(appCtx.roads);
+  const elevatedVisualFeatures = allElevatedFeatures.filter(canPublishElevatedStructureVisual);
+  const merged = {};
+  const chunkSize = 180;
+  for (let start = 0; start < allElevatedFeatures.length; start += chunkSize) {
+    const partial = collectStructureVisualInstances({
+      ...deps,
+      allElevatedFeatures,
+      elevatedVisualFeatures,
+      roadConflictIndex,
+      featuresToProcess: allElevatedFeatures.slice(start, start + chunkSize)
+    });
+    for (const [key, value] of Object.entries(partial)) {
+      if (!Array.isArray(value)) continue;
+      if (!Array.isArray(merged[key])) merged[key] = [];
+      merged[key].push(...value);
+    }
+    await yieldToMainThread();
+  }
+  return merged;
 }
 
 export function clearStructureVisualMeshes() {
@@ -627,5 +689,13 @@ export function clearStructureVisualMeshes() {
 }
 
 export function rebuildStructureVisualMeshes(deps = {}) {
-  return rebuildStructureVisualMeshesForContext(appCtx, collectStructureVisualInstances, deps);
+  const collected = collectStructureVisualInstances(deps);
+  applyTerrainPortalMasksForContext(appCtx, collected.tunnelPortalMasks);
+  return rebuildStructureVisualMeshesForContext(appCtx, () => collected, deps);
+}
+
+export async function rebuildStructureVisualMeshesCooperatively(deps = {}) {
+  const collected = await collectStructureVisualInstancesCooperatively(deps);
+  applyTerrainPortalMasksForContext(appCtx, collected.tunnelPortalMasks);
+  return rebuildStructureVisualMeshesForContext(appCtx, () => collected, deps);
 }

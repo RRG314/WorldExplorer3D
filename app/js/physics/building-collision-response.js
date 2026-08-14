@@ -48,9 +48,13 @@ function isRoadGhostCollision(buildingCheck, nearestRoad) {
     partKind === 'canopy' ||
     building.collisionKind === 'thin_part' ||
     building.allowsPassageBelow === true;
+  const neighboringTunnelShellOnRoadCore =
+    onRoadCore &&
+    building.geometrySource === 'compiled_transport_structures';
   const shallowRoadsideCollision =
     !!buildingCheck?.collision &&
     onRoadCenter &&
+    (colliderDetail !== 'full' || roofLikeCollider) &&
     !buildingCheck.inside &&
     Number.isFinite(buildingCheck.penetration) &&
     buildingCheck.penetration < 1.25;
@@ -58,8 +62,9 @@ function isRoadGhostCollision(buildingCheck, nearestRoad) {
     !!buildingCheck?.collision &&
     (
       (onRoadCenter && colliderDetail !== 'full') ||
-      (onRoadCore && buildingCheck.inside) ||
-      (onRoadCenter && roofLikeCollider)
+      (onRoadCore && buildingCheck.inside && colliderDetail !== 'full') ||
+      (onRoadCenter && roofLikeCollider) ||
+      neighboringTunnelShellOnRoadCore
     );
   return shallowRoadsideCollision || likelyRoadGhostCollision;
 }
@@ -98,13 +103,12 @@ function queryVehicleBuildingCollision(appCtx, checkBuildingCollision, x, z, car
       VEHICLE_COLLISION_PROFILE.radius,
       {
         actorBaseY: carFeetY,
-        actorHeight: 1.9
+        actorHeight: 1.9,
+        acceptCollision: (collision) =>
+          isVehicleBuildingCollisionBlocking(collision, nearestRoad)
       }
     );
-    if (
-      buildingCheck?.collision &&
-      isVehicleBuildingCollisionBlocking(buildingCheck, nearestRoad)
-    ) {
+    if (buildingCheck?.collision) {
       return { buildingCheck, nearestRoad, longitudinalOffset };
     }
   }
@@ -125,7 +129,7 @@ export function findSweptVehicleBuildingCollision(
   const distance = Math.hypot(dx, dz);
   // Sampling below the collider radius prevents a fast vehicle from crossing
   // an entire narrow wall between two physics positions.
-  const steps = Math.max(1, Math.min(64, Math.ceil(distance / 0.75)));
+  const steps = Math.max(1, Math.ceil(distance / 0.75));
   let lastSafeX = startX;
   let lastSafeZ = startZ;
   for (let step = 1; step <= steps; step += 1) {

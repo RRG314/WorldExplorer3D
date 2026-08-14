@@ -65,9 +65,20 @@ function createSampleDistances(totalDistance, sampleStep) {
 
 function normalizeAnchors(feature, semantics, totalDistance) {
   const total = Math.max(0, finiteNumber(totalDistance));
+  const tunnelRoofCover = semantics?.structureKind === 'tunnel' || semantics?.isTunnel === true
+    ? 0.4
+    : 0;
   const defaultOffset =
     semantics?.terrainMode === 'subgrade'
-      ? -Math.max(0, finiteNumber(semantics?.cutDepth) + finiteNumber(feature?.structureStackOffset))
+      // cutDepth describes the usable interior envelope. Keep a physical
+      // terrain cover above the compiled shell as well, otherwise the roof
+      // sits on the terrain plane and flickers/exposes across hills.
+      ? -Math.max(
+          0,
+          finiteNumber(semantics?.cutDepth) +
+            tunnelRoofCover +
+            finiteNumber(feature?.structureStackOffset)
+        )
       : semantics?.terrainMode === 'elevated'
         ? Math.max(
             0,

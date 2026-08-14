@@ -33,6 +33,7 @@ const {
   FAR_CONTEXT_MAX_BUILDINGS,
   FAR_CONTEXT_MAX_BUILDING_INSTANCES,
   FAR_CONTEXT_ZOOM,
+  FAR_FIELD_GRID_INTERVAL_METERS,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   FAR_WATER_TERRAIN_MASK_SIZE,
@@ -65,6 +66,7 @@ const {
   pointInLonLatRing,
   pointInMappedWaterArea,
   retainFarWaterRing,
+  distributedFeatureIndices,
   selectSpatiallyDistributedBuildings,
   selectContextZoomForTileBudget
 } = await import('../app/js/terrain/far-field-mapped-context.js');
@@ -154,15 +156,16 @@ assert.match(
 assert.match(locationTerrainSource, /updateFarTerrainClipmap/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
-assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 8000);
+assert.equal(FAR_FIELD_GRID_INTERVAL_METERS, 320, 'fixed terrain must retain the accepted fixed-location mesh density');
+assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 14000);
 assert.equal(FAR_CONTEXT_ZOOM, 14);
 assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
 assert.equal(FAR_WATER_MIN_SPAN_METERS, 200);
 assert.equal(FAR_WATER_TERRAIN_MASK_SIZE, 4096);
-assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 26000);
-assert.equal(FAR_CONTEXT_BUILDING_COVERAGE_TARGET, 0.85);
-assert.equal(FAR_CONTEXT_MAX_BUILDING_INSTANCES, 500000);
-assert.equal(FAR_CONTEXT_BUILDING_MAX_TILES, 144);
+assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 9000);
+assert.equal(FAR_CONTEXT_BUILDING_COVERAGE_TARGET, 0.45);
+assert.equal(FAR_CONTEXT_MAX_BUILDING_INSTANCES, 280000);
+assert.equal(FAR_CONTEXT_BUILDING_MAX_TILES, 512);
 const triangleSurfaceGrid = {
   xValues: [0, 10],
   zValues: [0, 10],
@@ -204,6 +207,11 @@ assert.match(
   /texture2D\(mappedWaterTerrainOwnershipMask, vMappedWaterOwnershipUv\).*discard/,
   'far terrain fragments inside exact mapped water polygons must be discarded by the terrain owner'
 );
+assert.match(
+  farFieldWaterSource,
+  /publishedAreaIdentities instanceof Set/,
+  'terrain may delegate only to water polygons that successfully published render geometry'
+);
 const detailedWaterRing = Array.from({ length: 500 }, (_, index) => {
   const angle = index / 500 * Math.PI * 2;
   const radius = index % 2 === 0 ? 1 : 0.55;
@@ -232,12 +240,17 @@ assert.equal(
 );
 assert.equal(
   selectContextZoomForTileBudget(
-    { latS: 51.4486, latN: 51.5663, lonW: -0.2217, lonE: -0.0339 },
+    { latS: 51.3813, latN: 51.6335, lonW: -0.3295, lonE: 0.0740 },
     FAR_CONTEXT_ZOOM,
     FAR_CONTEXT_BUILDING_MAX_TILES
   ),
   FAR_CONTEXT_ZOOM,
   'London building coverage must retain zoom 14 instead of requesting an empty generalized layer'
+);
+assert.deepEqual(
+  distributedFeatureIndices(10, 4),
+  [1, 3, 6, 8],
+  'far-building source reduction must sample the entire tile instead of truncating one edge'
 );
 const distributedBuildings = selectSpatiallyDistributedBuildings([
   { identity: 'nw-large', centerLat: 3, centerLon: 0, priority: 8 },

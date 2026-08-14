@@ -1,17 +1,25 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=14";
+} from "../world/shortbread-source.js?v=15";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
-// Preserve exact footprint geometry for the most visually important regional
-// buildings and publish the rest through one instanced low-detail owner.
-const FAR_CONTEXT_MAX_BUILDINGS = 26000;
-const FAR_CONTEXT_BUILDING_COVERAGE_TARGET = 0.85;
-const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 500000;
-const FAR_CONTEXT_BUILDING_MAX_TILES = 144;
+// Detailed city buildings remain complete. The fixed regional ring is an
+// aerial continuity LOD: retain a spatially distributed subset and publish
+// most of it as inexpensive oriented instances instead of converting nearly
+// a million source footprints that are not individually resolvable.
+const FAR_CONTEXT_MAX_BUILDINGS = 9000;
+const FAR_CONTEXT_BUILDING_COVERAGE_TARGET = 0.45;
+const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 280000;
+// The building layer is available at z14, not at the lower generalized zooms.
+// A 14 km half-extent needs roughly 400 tiles at London's latitude, so this
+// budget must cover every shipped fixed-location preset before zoom selection
+// is allowed to step down. Terrain and mapped water retain their own smaller
+// requests; this budget governs the one regional-building publication pass.
+const FAR_CONTEXT_BUILDING_MAX_TILES = 512;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
 
@@ -192,13 +200,16 @@ function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
 }
 
 function roundRobinSelect(buckets, maxCount) {
-  const active = buckets.filter((bucket) => Array.isArray(bucket) && bucket.length > 0);
+  const active = buckets
+    .filter((bucket) => Array.isArray(bucket) && bucket.length > 0)
+    .map((bucket) => ({ bucket, index: 0 }));
   const selected = [];
   let index = 0;
   while (active.length > 0 && selected.length < maxCount) {
-    const bucket = active[index];
-    selected.push(bucket.shift());
-    if (bucket.length === 0) {
+    const cursor = active[index];
+    selected.push(cursor.bucket[cursor.index]);
+    cursor.index += 1;
+    if (cursor.index >= cursor.bucket.length) {
       active.splice(index, 1);
       if (active.length === 0) break;
       index %= active.length;
@@ -207,6 +218,17 @@ function roundRobinSelect(buckets, maxCount) {
     }
   }
   return selected;
+}
+
+function distributedFeatureIndices(featureCount, selectedCount) {
+  const count = Math.max(0, Math.floor(Number(featureCount) || 0));
+  const target = Math.max(0, Math.min(count, Math.floor(Number(selectedCount) || 0)));
+  if (target === count) return Array.from({ length: count }, (_, index) => index);
+  const indices = [];
+  for (let sample = 0; sample < target; sample += 1) {
+    indices.push(Math.min(count - 1, Math.floor((sample + 0.5) * count / target)));
+  }
+  return indices;
 }
 
 function selectSpatiallyDistributedBuildings(buildings, maxCount) {
@@ -275,7 +297,8 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
   const tiles = waterBatch.values;
   const waterAreas = [];
 
-  for (const tileRecord of tiles) {
+  for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
+    const tileRecord = tiles[tileIndex];
     for (const layerName of ['ocean', 'water_polygons']) {
       const layer = tileRecord.tile.layers[layerName];
       if (!layer) continue;
@@ -348,15 +371,32 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   const buildingBuckets = [];
   let skippedNearBuildings = 0;
   let availableBuildings = 0;
+  const perTileBuildingBudget = Math.max(
+    1,
+    Math.ceil(FAR_CONTEXT_MAX_BUILDING_INSTANCES / Math.max(1, tiles.length))
+  );
 
-  for (const tileRecord of tiles) {
+  for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
+    const tileRecord = tiles[tileIndex];
     const buildingLayer = tileRecord.tile.layers.buildings;
     if (!buildingLayer) continue;
     const tileBuildings = [];
+    let remainingTileBudget = perTileBuildingBudget;
     for (let index = 0; index < buildingLayer.length; index += 1) {
       const feature = buildingLayer.feature(index);
       const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
-      for (const ring of polygonRings(geojson?.geometry)) {
+      const rings = polygonRings(geojson?.geometry);
+      availableBuildings += rings.length;
+      const selectedRingIndices = distributedFeatureIndices(
+        rings.length,
+        Math.min(
+          remainingTileBudget,
+          Math.ceil(rings.length * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)
+        )
+      );
+      remainingTileBudget -= selectedRingIndices.length;
+      for (const ringIndex of selectedRingIndices) {
+        const ring = rings[ringIndex];
         if (ring.length < 4) continue;
         const bounds = ringBounds(ring);
         const centerLat = (bounds.minLat + bounds.maxLat) * 0.5;
@@ -374,17 +414,15 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         );
         if (descriptor) tileBuildings.push(descriptor);
       }
+      if (remainingTileBudget <= 0) break;
     }
-    availableBuildings += tileBuildings.length;
-    buildingBuckets.push(selectSpatiallyDistributedBuildings(
-      tileBuildings,
-      Math.ceil(tileBuildings.length * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)
-    ));
+    buildingBuckets.push(tileBuildings);
+    if ((tileIndex + 1) % 2 === 0) await yieldToMainThread();
   }
 
   const selectedBuildingTarget = Math.min(
     FAR_CONTEXT_MAX_BUILDING_INSTANCES,
-    Math.ceil(availableBuildings * FAR_CONTEXT_BUILDING_COVERAGE_TARGET)
+    buildingBuckets.reduce((total, bucket) => total + bucket.length, 0)
   );
   const selectedBuildings = roundRobinSelect(buildingBuckets, selectedBuildingTarget);
   const exactBuildingIds = new Set(selectSpatiallyDistributedBuildings(
@@ -417,6 +455,7 @@ export {
   FAR_CONTEXT_ZOOM,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
+  distributedFeatureIndices,
   loadFarMappedContext,
   loadFarMappedWaterContext,
   pointInLonLatRing,

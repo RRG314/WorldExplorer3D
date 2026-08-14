@@ -57,9 +57,21 @@ const splitCoverModel = compileTunnelSystemModel(
   (x) => ((x >= 12 && x <= 42) || (x >= 72 && x <= 108) ? 8 : 0)
 );
 assert.equal(splitCoverModel.shellRanges.length, 2, 'separate hills must create separate tunnel shells');
-assert.equal(splitCoverModel.portalDistances.length, 4, 'every verified terrain crossing needs a portal');
+assert.equal(splitCoverModel.portalDistances.length, 2, 'only mapped tunnel-to-surface endpoints may create portals');
 assert.ok(splitCoverModel.shellRanges[0].end < splitCoverModel.shellRanges[1].start);
-assert.equal(splitCoverModel.portalZones.length, 4);
+assert.equal(splitCoverModel.portalZones.length, 2);
+assert.equal(splitCoverModel.portalDistances[0], splitCoverModel.shellRanges[0].start);
+assert.equal(splitCoverModel.portalDistances[1], splitCoverModel.shellRanges[1].end);
+
+const shallowCoverTunnel = tunnelFeature(0, 80, 'Shallow Cover Tunnel');
+shallowCoverTunnel.connectedFeatures.start.push({ feature: surfaceStart });
+shallowCoverTunnel.connectedFeatures.end.push({ feature: surfaceEnd });
+const shallowCoverModel = compileTunnelSystemModel(shallowCoverTunnel, () => 4.75);
+assert.equal(
+  shallowCoverModel.shellRanges.length,
+  0,
+  'a tunnel roof without physical cover must not publish a street-level shell'
+);
 
 const exposedProfileTunnel = tunnelFeature(0, 100, 'Exposed Approach Tunnel');
 exposedProfileTunnel.connectedFeatures.start.push({ feature: surfaceStart });

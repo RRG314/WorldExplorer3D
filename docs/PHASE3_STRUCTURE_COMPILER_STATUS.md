@@ -17,9 +17,10 @@
 - Tunnels and short underpasses compile shell ranges and real portal stations.
   Covered roads and building passages have distinct roof, wall and portal
   presentation.
-- Tunnel and covered collision publishes vertically bounded side-wall and
-  ceiling descriptors from the compiled structure and surface. No terminal or
-  centerline wall is generated.
+- Tunnel and covered collision publishes actor-height-bounded side-wall
+  descriptors from the compiled structure and surface. Roofs/ceilings remain
+  visual and camera-obstruction geometry; they are not lateral actor obstacles.
+  No terminal or centerline wall is generated.
 - Zero-meter surface profile endpoints now remain valid instead of being
   treated as missing data.
 
@@ -31,7 +32,7 @@
   - incomplete-source non-driving endpoint policy
   - crossing-derived short-underpass shell and portals
   - tunnel/building-passage visuals
-  - side-only walls and vertically bounded ceilings
+  - actor-height-bounded side walls and no lateral ceiling colliders
   - 600-feature compiler fixture
 - `npm run test:runtime`
   - 429 mapped structures and 209 chains in the recorded Baltimore run

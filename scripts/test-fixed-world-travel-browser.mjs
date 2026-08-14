@@ -131,7 +131,7 @@ try {
   phase = 'drive';
   const driveStart = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const collisionResponse = await import('/app/js/physics/building-collision-response.js?v=4');
+    const collisionResponse = await import('/app/js/physics/building-collision-response.js?v=5');
     const collisionProfile = collisionResponse.VEHICLE_COLLISION_PROFILE;
     const sampleRoadPoint = (road, fraction) => {
       if (!Array.isArray(road?.pts) || road.pts.length < 2) return null;

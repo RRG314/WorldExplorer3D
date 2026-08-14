@@ -12,6 +12,11 @@ import { compileStructureColliderDescriptors } from '../app/js/world/structure-c
 import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
 import { PUBLISH_TUNNEL_STRUCTURE_VISUALS } from '../app/js/terrain/structure-visual-meshes.js';
 import {
+  canPublishElevatedStructureVisual,
+  collectStructureVisualInstances
+} from '../app/js/terrain/structure-visuals.js';
+import { selectPortalMasksForBounds } from '../app/js/terrain/structure-terrain-portals.js';
+import {
   canPublishTunnelVisual,
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
@@ -182,6 +187,18 @@ assert.ok(
 );
 bridgeA.transportRecord.completeness = 'lossless';
 assert.equal(isProtectedRoadFeature(bridgeA), true);
+const bridgeVisuals = collectStructureVisualInstances({
+  featuresToProcess: [bridgeA],
+  allElevatedFeatures: [bridgeA],
+  elevatedVisualFeatures: [bridgeA],
+  boundsIntersect: () => false,
+  cachedTerrainHeight: () => -8,
+  pointAlongPolyline,
+  polylineCurvatureMetric: () => 0,
+  roadConflictIndex: { query: () => [] }
+});
+assert.ok(bridgeVisuals.deckInstances.length > 0, 'lossless road bridge must publish an engineered deck body');
+assert.ok(bridgeVisuals.girderInstances.length > 0, 'lossless road bridge must publish visible girders');
 const generalizedBridgeVisual = structureFeature(
   'shortbread:generalized-bridge',
   [{ x: 0, z: 10 }, { x: 60, z: 10 }],
@@ -193,6 +210,18 @@ assert.equal(
   false,
   'generalized structure geometry must not publish hard guardrail collision'
 );
+assert.equal(
+  canPublishElevatedStructureVisual(generalizedBridgeVisual),
+  true,
+  'a complete mapped generalized bridge must retain a visible non-colliding deck'
+);
+generalizedBridgeVisual.transportRecord.routeState = 'incomplete';
+assert.equal(
+  canPublishElevatedStructureVisual(generalizedBridgeVisual),
+  false,
+  'an incomplete generalized bridge must not invent a visible route'
+);
+generalizedBridgeVisual.transportRecord.routeState = 'complete';
 assert.equal(canPublishTunnelVisual(generalizedBridgeVisual), false);
 
 const mergeMainline = structureFeature(
@@ -261,21 +290,25 @@ assert.equal(incompleteRamp.transportStructureRef.start.policy, 'non_drivable');
 const underpass = structureFeature(
   'osm:way:underpass',
   [{ x: 0, z: 0 }, { x: 100, z: 0 }],
-  { highway: 'primary', tunnel: 'yes', layer: '-1' }
+  { highway: 'primary', tunnel: 'yes', layer: '-1' },
+  { surfaceY: -6 }
 );
 const crossingRoad = structureFeature(
   'osm:way:crossing',
   [{ x: 50, z: -30 }, { x: 50, z: 30 }],
   { highway: 'primary', layer: '0' }
 );
+underpass.connectedFeatures.start.push({ feature: surfaceStart });
+underpass.connectedFeatures.end.push({ feature: surfaceEnd });
 const underpassModel = compileTunnelSystemModel(underpass, () => 0, {
   features: [underpass, crossingRoad]
 });
 underpass.tunnelSystemModel = underpassModel;
 compileTransportStructureModel([underpass, crossingRoad]);
-assert.equal(underpassModel.visualKind, 'underpass');
+assert.equal(underpassModel.visualKind, 'tunnel');
 assert.equal(underpassModel.shellRanges.length, 1);
-assert.ok(underpassModel.shellStart < 50 && underpassModel.shellEnd > 50);
+assert.equal(underpassModel.shellStart, 0);
+assert.equal(underpassModel.shellEnd, 100);
 assert.equal(underpassModel.portalDistances.length, 2);
 assert.equal(underpassModel.portalZones.length, 2);
 
@@ -283,8 +316,9 @@ const tunnelColliders = compileStructureColliderDescriptors([underpass]);
 const tunnelWalls = tunnelColliders.filter((collider) => collider.structureColliderKind === 'side_wall');
 const tunnelCeilings = tunnelColliders.filter((collider) => collider.structureColliderKind === 'ceiling');
 assert.equal(PUBLISH_TUNNEL_STRUCTURE_VISUALS, true);
-assert.equal(tunnelWalls.length, 0);
-assert.equal(tunnelCeilings.length, 0);
+assert.ok(tunnelWalls.length > 0, 'lossless compiled tunnel walls must own vehicle collision');
+assert.equal(tunnelCeilings.length, 0, 'a tunnel ceiling must not become a lateral vehicle obstacle on the street above');
+assert.ok(tunnelWalls.every((collider) => collider.maxY - collider.minY <= 3.05));
 const underpassVisuals = collectTunnelVisualInstances(
   underpass,
   underpass.pts,
@@ -295,9 +329,18 @@ const underpassVisuals = collectTunnelVisualInstances(
   }
 );
 assert.equal(underpassVisuals.shells.length, 1);
-assert.equal(underpassVisuals.portals.length, 0);
-assert.equal(underpassVisuals.lights.length, 0);
-assert.equal(underpassVisuals.shells[0].visualKind, 'underpass');
+assert.equal(underpassVisuals.portals.length, 6);
+assert.ok(underpassVisuals.portalMasks.length > 0);
+assert.ok(underpassVisuals.lights.length > 0);
+assert.equal(underpassVisuals.shells[0].visualKind, 'tunnel');
+assert.equal(
+  selectPortalMasksForBounds(
+    { minX: -5, maxX: 105, minZ: -15, maxZ: 15 },
+    underpassVisuals.portalMasks
+  ).length,
+  underpassVisuals.portalMasks.length,
+  'portal terrain masks must remain local to the compiled entrance approaches'
+);
 
 const generalizedTunnel = structureFeature(
   'shortbread:generalized-tunnel',
@@ -308,6 +351,11 @@ const generalizedTunnel = structureFeature(
 generalizedTunnel.tunnelSystemModel = compileTunnelSystemModel(generalizedTunnel, () => 8);
 assert.equal(generalizedTunnel.tunnelSystemModel.visualKind, 'tunnel');
 assert.equal(canPublishTunnelVisual(generalizedTunnel), true);
+assert.equal(
+  compileStructureColliderDescriptors([generalizedTunnel]).length,
+  0,
+  'generalized tunnel centerlines cannot publish hard collision geometry'
+);
 generalizedTunnel.transportRecord.routeState = 'incomplete';
 assert.equal(canPublishTunnelVisual(generalizedTunnel), false);
 
@@ -319,7 +367,7 @@ const buildingPassage = structureFeature(
 );
 compileTransportStructureModel([buildingPassage]);
 const coveredColliders = compileStructureColliderDescriptors([buildingPassage]);
-assert.ok(coveredColliders.some((collider) => collider.structureColliderKind === 'ceiling'));
+assert.ok(!coveredColliders.some((collider) => collider.structureColliderKind === 'ceiling'));
 assert.ok(coveredColliders.some((collider) => collider.structureColliderKind === 'side_wall'));
 const coveredVisuals = collectCoveredVisualInstances(
   buildingPassage,
@@ -403,6 +451,8 @@ console.log(JSON.stringify({
     coveredColliders: coveredColliders.length
   },
   visuals: {
+    bridgeDeckBodies: bridgeVisuals.deckInstances.length,
+    bridgeGirders: bridgeVisuals.girderInstances.length,
     underpassShells: underpassVisuals.shells.length,
     underpassPortals: underpassVisuals.portals.length,
     coveredRoofs: coveredVisuals.roofs.length,

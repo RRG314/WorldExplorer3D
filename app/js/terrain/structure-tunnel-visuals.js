@@ -1,4 +1,4 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=42";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=46";
 
 function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY) {
   return { x, y, z, scaleX, scaleY, scaleZ, rotationY };
@@ -302,6 +302,38 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     const roadY = sampleFeatureSurfaceY(feature, point.x, point.z);
     const openingHeight = clearance;
     if (!Number.isFinite(roadY) || !(openingHeight > 2.6)) continue;
+    const tangentX = Number(point.tangentX);
+    const tangentZ = Number(point.tangentZ);
+    const tangentLength = Math.hypot(tangentX, tangentZ);
+    if (!(tangentLength > 0.1)) continue;
+    const tx = tangentX / tangentLength;
+    const tz = tangentZ / tangentLength;
+    const nx = -tz;
+    const nz = tx;
+    const rotationY = Math.atan2(tx, tz);
+    const pillarWidth = Math.max(0.58, Math.min(1.15, width * 0.12));
+    const portalDepth = Math.max(0.9, Math.min(2.4, width * 0.24));
+    const sideOffset = width * 0.5 + pillarWidth * 0.62;
+    for (const side of [-1, 1]) {
+      portals.push(beam(
+        point.x + nx * sideOffset * side,
+        roadY + openingHeight * 0.5,
+        point.z + nz * sideOffset * side,
+        pillarWidth,
+        openingHeight,
+        portalDepth,
+        rotationY
+      ));
+    }
+    portals.push(beam(
+      point.x,
+      roadY + openingHeight + roofThickness * 0.75,
+      point.z,
+      width + pillarWidth * 2.25,
+      Math.max(0.42, roofThickness * 1.8),
+      portalDepth,
+      rotationY
+    ));
   }
   return { portals, walls, roofs, lights, shells, portalMasks };
 }

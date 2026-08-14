@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=42";
+import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=46";
 // Installs the final-publication guardrail owner. Guardrails are compiled once
 // after the complete transport graph and accepted terrain are ready.
 import "./bridge-guardrails.js?v=13";
@@ -109,9 +109,9 @@ export async function buildRoadGeometryPass(options = {}) {
       ? Math.max(20, getRoadSubdivisionStep(type, roadTileDepth, perfModeNow))
       : getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
     const engineeredRegionalStep = fixedRegionalRoad
-      ? structureSemantics?.isTunnel === true ? 4 : 2.5
+      ? 5
       : 0.55;
-    const regionalRampStep = fixedRegionalRoad ? 1.8 : 0.65;
+    const regionalRampStep = fixedRegionalRoad ? 4 : 0.65;
     const roadSubdivideStep =
       structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade'
         ? Math.min(roadSubdivideStepBase, engineeredRegionalStep)

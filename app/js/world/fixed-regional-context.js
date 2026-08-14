@@ -1,4 +1,9 @@
-const FIXED_REGIONAL_CONTEXT_RADIUS_METERS = 8000;
+// The mapped context must cover the fixed location visible from the map and
+// aerial modes. Eight kilometres ended before northern Manhattan and exposed
+// terrain-only sectors in nearby New Jersey even though the 22 km terrain LOD
+// remained visible. Fourteen kilometres covers a complete metropolitan view
+// without turning movement into a streaming trigger.
+const FIXED_REGIONAL_CONTEXT_RADIUS_METERS = 14000;
 const LATITUDE_METERS_PER_DEGREE = 110540;
 const LONGITUDE_METERS_PER_DEGREE = 111320;
 
@@ -137,7 +142,10 @@ export function beginFixedRegionalTransportLoad(options = {}) {
       // Outer natural surfaces are already owned by the fixed terrain and
       // WorldCover. Decode only transport needed to close the regional gap.
       layerNames: ['streets'],
-      maxTiles: 144,
+      // Fourteen kilometres is 256 z14 tiles in New York and roughly 400 in
+      // London. Buildings also require z14, so keep both consumers on one
+      // shared tile identity instead of issuing independent z13/z14 passes.
+      maxTiles: 512,
       minimumZoom: 10,
       signal
     })

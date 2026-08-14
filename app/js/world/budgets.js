@@ -88,6 +88,49 @@ export function featureTileKeyForLatLon(lat, lon, tileDegrees = FEATURE_TILE_DEG
   return `${cx},${cz}`;
 }
 
+function selectWaysAcrossArea(ways, nodeMap, limit, compareFn, options = {}) {
+  if (ways.length <= limit) return ways;
+  const coreRatio = Math.max(0.1, Math.min(0.9, Number(options.coreRatio) || 0.5));
+  const ordered = ways.slice().sort((a, b) => {
+    const priority = compareFn ? compareFn(a, b) : 0;
+    return priority || runtime.nodeDistanceSq(nodeMap[a?.nodes?.[0]]) -
+      runtime.nodeDistanceSq(nodeMap[b?.nodes?.[0]]);
+  });
+  const coreKeep = Math.max(1, Math.min(limit, Math.floor(limit * coreRatio)));
+  const selected = ordered.slice(0, coreKeep);
+  const selectedSet = new Set(selected);
+  const spreadDegrees = Math.max(
+    FEATURE_TILE_DEGREES,
+    Number(options.tileDegrees || FEATURE_TILE_DEGREES) * 4
+  );
+  const buckets = new Map();
+  for (const way of ordered) {
+    if (selectedSet.has(way)) continue;
+    const center = wayCenterLatLon(way, nodeMap);
+    if (!center) continue;
+    const key = featureTileKeyForLatLon(center.lat, center.lon, spreadDegrees);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(way);
+  }
+  const active = [...buckets.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, bucket]) => bucket);
+  let bucketIndex = 0;
+  while (active.length > 0 && selected.length < limit) {
+    const bucket = active[bucketIndex];
+    const way = bucket.shift();
+    if (way) selected.push(way);
+    if (bucket.length === 0) {
+      active.splice(bucketIndex, 1);
+      if (active.length === 0) break;
+      bucketIndex %= active.length;
+    } else {
+      bucketIndex = (bucketIndex + 1) % active.length;
+    }
+  }
+  return selected.slice(0, limit);
+}
+
 export function rdtDepthForFeatureTile(tileKey, tileDegrees = FEATURE_TILE_DEGREES) {
   const cacheKey = `${tileDegrees}:${tileKey}`;
   if (rdtTileDepthCache.has(cacheKey)) return rdtTileDepthCache.get(cacheKey);
@@ -163,6 +206,12 @@ export function limitWaysByTileBudget(ways, nodeMap, options = {}) {
   });
 
   if (selected.length <= globalCap) return selected;
+  if (spreadAcrossArea) {
+    return selectWaysAcrossArea(selected, nodeMap, globalCap, compareFn, {
+      coreRatio,
+      tileDegrees
+    });
+  }
   return runtime.limitWaysByDistance(
     selected,
     nodeMap,

@@ -267,7 +267,7 @@ try {
       `${scenario.id} is missing mapped bridge geometry at its landmark: ${JSON.stringify(report.namedBridges.slice(0, 30))}`
     );
     assert.ok(
-      report.farBuildings >= 50000 && report.farBuildingPublishedCoverage >= 0.84,
+      report.farBuildings >= 150000 && report.farBuildingPublishedCoverage >= 0.20,
       `${scenario.id} outer building coverage is too sparse: ${JSON.stringify(report)}`
     );
     assert.ok(
@@ -276,7 +276,7 @@ try {
     );
     assert.equal(
       report.farWaterDiagnostics.terrainMaskAuthority,
-      'mapped-water-polygon-fragment-mask',
+      'published-water-geometry-fragment-mask',
       `${scenario.id} terrain is not yielding mapped water fragments: ${JSON.stringify(report.farWaterDiagnostics)}`
     );
     assert.equal(

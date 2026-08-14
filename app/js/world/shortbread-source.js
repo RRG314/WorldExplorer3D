@@ -4,7 +4,10 @@ import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
 const SHORTBREAD_TILE_CONCURRENCY = 8;
-const SHORTBREAD_DECODED_TILE_CACHE_LIMIT = 160;
+// Roads and far buildings request the same z14 metropolitan tiles concurrently.
+// Retain one complete London-sized set so the in-flight/cache owner can prevent
+// a second provider pass instead of evicting early tiles during publication.
+const SHORTBREAD_DECODED_TILE_CACHE_LIMIT = 544;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
 
