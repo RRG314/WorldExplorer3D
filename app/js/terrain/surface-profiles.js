@@ -11,15 +11,16 @@ import {
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import { latLonToTileXY } from './tile-coordinates.js?v=1';
 import { pointInMappedLandArea } from './far-field-mapped-context.js?v=16';
+import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
 import {
+  applyTerrainReliefMaterialMix,
   applyWorldCoverSurfaceMaterialMix,
   configureTerrainSurfaceMaterialBlend,
   ensureTerrainSurfaceMixAttributes,
   setTerrainSurfaceMaterialMixAt
 } from './surface-material-blend.js?v=1';
 
-const SNOW_COLOR_HEX = 0xffffff;
-const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
+const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
 export const TERRAIN_GRASS_COLOR_HEX = 0x6b8e4a;
 const URBAN_GROUND_HEX = 0x8b8f96;
@@ -310,7 +311,8 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
     sand: terrainTextureSource('sand'),
     forest: terrainTextureSource('forest'),
     soil: terrainTextureSource('soil'),
-    rock: terrainTextureSource('rock')
+    rock: terrainTextureSource('rock'),
+    biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
   };
 }
 
@@ -395,20 +397,6 @@ export function classifyTerrainVisualProfile(bounds, minElevationMeters = null, 
     elevationStats,
     worldSurfaceProfile: appCtx.worldSurfaceProfile || null
   });
-}
-
-function worldCoverStats() {
-  if (!appCtx.worldCoverStats) {
-    appCtx.worldCoverStats = {
-      requested: 0,
-      ready: 0,
-      failed: 0,
-      network: 0,
-      persistentCache: 0,
-      classes: {}
-    };
-  }
-  return appCtx.worldCoverStats;
 }
 
 function classifyWorldCoverSurfaceProfile(mesh, result) {
@@ -570,10 +558,12 @@ function applyLoadedWorldCoverBaseline(mesh) {
     applyWorldCoverVertexTints(mesh, result);
     applyWorldCoverSurfaceMaterialMix(mesh, result);
     applyMappedSemanticVertexTints(mesh, appCtx.fixedLocationMappedSurfaceContext, { force: true });
+    applyTerrainReliefMaterialMix(mesh);
     applyTerrainSemanticMaterialBlend(
       mesh,
       Number(mesh.userData.terrainTextureRepeats) || 12
     );
+    // Keep shader input neutral so missing PBR maps cannot bleach semantic colors.
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
@@ -615,7 +605,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
   }
   if (mesh.userData.worldCoverPromise || mesh.userData.worldCoverStatus === 'unavailable') return;
 
-  const stats = worldCoverStats();
+  const stats = worldCoverStatsForLocation(appCtx);
   const key = String(mesh.userData.terrainTileKey || [
     bounds.latS,
     bounds.lonW,
@@ -646,6 +636,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
       Object.entries(result.counts || {}).forEach(([className, count]) => {
         stats.classes[className] = Number(stats.classes[className] || 0) + Number(count || 0);
       });
+      refreshWorldBiomeFromWorldCoverStats(appCtx, stats);
       applyLoadedWorldCoverBaseline(mesh);
     })
     .catch(() => {
@@ -780,6 +771,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   mat.emissiveMap = null;
   mat.needsUpdate = true;
   applyMappedSemanticVertexTints(mesh);
+  applyTerrainReliefMaterialMix(mesh);
   applyTerrainSemanticMaterialBlend(mesh, textureRepeats);
   if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
 }

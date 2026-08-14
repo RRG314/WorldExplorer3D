@@ -215,6 +215,35 @@ export function beginFixedRegionalStructureLoad(options = {}) {
     lat: Number(location?.lat),
     lon: Number(location?.lon)
   });
+  if (Math.abs(fixedLocation.lat) >= 86) {
+    const bounds = Object.freeze({
+      minLat: fixedLocation.lat,
+      minLon: fixedLocation.lon,
+      maxLat: fixedLocation.lat,
+      maxLon: fixedLocation.lon
+    });
+    return {
+      bounds,
+      cacheMeta: { kind: 'fixed-regional-structures', skipped: true },
+      location: fixedLocation,
+      outcome: Promise.resolve({
+        value: {
+          elements: [],
+          _fixedRegionalStructures: {
+            exactWays: 0,
+            connectors: 0,
+            bridges: 0,
+            tunnels: 0,
+            covered: 0,
+            skipped: true,
+            reason: 'polar-cryosphere-domain'
+          }
+        },
+        error: null
+      }),
+      radiusMeters
+    };
+  }
   const bounds = fixedRegionalContextBounds(fixedLocation, radiusMeters);
   const query = buildFixedRegionalStructureQuery(bounds, timeoutMs / 1000);
   const radiusDegrees = radiusMeters / 110540;

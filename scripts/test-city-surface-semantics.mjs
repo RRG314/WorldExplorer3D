@@ -24,6 +24,7 @@ const surfaceContractSource = read('app/js/world/surface-contract.js');
 const terrainTileSource = read('app/js/terrain/tiles.js');
 const materialBlendSource = read('app/js/terrain/surface-material-blend.js');
 const mappedContextSource = read('app/js/terrain/far-field-mapped-context.js');
+const biomeStateSource = read('app/js/terrain/worldcover-biome-state.js');
 
 assert.equal(
   fs.existsSync(path.join(sourceRoot, 'app/js/terrain/sidewalk-batching.js')),
@@ -57,6 +58,8 @@ assert.doesNotMatch(
   'A built-dominant classification must not turn the detailed terrain footprint into a gray city square.'
 );
 assert.match(profileSource, /applyWorldCoverSurfaceMaterialMix\(mesh, result\)/);
+assert.match(biomeStateSource, /aggregated-worldcover-semantic-classes/);
+assert.match(biomeStateSource, /worldCoverStats\.locationKey !== key/);
 assert.match(profileSource, /applyTerrainSemanticMaterialBlend/);
 const semanticTextureSetBody = profileSource.slice(
   profileSource.indexOf('function ensureTerrainSemanticTextureSets'),
@@ -68,12 +71,28 @@ assert.doesNotMatch(
   /ensureTerrainTextureSet\(/,
   'Semantic blend maps must be shared sources rather than six cloned PBR sets per terrain tile.'
 );
-assert.match(materialBlendSource, /terrain-semantic-pbr-material-mix-v1/);
+assert.match(materialBlendSource, /terrain-semantic-pbr-material-mix-v4/);
 assert.match(materialBlendSource, /terrainUrbanMap/);
 assert.match(materialBlendSource, /terrainSandMap/);
 assert.match(materialBlendSource, /terrainForestMap/);
 assert.match(materialBlendSource, /terrainSoilMap/);
 assert.match(materialBlendSource, /terrainRockMap/);
+assert.match(materialBlendSource, /terrainAridWarmth/);
+assert.match(
+  materialBlendSource,
+  /vec4 terrainForestColor = vec4/,
+  'Semantic land classes need visible fallback colors when optional PBR maps are unavailable.'
+);
+assert.match(
+  materialBlendSource,
+  /terrainRockBand/,
+  'Rock terrain needs elevation-driven geological variation rather than one flat slab color.'
+);
+assert.match(
+  materialBlendSource,
+  /slope-derived-exposed-rock/,
+  'Steep terrain needs one global geomorphic rule for exposed rock.'
+);
 assert.doesNotMatch(
   materialBlendSource,
   /new THREE\.Mesh|new THREE\.PlaneGeometry/,

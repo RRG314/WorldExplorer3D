@@ -61,6 +61,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=8";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
+import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=66";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
@@ -135,6 +136,11 @@ function clampElevationMeters(meters) {
 }
 
 function elevationMetersAtLatLon(latitude, longitude) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    const world = appCtx.geoToWorld(latitude, longitude);
+    const worldY = appCtx.samplePolarCryosphereWorldYAt?.(world.x, world.z);
+    return Number.isFinite(worldY) ? worldY / appCtx.WORLD_UNITS_PER_METER : null;
+  }
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
     const sample = terrainSourceSampleAtLatLon(latitude, longitude, terrainTileDeps);
     return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
@@ -149,6 +155,10 @@ function elevationMetersAtLatLon(latitude, longitude) {
 }
 
 function elevationWorldYAtWorldXZ(x, z) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    const worldY = appCtx.samplePolarCryosphereWorldYAt?.(x, z);
+    return Number.isFinite(worldY) ? worldY : null;
+  }
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
     const sample = terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps);
     return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
@@ -170,6 +180,9 @@ function elevationWorldYAtWorldXZ(x, z) {
 }
 
 function peekElevationMetersAtLatLon(latitude, longitude) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    return elevationMetersAtLatLon(latitude, longitude);
+  }
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
     const sample = peekTerrainSourceSampleAtLatLon(latitude, longitude, terrainTileDeps);
     return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
@@ -237,7 +250,7 @@ const terrainTileDeps = {
   clampElevationMeters,
   sampleAcceptedGroundAtLatLon,
   usesAcceptedGround: () =>
-    appCtx.worldLoadRuntimeState?.groundMode !== 'worldwide-terrain-fallback',
+    appCtx.worldLoadRuntimeState?.groundMode === 'accepted-ground',
   applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
   createWaterTerrainContext,
   resolveWaterTerrainY,
@@ -345,6 +358,7 @@ const {
   worldToLatLon,
   latLonToTileXY,
   buildTerrainTileMesh,
+  buildPolarCryosphereSurface,
   terrainTileDeps,
   getTerrainMeshKey,
   terrainTileMeshKey,
@@ -359,6 +373,10 @@ const {
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
   if (![x, z].every(Number.isFinite)) return { ready: false, loaded: 0, total: 0 };
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    const ready = !!appCtx.polarCryosphereSurface?.parent;
+    return { ready, loaded: ready ? 1 : 0, total: 1, mode: 'polar-cryosphere-local' };
+  }
   if (terrainTileDeps.usesAcceptedGround()) {
     const acceptedSample = sampleAcceptedGroundAtWorldXZ(x, z);
     if (acceptedSample.status !== 'available') {

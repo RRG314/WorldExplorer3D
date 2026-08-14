@@ -591,6 +591,7 @@ function applySpawnTarget(worldX, worldZ, options = {}) {
 
 function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
   if (!options?.preferBoatIfWater || typeof appCtx.enterBoatAtWorldPoint !== "function") return null;
+  if (appCtx.worldLoadRuntimeState?.surfaceDomain?.kind === 'cryosphere') return null;
   const entryMode = options.mode === "walk" ? "walk" : "drive";
   const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
   const requestedBoatArrival = appCtx.customLoc?.arrivalMode === "boat";

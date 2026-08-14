@@ -11,6 +11,9 @@ export async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase
       ? await waitForCoverage(0, 0, Math.max(800, 5000 - (performance.now() - startedAt)), 0.72)
       : null;
     const nearReady = centerReady || coverage?.ready === true;
+    if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+      return nearReady;
+    }
     const waitForFarTerrain = appCtx.waitForFarTerrainClipmap;
     if (typeof waitForFarTerrain !== 'function') return nearReady;
     startLoadPhase('waitForFixedLocationBackground');

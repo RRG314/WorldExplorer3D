@@ -1151,8 +1151,15 @@ async function loadLocation(page, spec) {
         sequence: Number(completedLoad.sequence),
         status: String(completedLoad.status || ''),
         location: { ...(completedLoad.location || {}) },
-        publicationSequence: Number(publication.sequence)
+        publicationSequence: Number(publication.sequence),
+        groundMode: String(completedLoad.groundMode || ''),
+        surfaceDomain: completedLoad.surfaceDomain
+          ? JSON.parse(JSON.stringify(completedLoad.surfaceDomain))
+          : null
       },
+      worldSurfaceProfile: ctx.worldSurfaceProfile
+        ? JSON.parse(JSON.stringify(ctx.worldSurfaceProfile))
+        : null,
       farTerrainClipmap: ctx.farTerrainClipmapState ? { ...ctx.farTerrainClipmapState } : null,
       buildingDetailWaitMs: Number(buildingDetailWaitMs.toFixed(1)),
       landmarkWaitMs: Number(landmarkWaitMs.toFixed(1)),

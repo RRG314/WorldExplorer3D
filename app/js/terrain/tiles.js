@@ -365,6 +365,7 @@ export function sampleTileElevationMeters(tile, u, v, clampElevationMeters = nul
 }
 
 export function worldToLatLon(x, z) {
+  if (typeof appCtx.worldToGeo === 'function') return appCtx.worldToGeo(x, z);
   const lat = appCtx.LOC.lat - z / appCtx.SCALE;
   const lon = appCtx.LOC.lon + x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
   return { lat, lon };

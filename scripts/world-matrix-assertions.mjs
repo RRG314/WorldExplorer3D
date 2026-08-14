@@ -62,11 +62,27 @@ export function assertWorldMatrixLocation(spec, result) {
     `${spec.id}: requested world load and published world sequences diverged`
   );
   assertWorldLocationIdentity(spec, result);
-  if (!/open_ocean/.test(String(spec.category || ''))) {
+  if (spec.expectedSurfaceDomain !== 'cryosphere' && !/open_ocean/.test(String(spec.category || ''))) {
     assert(
       result.farTerrainClipmap?.status === 'ready',
       `${spec.id}: fixed location finalized without horizon terrain ${JSON.stringify(result.farTerrainClipmap)}`
     );
+  }
+  if (spec.expectedSurfaceDomain) {
+    assert(
+      result.worldLoad?.surfaceDomain?.kind === spec.expectedSurfaceDomain,
+      `${spec.id}: expected ${spec.expectedSurfaceDomain} surface domain ${JSON.stringify(result.worldLoad)}`
+    );
+    if (spec.expectedSurfaceDomain === 'cryosphere') {
+      assert(
+        result.worldLoad?.groundMode === 'polar-cryosphere-local',
+        `${spec.id}: cryosphere escaped its fixed terrain owner ${JSON.stringify(result.worldLoad)}`
+      );
+      assert(
+        Number(result.terrainSurface?.semanticMaterialMeshes || 0) === 1,
+        `${spec.id}: polar terrain must have exactly one visible surface owner ${JSON.stringify(result.terrainSurface)}`
+      );
+    }
   }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (Number(result.worldCover?.status?.ready || 0) > 0) {
@@ -132,6 +148,24 @@ export function assertWorldMatrixLocation(spec, result) {
     `${JSON.stringify(trappedElevatedTerminals.slice(0, 4))}`
   );
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
+  if (spec.minimumWaterways) {
+    assert(
+      Number(result.counts.waterways || 0) >= Number(spec.minimumWaterways),
+      `${spec.id}: expected mapped waterways ${JSON.stringify(result.counts)}`
+    );
+  }
+  if (spec.minimumVegetationFeatures) {
+    assert(
+      Number(result.counts.vegetationFeatures || 0) >= Number(spec.minimumVegetationFeatures),
+      `${spec.id}: expected at least ${spec.minimumVegetationFeatures} biome vegetation features ${JSON.stringify(result.counts)}`
+    );
+  }
+  if (spec.minimumVegetationMeshes) {
+    assert(
+      Number(result.counts.vegetationMeshes || 0) >= Number(spec.minimumVegetationMeshes),
+      `${spec.id}: expected multilayer canopy publication ${JSON.stringify(result.counts)}`
+    );
+  }
   if (spec.minimumBuildings) {
     assert(
       result.counts.buildings >= spec.minimumBuildings,
@@ -247,7 +281,10 @@ export function assertWorldMatrixLocation(spec, result) {
   }
 
   const hasMappedWorld = result.counts.roads > 0 || result.counts.buildings > 0 || result.counts.landuses > 0;
-  const hasTerrainFallback = result.counts.terrainTilesLoaded > 0;
+  const hasTerrainFallback = result.counts.terrainTilesLoaded > 0 || (
+    result.worldLoad?.surfaceDomain?.kind === 'cryosphere' &&
+    Number(result.terrainSurface?.semanticMaterialMeshes || 0) === 1
+  );
   if (result.expectedStart === 'water') {
     assert(result.boatActive && result.initialSpawn?.mode === 'boat', `${spec.id}: water start did not enter boat mode ${JSON.stringify(result.initialSpawn)}`);
     assert(result.boatPresentation?.meshVisible, `${spec.id}: boat mesh is not visible`);

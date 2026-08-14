@@ -198,6 +198,26 @@ export const WORLD_TEST_LOCATIONS = [
     acceptableStartTerrainModes: ['snow', 'snowRock']
   },
   {
+    id: 'north_pole_custom',
+    kind: 'custom',
+    lat: 90,
+    lon: 0,
+    label: 'North Pole, Arctic Ocean',
+    category: 'polar_sea_ice_custom',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'cryosphere'
+  },
+  {
+    id: 'south_pole_custom',
+    kind: 'custom',
+    lat: -90,
+    lon: 0,
+    label: 'South Pole, Antarctica',
+    category: 'polar_ice_sheet_custom',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'cryosphere'
+  },
+  {
     id: 'sahara_custom',
     kind: 'custom',
     lat: 31.1342,
@@ -214,6 +234,18 @@ export const WORLD_TEST_LOCATIONS = [
     lon: -62.2159,
     label: 'Amazon Basin, Brazil',
     category: 'tropical_forest_river_custom',
+    expectedStart: 'land',
+    minimumWaterways: 1,
+    minimumVegetationFeatures: 4000,
+    minimumVegetationMeshes: 4
+  },
+  {
+    id: 'grand_canyon_custom',
+    kind: 'custom',
+    lat: 36.1069,
+    lon: -112.1129,
+    label: 'Grand Canyon, Arizona',
+    category: 'canyon_geology_custom',
     expectedStart: 'land'
   },
   {

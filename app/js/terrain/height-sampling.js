@@ -15,6 +15,10 @@ function createTerrainHeightSamplingApi(deps = {}) {
   let terrainHeightCacheEnabled = true;
 
   function terrainMeshHeightAt(x, z) {
+    if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+      const polarY = appCtx.samplePolarCryosphereWorldYAt?.(x, z);
+      return Number.isFinite(polarY) ? polarY : elevationWorldYAtWorldXZ(x, z);
+    }
     if (!appCtx.terrainGroup || appCtx.terrainGroup.children.length === 0) {
       return elevationWorldYAtWorldXZ(x, z);
     }

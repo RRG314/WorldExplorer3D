@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createLocalSurfaceAnalysisApi } from "./surface-rules-local.js?v=1";
+import { classifyBiomeProfile } from "./earth-core/biome-profile.js?v=1";
 
 const POLAR_SNOW_LAT_THRESHOLD = 66;
 const POLAR_ICE_LAT_THRESHOLD = 66;
@@ -239,12 +240,17 @@ function classifyWorldSurfaceProfile({
     subtropicalDryFallback
   );
 
+  const biome = classifyBiomeProfile({
+    latitude: lat,
+    signals: norm
+  });
   return {
     absLat,
     centerLat: lat,
     terrainModeHint: polar ? 'snow' : aridTerrain ? 'sand' : 'grass',
     waterModeHint: frozenWater ? 'ice' : 'water',
     reason: polar ? 'polar_latitude' : aridTerrain ? 'arid_surface' : 'temperate',
+    biome,
     signals
   };
 }

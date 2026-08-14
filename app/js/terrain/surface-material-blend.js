@@ -120,6 +120,59 @@ export function setTerrainSurfaceMaterialMixAt(attributes, index, mode) {
   return true;
 }
 
+export function applyTerrainReliefMaterialMix(mesh) {
+  const geometry = mesh?.geometry;
+  const positions = geometry?.attributes?.position;
+  const attributes = ensureTerrainSurfaceMixAttributes(geometry);
+  if (!positions || !attributes) return 0;
+  if (!geometry.attributes.normal || geometry.attributes.normal.count !== positions.count) {
+    geometry.computeVertexNormals?.();
+  }
+  const normals = geometry.attributes.normal;
+  if (!normals || normals.count !== positions.count) return 0;
+
+  let exposedRockVertices = 0;
+  for (let index = 0; index < positions.count; index += 1) {
+    // A 23-degree slope begins exposing substrate; by roughly 44 degrees the
+    // natural terrain is predominantly rock. Explicit urban, sand and snow
+    // ownership remains authoritative over the geomorphic fallback.
+    const up = Math.max(0, Math.min(1, Math.abs(Number(normals.getY(index) || 0))));
+    const slopeT = Math.max(0, Math.min(1, (0.92 - up) / 0.20));
+    const slopeRock = slopeT * slopeT * (3 - 2 * slopeT);
+    if (slopeRock <= 0.001) continue;
+
+    const urban = Math.max(0, Number(attributes.mixA.getX(index) || 0));
+    const sand = Math.max(0, Number(attributes.mixA.getY(index) || 0));
+    const snow = Math.max(0, Number(attributes.mixB.getY(index) || 0));
+    const protectedWeight = Math.min(1, urban + sand + snow);
+    const rock = Math.max(
+      Math.max(0, Number(attributes.mixB.getX(index) || 0)),
+      slopeRock * (1 - protectedWeight)
+    );
+    if (rock <= 0.001) continue;
+
+    const naturalScale = Math.max(0, 1 - rock);
+    attributes.mixA.setXYZW(
+      index,
+      urban,
+      sand,
+      Math.max(0, Number(attributes.mixA.getZ(index) || 0)) * naturalScale,
+      Math.max(0, Number(attributes.mixA.getW(index) || 0)) * naturalScale
+    );
+    attributes.mixB.setXY(index, rock, snow);
+    exposedRockVertices += 1;
+  }
+  if (exposedRockVertices > 0) {
+    attributes.mixA.needsUpdate = true;
+    attributes.mixB.needsUpdate = true;
+  }
+  mesh.userData.terrainReliefMaterialAuthority = {
+    kind: 'slope-derived-exposed-rock',
+    exposedRockVertices
+  };
+  return exposedRockVertices;
+}
+
 export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
   const material = mesh?.material;
   const geometry = mesh?.geometry;
@@ -135,7 +188,8 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
         terrainSandMap: { value: null },
         terrainForestMap: { value: null },
         terrainSoilMap: { value: null },
-        terrainRockMap: { value: null }
+        terrainRockMap: { value: null },
+        terrainAridWarmth: { value: 0 }
       }
     };
     material.userData.terrainSurfaceMaterialBlend = state;
@@ -145,38 +199,48 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
-          '#include <common>\nattribute vec4 terrainSurfaceMixA;\nattribute vec2 terrainSurfaceMixB;\nvarying vec4 vTerrainSurfaceMixA;\nvarying vec2 vTerrainSurfaceMixB;'
+          '#include <common>\nattribute vec4 terrainSurfaceMixA;\nattribute vec2 terrainSurfaceMixB;\nvarying vec4 vTerrainSurfaceMixA;\nvarying vec2 vTerrainSurfaceMixB;\nvarying float vTerrainWorldHeight;\nvarying float vTerrainWorldHorizontal;'
         )
         .replace(
           '#include <color_vertex>',
-          '#include <color_vertex>\nvTerrainSurfaceMixA = terrainSurfaceMixA;\nvTerrainSurfaceMixB = terrainSurfaceMixB;'
+          '#include <color_vertex>\nvTerrainSurfaceMixA = terrainSurfaceMixA;\nvTerrainSurfaceMixB = terrainSurfaceMixB;\nvec3 terrainWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;\nvTerrainWorldHeight = terrainWorldPosition.y;\nvTerrainWorldHorizontal = terrainWorldPosition.x * 0.73 + terrainWorldPosition.z * 0.41;'
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          '#include <common>\nuniform sampler2D terrainUrbanMap;\nuniform sampler2D terrainSandMap;\nuniform sampler2D terrainForestMap;\nuniform sampler2D terrainSoilMap;\nuniform sampler2D terrainRockMap;\nvarying vec4 vTerrainSurfaceMixA;\nvarying vec2 vTerrainSurfaceMixB;'
+          '#include <common>\nuniform sampler2D terrainUrbanMap;\nuniform sampler2D terrainSandMap;\nuniform sampler2D terrainForestMap;\nuniform sampler2D terrainSoilMap;\nuniform sampler2D terrainRockMap;\nuniform float terrainAridWarmth;\nvarying vec4 vTerrainSurfaceMixA;\nvarying vec2 vTerrainSurfaceMixB;\nvarying float vTerrainWorldHeight;\nvarying float vTerrainWorldHorizontal;'
         )
         .replace(
           '#include <map_fragment>',
           [
+            'vec4 terrainGrassColor = vec4(0.29, 0.48, 0.18, 1.0);',
+            'vec4 terrainUrbanColor = vec4(0.46, 0.48, 0.51, 1.0);',
+            'vec4 terrainSandColor = vec4(0.78, 0.66, 0.44, 1.0);',
+            'vec4 terrainForestColor = vec4(0.18, 0.33, 0.14, 1.0);',
+            'vec4 terrainSoilColor = vec4(0.49, 0.37, 0.24, 1.0);',
+            'vec4 terrainRockColor = vec4(0.48, 0.42, 0.36, 1.0);',
             '#ifdef USE_MAP',
-            '  vec4 terrainGrassColor = mapTexelToLinear(texture2D(map, vUv));',
-            '  vec4 terrainUrbanColor = mapTexelToLinear(texture2D(terrainUrbanMap, vUv));',
-            '  vec4 terrainSandColor = mapTexelToLinear(texture2D(terrainSandMap, vUv));',
-            '  vec4 terrainForestColor = mapTexelToLinear(texture2D(terrainForestMap, vUv));',
-            '  vec4 terrainSoilColor = mapTexelToLinear(texture2D(terrainSoilMap, vUv));',
-            '  vec4 terrainRockColor = mapTexelToLinear(texture2D(terrainRockMap, vUv));',
-            '  float terrainSnowWeight = clamp(vTerrainSurfaceMixB.y, 0.0, 1.0);',
-            '  float terrainClassWeight = clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + vTerrainSurfaceMixB.x + terrainSnowWeight, 0.0, 1.0);',
-            '  vec4 terrainSurfaceColor = terrainGrassColor * (1.0 - terrainClassWeight);',
-            '  terrainSurfaceColor += terrainUrbanColor * max(0.0, vTerrainSurfaceMixA.x);',
-            '  terrainSurfaceColor += terrainSandColor * max(0.0, vTerrainSurfaceMixA.y);',
-            '  terrainSurfaceColor += terrainForestColor * max(0.0, vTerrainSurfaceMixA.z);',
-            '  terrainSurfaceColor += terrainSoilColor * max(0.0, vTerrainSurfaceMixA.w);',
-            '  terrainSurfaceColor += terrainRockColor * max(0.0, vTerrainSurfaceMixB.x);',
-            '  terrainSurfaceColor += vec4(0.94, 0.96, 1.0, 1.0) * terrainSnowWeight;',
-            '  diffuseColor *= terrainSurfaceColor;',
-            '#endif'
+            '  terrainGrassColor = mapTexelToLinear(texture2D(map, vUv));',
+            '  terrainUrbanColor = mapTexelToLinear(texture2D(terrainUrbanMap, vUv));',
+            '  terrainSandColor = mapTexelToLinear(texture2D(terrainSandMap, vUv));',
+            '  terrainForestColor = mapTexelToLinear(texture2D(terrainForestMap, vUv));',
+            '  terrainSoilColor = mapTexelToLinear(texture2D(terrainSoilMap, vUv));',
+            '  terrainRockColor = mapTexelToLinear(texture2D(terrainRockMap, vUv));',
+            '#endif',
+            'terrainGrassColor.rgb = mix(terrainGrassColor.rgb, vec3(0.42, 0.36, 0.22), terrainAridWarmth * 0.72);',
+            'terrainRockColor.rgb = mix(terrainRockColor.rgb, vec3(0.58, 0.31, 0.15), terrainAridWarmth);',
+            'float terrainRockBand = 0.5 + 0.5 * sin(vTerrainWorldHeight * 0.045 + sin(vTerrainWorldHorizontal * 0.013) * 0.8);',
+            'terrainRockColor.rgb *= mix(0.94, 1.06, smoothstep(0.12, 0.88, terrainRockBand));',
+            'float terrainSnowWeight = clamp(vTerrainSurfaceMixB.y, 0.0, 1.0);',
+            'float terrainClassWeight = clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + vTerrainSurfaceMixB.x + terrainSnowWeight, 0.0, 1.0);',
+            'vec4 terrainSurfaceColor = terrainGrassColor * (1.0 - terrainClassWeight);',
+            'terrainSurfaceColor += terrainUrbanColor * max(0.0, vTerrainSurfaceMixA.x);',
+            'terrainSurfaceColor += terrainSandColor * max(0.0, vTerrainSurfaceMixA.y);',
+            'terrainSurfaceColor += terrainForestColor * max(0.0, vTerrainSurfaceMixA.z);',
+            'terrainSurfaceColor += terrainSoilColor * max(0.0, vTerrainSurfaceMixA.w);',
+            'terrainSurfaceColor += terrainRockColor * max(0.0, vTerrainSurfaceMixB.x);',
+            'terrainSurfaceColor += vec4(0.94, 0.96, 1.0, 1.0) * terrainSnowWeight;',
+            'diffuseColor *= terrainSurfaceColor;'
           ].join('\n')
         )
         .replace(
@@ -186,7 +250,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v1'
+      'terrain-semantic-pbr-material-mix-v4'
     ].join(':');
   }
   state.uniforms.terrainUrbanMap.value = textureSets.urban?.map || material.map;
@@ -194,6 +258,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
   state.uniforms.terrainForestMap.value = textureSets.forest?.map || material.map;
   state.uniforms.terrainSoilMap.value = textureSets.soil?.map || material.map;
   state.uniforms.terrainRockMap.value = textureSets.rock?.map || material.map;
+  state.uniforms.terrainAridWarmth.value = textureSets.biomeId === 'hot-desert' ? 1 : 0;
   material.needsUpdate = true;
   mesh.userData.terrainSurfaceMaterialBlend = {
     authority: 'single-terrain-semantic-pbr-material',

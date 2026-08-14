@@ -130,6 +130,27 @@ export function beginFixedRegionalTransportLoad(options = {}) {
     lat: Number(location?.lat),
     lon: Number(location?.lon)
   });
+  if (Math.abs(fixedLocation.lat) >= 86) {
+    const bounds = Object.freeze({
+      minLat: fixedLocation.lat,
+      minLon: fixedLocation.lon,
+      maxLat: fixedLocation.lat,
+      maxLon: fixedLocation.lon
+    });
+    return {
+      bounds,
+      location: fixedLocation,
+      outcome: Promise.resolve({
+        value: {
+          elements: [],
+          _shortbreadTiles: [],
+          _regionalContext: { skipped: true, reason: 'polar-cryosphere-domain' }
+        },
+        error: null
+      }),
+      radiusMeters
+    };
+  }
   const bounds = fixedRegionalContextBounds(fixedLocation, radiusMeters);
   const outcome = runProviderWork(
     'openstreetmap-shortbread',
