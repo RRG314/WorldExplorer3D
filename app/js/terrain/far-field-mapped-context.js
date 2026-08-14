@@ -23,12 +23,12 @@ const FAR_CONTEXT_BUILDING_MAX_TILES = 512;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
 const FAR_LAND_SURFACE_PROFILES = Object.freeze({
-  forest: Object.freeze({ tint: [0.64, 0.82, 0.60], priority: 3 }),
-  grass: Object.freeze({ tint: [0.82, 0.96, 0.74], priority: 3 }),
-  agriculture: Object.freeze({ tint: [0.92, 0.90, 0.68], priority: 2 }),
-  sand: Object.freeze({ tint: [1.08, 0.98, 0.76], priority: 3 }),
-  bare: Object.freeze({ tint: [0.94, 0.88, 0.76], priority: 3 }),
-  urban: Object.freeze({ tint: [0.76, 0.78, 0.80], priority: 1 })
+  forest: Object.freeze({ mode: 'forest', tint: [0.64, 0.82, 0.60], priority: 3 }),
+  grass: Object.freeze({ mode: 'grass', tint: [0.82, 0.96, 0.74], priority: 3 }),
+  agriculture: Object.freeze({ mode: 'soil', tint: [0.92, 0.90, 0.68], priority: 2 }),
+  sand: Object.freeze({ mode: 'sand', tint: [1.08, 0.98, 0.76], priority: 3 }),
+  bare: Object.freeze({ mode: 'rock', tint: [0.94, 0.88, 0.76], priority: 3 }),
+  urban: Object.freeze({ mode: 'urban', tint: [0.76, 0.78, 0.80], priority: 1 })
 });
 
 function mappedLandSurfaceProfile(kind = '') {
@@ -434,6 +434,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
             holes: (rings || []).slice(1).map(retainFarWaterRing).filter((ring) => ring.length >= 4),
             bounds: ringBounds(outer),
             tint: profile.tint,
+            mode: profile.mode,
             priority: profile.priority,
             kind: String(geojson?.properties?.kind || '')
           });

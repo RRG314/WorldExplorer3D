@@ -9,7 +9,7 @@ import {
   loadFarMappedContext,
   pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=15';
+} from './far-field-mapped-context.js?v=16';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=3';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -23,16 +23,22 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=15';
+} from './far-field-geometry.js?v=16';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
-} from './worldcover-baseline.js?v=15';
+} from './worldcover-baseline.js?v=16';
 import {
   applyMappedSemanticVertexTints,
+  applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=46';
+} from './surface-profiles.js?v=48';
+import {
+  applyWorldCoverSurfaceMaterialMix,
+  ensureTerrainSurfaceMixAttributes,
+  setTerrainSurfaceMaterialMixAt
+} from './surface-material-blend.js?v=1';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import {
   FAR_WATER_SURFACE_CLEARANCE_WORLD,
@@ -80,6 +86,7 @@ function createFarFieldTerrainApi(deps = {}) {
   let farFieldSurfaceState = null;
   let surfaceRefreshTimer = null;
   let lastAppliedDetailMode = '';
+  let lastAppliedFallbackMode = '';
 
   function waitForGenerationDrain(buildPromise) {
     if (!buildPromise) return Promise.resolve();
@@ -108,6 +115,7 @@ function createFarFieldTerrainApi(deps = {}) {
     }
     farFieldSurfaceState = null;
     lastAppliedDetailMode = '';
+    lastAppliedFallbackMode = '';
   }
 
   function resetFarTerrainClipmap() {
@@ -155,15 +163,24 @@ function createFarFieldTerrainApi(deps = {}) {
   function applyMappedSurfaceTintOwnership(mesh) {
     const colors = mesh?.geometry?.attributes?.color;
     const mappedTints = mesh?.userData?.mappedSurfaceTints;
+    const mappedModes = mesh?.userData?.mappedSurfaceModes;
     if (!colors || !mappedTints || mappedTints.length !== colors.count * 3) return false;
+    const materialMix = ensureTerrainSurfaceMixAttributes(mesh.geometry);
     let owned = 0;
     for (let index = 0; index < colors.count; index += 1) {
       const offset = index * 3;
       if (!Number.isFinite(mappedTints[offset])) continue;
       colors.setXYZ(index, mappedTints[offset], mappedTints[offset + 1], mappedTints[offset + 2]);
+      setTerrainSurfaceMaterialMixAt(materialMix, index, mappedModes?.[index] || 'grass');
       owned += 1;
     }
-    if (owned > 0) colors.needsUpdate = true;
+    if (owned > 0) {
+      colors.needsUpdate = true;
+      if (materialMix) {
+        materialMix.mixA.needsUpdate = true;
+        materialMix.mixB.needsUpdate = true;
+      }
+    }
     mesh.userData.mappedSurfaceTintVertices = owned;
     return owned > 0;
   }
@@ -204,7 +221,7 @@ function createFarFieldTerrainApi(deps = {}) {
     // keeps that physical scale instead of stretching one texture across the
     // entire 44 km background square.
     const repeats = Math.max(12, spanMeters / 80);
-    const detailTextures = ensureTerrainTextureSet(mesh, repeats, detailMode);
+    const detailTextures = ensureTerrainTextureSet(mesh, repeats, 'grass');
     material.map = detailTextures?.map || null;
     material.normalMap = detailTextures?.normalMap || null;
     material.roughnessMap = detailTextures?.roughnessMap || null;
@@ -220,6 +237,9 @@ function createFarFieldTerrainApi(deps = {}) {
     const tinted = worldCoverResult
       ? applyWorldCoverVertexTints(mesh, worldCoverResult)
       : false;
+    if (worldCoverResult) applyWorldCoverSurfaceMaterialMix(mesh, worldCoverResult);
+    applyMappedSurfaceTintOwnership(mesh);
+    applyTerrainSemanticMaterialBlend(mesh, repeats);
     material.color.setHex(0xffffff);
     material.roughness = 0.96;
     material.metalness = 0;
@@ -227,13 +247,14 @@ function createFarFieldTerrainApi(deps = {}) {
     mesh.userData.terrainTextureRepeats = repeats;
     mesh.userData.terrainDetailProvenance = {
       kind: tinted
-        ? 'fixed-location-smoothed-worldcover-natural-terrain-pbr'
+        ? 'fixed-location-spatial-worldcover-mapped-semantic-pbr'
         : 'fixed-location-semantic-pbr',
       source: worldCoverResult?.source || 'fixed-location-profile',
-      mode: detailMode,
+      mode: 'semantic-pbr',
       hardscapeOwner: 'exact-mapped-surface-geometry'
     };
-    lastAppliedDetailMode = detailMode;
+    lastAppliedDetailMode = 'semantic-pbr';
+    lastAppliedFallbackMode = detailMode;
     return true;
   }
 
@@ -494,6 +515,7 @@ function createFarFieldTerrainApi(deps = {}) {
     mesh.userData.isFarTerrainClipmap = true;
     mesh.userData.isFixedLocationTerrainLod = true;
     mesh.userData.mappedSurfaceTints = built.mappedSurfaceTints;
+    mesh.userData.mappedSurfaceModes = built.mappedSurfaceModes;
     farFieldSurfaceState = {
       spec,
       worldCoverResult: worldCoverContext,
@@ -619,7 +641,7 @@ function createFarFieldTerrainApi(deps = {}) {
         : Number(mappedContext.landAreas || 0) > 0
           ? 'mapped-shortbread-semantic-pbr'
           : 'shared-semantic-pbr',
-      surfaceMaterialOwner: 'fixed-location-shared-pbr',
+      surfaceMaterialOwner: 'single-terrain-semantic-pbr',
       surfaceDetailMode: lastAppliedDetailMode,
       worldCoverSurfaceStatus: worldCoverContext ? 'ready' : 'unavailable',
       mappedSurfaceTintAreas: Number(mappedContext.landAreas || 0),
@@ -664,7 +686,7 @@ function createFarFieldTerrainApi(deps = {}) {
   function refreshFarTerrainSurfaceColors() {
     if (!farFieldMesh || !farFieldSurfaceState || farFieldMesh.userData?.farFieldDisposed) return false;
     const nextMode = fixedLocationDetailMode(farFieldSurfaceState.worldCoverResult);
-    if (nextMode === lastAppliedDetailMode) return false;
+    if (nextMode === lastAppliedFallbackMode) return false;
     if (!applyFixedLocationSurfaceMaterial(
       farFieldMesh,
       farFieldSurfaceState.worldCoverResult,
@@ -673,7 +695,7 @@ function createFarFieldTerrainApi(deps = {}) {
     applyMappedSurfaceTintOwnership(farFieldMesh);
     setState({
       ...appCtx.farTerrainClipmapState,
-      surfaceDetailMode: nextMode,
+      surfaceDetailMode: 'semantic-pbr',
       surfaceRefreshes: Number(appCtx.farTerrainClipmapState?.surfaceRefreshes || 0) + 1
     });
     return true;

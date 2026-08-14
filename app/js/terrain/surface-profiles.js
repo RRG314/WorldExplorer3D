@@ -7,10 +7,16 @@ import {
   loadWorldCoverBaseline,
   worldCoverProviderSnapshot,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=15";
+} from "./worldcover-baseline.js?v=16";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import { latLonToTileXY } from './tile-coordinates.js?v=1';
-import { pointInMappedLandArea } from './far-field-mapped-context.js?v=15';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=16';
+import {
+  applyWorldCoverSurfaceMaterialMix,
+  configureTerrainSurfaceMaterialBlend,
+  ensureTerrainSurfaceMixAttributes,
+  setTerrainSurfaceMaterialMixAt
+} from './surface-material-blend.js?v=1';
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -240,6 +246,32 @@ export function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     mode === "rock" ? "rock" :
     mode === "forest" ? "forest" :
     "grass";
+  const source = terrainTextureSource(modeKey);
+  if (!source) return null;
+
+  const textureCacheKey = [
+    modeKey,
+    Number(repeats) || 12,
+    source.map?.uuid || 'none',
+    source.normalMap?.uuid || 'none',
+    source.roughnessMap?.uuid || 'none'
+  ].join(':');
+  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
+    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
+    return mesh.userData.terrainTextureSet;
+  }
+
+  const textureSet = {
+    map: cloneTerrainTextureWithRepeat(source.map, repeats),
+    normalMap: cloneTerrainTextureWithRepeat(source.normalMap, repeats),
+    roughnessMap: cloneTerrainTextureWithRepeat(source.roughnessMap, repeats)
+  };
+  mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
+  mesh.userData.terrainTextureSet = textureSet;
+  return textureSet;
+}
+
+function terrainTextureSource(modeKey = 'grass') {
   let source = null;
   const registeredMode = modeKey === 'snowRock' ? 'rock' : modeKey;
   if (appCtx.surfaceTextureSets?.[registeredMode]?.map) {
@@ -268,28 +300,23 @@ export function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   } else {
     source = getProceduralTerrainTextureBase(modeKey);
   }
-  if (!source) return null;
+  return source;
+}
 
-  const textureCacheKey = [
-    modeKey,
-    Number(repeats) || 12,
-    source.map?.uuid || 'none',
-    source.normalMap?.uuid || 'none',
-    source.roughnessMap?.uuid || 'none'
-  ].join(':');
-  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
-    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
-    return mesh.userData.terrainTextureSet;
-  }
-
-  const textureSet = {
-    map: cloneTerrainTextureWithRepeat(source.map, repeats),
-    normalMap: cloneTerrainTextureWithRepeat(source.normalMap, repeats),
-    roughnessMap: cloneTerrainTextureWithRepeat(source.roughnessMap, repeats)
+function ensureTerrainSemanticTextureSets(mesh, repeats) {
+  return {
+    grass: terrainTextureSource('grass'),
+    urban: terrainTextureSource('urban'),
+    sand: terrainTextureSource('sand'),
+    forest: terrainTextureSource('forest'),
+    soil: terrainTextureSource('soil'),
+    rock: terrainTextureSource('rock')
   };
-  mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
-  mesh.userData.terrainTextureSet = textureSet;
-  return textureSet;
+}
+
+export function applyTerrainSemanticMaterialBlend(mesh, repeats = 12) {
+  const textureSets = ensureTerrainSemanticTextureSets(mesh, repeats);
+  return configureTerrainSurfaceMaterialBlend(mesh, textureSets);
 }
 
 let cachedGroundFallbackMesh = null;
@@ -454,6 +481,7 @@ export function applyMappedSemanticVertexTints(
     colors = new THREE.Float32BufferAttribute(neutral, 3);
     geometry.setAttribute('color', colors);
   }
+  const materialMix = ensureTerrainSurfaceMixAttributes(geometry);
   let tintedVertices = 0;
   for (let index = 0; index < positions.count; index += 1) {
     const geographic = appCtx.worldToLatLon(
@@ -469,10 +497,15 @@ export function applyMappedSemanticVertexTints(
     ));
     if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
     colors.setXYZ(index, owner.tint[0], owner.tint[1], owner.tint[2]);
+    setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);
     tintedVertices += 1;
   }
   if (tintedVertices > 0) {
     colors.needsUpdate = true;
+    if (materialMix) {
+      materialMix.mixA.needsUpdate = true;
+      materialMix.mixB.needsUpdate = true;
+    }
     mesh.material.vertexColors = true;
     mesh.material.needsUpdate = true;
   }
@@ -515,12 +548,13 @@ function applyLoadedWorldCoverBaseline(mesh) {
     const detailTextures = ensureTerrainTextureSet(
       mesh,
       Number(mesh.userData.terrainTextureRepeats) || 12,
-      detailMode
+      'grass'
     );
     mesh.userData.terrainTextureSet = detailTextures;
-    // One center-tile PBR mode owns the whole fixed location. WorldCover's
-    // spatial tint still varies within each tile, but neighboring tiles cannot
-    // expose categorical grass/soil/forest texture changes as square borders.
+    // Grass is the neutral natural base. Per-vertex semantic weights below
+    // blend the existing urban, sand, forest, soil, rock and snow treatments
+    // inside this same terrain material, so land-cover classes do not become
+    // competing square meshes or location-wide grass detail.
     material.map = detailTextures?.map || null;
     material.normalMap = detailTextures?.normalMap || null;
     material.roughnessMap = detailTextures?.roughnessMap || null;
@@ -534,7 +568,12 @@ function applyLoadedWorldCoverBaseline(mesh) {
       material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
     }
     applyWorldCoverVertexTints(mesh, result);
+    applyWorldCoverSurfaceMaterialMix(mesh, result);
     applyMappedSemanticVertexTints(mesh, appCtx.fixedLocationMappedSurfaceContext, { force: true });
+    applyTerrainSemanticMaterialBlend(
+      mesh,
+      Number(mesh.userData.terrainTextureRepeats) || 12
+    );
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
@@ -542,9 +581,10 @@ function applyLoadedWorldCoverBaseline(mesh) {
     material.metalness = 0;
     material.needsUpdate = true;
     mesh.userData.terrainDetailProvenance = {
-      kind: 'smoothed-worldcover-natural-terrain-pbr',
+      kind: 'spatial-worldcover-mapped-semantic-pbr',
       source: result.source,
-      mode: detailMode,
+      mode: 'semantic-pbr',
+      fallbackMode: detailMode,
       hardscapeOwner: 'exact-mapped-surface-geometry'
     };
     if (becomesLocationOwner && previousLocationDetailMode !== ownDetailMode &&
@@ -740,6 +780,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   mat.emissiveMap = null;
   mat.needsUpdate = true;
   applyMappedSemanticVertexTints(mesh);
+  applyTerrainSemanticMaterialBlend(mesh, textureRepeats);
   if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
 }
 

@@ -1038,12 +1038,42 @@ async function loadLocation(page, spec) {
     const worldCoverStatus = {};
     const terrainRasterUrls = [];
     let terrainImageryOwners = 0;
+    let terrainSemanticMaterialMeshes = 0;
+    const terrainSemanticClassSamples = {
+      grass: 0,
+      urban: 0,
+      sand: 0,
+      forest: 0,
+      soil: 0,
+      rock: 0,
+      snow: 0
+    };
     for (const mesh of worldCoverMeshes) {
       const status = String(mesh?.userData?.worldCoverStatus || 'not_requested');
       worldCoverStatus[status] = Number(worldCoverStatus[status] || 0) + 1;
       if (mesh?.userData?.terrainImageryTexture || mesh?.userData?.terrainImageryStatus) terrainImageryOwners += 1;
       const source = String(mesh?.material?.map?.image?.currentSrc || mesh?.material?.map?.image?.src || '');
       if (/arcgisonline|World_Imagery/i.test(source)) terrainRasterUrls.push(source);
+      if (mesh?.userData?.terrainSurfaceMaterialBlend?.authority === 'single-terrain-semantic-pbr-material') {
+        terrainSemanticMaterialMeshes += 1;
+      }
+      const mixA = mesh?.geometry?.attributes?.terrainSurfaceMixA;
+      const mixB = mesh?.geometry?.attributes?.terrainSurfaceMixB;
+      if (mixA && mixB && mixA.count === mixB.count) {
+        const step = Math.max(1, Math.floor(mixA.count / 4000));
+        for (let index = 0; index < mixA.count; index += step) {
+          const values = [
+            mixA.getX(index), mixA.getY(index), mixA.getZ(index), mixA.getW(index),
+            mixB.getX(index), mixB.getY(index)
+          ];
+          const classNames = ['urban', 'sand', 'forest', 'soil', 'rock', 'snow'];
+          const classWeight = values.reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
+          terrainSemanticClassSamples.grass += Math.max(0, 1 - classWeight);
+          values.forEach((value, classIndex) => {
+            terrainSemanticClassSamples[classNames[classIndex]] += Math.max(0, Number(value) || 0);
+          });
+        }
+      }
     }
 
     // Keep actor pose and road evidence from the same frame. The nearest-road API
@@ -1171,6 +1201,9 @@ async function loadLocation(page, spec) {
           .filter((mesh) => mesh?.userData?.worldCoverStatus === 'ready')
           .map((mesh) => String(mesh?.userData?.terrainDetailProvenance?.mode || ''))
           .filter(Boolean))],
+        semanticMaterialMeshes: terrainSemanticMaterialMeshes,
+        semanticClassSamples: Object.fromEntries(Object.entries(terrainSemanticClassSamples)
+          .map(([name, count]) => [name, Number(count.toFixed(2))])),
         samples: worldCoverMeshes.slice(0, 5).map((mesh) => ({
           key: mesh?.userData?.terrainTileKey || null,
           visualMode: mesh?.userData?.terrainVisualProfile?.visualMode || mesh?.userData?.terrainVisualProfile?.mode || null,

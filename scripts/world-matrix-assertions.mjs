@@ -71,13 +71,17 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (Number(result.worldCover?.status?.ready || 0) > 0) {
     assert(
-      String(result.terrainSurface?.locationBaseDetailMode || '').length > 0,
-      `${spec.id}: WorldCover published without one location PBR owner ${JSON.stringify(result.terrainSurface)}`
+      Number(result.terrainSurface?.semanticMaterialMeshes || 0) > 0,
+      `${spec.id}: WorldCover published without the semantic terrain material ${JSON.stringify(result.terrainSurface)}`
     );
     assert(
       (result.terrainSurface?.publishedDetailModes || []).length === 1 &&
-        result.terrainSurface.publishedDetailModes[0] === result.terrainSurface.locationBaseDetailMode,
-      `${spec.id}: WorldCover exposed per-tile PBR mode boundaries ${JSON.stringify(result.terrainSurface)}`
+        result.terrainSurface.publishedDetailModes[0] === 'semantic-pbr',
+      `${spec.id}: WorldCover escaped the one semantic PBR terrain authority ${JSON.stringify(result.terrainSurface)}`
+    );
+    assert(
+      Object.values(result.terrainSurface?.semanticClassSamples || {}).some((count) => Number(count) > 0),
+      `${spec.id}: semantic terrain material published without classified samples ${JSON.stringify(result.terrainSurface)}`
     );
   }
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);

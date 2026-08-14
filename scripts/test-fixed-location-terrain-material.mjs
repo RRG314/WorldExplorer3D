@@ -13,6 +13,10 @@ const mappedContextSource = await readFile(
   new URL('../app/js/terrain/far-field-mapped-context.js', import.meta.url),
   'utf8'
 );
+const materialBlendSource = await readFile(
+  new URL('../app/js/terrain/surface-material-blend.js', import.meta.url),
+  'utf8'
+);
 
 assert.match(
   surfaceProfilesSource,
@@ -26,14 +30,18 @@ assert.match(
 );
 assert.match(
   farFieldSource,
-  /ensureTerrainTextureSet\(mesh, repeats, detailMode\)/,
-  'outer fixed-location geometry must use the detailed terrain PBR texture authority'
+  /ensureTerrainTextureSet\(mesh, repeats, 'grass'\)/,
+  'outer fixed-location geometry must use the shared natural base before semantic blending'
 );
 assert.match(
   farFieldSource,
   /applyWorldCoverVertexTints\(mesh, worldCoverResult\)/,
   'outer fixed-location geometry must use the same WorldCover tint application'
 );
+assert.match(farFieldSource, /applyWorldCoverSurfaceMaterialMix\(mesh, worldCoverResult\)/);
+assert.match(farFieldSource, /applyTerrainSemanticMaterialBlend\(mesh, repeats\)/);
+assert.match(materialBlendSource, /single-terrain-semantic-pbr-material/);
+assert.doesNotMatch(materialBlendSource, /new THREE\.Mesh|new THREE\.PlaneGeometry/);
 assert.match(
   farFieldSource,
   /hardscapeOwner: 'exact-mapped-surface-geometry'/,
@@ -46,7 +54,7 @@ assert.match(
 );
 assert.match(farFieldSource, /mesh\.name = 'FixedLocationTerrainLod'/);
 assert.match(farFieldSource, /mesh\.receiveShadow = true/);
-assert.match(farFieldSource, /surfaceMaterialOwner: 'fixed-location-shared-pbr'/);
+assert.match(farFieldSource, /surfaceMaterialOwner: 'single-terrain-semantic-pbr'/);
 assert.match(
   farFieldSource,
   /nearestDetailedTerrain[\s\S]*terrainVisualProfile\?\.visualMode/,
@@ -87,7 +95,7 @@ console.log(JSON.stringify({
   ok: true,
   contract: 'fixed-location-shared-terrain-material',
   verified: [
-    'one-pbr-texture-authority',
+    'one-semantic-pbr-material-authority',
     'one-worldcover-tint-authority',
     'exact-mapped-hardscape-authority',
     'consistent-physical-texture-scale',

@@ -710,6 +710,43 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - The final forced-daylight matrix passed its automated assertions in Baltimore, New York, Monaco, and London. Every location reported zero unowned terrain cells and mapped semantic tinting on both detailed and regional terrain. Monaco proved that the same-request mapped fallback remains continuous when WorldCover is unavailable. The captured frames were inspected, but release visual approval remains intentionally unasserted until the clean immutable candidate is tested by the user.
 - Additional guards: `npm run test:player-drive-input`, `npm run test:runtime`, `npm run test:maintainability`, and `WORLD_MATRIX_IDS=baltimore,newyork,london,monaco WORLD_MATRIX_CAPTURE_DRONE=1 WORLD_MATRIX_FORCE_DAYLIGHT=1 npm run test:world-matrix`.
 
+## 2026-08-14 — Spatial land-use data was multiplied over one grass material
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed.
+- Symptom: dense city ground looked like a continuous grass sheet even though
+  parks, water, developed land, forest, sand, and agriculture classifications
+  were already being loaded. Vertex colors changed, but the close-range detail
+  still read as grass everywhere.
+- Root cause: WorldCover and mapped Shortbread polygons only published RGB
+  tints. `worldCoverBaseDetailMode` selected one repeating PBR set for the whole
+  fixed location, and the built classifier deliberately resolved that set to
+  grass. A neutral tint cannot remove grass blades from a diffuse/normal map.
+- Resolution: WorldCover now retains a compact categorical byte per sample.
+  Detailed and regional vertices translate it into semantic material weights;
+  mapped land/site polygons override those weights with their exact semantic
+  mode. The existing terrain `MeshStandardMaterial` blends shared bundled
+  urban, grass, forest, sand, soil, rock, and snow sources in one shader. It
+  creates no second mesh or overlay and does not clone six texture sets per
+  terrain tile. Exact mapped water, parking/paved geometry, tunnels, terrain
+  portals, and the accepted terrain geometry remain separate unchanged owners.
+- Evidence: the focused Hollywood Chrome matrix passed with 50 semantic
+  terrain-material meshes and nonzero urban, grass, forest, sand, and soil
+  samples. Baltimore and New York drone frames were inspected; Central Park
+  stays natural while surrounding developed ground no longer inherits the
+  grass material. All locations retain zero unowned terrain cells and exact
+  mapped-water ownership. Runtime invariants passed after waiting for the
+  asynchronous vegetation publication instead of sampling it prematurely.
+- Guard: `npm run test:city-surface-semantics`,
+  `npm run test:fixed-location-terrain-material`,
+  `npm run test:world-rendering-contract`, `npm run test:runtime`, and the
+  focused world matrix with `WORLD_MATRIX_REQUIRE_WORLDCOVER=1`. The matrix
+  records semantic material mesh count and per-class sample totals.
+- Never reintroduce: one location-wide grass texture over categorical land
+  cover, tint-only assertions as proof of surface material, broad developed or
+  natural overlay meshes, per-tile copies of every biome texture, using
+  WorldCover water as permission to invent water, or testing vegetation before
+  its asynchronous surface source is ready.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

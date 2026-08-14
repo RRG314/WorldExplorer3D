@@ -434,6 +434,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const surfaceWorldYs = [];
     const colors = [];
     const mappedSurfaceTints = [];
+    const mappedSurfaceModes = [];
     const uvs = [];
     const indices = [];
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
@@ -489,9 +490,11 @@ function createFarFieldGeometryPlanner(deps = {}) {
         if (Array.isArray(mappedTint) && mappedTint.length >= 3) {
           colors.push(mappedTint[0], mappedTint[1], mappedTint[2]);
           mappedSurfaceTints.push(mappedTint[0], mappedTint[1], mappedTint[2]);
+          mappedSurfaceModes.push(String(mappedSurface.mode || mappedSurface.kind || ''));
         } else {
           colors.push(1, 1, 1);
           mappedSurfaceTints.push(NaN, NaN, NaN);
+          mappedSurfaceModes.push('');
         }
         uvs.push((x - spec.outer.minX) / xRange, 1 - (z - spec.outer.minZ) / zRange);
       }
@@ -534,6 +537,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
       maxElevationMeters,
       waterMaskedVertices: maskStats.waterMaskedVertices,
       mappedSurfaceTints: new Float32Array(mappedSurfaceTints),
+      mappedSurfaceModes,
       coverage: {
         totalCells: (xValues.length - 1) * (zValues.length - 1),
         farOwnedCells,

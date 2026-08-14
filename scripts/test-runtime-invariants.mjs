@@ -212,6 +212,26 @@ async function waitForTraversalNetworks(page, timeoutMs = 60000) {
   throw new Error(`Timed out waiting for traversal networks. Last snapshot: ${JSON.stringify(last || {})}`);
 }
 
+async function waitForVegetationLayer(page, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    last = await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const ctx = mod?.ctx;
+      return {
+        features: Array.isArray(ctx?.vegetationFeatures) ? ctx.vegetationFeatures.length : 0,
+        meshes: Array.isArray(ctx?.vegetationMeshes) ? ctx.vegetationMeshes.length : 0,
+        worldCoverReady: Number(ctx?.worldCoverStats?.ready || 0),
+        worldCoverFailed: Number(ctx?.worldCoverStats?.failed || 0)
+      };
+    });
+    if (last.features > 0 && last.meshes > 0) return last;
+    await page.waitForTimeout(250);
+  }
+  return last;
+}
+
 function assert(condition, message) {
   if (!condition) {
     const err = new Error(message);
@@ -326,6 +346,7 @@ async function main() {
     }
 
     const traversalSnapshot = await waitForTraversalNetworks(page, 60000);
+    const vegetationReadiness = await waitForVegetationLayer(page, 15000);
 
     const preWaterMetrics = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
@@ -1487,6 +1508,7 @@ async function main() {
       metrics: report,
       readySnapshot,
       traversalSnapshot,
+      vegetationReadiness,
       preWaterMetrics,
       mapToggleCheck,
       debugToggleCheck,

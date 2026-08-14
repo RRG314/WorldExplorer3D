@@ -1,4 +1,5 @@
 import { createProviderOutageCircuit } from '../earth-core/provider-outage-circuit.js?v=1';
+import { terrainSurfaceClassForWorldCover } from './surface-material-blend.js?v=1';
 
 const WORLDCOVER_WMS_ENDPOINT = 'https://titiler.terrascope.be/wms';
 const WORLDCOVER_LAYER = 'esa-worldcover-map-10m-2021-v2_map';
@@ -387,7 +388,7 @@ async function imageFromBlob(blob) {
   });
 }
 
-async function createSemanticTexture(blob, size) {
+async function createSemanticTexture(blob, size, bounds = null) {
   const sourceImage = await imageFromBlob(blob);
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -401,6 +402,7 @@ async function createSemanticTexture(blob, size) {
   const imageData = context.getImageData(0, 0, size, size);
   const counts = {};
   const classes = new Array(size * size);
+  const surfaceMaterialClasses = new Uint8Array(size * size);
   let recognized = 0;
 
   for (let i = 0; i < imageData.data.length; i += 4) {
@@ -430,6 +432,12 @@ async function createSemanticTexture(blob, size) {
       if (nearbyBuilt >= 12) entry = builtClass;
     }
     classes[pixel] = entry;
+    surfaceMaterialClasses[pixel] = terrainSurfaceClassForWorldCover(
+      entry?.name || '',
+      Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS)
+        ? (bounds.latN + bounds.latS) * 0.5
+        : 0
+    );
   }
   if (recognized < size * size * 0.2) throw new Error('WorldCover tile contained insufficient classified coverage');
   const vegetationSamples = [];
@@ -450,6 +458,8 @@ async function createSemanticTexture(blob, size) {
     surfaceTints: buildSmoothedSurfaceTints(classes, size),
     surfaceTintSize: size,
     surfaceTintEncodingScale: SURFACE_TINT_ENCODING_SCALE,
+    surfaceMaterialClasses,
+    surfaceMaterialClassSize: size,
     counts,
     recognizedPixels: recognized,
     totalPixels: size * size,
@@ -470,7 +480,7 @@ export async function loadWorldCoverBaseline(bounds, options = {}) {
     Number(options.priority) || 0,
     Number(options.timeoutMs) || REQUEST_TIMEOUT_MS
   );
-  const result = await createSemanticTexture(loaded.blob, size);
+  const result = await createSemanticTexture(loaded.blob, size, bounds);
   return { ...result, key, source: loaded.source };
 }
 

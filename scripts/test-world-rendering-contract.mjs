@@ -24,7 +24,8 @@ assert.equal(FAR_FIELD_WORLDCOVER_SIZE, contract.terrain.regionalLandCoverTextur
 assert.equal(contract.terrain.maximumUnownedCells, 0);
 assert.equal(contract.landUse.generatedSidewalks, false);
 assert.equal(contract.landUse.generatedFootpaths, false);
-assert.equal(contract.landUse.providerFallback, 'same-request-shortbread-semantic-tint');
+assert.equal(contract.landUse.providerFallback, 'same-request-shortbread-semantic-material');
+assert.equal(contract.landUse.surfaceMaterialOwner, 'single-terrain-semantic-pbr');
 assert.deepEqual(contract.visualMatrix, ['baltimore', 'new-york', 'london', 'monaco']);
 
 for (const kind of ['residential', 'commercial', 'industrial', 'retail']) {

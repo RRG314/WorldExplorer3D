@@ -337,7 +337,7 @@ assert.match(farFieldSource, /FarMappedBuildingContext/);
 assert.match(farFieldSource, /waitForFarTerrainClipmap/);
 assert.match(farFieldSource, /contextGeographic/);
 assert.doesNotMatch(farFieldSource, /actorX|actorZ/);
-assert.match(farFieldSource, /surfaceMaterialOwner: 'fixed-location-shared-pbr'/);
+assert.match(farFieldSource, /surfaceMaterialOwner: 'single-terrain-semantic-pbr'/);
 assert.match(farFieldSource, /sourceZoomForTileBudget/);
 assert.match(farFieldSource, /openstreetmap-shortbread/);
 assert.match(farFieldSource, /camera\?\.far \|\| 0\) \* 1\.6/);

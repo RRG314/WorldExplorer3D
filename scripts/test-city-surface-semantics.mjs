@@ -7,6 +7,12 @@ import {
   waitForTerrainSurfaceMaterials
 } from '../app/js/world/load-terrain-readiness.js';
 import { landusePresentationOwner } from '../app/js/world/surface-contract.js';
+import {
+  TERRAIN_SURFACE_CLASS,
+  terrainSurfaceClassForMappedMode,
+  terrainSurfaceClassForWorldCover,
+  terrainSurfaceMixForClass
+} from '../app/js/terrain/surface-material-blend.js';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relativePath) => fs.readFileSync(path.join(sourceRoot, relativePath), 'utf8');
@@ -16,6 +22,8 @@ const profileSource = read('app/js/terrain/surface-profiles.js');
 const transportSource = read('app/js/terrain/rebuild.js');
 const surfaceContractSource = read('app/js/world/surface-contract.js');
 const terrainTileSource = read('app/js/terrain/tiles.js');
+const materialBlendSource = read('app/js/terrain/surface-material-blend.js');
+const mappedContextSource = read('app/js/terrain/far-field-mapped-context.js');
 
 assert.equal(
   fs.existsSync(path.join(sourceRoot, 'app/js/terrain/sidewalk-batching.js')),
@@ -28,10 +36,10 @@ assert.equal(
   'The disabled sidewalk extrusion policy must not ship.'
 );
 
-assert.doesNotMatch(
+assert.match(
   baselineSource,
-  /surfaceBuiltWeights|surfaceBuiltWeightSize|buildSmoothedClassWeight/,
-  'Coarse built-up pixels must not publish a second hardscape presentation pipeline.'
+  /surfaceMaterialClasses/,
+  'WorldCover must retain spatial material classes instead of reducing a city to one location-wide texture.'
 );
 assert.match(
   baselineSource,
@@ -47,6 +55,43 @@ assert.doesNotMatch(
   profileSource,
   /applyWorldCoverBuiltSurfaceMaterial|worldCoverBuiltBlend|surfaceBuiltWeight/,
   'A built-dominant classification must not turn the detailed terrain footprint into a gray city square.'
+);
+assert.match(profileSource, /applyWorldCoverSurfaceMaterialMix\(mesh, result\)/);
+assert.match(profileSource, /applyTerrainSemanticMaterialBlend/);
+const semanticTextureSetBody = profileSource.slice(
+  profileSource.indexOf('function ensureTerrainSemanticTextureSets'),
+  profileSource.indexOf('export function applyTerrainSemanticMaterialBlend')
+);
+assert.match(semanticTextureSetBody, /terrainTextureSource\('urban'\)/);
+assert.doesNotMatch(
+  semanticTextureSetBody,
+  /ensureTerrainTextureSet\(/,
+  'Semantic blend maps must be shared sources rather than six cloned PBR sets per terrain tile.'
+);
+assert.match(materialBlendSource, /terrain-semantic-pbr-material-mix-v1/);
+assert.match(materialBlendSource, /terrainUrbanMap/);
+assert.match(materialBlendSource, /terrainSandMap/);
+assert.match(materialBlendSource, /terrainForestMap/);
+assert.match(materialBlendSource, /terrainSoilMap/);
+assert.match(materialBlendSource, /terrainRockMap/);
+assert.doesNotMatch(
+  materialBlendSource,
+  /new THREE\.Mesh|new THREE\.PlaneGeometry/,
+  'Semantic materials must blend inside the one terrain mesh, not create a second land renderer.'
+);
+assert.match(mappedContextSource, /mode: profile\.mode/);
+
+assert.equal(terrainSurfaceClassForWorldCover('built', 39), TERRAIN_SURFACE_CLASS.urban);
+assert.equal(terrainSurfaceClassForWorldCover('tree', 39), TERRAIN_SURFACE_CLASS.forest);
+assert.equal(terrainSurfaceClassForWorldCover('crop', 39), TERRAIN_SURFACE_CLASS.soil);
+assert.equal(terrainSurfaceClassForWorldCover('bare', 25), TERRAIN_SURFACE_CLASS.sand);
+assert.equal(terrainSurfaceClassForWorldCover('bare', 44), TERRAIN_SURFACE_CLASS.rock);
+assert.equal(terrainSurfaceClassForMappedMode('park'), TERRAIN_SURFACE_CLASS.grass);
+assert.equal(terrainSurfaceClassForMappedMode('urban'), TERRAIN_SURFACE_CLASS.urban);
+assert.equal(terrainSurfaceClassForMappedMode('sand'), TERRAIN_SURFACE_CLASS.sand);
+assert.deepEqual(
+  terrainSurfaceMixForClass(TERRAIN_SURFACE_CLASS.urban),
+  { mixA: [1, 0, 0, 0], mixB: [0, 0] }
 );
 assert.match(
   transportSource,

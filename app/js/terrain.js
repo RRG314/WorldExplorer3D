@@ -26,7 +26,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=46";
+} from "./terrain/surface-profiles.js?v=48";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -61,7 +61,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=8";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=62";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=66";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {

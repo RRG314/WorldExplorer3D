@@ -12,8 +12,9 @@
     "developedPresentationOwner": "terrain_worldcover",
     "explicitHardscapePresentationOwner": "mapped_geometry",
     "naturalPresentationOwner": "terrain_worldcover",
-    "builtContinuity": "worldcover-neutral-urban-tint",
-    "providerFallback": "same-request-shortbread-semantic-tint",
+    "builtContinuity": "worldcover-spatial-semantic-material",
+    "providerFallback": "same-request-shortbread-semantic-material",
+    "surfaceMaterialOwner": "single-terrain-semantic-pbr",
     "generatedSidewalks": false,
     "generatedFootpaths": false
   },
