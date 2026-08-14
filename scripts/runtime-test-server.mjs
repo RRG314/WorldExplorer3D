@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
 import net from 'node:net';
+import { serveMutableSourceManifest } from './source-preview-manifest.mjs';
 
 export async function mkdirp(dir) {
   await fs.mkdir(dir, { recursive: true });
@@ -35,6 +36,11 @@ async function serveStaticRoot(rootDir, host, port) {
   const server = http.createServer(async (req, res) => {
     try {
       const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+      if (await serveMutableSourceManifest({
+        pathname: reqUrl.pathname,
+        rootDir,
+        response: res
+      })) return;
       let relPath = decodeURIComponent(reqUrl.pathname || '/');
       if (relPath === '/') relPath = '/index.html';
       const resolved = path.resolve(path.join(rootDir, relPath));

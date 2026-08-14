@@ -1,7 +1,7 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=15";
+} from "../world/shortbread-source.js?v=16";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
@@ -22,6 +22,33 @@ const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 280000;
 const FAR_CONTEXT_BUILDING_MAX_TILES = 512;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
+const FAR_LAND_SURFACE_PROFILES = Object.freeze({
+  forest: Object.freeze({ tint: [0.64, 0.82, 0.60], priority: 3 }),
+  grass: Object.freeze({ tint: [0.82, 0.96, 0.74], priority: 3 }),
+  agriculture: Object.freeze({ tint: [0.92, 0.90, 0.68], priority: 2 }),
+  sand: Object.freeze({ tint: [1.08, 0.98, 0.76], priority: 3 }),
+  bare: Object.freeze({ tint: [0.94, 0.88, 0.76], priority: 3 }),
+  urban: Object.freeze({ tint: [0.76, 0.78, 0.80], priority: 1 })
+});
+
+function mappedLandSurfaceProfile(kind = '') {
+  const normalized = String(kind || '').toLowerCase();
+  if (['forest', 'wood', 'scrub', 'heath', 'mangrove'].includes(normalized)) {
+    return FAR_LAND_SURFACE_PROFILES.forest;
+  }
+  if (['grass', 'grassland', 'meadow', 'park', 'garden', 'recreation_ground', 'village_green', 'cemetery'].includes(normalized)) {
+    return FAR_LAND_SURFACE_PROFILES.grass;
+  }
+  if (['farmland', 'farmyard', 'orchard', 'vineyard', 'allotments', 'plant_nursery'].includes(normalized)) {
+    return FAR_LAND_SURFACE_PROFILES.agriculture;
+  }
+  if (['sand', 'beach', 'dune'].includes(normalized)) return FAR_LAND_SURFACE_PROFILES.sand;
+  if (['bare_rock', 'scree', 'shingle', 'quarry'].includes(normalized)) return FAR_LAND_SURFACE_PROFILES.bare;
+  if (['residential', 'industrial', 'commercial', 'retail', 'garages', 'railway', 'construction', 'brownfield', 'landfill', 'education', 'medical'].includes(normalized)) {
+    return FAR_LAND_SURFACE_PROFILES.urban;
+  }
+  return null;
+}
 
 function polygonRings(geometry) {
   if (geometry?.type === 'Polygon') return geometry.coordinates?.[0] ? [geometry.coordinates[0]] : [];
@@ -158,6 +185,16 @@ function pointInLonLatRing(lon, lat, ring) {
 }
 
 function pointInMappedWaterArea(lon, lat, area) {
+  const bounds = area?.bounds;
+  if (
+    bounds &&
+    (lon < bounds.minLon || lon > bounds.maxLon || lat < bounds.minLat || lat > bounds.maxLat)
+  ) return false;
+  if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
+  return !(area?.holes || []).some((hole) => pointInLonLatRing(lon, lat, hole));
+}
+
+function pointInMappedLandArea(lon, lat, area) {
   const bounds = area?.bounds;
   if (
     bounds &&
@@ -369,6 +406,8 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   ]);
   const tiles = contextBatch.values;
   const buildingBuckets = [];
+  const landAreasByTile = new Map();
+  let landAreas = 0;
   let skippedNearBuildings = 0;
   let availableBuildings = 0;
   const perTileBuildingBudget = Math.max(
@@ -378,8 +417,39 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
 
   for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
     const tileRecord = tiles[tileIndex];
+    const landBucket = [];
+    for (const layerName of ['land', 'sites']) {
+      const layer = tileRecord.tile.layers[layerName];
+      if (!layer) continue;
+      for (let index = 0; index < layer.length; index += 1) {
+        const feature = layer.feature(index);
+        const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
+        const profile = mappedLandSurfaceProfile(geojson?.properties?.kind);
+        if (!profile) continue;
+        for (const rings of polygonAreas(geojson?.geometry)) {
+          const outer = retainFarWaterRing(rings?.[0]);
+          if (outer.length < 4) continue;
+          landBucket.push({
+            outer,
+            holes: (rings || []).slice(1).map(retainFarWaterRing).filter((ring) => ring.length >= 4),
+            bounds: ringBounds(outer),
+            tint: profile.tint,
+            priority: profile.priority,
+            kind: String(geojson?.properties?.kind || '')
+          });
+        }
+      }
+    }
+    if (landBucket.length > 0) {
+      landBucket.sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0));
+      landAreasByTile.set(`${tileRecord.z}/${tileRecord.x}/${tileRecord.y}`, landBucket);
+      landAreas += landBucket.length;
+    }
     const buildingLayer = tileRecord.tile.layers.buildings;
-    if (!buildingLayer) continue;
+    if (!buildingLayer) {
+      if ((tileIndex + 1) % 2 === 0) await yieldToMainThread();
+      continue;
+    }
     const tileBuildings = [];
     let remainingTileBudget = perTileBuildingBudget;
     for (let index = 0; index < buildingLayer.length; index += 1) {
@@ -443,7 +513,9 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     contextZoom,
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length,
-    contextMaxInFlight: contextBatch.metrics.maxInFlight
+    contextMaxInFlight: contextBatch.metrics.maxInFlight,
+    landAreas,
+    landAreasByTile
   };
 }
 
@@ -459,6 +531,7 @@ export {
   loadFarMappedContext,
   loadFarMappedWaterContext,
   pointInLonLatRing,
+  pointInMappedLandArea,
   pointInMappedWaterArea,
   retainFarWaterRing,
   roundRobinSelect,

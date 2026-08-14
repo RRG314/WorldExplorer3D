@@ -1,5 +1,5 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
-import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=13';
+import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=15';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
@@ -55,7 +55,7 @@ function hardscapeMaterialOptions(appCtx, landuseType, composition) {
       : null;
   return {
     material: {
-      color: textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
+      color: textures?.map ? 0xffffff : (appCtx.LANDUSE_STYLES?.[landuseType]?.color ?? 0xb8b8b8),
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,

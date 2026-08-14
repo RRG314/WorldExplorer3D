@@ -9,6 +9,8 @@ import {
   worldCoverSupportsBounds
 } from "./worldcover-baseline.js?v=15";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
+import { latLonToTileXY } from './tile-coordinates.js?v=1';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=15';
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -430,6 +432,55 @@ export function applyWorldCoverVertexTints(mesh, result) {
   return true;
 }
 
+export function applyMappedSemanticVertexTints(
+  mesh,
+  mappedContext = appCtx.fixedLocationMappedSurfaceContext,
+  options = {}
+) {
+  const geometry = mesh?.geometry;
+  const positions = geometry?.attributes?.position;
+  const contextZoom = Number(mappedContext?.contextZoom || 0);
+  const buckets = mappedContext?.landAreasByTile;
+  if (!geometry || !positions || !buckets?.get || contextZoom <= 0 ||
+      typeof appCtx.worldToLatLon !== 'function') return 0;
+  if (options.force !== true && mesh.userData?.mappedSemanticTintContext === mappedContext) {
+    return Number(mesh.userData?.mappedSemanticTintVertices || 0);
+  }
+
+  let colors = geometry.attributes.color;
+  if (!colors || colors.count !== positions.count) {
+    const neutral = new Float32Array(positions.count * 3);
+    neutral.fill(1);
+    colors = new THREE.Float32BufferAttribute(neutral, 3);
+    geometry.setAttribute('color', colors);
+  }
+  let tintedVertices = 0;
+  for (let index = 0; index < positions.count; index += 1) {
+    const geographic = appCtx.worldToLatLon(
+      positions.getX(index) + Number(mesh.position?.x || 0),
+      positions.getZ(index) + Number(mesh.position?.z || 0)
+    );
+    const tile = latLonToTileXY(geographic.lat, geographic.lon, contextZoom);
+    const bucket = buckets.get(`${contextZoom}/${tile.x}/${tile.y}`) || [];
+    const owner = bucket.find((area) => pointInMappedLandArea(
+      geographic.lon,
+      geographic.lat,
+      area
+    ));
+    if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
+    colors.setXYZ(index, owner.tint[0], owner.tint[1], owner.tint[2]);
+    tintedVertices += 1;
+  }
+  if (tintedVertices > 0) {
+    colors.needsUpdate = true;
+    mesh.material.vertexColors = true;
+    mesh.material.needsUpdate = true;
+  }
+  mesh.userData.mappedSemanticTintVertices = tintedVertices;
+  mesh.userData.mappedSemanticTintContext = mappedContext;
+  return tintedVertices;
+}
+
 function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
   const material = mesh?.material;
@@ -483,6 +534,7 @@ function applyLoadedWorldCoverBaseline(mesh) {
       material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
     }
     applyWorldCoverVertexTints(mesh, result);
+    applyMappedSemanticVertexTints(mesh, appCtx.fixedLocationMappedSurfaceContext, { force: true });
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
@@ -687,6 +739,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   applyGroundFallbackProfile(nextProfile);
   mat.emissiveMap = null;
   mat.needsUpdate = true;
+  applyMappedSemanticVertexTints(mesh);
   if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
 }
 

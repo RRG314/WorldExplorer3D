@@ -7,30 +7,32 @@ import {
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   loadFarMappedContext,
+  pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=13';
+} from './far-field-mapped-context.js?v=15';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=3';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
   cellInsideDetailedCoverage,
   cellInsideHole
-} from './far-field-coverage.js?v=1';
+} from './far-field-coverage.js?v=2';
 import {
   buildClipmapAxis,
   createFarFieldGeometryPlanner,
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=12';
+} from './far-field-geometry.js?v=15';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
 } from './worldcover-baseline.js?v=15';
 import {
+  applyMappedSemanticVertexTints,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=44';
+} from './surface-profiles.js?v=46';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import {
   FAR_WATER_SURFACE_CLEARANCE_WORLD,
@@ -39,7 +41,7 @@ import {
   buildFarWaterGeometry,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
-} from './far-field-water.js?v=2';
+} from './far-field-water.js?v=3';
 import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=7';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
@@ -49,6 +51,8 @@ const FAR_FIELD_OUTER_DISTANCE_METERS = 22000;
 // owned by the shared PBR/WorldCover presentation; structure and facade work
 // must not silently replace its geometry with a different terrain product.
 const FAR_FIELD_GRID_INTERVAL_METERS = 320;
+const FAR_FIELD_GAP_FILL_INTERVAL_METERS = 40;
+const FAR_FIELD_WORLDCOVER_SIZE = 256;
 const FAR_FIELD_SEAM_BLEND_METERS = 550;
 const FAR_CONTEXT_HALF_EXTENT_METERS = FIXED_REGIONAL_CONTEXT_RADIUS_METERS;
 
@@ -116,6 +120,7 @@ function createFarFieldTerrainApi(deps = {}) {
     activeKey = '';
     removeCurrentMesh();
     pendingBuildPromise = null;
+    appCtx.fixedLocationMappedSurfaceContext = null;
     appCtx.farTerrainClipmapState = null;
     return waitForGenerationDrain(retiringBuildPromise);
   }
@@ -135,6 +140,7 @@ function createFarFieldTerrainApi(deps = {}) {
     appCtx,
     clampElevationMeters,
     farFieldGridIntervalMeters: FAR_FIELD_GRID_INTERVAL_METERS,
+    farFieldGapFillIntervalMeters: FAR_FIELD_GAP_FILL_INTERVAL_METERS,
     farFieldSeamBlendMeters: FAR_FIELD_SEAM_BLEND_METERS,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
@@ -142,8 +148,25 @@ function createFarFieldTerrainApi(deps = {}) {
     terrainTileDeps,
     tileXYToLatLonBounds,
     worldToLatLon,
-    pointInMappedWaterArea
+    pointInMappedWaterArea,
+    pointInMappedLandArea
   });
+
+  function applyMappedSurfaceTintOwnership(mesh) {
+    const colors = mesh?.geometry?.attributes?.color;
+    const mappedTints = mesh?.userData?.mappedSurfaceTints;
+    if (!colors || !mappedTints || mappedTints.length !== colors.count * 3) return false;
+    let owned = 0;
+    for (let index = 0; index < colors.count; index += 1) {
+      const offset = index * 3;
+      if (!Number.isFinite(mappedTints[offset])) continue;
+      colors.setXYZ(index, mappedTints[offset], mappedTints[offset + 1], mappedTints[offset + 2]);
+      owned += 1;
+    }
+    if (owned > 0) colors.needsUpdate = true;
+    mesh.userData.mappedSurfaceTintVertices = owned;
+    return owned > 0;
+  }
 
   function fixedLocationDetailMode(worldCoverResult = null) {
     const publishedMode = String(appCtx.worldCoverBaseDetailMode || '');
@@ -368,13 +391,30 @@ function createFarFieldTerrainApi(deps = {}) {
         { signal }
       ),
       loadWorldCoverBaseline(spec.geographic, {
-        size: 128,
+        size: FAR_FIELD_WORLDCOVER_SIZE,
         key: `far-field:${activeKey}`,
         signal,
         priority: -10
       }).catch(() => null)
     ]);
     if (requestGeneration !== generation) return;
+    appCtx.fixedLocationMappedSurfaceContext = mappedContext;
+    let detailedMappedSurfaceTintVertices = 0;
+    for (const detailedMesh of appCtx.terrainGroup?.children || []) {
+      if (detailedMesh?.userData?.isTerrainMesh !== true || detailedMesh?.userData?.isFarTerrainClipmap) continue;
+      detailedMappedSurfaceTintVertices += applyMappedSemanticVertexTints(detailedMesh, mappedContext);
+      await yieldToMainThread();
+    }
+    const coverageRequest = spec.detailedCoverageRequest || {};
+    spec = {
+      ...spec,
+      detailedCoverage: completeDetailedTileCoverage(
+        Number(coverageRequest.z),
+        Number(coverageRequest.centerX),
+        Number(coverageRequest.centerY),
+        Number(coverageRequest.ring)
+      )
+    };
     const missingSourceTiles = elevation.missingSourceTiles;
     const fallbackTiles = elevation.fallbackTiles;
     const fallbackElevation = elevation.fallback;
@@ -453,12 +493,14 @@ function createFarFieldTerrainApi(deps = {}) {
     mesh.castShadow = false;
     mesh.userData.isFarTerrainClipmap = true;
     mesh.userData.isFixedLocationTerrainLod = true;
+    mesh.userData.mappedSurfaceTints = built.mappedSurfaceTints;
     farFieldSurfaceState = {
       spec,
       worldCoverResult: worldCoverContext,
       surfaceGrid: built.surfaceGrid
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
+    applyMappedSurfaceTintOwnership(mesh);
     applyMappedWaterTerrainOwnership(mesh, material, waterTerrainMask);
     mesh.userData.renderProvenance = {
       version: 1,
@@ -571,10 +613,18 @@ function createFarFieldTerrainApi(deps = {}) {
       minElevationMeters: built.minElevationMeters,
       maxElevationMeters: built.maxElevationMeters,
       waterMaskedVertices: built.waterMaskedVertices,
-      surfaceColor: worldCoverContext ? 'shared-worldcover-pbr' : 'shared-semantic-pbr',
+      terrainCoverage: built.coverage,
+      surfaceColor: worldCoverContext
+        ? 'shared-worldcover-pbr-with-mapped-semantic-overrides'
+        : Number(mappedContext.landAreas || 0) > 0
+          ? 'mapped-shortbread-semantic-pbr'
+          : 'shared-semantic-pbr',
       surfaceMaterialOwner: 'fixed-location-shared-pbr',
       surfaceDetailMode: lastAppliedDetailMode,
       worldCoverSurfaceStatus: worldCoverContext ? 'ready' : 'unavailable',
+      mappedSurfaceTintAreas: Number(mappedContext.landAreas || 0),
+      mappedSurfaceTintVertices: Number(mesh.userData.mappedSurfaceTintVertices || 0),
+      detailedMappedSurfaceTintVertices,
       detailedWorldCoverSurfacesReused: 0,
       contextSource: 'openstreetmap-shortbread',
       contextZoom: mappedContext.contextZoom,
@@ -620,6 +670,7 @@ function createFarFieldTerrainApi(deps = {}) {
       farFieldSurfaceState.worldCoverResult,
       farFieldSurfaceState.spec
     )) return false;
+    applyMappedSurfaceTintOwnership(farFieldMesh);
     setState({
       ...appCtx.farTerrainClipmapState,
       surfaceDetailMode: nextMode,
@@ -696,13 +747,13 @@ function createFarFieldTerrainApi(deps = {}) {
     const geographic = geographicBounds(outer);
     const preferredSourceZoom = Math.max(0, z - FAR_FIELD_SOURCE_ZOOM_OFFSET);
     const sourceZoom = sourceZoomForTileBudget(geographic, preferredSourceZoom);
-    const detailedCoverage = completeDetailedTileCoverage(z, centerX, centerY, ring);
     setState({ status: 'queued', sourceZoom });
     const beginBuild = () => {
       if (generationSignal.aborted || requestGeneration !== generation) return undefined;
       return buildAndPublish({
         inner,
-        detailedCoverage,
+        detailedCoverage: [],
+        detailedCoverageRequest: { z, centerX, centerY, ring },
         detailExclusionGeographic: geographicBounds(detailExclusion),
         outer,
         geographic,
@@ -766,6 +817,8 @@ export {
   FAR_WATER_MIN_SPAN_METERS,
   FAR_WATER_TERRAIN_MASK_SIZE,
   FAR_FIELD_GRID_INTERVAL_METERS,
+  FAR_FIELD_GAP_FILL_INTERVAL_METERS,
+  FAR_FIELD_WORLDCOVER_SIZE,
   FAR_FIELD_OUTER_DISTANCE_METERS,
   FAR_FIELD_SEAM_BLEND_METERS,
   FAR_FIELD_SOURCE_ZOOM_OFFSET,

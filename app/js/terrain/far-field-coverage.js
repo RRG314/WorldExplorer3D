@@ -10,6 +10,29 @@ export function cellInsideDetailedCoverage(centerX, centerZ, coverageRects = [])
   ));
 }
 
+export function cellFullyInsideDetailedCoverage(minX, maxX, minZ, maxZ, coverageRects = []) {
+  const epsilon = 1e-6;
+  return coverageRects.some((rect) => (
+    minX >= rect.minX - epsilon && maxX <= rect.maxX + epsilon &&
+    minZ >= rect.minZ - epsilon && maxZ <= rect.maxZ + epsilon
+  ));
+}
+
+export function publishedDetailedTerrainTileKeys(children = []) {
+  return new Set(
+    (children || [])
+      .filter((mesh) => (
+        mesh?.visible &&
+        mesh?.userData?.isTerrainMesh &&
+        !mesh.userData?.isFixedLocationTerrainLod &&
+        !mesh.userData?.pendingTerrainTile &&
+        mesh.geometry?.attributes?.position?.count > 0
+      ))
+      .map((mesh) => String(mesh.userData?.terrainTileKey || ''))
+      .filter(Boolean)
+  );
+}
+
 export function addCoverageEdges(axisValues, coverageRects, minKey, maxKey) {
   const values = axisValues.slice();
   for (const rect of coverageRects || []) {

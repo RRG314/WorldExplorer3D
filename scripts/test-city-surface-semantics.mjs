@@ -6,6 +6,7 @@ import {
   terrainSurfaceMaterialSnapshot,
   waitForTerrainSurfaceMaterials
 } from '../app/js/world/load-terrain-readiness.js';
+import { landusePresentationOwner } from '../app/js/world/surface-contract.js';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relativePath) => fs.readFileSync(path.join(sourceRoot, relativePath), 'utf8');
@@ -34,8 +35,8 @@ assert.doesNotMatch(
 );
 assert.match(
   baselineSource,
-  /name: 'built'.*tint: \[1, 1, 1\]/,
-  'Built-up classification must leave base terrain neutral; exact mapped geometry owns hardscape.'
+  /name: 'built'.*tint: \[0\.76, 0\.78, 0\.80\]/,
+  'Built-up pixels need a neutral urban continuity tint instead of revealing grass between city buildings.'
 );
 assert.doesNotMatch(
   baselineSource,
@@ -57,10 +58,18 @@ assert.doesNotMatch(
   /sidewalk-batching|shouldBuildSidewalks|getSharedUrbanSurfaceMaterials|buildSidewalkStripBatch|sidewalkBatchVerts|sidewalkBatchIdx/,
   'Disabled sidewalk extrusion must not be loaded, allocated, or evaluated during Earth publication.'
 );
-assert.match(
+assert.equal(landusePresentationOwner('residential'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('commercial'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('industrial'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('parking'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('paved'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('park'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('grass'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('water'), 'mapped_geometry');
+assert.doesNotMatch(
   surfaceContractSource,
-  /:\s*'terrain_worldcover';/,
-  'Broad land-use polygons must stay semantic-only unless they are an explicit paved, parking, or water surface.'
+  /sidewalk|footpath/,
+  'City-surface ownership must not reintroduce generated sidewalks or footpaths.'
 );
 
 const terrainBuilderSource = terrainTileSource.slice(

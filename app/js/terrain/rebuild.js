@@ -317,9 +317,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
   const markMat = sharedRoadMaterials.markMat;
-  measure('buildRoadRibbons', () => {
-    baseRoads.forEach((road) => {
-      if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return;
+  await measureAsync('buildRoadRibbons', async () => {
+    let sliceStartedAt = now();
+    for (let roadIndex = 0; roadIndex < baseRoads.length; roadIndex += 1) {
+      const road = baseRoads[roadIndex];
+      if (!road || !Array.isArray(road.pts) || road.pts.length < 2) continue;
       const { width } = road;
       const hw = width / 2;
 
@@ -329,7 +331,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // intersection-cap pass previously trimmed these endpoints and filled
       // junctions with fan polygons, exposing circles and triangle boundaries.
       const pts = basePts;
-      if (!Array.isArray(pts) || pts.length < 2) return;
+      if (!Array.isArray(pts) || pts.length < 2) continue;
 
       const verts = [];
       const indices = [];
@@ -360,7 +362,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
         }
       }
-    });
+      // Large regional locations can publish tens of thousands of ribbons.
+      // Yield by elapsed time, rather than a fixed road count, because one
+      // complex interchange can cost far more than many short streets.
+      if (now() - sliceStartedAt >= 24) {
+        await yieldToMainThread();
+        sliceStartedAt = now();
+      }
+    }
   });
   await yieldToMainThread();
 

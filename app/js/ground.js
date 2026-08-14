@@ -3,7 +3,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
 } from "./structure-semantics.js?v=46";
-import { createSurfaceQuery } from './world/surface-contract.js?v=13';
+import { createSurfaceQuery } from './world/surface-contract.js?v=15';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================

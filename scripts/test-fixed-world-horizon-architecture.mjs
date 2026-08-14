@@ -34,6 +34,8 @@ const {
   FAR_CONTEXT_MAX_BUILDING_INSTANCES,
   FAR_CONTEXT_ZOOM,
   FAR_FIELD_GRID_INTERVAL_METERS,
+  FAR_FIELD_GAP_FILL_INTERVAL_METERS,
+  FAR_FIELD_WORLDCOVER_SIZE,
   FAR_WATER_CONTEXT_ZOOM,
   FAR_WATER_MIN_SPAN_METERS,
   FAR_WATER_TERRAIN_MASK_SIZE,
@@ -48,6 +50,10 @@ const {
   normalizeMappedWaterSurfaceOwnership,
   sampleFarFieldGridWorldY
 } = await import('../app/js/terrain/far-field-geometry.js');
+const {
+  cellFullyInsideDetailedCoverage,
+  publishedDetailedTerrainTileKeys
+} = await import('../app/js/terrain/far-field-coverage.js');
 assert.equal(
   farFieldPointWithinOuterBounds(
     100 + Number.EPSILON * 100,
@@ -157,6 +163,8 @@ assert.match(locationTerrainSource, /updateFarTerrainClipmap/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 22000);
 assert.equal(FAR_FIELD_GRID_INTERVAL_METERS, 320, 'fixed terrain must retain the accepted fixed-location mesh density');
+assert.equal(FAR_FIELD_GAP_FILL_INTERVAL_METERS, 40, 'only unpublished detailed gaps receive bounded terrain refinement');
+assert.equal(FAR_FIELD_WORLDCOVER_SIZE, 256, 'regional land-cover semantics must not stretch block-sized pixels across the visible world');
 assert.equal(FAR_CONTEXT_HALF_EXTENT_METERS, 14000);
 assert.equal(FAR_CONTEXT_ZOOM, 14);
 assert.equal(FAR_WATER_CONTEXT_ZOOM, 11);
@@ -271,12 +279,40 @@ assert.ok(axis.includes(-20) && axis.includes(30), 'far terrain must meet both e
 assert.ok(axis.every((value, index) => index === 0 || value > axis[index - 1]));
 assert.equal(cellInsideHole(0, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), true);
 assert.equal(cellInsideDetailedCoverage(0, 0, [{ minX: -20, maxX: 30, minZ: -10, maxZ: 10 }]), true);
+assert.equal(
+  cellFullyInsideDetailedCoverage(-5, 5, -5, 5, [{ minX: -20, maxX: 30, minZ: -10, maxZ: 10 }]),
+  true,
+  'far terrain may yield only when the detailed owner covers the entire cell'
+);
+assert.equal(
+  cellFullyInsideDetailedCoverage(-25, 5, -5, 5, [{ minX: -20, maxX: 30, minZ: -10, maxZ: 10 }]),
+  false,
+  'a partial detailed overlap must retain far terrain instead of opening a sky gap'
+);
+const publishedDetailedKeys = publishedDetailedTerrainTileKeys([
+  {
+    visible: true,
+    geometry: { attributes: { position: { count: 9 } } },
+    userData: { isTerrainMesh: true, terrainTileKey: '15/1/2', pendingTerrainTile: false }
+  },
+  {
+    visible: false,
+    geometry: { attributes: { position: { count: 9 } } },
+    userData: { isTerrainMesh: true, terrainTileKey: '15/1/3', pendingTerrainTile: true }
+  }
+]);
+assert.deepEqual([...publishedDetailedKeys], ['15/1/2']);
 assert.doesNotMatch(
   `${farFieldSource}\n${farFieldGeometrySource}`,
   /if \(cellInsideHole\(centerX, centerZ, spec\.inner\)\) continue/,
   'far terrain must remain continuous below unavailable detailed edge tiles'
 );
-assert.match(farFieldGeometrySource, /cellInsideDetailedCoverage\(centerX, centerZ, spec\.detailedCoverage\)/);
+assert.match(farFieldGeometrySource, /cellFullyInsideDetailedCoverage\(/);
+assert.match(
+  farFieldSource,
+  /detailedCoverage:\s*completeDetailedTileCoverage/,
+  'far terrain must resolve exclusions after asynchronous providers finish, using actually published detail'
+);
 assert.match(farFieldGeometrySource, /mappedWaterBedMetersAt/);
 assert.doesNotMatch(
   farFieldWaterSource,

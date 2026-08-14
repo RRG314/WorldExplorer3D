@@ -1,4 +1,5 @@
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
+import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
 const SHORTBREAD_ZOOM = 14;
@@ -279,7 +280,7 @@ function partIntersectsBounds(part, bounds) {
     minLat <= bounds.maxLat && maxLat >= bounds.minLat;
 }
 
-function convertTilesToElements(tiles, layerNames, bounds = null) {
+async function convertTilesToElements(tiles, layerNames, bounds = null) {
   const elements = [];
   const nodesByCoordinate = new Map();
   const featureSignatures = new Set();
@@ -304,6 +305,7 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
     return id;
   };
 
+  let sliceStartedAt = globalThis.performance?.now?.() ?? Date.now();
   for (const { tile, x, y, z } of tiles) {
     const resolveRoadName = layerNames.includes('streets')
       ? createRoadNameResolver({ tile, x, y, z }, projectLine)
@@ -347,6 +349,11 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
             nodes: nodeIds,
             tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
           });
+        }
+        const now = globalThis.performance?.now?.() ?? Date.now();
+        if (now - sliceStartedAt >= 24) {
+          await yieldToMainThread();
+          sliceStartedAt = globalThis.performance?.now?.() ?? Date.now();
         }
       }
     }
@@ -461,7 +468,7 @@ export async function fetchShortbreadWorldData(options = {}) {
     ? options.layerNames.slice()
     : ['streets', 'land', 'sites', 'street_polygons'];
   if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
-  const elements = convertTilesToElements(tiles, layerNames, bounds);
+  const elements = await convertTilesToElements(tiles, layerNames, bounds);
   if (metrics.rejected > 0) {
     for (const element of elements) {
       if (element?.type === 'way' && element?.tags?.highway) {

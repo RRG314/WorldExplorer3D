@@ -18,7 +18,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=44";
+} from "./surface-profiles.js?v=46";
 import { stitchTerrainMeshEdges } from "./seams.js?v=1";
 import {
   cancelTerrainTileRequest as cancelTileRequest,

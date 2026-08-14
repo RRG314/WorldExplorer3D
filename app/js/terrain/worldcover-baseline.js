@@ -23,9 +23,11 @@ const WORLD_COVER_CLASSES = [
   { id: 20, name: 'shrub', source: [255, 187, 34], tint: [0.96, 0.98, 0.78] },
   { id: 30, name: 'grass', source: [255, 255, 76], tint: [1.03, 1.05, 0.94] },
   { id: 40, name: 'crop', source: [240, 150, 255], tint: [1.08, 0.97, 0.74] },
-  // Built-up classification is context, not proof that the ground is asphalt.
-  // Exact roads, hardscape, landuse, and building footprints own that surface.
-  { id: 50, name: 'built', source: [250, 0, 0], tint: [1, 1, 1] },
+  // Built-up classification is a neutral urban continuity tint, not proof
+  // that every pixel is asphalt. Exact mapped roads and developed land-use
+  // polygons still own their physical surfaces; this only prevents uncovered
+  // regional city pixels from reverting to bright grass.
+  { id: 50, name: 'built', source: [250, 0, 0], tint: [0.76, 0.78, 0.80] },
   { id: 60, name: 'bare', source: [180, 180, 180], tint: [1.08, 0.94, 0.76] },
   { id: 70, name: 'snow', source: [240, 240, 240], tint: [1.32, 1.34, 1.38] },
   { id: 80, name: 'water', source: [0, 100, 200], tint: [0.82, 0.91, 0.96] },

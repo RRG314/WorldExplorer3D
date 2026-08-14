@@ -1,4 +1,4 @@
-import { getVectorTileLib } from './shortbread-source.js?v=15';
+import { getVectorTileLib } from './shortbread-source.js?v=16';
 
 const OVERTURE_RELEASE = '2026-06-17.0';
 const OVERTURE_THEME_ZOOM = Object.freeze({

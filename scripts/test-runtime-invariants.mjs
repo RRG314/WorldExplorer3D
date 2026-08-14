@@ -502,12 +502,21 @@ async function main() {
               centerRoad
             );
           if (centerBlocked) centerHits += 1;
-          const laneOffset = Math.max(0.4, halfWidth - 0.8);
+          const vehicleRadius = 2;
+          const laneEdgeClearance = 0.25;
+          // Probe representative lane centers while keeping the complete
+          // vehicle collider inside the mapped road surface. The previous
+          // halfWidth - 0.8 probe put a 2 m collider 1.2 m beyond every road
+          // edge and measured neighboring buildings/shoulders as lane faults.
+          const laneOffset = Math.min(
+            halfWidth * 0.5,
+            Math.max(0, halfWidth - vehicleRadius - laneEdgeClearance)
+          );
           for (const sign of [-1, 1]) {
             const laneCollision = ctx.checkBuildingCollision?.(
               point.x + point.normalX * laneOffset * sign,
               point.z + point.normalZ * laneOffset * sign,
-              2,
+              vehicleRadius,
               collisionOptions
             );
             const laneRoad = ctx.findNearestRoad?.(

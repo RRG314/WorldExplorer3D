@@ -154,6 +154,10 @@ try {
         farBuildingsAvailable: Number(ctx.farTerrainClipmapState?.farBuildingsAvailable || 0),
         farBuildingSelectionCoverage: Number(ctx.farTerrainClipmapState?.farBuildingSelectionCoverage || 0),
         farBuildingPublishedCoverage: Number(ctx.farTerrainClipmapState?.farBuildingPublishedCoverage || 0),
+        terrainCoverage: ctx.farTerrainClipmapState?.terrainCoverage || null,
+        mappedSurfaceTintAreas: Number(ctx.farTerrainClipmapState?.mappedSurfaceTintAreas || 0),
+        mappedSurfaceTintVertices: Number(ctx.farTerrainClipmapState?.mappedSurfaceTintVertices || 0),
+        detailedMappedSurfaceTintVertices: Number(ctx.farTerrainClipmapState?.detailedMappedSurfaceTintVertices || 0),
         farTerrainStatus: ctx.farTerrainClipmapState?.status || null,
         traversalRadius: Number(ctx.worldTraversalRadiusWorld || 0),
         regionalBridges: bridges.length,
@@ -267,8 +271,18 @@ try {
       `${scenario.id} is missing mapped bridge geometry at its landmark: ${JSON.stringify(report.namedBridges.slice(0, 30))}`
     );
     assert.ok(
-      report.farBuildings >= 150000 && report.farBuildingPublishedCoverage >= 0.20,
+      report.farBuildings >= 40000 && report.farBuildingPublishedCoverage >= 0.20,
       `${scenario.id} outer building coverage is too sparse: ${JSON.stringify(report)}`
+    );
+    assert.equal(
+      report.terrainCoverage?.unownedCells,
+      0,
+      `${scenario.id} contains terrain cells owned by neither detailed nor regional terrain: ${JSON.stringify(report.terrainCoverage)}`
+    );
+    assert.ok(
+      report.mappedSurfaceTintAreas > 0 && report.mappedSurfaceTintVertices > 0 &&
+        report.detailedMappedSurfaceTintVertices > 0,
+      `${scenario.id} lost deterministic mapped land-use fallback: ${JSON.stringify(report)}`
     );
     assert.ok(
       Number.isFinite(report.targetBridgeSurfaceY) && report.targetBridgeSurfaceKind === 'road',

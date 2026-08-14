@@ -164,7 +164,7 @@ import {
 import { createWorldRoadLoader } from "./world/load-roads.js?v=105";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=15";
+} from "./world/shortbread-source.js?v=16";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=10";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=25";

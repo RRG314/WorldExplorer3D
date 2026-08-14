@@ -1,7 +1,9 @@
 import {
   addCoverageEdges,
-  cellInsideDetailedCoverage
-} from './far-field-coverage.js?v=1';
+  cellFullyInsideDetailedCoverage,
+  cellInsideDetailedCoverage,
+  publishedDetailedTerrainTileKeys
+} from './far-field-coverage.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 function median(values) {
@@ -19,10 +21,10 @@ function appendInterval(values, start, end, interval, includeStart = true) {
   }
 }
 
-function buildClipmapAxis(outerMin, innerMin, innerMax, outerMax, interval) {
+function buildClipmapAxis(outerMin, innerMin, innerMax, outerMax, interval, innerInterval = interval) {
   const values = [];
   appendInterval(values, outerMin, innerMin, interval, true);
-  appendInterval(values, innerMin, innerMax, interval, false);
+  appendInterval(values, innerMin, innerMax, innerInterval, false);
   appendInterval(values, innerMax, outerMax, interval, false);
   return values;
 }
@@ -137,9 +139,13 @@ function sampleFarFieldGridWorldY(x, z, surfaceGrid) {
   const row = intervalIndex(zValues, Number(z));
   if (column < 0 || row < 0 || !worldYs) return null;
 
-  const centerX = (xValues[column] + xValues[column + 1]) * 0.5;
-  const centerZ = (zValues[row] + zValues[row + 1]) * 0.5;
-  if (cellInsideDetailedCoverage(centerX, centerZ, surfaceGrid.detailedCoverage)) return null;
+  if (cellFullyInsideDetailedCoverage(
+    xValues[column],
+    xValues[column + 1],
+    zValues[row],
+    zValues[row + 1],
+    surfaceGrid.detailedCoverage
+  )) return null;
 
   const columns = xValues.length;
   const a = row * columns + column;
@@ -201,11 +207,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
     appCtx,
     clampElevationMeters,
     farFieldGridIntervalMeters,
+    farFieldGapFillIntervalMeters,
     farFieldSeamBlendMeters,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
     sampleTileElevationMeters,
     pointInMappedWaterArea,
+    pointInMappedLandArea,
     terrainTileDeps,
     tileXYToLatLonBounds,
     worldToLatLon
@@ -244,28 +252,14 @@ function createFarFieldGeometryPlanner(deps = {}) {
   }
 
   function completeDetailedTileCoverage(z, centerX, centerY, ring) {
-    if (typeof terrainTileDeps?.usesAcceptedGround === 'function' &&
-        !terrainTileDeps.usesAcceptedGround()) return [];
     const coverage = [];
-    const checkpoints = [0, 0.5, 1];
+    const publishedTiles = publishedDetailedTerrainTileKeys(appCtx.terrainGroup?.children || []);
     for (let dx = -ring; dx <= ring; dx += 1) {
       for (let dy = -ring; dy <= ring; dy += 1) {
-        const rect = detailedTileWorldBounds(z, centerX + dx, centerY + dy);
-        let complete = true;
-        for (const fx of checkpoints) {
-          for (const fz of checkpoints) {
-            const x = rect.minX + (rect.maxX - rect.minX) * fx;
-            const zWorld = rect.minZ + (rect.maxZ - rect.minZ) * fz;
-            const { lat, lon } = worldToLatLon(x, zWorld);
-            const sample = sampleAcceptedGroundAtLatLon(lat, lon);
-            if (sample?.status !== 'available' || !Number.isFinite(Number(sample.groundElevationMeters))) {
-              complete = false;
-              break;
-            }
-          }
-          if (!complete) break;
-        }
-        if (complete) coverage.push(rect);
+        const tx = centerX + dx;
+        const ty = centerY + dy;
+        if (!publishedTiles.has(`${z}/${tx}/${ty}`)) continue;
+        coverage.push(detailedTileWorldBounds(z, tx, ty));
       }
     }
     return coverage;
@@ -405,14 +399,33 @@ function createFarFieldGeometryPlanner(deps = {}) {
 
   async function buildFarFieldGeometry(spec, loadedTiles, offsetMeters, mappedContext = null) {
     const interval = farFieldGridIntervalMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
+    const gapFillInterval = Math.min(
+      interval,
+      Math.max(20, Number(farFieldGapFillIntervalMeters) || farFieldGridIntervalMeters) *
+        Number(appCtx.WORLD_UNITS_PER_METER || 1)
+    );
     const xValues = addCoverageEdges(
-      buildClipmapAxis(spec.outer.minX, spec.inner.minX, spec.inner.maxX, spec.outer.maxX, interval),
+      buildClipmapAxis(
+        spec.outer.minX,
+        spec.inner.minX,
+        spec.inner.maxX,
+        spec.outer.maxX,
+        interval,
+        gapFillInterval
+      ),
       spec.detailedCoverage,
       'minX',
       'maxX'
     );
     const zValues = addCoverageEdges(
-      buildClipmapAxis(spec.outer.minZ, spec.inner.minZ, spec.inner.maxZ, spec.outer.maxZ, interval),
+      buildClipmapAxis(
+        spec.outer.minZ,
+        spec.inner.minZ,
+        spec.inner.maxZ,
+        spec.outer.maxZ,
+        interval,
+        gapFillInterval
+      ),
       spec.detailedCoverage,
       'minZ',
       'maxZ'
@@ -420,10 +433,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const positions = [];
     const surfaceWorldYs = [];
     const colors = [];
+    const mappedSurfaceTints = [];
     const uvs = [];
     const indices = [];
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
     const zRange = spec.outer.maxZ - spec.outer.minZ || 1;
+    let farOwnedCells = 0;
+    let detailedOwnedCells = 0;
     let minElevationMeters = Infinity;
     let maxElevationMeters = -Infinity;
     const maskStats = { waterMaskedVertices: 0 };
@@ -455,7 +471,28 @@ function createFarFieldGeometryPlanner(deps = {}) {
         // The fixed-location LOD uses the same PBR base, WorldCover tint, and
         // built-surface shader as detailed terrain. White is the neutral vertex
         // multiplier until that shared presentation is applied to the mesh.
-        colors.push(1, 1, 1);
+        const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
+        const geographicPoint = worldToLatLon(samplePoint.x, samplePoint.z);
+        const contextTile = latLonToTileXY(
+          geographicPoint.lat,
+          geographicPoint.lon,
+          Number(mappedContext?.contextZoom || 0)
+        );
+        const landBucket = mappedContext?.landAreasByTile?.get?.(
+          `${mappedContext.contextZoom}/${contextTile.x}/${contextTile.y}`
+        ) || [];
+        const mappedSurface = landBucket.find((area) => (
+          typeof pointInMappedLandArea === 'function' &&
+          pointInMappedLandArea(geographicPoint.lon, geographicPoint.lat, area)
+        ));
+        const mappedTint = mappedSurface?.tint;
+        if (Array.isArray(mappedTint) && mappedTint.length >= 3) {
+          colors.push(mappedTint[0], mappedTint[1], mappedTint[2]);
+          mappedSurfaceTints.push(mappedTint[0], mappedTint[1], mappedTint[2]);
+        } else {
+          colors.push(1, 1, 1);
+          mappedSurfaceTints.push(NaN, NaN, NaN);
+        }
         uvs.push((x - spec.outer.minX) / xRange, 1 - (z - spec.outer.minZ) / zRange);
       }
     }
@@ -463,9 +500,17 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const width = xValues.length;
     for (let row = 0; row < zValues.length - 1; row += 1) {
       for (let column = 0; column < xValues.length - 1; column += 1) {
-        const centerX = (xValues[column] + xValues[column + 1]) * 0.5;
-        const centerZ = (zValues[row] + zValues[row + 1]) * 0.5;
-        if (cellInsideDetailedCoverage(centerX, centerZ, spec.detailedCoverage)) continue;
+        if (cellFullyInsideDetailedCoverage(
+          xValues[column],
+          xValues[column + 1],
+          zValues[row],
+          zValues[row + 1],
+          spec.detailedCoverage
+        )) {
+          detailedOwnedCells += 1;
+          continue;
+        }
+        farOwnedCells += 1;
         const a = row * width + column;
         const b = a + 1;
         const c = a + width;
@@ -488,6 +533,14 @@ function createFarFieldGeometryPlanner(deps = {}) {
       minElevationMeters,
       maxElevationMeters,
       waterMaskedVertices: maskStats.waterMaskedVertices,
+      mappedSurfaceTints: new Float32Array(mappedSurfaceTints),
+      coverage: {
+        totalCells: (xValues.length - 1) * (zValues.length - 1),
+        farOwnedCells,
+        detailedOwnedCells,
+        unownedCells: (xValues.length - 1) * (zValues.length - 1) -
+          farOwnedCells - detailedOwnedCells
+      },
       surfaceGrid: {
         xValues,
         zValues,

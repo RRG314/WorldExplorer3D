@@ -528,9 +528,27 @@ try {
     report.mountainContinuity?.farTerrain?.farWaterPolygons,
     `regional terrain contains water cutouts without matching water geometry: ${JSON.stringify(report.mountainContinuity?.farTerrain)}`
   );
+  assert.equal(
+    report.mountainContinuity?.farTerrain?.terrainCoverage?.unownedCells,
+    0,
+    `Monaco contains terrain cells owned by neither detailed nor far terrain: ${JSON.stringify(report.mountainContinuity?.farTerrain?.terrainCoverage)}`
+  );
   assert.ok(
-    Number(report.mountainContinuity?.farTerrain?.vertices || 0) >= 150000,
-    `fixed Monaco mountain terrain is still too coarse: ${JSON.stringify(report.mountainContinuity?.farTerrain)}`
+    Number(report.mountainContinuity?.farTerrain?.mappedSurfaceTintAreas || 0) > 0 &&
+      Number(report.mountainContinuity?.farTerrain?.mappedSurfaceTintVertices || 0) > 0 &&
+      Number(report.mountainContinuity?.farTerrain?.detailedMappedSurfaceTintVertices || 0) > 0,
+    `Monaco has no deterministic mapped land-use fallback: ${JSON.stringify(report.mountainContinuity?.farTerrain)}`
+  );
+  assert.equal(
+    Number(report.mountainContinuity?.farTerrain?.terrainCoverage?.farOwnedCells || 0) +
+      Number(report.mountainContinuity?.farTerrain?.terrainCoverage?.detailedOwnedCells || 0),
+    Number(report.mountainContinuity?.farTerrain?.terrainCoverage?.totalCells || -1),
+    `Monaco terrain ownership does not cover the complete fixed mesh: ${JSON.stringify(report.mountainContinuity?.farTerrain?.terrainCoverage)}`
+  );
+  assert.ok(
+    Number(report.mountainContinuity?.farTerrain?.vertices || 0) >= 50000 &&
+      Number(report.mountainContinuity?.farTerrain?.vertices || 0) <= 100000,
+    `fixed Monaco terrain no longer matches the accepted 320 m grid budget: ${JSON.stringify(report.mountainContinuity?.farTerrain)}`
   );
   assert.equal(
     report.mountainContinuity?.detailedFacadeMaterials,
@@ -540,7 +558,7 @@ try {
   assert.ok(
     report.mountainContinuity?.farFacadeOwners?.length > 0 &&
       report.mountainContinuity.farFacadeOwners.every((entry) => (
-        entry.detail === 'world-space-antialiased-window-grid' &&
+        entry.detail === 'world-space-distance-adaptive-window-grid' &&
         entry.coverage === 'entire-fixed-map'
       )),
     `some regional Monaco building tier lacks full-map facades: ${JSON.stringify(report.mountainContinuity?.farFacadeOwners)}`

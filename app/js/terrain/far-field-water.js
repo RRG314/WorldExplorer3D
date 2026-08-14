@@ -128,9 +128,10 @@ function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publi
   }
   if (polygons === 0) return null;
   const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
-  const mask = new Uint8Array(canvas.width * canvas.height);
-  for (let index = 0; index < mask.length; index += 1) mask[index] = rgba[index * 4];
-  const texture = new THREE.DataTexture(mask, canvas.width, canvas.height, THREE.RedFormat, THREE.UnsignedByteType);
+  // The canvas already owns a GPU-ready RGBA buffer whose red channel is the
+  // mask. Converting 16.7 million pixels into a second red-only array blocked
+  // Chrome for several seconds on large locations without saving peak memory.
+  const texture = new THREE.DataTexture(rgba, canvas.width, canvas.height, THREE.RGBAFormat, THREE.UnsignedByteType);
   texture.name = 'FarMappedWaterTerrainOwnershipMask';
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.flipY = true;
@@ -164,7 +165,7 @@ function applyMappedWaterTerrainOwnership(mesh, material, ownership) {
     authority: 'published-water-geometry-fragment-mask',
     polygons: ownership.polygons,
     size: ownership.size,
-    format: 'red8',
+    format: 'rgba8-red-channel',
     shaderDiscard: true,
     delegationRule: 'published-water-geometry-only'
   };

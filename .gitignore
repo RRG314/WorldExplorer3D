@@ -12,6 +12,7 @@ output/
 test-results/
 coverage/
 dist/
+.local-candidates/
 public/
 *.log
 progress.md

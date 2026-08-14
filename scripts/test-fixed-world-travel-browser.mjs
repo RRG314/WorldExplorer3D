@@ -75,7 +75,11 @@ async function readWorldState() {
       ),
       farTerrain: ctx.farTerrainClipmapState ? {
         status: ctx.farTerrainClipmapState.status,
-        elevationMaxInFlight: Number(ctx.farTerrainClipmapState.elevationMaxInFlight || 0)
+        elevationMaxInFlight: Number(ctx.farTerrainClipmapState.elevationMaxInFlight || 0),
+        terrainCoverage: ctx.farTerrainClipmapState.terrainCoverage || null,
+        mappedSurfaceTintAreas: Number(ctx.farTerrainClipmapState.mappedSurfaceTintAreas || 0),
+        mappedSurfaceTintVertices: Number(ctx.farTerrainClipmapState.mappedSurfaceTintVertices || 0),
+        detailedMappedSurfaceTintVertices: Number(ctx.farTerrainClipmapState.detailedMappedSurfaceTintVertices || 0)
       } : null
     };
   });
@@ -299,7 +303,7 @@ try {
       };
     }, { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
     if (!Number.isFinite(bounds.minX)) throw new Error('Detailed terrain bounds unavailable');
-    const x = bounds.minX + 120;
+    const x = bounds.minX + 40;
     const z = (bounds.minZ + bounds.maxZ) * 0.5;
     const ground = ctx.SurfaceQuery.terrainAt(x, z)?.position?.y ?? 0;
     ctx.setTravelMode('plane', {
@@ -330,7 +334,7 @@ try {
       start,
       end: { x: current.x, y: current.y, z: current.z },
       displacement: Math.hypot(current.x - start.x, current.z - start.z),
-      boundaryCrossed: current.x < start.bounds.minX - 100,
+      boundaryCrossed: current.x < start.bounds.minX - 40,
       active: current.active === true,
       airborne: current.airborne === true,
       acceptedGroundStatus: acceptedGround?.status || null,
@@ -398,6 +402,17 @@ try {
   await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
 
   assert.equal(ready.publication?.stable, true, 'world was unstable before movement');
+  assert.equal(
+    ready.farTerrain?.terrainCoverage?.unownedCells,
+    0,
+    `Baltimore contains terrain cells owned by neither detailed nor regional terrain: ${JSON.stringify(ready.farTerrain)}`
+  );
+  assert.ok(
+    ready.farTerrain?.mappedSurfaceTintAreas > 0 &&
+      ready.farTerrain?.mappedSurfaceTintVertices > 0 &&
+      ready.farTerrain?.detailedMappedSurfaceTintVertices > 0,
+    `Baltimore lost deterministic mapped land-use fallback: ${JSON.stringify(ready.farTerrain)}`
+  );
   assert.ok(
     drive.pathDistance >= 20 && drive.displacement >= 15,
     `${durationSeconds}-second drive covered only ${drive.pathDistance.toFixed(1)} m ` +

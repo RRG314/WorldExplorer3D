@@ -218,12 +218,31 @@ const APP_SHELL_FRAGMENT_HTML = `
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
 `;
 
+async function publishImmutableBuildIdentity() {
+  try {
+    const response = await fetch('/build-manifest.json', { cache: 'no-store' });
+    if (!response.ok) return;
+    const manifest = await response.json();
+    const candidateId = String(manifest?.candidateId || '');
+    if (!candidateId || candidateId !== String(manifest?.buildId || '')) return;
+    globalThis.__WORLD_EXPLORER_BUILD__ = Object.freeze(manifest);
+    const hudBox = document.querySelector('.hud-box');
+    if (hudBox) {
+      hudBox.dataset.buildLabel = `V${manifest.version} · ${String(manifest.commit || '').slice(0, 7)}`;
+      hudBox.title = candidateId;
+    }
+  } catch {
+    // A mutable source preview deliberately has no immutable build manifest.
+  }
+}
+
 function ensureAppShellFragments() {
   if (!document.body || document.getElementById('propertyPanel')) {
     return;
   }
 
-  document.body.insertAdjacentHTML('beforeend', APP_SHELL_FRAGMENT_HTML);
+document.body.insertAdjacentHTML('beforeend', APP_SHELL_FRAGMENT_HTML);
+publishImmutableBuildIdentity();
 }
 
 ensureAppShellFragments();
