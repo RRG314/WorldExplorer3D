@@ -89,6 +89,37 @@ export function barrierPointConflictsWithDriveableRoad(feature, options = {}) {
   return false;
 }
 
+export function supportPointConflictsWithDriveableRoad(feature, options = {}) {
+  const x = Number(options.x);
+  const z = Number(options.z);
+  const supportBottomY = Number(options.supportBottomY);
+  const supportTopY = Number(options.supportTopY);
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(z) ||
+    !Number.isFinite(supportBottomY) ||
+    !Number.isFinite(supportTopY)
+  ) return false;
+  const candidateRoads = typeof options.roadIndex?.candidates === 'function'
+    ? options.roadIndex.candidates(x, z)
+    : options.roads || [];
+  for (const road of candidateRoads) {
+    if (!road || road === feature || road.driveable === false || !Array.isArray(road.pts)) continue;
+    const corridorRadius = Math.max(
+      2,
+      (Number(road.width) || 5) * 0.5 + Math.max(0.8, Number(options.columnRadius) || 0)
+    );
+    if (distanceToRoadCenterline(road, x, z) > corridorRadius) continue;
+    const otherY = sampleFeatureSurfaceY(road, x, z);
+    if (!Number.isFinite(otherY)) continue;
+    // A pier occupies the complete vertical interval below its deck. Reject a
+    // placement when any other driveable surface crosses that interval, with
+    // enough headroom that the column cannot visually intrude into traffic.
+    if (otherY >= supportBottomY - 0.35 && otherY <= supportTopY + 2.2) return true;
+  }
+  return false;
+}
+
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;
   if (semantics?.terrainMode !== 'elevated' || feature?.driveable === false) return false;

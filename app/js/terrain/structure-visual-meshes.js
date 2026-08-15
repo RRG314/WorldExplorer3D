@@ -157,11 +157,12 @@ function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegment
       const nx = -dz / length;
       const nz = dx / length;
       const halfWidth = shell.width * 0.5 + 0.1;
+      const thickness = Math.max(0.06, Number(ring.thickness) || Number(shell.thickness) || 0.18);
       positions.push(
         ring.x + nx * halfWidth, ring.y - 0.045, ring.z + nz * halfWidth,
         ring.x - nx * halfWidth, ring.y - 0.045, ring.z - nz * halfWidth,
-        ring.x + nx * halfWidth, ring.y - shell.thickness, ring.z + nz * halfWidth,
-        ring.x - nx * halfWidth, ring.y - shell.thickness, ring.z - nz * halfWidth
+        ring.x + nx * halfWidth, ring.y - thickness, ring.z + nz * halfWidth,
+        ring.x - nx * halfWidth, ring.y - thickness, ring.z - nz * halfWidth
       );
     }
     for (let index = 0; index < rings.length - 1; index += 1) {
@@ -173,6 +174,12 @@ function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegment
         a + 1, a + 3, b + 1, a + 3, b + 3, b + 1
       );
     }
+    const start = base;
+    const end = base + (rings.length - 1) * 4;
+    indices.push(
+      start, start + 2, start + 1, start + 1, start + 2, start + 3,
+      end, end + 1, end + 2, end + 1, end + 3, end + 2
+    );
   }
   for (const segment of barrierSegments || []) {
     const p1 = segment?.p1;
@@ -212,7 +219,9 @@ function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegment
   Object.assign(mesh.userData, {
     isStructureVisual: true,
     structureVisualType: "elevated_road_shells",
-    elevatedRoadOwner: "compiled-transport-surface"
+    elevatedRoadOwner: "compiled-transport-structure-assembly",
+    closedStructureEnds: true,
+    variableTransitionThickness: true
   });
   appCtx.addEarthWorldObject(mesh);
   appCtx.structureVisualMeshes.push(mesh);

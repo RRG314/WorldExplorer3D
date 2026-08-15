@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=46";
 // Installs the final-publication guardrail owner. Guardrails are compiled once
 // after the complete transport graph and accepted terrain are ready.
-import "./bridge-guardrails.js?v=13";
+import "./bridge-guardrails.js?v=14";
 import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=3";
 import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 

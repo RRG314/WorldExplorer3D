@@ -10,7 +10,12 @@ import {
 } from "../structure-semantics.js?v=46";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=10";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=3";
 import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=1";
+import {
+  createDriveableRoadConflictIndex,
+  supportPointConflictsWithDriveableRoad
+} from "./bridge-safety.js?v=7";
 import { refreshStructureColliders } from "./structure-colliders.js?v=7";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
@@ -376,6 +381,24 @@ function* compileStructureAwareFeatureProfileSteps() {
   yield;
 
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
+  yield;
+  measure('compileStructureAssemblies', () => {
+    const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
+    appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
+      transportFeatures,
+      worldBaseTerrainY,
+      {
+        supportConflict: (feature, column) => supportPointConflictsWithDriveableRoad(feature, {
+          x: column.x,
+          z: column.z,
+          supportBottomY: column.terrainY,
+          supportTopY: column.topY,
+          columnRadius: column.width * 0.5,
+          roadIndex: supportRoadIndex
+        })
+      }
+    );
+  });
   yield;
   measure('refreshStructureColliders', () => refreshStructureColliders(appCtx, transportFeatures));
   yield;

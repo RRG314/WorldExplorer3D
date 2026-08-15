@@ -4,6 +4,7 @@ import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
 import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
+import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=1";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -415,25 +416,32 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const activeRoadSemantics = appCtx.car?.road?.structureSemantics || null;
-  const activeStructureKind = String(
-    appCtx.car?.road?.transportStructureRef?.kind ||
-    activeRoadSemantics?.structureKind ||
-    ''
-  );
-  const insideTunnel =
-    activeRoadSemantics?.terrainMode === 'subgrade' ||
-    activeRoadSemantics?.structureKind === 'covered' ||
-    ['covered', 'indoor_covered', 'building_passage'].includes(activeStructureKind);
   const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
-  const d = insideTunnel ? 6.5 : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
-  const h = insideTunnel ? 2.35 : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
 
   // Get car's actual Y position (follows terrain)
   const carGroundY = Number(presentationCar?.y ?? appCtx.carMesh.position.y) - CAR_BODY_HEIGHT_FROM_GROUND;
   const carX = Number(presentationCar?.x ?? appCtx.car.x);
   const carZ = Number(presentationCar?.z ?? appCtx.car.z);
   const carAngle = Number(presentationCar?.angle ?? appCtx.car.angle);
+  const tunnelCameraState = resolveTunnelCameraState({
+    disabled: planetaryChase,
+    road: appCtx.car?.road || null,
+    x: carX,
+    z: carZ,
+    angle: carAngle,
+    lookYaw: carLook.yaw,
+    reverse: lb,
+    trailingDistance: CHASE_CAMERA_DISTANCE
+  });
+  const tunnelCameraEnvelope = tunnelCameraState.envelope;
+  const tunnelCameraTransitionOnly = tunnelCameraState.transitionOnly;
+  const insideTunnel = tunnelCameraState.inside;
+  const d = insideTunnel
+    ? tunnelCameraEnvelope.chaseDistance
+    : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
+  const h = insideTunnel
+    ? tunnelCameraEnvelope.cameraHeight
+    : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
   const viewAngle = carAngle + carLook.yaw + (lb ? Math.PI : 0);
 
   // Show car mesh for non-first-person modes
@@ -447,10 +455,21 @@ function updateCamera(dt = 1 / 60) {
     const ox = -Math.sin(viewAngle) * horizontalDistance;
     const oz = -Math.cos(viewAngle) * horizontalDistance;
     let targetX = carX + ox;
-    let targetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
+    const cameraFloorY = insideTunnel ? tunnelCameraEnvelope.floorY : carGroundY;
+    const maximumTunnelCameraY = insideTunnel
+      ? tunnelCameraEnvelope.ceilingY - 0.35
+      : Infinity;
+    let targetY = Math.min(
+      maximumTunnelCameraY,
+      cameraFloorY + h + Math.sin(carLook.pitch) * d * 0.72
+    );
     let targetZ = carZ + oz;
     const lookX = carX;
-    const lookY = carGroundY + (planetaryChase ? 2.1 : 0.5);
+    const lookY = insideTunnel
+      ? tunnelCameraTransitionOnly
+        ? carGroundY + 0.5
+        : tunnelCameraEnvelope.floorY + tunnelCameraEnvelope.lookHeight
+      : carGroundY + (planetaryChase ? 2.1 : 0.5);
     const lookZ = carZ;
     let collisionTarget = planetaryChase
       ? { x: targetX, y: targetY, z: targetZ, collided: false }
@@ -479,6 +498,12 @@ function updateCamera(dt = 1 / 60) {
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
+    if (insideTunnel) {
+      appCtx.camera.position.y = Math.max(
+        tunnelCameraEnvelope.floorY + 0.35,
+        Math.min(tunnelCameraEnvelope.ceilingY - 0.28, appCtx.camera.position.y)
+      );
+    }
 
     // Initialize lookAt target if needed
     if (!appCtx.camera.userData.lookTarget) {

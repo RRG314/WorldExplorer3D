@@ -43,6 +43,15 @@ function structureFamily(kind) {
   return kind;
 }
 
+function sourceTag(feature, key) {
+  return String(
+    feature?.transportRecord?.sourceTags?.[key] ??
+    feature?.transportRecord?.rawTags?.[key] ??
+    feature?.structureTags?.[key] ??
+    ''
+  ).trim().toLowerCase();
+}
+
 function compatibleChain(left, right) {
   if (!left || !right) return false;
   if (structureFamily(left.kind) !== structureFamily(right.kind)) return false;
@@ -108,6 +117,9 @@ function structureSpecification(entry) {
   );
   return Object.freeze({
     width,
+    bridgeStructure: sourceTag(feature, 'bridge:structure') || null,
+    bridgeSupport: sourceTag(feature, 'bridge:support') || null,
+    bridgeMaterial: sourceTag(feature, 'bridge:material') || sourceTag(feature, 'material') || null,
     deckThickness,
     fasciaDepth: Math.max(0.18, deckThickness * 0.62),
     barrierOffset: width * 0.5 + 0.3,

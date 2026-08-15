@@ -6,7 +6,12 @@ import {
 import { classifyStructureSemantics } from '../app/js/structure-semantics/classification.js';
 import { compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system-model.js';
 import { compileTransportStructureModel } from '../app/js/world/compiler/transport-structure-model.js';
+import {
+  compileElevatedAssembly,
+  compileTransportStructureAssemblies
+} from '../app/js/world/compiler/transport-structure-assembly.js';
 import { buildTransportJunctionProfileAnchors } from '../app/js/world/compiler/transport-junction-profile.js';
+import { resolveTunnelCameraEnvelope } from '../app/js/hud/tunnel-camera-envelope.js';
 import { isProtectedRoadFeature } from '../app/js/world/bridge-safety.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
@@ -52,7 +57,8 @@ function structureFeature(id, points, tags, options = {}) {
       completeness: options.completeness || 'lossless',
       routeState: options.routeState || 'complete',
       safeForDriving: options.driveable !== false,
-      maxHeightMeters: options.maxHeightMeters || null
+      maxHeightMeters: options.maxHeightMeters || null,
+      sourceTags: { ...tags }
     },
     transportSurfaceModel: constantProfile(length, options.surfaceY || 0, options.width || 8),
     connectedFeatures: { start: [], end: [] }
@@ -187,6 +193,7 @@ assert.ok(
 );
 bridgeA.transportRecord.completeness = 'lossless';
 assert.equal(isProtectedRoadFeature(bridgeA), true);
+compileTransportStructureAssemblies([bridgeA], () => -8);
 const bridgeVisuals = collectStructureVisualInstances({
   featuresToProcess: [bridgeA],
   allElevatedFeatures: [bridgeA],
@@ -197,14 +204,89 @@ const bridgeVisuals = collectStructureVisualInstances({
   polylineCurvatureMetric: () => 0,
   roadConflictIndex: { query: () => [] }
 });
-assert.ok(bridgeVisuals.deckInstances.length > 0, 'lossless road bridge must publish an engineered deck body');
+assert.equal(
+  bridgeVisuals.deckInstances.length,
+  0,
+  'vehicle road structures must not republish the obsolete overlapping segment-box body'
+);
+assert.equal(bridgeVisuals.elevatedDeckShells.length, 1, 'lossless road bridge must publish one continuous body');
+assert.equal(bridgeVisuals.elevatedDeckShells[0].bodyCoverage, 1);
 assert.ok(bridgeVisuals.girderInstances.length > 0, 'lossless road bridge must publish visible girders');
+assert.ok(bridgeVisuals.supportInstances.length > 0, 'lossless road bridge must publish support/abutment geometry');
+
+const curvedRamp = structureFeature(
+  'osm:way:curved-ramp',
+  [
+    { x: 0, z: 0 },
+    { x: 35, z: 8 },
+    { x: 68, z: 30 },
+    { x: 92, z: 66 },
+    { x: 105, z: 110 },
+    { x: 108, z: 155 }
+  ],
+  { highway: 'motorway_link', bridge: 'yes', layer: '1', 'bridge:structure': 'viaduct' },
+  { width: 6.2, surfaceY: 11 }
+);
+curvedRamp.structureStations = [{ distance: 78, span: 32, source: 'feature_crossing' }];
+compileTransportStructureModel([curvedRamp]);
+const curvedRampAssembly = compileElevatedAssembly(curvedRamp, () => 0);
+curvedRamp.transportStructureAssembly = curvedRampAssembly;
+assert.equal(curvedRampAssembly.bodyCoverage, 1);
+assert.equal(curvedRampAssembly.structureType, 'viaduct');
+assert.ok(curvedRampAssembly.supportStations.length > 0, 'curved ramp lost every support station');
+assert.ok(
+  curvedRampAssembly.supportStations.every((station) => station.distance < 58.8 || station.distance > 97.2),
+  'a support was placed inside the compiled crossing-clearance exclusion'
+);
+const curvedRampVisuals = collectStructureVisualInstances({
+  featuresToProcess: [curvedRamp],
+  allElevatedFeatures: [curvedRamp],
+  cachedTerrainHeight: () => 0,
+  pointAlongPolyline,
+  roadConflictIndex: { candidates: () => [] }
+});
+assert.equal(curvedRampVisuals.elevatedDeckShells.length, 1);
+assert.ok(curvedRampVisuals.supportInstances.length > 0, 'curved/ramp-like geometry must not suppress all supports');
+
+const crossingSafeBridge = structureFeature(
+  'osm:way:crossing-safe-bridge',
+  [{ x: 0, z: 0 }, { x: 120, z: 0 }],
+  { highway: 'motorway', bridge: 'yes', layer: '1' },
+  { width: 12, surfaceY: 12 }
+);
+compileTransportStructureModel([crossingSafeBridge]);
+const crossingSafeAssembly = compileElevatedAssembly(
+  crossingSafeBridge,
+  () => 0,
+  {
+    // Model a lower road occupying the full space beneath the deck center.
+    // The compiler must select the outside-column layout instead of placing a
+    // pier through the lower carriageway or suppressing the entire structure.
+    supportConflict: (_feature, column) => Math.abs(column.z) < 7
+  }
+);
+assert.ok(crossingSafeAssembly.supportStations.length > 0);
+assert.ok(
+  crossingSafeAssembly.supportStations.every((station) =>
+    station.columns.length === 2 && station.columns.every((column) => Math.abs(column.z) >= 7)
+  ),
+  'support compiler did not move columns clear of an underlying road corridor'
+);
 const generalizedBridgeVisual = structureFeature(
   'shortbread:generalized-bridge',
   [{ x: 0, z: 10 }, { x: 60, z: 10 }],
-  { highway: 'primary', bridge: 'yes', layer: '1' }
+  { highway: 'primary', bridge: 'yes', layer: '1' },
+  { surfaceY: 9 }
 );
 generalizedBridgeVisual.transportRecord.completeness = 'generalized';
+compileTransportStructureModel([generalizedBridgeVisual]);
+const generalizedBridgeAssembly = compileElevatedAssembly(generalizedBridgeVisual, () => 0);
+assert.equal(generalizedBridgeAssembly.bodyCoverage, 1);
+assert.ok(
+  generalizedBridgeAssembly.supportStations.length > 0 &&
+    generalizedBridgeAssembly.supportStations.every((station) => station.columns.length > 0),
+  'generalized bridge lost its sparse non-colliding visual support fallback'
+);
 assert.equal(
   isProtectedRoadFeature(generalizedBridgeVisual),
   false,
@@ -341,6 +423,25 @@ assert.equal(
   underpassVisuals.portalMasks.length,
   'portal terrain masks must remain local to the compiled entrance approaches'
 );
+const tunnelCamera = resolveTunnelCameraEnvelope(underpass, 50, 0);
+assert.equal(tunnelCamera.inside, true, 'camera occupancy must follow the compiled tunnel shell interval');
+assert.equal(tunnelCamera.floorY, -6);
+assert.ok(tunnelCamera.cameraHeight < tunnelCamera.clearance);
+
+const exposedTunnelTag = structureFeature(
+  'osm:way:exposed-tunnel-tag',
+  [{ x: 0, z: 70 }, { x: 80, z: 70 }],
+  { highway: 'service', tunnel: 'yes', layer: '-1' },
+  { surfaceY: 0 }
+);
+exposedTunnelTag.tunnelSystemModel = compileTunnelSystemModel(exposedTunnelTag, () => 0);
+compileTransportStructureModel([exposedTunnelTag]);
+assert.equal(exposedTunnelTag.tunnelSystemModel.shellRanges.length, 0);
+assert.equal(
+  resolveTunnelCameraEnvelope(exposedTunnelTag, 40, 70).inside,
+  false,
+  'an unburied tunnel tag must not force the camera into tunnel mode'
+);
 
 const generalizedTunnel = structureFeature(
   'shortbread:generalized-tunnel',
@@ -451,13 +552,22 @@ console.log(JSON.stringify({
     coveredColliders: coveredColliders.length
   },
   visuals: {
-    bridgeDeckBodies: bridgeVisuals.deckInstances.length,
+    bridgeDeckBodies: bridgeVisuals.elevatedDeckShells.length,
     bridgeGirders: bridgeVisuals.girderInstances.length,
+    bridgeSupports: bridgeVisuals.supportInstances.length,
+    curvedRampSupports: curvedRampVisuals.supportInstances.length,
+    crossingSafeSupportStations: crossingSafeAssembly.supportStations.length,
     underpassShells: underpassVisuals.shells.length,
     underpassPortals: underpassVisuals.portals.length,
     coveredRoofs: coveredVisuals.roofs.length,
     coveredWalls: coveredVisuals.walls.length,
     coveredPortals: coveredVisuals.portals.length
+  },
+  tunnelCamera: {
+    inside: tunnelCamera.inside,
+    floorY: tunnelCamera.floorY,
+    ceilingY: tunnelCamera.ceilingY,
+    exposedTagInside: resolveTunnelCameraEnvelope(exposedTunnelTag, 40, 70).inside
   },
   slopedTerrainCrossingClearance: Number((slopedUpperY - slopedLowerY).toFixed(3)),
   performance: {

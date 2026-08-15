@@ -7,6 +7,7 @@ import { mkdirp, startServer } from './runtime-test-server.mjs';
 const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'phase3-structure-journeys');
 const host = '127.0.0.1';
+const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || 'chrome').trim();
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -315,14 +316,28 @@ async function prepareJourney(page, journeySpec) {
     ctx.camera?.lookAt?.(x, surfaceY + 0.5, z);
     ctx.__phase3JourneyRoad = target.road;
     ctx.__phase3JourneyKind = targetKind;
+    const structureAssembly = target.road.transportStructureAssembly || null;
     return {
       ok: true,
       kind: targetKind,
       sourceFeatureId: String(target.road.sourceFeatureId || ''),
+      completeness: String(target.road.transportRecord?.completeness || ''),
       chainId: String(target.road.transportStructureRef?.chainId || ''),
       routeState: String(target.road.transportStructureRef?.routeState || ''),
       endState: String(target.road.transportStructureRef?.end?.state || ''),
       segmentLength: Number(target.segmentLength.toFixed(2)),
+      structureAssembly: structureAssembly
+        ? {
+            authority: String(structureAssembly.authority || ''),
+            bodyCoverage: Number(structureAssembly.bodyCoverage) || 0,
+            supportStations: structureAssembly.supportStations?.length || 0,
+            supportColumns: (structureAssembly.supportStations || []).reduce(
+              (count, station) => count + (station.columns?.length || 0),
+              0
+            ),
+            abutments: structureAssembly.abutments?.length || 0
+          }
+        : null,
       shellRange: target.shellRange
         ? {
             start: Number(target.shellRange.start.toFixed(2)),
@@ -338,6 +353,7 @@ async function prepareJourney(page, journeySpec) {
 async function sampleJourney(page) {
   return page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { resolveTunnelCameraEnvelope } = await import('/app/js/hud/tunnel-camera-envelope.js?v=2');
     const feetY = Number(ctx?.car?.y) - 1.2;
     const nearest = ctx?.findNearestRoad?.(
       Number(ctx?.car?.x),
@@ -355,6 +371,11 @@ async function sampleJourney(page) {
       { actorBaseY: feetY, actorHeight: 1.9 }
     );
     const journeyRoad = ctx?.__phase3JourneyRoad;
+    const cameraEnvelope = resolveTunnelCameraEnvelope(
+      journeyRoad,
+      Number(ctx?.car?.x),
+      Number(ctx?.car?.z)
+    );
     const tunnelRanges = journeyRoad?.tunnelSystemModel?.shellRanges || [];
     const nearestTunnelRanges = nearest?.road?.tunnelSystemModel?.shellRanges || [];
     let distanceAlong = NaN;
@@ -414,7 +435,16 @@ async function sampleJourney(page) {
         Number(ctx?.camera?.position?.x) - Number(ctx?.car?.x),
         Number(ctx?.camera?.position?.z) - Number(ctx?.car?.z)
       ),
-      cameraHeight: Number(ctx?.camera?.position?.y) - feetY
+      cameraHeight: Number(ctx?.camera?.position?.y) - feetY,
+      cameraEnvelope: cameraEnvelope.inside
+        ? {
+            floorY: cameraEnvelope.floorY,
+            ceilingY: cameraEnvelope.ceilingY,
+            clearance: cameraEnvelope.clearance,
+            chaseDistance: cameraEnvelope.chaseDistance,
+            cameraHeight: cameraEnvelope.cameraHeight
+          }
+        : null
     };
   });
 }
@@ -558,12 +588,22 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   const durationMs = softwareRenderer
     ? Number(journeySpec.softwareDurationMs || journeySpec.durationMs) || 3000
     : Number(journeySpec.hardwareDurationMs || journeySpec.durationMs) || 3000;
+  const outcomeTimeoutMs = journeySpec.requireShellExit
+    ? Math.max(durationMs, Number(journeySpec.shellExitTimeoutMs) || 15000)
+    : durationMs;
   await page.keyboard.down('ArrowUp');
   try {
-    const deadline = Date.now() + durationMs;
+    const deadline = Date.now() + outcomeTimeoutMs;
     while (Date.now() < deadline) {
       await page.waitForTimeout(250);
-      samples.push(await sampleJourney(page));
+      const sample = await sampleJourney(page);
+      samples.push(sample);
+      if (journeySpec.requireShellExit) {
+        const sampledInterior = samples.some((entry) => entry.insideTunnelShell);
+        const crossedPortal = sampledInterior && !sample.insideTunnelShell;
+        const crossedPhysicalPortal = crossedPortal && !sample.insideNearestTunnelShell;
+        if (journeySpec.physicalExit ? crossedPhysicalPortal : crossedPortal) break;
+      }
     }
   } finally {
     await page.keyboard.up('ArrowUp');
@@ -678,7 +718,30 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   );
   assert(maximumLateralError <= 8, `${label} lateral error reached ${maximumLateralError.toFixed(3)}m`);
   assert(centerCollisionSamples === 0, `${label} centerline hit ${centerCollisionSamples} structure colliders`);
-  assert(minimumCameraDistance >= 1.5, `${label} camera collapsed into the vehicle`);
+  if (kind === 'bridge' && setup.completeness === 'lossless') {
+    assert(
+      setup.structureAssembly?.authority === 'compiled_transport_structure_assembly' &&
+      setup.structureAssembly?.bodyCoverage === 1,
+      `${label} lacks complete compiled structural-body coverage: ${JSON.stringify(setup.structureAssembly)}`
+    );
+    assert(
+      Number(setup.structureAssembly?.supportColumns || 0) +
+        Number(setup.structureAssembly?.abutments || 0) > 0,
+      `${label} is a floating exact structure: ${JSON.stringify(setup.structureAssembly)}`
+    );
+  }
+  assert(
+    minimumCameraDistance >= 1.5,
+    `${label} camera collapsed into the vehicle: ${JSON.stringify(
+      samples.map((sample) => ({
+        cameraDistance: Number(sample.cameraDistance.toFixed(3)),
+        cameraHeight: Number(sample.cameraHeight.toFixed(3)),
+        envelope: sample.cameraEnvelope,
+        inside: sample.insideTunnelShell,
+        speed: Number(sample.speed.toFixed(3))
+      }))
+    )}`
+  );
   assert(minimumCameraHeight >= 0.8, `${label} camera dropped below the driven surface`);
   assert(
     firstCarCameraHit !== null,
@@ -753,7 +816,8 @@ const server = await startServer({
   candidatePorts: [4183, 4184, 4185, 4186]
 });
 const browser = await chromium.launch({
-  headless: process.env.PHASE3_HEADED !== '1'
+  headless: process.env.PHASE3_HEADED !== '1',
+  ...(browserChannel ? { channel: browserChannel } : {})
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 const consoleErrors = [];

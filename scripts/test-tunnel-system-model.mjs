@@ -4,6 +4,11 @@ import {
   compileTunnelSystemModel,
   compileTunnelSystemModels
 } from '../app/js/world/compiler/tunnel-system-model.js';
+import { resolveTunnelCameraEnvelope } from '../app/js/hud/tunnel-camera-envelope.js';
+import {
+  resetTunnelCameraController,
+  resolveTunnelCameraState
+} from '../app/js/hud/tunnel-camera-controller.js';
 
 function constantProfile(length, y = 0) {
   return {
@@ -48,6 +53,38 @@ assert.equal(tunnelModel.portalZones.length, 2);
 assert.ok(tunnelModel.portalZones.every((zone) => zone.transitionLength <= 11));
 assert.ok(tunnelModel.portalZones[0].approachStart > 0, 'entrance transition must be local to the cover boundary');
 assert.ok(tunnelModel.portalZones[1].approachEnd < 100, 'exit transition must be local to the cover boundary');
+tunnel.tunnelSystemModel = tunnelModel;
+const exitTransitionDistance = (
+  tunnelModel.portalZones[1].approachStart + tunnelModel.portalZones[1].approachEnd
+) * 0.5;
+const exitCameraEnvelope = resolveTunnelCameraEnvelope(tunnel, exitTransitionDistance, 0);
+assert.equal(exitCameraEnvelope.inside, true);
+assert.equal(exitCameraEnvelope.portalTransition, true);
+assert.equal(exitCameraEnvelope.reason, 'compiled_portal_transition');
+resetTunnelCameraController();
+assert.equal(resolveTunnelCameraState({
+  road: tunnel,
+  x: tunnelModel.shellEnd - 1,
+  z: 0,
+  angle: Math.PI / 2,
+  trailingDistance: 10
+}).inside, true);
+const cameraStillInPortal = resolveTunnelCameraState({
+  road: surfaceEnd,
+  x: tunnelModel.shellEnd + 9,
+  z: 0,
+  angle: Math.PI / 2,
+  trailingDistance: 10
+});
+assert.equal(cameraStillInPortal.inside, true);
+assert.equal(cameraStillInPortal.transitionOnly, true);
+assert.equal(resolveTunnelCameraState({
+  road: surfaceEnd,
+  x: tunnelModel.shellEnd + 24,
+  z: 0,
+  angle: Math.PI / 2,
+  trailingDistance: 10
+}).inside, false);
 
 const splitCoverTunnel = tunnelFeature(0, 120, 'Split Cover Tunnel');
 splitCoverTunnel.connectedFeatures.start.push({ feature: surfaceStart });
