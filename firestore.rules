@@ -1675,6 +1675,41 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /deflockLeaderboard/{entryId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt', 'score', 'disabledCameras',
+          'totalCameras', 'detections', 'distance'
+        ]) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.challenge == 'deflock' &&
+        request.resource.data.player is string &&
+        request.resource.data.player.size() > 0 &&
+        request.resource.data.player.size() <= 24 &&
+        request.resource.data.location is string &&
+        request.resource.data.location.size() <= 80 &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 86400000 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 100000 &&
+        request.resource.data.disabledCameras is int &&
+        request.resource.data.disabledCameras > 0 &&
+        request.resource.data.disabledCameras <= 750 &&
+        request.resource.data.totalCameras is int &&
+        request.resource.data.totalCameras == request.resource.data.disabledCameras &&
+        request.resource.data.detections is int &&
+        request.resource.data.detections >= 0 &&
+        request.resource.data.detections <= 100000 &&
+        request.resource.data.distance is number &&
+        request.resource.data.distance >= 0;
+      allow update, delete: if false;
+    }
+
     match /fishingLeaderboard/{entryId} {
       allow read: if true;
       allow create: if isSignedIn() &&
@@ -1812,6 +1847,13 @@ service cloud.firestore {
           request.auth.uid == resource.data.uid &&
           validPaintClaimUpdate(claimId);
         allow delete: if false;
+      }
+
+      match /deflockStates/{cameraId} {
+        // Shared DeFlock state is written only by the verified Cloud Function.
+        // Room members may observe the immutable overlay for join/rejoin sync.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
       }
 
       match /state/{stateId} {

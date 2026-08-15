@@ -165,6 +165,7 @@ function setupUI() {
   }
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
+    appCtx.stopGameplayPlugin?.('main-menu', { resumeFree: false });
     prepareTitleEnvironment();
     appCtx.hideLoad?.();
     appCtx.gameStarted = false;appCtx.clearPauseReasons?.();appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
@@ -177,7 +178,7 @@ function setupUI() {
     document.getElementById('titleScreen').classList.remove('hidden');
     window.requestAnimationFrame(() => appCtx.openGlobeSelector?.());
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });

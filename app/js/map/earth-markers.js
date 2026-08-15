@@ -5,6 +5,7 @@ function drawEarthMarkerLayers(ctx, w, h, isLarge, view) {
   const { worldToScreen, latLonToScreen, mx, my } = view;
 
   drawGameModeMarkers(ctx, w, h, isLarge, worldToScreen, mx, my);
+  drawDeFlockMarkers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawPois(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawMemoryEntries(ctx, w, h, isLarge, latLonToScreen, mx, my);
   drawMultiplayerRooms(ctx, w, h, isLarge, latLonToScreen, mx, my);
@@ -12,6 +13,58 @@ function drawEarthMarkerLayers(ctx, w, h, isLarge, view) {
   drawProperties(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawNavigation(ctx, isLarge, worldToScreen);
   drawCustomTrack(ctx, isLarge, worldToScreen);
+}
+
+function drawDeFlockMarkers(ctx, w, h, isLarge, worldToScreen, mx, my) {
+  if (appCtx.gameMode !== "deflock" || !Array.isArray(appCtx.deFlockMapMarkers)) return;
+  const markers = appCtx.deFlockMapMarkers
+    .filter((marker) => Number.isFinite(marker?.x) && Number.isFinite(marker?.z))
+    .map((marker) => ({ marker, position: worldToScreen(marker.x, marker.z) }))
+    .filter(({ position }) => Math.abs(position.x - mx) < w / 2 && Math.abs(position.y - my) < h / 2);
+  if (markers.length <= 0) return;
+
+  const detailed = isLarge && Number(appCtx.largeMapZoom || 15) >= 14;
+  const cellSize = detailed ? 10 : isLarge ? 22 : 15;
+  const clusters = new Map();
+  markers.forEach((entry) => {
+    const key = detailed && entry.marker.objective
+      ? `objective:${entry.marker.sourceId}`
+      : `${Math.floor(entry.position.x / cellSize)}:${Math.floor(entry.position.y / cellSize)}`;
+    const cluster = clusters.get(key) || [];
+    cluster.push(entry);
+    clusters.set(key, cluster);
+  });
+
+  [...clusters.values()].slice(0, isLarge ? 300 : 60).forEach((cluster) => {
+    const x = cluster.reduce((sum, entry) => sum + entry.position.x, 0) / cluster.length;
+    const y = cluster.reduce((sum, entry) => sum + entry.position.y, 0) / cluster.length;
+    const objective = cluster.some((entry) => entry.marker.objective);
+    const states = new Set(cluster.map((entry) => entry.marker.state));
+    const color = states.has("discovered") ? "#fbbf24" : states.has("undiscovered") ? "#f43f5e" : "#22d3ee";
+    const radius = objective ? (isLarge ? 8 : 6) : (isLarge ? 5 : 3.5);
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.strokeStyle = objective ? "#ffffff" : "rgba(255,255,255,.82)";
+    ctx.lineWidth = objective ? 2.5 : 1.2;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (objective) {
+      ctx.strokeStyle = "#fbbf24";
+      ctx.beginPath();
+      ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (cluster.length > 1 && isLarge) {
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 9px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(cluster.length), x, y);
+    }
+    ctx.restore();
+  });
 }
 
 function drawGameModeMarkers(ctx, w, h, isLarge, worldToScreen, mx, my) {

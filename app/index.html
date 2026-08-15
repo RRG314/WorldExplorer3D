@@ -163,6 +163,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="police"><div class="mode-icon">🚔</div><div><div class="mode-name">Police Chase</div><div class="mode-desc">Start with police pursuit enabled and survive the chase.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Toggle walking mode anytime with <b>F</b> key or float menu</div>
 </div>
 </div>
@@ -411,6 +412,7 @@ Graphics changes apply to the current session.
 <button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
 <button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
 <button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">🧭 Explorer</button>
+<button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
 </div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
@@ -643,6 +645,19 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
 </div>
+<aside id="deFlockHud" aria-live="polite">
+  <div class="deFlockHudHead"><strong>📷 DEFLOCK HUNT</strong><button id="deFlockHelpOpen" type="button" aria-label="DeFlock information">i</button></div>
+  <div id="deFlockCounts">Loading mapped cameras…</div>
+  <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
+</aside>
+<div id="deFlockPrompt" role="status"></div>
+<aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
+  <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
+  <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
+  <p>All actions are fictional and happen only inside World Explorer. “Virtual Camera Disabled” never changes physical equipment.</p>
+  <p>Direction cones and detection range are gameplay approximations, not claims about real camera capabilities. No plates, vehicle photos, live results, or driver data are collected.</p>
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors • ODbL</a>
+</aside>
 <canvas id="minimap" width="150" height="150"></canvas>
 <div id="minimapZoomControls" aria-label="Minimap zoom controls">
   <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>

@@ -373,9 +373,14 @@ function initMobileControls() {
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
+    let actions = profile.actions;
+    if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {
+      actions = Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : [];
+      actions.push({ label: 'DeFlock', binding: { channel: 'earth', key: 'KeyE' } });
+    }
     applyPadProfile('mobileMove', mobileMovePad, profile.move, mobileMoveLabel, profile.moveLabel || 'Move');
     applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
-    applyActionProfile(profile.actions);
+    applyActionProfile(actions);
     mobileTouchControls.classList.add('show');
   }
 
@@ -387,6 +392,9 @@ function initMobileControls() {
       '#mainMenuBtn',
       '#memoryFlowerFloatBtn',
       '#flowerActionMenu',
+      '#deFlockHud',
+      '#deFlockPrompt',
+      '#deFlockHelp',
       '#gameShareFloatBtn',
       '#gameShareMenu',
       '#mobileTouchControls',

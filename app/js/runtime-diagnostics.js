@@ -363,6 +363,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    deflock: appCtx.getDeFlockSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     activeActor,
     surfaceChain: surfaceChainSnapshot(activeActor),

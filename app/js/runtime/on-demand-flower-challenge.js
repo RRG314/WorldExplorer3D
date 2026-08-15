@@ -72,6 +72,10 @@ function installOnDemandFlowerChallenge(appCtx) {
       const challenge = await ensureFlowerChallengeReady();
       return challenge.submitFishingScore?.(...args) ?? false;
     },
+    submitDeFlockScore: async (...args) => {
+      const challenge = await ensureFlowerChallengeReady();
+      return challenge.submitDeFlockScore?.(...args) ?? null;
+    },
     submitPaintTownScore: async (...args) => {
       const challenge = await ensureFlowerChallengeReady();
       return challenge.submitPaintTownScore?.(...args) ?? false;

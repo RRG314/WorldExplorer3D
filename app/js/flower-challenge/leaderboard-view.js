@@ -40,6 +40,10 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   const roomsJoined = Number(raw.roomsJoined);
   const artifactsShared = Number(raw.artifactsShared);
   const friendsAdded = Number(raw.friendsAdded);
+  const disabledCameras = Number(raw.disabledCameras);
+  const totalCameras = Number(raw.totalCameras);
+  const detections = Number(raw.detections);
+  const distance = Number(raw.distance);
 
   if (challenge === 'flower') {
     if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
@@ -74,6 +78,10 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
     roomsJoined: Number.isFinite(roomsJoined) ? Math.max(0, Math.round(roomsJoined)) : 0,
     artifactsShared: Number.isFinite(artifactsShared) ? Math.max(0, Math.round(artifactsShared)) : 0,
     friendsAdded: Number.isFinite(friendsAdded) ? Math.max(0, Math.round(friendsAdded)) : 0,
+    disabledCameras: Number.isFinite(disabledCameras) ? Math.max(0, Math.round(disabledCameras)) : 0,
+    totalCameras: Number.isFinite(totalCameras) ? Math.max(0, Math.round(totalCameras)) : 0,
+    detections: Number.isFinite(detections) ? Math.max(0, Math.round(detections)) : 0,
+    distance: Number.isFinite(distance) ? Math.max(0, distance) : 0,
     location,
     lat: Number.isFinite(lat) ? lat : null,
     lon: Number.isFinite(lon) ? lon : null,
@@ -120,7 +128,8 @@ function renderLeaderboard(entries) {
       flower: 'No flower runs yet. Be the first.',
       painttown: 'No paint runs yet. Reach rooftops to paint and post a score.',
       fishing: 'No catches yet. Launch a boat, stop in open water, and cast.',
-      explorer: 'Explorer scores appear as people join rooms, share artifacts, and make connections.'
+      explorer: 'Explorer scores appear as people join rooms, share artifacts, and make connections.',
+      deflock: 'No completed DeFlock hunts yet.'
     }[challengeType];
     ui.titleList.innerHTML = `<li class="flowerLeaderboardEmpty">${safeText(empty)}</li>`;
     return;
@@ -138,6 +147,9 @@ function renderLeaderboard(entries) {
     } else if (challengeType === 'explorer') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
       locationLine = `Rooms ${entry.roomsJoined || 0} | Artifacts ${entry.artifactsShared || 0} | Friends ${entry.friendsAdded || 0}`;
+    } else if (challengeType === 'deflock') {
+      metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
+      locationLine = `${entry.disabledCameras || 0}/${entry.totalCameras || 0} virtual cameras | ${((Number(entry.timeMs) || 0) / 1000).toFixed(1)}s | ${safeText(entry.location)}`;
     }
     return `<li class="flowerLeaderboardItem">
       <span class="flowerLeaderboardRank">#${idx + 1}</span>

@@ -227,6 +227,13 @@ async function seedData(testEnv) {
     await setDoc(doc(db, 'rooms', PUBLIC_ROOM_ID), publicRoomDoc());
     await setDoc(doc(db, 'rooms', ROOM_ID, 'players', OWNER_UID), playerDoc(OWNER_UID, 'Owner', 'owner'));
     await setDoc(doc(db, 'rooms', ROOM_ID, 'players', MEMBER_UID), playerDoc(MEMBER_UID, 'Member', 'member'));
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'deflockStates', 'osm-node-101'), {
+      sourceId: 'osm:node:101',
+      uid: OWNER_UID,
+      displayName: 'Owner',
+      disabledAt: Timestamp.fromMillis(Date.now() - 20_000),
+      source: 'OpenStreetMap'
+    });
 
     await setDoc(doc(db, 'users', OWNER_UID, 'friends', INVITEE_UID), {
       uid: INVITEE_UID,
@@ -317,6 +324,60 @@ await runCheck('anonymous player cannot publish a fishing score', async () => {
   await assertFails(setDoc(doc(anonDb, 'fishingLeaderboard', 'anon_catch'), {
     ...validFishingScore,
     uid: 'anonymous'
+  }));
+});
+
+const validDeFlockScore = {
+  uid: OWNER_UID,
+  challenge: 'deflock',
+  player: 'Owner',
+  timeMs: 95_000,
+  paintedPct: 0,
+  paintedBuildings: 0,
+  totalBuildings: 0,
+  location: 'Baltimore',
+  lat: 39.2904,
+  lon: -76.6122,
+  mode: 'walking',
+  createdAtIso: new Date().toISOString(),
+  createdAt: serverTimestamp(),
+  score: 1830,
+  disabledCameras: 6,
+  totalCameras: 6,
+  detections: 1,
+  distance: 870.5
+};
+
+await runCheck('signed-in player can publish own completed DeFlock score', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'deflockLeaderboard', 'owner_deflock'), validDeFlockScore));
+});
+
+await runCheck('player cannot publish a DeFlock score for another account', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'deflockLeaderboard', 'forged_deflock'), validDeFlockScore));
+});
+
+await runCheck('incomplete DeFlock runs cannot publish to the leaderboard', async () => {
+  await assertFails(setDoc(doc(ownerDb, 'deflockLeaderboard', 'incomplete_deflock'), {
+    ...validDeFlockScore,
+    disabledCameras: 5
+  }));
+});
+
+await runCheck('room member can read server-owned shared DeFlock state', async () => {
+  await assertSucceeds(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'deflockStates', 'osm-node-101')));
+});
+
+await runCheck('non-member cannot read private shared DeFlock state', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'deflockStates', 'osm-node-101')));
+});
+
+await runCheck('room clients cannot fabricate shared DeFlock state', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'deflockStates', 'osm-node-999'), {
+    sourceId: 'osm:node:999',
+    uid: MEMBER_UID,
+    displayName: 'Member',
+    disabledAt: serverTimestamp(),
+    source: 'OpenStreetMap'
   }));
 });
 

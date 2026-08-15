@@ -4,6 +4,42 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-15 — DeFlock compass orientation and unreadable instance colors
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or
+  deployed.
+- Symptom: a mapped northeast camera and its direction zone pointed northwest,
+  and fixture screenshots showed the virtual camera body as a black box even
+  though its state color had been assigned.
+- Root cause: OSM compass bearings increase clockwise from Earth north (`-Z`),
+  while a positive Three.js Y rotation turns the local `-Z` axis the opposite
+  way. The instanced material also enabled geometry vertex colors even though
+  the box and torus had no vertex-color attribute; that missing input
+  multiplied the valid instance color to black.
+- Resolution: the DeFlock renderer converts compass bearing to a negative Y
+  rotation, uses the independent instance-color shader path without requiring
+  geometry colors, and retains one shared instanced layer for poles, colored
+  bodies, lenses, targets, and optional direction zones.
+- Evidence: `npm run test:deflock-browser` launches installed Google Chrome and
+  requires NE and 270-degree fixture orientations, exact `geoToWorld`
+  placement, terrain-relative camera height, two rendered instances,
+  discovery, desktop and mobile virtual disable, reload persistence, colored
+  large-map markers, Earth-away-return restoration, and Main Menu disposal.
+  The five screenshots under `output/playwright/deflock-browser/` were visually
+  inspected. The passing run recorded no fatal application console errors;
+  external provider resource failures were recoverable and reported
+  separately.
+- Guard: `npm run test:deflock-model`, `npm run test:deflock-multiplayer`,
+  `npm run test:deflock-browser`, `npm run test:rules`,
+  `npm run test:gameplay-plugins`, `npm run test:css`, and
+  `npm run test:module-versions`. The dedicated browser gate owns DeFlock's
+  iPhone interaction/layout check; the broader `test:mobile-controls` gate may
+  still report Baltimore world-readiness/provider timeouts independently.
+- Never reintroduce: direct positive compass-bearing Y rotation, geometry
+  `vertexColors` on instance-only state meshes without a color attribute, one
+  renderer per camera, fixture tests backed by live surveillance data, or
+  client-writable shared DeFlock completion state.
+
 ## 2026-08-14 — Multiplayer invite, discovery, and shared-shape regressions
 
 - Status: resolved locally; not pushed or deployed.

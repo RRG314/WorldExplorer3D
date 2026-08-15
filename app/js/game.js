@@ -110,6 +110,25 @@ function showMapInfo(type, data) {
   const content = document.getElementById('mapInfoContent');
   panel.style.display = 'block';
 
+  if (type === 'deflock') {
+    title.textContent = '📷 Mapped Virtual Camera';
+    const direction = Number.isFinite(Number(data.direction)) ? `${Number(data.direction).toFixed(0)}°` : 'Unknown';
+    const status = data.state === 'disabled' ? 'Virtually disabled' : data.state === 'discovered' ? 'Discovered' : 'Undiscovered';
+    content.innerHTML = `
+      <div style="margin-bottom:10px;color:#e6faff"><strong>${escapeHtml(status)}</strong></div>
+      <div>Type: <strong>${escapeHtml(data.cameraType || data.surveillanceType || 'Unknown')}</strong></div>
+      <div>Mapped direction: <strong>${escapeHtml(direction)}</strong></div>
+      <div>Operator: <strong>${escapeHtml(data.operator || 'Unknown')}</strong></div>
+      <div>Manufacturer: <strong>${escapeHtml(data.manufacturer || 'Unknown')}</strong></div>
+      <div>Source: <strong>${escapeHtml(data.sourceDataset || 'OpenStreetMap')}</strong></div>
+      <div>Source ID: <strong>${escapeHtml(data.sourceId || 'Unknown')}</strong></div>
+      <div>Last mapped timestamp: <strong>${escapeHtml(data.sourceTimestamp || 'Unknown')}</strong></div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,255,204,.35);font-size:10px;opacity:.82">Public community mapping can be incomplete or outdated. Detection is a gameplay approximation. Virtual actions do not affect physical infrastructure.</div>
+      <div style="margin-top:8px"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color:#67e8f9">© OpenStreetMap contributors • ODbL</a></div>
+    `;
+    return;
+  }
+
   if (type === 'property') {
     title.textContent = '🏠 Property Details';
     const entrySupportText = describeDestinationEntrySupport(data);
