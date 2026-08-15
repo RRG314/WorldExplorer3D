@@ -73,6 +73,10 @@
     ],
     "rewrites": [
       {
+        "source": "/api/geospatial/deflock-cameras",
+        "function": "getDeFlockCameras"
+      },
+      {
         "source": "/api/geospatial/street-imagery",
         "function": "getStreetImagery"
       },

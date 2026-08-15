@@ -8,7 +8,7 @@ const sourceRootDir = process.cwd();
 const rootDir = path.resolve(process.env.WE3D_PREVIEW_ROOT || sourceRootDir);
 const host = '127.0.0.1';
 const port = Number(process.env.PORT || 4192);
-const { queryAircraft, queryStreetImagery } = geospatial;
+const { queryAircraft, queryDeFlockCameras, queryStreetImagery } = geospatial;
 
 async function readCandidateManifest() {
   try {
@@ -114,6 +114,29 @@ const server = http.createServer(async (req, res) => {
           'Cache-Control': 'no-store'
         });
         res.end(JSON.stringify({ error: status === 504 ? 'OpenSky timed out.' : (error?.message || 'Aircraft observations unavailable.') }));
+      }
+      return;
+    }
+    if (reqUrl.pathname === '/api/geospatial/deflock-cameras') {
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Method not allowed.' }));
+        return;
+      }
+      try {
+        const payload = await queryDeFlockCameras(Object.fromEntries(reqUrl.searchParams));
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300, stale-while-revalidate=21600'
+        });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        const status = Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502);
+        res.writeHead(status, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify({ error: error?.message || 'Mapped camera data is unavailable.' }));
       }
       return;
     }

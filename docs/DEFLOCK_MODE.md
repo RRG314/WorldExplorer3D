@@ -28,9 +28,12 @@ type, surveillance type, source name, and ODbL provenance. Missing metadata is
 shown as unknown rather than inferred.
 
 OpenStreetMap coverage is community-maintained and can be incomplete or
-outdated. The runtime uses the existing bounded Overpass request, cancellation,
-memory-cache, and IndexedDB-cache path. It does not import or maintain a second
-surveillance dataset.
+outdated. The runtime first uses a bounded same-origin service that races the
+configured Overpass providers outside the browser and keeps a short-lived
+last-good response. If that service is unavailable, it falls back to the
+existing direct Overpass request, cancellation, memory-cache, and
+IndexedDB-cache path. It does not import or maintain a second surveillance
+dataset.
 
 Required attribution: `© OpenStreetMap contributors` under the ODbL. The game
 help surface links to [OpenStreetMap copyright and licensing](https://www.openstreetmap.org/copyright).
@@ -98,6 +101,7 @@ Use these focused gates while changing the mode:
 npm run test:deflock-model
 npm run test:deflock-multiplayer
 npm run test:deflock-browser
+npm run smoke:deflock-live
 npm run test:rules
 npm run test:gameplay-plugins
 npm run test:mobile-controls
@@ -111,3 +115,9 @@ checks the Missions launch, placement, direction, terrain height, discovery,
 virtual disabling, reload persistence, maps, Earth lifecycle, cleanup, and an
 iPhone-sized touch journey. Its screenshots and report are written under
 `output/playwright/deflock-browser/`.
+
+With the local preview running on port 4192, `smoke:deflock-live` performs an
+unmocked Baltimore launch through the same-origin service, approaches a live
+mapped camera, virtually disables it, and writes its report and screenshot to
+`output/playwright/deflock-live/`. This smoke depends on current external OSM
+provider availability and is intentionally separate from deterministic gates.

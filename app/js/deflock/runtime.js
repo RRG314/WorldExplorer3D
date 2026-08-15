@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=1";
+import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=2";
 import { computeCameraPlacement } from "./placement.js?v=1";
 import {
   applySharedDisabled,
@@ -647,9 +647,17 @@ function getDeFlockSnapshot() {
   };
 }
 
+function handleDeFlockGameplayInteraction() {
+  // Physical keyboard input is dispatched immediately by input.js while touch
+  // actions flow through the held-key update path. Latch an active KeyE here so
+  // the same keyboard press is not consumed again on the next animation frame.
+  if (activeSession && appCtx.keys?.KeyE === true) activeSession.mobileActionLatched = true;
+  return interactWithNearbyCamera();
+}
+
 Object.assign(appCtx, {
   getDeFlockSnapshot,
-  handleGameplayInteraction: () => interactWithNearbyCamera(),
+  handleGameplayInteraction: handleDeFlockGameplayInteraction,
   startDeFlockMode,
   stopDeFlockMode,
   updateDeFlockMode

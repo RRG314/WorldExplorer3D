@@ -338,6 +338,7 @@ async function runDesktop() {
 
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress?.disabled === 1);
+  await page.waitForTimeout(250);
   assert.match(await page.locator('#deFlockStatus').innerText(), /Virtual Camera Disabled/);
   await aimAtMarker(page, 1);
   await page.screenshot({ path: path.join(outputDir, 'virtually-disabled.png'), fullPage: false });

@@ -4,6 +4,37 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-15 — DeFlock live data unavailable and duplicate E action
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or
+  deployed.
+- Symptom: a real Baltimore DeFlock launch could show that mapped camera data
+  could not be loaded even though fixture tests passed. When live data did
+  load, one physical E press could replace the success message with "already
+  disabled."
+- Root cause: public Overpass availability and browser transport were allowed
+  to determine whether the game started. During reproduction one configured
+  host was unreachable and browser POST requests stalled, while the remaining
+  providers' GET interface returned the same bounded query in seconds. KeyE
+  was also consumed once by the immediate keyboard dispatcher and again by the
+  touch-oriented held-key update path.
+- Resolution: DeFlock now prefers a bounded same-origin service which races
+  independent Overpass GET providers, validates and caps mapped nodes, caches
+  successful responses, and retains a 24-hour last-good in-memory fallback.
+  The browser retains its direct/cache path if the service is unavailable.
+  Immediate keyboard interaction latches KeyE so the held-key path cannot
+  consume the same press; touch behavior remains unchanged.
+- Evidence: `npm run smoke:deflock-live` used installed Google Chrome against
+  the real port 4192 preview, loaded and rendered 24 Baltimore OSM cameras,
+  approached and virtually disabled one, retained the success status, and
+  recorded zero fatal application errors. `npm run test:deflock-browser` then
+  passed the deterministic desktop/mobile, fallback, persistence, map, and
+  lifecycle journey.
+- Never reintroduce: browser-only live data authority, a single public
+  provider, arbitrary client-supplied Overpass queries, POST-only camera
+  transport, invented fallback camera locations, or two consumers for one
+  physical interaction event.
+
 ## 2026-08-15 — DeFlock compass orientation and unreadable instance colors
 
 - Status: resolved locally on `steven/earth-core-recovery`; not pushed or

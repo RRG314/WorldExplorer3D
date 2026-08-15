@@ -7,7 +7,7 @@ import {
   startDeFlockMode,
   stopDeFlockMode,
   updateDeFlockMode
-} from "../deflock/runtime.js?v=1";
+} from "../deflock/runtime.js?v=2";
 
 const gameplayRegistry = createGameplayPluginRegistry({
   onError(error, id, phase) {

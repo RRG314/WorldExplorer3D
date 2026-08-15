@@ -4,10 +4,18 @@ const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
 const OPENSKY_API = 'https://opensky-network.org/api/states/all';
 const ADSB_LOL_API = 'https://api.adsb.lol/v2/point';
+const DEFLOCK_OVERPASS_ENDPOINTS = Object.freeze([
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter'
+]);
 const MEMORY_CACHE = new Map();
 const AIRCRAFT_CACHE = new Map();
+const DEFLOCK_CACHE = new Map();
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const AIRCRAFT_CACHE_TTL_MS = 60 * 1000;
+const DEFLOCK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const DEFLOCK_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 80;
 
 function numberInRange(value, min, max, fallback = NaN) {
@@ -107,6 +115,104 @@ function normalizeAircraftQuery(input = {}) {
   const radiusKm = Math.round(numberInRange(input.radiusKm, 20, 200, 160));
   const limit = Math.round(numberInRange(input.limit, 1, 120, 80));
   return { lat, lon, radiusKm, limit };
+}
+
+function normalizeDeFlockQuery(input = {}) {
+  const lat = Number(input.lat);
+  const lon = Number(input.lon);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+    const error = new Error('Valid latitude and longitude are required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const radiusDegrees = numberInRange(input.radiusDegrees, 0.002, 0.04, 0.022);
+  return { lat, lon, radiusDegrees };
+}
+
+function buildDeFlockOverpassQuery(query) {
+  const { lat, lon, radiusDegrees } = query;
+  const bounds = `(${(lat - radiusDegrees).toFixed(7)},${(lon - radiusDegrees).toFixed(7)},${(lat + radiusDegrees).toFixed(7)},${(lon + radiusDegrees).toFixed(7)})`;
+  return `[out:json][timeout:18];node["man_made"="surveillance"]${bounds};out meta qt;`;
+}
+
+function isDeFlockCameraElement(element) {
+  return element?.type === 'node' &&
+    String(element?.tags?.man_made || '').toLowerCase() === 'surveillance' &&
+    Number.isFinite(Number(element.lat)) &&
+    Number.isFinite(Number(element.lon));
+}
+
+async function fetchDeFlockOverpass(endpoint, overpassQuery, options, controllers) {
+  const controller = new AbortController();
+  controllers.push(controller);
+  const timeoutId = setTimeout(() => controller.abort(), Number(options.timeoutMs) || 14000);
+  try {
+    const url = `${endpoint}?data=${encodeURIComponent(overpassQuery)}`;
+    const response = await (options.fetchImpl || globalThis.fetch)(url, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'WorldExplorer3D-DeFlock/1.0 (public OSM camera query)'
+      },
+      signal: controller.signal
+    });
+    if (!response?.ok) throw new Error(`Upstream HTTP ${Number(response?.status) || 502}`);
+    const payload = typeof response.json === 'function'
+      ? await response.json()
+      : JSON.parse(await response.text());
+    if (!Array.isArray(payload?.elements)) throw new Error('Upstream returned an invalid Overpass payload.');
+    return { endpoint, payload };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function queryDeFlockCameras(input = {}, options = {}) {
+  const query = normalizeDeFlockQuery(input);
+  const key = `${query.lat.toFixed(5)}:${query.lon.toFixed(5)}:${query.radiusDegrees.toFixed(5)}`;
+  const now = Date.now();
+  const cached = DEFLOCK_CACHE.get(key);
+  if (!options.force && cached?.expiresAt > now) {
+    return { ...cached.value, cache: 'memory', cacheAgeMs: now - cached.savedAt };
+  }
+
+  const endpoints = Array.isArray(options.endpoints) && options.endpoints.length
+    ? options.endpoints
+    : DEFLOCK_OVERPASS_ENDPOINTS;
+  const controllers = [];
+  const overpassQuery = buildDeFlockOverpassQuery(query);
+  try {
+    const winner = await Promise.any(endpoints.map((endpoint) => (
+      fetchDeFlockOverpass(String(endpoint), overpassQuery, options, controllers)
+    )));
+    controllers.forEach((controller) => controller.abort());
+    const value = {
+      schemaVersion: 1,
+      provider: 'OpenStreetMap',
+      fetchedAt: new Date().toISOString(),
+      query,
+      endpoint: winner.endpoint,
+      elements: winner.payload.elements.filter(isDeFlockCameraElement).slice(0, 750),
+      cache: 'upstream',
+      cacheAgeMs: 0
+    };
+    DEFLOCK_CACHE.set(key, {
+      value,
+      savedAt: now,
+      expiresAt: now + DEFLOCK_CACHE_TTL_MS,
+      staleUntil: now + DEFLOCK_STALE_TTL_MS
+    });
+    while (DEFLOCK_CACHE.size > 48) DEFLOCK_CACHE.delete(DEFLOCK_CACHE.keys().next().value);
+    return value;
+  } catch (error) {
+    controllers.forEach((controller) => controller.abort());
+    if (cached?.staleUntil > now) {
+      return { ...cached.value, cache: 'stale-memory', cacheAgeMs: now - cached.savedAt };
+    }
+    const upstreamError = new Error('Mapped camera providers are temporarily unavailable.');
+    upstreamError.statusCode = 502;
+    upstreamError.cause = error;
+    throw upstreamError;
+  }
 }
 
 function aircraftBounds(query) {
@@ -370,6 +476,22 @@ async function queryStreetImagery(input = {}, options = {}) {
 
 function buildGeospatialExports({ functions, setCors }) {
   return {
+    getDeFlockCameras: functions.region('us-central1').https.onRequest(async (req, res) => {
+      if (setCors(req, res)) return;
+      if (req.method !== 'GET') {
+        res.status(405).json({ error: 'Method not allowed.' });
+        return;
+      }
+      try {
+        const payload = await queryDeFlockCameras(req.query || {});
+        res.set('Cache-Control', 'public, max-age=300, s-maxage=21600, stale-while-revalidate=86400');
+        res.status(200).json(payload);
+      } catch (error) {
+        const status = Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502);
+        console.warn('[getDeFlockCameras] request failed:', error?.message || error);
+        res.status(status).json({ error: error?.message || 'Mapped camera data is unavailable.' });
+      }
+    }),
     getStreetImagery: functions.region('us-central1').https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
@@ -406,12 +528,15 @@ function buildGeospatialExports({ functions, setCors }) {
 }
 
 module.exports = {
+  buildDeFlockOverpassQuery,
   buildGeospatialExports,
+  normalizeDeFlockQuery,
   normalizeAircraftQuery,
   normalizeAdsbLolState,
   normalizeOpenSkyState,
   normalizeQuery,
   queryAircraft,
+  queryDeFlockCameras,
   queryStreetImagery,
   normalizePanoramaxItem,
   normalizeKartaItem

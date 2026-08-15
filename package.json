@@ -84,6 +84,7 @@
     "test:deflock-model": "node scripts/test-deflock-model.mjs",
     "test:deflock-multiplayer": "node scripts/test-deflock-multiplayer.mjs",
     "test:deflock-browser": "node scripts/test-deflock-browser.mjs",
+    "smoke:deflock-live": "node scripts/smoke-deflock-live.mjs",
     "test:local-data": "node scripts/test-local-data-safety.mjs",
     "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
     "test:plane-interiors": "node scripts/test-plane-interior-lifecycle.mjs",

@@ -4,6 +4,8 @@ const DEFLOCK_SOURCE_VERSION = "osm-surveillance-v1";
 const DEFLOCK_RADIUS_DEGREES = 0.022;
 const DEFLOCK_MAX_CAMERAS = 750;
 const DEFLOCK_TIMEOUT_MS = 18000;
+const DEFLOCK_PROXY_TIMEOUT_MS = 20000;
+const DEFLOCK_PROXY_ENDPOINT = "/api/geospatial/deflock-cameras";
 
 function finite(value, fallback = null) {
   const number = Number(value);
@@ -107,6 +109,40 @@ function buildSurveillanceQuery(location, radiusDegrees = DEFLOCK_RADIUS_DEGREES
   return `[out:json][timeout:${Math.ceil(DEFLOCK_TIMEOUT_MS / 1000)}];node["man_made"="surveillance"]${bounds};out meta qt;`;
 }
 
+async function fetchSurveillanceProxyJSON(location, radiusDegrees, options = {}) {
+  const endpoint = String(options.proxyEndpoint || DEFLOCK_PROXY_ENDPOINT);
+  const fetchImpl = typeof options.proxyFetchImpl === "function" ? options.proxyFetchImpl : globalThis.fetch;
+  if (typeof fetchImpl !== "function") throw new TypeError("Mapped camera proxy fetch is unavailable");
+  const params = new URLSearchParams({
+    lat: String(finite(location?.lat, 0)),
+    lon: String(finite(location?.lon, 0)),
+    radiusDegrees: String(radiusDegrees)
+  });
+  const controller = new AbortController();
+  const externalSignal = options.signal || null;
+  const relayAbort = () => controller.abort(externalSignal?.reason);
+  externalSignal?.addEventListener?.("abort", relayAbort, { once: true });
+  const timeoutId = setTimeout(() => controller.abort(), Number(options.proxyTimeoutMs) || DEFLOCK_PROXY_TIMEOUT_MS);
+  try {
+    const response = await fetchImpl(`${endpoint}?${params}`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response?.ok) throw new Error(`Mapped camera proxy HTTP ${Number(response?.status) || 502}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload?.elements)) throw new Error("Mapped camera proxy returned an invalid payload");
+    return {
+      ...payload,
+      _overpassEndpoint: payload.endpoint ? `${payload.endpoint} (server-proxy)` : "server-proxy",
+      _overpassSource: payload.cache === "upstream" ? "server-proxy" : `server-${payload.cache || "proxy"}`,
+      _overpassCacheAgeMs: finite(payload.cacheAgeMs, 0)
+    };
+  } finally {
+    clearTimeout(timeoutId);
+    externalSignal?.removeEventListener?.("abort", relayAbort);
+  }
+}
+
 async function loadSurveillanceFeatures(location, options = {}) {
   const radius = Math.max(0.002, Math.min(0.04, finite(options.radiusDegrees, DEFLOCK_RADIUS_DEGREES)));
   const query = buildSurveillanceQuery(location, radius);
@@ -118,13 +154,32 @@ async function loadSurveillanceFeatures(location, options = {}) {
     poiRadius: radius,
     kind: DEFLOCK_SOURCE_VERSION
   };
-  const payload = await fetchOverpassJSON(
-    query,
-    Number(options.timeoutMs) || DEFLOCK_TIMEOUT_MS,
-    performance.now() + (Number(options.deadlineMs) || DEFLOCK_TIMEOUT_MS + 2500),
-    cacheMeta,
-    { signal: options.signal }
-  );
+  let payload = null;
+  let proxyError = null;
+  if (options.useProxy !== false) {
+    try {
+      payload = await fetchSurveillanceProxyJSON(location, radius, options);
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      proxyError = error;
+    }
+  }
+  if (!payload) {
+    try {
+      payload = await fetchOverpassJSON(
+        query,
+        Number(options.timeoutMs) || DEFLOCK_TIMEOUT_MS,
+        performance.now() + (Number(options.deadlineMs) || DEFLOCK_TIMEOUT_MS + 2500),
+        cacheMeta,
+        { signal: options.signal }
+      );
+    } catch (error) {
+      if (proxyError) {
+        throw new Error(`Mapped camera data could not be loaded. Proxy: ${proxyError.message}. Direct: ${error.message}`);
+      }
+      throw error;
+    }
+  }
   return {
     features: parseSurveillanceElements(payload, options),
     source: "OpenStreetMap",
@@ -138,9 +193,11 @@ async function loadSurveillanceFeatures(location, options = {}) {
 
 export {
   DEFLOCK_MAX_CAMERAS,
+  DEFLOCK_PROXY_ENDPOINT,
   DEFLOCK_RADIUS_DEGREES,
   DEFLOCK_SOURCE_VERSION,
   buildSurveillanceQuery,
+  fetchSurveillanceProxyJSON,
   loadSurveillanceFeatures,
   normalizeDirection,
   parseSurveillanceElements

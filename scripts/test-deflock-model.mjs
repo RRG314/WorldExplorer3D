@@ -5,6 +5,7 @@ import { geoToWorld } from '../app/js/config.js';
 import { computeCameraPlacement } from '../app/js/deflock/placement.js';
 import {
   buildSurveillanceQuery,
+  loadSurveillanceFeatures,
   normalizeDirection,
   parseSurveillanceElements
 } from '../app/js/deflock/source.js';
@@ -37,6 +38,31 @@ assert.equal(normalizeDirection('unknown'), null);
 const query = buildSurveillanceQuery({ lat: 39.2904, lon: -76.6122 }, 0.01);
 assert.match(query, /man_made/);
 assert.match(query, /39\.2804000,-76\.6222000,39\.3004000,-76\.6022000/);
+
+let proxyCalls = 0;
+const proxyLoaded = await loadSurveillanceFeatures({ lat: 39.2904, lon: -76.6122 }, {
+  proxyFetchImpl: async (url) => {
+    proxyCalls += 1;
+    assert.match(String(url), /^\/api\/geospatial\/deflock-cameras\?/);
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          provider: 'OpenStreetMap',
+          endpoint: 'https://fixture-overpass.test/api/interpreter',
+          cache: 'upstream',
+          cacheAgeMs: 0,
+          elements: fixture.elements
+        };
+      }
+    };
+  }
+});
+assert.equal(proxyCalls, 1, 'DeFlock should prefer the same-origin camera proxy');
+assert.equal(proxyLoaded.features.length, 2);
+assert.equal(proxyLoaded.cacheSource, 'server-proxy');
+assert.match(proxyLoaded.features[0].provenance.fetchedFrom, /server-proxy/);
 
 const world = geoToWorld(features[0].lat, features[0].lon);
 const placement = computeCameraPlacement(features[0], {
