@@ -9,7 +9,6 @@ import {
   DEFAULT_SURFACE_BIAS,
   DEFAULT_VERTICAL_FIT_RADIUS,
   applyEndpointTieIns,
-  applyExactGraphNodeConstraints,
   applyStationInfluence,
   clamp,
   createSampleDistances,
@@ -44,6 +43,64 @@ function smoothUpperBoundedGradeProfile(initialHeights, upperBounds, distances, 
     maximumGrade
   );
   return Float32Array.from(mirrored, (height) => -height);
+}
+
+function reconcileExactSubgradeGraphNodeConstraints(
+  feature,
+  heights,
+  upperBounds,
+  distances,
+  maximumGrade
+) {
+  const transitionAnchors = Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors
+    : [];
+  const totalDistance = finiteNumber(distances?.[distances.length - 1]);
+  const portalTransitionRanges = transitionAnchors
+    .filter((anchor) =>
+      anchor?.source === 'transport_graph_node' &&
+      (anchor?.endpoint === 'start' || anchor?.endpoint === 'end'))
+    .map((anchor) => {
+      const span = Math.max(1, finiteNumber(anchor?.span, 1));
+      return anchor.endpoint === 'start'
+        ? { start: 0, end: Math.min(totalDistance, span) }
+        : { start: Math.max(0, totalDistance - span), end: totalDistance };
+    });
+  const hardStructureStations = (Array.isArray(feature?.structureStations)
+    ? feature.structureStations
+    : []).filter((station) => {
+      const stationDistance = clamp(finiteNumber(station?.distance), 0, totalDistance);
+      const stationSpan = Math.max(1, finiteNumber(station?.span, 1));
+      return !portalTransitionRanges.some((range) =>
+        stationDistance + stationSpan >= range.start &&
+        stationDistance - stationSpan <= range.end);
+    });
+  const mirroredFeature = {
+    ...feature,
+    minimumStructureSurfaceY: undefined,
+    // Mapped graph endpoints are the tunnel portals. A river/crossing station
+    // whose influence overlaps that compiled portal approach cannot remain a
+    // hard cover constraint all the way to the shared surface node; the same
+    // station has already been tapered by endpointTransitionGate. Stations
+    // away from a portal remain hard and still outrank an impossible join.
+    structureStations: hardStructureStations,
+    structureTransitionAnchors: transitionAnchors.map((anchor) => ({
+      ...anchor,
+      targetSurfaceY: Number.isFinite(Number(anchor?.targetSurfaceY))
+        ? -Number(anchor.targetSurfaceY)
+        : anchor?.targetSurfaceY
+    }))
+  };
+  const mirroredHeights = Float32Array.from(heights, (height) => -height);
+  const mirroredLowerBounds = Float64Array.from(upperBounds, (height) => -height);
+  const reconciled = reconcileExactGraphNodeConstraints(
+    mirroredFeature,
+    mirroredHeights,
+    distances,
+    mirroredLowerBounds,
+    maximumGrade
+  );
+  return Float32Array.from(reconciled, (height) => -height);
 }
 
 function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
@@ -272,31 +329,23 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         centerLowerBounds,
         maximumGrade
       );
-    } else {
-      const graphConstrainedHeights = applyExactGraphNodeConstraints(
-        feature,
-        centerHeights,
-        sampleDistances
-      );
-      if (graphConstrainedHeights !== centerHeights) {
-        // Graph-node elevations are sampled from provisional neighboring
-        // profiles. They are exact only when physically feasible for this
-        // feature's clearance envelope and grade budget. Reconcile a constrained
-        // profile so a stale or conflicting node cannot punch a one-sample
-        // vertical wall into a tunnel approach.
-        centerHeights = smoothGradeLimitedProfile(
-          graphConstrainedHeights,
-          centerLowerBounds,
-          sampleDistances,
-          maximumGrade
-        );
-      }
     }
     if (mode === 'subgrade') {
       // Endpoint and graph constraints may only expose a tunnel where an
       // explicit compiled transition permits it. Reconcile the completed
       // profile with the local subgrade ceiling everywhere else.
       centerHeights = smoothUpperBoundedGradeProfile(
+        centerHeights,
+        centerUpperBounds,
+        sampleDistances,
+        maximumGrade
+      );
+      // Tunnel containment is the mirrored bridge problem: the terrain cover
+      // is an upper bound, but a feasible graph-owned portal still has to meet
+      // its connected surface exactly. Reconcile after the upper-bound pass so
+      // the portal cannot be moved back underground and leave a vertical step.
+      centerHeights = reconcileExactSubgradeGraphNodeConstraints(
+        feature,
         centerHeights,
         centerUpperBounds,
         sampleDistances,

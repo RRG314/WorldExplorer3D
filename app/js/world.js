@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=47";
+} from "./structure-semantics.js?v=48";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,15 +26,16 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=30";
+} from "./world/spawn.js?v=31";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
   getWorldLoadSignature,
   initWorldOsmLoader,
   invalidateOverpassCaches,
+  releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=17";
+} from "./world/osm-loader.js?v=18";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -81,7 +82,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=24";
+} from "./world/load-geometry.js?v=25";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -99,8 +100,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=34";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=42";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=35";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=43";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -141,7 +142,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=24";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=25";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=13";
@@ -160,14 +161,15 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=35";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=106";
+} from "./world/structure-aware.js?v=36";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=107";
 import {
-  fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=16";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=10";
+  fetchShortbreadWorldData,
+  releaseShortbreadRuntimeCache
+} from "./world/shortbread-source.js?v=17";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=25";
+import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
 import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=18";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
@@ -274,7 +276,19 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
 });
 
 async function loadRoads(retryPass = 0) {
-  return loadOsmRoads(retryPass);
+  try {
+    return await loadOsmRoads(retryPass);
+  } finally {
+    // Vector-tile decoders and raw provider responses are compilation staging,
+    // not part of the fixed playable world. HTTP/IndexedDB remain the reload
+    // caches; retaining the decoded source graph here duplicates the compiled
+    // roads/buildings and can keep more than a gigabyte alive in dense cities.
+    appCtx.worldProviderStagingRelease = Object.freeze({
+      shortbread: releaseShortbreadRuntimeCache(),
+      overpass: releaseOverpassRuntimeCache(),
+      releasedAt: performance.now()
+    });
+  }
 }
 
 async function refreshAuthoritativeMapData() {

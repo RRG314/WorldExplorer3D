@@ -166,7 +166,21 @@ async function prepareJourney(page, journeySpec) {
                 (right.end - right.start) - (left.end - left.start)
               )[0] || null
           : null;
-        return { road, segmentIndex: bestIndex, segmentLength: bestLength, totalLength, shellRange };
+        const centerDistance = road.pts.reduce((minimum, point) =>
+          Math.min(minimum, Math.hypot(Number(point.x), Number(point.z))), Infinity);
+        const graphNodeConstraintCount = (road.structureTransitionAnchors || []).filter((anchor) =>
+          anchor?.source === 'transport_graph_node' &&
+          Number.isFinite(Number(anchor?.targetSurfaceY))
+        ).length;
+        return {
+          road,
+          segmentIndex: bestIndex,
+          segmentLength: bestLength,
+          totalLength,
+          shellRange,
+          centerDistance,
+          graphNodeConstraintCount
+        };
       })
       .filter((candidate) =>
         candidate.segmentLength >= 12 &&
@@ -181,6 +195,10 @@ async function prepareJourney(page, journeySpec) {
           )
         ) &&
         (
+          !Number.isFinite(Number(spec.maximumCenterDistance)) ||
+          candidate.centerDistance <= Number(spec.maximumCenterDistance)
+        ) &&
+        (
           !spec.requireEndConnection ||
           (candidate.road?.connectedFeatures?.end || []).some((link) =>
             link?.feature?.driveable !== false &&
@@ -188,7 +206,24 @@ async function prepareJourney(page, journeySpec) {
           )
         )
       )
-      .sort((left, right) => right.segmentLength - left.segmentLength);
+      .sort((left, right) => {
+        if (
+          spec.requireExactGraphJoin &&
+          (left.graphNodeConstraintCount > 0) !== (right.graphNodeConstraintCount > 0)
+        ) {
+          return left.graphNodeConstraintCount > 0 ? -1 : 1;
+        }
+        const preferredName = String(spec.preferredName || '').trim().toLowerCase();
+        if (preferredName) {
+          const leftMatches = String(left.road?.name || '').toLowerCase().includes(preferredName);
+          const rightMatches = String(right.road?.name || '').toLowerCase().includes(preferredName);
+          if (leftMatches !== rightMatches) return leftMatches ? -1 : 1;
+        }
+        if (spec.preferLocationCenter && Math.abs(left.centerDistance - right.centerDistance) > 1) {
+          return left.centerDistance - right.centerDistance;
+        }
+        return right.segmentLength - left.segmentLength;
+      });
     const candidateIndex = Math.max(0, Math.floor(Number(spec.candidateIndex) || 0));
     const target = candidates[candidateIndex] || null;
     if (!target) {
@@ -331,19 +366,31 @@ async function prepareJourney(page, journeySpec) {
       return Number(heights[index]) +
         (Number(heights[Math.min(heights.length - 1, index + 1)]) - Number(heights[index])) * progress;
     };
-    const graphNodeErrors = (target.road.structureTransitionAnchors || [])
+    const graphNodeDiagnostics = (target.road.structureTransitionAnchors || [])
       .filter((anchor) =>
         anchor?.source === 'transport_graph_node' &&
         Number.isFinite(Number(anchor?.targetSurfaceY))
       )
-      .map((anchor) => Math.abs(
-        sampleProfileAtDistance(Number(anchor.distance)) - Number(anchor.targetSurfaceY)
-      ))
-      .filter(Number.isFinite);
+      .map((anchor) => {
+        const sampledSurfaceY = sampleProfileAtDistance(Number(anchor.distance));
+        return {
+          distance: Number(anchor.distance),
+          endpoint: anchor.endpoint || anchor.graphEndpoint || null,
+          targetSurfaceY: Number(anchor.targetSurfaceY),
+          sampledSurfaceY,
+          error: Math.abs(sampledSurfaceY - Number(anchor.targetSurfaceY))
+        };
+      })
+      .filter((entry) => Number.isFinite(entry.error));
+    const graphNodeErrors = graphNodeDiagnostics.map((entry) => entry.error);
+    const { getShortbreadRuntimeCacheStats } = await import('/app/js/world/shortbread-source.js?v=17');
+    const { getOverpassRuntimeCacheStats } = await import('/app/js/world/osm-loader.js?v=18');
+    const rendererMemory = ctx.renderer?.info?.memory || {};
     return {
       ok: true,
       kind: targetKind,
       sourceFeatureId: String(target.road.sourceFeatureId || ''),
+      name: String(target.road.name || ''),
       completeness: String(target.road.transportRecord?.completeness || ''),
       chainId: String(target.road.transportStructureRef?.chainId || ''),
       routeState: String(target.road.transportStructureRef?.routeState || ''),
@@ -353,6 +400,15 @@ async function prepareJourney(page, journeySpec) {
       maximumGraphNodeStep: graphNodeErrors.length
         ? Number(Math.max(...graphNodeErrors).toFixed(4))
         : null,
+      graphNodeDiagnostics,
+      runtimeMemory: {
+        jsHeapUsedBytes: Number(performance.memory?.usedJSHeapSize || 0),
+        jsHeapTotalBytes: Number(performance.memory?.totalJSHeapSize || 0),
+        rendererGeometries: Number(rendererMemory.geometries || 0),
+        rendererTextures: Number(rendererMemory.textures || 0),
+        shortbreadCache: getShortbreadRuntimeCacheStats(),
+        overpassCache: getOverpassRuntimeCacheStats()
+      },
       structureAssembly: structureAssembly
         ? {
             authority: String(structureAssembly.authority || ''),
@@ -592,13 +648,33 @@ async function verifyModeSwitch(page, label) {
 async function runJourney(page, journeySpec, softwareRenderer) {
   const kind = journeySpec.kind;
   const label = journeySpec.id;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('HeapProfiler.collectGarbage');
+  await cdp.detach();
   let setup = await prepareJourney(page, journeySpec);
   assert(setup.ok, `${label} journey setup failed: ${JSON.stringify(setup)}`);
+  console.log(`[phase3-journeys] setup ${label}: ${JSON.stringify({
+    graphNodeConstraintCount: setup.graphNodeConstraintCount,
+    maximumGraphNodeStep: setup.maximumGraphNodeStep,
+    graphNodeDiagnostics: setup.graphNodeDiagnostics,
+    runtimeMemory: setup.runtimeMemory
+  })}`);
   if (journeySpec.requireExactGraphJoin) {
     assert(setup.graphNodeConstraintCount > 0, `${label} did not compile a graph-node transition`);
     assert(
       setup.maximumGraphNodeStep <= 0.025,
       `${label} retained a vertical transition step: ${setup.maximumGraphNodeStep}m`
+    );
+  }
+  if (Number.isFinite(Number(journeySpec.maximumJsHeapBytes))) {
+    assert(
+      setup.runtimeMemory.jsHeapUsedBytes <= Number(journeySpec.maximumJsHeapBytes),
+      `${label} exceeded the fixed-world heap budget: ${JSON.stringify(setup.runtimeMemory)}`
+    );
+    assert(
+      setup.runtimeMemory.shortbreadCache.decodedTileCount === 0 &&
+      setup.runtimeMemory.overpassCache.entryCount === 0,
+      `${label} retained provider staging caches after world compilation: ${JSON.stringify(setup.runtimeMemory)}`
     );
   }
   await page.waitForTimeout(500);
@@ -615,7 +691,22 @@ async function runJourney(page, journeySpec, softwareRenderer) {
     ? path.join(outputDir, `${label}-start.png`)
     : null;
   if (startScreenshot) {
+    if (Number.isFinite(Number(journeySpec.captureShellProgress))) {
+      const proofSpec = {
+        ...journeySpec,
+        shellProgress: Number(journeySpec.captureShellProgress)
+      };
+      delete proofSpec.startDistanceFromShellEnd;
+      const proofSetup = await prepareJourney(page, proofSpec);
+      assert(proofSetup.ok, `${label} interior proof setup failed: ${JSON.stringify(proofSetup)}`);
+      await page.waitForTimeout(250);
+    }
     await page.screenshot({ path: startScreenshot, fullPage: false });
+    if (Number.isFinite(Number(journeySpec.captureShellProgress))) {
+      setup = await prepareJourney(page, journeySpec);
+      assert(setup.ok, `${label} post-proof journey setup failed: ${JSON.stringify(setup)}`);
+      await page.waitForTimeout(250);
+    }
   }
   const samples = [await sampleJourney(page)];
   const structureRenderStats = await page.evaluate(async () => {
@@ -822,7 +913,19 @@ async function runJourney(page, journeySpec, softwareRenderer) {
       }))
     )}`
   );
-  assert(minimumCameraHeight >= 0.8, `${label} camera dropped below the driven surface`);
+  assert(
+    minimumCameraHeight >= 0.8,
+    `${label} camera dropped below the driven surface: ${JSON.stringify(
+      samples.map((sample) => ({
+        distanceAlong: sample.distanceAlong,
+        cameraHeight: Number(sample.cameraHeight.toFixed(3)),
+        inside: sample.insideTunnelShell,
+        nearestKind: sample.nearestKind,
+        nearestSourceFeatureId: sample.nearestSourceFeatureId,
+        surfaceError: sample.surfaceError
+      }))
+    )}`
+  );
   assert(
     firstCarCameraHit !== null,
     `${label} chase camera ray did not intersect the rendered vehicle: ${JSON.stringify(cameraEvidenceHits)}`
@@ -937,10 +1040,16 @@ try {
           id: 'holland-tunnel',
           kind: 'tunnel',
           visualKind: 'tunnel',
-          startDistanceFromShellEnd: 4,
+          preferredName: 'Holland Tunnel',
+          maximumCenterDistance: 4000,
+          preferLocationCenter: true,
+          startDistanceFromShellEnd: 80,
+          captureShellProgress: 0.5,
+          maximumJsHeapBytes: 850000000,
           requireEndPortal: true,
           requireShellExit: true,
-          capturePortalExterior: true
+          captureStart: true,
+          capturePortalExterior: false
         },
         {
           id: 'holland-short-underpass',

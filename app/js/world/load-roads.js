@@ -27,11 +27,11 @@ import {
   fixedRegionalRoadGeometryGuards,
   sampleFixedRegionalGround,
   waitForFixedRegionalGround
-} from "./fixed-regional-context.js?v=7";
+} from "./fixed-regional-context.js?v=8";
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=2";
+} from "./fixed-regional-structures.js?v=3";
 
 export function createWorldRoadLoader(deps = {}) {
   const {

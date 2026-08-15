@@ -388,6 +388,48 @@ assert.ok(
   'an infeasible graph-node constraint created a vertical bridge/ramp wall'
 );
 
+const tunnelPortalTieIn = straightFeature({
+  id: 'tunnel-portal-graph-tie-in',
+  length: 100,
+  semantics: {
+    featureCategory: 'road',
+    structureKind: 'tunnel',
+    terrainMode: 'subgrade',
+    gradeSeparated: true,
+    isTunnel: true,
+    cutDepth: 4.6,
+    verticalGroup: 'subgrade:-1:tunnel'
+  }
+});
+tunnelPortalTieIn.structureTransitionAnchors = [{
+  endpoint: 'end',
+  graphEndpoint: 'end',
+  distance: 100,
+  targetOffset: 0,
+  targetSurfaceY: 30.08,
+  span: 46,
+  source: 'transport_graph_node'
+}];
+tunnelPortalTieIn.structureStations = [{
+  distance: 76,
+  span: 28,
+  targetOffset: 7.2,
+  reason: 'underwater_tunnel'
+}];
+const tunnelPortalTieInModel = compileTransportSurfaceModel(
+  tunnelPortalTieIn,
+  () => 30,
+  { sampleStep: 1 }
+);
+assert.ok(
+  Math.abs(tunnelPortalTieInModel.centerHeights[tunnelPortalTieInModel.centerHeights.length - 1] - 30.08) <= EPSILON,
+  'a feasible tunnel portal must meet its graph-owned surface without a vertical step'
+);
+assert.ok(
+  tunnelPortalTieInModel.stats.maximumGrade <= 0.1201,
+  'an exact tunnel portal tie-in must preserve the road grade limit'
+);
+
 const layerOnlyDriveway = straightFeature({
   id: 'layer-only-driveway',
   length: 52,

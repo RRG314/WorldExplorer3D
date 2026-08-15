@@ -2,25 +2,25 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=47";
+} from "../structure-semantics.js?v=48";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,
   updateStructureVisualVisibilityForContext
-} from "./structure-visual-meshes.js?v=19";
+} from "./structure-visual-meshes.js?v=20";
 import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=19";
+} from "./structure-tunnel-visuals.js?v=20";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
-} from "../world/bridge-safety.js?v=7";
+} from "../world/bridge-safety.js?v=8";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
-import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=4';
+import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=5';
 
 export function canPublishElevatedStructureVisual(feature) {
   if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;

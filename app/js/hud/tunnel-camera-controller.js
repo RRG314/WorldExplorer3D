@@ -1,4 +1,4 @@
-import { resolveTunnelCameraEnvelope } from './tunnel-camera-envelope.js?v=4';
+import { resolveTunnelCameraEnvelope } from './tunnel-camera-envelope.js?v=5';
 
 let activeRoad = null;
 let activeEnvelope = null;

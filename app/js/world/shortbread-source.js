@@ -16,6 +16,23 @@ let vectorTileLibPromise = null;
 const decodedTileCache = new Map();
 const pendingTileRequests = new Map();
 
+export function getShortbreadRuntimeCacheStats() {
+  return Object.freeze({
+    decodedTileCount: decodedTileCache.size,
+    pendingTileCount: pendingTileRequests.size,
+    decodedTileLimit: SHORTBREAD_DECODED_TILE_CACHE_LIMIT
+  });
+}
+
+export function releaseShortbreadRuntimeCache() {
+  const releasedTileCount = decodedTileCache.size;
+  decodedTileCache.clear();
+  return Object.freeze({
+    releasedTileCount,
+    pendingTileCount: pendingTileRequests.size
+  });
+}
+
 function tileTemplate() {
   const configured =
     globalThis.WORLD_EXPLORER_CONFIG?.osmVectorTileUrl ||

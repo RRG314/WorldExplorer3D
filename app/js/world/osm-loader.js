@@ -22,6 +22,23 @@ const overpassMemoryCache = [];
 let lastOverpassEndpoint = null;
 let readPerfModeValue = () => 'balanced';
 
+export function getOverpassRuntimeCacheStats() {
+  return Object.freeze({
+    entryCount: overpassMemoryCache.length,
+    elementCount: overpassMemoryCache.reduce(
+      (count, entry) => count + (Array.isArray(entry?.data?.elements) ? entry.data.elements.length : 0),
+      0
+    ),
+    entryLimit: OVERPASS_MEMORY_CACHE_MAX
+  });
+}
+
+export function releaseOverpassRuntimeCache() {
+  const stats = getOverpassRuntimeCacheStats();
+  overpassMemoryCache.length = 0;
+  return stats;
+}
+
 export function initWorldOsmLoader(deps = {}) {
   if (typeof deps.getPerfModeValue === 'function') {
     readPerfModeValue = deps.getPerfModeValue;

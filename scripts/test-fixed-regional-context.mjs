@@ -83,14 +83,14 @@ assert.equal(
   'detailed core structures must retain their high-resolution surface profile'
 );
 const bounds = fixedRegionalContextBounds(location);
-const zoom = selectShortbreadZoomForBounds(bounds, { preferredZoom: 14, maxTiles: 512 });
-assert.equal(zoom, 14, 'metropolitan fixed context must retain local-street detail');
-assert.ok(shortbreadTileCountForBounds(bounds, zoom) <= 512);
+const zoom = selectShortbreadZoomForBounds(bounds, { preferredZoom: 13, maxTiles: 128 });
+assert.equal(zoom, 13, 'the fixed outer context must use compact regional transport detail');
+assert.ok(shortbreadTileCountForBounds(bounds, zoom) <= 128);
 const londonBounds = fixedRegionalContextBounds({ lat: 51.5074, lon: -0.1278 });
 assert.equal(
-  selectShortbreadZoomForBounds(londonBounds, { preferredZoom: 14, maxTiles: 512 }),
-  14,
-  'London roads and buildings must share one zoom-14 provider tile identity'
+  selectShortbreadZoomForBounds(londonBounds, { preferredZoom: 13, maxTiles: 128 }),
+  13,
+  'London outer roads must keep one compact fixed-world provider pass'
 );
 
 const source = {

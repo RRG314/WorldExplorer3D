@@ -4,10 +4,10 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=43";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=7";
+} from "./terrain/structure-visuals.js?v=44";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=8";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=15";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=16";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -27,7 +27,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=48";
+} from "./terrain/surface-profiles.js?v=49";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -50,20 +50,20 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=43";
+} from "./terrain/tiles.js?v=44";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=37";
+} from "./terrain/rebuild.js?v=38";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=8";
+} from "./terrain/debug-tools.js?v=9";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=66";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=67";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {

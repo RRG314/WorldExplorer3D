@@ -163,10 +163,12 @@ export function beginFixedRegionalTransportLoad(options = {}) {
       // Outer natural surfaces are already owned by the fixed terrain and
       // WorldCover. Decode only transport needed to close the regional gap.
       layerNames: ['streets'],
-      // Fourteen kilometres is 256 z14 tiles in New York and roughly 400 in
-      // London. Buildings also require z14, so keep both consumers on one
-      // shared tile identity instead of issuing independent z13/z14 passes.
-      maxTiles: 512,
+      // The exact playable core already owns lossless streets. The fixed
+      // 14-kilometre context needs route continuity, not a second copy of
+      // every local z14 vertex. A z13 outer ring preserves the one-shot fixed
+      // world while cutting decoded source tiles and peak heap by about 4x.
+      preferredZoom: 13,
+      maxTiles: 128,
       minimumZoom: 10,
       signal
     })

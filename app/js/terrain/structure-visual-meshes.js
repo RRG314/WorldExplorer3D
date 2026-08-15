@@ -160,11 +160,21 @@ export function shouldPublishTunnelShellSection(shell, section, segmentDistance)
 function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   if (!Array.isArray(shellDescriptors) || shellDescriptors.length === 0 || typeof THREE === "undefined") return null;
   const positions = [];
+  const colors = [];
   const indices = [];
   // A continuous seven-point section gives vertical walls, shoulders, and an
   // arched crown without fragment seams or exposed box ends on curves.
   const lateralFactors = [-1, -1, -0.76, 0, 0.76, 1, 1];
   const heightFactors = [0.02, 0.56, 0.84, 1, 0.84, 0.56, 0.02];
+  const sectionColors = [
+    [0.33, 0.35, 0.35],
+    [0.58, 0.59, 0.56],
+    [0.43, 0.45, 0.43],
+    [0.29, 0.31, 0.32],
+    [0.43, 0.45, 0.43],
+    [0.58, 0.59, 0.56],
+    [0.33, 0.35, 0.35]
+  ];
   for (const shell of shellDescriptors) {
     const rings = Array.isArray(shell?.rings) ? shell.rings : [];
     if (rings.length < 2) continue;
@@ -179,6 +189,7 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
           ring.y + heightFactors[section] * shell.clearance,
           ring.z + nz * lateral
         );
+        colors.push(...sectionColors[section]);
       }
     }
     const sectionSize = lateralFactors.length;
@@ -214,6 +225,9 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
             terrainY,
             ring.z + nz * lateral
           );
+          // Portal retaining walls use the same warm concrete tone as the
+          // lower tunnel lining so the approach reads as one built structure.
+          colors.push(0.5, 0.51, 0.49, 0.5, 0.51, 0.49);
         }
       }
       for (let ringIndex = 0; ringIndex < approachRings.length - 1; ringIndex += 1) {
@@ -230,9 +244,11 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   if (positions.length === 0 || indices.length === 0) return null;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  const material = createStructureVisualMaterial(0x5d6974, 0.9, 0.04);
+  const material = createStructureVisualMaterial(0xffffff, 0.93, 0.02);
+  material.vertexColors = true;
   material.side = THREE.DoubleSide;
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = false;
@@ -417,7 +433,7 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
   if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && tunnelLightInstances.length > 0) {
     const material = createStructureVisualMaterial(0xfff2c7, 0.5, 0.02);
     material.emissive.setHex(0xffd98a);
-    material.emissiveIntensity = 1.8;
+    material.emissiveIntensity = 1.15;
     buildStructureVisualMeshForContext(appCtx, tunnelLightInstances, material, { structureVisualType: "tunnel_lights" });
   }
   if (PUBLISH_TUNNEL_STRUCTURE_VISUALS) {

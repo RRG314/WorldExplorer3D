@@ -7,16 +7,16 @@ import {
   buildFeatureTransitionAnchors,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=47";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=12";
+} from "../structure-semantics.js?v=48";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=13";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=4";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=5";
 import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=2";
 import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad
-} from "./bridge-safety.js?v=7";
-import { refreshStructureColliders } from "./structure-colliders.js?v=8";
+} from "./bridge-safety.js?v=8";
+import { refreshStructureColliders } from "./structure-colliders.js?v=9";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const runtime = {

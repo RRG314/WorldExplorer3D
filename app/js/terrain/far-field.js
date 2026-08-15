@@ -9,7 +9,7 @@ import {
   loadFarMappedContext,
   pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=16';
+} from './far-field-mapped-context.js?v=17';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=3';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -33,7 +33,7 @@ import {
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=48';
+} from './surface-profiles.js?v=49';
 import {
   applyWorldCoverSurfaceMaterialMix,
   ensureTerrainSurfaceMixAttributes,
@@ -47,8 +47,8 @@ import {
   buildFarWaterGeometry,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
-} from './far-field-water.js?v=3';
-import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=7';
+} from './far-field-water.js?v=4';
+import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=8';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
