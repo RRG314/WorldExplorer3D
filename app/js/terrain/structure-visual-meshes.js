@@ -53,6 +53,17 @@ function createStructureVisualMaterial(hex, roughness, metalness) {
   });
 }
 
+export function shouldPublishTunnelShellSection(shell, section, segmentDistance) {
+  const junctionZones = Array.isArray(shell?.junctionZones) ? shell.junctionZones : [];
+  const insideJunction = Number.isFinite(segmentDistance) && junctionZones.some((zone) => (
+    segmentDistance >= Number(zone?.start) && segmentDistance <= Number(zone?.end)
+  ));
+  if (!insideJunction) return true;
+  // Seven-point cross-section: 0-1 and 4-5 are the independent side
+  // walls/shoulders. Sections 2-3 retain the crown across the graph chamber.
+  return section > 1 && section < 4;
+}
+
 function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   if (!Array.isArray(shellDescriptors) || shellDescriptors.length === 0 || typeof THREE === "undefined") return null;
   const positions = [];
@@ -79,7 +90,12 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
     }
     const sectionSize = lateralFactors.length;
     for (let ringIndex = 0; ringIndex < rings.length - 1; ringIndex += 1) {
+      const segmentDistance = (Number(rings[ringIndex]?.distance) + Number(rings[ringIndex + 1]?.distance)) * 0.5;
       for (let section = 0; section < sectionSize - 1; section += 1) {
+        // In a graph-owned branch chamber the overlapping tunnel crowns remain
+        // as one continuous cover, but the independent side walls and shoulders
+        // must open so they cannot cross a splitting drive lane.
+        if (!shouldPublishTunnelShellSection(shell, section, segmentDistance)) continue;
         const a = baseVertex + ringIndex * sectionSize + section;
         const b = a + 1;
         const c = a + sectionSize;

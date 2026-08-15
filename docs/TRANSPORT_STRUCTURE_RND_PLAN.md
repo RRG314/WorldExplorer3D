@@ -98,6 +98,24 @@ physics world preserves mode switching, multiplayer positions, and road-graph
 continuity; camera behavior changes only while the actor occupies a compiled
 shell interval.
 
+### Covered passages and tunnel junctions
+
+- `covered=yes` and `tunnel=building_passage` describe a road passing beneath
+  another mapped structure. They do not authorize a freestanding tunnel box.
+  The mapped building/structure owns the visible cover; the ordinary road owns
+  its drive surface. These tags alone create no tunnel shell, portal, side-wall
+  collider, or enclosed-camera state.
+- A true tunnel shell is published only by the compiled tunnel system after
+  accepted terrain proves roof cover. Rendering, collision, portals, and the
+  tunnel camera all consume that same compiled model.
+- Connected true-tunnel ways on the same graph layer compile one junction zone
+  at a shared branch node. The zone is sized from every connected road width,
+  not from a city-specific constant. Branch shells retain their central crown
+  for exterior occlusion but remove independent side walls and wall collision
+  inside the zone, so a wall cannot continue across a splitting travel lane.
+- Close tunnels that do not share a compatible graph node remain independent
+  bores. Proximity by itself never merges their geometry or collision.
+
 ## Required evidence
 
 - Pure fixtures: straight bridge, curved ramp, stacked interchange, bridge

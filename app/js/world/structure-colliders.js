@@ -94,12 +94,27 @@ function descriptor(feature, kind, points, minY, maxY, index) {
 
 function colliderRanges(feature, profile) {
   const tunnel = feature?.tunnelSystemModel;
-  if (Array.isArray(tunnel?.shellRanges) && tunnel.shellRanges.length > 0) {
-    return tunnel.shellRanges;
+  const shellRanges = Array.isArray(tunnel?.shellRanges)
+    ? tunnel.shellRanges.filter((range) => Number(range?.end) - Number(range?.start) > 0.5)
+    : [];
+  const junctionZones = Array.isArray(tunnel?.junctionZones) ? tunnel.junctionZones : [];
+  let ranges = shellRanges.map((range) => ({
+    start: Math.max(0, Number(range.start)),
+    end: Math.min(profile.total, Number(range.end))
+  }));
+  for (const zone of junctionZones) {
+    const zoneStart = Math.max(0, Number(zone?.start));
+    const zoneEnd = Math.min(profile.total, Number(zone?.end));
+    if (!(zoneEnd > zoneStart)) continue;
+    ranges = ranges.flatMap((range) => {
+      if (zoneEnd <= range.start || zoneStart >= range.end) return [range];
+      const pieces = [];
+      if (zoneStart - range.start > 0.5) pieces.push({ start: range.start, end: zoneStart });
+      if (range.end - zoneEnd > 0.5) pieces.push({ start: zoneEnd, end: range.end });
+      return pieces;
+    });
   }
-  const semantics = feature?.structureSemantics || {};
-  if (semantics.structureKind === 'covered') return [{ start: 0, end: profile.total }];
-  return [];
+  return ranges;
 }
 
 export function compileStructureColliderDescriptors(features = []) {
@@ -116,15 +131,15 @@ export function compileStructureColliderDescriptors(features = []) {
       feature?.tunnelSystemModel?.visualKind === 'tunnel' &&
       Array.isArray(feature?.tunnelSystemModel?.shellRanges) &&
       feature.tunnelSystemModel.shellRanges.length > 0;
-    const coveredLike = semantics.structureKind === 'covered';
-    if (!tunnelLike && !coveredLike) continue;
+    if (!tunnelLike) continue;
     const profile = polylineDistances(feature.pts);
     if (!(profile.total > 0.5)) continue;
     const specification = feature?.transportStructureRef?.specification || {};
     const width = Math.max(3.4, Number(feature.width) || 6);
-    const clearance = tunnelLike
-      ? Math.max(3, Number(feature?.tunnelSystemModel?.clearance) || Number(specification.tunnelClearance) || 4.2)
-      : Math.max(3, Math.min(5.2, Number(feature?.transportRecord?.maxHeightMeters) || 4.4));
+    const clearance = Math.max(
+      3,
+      Number(feature?.tunnelSystemModel?.clearance) || Number(specification.tunnelClearance) || 4.2
+    );
     const wallOffset = Number(specification.tunnelWallOffset) || width * 0.5 + 0.72;
     const enclosedSides = tunnelLike || semantics.buildingPassage || semantics.indoor;
     let colliderIndex = 0;

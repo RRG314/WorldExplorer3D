@@ -6,12 +6,11 @@ import {
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=16";
+} from "./structure-visual-meshes.js?v=17";
 import {
   canPublishTunnelVisual,
-  collectCoveredVisualInstances,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=18";
+} from "./structure-tunnel-visuals.js?v=19";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
@@ -568,13 +567,6 @@ export function collectStructureVisualInstances(deps = {}) {
       tunnelLightInstances.push(...tunnel.lights);
       tunnelShells.push(...tunnel.shells);
       tunnelPortalMasks.push(...tunnel.portalMasks);
-    } else if (semantics.structureKind === "covered") {
-      const covered = collectCoveredVisualInstances(feature, structurePts, {
-        samplePointAlongPolyline
-      });
-      portalInstances.push(...covered.portals);
-      wallInstances.push(...covered.walls);
-      roofInstances.push(...covered.roofs);
     }
   }
 

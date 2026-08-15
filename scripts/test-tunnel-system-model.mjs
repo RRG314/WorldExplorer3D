@@ -144,6 +144,26 @@ const buildingPassage = classifyStructureSemantics(
 assert.equal(buildingPassage.structureKind, 'covered');
 assert.equal(buildingPassage.terrainMode, 'at_grade');
 assert.equal(buildingPassage.isTunnel, false);
+assert.equal(resolveTunnelCameraEnvelope({
+  width: 6,
+  pts: [{ x: 0, z: 0 }, { x: 40, z: 0 }],
+  structureSemantics: buildingPassage,
+  transportSurfaceModel: constantProfile(40)
+}, 20, 0).inside, false);
+
+const junctionStem = tunnelFeature(0, 60, 'Junction Stem');
+const junctionLeft = tunnelFeature(60, 110, 'Junction Left');
+const junctionRight = tunnelFeature(60, 110, 'Junction Right');
+junctionStem.sourceFeatureId = 'junction-stem';
+junctionLeft.sourceFeatureId = 'junction-left';
+junctionRight.sourceFeatureId = 'junction-right';
+junctionStem.connectedFeatures.end.push({ feature: junctionLeft }, { feature: junctionRight });
+junctionLeft.connectedFeatures.start.push({ feature: junctionStem }, { feature: junctionRight });
+junctionRight.connectedFeatures.start.push({ feature: junctionStem }, { feature: junctionLeft });
+compileTunnelSystemModels([junctionStem, junctionLeft, junctionRight], () => 9);
+assert.equal(junctionStem.tunnelSystemModel.junctionZones.length, 1);
+assert.equal(junctionStem.tunnelSystemModel.junctionZones[0].endpoint, 'end');
+assert.equal(junctionStem.tunnelSystemModel.junctionZones[0].connectionCount, 3);
 
 const culvert = classifyStructureSemantics(
   { tunnel: 'culvert', layer: '-1' },

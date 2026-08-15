@@ -43,6 +43,56 @@ function linkedSurfaceAt(feature, endpoint) {
   return links.some((entry) => entry?.feature && !compatibleTunnelFeature(entry.feature));
 }
 
+function linkedTunnelFeaturesAt(feature, endpoint) {
+  const links = Array.isArray(feature?.connectedFeatures?.[endpoint])
+    ? feature.connectedFeatures[endpoint]
+    : [];
+  const ownLayer = Number(feature?.structureSemantics?.layer) || 0;
+  const unique = new Set();
+  const linked = [];
+  for (const entry of links) {
+    const other = entry?.feature;
+    if (!compatibleTunnelFeature(other)) continue;
+    if ((Number(other?.structureSemantics?.layer) || 0) !== ownLayer) continue;
+    const identity = String(
+      other?.transportRecord?.identity ||
+      other?.sourceFeatureId ||
+      other?.transportGraphRef?.featureId ||
+      ''
+    );
+    if (identity && unique.has(identity)) continue;
+    if (identity) unique.add(identity);
+    linked.push(other);
+  }
+  return linked;
+}
+
+function compileTunnelJunctionZones(feature, total, width) {
+  const zones = [];
+  for (const endpoint of ['start', 'end']) {
+    const linked = linkedTunnelFeaturesAt(feature, endpoint);
+    // One linked tunnel is an ordinary way seam. Two or more linked tunnels
+    // make a branch chamber where independent side walls must yield to the
+    // graph-owned junction opening.
+    if (linked.length < 2) continue;
+    const widestBranch = linked.reduce(
+      (maximum, other) => Math.max(maximum, Number(other?.width) || width),
+      width
+    );
+    const cutback = Math.max(4.5, Math.min(16, width * 0.75 + widestBranch * 0.55));
+    zones.push(Object.freeze({
+      endpoint,
+      distance: endpoint === 'start' ? 0 : total,
+      start: endpoint === 'start' ? 0 : Math.max(0, total - cutback),
+      end: endpoint === 'start' ? Math.min(total, cutback) : total,
+      cutback,
+      connectionCount: linked.length + 1,
+      authority: 'compiled_tunnel_graph_junction'
+    }));
+  }
+  return Object.freeze(zones);
+}
+
 function pointAtDistance(points, distances, distance) {
   if (!Array.isArray(points) || points.length < 2 || !(distances instanceof Float32Array)) return null;
   const total = Number(distances[distances.length - 1]) || 0;
@@ -208,6 +258,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
   if (!(total > 0.5)) return null;
 
   const width = Math.max(3.4, Number(feature.width) || 6);
+  const junctionZones = compileTunnelJunctionZones(feature, total, width);
   const clearance = Math.max(
     3.2,
     Math.min(5.2, (Number(feature?.structureSemantics?.cutDepth) || 4.6) - 0.25)
@@ -265,6 +316,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
         shellRanges: Object.freeze([]),
         portalDistances: Object.freeze([]),
         portalZones: Object.freeze([]),
+        junctionZones,
         shellStart: null,
         shellEnd: null,
         portalStart: null,
@@ -294,6 +346,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
         shellEnd: shellRanges[shellRanges.length - 1].end,
         portalDistances,
         portalZones: compilePortalZones(shellRanges, total, width, portalDistances),
+        junctionZones,
         portalStart: shellRanges[0].start,
         portalEnd: shellRanges[shellRanges.length - 1].end
       };
@@ -307,6 +360,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
       shellRanges: [],
       portalDistances: [],
       portalZones: Object.freeze([]),
+      junctionZones,
       shellStart: null,
       shellEnd: null,
       portalStart: null,
@@ -325,6 +379,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
       shellRanges: [],
       portalDistances: [],
       portalZones: Object.freeze([]),
+      junctionZones,
       shellStart: null,
       shellEnd: null,
       portalStart: null,
@@ -362,6 +417,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     // the middle of a tunnel has no connected surface way and gets no fake arch.
     portalDistances: Object.freeze(portalDistances),
     portalZones: compilePortalZones(shellRanges, total, width, portalDistances, samples),
+    junctionZones,
     portalStart,
     portalEnd
   };

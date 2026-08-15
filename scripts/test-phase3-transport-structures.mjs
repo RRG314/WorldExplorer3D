@@ -15,7 +15,10 @@ import { resolveTunnelCameraEnvelope } from '../app/js/hud/tunnel-camera-envelop
 import { isProtectedRoadFeature } from '../app/js/world/bridge-safety.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
-import { PUBLISH_TUNNEL_STRUCTURE_VISUALS } from '../app/js/terrain/structure-visual-meshes.js';
+import {
+  PUBLISH_TUNNEL_STRUCTURE_VISUALS,
+  shouldPublishTunnelShellSection
+} from '../app/js/terrain/structure-visual-meshes.js';
 import {
   canPublishElevatedStructureVisual,
   collectStructureVisualInstances
@@ -23,7 +26,6 @@ import {
 import { selectPortalMasksForBounds } from '../app/js/terrain/structure-terrain-portals.js';
 import {
   canPublishTunnelVisual,
-  collectCoveredVisualInstances,
   collectTunnelVisualInstances
 } from '../app/js/terrain/structure-tunnel-visuals.js';
 
@@ -460,6 +462,72 @@ assert.equal(
 generalizedTunnel.transportRecord.routeState = 'incomplete';
 assert.equal(canPublishTunnelVisual(generalizedTunnel), false);
 
+const junctionStem = structureFeature(
+  'osm:way:junction-stem',
+  [{ x: 0, z: 0 }, { x: 60, z: 0 }],
+  { highway: 'primary', tunnel: 'yes', layer: '-1' },
+  { surfaceY: -7 }
+);
+const junctionLeft = structureFeature(
+  'osm:way:junction-left',
+  [{ x: 60, z: 0 }, { x: 110, z: -35 }],
+  { highway: 'primary', tunnel: 'yes', layer: '-1' },
+  { surfaceY: -7 }
+);
+const junctionRight = structureFeature(
+  'osm:way:junction-right',
+  [{ x: 60, z: 0 }, { x: 110, z: 35 }],
+  { highway: 'primary', tunnel: 'yes', layer: '-1' },
+  { surfaceY: -7 }
+);
+junctionStem.connectedFeatures.end.push({ feature: junctionLeft }, { feature: junctionRight });
+junctionLeft.connectedFeatures.start.push({ feature: junctionStem }, { feature: junctionRight });
+junctionRight.connectedFeatures.start.push({ feature: junctionStem }, { feature: junctionLeft });
+for (const feature of [junctionStem, junctionLeft, junctionRight]) {
+  feature.tunnelSystemModel = compileTunnelSystemModel(feature, () => 2);
+  assert.equal(feature.tunnelSystemModel.junctionZones.length, 1);
+  assert.equal(feature.tunnelSystemModel.junctionZones[0].connectionCount, 3);
+}
+const stemZone = junctionStem.tunnelSystemModel.junctionZones[0];
+const junctionColliders = compileStructureColliderDescriptors([junctionStem]);
+assert.ok(junctionColliders.length > 0, 'the tunnel stem must retain walls outside its junction');
+assert.ok(
+  junctionColliders.every((collider) => collider.pts.every((point) => point.x <= stemZone.start + 0.15)),
+  'tunnel side-wall collision continued into a splitting drive lane'
+);
+const junctionVisuals = collectTunnelVisualInstances(
+  junctionStem,
+  junctionStem.pts,
+  60,
+  {
+    samplePointAlongPolyline: pointAlongPolyline,
+    sampleTerrainHeight: () => 2
+  }
+);
+assert.equal(junctionVisuals.shells.length, 1);
+assert.deepEqual(junctionVisuals.shells[0].junctionZones, junctionStem.tunnelSystemModel.junctionZones);
+const chamberDistance = (stemZone.start + stemZone.end) * 0.5;
+assert.equal(
+  shouldPublishTunnelShellSection(junctionVisuals.shells[0], 0, chamberDistance),
+  false,
+  'left tunnel wall continued through the graph-owned junction chamber'
+);
+assert.equal(
+  shouldPublishTunnelShellSection(junctionVisuals.shells[0], 5, chamberDistance),
+  false,
+  'right tunnel wall continued through the graph-owned junction chamber'
+);
+assert.equal(
+  shouldPublishTunnelShellSection(junctionVisuals.shells[0], 2, chamberDistance),
+  true,
+  'junction chamber lost its terrain-occluding crown'
+);
+assert.equal(
+  shouldPublishTunnelShellSection(junctionVisuals.shells[0], 0, stemZone.start - 1),
+  true,
+  'tunnel wall was removed outside the junction chamber'
+);
+
 const buildingPassage = structureFeature(
   'osm:way:building-passage',
   [{ x: 0, z: 50 }, { x: 40, z: 50 }],
@@ -468,16 +536,26 @@ const buildingPassage = structureFeature(
 );
 compileTransportStructureModel([buildingPassage]);
 const coveredColliders = compileStructureColliderDescriptors([buildingPassage]);
-assert.ok(!coveredColliders.some((collider) => collider.structureColliderKind === 'ceiling'));
-assert.ok(coveredColliders.some((collider) => collider.structureColliderKind === 'side_wall'));
-const coveredVisuals = collectCoveredVisualInstances(
-  buildingPassage,
-  buildingPassage.pts,
-  { samplePointAlongPolyline: pointAlongPolyline }
+assert.equal(
+  coveredColliders.length,
+  0,
+  'a covered/building-passage tag must not invent a freestanding collision shell'
 );
-assert.equal(coveredVisuals.roofs.length, 1);
-assert.equal(coveredVisuals.walls.length, 2);
-assert.equal(coveredVisuals.portals.length, 6);
+const coveredVisuals = collectStructureVisualInstances({
+  featuresToProcess: [buildingPassage],
+  allElevatedFeatures: [buildingPassage],
+  cachedTerrainHeight: () => 0,
+  pointAlongPolyline,
+  roadConflictIndex: { query: () => [] }
+});
+assert.equal(coveredVisuals.roofInstances.length, 0);
+assert.equal(coveredVisuals.wallInstances.length, 0);
+assert.equal(coveredVisuals.portalInstances.length, 0);
+assert.equal(
+  resolveTunnelCameraEnvelope(buildingPassage, 20, 50).inside,
+  false,
+  'a covered/building-passage tag without a compiled shell must not force tunnel camera mode'
+);
 
 const slopedLower = structureFeature(
   'fixture:sloped-lower',
@@ -559,9 +637,10 @@ console.log(JSON.stringify({
     crossingSafeSupportStations: crossingSafeAssembly.supportStations.length,
     underpassShells: underpassVisuals.shells.length,
     underpassPortals: underpassVisuals.portals.length,
-    coveredRoofs: coveredVisuals.roofs.length,
-    coveredWalls: coveredVisuals.walls.length,
-    coveredPortals: coveredVisuals.portals.length
+    coveredRoofs: coveredVisuals.roofInstances.length,
+    coveredWalls: coveredVisuals.wallInstances.length,
+    coveredPortals: coveredVisuals.portalInstances.length,
+    tunnelJunctionZones: junctionStem.tunnelSystemModel.junctionZones.length
   },
   tunnelCamera: {
     inside: tunnelCamera.inside,

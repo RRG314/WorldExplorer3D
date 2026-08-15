@@ -34,6 +34,7 @@
     "test:new-york-regional-continuity-browser": "node scripts/test-new-york-regional-continuity-browser.mjs",
     "test:regional-structures-browser": "node scripts/test-regional-structures-browser.mjs",
     "test:monaco-tunnels-browser": "node scripts/test-monaco-tunnels-browser.mjs",
+    "test:monaco-structure-ownership": "node scripts/diagnose-monaco-structure-ownership.mjs",
     "test:fixed-regional-context": "node scripts/test-fixed-regional-context.mjs",
     "test:fixed-regional-structures": "node scripts/test-fixed-regional-structures.mjs",
     "test:far-field-elevation-loader": "node scripts/test-far-field-elevation-loader.mjs",

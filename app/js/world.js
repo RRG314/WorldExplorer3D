@@ -160,7 +160,7 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=33";
+} from "./world/structure-aware.js?v=34";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=106";
 import {
   fetchShortbreadWorldData

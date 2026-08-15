@@ -3,7 +3,7 @@ import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively
-} from "./terrain/structure-visuals.js?v=39";
+} from "./terrain/structure-visuals.js?v=40";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=7";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=15";

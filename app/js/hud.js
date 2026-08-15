@@ -4,7 +4,7 @@ import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
 import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
-import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=1";
+import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=2";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 

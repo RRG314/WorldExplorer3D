@@ -46,11 +46,7 @@ export function resolveTunnelCameraEnvelope(feature, x, z) {
     return Object.freeze({ inside: false, reason: 'outside_cross_section' });
   }
 
-  const semantics = feature?.structureSemantics || {};
   const tunnel = feature?.tunnelSystemModel || null;
-  const covered = ['covered', 'indoor_covered', 'building_passage'].includes(
-    String(feature?.transportStructureRef?.kind || semantics.structureKind || '')
-  );
   const shellRanges = Array.isArray(tunnel?.shellRanges) ? tunnel.shellRanges : [];
   const portalZones = Array.isArray(tunnel?.portalZones) ? tunnel.portalZones : [];
   const shellInside = distanceInRanges(projection.distance, shellRanges, 0.12);
@@ -58,7 +54,7 @@ export function resolveTunnelCameraEnvelope(feature, x, z) {
     projection.distance >= Number(zone?.approachStart) - 0.12 &&
     projection.distance <= Number(zone?.approachEnd) + 0.12
   ) || null;
-  const inside = covered || shellInside || portalZone !== null;
+  const inside = shellInside || portalZone !== null;
   if (!inside) {
     return Object.freeze({
       inside: false,
@@ -84,11 +80,7 @@ export function resolveTunnelCameraEnvelope(feature, x, z) {
   const ceilingY = floorY + clearance;
   return Object.freeze({
     inside: true,
-    reason: covered
-      ? 'covered_interval'
-      : shellInside
-        ? 'compiled_shell_interval'
-        : 'compiled_portal_transition',
+    reason: shellInside ? 'compiled_shell_interval' : 'compiled_portal_transition',
     shellInside,
     portalTransition: portalZone !== null && !shellInside,
     distance: projection.distance,
