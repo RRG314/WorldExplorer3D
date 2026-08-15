@@ -124,9 +124,9 @@ async function inspectPlacement(page) {
     const ctx = globalThis.getWorldExplorerRuntimeDiagnostics ? globalThis.ctx : null;
     return import('/app/js/shared-context.js?v=55').then(({ ctx: appCtx }) => {
       const group = appCtx.scene?.getObjectByName?.('DeFlockCameraLayer');
-      const cameraMesh = group?.children?.find((child) => (
-        child?.isInstancedMesh && child.geometry?.type === 'BoxGeometry'
-      ));
+      const poleMesh = group?.getObjectByName?.('DeFlockPoles');
+      const mountArmMesh = group?.getObjectByName?.('DeFlockMountArms');
+      const cameraMesh = group?.getObjectByName?.('DeFlockCameraBodies');
       const beaconMesh = group?.getObjectByName?.('DeFlockBeacons');
       const beamMesh = group?.getObjectByName?.('DeFlockBeaconBeams');
       const markers = Array.isArray(appCtx.deFlockMapMarkers) ? appCtx.deFlockMapMarkers : [];
@@ -142,15 +142,28 @@ async function inspectPlacement(page) {
         const beaconPosition = new globalThis.THREE.Vector3();
         beaconMesh?.getMatrixAt?.(index, beaconMatrix);
         beaconPosition.setFromMatrixPosition(beaconMatrix);
+        const poleMatrix = new globalThis.THREE.Matrix4();
+        const poleScale = new globalThis.THREE.Vector3();
+        poleMesh?.getMatrixAt?.(index, poleMatrix);
+        poleMatrix.decompose(new globalThis.THREE.Vector3(), new globalThis.THREE.Quaternion(), poleScale);
+        const armMatrix = new globalThis.THREE.Matrix4();
+        const armScale = new globalThis.THREE.Vector3();
+        mountArmMesh?.getMatrixAt?.(index, armMatrix);
+        armMatrix.decompose(new globalThis.THREE.Vector3(), new globalThis.THREE.Quaternion(), armScale);
         const world = appCtx.geoToWorld(expected[index].lat, expected[index].lon);
         const terrainY = Number(appCtx.SurfaceQuery?.terrainAt?.(marker.x, marker.z)?.position?.y);
+        const nearestRoad = appCtx.findNearestRoad?.(marker.x, marker.z);
         return {
           ...marker,
           expectedWorld: { x: Number(world?.x), z: Number(world?.z) },
           rendered: { x: position.x, y: position.y, z: position.z },
-          groundY: position.y - 3.15,
+          groundY: marker.groundY,
           beaconY: beaconPosition.y,
           terrainY,
+          nearestRoadDistance: Number(nearestRoad?.dist),
+          nearestRoadHalfWidth: Number(nearestRoad?.road?.width) * 0.5,
+          poleScaleY: poleScale.y,
+          mountArmScaleX: armScale.x,
           forward: { x: forward.x, z: forward.z }
         };
       });
@@ -178,12 +191,11 @@ function assertPlacement(placement) {
   assert.equal(placement.beaconDepthVisible, true, 'DeFlock beacons can disappear behind coarse world geometry');
   assert.deepEqual(placement.rows.map((row) => row.sourceId), ['osm:node:101', 'osm:node:102']);
   assert.deepEqual(placement.rows.map((row) => row.direction), [45, 270]);
+  assert.deepEqual(placement.rows.map((row) => row.mountKind), ['pole', 'traffic_signal']);
   for (const row of placement.rows) {
-    assert(Math.hypot(row.x - row.expectedWorld.x, row.z - row.expectedWorld.z) < 0.01,
-      `${row.sourceId} was not placed by the canonical geographic transform`);
+    assert(Math.hypot(row.sourceX - row.expectedWorld.x, row.sourceZ - row.expectedWorld.z) < 0.01,
+      `${row.sourceId} did not retain its canonical mapped source coordinate`);
     assert(Number.isFinite(row.terrainY), `${row.sourceId} did not receive a finite terrain sample`);
-    assert(Math.abs(row.groundY - row.terrainY) < 0.05,
-      `${row.sourceId} camera body was not based on terrain height`);
     assert(Math.hypot(row.rendered.x - row.x, row.rendered.z - row.z) < 0.01,
       `${row.sourceId} rendered instance diverged from its map/world placement`);
     assert(row.beaconY - row.groundY > 4.25,
@@ -193,6 +205,32 @@ function assertPlacement(placement) {
     assert(Math.hypot(row.forward.x - expectedForward.x, row.forward.z - expectedForward.z) < 0.01,
       `${row.sourceId} rendered direction did not match its mapped compass bearing`);
   }
+  const pole = placement.rows[0];
+  assert(pole.curbAdjusted || pole.nearestRoadDistance >= pole.nearestRoadHalfWidth + 0.75,
+    `pole-mounted camera remained inside a driveable road: ${JSON.stringify(pole)}`);
+  assert(pole.poleScaleY >= 4.1 && pole.mountArmScaleX < 0.01,
+    `pole-mounted camera did not use its mapped support height: ${JSON.stringify(pole)}`);
+  const overhead = placement.rows[1];
+  assert(overhead.overhead && Math.hypot(overhead.x - overhead.sourceX, overhead.z - overhead.sourceZ) < 0.01,
+    `traffic-signal camera did not stay overhead at its mapped coordinate: ${JSON.stringify(overhead)}`);
+  assert(overhead.mountArmScaleX >= 5.9 && overhead.poleScaleY < 0.01,
+    `traffic-signal camera did not render an overhead support: ${JSON.stringify(overhead)}`);
+}
+
+async function inspectDisabledPose(page, markerIndex = 0) {
+  return page.evaluate((index) => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    const marker = ctx.deFlockMapMarkers?.[index];
+    const mesh = ctx.scene?.getObjectByName?.('DeFlockCameraBodies');
+    const matrix = new globalThis.THREE.Matrix4();
+    const position = new globalThis.THREE.Vector3();
+    mesh?.getMatrixAt?.(index, matrix);
+    position.setFromMatrixPosition(matrix);
+    return {
+      y: position.y,
+      groundY: marker?.groundY,
+      fallingInstances: ctx.getDeFlockSnapshot?.().fallingInstances
+    };
+  }), markerIndex);
 }
 
 async function moveActorNear(page, markerIndex = 0) {
@@ -432,6 +470,35 @@ async function verifyCleanup(page) {
   return cleanup;
 }
 
+async function verifyInWorldLaunch(page) {
+  const before = await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    const result = { sceneId: ctx.scene?.uuid, roads: ctx.roads?.length || 0 };
+    ctx.stopGameplayPlugin?.('deflock-in-world-test', { resumeFree: true });
+    return result;
+  }));
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.active === false);
+  await page.locator('#gameBtn').click({ force: true });
+  assert.equal(await page.locator('#gameMenu .floatItems > .floatItem').first().getAttribute('id'), 'fDeFlock',
+    'DeFlock must be the first in-world Games-menu action');
+  await page.locator('#fDeFlock').click({ force: true });
+  await page.waitForFunction(() => {
+    const snapshot = globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock;
+    return snapshot?.active === true && snapshot.loading === false && snapshot.progress?.total === 2;
+  }, null, { timeout: 30000 });
+  const after = await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => ({
+    sceneId: ctx.scene?.uuid,
+    roads: ctx.roads?.length || 0,
+    gameMode: ctx.gameMode,
+    active: ctx.getDeFlockSnapshot?.().active,
+    menuActive: document.getElementById('fDeFlock')?.classList.contains('on')
+  })));
+  assert.equal(after.sceneId, before.sceneId, 'starting DeFlock in-world replaced the loaded Earth scene');
+  assert.equal(after.roads, before.roads, 'starting DeFlock in-world reloaded the current Earth roads');
+  assert(after.gameMode === 'deflock' && after.active && after.menuActive,
+    `in-world DeFlock launch did not activate the existing location: ${JSON.stringify(after)}`);
+  return { before, after };
+}
+
 async function runDesktop() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const page = await context.newPage();
@@ -459,10 +526,22 @@ async function runDesktop() {
   await aimAtMarker(page, 1);
   await page.screenshot({ path: path.join(outputDir, 'near-virtual-camera.png'), fullPage: false });
 
+  await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    ctx.setPauseReason?.('deflock-browser-visual', false);
+  }));
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress?.disabled === 1);
   await page.waitForTimeout(250);
+  const falling = await inspectDisabledPose(page, 1);
+  assert.equal(falling.fallingInstances, 1, `disabled camera did not enter its fall animation: ${JSON.stringify(falling)}`);
   assert.match(await page.locator('#deFlockStatus').innerText(), /Virtual Camera Disabled/);
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.fallingInstances === 0);
+  const fallen = await inspectDisabledPose(page, 1);
+  assert(fallen.y - fallen.groundY < 0.7,
+    `disabled overhead camera did not fall to the ground: ${JSON.stringify(fallen)}`);
+  await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    ctx.setPauseReason?.('deflock-browser-visual', true);
+  }));
   await aimAtMarker(page, 1);
   await page.screenshot({ path: path.join(outputDir, 'virtually-disabled.png'), fullPage: false });
 
@@ -470,6 +549,7 @@ async function runDesktop() {
   assert.equal(mapMarker.state, 'disabled');
   await page.screenshot({ path: path.join(outputDir, 'large-map-markers.png'), fullPage: false });
   const lifecycle = await verifyEnvironmentLifecycle(page);
+  const inWorldLaunch = await verifyInWorldLaunch(page);
 
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 120000 });
   await waitForRuntime(page);
@@ -485,7 +565,7 @@ async function runDesktop() {
   const cleanup = await verifyCleanup(page);
 
   await context.close();
-  return { placement, hudLayout, lighting, motion, discovered, restored, mapMarker, lifecycle, cleanup };
+  return { placement, hudLayout, lighting, motion, discovered, restored, mapMarker, lifecycle, inWorldLaunch, falling, fallen, cleanup };
 }
 
 async function runMobile() {

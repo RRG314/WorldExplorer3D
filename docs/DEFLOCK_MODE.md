@@ -7,7 +7,8 @@ does not affect physical equipment.
 
 ## Start a hunt
 
-1. Open **Missions** in the title hub and select **DeFlock Hunt**.
+1. Open **Missions** in the title hub and select **DeFlock Hunt**, or choose
+   **Games → Start DeFlock Hunt** while already exploring an Earth location.
 2. Choose an Earth location with the normal preset, search, coordinate, globe,
    or geolocation flow.
 3. Start exploring. The HUD reports mapped objectives, discoveries, virtual
@@ -49,6 +50,16 @@ bodies, lenses, interaction targets, and optional direction zones are rendered
 as shared instanced meshes. A state-colored ground ring, short vertical beam,
 and elevated beacon make each mapped objective legible against dense buildings
 without changing its exact OSM position.
+
+Mapped `camera:mount` and safe height values control the game representation.
+Traffic-signal, bridge, gantry, and wire-mounted cameras stay overhead at the
+mapped coordinate and receive an overhead support. A pole or unknown mount that
+lands inside the mapped road footprint receives a deterministic curb-side
+visual anchor while its exact OSM coordinate remains in the source record.
+Virtually disabling a camera tips a ground pole from its base or drops an
+overhead camera body while leaving its mapped support in place. This animation
+is fictional game feedback and does not represent an action on physical
+equipment.
 
 The compact hunt HUD stays in the upper-right corner and the persistent game
 navigation contracts while a hunt is active. On mobile, the HUD and minimap use

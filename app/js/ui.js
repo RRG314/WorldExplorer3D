@@ -304,6 +304,16 @@ function setupUI() {
     }
     closeAllFloatMenus();
   });
+  document.getElementById('fDeFlock')?.addEventListener('click', () => {
+    if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {
+      appCtx.showToast?.('DeFlock Hunt is available while exploring an Earth location.');
+      closeAllFloatMenus();
+      return;
+    }
+    appCtx.gameMode = 'deflock';
+    appCtx.startGameplayPlugin?.('deflock', { source: 'in-world-games-menu' });
+    closeAllFloatMenus();
+  });
   const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
   if (memoryFlowerFloatBtn) {
     bindTouchFriendlyPress(memoryFlowerFloatBtn, () => {

@@ -13,7 +13,9 @@
         "man_made": "surveillance",
         "surveillance:type": "ALPR",
         "direction": "NE",
-        "operator": "Fixture Operator"
+    "operator": "Fixture Operator",
+    "camera:mount": "pole",
+    "camera:height": "4.2 m"
       }
     },
     {
@@ -25,7 +27,8 @@
         "man_made": "surveillance",
         "surveillance:type": "camera",
         "camera:type": "dome",
-        "camera:direction": "270"
+    "camera:direction": "270",
+    "camera:mount": "traffic_signals"
       }
     },
     {

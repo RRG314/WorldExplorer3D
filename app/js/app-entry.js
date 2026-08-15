@@ -38,13 +38,13 @@ import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=1';
-import './game.js?v=59';
+import './game.js?v=60';
 import './input.js?v=60';
 import './hud.js?v=86';
 import './map.js?v=59';
 import { renderLoop } from './main.js?v=71';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=118';
+import { setupUI } from './ui.js?v=119';
 
 let _booted = false;
 let _lastObservedAuthUser = null;

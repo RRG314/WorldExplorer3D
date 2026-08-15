@@ -7,6 +7,7 @@ import {
   buildSurveillanceQuery,
   loadSurveillanceFeatures,
   normalizeDirection,
+  normalizeHeightMeters,
   parseSurveillanceElements
 } from '../app/js/deflock/source.js';
 import {
@@ -28,6 +29,8 @@ assert.equal(features.length, 2, 'only mapped surveillance cameras are accepted'
 assert.equal(features[0].sourceId, 'osm:node:101');
 assert.equal(features[0].cameraType, 'ALPR');
 assert.equal(features[0].direction, 45);
+assert.equal(features[0].cameraMount, 'pole');
+assert.equal(features[0].cameraHeightMeters, 4.2);
 assert.equal(features[0].operator, 'Fixture Operator');
 assert.equal(features[0].provenance.license, 'ODbL-1.0');
 assert.equal(features[1].direction, 270);
@@ -35,6 +38,8 @@ assert.equal(normalizeDirection('SSW'), 202.5);
 assert.equal(normalizeDirection('-90'), 270);
 assert.equal(normalizeDirection('0;71;163'), 0, 'multi-camera direction lists use the first mapped bearing');
 assert.equal(normalizeDirection('unknown'), null);
+assert.equal(normalizeHeightMeters('5.5 m'), 5.5);
+assert.equal(normalizeHeightMeters('unknown'), null);
 
 const query = buildSurveillanceQuery({ lat: 39.2904, lon: -76.6122 }, 0.01);
 assert.match(query, /man_made/);
@@ -74,6 +79,37 @@ assert.ok(Math.abs(placement.x - world.x) < 1e-9, 'uses the canonical Earth proj
 assert.ok(Math.abs(placement.z - world.z) < 1e-9, 'uses the canonical Earth projection');
 assert.equal(placement.bearingDegrees, 45, 'preserves known facing');
 assert.equal(placement.groundY, world.x * 0.01 + world.z * 0.005 + 12, 'uses terrain authority height');
+assert.equal(placement.mountKind, 'pole');
+assert.equal(placement.mountHeight, 4.2, 'uses an explicit mapped camera height');
+
+const road = { width: 10, pts: [{ x: -20, z: 0 }, { x: 20, z: 0 }] };
+const curbPlacement = computeCameraPlacement(features[0], {
+  geoToWorld: () => ({ x: 0, z: 0 }),
+  terrainAt: () => ({ position: { y: 7 } }),
+  nearestRoadAt: () => ({ road, dist: 0, pt: { x: 0, z: 0 }, segIndex: 0 })
+});
+assert.equal(curbPlacement.curbAdjusted, true, 'pole-mounted cameras inside a roadway move to its curb');
+assert(Math.abs(curbPlacement.z) >= 6.3, 'curb placement clears the mapped roadway width');
+assert.equal(curbPlacement.sourceX, 0, 'the exact mapped source coordinate remains recorded');
+
+const overheadPlacement = computeCameraPlacement(features[1], {
+  geoToWorld: () => ({ x: 0, z: 0 }),
+  terrainAt: () => ({ position: { y: 7 } }),
+  nearestRoadAt: () => ({ road, dist: 0, pt: { x: 0, z: 0 }, segIndex: 0 })
+});
+assert.equal(overheadPlacement.mountKind, 'traffic_signal');
+assert.equal(overheadPlacement.overhead, true);
+assert.equal(overheadPlacement.x, 0, 'explicit overhead mounts stay at the mapped coordinate');
+assert.equal(overheadPlacement.mountHeight, 5.4);
+
+const isolatedOverheadPlacement = computeCameraPlacement(features[1], {
+  geoToWorld: () => ({ x: 0, z: 0 }),
+  terrainAt: () => ({ position: { y: 7 } }),
+  nearestRoadAt: () => ({ road, dist: 40, y: 30, pt: { x: 0, z: 40 }, segIndex: 0 })
+});
+assert.equal(isolatedOverheadPlacement.groundY, 7,
+  'an unrelated distant road cannot provide the support height for an overhead camera');
+assert.equal(isolatedOverheadPlacement.roadSurfaceY, null);
 
 const location = { lat: 39.2904, lon: -76.6122, name: 'Baltimore' };
 const state = createDeFlockState(features, { location, sourceVersion: 'fixture-v1', startedAt: 1000 });

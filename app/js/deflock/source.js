@@ -44,6 +44,13 @@ function normalizeText(value, maxLength = 120) {
   return text ? text.slice(0, maxLength) : null;
 }
 
+function normalizeHeightMeters(value) {
+  const match = String(value ?? "").trim().match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const height = Number(match[0]);
+  return Number.isFinite(height) && height >= 1.5 && height <= 20 ? height : null;
+}
+
 function isCameraRecord(tags = {}) {
   if (String(tags.man_made || "").toLowerCase() !== "surveillance") return false;
   const surveillanceType = String(tags["surveillance:type"] || "").toLowerCase();
@@ -80,6 +87,8 @@ function parseSurveillanceElements(payload = {}, options = {}) {
       lat,
       lon,
       cameraType: cameraKind(tags),
+      cameraMount: normalizeText(tags["camera:mount"], 48),
+      cameraHeightMeters: normalizeHeightMeters(tags["camera:height"] ?? tags.height),
       surveillanceType: normalizeText(tags["surveillance:type"], 48) || "unknown",
       surveillanceZone: normalizeText(tags["surveillance:zone"], 48),
       direction: normalizeDirection(tags.direction ?? tags["camera:direction"]),
@@ -202,5 +211,6 @@ export {
   fetchSurveillanceProxyJSON,
   loadSurveillanceFeatures,
   normalizeDirection,
+  normalizeHeightMeters,
   parseSurveillanceElements
 };

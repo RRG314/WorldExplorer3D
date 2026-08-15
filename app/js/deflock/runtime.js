@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=2";
-import { computeCameraPlacement } from "./placement.js?v=1";
+import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=3";
+import { computeCameraPlacement } from "./placement.js?v=2";
 import {
   applySharedDisabled,
   createDeFlockState,
@@ -16,6 +16,7 @@ const INTERACTION_RADIUS = 10;
 const DETECTION_RANGE = 70;
 const DETECTION_HALF_ANGLE = 35;
 const DETECTION_COOLDOWN_MS = 5000;
+const DISABLE_FALL_DURATION_MS = 950;
 const STATE_COLORS = Object.freeze({
   undiscovered: 0xf43f5e,
   discovered: 0xfbbf24,
@@ -90,6 +91,9 @@ function showHud(visible) {
   const refs = ui();
   refs.hud?.classList.toggle("show", visible);
   document.body?.classList.toggle("deflock-active", visible);
+  const menuItem = document.getElementById('fDeFlock');
+  menuItem?.classList.toggle('on', visible);
+  if (menuItem) menuItem.textContent = visible ? '📷 DeFlock Hunt Active' : '📷 Start DeFlock Hunt';
   if (!visible) {
     refs.prompt?.classList.remove("show");
     refs.help?.classList.remove("show");
@@ -128,8 +132,13 @@ function createCameraLayer(session) {
   group.userData.deFlockLayer = true;
 
   const pole = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.09, 0.12, 3, 6),
+    new THREE.CylinderGeometry(0.09, 0.12, 1, 6),
     new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.72, metalness: 0.28 }),
+    count
+  );
+  const mountArm = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 0.08, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.68, metalness: 0.32 }),
     count
   );
   const camera = new THREE.InstancedMesh(
@@ -189,12 +198,14 @@ function createCameraLayer(session) {
   }
 
   pole.frustumCulled = false;
+  mountArm.frustumCulled = false;
   camera.frustumCulled = false;
   lens.frustumCulled = false;
   target.frustumCulled = false;
   beacon.frustumCulled = false;
   beam.frustumCulled = false;
   pole.name = "DeFlockPoles";
+  mountArm.name = "DeFlockMountArms";
   camera.name = "DeFlockCameraBodies";
   lens.name = "DeFlockCameraLenses";
   target.name = "DeFlockTargets";
@@ -203,78 +214,158 @@ function createCameraLayer(session) {
   target.renderOrder = 20;
   beacon.renderOrder = 21;
   beam.renderOrder = 20;
-  group.add(pole, camera, lens, target, beam, beacon);
+  group.add(pole, mountArm, camera, lens, target, beam, beacon);
   appCtx.scene.add(group);
-  session.render = { group, pole, camera, lens, target, beacon, beam, zones, directed };
+  session.render = { group, pole, mountArm, camera, lens, target, beacon, beam, zones, directed };
   refreshPlacements(session, true);
   refreshInstanceColors(session);
   return group;
 }
 
-function refreshPlacements(session, force = false) {
+function refreshPlacements(session, force = false, animationOnly = false) {
   const render = session?.render;
   const state = session?.state;
   if (!render || !state || !globalThis.THREE) return false;
   const THREE = globalThis.THREE;
   const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion();
+  const identityQuaternion = new THREE.Quaternion();
+  const yawQuaternion = new THREE.Quaternion();
+  const fallQuaternion = new THREE.Quaternion();
+  const cameraQuaternion = new THREE.Quaternion();
+  const armQuaternion = new THREE.Quaternion();
+  const fallAxis = new THREE.Vector3();
+  const upAxis = new THREE.Vector3(0, 1, 0);
   const scale = new THREE.Vector3(1, 1, 1);
   const position = new THREE.Vector3();
+  const local = new THREE.Vector3();
   let changed = false;
   let directedIndex = 0;
+  const now = performance.now();
+  const completedAnimations = [];
 
   state.features.forEach((feature, index) => {
-    const placement = computeCameraPlacement(feature, {
-      geoToWorld: appCtx.geoToWorld,
-      terrainAt: (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)
-    });
+    let placement = feature.deFlockPlacement || null;
+    if (!placement) {
+      placement = computeCameraPlacement(feature, {
+        geoToWorld: appCtx.geoToWorld,
+        terrainAt: (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z),
+        nearestRoadAt: (x, z) => appCtx.findNearestRoad?.(x, z)
+      });
+      if (placement) feature.deFlockPlacement = { ...placement };
+    } else if (!animationOnly) {
+      const terrainY = Number(appCtx.SurfaceQuery?.terrainAt?.(placement.x, placement.z)?.position?.y);
+      const surfaceY = placement.overhead && Number.isFinite(placement.roadSurfaceY)
+        ? placement.roadSurfaceY
+        : terrainY;
+      if (Number.isFinite(surfaceY)) {
+        placement = { ...placement, groundY: surfaceY };
+        feature.deFlockPlacement.groundY = surfaceY;
+      }
+    }
     if (!placement) return;
     if (force || Math.hypot((feature.x ?? Infinity) - placement.x, (feature.z ?? Infinity) - placement.z) > 0.25 || Math.abs((feature.groundY ?? Infinity) - placement.groundY) > 0.25) {
       changed = true;
     }
+    feature.sourceX = placement.sourceX;
+    feature.sourceZ = placement.sourceZ;
     feature.x = placement.x;
     feature.z = placement.z;
     feature.groundY = placement.groundY;
+    feature.mountKind = placement.mountKind;
+    feature.mountHeight = placement.mountHeight;
+    feature.overhead = placement.overhead;
+    feature.curbAdjusted = placement.curbAdjusted;
+    feature.roadWidth = placement.roadWidth;
     const bearing = placement.bearingRadians;
     // Earth compass bearings increase clockwise from north (-Z), while
     // Three.js positive Y rotations turn counter-clockwise when viewed above.
-    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -bearing);
+    yawQuaternion.setFromAxisAngle(upAxis, -bearing);
+    const fallStartedAt = session.fallStarts.get(feature.sourceId);
+    const disabled = state.disabled.has(feature.sourceId);
+    const linearFall = !disabled ? 0 : Number.isFinite(fallStartedAt)
+      ? Math.max(0, Math.min(1, (now - fallStartedAt) / DISABLE_FALL_DURATION_MS))
+      : 1;
+    const fall = 1 - Math.pow(1 - linearFall, 3);
+    if (linearFall >= 1 && Number.isFinite(fallStartedAt)) completedAnimations.push(feature.sourceId);
+    const fallAngle = fall * Math.PI * 0.49;
+    fallAxis.set(Math.cos(bearing), 0, Math.sin(bearing)).normalize();
+    fallQuaternion.setFromAxisAngle(fallAxis, fallAngle);
+    const mountHeight = Math.max(1.5, Number(placement.mountHeight) || 3.15);
 
-    position.set(feature.x, feature.groundY + 1.5, feature.z);
-    matrix.compose(position, new THREE.Quaternion(), scale);
+    if (placement.overhead || placement.mountKind === 'wall' || placement.mountKind === 'ceiling') {
+      scale.set(0.0001, 0.0001, 0.0001);
+      position.set(feature.x, feature.groundY, feature.z);
+      matrix.compose(position, identityQuaternion, scale);
+    } else {
+      scale.set(1, mountHeight, 1);
+      local.set(0, mountHeight * 0.5, 0).applyQuaternion(fallQuaternion);
+      position.set(feature.x + local.x, feature.groundY + local.y, feature.z + local.z);
+      matrix.compose(position, fallQuaternion, scale);
+    }
     render.pole.setMatrixAt(index, matrix);
 
-    position.set(feature.x, feature.groundY + 3.15, feature.z);
-    matrix.compose(position, quaternion, scale);
+    if (placement.overhead) {
+      const tangentX = Number(placement.roadTangentX);
+      const tangentZ = Number(placement.roadTangentZ);
+      const normalX = Number.isFinite(tangentX) && Number.isFinite(tangentZ) ? -tangentZ : Math.cos(bearing);
+      const normalZ = Number.isFinite(tangentX) && Number.isFinite(tangentZ) ? tangentX : -Math.sin(bearing);
+      const armYaw = Math.atan2(-normalZ, normalX);
+      armQuaternion.setFromAxisAngle(upAxis, armYaw);
+      scale.set(Math.max(6, Math.min(24, Number(placement.roadWidth) + 3 || 8)), 1, 1);
+      position.set(feature.sourceX, feature.groundY + mountHeight, feature.sourceZ);
+      matrix.compose(position, armQuaternion, scale);
+    } else {
+      scale.set(0.0001, 0.0001, 0.0001);
+      position.set(feature.x, feature.groundY, feature.z);
+      matrix.compose(position, identityQuaternion, scale);
+    }
+    render.mountArm.setMatrixAt(index, matrix);
+
+    let cameraX;
+    let cameraY;
+    let cameraZ;
+    if (placement.overhead || placement.mountKind === 'wall' || placement.mountKind === 'ceiling') {
+      cameraX = feature.x + Math.sin(fall * Math.PI) * 0.45;
+      cameraY = feature.groundY + mountHeight + (feature.groundY + 0.32 - (feature.groundY + mountHeight)) * fall;
+      cameraZ = feature.z + Math.sin(fall * Math.PI) * 0.28;
+    } else {
+      local.set(0, mountHeight, 0).applyQuaternion(fallQuaternion);
+      cameraX = feature.x + local.x;
+      cameraY = feature.groundY + local.y;
+      cameraZ = feature.z + local.z;
+    }
+    cameraQuaternion.copy(fallQuaternion).multiply(yawQuaternion);
+    scale.set(1, 1, 1);
+    position.set(cameraX, cameraY, cameraZ);
+    matrix.compose(position, cameraQuaternion, scale);
     render.camera.setMatrixAt(index, matrix);
 
-    position.set(
-      feature.x + Math.sin(bearing) * 0.5,
-      feature.groundY + 3.15,
-      feature.z - Math.cos(bearing) * 0.5
-    );
-    matrix.compose(position, quaternion, scale);
+    local.set(Math.sin(bearing) * 0.5, 0, -Math.cos(bearing) * 0.5).applyQuaternion(fallQuaternion);
+    position.set(cameraX + local.x, cameraY + local.y, cameraZ + local.z);
+    matrix.compose(position, cameraQuaternion, scale);
     render.lens.setMatrixAt(index, matrix);
 
     position.set(feature.x, feature.groundY + 0.12, feature.z);
-    matrix.compose(position, new THREE.Quaternion(), scale);
+    matrix.compose(position, identityQuaternion, scale);
     render.target.setMatrixAt(index, matrix);
 
-    position.set(feature.x, feature.groundY + 3.85, feature.z);
-    matrix.compose(position, new THREE.Quaternion(), scale);
+    const beaconY = feature.groundY + Math.max(4.6, mountHeight + 1.15);
+    position.set(feature.x, beaconY - 0.75, feature.z);
+    matrix.compose(position, identityQuaternion, scale);
     render.beam.setMatrixAt(index, matrix);
 
-    position.set(feature.x, feature.groundY + 4.6, feature.z);
-    matrix.compose(position, new THREE.Quaternion(), scale);
+    position.set(feature.x, beaconY, feature.z);
+    matrix.compose(position, identityQuaternion, scale);
     render.beacon.setMatrixAt(index, matrix);
 
     if (Number.isFinite(feature.direction) && render.zones) {
       position.set(feature.x, feature.groundY + 0.16, feature.z);
-      matrix.compose(position, quaternion, scale);
+      matrix.compose(position, yawQuaternion, scale);
       render.zones.setMatrixAt(directedIndex++, matrix);
     }
   });
-  [render.pole, render.camera, render.lens, render.target, render.beam, render.beacon, render.zones].filter(Boolean).forEach((mesh) => {
+  completedAnimations.forEach((sourceId) => session.fallStarts.delete(sourceId));
+  [render.pole, render.mountArm, render.camera, render.lens, render.target, render.beam, render.beacon, render.zones].filter(Boolean).forEach((mesh) => {
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere?.();
   });
@@ -317,11 +408,19 @@ function publishMapMarkers(session) {
     sourceId: feature.sourceId,
     lat: feature.lat,
     lon: feature.lon,
+    sourceX: feature.sourceX,
+    sourceZ: feature.sourceZ,
     x: feature.x,
     z: feature.z,
+    groundY: feature.groundY,
     state: cameraState(state, feature.sourceId),
     objective: nearest?.sourceId === feature.sourceId,
     cameraType: feature.cameraType,
+    cameraMount: feature.cameraMount,
+    mountKind: feature.mountKind,
+    mountHeight: feature.mountHeight,
+    curbAdjusted: feature.curbAdjusted === true,
+    overhead: feature.overhead === true,
     surveillanceType: feature.surveillanceType,
     direction: feature.direction,
     operator: feature.operator,
@@ -407,6 +506,7 @@ function clearRoomListener(session) {
 
 function resetProgressForAuthority(session, nextRoomCode) {
   const state = session.state;
+  session.fallStarts.clear();
   state.discovered.clear();
   state.disabled.clear();
   state.disabledBy.clear();
@@ -421,6 +521,7 @@ function resetProgressForAuthority(session, nextRoomCode) {
     });
     session.state = restored;
   }
+  refreshPlacements(session, true);
   refreshInstanceColors(session);
   publishMapMarkers(session);
 }
@@ -441,8 +542,16 @@ function syncRoomAuthority(session) {
     if (activeSession !== session || session.roomCode !== expectedRoomCode) return;
     session.unsubRoom = listenDeFlockRoomState(expectedRoomCode, (entries) => {
       if (activeSession !== session || session.roomCode !== expectedRoomCode) return;
+      const previouslyDisabled = new Set(session.state.disabled);
       if (applySharedDisabled(session.state, entries)) {
+        entries.forEach((entry) => {
+          const sourceId = String(entry?.sourceId || '');
+          if (sourceId && !previouslyDisabled.has(sourceId) && session.state.disabled.has(sourceId)) {
+            session.fallStarts.set(sourceId, performance.now());
+          }
+        });
         refreshInstanceColors(session);
+        refreshPlacements(session);
         publishMapMarkers(session);
       }
     }, {
@@ -453,7 +562,7 @@ function syncRoomAuthority(session) {
 
 function completeIfNeeded(session) {
   const state = session.state;
-  if (state.features.length <= 0 || state.disabled.size < state.features.length || session.resultShown) return;
+  if (state.features.length <= 0 || state.disabled.size < state.features.length || session.resultShown || session.fallStarts.size > 0) return;
   session.resultShown = true;
   const snapshot = progressSnapshot(state);
   if (!session.roomCode) writeLocalProgress(state);
@@ -492,21 +601,24 @@ async function interactWithNearbyCamera(session = activeSession) {
   session.pendingInteraction = true;
   setStatus(session, "Running fictional virtual disable action…");
   try {
+    let newlyDisabled = false;
     if (session.roomCode) {
       const { claimSharedVirtualDisable } = await ensureMultiplayerModule();
       const result = await claimSharedVirtualDisable(session.roomCode, target.sourceId);
-      markVirtuallyDisabled(session.state, target.sourceId, {
+      newlyDisabled = markVirtuallyDisabled(session.state, target.sourceId, {
         displayName: result.awarded === false ? "Another explorer" : "You"
       });
       setStatus(session, result.awarded === false
         ? "Another explorer already disabled this virtual camera."
         : "Virtual Camera Disabled — shared room progress updated.", "success");
     } else {
-      markVirtuallyDisabled(session.state, target.sourceId, { displayName: "You" });
+      newlyDisabled = markVirtuallyDisabled(session.state, target.sourceId, { displayName: "You" });
       writeLocalProgress(session.state);
       setStatus(session, "Virtual Camera Disabled — no physical equipment was affected.", "success");
     }
+    if (newlyDisabled) session.fallStarts.set(target.sourceId, performance.now());
     refreshInstanceColors(session);
+    refreshPlacements(session);
     publishMapMarkers(session);
     completeIfNeeded(session);
   } catch (error) {
@@ -575,6 +687,7 @@ function startDeFlockMode() {
     render: null,
     nearby: null,
     pendingInteraction: false,
+    fallStarts: new Map(),
     mobileActionLatched: false,
     roomCode: "",
     unsubRoom: null,
@@ -618,6 +731,7 @@ function updateDeFlockMode(dt) {
     updateTravelDistance(session.state, actor);
     updateNearbyState(session, actor);
   }
+  if (session.fallStarts.size > 0) refreshPlacements(session, false, true);
   const mobileActionPressed = appCtx.keys?.KeyE === true;
   if (mobileActionPressed && !session.mobileActionLatched) {
     session.mobileActionLatched = true;
@@ -674,6 +788,16 @@ function getDeFlockSnapshot() {
     nearbySourceId: activeSession.nearby?.feature?.sourceId || null,
     renderInstances: activeSession.state.features.length,
     markerInstances: activeSession.render?.beacon?.count || 0,
+    fallingInstances: activeSession.fallStarts.size,
+    placement: {
+      curbAdjusted: activeSession.state.features.filter((feature) => feature.curbAdjusted).length,
+      overhead: activeSession.state.features.filter((feature) => feature.overhead).length,
+      mounts: activeSession.state.features.reduce((counts, feature) => {
+        const key = String(feature.mountKind || 'unknown');
+        counts[key] = (counts[key] || 0) + 1;
+        return counts;
+      }, {})
+    },
     detectionParameters: {
       rangeWorldUnits: DETECTION_RANGE,
       halfAngleDegrees: DETECTION_HALF_ANGLE,
