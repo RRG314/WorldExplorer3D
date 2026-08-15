@@ -1,4 +1,5 @@
 const https = require('node:https');
+const DEFLOCK_BALTIMORE_SNAPSHOT = require('./data/deflock-baltimore.json');
 
 const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
@@ -142,6 +143,33 @@ function isDeFlockCameraElement(element) {
     Number.isFinite(Number(element.lon));
 }
 
+function bundledDeFlockFallback(query) {
+  const center = DEFLOCK_BALTIMORE_SNAPSHOT.center || {};
+  if (Math.abs(query.lat - Number(center.lat)) > 0.001 || Math.abs(query.lon - Number(center.lon)) > 0.001) return null;
+  const south = query.lat - query.radiusDegrees;
+  const north = query.lat + query.radiusDegrees;
+  const west = query.lon - query.radiusDegrees;
+  const east = query.lon + query.radiusDegrees;
+  const elements = (DEFLOCK_BALTIMORE_SNAPSHOT.elements || []).filter((element) => (
+    isDeFlockCameraElement(element) &&
+    Number(element.lat) >= south && Number(element.lat) <= north &&
+    Number(element.lon) >= west && Number(element.lon) <= east
+  ));
+  if (elements.length === 0) return null;
+  const fetchedAt = String(DEFLOCK_BALTIMORE_SNAPSHOT.fetchedAt || '');
+  return {
+    schemaVersion: 1,
+    provider: 'OpenStreetMap',
+    fetchedAt,
+    query,
+    endpoint: `${String(DEFLOCK_BALTIMORE_SNAPSHOT.source || 'OpenStreetMap')} (bundled last-good snapshot)`,
+    elements: elements.slice(0, 750),
+    cache: 'bundled-last-good',
+    cacheAgeMs: fetchedAt ? Math.max(0, Date.now() - Date.parse(fetchedAt)) : 0,
+    warnings: ['Live Overpass providers were unavailable; using a dated Baltimore OpenStreetMap cache snapshot.']
+  };
+}
+
 async function fetchDeFlockOverpass(endpoint, overpassQuery, options, controllers) {
   const controller = new AbortController();
   controllers.push(controller);
@@ -208,6 +236,8 @@ async function queryDeFlockCameras(input = {}, options = {}) {
     if (cached?.staleUntil > now) {
       return { ...cached.value, cache: 'stale-memory', cacheAgeMs: now - cached.savedAt };
     }
+    const bundled = bundledDeFlockFallback(query);
+    if (bundled) return bundled;
     const upstreamError = new Error('Mapped camera providers are temporarily unavailable.');
     upstreamError.statusCode = 502;
     upstreamError.cause = error;
@@ -528,6 +558,7 @@ function buildGeospatialExports({ functions, setCors }) {
 }
 
 module.exports = {
+  bundledDeFlockFallback,
   buildDeFlockOverpassQuery,
   buildGeospatialExports,
   normalizeDeFlockQuery,

@@ -21,7 +21,10 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Resolution: DeFlock now prefers a bounded same-origin service which races
   independent Overpass GET providers, validates and caps mapped nodes, caches
   successful responses, and retains a 24-hour last-good in-memory fallback.
-  The browser retains its direct/cache path if the service is unavailable.
+  Baltimore has a clearly labeled dated last-good cache of the 24 real OSM
+  nodes returned during verification so a cold server start also survives a
+  total provider outage. The browser retains its direct/cache path if the
+  service is unavailable.
   Immediate keyboard interaction latches KeyE so the held-key path cannot
   consume the same press; touch behavior remains unchanged.
 - Evidence: `npm run smoke:deflock-live` used installed Google Chrome against

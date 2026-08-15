@@ -13,7 +13,7 @@ function finite(value, fallback = null) {
 }
 
 function normalizeDirection(value) {
-  const text = String(value ?? "").trim().toUpperCase();
+  const text = String(value ?? "").trim().toUpperCase().split(/[;,]/)[0].trim();
   if (!text) return null;
   const numericText = text.replace(/[^0-9.+-]/g, "");
   const numeric = numericText ? Number(numericText) : Number.NaN;
@@ -186,6 +186,8 @@ async function loadSurveillanceFeatures(location, options = {}) {
     sourceVersion: DEFLOCK_SOURCE_VERSION,
     cacheSource: payload._overpassSource || "network",
     cacheAgeMs: finite(payload._overpassCacheAgeMs, 0),
+    fetchedAt: normalizeText(payload.fetchedAt, 40),
+    warnings: Array.isArray(payload.warnings) ? payload.warnings.map((warning) => normalizeText(warning, 180)).filter(Boolean) : [],
     bounded: true,
     radiusDegrees: radius
   };

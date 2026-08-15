@@ -285,6 +285,18 @@ assert.equal(deFlockAttempts.length, 2, 'server proxy should race independent Ov
 assert.equal(deFlockProxy.elements.length, 1, 'server proxy must publish only valid mapped camera nodes');
 assert.equal(deFlockProxy.endpoint, 'https://working-overpass.test');
 assert.equal(deFlockProxy.cache, 'upstream');
+const bundledBaltimore = geospatialFunctions.bundledDeFlockFallback({ lat: 39.2904, lon: -76.6122, radiusDegrees: 0.022 });
+assert.equal(bundledBaltimore.elements.length, 24, 'Baltimore must retain a real last-good OSM snapshot for a cold provider outage');
+assert.equal(bundledBaltimore.cache, 'bundled-last-good');
+assert.match(bundledBaltimore.warnings[0], /dated Baltimore OpenStreetMap cache/);
+assert.equal(geospatialFunctions.bundledDeFlockFallback({ lat: 40.7128, lon: -74.006, radiusDegrees: 0.022 }), null);
+const coldOutageBaltimore = await geospatialFunctions.queryDeFlockCameras({ lat: 39.2904, lon: -76.6122, radiusDegrees: 0.022 }, {
+  force: true,
+  endpoints: ['https://offline-overpass.test'],
+  fetchImpl: async () => { throw new Error('simulated total provider outage'); }
+});
+assert.equal(coldOutageBaltimore.elements.length, 24);
+assert.equal(coldOutageBaltimore.cache, 'bundled-last-good');
 const normalizedPanoramax = geospatialFunctions.normalizePanoramaxItem({
   id: 'p1',
   geometry: { coordinates: [-76.6111, 39.2886] },

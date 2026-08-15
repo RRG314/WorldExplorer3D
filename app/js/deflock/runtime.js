@@ -518,6 +518,8 @@ async function initializeSession(session) {
     syncRoomAuthority(session);
     if (loaded.features.length === 0) {
       setStatus(session, "No mapped surveillance cameras were found in this area. Continue exploring or choose another Earth location.", "empty");
+    } else if (/bundled|stale/i.test(String(loaded.cacheSource || ""))) {
+      setStatus(session, `${loaded.features.length} virtual cameras loaded from a dated last-good OpenStreetMap snapshot.`, "empty");
     } else {
       setStatus(session, `${loaded.features.length} publicly mapped virtual cameras loaded from OpenStreetMap.`);
     }
@@ -633,6 +635,9 @@ function getDeFlockSnapshot() {
       name: activeSession.source.source,
       version: activeSession.source.sourceVersion,
       cacheSource: activeSession.source.cacheSource,
+      cacheAgeMs: activeSession.source.cacheAgeMs,
+      fetchedAt: activeSession.source.fetchedAt,
+      warnings: activeSession.source.warnings,
       radiusDegrees: activeSession.source.radiusDegrees,
       bounded: activeSession.source.bounded
     } : null,

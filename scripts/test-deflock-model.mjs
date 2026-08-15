@@ -33,6 +33,7 @@ assert.equal(features[0].provenance.license, 'ODbL-1.0');
 assert.equal(features[1].direction, 270);
 assert.equal(normalizeDirection('SSW'), 202.5);
 assert.equal(normalizeDirection('-90'), 270);
+assert.equal(normalizeDirection('0;71;163'), 0, 'multi-camera direction lists use the first mapped bearing');
 assert.equal(normalizeDirection('unknown'), null);
 
 const query = buildSurveillanceQuery({ lat: 39.2904, lon: -76.6122 }, 0.01);

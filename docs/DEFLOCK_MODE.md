@@ -32,8 +32,10 @@ outdated. The runtime first uses a bounded same-origin service that races the
 configured Overpass providers outside the browser and keeps a short-lived
 last-good response. If that service is unavailable, it falls back to the
 existing direct Overpass request, cancellation, memory-cache, and
-IndexedDB-cache path. It does not import or maintain a second surveillance
-dataset.
+IndexedDB-cache path. Baltimore also ships with a dated last-good cache of real
+OSM nodes for a cold start during a total provider outage. This cache is
+identified in the HUD, retains its source timestamps and ODbL provenance, and
+is never presented as current live data or used as a second authority.
 
 Required attribution: `© OpenStreetMap contributors` under the ODbL. The game
 help surface links to [OpenStreetMap copyright and licensing](https://www.openstreetmap.org/copyright).
