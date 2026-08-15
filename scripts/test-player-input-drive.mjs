@@ -5,6 +5,8 @@ import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 import { classifyEvidence } from './production-readiness.mjs';
 import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
+import { ROAD_CAR_CONFIG } from '../app/js/physics/vehicle-config.js';
+import { carSpeedToWorldUnitsPerSecond } from '../app/js/physics/vehicle-speed-units.js';
 
 const rootDir = process.cwd();
 const outputDir = path.join(
@@ -189,6 +191,10 @@ async function pose(page) {
       z: Number(ctx?.car?.z),
       angle: Number(ctx?.car?.angle),
       speed: Number(ctx?.car?.speed),
+      worldVelocity: Math.hypot(
+        Number(ctx?.car?.vx) || 0,
+        Number(ctx?.car?.vz) || 0
+      ),
       surfaceY: Number(surface?.position?.y),
       buildingCollision: buildingCheck.collision === true,
       buildingInside: buildingCheck.inside === true,
@@ -655,13 +661,28 @@ try {
       sample.z - samples[index].z
     )
   );
-  const sampleVelocities = samples.slice(1).map((sample, index) => {
+  const sampledMotion = samples.slice(1).map((sample, index) => {
     const elapsedSeconds = Math.max(
       0.001,
       (sample.timestamp - samples[index].timestamp) / 1000
     );
-    return displacements[index] / elapsedSeconds;
+    return {
+      elapsedSeconds,
+      velocity: displacements[index] / elapsedSeconds
+    };
   });
+  // Playwright's final partial wait can be much shorter than the browser's
+  // preceding render interval. Do not divide a full rendered movement step by
+  // that partial wait and misclassify scheduler timing as vehicle overspeed.
+  // The actor's physics velocity and the absolute movement step remain the
+  // authoritative independent limits below.
+  const stableSampleVelocities = sampledMotion
+    .filter(({ elapsedSeconds }) => elapsedSeconds >= 0.1)
+    .map(({ velocity }) => velocity);
+  const modeledBoostVelocityLimit = carSpeedToWorldUnitsPerSecond(
+    ROAD_CAR_CONFIG.boostMax,
+    1.11
+  );
   const first = samples[0];
   const last = samples.at(-1);
   const cameraSpan = Math.max(
@@ -736,8 +757,15 @@ try {
     ),
     maximumStep: Number(Math.max(0, ...displacements).toFixed(3)),
     maximumSampleVelocity: Number(
-      Math.max(0, ...sampleVelocities).toFixed(3)
+      Math.max(0, ...stableSampleVelocities).toFixed(3)
     ),
+    maximumActorVelocity: Number(
+      Math.max(0, ...samples.map((sample) => sample.worldVelocity)).toFixed(3)
+    ),
+    shortIntervalSampleCount: sampledMotion.filter(
+      ({ elapsedSeconds }) => elapsedSeconds < 0.1
+    ).length,
+    modeledBoostVelocityLimit: Number(modeledBoostVelocityLimit.toFixed(3)),
     maximumSurfaceGap: Number(maximumSurfaceGap.toFixed(3)),
     surfaceSampleCount: finiteSurfaceSamples.length,
     cameraSpan: Number(cameraSpan.toFixed(2)),
@@ -801,6 +829,14 @@ try {
   assert(
     report.maximumSampleVelocity <= 160,
     `real-input drive exceeded modeled velocity at ${report.maximumSampleVelocity} m/s`
+  );
+  assert(
+    report.maximumActorVelocity <= modeledBoostVelocityLimit * 1.1,
+    `car physics exceeded its boost envelope at ${report.maximumActorVelocity} m/s`
+  );
+  assert(
+    report.maximumStep <= modeledBoostVelocityLimit * 0.4,
+    `real-input drive teleported ${report.maximumStep} m between samples`
   );
   assert(
     report.maximumRouteOffset <= driveRoute.segmentLength * 0.5 + 30,
