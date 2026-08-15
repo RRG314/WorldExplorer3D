@@ -14,11 +14,24 @@ import {
   aircraftBankTurnFactor,
   aircraftChaseOffset,
   aircraftForwardVector,
+  cameraSmoothingBlend,
   integrateAerobaticAttitude,
   nextPrimaryTravelMode,
   projectSteeringArc,
   resolveCarDriveCommand
 } from '../app/js/controls/traversal-control-policy.js';
+
+const smoothForOneSecond = (framesPerSecond) => {
+  let current = 0;
+  for (let frame = 0; frame < framesPerSecond; frame += 1) {
+    current += (100 - current) * cameraSmoothingBlend(8, 1 / framesPerSecond);
+  }
+  return current;
+};
+assert(Math.abs(smoothForOneSecond(30) - smoothForOneSecond(60)) < 1e-9,
+  'camera damping changed with the rendered frame rate');
+assert(Math.abs(smoothForOneSecond(60) - smoothForOneSecond(120)) < 1e-9,
+  'camera damping changed at high refresh rates');
 import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
 import {

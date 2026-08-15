@@ -15,7 +15,7 @@ import {
   arcadeSteeringYawTarget,
   earthDrivingSteeringProfile,
   resolveCarDriveCommand
-} from "./controls/traversal-control-policy.js?v=7";
+} from "./controls/traversal-control-policy.js?v=8";
 import {
   carSpeedToMph,
   carSpeedToWorldUnitsPerSecond

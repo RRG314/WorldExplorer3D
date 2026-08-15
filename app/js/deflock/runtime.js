@@ -89,6 +89,7 @@ function setStatus(session, message, tone = "neutral") {
 function showHud(visible) {
   const refs = ui();
   refs.hud?.classList.toggle("show", visible);
+  document.body?.classList.toggle("deflock-active", visible);
   if (!visible) {
     refs.prompt?.classList.remove("show");
     refs.help?.classList.remove("show");
@@ -144,11 +145,21 @@ function createCameraLayer(session) {
     count
   );
   const target = new THREE.InstancedMesh(
-    new THREE.TorusGeometry(0.75, 0.08, 6, 16),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.78 }),
+    new THREE.TorusGeometry(1.2, 0.12, 8, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, depthTest: false, depthWrite: false }),
     count
   );
   target.geometry.rotateX(Math.PI / 2);
+  const beacon = new THREE.InstancedMesh(
+    new THREE.OctahedronGeometry(0.36, 0),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.96, depthTest: false, depthWrite: false }),
+    count
+  );
+  const beam = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.055, 0.055, 1.4, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72, depthTest: false, depthWrite: false }),
+    count
+  );
 
   const directed = session.state.features.filter((feature) => Number.isFinite(feature.direction));
   let zones = null;
@@ -181,13 +192,20 @@ function createCameraLayer(session) {
   camera.frustumCulled = false;
   lens.frustumCulled = false;
   target.frustumCulled = false;
+  beacon.frustumCulled = false;
+  beam.frustumCulled = false;
   pole.name = "DeFlockPoles";
   camera.name = "DeFlockCameraBodies";
   lens.name = "DeFlockCameraLenses";
   target.name = "DeFlockTargets";
-  group.add(pole, camera, lens, target);
+  beacon.name = "DeFlockBeacons";
+  beam.name = "DeFlockBeaconBeams";
+  target.renderOrder = 20;
+  beacon.renderOrder = 21;
+  beam.renderOrder = 20;
+  group.add(pole, camera, lens, target, beam, beacon);
   appCtx.scene.add(group);
-  session.render = { group, pole, camera, lens, target, zones, directed };
+  session.render = { group, pole, camera, lens, target, beacon, beam, zones, directed };
   refreshPlacements(session, true);
   refreshInstanceColors(session);
   return group;
@@ -242,13 +260,21 @@ function refreshPlacements(session, force = false) {
     matrix.compose(position, new THREE.Quaternion(), scale);
     render.target.setMatrixAt(index, matrix);
 
+    position.set(feature.x, feature.groundY + 3.85, feature.z);
+    matrix.compose(position, new THREE.Quaternion(), scale);
+    render.beam.setMatrixAt(index, matrix);
+
+    position.set(feature.x, feature.groundY + 4.6, feature.z);
+    matrix.compose(position, new THREE.Quaternion(), scale);
+    render.beacon.setMatrixAt(index, matrix);
+
     if (Number.isFinite(feature.direction) && render.zones) {
       position.set(feature.x, feature.groundY + 0.16, feature.z);
       matrix.compose(position, quaternion, scale);
       render.zones.setMatrixAt(directedIndex++, matrix);
     }
   });
-  [render.pole, render.camera, render.lens, render.target, render.zones].filter(Boolean).forEach((mesh) => {
+  [render.pole, render.camera, render.lens, render.target, render.beam, render.beacon, render.zones].filter(Boolean).forEach((mesh) => {
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere?.();
   });
@@ -266,9 +292,12 @@ function refreshInstanceColors(session) {
     color.setHex(value);
     render.camera.setColorAt(index, color);
     render.target.setColorAt(index, color);
+    render.beam.setColorAt(index, color);
+    render.beacon.setColorAt(index, color);
   });
-  if (render.camera.instanceColor) render.camera.instanceColor.needsUpdate = true;
-  if (render.target.instanceColor) render.target.instanceColor.needsUpdate = true;
+  [render.camera, render.target, render.beam, render.beacon].forEach((mesh) => {
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  });
 }
 
 function publishMapMarkers(session) {
@@ -307,7 +336,7 @@ function renderHud(session) {
   if (!session?.state) return;
   const refs = ui();
   const snapshot = progressSnapshot(session.state);
-  if (refs.counts) refs.counts.textContent = `${snapshot.disabled}/${snapshot.total} virtually disabled • ${snapshot.discovered} discovered • ${snapshot.score} pts`;
+  if (refs.counts) refs.counts.textContent = `${snapshot.disabled}/${snapshot.total} disabled • ${snapshot.discovered} found • ${snapshot.score} pts`;
   if (refs.timer) refs.timer.textContent = formatTime(snapshot.elapsedMs);
   if (refs.status && refs.status.textContent !== session.message) {
     refs.status.textContent = session.message || "Explore the mapped area and approach a virtual camera.";
@@ -644,6 +673,7 @@ function getDeFlockSnapshot() {
     progress: progressSnapshot(activeSession.state),
     nearbySourceId: activeSession.nearby?.feature?.sourceId || null,
     renderInstances: activeSession.state.features.length,
+    markerInstances: activeSession.render?.beacon?.count || 0,
     detectionParameters: {
       rangeWorldUnits: DETECTION_RANGE,
       halfAngleDegrees: DETECTION_HALF_ANGLE,

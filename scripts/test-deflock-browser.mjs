@@ -127,6 +127,8 @@ async function inspectPlacement(page) {
       const cameraMesh = group?.children?.find((child) => (
         child?.isInstancedMesh && child.geometry?.type === 'BoxGeometry'
       ));
+      const beaconMesh = group?.getObjectByName?.('DeFlockBeacons');
+      const beamMesh = group?.getObjectByName?.('DeFlockBeaconBeams');
       const markers = Array.isArray(appCtx.deFlockMapMarkers) ? appCtx.deFlockMapMarkers : [];
       const rows = markers.map((marker, index) => {
         const matrix = new globalThis.THREE.Matrix4();
@@ -136,6 +138,10 @@ async function inspectPlacement(page) {
         cameraMesh?.getMatrixAt?.(index, matrix);
         matrix.decompose(position, quaternion, scale);
         const forward = new globalThis.THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+        const beaconMatrix = new globalThis.THREE.Matrix4();
+        const beaconPosition = new globalThis.THREE.Vector3();
+        beaconMesh?.getMatrixAt?.(index, beaconMatrix);
+        beaconPosition.setFromMatrixPosition(beaconMatrix);
         const world = appCtx.geoToWorld(expected[index].lat, expected[index].lon);
         const terrainY = Number(appCtx.SurfaceQuery?.terrainAt?.(marker.x, marker.z)?.position?.y);
         return {
@@ -143,6 +149,7 @@ async function inspectPlacement(page) {
           expectedWorld: { x: Number(world?.x), z: Number(world?.z) },
           rendered: { x: position.x, y: position.y, z: position.z },
           groundY: position.y - 3.15,
+          beaconY: beaconPosition.y,
           terrainY,
           forward: { x: forward.x, z: forward.z }
         };
@@ -152,6 +159,9 @@ async function inspectPlacement(page) {
         groupAttached: group?.parent === appCtx.scene,
         groupVisible: group?.visible !== false,
         cameraCount: Number(cameraMesh?.count || 0),
+        beaconCount: Number(beaconMesh?.count || 0),
+        beamCount: Number(beamMesh?.count || 0),
+        beaconDepthVisible: beaconMesh?.material?.depthTest === false && beamMesh?.material?.depthTest === false,
         rows
       };
     });
@@ -160,8 +170,12 @@ async function inspectPlacement(page) {
 
 function assertPlacement(placement) {
   assert.equal(placement.snapshot?.renderInstances, 2, 'DeFlock snapshot did not report two rendered instances');
+  assert.equal(placement.snapshot?.markerInstances, 2, 'DeFlock snapshot did not report two high-visibility markers');
   assert(placement.groupAttached && placement.groupVisible, 'DeFlock camera layer was not visible in the Earth scene');
   assert.equal(placement.cameraCount, 2, 'DeFlock instanced camera mesh did not render two instances');
+  assert.equal(placement.beaconCount, 2, 'DeFlock beacon mesh did not render two instances');
+  assert.equal(placement.beamCount, 2, 'DeFlock beacon beam did not render two instances');
+  assert.equal(placement.beaconDepthVisible, true, 'DeFlock beacons can disappear behind coarse world geometry');
   assert.deepEqual(placement.rows.map((row) => row.sourceId), ['osm:node:101', 'osm:node:102']);
   assert.deepEqual(placement.rows.map((row) => row.direction), [45, 270]);
   for (const row of placement.rows) {
@@ -172,6 +186,8 @@ function assertPlacement(placement) {
       `${row.sourceId} camera body was not based on terrain height`);
     assert(Math.hypot(row.rendered.x - row.x, row.rendered.z - row.z) < 0.01,
       `${row.sourceId} rendered instance diverged from its map/world placement`);
+    assert(row.beaconY - row.groundY > 4.25,
+      `${row.sourceId} did not receive an elevated world-space beacon`);
     const radians = row.direction * Math.PI / 180;
     const expectedForward = { x: Math.sin(radians), z: -Math.cos(radians) };
     assert(Math.hypot(row.forward.x - expectedForward.x, row.forward.z - expectedForward.z) < 0.01,
@@ -229,7 +245,109 @@ async function assertHudLayout(page) {
     layout.deflock.bottom <= layout.hud.top || layout.deflock.top >= layout.hud.bottom
   );
   assert(!overlaps, `DeFlock HUD overlaps the main status panel: ${JSON.stringify(layout)}`);
+  assert(layout.deflock.width <= 360 && layout.viewport.width - layout.deflock.right <= 24,
+    `DeFlock HUD is not compactly anchored to the upper-right: ${JSON.stringify(layout)}`);
   return layout;
+}
+
+async function captureLightingState(page, mode, filename, { aimMarker = false } = {}) {
+  const state = await page.evaluate((nextMode) => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    ctx.setTimeOfDay?.(nextMode);
+    ctx.applyWeatherPresentation?.();
+    return {
+      mode: ctx.timeOfDay,
+      exposure: Number(ctx.renderer?.toneMappingExposure),
+      ambient: Number(ctx.ambientLight?.intensity),
+      hemisphere: Number(ctx.hemiLight?.intensity),
+      background: ctx.scene?.background?.getHex?.()
+    };
+  }), mode);
+  if (aimMarker) await aimAtMarker(page, 1);
+  else await page.waitForTimeout(180);
+  await page.screenshot({ path: path.join(outputDir, filename), fullPage: false });
+  assert(state.exposure >= 1.02, `${mode} exposure fell below the playable Earth floor: ${JSON.stringify(state)}`);
+  assert(state.ambient >= 0.48, `${mode} ambient light fell below the playable Earth floor: ${JSON.stringify(state)}`);
+  assert(state.hemisphere >= 0.55, `${mode} hemisphere light fell below the playable Earth floor: ${JSON.stringify(state)}`);
+  return state;
+}
+
+function motionMetrics(samples = []) {
+  const offsetSteps = [];
+  const actorSteps = [];
+  for (let index = 16; index < samples.length; index += 1) {
+    const previous = samples[index - 1];
+    const current = samples[index];
+    offsetSteps.push(Math.hypot(
+      (current.camera.x - current.actor.x) - (previous.camera.x - previous.actor.x),
+      (current.camera.y - current.actor.y) - (previous.camera.y - previous.actor.y),
+      (current.camera.z - current.actor.z) - (previous.camera.z - previous.actor.z)
+    ));
+    actorSteps.push(Math.hypot(
+      current.actor.x - previous.actor.x,
+      current.actor.y - previous.actor.y,
+      current.actor.z - previous.actor.z
+    ));
+  }
+  const sorted = [...offsetSteps].sort((left, right) => left - right);
+  return {
+    frames: samples.length,
+    p95OffsetStep: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] || 0,
+    maxOffsetStep: Math.max(0, ...offsetSteps),
+    maxActorStep: Math.max(0, ...actorSteps)
+  };
+}
+
+async function verifyVehicleAndPlaneMotion(page) {
+  const samples = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.setPauseReason?.('deflock-browser-visual', false);
+    ctx.setTimeOfDay?.('day');
+    const collect = (kind, count = 75) => new Promise((resolve) => {
+      const rows = [];
+      const frame = () => {
+        const actor = kind === 'plane' ? ctx.planeMode : ctx.car;
+        rows.push({
+          actor: { x: Number(actor.x), y: Number(actor.y), z: Number(actor.z) },
+          camera: {
+            x: Number(ctx.camera.position.x),
+            y: Number(ctx.camera.position.y),
+            z: Number(ctx.camera.position.z)
+          }
+        });
+        if (rows.length >= count) resolve(rows);
+        else requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+
+    ctx.setTravelMode?.('drive', { source: 'deflock-motion-test', force: true, emitTutorial: false });
+    ctx.car.speed = Math.max(10, Number(ctx.car.speed) || 0);
+    ctx.keys.ArrowUp = true;
+    const drive = await collect('drive');
+    ctx.keys.ArrowUp = false;
+    const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(ctx.car.x, ctx.car.z)?.position?.y) || 0;
+    ctx.setTravelMode?.('plane', {
+      source: 'deflock-motion-test',
+      force: true,
+      emitTutorial: false,
+      x: ctx.car.x,
+      y: terrainY + 80,
+      z: ctx.car.z,
+      yaw: ctx.car.angle,
+      pitch: 0,
+      speed: 38,
+      throttle: 0.72,
+      airborne: true
+    });
+    const plane = await collect('plane');
+    return { drive, plane };
+  });
+  const drive = motionMetrics(samples.drive);
+  const plane = motionMetrics(samples.plane);
+  assert(drive.p95OffsetStep < 2.5, `car camera remained jumpy: ${JSON.stringify(drive)}`);
+  assert(plane.p95OffsetStep < 3.5, `plane camera remained jumpy: ${JSON.stringify(plane)}`);
+  await page.screenshot({ path: path.join(outputDir, 'plane-motion.png'), fullPage: false });
+  return { drive, plane };
 }
 
 async function openAndInspectLargeMap(page, markerIndex = 0) {
@@ -327,6 +445,11 @@ async function runDesktop() {
   const placement = await inspectPlacement(page);
   assertPlacement(placement);
   const hudLayout = await assertHudLayout(page);
+  const lighting = {
+    day: await captureLightingState(page, 'day', 'world-visibility-day.png'),
+    night: await captureLightingState(page, 'night', 'world-visibility-night.png')
+  };
+  const motion = await verifyVehicleAndPlaneMotion(page);
 
   const near = await moveActorNear(page, 1);
   assert.equal(near.nearbySourceId, 'osm:node:102', 'approaching the fixture camera did not make it interactive');
@@ -362,7 +485,7 @@ async function runDesktop() {
   const cleanup = await verifyCleanup(page);
 
   await context.close();
-  return { placement, hudLayout, discovered, restored, mapMarker, lifecycle, cleanup };
+  return { placement, hudLayout, lighting, motion, discovered, restored, mapMarker, lifecycle, cleanup };
 }
 
 async function runMobile() {
@@ -406,6 +529,8 @@ async function runMobile() {
     `DeFlock mobile action escaped the viewport: ${JSON.stringify(layout)}`);
   assert(layout.hud && layout.hud.left >= 0 && layout.hud.right <= layout.viewport.width,
     `DeFlock mobile HUD escaped the viewport: ${JSON.stringify(layout)}`);
+  assert(layout.hud.right - layout.hud.left <= 224,
+    `DeFlock mobile HUD remained too wide for gameplay: ${JSON.stringify(layout)}`);
   await aimAtMarker(page, 1);
   await page.screenshot({ path: path.join(outputDir, 'mobile-gameplay.png'), fullPage: false });
   const beforeDisabled = Number((await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress?.disabled)) || 0);
@@ -432,6 +557,9 @@ try {
     screenshots: [
       'title-selected.png',
       'near-virtual-camera.png',
+      'world-visibility-day.png',
+      'world-visibility-night.png',
+      'plane-motion.png',
       'virtually-disabled.png',
       'large-map-markers.png',
       'mobile-gameplay.png'

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=7';
+import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -328,6 +328,7 @@ function startPlaneMode(options = {}) {
   state.vy = 0;
   state.vz = 0;
   appCtx.camera?.up?.set?.(0, 1, 0);
+  if (appCtx.camera?.userData) delete appCtx.camera.userData.planeLookTarget;
   state.cameraYaw = 0;
   state.cameraPitch = 0;
   state.cameraLookTimer = 0;
@@ -356,6 +357,7 @@ function stopPlaneMode(options = {}) {
   state.vy = 0;
   state.vz = 0;
   appCtx.camera?.up?.set?.(0, 1, 0);
+  if (appCtx.camera?.userData) delete appCtx.camera.userData.planeLookTarget;
 
   if (targetMode === 'drone') return exitState;
 
@@ -591,11 +593,24 @@ function applyPlaneCamera(dt) {
     const targetX = flightPose.x + chaseOffset.x;
     const targetY = flightPose.y + chaseOffset.y;
     const targetZ = flightPose.z + chaseOffset.z;
-    const blend = 1 - Math.exp(-6.5 * dt);
+    const blend = cameraSmoothingBlend(7.5, dt);
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * blend;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * blend;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * blend;
-    appCtx.camera.lookAt(flightPose.x + forward.x * 3, flightPose.y + 0.4, flightPose.z + forward.z * 3);
+    const targetLookX = flightPose.x + forward.x * 3;
+    const targetLookY = flightPose.y + 0.4;
+    const targetLookZ = flightPose.z + forward.z * 3;
+    const lookTarget = appCtx.camera.userData.planeLookTarget || {
+      x: targetLookX,
+      y: targetLookY,
+      z: targetLookZ
+    };
+    appCtx.camera.userData.planeLookTarget = lookTarget;
+    const lookBlend = cameraSmoothingBlend(10, dt);
+    lookTarget.x += (targetLookX - lookTarget.x) * lookBlend;
+    lookTarget.y += (targetLookY - lookTarget.y) * lookBlend;
+    lookTarget.z += (targetLookZ - lookTarget.z) * lookBlend;
+    appCtx.camera.lookAt(lookTarget.x, lookTarget.y, lookTarget.z);
   }
   return true;
 }

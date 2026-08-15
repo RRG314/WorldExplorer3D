@@ -7,7 +7,7 @@ import {
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=4";
+} from "./sky/astronomical-state.js?v=5";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,

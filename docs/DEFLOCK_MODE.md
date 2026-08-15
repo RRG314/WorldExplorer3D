@@ -46,7 +46,13 @@ Each source node is transformed with the canonical Earth geographic-to-world
 authority and placed on the shared terrain surface. Mapped direction controls
 the virtual camera and direction-zone orientation. Poles, state-colored camera
 bodies, lenses, interaction targets, and optional direction zones are rendered
-as shared instanced meshes.
+as shared instanced meshes. A state-colored ground ring, short vertical beam,
+and elevated beacon make each mapped objective legible against dense buildings
+without changing its exact OSM position.
+
+The compact hunt HUD stays in the upper-right corner and the persistent game
+navigation contracts while a hunt is active. On mobile, the HUD and minimap use
+separate bounded regions so neither panel covers the other.
 
 Direction zones use a bounded range and field of view chosen for gameplay.
 They are approximations, not claims about a physical camera's recognition

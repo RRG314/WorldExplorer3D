@@ -27,9 +27,12 @@ const WEATHER_MODES = ['live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'f
 const WEATHER_FOG_COLOR = 0x9aa4b2;
 const WEATHER_CLOUD_COLOR = 0xc5cdd6;
 const WEATHER_CLEAR_COLOR = 0xf5fbff;
-const MIN_EARTH_EXPOSURE = 0.92;
-const MIN_EARTH_AMBIENT_INTENSITY = 0.32;
-const MIN_EARTH_HEMISPHERE_INTENSITY = 0.34;
+// Weather can mute the sun, but it must not make an Earth location unreadable.
+// These floors preserve time-of-day color while keeping streets, terrain, and
+// gameplay objects visible in overcast conditions and at night.
+const MIN_EARTH_EXPOSURE = 1.02;
+const MIN_EARTH_AMBIENT_INTENSITY = 0.48;
+const MIN_EARTH_HEMISPHERE_INTENSITY = 0.55;
 const _weatherColorA = new THREE.Color();
 const _weatherColorB = new THREE.Color();
 let _lastWeatherVisualSignature = '';
