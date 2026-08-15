@@ -235,9 +235,10 @@ async function assertLandscapeShell(browser, baseUrl) {
   await assertDockHitTargets(page);
   await page.locator('#exploreBtn').tap();
   await page.waitForFunction(() => {
+    const menu = document.getElementById('exploreMenu');
     const card = document.getElementById('tutorialHintCard');
-    return !card || getComputedStyle(card).display === 'none';
-  }, null, { timeout: 2000 });
+    return menu?.classList.contains('open') && (!card || getComputedStyle(card).display === 'none');
+  }, null, { timeout: 8000 });
   await page.screenshot({ path: path.join(outputDir, 'iphone-landscape.png') });
   await context.close();
 }

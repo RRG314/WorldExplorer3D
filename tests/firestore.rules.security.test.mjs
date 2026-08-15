@@ -13,6 +13,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   serverTimestamp,
   setDoc,
   writeBatch
@@ -25,6 +26,7 @@ const MEMBER_UID = 'member_user';
 const ATTACKER_UID = 'attacker_user';
 const INVITEE_UID = 'invitee_user';
 const FRESH_UID = 'fresh_user';
+const JOINER_UID = 'private_room_joiner';
 
 const JOINED_AT = Timestamp.fromMillis(Date.now() - 60_000);
 const OLD_LAST_SEEN = Timestamp.fromMillis(Date.now() - 10_000);
@@ -266,6 +268,7 @@ const memberDb = testEnv.authenticatedContext(MEMBER_UID).firestore();
 const attackerDb = testEnv.authenticatedContext(ATTACKER_UID).firestore();
 const inviteeDb = testEnv.authenticatedContext(INVITEE_UID).firestore();
 const freshDb = testEnv.authenticatedContext(FRESH_UID).firestore();
+const joinerDb = testEnv.authenticatedContext(JOINER_UID).firestore();
 const anonDb = testEnv.unauthenticatedContext().firestore();
 
 const checks = [];
@@ -317,8 +320,38 @@ await runCheck('anonymous player cannot publish a fishing score', async () => {
   }));
 });
 
-await runCheck('non-member cannot read private room doc', async () => {
-  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID)));
+await runCheck('signed-in invite-code joiner can read private room metadata', async () => {
+  await assertSucceeds(getDoc(doc(joinerDb, 'rooms', ROOM_ID)));
+});
+
+await runCheck('signed-in invite-code joiner can count players before membership', async () => {
+  await assertSucceeds(getDocs(collection(joinerDb, 'rooms', ROOM_ID, 'players')));
+});
+
+await runCheck('signed-in user cannot enumerate all private rooms', async () => {
+  await assertFails(getDocs(collection(joinerDb, 'rooms')));
+});
+
+await runCheck('signed-in invite-code joiner can create own membership', async () => {
+  await assertSucceeds(setDoc(
+    doc(joinerDb, 'rooms', ROOM_ID, 'players', JOINER_UID),
+    playerDoc(JOINER_UID, 'Private Room Joiner', 'member')
+  ));
+});
+
+await runCheck('room owner cannot self-feature a public room', async () => {
+  await assertFails(setDoc(doc(ownerDb, 'rooms', PUBLIC_ROOM_ID), {
+    featured: true
+  }, { merge: true }));
+});
+
+await runCheck('admin claim can curate a featured public room', async () => {
+  await assertSucceeds(setDoc(doc(adminClaimsDb, 'rooms', PUBLIC_ROOM_ID), {
+    featured: true
+  }, { merge: true }));
+  await assertSucceeds(setDoc(doc(adminClaimsDb, 'rooms', PUBLIC_ROOM_ID), {
+    featured: false
+  }, { merge: true }));
 });
 
 await runCheck('non-owner cannot delete room', async () => {
@@ -853,6 +886,36 @@ await runCheck('member can create shared room block', async () => {
     materialIndex: 1,
     shape: 'ramp',
     rotation: 2,
+    createdBy: MEMBER_UID,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('member can preserve a half-grid stacked shared block', async () => {
+  await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'blocks', '10_2.5_4'), {
+    id: '10_2.5_4',
+    gx: 10,
+    gy: 2.5,
+    gz: 4,
+    materialIndex: 2,
+    shape: 'slab',
+    rotation: 1,
+    createdBy: MEMBER_UID,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('member cannot publish an unsupported material index', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'blocks', '12_2_4'), {
+    id: '12_2_4',
+    gx: 12,
+    gy: 2,
+    gz: 4,
+    materialIndex: 8,
+    shape: 'cube',
+    rotation: 0,
     createdBy: MEMBER_UID,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()

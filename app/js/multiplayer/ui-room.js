@@ -1,23 +1,20 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=55';
-import {
-  getWeeklyFeaturedCity
-} from './loop.js?v=55';
+import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=56';
 import {
   getCurrentRoom,
   normalizeCityKey,
   normalizeCode,
   setHomeBase
-} from './rooms.js?v=66';
-import { saveRoomActivity } from './room-activities.js?v=1';
+} from './rooms.js?v=67';
+import { saveRoomActivity } from './room-activities.js?v=2';
 import {
   normalizeColorHex as normalizePaintColorHex
-} from './painttown.js?v=55';
+} from './painttown.js?v=56';
 import {
   createUiRoomEventsApi
-} from './ui-room-events.js?v=1';
-import { createUiRoomRenderers } from './ui-room-renderers.js?v=1';
-import { createUiRoomActions } from './ui-room-actions.js?v=2';
+} from './ui-room-events.js?v=2';
+import { createUiRoomRenderers } from './ui-room-renderers.js?v=2';
+import { createUiRoomActions } from './ui-room-actions.js?v=3';
 import {
   emitTutorialEvent,
   finiteNumber,
@@ -44,8 +41,8 @@ import {
   eventElementTarget,
   isWalkModeActive,
   isDroneModeActive
-} from './ui-room-support.js?v=1';
-import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=1';
+} from './ui-room-support.js?v=2';
+import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=2';
 
 let singleton = null;
 function initMultiplayerPlatform() {
@@ -100,6 +97,7 @@ function initMultiplayerPlatform() {
     roomPanelPlayerList: document.getElementById('roomPanelPlayerList'),
     roomPanelPlayerCount: document.getElementById('roomPanelPlayerCount'),
     roomPanelNameInput: document.getElementById('roomPanelNameInput'),
+    roomPanelFeaturedControl: document.getElementById('roomPanelFeaturedControl'),
     roomPanelFeaturedToggle: document.getElementById('roomPanelFeaturedToggle'),
     roomPanelPaintTimeInput: document.getElementById('roomPanelPaintTimeInput'),
     roomPanelPaintTouchModeSelect: document.getElementById('roomPanelPaintTouchModeSelect'),

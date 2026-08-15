@@ -477,6 +477,7 @@ service cloud.firestore {
         request.resource.data.maxPlayers >= 2 &&
         request.resource.data.maxPlayers <= 32 &&
         (!('featured' in request.resource.data) || request.resource.data.featured is bool) &&
+        (!('featured' in request.resource.data) || request.resource.data.featured == false || isAdminToken()) &&
         (
           !('featured' in request.resource.data) ||
           request.resource.data.featured == false ||
@@ -535,6 +536,7 @@ service cloud.firestore {
         request.resource.data.maxPlayers >= 2 &&
         request.resource.data.maxPlayers <= 32 &&
         (!('featured' in request.resource.data) || request.resource.data.featured is bool) &&
+        (!('featured' in request.resource.data) || request.resource.data.featured == resource.data.featured || isAdminToken()) &&
         (
           !('featured' in request.resource.data) ||
           request.resource.data.featured == false ||
@@ -1195,7 +1197,7 @@ service cloud.firestore {
       return blockId is string &&
         blockId.size() > 0 &&
         blockId.size() <= 64 &&
-        blockId.matches('^-?[0-9]+_-?[0-9]+_-?[0-9]+$');
+        blockId.matches('^-?[0-9]+_-?[0-9]+([.]5)?_-?[0-9]+$');
     }
 
     function validRoomBlockData(blockId) {
@@ -1217,7 +1219,8 @@ service cloud.firestore {
         request.resource.data.gx is int &&
         request.resource.data.gx >= -50000 &&
         request.resource.data.gx <= 50000 &&
-        request.resource.data.gy is int &&
+        request.resource.data.gy is number &&
+        int(request.resource.data.gy * 2) == request.resource.data.gy * 2 &&
         request.resource.data.gy >= -50000 &&
         request.resource.data.gy <= 50000 &&
         request.resource.data.gz is int &&
@@ -1225,7 +1228,7 @@ service cloud.firestore {
         request.resource.data.gz <= 50000 &&
         request.resource.data.materialIndex is int &&
         request.resource.data.materialIndex >= 0 &&
-        request.resource.data.materialIndex <= 64 &&
+        request.resource.data.materialIndex <= 7 &&
         (!('shape' in request.resource.data) ||
           request.resource.data.shape in ['cube', 'slab', 'ramp', 'column']) &&
         (!('rotation' in request.resource.data) ||
@@ -1708,16 +1711,22 @@ service cloud.firestore {
     }
 
     match /rooms/{roomId} {
-      allow read: if (
+      allow get: if (
         resource.data.visibility == 'public' ||
-        isRoomMember(roomId)
+        isSignedIn()
+      );
+      allow list: if (
+        resource.data.visibility == 'public' ||
+        isRoomOwner(roomId)
       );
       allow create: if isMultiplayerEntitled() && validRoomCore(roomId);
       allow update: if isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
       allow delete: if isSignedIn() && isRoomOwner(roomId);
 
       match /players/{uid} {
-        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        // A signed-in invite holder must be able to count room occupants before
+        // creating membership. The unlisted room code remains the discovery key.
+        allow read: if isMultiplayerEntitled() && roomExists(roomId);
         allow create: if isMultiplayerEntitled() &&
           isSelf(uid) &&
           roomExists(roomId) &&

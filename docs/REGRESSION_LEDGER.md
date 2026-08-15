@@ -4,6 +4,49 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-14 — Multiplayer invite, discovery, and shared-shape regressions
+
+- Status: resolved locally; not pushed or deployed.
+- Symptom: private room codes could not complete a join, featured-city behavior
+  came from competing rotations, room controls exposed actions members could
+  not save, transient listener errors erased visible shared state, and slabs or
+  ramps could shift/overwrite when synchronized. The existing multiplayer test
+  remained green because it never connected two users or created a backend
+  room.
+- Root cause: private room and player reads contradicted the client join order;
+  the local builder used a 0.5 vertical grid while its Firestore serializer,
+  document IDs, and rules required integer `gy`; featured status had both
+  owner-facing and admin-facing writers; and listener errors were delivered as
+  valid empty/deleted snapshots. Presence also read only 24 entries for rooms
+  whose model permits 32 and initially published an Earth frame for Moon/Space
+  rooms.
+- Resolution: private rooms are unlisted but readable by an authenticated
+  invite-code holder, while collection-wide private-room enumeration remains
+  denied. A known room code permits the pre-join player count and self-membership
+  write. One canonical block schema preserves half-grid coordinates and IDs
+  across local, network, and rules layers. Admin claims exclusively own the
+  featured flag, one Earth-city rotation owns the weekly callout, owner-only
+  settings are hidden from members, presence supports all 32 entries, and active
+  room listeners retain their last good state while reconnecting. Ghosts render
+  only when the remote and local world frames match.
+- UX: Join, Create, My Rooms, city discovery, and curated rooms are separate
+  workflows. Friends, invites, recent players, and the leaderboard remain
+  available under secondary tools instead of competing with the primary path.
+- Evidence: `npm run test:multiplayer-integration` passes 8/8 in two independent
+  installed-Chrome contexts using local Auth/Firestore emulators: create,
+  private-code join, two-player presence, movement, chat, shared half-grid
+  slab/column stack, and real start-hub UI. Firestore rules pass 52/52. The
+  in-game builder renders all four shapes/eight materials, enforces 200 pieces,
+  lands the walker on block surfaces, blocks a car on a cube, and drives a ramp.
+- Terrain guard: this multiplayer change has no terrain, ground, water, biome,
+  vegetation, road, building, or transport-owner diff from accepted commit
+  `0bb624c86874aa6d044637620716c860ccac5b7c`. Do not change those systems while
+  repairing multiplayer.
+- Never reintroduce: a test that calls only local APIs, integer rounding of
+  shared `gy`, member-visible owner controls, owner-authored featured flags,
+  blanking live room state on listener error, hard-coded Earth join frames, or
+  ghosts from a different world/location frame.
+
 ## 2026-08-13 — Tunnel shells snag surface streets, steep camera clipping, and intermittent building pass-through
 
 - Status: resolved locally; not pushed or deployed.
@@ -826,3 +869,14 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Evidence: the provider response for Côte d’Ivoire is `+284 m` and the browser selector changes a previous verified-ocean selection back to `arrivalMode: auto`, verified land. Installed-Chrome gameplay starts Côte d’Ivoire and Longyearbyen in walking mode with land domains, no synthetic water, 256 and 169 mapped roads respectively, and no console errors. Exact North Pole starts walking with one cryosphere owner in 314.5 ms and zero mapped-feature work. Amazon publishes 12,000 placements, 120,000 crowns, four vegetation meshes, and five mapped waterways in 18.6 s. The same focused run measured 19.1 s for Côte d’Ivoire and 25.3 s for Svalbard, proving workload follows location content instead of a fixed delay.
 - Guard: `npm run test:world-surface-domain`, `npm run test:accepted-ground-activation`, `npm run test:globe-selector`, `npm run test:globe-selector-browser`, `npm run test:runtime`, and focused world-matrix IDs `ivory_coast_inland_regression,svalbard_land_regression,north_pole_custom,amazon_custom`. The focused-only land fixtures do not extend the normal release matrix unless explicitly requested.
 - Never reintroduce: names as point-in-water evidence, boat preference as geography, stale water state across coordinate changes, synthetic open ocean on unknown/provider-failed coordinates, terrestrial providers after a complete surface-only world is published, a second jungle renderer/provider, or identical artificial loading delays across different world-domain plans.
+
+# 2026-08-14 — Private rooms cannot be joined and half-height shared shapes overwrite one another
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed. User Chrome acceptance remains open.
+- Symptom: a signed-in player with a valid private invite code could not complete the join flow. Shared slabs and ramps could move to an integer height or overwrite another block. Featured-room discovery had competing city rotations, members saw settings they could not save, and transient listener failures could look like a deleted room.
+- Root cause: Firestore required private-room membership before the client could read the room and count capacity, although membership creation required the room's join code. The local builder used a 0.5 vertical grid while multiplayer document IDs and validation rounded or rejected half steps. Room discovery, UI permissions, initial world presence, and reconnect behavior had separate partial contracts.
+- Resolution: authenticated invite holders may directly get a known private room and read its player list for the pre-join capacity check, but private rooms remain excluded from list queries. One shared block catalog now owns horizontal/vertical normalization, canonical IDs, shape/material validation, direct stacking, and support surfaces. One featured-city model owns discovery; only admins curate `featured`. Presence uses the room world/location from its first write, ghosts require compatible world frames, and room-related listeners retain last-known state during reconnects. The globe hub now separates Join, Create, My Rooms, city discovery, and curated rooms.
+- Evidence: Firestore rules pass 52/52. Two independent installed-Chrome contexts plus local Auth/Firestore emulators pass eight end-to-end assertions: private create/join, two-player presence, movement propagation, chat, half-grid slab/column coexistence, and the actual globe-hub workflow. The real editor journey lands the player on cube, slab, ramp, and column support surfaces, proves jump, vehicle collision, ramp driving, and Earth/Moon/Space/Earth ownership. Runtime invariants and iPhone/Android/landscape browser controls also pass. The generic web-game harness reports correct title state but captures a black WebGL frame in both headless and headed modes; its screenshot is not visual release evidence.
+- Guard: `npm run test:multiplayer-contract`, `npm run test:rules`, `WE3D_BROWSER_CHANNEL=chrome npm run test:multiplayer-integration`, `WE3D_BROWSER_CHANNEL=chrome npm run test:editor-multiplayer`, `npm run test:block-builder`, `npm run test:runtime`, and `npm run test:mobile-controls`.
+- Never reintroduce: membership-before-invite-read deadlocks, private-room collection enumeration, integer-only shared vertical coordinates, shape-specific stacking exceptions, a second featured-city rotation, member-visible owner controls, Earth-zero presence for non-Earth rooms, clearing good state on transient snapshot errors, or treating synthetic API presence as proof that two browsers can play together.
+- Terrain protection: this change is based on worldwide surface baseline `0bb624c86874aa6d044637620716c860ccac5b7c` and changes no terrain, ground, water, biome, vegetation, road, building, or transport authority file. Bright green at the edge of the block-builder evidence is vegetation canopy, not a replacement ground plane.

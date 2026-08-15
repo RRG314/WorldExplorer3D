@@ -11,7 +11,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=66';
+import { normalizeCode } from './rooms.js?v=67';
 
 const ROOM_COLLECTION = 'rooms';
 const ACTIVITIES_COLLECTION = 'activities';
@@ -196,7 +196,7 @@ async function deleteRoomActivity(roomCode, activityId) {
   return true;
 }
 
-function listenRoomActivities(roomCode, callback = () => {}) {
+function listenRoomActivities(roomCode, callback = () => {}, options = {}) {
   const normalizedRoomCode = normalizeCode(roomCode);
   if (!normalizedRoomCode || typeof callback !== 'function') return () => {};
   const { db } = services();
@@ -208,7 +208,7 @@ function listenRoomActivities(roomCode, callback = () => {}) {
     },
     (error) => {
       console.warn('[multiplayer][room-activities] listener failed:', error);
-      callback([]);
+      if (typeof options.onError === 'function') options.onError(error);
     }
   );
 }
@@ -265,7 +265,7 @@ async function stopRoomActivitySession(roomCode, actor = {}) {
   return true;
 }
 
-function listenRoomActivityState(roomCode, callback = () => {}) {
+function listenRoomActivityState(roomCode, callback = () => {}, options = {}) {
   const normalizedRoomCode = normalizeCode(roomCode);
   if (!normalizedRoomCode || typeof callback !== 'function') return () => {};
   const { db } = services();
@@ -276,7 +276,7 @@ function listenRoomActivityState(roomCode, callback = () => {}) {
     },
     (error) => {
       console.warn('[multiplayer][room-activities] state listener failed:', error);
-      callback(null);
+      if (typeof options.onError === 'function') options.onError(error);
     }
   );
 }

@@ -12,21 +12,17 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCityKey, normalizeCode } from './rooms.js?v=66';
+import { normalizeCityKey, normalizeCode } from './rooms.js?v=67';
+import {
+  WEEKLY_CITY_ROTATION,
+  getWeeklyEventMessage,
+  getWeeklyFeaturedCity
+} from './featured-city-model.js?v=1';
 
 const ACTIVITY_FEED_COLLECTION = 'activityFeed';
 const LEADERBOARD_COLLECTION = 'explorerLeaderboard';
 const ACTIVITY_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const ACTIVITY_POST_COOLDOWN_MS = 10 * 1000;
-const cityCycle = [
-  { city: 'Tokyo', kind: 'earth' },
-  { city: 'Paris', kind: 'earth' },
-  { city: 'Moon Base', kind: 'moon' },
-  { city: 'Mars Gateway', kind: 'space' },
-  { city: 'Baltimore', kind: 'earth' },
-  { city: 'Monaco', kind: 'earth' }
-];
-
 const postGate = new Map();
 
 function getServices() {
@@ -39,37 +35,6 @@ function getServices() {
 
 function sanitizeText(value, max = 120) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
-}
-
-function isoWeekNumber(date = new Date()) {
-  const value = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = value.getUTCDay() || 7;
-  value.setUTCDate(value.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
-  return Math.ceil((((value - yearStart) / 86400000) + 1) / 7);
-}
-
-function getWeeklyFeaturedCity(date = new Date()) {
-  const week = isoWeekNumber(date);
-  const selected = cityCycle[week % cityCycle.length];
-  return {
-    week,
-    city: selected.city,
-    kind: selected.kind,
-    cityKey: normalizeCityKey(selected.city)
-  };
-}
-
-function getWeeklyEventMessage(date = new Date()) {
-  const featured = getWeeklyFeaturedCity(date);
-  const day = date.getDay();
-  const fridayPush = day === 5
-    ? `Explore ${featured.city} with others today.`
-    : `Explore ${featured.city} with others this Friday.`;
-  return {
-    featured,
-    message: fridayPush
-  };
 }
 
 function canPostActivity(type) {
@@ -219,6 +184,7 @@ function listenExplorerLeaderboard(callback) {
 }
 
 export {
+  WEEKLY_CITY_ROTATION,
   bumpExplorerLeaderboard,
   getWeeklyEventMessage,
   getWeeklyFeaturedCity,

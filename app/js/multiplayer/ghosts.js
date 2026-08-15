@@ -44,6 +44,7 @@ const POSITION_ALPHA_MIN = 0.06;
 const POSITION_ALPHA_MAX = 0.92;
 const YAW_ALPHA_MIN = 0.08;
 const YAW_ALPHA_MAX = 0.9;
+const FRAME_LOCATION_TOLERANCE_DEGREES = 0.0001;
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
@@ -72,6 +73,22 @@ function shortestAngleDelta(target, current) {
 function normalizeMode(rawMode) {
   const mode = String(rawMode || '').toLowerCase();
   return VALID_MODES.has(mode) ? mode : 'walk';
+}
+
+function areMultiplayerFramesCompatible(localFrame, remoteFrame, tolerance = FRAME_LOCATION_TOLERANCE_DEGREES) {
+  if (!localFrame || typeof localFrame !== 'object') return true;
+  if (!remoteFrame || typeof remoteFrame !== 'object') return false;
+  const localKind = String(localFrame.kind || 'earth').toLowerCase();
+  const remoteKind = String(remoteFrame.kind || 'earth').toLowerCase();
+  if (localKind !== remoteKind) return false;
+
+  const localLat = Number(localFrame.locLat);
+  const localLon = Number(localFrame.locLon);
+  const remoteLat = Number(remoteFrame.locLat);
+  const remoteLon = Number(remoteFrame.locLon);
+  if (![localLat, localLon, remoteLat, remoteLon].every(Number.isFinite)) return false;
+  const safeTolerance = Math.max(0, Number.isFinite(Number(tolerance)) ? Number(tolerance) : FRAME_LOCATION_TOLERANCE_DEGREES);
+  return Math.abs(localLat - remoteLat) <= safeTolerance && Math.abs(localLon - remoteLon) <= safeTolerance;
 }
 
 function clampVelocityVector(vx, vy, vz, maxSpeed = MAX_NETWORK_SPEED) {
@@ -151,6 +168,10 @@ function createGhostManager(scene, options = {}) {
   function getSelfUid() {
     if (typeof options.getSelfUid === 'function') return String(options.getSelfUid() || '');
     return String(globalThis.__WE3D_AUTH_UID__ || '');
+  }
+
+  function getLocalFrame() {
+    return typeof options.getLocalFrame === 'function' ? options.getLocalFrame() : null;
   }
 
   function createEntry(player, nowEpochMs) {
@@ -331,11 +352,13 @@ function createGhostManager(scene, options = {}) {
   function updateGhosts(playersSnapshot = []) {
     const nowEpochMs = Date.now();
     const selfUid = getSelfUid();
+    const localFrame = getLocalFrame();
     const seen = new Set();
 
     for (const player of playersSnapshot) {
       const uid = String(player?.uid || '');
       if (!uid || uid === selfUid) continue;
+      if (!areMultiplayerFramesCompatible(localFrame, player?.frame)) continue;
       seen.add(uid);
 
       let entry = entries.get(uid);
@@ -434,4 +457,4 @@ function createGhostManager(scene, options = {}) {
   };
 }
 
-export { createGhostManager };
+export { FRAME_LOCATION_TOLERANCE_DEGREES, areMultiplayerFramesCompatible, createGhostManager };

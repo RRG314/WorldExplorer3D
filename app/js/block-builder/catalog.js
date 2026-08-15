@@ -19,6 +19,26 @@ const BLOCK_SHAPES = Object.freeze([
 
 const BLOCK_SHAPE_IDS = new Set(BLOCK_SHAPES.map((shape) => shape.id));
 
+function normalizeBlockHorizontalGrid(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.round(numeric) : 0;
+}
+
+function normalizeBlockVerticalGrid(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  const normalized = Math.round(numeric * 2) / 2;
+  return Object.is(normalized, -0) ? 0 : normalized;
+}
+
+function blockDocumentIdFromCoords(gx, gy, gz) {
+  return [
+    normalizeBlockHorizontalGrid(gx),
+    normalizeBlockVerticalGrid(gy),
+    normalizeBlockHorizontalGrid(gz)
+  ].join('_');
+}
+
 function normalizeBlockShape(value) {
   const shape = String(value || '').toLowerCase();
   return BLOCK_SHAPE_IDS.has(shape) ? shape : 'cube';
@@ -93,9 +113,12 @@ export {
   BLOCK_MATERIALS,
   BLOCK_LIMIT_PER_LOCATION,
   BLOCK_SHAPES,
+  blockDocumentIdFromCoords,
   createBlockShapeGeometry,
   getBlockShapeSurface,
+  normalizeBlockHorizontalGrid,
   normalizeBlockMaterial,
   normalizeBlockRotation,
-  normalizeBlockShape
+  normalizeBlockShape,
+  normalizeBlockVerticalGrid
 };

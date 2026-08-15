@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { finiteNumber, isDroneModeActive, isWalkModeActive, sanitizeText } from './ui-room-support.js?v=1';
+import { finiteNumber, isDroneModeActive, isWalkModeActive, sanitizeText } from './ui-room-support.js?v=2';
 
 function readWorldContext() {
   const lat = finiteNumber(appCtx.LOC?.lat, finiteNumber(appCtx.customLoc?.lat, 0));

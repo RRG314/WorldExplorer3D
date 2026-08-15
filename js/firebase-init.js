@@ -1,12 +1,21 @@
 import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { connectAuthEmulator, getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { connectFirestoreEmulator, getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
 let cachedServices = null;
 let cachedAnalytics = undefined;
 let cachedAnalyticsPromise = null;
+
+function readEmulatorConfig() {
+  const raw = globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS;
+  if (!raw || raw.enabled !== true) return null;
+  const host = String(raw.host || '127.0.0.1').trim() || '127.0.0.1';
+  const authPort = Math.max(1, Math.min(65535, Math.floor(Number(raw.authPort || 9099))));
+  const firestorePort = Math.max(1, Math.min(65535, Math.floor(Number(raw.firestorePort || 8080))));
+  return { host, authPort, firestorePort };
+}
 
 function normalizeConfig(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -56,8 +65,13 @@ export function initFirebase() {
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const emulator = readEmulatorConfig();
+  if (emulator) {
+    connectAuthEmulator(auth, `http://${emulator.host}:${emulator.authPort}`, { disableWarnings: true });
+    connectFirestoreEmulator(db, emulator.host, emulator.firestorePort);
+  }
 
-  cachedServices = { app, auth, db, config };
+  cachedServices = { app, auth, db, config, emulator };
   return cachedServices;
 }
 

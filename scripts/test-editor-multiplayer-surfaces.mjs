@@ -278,6 +278,42 @@ async function runBlockBuilderAudit(page) {
   await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'block-builder-jump.png') });
 
+  const shapeLandings = [];
+  for (const shape of ['cube', 'slab', 'ramp', 'column']) {
+    const landingSetup = await page.evaluate(async (nextShape) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      ctx.clearAllBuildBlocks({ persist: false });
+      const walker = ctx.Walk.state.walker;
+      const gx = Math.round(walker.x);
+      const gz = Math.round(walker.z);
+      const ground = ctx.terrainMeshHeightAt?.(gx, gz) ?? ctx.elevationWorldYAtWorldXZ?.(gx, gz) ?? 0;
+      const gy = Math.round((ground + 0.5) * 2) / 2;
+      ctx.placeBuildBlock(gx, gy, gz, 0, { shape: nextShape, rotation: 0, persist: false });
+      const blockTop = ctx.getBuildTopSurfaceAtWorldXZ?.(gx, gz);
+      walker.x = gx;
+      walker.z = gz;
+      walker.y = blockTop + 1.7 + 1.4;
+      walker.vy = -2;
+      walker.onGround = false;
+      return { blockTop };
+    }, shape);
+    for (let i = 0; i < 50; i += 1) {
+      const landed = await page.evaluate(async (blockTop) => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const walker = ctx.Walk.state.walker;
+        return walker.onGround === true && Math.abs((walker.y - 1.7) - blockTop) <= 0.12;
+      }, landingSetup.blockTop);
+      if (landed) break;
+      await page.waitForTimeout(40);
+    }
+    const result = await page.evaluate(async ({ nextShape, blockTop }) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const walker = ctx.Walk.state.walker;
+      return { shape: nextShape, blockTop, feetY: walker.y - 1.7, onGround: walker.onGround === true };
+    }, { nextShape: shape, blockTop: landingSetup.blockTop });
+    shapeLandings.push(result);
+  }
+
   const limit = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.clearAllBuildBlocks({ persist: false });
@@ -308,7 +344,7 @@ async function runBlockBuilderAudit(page) {
     return { cube, ramp };
   });
 
-  return { visual, limit, jump, vehicle };
+  return { visual, limit, jump, shapeLandings, vehicle };
 }
 
 async function runAudit(page, baseUrl) {
@@ -564,6 +600,9 @@ function assertReport(report) {
     report.builder.jump?.maxY > report.builder.jump?.startY + 0.5;
   if (!jumpArcObserved || report.builder.jump?.onGround !== true ||
     Math.abs(report.builder.jump.feetY - report.builder.jump.blockTop) > 0.15) throw new Error('Walker did not jump and land on a block.');
+  if (report.builder.shapeLandings?.length !== 4 || report.builder.shapeLandings.some((landing) => (
+    landing.onGround !== true || Math.abs(landing.feetY - landing.blockTop) > 0.15
+  ))) throw new Error(`A build shape is not a valid player landing surface: ${JSON.stringify(report.builder.shapeLandings)}`);
   if (report.builder.vehicle?.cube?.blocked !== true) throw new Error('Car did not collide with a cube.');
   if (report.builder.vehicle?.ramp?.blocked !== false || !Number.isFinite(report.builder.vehicle?.ramp?.supportTopY)) {
     throw new Error('Car ramp contact is not driveable.');

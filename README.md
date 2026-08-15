@@ -35,6 +35,20 @@ Highlights:
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
 
+## Multiplayer model
+
+Multiplayer uses bounded shared rooms rather than one continuous MMO server. A
+room keeps one fixed world/location, live player presence, chat, shared blocks,
+artifacts, and room activities together. Private rooms are unlisted and joined
+with a six-character invite code; public rooms are discovered by city; featured
+rooms are curated by administrators. Rooms support 2–32 players, with 8–14
+recommended for the current browser renderer and Firestore presence model.
+
+Run the real two-browser contract with `npm run test:multiplayer-integration`.
+It uses local Auth and Firestore emulators and verifies private-code joining,
+presence/movement, chat, and shared half-grid shape stacks without production
+data.
+
 ## Screenshots
 
 ![Driving through Baltimore](assets/landing/gameplay/drive-baltimore.png)

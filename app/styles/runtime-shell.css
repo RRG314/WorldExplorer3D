@@ -797,6 +797,9 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
 .mp-check input{width:15px;height:15px;cursor:pointer}
 .mp-pill{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:700;color:#334155}
 .mp-row .mpSmallBtn{padding:8px 10px;font-size:11px}
+.mp-secondary-tools{border:1px solid #dbe5f5;border-radius:10px;background:#f8fafc;padding:9px 10px}
+.mp-secondary-tools>summary{cursor:pointer;font:700 11px 'Poppins',sans-serif;color:#334155;list-style-position:inside}
+.mp-secondary-tools[open]>summary{margin-bottom:10px;color:#1d4ed8}
 .mpMeta{font-size:10px;color:#64748b;line-height:1.35}
 .mpFeedList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:160px;overflow:auto}
 .mpFeedItem{background:#f8fafc;border:1px solid #dbe5f5;border-radius:8px;padding:8px}

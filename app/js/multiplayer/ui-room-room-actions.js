@@ -304,7 +304,7 @@ export function createUiRoomRoomActionsApi({
         code: roomCode,
         name: roomName,
         visibility: "public",
-        featured: true,
+        featured: false,
         maxPlayers: cap,
         world,
         locationName: weekly.city,

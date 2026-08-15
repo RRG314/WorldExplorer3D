@@ -1,28 +1,11 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { getWeeklyFeaturedCity } from './loop.js?v=55';
-import { normalizeCityKey, normalizeCode } from './rooms.js?v=66';
+import { getWeeklyFeaturedCity } from './featured-city-model.js?v=1';
+import { normalizeCityKey, normalizeCode } from './rooms.js?v=67';
 
 const MAX_PLAN_DISPLAY_NAME_LEN = 48;
 const RELATIVE_MINUTE_MS = 60 * 1000;
 const RELATIVE_HOUR_MS = 60 * RELATIVE_MINUTE_MS;
 const RELATIVE_DAY_MS = 24 * RELATIVE_HOUR_MS;
-const WEEKLY_CITY_ROTATION = Object.freeze([
-  'Tokyo',
-  'Paris',
-  'Baltimore',
-  'Monaco',
-  'New York',
-  'Miami',
-  'London',
-  'Dubai',
-  'San Francisco',
-  'Los Angeles',
-  'Chicago',
-  'Seattle',
-  'Hollywood',
-  'Nürburgring',
-  'Las Vegas'
-]);
 const WEEKLY_ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BASE_ROOM_CAP_MOBILE = 8;
 const BASE_ROOM_CAP_DESKTOP = 10;
@@ -105,7 +88,7 @@ function hashStringToUint32(input) {
 function getWeeklyCitySelection(date = new Date()) {
   const weekly = getWeeklyFeaturedCity(date);
   const week = Math.max(1, Math.floor(Number(weekly?.week || 1)));
-  const city = WEEKLY_CITY_ROTATION[week % WEEKLY_CITY_ROTATION.length] || WEEKLY_CITY_ROTATION[0];
+  const city = sanitizeText(weekly?.city || 'Baltimore', 48) || 'Baltimore';
   return {
     week,
     city,

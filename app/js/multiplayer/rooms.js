@@ -75,7 +75,7 @@ import {
   toSavedRoomObject,
   waitMs
 } from './rooms-model.js?v=1';
-import { createMultiplayerRoomsDirectoryApi } from './rooms-directory.js?v=1';
+import { createMultiplayerRoomsDirectoryApi } from './rooms-directory.js?v=2';
 
 let currentRoom = null;
 
@@ -478,11 +478,7 @@ async function joinRoomByCode(codeInput, options = {}) {
       joinedAt: preservedJoinedAt || serverTimestamp(),
       role: preservedRole,
       joinCode: code,
-      world: {
-        kind: 'earth',
-        lat: 0,
-        lon: 0
-      }
+      world: room.world
     }), { merge: true });
   } catch (err) {
     if (String(err?.code || '') === 'permission-denied') {
@@ -586,7 +582,7 @@ function getCurrentRoom() {
   return currentRoom ? cloneObject(currentRoom) : null;
 }
 
-function listenRoom(roomId, callback) {
+function listenRoom(roomId, callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
 
   const normalizedRoomId = normalizeCode(roomId);
@@ -612,7 +608,7 @@ function listenRoom(roomId, callback) {
     callback(room);
   }, (err) => {
     console.warn('[multiplayer][rooms] listenRoom failed:', err);
-    callback(null);
+    if (typeof options.onError === 'function') options.onError(err);
   });
 }
 

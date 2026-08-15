@@ -29,7 +29,7 @@ import './sky.js?v=86';
 import './weather.js?v=8';
 import './runtime/on-demand-modes.js?v=8';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=42';
-import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=1';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
@@ -148,7 +148,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=75');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=76');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;

@@ -83,6 +83,8 @@
     "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
     "test:plane-interiors": "node scripts/test-plane-interior-lifecycle.mjs",
     "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
+    "test:multiplayer-integration": "node scripts/test-multiplayer-integration.mjs",
+    "test:multiplayer-contract": "node scripts/test-multiplayer-contract.mjs",
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
     "test:space-flight-controls": "node scripts/test-space-flight-controls.mjs && node scripts/test-space-physics-and-visuals.mjs",

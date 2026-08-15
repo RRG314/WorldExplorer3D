@@ -1179,6 +1179,9 @@ async function main() {
       const transportStructureColliders = Array.isArray(ctx?.transportStructureColliders)
         ? ctx.transportStructureColliders
         : [];
+      const transportStructureFeatures = Array.isArray(transportStructureModel?.features)
+        ? transportStructureModel.features
+        : [];
       const transportStructureCoverage = {
         authority: String(transportStructureModel?.authority || ''),
         modelId: String(transportStructureModel?.id || ''),
@@ -1187,9 +1190,18 @@ async function main() {
         featureCount: Number(transportStructureModel?.stats?.featureCount || 0),
         chainCount: Number(transportStructureModel?.stats?.chainCount || 0),
         incompleteCount: Number(transportStructureModel?.stats?.incompleteCount || 0),
-        coveredFeatureCount: Array.isArray(transportStructureModel?.features)
-          ? transportStructureModel.features.filter((feature) => feature?.kind === 'covered').length
-          : 0,
+        coveredFeatureCount: transportStructureFeatures.filter((feature) => feature?.kind === 'covered').length,
+        colliderEligibleFeatureCount: transportStructureFeatures.filter((feature) => {
+          const semantics = feature?.structureSemantics || {};
+          const tunnel = feature?.tunnelSystemModel || {};
+          return feature?.kind === 'covered' || semantics.structureKind === 'covered' || (
+            semantics.terrainMode === 'subgrade' &&
+            feature?.transportRecord?.completeness === 'lossless' &&
+            tunnel.visualKind === 'tunnel' &&
+            Array.isArray(tunnel.shellRanges) &&
+            tunnel.shellRanges.length > 0
+          );
+        }).length,
         colliderPolicy: String(ctx?.transportStructureColliderPolicy || ''),
         colliderCount: transportStructureColliders.length,
         invalidColliderCount: transportStructureColliders.filter((collider) =>
@@ -1416,15 +1428,16 @@ async function main() {
         report.transportStructureCoverage?.invalidColliderCount === 0 &&
         (
           (
+            report.transportStructureCoverage?.colliderEligibleFeatureCount > 0 &&
             report.transportStructureCoverage?.colliderCount > 0 &&
             report.transportStructureCoverage?.sideWallCount > 0 &&
             report.transportStructureCoverage?.ceilingCount === 0
           ) ||
           (
-            report.transportStructureCoverage?.coveredFeatureCount === 0 &&
+            report.transportStructureCoverage?.colliderEligibleFeatureCount === 0 &&
             report.transportStructureCoverage?.colliderCount === 0 &&
             report.transportStructureCoverage?.colliderPolicy ===
-              'covered-only-tunnels-withheld-until-trustworthy-portals'
+              'actor-height-bounded-lossless-tunnel-side-walls'
           )
         ),
       compiledTransportRendererBudget:
