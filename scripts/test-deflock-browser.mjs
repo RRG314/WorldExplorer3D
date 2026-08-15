@@ -95,6 +95,11 @@ async function prepareTitle(page, { clearProgress = false } = {}) {
   await page.locator('#globeCityList').getByText('Baltimore', { exact: true }).click();
   await page.locator('[data-globe-destination="games"]').click();
   await page.locator('#globeHubOverlay:not([hidden])').waitFor({ state: 'visible' });
+  assert.equal(
+    await page.locator('#tab-games .mode-grid > .mode').first().getAttribute('data-mode'),
+    'deflock',
+    'DeFlock must be the first entry in the shared Missions and Games list'
+  );
   await page.locator('.mode[data-mode="deflock"]').click();
   await page.waitForFunction(() => document.querySelector('.mode[data-mode="deflock"]')?.classList.contains('sel'));
 }
@@ -227,12 +232,12 @@ async function assertHudLayout(page) {
   return layout;
 }
 
-async function openAndInspectLargeMap(page) {
+async function openAndInspectLargeMap(page, markerIndex = 0) {
   await page.locator('#minimap').click({ force: true });
   await page.locator('#largeMap.show').waitFor({ state: 'visible', timeout: 10000 });
-  const marker = await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+  const marker = await page.evaluate((index) => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
     ctx.drawLargeMap?.();
-    const first = ctx.deFlockMapMarkers?.[0];
+    const first = ctx.deFlockMapMarkers?.[index];
     const point = first ? ctx.worldToScreenLarge?.(first.x, first.z) : null;
     if (!first || !point) return null;
     const canvas = document.getElementById('largeMapCanvas');
@@ -247,7 +252,7 @@ async function openAndInspectLargeMap(page) {
       if ((red > 210 && green < 130 && blue < 160) || (red > 210 && green > 150 && blue < 100) || (red < 80 && green > 170 && blue > 170)) coloredPixels++;
     }
     return { point, coloredPixels, state: first.state, sourceId: first.sourceId };
-  }));
+  }), markerIndex);
   assert(marker && marker.coloredPixels > 0, `large map did not paint a DeFlock marker: ${JSON.stringify(marker)}`);
   const box = await page.locator('#largeMapCanvas').boundingBox();
   assert(box, 'large map canvas was not visible');
@@ -323,21 +328,21 @@ async function runDesktop() {
   assertPlacement(placement);
   const hudLayout = await assertHudLayout(page);
 
-  const near = await moveActorNear(page, 0);
-  assert.equal(near.nearbySourceId, 'osm:node:101', 'approaching the fixture camera did not make it interactive');
+  const near = await moveActorNear(page, 1);
+  assert.equal(near.nearbySourceId, 'osm:node:102', 'approaching the fixture camera did not make it interactive');
   await page.waitForFunction(() => document.getElementById('deFlockPrompt')?.classList.contains('show'));
   const discovered = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress);
   assert(discovered.discovered >= 1, 'nearby fixture camera was not discovered');
-  await aimAtMarker(page, 0);
+  await aimAtMarker(page, 1);
   await page.screenshot({ path: path.join(outputDir, 'near-virtual-camera.png'), fullPage: false });
 
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress?.disabled === 1);
   assert.match(await page.locator('#deFlockStatus').innerText(), /Virtual Camera Disabled/);
-  await aimAtMarker(page, 0);
+  await aimAtMarker(page, 1);
   await page.screenshot({ path: path.join(outputDir, 'virtually-disabled.png'), fullPage: false });
 
-  const mapMarker = await openAndInspectLargeMap(page);
+  const mapMarker = await openAndInspectLargeMap(page, 1);
   assert.equal(mapMarker.state, 'disabled');
   await page.screenshot({ path: path.join(outputDir, 'large-map-markers.png'), fullPage: false });
   const lifecycle = await verifyEnvironmentLifecycle(page);
