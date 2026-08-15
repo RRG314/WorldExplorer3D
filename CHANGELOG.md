@@ -47,6 +47,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   exact half-height stacking for shared cubes, slabs, ramps, and columns.
 - Kept dense mapped city blocks developed when optional land-cover tiles are
   unavailable, while mapped parks and other natural surfaces remain exact.
+- Restored the Shortbread building fallback when Overture is unavailable by
+  awaiting decoded vector-tile elements before publication.
 
 ## [4.1.3] - 2026-08-07
 

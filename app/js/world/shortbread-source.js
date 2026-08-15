@@ -501,7 +501,7 @@ export async function fetchShortbreadBuildingData(options = {}) {
   const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
     lat, lon, options.radius, SHORTBREAD_ZOOM, options
   );
-  const elements = convertTilesToElements(tiles, ['buildings'], bounds);
+  const elements = await convertTilesToElements(tiles, ['buildings'], bounds);
   const coverageComplete = metrics.fulfilled === requestedTiles;
   elements.forEach((element) => {
     if (element?.type === 'way' && element.tags) {
