@@ -32,6 +32,7 @@ const steps = [
   ['Road junction envelopes', 'scripts/test-road-junction-envelopes.mjs'],
   ['Indexed bridge-road conflict queries', 'scripts/test-bridge-road-conflict-index.mjs'],
   ['Globe selector contract', 'scripts/test-globe-selector-contract.mjs'],
+  ['Mode position handoff', 'scripts/test-travel-control-runtime.mjs'],
   ['Title geolocation adapter', 'scripts/test-title-geolocation.mjs'],
   ['Loading transition contract', 'scripts/test-loading-transition-contract.mjs'],
   ['Fixed-world horizon ownership', 'scripts/test-fixed-world-horizon-architecture.mjs'],

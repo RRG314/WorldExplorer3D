@@ -32,6 +32,9 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
+- Switching between travel modes now preserves the active actor's current
+  traveled position instead of returning the car or character to the original
+  location spawn.
 - Removed rectangular land-cover color changes in farmland, dense cities, and
   sparse-data polar terrain by giving detailed and far ground one semantic
   color composition.

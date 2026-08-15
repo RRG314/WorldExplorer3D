@@ -70,14 +70,20 @@ const destinationChrome = await page.evaluate(() => ({
   })),
   worldThumbnails: ['earth', 'moon', 'mars', 'ocean'].map((kind) => {
     const element = document.querySelector(`.destination-thumb.${kind}`);
+    const button = element.closest('button');
     const style = getComputedStyle(element);
     const bounds = element.getBoundingClientRect();
+    const buttonStyle = getComputedStyle(button);
+    const buttonBounds = button.getBoundingClientRect();
     return {
       kind,
       width: bounds.width,
       height: bounds.height,
       borderRadius: style.borderRadius,
-      clipPath: style.clipPath
+      clipPath: style.clipPath,
+      buttonWidth: buttonBounds.width,
+      buttonHeight: buttonBounds.height,
+      buttonBorderRadius: buttonStyle.borderRadius
     };
   }),
   spaceThumbnail: (() => {
@@ -89,8 +95,10 @@ const destinationChrome = await page.evaluate(() => ({
 assert.equal(destinationChrome.barBorderTop, '0px');
 assert(destinationChrome.buttonBorders.every(({ right, bottom }) => right === '0px' && bottom === '0px'));
 assert(destinationChrome.worldThumbnails.every(({ width, height }) => Math.abs(width - height) < 0.01));
-assert(destinationChrome.worldThumbnails.every(({ borderRadius }) => borderRadius === '999px'));
+assert(destinationChrome.worldThumbnails.every(({ borderRadius }) => borderRadius === '50%'));
 assert(destinationChrome.worldThumbnails.every(({ clipPath }) => clipPath === 'circle(50% at 50% 50%)'));
+assert(destinationChrome.worldThumbnails.every(({ buttonWidth, buttonHeight }) => Math.abs(buttonWidth - buttonHeight) < 0.01));
+assert(destinationChrome.worldThumbnails.every(({ buttonBorderRadius }) => buttonBorderRadius === '50%'));
 assert.equal(destinationChrome.spaceThumbnail.borderRadius, '8px');
 assert.equal(destinationChrome.spaceThumbnail.clipPath, 'none');
 await page.setViewportSize({ width: 390, height: 844 });
@@ -109,7 +117,7 @@ const mobileWorldThumbnails = await page.evaluate(() => (
   })
 ));
 assert(mobileWorldThumbnails.every(({ width, height }) => Math.abs(width - height) < 0.01));
-assert(mobileWorldThumbnails.every(({ borderRadius }) => borderRadius === '999px'));
+assert(mobileWorldThumbnails.every(({ borderRadius }) => borderRadius === '50%'));
 assert(mobileWorldThumbnails.every(({ clipPath }) => clipPath === 'circle(50% at 50% 50%)'));
 await page.setViewportSize({ width: 1365, height: 768 });
 

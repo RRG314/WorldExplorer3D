@@ -42,6 +42,7 @@
     "test:worldcover-provider-outage": "node scripts/test-worldcover-provider-outage-browser.mjs",
     "test:terrain-tile-cancellation": "node scripts/test-terrain-tile-cancellation.mjs",
     "test:fixed-world-travel-browser": "node scripts/test-fixed-world-travel-browser.mjs",
+    "test:travel-control-runtime": "node scripts/test-travel-control-runtime.mjs",
     "test:load-performance-comparison": "node scripts/test-load-performance-comparison.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",
     "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
