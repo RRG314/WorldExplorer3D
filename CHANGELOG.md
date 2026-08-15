@@ -2,7 +2,7 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [4.1.4] - 2026-08-08
+## [4.1.4] - 2026-08-14
 
 ### Added
 
@@ -11,6 +11,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 - Release checks for provider cancellation/failure behavior, 30-second drive
   and flight, fixed-world boundary traversal, Space return, and cold/warm load
   performance against the exact 4.1.3 release.
+- Worldwide land, open-ocean, and cryosphere classification with dedicated
+  non-streaming polar surfaces and biome-aware terrain/vegetation presentation.
+- A two-browser multiplayer integration gate for private room joining,
+  presence, movement, chat, and shared half-grid building shapes.
 
 ### Changed
 
@@ -21,6 +25,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   the complete horizon.
 - Location changes cancel superseded provider work and reveal the replacement
   scene only after its matching immutable snapshot commits.
+- Multiplayer discovery now separates invite-code joining, room creation,
+  saved rooms, city discovery, and administrator-curated featured rooms.
+- Earth, Moon, Mars, and Ocean destination controls are circular at desktop and
+  mobile sizes; Space remains the rectangular destination control.
 
 ### Fixed
 
@@ -33,6 +41,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   reloading or republishing the selected Earth world.
 - Preserved the requested location label and aircraft pose through publication
   and Earth→Space→Earth transitions.
+- Prevented land coordinates from inheriting boat/open-water state, including
+  provider-limited and polar locations, while retaining mapped water ownership.
+- Restored private invite-room joining, compatible world-frame presence, and
+  exact half-height stacking for shared cubes, slabs, ramps, and columns.
 
 ## [4.1.3] - 2026-08-07
 

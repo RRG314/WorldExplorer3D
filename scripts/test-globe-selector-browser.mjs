@@ -67,10 +67,51 @@ const destinationChrome = await page.evaluate(() => ({
   buttonBorders: [...document.querySelectorAll('.globe-destination-bar button')].map((button) => ({
     right: getComputedStyle(button).borderRightWidth,
     bottom: getComputedStyle(button).borderBottomWidth
-  }))
+  })),
+  worldThumbnails: ['earth', 'moon', 'mars', 'ocean'].map((kind) => {
+    const element = document.querySelector(`.destination-thumb.${kind}`);
+    const style = getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    return {
+      kind,
+      width: bounds.width,
+      height: bounds.height,
+      borderRadius: style.borderRadius,
+      clipPath: style.clipPath
+    };
+  }),
+  spaceThumbnail: (() => {
+    const element = document.querySelector('.destination-thumb.space');
+    const style = getComputedStyle(element);
+    return { borderRadius: style.borderRadius, clipPath: style.clipPath };
+  })()
 }));
 assert.equal(destinationChrome.barBorderTop, '0px');
 assert(destinationChrome.buttonBorders.every(({ right, bottom }) => right === '0px' && bottom === '0px'));
+assert(destinationChrome.worldThumbnails.every(({ width, height }) => Math.abs(width - height) < 0.01));
+assert(destinationChrome.worldThumbnails.every(({ borderRadius }) => borderRadius === '999px'));
+assert(destinationChrome.worldThumbnails.every(({ clipPath }) => clipPath === 'circle(50% at 50% 50%)'));
+assert.equal(destinationChrome.spaceThumbnail.borderRadius, '8px');
+assert.equal(destinationChrome.spaceThumbnail.clipPath, 'none');
+await page.setViewportSize({ width: 390, height: 844 });
+const mobileWorldThumbnails = await page.evaluate(() => (
+  ['earth', 'moon', 'mars', 'ocean'].map((kind) => {
+    const element = document.querySelector(`.destination-thumb.${kind}`);
+    const style = getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    return {
+      kind,
+      width: bounds.width,
+      height: bounds.height,
+      borderRadius: style.borderRadius,
+      clipPath: style.clipPath
+    };
+  })
+));
+assert(mobileWorldThumbnails.every(({ width, height }) => Math.abs(width - height) < 0.01));
+assert(mobileWorldThumbnails.every(({ borderRadius }) => borderRadius === '999px'));
+assert(mobileWorldThumbnails.every(({ clipPath }) => clipPath === 'circle(50% at 50% 50%)'));
+await page.setViewportSize({ width: 1365, height: 768 });
 
 const themeButton = page.locator('#globeHubThemeBtn');
 assert.equal(await page.evaluate(() => document.documentElement.dataset.hubTheme), 'night');

@@ -880,3 +880,12 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Guard: `npm run test:multiplayer-contract`, `npm run test:rules`, `WE3D_BROWSER_CHANNEL=chrome npm run test:multiplayer-integration`, `WE3D_BROWSER_CHANNEL=chrome npm run test:editor-multiplayer`, `npm run test:block-builder`, `npm run test:runtime`, and `npm run test:mobile-controls`.
 - Never reintroduce: membership-before-invite-read deadlocks, private-room collection enumeration, integer-only shared vertical coordinates, shape-specific stacking exceptions, a second featured-city rotation, member-visible owner controls, Earth-zero presence for non-Earth rooms, clearing good state on transient snapshot errors, or treating synthetic API presence as proof that two browsers can play together.
 - Terrain protection: this change is based on worldwide surface baseline `0bb624c86874aa6d044637620716c860ccac5b7c` and changes no terrain, ground, water, biome, vegetation, road, building, or transport authority file. Bright green at the edge of the block-builder evidence is vegetation canopy, not a replacement ground plane.
+
+# 2026-08-14 — Destination thumbnails regress to rounded squares
+
+- Status: resolved locally on `steven/earth-core-recovery`; deployment pending final release verification.
+- Symptom: the Earth, Moon, Mars, and Ocean controls in the globe hub read as rounded square texture tiles instead of round world destinations.
+- Root cause: all four source thumbnails are square raster images and their presentation relied only on percentage corner rounding while several responsive button rules resize the same elements.
+- Resolution: one destination-thumbnail rule now enforces a square aspect ratio, a circular clip path, and a full circular radius at every responsive size. Space remains the intentionally rectangular exception.
+- Guard: `npm run test:globe-selector-browser` checks equal rendered dimensions, the circular clip contract for Earth/Moon/Mars/Ocean, the rectangular Space exception, and captures the day/night hub for visual inspection.
+- Never reintroduce: unmasked square world thumbnails, separate per-planet shape rules, converting Space into a circle, or changing terrain/planet/ocean runtime geometry to fix a launch-control presentation defect.
