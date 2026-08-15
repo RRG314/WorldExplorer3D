@@ -5,8 +5,9 @@ import {
 } from "../structure-semantics.js?v=46";
 import {
   clearStructureVisualMeshesForContext,
-  rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=17";
+  rebuildStructureVisualMeshesForContext,
+  updateStructureVisualVisibilityForContext
+} from "./structure-visual-meshes.js?v=19";
 import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
@@ -615,6 +616,10 @@ export async function collectStructureVisualInstancesCooperatively(deps = {}) {
 
 export function clearStructureVisualMeshes() {
   return clearStructureVisualMeshesForContext(appCtx);
+}
+
+export function updateStructureVisualVisibility(force = false) {
+  return updateStructureVisualVisibilityForContext(appCtx, force);
 }
 
 export function rebuildStructureVisualMeshes(deps = {}) {

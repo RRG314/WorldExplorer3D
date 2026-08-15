@@ -193,6 +193,7 @@ function createCameraLayer(session) {
       directed.length
     );
     zones.renderOrder = 2;
+    zones.frustumCulled = false;
     zones.userData.gameplayApproximation = true;
     group.add(zones);
   }
@@ -367,7 +368,6 @@ function refreshPlacements(session, force = false, animationOnly = false) {
   completedAnimations.forEach((sourceId) => session.fallStarts.delete(sourceId));
   [render.pole, render.mountArm, render.camera, render.lens, render.target, render.beam, render.beacon, render.zones].filter(Boolean).forEach((mesh) => {
     mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere?.();
   });
   if (changed) publishMapMarkers(session);
   return changed;
@@ -435,8 +435,10 @@ function renderHud(session) {
   if (!session?.state) return;
   const refs = ui();
   const snapshot = progressSnapshot(session.state);
-  if (refs.counts) refs.counts.textContent = `${snapshot.disabled}/${snapshot.total} disabled • ${snapshot.discovered} found • ${snapshot.score} pts`;
-  if (refs.timer) refs.timer.textContent = formatTime(snapshot.elapsedMs);
+  const counts = `${snapshot.disabled}/${snapshot.total} disabled • ${snapshot.discovered} found • ${snapshot.score} pts`;
+  const timer = formatTime(snapshot.elapsedMs);
+  if (refs.counts && refs.counts.textContent !== counts) refs.counts.textContent = counts;
+  if (refs.timer && refs.timer.textContent !== timer) refs.timer.textContent = timer;
   if (refs.status && refs.status.textContent !== session.message) {
     refs.status.textContent = session.message || "Explore the mapped area and approach a virtual camera.";
     refs.status.dataset.tone = session.messageTone || "neutral";
@@ -691,7 +693,6 @@ function startDeFlockMode() {
     mobileActionLatched: false,
     roomCode: "",
     unsubRoom: null,
-    lastPlacementRefresh: 0,
     lastRoomSync: 0,
     resultShown: false,
     scoreSubmitted: false,
@@ -740,10 +741,6 @@ function updateDeFlockMode(dt) {
     session.mobileActionLatched = false;
   }
   const now = performance.now();
-  if (now - session.lastPlacementRefresh > 2000) {
-    session.lastPlacementRefresh = now;
-    refreshPlacements(session);
-  }
   if (now - session.lastRoomSync > 800) {
     session.lastRoomSync = now;
     syncRoomAuthority(session);

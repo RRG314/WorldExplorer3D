@@ -28,10 +28,22 @@ const smoothForOneSecond = (framesPerSecond) => {
   }
   return current;
 };
+const smoothForDuration = (rate, seconds, framesPerSecond = 60) => {
+  let current = 0;
+  const frames = Math.round(seconds * framesPerSecond);
+  for (let frame = 0; frame < frames; frame += 1) {
+    current += (100 - current) * cameraSmoothingBlend(rate, 1 / framesPerSecond);
+  }
+  return current;
+};
 assert(Math.abs(smoothForOneSecond(30) - smoothForOneSecond(60)) < 1e-9,
   'camera damping changed with the rendered frame rate');
 assert(Math.abs(smoothForOneSecond(60) - smoothForOneSecond(120)) < 1e-9,
   'camera damping changed at high refresh rates');
+assert(smoothForDuration(60, 0.1) > 99.7,
+  'car chase response must stay close to the previously deployed 0.7-per-frame feel');
+assert(smoothForDuration(12, 0.25) > 95,
+  'plane chase response must not visibly trail a moving aircraft');
 import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
 import {
@@ -475,8 +487,20 @@ const loopTopChase = aircraftChaseOffset(0, Math.PI, 12, 4.2);
 assert.deepEqual(loopTopChase, uprightChase, 'third-person loop camera must remain heading-locked');
 
 const planeSource = fs.readFileSync(new URL('../app/js/plane-mode.js', import.meta.url), 'utf8');
+const hudSource = fs.readFileSync(new URL('../app/js/hud.js', import.meta.url), 'utf8');
 assert.match(planeSource, /appCtx\.camMode === 1 && state\.mesh/);
 assert.match(planeSource, /else \{\s*appCtx\.camera\.up\.set\(0, 1, 0\)/);
+assert.match(planeSource, /cameraSmoothingBlend\(12, dt\)/,
+  'plane chase camera lost its responsive time-based rate');
+assert.match(hudSource, /CHASE_CAMERA_SMOOTH_RATE = 60/,
+  'car chase camera lost its responsive time-based rate');
+const chaseCollisionSource = hudSource.match(
+  /function resolveChaseCameraStructureCollision[\s\S]*?function locationName/
+)?.[0] || '';
+assert.match(chaseCollisionSource, /checkBuildingCollision/,
+  'chase camera must use the bounded nearby collision index');
+assert.doesNotMatch(chaseCollisionSource, /intersectObjects|roadMeshes|elevated_road_shells/,
+  'chase camera must not raycast whole regional road or bridge meshes');
 
 clearControlInputState('controller-contract');
 actions = readControlActions('drive');
@@ -549,6 +573,7 @@ console.log(JSON.stringify({
   aerobaticForwardVectorRemainsBodyRelative: true,
   aerobaticChaseCameraRemainsLoopStable: true,
   chaseAndOverheadPlaneCamerasRemainHorizonStable: true,
+  chaseCamerasRemainResponsiveWithoutFrameRateDependence: true,
   boatLocksOffshoreModeSwitches: true,
   boatMovementDoesNotSuppressWorld: true,
   explicitNearShoreExitStillWorks: true,

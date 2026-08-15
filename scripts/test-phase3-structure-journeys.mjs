@@ -584,6 +584,19 @@ async function runJourney(page, journeySpec, softwareRenderer) {
     await page.screenshot({ path: startScreenshot, fullPage: false });
   }
   const samples = [await sampleJourney(page)];
+  const structureRenderStats = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const supportBatches = (ctx.structureVisualMeshes || []).filter((mesh) =>
+      mesh?.userData?.structureVisualType === 'supports'
+    );
+    return {
+      supportBatches: supportBatches.length,
+      visibleSupportBatches: supportBatches.filter((mesh) => mesh.visible !== false).length,
+      supportInstances: supportBatches.reduce((count, mesh) => count + Number(mesh.count || 0), 0),
+      supportShadowBatches: supportBatches.filter((mesh) => mesh.castShadow === true).length,
+      structureBatches: (ctx.structureVisualMeshes || []).length
+    };
+  });
   const startedAt = Date.now();
   const durationMs = softwareRenderer
     ? Number(journeySpec.softwareDurationMs || journeySpec.durationMs) || 3000
@@ -591,6 +604,17 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   const outcomeTimeoutMs = journeySpec.requireShellExit
     ? Math.max(durationMs, Number(journeySpec.shellExitTimeoutMs) || 15000)
     : durationMs;
+  await page.evaluate(() => {
+    const cadence = { active: true, intervals: [], last: performance.now() };
+    globalThis.__phase3FrameCadence = cadence;
+    const sampleFrame = (now) => {
+      if (!cadence.active) return;
+      cadence.intervals.push(now - cadence.last);
+      cadence.last = now;
+      requestAnimationFrame(sampleFrame);
+    };
+    requestAnimationFrame(sampleFrame);
+  });
   await page.keyboard.down('ArrowUp');
   try {
     const deadline = Date.now() + outcomeTimeoutMs;
@@ -608,6 +632,21 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   } finally {
     await page.keyboard.up('ArrowUp');
   }
+  const frameCadence = await page.evaluate(() => {
+    const cadence = globalThis.__phase3FrameCadence || { intervals: [] };
+    cadence.active = false;
+    const intervals = cadence.intervals.filter((value) => Number.isFinite(value) && value >= 0).sort((a, b) => a - b);
+    const percentile = (value) => intervals[Math.min(intervals.length - 1, Math.floor(intervals.length * value))] || 0;
+    delete globalThis.__phase3FrameCadence;
+    return {
+      frames: intervals.length,
+      p95Ms: Number(percentile(0.95).toFixed(2)),
+      p99Ms: Number(percentile(0.99).toFixed(2)),
+      maxMs: Number((intervals.at(-1) || 0).toFixed(2)),
+      over50: intervals.filter((value) => value > 50).length,
+      over100: intervals.filter((value) => value > 100).length
+    };
+  });
   await page.waitForTimeout(250);
   samples.push(await sampleJourney(page));
   const wallClockSeconds = (Date.now() - startedAt) / 1000;
@@ -711,6 +750,13 @@ async function runJourney(page, journeySpec, softwareRenderer) {
     `${label} journey was trapped after ${moved.toFixed(2)}m`
   );
   assert(maximumSpeed >= 0.3, `${label} never accelerated beyond ${maximumSpeed.toFixed(2)}m/s`);
+  assert(frameCadence.frames >= 30, `${label} did not collect enough rendered frames: ${JSON.stringify(frameCadence)}`);
+  if (!softwareRenderer) {
+    assert(frameCadence.p95Ms < 40,
+      `${label} had recurring rendered-frame stalls: ${JSON.stringify({ frameCadence, structureRenderStats })}`);
+    assert(frameCadence.over100 <= Math.max(1, Math.floor(frameCadence.frames * 0.02)),
+      `${label} had repeated 100ms stalls: ${JSON.stringify(frameCadence)}`);
+  }
   const surfaceErrorLimit = softwareRenderer ? 0.5 : 0.6;
   assert(
     maximumSurfaceError <= surfaceErrorLimit,
@@ -779,6 +825,8 @@ async function runJourney(page, journeySpec, softwareRenderer) {
     kind,
     setup,
     wallClockSeconds: Number(wallClockSeconds.toFixed(2)),
+    frameCadence,
+    structureRenderStats,
     sampleCount: samples.length,
     moved: Number(moved.toFixed(2)),
     maximumSpeed: Number(maximumSpeed.toFixed(2)),

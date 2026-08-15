@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   buildFeatureStations,
   updateFeatureSurfaceProfile
@@ -17,7 +18,8 @@ import { compileStructureColliderDescriptors } from '../app/js/world/structure-c
 import { shouldOmitUnmatchedElevatedPedestrianFeature } from '../app/js/world/load-linear-runtime.js';
 import {
   PUBLISH_TUNNEL_STRUCTURE_VISUALS,
-  shouldPublishTunnelShellSection
+  shouldPublishTunnelShellSection,
+  updateStructureVisualVisibilityForContext
 } from '../app/js/terrain/structure-visual-meshes.js';
 import {
   canPublishElevatedStructureVisual,
@@ -28,6 +30,47 @@ import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
 } from '../app/js/terrain/structure-tunnel-visuals.js';
+
+const structureMeshSource = fs.readFileSync(
+  new URL('../app/js/terrain/structure-visual-meshes.js', import.meta.url),
+  'utf8'
+);
+const hudSource = fs.readFileSync(new URL('../app/js/hud.js', import.meta.url), 'utf8');
+assert.match(structureMeshSource, /instanceMatrix\.setUsage\(THREE\.StaticDrawUsage\)/,
+  'static bridge structures must not use streaming instance buffers');
+assert.match(structureMeshSource, /staticBridgeSupportBatch: true[\s\S]*?castShadow: false, chunkSize: 600/,
+  'regional bridge supports must be static, spatially culled, and omitted from the dynamic shadow map');
+assert.match(structureMeshSource, /SUPPORT_VISIBILITY_RADIUS = 2200/,
+  'far bridge-support batches need a bounded fixed-world visibility radius');
+const nearSupportBatch = {
+  visible: false,
+  userData: {
+    staticBridgeSupportBatch: true,
+    structureVisualCenterX: 500,
+    structureVisualCenterZ: 0,
+    structureVisualRadius: 300
+  }
+};
+const farSupportBatch = {
+  visible: true,
+  userData: {
+    staticBridgeSupportBatch: true,
+    structureVisualCenterX: 5000,
+    structureVisualCenterZ: 0,
+    structureVisualRadius: 300
+  }
+};
+updateStructureVisualVisibilityForContext({
+  activeTransportActor: () => ({ position: { x: 0, z: 0 } }),
+  structureVisualMeshes: [nearSupportBatch, farSupportBatch]
+}, true);
+assert.equal(nearSupportBatch.visible, true, 'nearby fixed-world supports must remain visible');
+assert.equal(farSupportBatch.visible, false, 'off-route fixed-world supports must be culled without streaming');
+assert.doesNotMatch(
+  hudSource.match(/function resolveChaseCameraStructureCollision[\s\S]*?function locationName/)?.[0] || '',
+  /supports/,
+  'bridge supports must not enter the recurring chase-camera raycast target set'
+);
 
 function constantProfile(length, y = 0, width = 8) {
   return {

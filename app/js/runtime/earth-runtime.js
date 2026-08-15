@@ -4,7 +4,7 @@
 // comparatively large local-world compiler. Import order preserves the
 // initialization contract that previously lived in app-entry.js.
 import '../ground.js?v=82';
-import '../terrain.js?v=248';
+import '../terrain.js?v=250';
 import '../world.js?v=329';
 import '../building-entry.js?v=5';
 

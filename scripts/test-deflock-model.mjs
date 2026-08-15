@@ -24,6 +24,12 @@ import {
 const fixturePath = fileURLToPath(new URL('./fixtures/deflock-surveillance.json', import.meta.url));
 const fixture = JSON.parse(await fs.readFile(fixturePath, 'utf8'));
 const features = parseSurveillanceElements(fixture);
+const runtimeSource = await fs.readFile(new URL('../app/js/deflock/runtime.js', import.meta.url), 'utf8');
+
+assert.doesNotMatch(runtimeSource, /lastPlacementRefresh/,
+  'DeFlock must not rebuild every camera placement on a fixed gameplay timer');
+assert.doesNotMatch(runtimeSource, /computeBoundingSphere/,
+  'DeFlock instances disable frustum culling and must not recompute bounds while cameras fall');
 
 assert.equal(features.length, 2, 'only mapped surveillance cameras are accepted');
 assert.equal(features[0].sourceId, 'osm:node:101');
@@ -137,4 +143,11 @@ assert.equal(restored.disabled.length, 2, 'local progress reloads by location an
 const empty = createDeFlockState([], { location, sourceVersion: 'fixture-v1' });
 assert.equal(empty.status, 'empty', 'no-data locations remain playable without fake cameras');
 
-console.log(JSON.stringify({ ok: true, features: features.length, placement, progress: progressSnapshot(state) }, null, 2));
+console.log(JSON.stringify({
+  ok: true,
+  features: features.length,
+  noPeriodicPlacementRebuild: true,
+  noAnimatedBoundsRebuild: true,
+  placement,
+  progress: progressSnapshot(state)
+}, null, 2));

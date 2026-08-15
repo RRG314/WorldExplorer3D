@@ -1,10 +1,18 @@
 export function clearStructureVisualMeshesForContext(appCtx) {
   if (!Array.isArray(appCtx.structureVisualMeshes)) appCtx.replaceWorldCollection('structureVisualMeshes');
+  const disposedGeometries = new Set();
+  const disposedMaterials = new Set();
   appCtx.structureVisualMeshes.forEach((mesh) => {
     if (!mesh) return;
     mesh.parent?.remove?.(mesh);
-    if (mesh.geometry && typeof mesh.geometry.dispose === "function") mesh.geometry.dispose();
-    if (mesh.material && typeof mesh.material.dispose === "function") mesh.material.dispose();
+    if (mesh.geometry && !disposedGeometries.has(mesh.geometry) && typeof mesh.geometry.dispose === "function") {
+      disposedGeometries.add(mesh.geometry);
+      mesh.geometry.dispose();
+    }
+    if (mesh.material && !disposedMaterials.has(mesh.material) && typeof mesh.material.dispose === "function") {
+      disposedMaterials.add(mesh.material);
+      mesh.material.dispose();
+    }
   });
   appCtx.replaceWorldCollection('structureVisualMeshes');
 }
@@ -13,12 +21,62 @@ export function clearStructureVisualMeshesForContext(appCtx) {
 // shell ranges are limited to portions with measured terrain cover and its
 // portal approaches are tied to the accepted terrain at both road edges.
 export const PUBLISH_TUNNEL_STRUCTURE_VISUALS = true;
+const SUPPORT_VISIBILITY_RADIUS = 2200;
+const SUPPORT_VISIBILITY_MOVE_THRESHOLD = 120;
+let lastSupportVisibilityX = NaN;
+let lastSupportVisibilityZ = NaN;
 
-export function buildStructureVisualMeshForContext(appCtx, instances, material, userData = {}) {
+export function updateStructureVisualVisibilityForContext(appCtx, force = false) {
+  const actor = appCtx.activeTransportActor?.();
+  const x = Number(actor?.position?.x ?? appCtx.camera?.position?.x);
+  const z = Number(actor?.position?.z ?? appCtx.camera?.position?.z);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+  if (!force && Number.isFinite(lastSupportVisibilityX) &&
+      Math.hypot(x - lastSupportVisibilityX, z - lastSupportVisibilityZ) < SUPPORT_VISIBILITY_MOVE_THRESHOLD) {
+    return 0;
+  }
+  lastSupportVisibilityX = x;
+  lastSupportVisibilityZ = z;
+  let changed = 0;
+  for (const mesh of appCtx.structureVisualMeshes || []) {
+    if (mesh?.userData?.staticBridgeSupportBatch !== true) continue;
+    const centerX = Number(mesh.userData.structureVisualCenterX);
+    const centerZ = Number(mesh.userData.structureVisualCenterZ);
+    const chunkRadius = Math.max(0, Number(mesh.userData.structureVisualRadius) || 0);
+    const visible = Number.isFinite(centerX) && Number.isFinite(centerZ) &&
+      Math.hypot(centerX - x, centerZ - z) <= SUPPORT_VISIBILITY_RADIUS + chunkRadius;
+    if (mesh.visible !== visible) {
+      mesh.visible = visible;
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+export function buildStructureVisualMeshForContext(appCtx, instances, material, userData = {}, renderOptions = {}) {
   if (!Array.isArray(instances) || instances.length === 0 || typeof THREE === "undefined") return null;
+  const chunkSize = Math.max(0, Number(renderOptions.chunkSize) || 0);
+  if (chunkSize > 0) {
+    const chunks = new Map();
+    for (const instance of instances) {
+      const key = `${Math.floor(Number(instance.x) / chunkSize)}:${Math.floor(Number(instance.z) / chunkSize)}`;
+      if (!chunks.has(key)) chunks.set(key, []);
+      chunks.get(key).push(instance);
+    }
+    return [...chunks.entries()].map(([chunkKey, chunkInstances]) => buildStructureVisualMeshForContext(
+      appCtx,
+      chunkInstances,
+      material,
+      { ...userData, structureVisualChunk: chunkKey },
+      { ...renderOptions, chunkSize: 0, frustumCulled: true }
+    ));
+  }
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const mesh = new THREE.InstancedMesh(geometry, material, instances.length);
-  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  // Structure batches are immutable for the lifetime of a loaded world. Mark
+  // their instance buffers static so the renderer does not treat bridge
+  // supports and girders like streaming animation data.
+  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3();
@@ -36,9 +94,44 @@ export function buildStructureVisualMeshForContext(appCtx, instances, material, 
     mesh.setMatrixAt(i, matrix);
   }
   mesh.instanceMatrix.needsUpdate = true;
-  mesh.castShadow = true;
+  mesh.castShadow = renderOptions.castShadow !== false;
   mesh.receiveShadow = true;
-  mesh.frustumCulled = false;
+  mesh.frustumCulled = renderOptions.frustumCulled === true;
+  if (mesh.frustumCulled) {
+    const bounds = instances.reduce((result, instance) => {
+      const halfX = Math.max(0.5, Number(instance.scaleX) * 0.5);
+      const halfY = Math.max(0.5, Number(instance.scaleY) * 0.5);
+      const halfZ = Math.max(0.5, Number(instance.scaleZ) * 0.5);
+      result.minX = Math.min(result.minX, Number(instance.x) - halfX);
+      result.maxX = Math.max(result.maxX, Number(instance.x) + halfX);
+      result.minY = Math.min(result.minY, Number(instance.y) - halfY);
+      result.maxY = Math.max(result.maxY, Number(instance.y) + halfY);
+      result.minZ = Math.min(result.minZ, Number(instance.z) - halfZ);
+      result.maxZ = Math.max(result.maxZ, Number(instance.z) + halfZ);
+      return result;
+    }, {
+      minX: Infinity, maxX: -Infinity,
+      minY: Infinity, maxY: -Infinity,
+      minZ: Infinity, maxZ: -Infinity
+    });
+    const center = new THREE.Vector3(
+      (bounds.minX + bounds.maxX) * 0.5,
+      (bounds.minY + bounds.maxY) * 0.5,
+      (bounds.minZ + bounds.maxZ) * 0.5
+    );
+    const radius = Math.hypot(
+      bounds.maxX - center.x,
+      bounds.maxY - center.y,
+      bounds.maxZ - center.z
+    );
+    geometry.boundingSphere = new THREE.Sphere(center, radius);
+    mesh.userData.structureVisualCenterX = center.x;
+    mesh.userData.structureVisualCenterZ = center.z;
+    mesh.userData.structureVisualRadius = Math.hypot(
+      bounds.maxX - center.x,
+      bounds.maxZ - center.z
+    );
+  }
   Object.assign(mesh.userData, userData, { isStructureVisual: true });
   appCtx.addEarthWorldObject(mesh);
   appCtx.structureVisualMeshes.push(mesh);
@@ -291,7 +384,10 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       appCtx,
       supportInstances,
       createStructureVisualMaterial(0x717983, 0.95, 0.02),
-      { structureVisualType: "supports" }
+      { structureVisualType: "supports", staticBridgeSupportBatch: true },
+      // Supports remain shaded by the world but do not need to redraw every
+      // regional instance into the dynamic sun shadow map each frame.
+      { castShadow: false, chunkSize: 600 }
     );
   }
   if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && wallInstances.length > 0) {
@@ -336,4 +432,5 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       { structureVisualType: "guardrails" }
     );
   }
+  updateStructureVisualVisibilityForContext(appCtx, true);
 }

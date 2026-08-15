@@ -4,6 +4,18 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-15 — DeFlock causes two-second travel hitches and chase cameras lag behind actors
+
+- Status: resolved locally on `steven/earth-core-recovery`; not pushed or deployed.
+- Symptom: driving, flying, and ordinary Earth travel paused at a regular cadence after DeFlock was added, while the chase view visibly trailed the car or plane.
+- Root cause: the active DeFlock loop resampled terrain and rebuilt every camera instance plus bounding spheres every two seconds. The replacement frame-rate-independent car damping rate was also much slower than the deployed 0.7-per-frame response.
+- Resolution: camera placement is static after source creation and changes only for explicit gameplay/multiplayer transitions; falling meshes skip unnecessary bounding-volume work; unchanged HUD strings no longer write to the DOM. Car and plane chase rigs retain time-based damping with responsive rates close to the deployed feel.
+- Bridge-support audit: supports are published during world load and are not chase-raycast targets. An installed-Chrome Pregerson drive measured 83.9 ms p95 with one always-visible regional support batch; hiding that batch improved p95 to 34.2 ms and removed 100 ms stalls. Supports are now split into 600 m static, frustum-culled batches that receive lighting without globally redrawing into the moving sun shadow map.
+- Final isolation: with only six support chunks visible, the 83 ms cadence remained. The actual recurring cost was the chase camera raycasting merged regional road and compiled bridge meshes every eighth frame. It now probes the existing nearby spatial collision index along its ten-metre arm, preserving obstruction response without whole-world triangle scans.
+- Corrected evidence: the installed-Chrome Pregerson drive retained 40 support columns and one abutment at 17.6 ms p95, 33.3 ms p99, and zero frames over 50 ms. Support visibility uses already-loaded fixed-world batches within 2.2 km and performs no provider request or geometry streaming.
+- Guard: `npm run test:deflock-model`, `npm run test:phase5-controls`, `npm run test:deflock-browser`, `npm run test:phase3-structures`, `npm run test:module-versions`, and the generic web-game client.
+- Never reintroduce: fixed-interval whole-layer placement rebuilds, bounding-sphere computation during instance animation, per-frame writes of unchanged HUD text, dynamic buffer hints for immutable bridge batches, global bridge-support shadow redraws, or chase damping tuned far below the deployed response.
+
 ## 2026-08-15 — DeFlock live data unavailable and duplicate E action
 
 - Status: resolved locally on `steven/earth-core-recovery`; not pushed or

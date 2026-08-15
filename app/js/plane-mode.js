@@ -593,7 +593,7 @@ function applyPlaneCamera(dt) {
     const targetX = flightPose.x + chaseOffset.x;
     const targetY = flightPose.y + chaseOffset.y;
     const targetZ = flightPose.z + chaseOffset.z;
-    const blend = cameraSmoothingBlend(7.5, dt);
+    const blend = cameraSmoothingBlend(12, dt);
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * blend;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * blend;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * blend;
@@ -606,7 +606,7 @@ function applyPlaneCamera(dt) {
       z: targetLookZ
     };
     appCtx.camera.userData.planeLookTarget = lookTarget;
-    const lookBlend = cameraSmoothingBlend(10, dt);
+    const lookBlend = cameraSmoothingBlend(14, dt);
     lookTarget.x += (targetLookX - lookTarget.x) * lookBlend;
     lookTarget.y += (targetLookY - lookTarget.y) * lookBlend;
     lookTarget.z += (targetLookZ - lookTarget.z) * lookBlend;

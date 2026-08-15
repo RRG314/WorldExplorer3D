@@ -15,7 +15,10 @@ const GEO_DECIMALS = 4;
 const CAR_BODY_HEIGHT_FROM_GROUND = 1.2;
 const CHASE_CAMERA_DISTANCE = 10;
 const CHASE_CAMERA_HEIGHT = 5;
-const CHASE_CAMERA_SMOOTH_RATE = 11;
+// The deployed 0.7-per-frame chase factor corresponds to roughly 72/s at
+// 60 Hz. Keep the time-based response close to that feel without bringing
+// back refresh-rate-dependent camera motion.
+const CHASE_CAMERA_SMOOTH_RATE = 60;
 const HOOD_FORWARD_OFFSET = 1.2;
 const HOOD_LOOK_DISTANCE = 10;
 const HOOD_CAMERA_HEIGHT = 1.8;
@@ -23,9 +26,6 @@ const OVERHEAD_CAMERA_HEIGHT = 50;
 const OVERHEAD_CAMERA_Z_OFFSET = 15;
 const WALK_ROAD_EDGE_MIN = 6;
 const WALK_ROAD_EDGE_SCALE = 0.75;
-let chaseCameraRaycaster = null;
-let chaseCameraOrigin = null;
-let chaseCameraDirection = null;
 let chaseCameraCollisionFrame = 0;
 let chaseCameraCollisionRatio = 1;
 let chaseCameraCollisionTargetRatio = 1;
@@ -34,90 +34,76 @@ let chaseCameraCollisionLookX = NaN;
 let chaseCameraCollisionLookZ = NaN;
 
 function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targetY, targetZ, dt = 1 / 60) {
-  if (typeof THREE === 'undefined') return { x: targetX, y: targetY, z: targetZ, collided: false };
-  const structureTargets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
-    if (!mesh?.visible) return false;
-    const type = String(mesh.userData?.structureVisualType || '');
-    return /^(decks|girders|caps|walls|roofs|portals|tunnel_shells|elevated_road_shells)$/.test(type);
-  });
-  const buildingTargets = (appCtx.buildingMeshes || []).filter((mesh) =>
-    mesh?.visible && mesh?.geometry?.attributes?.position
-  );
-  // A convex elevated road can rise between the car and its nominal chase
-  // point. Buildings/structure shells alone do not catch that, leaving the
-  // camera below the deck and the road filling the whole viewport.
-  const roadTargets = (appCtx.roadMeshes || []).filter((mesh) =>
-    mesh?.visible && mesh?.geometry?.attributes?.position
-  );
-  const targets = [...structureTargets, ...buildingTargets, ...roadTargets]
-    .filter((mesh) => mesh?.geometry?.attributes?.position);
-  if (targets.length === 0) {
+  if (typeof appCtx.checkBuildingCollision !== 'function') {
     chaseCameraCollisionCacheValid = false;
     chaseCameraCollisionRatio = 1;
     chaseCameraCollisionTargetRatio = 1;
     return { x: targetX, y: targetY, z: targetZ, collided: false };
   }
 
-  chaseCameraOrigin ||= new THREE.Vector3();
-  chaseCameraDirection ||= new THREE.Vector3();
-  chaseCameraOrigin.set(lookX, lookY, lookZ);
-  chaseCameraDirection.set(
-    targetX - lookX,
-    targetY - lookY,
-    targetZ - lookZ
-  );
-  const distance = chaseCameraDirection.length();
+  const deltaX = targetX - lookX;
+  const deltaY = targetY - lookY;
+  const deltaZ = targetZ - lookZ;
+  const distance = Math.hypot(deltaX, deltaY, deltaZ);
   if (!(distance > 1.5)) return { x: targetX, y: targetY, z: targetZ, collided: false };
-  chaseCameraDirection.multiplyScalar(1 / distance);
   chaseCameraCollisionFrame += 1;
   const movedSinceProbe = Number.isFinite(chaseCameraCollisionLookX)
     ? Math.hypot(lookX - chaseCameraCollisionLookX, lookZ - chaseCameraCollisionLookZ)
     : Infinity;
-  const shouldRaycast =
+  const shouldProbe =
     !chaseCameraCollisionCacheValid ||
     movedSinceProbe > 3 ||
     chaseCameraCollisionFrame % 8 === 0;
-  if (!shouldRaycast) {
+  if (!shouldProbe) {
     const ratioBlend = cameraSmoothingBlend(
-      chaseCameraCollisionTargetRatio < chaseCameraCollisionRatio ? 34 : 8,
+      chaseCameraCollisionTargetRatio < chaseCameraCollisionRatio ? 42 : 22,
       dt
     );
     chaseCameraCollisionRatio += (chaseCameraCollisionTargetRatio - chaseCameraCollisionRatio) * ratioBlend;
     return {
-      x: lookX + chaseCameraDirection.x * distance * chaseCameraCollisionRatio,
-      y: lookY + chaseCameraDirection.y * distance * chaseCameraCollisionRatio,
-      z: lookZ + chaseCameraDirection.z * distance * chaseCameraCollisionRatio,
+      x: lookX + deltaX * chaseCameraCollisionRatio,
+      y: lookY + deltaY * chaseCameraCollisionRatio,
+      z: lookZ + deltaZ * chaseCameraCollisionRatio,
       collided: chaseCameraCollisionRatio < 0.999
     };
   }
 
-  chaseCameraRaycaster ||= new THREE.Raycaster();
-  chaseCameraRaycaster.set(chaseCameraOrigin, chaseCameraDirection);
-  chaseCameraRaycaster.near = 0.65;
-  chaseCameraRaycaster.far = distance;
-  const hit = chaseCameraRaycaster.intersectObjects(targets, false)
-    .find((candidate) => Number(candidate?.distance) > 0.8);
-  chaseCameraRaycaster.near = 0;
-  chaseCameraRaycaster.far = Infinity;
+  // Query the existing spatial collision index along the short camera arm.
+  // Raycasting the merged regional road/bridge meshes scanned hundreds of
+  // thousands of triangles on a fixed eight-frame cadence.
+  const probeCount = Math.max(8, Math.ceil(distance / 0.7));
+  let blockedRatio = 1;
+  for (let probe = 2; probe <= probeCount; probe += 1) {
+    const ratio = probe / probeCount;
+    const y = lookY + deltaY * ratio;
+    const collision = appCtx.checkBuildingCollision(
+      lookX + deltaX * ratio,
+      lookZ + deltaZ * ratio,
+      0.38,
+      {
+        actorBaseY: y - 0.34,
+        actorHeight: 0.68,
+        acceptCollision: (candidate) => candidate?.building?.buildingType !== 'bridge_guardrail'
+      }
+    );
+    if (collision?.collision === true) {
+      blockedRatio = Math.max(0.12, ratio - 1.2 / probeCount);
+      break;
+    }
+  }
   chaseCameraCollisionCacheValid = true;
   chaseCameraCollisionLookX = lookX;
   chaseCameraCollisionLookZ = lookZ;
-  if (!hit) {
-    chaseCameraCollisionTargetRatio = 1;
-  } else {
-    const safeDistance = Math.max(1.15, Number(hit.distance) - 0.45);
-    chaseCameraCollisionTargetRatio = Math.min(1, safeDistance / distance);
-  }
+  chaseCameraCollisionTargetRatio = blockedRatio;
   const ratioBlend = cameraSmoothingBlend(
-    chaseCameraCollisionTargetRatio < chaseCameraCollisionRatio ? 34 : 8,
+    chaseCameraCollisionTargetRatio < chaseCameraCollisionRatio ? 42 : 22,
     dt
   );
   chaseCameraCollisionRatio += (chaseCameraCollisionTargetRatio - chaseCameraCollisionRatio) * ratioBlend;
-  const resolvedDistance = distance * chaseCameraCollisionRatio;
   return {
-    x: lookX + chaseCameraDirection.x * resolvedDistance,
-    y: lookY + chaseCameraDirection.y * resolvedDistance,
-    z: lookZ + chaseCameraDirection.z * resolvedDistance,
+    x: lookX + deltaX * chaseCameraCollisionRatio,
+    y: lookY + deltaY * chaseCameraCollisionRatio,
+    z: lookZ + deltaZ * chaseCameraCollisionRatio,
     collided: chaseCameraCollisionRatio < 0.999
   };
 }
@@ -510,7 +496,7 @@ function updateCamera(dt = 1 / 60) {
     // Smooth both camera position and lookAt target together
     // Higher factor = camera stays more rigidly fixed to car
     const smoothFactor = cameraSmoothingBlend(
-      collisionTarget.collided ? 22 : CHASE_CAMERA_SMOOTH_RATE,
+      collisionTarget.collided ? 42 : CHASE_CAMERA_SMOOTH_RATE,
       dt
     );
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;

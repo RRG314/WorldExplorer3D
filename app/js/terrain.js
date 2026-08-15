@@ -2,8 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes,
-  rebuildStructureVisualMeshesCooperatively
-} from "./terrain/structure-visuals.js?v=40";
+  rebuildStructureVisualMeshesCooperatively,
+  updateStructureVisualVisibility
+} from "./terrain/structure-visuals.js?v=42";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=7";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=15";
@@ -516,6 +517,7 @@ Object.assign(appCtx, {
   terrainSourceSampleAtWorldXZ: (x, z) =>
     terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps),
   terrainTileCacheSnapshot,
+  updateStructureVisualVisibility,
   updateFarTerrainClipmap,
   waitForFarTerrainClipmap,
   setWorldSurfaceProfile,
@@ -572,6 +574,7 @@ export {
   terrainSourceSampleAtLatLon,
   terrainSourceSampleAtWorldXZ,
   terrainTileCacheSnapshot,
+  updateStructureVisualVisibility,
   setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,
