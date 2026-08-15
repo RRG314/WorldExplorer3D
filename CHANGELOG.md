@@ -45,6 +45,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   provider-limited and polar locations, while retaining mapped water ownership.
 - Restored private invite-room joining, compatible world-frame presence, and
   exact half-height stacking for shared cubes, slabs, ramps, and columns.
+- Kept dense mapped city blocks developed when optional land-cover tiles are
+  unavailable, while mapped parks and other natural surfaces remain exact.
 
 ## [4.1.3] - 2026-08-07
 

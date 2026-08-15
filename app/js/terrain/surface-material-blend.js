@@ -120,6 +120,30 @@ export function setTerrainSurfaceMaterialMixAt(attributes, index, mode) {
   return true;
 }
 
+export function applyTerrainProfileSurfaceMaterialMix(mesh, mode = 'grass') {
+  const geometry = mesh?.geometry;
+  const positions = geometry?.attributes?.position;
+  const attributes = ensureTerrainSurfaceMixAttributes(geometry);
+  if (!positions || !attributes) return 0;
+  const surfaceClass = terrainSurfaceClassForMappedMode(mode);
+  const mix = terrainSurfaceMixForClass(surfaceClass);
+  const colors = geometry.attributes.color;
+  for (let index = 0; index < positions.count; index += 1) {
+    attributes.mixA.setXYZW(index, ...mix.mixA);
+    attributes.mixB.setXY(index, ...mix.mixB);
+    if (surfaceClass === TERRAIN_SURFACE_CLASS.urban && colors) {
+      colors.setXYZ(index, 1, 1, 1);
+    }
+  }
+  attributes.mixA.needsUpdate = true;
+  attributes.mixB.needsUpdate = true;
+  if (surfaceClass === TERRAIN_SURFACE_CLASS.urban && colors) colors.needsUpdate = true;
+  mesh.userData.terrainSurfaceMaterialAuthority = surfaceClass === TERRAIN_SURFACE_CLASS.grass
+    ? 'natural-profile-fallback'
+    : 'spatial-profile-fallback';
+  return positions.count;
+}
+
 export function applyTerrainReliefMaterialMix(mesh) {
   const geometry = mesh?.geometry;
   const positions = geometry?.attributes?.position;

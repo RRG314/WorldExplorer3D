@@ -1,5 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createLocalSurfaceAnalysisApi } from "./surface-rules-local.js?v=1";
+import {
+  createLocalSurfaceAnalysisApi,
+  denseSettlementOwnsUrbanSurface
+} from "./surface-rules-local.js?v=2";
 import { classifyBiomeProfile } from "./earth-core/biome-profile.js?v=1";
 
 const POLAR_SNOW_LAT_THRESHOLD = 66;
@@ -289,12 +292,21 @@ function classifyTerrainSurfaceProfile({
   const aridFallback = shouldUseAridFallback(absLat, worldProfile, norm, localSignals);
   const useSand = !useSnow && (explicitBeachSand || aridFallback);
   const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
-  const useBuilt = !useSnow && !useSand && !useRock &&
+  const mappedUrbanGround =
     norm.urban >= 0.52 &&
     norm.urban >= norm.grass * 1.6 &&
     norm.water < 0.45 &&
     localSignals.candidates.buildings >= 20 &&
     localSignals.candidates.roads >= 8;
+  const denseUrbanFallback = denseSettlementOwnsUrbanSurface({
+    buildings: localSignals.candidates.buildings,
+    roads: localSignals.candidates.roads,
+    greenLanduses: localSignals.candidates.greenLanduses,
+    urbanRatio: norm.urban,
+    waterRatio: norm.water
+  });
+  const useBuilt = !useSnow && !useSand && !useRock &&
+    (mappedUrbanGround || denseUrbanFallback);
   const useSoil = !useSnow && !useSand && !useRock && !useBuilt && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
   const mode = useSnow ?
     ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
@@ -313,7 +325,7 @@ function classifyTerrainSurfaceProfile({
       (weatherSnow ? 'live_weather_snow' : polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
       useSand ? (explicitBeachSand ? 'localized_beach' : 'arid_surface') :
       useRock ? 'rocky_surface' :
-      useBuilt ? 'mapped_urban_ground' :
+      useBuilt ? (mappedUrbanGround ? 'mapped_urban_ground' : 'dense_settlement_fallback') :
       useSoil ? 'soil_surface' :
       'vegetated_ground',
     absLat,

@@ -479,18 +479,18 @@ function createFarFieldGeometryPlanner(deps = {}) {
           geographicPoint.lon,
           Number(mappedContext?.contextZoom || 0)
         );
-        const landBucket = mappedContext?.landAreasByTile?.get?.(
-          `${mappedContext.contextZoom}/${contextTile.x}/${contextTile.y}`
-        ) || [];
+        const contextTileKey = `${mappedContext.contextZoom}/${contextTile.x}/${contextTile.y}`;
+        const landBucket = mappedContext?.landAreasByTile?.get?.(contextTileKey) || [];
         const mappedSurface = landBucket.find((area) => (
           typeof pointInMappedLandArea === 'function' &&
           pointInMappedLandArea(geographicPoint.lon, geographicPoint.lat, area)
         ));
-        const mappedTint = mappedSurface?.tint;
+        const resolvedSurface = mappedSurface || mappedContext?.surfaceFallbackByTile?.get?.(contextTileKey) || null;
+        const mappedTint = resolvedSurface?.tint;
         if (Array.isArray(mappedTint) && mappedTint.length >= 3) {
           colors.push(mappedTint[0], mappedTint[1], mappedTint[2]);
           mappedSurfaceTints.push(mappedTint[0], mappedTint[1], mappedTint[2]);
-          mappedSurfaceModes.push(String(mappedSurface.mode || mappedSurface.kind || ''));
+          mappedSurfaceModes.push(String(resolvedSurface.mode || resolvedSurface.kind || ''));
         } else {
           colors.push(1, 1, 1);
           mappedSurfaceTints.push(NaN, NaN, NaN);

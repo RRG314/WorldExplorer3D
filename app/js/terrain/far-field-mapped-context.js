@@ -4,6 +4,7 @@ import {
 } from "../world/shortbread-source.js?v=16";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=2';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
@@ -407,6 +408,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   const tiles = contextBatch.values;
   const buildingBuckets = [];
   const landAreasByTile = new Map();
+  const surfaceFallbackByTile = new Map();
   let landAreas = 0;
   let skippedNearBuildings = 0;
   let availableBuildings = 0;
@@ -452,12 +454,14 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
       continue;
     }
     const tileBuildings = [];
+    let tileAvailableBuildings = 0;
     let remainingTileBudget = perTileBuildingBudget;
     for (let index = 0; index < buildingLayer.length; index += 1) {
       const feature = buildingLayer.feature(index);
       const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
       const rings = polygonRings(geojson?.geometry);
       availableBuildings += rings.length;
+      tileAvailableBuildings += rings.length;
       const selectedRingIndices = distributedFeatureIndices(
         rings.length,
         Math.min(
@@ -486,6 +490,12 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
         if (descriptor) tileBuildings.push(descriptor);
       }
       if (remainingTileBudget <= 0) break;
+    }
+    if (regionalBuildingTileOwnsUrbanSurface(tileAvailableBuildings)) {
+      surfaceFallbackByTile.set(
+        `${tileRecord.z}/${tileRecord.x}/${tileRecord.y}`,
+        FAR_LAND_SURFACE_PROFILES.urban
+      );
     }
     buildingBuckets.push(tileBuildings);
     if ((tileIndex + 1) % 2 === 0) await yieldToMainThread();
@@ -516,7 +526,8 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     requestedTiles: coordinates.length,
     contextMaxInFlight: contextBatch.metrics.maxInFlight,
     landAreas,
-    landAreasByTile
+    landAreasByTile,
+    surfaceFallbackByTile
   };
 }
 

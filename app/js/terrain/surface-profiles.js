@@ -13,6 +13,7 @@ import { latLonToTileXY } from './tile-coordinates.js?v=1';
 import { pointInMappedLandArea } from './far-field-mapped-context.js?v=16';
 import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
 import {
+  applyTerrainProfileSurfaceMaterialMix,
   applyTerrainReliefMaterialMix,
   applyWorldCoverSurfaceMaterialMix,
   configureTerrainSurfaceMaterialBlend,
@@ -695,10 +696,8 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.metalness = 0.0;
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.78, 0.42);
   } else if (nextMode === "built") {
-    // A city classification describes the surrounding settlement; it does
-    // not mean every unmapped square metre is concrete. Roads, parking and
-    // mapped hardscape have their own geometry, while the base terrain should
-    // remain natural until the spatial WorldCover texture arrives.
+    // Dense settlement evidence owns a spatial urban fallback while exact
+    // mapped parks and other land classes continue to override it below.
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, "grass");
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
@@ -770,6 +769,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   applyGroundFallbackProfile(nextProfile);
   mat.emissiveMap = null;
   mat.needsUpdate = true;
+  applyTerrainProfileSurfaceMaterialMix(mesh, nextMode);
   applyMappedSemanticVertexTints(mesh);
   applyTerrainReliefMaterialMix(mesh);
   applyTerrainSemanticMaterialBlend(mesh, textureRepeats);

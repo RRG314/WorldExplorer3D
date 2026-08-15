@@ -13,6 +13,10 @@ import {
   terrainSurfaceClassForWorldCover,
   terrainSurfaceMixForClass
 } from '../app/js/terrain/surface-material-blend.js';
+import {
+  denseSettlementOwnsUrbanSurface,
+  regionalBuildingTileOwnsUrbanSurface
+} from '../app/js/surface-rules-local.js';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relativePath) => fs.readFileSync(path.join(sourceRoot, relativePath), 'utf8');
@@ -111,6 +115,29 @@ assert.equal(terrainSurfaceClassForMappedMode('sand'), TERRAIN_SURFACE_CLASS.san
 assert.deepEqual(
   terrainSurfaceMixForClass(TERRAIN_SURFACE_CLASS.urban),
   { mixA: [1, 0, 0, 0], mixB: [0, 0] }
+);
+assert.equal(denseSettlementOwnsUrbanSurface({
+  buildings: 603,
+  roads: 228,
+  greenLanduses: 0,
+  urbanRatio: 0.4816,
+  waterRatio: 0.08
+}), true, 'Dense mapped city blocks must not fall back to grass during a WorldCover outage.');
+assert.equal(denseSettlementOwnsUrbanSurface({
+  buildings: 603,
+  roads: 228,
+  greenLanduses: 1,
+  urbanRatio: 0.4816,
+  waterRatio: 0.08
+}), false, 'Mapped green landuse must override dense-settlement fallback.');
+assert.equal(regionalBuildingTileOwnsUrbanSurface(24), true);
+assert.equal(regionalBuildingTileOwnsUrbanSurface(23), false);
+assert.match(profileSource, /applyTerrainProfileSurfaceMaterialMix\(mesh, nextMode\)/);
+assert.match(mappedContextSource, /surfaceFallbackByTile/);
+assert.match(
+  materialBlendSource,
+  /surfaceClass === TERRAIN_SURFACE_CLASS\.urban && colors[\s\S]*colors\.setXYZ\(index, 1, 1, 1\)/,
+  'Developed fallback must clear the stale green vertex tint before exact mapped land classes override it.'
 );
 assert.match(
   transportSource,

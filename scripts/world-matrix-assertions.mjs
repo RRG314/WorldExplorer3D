@@ -89,7 +89,19 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
   }
-  assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
+  assert(!result.terrainProfiles?.urban, `${spec.id}: obsolete urban profile escaped the built-surface authority ${JSON.stringify(result.terrainProfiles.urban)}`);
+  if (spec.kind === 'preset' && Number(result.counts?.buildings || 0) >= 1000) {
+    const semanticSamples = result.terrainSurface?.semanticClassSamples || {};
+    const developed = Number(semanticSamples.urban || 0);
+    const grass = Number(semanticSamples.grass || 0);
+    const hasProviderCoverage = Number(result.worldCover?.status?.ready || 0) > 0;
+    if (!hasProviderCoverage) {
+      assert(
+        developed >= grass * 0.35,
+        `${spec.id}: dense city collapsed to grass during land-cover outage ${JSON.stringify({ developed, grass })}`
+      );
+    }
+  }
   if (Number(result.worldCover?.status?.ready || 0) > 0) {
     assert(
       Number(result.terrainSurface?.semanticMaterialMeshes || 0) > 0,
