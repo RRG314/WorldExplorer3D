@@ -299,6 +299,135 @@ function applyExactGraphNodeConstraints(feature, heights, distances) {
   return corrected;
 }
 
+function reconcileExactGraphNodeConstraints(
+  feature,
+  heights,
+  distances,
+  lowerBounds,
+  maximumGrade
+) {
+  const anchors = Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors.filter((anchor) =>
+        anchor?.source === 'transport_graph_node' && Number.isFinite(Number(anchor?.targetSurfaceY)))
+    : [];
+  if (anchors.length === 0 || heights.length === 0) return heights;
+
+  const grade = Math.max(0.01, finiteNumber(maximumGrade, DEFAULT_MAX_GRADE));
+  const fixedTargets = new Map();
+  for (const anchor of anchors) {
+    const targetDistance = clamp(
+      finiteNumber(anchor.distance),
+      0,
+      finiteNumber(distances[distances.length - 1])
+    );
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+    for (let index = 0; index < distances.length; index += 1) {
+      const delta = Math.abs(finiteNumber(distances[index]) - targetDistance);
+      if (delta < nearestDistance) {
+        nearestDistance = delta;
+        nearestIndex = index;
+      }
+    }
+    fixedTargets.set(nearestIndex, Number(anchor.targetSurfaceY));
+  }
+
+  const fixedEntries = [...fixedTargets.entries()];
+  const hasAbsoluteStructuralMinimum = Number.isFinite(Number(feature?.minimumStructureSurfaceY));
+  const structureStations = Array.isArray(feature?.structureStations)
+    ? feature.structureStations
+    : [];
+  const hasHardStationAt = (distance) => structureStations.some((station) =>
+    Math.abs(finiteNumber(station?.distance) - distance) <= Math.max(1, finiteNumber(station?.span, 1))
+  );
+  for (let leftIndex = 0; leftIndex < fixedEntries.length; leftIndex += 1) {
+    const [leftSample, leftTarget] = fixedEntries[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < fixedEntries.length; rightIndex += 1) {
+      const [rightSample, rightTarget] = fixedEntries[rightIndex];
+      const run = Math.abs(distances[rightSample] - distances[leftSample]);
+      if (Math.abs(rightTarget - leftTarget) > grade * run + 1e-6) return heights;
+    }
+    for (let index = 0; index < heights.length; index += 1) {
+      const structuralLowerBound = finiteNumber(lowerBounds?.[index], Number.NEGATIVE_INFINITY);
+      const run = Math.abs(distances[index] - distances[leftSample]);
+      if (
+        (hasAbsoluteStructuralMinimum || hasHardStationAt(distances[index])) &&
+        structuralLowerBound > leftTarget + grade * run + 1e-6
+      ) {
+        // Crossing clearance outranks a stale or physically impossible graph
+        // join. Keep the already grade-limited structural profile rather than
+        // cutting a bridge through the road or water beneath it.
+        return heights;
+      }
+    }
+  }
+
+  const effectiveLowerBounds = new Float64Array(heights.length);
+  const effectiveUpperBounds = new Float64Array(heights.length);
+  for (let index = 0; index < heights.length; index += 1) {
+    let lower = finiteNumber(lowerBounds?.[index], Number.NEGATIVE_INFINITY);
+    let upper = Number.POSITIVE_INFINITY;
+    for (const [fixedIndex, target] of fixedTargets) {
+      const run = Math.abs(finiteNumber(distances[index]) - finiteNumber(distances[fixedIndex]));
+      lower = Math.max(lower, target - grade * run);
+      upper = Math.min(upper, target + grade * run);
+    }
+    // A graph node is the physical join shared by both road surfaces. Keep it
+    // exact even when a generic bridge-clearance lower bound reaches the same
+    // sample; the grade cone then reconciles the approach instead of leaving
+    // a one-sample step at the junction.
+    if (fixedTargets.has(index)) {
+      lower = fixedTargets.get(index);
+      upper = fixedTargets.get(index);
+    }
+    effectiveLowerBounds[index] = Math.min(lower, upper);
+    effectiveUpperBounds[index] = upper;
+  }
+
+  const corrected = new Float64Array(heights);
+  const clampToBounds = (index, value) => clamp(
+    value,
+    effectiveLowerBounds[index],
+    effectiveUpperBounds[index]
+  );
+  for (let index = 0; index < corrected.length; index += 1) {
+    corrected[index] = clampToBounds(index, corrected[index]);
+  }
+
+  const enforceConstrainedGrade = () => {
+    for (let index = 1; index < corrected.length; index += 1) {
+      const run = Math.max(1e-6, distances[index] - distances[index - 1]);
+      corrected[index] = clampToBounds(
+        index,
+        clamp(corrected[index], corrected[index - 1] - grade * run, corrected[index - 1] + grade * run)
+      );
+    }
+    for (let index = corrected.length - 2; index >= 0; index -= 1) {
+      const run = Math.max(1e-6, distances[index + 1] - distances[index]);
+      corrected[index] = clampToBounds(
+        index,
+        clamp(corrected[index], corrected[index + 1] - grade * run, corrected[index + 1] + grade * run)
+      );
+    }
+    for (const [index, target] of fixedTargets) corrected[index] = target;
+  };
+
+  for (let pass = 0; pass < 8; pass += 1) enforceConstrainedGrade();
+  for (let pass = 0; pass < 6; pass += 1) {
+    const next = new Float64Array(corrected);
+    for (let index = 1; index < corrected.length - 1; index += 1) {
+      if (fixedTargets.has(index)) continue;
+      next[index] = clampToBounds(
+        index,
+        corrected[index] * 0.58 + (corrected[index - 1] + corrected[index + 1]) * 0.21
+      );
+    }
+    corrected.set(next);
+    enforceConstrainedGrade();
+  }
+  return new Float32Array(corrected);
+}
+
 function enforceMaximumGrade(heights, lowerBounds, distances, maximumGrade) {
   const grade = Math.max(0.01, finiteNumber(maximumGrade, DEFAULT_MAX_GRADE));
   for (let pass = 0; pass < 3; pass += 1) {
@@ -450,6 +579,7 @@ export {
   DEFAULT_VERTICAL_FIT_RADIUS,
   applyEndpointTieIns,
   applyExactGraphNodeConstraints,
+  reconcileExactGraphNodeConstraints,
   applyStationInfluence,
   clamp,
   createSampleDistances,

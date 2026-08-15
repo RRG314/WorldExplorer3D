@@ -19,12 +19,13 @@ import {
   normalizeAnchors,
   pointAtDistance,
   profileStats,
+  reconcileExactGraphNodeConstraints,
   sampleSmoothAnchors,
   sampleTerrainOrThrow,
   smoothGradeLimitedProfile,
   smoothSignedCutFillProfile,
   tangentAtDistance
-} from './transport-surface-profile.js?v=2';
+} from './transport-surface-profile.js?v=3';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 
@@ -263,23 +264,33 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         maximumGrade
       );
     }
-    const graphConstrainedHeights = applyExactGraphNodeConstraints(
-      feature,
-      centerHeights,
-      sampleDistances
-    );
-    if (graphConstrainedHeights !== centerHeights) {
-      // Graph-node elevations are sampled from provisional neighboring
-      // profiles. They are exact only when physically feasible for this
-      // feature's clearance envelope and grade budget. Reconcile a constrained
-      // profile so a stale or conflicting node cannot punch a one-sample
-      // vertical wall into a bridge deck or motorway ramp.
-      centerHeights = smoothGradeLimitedProfile(
-        graphConstrainedHeights,
-        centerLowerBounds,
+    if (mode === 'elevated') {
+      centerHeights = reconcileExactGraphNodeConstraints(
+        feature,
+        centerHeights,
         sampleDistances,
+        centerLowerBounds,
         maximumGrade
       );
+    } else {
+      const graphConstrainedHeights = applyExactGraphNodeConstraints(
+        feature,
+        centerHeights,
+        sampleDistances
+      );
+      if (graphConstrainedHeights !== centerHeights) {
+        // Graph-node elevations are sampled from provisional neighboring
+        // profiles. They are exact only when physically feasible for this
+        // feature's clearance envelope and grade budget. Reconcile a constrained
+        // profile so a stale or conflicting node cannot punch a one-sample
+        // vertical wall into a tunnel approach.
+        centerHeights = smoothGradeLimitedProfile(
+          graphConstrainedHeights,
+          centerLowerBounds,
+          sampleDistances,
+          maximumGrade
+        );
+      }
     }
     if (mode === 'subgrade') {
       // Endpoint and graph constraints may only expose a tunnel where an

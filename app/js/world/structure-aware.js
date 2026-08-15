@@ -7,11 +7,11 @@ import {
   buildFeatureTransitionAnchors,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=46";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=11";
+} from "../structure-semantics.js?v=47";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=12";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=3";
-import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=1";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=4";
+import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=2";
 import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad

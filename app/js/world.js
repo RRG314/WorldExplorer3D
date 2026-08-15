@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=46";
+} from "./structure-semantics.js?v=47";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -160,7 +160,7 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=34";
+} from "./world/structure-aware.js?v=35";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=106";
 import {
   fetchShortbreadWorldData

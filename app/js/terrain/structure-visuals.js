@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=46";
+} from "../structure-semantics.js?v=47";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,
@@ -20,7 +20,7 @@ import {
 } from "../world/bridge-safety.js?v=7";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
-import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=3';
+import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=4';
 
 export function canPublishElevatedStructureVisual(feature) {
   if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;

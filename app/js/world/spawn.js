@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=46";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=47";
 import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=6";
 import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
 import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=2';

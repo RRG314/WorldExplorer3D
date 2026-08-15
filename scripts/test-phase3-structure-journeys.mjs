@@ -317,6 +317,29 @@ async function prepareJourney(page, journeySpec) {
     ctx.__phase3JourneyRoad = target.road;
     ctx.__phase3JourneyKind = targetKind;
     const structureAssembly = target.road.transportStructureAssembly || null;
+    const profile = target.road.transportSurfaceModel || null;
+    const sampleProfileAtDistance = (distance) => {
+      const distances = profile?.distances;
+      const heights = profile?.centerHeights;
+      if (!distances?.length || !heights?.length) return NaN;
+      const targetDistance = Math.max(0, Math.min(Number(distances[distances.length - 1]), Number(distance) || 0));
+      let index = 0;
+      while (index < distances.length - 2 && Number(distances[index + 1]) < targetDistance) index += 1;
+      const startDistance = Number(distances[index]);
+      const endDistance = Number(distances[Math.min(distances.length - 1, index + 1)]);
+      const progress = Math.max(0, Math.min(1, (targetDistance - startDistance) / Math.max(1e-6, endDistance - startDistance)));
+      return Number(heights[index]) +
+        (Number(heights[Math.min(heights.length - 1, index + 1)]) - Number(heights[index])) * progress;
+    };
+    const graphNodeErrors = (target.road.structureTransitionAnchors || [])
+      .filter((anchor) =>
+        anchor?.source === 'transport_graph_node' &&
+        Number.isFinite(Number(anchor?.targetSurfaceY))
+      )
+      .map((anchor) => Math.abs(
+        sampleProfileAtDistance(Number(anchor.distance)) - Number(anchor.targetSurfaceY)
+      ))
+      .filter(Number.isFinite);
     return {
       ok: true,
       kind: targetKind,
@@ -326,6 +349,10 @@ async function prepareJourney(page, journeySpec) {
       routeState: String(target.road.transportStructureRef?.routeState || ''),
       endState: String(target.road.transportStructureRef?.end?.state || ''),
       segmentLength: Number(target.segmentLength.toFixed(2)),
+      graphNodeConstraintCount: graphNodeErrors.length,
+      maximumGraphNodeStep: graphNodeErrors.length
+        ? Number(Math.max(...graphNodeErrors).toFixed(4))
+        : null,
       structureAssembly: structureAssembly
         ? {
             authority: String(structureAssembly.authority || ''),
@@ -567,6 +594,13 @@ async function runJourney(page, journeySpec, softwareRenderer) {
   const label = journeySpec.id;
   let setup = await prepareJourney(page, journeySpec);
   assert(setup.ok, `${label} journey setup failed: ${JSON.stringify(setup)}`);
+  if (journeySpec.requireExactGraphJoin) {
+    assert(setup.graphNodeConstraintCount > 0, `${label} did not compile a graph-node transition`);
+    assert(
+      setup.maximumGraphNodeStep <= 0.025,
+      `${label} retained a vertical transition step: ${setup.maximumGraphNodeStep}m`
+    );
+  }
   await page.waitForTimeout(500);
   const modeSwitch = journeySpec.modeSwitch
     ? await verifyModeSwitch(page, label)
@@ -945,7 +979,8 @@ try {
           allowStructureFamilyTransition: true,
           requireEndConnection: true,
           startDistanceFromEnd: 20,
-          requireStructureTransition: true
+          requireStructureTransition: true,
+          requireExactGraphJoin: true
         }
       ]
     },

@@ -397,9 +397,35 @@ assert.equal(mergeAnchors.nodeCount, 1);
 assert.equal(mergeAnchors.constrainedFeatureCount, 1);
 assert.equal(mergeAnchors.anchorsByFeature.get(mergeRamp)[0].targetSurfaceY, 4);
 assert.equal(
+  mergeAnchors.anchorsByFeature.get(mergeRamp)[0].endpoint,
+  'end',
+  'a graph connection at a mapped endpoint must participate in the endpoint transition gate'
+);
+assert.ok(
+  mergeAnchors.anchorsByFeature.get(mergeRamp)[0].span >= 50,
+  'a ramp transition must reserve enough approach distance to satisfy its grade limit'
+);
+assert.equal(
   mergeAnchors.anchorsByFeature.get(mergeRamp)[0].ownerFeatureId,
   mergeMainline.sourceFeatureId,
   'ramp merge did not inherit its interior mainline surface'
+);
+mergeRamp.structureTransitionAnchors = [...mergeAnchors.anchorsByFeature.get(mergeRamp)];
+updateFeatureSurfaceProfile(mergeRamp, () => 4);
+assert.ok(
+  Math.abs(mergeRamp.surfaceHeights[mergeRamp.surfaceHeights.length - 1] - 4) <= 0.02,
+  'an elevated ramp endpoint must meet its graph-owned road surface without a vertical step'
+);
+assert.ok(
+  mergeRamp.transportSurfaceModel.stats.maximumGrade <= 0.1001,
+  'an exact ramp merge must preserve the motorway-link grade limit'
+);
+compileTransportStructureModel([mergeMainline, mergeRamp]);
+const mergeAssembly = compileElevatedAssembly(mergeRamp, () => 4);
+assert.equal(mergeAssembly.bodyCoverage, 1, 'the elevated body must cover the complete ramp approach');
+assert.ok(
+  Math.abs(mergeAssembly.surfaceSamples[mergeAssembly.surfaceSamples.length - 1].y - 4) <= 0.02,
+  'the visible elevated body must reach the exact connected-road elevation'
 );
 
 const incompleteRamp = structureFeature(

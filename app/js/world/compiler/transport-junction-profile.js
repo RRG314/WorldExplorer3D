@@ -25,6 +25,10 @@ function ownerScore(side, feature) {
   );
 }
 
+function maximumGradeFor(feature) {
+  return feature?.structureSemantics?.rampCandidate === true ? 0.1 : 0.12;
+}
+
 function connectedSideGroups(connections = []) {
   const parent = new Map();
   const sides = new Map();
@@ -113,6 +117,18 @@ export function buildTransportJunctionProfileAnchors(
       if (!Number.isFinite(terrainY)) continue;
       const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
       const isEndpoint = side.endpoint === 'start' || side.endpoint === 'end';
+      const currentSurfaceY = Number(sampleSurfaceY(
+        feature,
+        finite(point?.x),
+        finite(point?.z),
+        {
+          segIndex: finite(side.segmentIndex),
+          t: finite(side.segmentT)
+        }
+      ));
+      const gradeRun = Number.isFinite(currentSurfaceY)
+        ? Math.abs(currentSurfaceY - targetSurfaceY) / maximumGradeFor(feature)
+        : 0;
       if (!anchorsByFeature.has(feature)) anchorsByFeature.set(feature, []);
       anchorsByFeature.get(feature).push(Object.freeze({
         distance: Math.max(0, finite(side.distanceAlong)),
@@ -122,8 +138,10 @@ export function buildTransportJunctionProfileAnchors(
         // use a longer blend; endpoint constraints need only enough run to
         // respect the road's grade bound and must not be weakened by the
         // generic endpoint transition gate.
-        span: isEndpoint ? 2 : Math.max(18, Math.min(72, featureLength(feature) * 0.28)),
-        endpoint: null,
+        span: isEndpoint
+          ? Math.max(18, Math.min(featureLength(feature), gradeRun + 8))
+          : Math.max(18, Math.min(72, featureLength(feature) * 0.28)),
+        endpoint: isEndpoint ? side.endpoint : null,
         graphEndpoint: isEndpoint ? side.endpoint : null,
         source: 'transport_graph_node',
         ownerFeatureId: String(owner.side.featureId || '')

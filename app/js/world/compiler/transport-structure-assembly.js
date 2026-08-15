@@ -1,5 +1,5 @@
 import { polylineDistances } from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=15';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=16';
 
 const TRANSPORT_STRUCTURE_ASSEMBLY_SCHEMA_VERSION = 1;
 
