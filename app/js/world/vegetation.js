@@ -35,7 +35,7 @@ const TREE_ROW_SPACING = 11;
 export const MAX_TREE_NODES = 320;
 export const MAX_TREE_ROW_WAYS = 70;
 const MAX_GENERATED_TREE_INSTANCES = 950;
-const MAX_TROPICAL_TREE_INSTANCES = 9000;
+const MAX_TROPICAL_TREE_INSTANCES = 12000;
 
 const runtime = {
   findNearestRoad: () => ({ road: null, dist: Infinity }),
@@ -551,7 +551,7 @@ export function buildWorldVegetationInstancing(
     // One collision-checked semantic placement expands into a compact crown
     // cluster. This closes the canopy without running tens of thousands of
     // extra road/building/water queries during location startup.
-    const crownClusterSize = 7;
+    const crownClusterSize = 10;
     const understoryMesh = new THREE.InstancedMesh(
       canopyGeometry,
       understoryMaterial,
@@ -569,11 +569,11 @@ export function buildWorldVegetationInstancing(
         const angle = (Number(placement.rotation) || 0) +
           clusterIndex * (Math.PI * 2 / crownClusterSize) +
           (appCtx.rand01FromInt(seed ^ 0x7f4a7c15) - 0.5) * 0.85;
-        const radius = 6 + appCtx.rand01FromInt(seed ^ 0x165667b1) * 24;
-        const crownScale = canopyScale * (1.2 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.8);
+        const radius = 4 + appCtx.rand01FromInt(seed ^ 0x165667b1) * 16;
+        const crownScale = canopyScale * (1.3 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.85);
         euler.set(0, angle, 0);
         quat.setFromEuler(euler);
-        scale.set(crownScale * 1.55, crownScale * 0.5, crownScale * 1.55);
+        scale.set(crownScale * 1.7, crownScale * 0.52, crownScale * 1.7);
         matrix.compose(
           new THREE.Vector3(
             placement.x + Math.sin(angle) * radius,
@@ -594,6 +594,8 @@ export function buildWorldVegetationInstancing(
     if (understoryMesh.instanceColor) understoryMesh.instanceColor.needsUpdate = true;
     understoryMesh.userData.isVegetationBatch = true;
     understoryMesh.userData.vegetationLayer = 'closed-canopy-understory';
+    understoryMesh.userData.semanticPlacementCount = tropicalPlacements.length;
+    understoryMesh.userData.renderedCrownCount = tropicalPlacements.length * crownClusterSize;
     understoryMesh.frustumCulled = false;
     appCtx.addEarthWorldObject(understoryMesh);
     appCtx.vegetationMeshes.push(understoryMesh);

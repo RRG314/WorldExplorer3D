@@ -8,7 +8,8 @@ import {
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=18";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=22";
-import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=6";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
+import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=7";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
@@ -303,6 +304,35 @@ export function createWorldRoadLoader(deps = {}) {
       if (sparseWarning) console.warn(sparseWarning);
       await markLoaded(sparseReason);
     };
+    const worldLoadPlan = createWorldLoadPlan({
+      surfaceDomain: runtimeState?.surfaceDomain
+    });
+    loadMetrics.worldLoadPlan = worldLoadPlan;
+    runtimeState.worldLoadPlan = worldLoadPlan;
+    if (worldLoadPlan.surfaceOnly) {
+      worldSession.transition('compiling', worldLoadPlan.id);
+      syncWorldSessionState();
+      appCtx.worldTraversalRadiusWorld = runtimeState?.surfaceDomain?.kind === 'cryosphere'
+        ? 16900
+        : null;
+      appCtx.showLoad(
+        runtimeState?.surfaceDomain?.kind === 'cryosphere'
+          ? 'Preparing fixed polar surface...'
+          : 'Preparing verified open-ocean surface...'
+      );
+      await markLoaded('primary');
+      return finishWorldLoadRuntimeSession({
+        appCtx,
+        finalizePerfLoad,
+        loadMetrics,
+        loaded,
+        phaseTotals,
+        releaseWorldLoadCancellation,
+        runtimeState,
+        syncWorldSessionState,
+        worldSession
+      });
+    }
     const resolveWaterOnlyStartCandidate = () => {
       if (appCtx.selLoc !== 'custom') return null;
       if (!isPointInsideWaterFootprint(0, 0)) return null;

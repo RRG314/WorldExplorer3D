@@ -1,5 +1,4 @@
-import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
-import { resolveWorldSurfaceDomain } from "../earth-core/world-surface-domain.js?v=1";
+import { resolveWorldSurfaceDomain } from "../earth-core/world-surface-domain.js?v=2";
 
 export async function activateAcceptedGroundForWorldLoad(options = {}) {
   const {
@@ -15,10 +14,9 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
 
   const initialSurfaceDomain = resolveWorldSurfaceDomain({
     location: appCtx.LOC,
-    mappedWaterKind: appCtx.selLoc === 'custom'
-      ? inferSelectedLocationWaterKind(appCtx)
-      : null,
-    requestedArrivalMode: appCtx.customLoc?.arrivalMode
+    surfaceEvidence: appCtx.selLoc === 'custom'
+      ? appCtx.customLoc?.surfaceEvidence
+      : null
   });
   runtimeState.surfaceDomain = initialSurfaceDomain;
   loadMetrics.surfaceDomain = initialSurfaceDomain;
@@ -37,6 +35,20 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
     loadMetrics.acceptedGround = polarSurface;
     appCtx.showLoad('Building fixed polar terrain...');
     appCtx.publishLocationTerrain?.();
+    return true;
+  }
+  if (initialSurfaceDomain.kind === 'ocean') {
+    const oceanSurface = Object.freeze({
+      status: 'not-applicable',
+      reason: initialSurfaceDomain.reason,
+      waterKind: 'open_ocean',
+      surfaceEvidence: initialSurfaceDomain.surfaceEvidence
+    });
+    runtimeState.acceptedGround = oceanSurface;
+    runtimeState.groundMode = initialSurfaceDomain.groundMode;
+    loadMetrics.acceptedGround = oceanSurface;
+    appCtx.suppressGroundFallbackPlaceholder?.();
+    appCtx.showLoad('Loading verified open-ocean surface...');
     return true;
   }
 
@@ -71,34 +83,6 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
       groundMode: 'accepted-ground'
     });
     appCtx.publishLocationTerrain?.();
-    return true;
-  }
-
-  const reason = String(state?.reason || 'accepted-ground-unavailable');
-  const waterKind = appCtx.selLoc === 'custom'
-    ? inferSelectedLocationWaterKind(appCtx)
-    : null;
-  const requestedBoatArrival =
-    appCtx.selLoc === 'custom' &&
-    appCtx.customLoc?.arrivalMode === 'boat';
-  if (waterKind === 'open_ocean' || requestedBoatArrival) {
-    const exemption = Object.freeze({
-      status: 'not-applicable',
-      reason: 'open-ocean-has-no-land-ground',
-      waterKind: waterKind || 'open_ocean',
-      requestedBoatArrival,
-      rejectedGround: state || null
-    });
-    runtimeState.acceptedGround = exemption;
-    runtimeState.groundMode = 'open-ocean-surface-only';
-    runtimeState.surfaceDomain = resolveWorldSurfaceDomain({
-      location: appCtx.LOC,
-      mappedWaterKind: waterKind,
-      requestedArrivalMode: requestedBoatArrival ? 'boat' : null
-    });
-    loadMetrics.acceptedGround = exemption;
-    appCtx.suppressGroundFallbackPlaceholder?.();
-    appCtx.showLoad('Loading open-ocean surface data...');
     return true;
   }
 

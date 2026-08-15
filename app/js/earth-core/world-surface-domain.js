@@ -1,5 +1,11 @@
 const POLAR_CRYOSPHERE_LATITUDE = 86;
 
+const VERIFIED_SURFACE_KINDS = new Set([
+  'land',
+  'open_ocean',
+  'cryosphere'
+]);
+
 function finiteLatitude(location = {}) {
   const latitude = Number(location.latitude ?? location.lat);
   return Number.isFinite(latitude) ? Math.max(-90, Math.min(90, latitude)) : 0;
@@ -7,6 +13,21 @@ function finiteLatitude(location = {}) {
 
 export function isPolarCryosphereLocation(location = {}) {
   return Math.abs(finiteLatitude(location)) >= POLAR_CRYOSPHERE_LATITUDE;
+}
+
+export function normalizeWorldSurfaceEvidence(evidence = null) {
+  if (!evidence || typeof evidence !== 'object') return null;
+  const kind = String(evidence.kind || '').trim().toLowerCase();
+  if (!VERIFIED_SURFACE_KINDS.has(kind) || evidence.verified !== true) return null;
+  const elevationMeters = evidence.elevationMeters == null || evidence.elevationMeters === ''
+    ? NaN
+    : Number(evidence.elevationMeters);
+  return Object.freeze({
+    kind,
+    verified: true,
+    source: String(evidence.source || 'unknown').trim().slice(0, 80) || 'unknown',
+    elevationMeters: Number.isFinite(elevationMeters) ? elevationMeters : null
+  });
 }
 
 export function resolveWorldSurfaceDomain(options = {}) {
@@ -29,18 +50,18 @@ export function resolveWorldSurfaceDomain(options = {}) {
     });
   }
 
-  const mappedWaterKind = String(options.mappedWaterKind || '').trim().toLowerCase();
-  const requestedBoatArrival = options.requestedArrivalMode === 'boat';
-  if (mappedWaterKind === 'open_ocean' || requestedBoatArrival) {
+  const surfaceEvidence = normalizeWorldSurfaceEvidence(options.surfaceEvidence);
+  if (surfaceEvidence?.kind === 'open_ocean') {
     return Object.freeze({
       kind: 'ocean',
-      subtype: mappedWaterKind || 'open_ocean',
+      subtype: 'open_ocean',
       hemisphere: latitude >= 0 ? 'north' : 'south',
       groundMode: 'open-ocean-surface-only',
       walkable: false,
       supportsBoatArrival: true,
-      sourcePolicy: 'mapped-open-ocean',
-      reason: requestedBoatArrival ? 'explicit-boat-arrival' : 'mapped-open-ocean'
+      sourcePolicy: surfaceEvidence.source,
+      reason: 'verified-open-ocean-coordinate',
+      surfaceEvidence
     });
   }
 
@@ -52,7 +73,10 @@ export function resolveWorldSurfaceDomain(options = {}) {
     walkable: true,
     supportsBoatArrival: false,
     sourcePolicy: 'accepted-ground-or-worldwide-fallback',
-    reason: 'terrestrial-location'
+    reason: surfaceEvidence?.kind === 'land'
+      ? 'verified-terrestrial-coordinate'
+      : 'terrestrial-location',
+    surfaceEvidence
   });
 }
 

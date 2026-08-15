@@ -5,7 +5,6 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     applySpawnTarget,
     featuredArrivalNear,
     findGradeSeparatedRoadAt,
-    inferSelectedLocationWaterKind,
     isSubgradeArrival,
     resolveSafeWorldSpawn,
     searchNearestSafeRoadSpawn,
@@ -51,9 +50,8 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     });
   }
 
-  const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
-  const requestedBoatArrival = appCtx.customLoc?.arrivalMode === 'boat';
-  if (!inferredWaterKind && !requestedBoatArrival && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
+  const verifiedOcean = appCtx.worldLoadRuntimeState?.surfaceDomain?.kind === 'ocean';
+  if (!verifiedOcean && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
     const mappedWalkApproach = mode === 'walk'
       ? searchNearestSafeRoadSpawn(0, 0, {
           mode: 'walk',

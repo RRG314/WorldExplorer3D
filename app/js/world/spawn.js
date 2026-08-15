@@ -1,10 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
 import { isRoadSurfaceReachable } from "../structure-semantics.js?v=46";
 import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=6";
 import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
-import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=1';
+import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=2';
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -591,30 +590,17 @@ function applySpawnTarget(worldX, worldZ, options = {}) {
 
 function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
   if (!options?.preferBoatIfWater || typeof appCtx.enterBoatAtWorldPoint !== "function") return null;
-  if (appCtx.worldLoadRuntimeState?.surfaceDomain?.kind === 'cryosphere') return null;
+  const surfaceDomain = appCtx.worldLoadRuntimeState?.surfaceDomain || null;
+  if (surfaceDomain?.kind === 'cryosphere') return null;
   const entryMode = options.mode === "walk" ? "walk" : "drive";
-  const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
-  const requestedBoatArrival = appCtx.customLoc?.arrivalMode === "boat";
-  const openOceanSurfaceOnly =
-    appCtx.worldLoadRuntimeState?.groundMode === "open-ocean-surface-only";
-  const allowSynthetic = !!(
-    options.allowSyntheticWater ||
-    (requestedBoatArrival && openOceanSurfaceOnly) ||
-    (
-      inferredWaterKind &&
-      appCtx.selLoc === "custom" &&
-      (!Array.isArray(appCtx.roads) || appCtx.roads.length === 0) &&
-      (!Array.isArray(appCtx.waterAreas) || appCtx.waterAreas.length === 0) &&
-      (!Array.isArray(appCtx.waterways) || appCtx.waterways.length === 0)
-    )
-  );
+  const allowSynthetic = options.allowSyntheticWater === true || surfaceDomain?.kind === 'ocean';
   const started = appCtx.enterBoatAtWorldPoint(worldX, worldZ, {
     source: options.source || "water_target",
     entryMode,
     emitTutorial: options.emitTutorial !== false,
     maxDistance: Number.isFinite(options.maxWaterDistance) ? options.maxWaterDistance : undefined,
     allowSynthetic,
-    waterKind: options.waterKind || inferredWaterKind || "open_ocean"
+    waterKind: options.waterKind || surfaceDomain?.subtype || "open_ocean"
   });
   if (!started) return null;
   return {
@@ -636,7 +622,6 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     applySpawnTarget,
     featuredArrivalNear,
     findGradeSeparatedRoadAt,
-    inferSelectedLocationWaterKind,
     isSubgradeArrival,
     resolveSafeWorldSpawn,
     searchNearestSafeRoadSpawn,

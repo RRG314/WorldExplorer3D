@@ -236,8 +236,31 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'tropical_forest_river_custom',
     expectedStart: 'land',
     minimumWaterways: 1,
-    minimumVegetationFeatures: 4000,
-    minimumVegetationMeshes: 4
+    minimumVegetationFeatures: 10000,
+    minimumVegetationMeshes: 4,
+    minimumVegetationRenderedCrowns: 60000
+  },
+  {
+    id: 'ivory_coast_inland_regression',
+    kind: 'custom',
+    lat: 7.8939,
+    lon: -4.9369,
+    label: 'Gbêkê, Vallée du Bandama, Côte d’Ivoire',
+    category: 'inland_surface_authority_regression',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'land',
+    regressionOnly: true
+  },
+  {
+    id: 'svalbard_land_regression',
+    kind: 'custom',
+    lat: 78.2232,
+    lon: 15.6469,
+    label: 'Longyearbyen, Svalbard',
+    category: 'arctic_land_surface_authority_regression',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'land',
+    regressionOnly: true
   },
   {
     id: 'grand_canyon_custom',

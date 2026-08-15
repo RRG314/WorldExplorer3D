@@ -1,3 +1,5 @@
+import { isPolarCryosphereLocation } from '../../earth-core/world-surface-domain.js?v=2';
+
 export const FAVORITE_STORAGE_KEY = "worldExplorer3D.globeSelector.savedFavorites";
 export const MAX_SAVED_FAVORITES = 10;
 export const RECENT_STORAGE_KEY = "worldExplorer3D.globeSelector.recentPlaces";
@@ -293,12 +295,13 @@ export function parseReverseAddress(payload = {}) {
   const display =
     parts.join(", ") ||
     String(payload?.display_name || "").split(",").slice(0, 4).map((v) => String(v || "").trim()).filter(Boolean).join(", ");
-  const waterText = [
+  // Only structured feature fields may classify a selected coordinate as
+  // water. Names and display strings are labels, not point-in-water evidence
+  // (for example, administrative regions and towns can contain "water").
+  const structuredWaterText = [
     payload?.category,
     payload?.type,
     payload?.addresstype,
-    payload?.name,
-    payload?.display_name,
     addr.ocean,
     addr.sea,
     addr.water,
@@ -309,11 +312,11 @@ export function parseReverseAddress(payload = {}) {
     addr.river,
     addr.canal
   ].filter(Boolean).join(' ');
-  const waterKind = /\b(lake|reservoir|pond|loch)\b/i.test(waterText) ? 'lake' :
-    /\b(harbour|harbor|marina|port)\b/i.test(waterText) ? 'harbor' :
-    /\b(river|canal|channel)\b/i.test(waterText) ? 'channel' :
-    /\b(bay|gulf|strait|sound|lagoon|estuary|coast)\b/i.test(waterText) ? 'coastal' :
-    /\b(ocean|sea|open water|water)\b/i.test(waterText) ? 'open_ocean' : null;
+  const waterKind = /\b(lake|reservoir|pond|loch)\b/i.test(structuredWaterText) ? 'lake' :
+    /\b(harbour|harbor|marina|port)\b/i.test(structuredWaterText) ? 'harbor' :
+    /\b(river|canal|channel)\b/i.test(structuredWaterText) ? 'channel' :
+    /\b(bay|gulf|strait|sound|lagoon|estuary)\b/i.test(structuredWaterText) ? 'coastal' :
+    /\b(ocean|sea|open water)\b/i.test(structuredWaterText) ? 'open_ocean' : null;
 
   return {
     display,
@@ -370,15 +373,45 @@ export async function fetchGebcoElevationMeters(lat, lon, timeoutMs = 6500) {
   }
 }
 
-export async function resolveCoordinateWaterKind(lat, lon, reversePayload = null) {
+export async function resolveCoordinateSurfaceEvidence(lat, lon, reversePayload = null) {
+  if (isPolarCryosphereLocation({ lat, lon })) {
+    return Object.freeze({
+      kind: 'cryosphere',
+      verified: true,
+      source: 'polar-coordinate-policy',
+      elevationMeters: null
+    });
+  }
   const parsedKind = parseReverseAddress(reversePayload || {}).waterKind;
-  if (parsedKind) return parsedKind;
   try {
     const elevation = await fetchGebcoElevationMeters(lat, lon);
-    return Number.isFinite(elevation) && elevation <= -5 ? 'open_ocean' : null;
+    if (Number.isFinite(elevation)) {
+      return Object.freeze({
+        kind: elevation <= -5 ? 'open_ocean' : 'land',
+        verified: true,
+        source: 'gebco-elevation-sample',
+        elevationMeters: elevation
+      });
+    }
   } catch {
-    return null;
+    // The structured reverse result is a conservative fallback when the
+    // elevation service is unavailable. Unknown coordinates default to land
+    // later so an outage cannot create synthetic ocean.
   }
+  if (parsedKind === 'open_ocean') {
+    return Object.freeze({
+      kind: 'open_ocean',
+      verified: true,
+      source: 'structured-reverse-water-feature',
+      elevationMeters: null
+    });
+  }
+  return null;
+}
+
+export async function resolveCoordinateWaterKind(lat, lon, reversePayload = null) {
+  const evidence = await resolveCoordinateSurfaceEvidence(lat, lon, reversePayload);
+  return evidence?.kind === 'open_ocean' ? 'open_ocean' : null;
 }
 
 export async function fetchReversePayload(lat, lon) {
@@ -430,7 +463,9 @@ export function syncLegacyCustomSelection(appCtx, selection) {
     lat: selection.lat,
     lon: selection.lon,
     name: selection.name || appCtx.customLoc?.name || 'Custom Location',
-    arrivalMode: selection.arrivalMode || 'auto'
+    arrivalMode: selection.arrivalMode || 'auto',
+    waterKind: selection.waterKind || null,
+    surfaceEvidence: selection.surfaceEvidence || null
   }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 

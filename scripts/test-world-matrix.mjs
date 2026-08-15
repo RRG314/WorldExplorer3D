@@ -41,7 +41,7 @@ const requestedLocationIds = new Set(
 );
 const testLocations = requestedLocationIds.size > 0 ?
   WORLD_TEST_LOCATIONS.filter((location) => requestedLocationIds.has(String(location.id).toLowerCase())) :
-  WORLD_TEST_LOCATIONS;
+  WORLD_TEST_LOCATIONS.filter((location) => location.regressionOnly !== true);
 
 async function mkdirp(dir) {
   await fs.mkdir(dir, { recursive: true });
@@ -1155,6 +1155,9 @@ async function loadLocation(page, spec) {
         groundMode: String(completedLoad.groundMode || ''),
         surfaceDomain: completedLoad.surfaceDomain
           ? JSON.parse(JSON.stringify(completedLoad.surfaceDomain))
+          : null,
+        loadPlan: completedLoad.worldLoadPlan
+          ? JSON.parse(JSON.stringify(completedLoad.worldLoadPlan))
           : null
       },
       worldSurfaceProfile: ctx.worldSurfaceProfile
@@ -1176,6 +1179,12 @@ async function loadLocation(page, spec) {
         waterAreas: Array.isArray(ctx.waterAreas) ? ctx.waterAreas.length : 0,
         waterways: Array.isArray(ctx.waterways) ? ctx.waterways.length : 0,
         vegetationMeshes: Array.isArray(ctx.vegetationMeshes) ? ctx.vegetationMeshes.length : 0,
+        vegetationRenderedCrowns: Array.isArray(ctx.vegetationMeshes)
+          ? ctx.vegetationMeshes.reduce(
+              (sum, mesh) => sum + Number(mesh?.userData?.renderedCrownCount || 0),
+              0
+            )
+          : 0,
         vegetationFeatures: Array.isArray(ctx.vegetationFeatures) ? ctx.vegetationFeatures.length : 0,
         vegetationPlacementCandidates,
         streetFurnitureMeshes: Array.isArray(ctx.streetFurnitureMeshes) ? ctx.streetFurnitureMeshes.length : 0,

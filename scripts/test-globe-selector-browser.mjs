@@ -159,6 +159,43 @@ assert.equal(surfaceOceanLaunch.customLoc.arrivalMode, 'boat');
 await page.unroute('https://nominatim.openstreetmap.org/reverse?*');
 await page.unroute('https://wms.gebco.net/mapserv?*');
 
+await page.route('https://nominatim.openstreetmap.org/reverse?*', (route) => route.fulfill({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({
+    category: 'boundary',
+    type: 'administrative',
+    addresstype: 'state_district',
+    name: 'Gbêkê',
+    display_name: 'Gbêkê, Vallée du Bandama, Côte d’Ivoire',
+    address: {
+      state_district: 'Gbêkê',
+      state: 'Vallée du Bandama',
+      country: 'Côte d’Ivoire'
+    }
+  })
+}));
+await page.route('https://wms.gebco.net/mapserv?*', (route) => route.fulfill({
+  status: 200,
+  contentType: 'text/plain',
+  body: "GetFeatureInfo results:\nvalue_list = '284'"
+}));
+await page.locator('#globeCustomLat').fill('7.8939');
+await page.locator('#globeCustomLon').fill('-4.9369');
+await stubTitleLaunch();
+await page.getByRole('button', { name: 'Explore', exact: true }).click();
+await page.waitForFunction(() => window.__selectorLaunchCapture?.length === 1, null, { timeout: 20000 });
+const africaLandLaunch = (await page.evaluate(() => window.__selectorLaunchCapture))[0];
+assertCoordinate(africaLandLaunch.customLoc.lat, 7.8939, 'Africa land latitude');
+assertCoordinate(africaLandLaunch.customLoc.lon, -4.9369, 'Africa land longitude');
+assert.equal(africaLandLaunch.customLoc.arrivalMode, 'auto');
+assert.equal(africaLandLaunch.customLoc.waterKind, null);
+assert.equal(africaLandLaunch.customLoc.surfaceEvidence?.kind, 'land');
+assert.equal(africaLandLaunch.customLoc.surfaceEvidence?.elevationMeters, 284);
+await page.screenshot({ path: path.join(outputDir, 'africa-land-selection.png'), fullPage: true });
+await page.unroute('https://nominatim.openstreetmap.org/reverse?*');
+await page.unroute('https://wms.gebco.net/mapserv?*');
+
 await openSelector();
 await page.getByRole('button', { name: 'Featured Cities' }).click();
 await stubTitleLaunch();
@@ -225,6 +262,7 @@ console.log(JSON.stringify({
   tokyoCoordinates: [35.6762, 139.6503],
   oceanCoordinates: [oceanLaunch.customLoc.lat, oceanLaunch.customLoc.lon],
   surfaceOceanArrival: surfaceOceanLaunch.customLoc.arrivalMode,
+  africaLandArrival: africaLandLaunch.customLoc.arrivalMode,
   doubleClickCoordinates: [doubleClickLaunch.customLoc.lat, doubleClickLaunch.customLoc.lon],
   geolocationCoordinates: [geolocationLaunch.customLoc.lat, geolocationLaunch.customLoc.lon],
   screenshots: [
@@ -233,6 +271,7 @@ console.log(JSON.stringify({
     'output/playwright/globe-selector/selector-day-my-places.png',
     'output/playwright/globe-selector/featured-cities.png',
     'output/playwright/globe-selector/close-globe-original-imagery.png',
+    'output/playwright/globe-selector/africa-land-selection.png',
     'output/playwright/globe-selector/pacific-global-bathymetry.png'
   ]
 }, null, 2));

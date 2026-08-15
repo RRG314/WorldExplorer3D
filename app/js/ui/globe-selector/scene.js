@@ -3,7 +3,7 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
-import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=6';
+import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=7';
 
 export function createGlobeSelectorScene(options = {}) {
   const {

@@ -4,6 +4,7 @@ import {
   isPolarCryosphereLocation,
   resolveWorldSurfaceDomain
 } from '../app/js/earth-core/world-surface-domain.js';
+import { createWorldLoadPlan } from '../app/js/earth-core/world-load-plan.js';
 import {
   createLocalEnuFrame,
   geographicToLocalEnu,
@@ -42,13 +43,56 @@ assert.equal(southPole.subtype, 'ice_sheet');
 
 const openOcean = resolveWorldSurfaceDomain({
   location: { lat: 0, lon: -30 },
-  mappedWaterKind: 'open_ocean'
+  surfaceEvidence: {
+    kind: 'open_ocean',
+    verified: true,
+    source: 'gebco-elevation-sample',
+    elevationMeters: -4300
+  }
 });
 assert.equal(openOcean.kind, 'ocean');
 assert.equal(openOcean.groundMode, 'open-ocean-surface-only');
 
 const city = resolveWorldSurfaceDomain({ location: { lat: 39.2904, lon: -76.6122 } });
 assert.equal(city.kind, 'land');
+
+const inlandAfrica = resolveWorldSurfaceDomain({
+  location: { lat: 7.8939, lon: -4.9369 },
+  requestedArrivalMode: 'boat',
+  mappedWaterKind: 'open_ocean',
+  surfaceEvidence: {
+    kind: 'land',
+    verified: true,
+    source: 'gebco-elevation-sample',
+    elevationMeters: 284
+  }
+});
+assert.equal(inlandAfrica.kind, 'land');
+assert.equal(inlandAfrica.reason, 'verified-terrestrial-coordinate');
+
+const unverifiedBoatHint = resolveWorldSurfaceDomain({
+  location: { lat: 7.8939, lon: -4.9369 },
+  requestedArrivalMode: 'boat',
+  mappedWaterKind: 'open_ocean'
+});
+assert.equal(unverifiedBoatHint.kind, 'land');
+
+const arcticLand = resolveWorldSurfaceDomain({
+  location: { lat: 78.2232, lon: 15.6469 },
+  requestedArrivalMode: 'boat',
+  surfaceEvidence: {
+    kind: 'land',
+    verified: true,
+    source: 'gebco-elevation-sample',
+    elevationMeters: 43
+  }
+});
+assert.equal(arcticLand.kind, 'land');
+
+assert.equal(createWorldLoadPlan({ surfaceDomain: northPole }).id, 'cryosphere-surface-only');
+assert.equal(createWorldLoadPlan({ surfaceDomain: northPole }).loadTransport, false);
+assert.equal(createWorldLoadPlan({ surfaceDomain: openOcean }).id, 'verified-open-ocean-surface-only');
+assert.equal(createWorldLoadPlan({ surfaceDomain: inlandAfrica }).id, 'mapped-terrestrial-world');
 
 assert.equal(classifyBiomeProfile({
   latitude: -3.46,

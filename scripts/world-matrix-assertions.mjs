@@ -82,6 +82,11 @@ export function assertWorldMatrixLocation(spec, result) {
         Number(result.terrainSurface?.semanticMaterialMeshes || 0) === 1,
         `${spec.id}: polar terrain must have exactly one visible surface owner ${JSON.stringify(result.terrainSurface)}`
       );
+      assert(
+        result.worldLoad?.loadPlan?.id === 'cryosphere-surface-only' &&
+          result.worldLoad?.loadPlan?.loadTransport === false,
+        `${spec.id}: polar terrain ran the terrestrial map pipeline ${JSON.stringify(result.worldLoad?.loadPlan)}`
+      );
     }
   }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
@@ -164,6 +169,12 @@ export function assertWorldMatrixLocation(spec, result) {
     assert(
       Number(result.counts.vegetationMeshes || 0) >= Number(spec.minimumVegetationMeshes),
       `${spec.id}: expected multilayer canopy publication ${JSON.stringify(result.counts)}`
+    );
+  }
+  if (spec.minimumVegetationRenderedCrowns) {
+    assert(
+      Number(result.counts.vegetationRenderedCrowns || 0) >= Number(spec.minimumVegetationRenderedCrowns),
+      `${spec.id}: tropical canopy remained visually sparse ${JSON.stringify(result.counts)}`
     );
   }
   if (spec.minimumBuildings) {

@@ -131,7 +131,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=9";
+} from "./world/vegetation.js?v=10";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -161,7 +161,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=30";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=105";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=106";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=16";
