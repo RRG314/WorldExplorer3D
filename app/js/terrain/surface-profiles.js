@@ -702,7 +702,10 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(mat.map ? 0xffffff : TERRAIN_GRASS_COLOR_HEX);
+    // The semantic shader owns the visible developed fallback. Its input must
+    // stay neutral even when the optional grass texture is unavailable;
+    // otherwise the legacy grass hex multiplies the urban result green.
+    mat.color.setHex(0xffffff);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = 0.95;

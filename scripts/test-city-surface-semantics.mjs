@@ -134,6 +134,16 @@ assert.equal(regionalBuildingTileOwnsUrbanSurface(24), true);
 assert.equal(regionalBuildingTileOwnsUrbanSurface(23), false);
 assert.match(profileSource, /applyTerrainProfileSurfaceMaterialMix\(mesh, nextMode\)/);
 assert.match(mappedContextSource, /surfaceFallbackByTile/);
+const builtProfileBody = profileSource.slice(
+  profileSource.indexOf('} else if (nextMode === "built")'),
+  profileSource.indexOf('} else if (nextMode === "urban")')
+);
+assert.match(
+  builtProfileBody,
+  /mat\.color\.setHex\(0xffffff\)/,
+  'Developed fallback must use a neutral shader input when optional textures are unavailable.'
+);
+assert.doesNotMatch(builtProfileBody, /TERRAIN_GRASS_COLOR_HEX/);
 assert.match(
   materialBlendSource,
   /surfaceClass === TERRAIN_SURFACE_CLASS\.urban && colors[\s\S]*colors\.setXYZ\(index, 1, 1, 1\)/,

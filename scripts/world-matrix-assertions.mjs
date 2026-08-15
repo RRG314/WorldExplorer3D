@@ -101,6 +101,13 @@ export function assertWorldMatrixLocation(spec, result) {
         `${spec.id}: dense city collapsed to grass during land-cover outage ${JSON.stringify({ developed, grass })}`
       );
     }
+    if (result.terrainProfileSamples?.[0]?.mode === 'built') {
+      const detailedGround = (result.groundStackAtActor || []).find((entry) => entry?.terrain);
+      assert(
+        !detailedGround?.colors?.includes('6b8e4a'),
+        `${spec.id}: developed terrain retained the legacy grass material multiplier ${JSON.stringify(detailedGround)}`
+      );
+    }
   }
   if (Number(result.worldCover?.status?.ready || 0) > 0) {
     assert(

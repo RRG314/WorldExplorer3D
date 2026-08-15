@@ -317,6 +317,26 @@ async function loadLocation(page, spec) {
     for (const mesh of ctx.terrainGroup?.children || []) {
       if (!mesh?.userData?.isTerrainMesh) continue;
       const profile = mesh.userData?.terrainVisualProfile || {};
+      const mixA = mesh.geometry?.attributes?.terrainSurfaceMixA;
+      const mixB = mesh.geometry?.attributes?.terrainSurfaceMixB;
+      const materialMix = { grass: 0, urban: 0, sand: 0, forest: 0, soil: 0, rock: 0, snow: 0 };
+      if (mixA && mixB) {
+        for (let index = 0; index < mixA.count; index += 1) {
+          const urban = Math.max(0, Number(mixA.getX(index) || 0));
+          const sand = Math.max(0, Number(mixA.getY(index) || 0));
+          const forest = Math.max(0, Number(mixA.getZ(index) || 0));
+          const soil = Math.max(0, Number(mixA.getW(index) || 0));
+          const rock = Math.max(0, Number(mixB.getX(index) || 0));
+          const snow = Math.max(0, Number(mixB.getY(index) || 0));
+          materialMix.urban += urban;
+          materialMix.sand += sand;
+          materialMix.forest += forest;
+          materialMix.soil += soil;
+          materialMix.rock += rock;
+          materialMix.snow += snow;
+          materialMix.grass += Math.max(0, 1 - urban - sand - forest - soil - rock - snow);
+        }
+      }
       const mode = String(profile.mode || 'unknown');
       const visualMode = String(profile.visualMode || mode);
       const reason = String(profile.reason || 'unknown');
@@ -329,10 +349,39 @@ async function loadLocation(page, spec) {
         visualMode,
         reason,
         distance: Number(Math.hypot(Number(mesh.position?.x || 0) - actorX, Number(mesh.position?.z || 0) - actorZ).toFixed(1)),
-        localSignals: profile.localSignals || null
+        localSignals: profile.localSignals || null,
+        materialMix
       });
     }
     terrainProfileSamples.sort((a, b) => a.distance - b.distance);
+
+    const groundStackAtActor = [];
+    const groundCandidates = [
+      ...(ctx.terrainGroup?.children || []),
+      ...(ctx.landuseMeshes || []),
+      ctx.ground
+    ].filter((mesh, index, values) => mesh?.isMesh && values.indexOf(mesh) === index);
+    for (const mesh of groundCandidates) {
+      if (mesh.visible === false || !mesh.geometry) continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox?.();
+      if (!mesh.geometry.boundingBox) continue;
+      mesh.updateWorldMatrix?.(true, false);
+      const bounds = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+      if (actorX < bounds.min.x - 1 || actorX > bounds.max.x + 1 ||
+          actorZ < bounds.min.z - 1 || actorZ > bounds.max.z + 1) continue;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      groundStackAtActor.push({
+        name: String(mesh.name || ''),
+        landuseType: String(mesh.userData?.landuseType || ''),
+        terrain: !!mesh.userData?.isTerrainMesh,
+        loadingPlaceholder: !!mesh.userData?.isGroundPlane,
+        renderOrder: Number(mesh.renderOrder || 0),
+        minY: Number(bounds.min.y.toFixed(3)),
+        maxY: Number(bounds.max.y.toFixed(3)),
+        colors: materials.map((material) => material?.color?.getHexString?.() || null),
+        maps: materials.map((material) => String(material?.map?.name || material?.map?.source?.data?.currentSrc || ''))
+      });
+    }
 
     const landusePresentation = {};
     for (const mesh of ctx.landuseMeshes || []) {
@@ -1194,6 +1243,7 @@ async function loadLocation(page, spec) {
       terrainProfiles,
       terrainVisualModes,
       terrainProfileSamples: terrainProfileSamples.slice(0, 5),
+      groundStackAtActor,
       worldCover: {
         stats: ctx.worldCoverStats ? JSON.parse(JSON.stringify(ctx.worldCoverStats)) : null,
         provider: ctx.getWorldCoverProviderSnapshot?.() || null,
