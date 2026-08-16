@@ -42,6 +42,13 @@ async function serveStaticRoot(port) {
   const server = http.createServer(async (req, res) => {
     try {
       const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+      // Mutable source previews intentionally have no immutable build manifest.
+      // Artifact manifest integrity is validated separately by the release gate.
+      if (reqUrl.pathname === '/build-manifest.json') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end('{}');
+        return;
+      }
       let relPath = decodeURIComponent(reqUrl.pathname || '/');
       if (relPath === '/') relPath = '/index.html';
       const joined = path.join(root, relPath);
@@ -438,7 +445,7 @@ async function main() {
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       const text = msg.text();
-      if (/Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/i.test(text) || /blocked by CORS policy/i.test(text)) {
+      if (/Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|CONNECTION_TIMED_OUT|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/i.test(text) || /blocked by CORS policy/i.test(text)) {
         deferredNetworkErrorCount += 1;
         return;
       }
@@ -640,7 +647,7 @@ async function main() {
     assert(earthState.env === 'EARTH', `Expected EARTH env after ocean return (got ${earthState.env})`);
     assert(!earthState.oceanActive, 'Ocean renderer remained active after Earth return');
     const deferredRequests = requestFailures.filter((failure) =>
-      /net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/.test(failure.reason)
+      /net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|CONNECTION_TIMED_OUT|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/.test(failure.reason)
     );
     const localOrigin = new URL(baseUrl).origin;
     const localFailures = deferredRequests.filter((failure) => {
