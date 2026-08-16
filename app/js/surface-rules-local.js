@@ -3,12 +3,28 @@ export function denseSettlementOwnsUrbanSurface({
   roads = 0,
   greenLanduses = 0,
   urbanRatio = 0,
+  grassRatio = 0,
   waterRatio = 0
 } = {}) {
-  return Number(greenLanduses) === 0 &&
-    Number(buildings) >= 20 &&
-    Number(roads) >= 8 &&
-    Number(urbanRatio) >= 0.28 &&
+  const mappedBuildings = Number(buildings);
+  const mappedRoads = Number(roads);
+  const sampledUrbanRatio = Number(urbanRatio);
+  const sampledGrassRatio = Number(grassRatio);
+  const locallyUrban =
+    mappedBuildings >= 20 &&
+    mappedRoads >= 8 &&
+    sampledUrbanRatio >= 0.28;
+  // The 5x5 surface sampler can miss narrow footprints. Strong mapped density
+  // still needs sampled hardscape, while exact green and water retain vetoes.
+  const regionallyDense =
+    mappedBuildings >= 100 &&
+    mappedRoads >= 20 &&
+    sampledUrbanRatio >= 0.05;
+  const mappedGreenDominates =
+    Number(greenLanduses) > 0 &&
+    sampledGrassRatio > sampledUrbanRatio * 1.25;
+  return !mappedGreenDominates &&
+    (locallyUrban || regionallyDense) &&
     Number(waterRatio) < 0.45;
 }
 

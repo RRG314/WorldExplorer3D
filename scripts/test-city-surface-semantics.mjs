@@ -124,12 +124,42 @@ assert.equal(denseSettlementOwnsUrbanSurface({
   waterRatio: 0.08
 }), true, 'Dense mapped city blocks must not fall back to grass during a WorldCover outage.');
 assert.equal(denseSettlementOwnsUrbanSurface({
+  buildings: 565,
+  roads: 110,
+  greenLanduses: 0,
+  urbanRatio: 0.1772,
+  waterRatio: 0
+}), true, 'Strong regional building and road density must preserve urban continuity during a WorldCover outage.');
+assert.equal(denseSettlementOwnsUrbanSurface({
+  buildings: 40,
+  roads: 12,
+  greenLanduses: 0,
+  urbanRatio: 0.1772,
+  waterRatio: 0
+}), false, 'Sparse settlements must not use the lower regional-density urban threshold.');
+assert.equal(denseSettlementOwnsUrbanSurface({
+  buildings: 565,
+  roads: 110,
+  greenLanduses: 0,
+  urbanRatio: 0.049,
+  waterRatio: 0
+}), false, 'Regional density still requires sampled hardscape evidence.');
+assert.equal(denseSettlementOwnsUrbanSurface({
   buildings: 603,
   roads: 228,
   greenLanduses: 1,
   urbanRatio: 0.4816,
+  grassRatio: 0.7,
   waterRatio: 0.08
-}), false, 'Mapped green landuse must override dense-settlement fallback.');
+}), false, 'Mapped green landuse must override dense-settlement fallback when green coverage dominates.');
+assert.equal(denseSettlementOwnsUrbanSurface({
+  buildings: 395,
+  roads: 84,
+  greenLanduses: 1,
+  urbanRatio: 0.434,
+  grassRatio: 0.08,
+  waterRatio: 0
+}), true, 'A small mapped green area must not turn a strongly developed tile into grass.');
 assert.equal(regionalBuildingTileOwnsUrbanSurface(24), true);
 assert.equal(regionalBuildingTileOwnsUrbanSurface(23), false);
 assert.match(profileSource, /applyTerrainProfileSurfaceMaterialMix\(mesh, nextMode\)/);

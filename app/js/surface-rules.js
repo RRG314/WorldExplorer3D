@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import {
   createLocalSurfaceAnalysisApi,
   denseSettlementOwnsUrbanSurface
-} from "./surface-rules-local.js?v=2";
+} from "./surface-rules-local.js?v=3";
 import { classifyBiomeProfile } from "./earth-core/biome-profile.js?v=1";
 
 const POLAR_SNOW_LAT_THRESHOLD = 66;
@@ -303,6 +303,7 @@ function classifyTerrainSurfaceProfile({
     roads: localSignals.candidates.roads,
     greenLanduses: localSignals.candidates.greenLanduses,
     urbanRatio: norm.urban,
+    grassRatio: norm.grass,
     waterRatio: norm.water
   });
   const useBuilt = !useSnow && !useSand && !useRock &&
