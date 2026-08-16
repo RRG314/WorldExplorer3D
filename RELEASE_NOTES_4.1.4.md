@@ -25,6 +25,17 @@ add a competing terrain, water, road, or building pipeline.
   request, selected location, scene root, travel mode, and aircraft pose.
 - Space controls retain their screen-relative direction through repeated world-
   axis crossings, and Space remains lazy-loaded outside normal Earth startup.
+- DeFlock Hunt is the first Missions and Games entry. It uses publicly mapped
+  OpenStreetMap surveillance nodes, keeps mapped mount/height placement, makes
+  objectives legible in the world and maps, and supports fictional virtual
+  disabling without affecting physical equipment.
+- Live GPS Explore follows foreground browser geolocation inside the existing
+  fixed world. Accuracy filtering, jump rejection, smoothing, low-power mode,
+  pause/manual control, and bounded edge behavior avoid turning Earth into a
+  continuously streamed world.
+- Brighter environment limits, compact gameplay HUDs, smoother vehicle/camera
+  motion, supported elevated roads, graded ramp transitions, and enclosed
+  tunnel presentation improve normal exploration as well as location games.
 
 ## Loading and budgets
 
@@ -55,6 +66,19 @@ the Swiss Alps, the Sahara, Antarctica, Lake Tahoe, and open Atlantic ocean.
 The reviewed frames retain terrain/building continuity to the horizon without
 the former blue square, blank ground, stars through land, striping, or
 categorical WorldCover tile blocks.
+
+The production-config hosting artifact also passed bundled-browser startup,
+real keyboard driving, and the complete Live GPS/DeFlock mobile journey. The
+phone-tested GPS session kept one world identity while physical location
+updates moved the avatar.
+
+## Data and attribution
+
+DeFlock Hunt uses OpenStreetMap surveillance nodes under the ODbL and displays
+`© OpenStreetMap contributors`. The concept is inspired by the independent
+[DeFlock project](https://deflock.org/); World Explorer 3D is unaffiliated with
+DeFlock and uses neither its application code nor a DeFlock-owned data feed.
+See [DATA_SOURCES.md](DATA_SOURCES.md) and [ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## Compatibility and limitations
 

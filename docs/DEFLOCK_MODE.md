@@ -41,6 +41,12 @@ is never presented as current live data or used as a second authority.
 Required attribution: `© OpenStreetMap contributors` under the ODbL. The game
 help surface links to [OpenStreetMap copyright and licensing](https://www.openstreetmap.org/copyright).
 
+The game concept is inspired by the independent
+[DeFlock project](https://deflock.org/), which helps people document public
+surveillance infrastructure in OpenStreetMap. World Explorer 3D is not
+affiliated with or endorsed by DeFlock and does not use DeFlock application
+code or a DeFlock-owned data feed.
+
 ## Game representation
 
 Each source node is transformed with the canonical Earth geographic-to-world
@@ -111,32 +117,3 @@ DeFlock Hunt does not collect license plates, vehicle photographs, live reader
 results, or driver data. It contains no instructions for approaching,
 damaging, obstructing, or modifying physical equipment. All interaction is a
 fictional in-game action.
-
-## Focused verification
-
-Use these focused gates while changing the mode:
-
-```bash
-npm run test:deflock-model
-npm run test:deflock-multiplayer
-npm run test:deflock-browser
-npm run smoke:deflock-live
-npm run test:rules
-npm run test:gameplay-plugins
-npm run test:mobile-controls
-npm run test:css
-npm run test:module-versions
-```
-
-`test:deflock-browser` launches installed Google Chrome, intercepts only the
-DeFlock Overpass query with `scripts/fixtures/deflock-surveillance.json`, and
-checks the Missions launch, placement, direction, terrain height, discovery,
-virtual disabling, reload persistence, maps, Earth lifecycle, cleanup, and an
-iPhone-sized touch journey. Its screenshots and report are written under
-`output/playwright/deflock-browser/`.
-
-With the local preview running on port 4192, `smoke:deflock-live` performs an
-unmocked Baltimore launch through the same-origin service, approaches a live
-mapped camera, virtually disables it, and writes its report and screenshot to
-`output/playwright/deflock-live/`. This smoke depends on current external OSM
-provider availability and is intentionally separate from deterministic gates.

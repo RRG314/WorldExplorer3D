@@ -171,7 +171,12 @@
     "webgl",
     "threejs",
     "browser-app",
-    "world-exploration"
+    "world-exploration",
+    "web-game",
+    "location-based-game",
+    "gps",
+    "multiplayer",
+    "surveillance-awareness"
   ],
   "author": "Steven Reid",
   "license": "SEE LICENSE IN LICENSE",

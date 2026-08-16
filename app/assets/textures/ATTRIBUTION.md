@@ -14,6 +14,14 @@
 - `uranus_jpl.jpg`: JPL/Caltech Uranus map. JPL documents it as a synthesized solid atmospheric color because available global detail is limited. Source: https://space.jpl.nasa.gov/tmaps/uranus.html
 - `neptune_jpl.jpg`: Don Davis/JPL-Caltech synthesized Neptune cloud map for NASA 3D resources. It is documented by NASA as fictional. Source: https://science.nasa.gov/3d-resources/neptune/
 
+## Destination UI Thumbnails
+
+- `ui-thumbnails/earth.jpg`: Local 256 px crop derived from `earth_atmos_2048.jpg` above.
+- `ui-thumbnails/moon.jpg`: Local 256 px crop derived from `moon_lroc_2048.jpg` above.
+- `ui-thumbnails/mars.jpg`: Local 256 px crop derived from `mars_viking_4096.jpg` above.
+- `ui-thumbnails/space.jpg`: Local 256 px crop of NASA/JPL-Caltech's GALEX and Spitzer Andromeda composite. Source: https://www.jpl.nasa.gov/images/pia08787-amazing-andromeda-galaxy/
+- `ui-thumbnails/ocean.png`: Local crop from a World Explorer 3D gameplay capture; underlying Earth map and bathymetry attribution remains OpenStreetMap and GEBCO as documented in the repository attribution index.
+
 ## Universe Observations
 
 - `universe/sun-sdo-2025.jpg`: NASA/GSFC Solar Dynamics Observatory image of the Sun, observed September 10, 2025. Source: https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/

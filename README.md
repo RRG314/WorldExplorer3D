@@ -33,6 +33,7 @@ Highlights:
 - Enterable buildings using mapped indoor geometry where available and footprint-aware generated interiors elsewhere.
 - Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
 - [DeFlock Hunt](docs/DEFLOCK_MODE.md), a virtual single-player and cooperative mode built from publicly mapped OpenStreetMap surveillance nodes.
+- Live GPS Explore, an optional foreground-only mode that follows a player's physical location inside one bounded, fixed world without continuous-world streaming.
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
 
@@ -114,7 +115,7 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
 - [DeFlock Hunt](docs/DEFLOCK_MODE.md)
-- [Regression ledger](docs/REGRESSION_LEDGER.md)
+- [Data sources and attribution](DATA_SOURCES.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
