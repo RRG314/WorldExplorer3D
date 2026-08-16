@@ -152,7 +152,10 @@ async function waitFor(page, predicateSource, timeout = 20000) {
 
 async function settleVisualFrame(page) {
   await page.evaluate(async () => {
-    await document.fonts?.ready;
+    await Promise.race([
+      document.fonts?.ready || Promise.resolve(),
+      new Promise((resolve) => window.setTimeout(resolve, 5000))
+    ]);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
   await page.waitForTimeout(500);
@@ -589,7 +592,7 @@ async function runAudit(page, baseUrl) {
 }
 
 function assertReport(report) {
-  if (report.builder.visual?.shapeControls !== 4) throw new Error('Builder shape controls are incomplete.');
+  if (report.builder.visual?.shapeControls !== 14) throw new Error('Builder shape controls are incomplete.');
   if (report.builder.visual?.colorControls !== 8) throw new Error('Builder color controls are incomplete.');
   if (report.builder.visual?.maxCount !== 200) throw new Error('Builder limit is not 200 blocks.');
   if (report.builder.visual?.placed?.some((placed) => placed !== true)) throw new Error('A builder shape did not render.');

@@ -299,6 +299,12 @@ Vegetation combines mapped natural/land-use areas and semantic land-cover eviden
 
 The world includes mapped POIs, historic sites, street furniture, public overlays, activity markers, memory markers, navigation markers, and gameplay markers. POI categories include education, healthcare, emergency services, food, shopping, culture, historic places, parks, parking, fuel, banks, postal services, hotels, recreation, and tourism.
 
+### 7.9 Living World derivation
+
+After one fixed Earth world publishes, a disposable Living World runtime derives a bounded entrance catalog, pedestrian graph, directed traffic graph, façade-depth batches, and procedural ambient populations from that publication. Mapped facts take precedence; inferred entrances, sidewalks, and crossings carry explicit inferred provenance. The traffic graph reuses the accepted transport surface for bridge, ramp, elevated-road, tunnel, and underpass heights.
+
+Pedestrians and vehicles are pooled instanced presentations updated at 10 Hz with distance-based work reduction and quality-tier caps. They are simulated game ambience, not observed people or live traffic. The runtime never requests provider data because an actor or the player moved, and it is disposed on world replacement.
+
 ## 8. Rendering, lighting, and visual systems
 
 ### 8.1 Rendering ownership
@@ -445,7 +451,7 @@ Fishing is available from a stopped surface boat. It has casting, wait/bite timi
 
 ### 11.5 Block builder
 
-The builder supports four primitive shapes, eight colors, a 0.5 m vertical grid, click/touch placement, removal, collision, a 200-piece cap, local persistence with backup, and Firestore room synchronization.
+The builder supports 14 safe architectural pieces (cube, slab, ramp, column, wall, floor, roof, window, door, storefront, glass wall, stairs, fence, and sign), eight colors, a 0.5 m vertical grid, click/touch placement, removal, rotation, collision/surface behavior, a 200-piece cap, local persistence with backup, and Firestore room synchronization. Glass-like pieces use an opaque reflective approximation to avoid transparent-overdraw growth.
 
 ### 11.6 Activities
 
@@ -478,6 +484,12 @@ Supported contribution types are place information, artifact marker, building no
 ### 12.4 Memories and tracks
 
 Players can create local memory markers such as pins/flowers and record a custom movement track. Memory and builder stores use primary-plus-backup local storage so a corrupt primary record can recover from the backup.
+
+### 12.5 Local and room-scoped alternate worlds
+
+Edit This World composes a fictional modification layer over the immutable fixed-world snapshot. Local worlds are keyed by stable rounded geographic identity and store bounded base-building suppressions, safe semantic objects, revisions, and history with primary/backup recovery. Removing a mapped building is virtual: it suppresses rendering/collision/entrance/navigation participation during the normal compile and never changes OpenStreetMap, Overture, or other source data. Restore-by-source-ID and Restore Base World recover the original generated world.
+
+In multiplayer rooms, the same concept uses `worldModifications` documents and optimistic Firestore transactions. Owners/moderators can suppress or restore base buildings and reset the room world; joined builders can create/update/delete their own allowlisted objects; visitors cannot write. Shared room state takes precedence while joined and late clients converge through the room listener. Moderated public overlays remain separate and are not created by this feature.
 
 ## 13. Destination environments
 
@@ -595,6 +607,7 @@ rooms/{roomId}
   activities/{activityId}
   activityState/{stateId}
   blocks/{blockId}
+  worldModifications/{modificationId}
   paintClaims/{claimId}
   deflockStates/{cameraId}
   state/{stateId}
@@ -686,6 +699,7 @@ The browser stores bounded local preferences or progress for:
 - fishing catch history;
 - Flower/other local leaderboard views and player name;
 - Paint Town color preference.
+- editable-world semantic deltas and backup, scoped by fixed geographic identity.
 
 Local data is device/browser-specific and can be removed by clearing site data. Shared or account data belongs in Firestore, not local storage.
 

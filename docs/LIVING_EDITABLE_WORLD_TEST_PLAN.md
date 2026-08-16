@@ -1,8 +1,18 @@
 # Living World and Editable World Test Plan
 
-Status: implementation plan  
+Status: Stages 0–G passed; Stage H final candidate verification in progress
 Production deployment: blocked until all gates pass and the user explicitly approves  
 Final handoff: one immutable local candidate URL, desktop and phone instructions, and retained test evidence
+
+Measured implementation summary (2026-08-16):
+
+- selected Character C / Car D / boat / plane / spacecraft mesh budgets pass;
+- façade, navigation, population, local delta, room revision, Firestore security, and module contracts pass;
+- real Baltimore suppress → rebuild → page reload → restore journey passes;
+- five-location performance matrix passes at a 16.7 ms median with zero providers in flight;
+- Living World adds eight draw calls and 9,072 triangles in the balanced Baltimore sample;
+- deterministic v4.2.0 comparison passes (0.980 cold ratio, 1.062 warm ratio; limit 1.10);
+- DeFlock, Live GPS, mobile, tunnels, interiors, editor, and two-client multiplayer browser journeys pass.
 
 ## What the final test build must contain
 

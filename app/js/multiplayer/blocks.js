@@ -148,6 +148,23 @@ async function clearMySharedBlocks(roomId, options = {}) {
   return count;
 }
 
+async function clearRoomSharedBlocks(roomId, options = {}) {
+  const { db } = getServices();
+  requireSignedInUser();
+  const normalizedRoomId = normalizeCode(roomId);
+  if (!normalizedRoomId) throw new Error('Invalid room code.');
+  const resultLimit = Math.max(1, Math.min(1000, Math.floor(Number(options.resultLimit || BLOCKS_RESULT_LIMIT))));
+  const snap = await getDocs(query(
+    collection(db, ROOM_COLLECTION, normalizedRoomId, BLOCKS_COLLECTION),
+    limit(resultLimit)
+  ));
+  if (snap.empty) return 0;
+  const batch = writeBatch(db);
+  snap.forEach((blockSnap) => batch.delete(blockSnap.ref));
+  await batch.commit();
+  return snap.size;
+}
+
 function listenSharedBlocks(roomId, callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
   const normalizedRoomId = normalizeCode(roomId);
@@ -191,6 +208,7 @@ function listenSharedBlocks(roomId, callback, options = {}) {
 
 export {
   clearMySharedBlocks,
+  clearRoomSharedBlocks,
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock

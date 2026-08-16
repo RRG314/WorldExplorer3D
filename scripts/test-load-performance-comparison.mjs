@@ -110,6 +110,17 @@ async function runBuild(context, baseUrl, build, cacheState) {
   }
 }
 
+async function clearHttpCache(context) {
+  const page = await context.newPage();
+  try {
+    const session = await context.newCDPSession(page);
+    await session.send('Network.clearBrowserCache');
+    await session.detach();
+  } finally {
+    await page.close();
+  }
+}
+
 try {
   await fs.mkdir(referenceRoot, { recursive: true });
   execFileSync('git', ['archive', '--format=tar', referenceTag, '-o', archivePath], {
@@ -121,25 +132,30 @@ try {
   referenceServer = await startStaticRootServer({
     rootDir: referenceRoot,
     host: '127.0.0.1',
-    candidatePorts: [4250, 4251, 4252]
+    candidatePorts: [4250]
   });
+  browser = await chromium.launchPersistentContext(path.join(temporaryRoot, 'browser-profile'), { headless: true });
+  const referenceUrl = `http://127.0.0.1:${referenceServer.port}`;
+
+  // Prime IndexedDB-backed provider caches once, then serve both revisions from
+  // the exact same origin and profile. Clearing only the HTTP cache between
+  // revisions prevents old app modules from leaking into the candidate while
+  // keeping provider inputs identical and removing external-response variance.
+  await runBuild(browser, referenceUrl, 'reference', 'provider-prime');
+  await clearHttpCache(browser);
+  const referenceCold = await runBuild(browser, referenceUrl, 'reference', 'cold');
+  const referenceWarm = await runBuild(browser, referenceUrl, 'reference', 'warm');
+  await referenceServer.close();
+  referenceServer = null;
   candidateServer = await startStaticRootServer({
     rootDir: candidateRoot,
     host: '127.0.0.1',
-    candidatePorts: [4253, 4254, 4255]
+    candidatePorts: [4250]
   });
-  browser = await chromium.launch({ headless: true });
-  const referenceContext = await browser.newContext();
-  const candidateContext = await browser.newContext();
-  const referenceUrl = `http://127.0.0.1:${referenceServer.port}`;
+  await clearHttpCache(browser);
   const candidateUrl = `http://127.0.0.1:${candidateServer.port}`;
-
-  const referenceCold = await runBuild(referenceContext, referenceUrl, 'reference', 'cold');
-  const candidateCold = await runBuild(candidateContext, candidateUrl, 'candidate', 'cold');
-  const referenceWarm = await runBuild(referenceContext, referenceUrl, 'reference', 'warm');
-  const candidateWarm = await runBuild(candidateContext, candidateUrl, 'candidate', 'warm');
-  await referenceContext.close();
-  await candidateContext.close();
+  const candidateCold = await runBuild(browser, candidateUrl, 'candidate', 'cold');
+  const candidateWarm = await runBuild(browser, candidateUrl, 'candidate', 'warm');
 
   const comparisons = {
     coldLoadRatio: ratio(candidateCold.loadMs, referenceCold.loadMs),
@@ -171,6 +187,13 @@ try {
       `${run.build} ${run.cacheState} retained provider work`
     );
     assert.deepEqual(run.consoleErrors, [], `${run.build} ${run.cacheState} emitted console errors`);
+  }
+  for (const [candidateRun, referenceRun, label] of [
+    [candidateCold, referenceCold, 'cold'],
+    [candidateWarm, referenceWarm, 'warm']
+  ]) {
+    assert.ok(Math.abs(ratio(candidateRun.counts?.roads, referenceRun.counts?.roads) - 1) <= 0.02, `${label} comparison used materially different road inputs`);
+    assert.ok(Math.abs(ratio(candidateRun.counts?.buildings, referenceRun.counts?.buildings) - 1) <= 0.02, `${label} comparison used materially different building inputs`);
   }
   assert.ok(
     comparisons.coldLoadRatio <= allowedRatio,

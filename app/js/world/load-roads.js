@@ -167,6 +167,7 @@ export function createWorldRoadLoader(deps = {}) {
     pointInPolygon: deps.pointInPolygon
   });
   async function loadRoadsInternal(retryPass = 0) {
+    await appCtx.ensureEditableWorldRuntime?.();
     const session = createWorldLoadRuntimeSession({
       appCtx,
       clearBuildingSpatialIndex,

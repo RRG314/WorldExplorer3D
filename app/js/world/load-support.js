@@ -96,6 +96,9 @@ export async function finalizeLoadedWorld(options = {}) {
   if (typeof appCtx.refreshBlockBuilderForCurrentLocation === 'function') {
     runFinalStep('refreshBlockBuilderForCurrentLocation', () => appCtx.refreshBlockBuilderForCurrentLocation());
   }
+  if (typeof appCtx.refreshEditableWorldPresentation === 'function') {
+    runFinalStep('refreshEditableWorldPresentation', () => appCtx.refreshEditableWorldPresentation());
+  }
   if (typeof appCtx.refreshApprovedEditorContributions === 'function') {
     runFinalStep('refreshApprovedEditorContributions', () => appCtx.refreshApprovedEditorContributions());
   }

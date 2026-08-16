@@ -95,6 +95,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       world: appCtx.geoToWorld(landmark.lat, landmark.lon)
     }));
   const waterAreaIndex = createWaterAreaSpatialIndex(appCtx.waterAreas);
+  const suppressedBuildingIds = new Set(appCtx.getSuppressedEditableBuildingIds?.() || []);
 
   showLoad(`Loading buildings... (${buildingWays.length})`);
   startLoadPhase('buildBuildingGeometry');
@@ -142,6 +143,11 @@ export async function buildBuildingGeometryPass(options = {}) {
   };
   for (let buildingIndex = 0; buildingIndex < buildingWays.length; buildingIndex += 1) {
     const way = buildingWays[buildingIndex];
+    const knownSourceBuildingId = String(way?.tags?._sourceFeatureId || way?.id || '');
+    if (knownSourceBuildingId && suppressedBuildingIds.has(knownSourceBuildingId)) {
+      loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
+      continue;
+    }
     try {
     loadMetrics.buildingPublication.candidates += 1;
     const pts = measureBuildingPhase('footprintPreparation', () => {
@@ -297,6 +303,10 @@ export async function buildBuildingGeometryPass(options = {}) {
       way.id ||
       `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`
     );
+    if (!knownSourceBuildingId && suppressedBuildingIds.has(sourceBuildingId)) {
+      loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
+      continue;
+    }
     const roadCorridorOverlap = measureBuildingPhase('apronClassification', () => {
       const expandedFootprint = expandFootprintForGroundApron(pts);
       const roadCorridorStats = sampleFootprintCoverage(expandedFootprint, pointOnRoadCorridor);

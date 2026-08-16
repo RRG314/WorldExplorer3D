@@ -317,6 +317,20 @@ initWorldNavigation({
   sampleFeatureSurfaceY,
   tryAutoEnterBoatAt
 });
+let editableWorldRuntimePromise = null;
+appCtx.ensureEditableWorldRuntime = () => {
+  if (typeof appCtx.getSuppressedEditableBuildingIds === 'function') return Promise.resolve(true);
+  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=1')
+    .then(({ initEditableWorldRuntime }) => {
+      initEditableWorldRuntime(appCtx);
+      return true;
+    })
+    .catch((error) => {
+      editableWorldRuntimePromise = null;
+      throw error;
+    });
+  return editableWorldRuntimePromise;
+};
 initWorldBudgets({
   getPerfModeValue,
   limitNodesByDistance,

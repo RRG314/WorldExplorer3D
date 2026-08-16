@@ -52,6 +52,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (typeof state.unsubRoomActivities === "function") state.unsubRoomActivities();
     if (typeof state.unsubRoomActivityState === "function") state.unsubRoomActivityState();
     if (typeof state.unsubSharedBlocks === "function") state.unsubSharedBlocks();
+    if (typeof state.unsubWorldModifications === "function") state.unsubWorldModifications();
     if (typeof state.unsubHomeBase === "function") state.unsubHomeBase();
     if (typeof state.unsubPaintClaims === "function") state.unsubPaintClaims();
     state.unsubRoom = null;
@@ -61,6 +62,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.unsubRoomActivities = null;
     state.unsubRoomActivityState = null;
     state.unsubSharedBlocks = null;
+    state.unsubWorldModifications = null;
     state.unsubHomeBase = null;
     state.unsubPaintClaims = null;
   }
@@ -282,6 +284,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (typeof appCtx.setSharedBuildEntries === "function") {
       appCtx.setSharedBuildEntries([]);
     }
+    appCtx.configureSharedEditableWorld?.({ enabled: false });
     await stopPresence();
     if (!localOnly) {
       await leaveRoom();

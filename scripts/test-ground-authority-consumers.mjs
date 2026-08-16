@@ -8,6 +8,10 @@ const allowedRawConsumers = new Set([
   // The fixed far-world renderer is an authorized lower-resolution horizon
   // consumer. It never owns mapped water semantics or near collision ground.
   'terrain/far-field.js',
+  // Geometry sampling was split from the authorized far-field owner in v4.2;
+  // it receives the private sampler by dependency injection and cannot publish
+  // or replace the accepted near-ground authority.
+  'terrain/far-field-geometry.js',
   'terrain/location-world.js',
   // The request lifecycle receives the private loader as an injected
   // dependency solely to coordinate retries, timeouts, and cancellation. It

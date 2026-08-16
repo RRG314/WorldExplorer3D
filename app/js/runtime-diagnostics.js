@@ -488,6 +488,8 @@ globalThis.render_game_to_text = () => JSON.stringify({
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
+  livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
+  editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

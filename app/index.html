@@ -23,7 +23,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=93">
-<link rel="stylesheet" href="styles/block-builder.css?v=2">
+<link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
 <link rel="stylesheet" href="styles/interface-v4.css?v=16">
@@ -1015,7 +1015,7 @@ Explore the area
 <div class="floatMenu" id="realEstateMenu">
 <button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Build, land, and property" data-mobile-label="Build"><span class="btnIcon">🏘️</span><span class="btnText">Land &amp; Property</span></button>
 <div class="floatItems">
-<div class="floatItem" id="fEditorMode">🧱 Build with Blocks</div>
+<div class="floatItem" id="fEditorMode">🏗️ Edit This World</div>
 <div class="floatItem" id="fEditorMine" hidden>📬 My Submissions</div>
 <div class="floatItem" id="fModerationPanel" hidden>🛡️ Review Queue</div>
 <div class="floatItem" id="fRealEstate">🏘️ Land &amp; Property</div>
@@ -1505,9 +1505,19 @@ Explore the area
 </div>
 <aside id="blockBuilderPanel" aria-label="Build with Blocks" aria-hidden="true">
   <header class="blockBuilderHeader">
-    <strong>Build with Blocks</strong>
+    <strong>Edit This World</strong>
     <button id="blockBuilderClose" type="button" aria-label="Close builder" title="Close builder">×</button>
   </header>
+  <p class="blockBuilderTruthNote">Creates a virtual alternate version on this device or in this room. It never changes OpenStreetMap, Overture, or real-world data.</p>
+  <section class="editableWorldBuildingTools" aria-label="Mapped building tools">
+    <strong>Mapped building</strong>
+    <div class="blockBuilderActions">
+      <button id="editableWorldSelectBuilding" type="button">Select Nearby</button>
+      <button id="editableWorldSuppressBuilding" type="button">Remove Virtually</button>
+      <button id="editableWorldRestoreBuilding" type="button">Restore</button>
+    </div>
+    <div id="editableWorldSelection" aria-live="polite">No mapped building selected.</div>
+  </section>
   <div class="blockBuilderTools" role="group" aria-label="Build tool">
     <button type="button" data-block-tool="place">Place</button>
     <button type="button" data-block-tool="remove">Remove</button>
@@ -1520,6 +1530,7 @@ Explore the area
   <div class="blockBuilderActions">
     <button id="blockBuilderUndo" type="button">Undo</button>
     <button id="blockBuilderClear" type="button">Clear</button>
+    <button id="editableWorldReset" type="button">Restore Base World</button>
   </div>
   <div class="blockBuilderMapActions">
     <a id="blockBuilderOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">Improve map in OSM</a>

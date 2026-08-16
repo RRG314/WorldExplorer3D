@@ -1,6 +1,6 @@
 # Living World and Editable World Architecture/R&D Report
 
-Status: architecture gate; implementation has not started  
+Status: implemented local test candidate; final Stage H release verification in progress
 Audit date: 2026-08-16  
 Audited branch/commit: `stable` / `74f1a47`  
 Product version at audit: `4.2.1`
@@ -602,3 +602,15 @@ Implementation may start only from these decisions:
 - production remains undeployed until Stage H and explicit approval.
 
 This report completes the requested pre-implementation architecture gate. It does not authorize skipping any stage-level tests or the final release verification.
+
+## 14. Implemented result and measured limits
+
+Stages 0–G are implemented on the local `steven/living-editable-world` branch. The fixed-world invariant remains intact: Living World derives immutable entrances, pedestrian/traffic graphs, façade presentation, and pooled agents only after an accepted `WorldSnapshot` publishes. Ordinary movement performs no provider query and no whole-road scan. Reload disposes the derived runtime before the next world owns the scene.
+
+The local editable layer persists compact, schema-versioned deltas keyed by fixed geographic identity. Building suppression uses stable OSM/Overture source identity during normal building compilation and never mutates provider records. A single suppression Set is compiled per load. Primary/backup recovery, optimistic revision checks, bounded history, restore-by-ID after page reload, and Restore Base World are implemented. Room-scoped modifications use Firestore transactions, manager-only base suppression/reset, member-owned safe objects, bounded transforms/catalogs/history, and listener convergence. Public moderated overlays remain a separate system.
+
+The accepted balanced-tier Baltimore measurement publishes 112 inferred entrances, 164 entrance links, 24 pedestrians, and 14 vehicles at a 10 Hz simulation rate. Presentation adds eight draw calls and 9,072 triangles with no per-window transparency. The adaptive performance tier uses 56 entrances, 12 pedestrians, and 8 vehicles. The five-location Manhattan/Baltimore/Monaco/suburban/rural run held a 16.7 ms median frame time and drained every provider before gameplay sampling.
+
+The deterministic v4.2.0 comparison primes provider caches once and gives both revisions the same inputs. The candidate measured 2.0% faster cold and 6.2% slower warm, inside the 10% load budget; bootstrapping was faster in both samples. Warm heap was 6.2% above the reference. Raw dense-city Chrome heap samples ranged roughly 0.8–1.82 GB across sequential real-provider loads, so total process memory must not be attributed to the eight-call Living World layer without a post-GC/component-isolated measurement.
+
+Current intentional limits: populations are procedural simulations, not live observations; mapped entrance coverage is used when present but current sampled cities relied on labeled deterministic inference; pedestrian animation is lightweight; traffic follows bounded compiled lanes with conservative junction behavior rather than a city-scale traffic solver; local rich architectural objects use the safe semantic catalog while legacy blocks retain their compatible persistence path. Final Stage H still requires the complete production gate, immutable local candidate creation, and explicit user approval before any deployment.

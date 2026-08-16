@@ -414,6 +414,17 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);
   }, { timeout: 1200 });
+  scheduleAfterFirstPlay(`living-world-${publication.sequence}`, async () => {
+    if (
+      appCtx.worldPublication?.requestId !== publication.requestId ||
+      appCtx.worldPublication?.sequence !== publication.sequence
+    ) return null;
+    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=1');
+    return startLivingWorldRuntime(appCtx, {
+      snapshot: publication,
+      request: worldSession?.request
+    });
+  }, { timeout: 900 });
   markFirstPlayReady({
     environment: 'earth',
     loadDurationMs: Math.round(performance.now() - Number(runtimeState?.startedAt || performance.now())),
