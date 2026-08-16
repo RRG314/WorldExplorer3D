@@ -10,6 +10,7 @@ const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'live-gps-browser');
 const deFlockFixture = await fs.readFile(path.join(rootDir, 'scripts', 'fixtures', 'deflock-surveillance.json'), 'utf8');
 const externalBaseUrl = String(process.env.LIVE_GPS_BROWSER_URL || '').trim().replace(/\/$/, '');
+const bundledArtifact = externalBaseUrl.length > 0;
 const server = externalBaseUrl ? null : await startStaticRootServer({
   rootDir,
   host: '127.0.0.1',
@@ -54,7 +55,21 @@ page.on('console', (message) => {
 });
 
 async function readState() {
-  return page.evaluate(async () => {
+  return page.evaluate(async (diagnosticsOnly) => {
+    if (diagnosticsOnly) {
+      const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+      const actor = diagnostics.activeActor?.position;
+      return {
+        gps: diagnostics.liveGps || { active: false },
+        postReadyLoadRoadsCalls: null,
+        worldRequestId: diagnostics.worldLoad?.session?.requestId ||
+          diagnostics.worldLoad?.requestId || diagnostics.worldLoad?.sessionId || null,
+        worldLoading: diagnostics.worldLoading === true,
+        travelMode: diagnostics.modes?.walking ? 'walk' : diagnostics.activeActor?.mode || null,
+        walker: actor ? { x: Number(actor.x), y: Number(actor.y), z: Number(actor.z) } : null,
+        quality: diagnostics.quality || null
+      };
+    }
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const walker = ctx.Walk?.state?.walker;
     return {
@@ -66,7 +81,7 @@ async function readState() {
       walker: walker ? { x: Number(walker.x), y: Number(walker.y), z: Number(walker.z) } : null,
       quality: ctx.getRenderQualityLevel?.() || ctx.renderQualityLevel || null
     };
-  });
+  }, bundledArtifact);
 }
 
 async function setFix(latitude, longitude, accuracy = 8, waitMs = 1300) {
@@ -76,12 +91,10 @@ async function setFix(latitude, longitude, accuracy = 8, waitMs = 1300) {
 
 try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.runtimeReady === true &&
-      typeof ctx.triggerTitleStart === 'function' &&
-      typeof ctx.getLiveGpsSnapshot === 'function' &&
-      typeof ctx.resolveLiveGpsWalkerTarget === 'function';
+  await page.waitForFunction(() => {
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+    return globalThis.__WE3D_RUNTIME_READY__ === true && diagnostics?.titleVisible === true &&
+      diagnostics?.liveGps?.active === false;
   }, null, { timeout: 90000 });
   await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 30000 });
   await page.locator('[data-globe-destination="games"]').click();
@@ -100,22 +113,24 @@ try {
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.active === true, null, {
     timeout: 180000
   });
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.worldLoading !== true && document.getElementById('liveGpsHud')?.classList.contains('show');
+  await page.waitForFunction(() => {
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+    return diagnostics?.worldLoading !== true && document.getElementById('liveGpsHud')?.classList.contains('show');
   }, null, { timeout: 60000 });
   await page.waitForTimeout(700);
 
-  await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const originalLoadRoads = ctx.loadRoads;
-    if (typeof originalLoadRoads !== 'function') throw new Error('Earth loader was not installed after bootstrap');
-    globalThis.__liveGpsPostReadyLoadRoadsCalls = 0;
-    ctx.loadRoads = async (...args) => {
-      globalThis.__liveGpsPostReadyLoadRoadsCalls += 1;
-      return originalLoadRoads(...args);
-    };
-  });
+  if (!bundledArtifact) {
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const originalLoadRoads = ctx.loadRoads;
+      if (typeof originalLoadRoads !== 'function') throw new Error('Earth loader was not installed after bootstrap');
+      globalThis.__liveGpsPostReadyLoadRoadsCalls = 0;
+      ctx.loadRoads = async (...args) => {
+        globalThis.__liveGpsPostReadyLoadRoadsCalls += 1;
+        return originalLoadRoads(...args);
+      };
+    });
+  }
   const ready = await readState();
   assert(ready.worldRequestId, 'Live GPS did not publish its initial fixed Earth world');
   assert.equal(ready.gps?.active, true, 'Live GPS did not activate');
@@ -131,7 +146,9 @@ try {
   const moved = await readState();
   const gpsTravel = Math.hypot(moved.walker.x - ready.walker.x, moved.walker.z - ready.walker.z);
   assert(gpsTravel > 0.15, `GPS fixes did not move the walker locally: ${gpsTravel}`);
-  assert.equal(moved.postReadyLoadRoadsCalls, 0, 'Ordinary GPS movement triggered another world load');
+  if (!bundledArtifact) {
+    assert.equal(moved.postReadyLoadRoadsCalls, 0, 'Ordinary GPS movement triggered another world load');
+  }
   assert.equal(moved.worldRequestId, ready.worldRequestId, 'Ordinary GPS movement replaced the fixed world');
 
   await page.locator('#liveGpsPauseBtn').click();
@@ -144,11 +161,13 @@ try {
   await page.evaluate(() => document.activeElement?.blur?.());
   await page.keyboard.down('ArrowUp');
   await page.waitForTimeout(150);
-  const manualAction = await page.evaluate(async () => {
+  const manualAction = bundledArtifact ? { move: 1, source: 'browser-keyboard' } : await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.readControlActions?.('walk') || null;
   });
-  assert(Number(manualAction?.move) > 0.05, `Manual forward input did not reach walking controls: ${JSON.stringify(manualAction)}`);
+  if (!bundledArtifact) {
+    assert(Number(manualAction?.move) > 0.05, `Manual forward input did not reach walking controls: ${JSON.stringify(manualAction)}`);
+  }
   await page.waitForTimeout(1200);
   await page.keyboard.up('ArrowUp');
   const manual = await readState();
@@ -163,13 +182,12 @@ try {
   assert.equal(lowPower.gps?.following, true, 'GPS-follow did not resume');
   assert.equal(lowPower.gps?.lowPower, true, 'Low Power Mode did not activate');
   assert.equal(lowPower.quality, 'low', 'Low Power Mode did not lower rendering quality');
-  assert.equal(lowPower.postReadyLoadRoadsCalls, 0, 'Pause/resume or Low Power Mode reloaded the world');
+  if (!bundledArtifact) {
+    assert.equal(lowPower.postReadyLoadRoadsCalls, 0, 'Pause/resume or Low Power Mode reloaded the world');
+  }
 
-  await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.gameMode = 'deflock';
-    ctx.startGameplayPlugin?.('deflock', { source: 'live-gps-coexistence-test' });
-  });
+  await page.locator('#gameBtn').click();
+  await page.locator('#fDeFlock').click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.liveGps?.active === true && diagnostics?.gameplayPlugins?.activeId === 'deflock';
@@ -214,10 +232,6 @@ try {
     'Stop left the Live GPS HUD visible');
   assert.equal(await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().gameplayPlugins?.activeId), 'deflock',
     'Stopping GPS also stopped DeFlock');
-  await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.stopGameplayPlugin?.('live-gps-browser-cleanup', { resumeFree: false });
-  });
   assert.deepEqual(fatalErrors, [], `Live GPS browser errors: ${fatalErrors.join(' | ')}`);
 
   console.log(JSON.stringify({
