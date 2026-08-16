@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=81";
-import { readSharedExperienceParams } from "./share-links.js?v=61";
+import { readSharedExperienceParams } from "./share-links.js?v=62";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
 import {
@@ -456,7 +456,7 @@ function initTitleScreenUi({
   } catch {}
 
   if (sharedExperienceParams) {
-    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock']);
+    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
       appCtx.gameMode = sharedExperienceParams.gameMode;
       const targetMode = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);
@@ -520,8 +520,12 @@ function initTitleScreenUi({
     const requestedLaunchMode = Object.entries(launchModeButtons)
       .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
     setLaunchMode(requestedLaunchMode);
+    if (requestedLaunchMode === 'earth' && appCtx.gameMode === 'livegps') {
+      const prepared = await appCtx.prepareLiveGpsStart?.({ source: 'title', setWorldLocation: true });
+      if (!prepared) return false;
+    }
     const externalBypassCustomGate = appCtx.pendingCustomLaunchBypass === true;
-    const shouldGateToGlobe = !appCtx.gameStarted && !skipGlobeGateOnce && !externalBypassCustomGate && requestedLaunchMode === 'earth' && String(appCtx.selLoc || '') === 'custom';
+    const shouldGateToGlobe = !appCtx.gameStarted && appCtx.gameMode !== 'livegps' && !skipGlobeGateOnce && !externalBypassCustomGate && requestedLaunchMode === 'earth' && String(appCtx.selLoc || '') === 'custom';
     if (shouldGateToGlobe) {
       setTitleLocationMode('custom');
       globeSelector?.open?.();

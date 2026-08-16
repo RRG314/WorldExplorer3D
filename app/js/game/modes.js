@@ -8,6 +8,12 @@ import {
   stopDeFlockMode,
   updateDeFlockMode
 } from "../deflock/runtime.js?v=5";
+import {
+  getLiveGpsSnapshot,
+  startLiveGpsMode,
+  stopLiveGpsMode,
+  updateLiveGpsMode
+} from "../live-gps/runtime.js?v=1";
 
 const gameplayRegistry = createGameplayPluginRegistry({
   onError(error, id, phase) {
@@ -221,6 +227,15 @@ gameplayRegistry.register({
   save: getDeFlockSnapshot,
   leaderboard: () => getDeFlockSnapshot()?.progress || null
 });
+gameplayRegistry.register({
+  id: "livegps",
+  label: "Live GPS Explore",
+  category: "location-game",
+  start: startLiveGpsMode,
+  update: updateLiveGpsMode,
+  stop: stopLiveGpsMode,
+  save: getLiveGpsSnapshot
+});
 
 export function registerGameplayPlugin(definition) {
   return gameplayRegistry.register(definition);
@@ -250,7 +265,7 @@ export function startGameplayPlugin(id, context = {}) {
   const pluginId = String(id || "free");
   if (!gameplayRegistry.has(pluginId)) throw new Error(`Unknown gameplay plugin: ${pluginId}`);
   prepareGameplayTransition("replaced", context);
-  if (!["trial", "checkpoint", "painttown", "police", "flower", "deflock"].includes(pluginId)) {
+  if (!["trial", "checkpoint", "painttown", "police", "flower", "deflock", "livegps"].includes(pluginId)) {
     appCtx.gameMode = "free";
   }
   return gameplayRegistry.start(pluginId, { appCtx, ...context });

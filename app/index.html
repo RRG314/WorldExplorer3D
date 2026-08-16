@@ -22,7 +22,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=91">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=92">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
@@ -158,6 +158,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div class="mode-grid">
 <div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
@@ -658,6 +659,31 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <p>Direction cones and detection range are gameplay approximations, not claims about real camera capabilities. No plates, vehicle photos, live results, or driver data are collected.</p>
   <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors • ODbL</a>
 </aside>
+<div id="liveGpsPermissionPanel" role="dialog" aria-modal="true" aria-labelledby="liveGpsPermissionTitle">
+  <div class="liveGpsPermissionCard">
+    <div class="liveGpsPermissionIcon">📍</div>
+    <h2 id="liveGpsPermissionTitle">Start Live GPS Explore?</h2>
+    <p>Your location moves the in-world walker while World Explorer remains open and visible. Locking the screen or switching apps may pause movement.</p>
+    <p class="liveGpsSafety"><strong>Stay aware of traffic, terrain, private property, and local rules. Do not use the game while driving.</strong></p>
+    <p>Location samples stay in memory for this session and are not saved as a route.</p>
+    <div id="liveGpsPermissionStatus" aria-live="polite"></div>
+    <div class="liveGpsPermissionActions">
+      <button id="liveGpsPermissionCancel" type="button">Cancel</button>
+      <button id="liveGpsPermissionContinue" type="button">Continue &amp; Allow Location</button>
+    </div>
+  </div>
+</div>
+<section id="liveGpsHud" aria-label="Live GPS status">
+  <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
+  <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span></div>
+  <div class="liveGpsActions">
+    <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
+    <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
+    <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
+    <button id="liveGpsStopBtn" type="button">Stop</button>
+  </div>
+</section>
 <canvas id="minimap" width="150" height="150"></canvas>
 <div id="minimapZoomControls" aria-label="Minimap zoom controls">
   <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
@@ -964,6 +990,7 @@ Explore the area
 <button class="floatBtn game" id="gameBtn" type="button" aria-label="Games" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fDeFlock">📷 Start DeFlock Hunt</div>
+<div class="floatItem" id="fLiveGps">📍 Start Live GPS Explore</div>
 <div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fRoomGames">👥 Room Games</div>
 <div class="floatItem" id="fActivityCreator">🧩 Create Game</div>
@@ -1608,5 +1635,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=444"></script>
+<script type="module" src="js/bootstrap.js?v=445"></script>
 </body></html>

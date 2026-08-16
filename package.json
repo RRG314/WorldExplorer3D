@@ -131,6 +131,8 @@
     "test:bridge-road-conflict-index": "node scripts/test-bridge-road-conflict-index.mjs",
     "test:globe-selector": "node scripts/test-globe-selector-contract.mjs",
     "test:title-geolocation": "node scripts/test-title-geolocation.mjs",
+    "test:live-gps-model": "node scripts/test-live-gps-model.mjs",
+    "test:live-gps-browser": "node scripts/test-live-gps-browser.mjs",
     "test:globe-selector-browser": "node scripts/test-globe-selector-browser.mjs",
     "test:ocean-global-bathymetry": "node scripts/test-ocean-global-bathymetry.mjs",
     "test:tunnel-system": "node scripts/test-tunnel-system-model.mjs",

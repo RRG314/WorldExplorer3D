@@ -5,10 +5,10 @@ import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-sessi
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=68";
-import { initShareUi } from "./ui/share-links.js?v=61";
+import { initShareUi } from "./ui/share-links.js?v=62";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=97";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=98";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -165,6 +165,7 @@ function setupUI() {
   }
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
+    appCtx.stopLiveGpsMode?.({ reason: 'main-menu' });
     appCtx.stopGameplayPlugin?.('main-menu', { resumeFree: false });
     prepareTitleEnvironment();
     appCtx.hideLoad?.();
@@ -178,7 +179,7 @@ function setupUI() {
     document.getElementById('titleScreen').classList.remove('hidden');
     window.requestAnimationFrame(() => appCtx.openGlobeSelector?.());
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
@@ -313,6 +314,18 @@ function setupUI() {
     appCtx.gameMode = 'deflock';
     appCtx.startGameplayPlugin?.('deflock', { source: 'in-world-games-menu' });
     closeAllFloatMenus();
+  });
+  document.getElementById('fLiveGps')?.addEventListener('click', () => {
+    if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {
+      appCtx.showToast?.('Live GPS Explore is available in an Earth location.');
+      closeAllFloatMenus();
+      return;
+    }
+    closeAllFloatMenus();
+    void appCtx.startLiveGpsFromWorld?.().catch((error) => {
+      console.error('[live-gps] Could not start from the in-world menu.', error);
+      appCtx.showToast?.('Live GPS could not start. Please try again.');
+    });
   });
   const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
   if (memoryFlowerFloatBtn) {

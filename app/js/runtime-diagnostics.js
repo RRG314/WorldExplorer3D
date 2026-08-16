@@ -364,6 +364,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
     deflock: appCtx.getDeFlockSnapshot?.() || { active: false },
+    liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     activeActor,
     surfaceChain: surfaceChainSnapshot(activeActor),
@@ -486,6 +487,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
   terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
+  liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

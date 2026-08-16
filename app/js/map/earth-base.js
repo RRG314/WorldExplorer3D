@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getOverlayPreset } from "../editor/preset-registry.js?v=1";
 import { geometryPolygonRings } from "../editor/schema.js?v=1";
-import { loadTile } from "./tiles.js?v=3";
+import { loadTile } from "./tiles.js?v=4";
 
 function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
   const {
