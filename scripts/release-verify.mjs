@@ -19,7 +19,7 @@ const steps = [
   { name: 'Terrain-tile generation cancellation', cmd: [process.execPath, 'scripts/test-terrain-tile-cancellation.mjs'] },
   { name: 'World-load cancellation browser', cmd: [process.execPath, 'scripts/test-world-load-cancellation-browser.mjs'] },
   { name: 'Fixed-world sustained travel and Space return', cmd: [process.execPath, 'scripts/test-fixed-world-travel-browser.mjs'] },
-  { name: '4.1.3 cold/warm load performance comparison', cmd: [process.execPath, 'scripts/test-load-performance-comparison.mjs'] },
+  { name: 'Previous-production cold/warm load performance comparison', cmd: [process.execPath, 'scripts/test-load-performance-comparison.mjs'] },
   { name: 'City-surface structural ownership', cmd: [process.execPath, 'scripts/test-city-surface-semantics.mjs'] },
   { name: 'Measured title startup workload', cmd: [process.execPath, 'scripts/test-startup-workload-browser.mjs'] },
   { name: 'Building publication coverage', cmd: [process.execPath, 'scripts/test-building-publication-coverage.mjs'] },
