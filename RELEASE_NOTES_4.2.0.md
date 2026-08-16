@@ -1,8 +1,9 @@
-# World Explorer 3D 4.1.4
+# World Explorer 3D 4.2.0
 
-World Explorer 3D 4.1.4 stabilizes the fixed selected-location Earth experience
-released in 4.1.3. It does not restore continuous world streaming and does not
-add a competing terrain, water, road, or building pipeline.
+World Explorer 3D 4.2.0 adds DeFlock Hunt and bounded Live GPS Explore while
+stabilizing the fixed selected-location Earth experience released in 4.1.3. It
+does not restore continuous world streaming or add a competing terrain, water,
+road, or building pipeline.
 
 ## Highlights
 
@@ -44,7 +45,7 @@ footpath presentation is not fetched or built, movement does not start terrain
 or provider work, and returning from Space reuses the retained Earth scene.
 
 On the same machine and connection, the exact 4.1.3 reference loaded Baltimore
-in 36.52 seconds cold and 35.25 seconds warm. The 4.1.4 candidate measured 35.68
+in 36.52 seconds cold and 35.25 seconds warm. The 4.2.0 candidate measured 35.68
 seconds cold and 32.84 seconds warm: 2.3% faster cold and 6.8% faster warm. All
 runs reached stable publication with provider work drained to zero.
 

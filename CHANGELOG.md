@@ -2,10 +2,14 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [4.1.4] - 2026-08-14
+## [4.2.0] - 2026-08-15
 
 ### Added
 
+- DeFlock Hunt, a location game using publicly mapped OpenStreetMap
+  surveillance nodes with single-player and shared-room virtual progress.
+- Live GPS Explore, an optional foreground-only location-following mode inside
+  one bounded fixed world with filtering, smoothing, pause, and low-power controls.
 - Atomic publication of six immutable selected-location products for terrain,
   water, transport, buildings, land use, and places.
 - Release checks for provider cancellation/failure behavior, 30-second drive

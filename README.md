@@ -10,12 +10,12 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.1.4
+## Version 4.2.0
 
-Version 4.1.4 stabilizes the fixed-location Earth world introduced in 4.1.3.
-Location loads now publish one immutable world, terrain and land cover remain
-continuous across the detailed/far boundary, movement does not reload world
-data, and returning from Space restores the retained Earth scene.
+Version 4.2.0 adds DeFlock Hunt and bounded Live GPS Explore while stabilizing
+the fixed-location Earth world introduced in 4.1.3. Location loads publish one
+immutable world, movement does not reload world data, and returning from Space
+restores the retained Earth scene.
 
 Highlights:
 

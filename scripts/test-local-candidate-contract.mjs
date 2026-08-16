@@ -32,7 +32,7 @@ async function waitForServer(url) {
 }
 
 const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'we3d-candidate-'));
-const candidateId = '4.1.4+0123456789ab.abcdef0123456789.staging';
+const candidateId = '4.2.0+0123456789ab.abcdef0123456789.staging';
 await fs.mkdir(path.join(temporaryRoot, 'app'), { recursive: true });
 await fs.writeFile(path.join(temporaryRoot, 'app', 'index.html'), '<!doctype html><title>candidate</title>', 'utf8');
 await fs.writeFile(path.join(temporaryRoot, 'app', 'runtime.js'), 'globalThis.candidateRuntime = true;\n', 'utf8');

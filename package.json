@@ -1,6 +1,6 @@
 {
   "name": "worldexplorer3d",
-  "version": "4.1.4",
+  "version": "4.2.0",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "type": "module",
   "main": "three.js",
