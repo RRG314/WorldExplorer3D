@@ -8,7 +8,7 @@ import { startStaticRootServer } from './test-static-server.mjs';
 
 const candidateRoot = process.cwd();
 const outputPath = path.join(candidateRoot, 'output', 'playwright', 'load-performance', 'report.json');
-const referenceTag = String(process.env.WE3D_PERF_REFERENCE_TAG || 'v4.1.3');
+const referenceTag = String(process.env.WE3D_PERF_REFERENCE_TAG || 'v4.2.0');
 const allowedRatio = 1.1;
 const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'we3d-performance-reference-'));
 const referenceRoot = path.join(temporaryRoot, 'reference');
