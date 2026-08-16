@@ -56,28 +56,6 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function redactReport(result, secrets = []) {
-  let serialized = JSON.stringify(result, null, 2);
-  for (const secret of secrets) {
-    const value = String(secret || '');
-    if (value) serialized = serialized.replaceAll(value, '[redacted]');
-  }
-  return serialized;
-}
-
-async function cleanupStagingAccount(page, credentials) {
-  return page.evaluate(async ({ email, password }) => {
-    const auth = await import(`/js/auth-ui.js?cleanup=${Date.now()}`);
-    if (!auth.getCurrentUser()) {
-      await auth.signInWithEmailPassword(email, password);
-    }
-    const billing = await import(`/js/billing.js?cleanup=${Date.now()}`);
-    const response = await billing.deleteAccount();
-    await auth.signOutUser();
-    return { accountDeleted: response?.deleted === true };
-  }, credentials);
-}
-
 async function main() {
   await ensureDir(OUTPUT_DIR);
   assert(BASE_URL, 'Set WE3D_BASE_URL to a running staging app URL before running retention tests.');
@@ -88,6 +66,8 @@ async function main() {
   const result = {
     ok: false,
     baseUrl: BASE_URL,
+    email,
+    password,
     displayName,
     authUid: '',
     roomCode: '',
@@ -104,7 +84,6 @@ async function main() {
     viewport: { width: 1440, height: 1000 }
   });
   const page = await context.newPage();
-  let cleanupAttempted = false;
 
   const seenEvents = new Set();
   function recordEvent(prefix, text) {
@@ -381,10 +360,6 @@ async function main() {
     assert(result.localRecovery.memoryPrimaryRestored, 'Memory backup did not restore its primary record.');
     assert(result.localRecovery.overlayDrafts?.restored, 'Overlay draft backup did not restore its primary record.');
     assert(result.localRecovery.activityLibrary?.restored, 'Activity library backup did not restore its primary record.');
-    currentStep = 'cleanup_staging_account';
-    cleanupAttempted = true;
-    result.cleanup = await cleanupStagingAccount(page, { email, password });
-    assert(result.cleanup.accountDeleted, 'Synthetic staging account cleanup did not complete.');
     result.ok = true;
   } catch (error) {
     result.step = currentStep;
@@ -411,22 +386,10 @@ async function main() {
       // Best effort only.
     }
   } finally {
-    if (!cleanupAttempted) {
-      cleanupAttempted = true;
-      try {
-        result.cleanup = await cleanupStagingAccount(page, { email, password });
-      } catch (cleanupError) {
-        const rawMessage = cleanupError?.message || String(cleanupError);
-        result.cleanup = {
-          accountDeleted: false,
-          error: rawMessage.replaceAll(email, '[redacted]').replaceAll(password, '[redacted]')
-        };
-      }
-    }
     await browser.close();
   }
 
-  console.log(redactReport(result, [email, password, result.authUid, result.roomCode]));
+  console.log(JSON.stringify(result, null, 2));
   if (!result.ok) process.exitCode = 1;
 }
 

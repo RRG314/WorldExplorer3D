@@ -1,24 +1,20 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=55';
-import {
-  getWeeklyFeaturedCity
-} from './loop.js?v=55';
+import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=56';
 import {
   getCurrentRoom,
   normalizeCityKey,
   normalizeCode,
   setHomeBase
-} from './rooms.js?v=66';
-import { saveRoomActivity } from './room-activities.js?v=1';
+} from './rooms.js?v=67';
+import { saveRoomActivity } from './room-activities.js?v=2';
 import {
   normalizeColorHex as normalizePaintColorHex
-} from './painttown.js?v=55';
+} from './painttown.js?v=56';
 import {
   createUiRoomEventsApi
-} from './ui-room-events.js?v=1';
-import { createUiRoomRenderers } from './ui-room-renderers.js?v=1';
-import { createUiRoomActions } from './ui-room-actions.js?v=10';
-import { createMmoRoomPanel } from './ui-room-mmo.js?v=4';
+} from './ui-room-events.js?v=2';
+import { createUiRoomRenderers } from './ui-room-renderers.js?v=2';
+import { createUiRoomActions } from './ui-room-actions.js?v=3';
 import {
   emitTutorialEvent,
   finiteNumber,
@@ -45,8 +41,8 @@ import {
   eventElementTarget,
   isWalkModeActive,
   isDroneModeActive
-} from './ui-room-support.js?v=1';
-import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=1';
+} from './ui-room-support.js?v=2';
+import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=2';
 
 let singleton = null;
 function initMultiplayerPlatform() {
@@ -100,21 +96,8 @@ function initMultiplayerPlatform() {
     roomPanelRoomName: document.getElementById('roomPanelRoomName'),
     roomPanelPlayerList: document.getElementById('roomPanelPlayerList'),
     roomPanelPlayerCount: document.getElementById('roomPanelPlayerCount'),
-    mmoProgressSummary: document.getElementById('mmoProgressSummary'),
-    mmoMissionSelect: document.getElementById('mmoMissionSelect'),
-    mmoMissionAcceptBtn: document.getElementById('mmoMissionAcceptBtn'),
-    mmoMissionStatus: document.getElementById('mmoMissionStatus'),
-    mmoWeaponSelect: document.getElementById('mmoWeaponSelect'),
-    mmoWeaponEquipBtn: document.getElementById('mmoWeaponEquipBtn'),
-    mmoTargetSelect: document.getElementById('mmoTargetSelect'),
-    mmoAttackBtn: document.getElementById('mmoAttackBtn'),
-    mmoInteractBtn: document.getElementById('mmoInteractBtn'),
-    mmoWorldEditSummary: document.getElementById('mmoWorldEditSummary'),
-    mmoDemolishBtn: document.getElementById('mmoDemolishBtn'),
-    mmoRestoreSelect: document.getElementById('mmoRestoreSelect'),
-    mmoRestoreBtn: document.getElementById('mmoRestoreBtn'),
-    mmoLeaderboardList: document.getElementById('mmoLeaderboardList'),
     roomPanelNameInput: document.getElementById('roomPanelNameInput'),
+    roomPanelFeaturedControl: document.getElementById('roomPanelFeaturedControl'),
     roomPanelFeaturedToggle: document.getElementById('roomPanelFeaturedToggle'),
     roomPanelPaintTimeInput: document.getElementById('roomPanelPaintTimeInput'),
     roomPanelPaintTouchModeSelect: document.getElementById('roomPanelPaintTouchModeSelect'),
@@ -171,11 +154,6 @@ function initMultiplayerPlatform() {
     roomActivities: [],
     activeRoomActivity: null,
     homeBase: null,
-    mmoProgression: null,
-    mmoLeaderboard: [],
-    mmoCatalog: null,
-    mmoSelfUid: '',
-    authoritativeSession: null,
     pendingRoomCode: normalizeCode(new URLSearchParams(window.location.search).get('room')),
     pendingRoomPrompted: false,
     pendingRoomInFlight: false,
@@ -320,15 +298,6 @@ function initMultiplayerPlatform() {
     state,
     helpers: helperFns
   });
-  const mmoPanel = createMmoRoomPanel({
-    appCtx,
-    refs,
-    state,
-    escapeHtml,
-    setStatus: renderers.setStatus
-  });
-  renderers.renderMmoPanel = mmoPanel.render;
-  mmoPanel.wire();
   const actions = createUiRoomActions({
     appCtx,
     refs,
@@ -351,7 +320,6 @@ function initMultiplayerPlatform() {
     renderHomeBase,
     renderInvites,
     renderLeaderboard,
-    renderMmoPanel,
     renderOwnedRooms,
     renderPlayerList,
     renderRecentPlayers,
@@ -475,7 +443,6 @@ function initMultiplayerPlatform() {
     renderInvites();
     renderOwnedRooms();
     renderLeaderboard();
-    renderMmoPanel();
     publishMapRoomsToContext();
   }
 
@@ -508,7 +475,6 @@ function initMultiplayerPlatform() {
     renderInvites();
     renderOwnedRooms();
     renderLeaderboard();
-    renderMmoPanel();
     updateToggleStates();
     applyEntitlementCopy();
     publishMapRoomsToContext();

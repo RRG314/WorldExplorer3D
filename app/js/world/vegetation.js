@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
+import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
 
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',
@@ -32,10 +32,10 @@ const TREE_DENSITY_BY_LANDUSE = {
 };
 
 const TREE_ROW_SPACING = 11;
-const TROPICAL_TREE_COLORS = [0x174d29, 0x1d5b2d, 0x286735, 0x337441];
 export const MAX_TREE_NODES = 320;
 export const MAX_TREE_ROW_WAYS = 70;
 const MAX_GENERATED_TREE_INSTANCES = 950;
+const MAX_TROPICAL_TREE_INSTANCES = 12000;
 
 const runtime = {
   findNearestRoad: () => ({ road: null, dist: Infinity }),
@@ -88,6 +88,14 @@ function vegetationWorldDensityScale() {
   if ((Number(norm.scrub) || 0) >= 0.1) scale *= 1.04;
   if ((Number(norm.water) || 0) >= 0.18 && (Number(norm.vegetated) || 0) >= 0.22) scale *= 1.06;
   return Math.max(0.38, Math.min(1.32, scale));
+}
+
+function isTropicalCanopyLocation() {
+  const biomeId = String(appCtx.worldSurfaceProfile?.biome?.id || '');
+  // Provider signals may be absent while WorldCover tiles are still resolving.
+  // Latitude only enables the larger budget; semantic forest weights below still
+  // decide where trees are allowed, so tropical cities do not become jungles.
+  return biomeId.startsWith('tropical-') || Math.abs(Number(appCtx.LOC?.lat) || 0) <= 24;
 }
 
 function vegetationLanduseDensityScale(landuseType = '') {
@@ -205,29 +213,17 @@ export function collectWorldVegetationPlacements() {
   const placements = [];
   const treeNodes = Array.isArray(appCtx.osmTreeNodes) ? appCtx.osmTreeNodes : [];
   const treeRows = Array.isArray(appCtx.osmTreeRows) ? appCtx.osmTreeRows : [];
-  const terrainMeshes = (appCtx.terrainGroup?.children || []).filter((mesh) =>
-    mesh?.userData?.worldCoverResult?.vegetationSamples?.length ||
-    (mesh?.userData?.worldCoverStatus === 'neighbor-fallback' && mesh?.userData?.worldCoverSurfaceMode === 'forest')
-  );
-  const forestTileCount = terrainMeshes.filter((mesh) => {
-    const result = mesh.userData?.worldCoverResult;
-    return result?.dominantClass === 'tree' ||
-      result?.dominantClass === 'mangrove' ||
-      mesh.userData?.worldCoverSurfaceMode === 'forest';
-  }).length;
-  const tropicalForest =
-    (appCtx.worldSurfaceProfile?.biomeHint === 'tropical_rainforest' || Math.abs(Number(appCtx.LOC?.lat) || 0) <= 24) &&
-    forestTileCount >= Math.max(1, Math.ceil(terrainMeshes.length * 0.35));
   const worldDensityScale = vegetationWorldDensityScale();
   const budgetScale =
     appCtx.rdtComplexity >= 6 ? 0.55 :
     appCtx.rdtComplexity >= 4 ? 0.72 :
     appCtx.rdtComplexity >= 2 ? 0.88 : 1;
-  const biomeDensityScale = tropicalForest ? 3.2 : 1;
-  const maxTrees = Math.max(
-    120,
-    Math.min(3600, Math.floor(MAX_GENERATED_TREE_INSTANCES * budgetScale * worldDensityScale * biomeDensityScale))
-  );
+  const tropicalCanopy = isTropicalCanopyLocation();
+  const maxTrees = Math.max(120, Math.floor(
+    (tropicalCanopy ? MAX_TROPICAL_TREE_INSTANCES : MAX_GENERATED_TREE_INSTANCES) *
+    budgetScale *
+    worldDensityScale
+  ));
   const pushPlacement = (placement) => {
     if (!placement || placements.length >= maxTrees) return false;
     if (!Number.isFinite(placement.x) || !Number.isFinite(placement.z)) return false;
@@ -256,9 +252,7 @@ export function collectWorldVegetationPlacements() {
 
   for (let i = 0; i < treeRows.length && placements.length < maxTrees; i++) {
     const way = treeRows[i];
-    const rawPts = Array.isArray(way?._worldPoints)
-      ? way._worldPoints
-      : way?.nodes?.map((id) => appCtx._worldLoadNodes?.[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon)) || [];
+    const rawPts = way?.nodes?.map((id) => appCtx._worldLoadNodes?.[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon)) || [];
     const pts = runtime.sanitizeWorldPathPoints(rawPts);
     if (pts.length < 2) continue;
     const totalLength = polylineLength(pts);
@@ -269,23 +263,17 @@ export function collectWorldVegetationPlacements() {
       const point = samplePolylinePointAtDistance(pts, p * TREE_ROW_SPACING * spacingNoise);
       if (!point) continue;
       const seed = vegetationSeed(rowSeed ^ p ^ 0x85ebca6b);
-      const clusterCount = tropicalForest ? 2 + Math.floor(appCtx.rand01FromInt(seed ^ 0x243f6a88) * 3) : 1;
-      for (let clusterIndex = 0; clusterIndex < clusterCount && placements.length < maxTrees; clusterIndex++) {
-        const clusterSeed = vegetationSeed(seed ^ Math.imul(clusterIndex + 1, 0x9e3779b9));
-        const clusterRadius = clusterIndex === 0 ? 0 : 1.5 + appCtx.rand01FromInt(clusterSeed) * 5.5;
-        const clusterAngle = appCtx.rand01FromInt(clusterSeed ^ 0x85ebca6b) * Math.PI * 2;
-        pushPlacement({
-          x: point.x + Math.cos(clusterAngle) * clusterRadius,
-          z: point.z + Math.sin(clusterAngle) * clusterRadius,
-          scale: 0.86 + appCtx.rand01FromInt(clusterSeed ^ 0x7f4a7c15) * 0.62,
-          canopyStretch: 0.88 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.24,
-          rotation: appCtx.rand01FromInt(clusterSeed ^ 0x165667b1) * Math.PI * 2,
-          color: [0x2c6726, 0x356f2d, 0x3a7b33][Math.floor(appCtx.rand01FromInt(clusterSeed ^ 0xd3a2646c) * 3) % 3],
-          source: 'tree_row',
-          landuseType: 'tree_row',
-          options: { roadPadding: 1.75, buildingPadding: 1.0 }
-        });
-      }
+      pushPlacement({
+        x: point.x,
+        z: point.z,
+        scale: 0.86 + appCtx.rand01FromInt(seed ^ 0x7f4a7c15) * 0.62,
+        canopyStretch: 0.88 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.24,
+        rotation: appCtx.rand01FromInt(seed ^ 0x165667b1) * Math.PI * 2,
+        color: [0x2c6726, 0x356f2d, 0x3a7b33][Math.floor(appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 3) % 3],
+        source: 'tree_row',
+        landuseType: 'tree_row',
+        options: { roadPadding: 1.75, buildingPadding: 1.0 }
+      });
     }
   }
 
@@ -350,26 +338,13 @@ export function collectWorldVegetationPlacements() {
     }
   }
 
+  const terrainMeshes = tropicalCanopy ? [] : (appCtx.terrainGroup?.children || []).filter(
+    (mesh) => mesh?.userData?.worldCoverResult?.vegetationSamples?.length
+  );
   for (let tileIndex = 0; tileIndex < terrainMeshes.length && placements.length < maxTrees; tileIndex++) {
     const mesh = terrainMeshes[tileIndex];
     const bounds = mesh.userData?.terrainTile?.bounds;
-    let samples = mesh.userData?.worldCoverResult?.vegetationSamples || null;
-    if ((!Array.isArray(samples) || samples.length === 0) && mesh.userData?.worldCoverStatus === 'neighbor-fallback') {
-      const tileSeed = vegetationSeed(
-        [...String(mesh.userData?.terrainTileKey || tileIndex)].reduce((seed, char) => Math.imul(seed ^ char.charCodeAt(0), 16777619), 2166136261)
-      );
-      samples = [];
-      for (let row = 0; row < 10; row++) {
-        for (let col = 0; col < 10; col++) {
-          const seed = vegetationSeed(tileSeed ^ (row * 10 + col));
-          samples.push({
-            kind: 'tree',
-            u: Math.max(0.02, Math.min(0.98, (col + 0.5 + (appCtx.rand01FromInt(seed) - 0.5) * 0.72) / 10)),
-            v: Math.max(0.02, Math.min(0.98, (row + 0.5 + (appCtx.rand01FromInt(seed ^ 0x9e3779b9) - 0.5) * 0.72) / 10))
-          });
-        }
-      }
-    }
+    const samples = mesh.userData.worldCoverResult.vegetationSamples;
     if (!bounds || !Array.isArray(samples)) continue;
     for (let sampleIndex = 0; sampleIndex < samples.length && placements.length < maxTrees; sampleIndex++) {
       const sample = samples[sampleIndex];
@@ -383,39 +358,81 @@ export function collectWorldVegetationPlacements() {
       );
       const kind = String(sample.kind || 'tree');
       const isShrub = kind === 'shrub' || kind === 'wetland';
-      const isTropicalTree = tropicalForest && !isShrub;
-      const clusterCount = isTropicalTree ? 2 + Math.floor(appCtx.rand01FromInt(seed ^ 0x243f6a88) * 3) : 1;
-      for (let clusterIndex = 0; clusterIndex < clusterCount && placements.length < maxTrees; clusterIndex++) {
-        const clusterSeed = vegetationSeed(seed ^ Math.imul(clusterIndex + 1, 0x9e3779b9));
-        const clusterRadius = clusterIndex === 0 ? 0 : 1.5 + appCtx.rand01FromInt(clusterSeed) * 5.5;
-        const clusterAngle = appCtx.rand01FromInt(clusterSeed ^ 0x85ebca6b) * Math.PI * 2;
-        pushPlacement({
-          x: point.x + Math.cos(clusterAngle) * clusterRadius,
-          z: point.z + Math.sin(clusterAngle) * clusterRadius,
-          scale: isShrub ?
-            0.42 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.35 :
-            isTropicalTree ?
-              1.18 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.92 :
-              0.78 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.62,
-          canopyStretch: isShrub ?
-            0.72 :
-            isTropicalTree ?
-              1.08 + appCtx.rand01FromInt(clusterSeed ^ 0x9e3779b9) * 0.34 :
-              0.9 + appCtx.rand01FromInt(clusterSeed ^ 0x9e3779b9) * 0.28,
-          canopyWidth: isTropicalTree ?
-            2.15 + appCtx.rand01FromInt(clusterSeed ^ 0x6a09e667) * 0.85 :
-            1,
-          rotation: appCtx.rand01FromInt(clusterSeed ^ 0x85ebca6b) * Math.PI * 2,
-          color: isShrub ?
-            0x55723c :
-            isTropicalTree ?
-              TROPICAL_TREE_COLORS[Math.floor(appCtx.rand01FromInt(clusterSeed ^ 0xd3a2646c) * TROPICAL_TREE_COLORS.length) % TROPICAL_TREE_COLORS.length] :
-              kind === 'mangrove' ? 0x285f3b : 0x285f2d,
-          source: mesh.userData?.worldCoverStatus === 'neighbor-fallback' ? 'worldcover_neighbor_fallback' : 'worldcover',
-          landuseType: kind,
-          biome: isTropicalTree ? 'tropical_forest' : 'temperate',
+      pushPlacement({
+        x: point.x,
+        z: point.z,
+        scale: isShrub ? 0.42 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.35 : 0.78 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.62,
+        canopyStretch: isShrub ? 0.72 : 0.9 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.28,
+        rotation: appCtx.rand01FromInt(seed ^ 0x85ebca6b) * Math.PI * 2,
+        color: isShrub ? 0x55723c : kind === 'mangrove' ? 0x285f3b : 0x285f2d,
+        source: 'worldcover',
+        landuseType: kind,
+        options: { roadPadding: 1.8, buildingPadding: 1.0 }
+      });
+    }
+  }
+
+  // The terrain compiler already owns a provider-independent semantic forest
+  // weight. Use that accepted surface product when optional raster vegetation
+  // samples are unavailable, so a provider outage cannot turn a mapped jungle
+  // into an empty green sheet or trigger a duplicate land-cover request.
+  const semanticMeshes = (appCtx.terrainGroup?.children || []).filter((mesh) => {
+    const positions = mesh?.geometry?.attributes?.position;
+    const mixA = mesh?.geometry?.attributes?.terrainSurfaceMixA;
+    return positions && mixA && positions.count === mixA.count;
+  });
+  const hasWorldCoverPlacements = placements.some((placement) => placement.source === 'worldcover');
+  if (!hasWorldCoverPlacements || tropicalCanopy) {
+    for (let meshIndex = 0; meshIndex < semanticMeshes.length && placements.length < maxTrees; meshIndex += 1) {
+      const mesh = semanticMeshes[meshIndex];
+      const positions = mesh.geometry.attributes.position;
+      const mixA = mesh.geometry.attributes.terrainSurfaceMixA;
+      const remainingMeshes = Math.max(1, semanticMeshes.length - meshIndex);
+      const perMeshBudget = Math.max(18, Math.ceil((maxTrees - placements.length) / remainingMeshes));
+      const start = vegetationSeed((appCtx.rdtSeed ^ (meshIndex + 1) * 0x9e3779b9) >>> 0) % positions.count;
+      let accepted = 0;
+      for (let visit = 0; visit < positions.count && accepted < perMeshBudget && placements.length < maxTrees; visit += 1) {
+        const index = (start + visit * 97) % positions.count;
+        const forestWeight = Number(mixA.getZ(index) || 0);
+        if (forestWeight < (tropicalCanopy ? 0.34 : 0.58)) continue;
+        const seed = vegetationSeed((appCtx.rdtSeed ^ index ^ (meshIndex + 1) * 0x85ebca6b) >>> 0);
+        if (appCtx.rand01FromInt(seed ^ 0x27d4eb2f) > Math.min(0.97, 0.28 + forestWeight * 0.72)) continue;
+        const jitterRadius = tropicalCanopy ? 42 : 5.5;
+        const x = Number(mesh.position?.x || 0) + positions.getX(index) +
+          (appCtx.rand01FromInt(seed ^ 0x7f4a7c15) - 0.5) * jitterRadius * 2;
+        const z = Number(mesh.position?.z || 0) + positions.getZ(index) +
+          (appCtx.rand01FromInt(seed ^ 0x165667b1) - 0.5) * jitterRadius * 2;
+        const mappedLanduse = mappedLanduseAt(x, z);
+        if (mappedLanduse?.type && !VEGETATION_ELIGIBLE_TYPES.has(mappedLanduse.type)) continue;
+        const layerRoll = appCtx.rand01FromInt(seed ^ 0xd3a2646c);
+        const layer = tropicalCanopy
+          ? layerRoll > 0.86 ? 'emergent' : layerRoll < 0.22 ? 'understory' : 'canopy'
+          : 'canopy';
+        const scale = tropicalCanopy
+          ? layer === 'emergent'
+            ? 1.6 + appCtx.rand01FromInt(seed ^ 0xa511e9b3) * 0.7
+            : layer === 'understory'
+              ? 0.62 + appCtx.rand01FromInt(seed ^ 0xa511e9b3) * 0.38
+              : 0.95 + appCtx.rand01FromInt(seed ^ 0xa511e9b3) * 0.65
+          : 0.76 + appCtx.rand01FromInt(seed ^ 0xa511e9b3) * 0.72;
+        if (pushPlacement({
+          x,
+          z,
+          scale,
+          canopyStretch: tropicalCanopy
+            ? 0.72 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.55
+            : 0.84 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.34,
+          rotation: appCtx.rand01FromInt(seed ^ 0x85ebca6b) * Math.PI * 2,
+          color: tropicalCanopy
+            ? [0x164d27, 0x1d5e2a, 0x286f32, 0x347c38][Math.floor(appCtx.rand01FromInt(seed ^ 0xc2b2ae35) * 4) % 4]
+            : 0x285f2d,
+          source: 'terrain_semantic_forest',
+          landuseType: tropicalCanopy ? 'tropical_forest' : 'forest',
+          biome: tropicalCanopy ? 'tropical_rainforest' : 'temperate_forest',
+          layer,
+          vine: tropicalCanopy && layer !== 'understory' && appCtx.rand01FromInt(seed ^ 0x94d049bb) > 0.82,
           options: { roadPadding: 1.8, buildingPadding: 1.0 }
-        });
+        })) accepted += 1;
       }
     }
   }
@@ -490,7 +507,6 @@ export function buildWorldVegetationInstancing(
       appCtx.elevationWorldYAtWorldXZ(placement.x, placement.z);
     const trunkScale = Math.max(0.65, Number(placement.scale) || 1);
     const canopyStretch = Math.max(0.72, Number(placement.canopyStretch) || 1);
-    const canopyWidth = Math.max(0.8, Number(placement.canopyWidth) || 1);
     euler.set(0, Number(placement.rotation) || 0, 0);
     quat.setFromEuler(euler);
 
@@ -502,7 +518,7 @@ export function buildWorldVegetationInstancing(
     );
     trunkMesh.setMatrixAt(i, matrix);
 
-    scale.set(trunkScale * canopyWidth, trunkScale * canopyStretch, trunkScale * canopyWidth);
+    scale.set(trunkScale, trunkScale * canopyStretch, trunkScale);
     matrix.compose(
       new THREE.Vector3(placement.x, baseY + 6.55 * trunkScale, placement.z),
       quat,
@@ -521,9 +537,103 @@ export function buildWorldVegetationInstancing(
   canopyMesh.userData.isVegetationBatch = true;
   trunkMesh.frustumCulled = false;
   canopyMesh.frustumCulled = false;
-  appCtx.scene.add(trunkMesh);
-  appCtx.scene.add(canopyMesh);
+  appCtx.addEarthWorldObject(trunkMesh);
+  appCtx.addEarthWorldObject(canopyMesh);
   appCtx.vegetationMeshes.push(trunkMesh, canopyMesh);
+
+  const tropicalPlacements = placements.filter(
+    (placement) => placement.biome === 'tropical_rainforest'
+  );
+  if (tropicalPlacements.length > 0) {
+    const understoryMaterial = canopyMat.clone();
+    understoryMaterial.emissive.setHex(0x0b2514);
+    understoryMaterial.emissiveIntensity = 0.24;
+    // One collision-checked semantic placement expands into a compact crown
+    // cluster. This closes the canopy without running tens of thousands of
+    // extra road/building/water queries during location startup.
+    const crownClusterSize = 10;
+    const understoryMesh = new THREE.InstancedMesh(
+      canopyGeometry,
+      understoryMaterial,
+      tropicalPlacements.length * crownClusterSize
+    );
+    for (let i = 0; i < tropicalPlacements.length; i += 1) {
+      const placement = tropicalPlacements[i];
+      const baseY = typeof appCtx.terrainMeshHeightAt === 'function'
+        ? appCtx.terrainMeshHeightAt(placement.x, placement.z)
+        : appCtx.elevationWorldYAtWorldXZ(placement.x, placement.z);
+      const canopyScale = Math.max(0.55, Math.min(1.75, Number(placement.scale) || 1));
+      for (let clusterIndex = 0; clusterIndex < crownClusterSize; clusterIndex += 1) {
+        const instanceIndex = i * crownClusterSize + clusterIndex;
+        const seed = vegetationSeed((i + 1) * 0x9e3779b9 ^ clusterIndex * 0x85ebca6b);
+        const angle = (Number(placement.rotation) || 0) +
+          clusterIndex * (Math.PI * 2 / crownClusterSize) +
+          (appCtx.rand01FromInt(seed ^ 0x7f4a7c15) - 0.5) * 0.85;
+        const radius = 4 + appCtx.rand01FromInt(seed ^ 0x165667b1) * 16;
+        const crownScale = canopyScale * (1.3 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.85);
+        euler.set(0, angle, 0);
+        quat.setFromEuler(euler);
+        scale.set(crownScale * 1.7, crownScale * 0.52, crownScale * 1.7);
+        matrix.compose(
+          new THREE.Vector3(
+            placement.x + Math.sin(angle) * radius,
+            baseY + 4.25 * canopyScale + clusterIndex * 0.18,
+            placement.z + Math.cos(angle) * radius
+          ),
+          quat,
+          scale
+        );
+        understoryMesh.setMatrixAt(instanceIndex, matrix);
+        color.setHex(Number(placement.color) || 0x1d5e2a).multiplyScalar(
+          0.72 + appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 0.16
+        );
+        understoryMesh.setColorAt(instanceIndex, color);
+      }
+    }
+    understoryMesh.instanceMatrix.needsUpdate = true;
+    if (understoryMesh.instanceColor) understoryMesh.instanceColor.needsUpdate = true;
+    understoryMesh.userData.isVegetationBatch = true;
+    understoryMesh.userData.vegetationLayer = 'closed-canopy-understory';
+    understoryMesh.userData.semanticPlacementCount = tropicalPlacements.length;
+    understoryMesh.userData.renderedCrownCount = tropicalPlacements.length * crownClusterSize;
+    understoryMesh.frustumCulled = false;
+    appCtx.addEarthWorldObject(understoryMesh);
+    appCtx.vegetationMeshes.push(understoryMesh);
+
+    const vinePlacements = tropicalPlacements.filter((placement) => placement.vine);
+    if (vinePlacements.length > 0) {
+      const vineMaterial = new THREE.MeshStandardMaterial({
+        color: 0x31552a,
+        roughness: 1,
+        metalness: 0
+      });
+      const vineMesh = new THREE.InstancedMesh(trunkGeometry, vineMaterial, vinePlacements.length);
+      for (let i = 0; i < vinePlacements.length; i += 1) {
+        const placement = vinePlacements[i];
+        const baseY = typeof appCtx.terrainMeshHeightAt === 'function'
+          ? appCtx.terrainMeshHeightAt(placement.x, placement.z)
+          : appCtx.elevationWorldYAtWorldXZ(placement.x, placement.z);
+        const heightScale = Math.max(0.7, Number(placement.scale) || 1);
+        scale.set(0.075, heightScale * 1.22, 0.075);
+        matrix.compose(
+          new THREE.Vector3(
+            placement.x + 1.1 * heightScale,
+            baseY + 2.65 * heightScale,
+            placement.z - 0.7 * heightScale
+          ),
+          new THREE.Quaternion(),
+          scale
+        );
+        vineMesh.setMatrixAt(i, matrix);
+      }
+      vineMesh.instanceMatrix.needsUpdate = true;
+      vineMesh.userData.isVegetationBatch = true;
+      vineMesh.userData.vegetationLayer = 'tropical-vines';
+      vineMesh.frustumCulled = false;
+      appCtx.addEarthWorldObject(vineMesh);
+      appCtx.vegetationMeshes.push(vineMesh);
+    }
+  }
   appCtx.replaceWorldCollection('vegetationFeatures', placements);
   return placements.length;
 }

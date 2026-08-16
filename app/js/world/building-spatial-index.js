@@ -1,37 +1,13 @@
+import { ctx as appCtx } from "../shared-context.js?v=55";
+
 const BUILDING_INDEX_CELL_SIZE = 120;
 let buildingSpatialIndex = new Map();
-let getBuildingsFn = () => [];
-let getDynamicCollidersFn = () => [];
-let getOverlayCollidersFn = () => [];
-let getOverlaySuppressionFn = () => null;
-const EMPTY_SUPPRESSION_SET = new Set();
-const suppressionArrayCache = new WeakMap();
-
-export function initBuildingSpatialIndex(options = {}) {
-  for (const key of ['getBuildings', 'getDynamicColliders', 'getOverlayColliders', 'getOverlaySuppression']) {
-    if (typeof options[key] !== 'function') {
-      throw new TypeError(`Building spatial index requires ${key}().`);
-    }
-  }
-  getBuildingsFn = options.getBuildings;
-  getDynamicCollidersFn = options.getDynamicColliders;
-  getOverlayCollidersFn = options.getOverlayColliders;
-  getOverlaySuppressionFn = options.getOverlaySuppression;
-  clearBuildingSpatialIndex();
-}
 
 function overlaySuppressionSet(key = 'roadIds') {
-  const source = getOverlaySuppressionFn()?.[key];
+  const source = appCtx.overlaySuppression?.[key];
   if (source instanceof Set) return source;
-  if (Array.isArray(source)) {
-    let cached = suppressionArrayCache.get(source);
-    if (!cached) {
-      cached = new Set(source);
-      suppressionArrayCache.set(source, cached);
-    }
-    return cached;
-  }
-  return EMPTY_SUPPRESSION_SET;
+  if (Array.isArray(source)) return new Set(source);
+  return new Set();
 }
 
 export function isSuppressedBaseRoad(road) {
@@ -100,23 +76,13 @@ export function removeBuildingsFromSpatialIndex(buildings) {
   });
 }
 
-export function getNearbyBuildings(x, z, radius = 80, output = null, dedupe = null) {
-  const baseBuildings = getBuildingsFn() || [];
-  const dynamicSource = getDynamicCollidersFn();
-  const overlaySource = getOverlayCollidersFn();
-  const dynamicColliders = Array.isArray(dynamicSource) ? dynamicSource : [];
-  const overlayColliders = Array.isArray(overlaySource) ? overlaySource : [];
-  const out = Array.isArray(output) ? output : [];
-  out.length = 0;
-  const seen = dedupe instanceof Set ? dedupe : new Set();
-  seen.clear();
+export function getNearbyBuildings(x, z, radius = 80) {
+  const baseBuildings = appCtx.buildings || [];
+  const dynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [];
+  const overlayColliders = Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders : [];
 
   if (!Number.isFinite(x) || !Number.isFinite(z) || !buildingSpatialIndex || buildingSpatialIndex.size === 0) {
-    for (let i = 0; i < baseBuildings.length; i += 1) {
-      if (!isSuppressedBaseBuilding(baseBuildings[i])) out.push(baseBuildings[i]);
-    }
-    out.push(...dynamicColliders, ...overlayColliders);
-    return out;
+    return baseBuildings.filter((building) => !isSuppressedBaseBuilding(building)).concat(dynamicColliders, overlayColliders);
   }
 
   const queryRadius = Math.max(20, radius);
@@ -124,6 +90,9 @@ export function getNearbyBuildings(x, z, radius = 80, output = null, dedupe = nu
   const maxCellX = Math.floor((x + queryRadius) / BUILDING_INDEX_CELL_SIZE);
   const minCellZ = Math.floor((z - queryRadius) / BUILDING_INDEX_CELL_SIZE);
   const maxCellZ = Math.floor((z + queryRadius) / BUILDING_INDEX_CELL_SIZE);
+  const out = [];
+  const seen = new Set();
+
   for (let cx = minCellX; cx <= maxCellX; cx++) {
     for (let cz = minCellZ; cz <= maxCellZ; cz++) {
       const bucket = buildingSpatialIndex.get(`${cx},${cz}`);

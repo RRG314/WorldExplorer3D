@@ -6,9 +6,10 @@ import {
   materialBatchKey,
   appendGeometryWithTransform
 } from "./geometry-batching.js?v=4";
-import { restoreFacadeWallMask } from "../engine/building-facade-shader.js?v=1";
+import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 
-const BUILDING_BATCH_CELL_METERS = 420;
+const NEAR_BUILDING_BATCH_CELL_METERS = 360;
+const MID_BUILDING_BATCH_CELL_METERS = 960;
 
 function buildingMeshCenter(mesh) {
   const footprint = mesh?.userData?.buildingFootprint;
@@ -24,21 +25,31 @@ function buildingMeshCenter(mesh) {
   return boundingSphereCenter(mesh, Number(mesh?.position?.x || 0), Number(mesh?.position?.z || 0));
 }
 
-export function batchMidLodBuildingMeshes() {
-  return batchBuildingMeshesByTier(['mid']);
+export async function batchMidLodBuildingMeshes(options = {}) {
+  return batchBuildingMeshesByTier(['mid'], options);
 }
 
-function batchBuildingMeshesByTier(tiers = ['near']) {
+async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
   try {
     if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length < 2) return 0;
     const tierSet = new Set(Array.isArray(tiers) ? tiers : ['near']);
 
     const keep = [];
     const groups = new Map();
+    const yieldEveryGroups = Math.max(1, Math.floor(Number(options.yieldEveryGroups) || 4));
+    const yieldEveryMeshes = Math.max(1, Math.floor(Number(options.yieldEveryMeshes) || 32));
+    const yieldToMainThread = typeof options.yieldToMainThread === 'function'
+      ? options.yieldToMainThread
+      : defaultYieldToMainThread;
 
     for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
       const mesh = appCtx.buildingMeshes[i];
+      try {
       if (!mesh) continue;
+      if (mesh.userData?.isMappedVessel) {
+        keep.push(mesh);
+        continue;
+      }
       const tier = mesh.userData?.lodTier || 'near';
       if (!tierSet.has(tier) || mesh.userData?.isBuildingBatch) {
         keep.push(mesh);
@@ -55,8 +66,14 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
         continue;
       }
       const center = buildingMeshCenter(mesh);
-      const cellX = Math.floor(center.x / BUILDING_BATCH_CELL_METERS);
-      const cellZ = Math.floor(center.z / BUILDING_BATCH_CELL_METERS);
+      // Near geometry keeps smaller cells for precise view culling. Mid-LOD
+      // geometry is already a skyline representation, so larger cells remove
+      // thousands of material/cell draw-call fragments in dense cities.
+      const cellSize = tier === 'mid'
+        ? MID_BUILDING_BATCH_CELL_METERS
+        : NEAR_BUILDING_BATCH_CELL_METERS;
+      const cellX = Math.floor(center.x / cellSize);
+      const cellZ = Math.floor(center.z / cellSize);
       const key = `${tier}|${cellX},${cellZ}|${matKey}`;
       if (!groups.has(key)) {
         groups.set(key, {
@@ -67,6 +84,11 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
         });
       }
       groups.get(key).meshes.push(mesh);
+      } finally {
+        if ((i + 1) % yieldEveryMeshes === 0 && i + 1 < appCtx.buildingMeshes.length) {
+          await yieldToMainThread();
+        }
+      }
     }
 
     if (groups.size === 0) return 0;
@@ -74,18 +96,23 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
     const batchedMeshes = [];
     let sourceMeshCount = 0;
 
-    groups.forEach((group) => {
+    const groupEntries = [...groups.values()];
+    for (let groupIndex = 0; groupIndex < groupEntries.length; groupIndex += 1) {
+      const group = groupEntries[groupIndex];
+      try {
       if (!group || !Array.isArray(group.meshes) || group.meshes.length < 2) {
         if (group?.meshes?.length === 1) keep.push(group.meshes[0]);
-        return;
+        continue;
       }
 
       const batch = { positions: [], normals: [], uvs: [], indices: [] };
       const sourceMeshes = [];
       const xzPoints = [];
+      const provenanceByFeatureId = new Map();
 
       for (let i = 0; i < group.meshes.length; i++) {
         const mesh = group.meshes[i];
+        try {
         mesh.updateMatrixWorld(true);
         const appendCount = appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
         if (appendCount <= 0) {
@@ -93,26 +120,46 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
           continue;
         }
         sourceMeshes.push(mesh);
+        const provenance = mesh.userData?.buildingProvenance;
+        const featureId = provenance?.identity?.featureId;
+        if (featureId) provenanceByFeatureId.set(featureId, provenance);
 
         xzPoints.push(buildingMeshCenter(mesh));
+        } finally {
+          if ((i + 1) % yieldEveryMeshes === 0 && i + 1 < group.meshes.length) {
+            await yieldToMainThread();
+          }
+        }
       }
 
       if (sourceMeshes.length < 2) {
         keep.push(...sourceMeshes);
-        return;
+        continue;
       }
 
       const geometry = buildMergedGeometry(batch);
       if (!geometry) {
         keep.push(...sourceMeshes);
-        return;
+        continue;
       }
 
       const material = group.material.clone();
-      restoreFacadeWallMask(material);
+      // THREE.Material.clone() does not preserve custom shader callbacks.
+      // Building batches must keep the single facade owner's wall mask so the
+      // shared atlas never spills across horizontal roof caps.
+      material.onBeforeCompile = group.material.onBeforeCompile;
+      material.customProgramCacheKey = group.material.customProgramCacheKey;
+      material.userData = {
+        ...(material.userData || {}),
+        sharedRuntimeMaterial: false,
+        buildingBatchMaterial: true
+      };
       const mergedMesh = new THREE.Mesh(geometry, material);
       mergedMesh.renderOrder = group.renderOrder;
-      mergedMesh.castShadow = true;
+      // The shadow camera only covers the near field. Rendering every distant
+      // skyline batch into that pass doubles dense-city draw pressure and
+      // creates the broad, unstable building shadow bands seen from aircraft.
+      mergedMesh.castShadow = group.lodTier !== 'mid';
       mergedMesh.receiveShadow = true;
       mergedMesh.frustumCulled = true;
 
@@ -135,15 +182,21 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
         isBuildingBatch: true,
         isNearBuildingBatch: true,
         batchCount: sourceMeshes.length,
+        buildingProvenanceRecords: Object.freeze([...provenanceByFeatureId.values()]),
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };
 
-      appCtx.scene.add(mergedMesh);
+      appCtx.addEarthWorldObject(mergedMesh);
       batchedMeshes.push(mergedMesh);
       for (let i = 0; i < sourceMeshes.length; i++) disposeSceneMesh(sourceMeshes[i]);
       sourceMeshCount += sourceMeshes.length;
-    });
+      } finally {
+        if ((groupIndex + 1) % yieldEveryGroups === 0 && groupIndex + 1 < groupEntries.length) {
+          await yieldToMainThread();
+        }
+      }
+    }
 
     if (!batchedMeshes.length) {
       appCtx._lastBuildingBatchStats = { groupCount: groups.size, batchMeshCount: 0, sourceMeshCount: 0 };
@@ -168,6 +221,6 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
   }
 }
 
-export function batchNearLodBuildingMeshes() {
-  return batchBuildingMeshesByTier(['near']);
+export async function batchNearLodBuildingMeshes(options = {}) {
+  return batchBuildingMeshesByTier(['near'], options);
 }

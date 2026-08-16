@@ -10,10 +10,18 @@ import {
   setDoc,
   where,
   writeBatch
-} from '../platform/firebase/firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=66';
+import {
+  BLOCK_MATERIALS,
+  blockDocumentIdFromCoords,
+  normalizeBlockMaterial,
+  normalizeBlockRotation,
+  normalizeBlockShape,
+  normalizeBlockVerticalGrid
+} from '../block-builder/catalog.js?v=2';
+import { normalizeCode } from './rooms.js?v=67';
 
 const ROOM_COLLECTION = 'rooms';
 const BLOCKS_COLLECTION = 'blocks';
@@ -21,8 +29,7 @@ const BLOCKS_RESULT_LIMIT = 400;
 const BLOCK_COORD_MIN = -50000;
 const BLOCK_COORD_MAX = 50000;
 const BLOCK_MATERIAL_MIN = 0;
-const BLOCK_MATERIAL_MAX = 64;
-const BLOCK_SHAPES = new Set(['cube', 'slab', 'ramp', 'column', 'wedge', 'pyramid']);
+const BLOCK_MATERIAL_MAX = BLOCK_MATERIALS.length - 1;
 
 function getServices() {
   const { db } = initFirebase();
@@ -51,28 +58,14 @@ function clampInt(value, min, max, fallback = min) {
   return n;
 }
 
-function blockDocIdFromCoords(gx, gy, gz) {
-  return `${toInt(gx, 0)}_${toInt(gy, 0)}_${toInt(gz, 0)}`;
-}
-
-function normalizeBlockShape(value) {
-  const shape = String(value || '').toLowerCase();
-  return BLOCK_SHAPES.has(shape) ? shape : 'cube';
-}
-
-function normalizeBlockRotation(value) {
-  const rotation = toInt(value, 0);
-  return ((rotation % 4) + 4) % 4;
-}
-
 function normalizeSharedBlockInput(raw = {}) {
   const gx = clampInt(raw.gx, BLOCK_COORD_MIN, BLOCK_COORD_MAX, 0);
-  const gy = clampInt(raw.gy, BLOCK_COORD_MIN, BLOCK_COORD_MAX, 0);
+  const gy = Math.max(BLOCK_COORD_MIN, Math.min(BLOCK_COORD_MAX, normalizeBlockVerticalGrid(raw.gy)));
   const gz = clampInt(raw.gz, BLOCK_COORD_MIN, BLOCK_COORD_MAX, 0);
-  const materialIndex = clampInt(raw.materialIndex, BLOCK_MATERIAL_MIN, BLOCK_MATERIAL_MAX, 0);
+  const materialIndex = normalizeBlockMaterial(raw.materialIndex);
   const shape = normalizeBlockShape(raw.shape);
   const rotation = normalizeBlockRotation(raw.rotation);
-  const id = String(raw.id || blockDocIdFromCoords(gx, gy, gz));
+  const id = blockDocumentIdFromCoords(gx, gy, gz);
   return { id, gx, gy, gz, materialIndex, shape, rotation };
 }
 
@@ -85,11 +78,11 @@ function toSharedBlockObject(blockSnap) {
   const materialIndex = Number(data.materialIndex);
   if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return null;
   return {
-    id: String(data.id || blockSnap.id || blockDocIdFromCoords(gx, gy, gz)),
+    id: String(data.id || blockSnap.id || blockDocumentIdFromCoords(gx, gy, gz)),
     gx: Math.round(gx),
-    gy: Math.round(gy),
+    gy: normalizeBlockVerticalGrid(gy),
     gz: Math.round(gz),
-    materialIndex: Number.isFinite(materialIndex) ? Math.max(BLOCK_MATERIAL_MIN, Math.min(BLOCK_MATERIAL_MAX, Math.round(materialIndex))) : 0,
+    materialIndex: Number.isFinite(materialIndex) ? normalizeBlockMaterial(materialIndex) : 0,
     shape: normalizeBlockShape(data.shape),
     rotation: normalizeBlockRotation(data.rotation),
     createdBy: String(data.createdBy || ''),
@@ -192,7 +185,7 @@ function listenSharedBlocks(roomId, callback, options = {}) {
     callback(rows);
   }, (err) => {
     console.warn('[multiplayer][blocks] listenSharedBlocks failed:', err);
-    callback([]);
+    if (typeof options.onError === 'function') options.onError(err);
   });
 }
 

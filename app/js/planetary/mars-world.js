@@ -1,9 +1,10 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=20';
-import { ENV, getEnv } from '../env.js?v=57';
+import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=17';
+import { ENV, getEnv } from '../env.js?v=58';
 import {
   commitEnvironment,
-  exitCurrentEnvironmentSync
+  exitCurrentEnvironmentSync,
+  registerEnvironmentLifecycle
 } from '../session-coordinator.js?v=2';
 import { configureColorTexture } from './catalog.js?v=1';
 import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
@@ -347,7 +348,7 @@ function prepareMarsTitleExit() {
   }
 }
 
-const marsDestinationAdapter = Object.freeze({
+registerEnvironmentLifecycle(ENV.MARS, {
   exitSync: prepareMarsTitleExit,
   snapshot: () => ({
     active: getEnv() === ENV.MARS,
@@ -372,7 +373,6 @@ export {
   arriveAtMars,
   cancelPendingMarsTransition,
   directTravelToMars,
-  marsDestinationAdapter,
   prepareEarthDepartureForMars,
   prepareMarsTitleExit,
   returnFromMars,

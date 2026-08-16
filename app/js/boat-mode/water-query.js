@@ -33,12 +33,13 @@ import {
   resolveBoatSpawnPoint,
   segmentDistanceInfo,
   shortestAngleDelta
-} from './water-geometry.js?v=2';
+} from './water-geometry.js?v=4';
 import {
   normalizeWaterBody,
   resolveWaterBodySurfaceY,
   waterKindLabel
-} from '../world/water-body-contract.js?v=2';
+} from '../world/water-body-contract.js?v=3';
+import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
 
 let _waterRaycaster = null;
 let _waterRayStart = null;
@@ -97,6 +98,7 @@ function buildSyntheticBoatCandidate(x, z, options = {}) {
     inside: true,
     distanceToWater: 0,
     shorelineDistance: radius,
+    shorelineDistanceKnown: false,
     entryPoint: { x: x + radius, z },
     tangent: { x: 0, z: 1 },
     spawnX: x,
@@ -265,12 +267,40 @@ function resolveBoatHeading(candidate, fallbackAngle = 0) {
 
 function getReferencePosition() {
   if (appCtx.boatMode?.active) {
-    return { x: appCtx.boat.x, z: appCtx.boat.z, angle: appCtx.boat.angle, mode: 'boat' };
+    return { x: appCtx.boat.x, y: appCtx.boat.y, z: appCtx.boat.z, angle: appCtx.boat.angle, mode: 'boat' };
   }
-  if (appCtx.droneMode) return null;
+  if (appCtx.planeMode?.active) {
+    if (appCtx.planeMode.airborne) return null;
+    return {
+      x: appCtx.planeMode.x,
+      y: appCtx.planeMode.y,
+      z: appCtx.planeMode.z,
+      angle: Number.isFinite(appCtx.planeMode.yaw) ? appCtx.planeMode.yaw : 0,
+      mode: 'plane'
+    };
+  }
+  if (appCtx.droneMode) {
+    const x = Number(appCtx.drone?.x);
+    const y = Number(appCtx.drone?.y);
+    const z = Number(appCtx.drone?.z);
+    if (![x, y, z].every(Number.isFinite)) return null;
+    const sampledGroundY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
+    const groundY = Number.isFinite(sampledGroundY)
+      ? sampledGroundY
+      : appCtx.terrainMeshHeightAt?.(x, z);
+    if (!Number.isFinite(groundY) || y - groundY > 4) return null;
+    return {
+      x,
+      y,
+      z,
+      angle: Number.isFinite(appCtx.drone.yaw) ? appCtx.drone.yaw : 0,
+      mode: 'drone'
+    };
+  }
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) {
     return {
       x: appCtx.Walk.state.walker.x,
+      y: appCtx.Walk.state.walker.y,
       z: appCtx.Walk.state.walker.z,
       angle: Number.isFinite(appCtx.Walk.state.walker.angle) ? appCtx.Walk.state.walker.angle : appCtx.Walk.state.walker.yaw || 0,
       mode: 'walk'
@@ -278,16 +308,21 @@ function getReferencePosition() {
   }
   return {
     x: Number.isFinite(appCtx.car?.x) ? appCtx.car.x : 0,
+    y: Number.isFinite(appCtx.car?.y) ? appCtx.car.y : 0,
     z: Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0,
     angle: Number.isFinite(appCtx.car?.angle) ? appCtx.car.angle : 0,
-    mode: 'drive'
+    mode: 'drive',
+    structureTerrainMode:
+      appCtx.car?.onRoad === true ?
+        String(appCtx.car?.road?.structureSemantics?.terrainMode || 'at_grade') :
+        'at_grade'
   };
 }
 
 function buildAreaCandidate(area, x, z) {
   const classification = classifyWaterArea(area);
   if (!classification) return null;
-  const inside = typeof appCtx.pointInPolygon === 'function' && appCtx.pointInPolygon(x, z, area.pts);
+  const inside = pointInWaterBody(area, x, z);
   const nearest = nearestPointOnPolygon(x, z, area.pts);
   if (!nearest) return null;
   const stats = area._boatStats || polygonStats(area.pts);
@@ -309,6 +344,10 @@ function buildAreaCandidate(area, x, z) {
     inside,
     distanceToWater: inside ? 0 : nearest.dist,
     shorelineDistance: localShorelineDistance,
+    // Vector-ocean polygons are clipped into source tiles, so the nearest
+    // polygon edge is not necessarily a coastline and must not be presented
+    // as a measured distance to shore.
+    shorelineDistanceKnown: classification.kind !== 'open_ocean',
     entryPoint: nearest.point,
     tangent: nearest.tangent,
     spawnX,
@@ -345,13 +384,25 @@ function buildWaterwayCandidate(way, x, z) {
 }
 
 function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANCE, options = {}) {
+  if (String(options.structureTerrainMode || '') === 'subgrade') return null;
   let best = null;
+  const requireContainment = options.requireContainment !== false;
+  const referenceY = Number(options.referenceY);
+  const maximumVerticalDelta = Math.max(0.5, Number(options.maximumVerticalDelta) || 2.8);
+  const verticallyReachable = (candidate) => {
+    if (!Number.isFinite(referenceY)) return true;
+    const surfaceY = waterSurfaceBaseYAt(x, z, candidate);
+    return Number.isFinite(surfaceY) &&
+      Math.abs(referenceY - surfaceY) <= maximumVerticalDelta;
+  };
   const areas = Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [];
   const ways = Array.isArray(appCtx.waterways) ? appCtx.waterways : [];
 
   for (let i = 0; i < areas.length; i++) {
     const candidate = buildAreaCandidate(areas[i], x, z);
     if (!candidate) continue;
+    if (requireContainment && !candidate.inside) continue;
+    if (!verticallyReachable(candidate)) continue;
     if (!candidate.inside && candidate.distanceToWater > candidateMaxDistance(candidate, maxDistance)) continue;
     if (!best || candidateDistanceScore(candidate) < candidateDistanceScore(best)) best = candidate;
   }
@@ -359,6 +410,8 @@ function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANC
   for (let i = 0; i < ways.length; i++) {
     const candidate = buildWaterwayCandidate(ways[i], x, z);
     if (!candidate) continue;
+    if (requireContainment && !candidate.inside) continue;
+    if (!verticallyReachable(candidate)) continue;
     if (!candidate.inside && candidate.distanceToWater > candidateMaxDistance(candidate, maxDistance)) continue;
     if (!best || candidateDistanceScore(candidate) < candidateDistanceScore(best)) best = candidate;
   }

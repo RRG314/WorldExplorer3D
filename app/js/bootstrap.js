@@ -4,7 +4,7 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=336';
+} from './modules/manifest.js?v=442';
 import { loadScriptList } from './modules/script-loader.js?v=56';
 import {
   initStartupDiagnostics,
@@ -12,6 +12,7 @@ import {
   showStartupDiagnostics,
   summarizeStartupError
 } from './startup-diagnostics.js?v=2';
+import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
 
 initStartupDiagnostics();
 recordStartupDiagnostic('bootstrap', 'bootstrap script loaded');
@@ -51,57 +52,28 @@ function formatReason(reason) {
   return reason?.stack || reason?.message || String(reason);
 }
 
-function resolveScriptSources(sources) {
-  return sources.map((source) => new URL(source, import.meta.url).toString());
-}
-
-function deferOptionalRenderingScripts(appApi) {
-  if (vendorScriptsOptional.length === 0) return;
-  const resolvedOptionalScripts = resolveScriptSources(vendorScriptsOptional);
-  let loadPromise = null;
-
-  const loadOptionalScripts = () => {
-    if (loadPromise) return loadPromise;
-    loadPromise = loadScriptList(resolvedOptionalScripts, { timeoutMs: 10000 })
-      .then(() => {
-        recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
-        appApi?.tryEnablePostProcessing?.();
-        return true;
-      })
-      .catch((error) => {
-        recordStartupDiagnostic(
-          'bootstrap',
-          'optional rendering scripts failed',
-          summarizeStartupError(error)
-        );
-        console.warn('[bootstrap] Optional rendering scripts not fully available:', error);
-        appApi?.tryEnablePostProcessing?.();
-        return false;
-      });
-    return loadPromise;
-  };
-
-  globalThis.addEventListener('we3d:game-started', loadOptionalScripts, { once: true });
-}
-
 async function boot() {
   try {
     recordStartupDiagnostic('bootstrap', 'loading critical vendor scripts');
-    const [coreThreeScript, ...dependentVendorScripts] = resolveScriptSources(vendorScriptsCritical);
+    const [coreThreeScript, ...dependentVendorScripts] = vendorScriptsCritical;
     if (coreThreeScript) {
       await loadScriptList([coreThreeScript], { timeoutMs: 12000 });
     }
     if (dependentVendorScripts.length > 0) {
-      await loadScriptList(dependentVendorScripts, { timeoutMs: 12000 });
+      await loadScriptList(dependentVendorScripts, { timeoutMs: 12000, parallel: true });
     }
     recordStartupDiagnostic('bootstrap', 'critical vendor scripts ready', {
       hasTHREE: !!globalThis.THREE,
+      hasRGBELoader: !!globalThis.THREE?.RGBELoader,
+      hasDRACOLoader: !!globalThis.THREE?.DRACOLoader,
       hasGLTFLoader: !!globalThis.THREE?.GLTFLoader
     });
     console.log(
       '[bootstrap] critical vendor state:',
       JSON.stringify({
         hasTHREE: !!globalThis.THREE,
+        hasRGBELoader: !!globalThis.THREE?.RGBELoader,
+        hasDRACOLoader: !!globalThis.THREE?.DRACOLoader,
         hasGLTFLoader: !!globalThis.THREE?.GLTFLoader
       })
     );
@@ -111,7 +83,13 @@ async function boot() {
     recordStartupDiagnostic('bootstrap', 'loading classic scripts', { count: resolvedClassicScripts.length });
     await loadScriptList(resolvedClassicScripts, { timeoutMs: 12000 });
 
-    const entrypoint = new URL(moduleEntrypoint, import.meta.url).toString();
+    const configuredEntrypoint = String(
+      globalThis.__WORLD_EXPLORER_PRODUCTION__?.appEntrypoint || ''
+    );
+    const entrypoint = new URL(
+      configuredEntrypoint || moduleEntrypoint,
+      import.meta.url
+    ).toString();
     recordStartupDiagnostic('bootstrap', 'importing module entrypoint', { entrypoint });
     const appModule = await import(entrypoint);
     const appApi = typeof appModule.bootApp === 'function'
@@ -120,7 +98,23 @@ async function boot() {
     recordStartupDiagnostic('bootstrap', 'entrypoint booted', { entrypoint });
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
-    deferOptionalRenderingScripts(appApi);
+    if (vendorScriptsOptional.length > 0) {
+      scheduleAfterFirstPlay('optional-rendering-vendors', () =>
+        loadScriptList(vendorScriptsOptional, { timeoutMs: 10000, parallel: true })
+        .then(() => {
+          recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
+          if (typeof appApi?.tryEnablePostProcessing === 'function') {
+            appApi.tryEnablePostProcessing();
+          }
+        })
+        .catch((err) => {
+          recordStartupDiagnostic('bootstrap', 'optional rendering scripts failed', summarizeStartupError(err));
+          console.warn('[bootstrap] Optional rendering scripts not fully available:', err);
+          if (typeof appApi?.tryEnablePostProcessing === 'function') {
+            appApi.tryEnablePostProcessing();
+          }
+        }), { timeout: 2400 });
+    }
   } catch (error) {
     recordStartupDiagnostic('bootstrap', 'fatal load error', summarizeStartupError(error));
     console.error('[bootstrap] Fatal load error:', error);

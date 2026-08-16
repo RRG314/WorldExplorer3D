@@ -1,115 +1,63 @@
-const QUALITY_LOW = 'low';
-const QUALITY_HIGH = 'high';
+const SHADOW_RADIUS_WORLD_UNITS = 150;
 
-function normalizeTier(value) {
-  const tier = String(value || '').toLowerCase();
-  if (tier === 'low' || tier === 'mid' || tier === 'high') return tier;
-  return 'mid';
+function qualityResolution(gpuTier, quality) {
+  if (quality === 'low') return 0;
+  if (gpuTier === 'low') return quality === 'high' ? 512 : 256;
+  if (gpuTier === 'mid') return quality === 'high' ? 1024 : 512;
+  return quality === 'high' ? 2048 : 1024;
 }
 
-function createShadowPolicy({ quality, gpuTier } = {}) {
-  const level = String(quality || '').toLowerCase();
-  const tier = normalizeTier(gpuTier);
-  if (level === QUALITY_LOW) {
-    return Object.freeze({
-      enabled: false,
-      mapType: 'disabled',
-      resolution: 0,
-      halfExtent: 0,
-      near: 0.5,
-      far: 500,
-      radius: 0,
-      bias: -0.00008,
-      normalBias: 0.025
-    });
-  }
+export function applyDirectionalShadowPolicy(appCtx, options = {}) {
+  const sun = appCtx?.sun;
+  const renderer = appCtx?.renderer;
+  if (!sun || !renderer) return null;
+  const quality = String(options.quality || appCtx.renderQualityLevel || 'med');
+  const gpuTier = String(options.gpuTier || 'high');
+  const resolution = qualityResolution(gpuTier, quality);
+  const enabled = resolution > 0;
 
-  const highQuality = level === QUALITY_HIGH;
-  const resolution = tier === 'high'
-    ? 2048
-    : tier === 'mid'
-      ? (highQuality ? 2048 : 1024)
-      : (highQuality ? 1024 : 512);
-  return Object.freeze({
-    enabled: true,
-    mapType: 'pcf-soft',
-    resolution,
-    halfExtent: highQuality ? 72 : 88,
-    near: 0.5,
-    far: 440,
-    radius: highQuality ? 3 : 2,
-    bias: -0.00008,
-    normalBias: highQuality ? 0.018 : 0.025
-  });
-}
-
-function applyShadowPolicy({ renderer, sun, three, policy }) {
-  if (!policy) throw new TypeError('Shadow policy is required.');
-  if (renderer?.shadowMap) {
-    renderer.shadowMap.enabled = policy.enabled;
-    if (policy.enabled && three?.PCFSoftShadowMap !== undefined) {
-      renderer.shadowMap.type = three.PCFSoftShadowMap;
-    }
-  }
-  if (!sun?.shadow) return policy;
-
-  sun.castShadow = policy.enabled;
-  const size = policy.enabled ? policy.resolution : 1;
-  sun.shadow.mapSize.width = size;
-  sun.shadow.mapSize.height = size;
-  sun.shadow.radius = policy.radius;
-  sun.shadow.bias = policy.bias;
-  sun.shadow.normalBias = policy.normalBias;
-  const camera = sun.shadow.camera;
-  if (camera) {
-    camera.left = -policy.halfExtent;
-    camera.right = policy.halfExtent;
-    camera.top = policy.halfExtent;
-    camera.bottom = -policy.halfExtent;
-    camera.near = policy.near;
-    camera.far = policy.far;
-    camera.updateProjectionMatrix?.();
-  }
+  renderer.shadowMap.enabled = enabled;
+  renderer.shadowMap.type = quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  sun.castShadow = enabled;
+  sun.shadow.mapSize.set(Math.max(1, resolution), Math.max(1, resolution));
+  sun.shadow.camera.left = -SHADOW_RADIUS_WORLD_UNITS;
+  sun.shadow.camera.right = SHADOW_RADIUS_WORLD_UNITS;
+  sun.shadow.camera.top = SHADOW_RADIUS_WORLD_UNITS;
+  sun.shadow.camera.bottom = -SHADOW_RADIUS_WORLD_UNITS;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 620;
+  sun.shadow.bias = 0;
+  sun.shadow.normalBias = quality === 'high' ? 0.045 : 0.06;
+  sun.shadow.radius = quality === 'high' ? 2 : 1;
+  sun.shadow.camera.updateProjectionMatrix?.();
   sun.shadow.needsUpdate = true;
-  sun.userData = sun.userData || {};
-  sun.userData.shadowPolicy = policy;
-  return policy;
+  sun.userData.shadowPolicy = {
+    owner: 'engine/shadow-policy',
+    quality,
+    gpuTier,
+    resolution,
+    radiusWorldUnits: SHADOW_RADIUS_WORLD_UNITS
+  };
+  return sun.userData.shadowPolicy;
 }
 
-function updateShadowAnchor({ sun, focus, policy }) {
-  if (!policy?.enabled || !sun?.position || !sun?.target?.position || !focus) return false;
-  const focusX = Number(focus.x);
-  const focusY = Number(focus.y);
-  const focusZ = Number(focus.z);
-  if (![focusX, focusY, focusZ].every(Number.isFinite)) return false;
+export function updateStableDirectionalShadow(appCtx, direction, observer) {
+  const sun = appCtx?.sun;
+  if (!sun || !observer) return false;
+  const policy = sun.userData?.shadowPolicy;
+  const resolution = Math.max(1, Number(policy?.resolution) || 1);
+  const span = Math.max(1, Number(policy?.radiusWorldUnits || SHADOW_RADIUS_WORLD_UNITS) * 2);
+  const texelWorldSize = span / resolution;
+  const snap = (value) => Math.round(Number(value || 0) / texelWorldSize) * texelWorldSize;
+  const targetX = snap(observer.x);
+  const targetY = snap(observer.y);
+  const targetZ = snap(observer.z);
+  const dirX = Number.isFinite(direction?.x) ? direction.x : 0.52;
+  const dirY = Number.isFinite(direction?.y) ? direction.y : 0.82;
+  const dirZ = Number.isFinite(direction?.z) ? direction.z : 0.22;
 
-  const texelSize = (policy.halfExtent * 2) / Math.max(1, policy.resolution);
-  const snappedX = Math.round(focusX / texelSize) * texelSize;
-  const snappedY = Math.round(focusY / texelSize) * texelSize;
-  const snappedZ = Math.round(focusZ / texelSize) * texelSize;
-  const state = sun.userData?.shadowAnchor;
-  if (state &&
-      state.x === snappedX &&
-      state.y === snappedY &&
-      state.z === snappedZ) {
-    return false;
-  }
-
-  const target = sun.target.position;
-  const offsetX = sun.position.x - target.x;
-  const offsetY = sun.position.y - target.y;
-  const offsetZ = sun.position.z - target.z;
-  target.set(snappedX, snappedY, snappedZ);
-  sun.position.set(snappedX + offsetX, snappedY + offsetY, snappedZ + offsetZ);
-  sun.target.updateMatrixWorld?.();
-  sun.updateMatrixWorld?.();
-  sun.userData = sun.userData || {};
-  sun.userData.shadowAnchor = { x: snappedX, y: snappedY, z: snappedZ };
+  sun.position.set(targetX + dirX * 260, targetY + dirY * 260, targetZ + dirZ * 260);
+  sun.target?.position.set(targetX, targetY, targetZ);
+  sun.target?.updateMatrixWorld?.();
   return true;
 }
-
-export {
-  applyShadowPolicy,
-  createShadowPolicy,
-  updateShadowAnchor
-};

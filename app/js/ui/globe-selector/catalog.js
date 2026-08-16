@@ -1,4 +1,4 @@
-import { distanceKmBetween, normalizeCityRecord } from './helpers.js?v=4';
+import { distanceKmBetween, normalizeCityRecord } from './helpers.js?v=7';
 
 const OVERPASS_ENDPOINTS = [
   'https://lz4.overpass-api.de/api/interpreter',

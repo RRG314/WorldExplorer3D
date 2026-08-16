@@ -174,5 +174,8 @@ export function disposeSceneMesh(mesh) {
   if (!mesh) return;
   mesh.parent?.remove?.(mesh);
   if (mesh.geometry) mesh.geometry.dispose();
-  if (mesh.material) mesh.material.dispose();
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  materials.forEach((material) => {
+    if (material && material.userData?.sharedRuntimeMaterial !== true) material.dispose?.();
+  });
 }

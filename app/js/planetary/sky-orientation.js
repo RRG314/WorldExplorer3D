@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=11';
+import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=15';
 import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
@@ -69,6 +69,11 @@ function clearPlanetarySky() {
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
   if (marsAtmosphere) marsAtmosphere.visible = false;
   appCtx.planetarySkyOrientation = null;
+  // Planetary modes directly restyle the shared star materials. Invalidate
+  // Earth's cached sky signature so the next forced astronomical refresh
+  // reapplies visibility and opacity even when the player returns to the same
+  // location and time-of-day bucket.
+  appCtx.invalidateSkyVisualCache?.();
 }
 
 function updatePlanetarySky() {

@@ -19,64 +19,64 @@ const SKY_PRESETS = {
   day: {
     skyColor: 0x87ceeb,
     groundColor: 0x545454,
-    hemiIntensity: 0.5,
+    hemiIntensity: 0.7,
     sunColor: 0xfff5e1,
     sunIntensity: 1.3,
     fillColor: 0x9db4ff,
-    fillIntensity: 0.35,
+    fillIntensity: 0.42,
     ambientColor: 0xffffff,
-    ambientIntensity: 0.35,
+    ambientIntensity: 0.52,
     fogColor: 0xb8d4e8,
     fogDensity: 0.00035,
-    exposure: 0.95,
+    exposure: 1.08,
     bloomStrength: 0.1,
     icon: "\u2600\ufe0f"
   },
   sunset: {
     skyColor: 0xff7e5f,
     groundColor: 0x3d2817,
-    hemiIntensity: 0.35,
+    hemiIntensity: 0.58,
     sunColor: 0xff6b35,
     sunIntensity: 0.9,
     fillColor: 0xff8c69,
-    fillIntensity: 0.25,
+    fillIntensity: 0.38,
     ambientColor: 0xffa07a,
-    ambientIntensity: 0.28,
+    ambientIntensity: 0.5,
     fogColor: 0xff9a76,
     fogDensity: 0.00045,
-    exposure: 1.1,
+    exposure: 1.12,
     bloomStrength: 0.2,
     icon: "\ud83c\udf05"
   },
   night: {
-    skyColor: 0x0a0e27,
-    groundColor: 0x000000,
-    hemiIntensity: 0.15,
+    skyColor: 0x111a38,
+    groundColor: 0x263142,
+    hemiIntensity: 0.58,
     sunColor: 0x6b8cff,
-    sunIntensity: 0.04,
-    fillColor: 0x1a2a4a,
-    fillIntensity: 0.12,
-    ambientColor: 0x404060,
-    ambientIntensity: 0.18,
-    fogColor: 0x0d1128,
+    sunIntensity: 0.14,
+    fillColor: 0x607ca8,
+    fillIntensity: 0.5,
+    ambientColor: 0x8a9bb8,
+    ambientIntensity: 0.55,
+    fogColor: 0x121a34,
     fogDensity: 0.00008,
-    exposure: 0.5,
-    bloomStrength: 0.35,
+    exposure: 1.08,
+    bloomStrength: 0.25,
     icon: "\ud83c\udf19"
   },
   sunrise: {
     skyColor: 0xffc4a3,
     groundColor: 0x4a3428,
-    hemiIntensity: 0.4,
+    hemiIntensity: 0.6,
     sunColor: 0xffe4b5,
     sunIntensity: 1.0,
     fillColor: 0xffb8a8,
-    fillIntensity: 0.28,
+    fillIntensity: 0.4,
     ambientColor: 0xffd4a3,
-    ambientIntensity: 0.3,
+    ambientIntensity: 0.5,
     fogColor: 0xffd4b8,
     fogDensity: 0.0004,
-    exposure: 1.0,
+    exposure: 1.1,
     bloomStrength: 0.2,
     icon: "\ud83c\udf04"
   }
@@ -89,6 +89,11 @@ const _moonDir = new THREE.Vector3(-0.4, 0.8, -0.2).normalize();
 const _fillDir = new THREE.Vector3(-0.3, 0.6, -0.7).normalize();
 let _lastAppliedSkySignature = "";
 let _lastStarOpacitySignature = "";
+
+export function invalidateSkyVisualCache() {
+  _lastAppliedSkySignature = "";
+  _lastStarOpacitySignature = "";
+}
 let _lastMoonPhaseSignature = "";
 
 function buildSkyCacheKey(lat, lon, timestamp) {
@@ -283,7 +288,9 @@ function applyStarVisibility(state) {
       child.userData.baseOpacity = material.opacity;
     }
     material.opacity = child.userData.baseOpacity * opacity;
-    material.transparent = material.opacity < 0.999 || material.transparent;
+    if (!material.userData?.skyBackgroundMaterial) {
+      material.transparent = material.opacity < 0.999 || material.transparent;
+    }
     material.needsUpdate = true;
   });
 
@@ -314,9 +321,7 @@ function applySkyVisualState(config, state) {
     Math.round((state?.moon?.phase || 0) * 128),
     Math.round((state?.starsOpacity || 0) * 100)
   ].join("|");
-  const backgroundMatches = appCtx.scene.background?.isColor &&
-    appCtx.scene.background.getHex() === config.skyColor;
-  if (_lastAppliedSkySignature === signature && backgroundMatches) return;
+  if (_lastAppliedSkySignature === signature) return;
   _lastAppliedSkySignature = signature;
 
   appCtx.timeOfDay = config.phase;
@@ -364,9 +369,8 @@ function applySkyVisualState(config, state) {
 
   if (appCtx.scene.fog?.isFogExp2) {
     appCtx.scene.fog.color.setHex(config.fogColor);
-    appCtx.scene.fog.density = config.fogDensity;
   } else {
-    appCtx.scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
+    appCtx.scene.fog = new THREE.FogExp2(config.fogColor, 0);
   }
 
   if (appCtx.renderer) {

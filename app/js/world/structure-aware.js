@@ -1,14 +1,23 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   assignFeatureConnections,
+  assignStructureStackRanks,
+  areRoadsConnected,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
+  sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=22";
+} from "../structure-semantics.js?v=48";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=13";
+import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=5";
+import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=2";
 import {
-  boundsIntersect,
-  polylineBounds
-} from "../structure-semantics/geometry.js?v=1";
+  createDriveableRoadConflictIndex,
+  supportPointConflictsWithDriveableRoad
+} from "./bridge-safety.js?v=8";
+import { refreshStructureColliders } from "./structure-colliders.js?v=9";
+import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -27,8 +36,7 @@ export function cloneStructureSemantics(semantics) {
 }
 
 export function worldBaseTerrainY(x, z) {
-  const surfaceY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
-  if (Number.isFinite(surfaceY)) return surfaceY;
+  if (typeof appCtx.baseTerrainHeightAt === 'function') return appCtx.baseTerrainHeightAt(x, z);
   if (typeof appCtx.terrainMeshHeightAt === 'function') return appCtx.terrainMeshHeightAt(x, z);
   return appCtx.elevationWorldYAtWorldXZ(x, z);
 }
@@ -40,25 +48,57 @@ function worldRenderedTerrainY(x, z) {
 
 function structureAwareLinearFeatures() {
   if (!Array.isArray(appCtx.linearFeatures)) return [];
-  return appCtx.linearFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+  return appCtx.linearFeatures.filter((feature) =>
+    feature?.structureSemantics?.gradeSeparated ||
+    feature?.structureSemantics?.structureKind === 'covered'
+  );
 }
 
-function featureBounds(feature, padding = 0) {
-  const bounds = feature?.bounds;
-  if (
-    Number.isFinite(bounds?.minX) &&
-    Number.isFinite(bounds?.maxX) &&
-    Number.isFinite(bounds?.minZ) &&
-    Number.isFinite(bounds?.maxZ)
-  ) {
+function createFeatureBoundsIndex(features = [], cellSize = 240) {
+  const buckets = new Map();
+  const boundsByFeature = new Map();
+  const boundsFor = (feature) => {
+    if (boundsByFeature.has(feature)) return boundsByFeature.get(feature);
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    const padding = (Number(feature?.width) || 4) + 24;
+    const bounds = feature?.bounds || points.reduce((result, point) => ({
+      minX: Math.min(result.minX, Number(point?.x) - padding),
+      maxX: Math.max(result.maxX, Number(point?.x) + padding),
+      minZ: Math.min(result.minZ, Number(point?.z) - padding),
+      maxZ: Math.max(result.maxZ, Number(point?.z) + padding)
+    }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    boundsByFeature.set(feature, bounds);
     return bounds;
+  };
+  for (const feature of features) {
+    const bounds = boundsFor(feature);
+    if (![bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ].every(Number.isFinite)) continue;
+    const minColumn = Math.floor(bounds.minX / cellSize);
+    const maxColumn = Math.floor(bounds.maxX / cellSize);
+    const minRow = Math.floor(bounds.minZ / cellSize);
+    const maxRow = Math.floor(bounds.maxZ / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        const key = `${column}:${row}`;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(feature);
+      }
+    }
   }
-  return polylineBounds(feature?.pts || [], padding);
-}
-
-function smoothstep01Local(value) {
-  const t = Math.max(0, Math.min(1, Number(value) || 0));
-  return t * t * (3 - 2 * t);
+  return (feature) => {
+    const bounds = boundsFor(feature);
+    const candidates = new Set();
+    const minColumn = Math.floor((bounds.minX - 14) / cellSize);
+    const maxColumn = Math.floor((bounds.maxX + 14) / cellSize);
+    const minRow = Math.floor((bounds.minZ - 14) / cellSize);
+    const maxRow = Math.floor((bounds.maxZ + 14) / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (const candidate of buckets.get(`${column}:${row}`) || []) candidates.add(candidate);
+      }
+    }
+    return [...candidates];
+  };
 }
 
 function featureBuildingContainmentStats(feature) {
@@ -126,123 +166,6 @@ function featureBuildingContainmentStats(feature) {
   };
 }
 
-function normalizeStructureEndpointHeights(structureFeatures) {
-  if (!Array.isArray(structureFeatures) || structureFeatures.length === 0) return;
-  const endpointGroups = new Map();
-
-  for (let i = 0; i < structureFeatures.length; i++) {
-    const feature = structureFeatures[i];
-    const semantics = feature?.structureSemantics;
-    const points = Array.isArray(feature?.pts) ? feature.pts : null;
-    const heights = feature?.surfaceHeights;
-    const distances = feature?.surfaceDistances;
-    if (!semantics?.gradeSeparated || !points || points.length < 2 || !(heights instanceof Float32Array) || !(distances instanceof Float32Array)) continue;
-    const entries = [
-      { index: 0, point: points[0] },
-      { index: points.length - 1, point: points[points.length - 1] }
-    ];
-    for (let e = 0; e < entries.length; e++) {
-      const entry = entries[e];
-      const point = entry.point;
-      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) continue;
-      const key = `${Math.round(point.x * 10)},${Math.round(point.z * 10)}:${semantics.verticalGroup || semantics.terrainMode || 'structure'}`;
-      let group = endpointGroups.get(key);
-      if (!group) {
-        group = [];
-        endpointGroups.set(key, group);
-      }
-      group.push({ feature, endpointIndex: entry.index, y: Number(heights[entry.index]) || 0 });
-    }
-  }
-
-  endpointGroups.forEach((entries) => {
-    if (!Array.isArray(entries) || entries.length < 2) return;
-    const averageY = entries.reduce((sum, entry) => sum + entry.y, 0) / entries.length;
-    for (let i = 0; i < entries.length; i++) {
-      const { feature, endpointIndex } = entries[i];
-      const heights = feature?.surfaceHeights;
-      const distances = feature?.surfaceDistances;
-      if (!(heights instanceof Float32Array) || !(distances instanceof Float32Array) || heights.length !== distances.length) continue;
-      const lastIndex = heights.length - 1;
-      const anchorIndex = endpointIndex === 0 ? 0 : lastIndex;
-      const delta = averageY - (Number(heights[anchorIndex]) || 0);
-      if (Math.abs(delta) < 0.01) continue;
-      const blendDistance = Math.max(12, Math.min(28, (Number(feature.width) || 6) * 2.6));
-      const totalDistance = Number(distances[lastIndex]) || 0;
-
-      for (let h = 0; h < heights.length; h++) {
-        const distanceFromEndpoint = endpointIndex === 0 ?
-          (Number(distances[h]) || 0) :
-          Math.max(0, totalDistance - (Number(distances[h]) || 0));
-        if (distanceFromEndpoint > blendDistance) continue;
-        const weight = 1 - smoothstep01Local(distanceFromEndpoint / Math.max(1, blendDistance));
-        heights[h] += delta * weight;
-      }
-      feature.structureSurfaceMinY = heights.reduce((best, value) => Math.min(best, value), Infinity);
-      feature.structureSurfaceMaxY = heights.reduce((best, value) => Math.max(best, value), -Infinity);
-    }
-  });
-}
-
-function smoothStructureSurfaceProfiles(structureFeatures) {
-  if (!Array.isArray(structureFeatures) || structureFeatures.length === 0) return;
-
-  for (let i = 0; i < structureFeatures.length; i++) {
-    const feature = structureFeatures[i];
-    const semantics = feature?.structureSemantics;
-    const heights = feature?.surfaceHeights;
-    const distances = feature?.surfaceDistances;
-    const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
-    if ((!semantics?.gradeSeparated && !hasTransitionAnchors) || !(heights instanceof Float32Array) || !(distances instanceof Float32Array) || heights.length < 4) continue;
-
-    const smoothed = new Float32Array(heights);
-    const passes =
-      semantics.terrainMode === 'elevated' ? 3 :
-      semantics.terrainMode === 'subgrade' ? 2 :
-      hasTransitionAnchors ? 2 :
-      1;
-
-    for (let pass = 0; pass < passes; pass++) {
-      const next = new Float32Array(smoothed);
-      const lastIndex = smoothed.length - 1;
-      for (let h = 1; h < lastIndex; h++) {
-        const current = smoothed[h];
-        const neighborAverage = (smoothed[h - 1] + smoothed[h + 1]) * 0.5;
-        let blend =
-          semantics?.terrainMode === 'elevated' ? 0.46 :
-          semantics?.terrainMode === 'subgrade' ? 0.4 :
-          hasTransitionAnchors ? 0.26 :
-          0.42;
-
-        if (Array.isArray(feature.structureStations) && feature.structureStations.length > 0) {
-          const distance = Number(distances[h]) || 0;
-          let nearestWeight = Infinity;
-          for (let s = 0; s < feature.structureStations.length; s++) {
-            const station = feature.structureStations[s];
-            const stationSpan = Math.max(1, Number(station?.span) || 1);
-            const normalizedDistance = Math.abs(distance - (Number(station?.distance) || 0)) / stationSpan;
-            nearestWeight = Math.min(nearestWeight, normalizedDistance);
-          }
-          if (nearestWeight < 0.35) blend = semantics?.terrainMode === 'elevated' ? 0.16 : 0.18;
-          else if (nearestWeight < 0.7) blend = semantics?.terrainMode === 'elevated' ? 0.24 : 0.28;
-        }
-
-        next[h] = current * (1 - blend) + neighborAverage * blend;
-      }
-      smoothed.set(next);
-    }
-    heights.set(smoothed);
-    const minimumSurfaceY = Number(feature.minimumStructureSurfaceY);
-    if (semantics?.terrainMode === 'elevated' && Number.isFinite(minimumSurfaceY)) {
-      for (let h = 0; h < heights.length; h++) {
-        heights[h] = Math.max(heights[h], minimumSurfaceY);
-      }
-    }
-    feature.structureSurfaceMinY = heights.reduce((best, value) => Math.min(best, value), Infinity);
-    feature.structureSurfaceMaxY = heights.reduce((best, value) => Math.max(best, value), -Infinity);
-  }
-}
-
 export function applyBuildingContextSemanticsToFeature(feature) {
   if (!feature) return;
   if (!feature.baseStructureSemantics) {
@@ -252,10 +175,22 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   const baseSemantics = feature.baseStructureSemantics || feature.structureSemantics || null;
   if (!baseSemantics) return;
 
+  const canBeEmbeddedElevatedFeature =
+    baseSemantics.terrainMode === 'elevated' &&
+    !baseSemantics.isBridge;
+  if (!canBeEmbeddedElevatedFeature) {
+    feature.structureSemantics = {
+      ...cloneStructureSemantics(baseSemantics),
+      embeddedInBuilding: false
+    };
+    if (feature.isStructureConnector === true) {
+      feature.isStructureConnector = feature.structureSemantics.gradeSeparated || feature.structureSemantics.skywalk === true;
+    }
+    return;
+  }
+
   const stats = featureBuildingContainmentStats(feature);
   const embeddedInBuilding =
-    baseSemantics.terrainMode === 'elevated' &&
-    !baseSemantics.isBridge &&
     stats.total > 0 &&
     (
       stats.insideRatio >= 0.62 ||
@@ -289,14 +224,29 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-export function refreshStructureAwareFeatureProfiles() {
+function* compileStructureAwareFeatureProfileSteps() {
+  const now = () => globalThis.performance?.now?.() ?? Date.now();
+  const compilationStartedAt = now();
+  const phaseDurationsMs = Object.create(null);
+  const measure = (name, task) => {
+    const startedAt = now();
+    try {
+      return task();
+    } finally {
+      phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+    }
+  };
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const connectorFeatures = structureAwareLinearFeatures();
   const transportFeatures = roadFeatures.concat(connectorFeatures);
+  const nearbyTransportFeatures = createFeatureBoundsIndex(transportFeatures);
 
-  for (let i = 0; i < transportFeatures.length; i++) {
-    applyBuildingContextSemanticsToFeature(transportFeatures[i]);
-  }
+  measure('buildingContext', () => {
+    for (let i = 0; i < transportFeatures.length; i++) {
+      applyBuildingContextSemanticsToFeature(transportFeatures[i]);
+    }
+  });
+  yield;
 
   if (Array.isArray(appCtx.linearFeatureMeshes)) {
     for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
@@ -309,68 +259,181 @@ export function refreshStructureAwareFeatureProfiles() {
   }
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
-  assignFeatureConnections(transportFeatures);
-
-  for (let i = 0; i < structureFeatures.length; i++) {
-    const feature = structureFeatures[i];
-    if (!feature?.structureSemantics?.gradeSeparated) continue;
-    const bounds = featureBounds(feature, (Number(feature.width) || 4) + 24);
-    const nearbyStructures = structureFeatures.filter((other) =>
-      other === feature || boundsIntersect(bounds, featureBounds(other, (Number(other?.width) || 4) + 18), 14)
-    );
-    const nearbyWaterAreas = (appCtx.waterAreas || []).filter((water) =>
-      boundsIntersect(bounds, featureBounds(water), 8)
-    );
-    feature.structureStations = buildFeatureStations(feature, {
-      features: nearbyStructures,
-      waterAreas: nearbyWaterAreas
+  measure('compileConnections', () => {
+    appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
+    appCtx.transportStructureModel = compileTransportStructureModel(transportFeatures, {
+      transportGraphId: appCtx.transportNetworkModel.id
+    });
+  });
+  yield;
+  if (appCtx.transportSurfacePublication?.authority === 'compiled_transport_surface') {
+    appCtx.transportSurfacePublication = Object.freeze({
+      ...appCtx.transportSurfacePublication,
+      transportGraphId: appCtx.transportNetworkModel.id,
+      roadCount: roadFeatures.length
     });
   }
+  measure('assignStackRanks', () => assignStructureStackRanks(
+    structureFeatures,
+    worldBaseTerrainY,
+    { areRoadsConnected }
+  ));
+  yield;
 
-  for (let i = 0; i < transportFeatures.length; i++) {
-    const feature = transportFeatures[i];
-    if (!feature) continue;
-    if (feature.structureSemantics?.terrainMode === 'at_grade') {
+  measure('buildInitialStations', () => {
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      if (!feature?.structureSemantics?.gradeSeparated) continue;
+      feature.structureStations = buildFeatureStations(feature, {
+        features: nearbyTransportFeatures(feature),
+        waterAreas: appCtx.waterAreas,
+        sampleTerrainY: worldBaseTerrainY
+      });
+    }
+  });
+  yield;
+
+  // Connection anchors must read surfaces compiled from the current graph and
+  // stack ranks. Reusing the pre-refresh models makes a merge target sample a
+  // stale deck height and leaves visible steps or open-air ramp ends.
+  measure('buildInitialProfiles', () => {
+    for (let i = 0; i < transportFeatures.length; i++) {
+      const feature = transportFeatures[i];
+      if (!feature) continue;
       feature.structureTransitionAnchors = [];
-      continue;
+      const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
+        ? worldRenderedTerrainY
+        : worldBaseTerrainY;
+      updateFeatureSurfaceProfile(feature, sampleTerrainY, {
+        surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+      });
     }
-    buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
-  }
+  });
+  yield;
 
-  const profiledFeatures = [];
-  for (let i = 0; i < transportFeatures.length; i++) {
-    const feature = transportFeatures[i];
-    if (!feature) continue;
-    const hasTransitionAnchors = Array.isArray(feature.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
-    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade' ?
-      worldRenderedTerrainY :
-      worldBaseTerrainY;
-    updateFeatureSurfaceProfile(feature, sampleTerrainY, {
-      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+  // Resolve crossing clearances once against the first compiled world-space
+  // surfaces. Nominal layer offsets alone are insufficient when two ramps
+  // have different endpoint-ground chords on sloped terrain.
+  measure('refineStructureProfiles', () => {
+    for (let refinement = 0; refinement < 3; refinement += 1) {
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        feature.structureStations = buildFeatureStations(feature, {
+          features: nearbyTransportFeatures(feature),
+          waterAreas: appCtx.waterAreas,
+          sampleTerrainY: worldBaseTerrainY
+        });
+      }
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        });
+      }
+    }
+  });
+  yield;
+
+  // A ramp endpoint and the interior freeway segment it joins are one physical
+  // surface. A single anchor pass reads the target's provisional profile and
+  // then recompiles both roads independently, which left real merge steps over
+  // two metres high. Compile one shared graph-node constraint set from the
+  // refined profiles, then rebuild only the grade-separated roads once.
+  // Repeatedly deriving constraints from already-constrained profiles creates
+  // positive feedback through stacked interchanges and lifts decks skyward.
+  // Ordinary roads are not rebuilt here.
+  measure('compileJunctionProfiles', () => {
+    const junctionPasses = 1;
+    let junctionProfile = null;
+    for (let pass = 0; pass < junctionPasses; pass += 1) {
+      for (let i = 0; i < transportFeatures.length; i++) {
+        const feature = transportFeatures[i];
+        if (!feature) continue;
+        if (feature.structureSemantics?.terrainMode === 'at_grade') {
+          feature.structureTransitionAnchors = [];
+          continue;
+        }
+        buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
+      }
+      junctionProfile = buildTransportJunctionProfileAnchors(
+        transportFeatures,
+        appCtx.transportNetworkModel,
+        worldBaseTerrainY,
+        sampleFeatureSurfaceY
+      );
+      for (const [feature, anchors] of junctionProfile.anchorsByFeature) {
+        feature.structureTransitionAnchors.push(...anchors);
+      }
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        });
+      }
+    }
+    appCtx.transportJunctionProfile = Object.freeze({
+      authority: 'compiled_transport_graph_nodes',
+      nodeCount: junctionProfile?.nodeCount || 0,
+      constrainedFeatureCount: junctionProfile?.constrainedFeatureCount || 0,
+      junctionPasses
     });
-    if (feature?.structureSemantics?.gradeSeparated || hasTransitionAnchors) {
-      profiledFeatures.push(feature);
-    }
-  }
+  });
+  yield;
 
-  normalizeStructureEndpointHeights(structureFeatures);
-  smoothStructureSurfaceProfiles(profiledFeatures);
-  appCtx.refreshBridgeGuardrails?.(roadFeatures);
+  measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
+  yield;
+  measure('compileStructureAssemblies', () => {
+    const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
+    appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
+      transportFeatures,
+      worldBaseTerrainY,
+      {
+        supportConflict: (feature, column) => supportPointConflictsWithDriveableRoad(feature, {
+          x: column.x,
+          z: column.z,
+          supportBottomY: column.terrainY,
+          supportTopY: column.topY,
+          columnRadius: column.width * 0.5,
+          roadIndex: supportRoadIndex
+        })
+      }
+    );
+  });
+  yield;
+  measure('refreshStructureColliders', () => refreshStructureColliders(appCtx, transportFeatures));
+  yield;
+  measure('refreshBridgeGuardrails', () => appCtx.refreshBridgeGuardrails?.(roadFeatures));
 
-  if (structureFeatures.length > 0) {
-    appCtx.structureTerrainCuts = structureFeatures
-      .filter((feature) => feature?.structureSemantics?.terrainMode === 'subgrade')
-      .map((feature) => ({
-        feature,
-        pts: feature.pts,
-        width: Math.max(6.2, (Number(feature.width) || 6) + 3.2),
-        clearance: Math.max(3.8, Number(feature?.structureSemantics?.cutDepth) ? 3.35 + Math.min(3.4, Number(feature.structureSemantics.cutDepth) * 0.45) : 3.8),
-        portalLength: Math.max(12, Math.min(34, (Number(feature.width) || 6) * 2.2)),
-        bounds: feature.bounds
-      }));
-  } else {
-    appCtx.structureTerrainCuts = [];
+  // Terrain remains the roof above tunnels. Road and tunnel renderers must not
+  // mutate the shared ground surface.
+  appCtx.structureTerrainCuts = [];
+  appCtx.structureTerrainCutIndex = null;
+  appCtx.structureProfileCompilation = Object.freeze({
+    roadCount: roadFeatures.length,
+    structureCount: structureFeatures.length,
+    phaseDurationsMs: Object.freeze({
+      ...phaseDurationsMs,
+      total: Number((now() - compilationStartedAt).toFixed(2))
+    })
+  });
+  return appCtx.structureProfileCompilation;
+}
+
+export function refreshStructureAwareFeatureProfiles() {
+  const steps = compileStructureAwareFeatureProfileSteps();
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+export async function refreshStructureAwareFeatureProfilesCooperatively() {
+  const steps = compileStructureAwareFeatureProfileSteps();
+  let result = steps.next();
+  while (!result.done) {
+    await yieldToMainThread();
+    result = steps.next();
   }
+  return result.value;
 }
 
 export function syncLinearFeatureOverlayVisibility() {

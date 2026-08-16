@@ -1,13 +1,10 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=4';
-import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
-import { getFrameOwnershipSnapshot } from './runtime/frame-ownership.js?v=1';
-import { createRuntimeKernel } from './runtime/kernel.js?v=1';
-import { getRuntimeProductPorts } from './session-coordinator.js?v=2';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=5';
+import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=2';
+import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
-const runtimeProductPorts = getRuntimeProductPorts();
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = '../assets/landing/city.jpg';
@@ -90,6 +87,7 @@ function shouldUseComposer() {
 
 function dedicatedRendererActive() {
   return !!(
+    appCtx.worldLoading ||
     appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) ||
     appCtx.spaceFlight?.active ||
     appCtx.oceanMode?.active
@@ -99,38 +97,23 @@ function dedicatedRendererActive() {
 const runtimeKernel = createRuntimeKernel({
   fixedDelta: 1 / 60,
   maxDelta: 0.1,
-  maxFixedSteps: 5,
+  // Bound catch-up work so a slow frame cannot recursively create another
+  // slow frame. Excess wall-clock time is intentionally dropped.
+  maxFixedSteps: 2,
   getContext: () => ({
     appCtx,
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted
   }),
-  isSuspended: () => document.hidden || dedicatedRendererActive(),
+  isSuspended: dedicatedRendererActive,
   onSuspendedFrame: ({ timestamp }) => {
     appCtx.lastTime = timestamp;
   },
   onSystemError: ({ error, system }) => {
     console.error(`[runtime] System failed: ${system.id}`, error);
-    runtimeProductPorts.tryCall('shell', 'reportRuntimeError', {
-      system,
-      message: error instanceof Error ? error.message : String(error)
-    });
-  }
-});
-
-const earthFrameOwnerDefinition = Object.freeze({
-  id: 'earth.runtime-kernel',
-  label: 'Earth runtime kernel',
-  kind: 'continuous-renderer',
-  exclusiveGroup: 'environment-renderer',
-  getState: () => {
-    const running = runtimeKernel.snapshot().running;
-    const suspended = document.hidden || dedicatedRendererActive();
-    return {
-      active: running && !suspended,
-      scheduled: running,
-      suspended: running && suspended
-    };
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', {
+      detail: { system, message: error instanceof Error ? error.message : String(error) }
+    }));
   }
 });
 
@@ -140,8 +123,7 @@ function registerRuntimeSystems() {
   const systems = createCoreFrameSystems(appCtx, {
     isActivityCreatorOpen,
     isEditorWorkspaceOpen,
-    positionTopOverlays,
-    updateInput: () => runtimeProductPorts.call('input', 'update')
+    positionTopOverlays
   });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));
@@ -172,158 +154,19 @@ function registerRuntimeSystems() {
   });
 }
 
-function createSharedSceneScheduler({ destination }) {
-  let active = false;
-  let releaseVisibilityListener = null;
-
-  function syncVisibility() {
-    if (!active) return false;
-    if (document.hidden) {
-      runtimeKernel.stop(`${destination}:hidden`);
-      return false;
-    }
-    return runtimeKernel.start();
-  }
-
-  return Object.freeze({
-    start() {
-      registerRuntimeSystems();
-      active = true;
-      if (!releaseVisibilityListener) {
-        const onVisibilityChange = () => syncVisibility();
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        releaseVisibilityListener = () => {
-          document.removeEventListener('visibilitychange', onVisibilityChange);
-          releaseVisibilityListener = null;
-        };
-      }
-      return syncVisibility();
-    },
-    stop(reason = 'destination-exit') {
-      active = false;
-      releaseVisibilityListener?.();
-      return runtimeKernel.stop(`${destination}:${reason}`);
-    },
-    snapshot() {
-      return {
-        ...runtimeKernel.snapshot(),
-        active,
-        visibilityBound: releaseVisibilityListener != null
-      };
-    }
-  });
-}
-
 function renderLoop() {
   registerRuntimeSystems();
-  const destination = appCtx.getEnv?.();
-  if (
-    destination === appCtx.ENV?.EARTH ||
-    destination === appCtx.ENV?.MOON ||
-    destination === appCtx.ENV?.MARS
-  ) {
-    return runtimeKernel.start();
-  }
-  return true;
-}
-
-function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
-  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) return 0;
-  const actor = appCtx.activeTransportActor?.()?.position || appCtx.car || { x: 0, z: 0 };
-  const radiusSq = radius * radius;
-  const restored = [];
-  const restoredActors = [];
-  for (const root of [appCtx.carMesh, appCtx.Walk?.state?.characterMesh]) {
-    if (!root) continue;
-    restoredActors.push({ root, visible: root.visible });
-    root.visible = true;
-  }
-  const candidates = [...new Set([
-    ...(appCtx.buildingMeshes || []),
-    ...(appCtx.landuseMeshes || []),
-    ...(appCtx.roadMeshes || [])
-  ])];
-  const startedAt = performance.now();
-  for (let i = 0; i < candidates.length; i += 1) {
-    const mesh = candidates[i];
-    if (!mesh?.geometry) continue;
-    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
-    const center = mesh.userData?.lodCenter || mesh.geometry.boundingSphere?.center;
-    const x = Number(center?.x || 0) + Number(mesh.position?.x || 0);
-    const z = Number(center?.z || 0) + Number(mesh.position?.z || 0);
-    if ((x - actor.x) ** 2 + (z - actor.z) ** 2 > radiusSq) continue;
-    restored.push({ mesh, parent: mesh.parent, visible: mesh.visible, frustumCulled: mesh.frustumCulled });
-    mesh.visible = true;
-    mesh.frustumCulled = false;
-    if (!mesh.parent) appCtx.scene.add(mesh);
-  }
-  try {
-    appCtx.renderer.render(appCtx.scene, appCtx.camera);
-  } finally {
-    for (let i = 0; i < restored.length; i += 1) {
-      const { mesh, parent, visible, frustumCulled } = restored[i];
-      mesh.visible = visible;
-      mesh.frustumCulled = frustumCulled;
-      if (!parent && mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
-    }
-    for (let i = 0; i < restoredActors.length; i += 1) {
-      restoredActors[i].root.visible = restoredActors[i].visible;
-    }
-  }
-  return performance.now() - startedAt;
-}
-
-async function waitForWorldRenderReadiness(options = {}) {
-  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) {
-    return { ready: false, reason: 'renderer_unavailable', durationMs: 0, frames: 0 };
-  }
-  const timeoutMs = Math.max(500, Math.min(12000, Number(options.timeoutMs) || 9000));
-  const requiredStableFrames = Math.max(4, Math.min(16, Number(options.stableFrames) || 8));
-  const minimumReadyMs = Math.max(250, Math.min(2500, Number(options.minimumReadyMs) || 650));
-  const startedAt = performance.now();
-  const warmupMs = await warmNearbyWorldRenderResources();
-  let previousFrameAt = startedAt;
-  let previousSignature = '';
-  let stableFrames = 0;
-  let frames = 0;
-
-  while (
-    performance.now() - startedAt < timeoutMs &&
-    (stableFrames < requiredStableFrames || performance.now() - startedAt < minimumReadyMs)
-  ) {
-    const frameAt = await new Promise((resolve) => requestAnimationFrame(resolve));
-    frames += 1;
-    const frameMs = frameAt - previousFrameAt;
-    previousFrameAt = frameAt;
-    const info = appCtx.renderer.info;
-    const signature = [
-      Number(info?.memory?.geometries || 0),
-      Number(info?.memory?.textures || 0),
-      Number(info?.programs?.length || 0)
-    ].join(':');
-    stableFrames = signature === previousSignature && frameMs <= 50 ? stableFrames + 1 : 0;
-    previousSignature = signature;
-  }
-
-  const result = {
-    ready: stableFrames >= requiredStableFrames,
-    reason: stableFrames >= requiredStableFrames ? 'stable' : 'timeout',
-    durationMs: Math.round(performance.now() - startedAt),
-    frames,
-    stableFrames,
-    minimumReadyMs,
-    warmupMs: Math.round(warmupMs),
-    geometries: Number(appCtx.renderer.info?.memory?.geometries || 0),
-    textures: Number(appCtx.renderer.info?.memory?.textures || 0),
-    programs: Number(appCtx.renderer.info?.programs?.length || 0)
-  };
-  appCtx._lastWorldRenderReadiness = result;
-  return result;
+  return runtimeKernel.start();
 }
 
 function registerRuntimeSystem(definition) {
   registerRuntimeSystems();
   return runtimeKernel.registerSystem(definition);
+}
+
+function advanceRuntimeTime(milliseconds = 0) {
+  registerRuntimeSystems();
+  return runtimeKernel.advanceBy(milliseconds, { source: 'automation' });
 }
 
 function showLoad(text, options = {}) {
@@ -334,7 +177,14 @@ function showLoad(text, options = {}) {
   const selectedMode = options.mode || appCtx.loadingScreenMode || 'earth';
   const background = options.background || LOADING_BG_BY_MODE[selectedMode] || DEFAULT_LOADING_BG;
   const overlay = Number.isFinite(options.overlay) ? options.overlay : 0.32;
-  loading.style.background = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}') center center / cover no-repeat`;
+  // Keep the overlay opaque while a fresh browser decodes the image. Using
+  // the background shorthand reset the CSS black fallback to transparent and
+  // briefly exposed the previously rendered city during location changes.
+  loading.style.backgroundColor = '#000';
+  loading.style.backgroundImage = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}')`;
+  loading.style.backgroundPosition = 'center center';
+  loading.style.backgroundSize = 'cover';
+  loading.style.backgroundRepeat = 'no-repeat';
   loadText.textContent = text || 'Loading...';
   loadText.style.fontWeight = options.bold ? '700' : '500';
   loadText.style.letterSpacing = options.letterSpacing || '';
@@ -352,7 +202,11 @@ function hideLoad() {
   loadText.style.fontWeight = '';
   loadText.style.letterSpacing = '';
   loadText.style.textShadow = '';
-  loading.style.background = '';
+  loading.style.backgroundColor = '';
+  loading.style.backgroundImage = '';
+  loading.style.backgroundPosition = '';
+  loading.style.backgroundSize = '';
+  loading.style.backgroundRepeat = '';
   loading.classList.remove('show');
 }
 
@@ -376,13 +230,12 @@ window.addEventListener('resize', () => {
 }, { passive: true });
 
 Object.assign(appCtx, {
-  getFrameOwnershipSnapshot,
+  advanceRuntimeTime,
   getRuntimeKernelSnapshot: () => runtimeKernel.snapshot(),
   hideLoad,
   positionTopOverlays,
   registerRuntimeSystem,
   renderLoop,
-  waitForWorldRenderReadiness,
   showLoad,
   showTransitionLoad,
   stopRuntimeKernel: (reason) => runtimeKernel.stop(reason),
@@ -391,13 +244,11 @@ Object.assign(appCtx, {
 });
 
 export {
-  createSharedSceneScheduler,
-  earthFrameOwnerDefinition,
+  advanceRuntimeTime,
   hideLoad,
   positionTopOverlays,
   registerRuntimeSystem,
   renderLoop,
-  waitForWorldRenderReadiness,
   showLoad,
   showTransitionLoad
 };

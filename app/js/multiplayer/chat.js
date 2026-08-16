@@ -10,10 +10,10 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp
-} from '../platform/firebase/firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=66';
+import { normalizeCode } from './rooms.js?v=67';
 
 const ROOM_COLLECTION = 'rooms';
 const CHAT_COLLECTION = 'chat';
@@ -245,7 +245,7 @@ async function sendMessage(roomId, text) {
   return filtered;
 }
 
-function listenChat(roomId, callback) {
+function listenChat(roomId, callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
 
   const normalizedRoomId = normalizeCode(roomId);
@@ -288,7 +288,7 @@ function listenChat(roomId, callback) {
     callback(messages.reverse());
   }, (err) => {
     console.warn('[multiplayer][chat] listenChat failed:', err);
-    callback([]);
+    if (typeof options.onError === 'function') options.onError(err);
   });
 }
 

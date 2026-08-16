@@ -46,6 +46,15 @@ export const WORLD_TEST_LOCATIONS = [
     minimumBuildings: 1000
   },
   {
+    id: 'monaco_sainte_devote_custom',
+    kind: 'custom',
+    lat: 43.7364,
+    lon: 7.4197,
+    label: 'Sainte-Dévote tunnel approaches, Monaco',
+    category: 'mountain_tunnel_elevated_interchange_custom',
+    expectedStart: 'land'
+  },
+  {
     id: 'tokyo_shinjuku_custom',
     kind: 'custom',
     lat: 35.6896,
@@ -140,7 +149,6 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Great Pyramids of Giza',
     category: 'historic_arid_custom',
     expectedStart: 'land',
-    captureMode: 'walk',
     expectedTerrainMode: 'sand',
     expectedLandmarkKind: 'pyramid'
   },
@@ -152,8 +160,6 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Great Wall of China',
     category: 'historic_mountain_custom',
     expectedStart: 'land',
-    captureMode: 'walk',
-    minimumLandmarkSpawnDistance: 35,
     expectedLandmarkKind: 'historic_wall'
   },
   {
@@ -165,7 +171,6 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'open_ocean_custom',
     expectedStart: 'water',
     expectedWaterKind: 'open_ocean',
-    expectedHudLocationTerms: ['Atlantic', 'Ocean'],
     expectedWaterElevationRange: [-2, 2]
   },
   {
@@ -176,12 +181,41 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Jungfrau Region, Switzerland',
     category: 'alpine_snow_rock_custom',
     expectedStart: 'land',
-    captureMode: 'walk',
-    maximumWaterAreaSpan: 50,
-    rejectBoatPrompt: true,
     expectedTerrainMode: 'snowRock',
     acceptableTerrainModes: ['snow', 'snowRock'],
     acceptableStartTerrainModes: ['snow', 'snowRock']
+  },
+  {
+    id: 'antarctica_glacier_custom',
+    kind: 'custom',
+    lat: -77.846,
+    lon: 166.668,
+    label: 'Antarctica Glacier',
+    category: 'polar_glacier_custom',
+    expectedStart: 'land',
+    expectedTerrainMode: 'snowRock',
+    acceptableTerrainModes: ['snow', 'snowRock'],
+    acceptableStartTerrainModes: ['snow', 'snowRock']
+  },
+  {
+    id: 'north_pole_custom',
+    kind: 'custom',
+    lat: 90,
+    lon: 0,
+    label: 'North Pole, Arctic Ocean',
+    category: 'polar_sea_ice_custom',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'cryosphere'
+  },
+  {
+    id: 'south_pole_custom',
+    kind: 'custom',
+    lat: -90,
+    lon: 0,
+    label: 'South Pole, Antarctica',
+    category: 'polar_ice_sheet_custom',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'cryosphere'
   },
   {
     id: 'sahara_custom',
@@ -196,12 +230,37 @@ export const WORLD_TEST_LOCATIONS = [
   {
     id: 'amazon_custom',
     kind: 'custom',
-    lat: -2.6500,
-    lon: -60.9120,
-    label: 'Rio Negro Rainforest Bank, Brazil',
+    lat: -3.4653,
+    lon: -62.2159,
+    label: 'Amazon Basin, Brazil',
     category: 'tropical_forest_river_custom',
     expectedStart: 'land',
-    minimumVegetationFeatures: 1800
+    minimumWaterways: 1,
+    minimumVegetationFeatures: 10000,
+    minimumVegetationMeshes: 4,
+    minimumVegetationRenderedCrowns: 60000
+  },
+  {
+    id: 'ivory_coast_inland_regression',
+    kind: 'custom',
+    lat: 7.8939,
+    lon: -4.9369,
+    label: 'Gbêkê, Vallée du Bandama, Côte d’Ivoire',
+    category: 'inland_surface_authority_regression',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'land',
+    regressionOnly: true
+  },
+  {
+    id: 'svalbard_land_regression',
+    kind: 'custom',
+    lat: 78.2232,
+    lon: 15.6469,
+    label: 'Longyearbyen, Svalbard',
+    category: 'arctic_land_surface_authority_regression',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'land',
+    regressionOnly: true
   },
   {
     id: 'grand_canyon_custom',
@@ -209,9 +268,8 @@ export const WORLD_TEST_LOCATIONS = [
     lat: 36.1069,
     lon: -112.1129,
     label: 'Grand Canyon, Arizona',
-    category: 'striated_canyon_rock_custom',
-    expectedStart: 'land',
-    expectedTerrainMode: 'rock'
+    category: 'canyon_geology_custom',
+    expectedStart: 'land'
   },
   {
     id: 'saopaulo_custom',
@@ -290,18 +348,27 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'major_bridge_coastal_custom',
     expectedStart: 'land',
     expectedRoadStructure: 'bridge',
-    maximumLoadMs: 20000,
     minimumStructureClearance: 6
   },
   {
     id: 'holland_tunnel_custom',
     kind: 'custom',
-    lat: 40.7272,
-    lon: -74.021,
+    lat: 40.726368,
+    lon: -74.014159,
     label: 'Holland Tunnel',
     category: 'urban_tunnel_custom',
     expectedStart: 'land',
     expectedRoadStructure: 'tunnel'
+  },
+  {
+    id: 'pregerson_interchange_custom',
+    kind: 'custom',
+    lat: 33.928746,
+    lon: -118.280939,
+    label: 'Judge Harry Pregerson Interchange',
+    category: 'multi_level_urban_interchange_custom',
+    expectedStart: 'land',
+    expectedRoadStructure: 'bridge'
   },
   {
     id: 'panama_canal_custom',

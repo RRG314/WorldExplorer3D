@@ -20,7 +20,7 @@ button{touch-action:manipulation}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
-#titleScreen{position:fixed;inset:0;background:#000 url('../../assets/landing/hero-interface.png') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(12px,calc(env(safe-area-inset-top) + 8px));padding-right:12px;padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 10px));padding-left:12px;gap:clamp(8px,1.2vh,14px);z-index:200;overflow-y:auto;overflow-x:hidden;isolation:isolate}
+#titleScreen{position:fixed;inset:0;background:#000 url('../../assets/landing/hero.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(12px,calc(env(safe-area-inset-top) + 8px));padding-right:12px;padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 10px));padding-left:12px;gap:clamp(8px,1.2vh,14px);z-index:200;overflow-y:auto;overflow-x:hidden;isolation:isolate}
 #titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px);pointer-events:none;z-index:0}
 #titleScreen.hidden{display:none}
 .logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
@@ -301,8 +301,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .ind{color:#cbd5e1;font-weight:500}
 .ind.on{color:#667eea}
 .ind.warn{color:#dc2626}
-#offRoadWarn{position:fixed;inset:0;pointer-events:none;border:4px solid transparent;z-index:50;transition:border-color 0.2s}
-#offRoadWarn.active{border-color:rgba(239,68,68,0.6);animation:pulse 0.5s infinite}
 @keyframes pulse{0%,100%{border-color:rgba(239,68,68,0.6)}50%{border-color:rgba(239,68,68,0.2)}}
 #liveEarthLocalPanel{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:141;display:none;min-width:min(360px,calc(100vw - 40px));max-width:min(440px,calc(100vw - 28px));background:rgba(255,255,255,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:14px;box-shadow:0 14px 32px rgba(2,6,23,0.18);padding:12px 14px}
 #liveEarthLocalPanel.show{display:block}

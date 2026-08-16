@@ -10,10 +10,10 @@ import {
   query,
   serverTimestamp,
   setDoc
-} from '../platform/firebase/firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=66';
+import { normalizeCode } from './rooms.js?v=67';
 
 const USERS_COLLECTION = 'users';
 const FRIENDS_COLLECTION = 'friends';

@@ -2,7 +2,6 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
 const SOURCE_ENTRIES = [
@@ -17,6 +16,7 @@ const SOURCE_ENTRIES = [
   'favicon.svg'
 ];
 const REPORT_EXTENSIONS = new Set(['.js', '.css']);
+const DECLARED_RUNTIME_ENTRIES = ['app/js/app-entry.js'];
 const strict = process.argv.includes('--strict');
 
 function normalize(value) {
@@ -76,7 +76,7 @@ function extractReferences(file, source) {
     patterns.push(/(?:import|export)\s+(?:[^;]*?\s+from\s*)?["']([^"']+)["']/g);
     patterns.push(/import\(\s*["']([^"']+)["']\s*\)/g);
   } else if (extension === '.js' || extension === '.mjs') {
-    patterns.push(/\b(?:import|export)(?:\s*[^;]*?\bfrom)?\s*["']([^"']+)["']/g);
+    patterns.push(/(?:import|export)\s+(?:[^;]*?\s+from\s*)?["']([^"']+)["']/g);
     patterns.push(/import\(\s*["']([^"']+)["']\s*\)/g);
     patterns.push(/\bmoduleEntrypoint\s*=\s*[`"']([^`"']+)[`"']/g);
     patterns.push(/new\s+URL\(\s*["']([^"']+)["']\s*,\s*import\.meta\.url\s*\)/g);
@@ -94,19 +94,8 @@ function extractReferences(file, source) {
 }
 
 const available = await sourceFiles();
-const runtimeManifest = await import(
-  pathToFileURL(path.join(ROOT, 'app/js/modules/manifest.js'))
-);
-const declaredVendorEntries = [
-  ...runtimeManifest.vendorScriptsCritical,
-  ...runtimeManifest.vendorScriptsOptional
-].map((source) => normalize(path.relative(ROOT, fileURLToPath(source))));
-const declaredRuntimeEntries = [
-  'app/js/app-entry.js',
-  ...declaredVendorEntries
-];
 const htmlEntries = [...available].filter((file) => path.extname(file).toLowerCase() === '.html');
-const entrypoints = [...htmlEntries, ...declaredRuntimeEntries];
+const entrypoints = [...htmlEntries, ...DECLARED_RUNTIME_ENTRIES];
 const reached = new Set(entrypoints);
 const pending = [...entrypoints];
 

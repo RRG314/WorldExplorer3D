@@ -1,17 +1,18 @@
-name: Runtime Verify
+name: PR and Stable Verification
 
 on:
   pull_request:
   push:
     branches:
-      - main
+      - stable
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  verify:
+  pull-request:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,5 +30,35 @@ jobs:
       - name: Install Playwright (runtime tests)
         run: npx playwright install --with-deps chromium
 
-      - name: Runtime verification
+      - name: Bounded pull-request verification
+        run: npm run verify:pr
+
+  stable-runtime:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/stable'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install datum normalizer
+        run: python -m pip install -r scripts/ground-datum-requirements.txt
+
+      - name: Install Playwright (runtime tests)
+        run: npx playwright install --with-deps chromium
+
+      - name: Extended stable runtime verification
         run: npm run runtime:verify

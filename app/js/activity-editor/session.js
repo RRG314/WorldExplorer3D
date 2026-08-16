@@ -8,16 +8,16 @@ import {
   getActivityTemplate,
   orderedRouteAnchors,
   sanitizeText
-} from './schema.js?v=3';
-import { validateActivityDraft } from './validation.js?v=3';
-import { resolvePlacementCandidateFromPointer } from './environment.js?v=10';
-import { ensureSceneGroups, refreshActivityScene } from './renderer.js?v=3';
+} from './schema.js?v=2';
+import { validateActivityDraft } from './validation.js?v=2';
+import { resolvePlacementCandidateFromPointer } from './environment.js?v=9';
+import { ensureSceneGroups, refreshActivityScene } from './renderer.js?v=2';
 import { createActivityCreatorCanvasApi } from './session-canvas.js?v=1';
 import {
   bindRefEvents as bindActivityCreatorRefEvents,
   renderUi as renderActivityCreatorUi
-} from './session-ui.js?v=5';
-import { createActivityCreatorTestingApi } from './session-testing.js?v=2';
+} from './session-ui.js?v=3';
+import { createActivityCreatorTestingApi } from './session-testing.js?v=1';
 import { createActivityCreatorGuideApi, defaultCreatorGuideState } from './session-guide.js?v=1';
 import { getRefs } from './session-refs.js?v=1';
 import { createActivityCreatorViewApi } from './session-view.js?v=1';

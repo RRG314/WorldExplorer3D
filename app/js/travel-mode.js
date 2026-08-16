@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -15,6 +16,7 @@ function setDroneModeActive(active) {
 
 function syncTravelModeButtons() {
   const activeMode = getCurrentTravelMode();
+  const boatLocked = activeMode === 'boat';
   const drivingBtn = document.getElementById('fDriving');
   const walkingBtn = document.getElementById('fWalk');
   const droneBtn = document.getElementById('fDrone');
@@ -25,6 +27,19 @@ function syncTravelModeButtons() {
   if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
   if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
+  [
+    drivingBtn,
+    walkingBtn,
+    droneBtn,
+    planeBtn,
+    document.getElementById('fOceanMode'),
+    document.getElementById('fEarthMode'),
+    document.getElementById('fSpaceDirect'),
+    document.getElementById('fSpaceRocket'),
+    document.getElementById('fSpaceMars')
+  ].forEach((button) => {
+    if (button) button.style.display = boatLocked ? 'none' : '';
+  });
   return activeMode;
 }
 
@@ -131,32 +146,67 @@ function emitTravelModeEvent(mode, source = 'runtime') {
   }
 }
 
-let pendingModeLodRefresh = null;
-
-function scheduleModeWorldRefresh() {
-  if (pendingModeLodRefresh !== null) {
-    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(pendingModeLodRefresh);
-    else clearTimeout(pendingModeLodRefresh);
+function clearControllerLocalState(targetMode) {
+  appCtx.clearControlInputState?.('travel-mode-transition');
+  if (targetMode === 'drive' && appCtx.car) {
+    appCtx.car.steerSm = 0;
+    appCtx.car.throttleSm = 0;
+    appCtx.car.yawRate = 0;
+    appCtx.car.vLat = 0;
+    appCtx.car.rearSlip = 0;
+    appCtx.car.isDrifting = false;
+    appCtx.car._driftHoldTimer = 0;
   }
-  const run = () => {
-    pendingModeLodRefresh = null;
-    appCtx.updateWorldLod?.(true);
+  if (targetMode !== 'drone' && appCtx.drone) {
+    appCtx.drone.roll = 0;
+    appCtx.drone.cameraYawOffset = 0;
+  }
+}
+
+function captureActiveModeReference(currentMode) {
+  const actor = appCtx.activeTransportActor?.();
+  if (!actor || actor.mode !== currentMode) return null;
+  const x = Number(actor.position?.x);
+  const y = Number(actor.position?.y);
+  const z = Number(actor.position?.z);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+  return {
+    mode: currentMode,
+    x,
+    y: Number.isFinite(y) ? y : undefined,
+    z,
+    angle: Number(actor.orientation?.yaw) || 0
   };
-  pendingModeLodRefresh = typeof requestIdleCallback === 'function'
-    ? requestIdleCallback(run, { timeout: 300 })
-    : setTimeout(run, 64);
+}
+
+function handoffAirPositionToGround(reference, targetMode) {
+  if (
+    reference?.mode !== 'drone' ||
+    (targetMode !== 'walk' && targetMode !== 'drive')
+  ) return false;
+
+  const resolved = appCtx.resolveSafeWorldSpawn?.(reference.x, reference.z, {
+    mode: targetMode,
+    angle: reference.angle,
+    source: 'travel_mode_actor_handoff',
+    maxRoadDistance: targetMode === 'drive' ? 180 : 80,
+    maxGroundRadius: 48,
+    fastLocalFallback: true
+  });
+  if (!resolved || typeof appCtx.applyResolvedWorldSpawn !== 'function') return false;
+  appCtx.applyResolvedWorldSpawn(resolved, {
+    mode: targetMode,
+    syncCar: true,
+    syncWalker: true
+  });
+  return true;
 }
 
 function setTravelMode(mode, options = {}) {
   const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
-  if (
-    targetMode === currentMode &&
-    options.force !== true &&
-    options.refreshSurface !== true
-  ) {
-    return syncTravelModeButtons();
-  }
+  const modeReference = captureActiveModeReference(currentMode);
+  if (targetMode !== currentMode) clearControllerLocalState(targetMode);
 
   if (targetMode === 'boat' && appCtx.oceanMode?.active && typeof appCtx.transferSubmarineToBoat === 'function') {
     void appCtx.transferSubmarineToBoat({
@@ -171,7 +221,10 @@ function setTravelMode(mode, options = {}) {
   }
 
   if (targetMode !== 'boat' && appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
-    if (typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, { showNotice: true })) {
+    if (options.force !== true && typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, {
+      showNotice: true,
+      source: options.source || 'runtime_switch'
+    })) {
       const resolvedMode = syncTravelModeButtons();
       if (typeof appCtx.updateControlsModeUI === 'function') {
         appCtx.updateControlsModeUI();
@@ -199,11 +252,12 @@ function setTravelMode(mode, options = {}) {
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else if (targetMode === 'walk') {
     setDroneModeActive(false);
-    if (appCtx.Walk && (appCtx.Walk.state?.mode !== 'walk' || options.refreshSurface === true)) {
+    const preservedCurrentPosition = handoffAirPositionToGround(modeReference, 'walk');
+    if (appCtx.Walk && appCtx.Walk.state?.mode !== 'walk') {
       appCtx.Walk.setModeWalk({
-        preserveResolvedSpawn: !!planeExitState,
+        preserveResolvedSpawn: !!planeExitState || preservedCurrentPosition,
         preserveResolvedSurface: planeExitState?.landedOnRoof === true,
-        deferWorldSync: !!planeExitState
+        deferWorldSync: !!planeExitState || preservedCurrentPosition
       });
     }
     if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
@@ -238,6 +292,7 @@ function setTravelMode(mode, options = {}) {
     }
   } else {
     setDroneModeActive(false);
+    handoffAirPositionToGround(modeReference, 'drive');
     if (appCtx.Walk?.state?.mode === 'walk') {
       appCtx.Walk.setModeDrive();
     }
@@ -251,7 +306,6 @@ function setTravelMode(mode, options = {}) {
   }
 
   const resolvedMode = syncTravelModeButtons();
-  scheduleModeWorldRefresh();
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }
@@ -275,8 +329,12 @@ function toggleDroneMode(options = {}) {
 
 function cyclePrimaryTravelMode(options = {}) {
   const currentMode = getCurrentTravelMode();
-  const nextMode = currentMode === 'drive' ? 'walk' : currentMode === 'walk' ? 'drone' : currentMode === 'drone' ? 'plane' : 'drive';
-  return setTravelMode(nextMode, options);
+  const nextMode = currentMode === 'boat' ? 'walk' : nextPrimaryTravelMode(currentMode);
+  const resolvedMode = setTravelMode(nextMode, options);
+  if (nextMode === 'plane' && resolvedMode !== 'plane') {
+    return setTravelMode('drone', options);
+  }
+  return resolvedMode;
 }
 
 function togglePlaneMode(options = {}) {

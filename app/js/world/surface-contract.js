@@ -20,14 +20,14 @@ const VERTICAL_DATUM = Object.freeze({
 });
 
 const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
-  [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 5000, originRebase: false })
+  [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 2700, originRebase: false })
 });
 
 const SURFACE_COMPOSITION_LAYER = Object.freeze({
   TERRAIN: 0,
-  DEVELOPED: 1,
+  NATURAL: 1,
   AGRICULTURE: 2,
-  NATURAL: 3,
+  DEVELOPED: 3,
   PEDESTRIAN: 4,
   TRANSPORTATION: 5,
   ROAD: 6,
@@ -38,7 +38,7 @@ const NATURAL_SURFACES = new Set([
   'forest', 'wood', 'scrub', 'park', 'garden', 'grass', 'grassland', 'meadow',
   'orchard', 'recreation_ground', 'village_green', 'cemetery', 'sand', 'beach',
   'bare_rock', 'scree', 'shingle', 'wetland', 'marsh', 'bog', 'swamp', 'dune',
-  'barren', 'glacier', 'quarry', 'greenfield'
+  'barren', 'glacier', 'quarry'
 ]);
 const AGRICULTURAL_SURFACES = new Set([
   'farmland', 'farmyard', 'vineyard', 'allotments', 'plant_nursery', 'greenhouse_horticulture'
@@ -48,8 +48,13 @@ const DEVELOPED_SURFACES = new Set([
   'industrial', 'retail', 'parking', 'paved'
 ]);
 const surfaceCompositionCache = new Map();
-const STEEP_SEMANTIC_LANDCOVER_GRADE = 0.075;
-const STEEP_SEMANTIC_LANDCOVER_MIN_SPAN = 120;
+
+function landusePresentationOwner(kind = '') {
+  const normalizedKind = String(kind || '').toLowerCase();
+  return normalizedKind === 'water' || normalizedKind === 'parking' || normalizedKind === 'paved'
+    ? 'mapped_geometry'
+    : 'terrain_worldcover';
+}
 
 function surfaceComposition(kind = '', role = 'land-cover') {
   const normalizedKind = String(kind || '').toLowerCase();
@@ -76,33 +81,6 @@ function surfaceComposition(kind = '', role = 'land-cover') {
   return composition;
 }
 
-function mappedLandcoverOwnership(kind = '', options = {}) {
-  const normalizedKind = String(kind || '').toLowerCase();
-  const span = Math.max(0, finiteOr(options.span, 0));
-  const relief = Math.max(0, finiteOr(options.relief, 0));
-  const grade = span > 0 ? relief / span : 0;
-  const explicitGeometry =
-    normalizedKind === 'water' ||
-    normalizedKind === 'parking' ||
-    normalizedKind === 'paved';
-  const broadSemanticLandcover =
-    NATURAL_SURFACES.has(normalizedKind) ||
-    AGRICULTURAL_SURFACES.has(normalizedKind);
-  const semanticOnly =
-    !explicitGeometry &&
-    broadSemanticLandcover &&
-    span >= STEEP_SEMANTIC_LANDCOVER_MIN_SPAN &&
-    grade >= STEEP_SEMANTIC_LANDCOVER_GRADE;
-  return Object.freeze({
-    owner: semanticOnly ? 'terrain_worldcover' : 'mapped_geometry',
-    semanticOnly,
-    reason: semanticOnly ? 'steep_broad_landcover' : explicitGeometry ? 'explicit_surface' : 'bounded_landcover',
-    span,
-    relief,
-    grade
-  });
-}
-
 function finiteOr(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -116,8 +94,12 @@ function activeSourceProfile() {
   return SOURCE_PROFILE.LOCATION_OSM;
 }
 
-function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM) {
-  return EARTH_TRAVERSAL_BOUNDS[profile] || EARTH_TRAVERSAL_BOUNDS[SOURCE_PROFILE.LOCATION_OSM];
+function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM, appCtx = null) {
+  const configured = EARTH_TRAVERSAL_BOUNDS[profile] || EARTH_TRAVERSAL_BOUNDS[SOURCE_PROFILE.LOCATION_OSM];
+  const runtimeRadius = Number(appCtx?.worldTraversalRadiusWorld);
+  return Number.isFinite(runtimeRadius) && runtimeRadius > 0
+    ? Object.freeze({ ...configured, horizontalRadius: runtimeRadius })
+    : configured;
 }
 
 function normalizedSourceName(feature = null, fallback = '') {
@@ -136,6 +118,7 @@ function sourceIdentity(feature = null) {
   const tags = feature?.tags || {};
   return String(
     tags._sourceFeatureId ||
+    tags._overtureFeatureId ||
     feature?.sourceFeatureId ||
     feature?.id ||
     ''
@@ -149,7 +132,11 @@ function provenanceFor(feature, options = {}) {
   let confidence = finiteOr(options.confidence, 0.7);
   let fallback = options.fallback === true;
 
-  if (source.includes('shortbread')) {
+  if (source.includes('overture')) {
+    provider = 'Overture Maps Foundation';
+    dataset = 'Overture Maps';
+    confidence = 0.92;
+  } else if (source.includes('shortbread')) {
     provider = 'OpenStreetMap Foundation';
     dataset = 'OSM Shortbread vector tiles';
     confidence = 0.9;
@@ -256,19 +243,32 @@ function surfaceKindFromWalkInfo(info = {}) {
 }
 
 function terrainProvenance(appCtx) {
-  const hasLoadedElevation = [...(appCtx.terrainTileCache?.values?.() || [])].some((tile) => tile?.loaded && tile?.elev);
-  return hasLoadedElevation ? {
-    provider: 'Amazon Web Services Open Data',
-    dataset: 'Mapzen Terrarium elevation tiles',
-    source: 'terrarium',
-    confidence: 0.88,
+  const ground = appCtx.getAcceptedGroundRuntimeSnapshot?.() || null;
+  if (ground?.status === 'accepted') return {
+    provider: ground.providerId,
+    dataset: ground.artifactId,
+    source: 'accepted_ground_artifact',
+    sourceRelease: ground.sourceRelease,
+    verticalDatum: ground.verticalDatum,
+    confidence: 1,
     fallback: false
-  } : {
+  };
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    return {
+      provider: 'mapzen-terrarium',
+      dataset: 'Mapzen Terrain Tiles',
+      source: 'worldwide_terrain_fallback',
+      verticalDatum: 'mixed-source',
+      confidence: 0.35,
+      fallback: true
+    };
+  }
+  return {
     provider: 'World Explorer 3D',
-    dataset: 'terrain fallback',
-    source: 'terrain_fallback',
-    confidence: 0.35,
-    fallback: true
+    dataset: 'accepted ground unavailable',
+    source: 'accepted_ground_unavailable',
+    confidence: 0,
+    fallback: false
   };
 }
 
@@ -276,6 +276,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   if (!appCtx || !GroundHeight) throw new TypeError('SurfaceQuery requires app context and GroundHeight.');
   const profile = () => activeSourceProfile(appCtx);
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
+  const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
 
   function terrainAt(x, z) {
     return createSurfaceSample({
@@ -290,7 +291,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   }
 
   function walkAt(x, z, options = {}) {
-    const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY);
+    const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY, options);
     const kind = surfaceKindFromWalkInfo(info);
     return createSurfaceSample({
       x,
@@ -310,7 +311,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   function driveAt(x, z, options = {}) {
     const preferRoad = options.preferRoad !== false;
     const currentY = Number.isFinite(Number(options.currentY)) ? Number(options.currentY) : NaN;
-    const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY);
+    const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY, options);
     const road = info.source === 'road';
     return createSurfaceSample({
       x,
@@ -364,7 +365,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
     createTileDescriptor: (options = {}) => createSurfaceTileDescriptor({ ...options, profile: options.profile || profile() }),
     driveAt,
     getSourceProfile: profile,
-    getTraversalBounds: () => earthTraversalBounds(profile()),
+    getTraversalBounds: traversalBounds,
     terrainAt,
     walkAt,
     waterAt
@@ -383,7 +384,7 @@ export {
   createSurfaceSample,
   createSurfaceTileDescriptor,
   earthTraversalBounds,
-  mappedLandcoverOwnership,
+  landusePresentationOwner,
   provenanceFor,
   surfaceComposition
 };

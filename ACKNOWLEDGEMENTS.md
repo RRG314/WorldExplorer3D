@@ -1,6 +1,6 @@
 # Acknowledgements 🙏
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-08-15 for World Explorer 3D 4.2.0.
 
 World Explorer acknowledges and thanks the following third-party projects, services, and individuals that made this software possible.
 
@@ -88,7 +88,7 @@ you may distribute the result only under the same license.
 - Data is community-contributed and continuously updated
 - Free to use for commercial applications with attribution
 - Derivative data must be shared under ODbL if distributed
-- Use in this open-source application is permitted under the applicable data terms
+- Using data in proprietary software (as done here) is permitted
 
 **Community**:
 OpenStreetMap is built by a community of mappers that contribute and maintain 
@@ -330,6 +330,13 @@ These are first-party research components used in the engine (not external third
 - Inspiration for block-based world building
 - Reference for procedural generation
 
+**DeFlock**
+- Independent public-interest project for documenting surveillance infrastructure
+- Inspiration for the DeFlock Hunt game concept
+- Website: https://deflock.org/
+- World Explorer 3D is unaffiliated with DeFlock and uses OpenStreetMap data,
+  not DeFlock code or a DeFlock-owned data feed
+
 ### Academic & Technical References
 
 **Real-Time Rendering**
@@ -388,19 +395,19 @@ These are first-party research components used in the engine (not external third
 
 ### Attribution Requirements
 
-When redistributing World Explorer 3D, preserve the notices required by the
-applicable code, data, and asset licenses:
+When using World Explorer, the following attributions are **REQUIRED**:
 
 **In-Application Credits**:
 ```
-World Explorer 3D code © 2026 Steven Reid, Apache-2.0
+World Explorer © 2026. All Rights Reserved.
 Powered by Three.js (MIT License)
 Map data © OpenStreetMap contributors
 ```
 
 **For Public Demonstrations**:
 ```
-World Explorer 3D code © 2026 Steven Reid, Apache-2.0
+World Explorer - Proprietary Software
+© 2026 All Rights Reserved
 
 Built with:
 • Three.js (MIT License) - 3D graphics
@@ -436,7 +443,7 @@ Map data is provided by OpenStreetMap contributors and is:
 
 ## Contribution Acknowledgments
 
-World Explorer 3D is open-source software. We acknowledge concepts and techniques learned from:
+While World Explorer is proprietary software, we acknowledge concepts and techniques learned from:
 
 - Open-source Three.js examples and documentation
 - WebGL tutorials and educational resources
@@ -473,10 +480,8 @@ Thank you all for your contributions to the technologies and standards that make
 
 ---
 
-**World Explorer 3D**
-
-Code licensed under Apache License 2.0
-
-© 2026 Steven Reid
+**World Explorer**  
+Proprietary Software - All Rights Reserved  
+© 2026
 
 For licensing inquiries: hello@worldexplorer.app

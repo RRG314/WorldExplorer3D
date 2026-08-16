@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { listStoredActivities } from '../activity-discovery/library.js?v=4';
+import { listStoredActivities } from '../activity-discovery/library.js?v=2';
 import {
   defaultSystemCreatorProfile,
   getCreatorProfile,

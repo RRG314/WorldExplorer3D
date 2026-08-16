@@ -1,3 +1,8 @@
+Character Assets
+- File: `soldier.glb`
+- Source: Existing project asset pack
+- Notes: Loaded as the primary rigged character model in runtime.
+
 Mars Exploration Rover
 - File: `mars-exploration-rover.glb`
 - Source: NASA Mars Exploration Rover 3D model
@@ -8,4 +13,4 @@ Curated Earth Landmarks
 - `landmarks/eiffel-tower.glb`: "Eiffel.stl" by ingoenius, sourced from Wikimedia Commons and converted to GLB. CC0 1.0. https://commons.wikimedia.org/wiki/File:Eiffel.stl
 - `landmarks/elizabeth-tower.glb`: "Big Ben.stl" by Microsoft, sourced from Wikimedia Commons and converted to GLB. CC BY 4.0. https://commons.wikimedia.org/wiki/File:Big_Ben.stl
 - `landmarks/pyramid-khufu.glb`: "Pyramid of Khufu.stl" by Drummyfish, sourced from Wikimedia Commons and converted to GLB. CC0 1.0. https://commons.wikimedia.org/wiki/File:Pyramid_of_Khufu.stl
-- Placement and scale use real geographic coordinates and published landmark dimensions; OpenStreetMap remains the source for surrounding world geometry and collision.
+- Placement and scale use real geographic coordinates and published landmark dimensions; OSM/Overture remain the sources for surrounding world geometry and collision.

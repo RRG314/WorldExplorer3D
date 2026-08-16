@@ -1,44 +1,49 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
-  polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=22";
+} from "../structure-semantics.js?v=48";
 import {
   clearStructureVisualMeshesForContext,
-  rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=4";
-import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=4";
+  rebuildStructureVisualMeshesForContext,
+  updateStructureVisualVisibilityForContext
+} from "./structure-visual-meshes.js?v=20";
 import {
-  buildGuardrailEdges,
-  elevatedSegmentSafety
-} from "../world/bridge-safety.js?v=2";
-import { sampleStructureVisualPolyline } from "./structure-visual-sampling.js?v=1";
+  canPublishTunnelVisual,
+  collectTunnelVisualInstances
+} from "./structure-tunnel-visuals.js?v=20";
+import {
+  barrierPointConflictsWithDriveableRoad,
+  createDriveableRoadConflictIndex,
+  elevatedSegmentSafety,
+  supportPointConflictsWithDriveableRoad
+} from "../world/bridge-safety.js?v=8";
+import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=5';
 
-function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
-  const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
-  if (!featureBounds) return 0;
-  let count = 0;
-  for (let i = 0; i < elevatedFeatures.length; i++) {
-    const other = elevatedFeatures[i];
-    if (!other || other === feature) continue;
-    const otherBounds = other.bounds || polylineBounds(other.pts || [], (Number(other.width) || 4) + padding);
-    if (!otherBounds) continue;
-    if (boundsIntersect(featureBounds, otherBounds, padding)) count += 1;
-  }
-  return count;
+export function canPublishElevatedStructureVisual(feature) {
+  if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;
+  if (!Array.isArray(feature?.pts) || feature.pts.length < 2) return false;
+  if (feature?.networkKind !== 'road') return true;
+  const record = feature?.transportRecord;
+  if (record?.completeness === 'lossless') return true;
+  // A generalized mapped bridge owns visual continuity only. Hard collision,
+  // supports, parapets, and engineered detail remain restricted to lossless
+  // source geometry elsewhere in this publisher.
+  return record?.completeness === 'generalized' &&
+    record?.routeState === 'complete' &&
+    record?.safeForDriving !== false &&
+    feature?.structureSemantics?.isBridge === true;
 }
 
-export function collectStructureVisualInstances({
-  boundsIntersect,
-  cachedTerrainHeight,
-  pointAlongPolyline,
-  polylineCurvatureMetric
-} = {}) {
-  const intersectBounds = typeof boundsIntersect === "function" ? boundsIntersect : () => false;
+export function collectStructureVisualInstances(deps = {}) {
+  const {
+    cachedTerrainHeight,
+    pointAlongPolyline
+  } = deps;
   const sampleTerrainHeight = typeof cachedTerrainHeight === "function" ? cachedTerrainHeight : () => 0;
   const samplePointAlongPolyline = typeof pointAlongPolyline === "function" ? pointAlongPolyline : () => null;
-  const measureCurvature = typeof polylineCurvatureMetric === "function" ? polylineCurvatureMetric : () => 0;
 
   const supportInstances = [];
   const portalInstances = [];
@@ -47,17 +52,21 @@ export function collectStructureVisualInstances({
   const capInstances = [];
   const wallInstances = [];
   const roofInstances = [];
-  const tunnelFloorInstances = [];
   const tunnelLightInstances = [];
+  const tunnelShells = [];
+  const tunnelPortalMasks = [];
+  const elevatedDeckShells = [];
+  const elevatedBarrierSegments = [];
   const guardrailInstances = [];
-  const elevatedFeatures = []
-    .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
-    .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
-  const elevatedVisualFeatures = elevatedFeatures.filter((feature) =>
-    feature?.structureSemantics?.terrainMode === "elevated" &&
-    Array.isArray(feature?.pts) &&
-    feature.pts.length >= 2
-  );
+  const elevatedFeatures = Array.isArray(deps.allElevatedFeatures)
+    ? deps.allElevatedFeatures
+    : []
+      .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
+      .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
+  const featuresToProcess = Array.isArray(deps.featuresToProcess)
+    ? deps.featuresToProcess
+    : elevatedFeatures;
+  const roadConflictIndex = deps.roadConflictIndex || createDriveableRoadConflictIndex(appCtx.roads);
 
   const addSupportInstance = (instance) => {
     if (!instance || !(instance.scaleY > 0.5)) return;
@@ -97,34 +106,55 @@ export function collectStructureVisualInstances({
     return { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w, length };
   };
 
-  for (let i = 0; i < elevatedFeatures.length; i++) {
-    const feature = elevatedFeatures[i];
+  for (let i = 0; i < featuresToProcess.length; i++) {
+    const feature = featuresToProcess[i];
     const semantics = feature?.structureSemantics;
     if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || !semantics) continue;
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
+    const generalizedRoadVisual =
+      category === 'road' &&
+      feature?.transportRecord?.completeness !== 'lossless';
+    if (generalizedRoadVisual && semantics.terrainMode !== 'elevated' && !canPublishTunnelVisual(feature)) {
+      continue;
+    }
     const isConnectorLike = category === "connector" || category === "footway";
     const isSkywalk = semantics.skywalk || semantics.covered || semantics.indoor;
     const suppressExteriorVisuals = semantics.embeddedInBuilding === true;
     const roadLinkFeature = /(?:^|_)link$/i.test(String(feature?.type || ""));
-    const localRoadType = String(feature?.type || "").toLowerCase();
-    const lowPriorityRoadVisual =
-      !isConnectorLike &&
-      /^(service|residential|unclassified|living_street|track)$/.test(localRoadType);
     const visualDetail =
       semantics.terrainMode === "elevated" ?
-        (isConnectorLike || isSkywalk ? 2.4 : 4.2) :
+        (
+          isConnectorLike || isSkywalk ? 2.4 :
+            generalizedRoadVisual && feature?.fixedRegionalContext === true ? 12 :
+            feature?.fixedRegionalContext === true && !roadLinkFeature ? 7.5 :
+              4.2
+        ) :
         10;
-    const visualPts = sampleStructureVisualPolyline(feature.pts, visualDetail);
+    const visualPts =
+      typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
+        appCtx.subdivideRoadPoints(feature.pts, visualDetail) :
+        feature.pts;
     const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
-    const guardrailEdges = buildGuardrailEdges(feature, structurePts, {
-      outsideGap: 0.28,
-      sampleTerrainY: sampleTerrainHeight
-    });
     const { distances, total } = polylineDistances(structurePts);
-    const curvatureMetric = measureCurvature(structurePts);
-    const nearbyElevatedCount = semantics.terrainMode === "elevated" ?
-      countNearbyElevatedFeatures(feature, elevatedVisualFeatures, intersectBounds) :
-      0;
+    const structureAssembly = semantics.terrainMode === 'elevated'
+      ? feature.transportStructureAssembly || compileElevatedAssembly(
+          feature,
+          sampleTerrainHeight,
+          {
+            supportConflict: (candidateFeature, column) => supportPointConflictsWithDriveableRoad(
+              candidateFeature,
+              {
+                x: column.x,
+                z: column.z,
+                supportBottomY: column.terrainY,
+                supportTopY: column.topY,
+                columnRadius: column.width * 0.5,
+                roadIndex: roadConflictIndex
+              }
+            )
+          }
+        )
+      : null;
     const transitionAnchorDistances =
       Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0 ?
         feature.structureTransitionAnchors
@@ -133,38 +163,19 @@ export function collectStructureVisualInstances({
         [];
     if (semantics.terrainMode === "elevated") {
       if (suppressExteriorVisuals) continue;
-      const clutteredInterchange =
-        !isConnectorLike &&
-        !isSkywalk &&
-        (
-          roadLinkFeature ||
-          !!semantics.rampCandidate ||
-          (lowPriorityRoadVisual && nearbyElevatedCount >= 1) ||
-          (total < 120 && nearbyElevatedCount >= 2) ||
-          (nearbyElevatedCount >= 4) ||
-          (curvatureMetric >= 0.22) ||
-          (transitionAnchorDistances.length >= 2 && nearbyElevatedCount >= 2)
-        );
-      const renderRoadFullDeckBody =
-        !isConnectorLike &&
-        !isSkywalk &&
-        !clutteredInterchange &&
-        total >= 42;
-      const renderRoadSideGirders =
-        renderRoadFullDeckBody &&
-        total >= 140 &&
-        curvatureMetric < 0.12 &&
-        nearbyElevatedCount <= 2;
+      // Structural coverage is compiled once. Curvature, ramp classification,
+      // nearby elevated roads, and feature length may tune detail, but may not
+      // delete the body/support contract and leave a floating interchange.
+      const renderRoadEngineeredDetail = structureAssembly?.engineeredDetail === true;
       const renderRoadSupports =
-        !isConnectorLike &&
-        !isSkywalk &&
-        !clutteredInterchange &&
-        total >= 58 &&
-        nearbyElevatedCount <= 3;
-      const renderRoadAbutments = renderRoadFullDeckBody;
+        structureAssembly?.visualSupportDetail === true &&
+        Array.isArray(structureAssembly?.supportStations) &&
+        structureAssembly.supportStations.length > 0;
       const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
       const width = Math.max(2, Number(feature.width) || 4);
-      const deckThickness = isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11));
+      const structureSpecification = feature?.transportStructureRef?.specification || {};
+      const deckThickness = Number(structureSpecification.deckThickness) ||
+        (isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11)));
       const girderDepth = isConnectorLike ? Math.max(0.34, deckThickness * 0.65) : Math.max(0.58, deckThickness * 0.72);
       for (let segIndex = 0; segIndex < structurePts.length - 1; segIndex++) {
         const p1 = structurePts[segIndex];
@@ -203,32 +214,27 @@ export function collectStructureVisualInstances({
           isConnectorLike || isSkywalk ?
             1 :
             Math.max(0.24, 1 - Math.max(0, slopeRatio - 0.01) / 0.065);
-        const renderMinimalRoadDeckBody =
-          !isConnectorLike &&
-          !isSkywalk &&
-          !suppressExteriorVisuals &&
-          !clutteredInterchange &&
-          total >= 24 &&
-          segmentClearance > 0.95 &&
-          (!nearTransitionVisual || segmentClearance > 1.35);
-        const renderDeckBody =
-          (
-            isConnectorLike ||
-            isSkywalk ||
-            renderMinimalRoadDeckBody
-          );
+        // The compiled road ribbon owns the drive surface; this publisher owns
+        // the visible engineered body beneath it. The former condition only
+        // emitted bodies for foot connectors, so lossless road bridges were
+        // reduced to thin asphalt ribbons even though their exact geometry had
+        // already passed the structure authority gate.
+        // Vehicle roads use the one continuous compiled shell below. The old
+        // segment-box road body overlapped that shell and had a different end
+        // policy, so it could reintroduce seams after a later visual edit.
+        const renderDeckBody = isConnectorLike || isSkywalk;
         const renderSideGirders =
           !nearTransitionVisual &&
           (
             isConnectorLike ||
             isSkywalk ||
-            renderRoadSideGirders
+            (renderRoadEngineeredDetail && semantics.isBridge === true)
           );
         const deckBodyThickness =
           isConnectorLike || isSkywalk ?
             deckThickness :
             (
-              renderRoadFullDeckBody ?
+              renderRoadEngineeredDetail ?
                 Math.max(0.16, Math.min(0.34, width * 0.028)) * (0.82 + rampVisualScale * 0.18) :
                 Math.max(0.08, Math.min(0.18, width * 0.014)) * (0.88 + rampVisualScale * 0.12)
             );
@@ -236,7 +242,7 @@ export function collectStructureVisualInstances({
           isConnectorLike || isSkywalk ?
             width + 0.5 :
             (
-              renderRoadFullDeckBody ?
+              renderRoadEngineeredDetail ?
                 width + 0.16 + rampVisualScale * 0.12 :
                 width + 0.08 + rampVisualScale * 0.08
             );
@@ -262,49 +268,69 @@ export function collectStructureVisualInstances({
           total,
           waterAreas: appCtx.waterAreas
         });
-        if (guardrailSafety.protected) {
+        if (guardrailSafety.protected && (isConnectorLike || isSkywalk)) {
+          const railOffset = width * 0.5 + 0.28;
           for (const side of [-1, 1]) {
-            const edge = side < 0 ? guardrailEdges.rightEdge : guardrailEdges.leftEdge;
-            const edgeStart = edge[segIndex];
-            const edgeEnd = edge[segIndex + 1];
-            if (!edgeStart || !edgeEnd) continue;
-            const railQuat = deckQuaternionForSegment(edgeStart, edgeStart.y, edgeEnd, edgeEnd.y);
-            if (!railQuat) continue;
-            const railX = (edgeStart.x + edgeEnd.x) * 0.5;
-            const railY = (edgeStart.y + edgeEnd.y) * 0.5;
-            const railZ = (edgeStart.z + edgeEnd.z) * 0.5;
+            if (barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * railOffset * side,
+              z: midZ + nz * railOffset * side,
+              deckY,
+              roadIndex: roadConflictIndex
+            })) continue;
             addBeam(
               guardrailInstances,
-              railX,
-              railY + 1.02,
-              railZ,
+              midX + nx * railOffset * side,
+              deckY + (Number(structureSpecification.barrierHeight) || 1.1) - 0.08,
+              midZ + nz * railOffset * side,
               0.14,
               0.16,
-              railQuat.length,
+              deckDepth,
               rotationY,
-              railQuat
+              segmentQuat
             );
             addBeam(
               guardrailInstances,
-              railX,
-              railY + 0.56,
-              railZ,
+              midX + nx * railOffset * side,
+              deckY + 0.56,
+              midZ + nz * railOffset * side,
               0.1,
               0.12,
-              railQuat.length,
+              deckDepth,
               rotationY,
-              railQuat
+              segmentQuat
             );
             addBeam(
               guardrailInstances,
-              railX,
-              railY + 0.52,
-              railZ,
+              midX + nx * railOffset * side,
+              deckY + 0.52,
+              midZ + nz * railOffset * side,
               0.1,
               1.04,
               0.1,
               rotationY
             );
+          }
+        } else if (guardrailSafety.protected) {
+          const barrierHalfWidth = width * 0.5 + 0.18;
+          const barrierSides = [-1, 1].filter((side) =>
+            !barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * barrierHalfWidth * side,
+              z: midZ + nz * barrierHalfWidth * side,
+              deckY,
+              roadIndex: roadConflictIndex
+            })
+          );
+          if (barrierSides.length > 0) {
+            elevatedBarrierSegments.push({
+              p1: { x: p1.x, y: startY, z: p1.z },
+              p2: { x: p2.x, y: endY, z: p2.z },
+              halfWidth: barrierHalfWidth,
+              sides: barrierSides,
+              // Road bridges use a low concrete parapet. The collision owner
+              // remains full protective height, but a 1.25 m solid visual wall
+              // made ordinary ramps read as narrow trenches.
+              height: 0.58
+            });
           }
         }
 
@@ -395,10 +421,33 @@ export function collectStructureVisualInstances({
         }
       }
 
-      const supportSpacing =
-        isConnectorLike ?
-          Math.max(16, width * 3.6) :
-          Math.max(26, width * 3.8 + nearbyElevatedCount * 5);
+      if (
+        !isConnectorLike &&
+        !isSkywalk &&
+        structureAssembly?.publishBody === true &&
+        structureAssembly.total >= 0.5
+      ) {
+        const rings = (structureAssembly.surfaceSamples || []).map((sample) => ({
+          x: sample.x,
+          y: sample.y,
+          z: sample.z,
+          thickness: sample.thickness
+        }));
+        if (rings.length >= 2) {
+          elevatedDeckShells.push({
+            rings,
+            width: structureAssembly.width,
+            thickness: structureAssembly.baseThickness,
+            featureId: structureAssembly.featureId,
+            structureType: structureAssembly.structureType,
+            bodyCoverage: structureAssembly.bodyCoverage
+          });
+        }
+      }
+
+      const supportSpacing = isConnectorLike
+        ? Math.max(Number(structureSpecification.supportSpacing) || 0, 16, width * 3.6)
+        : Number(structureAssembly?.supportSpacing) || Math.max(26, width * 3.8);
       const skipNear = Math.max(8, width * 0.9);
       const skipDistance = (distance) => {
         if (distance < skipNear || distance > total - skipNear) return true;
@@ -408,113 +457,54 @@ export function collectStructureVisualInstances({
         );
       };
 
-      if (isConnectorLike || renderRoadSupports) {
+      if (isConnectorLike) {
         for (let distance = supportSpacing * 0.5; distance < total; distance += supportSpacing) {
           if (skipDistance(distance)) continue;
           const point = samplePointAlongPolyline(structurePts, distance);
           if (!point) continue;
           const terrainY = sampleTerrainHeight(point.x, point.z);
           const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
-          const supportDeckThickness = isConnectorLike ? 0.42 : 0.78;
           const supportHeight = deckY - deckThickness - terrainY;
           if (!(supportHeight > 2.4)) continue;
-          const nx = -point.tangentZ;
-          const nz = point.tangentX;
-          const pierWidth =
-            isConnectorLike ?
-              Math.max(0.7, width * 0.22) :
-              Math.max(1.2, Math.min(2.0, width * 0.14));
-          if (isConnectorLike) {
-            addSupportInstance({
-              x: point.x,
-              y: terrainY + supportHeight * 0.5,
-              z: point.z,
-              scaleX: pierWidth,
-              scaleY: supportHeight,
-              scaleZ: pierWidth
-            });
-          } else {
-            const columnOffset = Math.max(1.2, Math.min(width * 0.24, width * 0.34));
-            addSupportInstance({
-              x: point.x + nx * columnOffset,
-              y: terrainY + supportHeight * 0.5,
-              z: point.z + nz * columnOffset,
-              scaleX: pierWidth,
-              scaleY: supportHeight,
-              scaleZ: Math.max(1.0, pierWidth * 1.08)
-            });
-            addSupportInstance({
-              x: point.x - nx * columnOffset,
-              y: terrainY + supportHeight * 0.5,
-              z: point.z - nz * columnOffset,
-              scaleX: pierWidth,
-              scaleY: supportHeight,
-              scaleZ: Math.max(1.0, pierWidth * 1.08)
-            });
-            if (renderCapBeams) {
-              addBeam(
-                capInstances,
-                point.x,
-                deckY - supportDeckThickness - 0.18,
-                point.z,
-                width * 0.76,
-                0.26,
-                Math.max(0.5, pierWidth * 1.1),
-                Math.atan2(point.tangentX, point.tangentZ)
-              );
-            }
-          }
+          const pierWidth = Math.max(0.7, width * 0.22);
+          addSupportInstance({
+            x: point.x,
+            y: terrainY + supportHeight * 0.5,
+            z: point.z,
+            scaleX: pierWidth,
+            scaleY: supportHeight,
+            scaleZ: pierWidth
+          });
         }
       }
 
-      if (!isConnectorLike && renderRoadSupports && renderCapBeams && Array.isArray(feature.structureStations)) {
-        const stationSpanFactor = Math.max(8, width * 1.2);
-        for (let s = 0; s < feature.structureStations.length; s++) {
-          const station = feature.structureStations[s];
-          const offsets = [
-            station.distance - Math.max(stationSpanFactor, station.span * 0.68),
-            station.distance + Math.max(stationSpanFactor, station.span * 0.68)
-          ];
-          for (let o = 0; o < offsets.length; o++) {
-            const stationDistance = offsets[o];
-            if (stationDistance <= skipNear || stationDistance >= total - skipNear) continue;
-            const point = samplePointAlongPolyline(structurePts, stationDistance);
-            if (!point) continue;
-            const terrainY = sampleTerrainHeight(point.x, point.z);
-            const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
-            const supportHeight = deckY - deckThickness - terrainY;
-            if (!(supportHeight > 2.6)) continue;
-            const nx = -point.tangentZ;
-            const nz = point.tangentX;
-            const pierWidth = Math.max(1.2, Math.min(2.5, width * 0.17));
-            const columnOffset = Math.max(1.2, Math.min(width * 0.28, width * 0.42));
+      if (!isConnectorLike && renderRoadSupports && renderCapBeams) {
+        for (const station of structureAssembly.supportStations) {
+          const columns = Array.isArray(station.columns) ? station.columns : [];
+          for (const column of columns) {
             addSupportInstance({
-              x: point.x + nx * columnOffset,
-              y: terrainY + supportHeight * 0.5,
-              z: point.z + nz * columnOffset,
-              scaleX: pierWidth,
-              scaleY: supportHeight,
-              scaleZ: Math.max(1.0, pierWidth * 1.1)
+              x: column.x,
+              y: column.terrainY + column.height * 0.5,
+              z: column.z,
+              scaleX: column.width,
+              scaleY: column.height,
+              scaleZ: Math.max(1, column.width * 1.1)
             });
-            addSupportInstance({
-              x: point.x - nx * columnOffset,
-              y: terrainY + supportHeight * 0.5,
-              z: point.z - nz * columnOffset,
-              scaleX: pierWidth,
-              scaleY: supportHeight,
-              scaleZ: Math.max(1.0, pierWidth * 1.1)
-            });
-            addBeam(
-              capInstances,
-              point.x,
-              deckY - deckThickness - 0.2,
-              point.z,
-              width * 0.86,
-              0.36,
-              Math.max(0.58, pierWidth * 1.2),
-              Math.atan2(point.tangentX, point.tangentZ)
-            );
           }
+          const capHalfSpan = Math.max(
+            width * 0.42,
+            ...columns.map((column) => Math.abs(Number(column.offset) || 0) + column.width * 0.6)
+          );
+          addBeam(
+            capInstances,
+            station.x,
+            station.surfaceY - deckThickness - 0.18,
+            station.z,
+            capHalfSpan * 2,
+            0.34,
+            Math.max(0.58, ...columns.map((column) => column.width * 1.2)),
+            Math.atan2(station.tangentX, station.tangentZ)
+          );
         }
       }
 
@@ -549,9 +539,23 @@ export function collectStructureVisualInstances({
           );
         }
       };
-      if (isConnectorLike || renderRoadAbutments) {
+      if (isConnectorLike) {
         addAbutmentAt(Math.min(6, total * 0.12));
         addAbutmentAt(Math.max(0, total - Math.min(6, total * 0.12)));
+      } else if (structureAssembly?.visualSupportDetail) {
+        for (const abutment of structureAssembly.abutments || []) {
+          const nx = -abutment.tangentZ;
+          const nz = abutment.tangentX;
+          addSupportInstance({
+            x: abutment.x + nx * 0.2,
+            y: abutment.terrainY + abutment.height * 0.5,
+            z: abutment.z + nz * 0.2,
+            scaleX: Math.max(2.4, width * 0.92),
+            scaleY: abutment.height,
+            scaleZ: Math.max(1.4, width * 0.38),
+            supportKind: 'abutment'
+          });
+        }
       }
     } else if (semantics.terrainMode === "subgrade") {
       const tunnel = collectTunnelVisualInstances(feature, structurePts, total, {
@@ -561,8 +565,9 @@ export function collectStructureVisualInstances({
       portalInstances.push(...tunnel.portals);
       wallInstances.push(...tunnel.walls);
       roofInstances.push(...tunnel.roofs);
-      tunnelFloorInstances.push(...tunnel.floors);
       tunnelLightInstances.push(...tunnel.lights);
+      tunnelShells.push(...tunnel.shells);
+      tunnelPortalMasks.push(...tunnel.portalMasks);
     }
   }
 
@@ -574,16 +579,57 @@ export function collectStructureVisualInstances({
     capInstances,
     wallInstances,
     roofInstances,
-    tunnelFloorInstances,
     tunnelLightInstances,
+    tunnelShells,
+    tunnelPortalMasks,
+    elevatedDeckShells,
+    elevatedBarrierSegments,
     guardrailInstances
   };
+}
+
+export async function collectStructureVisualInstancesCooperatively(deps = {}) {
+  const allElevatedFeatures = []
+    .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
+    .concat(Array.isArray(appCtx.linearFeatures)
+      ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true)
+      : []);
+  const roadConflictIndex = createDriveableRoadConflictIndex(appCtx.roads);
+  const merged = {};
+  const chunkSize = 180;
+  for (let start = 0; start < allElevatedFeatures.length; start += chunkSize) {
+    const partial = collectStructureVisualInstances({
+      ...deps,
+      allElevatedFeatures,
+      roadConflictIndex,
+      featuresToProcess: allElevatedFeatures.slice(start, start + chunkSize)
+    });
+    for (const [key, value] of Object.entries(partial)) {
+      if (!Array.isArray(value)) continue;
+      if (!Array.isArray(merged[key])) merged[key] = [];
+      merged[key].push(...value);
+    }
+    await yieldToMainThread();
+  }
+  return merged;
 }
 
 export function clearStructureVisualMeshes() {
   return clearStructureVisualMeshesForContext(appCtx);
 }
 
+export function updateStructureVisualVisibility(force = false) {
+  return updateStructureVisualVisibilityForContext(appCtx, force);
+}
+
 export function rebuildStructureVisualMeshes(deps = {}) {
-  return rebuildStructureVisualMeshesForContext(appCtx, collectStructureVisualInstances, deps);
+  const collected = collectStructureVisualInstances(deps);
+  applyTerrainPortalMasksForContext(appCtx, collected.tunnelPortalMasks);
+  return rebuildStructureVisualMeshesForContext(appCtx, () => collected, deps);
+}
+
+export async function rebuildStructureVisualMeshesCooperatively(deps = {}) {
+  const collected = await collectStructureVisualInstancesCooperatively(deps);
+  applyTerrainPortalMasksForContext(appCtx, collected.tunnelPortalMasks);
+  return rebuildStructureVisualMeshesForContext(appCtx, () => collected, deps);
 }

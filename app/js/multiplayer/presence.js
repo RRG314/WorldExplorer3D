@@ -8,10 +8,10 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp
-} from '../platform/firebase/firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=66';
+import { normalizeCode } from './rooms.js?v=67';
 
 const ROOM_COLLECTION = 'rooms';
 const PLAYER_COLLECTION = 'players';
@@ -22,7 +22,7 @@ const MOVE_THRESHOLD_METERS = 0.5;
 const ROTATE_THRESHOLD_RAD = 0.05;
 const STALE_LAST_SEEN_MS = 45 * 1000;
 const STALE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
-const MAX_PLAYER_DOCS_READ = 24;
+const MAX_PLAYER_DOCS_READ = 32;
 const LEAVE_TTL_MS = 1000;
 const ALLOWED_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
 
@@ -315,7 +315,7 @@ function startPresence(roomId, getPoseFn) {
   lastWriteAt = Date.now();
 }
 
-function listenPlayers(roomId, callback) {
+function listenPlayers(roomId, callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
 
   const normalizedRoomId = normalizeCode(roomId);
@@ -348,7 +348,7 @@ function listenPlayers(roomId, callback) {
     callback(players);
   }, (err) => {
     console.warn('[multiplayer][presence] listenPlayers failed:', err);
-    callback([]);
+    if (typeof options.onError === 'function') options.onError(err);
   });
 }
 

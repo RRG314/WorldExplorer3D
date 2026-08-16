@@ -1,8 +1,3 @@
-import {
-  applyShadowPolicy,
-  createShadowPolicy
-} from './shadow-policy.js?v=1';
-
 export function createProceduralEnvironmentMap(ctx, pmremGenerator) {
   if (!pmremGenerator) return null;
   try {
@@ -22,10 +17,11 @@ export function createProceduralEnvironmentMap(ctx, pmremGenerator) {
 }
 
 export function getShadowMapResolution(ctx, level) {
-  return createShadowPolicy({
-    quality: ctx.normalizeRenderQualityLevel(level),
-    gpuTier: ctx.state.currentGpuTier
-  }).resolution;
+  const normalized = ctx.normalizeRenderQualityLevel(level);
+  if (normalized === ctx.RENDER_QUALITY_LOW) return 0;
+  if (ctx.state.currentGpuTier === 'low') return normalized === ctx.RENDER_QUALITY_HIGH ? 512 : 256;
+  if (ctx.state.currentGpuTier === 'mid') return normalized === ctx.RENDER_QUALITY_HIGH ? 1024 : 512;
+  return normalized === ctx.RENDER_QUALITY_HIGH ? 2048 : 1024;
 }
 
 export function applyRenderQuality(ctx, level, options = {}) {
@@ -37,16 +33,12 @@ export function applyRenderQuality(ctx, level, options = {}) {
   if (ctx.appCtx.renderer) {
     ctx.appCtx.renderer.toneMappingExposure = normalized === ctx.RENDER_QUALITY_HIGH ? 0.95 : normalized === ctx.RENDER_QUALITY_MED ? 0.9 : 0.85;
   }
-  const shadowPolicy = createShadowPolicy({
-    quality: normalized,
-    gpuTier: ctx.state.currentGpuTier
-  });
-  ctx.state.shadowPolicy = applyShadowPolicy({
-    renderer: ctx.appCtx.renderer,
-    sun: ctx.appCtx.sun,
-    three: THREE,
-    policy: shadowPolicy
-  });
+  if (ctx.appCtx.sun) {
+    applyDirectionalShadowPolicy(ctx.appCtx, {
+      gpuTier: ctx.state.currentGpuTier,
+      quality: normalized
+    });
+  }
   if (normalized === ctx.RENDER_QUALITY_LOW) {
     ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap || null;
   } else if (ctx.state.hdrEnvMap) {
@@ -184,3 +176,4 @@ export function tryEnablePostProcessing(ctx) {
   }
   return enabled;
 }
+import { applyDirectionalShadowPolicy } from './shadow-policy.js?v=1';

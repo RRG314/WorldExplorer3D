@@ -2,6 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { createPerfPanelApi } from "./perf-panel.js?v=1";
 import { createPerfRendererInfoApi } from "./perf-renderer.js?v=1";
 import { createPerfSettingsApi } from "./perf-settings.js?v=1";
+import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
 // perf.js - Runtime performance mode + benchmark telemetry for RDT comparisons
 // ============================================================================
 
@@ -430,15 +431,6 @@ function finishPerfLoad(summary = {}) {
     ...(loadSpikes ? { spikes: loadSpikes } : {}),
     ...(typeof summary === 'object' ? summary : {})
   };
-  void appCtx.recordProductEvent?.('load', {
-    action: summary?.success === false ? 'failed' : 'completed',
-    mode: perfStats.lastLoad.mode,
-    load_ms: perfStats.lastLoad.loadMs,
-    roads: Number(summary?.roadsFinal) || 0,
-    buildings: Number(summary?.buildingMeshes) || 0,
-    retry_pass: Number(summary?.retryPass) || 0,
-    reason: String(summary?.reason || 'none')
-  });
   _perfLoadStart = null;
   _perfLoadSpikeState = null;
   perfStats.updatedAt = Date.now();
@@ -478,7 +470,7 @@ function recordPerfFrame(dt) {
       return Math.max(0, Math.abs(appCtx.Walk.state.walker?.speedMph || 0));
     }
     if (typeof appCtx.car !== 'undefined' && appCtx.car) {
-      return Math.max(0, Math.abs((appCtx.car.speed || 0) * 0.5));
+      return Math.max(0, Math.abs(carSpeedToMph(appCtx.car.speed || 0)));
     }
     return 0;
   })();

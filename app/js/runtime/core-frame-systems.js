@@ -1,12 +1,13 @@
 function createCoreFrameSystems(appCtx, hooks = {}) {
+  appCtx.presentationPose = null;
   let hudTimer = 0;
   let mapTimer = 0;
   let lodTimer = 0;
   let weatherTimer = 0;
+  let weatherUiTimer = 0;
   let boatTimer = 0;
   let liveEarthTimer = 0;
   const workspaceOpen = () => hooks.isEditorWorkspaceOpen?.() || hooks.isActivityCreatorOpen?.();
-  const gameplayReady = () => !!appCtx.gameStarted && !appCtx.worldLoading;
 
   return [
     {
@@ -16,7 +17,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       priority: -100,
       update(frame) {
         appCtx.lastTime = frame.timestamp;
-        if (!appCtx.worldLoading) appCtx.recordPerfFrame?.(frame.dt);
+        appCtx.recordPerfFrame?.(frame.dt);
         appCtx.tutorialUpdate?.(frame.dt);
         if (appCtx.renderer?.info?.autoReset === false) appCtx.renderer.info.reset?.();
       }
@@ -25,16 +26,16 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.input',
       owner: 'engine',
       phase: 'input',
-      enabled: gameplayReady,
+      enabled: () => !!appCtx.gameStarted,
       update() {
-        hooks.updateInput?.();
+        appCtx.updateControlInput?.();
       }
     },
     {
       id: 'core.simulation',
       owner: 'engine',
       phase: 'simulation',
-      enabled: gameplayReady,
+      enabled: () => !!appCtx.gameStarted,
       update(frame) {
         appCtx.update(frame.dt);
       }
@@ -43,14 +44,12 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.world',
       owner: 'world',
       phase: 'world',
-      enabled: gameplayReady,
+      enabled: () => !!appCtx.gameStarted,
       update(frame) {
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
-        appCtx.updateEarthWorldStreaming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();
         if (!appCtx.onMars) appCtx.refreshAstronomicalSky?.(false);
         appCtx.updateWaterWaveVisuals?.();
-        appCtx.updateWeatherEffects?.(frame.dt);
 
         weatherTimer += frame.dt;
         if (weatherTimer > 5) {
@@ -70,10 +69,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.camera',
       owner: 'camera',
       phase: 'camera',
-      enabled: gameplayReady,
+      enabled: () => !!appCtx.gameStarted,
       update(frame) {
         appCtx.updateCamera(frame.dt);
-        appCtx.updateShadowPolicyFrame?.();
         appCtx.updatePlanetarySky?.();
       }
     },
@@ -82,7 +80,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'platform',
       phase: 'camera',
       priority: 20,
-      enabled: gameplayReady,
+      enabled: () => !!appCtx.gameStarted,
       update(frame) {
         appCtx.updateActivityCreator?.(frame.dt, frame.timestamp);
         appCtx.updateActivityDiscovery?.(frame.dt, frame.timestamp);
@@ -101,6 +99,11 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'presentation',
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
+        weatherUiTimer += frame.dt;
+        if (weatherUiTimer >= 1) {
+          weatherUiTimer %= 1;
+          appCtx.updateWeatherUi?.();
+        }
         hudTimer += frame.dt;
         if (hudTimer > 0.066) {
           hudTimer = 0;
@@ -112,7 +115,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         }
 
         mapTimer += frame.dt;
-        const interval = appCtx.planeMode?.active ? 0.25 : appCtx.droneMode ? 0.16 : 0.1;
+        // Five updates per second keeps the navigation display responsive
+        // without rebuilding every vector layer ten times per second.
+        const interval = appCtx.planeMode?.active ? 0.25 : 0.2;
         if (mapTimer > interval) {
           mapTimer = 0;
           if (!workspaceOpen()) {
@@ -124,7 +129,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         lodTimer += frame.dt;
         if (lodTimer > 0.2) {
           lodTimer = 0;
-          appCtx.updateWorldLod?.(false);
+          appCtx.updateStructureVisualVisibility?.();
           appCtx.enforceEnvironmentSceneOwnership?.();
         }
       }

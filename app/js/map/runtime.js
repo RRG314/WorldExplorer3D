@@ -1,12 +1,20 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { drawEarthBaseLayers } from "./earth-base.js?v=3";
+import { drawEarthBaseLayers } from "./earth-base.js?v=2";
 import { drawEarthMarkerLayers } from "./earth-markers.js?v=2";
-import { drawMapCompass, drawMapPlayerIcons } from "./icons.js?v=3";
+import { drawMapCompass, drawMapPlayerIcons } from "./icons.js?v=2";
 import { drawMoonMap } from "./moon.js?v=1";
-import { latLonToTile, loadTile, resolveMapView, worldToScreenLarge } from "./tiles.js?v=2";
+import {
+  latLonToTile,
+  loadTile,
+  mapTileCacheSnapshot,
+  resetMinimapView,
+  resolveMapView,
+  worldToScreenLarge
+} from "./tiles.js?v=4";
 
 const mctx = document.getElementById("minimap").getContext("2d");
 const largeMapCtx = document.getElementById("largeMapCanvas").getContext("2d");
+let minimapViewSnapshot = null;
 
 function drawMinimap() {
   drawMapOnCanvas(mctx, 150, 150, false);
@@ -22,6 +30,16 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   const view = resolveMapView(w, h, isLarge);
+  if (!isLarge) {
+    const actor = view.worldToScreen(view.ref.x, view.ref.z);
+    minimapViewSnapshot = {
+      actorX: Number(actor.x.toFixed(2)),
+      actorY: Number(actor.y.toFixed(2)),
+      centerX: view.mx,
+      centerY: view.my,
+      zoom: view.zoom
+    };
+  }
   drawEarthBaseLayers(ctx, w, h, isLarge, view);
   drawEarthMarkerLayers(ctx, w, h, isLarge, view);
   drawMapPlayerIcons(ctx, w, h, isLarge, view);
@@ -32,8 +50,11 @@ Object.assign(appCtx, {
   drawLargeMap,
   drawMapOnCanvas,
   drawMinimap,
+  getMinimapViewSnapshot: () => minimapViewSnapshot,
   latLonToTile,
   loadTile,
+  mapTileCacheSnapshot,
+  resetMinimapView,
   worldToScreenLarge
 });
 
@@ -43,5 +64,7 @@ export {
   drawMinimap,
   latLonToTile,
   loadTile,
+  mapTileCacheSnapshot,
+  resetMinimapView,
   worldToScreenLarge
 };

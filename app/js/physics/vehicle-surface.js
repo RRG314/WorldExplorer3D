@@ -1,142 +1,21 @@
 const SURFACE_PROFILES = Object.freeze({
   asphalt: Object.freeze({ kind: 'asphalt', label: 'ROAD', grip: 1, rolling: 1, accel: 1, topSpeed: 1, drift: 1 }),
-  paved: Object.freeze({ kind: 'paved', label: 'PAVED', grip: 0.96, rolling: 1.03, accel: 0.98, topSpeed: 0.97, drift: 1.02 }),
-  grass: Object.freeze({ kind: 'grass', label: 'GRASS', grip: 0.84, rolling: 1.18, accel: 0.91, topSpeed: 0.84, drift: 0.86 }),
-  dirt: Object.freeze({ kind: 'dirt', label: 'DIRT', grip: 0.78, rolling: 1.28, accel: 0.86, topSpeed: 0.78, drift: 0.92 }),
   gravel: Object.freeze({ kind: 'gravel', label: 'GRAVEL', grip: 0.74, rolling: 1.34, accel: 0.84, topSpeed: 0.76, drift: 0.96 }),
-  sand: Object.freeze({ kind: 'sand', label: 'SAND', grip: 0.64, rolling: 1.55, accel: 0.76, topSpeed: 0.68, drift: 0.82 }),
-  snow: Object.freeze({ kind: 'snow', label: 'SNOW', grip: 0.58, rolling: 1.25, accel: 0.72, topSpeed: 0.7, drift: 1.08 }),
   rock: Object.freeze({ kind: 'rock', label: 'ROCK', grip: 0.72, rolling: 1.4, accel: 0.78, topSpeed: 0.72, drift: 0.76 })
 });
-
-const LANDUSE_SURFACE = Object.freeze({
-  paved: 'paved',
-  parking: 'paved',
-  commercial: 'paved',
-  retail: 'paved',
-  industrial: 'paved',
-  residential: 'grass',
-  grass: 'grass',
-  meadow: 'grass',
-  recreation_ground: 'grass',
-  village_green: 'grass',
-  garden: 'grass',
-  park: 'grass',
-  forest: 'dirt',
-  wood: 'dirt',
-  farmland: 'dirt',
-  farmyard: 'dirt',
-  orchard: 'dirt',
-  soil: 'dirt',
-  mud: 'dirt',
-  quarry: 'gravel',
-  scree: 'gravel',
-  shingle: 'gravel',
-  sand: 'sand',
-  dune: 'sand',
-  beach: 'sand',
-  glacier: 'snow',
-  snow: 'snow',
-  bare_rock: 'rock',
-  barren: 'rock'
-});
-
-const ROAD_SURFACE = Object.freeze({
-  asphalt: 'asphalt',
-  concrete: 'paved',
-  concrete_plates: 'paved',
-  paving_stones: 'paved',
-  sett: 'paved',
-  cobblestone: 'paved',
-  compacted: 'gravel',
-  fine_gravel: 'gravel',
-  gravel: 'gravel',
-  pebblestone: 'gravel',
-  dirt: 'dirt',
-  earth: 'dirt',
-  ground: 'dirt',
-  mud: 'dirt',
-  grass: 'grass',
-  grass_paver: 'grass',
-  sand: 'sand',
-  snow: 'snow',
-  ice: 'snow'
-});
-
-function normalizedTag(value) {
-  return String(value || '').trim().toLowerCase().replace(/[: -]+/g, '_');
-}
-
-function pointInsideRecord(appCtx, x, z, record) {
-  const bounds = record?.bounds;
-  if (bounds && (
-    x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ
-  )) return false;
-  const points = Array.isArray(record?.pts) ? record.pts : null;
-  return !!(points?.length >= 3 && appCtx.pointInPolygon?.(x, z, points));
-}
-
-function worldCoverTerrainSurface(appCtx, x, z) {
-  let nearest = null;
-  let nearestDistance = Infinity;
-  for (const mesh of appCtx.terrainGroup?.children || []) {
-    const mode = normalizedTag(mesh?.userData?.worldCoverSurfaceMode);
-    if (!SURFACE_PROFILES[mode]) continue;
-    const distance = Math.hypot(Number(mesh.position?.x || 0) - x, Number(mesh.position?.z || 0) - z);
-    if (distance >= nearestDistance) continue;
-    nearest = mode;
-    nearestDistance = distance;
-  }
-  return nearest;
-}
-
-function localLandSurface(appCtx, x, z) {
-  const baselineKind = worldCoverTerrainSurface(appCtx, x, z);
-  const collections = [appCtx.landuses, appCtx.surfaceFeatureHints];
-  for (const records of collections) {
-    if (!Array.isArray(records)) continue;
-    for (let index = records.length - 1; index >= 0; index--) {
-      const record = records[index];
-      const kind = LANDUSE_SURFACE[normalizedTag(record?.type)];
-      if (!kind || !pointInsideRecord(appCtx, x, z, record)) continue;
-      if (baselineKind === 'sand' && (kind === 'grass' || kind === 'dirt')) return baselineKind;
-      if (baselineKind === 'rock' && (kind === 'grass' || kind === 'dirt')) return baselineKind;
-      return kind;
-    }
-  }
-  if (baselineKind) return baselineKind;
-  const worldHint = normalizedTag(appCtx.worldSurfaceProfile?.terrainModeHint);
-  if (worldHint === 'sand') return 'sand';
-  if (worldHint === 'snow') return 'snow';
-  if (worldHint === 'rock') return 'rock';
-  return 'grass';
-}
 
 export function resolveVehicleSurface(appCtx) {
   if (appCtx.onMars) return SURFACE_PROFILES.rock;
   if (appCtx.onMoon) return SURFACE_PROFILES.gravel;
-  if (appCtx.car?.onRoad) {
-    const tagged = ROAD_SURFACE[normalizedTag(appCtx.car.road?.surfaceTag)];
-    return SURFACE_PROFILES[tagged || 'asphalt'];
-  }
-  return SURFACE_PROFILES[localLandSurface(appCtx, appCtx.car?.x || 0, appCtx.car?.z || 0)];
+  // Earth driving has one neutral handling profile. Road proximity still
+  // selects the correct physical deck, but surface tags, land use, and terrain
+  // never branch vehicle physics.
+  return SURFACE_PROFILES.asphalt;
 }
 
 export function updateVehicleSurface(appCtx, dt) {
   const car = appCtx.car;
-  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const moved = Math.hypot(
-    (Number(car.x) || 0) - (Number(car._surfaceSampleX) || 0),
-    (Number(car.z) || 0) - (Number(car._surfaceSampleZ) || 0)
-  );
-  if (!car._surfaceTarget || now - (car._surfaceSampleAt || 0) > 220 || moved > 6) {
-    car._surfaceTarget = resolveVehicleSurface(appCtx);
-    car._surfaceSampleAt = now;
-    car._surfaceSampleX = Number(car.x) || 0;
-    car._surfaceSampleZ = Number(car.z) || 0;
-  }
-
-  const target = car._surfaceTarget || SURFACE_PROFILES.asphalt;
+  const target = resolveVehicleSurface(appCtx);
   if (!car.surfaceDynamics) {
     car.surfaceDynamics = { ...target };
   } else {
@@ -149,6 +28,136 @@ export function updateVehicleSurface(appCtx, dt) {
   }
   car.surfaceKind = target.kind;
   return car.surfaceDynamics;
+}
+
+export function sampleEarthVehicleGroundContact(appCtx, options = {}) {
+  const x = Number(options.x) || 0;
+  const z = Number(options.z) || 0;
+  const angle = Number(options.angle) || 0;
+  const currentY = Number.isFinite(Number(options.currentY)) ? Number(options.currentY) : NaN;
+  const preferRoad = options.preferRoad !== false;
+  const halfWheelBase = Math.max(0.5, Number(options.halfWheelBase) || 1.45);
+  const halfTrack = Math.max(0.35, Number(options.halfTrack) || 0.85);
+  const forwardX = Math.sin(angle);
+  const forwardZ = Math.cos(angle);
+  const rightX = Math.cos(angle);
+  const rightZ = -Math.sin(angle);
+  const points = [
+    { id: 'center', x, z },
+    { id: 'front', x: x + forwardX * halfWheelBase, z: z + forwardZ * halfWheelBase },
+    { id: 'rear', x: x - forwardX * halfWheelBase, z: z - forwardZ * halfWheelBase },
+    { id: 'right', x: x + rightX * halfTrack, z: z + rightZ * halfTrack },
+    { id: 'left', x: x - rightX * halfTrack, z: z - rightZ * halfTrack }
+  ];
+  const samples = points.map((point) => {
+    const sample = appCtx.SurfaceQuery?.driveAt?.(point.x, point.z, {
+      preferRoad,
+      currentY,
+      sampleRenderedMesh: false,
+      nearestRoad: point.id === 'center' ? options.nearestRoad : null,
+      preferredRoadOnly: point.id !== 'center' && preferRoad
+    });
+    return {
+      ...point,
+      y: Number(sample?.position?.y),
+      kind: String(sample?.kind || ''),
+      feature: sample?.feature || null
+    };
+  }).filter((sample) => Number.isFinite(sample.y));
+  if (samples.length === 0) return null;
+  const rawById = Object.fromEntries(samples.map((sample) => [sample.id, sample]));
+  const center = rawById.center || samples[0];
+  const centerY = center.y;
+  // A narrow mountain road can put the left/right footprint probes just
+  // outside the asphalt. Those probes belong to the adjacent hillside, not
+  // the vehicle's suspension. Once the center owns a road deck, accept only
+  // road samples on the same vertically continuous deck.
+  const roadCentered = center.kind === 'road';
+  const supportSamples = roadCentered
+    ? samples.filter((sample) =>
+        sample.kind === 'road' &&
+        (
+          sample.feature === center.feature ||
+          Math.abs(sample.y - centerY) <= 2.5
+        )
+      )
+    : samples;
+  const byId = Object.fromEntries(supportSamples.map((sample) => [sample.id, sample]));
+  const frontY = Number.isFinite(byId.front?.y) ? byId.front.y : centerY;
+  const rearY = Number.isFinite(byId.rear?.y) ? byId.rear.y : centerY;
+  const rightY = Number.isFinite(byId.right?.y) ? byId.right.y : centerY;
+  const leftY = Number.isFinite(byId.left?.y) ? byId.left.y : centerY;
+  return Object.freeze({
+    centerY,
+    supportY: Math.max(centerY, ...supportSamples.map((sample) => sample.y)),
+    pitch: Math.max(-0.55, Math.min(0.55, -Math.atan2(frontY - rearY, halfWheelBase * 2))),
+    roll: Math.max(-0.45, Math.min(0.45, Math.atan2(rightY - leftY, halfTrack * 2))),
+    sampleCount: samples.length,
+    supportSampleCount: supportSamples.length,
+    roadCentered
+  });
+}
+
+export function createEarthVehicleGroundContactSampler(appCtx, options = {}) {
+  const refreshInterval = Math.max(1 / 60, Number(options.refreshInterval) || 1 / 30);
+  const movementThreshold = Math.max(0.5, Number(options.movementThreshold) || 3.5);
+  const turnThreshold = Math.max(0.02, Number(options.turnThreshold) || 0.14);
+  let cachedContact = null;
+  let hasSample = false;
+  let elapsed = Infinity;
+  let lastX = NaN;
+  let lastZ = NaN;
+  let lastAngle = NaN;
+  let lastFrameToken;
+
+  function reset() {
+    cachedContact = null;
+    hasSample = false;
+    elapsed = Infinity;
+    lastX = NaN;
+    lastZ = NaN;
+    lastAngle = NaN;
+    lastFrameToken = undefined;
+  }
+
+  function sample(sampleOptions = {}, dt = 0, frameToken) {
+    elapsed += Math.max(0, Number(dt) || 0);
+    const sameRenderedFrame = frameToken !== undefined && frameToken === lastFrameToken;
+    if (hasSample && sameRenderedFrame) return cachedContact;
+
+    const x = Number(sampleOptions.x) || 0;
+    const z = Number(sampleOptions.z) || 0;
+    const angle = Number(sampleOptions.angle) || 0;
+    const moved = Number.isFinite(lastX) && Math.hypot(x - lastX, z - lastZ) >= movementThreshold;
+    const turned = Number.isFinite(lastAngle) &&
+      Math.abs(Math.atan2(Math.sin(angle - lastAngle), Math.cos(angle - lastAngle))) >= turnThreshold;
+    const shouldRefresh = !hasSample || elapsed >= refreshInterval || moved || turned;
+
+    lastFrameToken = frameToken;
+    if (!shouldRefresh) return cachedContact;
+
+    cachedContact = sampleEarthVehicleGroundContact(appCtx, sampleOptions);
+    hasSample = true;
+    elapsed = 0;
+    lastX = x;
+    lastZ = z;
+    lastAngle = angle;
+    return cachedContact;
+  }
+
+  return Object.freeze({ reset, sample });
+}
+
+export function stabilizeEarthVehicleSurfaceY(rawSurfaceY, previousSurfaceY, dt, speed = 0) {
+  const raw = Number(rawSurfaceY);
+  const hasPrevious = previousSurfaceY !== null && previousSurfaceY !== undefined &&
+    previousSurfaceY !== '' && Number.isFinite(Number(previousSurfaceY));
+  const previous = hasPrevious ? Number(previousSurfaceY) : NaN;
+  if (!Number.isFinite(raw)) return hasPrevious ? previous : 0;
+  if (!hasPrevious) return raw;
+  const step = Math.max(0, Math.min(0.05, Number(dt) || 0));
+  const maximumDownwardStep = Math.max(0.35, step * (8 + Math.abs(Number(speed) || 0) * 0.45));
+  return Math.max(raw, previous - maximumDownwardStep);
 }
 
 export { SURFACE_PROFILES };

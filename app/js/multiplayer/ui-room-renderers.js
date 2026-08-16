@@ -367,28 +367,31 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (!refs.titlePlanState) return;
     const plan = state.entitlement.plan;
     if (state.entitlement.isAdmin === true) {
-      refs.titlePlanState.textContent = "Admin mode: multiplayer testing tools are available.";
+      refs.titlePlanState.textContent = "Admin mode: Multiplayer + Pro features unlocked for live testing.";
       refs.titlePlanState.classList.remove("warn");
       return;
     }
     if (plan === "pro") {
-      refs.titlePlanState.textContent = "Signed in. Multiplayer rooms and early previews are available.";
+      refs.titlePlanState.textContent = "Pro donation active: multiplayer is open, plus early demo access.";
       refs.titlePlanState.classList.remove("warn");
       return;
     }
     if (plan === "supporter" || plan === "support") {
       refs.titlePlanState.textContent =
-        "Signed in. Multiplayer rooms are available.";
+        "Supporter donation active: multiplayer is fully open. Upgrade to Pro for early demos.";
       refs.titlePlanState.classList.remove("warn");
       return;
     }
     refs.titlePlanState.textContent =
-      "Signed-in explorers can create and join multiplayer rooms.";
+      "Signed-in explorers can create and join multiplayer rooms. Donations are optional.";
     refs.titlePlanState.classList.remove("warn");
   }
 
   function updateToggleStates() {
     const hasRoom = !!state.currentRoom;
+    const isRoomOwner = hasRoom && !!state.authUser &&
+      String(state.currentRoom.ownerUid || "") === String(state.authUser.uid || "");
+    const canFeatureRoom = isRoomOwner && state.entitlement.isAdmin === true;
     if (refs.floatGhosts) {
       refs.floatGhosts.classList.toggle("on", state.ghostsEnabled);
       refs.floatGhosts.classList.toggle("disabled", !hasRoom);
@@ -407,17 +410,18 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (refs.titleLeaveBtn) refs.titleLeaveBtn.disabled = !hasRoom;
     if (refs.roomPanelInviteBtn) refs.roomPanelInviteBtn.disabled = !hasRoom;
     if (refs.roomPanelLeaveBtn) refs.roomPanelLeaveBtn.disabled = !hasRoom;
-    if (refs.roomPanelSaveSettingsBtn) refs.roomPanelSaveSettingsBtn.disabled = !hasRoom;
-    if (refs.roomHomeBaseSaveBtn) refs.roomHomeBaseSaveBtn.disabled = !hasRoom;
+    if (refs.roomPanelSaveSettingsBtn) refs.roomPanelSaveSettingsBtn.disabled = !isRoomOwner;
+    if (refs.roomHomeBaseSaveBtn) refs.roomHomeBaseSaveBtn.disabled = !isRoomOwner;
     if (refs.roomArtifactCreateBtn) refs.roomArtifactCreateBtn.disabled = !hasRoom;
-    if (refs.roomPanelFeaturedToggle) refs.roomPanelFeaturedToggle.disabled = !hasRoom;
-    if (refs.roomPanelNameInput) refs.roomPanelNameInput.disabled = !hasRoom;
-    if (refs.roomPanelPaintTimeInput) refs.roomPanelPaintTimeInput.disabled = !hasRoom;
-    if (refs.roomPanelPaintTouchModeSelect) refs.roomPanelPaintTouchModeSelect.disabled = !hasRoom;
-    if (refs.roomPanelPaintAllowGunToggle) refs.roomPanelPaintAllowGunToggle.disabled = !hasRoom;
-    if (refs.roomPanelPaintAllowRoofAutoToggle) refs.roomPanelPaintAllowRoofAutoToggle.disabled = !hasRoom;
-    if (refs.roomHomeBaseNameInput) refs.roomHomeBaseNameInput.disabled = !hasRoom;
-    if (refs.roomHomeBaseDescInput) refs.roomHomeBaseDescInput.disabled = !hasRoom;
+    if (refs.roomPanelFeaturedControl) refs.roomPanelFeaturedControl.hidden = state.entitlement.isAdmin !== true;
+    if (refs.roomPanelFeaturedToggle) refs.roomPanelFeaturedToggle.disabled = !canFeatureRoom;
+    if (refs.roomPanelNameInput) refs.roomPanelNameInput.disabled = !isRoomOwner;
+    if (refs.roomPanelPaintTimeInput) refs.roomPanelPaintTimeInput.disabled = !isRoomOwner;
+    if (refs.roomPanelPaintTouchModeSelect) refs.roomPanelPaintTouchModeSelect.disabled = !isRoomOwner;
+    if (refs.roomPanelPaintAllowGunToggle) refs.roomPanelPaintAllowGunToggle.disabled = !isRoomOwner;
+    if (refs.roomPanelPaintAllowRoofAutoToggle) refs.roomPanelPaintAllowRoofAutoToggle.disabled = !isRoomOwner;
+    if (refs.roomHomeBaseNameInput) refs.roomHomeBaseNameInput.disabled = !isRoomOwner;
+    if (refs.roomHomeBaseDescInput) refs.roomHomeBaseDescInput.disabled = !isRoomOwner;
     if (refs.roomArtifactTypeSelect) refs.roomArtifactTypeSelect.disabled = !hasRoom;
     if (refs.roomArtifactTitleInput) refs.roomArtifactTitleInput.disabled = !hasRoom;
     if (refs.roomArtifactTextInput) refs.roomArtifactTextInput.disabled = !hasRoom;

@@ -1,11 +1,11 @@
 import {
   CURATED_DESTINATIONS,
   MAJOR_CITY_DESTINATIONS
-} from '../globe-selector/catalog.js?v=8';
+} from '../globe-selector/catalog.js?v=2';
 import {
   loadRecentPlaces,
   loadSavedFavoriteCities
-} from '../globe-selector/helpers.js?v=4';
+} from '../globe-selector/helpers.js?v=7';
 
 const HUB_PANELS = {
   games: { tab: 'games', title: 'Missions & Games' },
@@ -30,9 +30,11 @@ function setupHubTheme() {
 
   const apply = () => {
     document.documentElement.dataset.hubTheme = mode;
-    button.textContent = mode === 'day' ? '☼' : '◒';
-    button.title = `Appearance: ${mode[0].toUpperCase()}${mode.slice(1)}`;
-    button.setAttribute('aria-label', `${button.title}. Activate to change.`);
+    const nextMode = mode === 'day' ? 'dark' : 'light';
+    button.textContent = mode === 'day' ? '◒' : '☼';
+    button.title = `Switch to ${nextMode} appearance`;
+    button.setAttribute('aria-label', button.title);
+    button.setAttribute('aria-pressed', mode === 'day' ? 'true' : 'false');
   };
 
   button.addEventListener('click', () => {
@@ -217,20 +219,30 @@ function setupGlobeHub({
     if (challengePanel && overlay) overlay.appendChild(challengePanel);
   }
 
-  libraryPanel.addEventListener('click', (event) => {
+  const selectLibraryPlace = (event, activate = false) => {
     const button = event.target instanceof Element
       ? event.target.closest('[data-library-lat][data-library-lon]')
       : null;
-    if (!(button instanceof HTMLButtonElement)) return;
+    if (!(button instanceof HTMLButtonElement)) return false;
     const lat = Number(button.dataset.libraryLat);
     const lon = Number(button.dataset.libraryLon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
     globeSelector.setSelection(lat, lon, {
       name: button.dataset.libraryName || 'Selected place',
       focus: true,
       arrivalMode: 'walk'
     });
-    closePanel();
+    if (activate) {
+      closePanel();
+      void globeSelector.startHere();
+    }
+    return true;
+  };
+  libraryPanel.addEventListener('click', (event) => {
+    selectLibraryPlace(event, false);
+  });
+  libraryPanel.addEventListener('dblclick', (event) => {
+    if (selectLibraryPlace(event, true)) event.preventDefault();
   });
 
   const titleFooter = document.querySelector('.title-footer');
@@ -267,11 +279,6 @@ function setupGlobeHub({
     globeSelector.close();
     onLaunchMode('mars');
   });
-  document.getElementById('globeSelectorOceanBtn')?.addEventListener('click', () => {
-    globeSelector.close();
-    onLaunchMode('ocean');
-  });
-
   return { closePanel, openPanel };
 }
 

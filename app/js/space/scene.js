@@ -1,14 +1,15 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   createAuxiliaryRenderer,
-  disposeThreeObjectTree
+  disposeThreeObjectTree,
+  disposeThreeRenderer
 } from "../engine/webgl-lifecycle.js?v=1";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=14";
+import { initUniverseRuntime } from "../universe/runtime.js?v=19";
 
-export function createSpaceFlightScene() {
+export function createSpaceFlightScene(options = {}) {
   console.log("Creating space flight scene...");
 
   appCtx.spaceFlight.scene = new THREE.Scene();
@@ -57,13 +58,22 @@ export function createSpaceFlightScene() {
   createSpaceMoon();
   createSpaceRocket();
 
+  appCtx.spaceFlight._extendedSpaceLoaded = false;
+  if (options.includeExtendedSpace !== false) ensureExtendedSpaceScene();
+
+  resetSpaceFlightForMoon();
+  console.log("Space flight scene ready!");
+}
+
+export function ensureExtendedSpaceScene() {
+  if (!appCtx.spaceFlight?.scene) return false;
+  if (appCtx.spaceFlight._extendedSpaceLoaded) return true;
   if (typeof appCtx.initSolarSystem === 'function') {
     appCtx.initSolarSystem(appCtx.spaceFlight.scene);
   }
   initUniverseRuntime(appCtx.spaceFlight.scene);
-
-  resetSpaceFlightForMoon();
-  console.log("Space flight scene ready!");
+  appCtx.spaceFlight._extendedSpaceLoaded = true;
+  return true;
 }
 
 function createSpaceEarth() {
@@ -80,8 +90,6 @@ function createSpaceEarth() {
     shininess: 4
   });
   appCtx.spaceFlight.earth = new THREE.Mesh(earthGeo, earthMat);
-  appCtx.spaceFlight.earth.rotation.order = 'ZYX';
-  appCtx.spaceFlight.earth.rotation.z = THREE.MathUtils.degToRad(23.439);
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.earth);
 
   const atmoGeo = new THREE.SphereGeometry(SPACE_CONSTANTS.EARTH_SIZE * 1.035, 48, 32);
@@ -140,8 +148,6 @@ function createSpaceMoon() {
     shininess: 5
   });
   appCtx.spaceFlight.moon = new THREE.Mesh(moonGeo, moonMat);
-  appCtx.spaceFlight.moon.rotation.order = 'ZYX';
-  appCtx.spaceFlight.moon.rotation.z = THREE.MathUtils.degToRad(6.68);
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.moon);
 
   const ringGeo = new THREE.TorusGeometry(SPACE_CONSTANTS.MOON_SIZE * 1.8, 2, 12, 32);
@@ -329,13 +335,15 @@ export function resetSpaceFlightForMars() {
 }
 
 export function destroySpaceFlightScene() {
+  appCtx.resetSolarSystemRuntime?.();
   if (appCtx.spaceFlight.scene) {
     disposeThreeObjectTree(appCtx.spaceFlight.scene);
   }
-  appCtx.spaceFlight.renderer?.renderLists?.dispose?.();
   appCtx.spaceFlight.renderer?.info?.reset?.();
   appCtx.spaceFlight.renderer?.clear?.();
+  appCtx.spaceFlight.renderer = disposeThreeRenderer(appCtx.spaceFlight.renderer);
   appCtx.spaceFlight.scene = null;
+  appCtx.spaceFlight._extendedSpaceLoaded = false;
   appCtx.spaceFlight.camera = null;
   appCtx.spaceFlight.rocket = null;
   appCtx.spaceFlight.earth = null;

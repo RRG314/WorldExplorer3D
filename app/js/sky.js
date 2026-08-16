@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js';
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=20";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
+  invalidateSkyVisualCache,
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=2";
+} from "./sky/astronomical-state.js?v=5";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -15,14 +15,16 @@ import {
   clearStarSelection,
   createStarField,
   highlightConstellation,
-  showStarInfo
-} from "./sky/starfield-ui.js?v=11";
+  showStarInfo,
+  ensureStarCatalogLoaded
+} from "./sky/starfield-ui.js?v=15";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=4";
+import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
   commitEnvironment,
-  exitCurrentEnvironmentSync
+  exitCurrentEnvironmentSync,
+  registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
@@ -66,32 +68,25 @@ function checkMoonClick(clientX, clientY) {
   return checkMoonSelection(clientX, clientY, travelToMoon);
 }
 
-let cameraTransitionScope = null;
-
 function runTimedCameraTransition({
   duration = 3000,
   onFrame,
   onComplete,
   isCurrent = () => true
 }) {
-  cameraTransitionScope?.dispose('camera-transition-superseded');
-  const scope = createLifecycleScope('planetary-camera-transition');
-  cameraTransitionScope = scope;
   const startTime = Date.now();
   let finished = false;
 
-  const finish = (reason, shouldComplete) => {
+  const complete = () => {
     if (finished) return;
     finished = true;
-    if (cameraTransitionScope === scope) cameraTransitionScope = null;
-    scope.dispose(reason);
-    if (shouldComplete && typeof onComplete === 'function') onComplete();
+    if (typeof onComplete === 'function') onComplete();
   };
 
   const animate = () => {
     if (finished) return;
     if (!isCurrent()) {
-      finish('camera-transition-stale', false);
+      finished = true;
       return;
     }
     const elapsed = Date.now() - startTime;
@@ -103,14 +98,14 @@ function runTimedCameraTransition({
     if (typeof onFrame === 'function') onFrame(eased, progress);
 
     if (progress < 1) {
-      scope.animationFrame(animate);
+      requestAnimationFrame(animate);
     } else {
-      finish('camera-transition-complete', true);
+      complete();
     }
   };
 
-  scope.animationFrame(animate);
-  scope.timeout(() => finish('camera-transition-timeout', true), duration + 250);
+  requestAnimationFrame(animate);
+  window.setTimeout(complete, duration + 250);
 }
 
 // Direct travel to moon (bypasses space flight module)
@@ -222,7 +217,7 @@ function arriveAtMoon() {
 
   // IMMEDIATELY set black background and hide car to prevent earth ground flash
   appCtx.scene.background = new THREE.Color(0x000000);
-  appCtx.scene.fog = new THREE.FogExp2(0x000000, 0.00005);
+  appCtx.scene.fog = new THREE.FogExp2(0x000000, 0);
   if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.05;
   appCtx.setLunarEarthVisible?.(true);
   appCtx.setPlanetarySky?.('moon');
@@ -357,7 +352,12 @@ async function arriveAtEarth(expectedSessionId = null) {
   commitEnvironment(appCtx.ENV.EARTH, { source: 'moon_return' });
   appCtx.setLunarEarthVisible?.(false);
   appCtx.clearPlanetarySky?.();
-  await appCtx.setPlanetaryVehicle?.('earth');
+  // Earth vehicle restoration is synchronous for this target. Do not yield
+  // after publishing the Earth environment while shared star materials still
+  // carry Moon opacity; the renderer and observers must see one atomic visual
+  // transition.
+  void appCtx.setPlanetaryVehicle?.('earth');
+  refreshAstronomicalSky(true);
   if (!isCurrentArrival()) {
     appCtx.earthResumePending = false;
     return false;
@@ -385,8 +385,6 @@ async function arriveAtEarth(expectedSessionId = null) {
     appCtx.fillLight.intensity = 0.3; // Normal fill light
   }
 
-  // Restore Earth-relative sky state
-  refreshAstronomicalSky(true);
   if (appCtx.car) {
     appCtx.car.vx = 0;
     appCtx.car.vz = 0;
@@ -434,7 +432,7 @@ function suspendMoonEnvironment() {
   });
 }
 
-const moonDestinationAdapter = Object.freeze({
+registerEnvironmentLifecycle(appCtx.ENV.MOON, {
   exitSync: suspendMoonEnvironment,
   snapshot: () => ({
     active: appCtx.getEnv?.() === appCtx.ENV.MOON,
@@ -454,11 +452,13 @@ Object.assign(appCtx, {
   clearStarSelection,
   createMoonSurface,
   createStarField,
+  ensureStarCatalogLoaded,
   cycleTimeOfDay,
   directTravelToMoon,
   hideReturnToEarthButton,
   highlightConstellation,
   inspectAstronomicalSkyState,
+  invalidateSkyVisualCache,
   getAstronomicalSkySnapshot,
   positionCarOnMoon,
   refreshAstronomicalSky,
@@ -481,13 +481,14 @@ export {
   clearStarSelection,
   createMoonSurface,
   createStarField,
+  ensureStarCatalogLoaded,
   cycleTimeOfDay,
   directTravelToMoon,
   hideReturnToEarthButton,
   highlightConstellation,
   inspectAstronomicalSkyState,
+  invalidateSkyVisualCache,
   getAstronomicalSkySnapshot,
-  moonDestinationAdapter,
   positionCarOnMoon,
   refreshAstronomicalSky,
   returnToEarth,

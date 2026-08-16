@@ -1,5 +1,4 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { queryNearbyRoads, roadSpatialIndexSnapshot } from "./road-spatial-index.js?v=2";
 
 const runtime = {
   applySpawnTarget: () => null,
@@ -19,6 +18,14 @@ const nearRoadResult = {
   distanceToEndpoint: Infinity,
   distanceToTransitionZone: Infinity
 };
+const ROAD_SEARCH_CELL_SIZE = 160;
+const ROAD_SEARCH_RADII = Object.freeze([96, 320, 960]);
+let roadSearchIndex = new Map();
+let roadSearchFeatureSet = new Set();
+let roadSearchBaseRef = null;
+let roadSearchBaseCount = -1;
+let roadSearchOverlayRef = null;
+let roadSearchOverlayCount = -1;
 
 export function initWorldNavigation(deps = {}) {
   if (typeof deps.applySpawnTarget === 'function') runtime.applySpawnTarget = deps.applySpawnTarget;
@@ -59,6 +66,99 @@ export function runtimeRoadFeatures() {
     }
   }
   return features;
+}
+
+function rawRuntimeRoadFeatures() {
+  const features = [];
+  if (Array.isArray(appCtx.roads)) features.push(...appCtx.roads);
+  if (Array.isArray(appCtx.overlayRuntimeRoads)) {
+    features.push(...appCtx.overlayRuntimeRoads);
+  }
+  return features;
+}
+
+function rebuildRoadSearchIndexIfNeeded() {
+  const baseRef = Array.isArray(appCtx.roads) ? appCtx.roads : null;
+  const overlayRef = Array.isArray(appCtx.overlayRuntimeRoads)
+    ? appCtx.overlayRuntimeRoads
+    : null;
+  const baseCount = baseRef?.length || 0;
+  const overlayCount = overlayRef?.length || 0;
+  if (
+    roadSearchBaseRef === baseRef &&
+    roadSearchBaseCount === baseCount &&
+    roadSearchOverlayRef === overlayRef &&
+    roadSearchOverlayCount === overlayCount
+  ) {
+    return;
+  }
+
+  roadSearchIndex = new Map();
+  const roads = rawRuntimeRoadFeatures();
+  roadSearchFeatureSet = new Set(roads);
+  for (let i = 0; i < roads.length; i += 1) {
+    const road = roads[i];
+    const pts = Array.isArray(road?.pts) ? road.pts : null;
+    if (!pts || pts.length < 2) continue;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let p = 0; p < pts.length; p += 1) {
+      const point = pts[p];
+      if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) continue;
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minZ = Math.min(minZ, point.z);
+      maxZ = Math.max(maxZ, point.z);
+    }
+    if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) continue;
+    const minCellX = Math.floor(minX / ROAD_SEARCH_CELL_SIZE);
+    const maxCellX = Math.floor(maxX / ROAD_SEARCH_CELL_SIZE);
+    const minCellZ = Math.floor(minZ / ROAD_SEARCH_CELL_SIZE);
+    const maxCellZ = Math.floor(maxZ / ROAD_SEARCH_CELL_SIZE);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+        const key = `${cellX},${cellZ}`;
+        let bucket = roadSearchIndex.get(key);
+        if (!bucket) {
+          bucket = [];
+          roadSearchIndex.set(key, bucket);
+        }
+        bucket.push(road);
+      }
+    }
+  }
+  roadSearchBaseRef = baseRef;
+  roadSearchBaseCount = baseCount;
+  roadSearchOverlayRef = overlayRef;
+  roadSearchOverlayCount = overlayCount;
+}
+
+function indexedRoadCandidates(x, z, radius) {
+  rebuildRoadSearchIndexIfNeeded();
+  if (roadSearchIndex.size === 0) return [];
+  const minCellX = Math.floor((x - radius) / ROAD_SEARCH_CELL_SIZE);
+  const maxCellX = Math.floor((x + radius) / ROAD_SEARCH_CELL_SIZE);
+  const minCellZ = Math.floor((z - radius) / ROAD_SEARCH_CELL_SIZE);
+  const maxCellZ = Math.floor((z + radius) / ROAD_SEARCH_CELL_SIZE);
+  const candidates = [];
+  const seen = new Set();
+  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+    for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+      const bucket = roadSearchIndex.get(`${cellX},${cellZ}`);
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i += 1) {
+        const road = bucket[i];
+        if (!road || seen.has(road) || runtime.isSuppressedBaseRoad(road)) {
+          continue;
+        }
+        seen.add(road);
+        candidates.push(road);
+      }
+    }
+  }
+  return candidates;
 }
 
 export function buildingContainingPoint(x, z, radius = 6, options = {}) {
@@ -203,27 +303,7 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
   if (!pts || pts.length < 2) return null;
   const semantics = road?.structureSemantics || null;
   const profileDistances = road?.surfaceDistances instanceof Float32Array ? road.surfaceDistances : null;
-  const profileHeights = road?.surfaceHeights instanceof Float32Array ? road.surfaceHeights : null;
   const transitionAnchors = Array.isArray(road?.structureTransitionAnchors) ? road.structureTransitionAnchors : [];
-  const sameRoad = road === preferredRoad;
-  const connectedRoad = !!(
-    preferredRoad &&
-    !sameRoad &&
-    (
-      Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
-      Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
-    )
-  );
-  const sameVerticalGroup = !!(
-    preferredRoad?.structureSemantics?.verticalGroup &&
-    road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup
-  );
-  const continuityAccess = !!preferredRoad && (
-    sameRoad ||
-    connectedRoad ||
-    sameVerticalGroup ||
-    runtime.areRoadsConnected(preferredRoad, road)
-  );
   let totalDistance = Number.isFinite(profileDistances?.[profileDistances.length - 1]) ? Number(profileDistances[profileDistances.length - 1]) : NaN;
   if (!Number.isFinite(totalDistance) || totalDistance <= 0) {
     totalDistance = 0;
@@ -246,23 +326,8 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     const nx = p1.x + t * dx;
     const nz = p1.z + t * dz;
     const d = Math.hypot(x - nx, z - nz);
-    // Navigation runs every simulation frame. Elevated and subgrade structures
-    // own their stored profiles, so point-aligned typed arrays are safe to
-    // interpolate directly. At-grade roads remain owned by the current terrain
-    // sampler: terrain tiles can be replaced after the road profile was built.
-    // Bypassing that sampler leaves ordinary roads floating above or buried
-    // below the rendered ground.
-    const fromY = profileHeights?.length === pts.length ? Number(profileHeights[i]) : NaN;
-    const toY = profileHeights?.length === pts.length ? Number(profileHeights[i + 1]) : NaN;
-    const requiresLiveTerrain =
-      semantics?.terrainMode === 'at_grade' &&
-      typeof road?.surfaceTerrainSampler === 'function';
-    const roadY =
-      !requiresLiveTerrain && Number.isFinite(fromY) && Number.isFinite(toY) ?
-        fromY + (toY - fromY) * t :
-        runtime.sampleFeatureSurfaceY(road, x, z, { x: nx, z: nz, dist: d, segIndex: i, t }, {
-          preferStoredProfile: !requiresLiveTerrain
-        });
+    const projected = { x: nx, z: nz, dist: d, segIndex: i, t };
+    const roadY = runtime.sampleFeatureSurfaceY(road, x, z, projected);
     const verticalDelta = Number.isFinite(targetY) && Number.isFinite(roadY) ? Math.abs(roadY - targetY) : 0;
     const distanceAlong =
       profileDistances && profileDistances.length > i ?
@@ -288,18 +353,25 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
       0.38;
     let weightedDist = d + (Number.isFinite(targetY) && Number.isFinite(roadY) ? verticalDelta * verticalWeight : 0);
     if (preferredRoad) {
+      const sameRoad = road === preferredRoad;
+      const connectedRoad = !sameRoad && (
+        Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
+        Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
+      );
       if (sameRoad) {
         weightedDist = d + verticalDelta * 0.12;
       } else if (connectedRoad) {
         weightedDist = d + verticalDelta * 0.2;
-      } else if (sameVerticalGroup) {
-        weightedDist = d + verticalDelta * 0.32;
       }
       if (sameRoad) weightedDist -= 3.4;
       else if (connectedRoad) weightedDist -= 2.25;
-      else if (sameVerticalGroup) weightedDist -= 0.7;
       if ((sameRoad || connectedRoad) && (t < 0.08 || t > 0.92)) weightedDist -= 0.55;
     }
+    const continuityAccess =
+      !!preferredRoad && (
+        road === preferredRoad ||
+        runtime.areRoadsConnected(preferredRoad, road)
+      );
     if (semantics?.gradeSeparated && !continuityAccess && Number.isFinite(verticalDelta)) {
       const directLockThreshold = semantics.terrainMode === 'elevated' ? 1.25 : 1.35;
       const transitionLockThreshold = semantics.terrainMode === 'elevated' ? 1.65 : 1.85;
@@ -317,6 +389,8 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
         dist: d,
         pt: { x: nx, z: nz },
         y: roadY,
+        segIndex: i,
+        t,
         verticalDelta,
         weightedDist,
         distanceAlong,
@@ -335,51 +409,31 @@ export function findNearestRoad(x, z, options = {}) {
   nearRoadResult.y = NaN;
   nearRoadResult.verticalDelta = Infinity;
   nearRoadResult.distanceAlong = NaN;
+  nearRoadResult.segIndex = -1;
+  nearRoadResult.t = NaN;
   nearRoadResult.distanceToEndpoint = Infinity;
   nearRoadResult.distanceToTransitionZone = Infinity;
   const targetY = Number.isFinite(options?.y) ? Number(options.y) : NaN;
   const maxVerticalDelta = Number.isFinite(options?.maxVerticalDelta) ? Math.max(0.5, Number(options.maxVerticalDelta)) : Infinity;
   let bestWeighted = Infinity;
 
-  const baseRoads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
-  const overlayRoads = Array.isArray(appCtx.overlayRuntimeRoads) ? appCtx.overlayRuntimeRoads : [];
-  let roads = queryNearbyRoads(baseRoads, overlayRoads, x, z, 260);
-  if (roads.length === 0) roads = queryNearbyRoads(baseRoads, overlayRoads, x, z, 880);
-  if (roads.length === 0) roads = queryNearbyRoads(baseRoads, overlayRoads, x, z, 2400);
-  roads = roads.filter((road) => !runtime.isSuppressedBaseRoad(road));
+  rebuildRoadSearchIndexIfNeeded();
   const requestedPreferredRoad = options?.preferredRoad || null;
-  const preferredRoad = requestedPreferredRoad && roads.includes(requestedPreferredRoad) ? requestedPreferredRoad : null;
-  if (preferredRoad) {
-    const preferredCandidates = roadContinuityCandidates(preferredRoad);
-    for (let i = 0; i < preferredCandidates.length; i++) {
-      const preferredHit = evaluateNearestRoadCandidate(preferredCandidates[i], x, z, targetY, maxVerticalDelta, preferredRoad);
-      if (!preferredHit) continue;
-      if (preferredHit.weightedDist < bestWeighted) {
-        bestWeighted = preferredHit.weightedDist;
-        nearRoadResult.road = preferredHit.road;
-        nearRoadResult.dist = preferredHit.dist;
-        nearRoadResult.pt.x = preferredHit.pt.x;
-        nearRoadResult.pt.z = preferredHit.pt.z;
-        nearRoadResult.y = preferredHit.y;
-        nearRoadResult.verticalDelta = preferredHit.verticalDelta;
-        nearRoadResult.distanceAlong = preferredHit.distanceAlong;
-        nearRoadResult.distanceToEndpoint = preferredHit.distanceToEndpoint;
-        nearRoadResult.distanceToTransitionZone = preferredHit.distanceToTransitionZone;
-      }
-    }
-    const continuityRadius = Math.max(12, Number(preferredRoad.width || 0) * 1.5);
-    if (nearRoadResult.road && nearRoadResult.dist <= continuityRadius) return nearRoadResult;
-  }
-
-  for (let r = 0; r < roads.length; r++) {
-    const road = roads[r];
-    if (preferredRoad && road === preferredRoad) continue;
-    const pts = road.pts;
-    const fp = pts[0];
-    const roughDist = Math.abs(x - fp.x) + Math.abs(z - fp.z);
-    if (roughDist > nearRoadResult.dist + 500) continue;
-    const hit = evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad);
-    if (!hit || hit.weightedDist >= bestWeighted) continue;
+  const preferredRoad = requestedPreferredRoad && roadSearchFeatureSet.has(requestedPreferredRoad) &&
+    !runtime.isSuppressedBaseRoad(requestedPreferredRoad) ? requestedPreferredRoad : null;
+  const evaluated = new Set();
+  const evaluateRoad = (road) => {
+    if (!road || evaluated.has(road)) return;
+    evaluated.add(road);
+    const hit = evaluateNearestRoadCandidate(
+      road,
+      x,
+      z,
+      targetY,
+      maxVerticalDelta,
+      preferredRoad
+    );
+    if (!hit || hit.weightedDist >= bestWeighted) return;
     bestWeighted = hit.weightedDist;
     nearRoadResult.road = hit.road;
     nearRoadResult.dist = hit.dist;
@@ -388,10 +442,42 @@ export function findNearestRoad(x, z, options = {}) {
     nearRoadResult.y = hit.y;
     nearRoadResult.verticalDelta = hit.verticalDelta;
     nearRoadResult.distanceAlong = hit.distanceAlong;
+    nearRoadResult.segIndex = hit.segIndex;
+    nearRoadResult.t = hit.t;
     nearRoadResult.distanceToEndpoint = hit.distanceToEndpoint;
     nearRoadResult.distanceToTransitionZone = hit.distanceToTransitionZone;
+  };
+  if (preferredRoad) {
+    const preferredCandidates = roadContinuityCandidates(preferredRoad);
+    for (let i = 0; i < preferredCandidates.length; i++) {
+      evaluateRoad(preferredCandidates[i]);
+    }
+  }
+
+  if (options.forceFullScan !== true) {
+    for (let i = 0; i < ROAD_SEARCH_RADII.length; i += 1) {
+      const radius = ROAD_SEARCH_RADII[i];
+      const candidates = indexedRoadCandidates(x, z, radius);
+      for (let c = 0; c < candidates.length; c += 1) {
+        evaluateRoad(candidates[c]);
+      }
+      // Continuity weighting can reduce a candidate score by at most 3.4 m.
+      // A result comfortably inside this radius cannot be beaten by a road
+      // whose bounding box lies outside the indexed search square.
+      if (nearRoadResult.road && nearRoadResult.dist <= radius - 4) {
+        break;
+      }
+    }
+  }
+
+  // A miss after the bounded spatial search is authoritative for normal
+  // gameplay. Scanning every road here made walking/driving progressively
+  // slower after leaving mapped road coverage, and could select a road several
+  // kilometres away. Explicit diagnostics may still compare against a full
+  // scan without putting that work in an actor frame.
+  if (options.forceFullScan === true) {
+    const roads = runtimeRoadFeatures();
+    for (let r = 0; r < roads.length; r += 1) evaluateRoad(roads[r]);
   }
   return nearRoadResult;
 }
-
-export { evaluateNearestRoadCandidate, roadSpatialIndexSnapshot };

@@ -1,10 +1,25 @@
 import {
   buildFeatureRibbonEdges,
-  isRoadSurfaceReachable,
-  updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=22";
-import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=19";
-import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=2';
+  isRoadSurfaceReachable
+} from "../structure-semantics.js?v=48";
+import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=25";
+import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=3';
+
+function mappedWaterReprojectionBase(mesh, sampledBoundaryHeights = []) {
+  const layer = String(
+    mesh?.userData?.waterSourceLayer ||
+    mesh?.userData?.waterAreaRef?.provenance?.layer ||
+    ''
+  ).toLowerCase();
+  if (layer === 'ocean') return 0;
+
+  // The water datum was selected from the mapped polygon's interior when the
+  // body was created. Boundary samples are mostly dry shoreline elevations
+  // and must never replace that datum during a later terrain rebuild.
+  const publishedBase = mesh?.userData?.waterSurfaceBase;
+  if (Number.isFinite(publishedBase)) return Number(publishedBase);
+  return waterSurfaceBaseElevation(sampledBoundaryHeights);
+}
 
 function createTerrainReprojectionApi(deps = {}) {
   const {
@@ -68,11 +83,6 @@ function createTerrainReprojectionApi(deps = {}) {
     const positions = mesh.geometry?.attributes?.position;
     if (!positions || positions.count < centerline.length * 2) return false;
     const featureRef = mesh.userData?.linearFeatureRef || null;
-    if (featureRef?.structureSemantics?.terrainMode === "at_grade") {
-      updateFeatureSurfaceProfile(featureRef, terrainMeshHeightAt, {
-        surfaceBias: verticalBias
-      });
-    }
     if (featureRef?.structureSemantics?.gradeSeparated) {
       const ribbonEdges = buildFeatureRibbonEdges(featureRef, centerline, halfWidth, cachedBaseTerrainHeight, {
         surfaceBias: verticalBias
@@ -171,6 +181,7 @@ function createTerrainReprojectionApi(deps = {}) {
     }
 
     appCtx.buildingMeshes.forEach((mesh) => {
+      if (mesh.userData?.isMappedVessel) return;
       const pts = mesh.userData.buildingFootprint;
       if (!pts || pts.length === 0) return;
 
@@ -182,7 +193,11 @@ function createTerrainReprojectionApi(deps = {}) {
       let maxElevation = -Infinity;
       let sampleCount = 0;
       pts.forEach((p) => {
-        const h = terrainMeshHeightAt(p.x, p.z);
+        let h = terrainMeshHeightAt(p.x, p.z);
+        if ((!Number.isFinite(h) || h === 0) && typeof elevationWorldYAtWorldXZ === "function") {
+          h = elevationWorldYAtWorldXZ(p.x, p.z);
+        }
+        if (h === 0 && Math.abs(fallbackElevation) > 2) h = fallbackElevation;
         if (!Number.isFinite(h)) return;
         minElevation = Math.min(minElevation, h);
         maxElevation = Math.max(maxElevation, h);
@@ -237,7 +252,7 @@ function createTerrainReprojectionApi(deps = {}) {
       });
       const isWaterPolygon = mesh.userData?.landuseType === "water";
       const avgElevation = isWaterPolygon
-        ? waterSurfaceBaseElevation(sampledHeights)
+        ? mappedWaterReprojectionBase(mesh, sampledHeights)
         : sampledHeights.reduce((sum, value) => sum + value, 0) / sampledHeights.length;
       mesh.position.y = avgElevation;
 
@@ -258,10 +273,11 @@ function createTerrainReprojectionApi(deps = {}) {
       mesh.geometry.computeVertexNormals();
       if (isWaterPolygon) {
         mesh.userData.waterSurfaceBase = avgElevation;
-        if (mesh.userData.waterAreaRef) {
+        const waterAreaSurface = mesh.userData.waterAreaRef?.surfaceY;
+        if (mesh.userData.waterAreaRef && !Number.isFinite(waterAreaSurface)) {
           reconcileWaterBodySurface(mesh.userData.waterAreaRef, avgElevation + vertexOffset, {
-            datumMethod: 'terrain-reprojection',
-            datumConfidence: 0.92
+            datumMethod: 'published-water-datum-recovery',
+            datumConfidence: 0.78
           });
         }
       }
@@ -292,5 +308,7 @@ function createTerrainReprojectionApi(deps = {}) {
     repositionBuildingsWithTerrain
   };
 }
+
+export { mappedWaterReprojectionBase };
 
 export { createTerrainReprojectionApi };

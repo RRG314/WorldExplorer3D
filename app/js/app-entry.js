@@ -2,59 +2,49 @@
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
 import './rdt.js?v=55';
-import './config.js?v=59';
+import './config.js?v=60';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
-import './runtime-diagnostics.js?v=18';
-import './state.js?v=60';
+import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
+import './runtime-diagnostics.js?v=27';
+import './state.js?v=61';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=3';
-import {
-    getControlInputSnapshot,
-    updateControlInput
-} from './controls/action-input.js?v=4';
+import './location-session.js?v=4';
+import './controls/action-input.js?v=6';
 import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
 import './perf.js?v=57';
-import './env.js?v=57';
-import {
-    bindRuntimeProductPort,
-    getRuntimeProductPorts
-} from './session-coordinator.js?v=2';
+import './env.js?v=58';
+import './session-coordinator.js?v=2';
+import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import './ground.js?v=72';
-import './terrain.js?v=154';
-import './world.js?v=274';
-import './building-entry.js?v=4';
-import './interiors.js?v=9';
-import './multiplayer/room-world-patches.js?v=1';
-import { init, tryEnablePostProcessing } from './engine.js?v=80';
-import './physics.js?v=88';
+import { init, tryEnablePostProcessing } from './engine.js?v=88';
+import './physics.js?v=104';
 import './walking.js?v=71';
-import './travel-mode.js?v=13';
+import './travel-mode.js?v=20';
 import { initBoatMode } from './boat-mode.js?v=37';
-import { setupFishingGame } from './fishing-game.js?v=2';
-import './weather.js?v=6';
-import './live-earth/controller.js?v=21';
-import './solar-system.js?v=72';
-import './planetary/scene-ownership.js?v=11';
-import './planetary/vehicles.js?v=3';
+import './sky.js?v=86';
+import './weather.js?v=9';
+import './runtime/on-demand-modes.js?v=8';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=46';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
+import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
+import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
+import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
+import './planetary/vehicles.js?v=2';
 import './planetary/astronaut.js?v=1';
-import './planetary/sky-orientation.js?v=9';
+import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=1';
-import './game.js?v=58';
-import './input.js?v=61';
-import './hud.js?v=78';
-import './map.js?v=60';
-import { composeRuntimeOwnership, renderLoop } from './runtime-composition.js';
-import './memory.js?v=56';
-import './blocks.js?v=63';
-import './block-builder/ui.js?v=3';
-import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=119';
+import './game.js?v=62';
+import './input.js?v=60';
+import './hud.js?v=90';
+import './map.js?v=59';
+import { renderLoop } from './main.js?v=72';
+import './memory.js?v=55';
+import { setupUI } from './ui.js?v=120';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -64,71 +54,13 @@ let _editorWarmupScheduled = false;
 let _activityDiscoveryWarmupScheduled = false;
 let _analyticsWarmupScheduled = false;
 let _platformServicesRegistered = false;
-let _runtimeProductPortsBound = false;
+let _interiorsModulePromise = null;
+let _fishingModulePromise = null;
 const platformServices = createPlatformServiceRegistry({
     onEvent(event) {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
     }
 });
-const runtimeProductPorts = getRuntimeProductPorts();
-
-function bindRuntimeProductPorts() {
-    if (_runtimeProductPortsBound) return;
-    _runtimeProductPortsBound = true;
-    bindRuntimeProductPort('shell', {
-        publishRuntimeEvent(event) {
-            globalThis.dispatchEvent?.(new CustomEvent('we3d:app-runtime', { detail: event }));
-        },
-        reportRuntimeError(detail) {
-            globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', { detail }));
-        },
-        setRuntimeReady(ready) {
-            const isReady = ready === true;
-            appCtx.runtimeReady = isReady;
-            globalThis.__WE3D_RUNTIME_READY__ = isReady;
-            const startButton = document.getElementById('startBtn');
-            if (startButton) {
-                startButton.disabled = !isReady;
-                startButton.setAttribute('aria-busy', isReady ? 'false' : 'true');
-            }
-            if (isReady) globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
-            return isReady;
-        }
-    });
-    bindRuntimeProductPort('input', {
-        snapshot: getControlInputSnapshot,
-        update: updateControlInput
-    });
-    bindRuntimeProductPort('persistence', {
-        async capture(destination = appCtx.getEnv?.()) {
-            if (destination !== appCtx.ENV?.EARTH) return null;
-            const module = await import('./earth-session.js?v=20');
-            return module.captureEarthWorldSession();
-        },
-        async restore(destination = appCtx.getEnv?.(), options = {}) {
-            if (destination !== appCtx.ENV?.EARTH) return false;
-            const module = await import('./earth-session.js?v=20');
-            return module.resumeEarthWorldSession(options);
-        },
-        snapshot() {
-            return {
-                destination: appCtx.getEnv?.() || null,
-                earthLoaded: Array.isArray(appCtx.roads) && appCtx.roads.length > 0,
-                selection: String(appCtx.selLoc || '')
-            };
-        }
-    });
-    bindRuntimeProductPort('multiplayer', {
-        ensureReady: ensureMultiplayerPlatformReady,
-        snapshot() {
-            return {
-                service: platformServices.snapshot().services
-                    .find((service) => service.id === 'multiplayer') || null,
-                room: platformServices.peek('multiplayer')?.getCurrentRoom?.() || null
-            };
-        }
-    });
-}
 
 function scheduleIdleTask(task, timeout = 1200) {
     if (typeof task !== 'function') return;
@@ -173,7 +105,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-creator', category: 'gameplay-authoring',
         load: async () => {
-            const mod = await import('./activity-editor/session.js?v=13');
+            const mod = await import('./activity-editor/session.js?v=11');
             mod.initActivityCreator?.();
             return mod;
         }
@@ -181,7 +113,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=6');
+            const mod = await import('./activity-discovery/session.js?v=5');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -197,7 +129,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'analytics', category: 'telemetry',
         load: async () => {
-            const mod = await import('../../js/analytics.js?v=4');
+            const mod = await import('../../js/analytics.js?v=1');
             if (typeof mod.getAnalyticsSessionSnapshot === 'function') {
                 appCtx.getAnalyticsSessionSnapshot = () => mod.getAnalyticsSessionSnapshot(appCtx);
             }
@@ -208,7 +140,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'editor-overlay', category: 'world-content',
         load: async () => {
-            const mod = await import('./editor/public-layer.js?v=6');
+            const mod = await import('./editor/public-layer.js?v=5');
             mod.initEditorPublicLayer?.();
             return mod;
         }
@@ -216,7 +148,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=85');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=76');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
@@ -227,6 +159,51 @@ function registerPlatformServices() {
 function ensurePlatformService(id) {
     registerPlatformServices();
     return platformServices.ensure(id);
+}
+
+function ensureInteriorsReady() {
+    if (!_interiorsModulePromise) {
+        _interiorsModulePromise = import('./interiors.js?v=9').catch((error) => {
+            _interiorsModulePromise = null;
+            throw error;
+        });
+    }
+    return _interiorsModulePromise;
+}
+
+function ensureFishingReady() {
+    if (!_fishingModulePromise) {
+        _fishingModulePromise = import('./fishing-game.js?v=2').then((fishing) => {
+            fishing.setupFishingGame?.();
+            return fishing;
+        }).catch((error) => {
+            _fishingModulePromise = null;
+            throw error;
+        });
+    }
+    return _fishingModulePromise;
+}
+
+function registerLazyFishingEntrypoints() {
+    appCtx.fishingGame = { open: false, active: false };
+    appCtx.ensureFishingReady = ensureFishingReady;
+    appCtx.openFishingGame = async (...args) => {
+        const fishing = await ensureFishingReady();
+        return fishing.openFishingGame?.(...args) ?? false;
+    };
+    appCtx.closeFishingGame = () => false;
+    appCtx.updateFishingGame = () => false;
+    const dockButton = document.getElementById('fishingDockBtn');
+    const menuButton = document.getElementById('fFishing');
+    const activate = async (event) => {
+        event?.preventDefault?.();
+        dockButton?.removeEventListener('click', activate);
+        menuButton?.removeEventListener('click', activate);
+        const fishing = await ensureFishingReady();
+        fishing.openFishingGame?.();
+    };
+    dockButton?.addEventListener('click', activate);
+    menuButton?.addEventListener('click', activate);
 }
 
 const ensureEditorSessionModule = () => ensurePlatformService('editor');
@@ -256,10 +233,10 @@ function scheduleActivityDiscoveryWarmup(timeout = 2600) {
 function scheduleAnalyticsWarmup(timeout = 2800) {
     if (_analyticsWarmupScheduled || platformServices.isReady('analytics')) return;
     _analyticsWarmupScheduled = true;
-    scheduleIdleTask(() => {
+    scheduleAfterFirstPlay('analytics-runtime', () => {
         _analyticsWarmupScheduled = false;
-        void ensureAnalyticsModule();
-    }, timeout);
+        return ensureAnalyticsModule();
+    }, { timeout });
 }
 
 async function ensureOverlayRuntimeLayer() {
@@ -294,22 +271,43 @@ async function ensureMultiplayerPlatformReady() {
 function scheduleTutorialInit() {
     if (_tutorialInitPromise) return _tutorialInitPromise;
     _tutorialInitPromise = new Promise((resolve) => {
-        scheduleIdleTask(async () => {
+        scheduleAfterFirstPlay('tutorial-runtime', async () => {
             try {
-                const mod = await import('./tutorial/tutorial.js?v=4');
+                const mod = await import('./tutorial/tutorial.js?v=2');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
             } finally {
                 resolve(true);
             }
-        }, 2200);
+        }, { timeout: 2200 });
     });
     return _tutorialInitPromise;
 }
 
 function registerLazySubsystemEntrypoints() {
     registerPlatformServices();
+    installOnDemandBlockBuilder(appCtx);
+    installOnDemandFlowerChallenge(appCtx);
+    installOnDemandLiveEarth(appCtx);
+    installOnDemandMars(appCtx);
+    appCtx.ensureInteriorsReady = ensureInteriorsReady;
+    appCtx.handleInteriorAction = async (...args) => {
+        const interiors = await ensureInteriorsReady();
+        return interiors.handleInteriorAction?.(...args) ?? false;
+    };
+    appCtx.enterInteriorForSupport = async (...args) => {
+        const interiors = await ensureInteriorsReady();
+        return interiors.enterInteriorForSupport?.(...args) ?? false;
+    };
+    appCtx.scanNearbyInteriorSupport = async (...args) => {
+        const interiors = await ensureInteriorsReady();
+        return interiors.scanNearbyInteriorSupport?.(...args) ?? [];
+    };
+    appCtx.listSupportedInteriorsNear = () => [];
+    appCtx.sampleInteriorWalkSurface = () => null;
+    appCtx.updateInteriorInteraction = () => false;
+    appCtx.clearActiveInterior = () => false;
     if (typeof appCtx.getEditorSnapshot !== 'function') {
         appCtx.getEditorSnapshot = () => ({
             active: false,
@@ -452,12 +450,6 @@ function registerLazySubsystemEntrypoints() {
             ? mod.getAnalyticsSessionSnapshot(appCtx)
             : appCtx.getAnalyticsSessionSnapshot();
     };
-    appCtx.recordProductEvent = async (category, params = {}) => {
-        const mod = await ensureAnalyticsModule();
-        return typeof mod.recordProductEvent === 'function'
-            ? mod.recordProductEvent(category, params)
-            : false;
-    };
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
     appCtx.ensureOverlayRuntimeReady = ensureOverlayRuntimeLayer;
     appCtx.kickOptionalRuntimeBoot = kickOptionalRuntimeBoot;
@@ -534,9 +526,8 @@ function bootApp() {
         return { tryEnablePostProcessing };
     }
 
-    bindRuntimeProductPorts();
-    composeRuntimeOwnership();
-    runtimeProductPorts.call('shell', 'setRuntimeReady', false);
+    appCtx.runtimeReady = false;
+    globalThis.__WE3D_RUNTIME_READY__ = false;
 
     const runBootStep = (label, action) => {
         console.log(`[boot] step:start:${label}`);
@@ -545,6 +536,7 @@ function bootApp() {
         return result;
     };
 
+    runBootStep('installOnDemandEarth', () => installOnDemandEarth(appCtx));
     const initOk = runBootStep('init', () => init());
     if (initOk === false || appCtx.engineInitFailed === true || !appCtx.renderer) {
         console.warn('[boot] init aborted before full app startup');
@@ -554,12 +546,19 @@ function bootApp() {
     runBootStep('registerLazySubsystemEntrypoints', () => registerLazySubsystemEntrypoints());
     runBootStep('setupUI', () => setupUI());
     runBootStep('initBoatMode', () => initBoatMode());
-    runBootStep('setupFishingGame', () => setupFishingGame());
+    runBootStep('registerLazyFishingEntrypoints', () => registerLazyFishingEntrypoints());
     runBootStep('scheduleTutorialInit', () => scheduleTutorialInit());
     runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
     runBootStep('renderLoop', () => renderLoop());
     runBootStep('markRuntimeReady', () => {
-        runtimeProductPorts.call('shell', 'setRuntimeReady', true);
+        appCtx.runtimeReady = true;
+        globalThis.__WE3D_RUNTIME_READY__ = true;
+        const startButton = document.getElementById('startBtn');
+        if (startButton) {
+            startButton.disabled = false;
+            startButton.setAttribute('aria-busy', 'false');
+        }
+        globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
     _booted = true;

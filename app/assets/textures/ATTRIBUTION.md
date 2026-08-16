@@ -9,14 +9,26 @@
 - `mars_mola_olympus_dem_512.jpg`: Local Olympus Mons elevation crop derived from the public-domain USGS Mars MGS MOLA DEM 463m browse raster. The runtime combines this measured elevation field with a controlled Olympus profile so the real regional relief remains traversable at game scale. Source: https://astrogeology.usgs.gov/search/map/mars_mgs_mola_dem_463m
 - `mercury_messenger.jpg`: NASA MESSENGER global Mercury mosaic (PIA12397), assembled with USGS and mission imagery. Source: https://science.nasa.gov/photojournal/full-global-mercury-mosaic/
 - `venus_magellan.jpg`: NASA/JPL-Caltech Venus map stitched from Magellan radar imagery for NASA 3D resources. Source: https://science.nasa.gov/3d-resources/venus/
-- `start-hub/earth.jpg`, `start-hub/moon.jpg`, and `start-hub/mars.jpg`: locally resized launch-menu derivatives of the corresponding NASA/USGS textures listed above.
-- `start-hub/space.jpg`: locally resized launch-menu derivative of `universe/andromeda-galex-spitzer.jpg`.
-- `start-hub/orion-background.jpg`: locally resized launch-screen derivative of `universe/orion-nebula-nasa.jpg`.
-- `start-hub/ocean.jpg`: locally resized launch-menu derivative of `assets/screenshots/ocean-mode-great-barrier-reef.png`; project-owned runtime capture.
 - `jupiter_voyager.jpg`: NASA/JPL-Caltech Jupiter map derived from Voyager imagery for NASA 3D resources. Source: https://science.nasa.gov/3d-resources/jupiter/
 - `saturn_jpl.jpg`: NASA/JPL-Caltech synthesized Saturn map for NASA 3D resources. It is documented by NASA as fictional rather than measured global imagery. Source: https://science.nasa.gov/3d-resources/saturn/
 - `uranus_jpl.jpg`: JPL/Caltech Uranus map. JPL documents it as a synthesized solid atmospheric color because available global detail is limited. Source: https://space.jpl.nasa.gov/tmaps/uranus.html
 - `neptune_jpl.jpg`: Don Davis/JPL-Caltech synthesized Neptune cloud map for NASA 3D resources. It is documented by NASA as fictional. Source: https://science.nasa.gov/3d-resources/neptune/
+
+## Destination UI Thumbnails
+
+- `ui-thumbnails/earth.jpg`: Local 256 px crop derived from `earth_atmos_2048.jpg` above.
+- `ui-thumbnails/moon.jpg`: Local 256 px crop derived from `moon_lroc_2048.jpg` above.
+- `ui-thumbnails/mars.jpg`: Local 256 px crop derived from `mars_viking_4096.jpg` above.
+- `ui-thumbnails/space.jpg`: Local 256 px crop of NASA/JPL-Caltech's GALEX and Spitzer Andromeda composite. Source: https://www.jpl.nasa.gov/images/pia08787-amazing-andromeda-galaxy/
+- `ui-thumbnails/ocean.png`: Local crop from a World Explorer 3D gameplay capture; underlying Earth map and bathymetry attribution remains OpenStreetMap and GEBCO as documented in the repository attribution index.
+
+## Universe Observations
+
+- `universe/sun-sdo-2025.jpg`: NASA/GSFC Solar Dynamics Observatory image of the Sun, observed September 10, 2025. Source: https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/
+- `universe/orion-nebula-nasa.jpg`: NASA/ESA Hubble Orion Treasury Project mosaic, resized to 2000 × 960 for interactive use. Source: https://science.nasa.gov/asset/hubble/orion-nebula-3/
+- `universe/carina-nebula-webb.jpg`: NASA/ESA/CSA/STScI Webb NIRCam and MIRI Cosmic Cliffs composite, resized to 2000 × 692 for interactive use. Source: https://science.nasa.gov/asset/webb/cosmic-cliffs-in-the-carina-nebula-nircam-and-miri-composite-image/
+- `universe/crab-nebula-webb.jpg`: NASA/ESA/CSA/STScI Webb NIRCam and MIRI Crab Nebula composite; image processing by Joseph DePasquale (STScI), resized to 2000 × 1741 for interactive use. Source: https://science.nasa.gov/asset/webb/crab-nebula-nircam-and-miri-image/
+- `universe/milky-way-spitzer.jpg`: NASA/JPL-Caltech/University of Wisconsin Spitzer GLIMPSE Galactic Plane panorama. Source: https://science.nasa.gov/photojournal/glimpse-the-galaxy-all-the-way-around/
 
 ## Earth Surface Materials
 

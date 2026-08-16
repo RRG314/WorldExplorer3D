@@ -5,14 +5,11 @@ import { computeOverlayAreaKey } from './schema.js?v=1';
 import { featureWorldCenter, geometryToWorldData } from './geometry.js?v=1';
 
 const PUBLISHED_RENDER_RANGE = 3600;
-const PUBLISHED_POLL_MS = 2600;
 
 const state = {
   areaSignature: '',
-  traversalSignature: '',
   unsub: null,
   group: null,
-  pollId: 0,
   hiddenBaseBuildingMeshes: new Map(),
   retryAfterMs: 0
 };
@@ -82,7 +79,7 @@ function restoreBaseBuildingVisibility() {
   state.hiddenBaseBuildingMeshes.clear();
 }
 
-function clearPublishedObjects(options = {}) {
+function clearPublishedObjects() {
   const hadRuntimeFeatures = !!(
     appCtx.overlayRuntimeRoads?.length ||
     appCtx.overlayRuntimeLinearFeatures?.length ||
@@ -107,26 +104,7 @@ function clearPublishedObjects(options = {}) {
     roadIds: new Set(),
     buildingIds: new Set()
   };
-  const topologyChanged = state.traversalSignature !== '';
-  state.traversalSignature = '';
-  if (options.refreshTraversal !== false && (hadRuntimeFeatures || topologyChanged)) {
-    refreshTraversalNetworks('overlay_published_cleared');
-  }
-}
-
-function traversalTopologySignature(roads = [], linearFeatures = [], suppressedRoadIds = new Set()) {
-  const featureSignature = (feature) => {
-    const points = Array.isArray(feature?.pts) ? feature.pts : [];
-    const geometry = points.map((point) =>
-      `${Number(point?.x || 0).toFixed(2)},${Number(point?.z || 0).toFixed(2)}`
-    ).join(';');
-    return `${feature?.sourceFeatureId || ''}:${feature?.networkKind || ''}:${geometry}`;
-  };
-  return [
-    ...roads.map(featureSignature),
-    ...linearFeatures.map(featureSignature),
-    ...[...suppressedRoadIds].sort().map((id) => `suppress:${id}`)
-  ].sort().join('|');
+  if (hadRuntimeFeatures) refreshTraversalNetworks('overlay_published_cleared');
 }
 
 function worldPointsBounds(points = []) {
@@ -213,8 +191,7 @@ function suppressBaseBuildings(features = []) {
 }
 
 function applyPublishedFeatures(features = []) {
-  const previousTraversalSignature = state.traversalSignature;
-  clearPublishedObjects({ refreshTraversal: false });
+  clearPublishedObjects();
   const group = ensureGroup();
   if (!group) return;
 
@@ -280,10 +257,7 @@ function applyPublishedFeatures(features = []) {
     roadIds: suppressionRoadIds,
     buildingIds: suppressionBuildingIds
   };
-  state.traversalSignature = traversalTopologySignature(runtimeRoads, runtimeLinear, suppressionRoadIds);
-  if (state.traversalSignature !== previousTraversalSignature) {
-    refreshTraversalNetworks('overlay_published_changed');
-  }
+  refreshTraversalNetworks('overlay_published_changed');
 }
 
 function updateListener() {
@@ -348,17 +322,6 @@ function refreshApprovedEditorContributions() {
 function initEditorPublicLayer() {
   clearPublishedObjects();
   updateListener();
-  if (state.pollId) clearInterval(state.pollId);
-  state.pollId = window.setInterval(() => {
-    updateListener();
-    if (state.group) {
-      const visible = appCtx.mapLayers?.contributions !== false;
-      state.group.visible = visible;
-      state.group.children.forEach((child) => {
-        child.visible = visible;
-      });
-    }
-  }, PUBLISHED_POLL_MS);
 
   Object.assign(appCtx, {
     getApprovedEditorContributionSnapshot,

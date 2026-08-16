@@ -8,7 +8,7 @@ const FEATURED_ARRIVALS = [
   {
     id: 'great-wall-mutianyu',
     match: { lat: 40.4319, lon: 116.5704, radiusMeters: 190 },
-    viewpoint: { lat: 40.4334, lon: 116.57348 },
+    viewpoint: { lat: 40.4334, lon: 116.5736 },
     lookAt: { lat: 40.4338583, lon: 116.5743061 }
   }
 ];

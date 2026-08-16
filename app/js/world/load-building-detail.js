@@ -1,22 +1,65 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { mergeBuildingMetadata } from "./building-metadata.js?v=2";
-import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=4";
-import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { createLandmarkBuildingOwnership } from "./landmark-building-ownership.js?v=5";
-import { curatedLandmarksNear } from "./landmark-catalog.js?v=8";
+import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
+import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
+import {
+  mappedWaterStructurePriority,
+  mergeMappedWaterStructures
+} from './water-structure-source.js?v=3';
 
-function buildingDataPriority(way) {
-  const tags = way?.tags || {};
-  let score = 0;
-  const height = Number.parseFloat(tags.height);
-  const levels = Number.parseFloat(tags['building:levels']);
-  const mappedHeight = Number.isFinite(height) ? height : Number.isFinite(levels) ? levels * 3.2 : 0;
-  if (mappedHeight > 0) score += 4 + Math.min(18, mappedHeight / 12);
-  if (tags['building:part']) score += 4;
-  if (tags['roof:shape'] || tags['roof:height']) score += 2;
-  if (tags.name) score += mappedHeight >= 20 ? 8 : 2;
-  if (['tower', 'skyscraper', 'office', 'hotel'].includes(String(tags.building || '').toLowerCase())) score += 5;
-  return score;
+const COMPLETE_BUILDING_TILE_CAP = 1200;
+const BUILDING_COVERAGE_TARGET = 0.85;
+const EXPANDED_COVERAGE_FLOOR = 9001;
+
+export function shouldFetchSupplementalWaterStructures(options = {}) {
+  return options.authoritativeMassing === true &&
+    options.waterStructureQueryAvailable === true &&
+    options.primaryCoverageComplete !== true &&
+    Number(options.semanticVessels || 0) === 0;
+}
+
+export function resolveBuildingPublicationSelection(options = {}) {
+  const configuredSafetyCap = Math.max(
+    1,
+    Math.floor(Number(options.maxBuildingWays) || 12000)
+  );
+  const requestedBuildingWays = Math.max(
+    0,
+    Math.floor(Number(options.requestedBuildingWays) || 0)
+  );
+  // Retain approximately 85% of mapped footprints. The one-feature floor
+  // above the retired 9,000 cap ensures a dense source cannot silently fall
+  // back to the exact coverage level the user rejected.
+  const coverageTargetCap = requestedBuildingWays > 0
+    ? Math.min(
+        requestedBuildingWays,
+        Math.max(
+          requestedBuildingWays > 9000 ? EXPANDED_COVERAGE_FLOOR : 1,
+          Math.ceil(requestedBuildingWays * BUILDING_COVERAGE_TARGET)
+        )
+      )
+    : configuredSafetyCap;
+  const configuredGlobalCap = Math.min(configuredSafetyCap, coverageTargetCap);
+  const configuredPerTile = Math.max(
+    1,
+    Math.floor(Number(options.tileBudgetCfg?.buildingsPerTile) || 1),
+    Math.floor(Number(options.tileBudgetCfg?.buildingsMinPerTile) || 1)
+  );
+  return Object.freeze({
+    globalCap: configuredGlobalCap,
+    // Building geometry is already spatially batched and runtime-culled. Do
+    // not apply the recursive-depth tile thinning used for roads and props:
+    // that policy intentionally retained as little as 62% of dense tiles and
+    // left visible holes between otherwise authoritative footprints.
+    basePerTile: Math.max(configuredPerTile, COMPLETE_BUILDING_TILE_CAP),
+    minPerTile: configuredPerTile,
+    useRdt: false,
+    spreadAcrossArea: true,
+    coverageTarget: BUILDING_COVERAGE_TARGET,
+    requestedBuildingWays,
+    // Preserve the broad mapped district when a global cap is reached instead
+    // of concentrating nearly every retained footprint in the center.
+    coreRatio: 0.78
+  });
 }
 
 async function fetchBuildingMetadata(options, metadataState) {
@@ -29,6 +72,9 @@ async function fetchBuildingMetadata(options, metadataState) {
       try {
         metadata = await options.fetchPreferredMetadata();
       } catch (preferredMetadataErr) {
+        if (preferredMetadataErr?.name === 'AbortError' || options.isActiveLoadContext?.() === false) {
+          throw preferredMetadataErr;
+        }
         options.recordLoadWarning?.('bundled building metadata', preferredMetadataErr);
       }
     }
@@ -43,6 +89,9 @@ async function fetchBuildingMetadata(options, metadataState) {
     metadataState.status = 'ready';
     return metadata;
   } catch (metadataErr) {
+    if (metadataErr?.name === 'AbortError' || options.isActiveLoadContext?.() === false) {
+      throw metadataErr;
+    }
     metadataState.status = 'error';
     metadataState.error = metadataErr?.message || String(metadataErr);
     options.recordLoadWarning?.('building metadata enrichment', metadataErr);
@@ -59,44 +108,69 @@ function setBuildingDetailState(status, extra = {}) {
   };
 }
 
-export function scheduleDeferredBuildingLoad(options = {}) {
+export async function loadBuildingDetailForPublication(options = {}) {
+  if (options.skipReason) {
+    setBuildingDetailState('skipped', {
+      reason: String(options.skipReason),
+      requested: 0,
+      selected: 0
+    });
+    return appCtx.worldDetailState.buildings;
+  }
   const query = String(options.query || '');
   const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
-  const onSettled = typeof options.onSettled === 'function' ? options.onSettled : () => {};
   const fetchPreferredData = typeof options.fetchPreferredData === 'function' ? options.fetchPreferredData : null;
   if (!fetchPreferredData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
     setBuildingDetailState('skipped');
-    onSettled();
-    return Promise.resolve(appCtx.worldDetailState.buildings);
+    return appCtx.worldDetailState.buildings;
   }
 
   setBuildingDetailState('loading', { requested: 0, selected: 0 });
-  const delayMs = Number.isFinite(options.delayMs) ? Math.max(0, options.delayMs) : 80;
-  return new Promise((resolve) => globalThis.setTimeout(async () => {
-    if (!isActiveLoadContext()) {
-      resolve({ status: 'aborted', updatedAt: Date.now() });
-      return;
-    }
-    const startedAt = performance.now();
-    try {
+  if (!isActiveLoadContext()) {
+    return { status: 'aborted', updatedAt: Date.now() };
+  }
+  const startedAt = performance.now();
+  try {
       let metadataState = { status: 'skipped' };
       let data;
-      options.startLoadPhase?.('fetchBuildingFootprints');
       try {
         data = fetchPreferredData ? await fetchPreferredData() : null;
       } catch (preferredErr) {
+        if (preferredErr?.name === 'AbortError' || !isActiveLoadContext()) throw preferredErr;
         options.recordLoadWarning?.('vector building detail', preferredErr);
-      } finally {
-        options.endLoadPhase?.('fetchBuildingFootprints');
       }
-      if (data) {
-        options.startLoadPhase?.('fetchBuildingMetadata');
-        let metadata;
+      const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
+      if (authoritativeMassing && options.waterStructureQuery) {
+        let waterStructureSummary = mergeMappedWaterStructures(
+          data,
+          options.mappedWaterStructureData,
+          { lat: options.location?.lat, lon: options.location?.lon }
+        );
         try {
-          metadata = await fetchBuildingMetadata(options, metadataState);
-        } finally {
-          options.endLoadPhase?.('fetchBuildingMetadata');
+          if (shouldFetchSupplementalWaterStructures({
+            authoritativeMassing,
+            waterStructureQueryAvailable: true,
+            primaryCoverageComplete: options.mappedWaterStructureCoverageComplete,
+            semanticVessels: waterStructureSummary.semanticVessels
+          })) {
+            const semanticData = await options.fetchOverpassJSON(
+              options.waterStructureQuery,
+              options.waterStructureTimeoutMs || options.timeoutMs,
+              options.waterStructureDeadlineMs || options.deadlineMs,
+              options.waterStructureCacheMeta
+            );
+            waterStructureSummary = mergeMappedWaterStructures(data, semanticData, {
+              lat: options.location?.lat,
+              lon: options.location?.lon
+            });
+          }
+        } catch (waterStructureError) {
+          if (waterStructureError?.name === 'AbortError' || !isActiveLoadContext()) throw waterStructureError;
+          options.recordLoadWarning?.('mapped water structures', waterStructureError);
         }
+      }
+      if (data && !authoritativeMassing) {
+        const metadata = await fetchBuildingMetadata(options, metadataState);
         if (!isActiveLoadContext()) return;
         if (metadata) {
           mergeBuildingMetadata(data, metadata, {
@@ -114,55 +188,34 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         );
       }
       if (!isActiveLoadContext()) return;
-      options.startLoadPhase?.('prepareBuildingOwnership');
       const inferredCoverage = supplementSparseBuildingData(data, appCtx);
 
-      const curatedLandmarks = curatedLandmarksNear(options.location);
-      let landmarkOwnership = createLandmarkBuildingOwnership(null, curatedLandmarks);
-      try {
-        const landmarkData = await fetchBundledLandmarkData({
-          lat: options.location?.lat,
-          lon: options.location?.lon
-        });
-        landmarkOwnership = createLandmarkBuildingOwnership(landmarkData, curatedLandmarks);
-      } catch (landmarkOwnershipErr) {
-        options.recordLoadWarning?.('landmark building ownership', landmarkOwnershipErr);
-      }
-
-      let nodes = {};
+      const nodes = {};
       for (const element of data.elements || []) {
         if (element?.type === 'node') nodes[element.id] = element;
       }
-      const buildingNodeMap = new Map(
-        Object.entries(nodes).map(([id, node]) => [Number(id), node])
-      );
-      const buildingCandidates = (data.elements || []).filter((element) =>
+      const requested = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
-      const buildingOwnership = landmarkOwnership.partition(buildingCandidates, buildingNodeMap);
-      const requested = buildingOwnership.selected;
-      const suppressedLandmarkBuildings = buildingOwnership.suppressed.length;
-      const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
-        globalCap: options.maxBuildingWays,
-        basePerTile: options.tileBudgetCfg.buildingsPerTile,
-        minPerTile: options.tileBudgetCfg.buildingsMinPerTile,
-        tileDegrees: options.tileBudgetCfg.tileDegrees,
-        useRdt: options.useRdtBudgeting,
-        spreadAcrossArea: true,
-        coreRatio: options.useRdtBudgeting ? 0.35 : 0.45,
-        compareFn: (a, b) => buildingDataPriority(b) - buildingDataPriority(a)
+      const publicationSelection = resolveBuildingPublicationSelection({
+        ...options,
+        requestedBuildingWays: requested.length
       });
-      options.endLoadPhase?.('prepareBuildingOwnership');
+      const provenancePublicationCap = publicationSelection.globalCap;
+      const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
+        ...publicationSelection,
+        tileDegrees: options.tileBudgetCfg.tileDegrees,
+        // Vessels remain the only semantic exception to distance ordering.
+        // Ordinary height/roof metadata must not displace closer buildings.
+        compareFn: (a, b) =>
+          mappedWaterStructurePriority(b?.tags || {}) - mappedWaterStructurePriority(a?.tags || {})
+      });
 
-      const requestedCount = requested.length;
-      const selectedCount = buildingWays.length;
-      const source = data._overpassSource || null;
-      const endpoint = data._overpassEndpoint || null;
-      const metadata = data._buildingMetadata || metadataState;
-      const sourceDetails = data._shortbreadTiles || null;
-      options.loadMetrics.buildings.requested = requestedCount;
-      options.loadMetrics.buildings.selected = selectedCount;
-      options.buildBuildingGeometryPass({
+      options.loadMetrics.buildings.requested = requested.length;
+      options.loadMetrics.buildings.selected = buildingWays.length;
+      options.loadMetrics.buildings.provenancePublicationCap = provenancePublicationCap;
+      options.loadMetrics.buildings.publicationSelection = publicationSelection;
+      const buildingPublication = await options.buildBuildingGeometryPass({
         buildingGeometryGuards: options.buildingGeometryGuards,
         buildingWays,
         featureMinPolygonArea: options.featureMinPolygonArea,
@@ -179,47 +232,47 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         endLoadPhase: options.endLoadPhase,
         useRdtBudgeting: options.useRdtBudgeting
       });
-      if (Array.isArray(data.elements)) data.elements.length = 0;
-      buildingNodeMap.clear();
-      if (Array.isArray(buildingCandidates)) buildingCandidates.length = 0;
-      if (Array.isArray(buildingWays)) buildingWays.length = 0;
-      if (requested !== buildingWays && Array.isArray(requested)) requested.length = 0;
-      nodes = null;
-      data = null;
+      options.loadMetrics.buildings.geometryPublication = buildingPublication;
       if (!isActiveLoadContext()) return;
 
-      if (options.deferSurfaceSync !== true) {
-        options.refreshStructureAwareFeatureProfiles?.();
-        appCtx.refreshTerrainSurfaceProfiles?.();
-        appCtx.clearTerrainHeightCache?.();
-        appCtx.requestWorldSurfaceSync?.({ force: true, source: 'deferred_buildings' });
-      }
-      options.updateWorldLod?.(true);
+      // Terrain-dependent caches are invalidated here, but visibility,
+      // provenance, traversal, and presentation publish exactly once in the
+      // final world-publication owner after landmarks are also complete.
+      appCtx.clearTerrainHeightCache?.();
       setBuildingDetailState('ready', {
-        requested: requestedCount,
-        selected: selectedCount,
+        requested: requested.length,
+        selected: buildingWays.length,
+        selectionRetention: requested.length > 0 ? buildingWays.length / requested.length : 1,
         meshes: appCtx.buildingMeshes.length,
+        provenanceFeatures: Array.isArray(appCtx.buildingProvenanceRecords)
+          ? appCtx.buildingProvenanceRecords.length
+          : 0,
+        publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
+        coveragePolicy: {
+          globalCap: publicationSelection.globalCap,
+          targetRatio: publicationSelection.coverageTarget,
+          basePerTile: publicationSelection.basePerTile,
+          recursiveTileThinning: publicationSelection.useRdt,
+          contiguousCoreRatio: publicationSelection.coreRatio
+        },
         durationMs: Math.round(performance.now() - startedAt),
-        source,
-        endpoint,
-        metadata,
-        sourceDetails,
-        inferredCoverage,
-        landmarkOwnership: {
-          footprints: landmarkOwnership.footprintCount,
-          curatedSites: landmarkOwnership.curatedCount,
-          suppressedBuildings: suppressedLandmarkBuildings
-        }
+        source: data._overpassSource || null,
+        endpoint: data._overpassEndpoint || null,
+        metadata: data._buildingMetadata || metadataState,
+        sourceDetails: data._overtureBuildings || data._shortbreadTiles || null,
+        waterStructures: data._waterStructureSemantics || null,
+        inferredCoverage
       });
-    } catch (err) {
-      options.recordLoadWarning?.('deferred buildings', err);
-      setBuildingDetailState('error', {
-        durationMs: Math.round(performance.now() - startedAt),
-        error: err?.message || String(err)
-      });
-    } finally {
-      if (isActiveLoadContext()) onSettled();
-      resolve(appCtx.worldDetailState?.buildings || { status: 'unknown', updatedAt: Date.now() });
-    }
-  }, delayMs));
+  } catch (err) {
+    if (err?.name === 'AbortError' || !isActiveLoadContext()) throw err;
+    options.recordLoadWarning?.('building publication', err);
+    setBuildingDetailState('error', {
+      durationMs: Math.round(performance.now() - startedAt),
+      error: err?.message || String(err)
+    });
+  }
+  return appCtx.worldDetailState?.buildings || {
+    status: 'unknown',
+    updatedAt: Date.now()
+  };
 }

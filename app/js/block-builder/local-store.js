@@ -79,8 +79,8 @@ export function createBlockLocalStore(options = {}) {
     if (!enabled) return false;
     const payload = JSON.stringify(entries);
     try {
-      localStorage.setItem(backupKey, payload);
       localStorage.setItem(storageKey, payload);
+      localStorage.setItem(backupKey, payload);
       return true;
     } catch (error) {
       enabled = false;

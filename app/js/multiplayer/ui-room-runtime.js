@@ -1,14 +1,14 @@
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
-import { createGhostManager } from "./ghosts.js?v=57";
-import { listenExplorerLeaderboard } from "./loop.js?v=55";
-import { stopPresence } from "./presence.js?v=60";
+import { createGhostManager } from "./ghosts.js?v=58";
+import { listenExplorerLeaderboard } from "./loop.js?v=56";
+import { stopPresence } from "./presence.js?v=61";
 import {
   deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,
   leaveRoom,
   listenMyRooms
-} from "./rooms.js?v=66";
-import { listenPaintClaims, upsertPaintClaim } from "./painttown.js?v=55";
+} from "./rooms.js?v=67";
+import { listenPaintClaims, upsertPaintClaim } from "./painttown.js?v=56";
 import {
   listenFriends,
   listenIncomingInvites,
@@ -33,7 +33,6 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderHomeBase,
     renderInvites,
     renderLeaderboard,
-    renderMmoPanel,
     renderOwnedRooms,
     renderPlayerList,
     renderRecentPlayers,
@@ -46,12 +45,6 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   } = renderers;
 
   function clearSubscriptions() {
-    if (state.authoritativeSession) {
-      state.authoritativeSession.stop().catch((error) => {
-        console.warn('[multiplayer][authority] disconnect failed:', error);
-      });
-      state.authoritativeSession = null;
-    }
     if (typeof state.unsubRoom === "function") state.unsubRoom();
     if (typeof state.unsubPlayers === "function") state.unsubPlayers();
     if (typeof state.unsubChat === "function") state.unsubChat();
@@ -189,12 +182,12 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       if (appCtx.spaceFlight?.active) return true;
       setStatus(`Syncing room world ${room.code} to Space...`);
       if (appCtx.onMoon && typeof appCtx.startSpaceFlightToEarth === "function") {
-        appCtx.startSpaceFlightToEarth();
-        return false;
+        await appCtx.startSpaceFlightToEarth();
+        return appCtx.spaceFlight?.active === true;
       }
       if (typeof appCtx.startSpaceFlightToMoon === "function") {
-        appCtx.startSpaceFlightToMoon();
-        return false;
+        await appCtx.startSpaceFlightToMoon();
+        return appCtx.spaceFlight?.active === true;
       }
       return false;
     }
@@ -232,16 +225,6 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     const lat = finiteNumber(world.lat, null);
     const lon = finiteNumber(world.lon, null);
     const kind = String(world.kind || "earth").toLowerCase();
-    const activeLat = finiteNumber(appCtx.LOC?.lat, null);
-    const activeLon = finiteNumber(appCtx.LOC?.lon, null);
-    const alreadyAtRoomEarthLocation =
-      kind === "earth" &&
-      Number.isFinite(lat) &&
-      Number.isFinite(lon) &&
-      Number.isFinite(activeLat) &&
-      Number.isFinite(activeLon) &&
-      Math.abs(activeLat - lat) <= 1e-7 &&
-      Math.abs(activeLon - lon) <= 1e-7;
 
     if (kind === "earth" && Number.isFinite(lat) && Number.isFinite(lon)) {
       setRoomEarthSelection(room, lat, lon);
@@ -278,15 +261,6 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || typeof appCtx.loadRoads !== "function") return;
 
-    if (alreadyAtRoomEarthLocation && appCtx.initialEarthWorldReady === true) {
-      appCtx.markLocationSelectionLoaded?.();
-      if (respawn && typeof appCtx.spawnOnRoad === "function") {
-        appCtx.spawnOnRoad();
-      }
-      clearPendingRoomWorldRetry();
-      return;
-    }
-
     setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
     try {
       await appCtx.loadRoads();
@@ -321,10 +295,6 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.roomActivities = [];
     state.activeRoomActivity = null;
     state.homeBase = null;
-    state.mmoProgression = null;
-    state.mmoLeaderboard = [];
-    state.mmoCatalog = null;
-    state.mmoSelfUid = '';
     if (typeof appCtx.clearPaintTownMultiplayerConfig === "function") {
       appCtx.clearPaintTownMultiplayerConfig();
     }
@@ -339,7 +309,6 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderArtifacts();
     renderRoomActivities();
     renderHomeBase();
-    renderMmoPanel();
     updateToggleStates();
     publishMapRoomsToContext();
   }
@@ -350,7 +319,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (!appCtx.scene) return;
 
     state.ghostManager = createGhostManager(appCtx.scene, {
-      getSelfUid: () => state.mmoSelfUid || state.authUser?.uid || state.entitlement.uid || ""
+      getSelfUid: () => state.authUser?.uid || state.entitlement.uid || "",
+      getLocalFrame: () => helpers.readPoseSnapshot?.()?.frame || null
     });
     state.ghostManager.setVisible(state.ghostsEnabled);
   }

@@ -1,5 +1,5 @@
 import { createBlackHoleVisual } from './black-hole.js?v=2';
-import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 
 function seededRandom(seed = 1) {
   let state = Math.abs(Math.floor(Number(seed) || 1)) >>> 0;
@@ -58,6 +58,9 @@ function makeOrbit(radius, color = 0x53677e) {
 }
 
 function createPlanetarySystem(entity) {
+  if (entity.id === 'sol') {
+    throw new Error('Sol visuals are owned by the authoritative solar-system runtime.');
+  }
   const group = new THREE.Group();
   const color = entity.visualProfile?.color || 0xfff0c2;
   const starRadius = Math.max(18, Math.min(38, 24 + Number(entity.physical?.hostMassSolar || 1) * 8));
@@ -66,7 +69,7 @@ function createPlanetarySystem(entity) {
     new THREE.MeshBasicMaterial({ color })
   );
   star.name = entity.name;
-  star.userData = { universeEntityId: entity.id, bodyRadius: starRadius, catalogEntity: entity };
+  star.userData = { universeEntityId: entity.id };
   group.add(star);
   const glow = new THREE.Mesh(
     new THREE.SphereGeometry(starRadius * 1.55, 24, 16),
@@ -93,14 +96,12 @@ function createPlanetarySystem(entity) {
       new THREE.MeshPhongMaterial({ color: new THREE.Color().setHSL(hue, 0.42, 0.54), shininess: 8 })
     );
     body.name = planet.name;
-    const catalogPlanet = { ...planet, parentId: entity.id };
-    body.userData = { universeEntityId: planet.id, planet: catalogPlanet, bodyRadius: radius };
+    body.userData = { universeEntityId: planet.id, planet };
     const phase = random() * Math.PI * 2;
     body.position.set(Math.cos(phase) * orbitRadius, (random() - 0.5) * 8, Math.sin(phase) * orbitRadius);
     group.add(body);
     group.userData.orbitingPlanets.push({ body, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
   });
-  group.userData.centralStar = star;
   return group;
 }
 

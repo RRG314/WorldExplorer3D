@@ -7,9 +7,9 @@ authors:
     given-names: "Steven"
 repository-code: "https://github.com/RRG314/WorldExplorer3D"
 url: "https://worldexplorer3d.io"
-license: "Apache-2.0"
-version: "4.0.0"
-date-released: "2026-07-22"
+license: "Proprietary"
+version: "4.2.0"
+date-released: "2026-08-15"
 abstract: >-
   Browser-based 3D geospatial exploration application using OpenStreetMap-derived
   data for interactive Earth exploration with Ocean, Moon, Mars, Solar System,
@@ -20,3 +20,5 @@ keywords:
   - webgl
   - mapping
   - threejs
+  - location-based-game
+  - gps

@@ -5,7 +5,7 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=4";
+} from "../building-entry.js?v=5";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=2";
 
 let nearbyInteriorScanPromise = null;
@@ -349,7 +349,11 @@ function pickNearbyBuildingCandidate(force = false, deps) {
 
   const candidate = pickNearbyEnterableBuildingSupport(walker.x, walker.z, {
     radius: deps.INTERIOR_ENTRY_RADIUS,
-    allowSynthetic: true
+    allowSynthetic: true,
+    actorBaseY: Number.isFinite(walker.y) ?
+      walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7) :
+      NaN,
+    actorHeight: (appCtx.Walk?.CFG?.eyeHeight || 1.7) * 0.95
   });
   setCandidateCache({
     at: now,

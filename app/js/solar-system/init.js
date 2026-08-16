@@ -31,23 +31,48 @@ function initSolarSystemModel(context, spaceScene) {
   solarSystem.raycaster = new THREE.Raycaster();
 
   const sunGeo = new THREE.SphereGeometry(solarSystem.SUN_SIZE, 32, 32);
-  const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
+  const sunCanvas = document.createElement('canvas');
+  sunCanvas.width = 2048;
+  sunCanvas.height = 1024;
+  const sunCanvasContext = sunCanvas.getContext('2d');
+  sunCanvasContext.fillStyle = '#7c3f08';
+  sunCanvasContext.fillRect(0, 0, sunCanvas.width, sunCanvas.height);
+  const sunTexture = new THREE.CanvasTexture(sunCanvas);
+  if (typeof THREE.SRGBColorSpace !== 'undefined') sunTexture.colorSpace = THREE.SRGBColorSpace;
+  const sunImage = new Image();
+  sunImage.onload = () => {
+    const sourceSize = Math.min(sunImage.naturalWidth, sunImage.naturalHeight) * 0.61;
+    const sourceX = (sunImage.naturalWidth - sourceSize) / 2;
+    const sourceY = (sunImage.naturalHeight - sourceSize) / 2;
+    const hemisphereWidth = sunCanvas.width / 2;
+    sunCanvasContext.drawImage(
+      sunImage,
+      sourceX, sourceY, sourceSize, sourceSize,
+      0, 0, hemisphereWidth, sunCanvas.height
+    );
+    sunCanvasContext.save();
+    sunCanvasContext.translate(sunCanvas.width, 0);
+    sunCanvasContext.scale(-1, 1);
+    sunCanvasContext.drawImage(
+      sunImage,
+      sourceX, sourceY, sourceSize, sourceSize,
+      0, 0, hemisphereWidth, sunCanvas.height
+    );
+    sunCanvasContext.restore();
+    sunTexture.needsUpdate = true;
+  };
+  sunImage.src = '/app/assets/textures/universe/sun-sdo-2025.jpg';
+  sunTexture.userData = {
+    imageCredit: 'NASA/GSFC/Solar Dynamics Observatory',
+    imageSourceUrl: 'https://science.nasa.gov/photojournal/image-of-sun-from-nasas-solar-dynamics-observatory/',
+    observationDate: '2025-09-10'
+  };
+  const sunMat = new THREE.MeshBasicMaterial({ map: sunTexture, color: 0xffffff });
   solarSystem.sunMesh = new THREE.Mesh(sunGeo, sunMat);
   solarSystem.sunMesh.name = 'Sun';
   solarSystem.sunMesh.position.set(0, 0, 0);
+  solarSystem.sunMesh.userData = { ...sunTexture.userData, authoritativeSpaceSun: true };
   solarSystem.group.add(solarSystem.sunMesh);
-
-  const glow1Geo = new THREE.SphereGeometry(solarSystem.SUN_SIZE * 1.5, 24, 24);
-  const glow1Mat = new THREE.MeshBasicMaterial({
-    color: 0xffaa22, transparent: true, opacity: 0.2, side: THREE.BackSide
-  });
-  solarSystem.sunMesh.add(new THREE.Mesh(glow1Geo, glow1Mat));
-
-  const glow2Geo = new THREE.SphereGeometry(solarSystem.SUN_SIZE * 3, 24, 24);
-  const glow2Mat = new THREE.MeshBasicMaterial({
-    color: 0xff8800, transparent: true, opacity: 0.08, side: THREE.BackSide
-  });
-  solarSystem.sunMesh.add(new THREE.Mesh(glow2Geo, glow2Mat));
 
   const sunLight = new THREE.PointLight(0xfff8e0, 0.8, 50000);
   solarSystem.sunMesh.add(sunLight);
@@ -77,8 +102,6 @@ function initSolarSystemModel(context, spaceScene) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = planet.name;
     mesh.userData = { isPlanet: true, planetIndex: i };
-    mesh.rotation.order = 'ZYX';
-    mesh.rotation.z = THREE.MathUtils.degToRad(Number(planet.axialTiltDeg) || 0);
 
     const glowGeo = new THREE.SphereGeometry(planet.radiusScaled * 1.4, 20, 20);
     const glowMat = new THREE.MeshBasicMaterial({

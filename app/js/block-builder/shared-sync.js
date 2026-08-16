@@ -1,8 +1,9 @@
 import {
+  blockDocumentIdFromCoords,
   normalizeBlockMaterial,
   normalizeBlockRotation,
   normalizeBlockShape
-} from './catalog.js?v=4';
+} from './catalog.js?v=2';
 
 export function createSharedBlockSync(options = {}) {
   const { blockKey, onRefresh, toVerticalGridCoord } = options;
@@ -25,7 +26,7 @@ export function createSharedBlockSync(options = {}) {
     const gz = Number(raw.gz);
     if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return null;
     return {
-      id: String(raw.id || `${Math.round(gx)}_${Math.round(gy)}_${Math.round(gz)}`),
+      id: blockDocumentIdFromCoords(gx, toVerticalGridCoord(gy), gz),
       gx: Math.round(gx),
       gy: toVerticalGridCoord(gy),
       gz: Math.round(gz),

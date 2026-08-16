@@ -13,7 +13,7 @@ function readSharedExperienceParams() {
   };
   const normalizeLaunch = (value) => value === 'moon' || value === 'mars' || value === 'space' || value === 'ocean' ? value : 'earth';
   const normalizeGameMode = (value) => {
-    if (value === 'trial' || value === 'checkpoint' || value === 'painttown' || value === 'police' || value === 'flower') return value;
+    if (value === 'trial' || value === 'checkpoint' || value === 'painttown' || value === 'police' || value === 'flower' || value === 'deflock' || value === 'livegps') return value;
     return value === 'free' ? 'free' : null;
   };
   const normalizeTravelMode = (value) => {

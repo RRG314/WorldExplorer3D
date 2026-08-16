@@ -1,20 +1,17 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import {
-  appendUpwardRibbonGeometry,
-  buildIndexedBatchMesh,
-  createRoadSurfaceMaterials
-} from "../road-render.js?v=2";
-import { estimateDriveableRoadWidth } from "./load-style.js?v=3";
-import {
-  buildFeatureRibbonEdges,
-  shouldRenderRoadSkirts,
-  updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=22";
-import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
+import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=48";
+// Installs the final-publication guardrail owner. Guardrails are compiled once
+// after the complete transport graph and accepted terrain are ready.
+import "./bridge-guardrails.js?v=15";
+import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=3";
+import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
-const ROAD_SURFACE_BIAS = 0.08;
+const ROAD_SURFACE_BIAS = 0.18;
 
-export function buildRoadGeometryPass(options = {}) {
+// This pass owns transport feature compilation only. Visual publication is
+// intentionally deferred until accepted terrain and structure profiles are
+// ready, when the final terrain authority creates the sole road mesh set.
+export async function buildRoadGeometryPass(options = {}) {
   const roadWays = Array.isArray(options.roadWays) ? options.roadWays : [];
   const nodes = options.nodes || {};
   const geometryGuards = options.geometryGuards || {};
@@ -35,86 +32,119 @@ export function buildRoadGeometryPass(options = {}) {
   const getRoadSubdivisionStep = options.getRoadSubdivisionStep;
   const polylineBounds = options.polylineBounds;
   const worldBaseTerrainY = options.worldBaseTerrainY;
-  const appendIndexedGeometry = options.appendIndexedGeometry;
+  const yieldEveryRoads = Math.max(1, Math.floor(Number(options.yieldEveryRoads) || 32));
+  const yieldToMainThread = typeof options.yieldToMainThread === 'function'
+    ? options.yieldToMainThread
+    : defaultYieldToMainThread;
 
   showLoad(`Loading roads... (${roadWays.length})`);
   startLoadPhase('buildRoadGeometry');
 
-  const roadMainBatchVerts = [];
-  const roadMainBatchIdx = [];
-  const roadSkirtBatchVerts = [];
-  const roadSkirtBatchIdx = [];
-  const roadMarkBatchVerts = [];
-  const roadMarkBatchIdx = [];
-
-  const {
-    roadMainMaterial,
-    roadSkirtMaterial,
-    roadMarkMaterial
-  } = createRoadSurfaceMaterials({
-    asphaltTex: appCtx.asphaltTex,
-    asphaltNormal: appCtx.asphaltNormal,
-    asphaltRoughness: appCtx.asphaltRoughness,
-    includeMarkings: true
-  });
-
-  roadWays.forEach((way) => {
-    const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+  let yieldCount = 0;
+  const diagnostics = {
+    rejectedMissingNodes: 0,
+    rejectedByGeometryGuards: 0,
+    maximumSourceRadius: 0,
+    maximumPublishedRadius: 0
+  };
+  for (let roadIndex = 0; roadIndex < roadWays.length; roadIndex += 1) {
+    const way = roadWays[roadIndex];
+    try {
+    const rawNodeRecords = way.nodes
+      .map((id) => ({ id: String(id), node: nodes[id] }))
+      .filter((entry) => entry.node);
+    const rawPts = rawNodeRecords.map((entry) =>
+      appCtx.geoToWorld(entry.node.lat, entry.node.lon)
+    );
+    if (rawPts.length < 2) {
+      diagnostics.rejectedMissingNodes += 1;
+      continue;
+    }
+    for (const point of rawPts) {
+      diagnostics.maximumSourceRadius = Math.max(
+        diagnostics.maximumSourceRadius,
+        Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
+      );
+    }
     const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-    if (pts.length < 2) return;
+    if (pts.length < 2) {
+      diagnostics.rejectedByGeometryGuards += 1;
+      continue;
+    }
+    for (const point of pts) {
+      diagnostics.maximumPublishedRadius = Math.max(
+        diagnostics.maximumPublishedRadius,
+        Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
+      );
+    }
 
     const type = way.tags?.highway || 'residential';
     const structureSemantics = classifyStructureSemantics(way.tags || {}, {
       featureKind: 'road',
       subtype: type
     });
-    const width = estimateDriveableRoadWidth(way.tags || {});
+    const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
+    const transportRecord = normalizeTransportSource({
+      sourceId: sourceFeatureId,
+      id: way.id,
+      type: 'way',
+      providerNamespace: sourceFeatureId.startsWith('shortbread:')
+        ? 'shortbread'
+        : 'osm',
+      completeness: sourceFeatureId.startsWith('shortbread:')
+        ? 'generalized'
+        : 'lossless',
+      geometryProvenance: sourceFeatureId.startsWith('shortbread:')
+        ? 'shortbread-v1'
+        : 'osm-overpass'
+    }, way.tags || {});
+    const width = transportRecord.crossSection.widthMeters;
     const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
     const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
     const centerLatLon = wayCenterLatLon(way, nodes);
     const roadTileKey = centerLatLon ? featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees) : null;
     const roadTileDepth = useRdtBudgeting && roadTileKey ? rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees) : 0;
-    const roadSubdivideStepBase = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+    const fixedRegionalRoad = way.tags?._regionalContext === 'fixed-location';
+    const roadSubdivideStepBase = fixedRegionalRoad
+      ? Math.max(20, getRoadSubdivisionStep(type, roadTileDepth, perfModeNow))
+      : getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+    const engineeredRegionalStep = fixedRegionalRoad
+      ? 5
+      : 0.55;
+    const regionalRampStep = fixedRegionalRoad ? 4 : 0.65;
     const roadSubdivideStep =
-      structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade' ? Math.min(roadSubdivideStepBase, 0.55) :
-      structureSemantics?.rampCandidate ? Math.min(roadSubdivideStepBase, 0.65) :
-      roadSubdivideStepBase;
+      structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade'
+        ? Math.min(roadSubdivideStepBase, engineeredRegionalStep)
+        : structureSemantics?.rampCandidate
+          ? Math.min(roadSubdivideStepBase, regionalRampStep)
+          : roadSubdivideStepBase;
     const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
-    if (decimatedRoadPts.length < 2) return;
-    const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
-      appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
-      decimatedRoadPts;
-    const profilePts =
-      structureSemantics?.gradeSeparated || structureSemantics?.rampCandidate ?
-        subdPts :
-        decimatedRoadPts;
+    if (decimatedRoadPts.length < 2) continue;
 
     const roadFeature = {
-      pts: profilePts,
+      pts: decimatedRoadPts,
       width,
       limit,
       name,
-      sourceFeatureId: String(way.tags?._sourceFeatureId || way.id || ''),
+      sourceFeatureId: transportRecord.identity,
+      sourceNodeIds: Object.freeze((way.nodes || []).map(String)),
+      sourceTopologyNodes: Object.freeze(rawNodeRecords.map((entry, index) =>
+        Object.freeze({
+          id: entry.id,
+          x: rawPts[index].x,
+          z: rawPts[index].z
+        })
+      )),
+      transportRecord,
       type,
       surfaceTag: String(way.tags?.surface || '').toLowerCase(),
       litTag: String(way.tags?.lit || '').toLowerCase(),
       sidewalkHint: String(way.tags?.sidewalk || '').toLowerCase(),
       networkKind: 'road',
-      walkable: true,
-      driveable: true,
-      structureTags: {
-        bridge: way.tags?.bridge || '',
-        tunnel: way.tags?.tunnel || '',
-        layer: way.tags?.layer || '',
-        level: way.tags?.level || '',
-        placement: way.tags?.placement || '',
-        ramp: way.tags?.ramp || '',
-        covered: way.tags?.covered || '',
-        indoor: way.tags?.indoor || '',
-        location: way.tags?.location || '',
-        min_height: way.tags?.min_height || '',
-        man_made: way.tags?.man_made || ''
-      },
+      fixedRegionalContext: fixedRegionalRoad,
+      walkable: transportRecord.access.pedestrian !== 'prohibited',
+      driveable: transportRecord.safeForDriving,
+      structureTags: transportRecord.rawTags,
       structureSemantics,
       baseStructureSemantics: cloneStructureSemantics(structureSemantics),
       surfaceBias: ROAD_SURFACE_BIAS,
@@ -124,106 +154,25 @@ export function buildRoadGeometryPass(options = {}) {
     };
     appCtx.roads.push(roadFeature);
     updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: ROAD_SURFACE_BIAS });
-    if (roadFeature.structureSemantics?.terrainMode === 'elevated') {
-      registerBridgeGuardrails(roadFeature);
-    }
-
-    const hw = width / 2;
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
-    loadMetrics.roads.subdividedPoints += subdPts.length;
-
-    const verts = [];
-    const indices = [];
-    const { leftEdge, rightEdge } = buildFeatureRibbonEdges(roadFeature, subdPts, hw, worldBaseTerrainY, {
-      surfaceBias: ROAD_SURFACE_BIAS
-    });
-    appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
-    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
-    loadMetrics.roads.vertices += verts.length / 3;
-
-    if (typeof appCtx.buildRoadSkirts === 'function' && shouldRenderRoadSkirts(roadFeature)) {
-      const skirtDepth = roadFeature.structureSemantics?.terrainMode === 'subgrade' ? 0.3 : 3.6;
-      const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, skirtDepth);
-      if (skirtData.verts.length > 0) {
-        appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
-        loadMetrics.roads.vertices += skirtData.verts.length / 3;
+    } finally {
+      if ((roadIndex + 1) % yieldEveryRoads === 0 && roadIndex + 1 < roadWays.length) {
+        yieldCount += 1;
+        await yieldToMainThread();
       }
     }
+  }
 
-    if (
-      roadFeature.structureSemantics?.terrainMode === 'at_grade' &&
-      width >= 8.4 &&
-      (type.includes('motorway') || type.includes('trunk') || type.includes('primary'))
-    ) {
-      const markVerts = [];
-      const markIdx = [];
-      const mw = 0.15;
-      const dashLen = 6;
-      const gapLen = 6;
-      let dist = 0;
-      for (let i = 0; i < decimatedRoadPts.length - 1; i++) {
-        const p1 = decimatedRoadPts[i];
-        const p2 = decimatedRoadPts[i + 1];
-        const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-        const dx = (p2.x - p1.x) / segLen;
-        const dz = (p2.z - p1.z) / segLen;
-        const nx = -dz;
-        const nz = dx;
-        let segDist = 0;
-        while (segDist < segLen) {
-          if (Math.floor((dist + segDist) / (dashLen + gapLen)) % 2 === 0) {
-            const x = p1.x + dx * segDist;
-            const z = p1.z + dz * segDist;
-            const len = Math.min(dashLen, segLen - segDist);
-            const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + ROAD_SURFACE_BIAS + 0.01;
-            const vi = markVerts.length / 3;
-            markVerts.push(
-              x + nx * mw, y, z + nz * mw,
-              x - nx * mw, y, z - nz * mw,
-              x + dx * len + nx * mw, y, z + dz * len + nz * mw,
-              x + dx * len - nx * mw, y, z + dz * len - nz * mw
-            );
-            markIdx.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3);
-          }
-          segDist += dashLen + gapLen;
-        }
-        dist += segLen;
-      }
-      if (markVerts.length > 0) {
-        appendIndexedGeometry(roadMarkBatchVerts, roadMarkBatchIdx, markVerts, markIdx);
-        loadMetrics.roads.vertices += markVerts.length / 3;
-      }
-    }
-  });
-
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadMainBatchVerts,
-    indices: roadMainBatchIdx,
-    material: roadMainMaterial,
-    renderOrder: 2,
-    userData: { isRoadBatch: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadSkirtBatchVerts,
-    indices: roadSkirtBatchIdx,
-    material: roadSkirtMaterial,
-    renderOrder: 1,
-    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadMarkBatchVerts,
-    indices: roadMarkBatchIdx,
-    material: roadMarkMaterial,
-    renderOrder: 3,
-    userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-
+  loadMetrics.roads.initialMeshPublications = 0;
+  loadMetrics.roads.featureCompilationYieldCount = yieldCount;
+  loadMetrics.roads.featureCompilationChunkSize = yieldEveryRoads;
+  loadMetrics.roads.compilationDiagnostics = diagnostics;
   endLoadPhase('buildRoadGeometry');
+  return Object.freeze({
+    roadCount: appCtx.roads.length,
+    meshCount: 0,
+    authority: 'transport_feature_compiler',
+    yieldCount
+  });
 }

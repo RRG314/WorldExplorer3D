@@ -10,14 +10,14 @@ import {
   signInWithRedirect,
   signOut,
   updateProfile
-} from '../app/js/platform/firebase/auth.js';
-import { initFirebaseAuth } from './firebase-auth-init.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { initFirebase } from './firebase-init.js';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 
 function getFirebaseAuth() {
-  const services = initFirebaseAuth();
+  const services = initFirebase();
   return services ? services.auth : null;
 }
 

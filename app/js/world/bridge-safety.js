@@ -1,11 +1,132 @@
-import {
-  buildFeatureRibbonEdges,
-  pointInPolygonXZ
-} from "../structure-semantics.js?v=22";
+import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=48";
+
+function distanceToRoadCenterline(road, x, z) {
+  let best = Infinity;
+  for (let index = 0; index < (road?.pts?.length || 0) - 1; index += 1) {
+    const a = road.pts[index];
+    const b = road.pts[index + 1];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const lengthSquared = dx * dx + dz * dz;
+    if (!(lengthSquared > 0)) continue;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / lengthSquared));
+    best = Math.min(best, Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t)));
+  }
+  return best;
+}
+
+export function createDriveableRoadConflictIndex(roads = [], options = {}) {
+  const cellSize = Math.max(24, Number(options.cellSize) || 96);
+  const buckets = new Map();
+  let indexedRoads = 0;
+  for (const road of roads) {
+    if (!road || road.driveable === false || !Array.isArray(road.pts) || road.pts.length < 2) continue;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const point of road.pts) {
+      if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) continue;
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minZ = Math.min(minZ, point.z);
+      maxZ = Math.max(maxZ, point.z);
+    }
+    if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) continue;
+    const padding = Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
+    const minCellX = Math.floor((minX - padding) / cellSize);
+    const maxCellX = Math.floor((maxX + padding) / cellSize);
+    const minCellZ = Math.floor((minZ - padding) / cellSize);
+    const maxCellZ = Math.floor((maxZ + padding) / cellSize);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+        const key = `${cellX},${cellZ}`;
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = [];
+          buckets.set(key, bucket);
+        }
+        bucket.push(road);
+      }
+    }
+    indexedRoads += 1;
+  }
+
+  return Object.freeze({
+    candidates(x, z) {
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return [];
+      return buckets.get(`${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`) || [];
+    },
+    snapshot: () => Object.freeze({
+      cellSize,
+      cells: buckets.size,
+      indexedRoads
+    })
+  });
+}
+
+export function barrierPointConflictsWithDriveableRoad(feature, options = {}) {
+  const x = Number(options.x);
+  const z = Number(options.z);
+  const deckY = Number(options.deckY);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+  const candidateRoads = typeof options.roadIndex?.candidates === 'function'
+    ? options.roadIndex.candidates(x, z)
+    : options.roads || [];
+  if (options.diagnostics && typeof options.diagnostics === 'object') {
+    options.diagnostics.queries = Number(options.diagnostics.queries || 0) + 1;
+    options.diagnostics.candidates = Number(options.diagnostics.candidates || 0) + candidateRoads.length;
+  }
+  for (const road of candidateRoads) {
+    if (!road || road === feature || road.driveable === false || !Array.isArray(road.pts)) continue;
+    const corridorRadius = Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
+    if (distanceToRoadCenterline(road, x, z) > corridorRadius) continue;
+    const otherY = sampleFeatureSurfaceY(road, x, z);
+    if (!Number.isFinite(deckY) || !Number.isFinite(otherY) || Math.abs(otherY - deckY) <= 1.8) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function supportPointConflictsWithDriveableRoad(feature, options = {}) {
+  const x = Number(options.x);
+  const z = Number(options.z);
+  const supportBottomY = Number(options.supportBottomY);
+  const supportTopY = Number(options.supportTopY);
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(z) ||
+    !Number.isFinite(supportBottomY) ||
+    !Number.isFinite(supportTopY)
+  ) return false;
+  const candidateRoads = typeof options.roadIndex?.candidates === 'function'
+    ? options.roadIndex.candidates(x, z)
+    : options.roads || [];
+  for (const road of candidateRoads) {
+    if (!road || road === feature || road.driveable === false || !Array.isArray(road.pts)) continue;
+    const corridorRadius = Math.max(
+      2,
+      (Number(road.width) || 5) * 0.5 + Math.max(0.8, Number(options.columnRadius) || 0)
+    );
+    if (distanceToRoadCenterline(road, x, z) > corridorRadius) continue;
+    const otherY = sampleFeatureSurfaceY(road, x, z);
+    if (!Number.isFinite(otherY)) continue;
+    // A pier occupies the complete vertical interval below its deck. Reject a
+    // placement when any other driveable surface crosses that interval, with
+    // enough headroom that the column cannot visually intrude into traffic.
+    if (otherY >= supportBottomY - 0.35 && otherY <= supportTopY + 2.2) return true;
+  }
+  return false;
+}
 
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;
   if (semantics?.terrainMode !== 'elevated' || feature?.driveable === false) return false;
+  // Barriers are hard collision geometry. Generalized vector roads preserve
+  // useful mapped centerlines but not enough edge/topology detail to place a
+  // trustworthy barrier, so only lossless structures may own guardrails.
+  if (feature?.transportRecord?.completeness !== 'lossless') return false;
   if (semantics.skywalk || semantics.covered || semantics.indoor || semantics.embeddedInBuilding) return false;
   const category = String(semantics.featureCategory || feature.networkKind || 'road').toLowerCase();
   const type = String(feature?.type || '').toLowerCase();
@@ -30,24 +151,6 @@ function stationCrossesWater(feature, distance) {
     if (Math.abs(distance - (Number(station?.distance) || 0)) <= span * 0.62) return true;
   }
   return false;
-}
-
-export function buildGuardrailEdges(feature, points = feature?.pts, options = {}) {
-  if (!Array.isArray(points) || points.length < 2) {
-    return { leftEdge: [], rightEdge: [] };
-  }
-  const width = Math.max(3, Number(feature?.width) || 5);
-  const outsideGap = Number.isFinite(options.outsideGap) ? Number(options.outsideGap) : 0.28;
-  const sampleTerrainY = typeof options.sampleTerrainY === 'function' ?
-    options.sampleTerrainY :
-    () => 0;
-  return buildFeatureRibbonEdges(
-    feature,
-    points,
-    width * 0.5 + outsideGap,
-    sampleTerrainY,
-    { surfaceBias: Number(feature?.surfaceBias) || 0.08 }
-  );
 }
 
 export function elevatedSegmentSafety(feature, options = {}) {

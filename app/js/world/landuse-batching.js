@@ -106,7 +106,7 @@ export function batchLanduseMeshes() {
       mergedMesh.renderOrder = group.renderOrder;
       mergedMesh.receiveShadow = false;
       mergedMesh.castShadow = false;
-      mergedMesh.frustumCulled = true;
+      mergedMesh.frustumCulled = false;
 
       let centerX = 0;
       let centerZ = 0;
@@ -134,7 +134,7 @@ export function batchLanduseMeshes() {
       };
       mergedMesh.visible = group.anyVisible || group.alwaysVisible;
 
-      appCtx.scene.add(mergedMesh);
+      appCtx.addEarthWorldObject(mergedMesh);
       batched.push(mergedMesh);
       for (let i = 0; i < group.meshes.length; i++) disposeSceneMesh(group.meshes[i]);
       sourceCount += group.meshes.length;

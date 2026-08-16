@@ -5,7 +5,7 @@ import {
   orderBy,
   query,
   where
-} from '../platform/firebase/firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
 import {
@@ -20,7 +20,7 @@ import {
   listLocalOverlayDrafts,
   removeLocalOverlayDraft,
   upsertLocalOverlayDraft
-} from './local-drafts.js?v=2';
+} from './local-drafts.js?v=1';
 
 const OVERLAY_FEATURES_COLLECTION = 'overlayFeatures';
 const OVERLAY_PUBLISHED_COLLECTION = 'overlayPublished';

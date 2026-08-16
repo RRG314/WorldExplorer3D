@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "terrain": {
+    "fixedLocationGridIntervalMeters": 320,
+    "unpublishedDetailGapIntervalMeters": 40,
+    "regionalLandCoverTextureSize": 256,
+    "detailedExclusionRequiresPublishedMesh": true,
+    "detailedExclusionRequiresFullCellCoverage": true,
+    "maximumUnownedCells": 0
+  },
+  "landUse": {
+    "developedPresentationOwner": "terrain_worldcover",
+    "explicitHardscapePresentationOwner": "mapped_geometry",
+    "naturalPresentationOwner": "terrain_worldcover",
+    "builtContinuity": "worldcover-spatial-semantic-material",
+    "providerFallback": "same-request-shortbread-semantic-material",
+    "surfaceMaterialOwner": "single-terrain-semantic-pbr",
+    "generatedSidewalks": false,
+    "generatedFootpaths": false
+  },
+  "water": {
+    "terrainMaskOwner": "published-water-geometry-fragment-mask",
+    "unmappedWaterAllowed": false
+  },
+  "visualMatrix": [
+    "baltimore",
+    "new-york",
+    "london",
+    "monaco"
+  ]
+}

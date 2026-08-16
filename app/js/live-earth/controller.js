@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
-import { getWeatherSnapshotForLocation } from "../weather.js?v=5";
+import { getWeatherSnapshotForLocation } from "../weather.js?v=9";
 import { getWeatherSampleSnapshots } from "./weather-samples.js?v=2";
 import { aircraftService } from "../geospatial/aircraft.js?v=1";
 import { marineService } from "../geospatial/marine.js?v=1";

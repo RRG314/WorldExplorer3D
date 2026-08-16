@@ -22,6 +22,23 @@ const overpassMemoryCache = [];
 let lastOverpassEndpoint = null;
 let readPerfModeValue = () => 'balanced';
 
+export function getOverpassRuntimeCacheStats() {
+  return Object.freeze({
+    entryCount: overpassMemoryCache.length,
+    elementCount: overpassMemoryCache.reduce(
+      (count, entry) => count + (Array.isArray(entry?.data?.elements) ? entry.data.elements.length : 0),
+      0
+    ),
+    entryLimit: OVERPASS_MEMORY_CACHE_MAX
+  });
+}
+
+export function releaseOverpassRuntimeCache() {
+  const stats = getOverpassRuntimeCacheStats();
+  overpassMemoryCache.length = 0;
+  return stats;
+}
+
 export function initWorldOsmLoader(deps = {}) {
   if (typeof deps.getPerfModeValue === 'function') {
     readPerfModeValue = deps.getPerfModeValue;
@@ -122,8 +139,21 @@ function orderedOverpassEndpoints() {
   return [lastOverpassEndpoint, ...rest];
 }
 
-function delayMs(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delayMs(ms, signal = null) {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  if (signal.aborted) return Promise.reject(externalAbortError(signal));
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', abort);
+      reject(externalAbortError(signal));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function firstSuccessful(promises) {
@@ -182,12 +212,7 @@ export function buildWorldOverpassPlan({
   const buildingBounds = formatBounds(location, buildingRadius);
   const buildingMetadataBounds = formatBounds(location, buildingMetadataRadius);
   const poiBounds = formatBounds(location, poiRadius);
-  const linearFeatureRadius = Math.min(featureRadius, Math.max(roadsRadius * 0.6, 0.008));
-  const linearFeatureBounds = formatBounds(location, linearFeatureRadius);
-  const landmarkRadius = Math.min(featureRadius, Math.max(roadsRadius * 0.72, 0.014));
-  const landmarkBounds = formatBounds(location, landmarkRadius);
   const queryTimeoutSeconds = Math.max(8, Math.floor(overpassTimeoutMs / 1000));
-  const linearTimeoutSeconds = Math.max(8, Math.floor(Math.min(overpassTimeoutMs, 18000) / 1000));
 
   return {
     featureRadius,
@@ -200,7 +225,7 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'core'
     },
-    deferredBuildingCacheMeta: {
+    buildingPublicationCacheMeta: {
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
@@ -208,7 +233,7 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'buildings'
     },
-    deferredBuildingMetadataCacheMeta: {
+    buildingMetadataCacheMeta: {
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
@@ -216,42 +241,26 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'building-metadata'
     },
-    deferredBuildingMetadataQuery: `[out:json][timeout:${Math.min(queryTimeoutSeconds, 8)}];(
-                way["building"]["height"]${buildingMetadataBounds};
-                way["building"]["building:levels"]${buildingMetadataBounds};
-                way["building"]["name"]${buildingMetadataBounds};
-                way["building"]["roof:shape"]${buildingMetadataBounds};
-            );out tags center qt;`,
-    deferredBuildingQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-                way["building"]${buildingBounds};
-                way["building:part"]${buildingBounds};
-            );out body;>;out skel qt;`,
-    deferredLandmarkCacheMeta: {
+    waterStructureCacheMeta: {
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
-      featureRadius: landmarkRadius,
+      featureRadius: buildingRadius,
       poiRadius,
-      kind: 'landmarks'
+      kind: 'water-structures'
     },
-    deferredLandmarkQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
-                way["tomb"="pyramid"]${landmarkBounds};
-                way["roof:shape"~"^(pyramidal|pyramid)$"]${landmarkBounds};
-                way["historic"="citywalls"]${landmarkBounds};
-                way["barrier"="city_wall"]${landmarkBounds};
-                way["barrier"="wall"]["historic"]${landmarkBounds};
+    waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+                way["building"="ship"]${buildingBounds};
+                way["historic"="ship"]${buildingBounds};
+                way["building"="houseboat"]${buildingBounds};
             );out body;>;out skel qt;`,
-    deferredLinearFeatureQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
-                way["railway"~"^(rail|light_rail|tram|subway|narrow_gauge)$"]${linearFeatureBounds};
-                way["highway"~"^(cycleway|footway|pedestrian|path|steps)$"]${linearFeatureBounds};
+    buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+                way["building"]${buildingMetadataBounds};
+            );out tags center qt;`,
+    buildingPublicationQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+                way["building"]${buildingBounds};
+                way["building:part"]${buildingBounds};
             );out body;>;out skel qt;`,
-    deferredPoiQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
-                node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
-                node["shop"]${poiBounds};
-                node["tourism"]${poiBounds};
-                node["historic"]${poiBounds};
-                node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
-            );out body qt;`,
     primaryQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["bridge"]${featureBounds};
@@ -267,8 +276,12 @@ export function buildWorldOverpassPlan({
                 way["place"="square"]${featureBounds};
                 way["surface"~"^(paved|asphalt|concrete|concrete:plates|paving_stones|sett|cobblestone)$"]["area"="yes"]${featureBounds};
                 way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${featureBounds};
+                node["natural"="tree"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
+                way["building"="ship"]${buildingBounds};
+                way["historic"="ship"]${buildingBounds};
+                way["building"="houseboat"]${buildingBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
             );out body;>;out skel qt;`,
@@ -276,7 +289,15 @@ export function buildWorldOverpassPlan({
   };
 }
 
-export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null) {
+function externalAbortError(signal) {
+  return signal?.reason instanceof Error
+    ? signal.reason
+    : new DOMException(String(signal?.reason || 'World load provider request aborted'), 'AbortError');
+}
+
+export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, options = {}) {
+  const externalSignal = options.signal || null;
+  if (externalSignal?.aborted) throw externalAbortError(externalSignal);
   const cached = findOverpassMemoryCache(cacheMeta);
   if (cached?.data?.elements) {
     cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
@@ -297,11 +318,24 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
 
   const controllers = [];
   const errors = [];
-  const endpoints = orderedOverpassEndpoints();
+  const configuredEndpoints = Array.isArray(options.endpoints)
+    ? options.endpoints.map((endpoint) => String(endpoint || '').trim()).filter(Boolean)
+    : [];
+  const endpoints = configuredEndpoints.length > 0 ? configuredEndpoints : orderedOverpassEndpoints();
+  const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
+  if (typeof fetchImpl !== 'function') throw new TypeError('Overpass fetch implementation is unavailable');
+  const staggerIntervalMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
+    ? Number(options.staggerMs)
+    : OVERPASS_STAGGER_MS);
+  const requestController = new AbortController();
+  const abortRequest = () => requestController.abort(externalAbortError(externalSignal));
+  externalSignal?.addEventListener?.('abort', abortRequest, { once: true });
   let requestSettled = false;
   const attempts = endpoints.map((endpoint, idx) => (async () => {
-    const staggerMs = idx * OVERPASS_STAGGER_MS;
-    if (staggerMs > 0) await delayMs(staggerMs);
+    const staggerMs = idx * staggerIntervalMs;
+    if (staggerMs > 0) await delayMs(staggerMs, requestController.signal);
+    if (externalSignal?.aborted) throw externalAbortError(externalSignal);
+    if (requestController.signal.aborted) throw externalAbortError(requestController.signal);
     if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
 
     const now = performance.now();
@@ -319,11 +353,15 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     );
 
     const controller = new AbortController();
+    const relayAbort = () => controller.abort(externalAbortError(externalSignal));
+    const relayRequestAbort = () => controller.abort(externalAbortError(requestController.signal));
+    externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
+    requestController.signal.addEventListener('abort', relayRequestAbort, { once: true });
     controllers.push(controller);
     const timeoutId = setTimeout(() => controller.abort(), timeoutForEndpointMs);
 
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetchImpl(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
         body: 'data=' + encodeURIComponent(query),
@@ -355,6 +393,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
     } catch (err) {
+      if (externalSignal?.aborted) throw externalAbortError(externalSignal);
       const reason = err?.name === 'AbortError' ?
         `timeout after ${Math.floor(timeoutForEndpointMs)}ms` :
         err?.message || String(err);
@@ -363,15 +402,19 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       throw wrapped;
     } finally {
       clearTimeout(timeoutId);
+      externalSignal?.removeEventListener?.('abort', relayAbort);
+      requestController.signal.removeEventListener('abort', relayRequestAbort);
     }
   })());
 
   try {
     const data = await firstSuccessful(attempts);
     requestSettled = true;
+    requestController.abort(new DOMException('Overpass request satisfied', 'AbortError'));
     controllers.forEach((controller) => controller.abort());
     return data;
-  } catch {
+  } catch (error) {
+    if (externalSignal?.aborted) throw externalAbortError(externalSignal);
     const fallback = await readPersistentOverpassFallback(cacheMeta);
     if (fallback?.data?.elements) {
       fallback.data._overpassEndpoint = fallback.endpoint ? `${fallback.endpoint} (persistent-fallback)` : 'persistent-fallback';
@@ -380,7 +423,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
       return fallback.data;
     }
-    throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
+    throw error?.message?.startsWith?.('All Overpass endpoints failed:')
+      ? error
+      : new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
+  } finally {
+    externalSignal?.removeEventListener?.('abort', abortRequest);
+    if (!requestController.signal.aborted) {
+      requestController.abort(new DOMException('Overpass request finished', 'AbortError'));
+    }
   }
 }
 

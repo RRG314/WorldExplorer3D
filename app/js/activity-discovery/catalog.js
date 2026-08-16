@@ -4,15 +4,15 @@ import {
   getActivityTemplate,
   orderedRouteAnchors,
   sanitizeText
-} from '../activity-editor/schema.js?v=3';
-import { listStoredActivities } from './library.js?v=4';
+} from '../activity-editor/schema.js?v=2';
+import { listStoredActivities } from './library.js?v=2';
 import {
   discoveryBadgeForActivity,
   discoveryCategoryForActivity,
   discoveryColorForActivity,
   discoveryIconForActivity,
   discoveryMarkerShape
-} from './schema.js?v=3';
+} from './schema.js?v=2';
 
 const CREATOR_SYSTEM_USER_ID = 'system_worldexplorer';
 
@@ -41,14 +41,6 @@ function currentReferencePose() {
       x: finiteNumber(appCtx.drone?.x, 0),
       y: finiteNumber(appCtx.drone?.y, 12),
       z: finiteNumber(appCtx.drone?.z, 0)
-    };
-  }
-  if (mode === 'plane') {
-    return {
-      mode,
-      x: finiteNumber(appCtx.planeMode?.x, 0),
-      y: finiteNumber(appCtx.planeMode?.y, 2),
-      z: finiteNumber(appCtx.planeMode?.z, 0)
     };
   }
   if (mode === 'walk' && appCtx.Walk?.state?.walker) {
@@ -118,7 +110,6 @@ function estimateDurationMinutes(traversalMode = '', anchors = []) {
   const distance = summarizeRouteDistance(anchors);
   const speedPerMinute =
     traversalMode === 'boat' ? 520 :
-    traversalMode === 'plane' ? 1900 :
     traversalMode === 'drone' ? 760 :
     traversalMode === 'walk' ? 110 :
     traversalMode === 'submarine' ? 320 :
@@ -129,7 +120,7 @@ function estimateDurationMinutes(traversalMode = '', anchors = []) {
 function estimateDifficulty(traversalMode = '', anchors = []) {
   const distance = summarizeRouteDistance(anchors);
   const checkpointCount = anchors.filter((anchor) => anchor.typeId === 'checkpoint').length;
-  const score = checkpointCount + distance / 260 + (traversalMode === 'drone' || traversalMode === 'plane' || traversalMode === 'boat' ? 0.8 : 0);
+  const score = checkpointCount + distance / 260 + (traversalMode === 'drone' || traversalMode === 'boat' ? 0.8 : 0);
   if (score >= 9) return 'Hard';
   if (score >= 5) return 'Moderate';
   return 'Easy';
@@ -360,103 +351,6 @@ function buildDroneActivity(ref) {
   }, ref);
 }
 
-function buildPlaneActivity(ref) {
-  const terrainY = finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(ref.x, ref.z), 0);
-  const radius = 520;
-  const cruiseY = terrainY + 120;
-  const points = [0.2, 1.7, 3.25].map((angle, index) => ({
-    x: ref.x + Math.cos(angle) * radius,
-    y: cruiseY + index * 28,
-    z: ref.z + Math.sin(angle) * radius,
-    baseY: finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(
-      ref.x + Math.cos(angle) * radius,
-      ref.z + Math.sin(angle) * radius
-    ), terrainY)
-  }));
-  return buildActivityRecord({
-    id: `generated_flight_${Math.round(ref.x)}_${Math.round(ref.z)}`,
-    sourceType: 'generated',
-    subtype: 'flight',
-    templateId: 'plane_course',
-    title: 'District Flight Course',
-    description: 'A takeoff, altitude-gate, and landing course above the current district.',
-    creatorId: CREATOR_SYSTEM_USER_ID,
-    creatorName: 'World Explorer',
-    visibility: 'public',
-    featured: true,
-    featuredReason: 'A complete local aircraft route with climb, bank, descent, and landing legs.',
-    locationLabel: appCtx.customLoc?.name || appCtx.LOCS?.[appCtx.selLoc]?.name || 'Current City',
-    anchors: [
-      buildAnchor('start', 'Takeoff', ref.x, terrainY + 0.8, ref.z, { environment: 'air', baseY: terrainY }),
-      ...points.map((point, index) => buildAnchor('checkpoint', `Flight Gate ${index + 1}`, point.x, point.y, point.z, {
-        environment: 'air',
-        baseY: point.baseY,
-        heightOffset: point.y - point.baseY
-      })),
-      buildAnchor('finish', 'Landing Zone', ref.x + 35, terrainY + 0.8, ref.z + 20, { environment: 'air', baseY: terrainY })
-    ],
-    recommendedScore: 84
-  }, ref);
-}
-
-function buildLocationHuntActivity(ref) {
-  const places = nearbyInterestingPlaces(1400).slice(0, 4);
-  if (places.length < 2) return null;
-  const start = resolveWalkSupport(ref.x, ref.z);
-  const clues = places.map((place) => ({ ...place, support: resolveWalkSupport(place.x, place.z) }));
-  return buildActivityRecord({
-    id: `generated_landmark_hunt_${Math.round(clues[0].x)}_${Math.round(clues[0].z)}`,
-    sourceType: 'generated',
-    subtype: 'search',
-    templateId: 'location_hunt',
-    title: 'Local Landmark Hunt',
-    description: `Find ${clues.length} real mapped places, beginning near ${clues[0].name}.`,
-    creatorId: CREATOR_SYSTEM_USER_ID,
-    creatorName: 'World Explorer',
-    visibility: 'public',
-    locationLabel: clues[0].name,
-    anchors: [
-      buildAnchor('start', 'Search Start', start.x, start.y, start.z, { environment: 'walk' }),
-      ...clues.map((place, index) => buildAnchor('location_clue', `Clue ${index + 1}: ${place.name}`, place.support.x, place.support.y, place.support.z, { environment: 'walk' }))
-    ],
-    recommendedScore: 74
-  }, ref);
-}
-
-function buildSearchRescueActivity(ref) {
-  const places = nearbyInterestingPlaces(1200).slice(0, 3);
-  if (places.length < 2) return null;
-  const groundY = finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(ref.x, ref.z), 0);
-  const anchors = [
-    buildAnchor('start', 'Search Launch', ref.x, groundY + 18, ref.z, { environment: 'air', baseY: groundY, heightOffset: 18 })
-  ];
-  places.slice(0, 2).forEach((place, index) => {
-    const baseY = finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(place.x, place.z), 0);
-    anchors.push(buildAnchor('search_zone', `Search Zone ${index + 1}`, place.x, baseY + 46, place.z, {
-      environment: 'air', baseY, heightOffset: 46, radius: 34
-    }));
-  });
-  const target = places[places.length - 1];
-  const targetY = finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(target.x, target.z), 0);
-  anchors.push(buildAnchor('rescue_target', `Rescue at ${target.name}`, target.x, targetY + 8, target.z, {
-    environment: 'air', baseY: targetY, heightOffset: 8
-  }));
-  return buildActivityRecord({
-    id: `generated_rescue_${Math.round(target.x)}_${Math.round(target.z)}`,
-    sourceType: 'generated',
-    subtype: 'search',
-    templateId: 'search_rescue',
-    title: 'Aerial Search and Rescue',
-    description: `Survey two areas and locate the rescue target near ${target.name}.`,
-    creatorId: CREATOR_SYSTEM_USER_ID,
-    creatorName: 'World Explorer',
-    visibility: 'public',
-    locationLabel: target.name,
-    anchors,
-    recommendedScore: 78
-  }, ref);
-}
-
 function buildBoatActivity(ref) {
   if (typeof appCtx.inspectBoatCandidate !== 'function') return null;
   const candidate = appCtx.inspectBoatCandidate(ref.x, ref.z, 420, { allowSynthetic: false, waterKind: 'coastal' });
@@ -529,9 +423,6 @@ function buildGeneratedActivities(ref) {
     buildWalkingActivity(ref),
     buildRooftopActivity(ref),
     buildDroneActivity(ref),
-    buildPlaneActivity(ref),
-    buildLocationHuntActivity(ref),
-    buildSearchRescueActivity(ref),
     buildBoatActivity(ref),
     buildFishingActivity(ref)
   ].filter(Boolean);

@@ -76,6 +76,7 @@
     }
     .landing-nav a:hover { color: var(--ink); }
     .landing-nav .nav-launch { padding: 11px 16px; color: #fff; background: var(--accent-2); border: 1px solid #65a1ff; }
+    }
 
     .hero {
       position: relative;
@@ -478,7 +479,7 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <h1><span id="landingHeroBrand" class="hero-brand">World Explorer 3D</span><span id="landingHeroHeadline" class="hero-headline">An interactive digital Earth for exploration, discovery, and contribution.</span></h1>
-          <p id="landingHeroLead" class="lead">Explore real locations by land, sea, and air, then navigate a catalog-backed universe from the Solar System to nearby stars, nebulae, galaxies, and black holes.</p>
+          <p id="landingHeroLead" class="lead">Explore real locations by land, sea, air, or space, experience the real sky and environment, and help expand a shared 3D world built from geographic data.</p>
           <div class="cta-row">
             <a class="btn btn-play" id="landingPrimaryCta" href="./app/">Play Now</a>
             <button class="btn btn-trial" id="landingSecondaryCta" type="button">Sign In for Multiplayer</button>
@@ -498,7 +499,7 @@
       <div id="landingHighlights" class="features">
         <article class="feature"><h3>Live Earth</h3><p>Open satellites, earthquakes, and weather on the globe, then jump straight from those layers into the local world.</p></article>
         <article class="feature"><h3>Real Weather + Time</h3><p>Local time, sun, moon, and live weather follow the place you are actually exploring, not just your own device clock.</p></article>
-        <article class="feature"><h3>Ground, Air, Water & Space Travel</h3><p>Drive, walk, drone, boat, and rocket through one runtime, with a spatial universe map linking catalog objects to travel.</p></article>
+        <article class="feature"><h3>Ground, Air, Water & Space Travel</h3><p>Drive, walk, drone, boat, and rocket through one connected runtime instead of separate disconnected modes.</p></article>
         <article class="feature"><h3>Buildings + Interiors</h3><p>Enter supported buildings on demand and move from streets into mapped or generated interiors without leaving the world.</p></article>
         <article class="feature"><h3>Land & Property</h3><p>Browse place context, property-linked destinations, and real-world location details while you explore.</p></article>
         <article class="feature"><h3>Multiplayer Rooms</h3><p>Share locations with other explorers, see live presence, and keep exploration social without putting core access behind a paywall.</p></article>
@@ -512,12 +513,16 @@
       <div class="gameplayGalleryWrap">
         <div class="gameplayGallery">
           <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/universe-map.png" alt="Deep Space universe map plotted over the active space-flight scene">
-            <figcaption class="gameplayMeta"><h3>Spatial Universe Navigation</h3><p>Compare nearby, galactic, deep-space, and planetary-system scales, inspect sourced objects, and travel from the same map.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/baltimore-session-walk-guft.png" alt="Walking mode in a Baltimore alley session with GUFT teammate tag">
             <figcaption class="gameplayMeta"><h3>Multiplayer Alley Walk</h3><p>On-foot exploration with live teammate presence, mode HUD, and build controls in-session.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/baltimore-session-drive-guft.png" alt="Driving mode in the same Baltimore session with obstacles and teammate ahead">
+            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drive</h3><p>Drive through obstacle-filled lanes while synced to the same room and player context.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/baltimore-session-drone-guft.png" alt="Drone mode above the same alley showing 5 meter AGL HUD telemetry">
+            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drone</h3><p>Low-altitude drone camera with AGL telemetry for tactical aerial visibility during shared play.</p></figcaption>
           </figure>
           <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/drone-baltimore.png" alt="Drone view over Baltimore skyline">
@@ -548,12 +553,24 @@
             <figcaption class="gameplayMeta"><h3>Drone Recon: Monaco</h3><p>Coastal city flyovers with broad terrain visibility and persistent map context.</p></figcaption>
           </figure>
           <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/drone-on-moon.png" alt="Drone mode on moon with star field">
+            <figcaption class="gameplayMeta"><h3>Moon Drone Mode</h3><p>Aerial lunar scans with crater visibility and navigation overlays.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/paint-town-red.png" alt="Paint the Town Red rooftop challenge in progress">
             <figcaption class="gameplayMeta"><h3>Paint the Town Red</h3><p>Timed challenge mode where rooftops and buildings are painted as objectives.</p></figcaption>
           </figure>
           <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/place-flower-memory.png" alt="Memory flower marker with popup details">
+            <figcaption class="gameplayMeta"><h3>Memory Flower Markers</h3><p>Place location-linked memories with quick actions for review and cleanup.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/police-chase.png" alt="Police pursuing the player car">
             <figcaption class="gameplayMeta"><h3>Police Chase</h3><p>Dynamic pursuit encounters while driving through the city.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/flee-cops.png" alt="Busted modal after getting caught by police">
+            <figcaption class="gameplayMeta"><h3>Failure State Feedback</h3><p>Clear in-game fail screens with immediate retry flow.</p></figcaption>
           </figure>
         </div>
       </div>
@@ -621,7 +638,7 @@
   <script type="module">
     import { hasFirebaseConfig } from './js/firebase-init.js?v=55';
     import { ensureSignedIn } from './js/auth-ui.js?v=55';
-    import { redirectToCheckout } from './js/billing.js?v=60';
+    import { redirectToCheckout } from './js/billing.js?v=58';
     import { hydrateLandingPageFromPublishedContent } from './js/site-content.js?v=1';
 
     const openMultiplayerBtn = document.getElementById('landingSecondaryCta');

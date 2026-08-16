@@ -16,9 +16,15 @@ function polylineDistances(points = []) {
 function sampleProfileAtDistance(distances, values, distance) {
   if (!(distances instanceof Float32Array) || !Array.isArray(values) && !(values instanceof Float32Array)) return NaN;
   if (distances.length === 0 || values.length === 0) return NaN;
-  if (distance <= 0) return Number(values[0]) || NaN;
+  if (distance <= 0) {
+    const first = Number(values[0]);
+    return Number.isFinite(first) ? first : NaN;
+  }
   const lastIndex = Math.min(distances.length, values.length) - 1;
-  if (distance >= distances[lastIndex]) return Number(values[lastIndex]) || NaN;
+  if (distance >= distances[lastIndex]) {
+    const last = Number(values[lastIndex]);
+    return Number.isFinite(last) ? last : NaN;
+  }
 
   for (let i = 0; i < lastIndex; i++) {
     const start = distances[i];
@@ -26,11 +32,14 @@ function sampleProfileAtDistance(distances, values, distance) {
     if (distance < start || distance > end) continue;
     const span = end - start;
     const t = span > 1e-6 ? (distance - start) / span : 0;
-    const from = Number(values[i]) || 0;
-    const to = Number(values[i + 1]) || from;
+    const rawFrom = Number(values[i]);
+    const from = Number.isFinite(rawFrom) ? rawFrom : 0;
+    const rawTo = Number(values[i + 1]);
+    const to = Number.isFinite(rawTo) ? rawTo : from;
     return from + (to - from) * t;
   }
-  return Number(values[lastIndex]) || NaN;
+  const fallback = Number(values[lastIndex]);
+  return Number.isFinite(fallback) ? fallback : NaN;
 }
 
 function segmentIntersection2D(a1, a2, b1, b2) {

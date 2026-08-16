@@ -1,197 +1,58 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=2";
-import { detectRoadIntersections } from "./intersections.js?v=1";
+import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
+import { detectRoadIntersections } from "./intersections.js?v=3";
+import { boundsIntersectLocal } from "./context-utils.js?v=1";
 import {
   buildFeatureRibbonEdges,
+  roadSkirtDepth,
+  sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=22";
-import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
+} from "../structure-semantics.js?v=48";
+import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
-const ROAD_SURFACE_BIAS = 0.08;
-const CONTEXT_GRID_SIZE = 320;
-const MAX_CONTEXT_GRID_CELLS = 4096;
+import {
+  computeIntersectionCapRadius,
+  shouldBuildCompactIntersectionCap
+} from "./road-junctions.js?v=6";
+
+const ROAD_SURFACE_BIAS = 0.18;
+const MAX_ROAD_BATCH_VERTICES = 60000;
 
 export { detectRoadIntersections };
 
-function createBoundsGrid(items, boundsForItem, cellSize = CONTEXT_GRID_SIZE) {
-  const cells = new Map();
-  const allItems = [];
-  const overflow = [];
-  (items || []).forEach((item) => {
-    const bounds = boundsForItem(item);
-    if (!bounds) return;
-    const values = [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ];
-    if (!values.every(Number.isFinite)) return;
-    allItems.push(item);
-    const minCellX = Math.floor(bounds.minX / cellSize);
-    const maxCellX = Math.floor(bounds.maxX / cellSize);
-    const minCellZ = Math.floor(bounds.minZ / cellSize);
-    const maxCellZ = Math.floor(bounds.maxZ / cellSize);
-    const cellCount = (maxCellX - minCellX + 1) * (maxCellZ - minCellZ + 1);
-    if (!Number.isFinite(cellCount) || cellCount > MAX_CONTEXT_GRID_CELLS) {
-      overflow.push(item);
-      return;
-    }
-    for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
-      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
-        const key = `${cellX},${cellZ}`;
-        const bucket = cells.get(key) || [];
-        bucket.push(item);
-        cells.set(key, bucket);
-      }
-    }
-  });
-  return { cellSize, cells, allItems, overflow };
-}
-
-function queryBoundsGrid(grid, bounds) {
-  if (!grid?.cells || !bounds) return [];
-  const values = [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ];
-  if (!values.every(Number.isFinite)) return [];
-  const minCellX = Math.floor(bounds.minX / grid.cellSize);
-  const maxCellX = Math.floor(bounds.maxX / grid.cellSize);
-  const minCellZ = Math.floor(bounds.minZ / grid.cellSize);
-  const maxCellZ = Math.floor(bounds.maxZ / grid.cellSize);
-  const cellCount = (maxCellX - minCellX + 1) * (maxCellZ - minCellZ + 1);
-  if (!Number.isFinite(cellCount) || cellCount > MAX_CONTEXT_GRID_CELLS) {
-    return Array.isArray(grid.allItems) ? grid.allItems : [];
+function appendCompactIntersectionCap(
+  intersection,
+  targetVerts,
+  targetIndices,
+  terrainHeightAt,
+  segments = 16
+) {
+  if (!shouldBuildCompactIntersectionCap(intersection)) return false;
+  const sampleTerrain = typeof terrainHeightAt === "function" ? terrainHeightAt : () => 0;
+  const radius = computeIntersectionCapRadius(intersection);
+  const base = targetVerts.length / 3;
+  targetVerts.push(
+    Number(intersection.x),
+    Number(sampleTerrain(intersection.x, intersection.z)) + ROAD_SURFACE_BIAS + 0.004,
+    Number(intersection.z)
+  );
+  for (let index = 0; index < segments; index += 1) {
+    const angle = index / segments * Math.PI * 2;
+    const x = Number(intersection.x) + Math.cos(angle) * radius;
+    const z = Number(intersection.z) + Math.sin(angle) * radius;
+    targetVerts.push(x, Number(sampleTerrain(x, z)) + ROAD_SURFACE_BIAS + 0.004, z);
   }
-  const result = Array.isArray(grid.overflow) ? grid.overflow.slice() : [];
-  const seen = new Set(result);
-  for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
-    for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
-      const bucket = grid.cells.get(`${cellX},${cellZ}`) || [];
-      for (let i = 0; i < bucket.length; i++) {
-        const item = bucket[i];
-        if (seen.has(item)) continue;
-        seen.add(item);
-        result.push(item);
-      }
-    }
+  for (let index = 0; index < segments; index += 1) {
+    targetIndices.push(base, base + 1 + index, base + 1 + ((index + 1) % segments));
   }
-  return result;
-}
-
-function shouldBuildIntersectionCap(intersection) {
-  if (!intersection || !Array.isArray(intersection.roads)) return false;
-  if (intersection.roads.length < 3) return false;
   return true;
 }
 
-function computeIntersectionCapRadius(intersection) {
-  const maxWidth = Number(intersection?.maxWidth || 8);
-  const roads = Array.isArray(intersection?.roads) ? intersection.roads : [];
-  const branchCount = Math.max(2, roads.length);
-  const avgWidth = roads.length > 0 ?
-    roads.reduce((sum, r) => sum + Number(r?.width || maxWidth), 0) / roads.length :
-    maxWidth;
-
-  const halfWidth = Math.max(avgWidth * 0.28, maxWidth * 0.26);
-  const branchBoost = Math.min(0.04, Math.max(0, (branchCount - 4) * 0.02));
-  const unclamped = halfWidth * (1 + branchBoost);
-  const minRadius = maxWidth * 0.22;
-  const maxRadius = maxWidth * 0.34;
-  return Math.max(minRadius, Math.min(maxRadius, unclamped));
-}
-
-function polylineLengthLocal(points = []) {
-  if (!Array.isArray(points) || points.length < 2) return 0;
-  let total = 0;
-  for (let i = 1; i < points.length; i++) {
-    total += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
-  }
-  return total;
-}
-
-function trimPolylineEndpoints(points = [], startTrim = 0, endTrim = 0) {
-  if (!Array.isArray(points) || points.length < 2) return Array.isArray(points) ? points.slice() : [];
-  const totalLength = polylineLengthLocal(points);
-  if (!(totalLength > 0)) return points.slice();
-
-  const safeStartTrim = Math.max(0, Math.min(Number(startTrim) || 0, totalLength * 0.32));
-  const safeEndTrim = Math.max(0, Math.min(Number(endTrim) || 0, totalLength * 0.32));
-  if (safeStartTrim <= 0 && safeEndTrim <= 0) return points.slice();
-  if (safeStartTrim + safeEndTrim >= totalLength - 2.5) return points.slice();
-
-  let startIndex = 0;
-  let startPoint = { ...points[0] };
-  let remainingStart = safeStartTrim;
-  while (remainingStart > 1e-4 && startIndex < points.length - 1) {
-    const a = points[startIndex];
-    const b = points[startIndex + 1];
-    const segLen = Math.hypot(b.x - a.x, b.z - a.z);
-    if (!(segLen > 1e-4)) {
-      startIndex += 1;
-      startPoint = { ...points[startIndex] };
-      continue;
-    }
-    if (remainingStart >= segLen) {
-      remainingStart -= segLen;
-      startIndex += 1;
-      startPoint = { ...points[startIndex] };
-      continue;
-    }
-    const t = remainingStart / segLen;
-    startPoint = {
-      x: a.x + (b.x - a.x) * t,
-      z: a.z + (b.z - a.z) * t
-    };
-    remainingStart = 0;
-  }
-
-  let endIndex = points.length - 1;
-  let endPoint = { ...points[endIndex] };
-  let remainingEnd = safeEndTrim;
-  while (remainingEnd > 1e-4 && endIndex > 0) {
-    const a = points[endIndex];
-    const b = points[endIndex - 1];
-    const segLen = Math.hypot(a.x - b.x, a.z - b.z);
-    if (!(segLen > 1e-4)) {
-      endIndex -= 1;
-      endPoint = { ...points[endIndex] };
-      continue;
-    }
-    if (remainingEnd >= segLen) {
-      remainingEnd -= segLen;
-      endIndex -= 1;
-      endPoint = { ...points[endIndex] };
-      continue;
-    }
-    const t = remainingEnd / segLen;
-    endPoint = {
-      x: a.x + (b.x - a.x) * t,
-      z: a.z + (b.z - a.z) * t
-    };
-    remainingEnd = 0;
-  }
-
-  if (startIndex >= endIndex && Math.hypot(endPoint.x - startPoint.x, endPoint.z - startPoint.z) < 2.5) {
-    return points.slice();
-  }
-
-  const trimmed = [startPoint];
-  for (let i = startIndex + 1; i < endIndex; i++) trimmed.push(points[i]);
-  trimmed.push(endPoint);
-  return trimmed;
-}
-
-function trimRoadVisualPointsForCaps(points, options = {}) {
-  const {
-    endIntersection = null,
-    halfWidth = 0,
-    startIntersection = null
-  } = options;
-  const trimForIntersection = (intersection) => {
-    if (!shouldBuildIntersectionCap(intersection)) return 0;
-    const radius = computeIntersectionCapRadius(intersection);
-    return Math.max(0, radius - Math.min(Math.max(halfWidth * 0.22, 0.3), 0.85));
-  };
-  return trimPolylineEndpoints(
-    points,
-    trimForIntersection(startIntersection),
-    trimForIntersection(endIntersection)
-  );
-}
+export {
+  appendCompactIntersectionCap,
+  computeIntersectionCapRadius,
+  shouldBuildCompactIntersectionCap
+};
 
 function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   if (!Array.isArray(verts) || verts.length === 0) return;
@@ -209,14 +70,93 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   }
 }
 
-export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
+function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
+  if (
+    (Number(road?.width) || 0) < 8.4 ||
+    !/(motorway|trunk|primary)/.test(String(road?.type || "")) ||
+    !Array.isArray(points) ||
+    points.length < 2
+  ) return;
+
+  const markHalfWidth = 0.15;
+  const dashLength = 6;
+  const patternLength = 12;
+  const laneCount = Math.max(1, Number(road?.transportRecord?.crossSection?.lanes) || 1);
+  const corridorOffset = Number(
+    road?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
+  ) || 0;
+  const markingOffsets = Array.from({ length: Math.max(1, laneCount - 1) }, (_, index) =>
+    laneCount > 1
+      ? -Number(road.width) * 0.5 + Number(road.width) * (index + 1) / laneCount
+      : 0
+  );
+  for (const laneOffset of markingOffsets) {
+    let distanceBeforeSegment = 0;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const start = points[index];
+      const end = points[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const segmentLength = Math.hypot(dx, dz);
+      if (!(segmentLength > 1e-5)) continue;
+      const dirX = dx / segmentLength;
+      const dirZ = dz / segmentLength;
+      const normalX = -dirZ;
+      const normalZ = dirX;
+      const lateralOffset = corridorOffset + laneOffset;
+      let localDistance = 0;
+      while (localDistance < segmentLength) {
+        const globalDistance = distanceBeforeSegment + localDistance;
+        const phase = ((globalDistance % patternLength) + patternLength) % patternLength;
+        const advanceToDash = phase < dashLength ? 0 : patternLength - phase;
+        const dashStart = localDistance + advanceToDash;
+        if (dashStart >= segmentLength) break;
+        const activePhase = (distanceBeforeSegment + dashStart) % patternLength;
+        const availableDash = dashLength - activePhase;
+        const dashEnd = Math.min(segmentLength, dashStart + Math.max(0.01, availableDash));
+        const x1 = start.x + dirX * dashStart + normalX * lateralOffset;
+        const z1 = start.z + dirZ * dashStart + normalZ * lateralOffset;
+        const x2 = start.x + dirX * dashEnd + normalX * lateralOffset;
+        const z2 = start.z + dirZ * dashEnd + normalZ * lateralOffset;
+        const y1 = sampleFeatureSurfaceY(road, x1, z1) + 0.012;
+        const y2 = sampleFeatureSurfaceY(road, x2, z2) + 0.012;
+        if (Number.isFinite(y1) && Number.isFinite(y2)) {
+          const baseVertex = targetVerts.length / 3;
+          targetVerts.push(
+            x1 + normalX * markHalfWidth, y1, z1 + normalZ * markHalfWidth,
+            x1 - normalX * markHalfWidth, y1, z1 - normalZ * markHalfWidth,
+            x2 + normalX * markHalfWidth, y2, z2 + normalZ * markHalfWidth,
+            x2 - normalX * markHalfWidth, y2, z2 - normalZ * markHalfWidth
+          );
+          targetIndices.push(
+            baseVertex, baseVertex + 2, baseVertex + 1,
+            baseVertex + 1, baseVertex + 2, baseVertex + 3
+          );
+        }
+        localDistance = Math.max(dashEnd, dashStart + 0.01);
+        const newPhase = (distanceBeforeSegment + localDistance) % patternLength;
+        if (newPhase < dashLength) localDistance += dashLength - newPhase;
+      }
+      distanceBeforeSegment += segmentLength;
+    }
+  }
+}
+
+export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeightAt = null) {
   const verts = [];
   const indices = [];
+  const bottomY = (top) => {
+    const fixedBottom = top.y - skirtDepth;
+    if (typeof baseHeightAt !== 'function') return fixedBottom;
+    const terrainY = Number(baseHeightAt(top.x, top.z));
+    if (!Number.isFinite(terrainY)) return fixedBottom;
+    return Math.max(fixedBottom, Math.min(top.y - 0.15, terrainY - 0.25));
+  };
 
   for (let i = 0; i < leftEdge.length; i++) {
     const top = leftEdge[i];
     verts.push(top.x, top.y, top.z);
-    verts.push(top.x, top.y - skirtDepth, top.z);
+    verts.push(top.x, bottomY(top), top.z);
 
     if (i < leftEdge.length - 1) {
       const vi = i * 2;
@@ -229,7 +169,7 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
     const top = rightEdge[i];
     const baseIdx = leftEdge.length * 2 + i * 2;
     verts.push(top.x, top.y, top.z);
-    verts.push(top.x, top.y - skirtDepth, top.z);
+    verts.push(top.x, bottomY(top), top.z);
 
     if (i < rightEdge.length - 1) {
       const vi = baseIdx;
@@ -241,118 +181,99 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
   return { verts, indices };
 }
 
-function buildIntersectionCap(x, z, radius, segments = 16, cachedTerrainHeight = null) {
-  const sampleTerrain = typeof cachedTerrainHeight === "function" ? cachedTerrainHeight : () => 0;
-  const verts = [];
-  const indices = [];
-
-  const centerY = sampleTerrain(x, z) + ROAD_SURFACE_BIAS;
-  verts.push(x, centerY, z);
-
-  for (let i = 0; i <= segments; i++) {
-    const angle = i / segments * Math.PI * 2;
-    const px = x + Math.cos(angle) * radius;
-    const pz = z + Math.sin(angle) * radius;
-    const py = sampleTerrain(px, pz) + ROAD_SURFACE_BIAS;
-    verts.push(px, py, pz);
+export function resolveRoadRibbonSubdivisionStep(road) {
+  const baseDetail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
+  // The feature compiler already assigns a coarser but bounded subdivision to
+  // the fixed regional context. Replacing it here with core-city density turns
+  // a complete bridge/tunnel network into millions of unnecessary triangles.
+  if (road?.fixedRegionalContext === true) return baseDetail;
+  const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) &&
+    road.structureTransitionAnchors.length > 0;
+  if (road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade") {
+    return Math.min(baseDetail, 0.55);
   }
-
-  for (let i = 0; i < segments; i++) {
-    indices.push(0, i + 1, i + 2);
-  }
-
-  return { verts, indices };
+  if (hasTransitionAnchors) return Math.min(baseDetail, 0.6);
+  return baseDetail;
 }
 
-export function rebuildRoadsWithTerrain(deps = {}) {
+export async function publishCompiledTransportMeshes(deps = {}) {
   const {
-    terrain,
-    constants = {},
     disableRoadDebugMode,
     clearTerrainHeightCache,
     getSharedRoadMaterials,
-    getSharedUrbanSurfaceMaterials,
-    boundsIntersectLocal,
-    expandBoundsLocal,
-    pointsBoundsLocal,
-    isUrbanLanduseType,
-    isGreenLanduseType,
-    roadHasExplicitSidewalkHint,
-    roadConnectedSidewalkContinuity,
-    roadSupportsInferredUrbanSidewalks,
-    roadSupportsSidewalks,
-    roadBaseSidewalkWidth,
-    resolveSidewalkWidth,
-    computeSidewalkCornerScale,
-    clampSidewalkWidthTransitions,
-    smoothSidewalkOuterHeights,
     cachedTerrainHeight,
     cachedBaseTerrainHeight,
     subdivideRoadPoints,
     pointAlongPolyline,
     polylineCurvatureMetric,
     rebuildStructureVisualMeshes,
+    rebuildStructureVisualMeshesCooperatively,
     validateRoadTerrainConformance
   } = deps;
-
-  const {
-    SIDEWALK_INNER_GAP = 0.18,
-    SIDEWALK_MIN_WIDTH = 0.9,
-    SIDEWALK_SEGMENT_MIN_WIDTH = 0.62,
-    SIDEWALK_CURB_LIFT = 0.05,
-    SIDEWALK_HEIGHT_BIAS = 0.13,
-    URBAN_CONTEXT_PAD = 26
-  } = constants;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
   const baseRoads = appCtx.roads;
   if (baseRoads.length === 0) return;
+  const now = () => globalThis.performance?.now?.() ?? Date.now();
+  const publicationStartedAt = now();
+  const phaseDurationsMs = Object.create(null);
+  const measure = (name, task) => {
+    const startedAt = now();
+    try {
+      return task();
+    } finally {
+      phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+    }
+  };
+  const measureAsync = async (name, task) => {
+    const startedAt = now();
+    try {
+      return await task();
+    } finally {
+      phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+    }
+  };
 
   if (typeof disableRoadDebugMode === "function") {
     disableRoadDebugMode();
   }
 
-  let tilesLoaded = 0;
-  let tilesTotal = 0;
-  appCtx.terrainTileCache.forEach((tile) => {
-    tilesTotal++;
-    if (tile.loaded) tilesLoaded++;
-  });
-
-  if (tilesLoaded === 0 || tilesTotal === 0) return;
-
-  // Terrain tiles arrive asynchronously. Profiles must sample the newly loaded
-  // elevation data, never the flat placeholder cached during initial loading.
-  const roadCountChanged = baseRoads.length !== terrain?._lastRoadCount;
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
-  terrain._lastRoadCount = baseRoads.length;
-  if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
-    appCtx.refreshStructureAwareFeatureProfiles();
+  if (typeof appCtx.refreshStructureAwareFeatureProfilesCooperatively === "function") {
+    await measureAsync(
+      'refreshStructureProfiles',
+      () => appCtx.refreshStructureAwareFeatureProfilesCooperatively()
+    );
+  } else if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
+    measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
+    await yieldToMainThread();
   }
 
-  appCtx.roadMeshes.forEach((mesh) => {
-    mesh.parent?.remove?.(mesh);
-    if (mesh.geometry) mesh.geometry.dispose();
-    if (mesh.material && !mesh.userData?.sharedRoadMaterial) {
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach((mat) => {
-          if (mat && typeof mat.dispose === "function") mat.dispose();
-        });
-      } else if (typeof mesh.material.dispose === "function") {
+  measure('disposePreviousMeshes', () => {
+    appCtx.roadMeshes.forEach((mesh) => {
+      mesh.parent?.remove?.(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material && !mesh.userData?.sharedRoadMaterial) {
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((mat) => {
+            if (mat && typeof mat.dispose === "function") mat.dispose();
+          });
+        } else if (typeof mesh.material.dispose === "function") {
+          mesh.material.dispose();
+        }
+      }
+    });
+    appCtx.replaceWorldCollection('roadMeshes');
+
+    appCtx.urbanSurfaceMeshes.forEach((mesh) => {
+      mesh.parent?.remove?.(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material && !mesh.userData?.sharedUrbanSurfaceMaterial && typeof mesh.material.dispose === "function") {
         mesh.material.dispose();
       }
-    }
+    });
+    appCtx.replaceWorldCollection('urbanSurfaceMeshes');
   });
-  appCtx.replaceWorldCollection('roadMeshes', []);
-
-  appCtx.urbanSurfaceMeshes.forEach((mesh) => {
-    mesh.parent?.remove?.(mesh);
-    if (mesh.geometry) mesh.geometry.dispose();
-    if (mesh.material && !mesh.userData?.sharedUrbanSurfaceMaterial && typeof mesh.material.dispose === "function") {
-      mesh.material.dispose();
-    }
-  });
-  appCtx.replaceWorldCollection('urbanSurfaceMeshes', []);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,
@@ -360,293 +281,189 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     skippedBuildingAprons: Number(appCtx.urbanSurfaceStats?.skippedBuildingAprons || 0)
   };
 
-  let intersections;
-  if (roadCountChanged || !terrain?._cachedIntersections) {
-    intersections = detectRoadIntersections(baseRoads);
-    if (terrain) terrain._cachedIntersections = intersections;
-  } else {
-    intersections = terrain._cachedIntersections;
-  }
-  const endpointIntersectionByRoad = new Map();
-  intersections.forEach((intersection) => {
-    if (intersection?.hasGradeSeparatedRoad) return;
-    (intersection.roads || []).forEach((entry) => {
-      endpointIntersectionByRoad.set(`${entry.roadIdx}:${entry.ptIdx}`, intersection);
-    });
-  });
-  const intersectionGrid = createBoundsGrid(
-    intersections.filter((intersection) => !intersection?.hasGradeSeparatedRoad),
-    (intersection) => ({
-      minX: intersection.x,
-      maxX: intersection.x,
-      minZ: intersection.z,
-      maxZ: intersection.z
-    })
-  );
-  const landuseGrid = createBoundsGrid(
-    appCtx.landuses,
-    (landuse) => landuse.bounds || pointsBoundsLocal(landuse.pts || [])
-  );
+  const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
+  await yieldToMainThread();
+  // Do not bend road profiles into a separately fitted junction plane. Those
+  // large convex envelopes were wider than the actual carriageway and caused
+  // visible polygon fans and edge bumps on slopes. Continuous road ribbons
+  // remain authoritative; only a small terrain-draped center cap closes true
+  // three-or-more-way gaps.
+  for (const road of baseRoads) road.junctionTransitions = [];
 
-  const roadMainBatchVerts = [];
-  const roadMainBatchIdx = [];
+  const roadMainBatches = [];
+  let roadMainBatchVerts = [];
+  let roadMainBatchIdx = [];
   const roadSkirtBatchVerts = [];
   const roadSkirtBatchIdx = [];
-  const roadCapBatchVerts = [];
-  const roadCapBatchIdx = [];
-  const sidewalkBatchVerts = [];
-  const sidewalkBatchIdx = [];
+  const roadMarkBatchVerts = [];
+  const roadMarkBatchIdx = [];
+  const flushRoadMainBatch = () => {
+    if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
+      roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx });
+    }
+    roadMainBatchVerts = [];
+    roadMainBatchIdx = [];
+  };
+  const appendRoadMainGeometry = (verts, indices) => {
+    const incomingVertices = Array.isArray(verts) ? verts.length / 3 : 0;
+    const currentVertices = roadMainBatchVerts.length / 3;
+    if (currentVertices > 0 && currentVertices + incomingVertices > MAX_ROAD_BATCH_VERTICES) {
+      flushRoadMainBatch();
+    }
+    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
+  };
 
   const sharedRoadMaterials = typeof getSharedRoadMaterials === "function" ? getSharedRoadMaterials() : {};
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
-  const capMat = sharedRoadMaterials.capMat;
-  const urbanSurfaceMaterials = typeof getSharedUrbanSurfaceMaterials === "function" ? getSharedUrbanSurfaceMaterials() : {};
-  const sidewalkMat = urbanSurfaceMaterials.sidewalkMat;
+  const markMat = sharedRoadMaterials.markMat;
+  await measureAsync('buildRoadRibbons', async () => {
+    let sliceStartedAt = now();
+    for (let roadIndex = 0; roadIndex < baseRoads.length; roadIndex += 1) {
+      const road = baseRoads[roadIndex];
+      if (!road || !Array.isArray(road.pts) || road.pts.length < 2) continue;
+      const { width } = road;
+      const hw = width / 2;
 
-  baseRoads.forEach((road, roadIdx) => {
-    if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return;
-    const { width } = road;
-    const hw = width / 2;
+      const requestedDetail = resolveRoadRibbonSubdivisionStep(road);
+      const basePts = subdivideRoadPoints(road.pts, requestedDetail);
+      // Preserve the source road as one continuous ribbon. A separate
+      // intersection-cap pass previously trimmed these endpoints and filled
+      // junctions with fan polygons, exposing circles and triangle boundaries.
+      const pts = basePts;
+      if (!Array.isArray(pts) || pts.length < 2) continue;
 
-    const baseDetail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
-    const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;
-    const detail =
-      road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade" ?
-        Math.min(baseDetail, 0.55) :
-        hasTransitionAnchors ?
-          Math.min(baseDetail, 0.6) :
-          baseDetail;
-    const basePts = subdivideRoadPoints(road.pts, detail);
-    const endpointIntersectionRefs = {
-      start: endpointIntersectionByRoad.get(`${roadIdx}:0`) || null,
-      end: endpointIntersectionByRoad.get(`${roadIdx}:${road.pts.length - 1}`) || null
-    };
-    const pts =
-      road?.structureSemantics?.terrainMode === "at_grade" && !hasTransitionAnchors ?
-        trimRoadVisualPointsForCaps(basePts, {
-          startIntersection: endpointIntersectionRefs.start,
-          endIntersection: endpointIntersectionRefs.end,
-          halfWidth: hw
-        }) :
-        basePts;
-    if (!Array.isArray(pts) || pts.length < 2) return;
+      const verts = [];
+      const indices = [];
+      const leftEdge = [];
+      const rightEdge = [];
+      const roadTerrainSampler = road?.structureSemantics?.terrainMode === "at_grade" ?
+        cachedTerrainHeight :
+        cachedBaseTerrainHeight;
+      const ribbonEdges = buildFeatureRibbonEdges(road, pts, hw, roadTerrainSampler, {
+        surfaceBias: Number.isFinite(road?.surfaceBias) ? road.surfaceBias : ROAD_SURFACE_BIAS
+      });
+      leftEdge.push(...ribbonEdges.leftEdge);
+      rightEdge.push(...ribbonEdges.rightEdge);
 
-    const verts = [];
-    const indices = [];
-    const leftEdge = [];
-    const rightEdge = [];
-    const roadBounds = road.bounds || pointsBoundsLocal(road.pts, width * 0.5 + URBAN_CONTEXT_PAD);
-    const contextBounds = expandBoundsLocal(roadBounds, URBAN_CONTEXT_PAD);
-    const contextCenterX = (contextBounds.minX + contextBounds.maxX) * 0.5;
-    const contextCenterZ = (contextBounds.minZ + contextBounds.maxZ) * 0.5;
-    const contextRadius = Math.max(
-      20,
-      Math.hypot(contextBounds.maxX - contextBounds.minX, contextBounds.maxZ - contextBounds.minZ) * 0.5
-    );
-    const nearbyBuildings = typeof appCtx.getNearbyBuildings === "function" ?
-      appCtx.getNearbyBuildings(contextCenterX, contextCenterZ, contextRadius) :
-      appCtx.buildings;
-    const buildingCandidates = Array.isArray(nearbyBuildings) ? nearbyBuildings.filter((building) =>
-      boundsIntersectLocal(building, contextBounds)
-    ) : [];
-    const nearbyLanduses = queryBoundsGrid(landuseGrid, contextBounds).filter((landuse) =>
-      boundsIntersectLocal(landuse.bounds || pointsBoundsLocal(landuse.pts || []), contextBounds)
-    );
-    const nearbyUrbanLanduses = nearbyLanduses.filter((landuse) => isUrbanLanduseType(landuse?.type)).length;
-    const nearbyGreenLanduses = nearbyLanduses.filter((landuse) => isGreenLanduseType(landuse?.type)).length;
-    const explicitSidewalkHint = roadHasExplicitSidewalkHint(road);
-    const roadLength = polylineLengthLocal(road.pts);
-    const denseUrbanContext =
-      nearbyUrbanLanduses >= 2 ||
-      buildingCandidates.length >= 12 ||
-      (buildingCandidates.length >= 8 && width >= 9) ||
-      (nearbyUrbanLanduses >= 1 && buildingCandidates.length >= 5);
-    const ruralGreenContext =
-      nearbyUrbanLanduses === 0 &&
-      (nearbyGreenLanduses > 0 || buildingCandidates.length < 4);
-    const shouldBuildSidewalks =
-      roadSupportsSidewalks(road) &&
-      explicitSidewalkHint;
-    const sidewalkWidth = shouldBuildSidewalks ? roadBaseSidewalkWidth(road, denseUrbanContext) : 0;
-    const nearbyIntersections = shouldBuildSidewalks ? queryBoundsGrid(intersectionGrid, roadBounds).filter((intersection) =>
-      !intersection?.hasGradeSeparatedRoad &&
-      boundsIntersectLocal(roadBounds, { minX: intersection.x, maxX: intersection.x, minZ: intersection.z, maxZ: intersection.z }, Math.max(width * 1.1, 8))
-    ) : [];
-    const endpointIntersections = shouldBuildSidewalks ? endpointIntersectionRefs : null;
+      appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
+      appendRoadMainGeometry(verts, indices);
+      appendRoadCenterMarkings(road, pts, roadMarkBatchVerts, roadMarkBatchIdx);
 
-    const roadTerrainSampler = road?.structureSemantics?.terrainMode === "at_grade" ?
-      cachedTerrainHeight :
-      cachedBaseTerrainHeight;
-    const ribbonEdges = buildFeatureRibbonEdges(road, pts, hw, roadTerrainSampler, {
-      surfaceBias: Number.isFinite(road?.surfaceBias) ? road.surfaceBias : ROAD_SURFACE_BIAS
+      if (shouldRenderRoadSkirts(road)) {
+        const skirtDepth = roadSkirtDepth(road);
+        const skirtData = buildRoadSkirts(
+          leftEdge,
+          rightEdge,
+          skirtDepth,
+          road?.structureSemantics?.terrainMode === "at_grade" ? roadTerrainSampler : null
+        );
+        if (skirtData.verts.length > 0) {
+          appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
+        }
+      }
+      // Large regional locations can publish tens of thousands of ribbons.
+      // Yield by elapsed time, rather than a fixed road count, because one
+      // complex interchange can cost far more than many short streets.
+      if (now() - sliceStartedAt >= 24) {
+        await yieldToMainThread();
+        sliceStartedAt = now();
+      }
+    }
+  });
+  await yieldToMainThread();
+
+  let compactJunctionCount = 0;
+  measure('buildJunctionCaps', () => {
+    for (const intersection of intersections) {
+      const capVerts = [];
+      const capIndices = [];
+      if (appendCompactIntersectionCap(
+        intersection,
+        capVerts,
+        capIndices,
+        cachedTerrainHeight
+      )) {
+        appendRoadMainGeometry(capVerts, capIndices);
+        compactJunctionCount += 1;
+      }
+    }
+    flushRoadMainBatch();
+  });
+
+  measure('uploadRoadMeshes', () => {
+    roadMainBatches.forEach((batch, batchIndex) => {
+      buildIndexedBatchMesh({
+        scene: appCtx.scene,
+        targetList: appCtx.roadMeshes,
+        verts: batch.verts,
+        indices: batch.indices,
+        material: roadMat,
+        renderOrder: 2,
+        userData: {
+          isRoadBatch: true,
+          roadBatchIndex: batchIndex,
+          sharedRoadMaterial: true,
+          worldLoadSequence: appCtx._worldLoadSequence || 0
+        }
+      });
     });
-    leftEdge.push(...ribbonEdges.leftEdge);
-    rightEdge.push(...ribbonEdges.rightEdge);
-
-    const edgeSmoothPasses =
-      road?.structureSemantics?.terrainMode === "elevated" ?
-        3 :
-        road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade" ?
-          2 :
-          hasTransitionAnchors ?
-            2 :
-            1;
-    for (let pass = 0; pass < edgeSmoothPasses; pass++) {
-      for (let i = 1; i < leftEdge.length - 1; i++) {
-        leftEdge[i].y = leftEdge[i].y * 0.52 + (leftEdge[i - 1].y + leftEdge[i + 1].y) * 0.24;
-        rightEdge[i].y = rightEdge[i].y * 0.52 + (rightEdge[i - 1].y + rightEdge[i + 1].y) * 0.24;
-      }
-    }
-
-    appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
-    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
-
-    const terrainMode = road?.structureSemantics?.terrainMode;
-    if (shouldRenderRoadSkirts(road)) {
-      const skirtDepth = terrainMode === "subgrade" ? 0.3 : 3.6;
-      const skirtData = buildRoadSkirts(leftEdge, rightEdge, skirtDepth);
-      if (skirtData.verts.length > 0) {
-        appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
-      }
-    }
-
-    if (shouldBuildSidewalks) {
-      const allowLeft = road.sidewalkHint !== "right";
-      const allowRight = road.sidewalkHint !== "left";
-      if (allowLeft) {
-        buildSidewalkStripBatch({
-          pts,
-          edgePoints: leftEdge,
-          sideSign: 1,
-          halfWidth: hw,
-          desiredWidth: sidewalkWidth,
-          roadFeature: road,
-          buildingCandidates,
-          nearbyIntersections,
-          endpointIntersections,
-          constants: {
-            SIDEWALK_INNER_GAP,
-            SIDEWALK_MIN_WIDTH,
-            SIDEWALK_SEGMENT_MIN_WIDTH,
-            SIDEWALK_CURB_LIFT,
-            SIDEWALK_HEIGHT_BIAS
-          },
-          deps: {
-            appendIndexedGeometry,
-            cachedTerrainHeight,
-            clampSidewalkWidthTransitions,
-            computeIntersectionCapRadius,
-            computeSidewalkCornerScale,
-            resolveSidewalkWidth,
-            smoothSidewalkOuterHeights
-          },
-          targets: {
-            sidewalkBatchVerts,
-            sidewalkBatchIdx
-          }
-        });
-      }
-      if (allowRight) {
-        buildSidewalkStripBatch({
-          pts,
-          edgePoints: rightEdge,
-          sideSign: -1,
-          halfWidth: hw,
-          desiredWidth: sidewalkWidth,
-          roadFeature: road,
-          buildingCandidates,
-          nearbyIntersections,
-          endpointIntersections,
-          constants: {
-            SIDEWALK_INNER_GAP,
-            SIDEWALK_MIN_WIDTH,
-            SIDEWALK_SEGMENT_MIN_WIDTH,
-            SIDEWALK_CURB_LIFT,
-            SIDEWALK_HEIGHT_BIAS
-          },
-          deps: {
-            appendIndexedGeometry,
-            cachedTerrainHeight,
-            clampSidewalkWidthTransitions,
-            computeIntersectionCapRadius,
-            computeSidewalkCornerScale,
-            resolveSidewalkWidth,
-            smoothSidewalkOuterHeights
-          },
-          targets: {
-            sidewalkBatchVerts,
-            sidewalkBatchIdx
-          }
-        });
-      }
-    }
-  });
-
-  intersections.forEach((intersection) => {
-    if (intersection?.hasGradeSeparatedRoad) return;
-    if (!shouldBuildIntersectionCap(intersection)) return;
-    const radius = computeIntersectionCapRadius(intersection);
-    const capData = buildIntersectionCap(intersection.x, intersection.z, radius, 24, cachedTerrainHeight);
-    appendIndexedGeometry(roadCapBatchVerts, roadCapBatchIdx, capData.verts, capData.indices);
-  });
-
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadMainBatchVerts,
-    indices: roadMainBatchIdx,
-    material: roadMat,
-    renderOrder: 2,
-    userData: { isRoadBatch: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadSkirtBatchVerts,
-    indices: roadSkirtBatchIdx,
-    material: skirtMat,
-    renderOrder: 1,
-    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadCapBatchVerts,
-    indices: roadCapBatchIdx,
-    material: capMat,
-    renderOrder: 3,
-    userData: { isRoadBatch: true, isIntersectionCap: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  if (sidewalkBatchVerts.length > 0 && sidewalkBatchIdx.length > 0) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(sidewalkBatchVerts, 3));
-    const vertexCount = sidewalkBatchVerts.length / 3;
-    const indexArray = vertexCount > 65535 ? new Uint32Array(sidewalkBatchIdx) : new Uint16Array(sidewalkBatchIdx);
-    geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
-    geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, sidewalkMat);
-    mesh.renderOrder = 2;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-    Object.assign(mesh.userData, {
-      isUrbanSurfaceBatch: true,
-      isSidewalkBatch: true,
-      sharedUrbanSurfaceMaterial: true
+    buildIndexedBatchMesh({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      verts: roadSkirtBatchVerts,
+      indices: roadSkirtBatchIdx,
+      material: skirtMat,
+      renderOrder: 1,
+      userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
-    appCtx.scene.add(mesh);
-    appCtx.urbanSurfaceMeshes.push(mesh);
-    appCtx.urbanSurfaceStats.sidewalkBatchCount += 1;
-    appCtx.urbanSurfaceStats.sidewalkVertices += vertexCount;
-    appCtx.urbanSurfaceStats.sidewalkTriangles += sidewalkBatchIdx.length / 3;
-  }
-
-  rebuildStructureVisualMeshes({
+    buildIndexedBatchMesh({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      verts: roadMarkBatchVerts,
+      indices: roadMarkBatchIdx,
+      material: markMat,
+      renderOrder: 4,
+      receiveShadow: false,
+      userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
+    });
+  });
+  await yieldToMainThread();
+  await measureAsync('rebuildStructureVisuals', () => (
+    typeof rebuildStructureVisualMeshesCooperatively === 'function'
+      ? rebuildStructureVisualMeshesCooperatively
+      : rebuildStructureVisualMeshes
+  )({
     boundsIntersect: boundsIntersectLocal,
     cachedTerrainHeight,
     pointAlongPolyline,
     polylineCurvatureMetric
-  });
+  }));
 
-  appCtx.roadsNeedRebuild = false;
+  appCtx.transportSurfacePublication = Object.freeze({
+    authority: "compiled_transport_surface",
+    transportGraphId: appCtx.transportNetworkModel?.id || null,
+    roadCount: baseRoads.length,
+    meshCount: appCtx.roadMeshes.length,
+    intersectionCount: compactJunctionCount,
+    topologyIntersectionCount: intersections.filter((intersection) =>
+      !intersection?.hasGradeSeparatedRoad
+    ).length,
+    compiledSampleCount: baseRoads.reduce((total, road) =>
+      total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
+    vertices:
+      roadMainBatches.reduce((sum, batch) => sum + batch.verts.length / 3, 0) +
+      roadSkirtBatchVerts.length / 3 +
+      roadMarkBatchVerts.length / 3,
+    triangles:
+      roadMainBatches.reduce((sum, batch) => sum + batch.indices.length / 3, 0) +
+      roadSkirtBatchIdx.length / 3 +
+      roadMarkBatchIdx.length / 3,
+    phaseDurationsMs: Object.freeze({
+      ...phaseDurationsMs,
+      total: Number((now() - publicationStartedAt).toFixed(2))
+    }),
+    worldLoadSequence: appCtx._worldLoadSequence || 0
+  });
+  return appCtx.transportSurfacePublication;
 }

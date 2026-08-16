@@ -71,14 +71,11 @@ function dataFootprints(data, appCtx) {
   const footprints = [];
   for (const element of data?.elements || []) {
     if (element?.type !== 'way' || !(element.tags?.building || element.tags?.['building:part'])) continue;
-    const points = element?._coordinates?.length >= 6
-      ? Array.from({ length: Math.floor(element._coordinates.length / 2) }, (_, index) =>
-        appCtx.geoToWorld(element._coordinates[index * 2 + 1], element._coordinates[index * 2]))
-      : (element.nodes || [])
-        .map((id) => nodes.get(id))
-        .filter(Boolean)
-        .map((node) => appCtx.geoToWorld(node.lat, node.lon))
-        .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.z));
+    const points = (element.nodes || [])
+      .map((id) => nodes.get(id))
+      .filter(Boolean)
+      .map((node) => appCtx.geoToWorld(node.lat, node.lon))
+      .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.z));
     if (points.length < 3) continue;
     const bounds = footprintBounds(points, 3.5);
     footprints.push({ points, bounds });
@@ -294,5 +291,6 @@ export function supplementSparseBuildingData(data, appCtx, options = {}) {
     residentialRoadEvidence: inferred.residentialRoadEvidence
   };
   data._inferredBuildings = summary;
+  if (data._overtureBuildings) data._overtureBuildings.inferredFootprints = summary;
   return summary;
 }

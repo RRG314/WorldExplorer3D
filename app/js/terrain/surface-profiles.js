@@ -1,28 +1,32 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=18";
+} from "../surface-rules.js?v=17";
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
+  worldCoverProviderSnapshot,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=11";
+} from "./worldcover-baseline.js?v=16";
+import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
+import { latLonToTileXY } from './tile-coordinates.js?v=1';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=17';
+import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
 import {
-  releaseTerrainTextureSets,
-  retainTerrainTextureSet,
-  terrainTextureCacheSnapshot
-} from "./texture-set-cache.js?v=1";
-import { applyWorldCoverNeighborFallback } from "./worldcover-neighbor-fallback.js?v=1";
-import { applyCanyonStrata } from "./canyon-strata.js?v=1";
+  applyTerrainProfileSurfaceMaterialMix,
+  applyTerrainReliefMaterialMix,
+  applyWorldCoverSurfaceMaterialMix,
+  configureTerrainSurfaceMaterialBlend,
+  ensureTerrainSurfaceMixAttributes,
+  setTerrainSurfaceMaterialMixAt
+} from './surface-material-blend.js?v=1';
 
-const SNOW_COLOR_HEX = 0xffffff;
-const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
+const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
 export const TERRAIN_GRASS_COLOR_HEX = 0x6b8e4a;
 const URBAN_GROUND_HEX = 0x8b8f96;
 const SOIL_COLOR_HEX = 0x8c6b47;
 const ROCK_COLOR_HEX = 0x7b7e82;
-const CANYON_ROCK_COLOR_HEX = 0xc47b50;
 const FOREST_COLOR_HEX = 0x4d633b;
 const GROUND_FALLBACK_GRASS_HEX = 0x4a7a2e;
 const GROUND_FALLBACK_SNOW_HEX = 0xd6e2ef;
@@ -32,6 +36,21 @@ const GROUND_FALLBACK_URBAN_HEX = 0x767a82;
 const GROUND_FALLBACK_SOIL_HEX = 0x7d5e3d;
 const GROUND_FALLBACK_ROCK_HEX = 0x6e7279;
 const GROUND_FALLBACK_FOREST_HEX = 0x3f5633;
+
+function cloneTerrainTextureWithRepeat(sourceTexture, repeats) {
+  if (!sourceTexture) return null;
+  const texture = sourceTexture.clone();
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(repeats, repeats);
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  const maximumAnisotropy = Number(appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+  texture.anisotropy = Math.max(1, Math.min(8, maximumAnisotropy));
+  texture.needsUpdate = true;
+  return texture;
+}
+
 const proceduralTerrainTextureBases = {
   snow: null,
   snowRock: null,
@@ -88,11 +107,9 @@ function makeProceduralTerrainTextureSet(mode = "snow", size = 128) {
       let g = 0;
       let b = 0;
       if (isSand) {
-        const duneWave = Math.sin((x * 0.14 + y * 0.045) + macro * 5.2);
-        const duneRipple = Math.sin((x * 0.34 - y * 0.08) + micro * 4.6);
-        const duneBlend = Math.max(0, duneWave * 0.65 + duneRipple * 0.35);
+        const duneBlend = hashNoise2D(x * 0.075 + 17, y * 0.075 - 9, colorSeed + 5);
         const baseTone = 196 + macro * 22 + micro * 10;
-        const warmTone = 22 + duneBlend * 24;
+        const warmTone = 22 + duneBlend * 14;
         r = baseTone + warmTone;
         g = baseTone * 0.91 + duneBlend * 11;
         b = baseTone * 0.72 + duneBlend * 6;
@@ -102,20 +119,17 @@ function makeProceduralTerrainTextureSet(mode = "snow", size = 128) {
         g = baseTone + 3;
         b = baseTone + 8;
       } else if (isUrban) {
-        const slab = Math.sin((x * 0.11) + macro * 3.2) * 0.5 + Math.cos((y * 0.12) + micro * 2.9) * 0.5;
         const grime = hashNoise2D(x * 0.24, y * 0.24, colorSeed + 6);
         const baseTone = 118 + macro * 20 + micro * 10;
-        const seam = slab > 0.92 || slab < -0.92 ? -28 : 0;
-        r = baseTone + seam - grime * 9;
-        g = baseTone + 4 + seam - grime * 8;
-        b = baseTone + 10 + seam - grime * 7;
+        r = baseTone - grime * 9;
+        g = baseTone + 4 - grime * 8;
+        b = baseTone + 10 - grime * 7;
       } else if (isSoil) {
-        const furrow = Math.sin((x * 0.19 - y * 0.05) + macro * 4.4);
         const clump = hashNoise2D(x * 0.31, y * 0.31, colorSeed + 8);
         const baseTone = 118 + macro * 26 + micro * 12;
-        r = baseTone + 20 + furrow * 9;
+        r = baseTone + 20 + clump * 7;
         g = baseTone * 0.74 + clump * 12;
-        b = baseTone * 0.48 + furrow * 6;
+        b = baseTone * 0.48 + clump * 5;
       } else if (isRock) {
         const fracture = Math.sin((x * 0.16 + y * 0.08) + macro * 5.1);
         const grain = hashNoise2D(x * 0.34, y * 0.34, colorSeed + 10);
@@ -141,7 +155,7 @@ function makeProceduralTerrainTextureSet(mode = "snow", size = 128) {
       colorImage.data[idx + 3] = 255;
 
       const nx = isSand ?
-        Math.sin((x * 0.22 + y * 0.035) + macro * 4.1) * 46 + (hashNoise2D(x * 0.19, y * 0.19, normalSeed) - 0.5) * 10 :
+        (hashNoise2D(x * 0.19, y * 0.19, normalSeed) - 0.5) * 28 :
         isBuilt ?
           (hashNoise2D(x * 0.1, y * 0.1, normalSeed) - 0.5) * 7 :
           isUrban ?
@@ -152,7 +166,7 @@ function makeProceduralTerrainTextureSet(mode = "snow", size = 128) {
               (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * 52 :
               (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * (isAlpine ? 54 : 34);
       const ny = isSand ?
-        Math.cos((x * 0.12 - y * 0.09) + micro * 3.8) * 28 + (hashNoise2D(x * 0.19 + 41, y * 0.19 - 29, normalSeed + 2) - 0.5) * 8 :
+        (hashNoise2D(x * 0.19 + 41, y * 0.19 - 29, normalSeed + 2) - 0.5) * 24 :
         isBuilt ?
           (hashNoise2D(x * 0.1 + 41, y * 0.1 - 29, normalSeed + 2) - 0.5) * 7 :
           isUrban ?
@@ -185,6 +199,9 @@ function makeProceduralTerrainTextureSet(mode = "snow", size = 128) {
   const makeTexture = (canvas, isColor = false) => {
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     if (isColor) {
       if (typeof texture.colorSpace !== "undefined" && typeof THREE.SRGBColorSpace !== "undefined") {
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -218,7 +235,7 @@ function getProceduralTerrainTextureBase(mode = "snow") {
   return proceduralTerrainTextureBases[key];
 }
 
-function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
+export function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   if (!mesh || !mesh.userData) return null;
   if (!mesh.userData.terrainTextureSetsByMode) mesh.userData.terrainTextureSetsByMode = {};
   const modeKey =
@@ -231,13 +248,35 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     mode === "rock" ? "rock" :
     mode === "forest" ? "forest" :
     "grass";
+  const source = terrainTextureSource(modeKey);
+  if (!source) return null;
+
+  const textureCacheKey = [
+    modeKey,
+    Number(repeats) || 12,
+    source.map?.uuid || 'none',
+    source.normalMap?.uuid || 'none',
+    source.roughnessMap?.uuid || 'none'
+  ].join(':');
+  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
+    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
+    return mesh.userData.terrainTextureSet;
+  }
+
+  const textureSet = {
+    map: cloneTerrainTextureWithRepeat(source.map, repeats),
+    normalMap: cloneTerrainTextureWithRepeat(source.normalMap, repeats),
+    roughnessMap: cloneTerrainTextureWithRepeat(source.roughnessMap, repeats)
+  };
+  mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
+  mesh.userData.terrainTextureSet = textureSet;
+  return textureSet;
+}
+
+function terrainTextureSource(modeKey = 'grass') {
   let source = null;
-  // Extreme biomes need a deterministic semantic surface. The registered
-  // snow/rock and sand assets are useful detail maps elsewhere, but their
-  // dominant colors misrepresent alpine snow and open desert at terrain scale.
-  const registeredMode =
-    modeKey === "snow" || modeKey === "snowRock" || modeKey === "sand" ? null : modeKey;
-  if (registeredMode && appCtx.surfaceTextureSets?.[registeredMode]?.map) {
+  const registeredMode = modeKey === 'snowRock' ? 'rock' : modeKey;
+  if (appCtx.surfaceTextureSets?.[registeredMode]?.map) {
     source = appCtx.surfaceTextureSets[registeredMode];
   } else if (modeKey === "grass" || modeKey === "forest") {
     source = {
@@ -263,28 +302,25 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   } else {
     source = getProceduralTerrainTextureBase(modeKey);
   }
-  if (!source) return null;
-
-  const sharedRepeats = Math.max(2, Math.round((Number(repeats) || 12) / 2) * 2);
-  const textureCacheKey = [
-    modeKey,
-    sharedRepeats,
-    source.map?.uuid || 'none',
-    source.normalMap?.uuid || 'none',
-    source.roughnessMap?.uuid || 'none'
-  ].join(':');
-  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
-    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
-    return mesh.userData.terrainTextureSet;
-  }
-
-  const textureSet = retainTerrainTextureSet(mesh, textureCacheKey, source, sharedRepeats);
-  mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
-  mesh.userData.terrainTextureSet = textureSet;
-  return textureSet;
+  return source;
 }
 
-export { releaseTerrainTextureSets, terrainTextureCacheSnapshot };
+function ensureTerrainSemanticTextureSets(mesh, repeats) {
+  return {
+    grass: terrainTextureSource('grass'),
+    urban: terrainTextureSource('urban'),
+    sand: terrainTextureSource('sand'),
+    forest: terrainTextureSource('forest'),
+    soil: terrainTextureSource('soil'),
+    rock: terrainTextureSource('rock'),
+    biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
+  };
+}
+
+export function applyTerrainSemanticMaterialBlend(mesh, repeats = 12) {
+  const textureSets = ensureTerrainSemanticTextureSets(mesh, repeats);
+  return configureTerrainSurfaceMaterialBlend(mesh, textureSets);
+}
 
 let cachedGroundFallbackMesh = null;
 
@@ -319,7 +355,7 @@ function applyGroundFallbackProfile(profile = null) {
           mode === "soil" ?
             GROUND_FALLBACK_SOIL_HEX :
             mode === "rock" ?
-              (profile?.reason === 'grand_canyon_striated_rock' ? 0xa85f3b : GROUND_FALLBACK_ROCK_HEX) :
+              GROUND_FALLBACK_ROCK_HEX :
               mode === "forest" ?
                 GROUND_FALLBACK_FOREST_HEX :
               GROUND_FALLBACK_GRASS_HEX;
@@ -364,23 +400,8 @@ export function classifyTerrainVisualProfile(bounds, minElevationMeters = null, 
   });
 }
 
-function worldCoverStats() {
-  if (!appCtx.worldCoverStats) {
-    appCtx.worldCoverStats = {
-      requested: 0,
-      ready: 0,
-      failed: 0,
-      network: 0,
-      persistentCache: 0,
-      classes: {}
-    };
-  }
-  return appCtx.worldCoverStats;
-}
-
 function classifyWorldCoverSurfaceProfile(mesh, result) {
   const current = mesh?.userData?.terrainVisualProfile || null;
-  if (current?.reason === 'grand_canyon_striated_rock') return current;
   const bounds = mesh?.userData?.terrainTile?.bounds || null;
   const centerLat = Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS) ?
     (bounds.latN + bounds.latS) * 0.5 :
@@ -394,6 +415,92 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
     reason: semantic.reason,
     worldCoverConfidence: semantic.confidence
   };
+}
+
+export function applyWorldCoverVertexTints(mesh, result) {
+  const geometry = mesh?.geometry;
+  const uvs = geometry?.attributes?.uv;
+  const tints = result?.surfaceTints;
+  const size = Number(result?.surfaceTintSize || 0);
+  const encodingScale = Number(result?.surfaceTintEncodingScale || 170);
+  if (!geometry || !uvs || !tints || size < 2 || encodingScale <= 0) return false;
+
+  const colors = new Float32Array(uvs.count * 3);
+  const sample = (x, y, channel) => tints[(y * size + x) * 3 + channel] / encodingScale;
+  for (let index = 0; index < uvs.count; index += 1) {
+    const sourceX = Math.max(0, Math.min(size - 1, uvs.getX(index) * (size - 1)));
+    const sourceY = Math.max(0, Math.min(size - 1, (1 - uvs.getY(index)) * (size - 1)));
+    const x0 = Math.floor(sourceX);
+    const y0 = Math.floor(sourceY);
+    const x1 = Math.min(size - 1, x0 + 1);
+    const y1 = Math.min(size - 1, y0 + 1);
+    const tx = sourceX - x0;
+    const ty = sourceY - y0;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const north = sample(x0, y0, channel) * (1 - tx) + sample(x1, y0, channel) * tx;
+      const south = sample(x0, y1, channel) * (1 - tx) + sample(x1, y1, channel) * tx;
+      colors[index * 3 + channel] = north * (1 - ty) + south * ty;
+    }
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.attributes.color.needsUpdate = true;
+  mesh.material.vertexColors = true;
+  return true;
+}
+
+export function applyMappedSemanticVertexTints(
+  mesh,
+  mappedContext = appCtx.fixedLocationMappedSurfaceContext,
+  options = {}
+) {
+  const geometry = mesh?.geometry;
+  const positions = geometry?.attributes?.position;
+  const contextZoom = Number(mappedContext?.contextZoom || 0);
+  const buckets = mappedContext?.landAreasByTile;
+  if (!geometry || !positions || !buckets?.get || contextZoom <= 0 ||
+      typeof appCtx.worldToLatLon !== 'function') return 0;
+  if (options.force !== true && mesh.userData?.mappedSemanticTintContext === mappedContext) {
+    return Number(mesh.userData?.mappedSemanticTintVertices || 0);
+  }
+
+  let colors = geometry.attributes.color;
+  if (!colors || colors.count !== positions.count) {
+    const neutral = new Float32Array(positions.count * 3);
+    neutral.fill(1);
+    colors = new THREE.Float32BufferAttribute(neutral, 3);
+    geometry.setAttribute('color', colors);
+  }
+  const materialMix = ensureTerrainSurfaceMixAttributes(geometry);
+  let tintedVertices = 0;
+  for (let index = 0; index < positions.count; index += 1) {
+    const geographic = appCtx.worldToLatLon(
+      positions.getX(index) + Number(mesh.position?.x || 0),
+      positions.getZ(index) + Number(mesh.position?.z || 0)
+    );
+    const tile = latLonToTileXY(geographic.lat, geographic.lon, contextZoom);
+    const bucket = buckets.get(`${contextZoom}/${tile.x}/${tile.y}`) || [];
+    const owner = bucket.find((area) => pointInMappedLandArea(
+      geographic.lon,
+      geographic.lat,
+      area
+    ));
+    if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
+    colors.setXYZ(index, owner.tint[0], owner.tint[1], owner.tint[2]);
+    setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);
+    tintedVertices += 1;
+  }
+  if (tintedVertices > 0) {
+    colors.needsUpdate = true;
+    if (materialMix) {
+      materialMix.mixA.needsUpdate = true;
+      materialMix.mixB.needsUpdate = true;
+    }
+    mesh.material.vertexColors = true;
+    mesh.material.needsUpdate = true;
+  }
+  mesh.userData.mappedSemanticTintVertices = tintedVertices;
+  mesh.userData.mappedSemanticTintContext = mappedContext;
+  return tintedVertices;
 }
 
 function applyLoadedWorldCoverBaseline(mesh) {
@@ -415,20 +522,80 @@ function applyLoadedWorldCoverBaseline(mesh) {
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
     applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
-  mesh.userData.terrainDetailProvenance = null;
-  if (result.texture) {
-    result.texture.dispose?.();
-    result.texture = null;
+  if (result.surfaceTints) {
+    const ownDetailMode = resolveWorldCoverDetailMode(semanticProfile, result);
+    const ownerDistance = Math.hypot(Number(mesh.position?.x || 0), Number(mesh.position?.z || 0));
+    const previousOwnerDistance = Number.isFinite(Number(appCtx.worldCoverBaseDetailModeOwnerDistance)) ?
+      Number(appCtx.worldCoverBaseDetailModeOwnerDistance) : Infinity;
+    const becomesLocationOwner = ownerDistance + 1e-6 < previousOwnerDistance;
+    const previousLocationDetailMode = appCtx.worldCoverBaseDetailMode || null;
+    if (becomesLocationOwner) {
+      appCtx.worldCoverBaseDetailMode = ownDetailMode;
+      appCtx.worldCoverBaseDetailModeOwnerDistance = ownerDistance;
+    }
+    const detailMode = appCtx.worldCoverBaseDetailMode || ownDetailMode;
+    const detailTextures = ensureTerrainTextureSet(
+      mesh,
+      Number(mesh.userData.terrainTextureRepeats) || 12,
+      'grass'
+    );
+    mesh.userData.terrainTextureSet = detailTextures;
+    // Grass is the neutral natural base. Per-vertex semantic weights below
+    // blend the existing urban, sand, forest, soil, rock and snow treatments
+    // inside this same terrain material, so land-cover classes do not become
+    // competing square meshes or location-wide grass detail.
+    material.map = detailTextures?.map || null;
+    material.normalMap = detailTextures?.normalMap || null;
+    material.roughnessMap = detailTextures?.roughnessMap || null;
+    if (material.normalMap) {
+      const normalStrength =
+        detailMode === 'sand' ? [0.78, 0.42] :
+        detailMode === 'rock' ? [0.56, 0.56] :
+        detailMode === 'soil' ? [0.48, 0.48] :
+        detailMode === 'forest' ? [0.48, 0.48] :
+        [0.6, 0.6];
+      material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
+    }
+    applyWorldCoverVertexTints(mesh, result);
+    applyWorldCoverSurfaceMaterialMix(mesh, result);
+    applyMappedSemanticVertexTints(mesh, appCtx.fixedLocationMappedSurfaceContext, { force: true });
+    applyTerrainReliefMaterialMix(mesh);
+    applyTerrainSemanticMaterialBlend(
+      mesh,
+      Number(mesh.userData.terrainTextureRepeats) || 12
+    );
+    // Keep shader input neutral so missing PBR maps cannot bleach semantic colors.
+    material.color.setHex(0xffffff);
+    material.emissiveMap = null;
+    material.emissiveIntensity = 0;
+    material.roughness = 0.96;
+    material.metalness = 0;
+    material.needsUpdate = true;
+    mesh.userData.terrainDetailProvenance = {
+      kind: 'spatial-worldcover-mapped-semantic-pbr',
+      source: result.source,
+      mode: 'semantic-pbr',
+      fallbackMode: detailMode,
+      hardscapeOwner: 'exact-mapped-surface-geometry'
+    };
+    if (becomesLocationOwner && previousLocationDetailMode !== ownDetailMode &&
+        !appCtx.worldCoverDetailModeRefreshQueued) {
+      appCtx.worldCoverDetailModeRefreshQueued = true;
+      queueMicrotask(() => {
+        appCtx.worldCoverDetailModeRefreshQueued = false;
+        for (const candidate of appCtx.terrainGroup?.children || []) {
+          if (candidate !== mesh && candidate?.userData?.worldCoverResult && !candidate.userData?.terrainDisposed) {
+            applyLoadedWorldCoverBaseline(candidate);
+          }
+        }
+      });
+    }
+  } else {
+    mesh.userData.terrainDetailProvenance = null;
   }
-  mesh.userData.worldCoverTexture = null;
   appCtx.scheduleWorldCoverVegetationRefresh?.();
+  appCtx.scheduleFarTerrainSurfaceRefresh?.();
   return true;
-}
-
-function applyDominantNaturalWorldCoverFallback() {
-  applyWorldCoverNeighborFallback(appCtx.terrainGroup, (mesh, profile) => {
-    applyTerrainVisualProfile(mesh, profile, null, { queueWorldCover: false });
-  });
 }
 
 function queueWorldCoverBaseline(mesh, bounds) {
@@ -439,7 +606,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
   }
   if (mesh.userData.worldCoverPromise || mesh.userData.worldCoverStatus === 'unavailable') return;
 
-  const stats = worldCoverStats();
+  const stats = worldCoverStatsForLocation(appCtx);
   const key = String(mesh.userData.terrainTileKey || [
     bounds.latS,
     bounds.lonW,
@@ -461,7 +628,6 @@ function queueWorldCoverBaseline(mesh, bounds) {
       mesh.userData.worldCoverPromise = null;
       mesh.userData.worldCoverAbortController = null;
       if (!result || mesh.userData.terrainDisposed) {
-        result?.texture?.dispose?.();
         return;
       }
       mesh.userData.worldCoverResult = result;
@@ -471,8 +637,8 @@ function queueWorldCoverBaseline(mesh, bounds) {
       Object.entries(result.counts || {}).forEach(([className, count]) => {
         stats.classes[className] = Number(stats.classes[className] || 0) + Number(count || 0);
       });
+      refreshWorldBiomeFromWorldCoverStats(appCtx, stats);
       applyLoadedWorldCoverBaseline(mesh);
-      applyDominantNaturalWorldCoverFallback();
     })
     .catch(() => {
       mesh.userData.worldCoverPromise = null;
@@ -480,7 +646,6 @@ function queueWorldCoverBaseline(mesh, bounds) {
       if (mesh.userData.terrainDisposed) return;
       mesh.userData.worldCoverStatus = 'unavailable';
       stats.failed += 1;
-      applyDominantNaturalWorldCoverFallback();
     });
 }
 
@@ -490,7 +655,6 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   const mat = mesh.material;
   const tileBounds = mesh.userData.terrainTile?.bounds || null;
   const nextProfile = profile || classifyTerrainVisualProfile(tileBounds);
-  const canyonRock = nextProfile.reason === 'grand_canyon_striated_rock';
   const nextMode =
     nextProfile.visualMode === "built" ? "built" :
     nextProfile.mode === "snowRock" ? "snowRock" :
@@ -508,15 +672,18 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
 
   if (nextMode === "snow" || nextMode === "snowRock") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, nextMode);
-    mat.map = textures?.map || null;
-    mat.normalMap = textures?.normalMap || null;
-    mat.roughnessMap = textures?.roughnessMap || null;
+    // Snow uses clean material response instead of the registered repeating
+    // ground scan. On large alpine slopes that directional scan produced
+    // visible diagonal bands and moire that read as terrain geometry.
+    mat.map = nextMode === "snow" ? null : textures?.map || null;
+    mat.normalMap = nextMode === "snow" ? null : textures?.normalMap || null;
+    mat.roughnessMap = nextMode === "snow" ? null : textures?.roughnessMap || null;
     mat.color.setHex(nextMode === "snow" ? SNOW_COLOR_HEX : ALPINE_SNOW_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = nextMode === "snow" ? 0.94 : 0.86;
     mat.metalness = 0.01;
-    mat.normalScale = nextMode === "snow" ? new THREE.Vector2(0.2, 0.2) : new THREE.Vector2(0.45, 0.45);
+    mat.normalScale = nextMode === "snow" ? new THREE.Vector2(0, 0) : new THREE.Vector2(0.2, 0.2);
   } else if (nextMode === "sand") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.3, "sand");
     mat.map = textures?.map || null;
@@ -529,16 +696,21 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.metalness = 0.0;
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.78, 0.42);
   } else if (nextMode === "built") {
-    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 0.7, "built");
+    // Dense settlement evidence owns a spatial urban fallback while exact
+    // mapped parks and other land classes continue to override it below.
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats, "grass");
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(mat.map ? 0xffffff : URBAN_GROUND_HEX);
+    // The semantic shader owns the visible developed fallback. Its input must
+    // stay neutral even when the optional grass texture is unavailable;
+    // otherwise the legacy grass hex multiplies the urban result green.
+    mat.color.setHex(0xffffff);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
-    mat.roughness = 0.9;
+    mat.roughness = 0.95;
     mat.metalness = 0;
-    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.18, 0.18);
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.6, 0.6);
   } else if (nextMode === "urban") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.1, "urban");
     mat.map = textures?.map || null;
@@ -566,19 +738,18 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(canyonRock ? CANYON_ROCK_COLOR_HEX : (mat.map ? 0xffffff : ROCK_COLOR_HEX));
+    mat.color.setHex(mat.map ? 0xffffff : ROCK_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = 0.87;
     mat.metalness = 0.02;
-    if (mat.normalMap) mat.normalScale = new THREE.Vector2(canyonRock ? 0.72 : 0.56, canyonRock ? 0.34 : 0.56);
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.56, 0.56);
   } else if (nextMode === "forest") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.1, "forest");
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    const tropicalForest = appCtx.worldSurfaceProfile?.biomeHint === 'tropical_rainforest';
-    mat.color.setHex(mat.map ? (tropicalForest ? 0x78966a : 0xffffff) : FOREST_COLOR_HEX);
+    mat.color.setHex(mat.map ? 0xffffff : FOREST_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = 0.96;
@@ -597,11 +768,14 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.6, 0.6);
   }
 
-  applyCanyonStrata(mesh, canyonRock);
   mesh.userData.terrainVisualProfile = nextProfile;
   applyGroundFallbackProfile(nextProfile);
   mat.emissiveMap = null;
   mat.needsUpdate = true;
+  applyTerrainProfileSurfaceMaterialMix(mesh, nextMode);
+  applyMappedSemanticVertexTints(mesh);
+  applyTerrainReliefMaterialMix(mesh);
+  applyTerrainSemanticMaterialBlend(mesh, textureRepeats);
   if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
 }
 
@@ -632,4 +806,7 @@ export function refreshTerrainSurfaceProfiles(profile = null) {
 export function setWorldSurfaceProfile(profile = null) {
   appCtx.worldSurfaceProfile = profile || null;
   refreshTerrainSurfaceProfiles(profile || null);
+  appCtx.scheduleFarTerrainSurfaceRefresh?.();
 }
+
+appCtx.getWorldCoverProviderSnapshot = worldCoverProviderSnapshot;

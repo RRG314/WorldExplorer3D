@@ -21,13 +21,13 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=91">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=92">
+<link rel="stylesheet" href="styles/title-shell.css?v=90">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=93">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
-<link rel="stylesheet" href="styles/universe.css?v=6">
+<link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=12">
-<link rel="stylesheet" href="styles/start-hub.css?v=16">
+<link rel="stylesheet" href="styles/interface-v4.css?v=16">
+<link rel="stylesheet" href="styles/start-hub.css?v=14">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -100,6 +100,9 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button" disabled>🚀 Space</button>
 <button class="launch-switch-btn" id="oceanLaunchToggle" data-launch="ocean" type="button" disabled>🌊 Ocean</button>
 </div>
+<div class="loc-grid custom-centered">
+<div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
+</div>
 <div class="title-location-actions">
 <button id="titleUseMyLocationBtn" class="title-use-location-btn" type="button">Use My Location</button>
 <div id="titleUseMyLocationStatus" class="title-location-status" aria-live="polite"></div>
@@ -154,6 +157,8 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 🎮 Game Mode
 </div>
 <div class="mode-grid">
+<div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
@@ -167,45 +172,41 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div class="tab-content" id="tab-multiplayer">
 <div class="mp-card">
-<div class="mp-title">Multiplayer</div>
-<p class="mp-workspace-intro">Create a private world for friends, join with a room code, or discover public rooms near a city. Your room keeps its location, shared builds, activities, and player presence together.</p>
-<nav class="mp-workspace-nav" aria-label="Multiplayer sections">
-<button class="active" type="button" data-mp-panel-target="rooms">Rooms</button>
-<button type="button" data-mp-panel-target="discover">Discover</button>
-<button type="button" data-mp-panel-target="people">People</button>
-<button type="button" data-mp-panel-target="rankings">Rankings</button>
-</nav>
-<section class="mp-workspace-panel active" data-mp-panel="rooms">
-<div class="mp-section-help"><strong>Start or return to a world</strong><span>Join with a code, or create a room at your selected location.</span></div>
+<div class="mp-title">🌐 Explore Together</div>
 <div id="mpPlanState" class="mp-plan-state">Sign in to access multiplayer rooms.</div>
+<div class="mp-subtitle">Join With A Room Code</div>
 <div class="mp-row">
 <input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
-<button id="mpTitleJoinBtn" class="mp-btn secondary" type="button">Join</button>
-<button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create</button>
+<button id="mpTitleJoinBtn" class="mp-btn primary" type="button">Join Room</button>
 </div>
-<div class="mp-subtitle">My Rooms</div>
-<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
-<ul id="mpOwnedRoomsList" class="mp-room-list">
-<li class="mpRoomEmpty">Sign in to load your rooms.</li>
-</ul>
+<div class="mp-status">Private rooms use an invite code. Public rooms can also be found by city below.</div>
+
+<div class="mp-subtitle">Create A Room At Your Selected Location</div>
 <div class="mp-row">
 <select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
 <option value="private" selected>Private Room</option>
 <option value="public">Public Room</option>
 </select>
 <input id="mpTitleRoomNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
-<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="Optional location tag (Tokyo, Paris, Moon Base)">
+<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="City label for public discovery (optional for private rooms)">
 </div>
 <div class="mp-row">
-<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Room Panel</button>
-<button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
-<button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave</button>
+<button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
+<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Open Active Room</button>
+<button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Copy Invite</button>
+<button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
+</div>
+<div class="mp-row">
+<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button>
 </div>
 <div id="mpTitleStatus" class="mp-status"></div>
-</section>
 
-<section class="mp-workspace-panel" data-mp-panel="discover" hidden>
-<div class="mp-section-help"><strong>Find active worlds</strong><span>Search by city or join a featured public room.</span></div>
+<div class="mp-subtitle">My Rooms</div>
+<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
+<ul id="mpOwnedRoomsList" class="mp-room-list">
+<li class="mpRoomEmpty">Sign in to load your rooms.</li>
+</ul>
+
 <div class="mp-subtitle">Public Rooms Near A City</div>
 <div class="mp-row">
 <input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="City (e.g. Tokyo)">
@@ -216,19 +217,18 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <li class="mpRoomEmpty">Search a city to find public rooms.</li>
 </ul>
 
-<div class="mp-subtitle">Featured Public Rooms</div>
+<div class="mp-subtitle">Featured City</div>
 <div class="mp-row">
 <button id="mpFeaturedWeeklyBtn" class="mp-btn primary mpSmallBtn" type="button">Join Weekly City</button>
-<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Featured</button>
+<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Curated Rooms</button>
 </div>
 <div id="mpFeaturedWeeklyMeta" class="mp-status">Weekly city room rotates each week.</div>
 <ul id="mpFeaturedList" class="mp-room-list">
-<li class="mpRoomEmpty">Featured rooms will appear here.</li>
+<li class="mpRoomEmpty">Admin-curated public rooms will appear here.</li>
 </ul>
-</section>
 
-<section class="mp-workspace-panel" data-mp-panel="people" hidden>
-<div class="mp-section-help"><strong>Play together again</strong><span>Manage friends, recent players, and room invitations.</span></div>
+<details class="mp-secondary-tools">
+<summary>Friends, invites, recent players, and leaderboard</summary>
 <div class="mp-subtitle">Friends</div>
 <div id="mpFriendsStatus" class="mp-status">Add friends by UID or from Recent Players to invite them fast.</div>
 <div class="mp-row">
@@ -249,15 +249,12 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <ul id="mpInvitesList" class="mp-room-list">
 <li class="mpRoomEmpty">No incoming invites.</li>
 </ul>
-</section>
 
-<section class="mp-workspace-panel" data-mp-panel="rankings" hidden>
-<div class="mp-section-help"><strong>Community progress</strong><span>Compare exploration and activity results across the platform.</span></div>
 <div class="mp-subtitle">Top Explorers</div>
 <ul id="mpLeaderboardList" class="mpFeedList">
 <li class="mpRoomEmpty">Leaderboard updates as explorers participate.</li>
 </ul>
-</section>
+</details>
 </div>
 </div>
 <div class="tab-content" id="tab-settings">
@@ -343,50 +340,41 @@ Graphics changes apply to the current session.
 </div>
 </div>
 <div class="tab-content" id="tab-controls">
-<section class="tutorial-overview" aria-label="Quick start guide">
-<div class="tutorial-overview-title">Quick Start</div>
-<div class="tutorial-overview-grid">
-  <article><b>1</b><strong>Choose a world</strong><span>Search, click the globe, use My Places, or select Earth, Ocean, Moon, Mars, or Space.</span></article>
-  <article><b>2</b><strong>Explore</strong><span>Use Walk, Drive, Drone, Plane, Boat, or Submarine. The controls below update by travel mode.</span></article>
-  <article><b>3</b><strong>Read the world</strong><span>Open Live Data for weather, aircraft, marine, satellite, seismic, and GIS layers.</span></article>
-  <article><b>4</b><strong>Play</strong><span>Open Missions for races, searches, fishing, Paint the Town, and community activities.</span></article>
-  <article><b>5</b><strong>Build</strong><span>Use Land & Property for block building, interiors, saved places, and creator tools.</span></article>
-  <article><b>6</b><strong>Play together</strong><span>Create a room, share its invite code, or discover a public room near a city.</span></article>
-</div>
-</section>
 <div class="ctrl-grid">
 <div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">WASD / Arrows</span><span class="ctrl-action">Drive / Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Drive / Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
 <div class="ctrl-section">Walking Mode</div>
-<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Walk Forward / Back</span></div>
-<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Turn Left / Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Up / Down</span><span class="ctrl-action">Walk Forward / Back</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Left / Right</span><span class="ctrl-action">Turn Left / Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
 <div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">WASD / Arrows</span><span class="ctrl-action">Fly / Turn</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-section">Plane Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Bank / Ground Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">X / Z</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Wheel Brake</span></div>
+<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl + ← / →</span><span class="ctrl-action">Barrel Roll</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">Up to ~188 MPH</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
 <div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Plane</span></div>
 <div class="ctrl-section">Camera & View</div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Look Back</span></div>
 <div class="ctrl-section">Mode Switching</div>
-<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Drive / Walk / Drone / Plane</span></div>
+<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character / Car / Plane / Drone</span></div>
 <div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
 <div class="ctrl-section">Navigation & Map</div>
 <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
@@ -425,6 +413,7 @@ Graphics changes apply to the current session.
 <button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
 <button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
 <button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">🧭 Explorer</button>
+<button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
 </div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
@@ -461,7 +450,7 @@ Graphics changes apply to the current session.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by ADSB.lol (ODbL); OpenSky is optional for authorized operators · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · World Explorer 3D code © 2026 Steven Reid, Apache-2.0 · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · Ground artifacts produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30. · Global ocean-floor elevations from the GEBCO_2024 Grid, GEBCO Compilation Group · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
 </div>
 </div>
 </div>
@@ -483,7 +472,8 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <button id="globeLocationSearchBtn" type="button">Search</button>
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
-<button id="globeHubThemeBtn" type="button" title="Appearance: Night" aria-label="Change appearance">◒</button>
+<button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
+<button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
 <button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
 <button id="globeHubFullscreenBtn" type="button" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
@@ -498,7 +488,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
 <div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
-<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to favorites" aria-label="Add selected place to favorites" disabled>☆</button>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
 </div>
 <div class="globe-selector-actions">
 <button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
@@ -510,7 +500,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
 <button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
-<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Uses the same search flow as location search.</div>
+<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
 <div class="globe-selector-row globe-selector-coordinate-row">
 <input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
@@ -518,7 +508,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-selector-city-tabs" role="tablist" aria-label="City lists">
 <button id="globeNearbyTabBtn" class="globe-selector-city-tab active" type="button" data-city-tab="nearby">Nearby</button>
-<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">My Places</button>
+<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Featured Cities</button>
 </div>
 <div id="globeCityListHint" class="globe-selector-stat-label">Pick a point to see nearby cities.</div>
 <ul id="globeCityList" class="globe-selector-city-list">
@@ -543,12 +533,11 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 <div class="globe-destination-bar" aria-label="World destinations">
-  <button id="globeSelectorEarthBtn" class="active" type="button" title="Travel to Earth" aria-label="Travel to Earth"><span class="destination-thumb earth" aria-hidden="true"></span><span class="destination-label">Earth</span></button>
-  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Travel to Moon" aria-label="Travel to Moon"><span class="destination-thumb moon" aria-hidden="true"></span><span class="destination-label">Moon</span></button>
-  <button id="globeSelectorMarsBtn" type="button" title="Travel to Mars" aria-label="Travel to Mars"><span class="destination-thumb mars" aria-hidden="true"></span><span class="destination-label">Mars</span></button>
-  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Travel to Space" aria-label="Travel to Space"><span class="destination-thumb space" aria-hidden="true"></span><span class="destination-label">Space</span></button>
-  <button id="globeSelectorOceanBtn" type="button" title="Travel to Ocean" aria-label="Travel to Ocean"><span class="destination-thumb ocean" aria-hidden="true"></span><span class="destination-label">Ocean</span></button>
-  <button class="destination-control" type="button" title="Open controls" aria-label="Open controls" data-globe-destination="controls"><span class="destination-control-icon" aria-hidden="true">⌨</span><span class="destination-label">Controls</span></button>
+  <button id="globeSelectorEarthBtn" class="active" type="button" title="Explore Earth" aria-label="Explore Earth"><span class="destination-thumb earth" aria-hidden="true"></span></button>
+  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
+  <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
+  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
   <header class="globe-hub-overlay-header">
@@ -589,7 +578,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div id="boostBar"><div id="boostFill"></div></div>
 <div id="street">Loading...</div>
 <div id="locationLine"></div>
-<div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span><span class="ind" id="indOff" hidden></span></div>
+<div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
 </div>
 </div></div>
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a></div>
@@ -657,7 +646,44 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
 </div>
-<div id="offRoadWarn"></div>
+<aside id="deFlockHud" aria-live="polite">
+  <div class="deFlockHudHead"><strong>📷 DEFLOCK HUNT</strong><button id="deFlockHelpOpen" type="button" aria-label="DeFlock information">i</button></div>
+  <div id="deFlockCounts">Loading mapped cameras…</div>
+  <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
+</aside>
+<div id="deFlockPrompt" role="status"></div>
+<aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
+  <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
+  <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
+  <p>All actions are fictional and happen only inside World Explorer. “Virtual Camera Disabled” never changes physical equipment.</p>
+  <p>Direction cones and detection range are gameplay approximations, not claims about real camera capabilities. No plates, vehicle photos, live results, or driver data are collected.</p>
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors • ODbL</a>
+</aside>
+<div id="liveGpsPermissionPanel" role="dialog" aria-modal="true" aria-labelledby="liveGpsPermissionTitle">
+  <div class="liveGpsPermissionCard">
+    <div class="liveGpsPermissionIcon">📍</div>
+    <h2 id="liveGpsPermissionTitle">Start Live GPS Explore?</h2>
+    <p>Your location moves the in-world walker while World Explorer remains open and visible. Locking the screen or switching apps may pause movement.</p>
+    <p class="liveGpsSafety"><strong>Stay aware of traffic, terrain, private property, and local rules. Do not use the game while driving.</strong></p>
+    <p>Location samples stay in memory for this session and are not saved as a route.</p>
+    <div id="liveGpsPermissionStatus" aria-live="polite"></div>
+    <div class="liveGpsPermissionActions">
+      <button id="liveGpsPermissionCancel" type="button">Cancel</button>
+      <button id="liveGpsPermissionContinue" type="button">Continue &amp; Allow Location</button>
+    </div>
+  </div>
+</div>
+<section id="liveGpsHud" aria-label="Live GPS status">
+  <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
+  <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span></div>
+  <div class="liveGpsActions">
+    <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
+    <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
+    <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
+    <button id="liveGpsStopBtn" type="button">Stop</button>
+  </div>
+</section>
 <canvas id="minimap" width="150" height="150"></canvas>
 <div id="minimapZoomControls" aria-label="Minimap zoom controls">
   <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
@@ -963,15 +989,26 @@ Explore the area
 <div class="floatMenu" id="gameMenu">
 <button class="floatBtn game" id="gameBtn" type="button" aria-label="Games" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
 <div class="floatItems">
+<div class="floatItem" id="fDeFlock">📷 Start DeFlock Hunt</div>
+<div class="floatItem" id="fLiveGps">📍 Start Live GPS Explore</div>
 <div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fRoomGames">👥 Room Games</div>
 <div class="floatItem" id="fActivityCreator">🧩 Create Game</div>
+<div class="floatItem" id="fMemoryFlower">🌸 Place Memory Flower</div>
+<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
 <div class="floatItem" id="fPolice">🚔 Police</div>
 <div class="floatItem" id="fTrack">🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack">🗑️ Erase Track</div>
 <div class="floatItem" id="fRespawn">🎯 Respawn</div>
 <div class="floatItem" id="fRespawnRand">🎲 Random Respawn</div>
+<div class="floatItemSection" role="separator">MULTIPLAYER</div>
+<div class="floatItem" id="fMpCreate">🆕 Create Room</div>
+<div class="floatItem" id="fMpJoin">🔑 Join Room</div>
+<div class="floatItem" id="fMpInvite">🔗 Invite Link</div>
+<div class="floatItem" id="fMpLeave">🚪 Leave Room</div>
+<div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
+<div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
 </div>
 </div>
 
@@ -989,23 +1026,12 @@ Explore the area
 </div>
 </div>
 <div class="floatMenuRow">
-<div class="floatMenu" id="multiplayerMenu">
-<button class="floatBtn multiplayer" id="multiplayerBtn" type="button" title="Multiplayer" aria-label="Multiplayer" data-mobile-label="Social"><span class="btnIcon">👥</span><span class="btnText">Multiplayer</span></button>
-<div class="floatItems">
-<div class="floatItem" id="fMpCreate">🆕 Create Room</div>
-<div class="floatItem" id="fMpJoin">🔑 Join Room</div>
-<div class="floatItem" id="fMpInvite">🔗 Invite Link</div>
-<div class="floatItem" id="fMpLeave">🚪 Leave Room</div>
-<div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
-<div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
-</div>
-</div>
 <div class="floatMenu" id="controlsMenu">
-<button class="floatBtn controls" id="gameControlsBtn" type="button" title="Controls" aria-label="Controls" data-mobile-label="Controls"><span class="btnIcon">⌨</span><span class="btnText">Controls</span></button>
-</div>
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open controls" aria-expanded="false" data-mobile-label="Controls"><span class="btnIcon">⚙️</span><span class="btnText">Driving Mode</span></button>
 </div>
 </div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
+</div>
 
 <div id="memoryComposer">
 <div class="memoryComposerTitle">Memory Marker</div>
@@ -1290,7 +1316,7 @@ Explore the area
 <section id="activityCreatorPanel" aria-label="Activity creator panel">
   <div class="activityCreatorTopBar">
     <div class="activityCreatorTitleWrap">
-      <div id="activityCreatorTitle">Activity Creator</div>
+      <div id="activityCreatorTitle">Activity Creator Beta</div>
       <div id="activityCreatorSubline">Place anchors directly in the 3D world for routes, zones, dock points, and collectibles.</div>
     </div>
     <div class="activityCreatorHeaderActions">
@@ -1507,11 +1533,11 @@ Explore the area
 <b>🚗 Driving Mode:</b><br>
 • Arrow Up/Down - Drive forward / reverse<br>
 • Arrow Left/Right - Steer left / right<br>
-• WASD, mouse, touch look pad, or right stick - Look around; chase view recenters automatically<br>
+• WASD - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
 • C - Camera view<br>
-• F - Cycle drive / walk / drone<br>
+• F - Cycle character / car / plane / drone<br>
 • M - Toggle map<br>
 • N - Next city<br>
 • B - Open / close Build with Blocks<br>
@@ -1520,7 +1546,7 @@ Explore the area
 <b>🚤 Boat Mode:</b><br>
 • Arrow Up/Down - Throttle / Reverse<br>
 • Arrow Left/Right - Steer<br>
-• WASD, mouse, touch look pad, or right stick - Look around<br>
+• WASD - Look around<br>
 • Space - Brake / Hold position<br>
 • G - Enter / exit boat travel<br>
 • C - Camera view<br>
@@ -1534,35 +1560,36 @@ Explore the area
 • Arrow Up/Down - Move forward / back<br>
 • Arrow Left/Right - Turn left / right<br>
 • WASD - Look around<br>
-• Mouse, touch look pad, or right stick - Look around<br>
 • E - Enter/exit building interior<br>
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
 • Shift - Run (2x speed)<br>
 • Right Click + Drag - Mouse look<br>
 • C - Camera view<br>
-• F - Cycle walk / drone / drive<br>
+• F - Cycle character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="droneControls" style="display:none">
 <b>🚁 Drone Mode:</b><br>
-• Arrow Up/Down - Fly forward / back<br>
-• Arrow Left/Right - Turn left / right<br>
-• WASD - Look around<br>
-• Mouse, touch look pad, or right stick - Look around<br>
-• Mouse - Look around<br>
+• Arrow Up/Down - Fly forward / back relative to the drone<br>
+• Arrow Left/Right - Turn the drone<br>
+• WASD - Look around independently<br>
+• Mouse - Look around independently<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
-• F - Cycle drone / plane / drive / walk<br>
+• F - Cycle character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="planeControls" style="display:none">
 <b>✈️ Plane Mode:</b><br>
 • Arrow Up/Down - Nose down / pull up (inverted)<br>
 • Arrow Left/Right - Bank or ground steer<br>
-• X/Z - Increase / reduce throttle<br>
-• Space - Wheel brake on the ground<br>
-• WASD, mouse, touch look pad, or right stick - Look around<br>
+• Double-tap Arrow Left/Right - Deliberate barrel roll while airborne<br>
+• Space/Shift - Increase / reduce throttle<br>
+• Full throttle - Up to about 188 MPH<br>
+• Hold pitch for loops; ordinary left/right banks into a coordinated turn<br>
+• Ctrl - Wheel brake on the ground<br>
+• WASD - Look around<br>
 • C - Chase / cockpit / overhead camera<br>
 • P - Enter / exit plane mode<br>
 </div>
@@ -1576,11 +1603,11 @@ Explore the area
 </div>
 <div id="oceanControls" style="display:none">
 <b>🌊 Submarine Mode:</b><br>
-• W/S - Forward / Reverse thrust<br>
-• A/D - Turn left / right<br>
+• Arrow Up/Down - Forward / Reverse thrust<br>
+• Arrow Left/Right - Turn left / right<br>
 • Space - Ascend<br>
 • Shift/Ctrl - Descend<br>
-• Arrow keys - Alternate steering controls<br>
+• WASD - Look around<br>
 • Explore the reef shelf and open deep ocean
 </div>
 </div></div>
@@ -1605,8 +1632,8 @@ Explore the area
 </div>
 </div>
 
-<!-- Authoritative multiplayer loads its SDK only when a configured room connects. -->
-<script type="module" src="js/app-shell-fragments.js?v=85"></script>
+<!-- Real Estate System -->
+<script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=340"></script>
+<script type="module" src="js/bootstrap.js?v=445"></script>
 </body></html>

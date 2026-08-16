@@ -1,24 +1,23 @@
-import { listenArtifacts } from "./artifacts.js?v=56";
+import { listenArtifacts } from "./artifacts.js?v=57";
 import {
   clearMySharedBlocks,
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
-} from "./blocks.js?v=64";
-import { listenChat } from "./chat.js?v=55";
-import { listenPlayers, startPresence } from "./presence.js?v=60";
+} from "./blocks.js?v=63";
+import { listenChat } from "./chat.js?v=56";
+import { listenPlayers, startPresence } from "./presence.js?v=61";
 import {
   deriveRoomDeterministicSeed,
   listenHomeBase,
   listenRoom
-} from "./rooms.js?v=66";
+} from "./rooms.js?v=67";
 import {
   listenRoomActivities,
   listenRoomActivityState
-} from "./room-activities.js?v=1";
-import { listenPaintClaims } from "./painttown.js?v=55";
+} from "./room-activities.js?v=2";
+import { listenPaintClaims } from "./painttown.js?v=56";
 import { recordRecentPlayers } from "./social.js?v=55";
-import { startAuthoritativeRoomSession } from './authoritative-session.js?v=7';
 
 export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, runtime }) {
   const {
@@ -33,7 +32,6 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     renderArtifacts,
     renderChat,
     renderHomeBase,
-    renderMmoPanel,
     renderPlayerList,
     renderRoomActivities,
     renderRoomMeta,
@@ -64,61 +62,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       origin: String(originLabel || "room")
     });
     upsertOwnedRoomLocal(room);
-    let playerRosterKey = '';
-    const authoritativeSession = await startAuthoritativeRoomSession({
-      room,
-      appCtx,
-      userUid: state.authUser?.uid,
-      readPoseSnapshot: helpers.readPoseSnapshot,
-      onPlayers(players, selfUid) {
-        state.players = players;
-        state.mmoSelfUid = String(selfUid || state.mmoSelfUid || '');
-        const nextRosterKey = JSON.stringify(players.map((player) => [
-          player.uid,
-          player.displayName,
-          player.role,
-          player.mode,
-          player.vehicleId,
-          player.connected,
-          player.health,
-          player.level
-        ]));
-        if (nextRosterKey !== playerRosterKey) {
-          playerRosterKey = nextRosterKey;
-          renderPlayerList();
-        }
-        renderMmoPanel();
-        ensureGhostManager();
-        state.ghostManager?.setVisible(state.ghostsEnabled);
-        state.ghostManager?.updateGhosts(players);
-      },
-      onProgression(profile, leaderboard, catalog) {
-        state.mmoProgression = profile;
-        state.mmoLeaderboard = Array.isArray(leaderboard) ? leaderboard : [];
-        state.mmoCatalog = catalog && typeof catalog === 'object' ? catalog : null;
-        renderMmoPanel();
-      },
-      onStatus(event) {
-        if (event.status === 'reconnecting') setStatus('Realtime room connection interrupted; reconnecting...', true);
-        void appCtx.recordProductEvent?.('room', {
-          action: event.status,
-          world_kind: room.world?.kind || 'earth'
-        });
-      },
-      onGameEvent(event) {
-        appCtx.onAuthoritativeGameEvent?.(event);
-        const eventType = String(event?.type || 'unknown');
-        const category = eventType.startsWith('mission.') || eventType.startsWith('progression.')
-          ? 'progression'
-          : 'room';
-        void appCtx.recordProductEvent?.(category, {
-          action: eventType,
-          world_kind: room.world?.kind || 'earth'
-        });
-      }
-    });
-    state.authoritativeSession = authoritativeSession;
-    if (!authoritativeSession && typeof appCtx.configureSharedBuildSync === "function") {
+    if (typeof appCtx.configureSharedBuildSync === "function") {
       appCtx.configureSharedBuildSync({
         enabled: true,
         roomId: room.id,
@@ -167,9 +111,11 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       renderRoomMeta();
       updateToggleStates();
       publishMapRoomsToContext();
+    }, {
+      onError: () => setStatus("Room connection interrupted. Retrying without discarding the session.", true)
     });
 
-    state.unsubPlayers = authoritativeSession ? null : listenPlayers(room.id, (players) => {
+    state.unsubPlayers = listenPlayers(room.id, (players) => {
       state.players = players;
       renderPlayerList();
       recordRecentPlayers(room.code, currentRoomName(), players).catch((err) => {
@@ -180,22 +126,30 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
         state.ghostManager.setVisible(state.ghostsEnabled);
         state.ghostManager.updateGhosts(players);
       }
+    }, {
+      onError: () => setStatus("Player presence is reconnecting; the room remains active.", true)
     });
 
     state.unsubChat = listenChat(room.id, (messages) => {
       state.messages = messages;
       renderChat();
+    }, {
+      onError: () => setStatus("Room chat is reconnecting; visible messages were kept.", true)
     });
 
     state.unsubArtifacts = listenArtifacts(room.id, (artifacts) => {
       state.artifacts = artifacts;
       renderArtifacts();
+    }, {
+      onError: () => setStatus("Shared artifacts are reconnecting; existing items were kept.", true)
     });
 
     state.unsubRoomActivities = listenRoomActivities(room.id, (activities) => {
       state.roomActivities = Array.isArray(activities) ? activities : [];
       renderRoomActivities();
       publishMapRoomsToContext();
+    }, {
+      onError: () => setStatus("Room activities are reconnecting; current games were kept.", true)
     });
 
     state.unsubRoomActivityState = listenRoomActivityState(room.id, async (activityState) => {
@@ -219,17 +173,23 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       } else if (typeof appCtx.stopSharedRoomActivityRuntime === "function") {
         appCtx.stopSharedRoomActivityRuntime({ source: "room_activity_stop" });
       }
+    }, {
+      onError: () => setStatus("The active room game is reconnecting without resetting progress.", true)
     });
 
-    state.unsubSharedBlocks = authoritativeSession ? null : listenSharedBlocks(room.id, (blocks) => {
+    state.unsubSharedBlocks = listenSharedBlocks(room.id, (blocks) => {
       if (typeof appCtx.setSharedBuildEntries === "function") {
         appCtx.setSharedBuildEntries(Array.isArray(blocks) ? blocks : []);
       }
+    }, {
+      onError: () => setStatus("Shared builds are reconnecting; existing blocks were kept.", true)
     });
 
     state.unsubHomeBase = listenHomeBase(room.id, (homeBase) => {
       state.homeBase = homeBase;
       renderHomeBase();
+    }, {
+      onError: () => setStatus("Home base data is reconnecting; the current marker was kept.", true)
     });
 
     state.unsubPaintClaims = listenPaintClaims(room.id, (claims) => {
@@ -239,9 +199,11 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
           claims: Array.isArray(claims) ? claims : []
         });
       }
+    }, {
+      onError: () => setStatus("Paint Town is reconnecting; visible paint was kept.", true)
     });
 
-    if (!authoritativeSession) startPresence(room.id, helpers.readPoseSnapshot);
+    startPresence(room.id, helpers.readPoseSnapshot);
     await syncRoomWorldContext(room, false, true);
 
     const invite = helpers.buildInviteLink(room.code);
@@ -251,12 +213,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       window.history.replaceState({}, "", url.toString());
     }
 
-    setStatus(`${authoritativeSession ? 'Authoritative realtime' : 'Legacy multiplayer'} connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
-    void appCtx.recordProductEvent?.('room', {
-      action: authoritativeSession ? 'authoritative_joined' : 'legacy_joined',
-      world_kind: room.world?.kind || 'earth',
-      visibility: room.visibility || 'private'
-    });
+    setStatus(`Connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
     publishMapRoomsToContext();
   }
 

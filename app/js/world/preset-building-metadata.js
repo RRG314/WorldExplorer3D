@@ -1,15 +1,46 @@
 const INDEX_URL = new URL('../../data/buildings/index.json', import.meta.url);
+const BUNDLED_BUILDING_SCHEMA_VERSION = 1;
 
 let indexPromise = null;
 const packPromises = new Map();
 
-function loadIndex() {
+async function fetchBundledJson(url, label, options = {}) {
+  const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
+  if (typeof fetchImpl !== 'function') throw new TypeError(`${label}: fetch unavailable`);
+  const response = await fetchImpl(url, { cache: 'default', signal: options.signal });
+  if (!response?.ok) throw new Error(`${label}: HTTP ${response?.status || 'unknown'}`);
+  return response.json();
+}
+
+function validateIndex(index) {
+  if (Number(index?.schemaVersion) !== BUNDLED_BUILDING_SCHEMA_VERSION) {
+    throw new Error('Preset building metadata index: unsupported schema');
+  }
+  if (!Array.isArray(index.packs)) throw new Error('Preset building metadata index: packs must be an array');
+  return index;
+}
+
+function validatePack(pack, expectedId) {
+  if (Number(pack?.schemaVersion) !== BUNDLED_BUILDING_SCHEMA_VERSION) {
+    throw new Error(`Preset building metadata ${expectedId}: unsupported schema`);
+  }
+  if (String(pack?.id || '') !== String(expectedId || '')) {
+    throw new Error(`Preset building metadata ${expectedId}: pack identity mismatch`);
+  }
+  if (!Array.isArray(pack.elements)) {
+    throw new Error(`Preset building metadata ${expectedId}: elements must be an array`);
+  }
+  return pack;
+}
+
+function loadIndex(options = {}) {
+  const fixtureFetch = typeof options.fetchImpl === 'function' && options.fetchImpl !== globalThis.fetch;
+  if (fixtureFetch) {
+    return fetchBundledJson(INDEX_URL, 'Preset building metadata index', options).then(validateIndex);
+  }
   if (!indexPromise) {
-    indexPromise = fetch(INDEX_URL, { cache: 'default' })
-      .then((response) => {
-        if (!response.ok) throw new Error(`Preset building metadata index: HTTP ${response.status}`);
-        return response.json();
-      })
+    indexPromise = fetchBundledJson(INDEX_URL, 'Preset building metadata index', options)
+      .then(validateIndex)
       .catch((error) => {
         indexPromise = null;
         throw error;
@@ -27,13 +58,22 @@ function locationMatches(pack, lat, lon) {
   return Math.hypot(lat - centerLat, (lon - centerLon) * lonScale) <= radius;
 }
 
-function loadPack(id) {
+function loadPack(id, options = {}) {
+  const fixtureFetch = typeof options.fetchImpl === 'function' && options.fetchImpl !== globalThis.fetch;
+  if (fixtureFetch) {
+    return fetchBundledJson(
+      new URL(`${encodeURIComponent(id)}.json`, INDEX_URL),
+      `Preset building metadata ${id}`,
+      options
+    ).then((pack) => validatePack(pack, id));
+  }
   if (packPromises.has(id)) return packPromises.get(id);
-  const promise = fetch(new URL(`${encodeURIComponent(id)}.json`, INDEX_URL), { cache: 'default' })
-    .then((response) => {
-      if (!response.ok) throw new Error(`Preset building metadata ${id}: HTTP ${response.status}`);
-      return response.json();
-    })
+  const promise = fetchBundledJson(
+    new URL(`${encodeURIComponent(id)}.json`, INDEX_URL),
+    `Preset building metadata ${id}`,
+    options
+  )
+    .then((pack) => validatePack(pack, id))
     .catch((error) => {
       packPromises.delete(id);
       throw error;
@@ -46,19 +86,22 @@ export async function fetchBundledBuildingMetadata(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  const index = await loadIndex();
+  const index = await loadIndex(options);
   const key = String(options.locationKey || '').trim().toLowerCase();
   const record = (index?.packs || []).find((pack) =>
     (key && key !== 'custom' && String(pack.id || '') === key) || locationMatches(pack, lat, lon)
   );
   if (!record?.id) return null;
 
-  const pack = await loadPack(String(record.id));
-  if (!Array.isArray(pack?.elements)) return null;
+  const pack = await loadPack(String(record.id), options);
   return {
     elements: pack.elements,
     _overpassSource: 'bundled-osm-building-metadata',
     _overpassEndpoint: String(pack.source || index.source || 'OpenStreetMap'),
-    _buildingMetadataPackId: String(pack.id || record.id)
+    _buildingMetadataPackId: String(pack.id || record.id),
+    _buildingMetadataSchemaVersion: BUNDLED_BUILDING_SCHEMA_VERSION,
+    _buildingMetadataLicense: String(pack.license || index.license || '')
   };
 }
+
+export { BUNDLED_BUILDING_SCHEMA_VERSION };

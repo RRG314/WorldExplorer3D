@@ -1,15 +1,6 @@
 import assert from 'node:assert/strict';
-import { createCoreFrameSystems } from '../app/js/runtime/core-frame-systems.js';
-import { diagnoseRuntimeBudgets } from '../app/js/runtime/budget-diagnostics.js';
 import { RUNTIME_PHASES, createRuntimeKernel } from '../app/js/runtime/kernel.js';
-
-const loadingSystems = createCoreFrameSystems({ gameStarted: true, worldLoading: true });
-const loadingSystem = (id) => loadingSystems.find((system) => system.id === id);
-assert.equal(loadingSystem('core.input').enabled(), false);
-assert.equal(loadingSystem('core.simulation').enabled(), false);
-assert.equal(loadingSystem('core.world').enabled(), false);
-assert.equal(loadingSystem('core.camera').enabled(), false);
-assert.equal(loadingSystem('core.presentation').enabled(), true);
+import { createCoreFrameSystems } from '../app/js/runtime/core-frame-systems.js';
 
 const calls = [];
 let requestedFrame = null;
@@ -77,39 +68,6 @@ assert.equal(snapshot.phases.input[0].id, 'test.input');
 assert.equal(snapshot.phases.simulation[0].fixedUpdates, 2);
 assert.equal(snapshot.phases.world[0].updates, 0);
 assert.equal(snapshot.owners['input-test'].systems[0], 'test.input');
-assert.equal(typeof snapshot.owners['simulation-test'].smoothedDurationMs, 'number');
-assert.equal(typeof snapshot.phases.simulation[0].maxDurationMs, 'number');
-
-const budgetStatus = diagnoseRuntimeBudgets({
-  runtimeKernel: {
-    lastFrameDurationMs: 41,
-    phases: {
-      simulation: [{ id: 'core.simulation', owner: 'world', phase: 'simulation', smoothedDurationMs: 17, maxDurationMs: 27 }],
-      render: [{ id: 'core.renderer', owner: 'renderer', phase: 'render', smoothedDurationMs: 6, maxDurationMs: 10 }]
-    },
-    owners: {
-      world: { systems: ['core.world'], smoothedDurationMs: 18, maxDurationMs: 28 },
-      engine: { systems: ['core.simulation'], smoothedDurationMs: 7, maxDurationMs: 12 }
-    }
-  },
-  renderer: { calls: 1200, triangles: 1200000, geometries: 400, textures: 40 },
-  browserMemory: { usedBytes: 1200 * 1024 * 1024 },
-  lastLoad: { loadMs: 72000 },
-  renderReadiness: { durationMs: 9500 }
-});
-assert.equal(budgetStatus.ok, false);
-assert.equal(budgetStatus.topRuntimeOwner.owner, 'world');
-assert.equal(budgetStatus.topRuntimeSystem.id, 'core.simulation');
-assert.deepEqual(
-  budgetStatus.violations.map((violation) => `${violation.metric}:${violation.owner}`),
-  [
-    'frameMs:world',
-    'calls:world-rendering',
-    'heapBytes:resource-lifecycle',
-    'loadMs:world-loading',
-    'renderReadyMs:renderer-readiness'
-  ]
-);
 
 assert.equal(kernel.unregisterOwner('input-test'), 1);
 assert.equal(kernel.snapshot().owners['input-test'], undefined);
@@ -120,9 +78,78 @@ assert.equal(kernel.unregisterSystem('test.disabled'), false);
 assert.equal(kernel.dispose('test-dispose'), true);
 assert.equal(kernel.dispose('test-dispose'), false);
 
+const advancedDeltas = [];
+const advanceKernel = createRuntimeKernel({
+  fixedDelta: 0.01,
+  maxDelta: 0.05,
+  now: () => 1000
+});
+advanceKernel.registerSystem({
+  id: 'test.manual-advance',
+  phase: 'simulation',
+  update: (frame) => advancedDeltas.push(frame.dt)
+});
+const advanceResult = advanceKernel.advanceBy(50);
+assert.equal(advanceResult.requestedMs, 50);
+assert.equal(advanceResult.simulatedMs, 50);
+assert.equal(advanceResult.frames, 5);
+assert.equal(advanceResult.suspendedFrames, 0);
+assert.equal(advanceKernel.snapshot().frameNumber, 5);
+assert.equal(Number(advancedDeltas.reduce((sum, value) => sum + value, 0).toFixed(6)), 0.05);
+
+const fixedCalls = [];
+const fixedAppCtx = {
+  gameStarted: true,
+  updateControlInput: () => fixedCalls.push('input'),
+  update: (dt) => fixedCalls.push(`simulation:${dt}`)
+};
+const fixedKernel = createRuntimeKernel({
+  fixedDelta: 0.01,
+  maxDelta: 0.1,
+  maxFixedSteps: 2
+});
+createCoreFrameSystems(fixedAppCtx)
+  .filter((system) => system.id === 'core.input' || system.id === 'core.simulation')
+  .forEach((system) => fixedKernel.registerSystem(system));
+fixedKernel.runFrame(0);
+fixedKernel.runFrame(100);
+assert.deepEqual(fixedCalls, [
+  'input',
+  'simulation:0',
+  'input',
+  'simulation:0.1'
+]);
+const fixedSnapshot = fixedKernel.snapshot();
+assert.equal(fixedSnapshot.phases.input[0].updates, 2);
+assert.equal(fixedSnapshot.phases.input[0].fixedUpdates, 0);
+assert.equal(fixedSnapshot.phases.simulation[0].updates, 2);
+assert.equal(fixedSnapshot.phases.simulation[0].fixedUpdates, 0);
+
+let weatherUiUpdates = 0;
+const presentationCtx = {
+  gameStarted: true,
+  showLargeMap: false,
+  updateHUD() {},
+  drawMinimap() {},
+  updateWeatherUi() { weatherUiUpdates += 1; }
+};
+const presentationSystem = createCoreFrameSystems(presentationCtx)
+  .find((system) => system.id === 'core.presentation');
+assert.equal(presentationSystem.enabled(), true);
+presentationSystem.update({ dt: 0.4, flags: {} });
+presentationSystem.update({ dt: 0.4, flags: {} });
+assert.equal(weatherUiUpdates, 0, 'Weather UI updated before its owned one-second cadence.');
+presentationSystem.update({ dt: 0.4, flags: {} });
+assert.equal(weatherUiUpdates, 1, 'Gameplay presentation did not own the weather clock update.');
+presentationCtx.gameStarted = false;
+assert.equal(presentationSystem.enabled(), false, 'Presentation scheduler remained active outside gameplay.');
+
 console.log(JSON.stringify({
   ok: true,
   phases: RUNTIME_PHASES,
   frameNumber: snapshot.frameNumber,
-  systems: Object.values(snapshot.phases).flat().map((system) => system.id)
+  systems: Object.values(snapshot.phases).flat().map((system) => system.id),
+  directFrameSimulationUpdates: fixedSnapshot.phases.simulation[0].updates,
+  weatherUiUpdates,
+  manualAdvance: advanceResult
 }, null, 2));

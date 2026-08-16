@@ -1,9 +1,6 @@
 import { operationalFeedService } from '../geospatial/operational-feeds.js?v=1';
 
-const SATELLITE_JS_URL = new URL(
-  '../../vendor/satellite-5.0.0/satellite.es.js',
-  import.meta.url
-).toString();
+const SATELLITE_JS_URL = 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/+esm';
 const EARTH_RADIUS_KM = 6378.137;
 const FALLBACK_ORBIT_EPOCH_MS = Date.UTC(2026, 2, 16, 0, 0, 0);
 

@@ -1,5 +1,6 @@
-import { setupEngineInputHandlers } from "./input-handlers.js?v=4";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=7";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=6";
+import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {
   recordStartupDiagnostic,
   showStartupDiagnostics,
@@ -205,20 +206,18 @@ function createRendererWithFallback() {
 
 function addSkyVisuals(appCtx, gpuTier) {
   appCtx.sunSphere = new THREE.Mesh(
-    new THREE.SphereGeometry(7, 16, 8),
+    new THREE.SphereGeometry(40, 16, 8),
     new THREE.MeshBasicMaterial({ color: 0xffdd00, fog: false })
   );
   appCtx.sunSphere.position.set(500, 800, 200);
   appCtx.scene.add(appCtx.sunSphere);
 
   const sunGlow = new THREE.Mesh(
-    new THREE.SphereGeometry(15, 12, 8),
+    new THREE.SphereGeometry(60, 12, 8),
     new THREE.MeshBasicMaterial({
       color: 0xffee88,
       transparent: true,
       opacity: 0.3,
-      depthWrite: false,
-      depthTest: true,
       fog: false
     })
   );
@@ -248,58 +247,59 @@ function addSkyVisuals(appCtx, gpuTier) {
   appCtx.scene.add(moonGlow);
   appCtx.moonSphere.userData.glow = moonGlow;
 
+  const cloudCanvas = document.createElement('canvas');
+  cloudCanvas.width = 128;
+  cloudCanvas.height = 128;
+  const cloudContext = cloudCanvas.getContext('2d');
+  const cloudGradient = cloudContext.createRadialGradient(64, 62, 5, 64, 64, 62);
+  cloudGradient.addColorStop(0, 'rgba(255,255,255,0.96)');
+  cloudGradient.addColorStop(0.46, 'rgba(255,255,255,0.82)');
+  cloudGradient.addColorStop(0.78, 'rgba(255,255,255,0.28)');
+  cloudGradient.addColorStop(1, 'rgba(255,255,255,0)');
+  cloudContext.fillStyle = cloudGradient;
+  cloudContext.fillRect(0, 0, 128, 128);
+  const cloudPixels = cloudContext.getImageData(0, 0, 128, 128);
+  for (let i = 3; i < cloudPixels.data.length; i += 4) {
+    if (cloudPixels.data[i] === 0) continue;
+    const dither = ((i * 17) % 9) - 4;
+    cloudPixels.data[i] = Math.max(0, Math.min(255, cloudPixels.data[i] + dither));
+  }
+  cloudContext.putImageData(cloudPixels, 0, 0);
+  const cloudTexture = new THREE.CanvasTexture(cloudCanvas);
+  cloudTexture.colorSpace = THREE.SRGBColorSpace;
+
   appCtx.cloudGroup = new THREE.Group();
-  const cloudMat = new THREE.MeshLambertMaterial({
+  const cloudMat = new THREE.PointsMaterial({
     color: 0xffffff,
+    map: cloudTexture,
     transparent: true,
-    opacity: 0.82
+    opacity: 0.72,
+    depthWrite: false,
+    alphaTest: 0.015,
+    size: gpuTier === 'low' ? 110 : 135,
+    sizeAttenuation: true,
+    fog: true
   });
 
-  const cloudCount = gpuTier === 'low' ? 8 : 15;
+  const cloudCount = gpuTier === 'low' ? 28 : 52;
+  const cloudPositions = new Float32Array(cloudCount * 3);
   for (let i = 0; i < cloudCount; i++) {
-    const cloud = new THREE.Group();
-    const numPuffs = 2 + Math.floor(Math.random() * 2);
-    for (let j = 0; j < numPuffs; j++) {
-      const size = 15 + Math.random() * 12;
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(size, 4, 3), cloudMat);
-      sphere.position.set(
-        (Math.random() - 0.5) * 35,
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 35
-      );
-      cloud.add(sphere);
-    }
-    cloud.position.set(
-      (Math.random() - 0.5) * 4000,
-      300 + Math.random() * 200,
-      (Math.random() - 0.5) * 4000
-    );
-    appCtx.cloudGroup.add(cloud);
+    const cluster = Math.floor(i / 3);
+    const clusterAngle = cluster * 2.399963229728653;
+    const clusterRadius = 520 + (cluster % 9) * 230;
+    cloudPositions[i * 3] = Math.cos(clusterAngle) * clusterRadius + (i % 3 - 1) * 72;
+    cloudPositions[i * 3 + 1] = 320 + (cluster % 5) * 38 + (i % 3) * 9;
+    cloudPositions[i * 3 + 2] = Math.sin(clusterAngle) * clusterRadius + ((i * 37) % 3 - 1) * 68;
   }
-
-  const largeClouds = gpuTier === 'low' ? 1 : 3;
-  for (let i = 0; i < largeClouds; i++) {
-    const largeCloud = new THREE.Group();
-    const numPuffs = 3 + Math.floor(Math.random() * 2);
-    for (let j = 0; j < numPuffs; j++) {
-      const size = 30 + Math.random() * 30;
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(size, 4, 3), cloudMat);
-      sphere.position.set(
-        (Math.random() - 0.5) * 80,
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 80
-      );
-      largeCloud.add(sphere);
-    }
-    largeCloud.position.set(
-      (Math.random() - 0.5) * 5000,
-      350 + Math.random() * 150,
-      (Math.random() - 0.5) * 5000
-    );
-    appCtx.cloudGroup.add(largeCloud);
-  }
+  const cloudGeometry = new THREE.BufferGeometry();
+  cloudGeometry.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
+  const cloudField = new THREE.Points(cloudGeometry, cloudMat);
+  cloudField.frustumCulled = false;
+  cloudField.renderOrder = -10;
+  appCtx.cloudGroup.add(cloudField);
 
   appCtx.cloudGroup.userData.sharedMaterial = cloudMat;
+  appCtx.cloudGroup.userData.sharedTexture = cloudTexture;
   appCtx.cloudGroup.userData.weatherDeck = null;
   appCtx.cloudGroup.userData.weatherDeckMaterial = null;
   appCtx.scene.add(appCtx.cloudGroup);
@@ -314,7 +314,28 @@ function addSkyVisuals(appCtx, gpuTier) {
   ground.position.y = -0.1;
   ground.receiveShadow = true;
   ground.userData.isGroundPlane = true;
+  ground.userData.isLoadingPlaceholder = true;
   appCtx.groundFallbackMesh = ground;
+  appCtx.showGroundFallbackPlaceholder = () => {
+    const parent = appCtx.earthSceneRoot || appCtx.scene;
+    if (!ground.parent && parent) parent.add(ground);
+    ground.visible = true;
+    return true;
+  };
+  appCtx.suppressGroundFallbackPlaceholder = () => {
+    ground.visible = false;
+    ground.parent?.remove?.(ground);
+    return true;
+  };
+  appCtx.retireGroundFallbackPlaceholder = () => {
+    const hasReadyTerrain = (appCtx.terrainGroup?.children || []).some((mesh) =>
+      mesh?.userData?.isTerrainMesh && mesh.userData.pendingTerrainTile === false
+    );
+    if (!hasReadyTerrain) return false;
+    ground.visible = false;
+    ground.parent?.remove?.(ground);
+    return true;
+  };
   appCtx.scene.add(ground);
 }
 
@@ -495,7 +516,18 @@ export function initEngineRuntime(ctx) {
   } catch {
     console.warn('Tone mapping not supported');
   }
-  if (appCtx.renderer.shadowMap) appCtx.renderer.shadowMap.enabled = false;
+  try {
+    appCtx.renderer.shadowMap.enabled = true;
+    appCtx.renderer.shadowMap.type = state.currentGpuTier === 'low' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+  } catch {
+    console.warn('Shadows not supported, trying basic');
+    try {
+      appCtx.renderer.shadowMap.enabled = true;
+      appCtx.renderer.shadowMap.type = THREE.BasicShadowMap;
+    } catch {
+      console.warn('Shadows not supported at all');
+    }
+  }
 
   document.body.prepend(appCtx.renderer.domElement);
 
@@ -541,6 +573,10 @@ export function initEngineRuntime(ctx) {
   appCtx.sun.position.set(100, 150, 50);
   appCtx.scene.add(appCtx.sun);
   appCtx.scene.add(appCtx.sun.target);
+  applyDirectionalShadowPolicy(appCtx, {
+    gpuTier: state.currentGpuTier,
+    quality: state.renderQualityLevel
+  });
 
   appCtx.fillLight = new THREE.DirectionalLight(0x9db4ff, 0.3);
   appCtx.fillLight.position.set(-50, 50, -50);

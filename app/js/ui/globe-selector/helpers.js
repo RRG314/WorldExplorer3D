@@ -1,3 +1,5 @@
+import { isPolarCryosphereLocation } from '../../earth-core/world-surface-domain.js?v=2';
+
 export const FAVORITE_STORAGE_KEY = "worldExplorer3D.globeSelector.savedFavorites";
 export const MAX_SAVED_FAVORITES = 10;
 export const RECENT_STORAGE_KEY = "worldExplorer3D.globeSelector.recentPlaces";
@@ -293,11 +295,34 @@ export function parseReverseAddress(payload = {}) {
   const display =
     parts.join(", ") ||
     String(payload?.display_name || "").split(",").slice(0, 4).map((v) => String(v || "").trim()).filter(Boolean).join(", ");
+  // Only structured feature fields may classify a selected coordinate as
+  // water. Names and display strings are labels, not point-in-water evidence
+  // (for example, administrative regions and towns can contain "water").
+  const structuredWaterText = [
+    payload?.category,
+    payload?.type,
+    payload?.addresstype,
+    addr.ocean,
+    addr.sea,
+    addr.water,
+    addr.bay,
+    addr.strait,
+    addr.lake,
+    addr.reservoir,
+    addr.river,
+    addr.canal
+  ].filter(Boolean).join(' ');
+  const waterKind = /\b(lake|reservoir|pond|loch)\b/i.test(structuredWaterText) ? 'lake' :
+    /\b(harbour|harbor|marina|port)\b/i.test(structuredWaterText) ? 'harbor' :
+    /\b(river|canal|channel)\b/i.test(structuredWaterText) ? 'channel' :
+    /\b(bay|gulf|strait|sound|lagoon|estuary)\b/i.test(structuredWaterText) ? 'coastal' :
+    /\b(ocean|sea|open water)\b/i.test(structuredWaterText) ? 'open_ocean' : null;
 
   return {
     display,
     queryLabel: city || county || region || country || "",
-    details: { city, county, region, country }
+    details: { city, county, region, country, waterKind },
+    waterKind
   };
 }
 
@@ -311,6 +336,82 @@ async function fetchJsonWithTimeout(url, timeoutMs = 6000) {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function fetchGebcoElevationMeters(lat, lon, timeoutMs = 6500) {
+  const halfSpan = 0.01;
+  const params = new URLSearchParams({
+    SERVICE: 'WMS',
+    VERSION: '1.1.1',
+    REQUEST: 'GetFeatureInfo',
+    LAYERS: 'GEBCO_LATEST_2',
+    QUERY_LAYERS: 'GEBCO_LATEST_2',
+    STYLES: '',
+    SRS: 'EPSG:4326',
+    BBOX: `${lon - halfSpan},${lat - halfSpan},${lon + halfSpan},${lat + halfSpan}`,
+    WIDTH: '64',
+    HEIGHT: '64',
+    FORMAT: 'image/png',
+    INFO_FORMAT: 'text/plain',
+    X: '32',
+    Y: '32'
+  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`https://wms.gebco.net/mapserv?${params.toString()}`, {
+      cache: 'force-cache',
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`GEBCO WMS HTTP ${response.status}`);
+    const payload = await response.text();
+    const match = payload.match(/value_list\s*=\s*'(-?\d+(?:\.\d+)?)/i);
+    const elevation = match ? Number(match[1]) : NaN;
+    return Number.isFinite(elevation) ? elevation : null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function resolveCoordinateSurfaceEvidence(lat, lon, reversePayload = null) {
+  if (isPolarCryosphereLocation({ lat, lon })) {
+    return Object.freeze({
+      kind: 'cryosphere',
+      verified: true,
+      source: 'polar-coordinate-policy',
+      elevationMeters: null
+    });
+  }
+  const parsedKind = parseReverseAddress(reversePayload || {}).waterKind;
+  try {
+    const elevation = await fetchGebcoElevationMeters(lat, lon);
+    if (Number.isFinite(elevation)) {
+      return Object.freeze({
+        kind: elevation <= -5 ? 'open_ocean' : 'land',
+        verified: true,
+        source: 'gebco-elevation-sample',
+        elevationMeters: elevation
+      });
+    }
+  } catch {
+    // The structured reverse result is a conservative fallback when the
+    // elevation service is unavailable. Unknown coordinates default to land
+    // later so an outage cannot create synthetic ocean.
+  }
+  if (parsedKind === 'open_ocean') {
+    return Object.freeze({
+      kind: 'open_ocean',
+      verified: true,
+      source: 'structured-reverse-water-feature',
+      elevationMeters: null
+    });
+  }
+  return null;
+}
+
+export async function resolveCoordinateWaterKind(lat, lon, reversePayload = null) {
+  const evidence = await resolveCoordinateSurfaceEvidence(lat, lon, reversePayload);
+  return evidence?.kind === 'open_ocean' ? 'open_ocean' : null;
 }
 
 export async function fetchReversePayload(lat, lon) {
@@ -362,7 +463,9 @@ export function syncLegacyCustomSelection(appCtx, selection) {
     lat: selection.lat,
     lon: selection.lon,
     name: selection.name || appCtx.customLoc?.name || 'Custom Location',
-    arrivalMode: selection.arrivalMode || 'auto'
+    arrivalMode: selection.arrivalMode || 'auto',
+    waterKind: selection.waterKind || null,
+    surfaceEvidence: selection.surfaceEvidence || null
   }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 

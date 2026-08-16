@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
 import net from 'node:net';
+import { serveMutableSourceManifest } from './source-preview-manifest.mjs';
 
 export async function mkdirp(dir) {
   await fs.mkdir(dir, { recursive: true });
@@ -21,7 +22,6 @@ async function serveStaticRoot(rootDir, host, port) {
   const mime = new Map([
     ['.html', 'text/html; charset=utf-8'],
     ['.js', 'text/javascript; charset=utf-8'],
-    ['.mjs', 'text/javascript; charset=utf-8'],
     ['.css', 'text/css; charset=utf-8'],
     ['.json', 'application/json; charset=utf-8'],
     ['.png', 'image/png'],
@@ -36,6 +36,11 @@ async function serveStaticRoot(rootDir, host, port) {
   const server = http.createServer(async (req, res) => {
     try {
       const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+      if (await serveMutableSourceManifest({
+        pathname: reqUrl.pathname,
+        rootDir,
+        response: res
+      })) return;
       let relPath = decodeURIComponent(reqUrl.pathname || '/');
       if (relPath === '/') relPath = '/index.html';
       const resolved = path.resolve(path.join(rootDir, relPath));
@@ -57,10 +62,7 @@ async function serveStaticRoot(rootDir, host, port) {
         return;
       }
 
-      const requestExtension = path.extname(reqUrl.pathname).toLowerCase();
-      const resolvedExtension = path.extname(filePath).toLowerCase();
-      const contentType = mime.get(requestExtension) || mime.get(resolvedExtension) ||
-        (filePath.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'application/octet-stream');
+      const contentType = mime.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(await fs.readFile(filePath));
     } catch (err) {

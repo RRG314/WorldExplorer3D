@@ -1,21 +1,36 @@
-import { createRoadNameResolver } from './road-labels.js';
-import Pbf from '../../vendor/vector-tile/pbf-3.2.1.mjs';
-import { VectorTile } from '../../vendor/vector-tile/mapbox-vector-tile-1.3.1.mjs';
+import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
+import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
+import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
+const SHORTBREAD_TILE_CONCURRENCY = 8;
+// Roads and far buildings request the same z14 metropolitan tiles concurrently.
+// Retain one complete London-sized set so the in-flight/cache owner can prevent
+// a second provider pass instead of evicting early tiles during publication.
+const SHORTBREAD_DECODED_TILE_CACHE_LIMIT = 544;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
-const inFlightTileRequests = new Map();
-const resolvedTileCache = new Map();
-const MAX_RESOLVED_TILES = 96;
 
-function rememberResolvedTile(cacheKey, tile) {
-  resolvedTileCache.delete(cacheKey);
-  resolvedTileCache.set(cacheKey, tile);
-  while (resolvedTileCache.size > MAX_RESOLVED_TILES) {
-    resolvedTileCache.delete(resolvedTileCache.keys().next().value);
-  }
+let vectorTileLibPromise = null;
+const decodedTileCache = new Map();
+const pendingTileRequests = new Map();
+
+export function getShortbreadRuntimeCacheStats() {
+  return Object.freeze({
+    decodedTileCount: decodedTileCache.size,
+    pendingTileCount: pendingTileRequests.size,
+    decodedTileLimit: SHORTBREAD_DECODED_TILE_CACHE_LIMIT
+  });
+}
+
+export function releaseShortbreadRuntimeCache() {
+  const releasedTileCount = decodedTileCache.size;
+  decodedTileCache.clear();
+  return Object.freeze({
+    releasedTileCount,
+    pendingTileCount: pendingTileRequests.size
+  });
 }
 
 function tileTemplate() {
@@ -33,7 +48,18 @@ function tileUrl(z, x, y) {
 }
 
 export async function getVectorTileLib() {
-  return { Pbf, VectorTile };
+  if (vectorTileLibPromise) return vectorTileLibPromise;
+  vectorTileLibPromise = Promise.all([
+    import('https://cdn.jsdelivr.net/npm/pbf@3.2.1/+esm'),
+    import('https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm')
+  ]).then(([pbfMod, vtMod]) => ({
+    Pbf: pbfMod.default || pbfMod.Pbf,
+    VectorTile: vtMod.VectorTile
+  })).catch((err) => {
+    vectorTileLibPromise = null;
+    throw err;
+  });
+  return vectorTileLibPromise;
 }
 
 function latLonToTileFloat(lat, lon, zoom) {
@@ -59,23 +85,45 @@ export function vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, zoom) {
   };
 }
 
+function shortbreadAbortError(z, x, y) {
+  const error = new Error(`Shortbread tile ${z}/${x}/${y} aborted`);
+  error.name = 'AbortError';
+  return error;
+}
+
+function waitForSharedTileRequest(entry, signal, z, x, y) {
+  const consumer = {};
+  entry.consumers.add(consumer);
+  let rejectAbort = null;
+  const abortPromise = new Promise((resolve, reject) => {
+    rejectAbort = reject;
+  });
+  const onAbort = () => rejectAbort?.(shortbreadAbortError(z, x, y));
+  if (signal?.aborted) onAbort();
+  else signal?.addEventListener?.('abort', onAbort, { once: true });
+  return Promise.race([entry.promise, abortPromise]).finally(() => {
+    signal?.removeEventListener?.('abort', onAbort);
+    entry.consumers.delete(consumer);
+    if (!entry.settled && entry.consumers.size === 0) entry.controller.abort();
+  });
+}
+
 export async function fetchShortbreadTile(z, x, y, options = {}) {
-  const cacheKey = `${z}/${x}/${y}`;
-  const cached = resolvedTileCache.get(cacheKey);
+  const cacheKey = `${tileTemplate()}:${z}/${x}/${y}`;
+  const cached = decodedTileCache.get(cacheKey);
   if (cached) {
-    rememberResolvedTile(cacheKey, cached);
+    decodedTileCache.delete(cacheKey);
+    decodedTileCache.set(cacheKey, cached);
     return cached;
   }
-  const pending = inFlightTileRequests.get(cacheKey);
-  if (pending) return pending;
-  const request = (async () => {
+  const externalSignal = options.signal || null;
+  if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
+  let entry = pendingTileRequests.get(cacheKey);
+  if (!entry) {
     const controller = new AbortController();
-    const externalSignal = options.signal || null;
-    const relayAbort = () => controller.abort();
-    if (externalSignal?.aborted) controller.abort();
-    else externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
+    entry = { controller, consumers: new Set(), promise: null, settled: false };
     const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
-    try {
+    entry.promise = (async () => {
       const { Pbf, VectorTile } = await getVectorTileLib();
       const response = await fetch(tileUrl(z, x, y), {
         signal: controller.signal,
@@ -83,50 +131,68 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
       });
       if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
       const buffer = await response.arrayBuffer();
-      return {
-        tile: new VectorTile(new Pbf(new Uint8Array(buffer))),
-        source: 'shortbread-vector',
-        release: 'live',
-        z,
-        x,
-        y
-      };
-    } finally {
+      const record = { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
+      decodedTileCache.set(cacheKey, record);
+      while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
+        decodedTileCache.delete(decodedTileCache.keys().next().value);
+      }
+      return record;
+    })().finally(() => {
       clearTimeout(timeoutId);
-      externalSignal?.removeEventListener?.('abort', relayAbort);
-    }
-  })();
-  inFlightTileRequests.set(cacheKey, request);
-  try {
-    const tile = await request;
-    rememberResolvedTile(cacheKey, tile);
-    return tile;
-  } finally {
-    if (inFlightTileRequests.get(cacheKey) === request) inFlightTileRequests.delete(cacheKey);
+      entry.settled = true;
+      if (pendingTileRequests.get(cacheKey) === entry) pendingTileRequests.delete(cacheKey);
+    });
+    pendingTileRequests.set(cacheKey, entry);
   }
+  return waitForSharedTileRequest(entry, externalSignal, z, x, y);
 }
 
 function roadTags(properties = {}) {
   const kind = String(properties.kind || '').toLowerCase();
   if (!kind) return null;
+  const raw = (key) => properties[key] == null ? '' : String(properties[key]);
+  const booleanTag = (key) => properties[key] === true
+    ? 'yes'
+    : properties[key] === false || properties[key] == null
+      ? ''
+      : String(properties[key]);
   if (properties.rail === true) {
-    return { railway: kind, tunnel: properties.tunnel ? 'yes' : '', bridge: properties.bridge ? 'yes' : '' };
+    return {
+      railway: kind,
+      tunnel: booleanTag('tunnel'),
+      bridge: booleanTag('bridge'),
+      layer: raw('layer'),
+      _sourceCompleteness: 'generalized'
+    };
   }
   const highway = properties.link === true && !kind.endsWith('_link') ? `${kind}_link` : kind;
   return {
     highway,
-    bridge: properties.bridge ? 'yes' : '',
-    tunnel: properties.tunnel ? 'yes' : '',
-    layer: properties.bridge ? '1' : properties.tunnel ? '-1' : '',
+    bridge: booleanTag('bridge'),
+    tunnel: booleanTag('tunnel'),
+    covered: booleanTag('covered'),
+    layer: raw('layer'),
+    level: raw('level'),
+    location: raw('location'),
+    cutting: booleanTag('cutting'),
+    embankment: booleanTag('embankment'),
+    incline: raw('incline'),
+    lanes: raw('lanes'),
+    placement: raw('placement'),
     oneway: properties.oneway ? (properties.oneway_reverse ? '-1' : 'yes') : '',
-    service: properties.service || '',
-    surface: properties.surface || '',
-    width: properties.width || '',
-    footway: properties.footway || '',
-    sidewalk: properties.sidewalk || '',
-    tracktype: properties.tracktype || '',
-    bicycle: properties.bicycle || '',
-    horse: properties.horse || ''
+    service: raw('service'),
+    surface: raw('surface'),
+    width: raw('width'),
+    access: raw('access'),
+    maxheight: raw('maxheight'),
+    destination: raw('destination'),
+    junction: raw('junction'),
+    footway: raw('footway'),
+    sidewalk: raw('sidewalk'),
+    tracktype: raw('tracktype'),
+    bicycle: raw('bicycle'),
+    horse: raw('horse'),
+    _sourceCompleteness: 'generalized'
   };
 }
 
@@ -231,7 +297,7 @@ function partIntersectsBounds(part, bounds) {
     minLat <= bounds.maxLat && maxLat >= bounds.minLat;
 }
 
-function convertTilesToElements(tiles, layerNames, bounds = null) {
+async function convertTilesToElements(tiles, layerNames, bounds = null) {
   const elements = [];
   const nodesByCoordinate = new Map();
   const featureSignatures = new Set();
@@ -256,6 +322,7 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
     return id;
   };
 
+  let sliceStartedAt = globalThis.performance?.now?.() ?? Date.now();
   for (const { tile, x, y, z } of tiles) {
     const resolveRoadName = layerNames.includes('streets')
       ? createRoadNameResolver({ tile, x, y, z }, projectLine)
@@ -300,109 +367,100 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
             tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
           });
         }
+        const now = globalThis.performance?.now?.() ?? Date.now();
+        if (now - sliceStartedAt >= 24) {
+          await yieldToMainThread();
+          sliceStartedAt = globalThis.performance?.now?.() ?? Date.now();
+        }
       }
     }
   }
   return elements;
 }
 
-function convertTilesToCompactBuildingWays(tiles, bounds = null) {
-  const ways = [];
-  const featureSignatures = new Set();
-  let nextWayId = -1;
-  for (const { tile, x, y, z } of tiles) {
-    const layer = tile.layers.buildings;
-    if (!layer || !Number.isFinite(layer.length)) continue;
-    for (let index = 0; index < layer.length; index++) {
-      const feature = layer.feature(index);
-      if (!feature || typeof feature.toGeoJSON !== 'function') continue;
-      const geojson = feature.toGeoJSON(x, y, z);
-      const tags = featureTags('buildings', geojson.properties || {});
-      if (!tags) continue;
-      const parts = geometryParts(geojson.geometry);
-      for (let partIndex = 0; partIndex < parts.length; partIndex++) {
-        const part = parts[partIndex];
-        if (!Array.isArray(part.coords) || part.coords.length < 4 || !partIntersectsBounds(part, bounds)) continue;
-        const resolvedTags = { ...tags, _geometrySource: 'shortbread-vector' };
-        const signature = geometrySignature('buildings', part, resolvedTags);
-        if (featureSignatures.has(signature)) continue;
-        featureSignatures.add(signature);
-        const coordinateCount = part.coords.length > 1 &&
-          Number(part.coords[0]?.[0]) === Number(part.coords.at(-1)?.[0]) &&
-          Number(part.coords[0]?.[1]) === Number(part.coords.at(-1)?.[1])
-          ? part.coords.length - 1
-          : part.coords.length;
-        const coordinates = new Float64Array(coordinateCount * 2);
-        let writeIndex = 0;
-        for (let coordinateIndex = 0; coordinateIndex < coordinateCount; coordinateIndex++) {
-          const lon = Number(part.coords[coordinateIndex]?.[0]);
-          const lat = Number(part.coords[coordinateIndex]?.[1]);
-          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-          coordinates[writeIndex++] = lon;
-          coordinates[writeIndex++] = lat;
-        }
-        if (writeIndex < 6) continue;
-        ways.push({
-          type: 'way',
-          id: nextWayId--,
-          nodes: [],
-          _coordinates: writeIndex === coordinates.length ? coordinates : coordinates.slice(0, writeIndex),
-          tags: {
-            ...resolvedTags,
-            _sourceFeatureId: ['shortbread', 'buildings', z, x, y, feature.id ?? index, partIndex].join(':')
-          }
-        });
-      }
-    }
+function normalizeCoverageBounds(lat, lon, radius, explicitBounds = null, maxRadius = 0.04) {
+  if (explicitBounds) {
+    const bounds = {
+      minLat: Number(explicitBounds.minLat ?? explicitBounds.latS),
+      minLon: Number(explicitBounds.minLon ?? explicitBounds.lonW),
+      maxLat: Number(explicitBounds.maxLat ?? explicitBounds.latN),
+      maxLon: Number(explicitBounds.maxLon ?? explicitBounds.lonE)
+    };
+    if (Object.values(bounds).every(Number.isFinite) &&
+        bounds.minLat < bounds.maxLat && bounds.minLon < bounds.maxLon) return bounds;
+    throw new Error('Shortbread coverage bounds are invalid.');
   }
-  return ways;
-}
-
-async function fetchTileCoverage(lat, lon, radius, zoom) {
-  const safeRadius = Math.max(0.004, Math.min(0.04, Number(radius) || 0.012));
-  const bounds = {
+  const safeRadius = Math.max(0.004, Math.min(maxRadius, Number(radius) || 0.012));
+  return {
     minLat: lat - safeRadius,
     minLon: lon - safeRadius,
     maxLat: lat + safeRadius,
     maxLon: lon + safeRadius
   };
+}
+
+export function shortbreadTileCountForBounds(bounds, zoom = SHORTBREAD_ZOOM) {
   const range = vectorTileRangeForBounds(
-    lat - safeRadius,
-    lon - safeRadius,
-    lat + safeRadius,
-    lon + safeRadius,
+    bounds.minLat ?? bounds.latS,
+    bounds.minLon ?? bounds.lonW,
+    bounds.maxLat ?? bounds.latN,
+    bounds.maxLon ?? bounds.lonE,
+    zoom
+  );
+  return (range.xMax - range.xMin + 1) * (range.yMax - range.yMin + 1);
+}
+
+export function selectShortbreadZoomForBounds(bounds, options = {}) {
+  const minimumZoom = Math.max(8, Math.floor(Number(options.minimumZoom) || 10));
+  const maxTiles = Math.max(1, Math.floor(Number(options.maxTiles) || 81));
+  let zoom = Math.max(minimumZoom, Math.floor(Number(options.preferredZoom) || SHORTBREAD_ZOOM));
+  while (zoom > minimumZoom && shortbreadTileCountForBounds(bounds, zoom) > maxTiles) zoom -= 1;
+  return zoom;
+}
+
+async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
+  const bounds = normalizeCoverageBounds(
+    lat,
+    lon,
+    radius,
+    options.bounds,
+    Number(options.maxRadius) || 0.04
+  );
+  const range = vectorTileRangeForBounds(
+    bounds.minLat,
+    bounds.minLon,
+    bounds.maxLat,
+    bounds.maxLon,
     zoom
   );
   const coordinates = [];
   for (let x = range.xMin; x <= range.xMax; x++) {
-    for (let y = range.yMin; y <= range.yMax; y++) coordinates.push({ x, y });
+    for (let y = range.yMin; y <= range.yMax; y++) {
+      coordinates.push({ x, y });
+    }
   }
-  let attempts = 1;
-  let settled = await Promise.allSettled(
-    coordinates.map(({ x, y }) => fetchShortbreadTile(zoom, x, y))
+  const fetchTile = typeof options.shortbreadFetchTile === 'function'
+    ? options.shortbreadFetchTile
+    : fetchShortbreadTile;
+  const { settled, metrics } = await runBoundedProviderBatch(
+    coordinates,
+    ({ x, y }, _index, signal) => fetchTile(zoom, x, y, { signal }),
+    {
+      signal: options.signal,
+      concurrency: options.concurrency || SHORTBREAD_TILE_CONCURRENCY,
+      abortMessage: 'Shortbread coverage aborted'
+    }
   );
-  const failedCoordinates = coordinates.filter((_, index) => settled[index]?.status === 'rejected');
-  if (failedCoordinates.length > 0) {
-    attempts += 1;
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
-    const retried = await Promise.allSettled(
-      failedCoordinates.map(({ x, y }) => fetchShortbreadTile(zoom, x, y))
-    );
-    let retryIndex = 0;
-    settled = settled.map((entry) => entry.status === 'fulfilled' ? entry : retried[retryIndex++]);
-  }
-  const tiles = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
+  const tiles = settled
+    .filter((entry) => entry.status === 'fulfilled' && entry.value)
+    .map((entry) => entry.value);
+  const successfulTiles = settled.filter((entry) => entry.status === 'fulfilled').length;
   if (tiles.length === 0) {
+    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics };
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Shortbread coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  return {
-    tiles,
-    requestedTiles: coordinates.length,
-    failedTiles: coordinates.length - tiles.length,
-    attempts,
-    bounds
-  };
+  return { tiles, requestedTiles: coordinates.length, bounds, metrics };
 }
 
 export async function fetchShortbreadWorldData(options = {}) {
@@ -410,26 +468,46 @@ export async function fetchShortbreadWorldData(options = {}) {
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Shortbread location is invalid.');
   const includeBuildings = options.includeBuildings !== false;
-  const { tiles, requestedTiles, failedTiles, attempts, bounds } = await fetchTileCoverage(
+  const coverageBounds = options.bounds || null;
+  const zoom = Number.isFinite(Number(options.zoom))
+    ? Math.floor(Number(options.zoom))
+    : coverageBounds
+      ? selectShortbreadZoomForBounds(coverageBounds, options)
+      : SHORTBREAD_ZOOM;
+  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
-    SHORTBREAD_ZOOM
+    zoom,
+    options
   );
-  const layerNames = ['streets', 'land', 'sites', 'street_polygons'];
-  if (includeBuildings) layerNames.push('buildings');
-  const elements = convertTilesToElements(tiles, layerNames, bounds);
+  const layerNames = Array.isArray(options.layerNames)
+    ? options.layerNames.slice()
+    : ['streets', 'land', 'sites', 'street_polygons'];
+  if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
+  const elements = await convertTilesToElements(tiles, layerNames, bounds);
+  if (metrics.rejected > 0) {
+    for (const element of elements) {
+      if (element?.type === 'way' && element?.tags?.highway) {
+        element.tags._sourceTruncated = 'yes';
+      }
+    }
+  }
   return {
     elements,
     _overpassSource: 'shortbread-vector',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
     _shortbreadTiles: {
-      loaded: tiles.length,
+      loaded: metrics.fulfilled,
+      decoded: tiles.length,
       requested: requestedTiles,
-      failed: failedTiles,
-      attempts,
-      zoom: SHORTBREAD_ZOOM
+      failed: metrics.rejected,
+      maxInFlight: metrics.maxInFlight,
+      zoom,
+      bounds,
+      status: elements.length > 0 ? 'available' : 'authoritative-empty',
+      capabilities: { transport: 'generalized', landuse: 'generalized', buildings: includeBuildings ? 'generalized' : 'not-requested' }
     }
   };
 }
@@ -437,25 +515,37 @@ export async function fetchShortbreadWorldData(options = {}) {
 export async function fetchShortbreadBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
-  const { tiles, requestedTiles, failedTiles, attempts, bounds } = await fetchTileCoverage(
-    lat,
-    lon,
-    options.radius,
-    SHORTBREAD_ZOOM
+  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
+    lat, lon, options.radius, SHORTBREAD_ZOOM, options
   );
+  const elements = await convertTilesToElements(tiles, ['buildings'], bounds);
+  const coverageComplete = metrics.fulfilled === requestedTiles;
+  elements.forEach((element) => {
+    if (element?.type === 'way' && element.tags) {
+      element.tags._geometryCoverageComplete = coverageComplete ? 'yes' : 'no';
+    }
+  });
   return {
-    elements: convertTilesToCompactBuildingWays(tiles, bounds),
+    elements,
     _overpassSource: 'shortbread-vector-buildings',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
     _shortbreadTiles: {
-      loaded: tiles.length,
+      loaded: metrics.fulfilled,
+      decoded: tiles.length,
       requested: requestedTiles,
-      failed: failedTiles,
-      attempts,
-      zoom: SHORTBREAD_ZOOM
+      failed: metrics.rejected,
+      maxInFlight: metrics.maxInFlight,
+      zoom: SHORTBREAD_ZOOM,
+      coverageComplete,
+      status: elements.some((element) => element.type === 'way') ? 'available' : 'authoritative-empty',
+      capabilities: { buildings: 'generalized' }
     }
   };
 }
 
-export { SHORTBREAD_ZOOM };
+export {
+  SHORTBREAD_DECODED_TILE_CACHE_LIMIT,
+  SHORTBREAD_TILE_CONCURRENCY,
+  SHORTBREAD_ZOOM
+};

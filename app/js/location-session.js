@@ -1,4 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
+import { normalizeWorldSurfaceEvidence } from './earth-core/world-surface-domain.js?v=2';
 
 let loadedSelection = null;
 
@@ -6,13 +7,17 @@ function cloneCustomLocation(location) {
   const lat = Number(location?.lat);
   const lon = Number(location?.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const surfaceEvidence = normalizeWorldSurfaceEvidence(location?.surfaceEvidence);
+  const waterKind = surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
   return {
     lat: Math.max(-90, Math.min(90, lat)),
     lon: ((lon + 180) % 360 + 360) % 360 - 180,
     name: String(location?.name || 'Custom Location').trim().slice(0, 80) || 'Custom Location',
-    arrivalMode: location?.arrivalMode === 'walk' || location?.arrivalMode === 'boat'
+    arrivalMode: location?.arrivalMode === 'boat' || location?.arrivalMode === 'walk'
       ? location.arrivalMode
-      : 'auto'
+      : 'auto',
+    waterKind,
+    surfaceEvidence
   };
 }
 

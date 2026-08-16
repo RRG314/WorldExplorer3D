@@ -1,4 +1,4 @@
-import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
+import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
 
 export function createWorldRoadLoaderSupport({
   addBuildingToSpatialIndex,
@@ -54,6 +54,7 @@ export function createWorldRoadLoaderSupport({
       overtureBuildingId: options.overtureBuildingId || '',
       overtureParentBuildingId: options.overtureParentBuildingId || '',
       metadataSourceId: options.metadataSourceId || '',
+      buildingProvenance: options.buildingProvenance || null,
       minLevels: Number.isFinite(options.minLevels) ? options.minLevels : null,
       baseY,
       minY: baseY,

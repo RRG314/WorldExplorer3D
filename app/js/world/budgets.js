@@ -63,16 +63,6 @@ export function getRuntimeDynamicBudget(mode = runtime.getPerfModeValue()) {
 }
 
 export function wayCenterLatLon(way, nodeMap) {
-  if (way?._coordinates?.length >= 2) {
-    let latSum = 0;
-    let lonSum = 0;
-    const sampleCount = Math.min(Math.floor(way._coordinates.length / 2), 8);
-    for (let i = 0; i < sampleCount; i++) {
-      lonSum += way._coordinates[i * 2];
-      latSum += way._coordinates[i * 2 + 1];
-    }
-    return sampleCount > 0 ? { lat: latSum / sampleCount, lon: lonSum / sampleCount } : null;
-  }
   if (!way?.nodes?.length) return null;
 
   let latSum = 0;
@@ -96,6 +86,49 @@ export function featureTileKeyForLatLon(lat, lon, tileDegrees = FEATURE_TILE_DEG
   const cx = Math.floor(lat / tileDegrees);
   const cz = Math.floor(lon / tileDegrees);
   return `${cx},${cz}`;
+}
+
+function selectWaysAcrossArea(ways, nodeMap, limit, compareFn, options = {}) {
+  if (ways.length <= limit) return ways;
+  const coreRatio = Math.max(0.1, Math.min(0.9, Number(options.coreRatio) || 0.5));
+  const ordered = ways.slice().sort((a, b) => {
+    const priority = compareFn ? compareFn(a, b) : 0;
+    return priority || runtime.nodeDistanceSq(nodeMap[a?.nodes?.[0]]) -
+      runtime.nodeDistanceSq(nodeMap[b?.nodes?.[0]]);
+  });
+  const coreKeep = Math.max(1, Math.min(limit, Math.floor(limit * coreRatio)));
+  const selected = ordered.slice(0, coreKeep);
+  const selectedSet = new Set(selected);
+  const spreadDegrees = Math.max(
+    FEATURE_TILE_DEGREES,
+    Number(options.tileDegrees || FEATURE_TILE_DEGREES) * 4
+  );
+  const buckets = new Map();
+  for (const way of ordered) {
+    if (selectedSet.has(way)) continue;
+    const center = wayCenterLatLon(way, nodeMap);
+    if (!center) continue;
+    const key = featureTileKeyForLatLon(center.lat, center.lon, spreadDegrees);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(way);
+  }
+  const active = [...buckets.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, bucket]) => bucket);
+  let bucketIndex = 0;
+  while (active.length > 0 && selected.length < limit) {
+    const bucket = active[bucketIndex];
+    const way = bucket.shift();
+    if (way) selected.push(way);
+    if (bucket.length === 0) {
+      active.splice(bucketIndex, 1);
+      if (active.length === 0) break;
+      bucketIndex %= active.length;
+    } else {
+      bucketIndex = (bucketIndex + 1) % active.length;
+    }
+  }
+  return selected.slice(0, limit);
 }
 
 export function rdtDepthForFeatureTile(tileKey, tileDegrees = FEATURE_TILE_DEGREES) {
@@ -173,6 +206,12 @@ export function limitWaysByTileBudget(ways, nodeMap, options = {}) {
   });
 
   if (selected.length <= globalCap) return selected;
+  if (spreadAcrossArea) {
+    return selectWaysAcrossArea(selected, nodeMap, globalCap, compareFn, {
+      coreRatio,
+      tileDegrees
+    });
+  }
   return runtime.limitWaysByDistance(
     selected,
     nodeMap,
@@ -280,7 +319,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: clampNumber(1.0 * radiusScale, 0.90, 1.02, 1),
       poiRadiusScale: clampNumber(1.0 * radiusScale, 0.88, 1.02, 1),
       maxRoadWays: scaledInt(20000, scale, 3200),
-      maxBuildingWays: scaledInt(18000, scale, 7000),
+      maxBuildingWays: scaledInt(26000, scale, 7000),
       maxLanduseWays: scaledInt(15000, scale, 2200),
       maxPoiNodes: scaledInt(8000, scale, 1200),
       tileBudgetCfg: {
@@ -305,7 +344,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.96,
       poiRadiusScale: 0.88,
       maxRoadWays: 3400,
-      maxBuildingWays: 14000,
+      maxBuildingWays: 26000,
       maxLanduseWays: 4200,
       maxPoiNodes: 1600,
       roadsPerTile: 155,
@@ -324,7 +363,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.94,
       poiRadiusScale: 0.86,
       maxRoadWays: 3900,
-      maxBuildingWays: 14000,
+      maxBuildingWays: 24000,
       maxLanduseWays: 5200,
       maxPoiNodes: 1900,
       roadsPerTile: 165,
@@ -343,7 +382,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.93,
       poiRadiusScale: 0.86,
       maxRoadWays: 4300,
-      maxBuildingWays: 15000,
+      maxBuildingWays: 22000,
       maxLanduseWays: 6200,
       maxPoiNodes: 2200,
       roadsPerTile: 185,
@@ -361,7 +400,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.95,
       poiRadiusScale: 0.90,
       maxRoadWays: 5600,
-      maxBuildingWays: 16000,
+      maxBuildingWays: 24000,
       maxLanduseWays: 8500,
       maxPoiNodes: 2800,
       roadsPerTile: 220,

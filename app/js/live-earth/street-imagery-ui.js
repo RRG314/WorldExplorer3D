@@ -1,4 +1,4 @@
-import { getDataSource } from '../geospatial/data-contract.js?v=5';
+import { getDataSource } from '../geospatial/data-contract.js?v=3';
 
 function selectedStreetImage(state) {
   return state.streetImageryItems.find((item) => item.id === state.selectedStreetImageId) || state.streetImageryItems[0] || null;

@@ -1,6 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clamp } from './dynamics.js?v=1';
-import { normalizeWaterKind, waterKindLabel } from '../world/water-body-contract.js?v=2';
+import { normalizeWaterKind, waterKindLabel } from '../world/water-body-contract.js?v=3';
+import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
 
 const BOAT_ENTRY_OFFSET = 9;
 const BOAT_MAX_CANDIDATE_DISTANCE = 58;
@@ -91,7 +92,7 @@ function polygonStats(points) {
 
 function classifyWaterArea(area) {
   const stats = area?._boatStats || polygonStats(area?.pts || []);
-  if (!area) return null;
+  if (!area || area.navigable !== true) return null;
   area._boatStats = stats;
   if (!(stats.area >= BOAT_AREA_MIN_AREA || stats.span >= BOAT_AREA_MIN_SPAN)) return null;
   const declaredKind = normalizeWaterKind(area.waterKind || area.kind);
@@ -155,8 +156,8 @@ function nearestPointOnPolyline(px, pz, pts) {
 
 function isPointInsideWaterAreaFootprint(area, x, z, edgeBuffer = 0) {
   const pts = Array.isArray(area?.pts) ? area.pts : [];
-  if (pts.length < 3 || typeof appCtx.pointInPolygon !== 'function') return false;
-  if (!appCtx.pointInPolygon(x, z, pts)) return false;
+  if (area?.navigable !== true || pts.length < 3) return false;
+  if (!pointInWaterBody(area, x, z)) return false;
   const buffer = Math.max(0, Number(edgeBuffer) || 0);
   if (buffer <= 0) return true;
   const edge = nearestPointOnPolygon(x, z, pts);
@@ -243,7 +244,7 @@ function pointInsideBoatCandidate(candidate, x, z, edgeBuffer = 0) {
     return nearest.dist <= Math.max(0.8, halfWidth - buffer);
   }
   const pts = Array.isArray(candidate.source?.pts) ? candidate.source.pts : [];
-  const inside = typeof appCtx.pointInPolygon === 'function' ? appCtx.pointInPolygon(x, z, pts) : false;
+  const inside = pointInWaterBody(candidate.source, x, z);
   if (!inside) return false;
   if (buffer <= 0) return true;
   const edge = nearestPointOnPolygon(x, z, pts);

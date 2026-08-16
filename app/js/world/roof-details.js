@@ -1,3 +1,4 @@
+import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   appendGeometryWithTransform,
   buildMergedGeometry
@@ -7,14 +8,12 @@ let pointInPolygonFn = () => false;
 let distanceToPolygonEdgeXZFn = () => 0;
 let signedPolygonAreaXZFn = () => 0;
 let pickRoofColorFn = () => 0x6c7686;
-let rand01FromIntFn = () => 0.5;
 
 export function initRoofDetailSupport(options = {}) {
   if (typeof options.pointInPolygon === 'function') pointInPolygonFn = options.pointInPolygon;
   if (typeof options.distanceToPolygonEdgeXZ === 'function') distanceToPolygonEdgeXZFn = options.distanceToPolygonEdgeXZ;
   if (typeof options.signedPolygonAreaXZ === 'function') signedPolygonAreaXZFn = options.signedPolygonAreaXZ;
   if (typeof options.pickRoofColor === 'function') pickRoofColorFn = options.pickRoofColor;
-  if (typeof options.rand01FromInt === 'function') rand01FromIntFn = options.rand01FromInt;
 }
 
 export function createRoofDetailMesh(pts, height, baseElevation, bSeed, buildingType = 'yes', lodTier = 'near') {
@@ -36,7 +35,7 @@ export function createRoofDetailMesh(pts, height, baseElevation, bSeed, building
   const flatRoofType = ['apartments', 'commercial', 'office', 'industrial', 'warehouse', 'retail', 'supermarket', 'hospital', 'school'].includes(buildingType);
   const flatRoofLikely = flatRoofType || height >= 18;
   const detailGate = flatRoofType ? 0.0 : 0.64;
-  if (!flatRoofLikely || rand01FromIntFn(bSeed ^ 0x5f356495) < detailGate) return null;
+  if (!flatRoofLikely || appCtx.rand01FromInt(bSeed ^ 0x5f356495) < detailGate) return null;
   if (area < 90 || minSpan < 7 || height < 10) return null;
 
   const placementMargin = Math.min(1.8, Math.max(0.8, minSpan * 0.09));
@@ -76,8 +75,8 @@ export function createRoofDetailMesh(pts, height, baseElevation, bSeed, building
 
     for (let attempt = 0; attempt < 16; attempt++) {
       const attemptSeed = seed ^ ((attempt + 1) * 0x27d4eb2d);
-      const x = minXPos + rand01FromIntFn(attemptSeed ^ 0x9e3779b9) * (maxXPos - minXPos);
-      const z = minZPos + rand01FromIntFn(attemptSeed ^ 0x85ebca6b) * (maxZPos - minZPos);
+      const x = minXPos + appCtx.rand01FromInt(attemptSeed ^ 0x9e3779b9) * (maxXPos - minXPos);
+      const z = minZPos + appCtx.rand01FromInt(attemptSeed ^ 0x85ebca6b) * (maxZPos - minZPos);
       if (!pointInPolygonFn(x, z, pts)) continue;
       if (distanceToPolygonEdgeXZFn(x, z, pts) < minEdgeClearance) continue;
       let overlaps = false;
@@ -95,9 +94,9 @@ export function createRoofDetailMesh(pts, height, baseElevation, bSeed, building
 
   for (let i = 0; i < unitCount; i++) {
     const seed = bSeed ^ ((i + 1) * 0x45d9f3b);
-    const unitW = 1.1 + rand01FromIntFn(seed ^ 0x27d4eb2f) * Math.min(2.4, roofW * 0.14);
-    const unitD = 0.95 + rand01FromIntFn(seed ^ 0x165667b1) * Math.min(2.0, roofD * 0.14);
-    const unitH = 0.6 + rand01FromIntFn(seed ^ 0xd3a2646c) * 0.95;
+    const unitW = 1.1 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * Math.min(2.4, roofW * 0.14);
+    const unitD = 0.95 + appCtx.rand01FromInt(seed ^ 0x165667b1) * Math.min(2.0, roofD * 0.14);
+    const unitH = 0.6 + appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 0.95;
     const unitPos = tryPlaceUnit(seed, unitW, unitD);
     if (!unitPos) continue;
     const plinthH = Math.min(0.16, Math.max(0.08, unitH * 0.18));

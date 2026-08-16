@@ -1,5 +1,4 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { clearWindowTextureCache } from "./engine/procedural-textures.js?v=2";
 import {
   applyRenderQuality as applyEngineRenderQuality,
   canUseSsao as engineCanUseSsao,
@@ -13,15 +12,16 @@ import {
   setSsaoEnabled as engineSetSsaoEnabled,
   setupPostProcessingPipeline as setupEnginePostProcessingPipeline,
   tryEnablePostProcessing as tryEnableEnginePostProcessing
-} from "./engine/quality.js?v=2";
-import { updateShadowAnchor } from "./engine/shadow-policy.js?v=1";
+} from "./engine/quality.js?v=1";
 import {
   createBuildingGroundPatch as createBuildingGroundPatchRuntime,
+  ensureEnginePbrTextures as ensureEnginePbrTexturesRuntime,
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=16";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=10";
+} from "./engine/materials-runtime.js?v=21";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=12";
+import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
 const RENDER_QUALITY_LOW = 'low';
 const RENDER_QUALITY_MED = 'med';
@@ -33,8 +33,6 @@ const engineState = {
   asphaltTex: null,
   asphaltNormal: null,
   asphaltRoughness: null,
-  buildingNormalMap: null,
-  buildingRoughnessMap: null,
   currentGpuTier: 'high',
   renderQualityLevel: RENDER_QUALITY_MED,
   hdrEnvMap: null,
@@ -42,7 +40,6 @@ const engineState = {
   hdrLoadRequested: false,
   carPaintMaterial: null,
   ssaoEnabled: false,
-  shadowPolicy: null,
   grassDiffuse: null,
   grassNormal: null,
   grassRoughness: null,
@@ -66,7 +63,9 @@ const engineState = {
     soil: false,
     rock: false,
     snow: false
-  }
+  },
+  pbrTextureLoadStarted: false,
+  textureMaxAnisotropy: 1
 };
 
 function readStorage(key) {
@@ -107,23 +106,7 @@ function getRenderQualityLevel() {
   return engineState.renderQualityLevel;
 }
 
-const CFG = {
-  maxSpd: 120, offMax: 60, accel: 12, boostAccel: 25, brake: 150, friction: 25, offFriction: 120,
-  boostMax: 140, boostDur: 2.5,
-  brakeForce: 4.0,
-  gripRoad: 0.96,
-  gripOff: 0.70,
-  gripBrake: 0.48,
-  gripDrift: 0.3,
-  driftRec: 3.8,
-  turnLow: 1.8,
-  turnHigh: 0.8,
-  turnMin: 30,
-  roadForce: 0.93,
-  roadPushback: 0.3,
-  maxOffDist: 15,
-  cpRadius: 25, trialTime: 120, policeSpd: 140, policeAccel: 60, policeDist: 800
-};
+const CFG = ROAD_CAR_CONFIG;
 
 Object.assign(appCtx, { CFG });
 
@@ -207,6 +190,10 @@ function initEngineTextures(renderer) {
   return initEngineTexturesRuntime(buildEngineModuleContext(), renderer);
 }
 
+function ensureEnginePbrTextures() {
+  return ensureEnginePbrTexturesRuntime(buildEngineModuleContext());
+}
+
 function createBuildingGroundPatch(pts, avgElevation, options = {}) {
   return createBuildingGroundPatchRuntime(buildEngineModuleContext(), pts, avgElevation, options);
 }
@@ -219,23 +206,12 @@ function init() {
   return initEngineRuntime(buildEngineModuleContext());
 }
 
-function updateShadowPolicyFrame() {
-  const focus = appCtx.carMesh?.visible
-    ? appCtx.carMesh.position
-    : appCtx.camera?.position;
-  return updateShadowAnchor({
-    sun: appCtx.sun,
-    focus,
-    policy: engineState.shadowPolicy
-  });
-}
-
 syncTextureGlobals();
 
 Object.assign(appCtx, {
   canUseSsao,
-  clearWindowTextureCache,
   createBuildingGroundPatch,
+  ensureEnginePbrTextures,
   getHighQualityEnabled,
   getBuildingMaterial,
   getRenderQualityLevel,
@@ -246,14 +222,13 @@ Object.assign(appCtx, {
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,
-  updateShadowPolicyFrame,
   tryEnablePostProcessing
 });
 
 export {
   canUseSsao,
-  clearWindowTextureCache,
   createBuildingGroundPatch,
+  ensureEnginePbrTextures,
   getHighQualityEnabled,
   getBuildingMaterial,
   getRenderQualityLevel,
@@ -263,6 +238,5 @@ export {
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,
-  updateShadowPolicyFrame,
   tryEnablePostProcessing
 };

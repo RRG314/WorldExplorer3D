@@ -6,8 +6,8 @@ import {
   listActivityTemplateGroups,
   listAnchorTypesForTemplate,
   sanitizeText
-} from './schema.js?v=3';
-import { listStoredActivities, saveCreatorActivityDraft } from '../activity-discovery/library.js?v=4';
+} from './schema.js?v=2';
+import { listStoredActivities, saveCreatorActivityDraft } from '../activity-discovery/library.js?v=2';
 import { getCurrentCreatorIdentity, syncOwnCreatorActivityStats } from '../../../js/creator-profile-api.js?v=1';
 
 function inspectorHtml(ctx, anchor) {
@@ -121,7 +121,7 @@ function creatorGuideConfig(ctx) {
   const stepMap = {
     intro: {
       title: `Start with ${template.label}`,
-      body: 'Pick a template for the kind of game you want to make. Then place a start point in the world. Saved activities stay in your creator library on this browser so you can inspect and replay what you build.',
+      body: 'Pick a template for the kind of game you want to make. Then place a start point in the world. This beta creator saves to your local creator library so you can inspect and replay what you build.',
       actionLabel: "Let's Build"
     },
     test: {
@@ -486,8 +486,8 @@ export function renderUi(ctx) {
   document.body.classList.toggle('activity-creator-open', ctx.state.active);
   document.body.classList.toggle('activity-creator-testing', ctx.state.active && ctx.state.testing.active === true);
 
-  if (refs.title) refs.title.textContent = 'Activity Creator';
-  if (refs.subline) refs.subline.textContent = `${template.label} • ${template.description}`;
+  if (refs.title) refs.title.textContent = 'Activity Creator Beta';
+  if (refs.subline) refs.subline.textContent = `${template.label} • ${template.description} • Beta local creator demo`;
   if (refs.status) {
     refs.status.textContent = ctx.state.status.text;
     refs.status.dataset.tone = ctx.state.status.tone;

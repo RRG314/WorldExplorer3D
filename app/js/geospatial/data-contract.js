@@ -92,7 +92,7 @@ const DATA_SOURCES = Object.freeze({
     licenseId: 'OpenSky terms',
     licenseUrl: 'https://opensky-network.org/about/terms-of-use',
     homepage: 'https://opensky-network.org/',
-    description: 'Optional aircraft state vectors for operators with a written OpenSky operational-use agreement.'
+    description: 'Current aircraft state vectors derived from ADS-B and Mode S observations.'
   }),
   'adsb-lol': Object.freeze({
     id: 'adsb-lol',
@@ -102,7 +102,7 @@ const DATA_SOURCES = Object.freeze({
     licenseId: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
     homepage: 'https://www.adsb.lol/',
-    description: 'Default current community-fed ADS-B observations for the open-source distribution.'
+    description: 'Current community-fed ADS-B observations used when OpenSky is unavailable.'
   }),
   'transport-reference': Object.freeze({
     id: 'transport-reference',
@@ -113,10 +113,10 @@ const DATA_SOURCES = Object.freeze({
     homepage: 'https://worldexplorer3d.io/',
     description: 'Modeled route context that is not a live ADS-B or AIS observation.'
   }),
-  osm: Object.freeze({
-    id: 'osm',
-    label: 'OpenStreetMap',
-    operator: 'OpenStreetMap contributors',
+  'osm-overture': Object.freeze({
+    id: 'osm-overture',
+    label: 'OpenStreetMap and Overture Maps',
+    operator: 'Open mapping contributors',
     truthType: 'authoritative',
     licenseId: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',

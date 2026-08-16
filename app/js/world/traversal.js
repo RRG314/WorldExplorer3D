@@ -1,7 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 const TRAVERSAL_NODE_GRID = 2.5;
-const TRAVERSAL_SEGMENT_CELL_SIZE = 220;
 const TRAVERSAL_MAX_ANCHOR_DISTANCE = {
   drive: 260,
   walk: 180
@@ -49,7 +48,7 @@ function walkSurfacePenalty(feature) {
 }
 
 export function surfaceDisplayName(feature) {
-  if (!feature) return 'Off Road';
+  if (!feature) return 'Terrain';
   const explicitName = String(feature.name || '').trim();
   if (explicitName) return explicitName;
 
@@ -108,27 +107,11 @@ function buildTraversalGraph(mode = 'walk') {
   const nodes = [];
   const adjacency = [];
   const segments = [];
-  const segmentCells = new Map();
   const nodesByKey = new Map();
   const featureKinds = {};
 
-  const indexSegment = (segment) => {
-    const minCellX = Math.floor(Math.min(segment.p1.x, segment.p2.x) / TRAVERSAL_SEGMENT_CELL_SIZE);
-    const maxCellX = Math.floor(Math.max(segment.p1.x, segment.p2.x) / TRAVERSAL_SEGMENT_CELL_SIZE);
-    const minCellZ = Math.floor(Math.min(segment.p1.z, segment.p2.z) / TRAVERSAL_SEGMENT_CELL_SIZE);
-    const maxCellZ = Math.floor(Math.max(segment.p1.z, segment.p2.z) / TRAVERSAL_SEGMENT_CELL_SIZE);
-    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
-        const key = `${cellX},${cellZ}`;
-        const bucket = segmentCells.get(key) || [];
-        bucket.push(segment);
-        segmentCells.set(key, bucket);
-      }
-    }
-  };
-
-  const upsertNode = (point, feature) => {
-    const key = traversalNodeKey(point.x, point.z, feature);
+  const upsertNode = (point, feature, explicitKey = '') => {
+    const key = explicitKey || traversalNodeKey(point.x, point.z, feature);
     const existingId = nodesByKey.get(key);
     if (existingId !== undefined) {
       const existing = nodes[existingId];
@@ -153,76 +136,138 @@ function buildTraversalGraph(mode = 'walk') {
     return nodeId;
   };
 
+  const compiledPathPoints = (feature) => {
+    const points = feature.pts;
+    const stations = Array.isArray(feature?.transportGraphRef?.stations)
+      ? feature.transportGraphRef.stations
+      : [];
+    const distances = new Float64Array(points.length);
+    for (let index = 1; index < points.length; index += 1) {
+      distances[index] = distances[index - 1] +
+        Math.hypot(points[index].x - points[index - 1].x, points[index].z - points[index - 1].z);
+    }
+    if (stations.length === 0) {
+      return points.map((point, index) => ({
+        point,
+        distanceAlong: distances[index],
+        segmentIndex: Math.min(points.length - 2, index),
+        segmentT: index === points.length - 1 ? 1 : 0,
+        graphNodeId: ''
+      }));
+    }
+    const samples = points.map((point, index) => ({
+      point,
+      distanceAlong: distances[index],
+      segmentIndex: Math.min(points.length - 2, index),
+      segmentT: index === points.length - 1 ? 1 : 0,
+      graphNodeId: ''
+    }));
+    for (const station of stations) {
+      samples.push({
+        point: station.point,
+        distanceAlong: Number(station.distanceAlong),
+        segmentIndex: Number(station.segmentIndex),
+        segmentT: Number(station.segmentT),
+        graphNodeId: `transport:${station.nodeId}`
+      });
+    }
+    samples.sort((left, right) => left.distanceAlong - right.distanceAlong);
+    const compact = [];
+    for (const sample of samples) {
+      const previous = compact[compact.length - 1];
+      if (previous && Math.abs(previous.distanceAlong - sample.distanceAlong) <= 0.02) {
+        if (sample.graphNodeId) {
+          previous.point = sample.point;
+          previous.segmentIndex = sample.segmentIndex;
+          previous.segmentT = sample.segmentT;
+          previous.graphNodeId = sample.graphNodeId;
+        }
+        continue;
+      }
+      compact.push(sample);
+    }
+    return compact;
+  };
+  const sourceInterval = (feature, startDistance, endDistance) => {
+    const midpoint = (startDistance + endDistance) * 0.5;
+    let walked = 0;
+    for (let index = 0; index < feature.pts.length - 1; index += 1) {
+      const start = feature.pts[index];
+      const end = feature.pts[index + 1];
+      const length = Math.hypot(end.x - start.x, end.z - start.z);
+      if (midpoint <= walked + length + 1e-6 || index === feature.pts.length - 2) {
+        return {
+          segmentIndex: index,
+          startT: Math.max(0, Math.min(1, (startDistance - walked) / Math.max(1e-6, length))),
+          endT: Math.max(0, Math.min(1, (endDistance - walked) / Math.max(1e-6, length)))
+        };
+      }
+      walked += length;
+    }
+    return { segmentIndex: 0, startT: 0, endT: 1 };
+  };
+
   for (let f = 0; f < features.length; f++) {
     const feature = features[f];
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
 
     const kind = traversalFeatureKind(feature);
     featureKinds[kind] = (featureKinds[kind] || 0) + 1;
-    const nodeIds = feature.pts.map((point) => upsertNode(point, feature));
+    const pathPoints = compiledPathPoints(feature);
+    const nodeIds = pathPoints.map((sample) =>
+      upsertNode(sample.point, feature, sample.graphNodeId)
+    );
     const segmentPenalty = mode === 'drive' ? 1 : walkSurfacePenalty(feature);
+    const direction = mode === 'drive'
+      ? String(feature?.transportGraphRef?.direction || 'both')
+      : 'both';
 
-    for (let i = 0; i < feature.pts.length - 1; i++) {
+    for (let i = 0; i < pathPoints.length - 1; i++) {
       const fromId = nodeIds[i];
       const toId = nodeIds[i + 1];
       if (fromId === toId) continue;
 
-      const p1 = feature.pts[i];
-      const p2 = feature.pts[i + 1];
+      const p1 = pathPoints[i].point;
+      const p2 = pathPoints[i + 1].point;
       const length = Math.hypot(p2.x - p1.x, p2.z - p1.z);
       if (!(length > 0.05)) continue;
+      const source = sourceInterval(
+        feature,
+        pathPoints[i].distanceAlong,
+        pathPoints[i + 1].distanceAlong
+      );
 
       const weight = length * segmentPenalty;
-      adjacency[fromId].push({ to: toId, weight });
-      adjacency[toId].push({ to: fromId, weight });
-      const segment = {
+      if (direction !== 'reverse') adjacency[fromId].push({ to: toId, weight });
+      if (direction !== 'forward') adjacency[toId].push({ to: fromId, weight });
+      segments.push({
         feature,
-        segIndex: i,
+        direction,
+        segIndex: source.segmentIndex,
+        sourceTStart: source.startT,
+        sourceTEnd: source.endT,
         fromId,
         toId,
         p1,
         p2,
         length,
         penalty: segmentPenalty
-      };
-      segments.push(segment);
-      indexSegment(segment);
+      });
     }
   }
 
   return {
     mode,
+    authority: appCtx.transportNetworkModel?.authority || 'legacy_traversal_graph',
+    transportGraphId: appCtx.transportNetworkModel?.id || null,
     nodes: nodes.map((node) => ({ x: node.x, z: node.z })),
     adjacency,
     segments,
-    segmentCells,
     featureKinds,
     featureCount: features.length,
     nodeCount: nodes.length,
     segmentCount: segments.length
   };
-}
-
-function nearbyTraversalSegments(graph, x, z, radius) {
-  if (!(graph?.segmentCells instanceof Map) || graph.segmentCells.size === 0) return graph?.segments || [];
-  const minCellX = Math.floor((x - radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
-  const maxCellX = Math.floor((x + radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
-  const minCellZ = Math.floor((z - radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
-  const maxCellZ = Math.floor((z + radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
-  const segments = [];
-  const seen = new Set();
-  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-    for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
-      const bucket = graph.segmentCells.get(`${cellX},${cellZ}`) || [];
-      for (let i = 0; i < bucket.length; i += 1) {
-        const segment = bucket[i];
-        if (seen.has(segment)) continue;
-        seen.add(segment);
-        segments.push(segment);
-      }
-    }
-  }
-  return segments;
 }
 
 export function buildTraversalNetworks() {
@@ -285,39 +330,54 @@ function projectPointToSegment(x, z, p1, p2) {
 }
 
 export function findNearestTraversalFeature(x, z, options = {}) {
+  return findNearestTraversalFeatures(x, z, options)[0] || null;
+}
+
+function findNearestTraversalFeatures(x, z, options = {}) {
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
+  const excludeRoads = options.excludeRoads === true;
   const graph = traversalGraphForMode(mode);
+  const segments = Array.isArray(graph?.segments) ? graph.segments : [];
   const maxDistance = Number.isFinite(options.maxDistance) ?
     Math.max(4, options.maxDistance) :
     TRAVERSAL_MAX_ANCHOR_DISTANCE[mode];
-  const segments = nearbyTraversalSegments(graph, x, z, maxDistance);
+  const maximumCandidates = Math.max(1, Math.min(8, Number(options.maximumCandidates) || 4));
 
-  let best = null;
+  const candidates = [];
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
+    if (excludeRoads && traversalFeatureKind(segment.feature) === 'road') continue;
     const projected = projectPointToSegment(x, z, segment.p1, segment.p2);
     if (!Number.isFinite(projected.dist) || projected.dist > maxDistance) continue;
     const weighted = projected.dist * (mode === 'drive' ? 1 : Math.max(0.85, segment.penalty));
-    if (!best || weighted < best.weightedDist) {
-      best = {
-        mode,
-        feature: segment.feature,
-        dist: projected.dist,
-        weightedDist: weighted,
-        pt: { x: projected.x, z: projected.z },
-        t: projected.t,
-        segIndex: segment.segIndex,
-        fromId: segment.fromId,
-        toId: segment.toId,
-        p1: segment.p1,
-        p2: segment.p2,
-        length: segment.length,
-        penalty: segment.penalty
-      };
-    }
+    candidates.push({
+      mode,
+      feature: segment.feature,
+      direction: segment.direction || 'both',
+      dist: projected.dist,
+      weightedDist: weighted,
+      pt: { x: projected.x, z: projected.z },
+      t: segment.sourceTStart +
+        (segment.sourceTEnd - segment.sourceTStart) * projected.t,
+      segIndex: segment.segIndex,
+      fromId: segment.fromId,
+      toId: segment.toId,
+      p1: segment.p1,
+      p2: segment.p2,
+      length: segment.length,
+      penalty: segment.penalty
+    });
   }
 
-  return best;
+  candidates.sort((left, right) =>
+    left.weightedDist - right.weightedDist ||
+    left.dist - right.dist
+  );
+  const bestWeightedDistance = candidates[0]?.weightedDist;
+  if (!Number.isFinite(bestWeightedDistance)) return [];
+  return candidates
+    .filter((candidate) => candidate.weightedDist <= bestWeightedDistance + 0.5)
+    .slice(0, maximumCandidates);
 }
 
 function compactRoutePoints(points, minSpacing = 0.35) {
@@ -468,21 +528,37 @@ function aStarTraversalPath(graph, startId, endId) {
   return { nodeIds, cost: gScore[endId] };
 }
 
-function buildTraversalConnectorOptions(anchor, originX, originZ) {
+function buildTraversalConnectorOptions(anchor, originX, originZ, role = 'start') {
   if (!anchor) return [];
   const offNetwork = Math.hypot(originX - anchor.pt.x, originZ - anchor.pt.z);
-  const options = [
-    {
-      nodeId: anchor.fromId,
-      connectorCost: offNetwork + Math.hypot(anchor.pt.x - anchor.p1.x, anchor.pt.z - anchor.p1.z) * anchor.penalty
-    },
-    {
+  const direction = String(anchor.direction || 'both');
+  const fromDistance = Math.hypot(anchor.pt.x - anchor.p1.x, anchor.pt.z - anchor.p1.z);
+  const toDistance = Math.hypot(anchor.pt.x - anchor.p2.x, anchor.pt.z - anchor.p2.z);
+  const options = [];
+  if (
+    toDistance <= 0.02 ||
+    direction === 'both' ||
+    (role === 'start' && direction !== 'reverse') ||
+    (role === 'end' && direction !== 'forward')
+  ) {
+    options.push({
       nodeId: anchor.toId,
-      connectorCost: offNetwork + Math.hypot(anchor.pt.x - anchor.p2.x, anchor.pt.z - anchor.p2.z) * anchor.penalty
-    }
-  ];
+      connectorCost: offNetwork + toDistance * anchor.penalty
+    });
+  }
+  if (
+    fromDistance <= 0.02 ||
+    direction === 'both' ||
+    (role === 'start' && direction !== 'forward') ||
+    (role === 'end' && direction !== 'reverse')
+  ) {
+    options.push({
+      nodeId: anchor.fromId,
+      connectorCost: offNetwork + fromDistance * anchor.penalty
+    });
+  }
 
-  if (options[0].nodeId === options[1].nodeId) return [options[0]];
+  if (options.length === 2 && options[0].nodeId === options[1].nodeId) return [options[0]];
   return options;
 }
 
@@ -491,68 +567,86 @@ export function findTraversalRoute(fromX, fromZ, toX, toZ, options = {}) {
   const graph = traversalGraphForMode(mode);
   if (!graph || !Array.isArray(graph.segments) || graph.segments.length === 0) return null;
 
-  const startAnchor = findNearestTraversalFeature(fromX, fromZ, {
+  const startAnchors = findNearestTraversalFeatures(fromX, fromZ, {
     mode,
-    maxDistance: options.maxAnchorDistance
+    maxDistance: options.maxAnchorDistance,
+    maximumCandidates: 4
   });
-  const endAnchor = findNearestTraversalFeature(toX, toZ, {
+  const endAnchors = findNearestTraversalFeatures(toX, toZ, {
     mode,
-    maxDistance: options.maxAnchorDistance
+    maxDistance: options.maxAnchorDistance,
+    maximumCandidates: 4
   });
-  if (!startAnchor || !endAnchor) return null;
-
-  if (startAnchor.feature === endAnchor.feature && startAnchor.segIndex === endAnchor.segIndex) {
-    const points = compactRoutePoints([
-      { x: fromX, z: fromZ },
-      startAnchor.pt,
-      endAnchor.pt,
-      { x: toX, z: toZ }
-    ]);
-    return {
-      mode,
-      points,
-      distance: measurePolylineDistance(points),
-      startAnchor,
-      endAnchor
-    };
-  }
-
-  const startLinks = buildTraversalConnectorOptions(startAnchor, fromX, fromZ);
-  const endLinks = buildTraversalConnectorOptions(endAnchor, toX, toZ);
+  if (startAnchors.length === 0 || endAnchors.length === 0) return null;
   let best = null;
 
-  for (let i = 0; i < startLinks.length; i++) {
-    for (let j = 0; j < endLinks.length; j++) {
-      const startLink = startLinks[i];
-      const endLink = endLinks[j];
-      const core = aStarTraversalPath(graph, startLink.nodeId, endLink.nodeId);
-      if (!core) continue;
-      const totalCost = startLink.connectorCost + core.cost + endLink.connectorCost;
-      if (!best || totalCost < best.totalCost) {
-        best = {
-          totalCost,
-          nodeIds: core.nodeIds
-        };
+  for (const startAnchor of startAnchors) {
+    for (const endAnchor of endAnchors) {
+      if (startAnchor.feature === endAnchor.feature && startAnchor.segIndex === endAnchor.segIndex) {
+        const allowedDirect = mode !== 'drive' ||
+          startAnchor.direction === 'both' ||
+          (startAnchor.direction === 'forward' && startAnchor.t <= endAnchor.t) ||
+          (startAnchor.direction === 'reverse' && startAnchor.t >= endAnchor.t);
+        if (allowedDirect) {
+          const points = compactRoutePoints([
+            { x: fromX, z: fromZ },
+            startAnchor.pt,
+            endAnchor.pt,
+            { x: toX, z: toZ }
+          ]);
+          const totalCost = measurePolylineDistance(points);
+          if (!best || totalCost < best.totalCost) {
+            best = { totalCost, nodeIds: [], startAnchor, endAnchor, directPoints: points };
+          }
+        }
+      }
+
+      const startLinks = buildTraversalConnectorOptions(startAnchor, fromX, fromZ, 'start');
+      const endLinks = buildTraversalConnectorOptions(endAnchor, toX, toZ, 'end');
+      for (const startLink of startLinks) {
+        for (const endLink of endLinks) {
+          const core = aStarTraversalPath(graph, startLink.nodeId, endLink.nodeId);
+          if (!core) continue;
+          const totalCost = startLink.connectorCost + core.cost + endLink.connectorCost;
+          if (!best || totalCost < best.totalCost) {
+            best = {
+              totalCost,
+              nodeIds: core.nodeIds,
+              startAnchor,
+              endAnchor,
+              directPoints: null
+            };
+          }
+        }
       }
     }
   }
 
   if (!best) return null;
+  if (best.directPoints) {
+    return {
+      mode,
+      points: best.directPoints,
+      distance: measurePolylineDistance(best.directPoints),
+      startAnchor: best.startAnchor,
+      endAnchor: best.endAnchor
+    };
+  }
 
-  const routePoints = [{ x: fromX, z: fromZ }, startAnchor.pt];
+  const routePoints = [{ x: fromX, z: fromZ }, best.startAnchor.pt];
   for (let i = 0; i < best.nodeIds.length; i++) {
     const node = graph.nodes[best.nodeIds[i]];
     if (node) routePoints.push({ x: node.x, z: node.z });
   }
-  routePoints.push(endAnchor.pt, { x: toX, z: toZ });
+  routePoints.push(best.endAnchor.pt, { x: toX, z: toZ });
 
   const points = compactRoutePoints(routePoints);
   return {
     mode,
     points,
     distance: measurePolylineDistance(points),
-    startAnchor,
-    endAnchor
+    startAnchor: best.startAnchor,
+    endAnchor: best.endAnchor
   };
 }
 

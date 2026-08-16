@@ -1,4 +1,4 @@
-import { createRoundStarMaterial } from './star-point-material.js?v=2';
+import { createRoundStarMaterial } from './star-point-material.js?v=4';
 
 const GAIA_CSV_URL = new URL('../../assets/data/universe/gaia-dr3-nearby-bright.csv', import.meta.url);
 let catalogPromise = null;
@@ -72,6 +72,7 @@ function createPointLayer(name, size, opacity) {
   const points = new THREE.Points(
     new THREE.BufferGeometry(),
     createRoundStarMaterial({
+      skyBackground: true,
       size,
       sizeAttenuation: false,
       vertexColors: true,
@@ -83,6 +84,7 @@ function createPointLayer(name, size, opacity) {
     })
   );
   points.name = name;
+  points.renderOrder = -1000;
   points.frustumCulled = false;
   points.userData = {
     accuracy: 'catalog-derived',
@@ -103,17 +105,24 @@ function createGaiaSkyLayers(options = {}) {
     brightPoints: createPointLayer(options.brightName || 'Gaia DR3 bright stars', options.brightSize || 5.2, 0.98),
     faintPoints: createPointLayer(options.faintName || 'Gaia DR3 faint stars', options.faintSize || 2.8, 0.84),
     stars: [],
-    ready: null
+    ready: Promise.resolve(0),
+    load: null
   };
   group.add(state.faintPoints, state.brightPoints);
-  state.ready = loadGaiaCatalog().then((stars) => {
-    state.stars = stars;
-    rebuildGaiaSkyLayers(state);
-    return stars.length;
-  }).catch((error) => {
-    console.warn('[Sky] Gaia DR3 catalog snapshot unavailable.', error);
-    return 0;
-  });
+  state.load = () => {
+    if (state.loadStarted) return state.ready;
+    state.loadStarted = true;
+    state.ready = loadGaiaCatalog().then((stars) => {
+      state.stars = stars;
+      rebuildGaiaSkyLayers(state);
+      return stars.length;
+    }).catch((error) => {
+      console.warn('[Sky] Gaia DR3 catalog snapshot unavailable.', error);
+      return 0;
+    });
+    return state.ready;
+  };
+  if (options.autoload !== false) state.load();
   return state;
 }
 

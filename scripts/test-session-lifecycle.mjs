@@ -12,7 +12,7 @@ function assert(condition, message) {
 }
 
 function isTransientNetworkError(message = '') {
-  return /net::ERR_(ABORTED|HTTP2_PROTOCOL_ERROR)|Failed to load resource:.*\b(429|500|502|503|504)\b/i.test(message);
+  return /net::ERR_(ABORTED|CONNECTION_REFUSED|HTTP2_PROTOCOL_ERROR)|Failed to load resource:.*\b(429|500|502|503|504)\b/i.test(message);
 }
 
 async function waitForRuntime(page) {
@@ -74,9 +74,6 @@ async function readLifecycleState(page, mode) {
     }
     return {
       coordinator: ctx.getSessionCoordinatorDebugState?.(),
-      diagnosticsLifecycle: ctx.getRuntimeDiagnosticsLifecycleSnapshot?.(),
-      frameOwnership: ctx.getFrameOwnershipSnapshot?.(),
-      productPorts: ctx.getRuntimeProductPortsSnapshot?.(),
       canvases: {
         ocean: document.querySelectorAll('#oceanModeCanvas').length,
         space: document.querySelectorAll('#spaceFlightCanvas').length,
@@ -118,206 +115,65 @@ async function waitForHubExit(page, mode) {
   }, mode, 30000, `${mode} return to hub`);
 }
 
-async function setTestDocumentHidden(page, hidden) {
-  await page.evaluate((nextHidden) => {
-    if (!Object.prototype.hasOwnProperty.call(document, '__we3dTestHiddenInstalled')) {
-      Object.defineProperty(document, '__we3dTestHiddenInstalled', {
-        configurable: true,
-        value: true
-      });
-      Object.defineProperty(document, 'hidden', {
-        configurable: true,
-        get: () => globalThis.__WE3D_TEST_DOCUMENT_HIDDEN__ === true
-      });
-    }
-    globalThis.__WE3D_TEST_DOCUMENT_HIDDEN__ = nextHidden === true;
-    document.dispatchEvent(new Event('visibilitychange'));
-  }, hidden);
-}
-
 async function runModeCycles(page, mode, lifecycleEvents) {
   const destination = mode === 'space' ? '#globeSelectorSpaceBtn' : '#globeSelectorOceanBtn';
   const cycles = [];
-  for (let cycle = 1; cycle <= 3; cycle++) {
+  for (let cycle = 1; cycle <= 10; cycle++) {
     const beforeLaunch = await readLifecycleState(page, mode);
     const previousSpaceSessionId = Number(beforeLaunch.coordinator.environments.SPACE_FLIGHT?.sessionId || 0);
     await page.click(destination);
     await waitForMode(page, mode, previousSpaceSessionId);
     const observed = await readLifecycleState(page, mode);
-    let hidden = null;
-    let resumed = null;
-    if (cycle === 1) {
-      await setTestDocumentHidden(page, true);
-      await pollPageState(page, async (requestedMode) => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
-        return requestedMode === 'space'
-          ? ctx.spaceFlight?.active && ctx.spaceFlight?.animationId == null
-          : ctx.oceanMode?.active && ctx.oceanMode?.animationId == null;
-      }, mode, 5000, `${mode} hidden-tab suspension`);
-      hidden = await readLifecycleState(page, mode);
-      await setTestDocumentHidden(page, false);
-      await waitForMode(page, mode, previousSpaceSessionId);
-      resumed = await readLifecycleState(page, mode);
-    }
     await page.waitForTimeout(1200);
     const active = await readLifecycleState(page, mode);
-    if (cycle === 1 || cycle === 3) {
+    if (cycle === 1 || cycle === 10) {
       await page.screenshot({ path: path.join(outputDir, `${mode}-cycle-${cycle}.png`), fullPage: false });
     }
 
-    await page.click('#mainMenuBtn');
+    await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
     await waitForHubExit(page, mode);
-    let exited = await readLifecycleState(page, mode);
-    let hiddenEarth = null;
-    let resumedEarth = null;
-    if (cycle === 1) {
-      await setTestDocumentHidden(page, true);
-      await pollPageState(page, async () => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
-        return ctx.getSessionCoordinatorDebugState?.().activeSession?.scheduler?.running === false;
-      }, null, 5000, 'shared destination hidden-tab suspension');
-      hiddenEarth = await readLifecycleState(page, mode);
-      await setTestDocumentHidden(page, false);
-      await pollPageState(page, async () => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
-        return ctx.getSessionCoordinatorDebugState?.().activeSession?.scheduler?.running === true;
-      }, null, 5000, 'shared destination visibility resume');
-      resumedEarth = await readLifecycleState(page, mode);
-      exited = resumedEarth;
-    }
-    cycles.push({
-      observed,
-      hidden,
-      resumed,
-      active,
-      exited,
-      hiddenEarth,
-      resumedEarth,
-      events: lifecycleEvents.splice(0)
-    });
+    const exited = await readLifecycleState(page, mode);
+    cycles.push({ observed, active, exited, events: lifecycleEvents.splice(0) });
   }
   return cycles;
 }
 
 function assertPlateau(mode, cycles) {
   const second = cycles[1];
-  const third = cycles[2];
+  const finalCycle = cycles.at(-1);
   const adapterKey = mode === 'space' ? 'SPACE_FLIGHT' : 'OCEAN';
   for (const [index, cycle] of cycles.entries()) {
     const activeAdapter = cycle.active.coordinator.environments[adapterKey];
     const exitedAdapter = cycle.exited.coordinator.environments[adapterKey];
-    const activeSession = cycle.active.coordinator.activeSession;
-    const exitedSession = cycle.exited.coordinator.activeSession;
-    const expectedFrameOwner = mode === 'space' ? 'space.flight-renderer' : 'ocean.mode-renderer';
     assert(activeAdapter.active && activeAdapter.animationActive, `${mode} cycle ${index + 1} did not own an active render loop`);
     assert(!exitedAdapter.active && !exitedAdapter.animationActive, `${mode} cycle ${index + 1} left its render loop active`);
-    assert(
-      activeSession?.destination === adapterKey && activeSession.active,
-      `${mode} cycle ${index + 1} was not owned by the active destination session`
-    );
-    assert(
-      activeSession.scope?.resources?.['animation-frame'] === 1,
-      `${mode} cycle ${index + 1} did not schedule exactly one frame through its destination scope`
-    );
-    assert(
-      activeAdapter.scope?.owner === activeSession.scope?.owner,
-      `${mode} cycle ${index + 1} retained a private renderer scope outside DestinationSession`
-    );
-    assert(
-      exitedSession?.destination === 'EARTH' && exitedSession.active,
-      `${mode} cycle ${index + 1} did not return ownership to an Earth destination session`
-    );
-    assert(
-      !activeAdapter.scope?.disposedReason,
-      `${mode} cycle ${index + 1} ran through an already disposed destination scope`
-    );
-    assert(
-      exitedAdapter.scope == null,
-      `${mode} cycle ${index + 1} retained its destination scope after exit`
-    );
-    assert(cycle.active.frameOwnership?.ok, `${mode} cycle ${index + 1} has conflicting frame owners`);
-    assert(
-      cycle.active.frameOwnership?.active?.includes(expectedFrameOwner),
-      `${mode} cycle ${index + 1} was not registered as the active environment renderer`
-    );
-    if (cycle.hidden) {
-      const hiddenAdapter = cycle.hidden.coordinator.environments[adapterKey];
-      const resumedAdapter = cycle.resumed.coordinator.environments[adapterKey];
-      assert(hiddenAdapter.active, `${mode} stopped the destination while the tab was hidden`);
-      assert(!hiddenAdapter.animationActive, `${mode} retained a destination frame while the tab was hidden`);
-      assert(
-        !cycle.hidden.frameOwnership?.scheduled?.includes(expectedFrameOwner),
-        `${mode} retained scheduled frame ownership while the tab was hidden`
-      );
-      assert(
-        !cycle.hidden.coordinator.activeSession.scope?.resources?.['animation-frame'],
-        `${mode} retained an animation-frame resource while the tab was hidden`
-      );
-      assert(
-        resumedAdapter.active && resumedAdapter.animationActive,
-        `${mode} did not resume exactly one destination frame after visibility returned`
-      );
-    }
-    if (cycle.hiddenEarth) {
-      assert(
-        cycle.hiddenEarth.coordinator.activeSession.scheduler?.running === false,
-        `Earth retained its shared destination frame while the tab was hidden after ${mode}`
-      );
-      assert(
-        !cycle.hiddenEarth.frameOwnership?.scheduled?.includes('earth.runtime-kernel'),
-        `Earth retained scheduled frame ownership while the tab was hidden after ${mode}`
-      );
-      assert(
-        cycle.resumedEarth.coordinator.activeSession.scheduler?.running === true,
-        `Earth did not resume its shared destination frame after ${mode}`
-      );
-    }
-    assert(
-      !cycle.active.frameOwnership?.scheduled?.includes('earth.runtime-kernel'),
-      `${mode} cycle ${index + 1} left the shared Earth/Moon/Mars kernel scheduled`
-    );
-    assert(
-      !cycle.exited.frameOwnership?.active?.includes(expectedFrameOwner),
-      `${mode} cycle ${index + 1} retained frame ownership after exit`
-    );
-    assert(
-      cycle.exited.frameOwnership?.active?.includes('earth.runtime-kernel'),
-      `${mode} cycle ${index + 1} did not return frame ownership to the shared scene kernel`
-    );
-    assert(
-      exitedSession.scheduler?.running === true,
-      `${mode} cycle ${index + 1} returned to Earth without starting its session scheduler`
-    );
-    assert(
-      cycle.active.productPorts?.ports?.length === 4 &&
-        cycle.active.productPorts.ports.every((port) => port.bound),
-      `${mode} cycle ${index + 1} did not boot all four runtime product ports`
-    );
-    assert(
-      cycle.active.diagnosticsLifecycle?.resources?.interval === 1 &&
-        cycle.active.diagnosticsLifecycle?.resources?.listener === 1,
-      `${mode} cycle ${index + 1} lost diagnostics lifecycle ownership`
-    );
     assert(cycle.exited.coordinator.transition === null, `${mode} cycle ${index + 1} left a transition token active`);
     assert(cycle.exited.canvases[mode] === 1, `${mode} cycle ${index + 1} duplicated its canvas`);
-    if (mode === 'ocean') {
-      assert(!exitedAdapter.rendererReady && !exitedAdapter.sceneReady, `ocean cycle ${index + 1} retained renderer resources`);
-    }
+    assert(!exitedAdapter.rendererReady, `${mode} cycle ${index + 1} retained renderer resources`);
+    if (mode === 'ocean') assert(!exitedAdapter.sceneReady, `ocean cycle ${index + 1} retained scene resources`);
+    const expectedSessionOwner = mode === 'space' ? 'space-flight-session' : 'ocean-session';
+    assert(cycle.active.coordinator.lifecycle.owners[expectedSessionOwner]?.scopes === 1, `${mode} cycle ${index + 1} did not have one session owner`);
+    assert(cycle.active.coordinator.lifecycle.resources.renderer === 1, `${mode} cycle ${index + 1} did not lease one renderer`);
+    assert(cycle.active.coordinator.lifecycle.resources['animation-frame'] === 1, `${mode} cycle ${index + 1} did not lease one RAF`);
+    assert(!cycle.exited.coordinator.lifecycle.owners[expectedSessionOwner], `${mode} cycle ${index + 1} retained its session owner`);
+    assert(!cycle.exited.coordinator.lifecycle.resources.renderer, `${mode} cycle ${index + 1} retained a renderer lease`);
+    assert(!cycle.exited.coordinator.lifecycle.resources['animation-frame'], `${mode} cycle ${index + 1} retained a RAF lease`);
   }
-  assert(third.active.scene.objects === second.active.scene.objects, `${mode} scene object count changed after warm-up`);
-  assert(third.active.scene.geometries === second.active.scene.geometries, `${mode} scene geometry count changed after warm-up`);
-  assert(third.active.scene.materials === second.active.scene.materials, `${mode} scene material count changed after warm-up`);
-  assert(third.active.scene.textures === second.active.scene.textures, `${mode} scene texture count changed after warm-up`);
-  if (mode === 'space') {
-    assert(third.active.scene.resourceSignature === second.active.scene.resourceSignature, 'space persistent scene resources were replaced after warm-up');
-  }
-  assert(third.exited.canvases.total === second.exited.canvases.total, `${mode} DOM canvas count grew after warm-up`);
+  assert(finalCycle.active.scene.objects === second.active.scene.objects, `${mode} scene object count changed after warm-up`);
+  assert(finalCycle.active.scene.geometries === second.active.scene.geometries, `${mode} scene geometry count changed after warm-up`);
+  assert(finalCycle.active.scene.materials === second.active.scene.materials, `${mode} scene material count changed after warm-up`);
+  assert(finalCycle.active.scene.textures === second.active.scene.textures, `${mode} scene texture count changed after warm-up`);
+  assert(finalCycle.exited.canvases.total === second.exited.canvases.total, `${mode} DOM canvas count grew after warm-up`);
+  assert(finalCycle.exited.coordinator.lifecycle.activeScopeCount === second.exited.coordinator.lifecycle.activeScopeCount, `${mode} lifecycle owner count grew after warm-up`);
+  assert(finalCycle.exited.coordinator.lifecycle.resourceCount === second.exited.coordinator.lifecycle.resourceCount, `${mode} lifecycle resource count grew after warm-up`);
+  assert(
+    JSON.stringify(finalCycle.exited.coordinator.lifecycle.resources) === JSON.stringify(second.exited.coordinator.lifecycle.resources),
+    `${mode} lifecycle resource types changed after warm-up`
+  );
 }
 
 await mkdirp(outputDir);
-const suppliedBaseUrl = String(process.env.SESSION_LIFECYCLE_BASE_URL || '').replace(/\/$/, '');
-const server = suppliedBaseUrl ? null : await startServer({ rootDir, host, candidatePorts: [4216, 4217, 4218] });
-const baseUrl = suppliedBaseUrl || `http://${host}:${server.port}`;
+const server = await startServer({ rootDir, host, candidatePorts: [4216, 4217, 4218] });
 const browser = await chromium.launch({
   headless: true,
   args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
@@ -334,7 +190,7 @@ try {
     }
     if (message.type() === 'error' && !isTransientNetworkError(text)) consoleErrors.push(text);
   });
-  await page.goto(`${baseUrl}/app/?lifecycle-plateau=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.goto(`http://${host}:${server.port}/app/?lifecycle-plateau=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForSelector('#globeSelectorScreen.show', { state: 'visible', timeout: 90000 });
   await waitForRuntime(page);
   await page.evaluate(() => {
@@ -349,19 +205,32 @@ try {
   await fs.writeFile(path.join(outputDir, 'plateau-report.json'), `${JSON.stringify({ ok: false, report }, null, 2)}\n`);
   assertPlateau('space', report.space);
   assertPlateau('ocean', report.ocean);
-  const registered = report.ocean.at(-1).exited.coordinator.registeredEnvironments;
-  assert(registered.length === 5, `Expected five environment adapters, found ${registered.length}`);
+  const idleRegistered = report.ocean.at(-1).exited.coordinator.registeredEnvironments;
+  assert(
+    JSON.stringify(idleRegistered) === JSON.stringify(['EARTH', 'MOON', 'SPACE_FLIGHT', 'OCEAN']),
+    `Idle lifecycle adapters do not match the title and exercised runtimes: ${JSON.stringify(idleRegistered)}`
+  );
+  const registeredAfterMarsIntent = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    await ctx.ensureMarsRuntimeReady?.();
+    return ctx.getSessionCoordinatorDebugState?.().registeredEnvironments || [];
+  });
+  assert(
+    JSON.stringify(registeredAfterMarsIntent) === JSON.stringify(['EARTH', 'MOON', 'SPACE_FLIGHT', 'OCEAN', 'MARS']),
+    `Mars intent did not install the fifth lifecycle adapter: ${JSON.stringify(registeredAfterMarsIntent)}`
+  );
   assert(consoleErrors.length === 0, `Lifecycle cycles logged errors: ${consoleErrors.join(' | ')}`);
 
   await fs.writeFile(path.join(outputDir, 'plateau-report.json'), `${JSON.stringify({ ok: true, report }, null, 2)}\n`);
   console.log(JSON.stringify({
     ok: true,
-    registeredEnvironments: registered,
+    idleRegisteredEnvironments: idleRegistered,
+    registeredEnvironmentsAfterMarsIntent: registeredAfterMarsIntent,
     spaceWarmGpu: report.space.at(-1).active.gpu,
     oceanWarmGpu: report.ocean.at(-1).active.gpu,
     consoleErrors
   }, null, 2));
 } finally {
   await browser.close();
-  await server?.close();
+  await server.close();
 }

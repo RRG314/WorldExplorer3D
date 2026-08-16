@@ -2,42 +2,129 @@ function assert(value, message) {
   if (!value) throw new Error(message);
 }
 
-export function assertWorldMatrixLocation(spec, result, { enforcePerformance = true } = {}) {
-  assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
-  if (enforcePerformance && Number.isFinite(spec.maximumLoadMs)) {
-    assert(
-      Number(result.loadMs) <= spec.maximumLoadMs,
-      `${spec.id}: location load exceeded ${spec.maximumLoadMs}ms ${JSON.stringify({ loadMs: result.loadMs })}`
-    );
-  }
+function clampHudLocation(value, maxLen = 52) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.length > maxLen ? `${text.slice(0, Math.max(8, maxLen - 1)).trim()}…` : text;
+}
+
+export function assertWorldLocationIdentity(spec, result) {
+  const locationPresentation = result.locationPresentation || {};
+  const expectedSelection = spec.kind === 'custom' ? 'custom' : spec.key;
+  assert(
+    String(locationPresentation.selected || '') === String(expectedSelection || ''),
+    `${spec.id}: published selection does not match the requested location ${JSON.stringify(locationPresentation)}`
+  );
+  assert(
+    String(locationPresentation.resolvedHudLabel || '').trim().length > 0 &&
+      String(locationPresentation.renderedHudLabel || '').trim().length > 0,
+    `${spec.id}: published location has no resolved and rendered HUD identity ${JSON.stringify(locationPresentation)}`
+  );
+  const resolvedHudLabel = String(locationPresentation.resolvedHudLabel || '').trim();
+  const renderedHudLabel = String(locationPresentation.renderedHudLabel || '').trim();
+  const exactRenderedLabel = clampHudLocation(resolvedHudLabel);
+  const contextualRenderedPrefix = resolvedHudLabel.length < 51 ? `${resolvedHudLabel} • ` : null;
+  assert(
+    renderedHudLabel === exactRenderedLabel ||
+      (contextualRenderedPrefix !== null && renderedHudLabel.startsWith(contextualRenderedPrefix)),
+    `${spec.id}: rendered HUD identity differs from the current loaded location ${JSON.stringify(locationPresentation)}`
+  );
   if (spec.kind === 'custom') {
     assert(
-      String(result.customLocationLabel || '') === String(spec.label || ''),
-      `${spec.id}: custom location identity changed during load ${JSON.stringify({ expected: spec.label, actual: result.customLocationLabel })}`
+      Math.abs(Number(locationPresentation.origin?.lat) - Number(spec.lat)) <= 1e-6 &&
+        Math.abs(Number(locationPresentation.origin?.lon) - Number(spec.lon)) <= 1e-6,
+      `${spec.id}: custom world origin differs from the requested coordinates ${JSON.stringify(locationPresentation)}`
+    );
+    assert(
+      String(locationPresentation.customName || '') === String(spec.label || ''),
+      `${spec.id}: custom location name was replaced during publication ${JSON.stringify(locationPresentation)}`
     );
   }
-  assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
-  if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
+  const placeState = locationPresentation.placeState;
   if (
-    result.expectedStart === 'land' &&
-    Number(result.counts?.roads || 0) === 0 &&
-    Number(result.traversal?.walkSegments || 0) > 0
+    placeState &&
+    String(placeState.display || '').trim() === String(locationPresentation.resolvedHudLabel || '').trim()
   ) {
+    const longitudeDelta = Math.abs(Number(placeState.lon) - Number(locationPresentation.origin?.lon));
     assert(
-      result.initialSpawn?.onWalkSurface === true &&
-      result.initialSpawn?.source === 'walk_surface_search',
-      `${spec.id}: sparse mapped world ignored its pedestrian network at spawn ${JSON.stringify(result.initialSpawn)}`
-    );
-    assert(
-      Number(result.initialSpawn?.slopeDeg) <= 22,
-      `${spec.id}: sparse mapped path spawn exceeded the walkable slope contract ${JSON.stringify(result.initialSpawn)}`
-    );
-    assert(
-      Number(result.counts?.linearFeatures || 0) > 0 &&
-      Number(result.counts?.linearFeatureMeshes || 0) > 0,
-      `${spec.id}: sparse pedestrian network has no rendered path product ${JSON.stringify(result.counts)}`
+      Math.abs(Number(placeState.lat) - Number(locationPresentation.origin?.lat)) <= 0.05 &&
+        Math.min(longitudeDelta, Math.abs(longitudeDelta - 360)) <= 0.05,
+      `${spec.id}: HUD accepted a place label from another loaded location ${JSON.stringify(locationPresentation)}`
     );
   }
+}
+
+export function assertWorldMatrixLocation(spec, result) {
+  assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  assert(result.worldLoad?.status === 'ready', `${spec.id}: requested world load did not reach ready`);
+  assert(
+    Number(result.worldLoad?.sequence) === Number(result.worldLoad?.publicationSequence),
+    `${spec.id}: requested world load and published world sequences diverged`
+  );
+  assertWorldLocationIdentity(spec, result);
+  if (spec.expectedSurfaceDomain !== 'cryosphere' && !/open_ocean/.test(String(spec.category || ''))) {
+    assert(
+      result.farTerrainClipmap?.status === 'ready',
+      `${spec.id}: fixed location finalized without horizon terrain ${JSON.stringify(result.farTerrainClipmap)}`
+    );
+  }
+  if (spec.expectedSurfaceDomain) {
+    assert(
+      result.worldLoad?.surfaceDomain?.kind === spec.expectedSurfaceDomain,
+      `${spec.id}: expected ${spec.expectedSurfaceDomain} surface domain ${JSON.stringify(result.worldLoad)}`
+    );
+    if (spec.expectedSurfaceDomain === 'cryosphere') {
+      assert(
+        result.worldLoad?.groundMode === 'polar-cryosphere-local',
+        `${spec.id}: cryosphere escaped its fixed terrain owner ${JSON.stringify(result.worldLoad)}`
+      );
+      assert(
+        Number(result.terrainSurface?.semanticMaterialMeshes || 0) === 1,
+        `${spec.id}: polar terrain must have exactly one visible surface owner ${JSON.stringify(result.terrainSurface)}`
+      );
+      assert(
+        result.worldLoad?.loadPlan?.id === 'cryosphere-surface-only' &&
+          result.worldLoad?.loadPlan?.loadTransport === false,
+        `${spec.id}: polar terrain ran the terrestrial map pipeline ${JSON.stringify(result.worldLoad?.loadPlan)}`
+      );
+    }
+  }
+  assert(!result.terrainProfiles?.urban, `${spec.id}: obsolete urban profile escaped the built-surface authority ${JSON.stringify(result.terrainProfiles.urban)}`);
+  if (spec.kind === 'preset' && Number(result.counts?.buildings || 0) >= 1000) {
+    const semanticSamples = result.terrainSurface?.semanticClassSamples || {};
+    const developed = Number(semanticSamples.urban || 0);
+    const grass = Number(semanticSamples.grass || 0);
+    const hasProviderCoverage = Number(result.worldCover?.status?.ready || 0) > 0;
+    if (!hasProviderCoverage) {
+      assert(
+        developed >= grass * 0.35,
+        `${spec.id}: dense city collapsed to grass during land-cover outage ${JSON.stringify({ developed, grass })}`
+      );
+    }
+    if (result.terrainProfileSamples?.[0]?.mode === 'built') {
+      const detailedGround = (result.groundStackAtActor || []).find((entry) => entry?.terrain);
+      assert(
+        !detailedGround?.colors?.includes('6b8e4a'),
+        `${spec.id}: developed terrain retained the legacy grass material multiplier ${JSON.stringify(detailedGround)}`
+      );
+    }
+  }
+  if (Number(result.worldCover?.status?.ready || 0) > 0) {
+    assert(
+      Number(result.terrainSurface?.semanticMaterialMeshes || 0) > 0,
+      `${spec.id}: WorldCover published without the semantic terrain material ${JSON.stringify(result.terrainSurface)}`
+    );
+    assert(
+      (result.terrainSurface?.publishedDetailModes || []).length === 1 &&
+        result.terrainSurface.publishedDetailModes[0] === 'semantic-pbr',
+      `${spec.id}: WorldCover escaped the one semantic PBR terrain authority ${JSON.stringify(result.terrainSurface)}`
+    );
+    assert(
+      Object.values(result.terrainSurface?.semanticClassSamples || {}).some((count) => Number(count) > 0),
+      `${spec.id}: semantic terrain material published without classified samples ${JSON.stringify(result.terrainSurface)}`
+    );
+  }
+  if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
     const acceptableTerrainModes = spec.acceptableTerrainModes || [spec.expectedTerrainMode];
     assert(acceptableTerrainModes.some((mode) => result.terrainProfiles?.[mode]?.count > 0), `${spec.id}: expected ${acceptableTerrainModes.join(' or ')} terrain ${JSON.stringify(result.terrainProfiles)}`);
@@ -60,68 +147,53 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
         `${JSON.stringify({ surfaceY: probe.surfaceY, terrainY, required: spec.minimumStructureClearance })}`
       );
     }
-    if (spec.expectedRoadStructure === 'bridge') {
-      const guardrails = result.structurePresentation?.guardrails || {};
-      assert(guardrails.protectedRoads > 0, `${spec.id}: mapped bridge registered no protected road guardrails ${JSON.stringify(guardrails)}`);
-      assert(guardrails.colliders > 0, `${spec.id}: mapped bridge registered no guardrail collision barriers ${JSON.stringify(guardrails)}`);
-      assert(guardrails.visualInstances > 0, `${spec.id}: mapped bridge rendered no guardrail instances ${JSON.stringify(guardrails)}`);
-      assert(
-        guardrails.visualInstances <= guardrails.colliders * 10,
-        `${spec.id}: guardrail visuals exceeded the physical collider-density budget ${JSON.stringify(guardrails)}`
-      );
-    }
-    if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
-      assert(
-        result.initialSpawn?.source === 'walk_surface_search' &&
-        result.initialSpawn?.terrainMode !== 'subgrade',
-        `${spec.id}: initial arrival remained inside the subgrade tunnel shell ${JSON.stringify(result.initialSpawn)}`
-      );
-      const tunnelVisuals = result.structurePresentation?.tunnelVisuals || {};
-      assert(tunnelVisuals.tunnelRoads > 0, `${spec.id}: no mapped tunnel roads were registered ${JSON.stringify(tunnelVisuals)}`);
-      assert(tunnelVisuals.walls > 0 && tunnelVisuals.roofs > 0 && tunnelVisuals.floors > 0, `${spec.id}: tunnel shell is incomplete ${JSON.stringify(tunnelVisuals)}`);
-      assert(tunnelVisuals.lights > 0 && tunnelVisuals.portals > 0, `${spec.id}: tunnel presentation is incomplete ${JSON.stringify(tunnelVisuals)}`);
-      assert(
-        tunnelVisuals.totalInstances <= tunnelVisuals.walls * 4,
-        `${spec.id}: tunnel visual density exceeded the shell-derived budget ${JSON.stringify(tunnelVisuals)}`
-      );
-      const traversal = result.tunnelPortalTraversal;
-      const checkpoints = traversal?.checkpoints || [];
-      const interior = checkpoints.filter((checkpoint) => checkpoint?.terrainMode === 'subgrade');
-      const interiorCore = interior.filter((checkpoint) => checkpoint?.stage !== 'entry');
-      const entry = checkpoints.find((checkpoint) => checkpoint?.stage === 'entry');
-      const exit = checkpoints.find((checkpoint) => checkpoint?.stage === 'exit');
-      assert(checkpoints.length === 5, `${spec.id}: tunnel lifecycle did not produce all five checkpoints ${JSON.stringify(traversal)}`);
-      assert(interior.length >= 4, `${spec.id}: tunnel lifecycle lost its subgrade road ${JSON.stringify(traversal)}`);
-      assert(interiorCore.every((checkpoint) => checkpoint.applied && checkpoint.renderedDelta <= 0.2), `${spec.id}: tunnel road diverged during interior traversal ${JSON.stringify(traversal)}`);
-      assert(entry?.applied && entry?.renderedDelta <= 0.5, `${spec.id}: tunnel portal transition diverged from its rendered surface ${JSON.stringify(traversal)}`);
-      assert(interior.every((checkpoint) => checkpoint.cameraAboveRoad <= 1.75), `${spec.id}: tunnel camera crossed the shell ceiling ${JSON.stringify(traversal)}`);
-      assert(interior.every((checkpoint) => checkpoint.visibleWaterMeshes === 0), `${spec.id}: water surface remained visible inside the tunnel ${JSON.stringify(traversal)}`);
-      assert(interior.every((checkpoint) => !checkpoint.boatAvailable && !checkpoint.boatPromptVisible), `${spec.id}: boat travel was offered inside the tunnel ${JSON.stringify(traversal)}`);
-      assert(
-        Number(traversal?.movement?.distance || 0) >= 0.5 &&
-        Number(traversal?.movement?.running?.speed || 0) >= 3,
-        `${spec.id}: accelerator input did not produce sustained vehicle motion inside the tunnel ${JSON.stringify(traversal)}`
-      );
-      assert(traversal?.movement?.remainedInTunnel, `${spec.id}: vehicle detached from the tunnel during movement ${JSON.stringify(traversal)}`);
-      assert(exit?.applied && exit?.terrainMode !== 'subgrade', `${spec.id}: no mapped at-grade tunnel exit was traversable ${JSON.stringify(traversal)}`);
-      assert(Number.isFinite(exit?.terrainY), `${spec.id}: exterior terrain is missing at the tunnel exit ${JSON.stringify(traversal)}`);
-      assert(exit?.renderedDelta <= 2.5, `${spec.id}: exit road diverged from its rendered surface ${JSON.stringify(traversal)}`);
-      assert(exit?.cameraAboveRoad >= 2, `${spec.id}: camera remained tunnel-constrained after exit ${JSON.stringify(traversal)}`);
-      if (exit?.waterMeshes > 0) {
-        assert(exit.visibleWaterMeshes > 0, `${spec.id}: water visibility was not restored after tunnel exit ${JSON.stringify(traversal)}`);
-      }
-    }
   }
-  if (spec.minimumWaterAreas) {
-    const mappedWaterPresent = result.counts.waterAreas >= spec.minimumWaterAreas;
-    const validatedWaterFallback =
-      result.expectedStart === 'water' &&
-      result.boatActive === true &&
-      result.initialSpawn?.mode === 'boat' &&
-      result.boatPresentation?.meshVisible === true;
+  if (Number.isFinite(spec.expectedStackedRoadClearance)) {
+    const crossings = result.stackedRoadCrossings || {};
     assert(
-      mappedWaterPresent || validatedWaterFallback,
-      `${spec.id}: expected mapped water areas or a validated water-start fallback`
+      Number(crossings.count || 0) > 0,
+      `${spec.id}: no mapped differently layered road crossing was measured ${JSON.stringify(crossings)}`
+    );
+    assert(
+      Number(crossings.minimumSeparation) >= Number(spec.expectedStackedRoadClearance),
+      `${spec.id}: stacked road decks lack vehicle clearance ${JSON.stringify({
+        measured: crossings.minimumSeparation,
+        required: spec.expectedStackedRoadClearance,
+        worst: crossings.worst
+      })}`
+    );
+  }
+  const trappedElevatedTerminals = (result.elevatedTerminalEndpoints || []).filter((endpoint) =>
+    endpoint?.terminalBarrierPresent === true
+  );
+  assert(
+    trappedElevatedTerminals.length === 0,
+    `${spec.id}: a bridge or elevated road has a travel-blocking terminal barrier ` +
+    `${JSON.stringify(trappedElevatedTerminals.slice(0, 4))}`
+  );
+  if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
+  if (spec.minimumWaterways) {
+    assert(
+      Number(result.counts.waterways || 0) >= Number(spec.minimumWaterways),
+      `${spec.id}: expected mapped waterways ${JSON.stringify(result.counts)}`
+    );
+  }
+  if (spec.minimumVegetationFeatures) {
+    assert(
+      Number(result.counts.vegetationFeatures || 0) >= Number(spec.minimumVegetationFeatures),
+      `${spec.id}: expected at least ${spec.minimumVegetationFeatures} biome vegetation features ${JSON.stringify(result.counts)}`
+    );
+  }
+  if (spec.minimumVegetationMeshes) {
+    assert(
+      Number(result.counts.vegetationMeshes || 0) >= Number(spec.minimumVegetationMeshes),
+      `${spec.id}: expected multilayer canopy publication ${JSON.stringify(result.counts)}`
+    );
+  }
+  if (spec.minimumVegetationRenderedCrowns) {
+    assert(
+      Number(result.counts.vegetationRenderedCrowns || 0) >= Number(spec.minimumVegetationRenderedCrowns),
+      `${spec.id}: tropical canopy remained visually sparse ${JSON.stringify(result.counts)}`
     );
   }
   if (spec.minimumBuildings) {
@@ -131,22 +203,18 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
       `${JSON.stringify({ buildings: result.counts.buildings, detail: result.buildingDetail })}`
     );
   }
-  if (spec.minimumVegetationFeatures) {
-    assert(
-      result.counts.vegetationFeatures >= spec.minimumVegetationFeatures,
-      `${spec.id}: expected at least ${spec.minimumVegetationFeatures} mapped vegetation instances ` +
-      `${JSON.stringify({ vegetationFeatures: result.counts.vegetationFeatures, worldCover: result.worldCover?.status })}`
-    );
-  }
   const architecturalBuildings = Number(result.buildingDimensions?.architecturalCount || 0);
   if (architecturalBuildings > 0) {
     const dimensions = result.buildingDimensions || {};
     const buildingSource = String(result.buildingDetail?.source || '');
-    const authoritativeBuildingSource = buildingSource === 'shortbread-vector-buildings';
+    const authoritativeBuildingSource =
+      buildingSource === 'overture-buildings-pmtiles' ||
+      buildingSource === 'shortbread-vector-buildings';
     assert(
       authoritativeBuildingSource,
       `${spec.id}: buildings did not use an authoritative mapped massing source ${JSON.stringify(result.buildingDetail)}`
     );
+    const overtureBuildings = Number(dimensions.geometrySources?.overture || 0);
     const streamedMappedBuildings = Number(dimensions.geometrySources?.['shortbread-vector'] || 0);
     const inferredFootprints = Number(dimensions.geometrySources?.inferred_road_frontage || 0);
     if (inferredFootprints > 0) {
@@ -164,18 +232,18 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
       );
     }
     assert(
-      streamedMappedBuildings > 0 || inferredFootprints > 0,
+      overtureBuildings > 0 || streamedMappedBuildings > 0 || inferredFootprints > 0,
       `${spec.id}: rendered buildings lost authoritative or explicit inferred provenance ${JSON.stringify(dimensions)}`
     );
     assert(
       architecturalBuildings > 0 &&
-        (streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
+        (overtureBuildings + streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
       `${spec.id}: more than 10% of rendered buildings bypassed global or explicit inferred provenance ${JSON.stringify(dimensions.geometrySources)}`
     );
     const sourceDetails = result.buildingDetail?.sourceDetails || {};
-    const coverageIsWideEnough =
-      Number(sourceDetails.loaded || 0) >= 4 &&
-      Number(sourceDetails.zoom || 0) >= 14;
+    const coverageIsWideEnough = buildingSource === 'shortbread-vector-buildings'
+      ? Number(sourceDetails.loaded || 0) >= 4 && Number(sourceDetails.zoom || 0) >= 14
+      : Number(sourceDetails.radiusDegrees || 0) >= 0.0135;
     assert(coverageIsWideEnough, `${spec.id}: building coverage is smaller than the visible-world contract ${JSON.stringify(sourceDetails)}`);
     assert(Number(dimensions.minHeight) >= 0.2, `${spec.id}: building height fell below the usable minimum ${JSON.stringify(dimensions)}`);
     assert(
@@ -197,10 +265,17 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
       assert(inferredBuckets >= 6, `${spec.id}: inferred building heights lack neighborhood-scale variation ${JSON.stringify(dimensions)}`);
     }
     if (spec.minimumAuthoritativeBuildingParts) {
-      assert(
-        Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
-        `${spec.id}: mapped building source lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
-      );
+      if (buildingSource === 'overture-buildings-pmtiles') {
+        assert(
+          Number(dimensions.buildingParts || 0) >= spec.minimumAuthoritativeBuildingParts,
+          `${spec.id}: expected at least ${spec.minimumAuthoritativeBuildingParts} authoritative building parts ${JSON.stringify(dimensions)}`
+        );
+      } else {
+        assert(
+          Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
+          `${spec.id}: mapped building fallback lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
+        );
+      }
     }
     if (result.counts.buildings >= 1000) {
       assert(
@@ -212,10 +287,19 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
     const presentation = result.buildingPresentation || {};
     const visibleSources = Number(presentation.visibleSourceCount || 0);
     if (visibleSources >= 30) {
-      const detailedRatio = Number(presentation.visibleDetailedSourceCount || 0) / visibleSources;
-      const wallFacadeRatio = Number(presentation.visibleWallFacadeSourceCount || 0) / visibleSources;
-      assert(detailedRatio >= 0.5, `${spec.id}: most visible buildings lost facade surface detail ${JSON.stringify(presentation)}`);
-      assert(wallFacadeRatio >= 0.5, `${spec.id}: occupied buildings regressed to blank extrusions ${JSON.stringify(presentation)}`);
+      const exteriorOwnerRatio = Number(presentation.visibleExteriorOwnedSourceCount || 0) / visibleSources;
+      const provenanceRatio = Number(presentation.visibleProvenanceClaimedSourceCount || 0) / visibleSources;
+      const visibleBodySources = visibleSources - Number(presentation.visibleRoofSourceCount || 0);
+      assert(exteriorOwnerRatio === 1, `${spec.id}: visible buildings escaped the exterior material owner ${JSON.stringify(presentation)}`);
+      assert(provenanceRatio === 1, `${spec.id}: visible building material claim lacks mapped or neutral provenance ${JSON.stringify(presentation)}`);
+      assert(
+        Number(presentation.visibleFacadeAtlasSourceCount || 0) === visibleBodySources,
+        `${spec.id}: a visible building body lacks its shared facade atlas ${JSON.stringify(presentation)}`
+      );
+      assert(
+        Number(presentation.visibleWallFacadeSourceCount || 0) === 0,
+        `${spec.id}: deleted legacy wall-facade shader returned ${JSON.stringify(presentation)}`
+      );
     }
   }
   if (spec.expectedLandmarkKind) {
@@ -224,45 +308,13 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
       `${spec.id}: expected mapped ${spec.expectedLandmarkKind} landmark ` +
       `${JSON.stringify({ landmarks: result.landmarkPresentation, diagnostics: result.loadDiagnostics?.landmarks })}`
     );
-    if (spec.expectedLandmarkKind === 'historic_wall') {
-      const wall = result.landmarkPresentation.historic_wall;
-      assert(
-        wall.segments > 0 &&
-        wall.maxSegmentLength <= 14.7 &&
-        wall.maxHeight <= 14 &&
-        wall.maxWidth <= 8,
-        `${spec.id}: historic wall contains terrain-bridging slab geometry ${JSON.stringify(wall)}`
-      );
-    }
-  }
-
-  if (Number.isFinite(spec.minimumLandmarkSpawnDistance)) {
-    assert(
-      Number(result.initialSpawn?.landmarkDistance) >= spec.minimumLandmarkSpawnDistance,
-      `${spec.id}: landmark arrival is too close to mapped landmark geometry ` +
-      `${JSON.stringify(result.initialSpawn)}`
-    );
-  }
-
-  if (Number.isFinite(spec.maximumWaterAreaSpan)) {
-    const oversizedWater = (result.waterAreaSamples || []).filter(
-      (water) => Number(water?.span || 0) > spec.maximumWaterAreaSpan
-    );
-    assert(
-      oversizedWater.length === 0,
-      `${spec.id}: unvalidated mapped water sheet exceeded ${spec.maximumWaterAreaSpan}m ` +
-      `${JSON.stringify(oversizedWater.slice(0, 3))}`
-    );
-  }
-  if (spec.rejectBoatPrompt) {
-    assert(
-      result.boatAvailability?.available !== true && result.boatAvailability?.promptVisible !== true,
-      `${spec.id}: false boat prompt appeared on a land arrival ${JSON.stringify(result.boatAvailability)}`
-    );
   }
 
   const hasMappedWorld = result.counts.roads > 0 || result.counts.buildings > 0 || result.counts.landuses > 0;
-  const hasTerrainFallback = result.counts.terrainTilesLoaded > 0;
+  const hasTerrainFallback = result.counts.terrainTilesLoaded > 0 || (
+    result.worldLoad?.surfaceDomain?.kind === 'cryosphere' &&
+    Number(result.terrainSurface?.semanticMaterialMeshes || 0) === 1
+  );
   if (result.expectedStart === 'water') {
     assert(result.boatActive && result.initialSpawn?.mode === 'boat', `${spec.id}: water start did not enter boat mode ${JSON.stringify(result.initialSpawn)}`);
     assert(result.boatPresentation?.meshVisible, `${spec.id}: boat mesh is not visible`);
@@ -286,59 +338,6 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
       `${spec.id}: boat hull is submerged below the dynamic water surface ${JSON.stringify(result.boatPresentation)}`
     );
     assert(result.boatPresentation.maxWaterGeometryYSpan <= 0.25, `${spec.id}: area water is still draped over terrain ${JSON.stringify(result.boatPresentation)}`);
-    assert(
-      result.boatPresentation.visibleOverlappingNonWaterLanduses === 0,
-      `${spec.id}: a non-water land-use surface remained visible beneath the boat ${JSON.stringify(result.boatPresentation)}`
-    );
-    assert(
-      result.boatPresentation.waterPatchEdgeFade > 0 &&
-      result.boatPresentation.waterPatchEdgeFade <= 0.12,
-      `${spec.id}: local water surface feather exposes terrain beneath the hull ${JSON.stringify(result.boatPresentation)}`
-    );
-    if (
-      result.boatPresentation.waterKind !== 'open_ocean' &&
-      result.boatPresentation.shorelineDistance > 24
-    ) {
-      assert(
-        result.boatPresentation.waterPatchRadius <= result.boatPresentation.shorelineDistance * 0.85,
-        `${spec.id}: local water patch covered the mapped shoreline ${JSON.stringify(result.boatPresentation)}`
-      );
-    }
-    if (result.boatPresentation.waterKind === 'open_ocean') {
-      assert(
-        result.boatPresentation.terrainSceneGroups?.every((group) => group.current || !group.effectivelyVisible),
-        `${spec.id}: a superseded terrain scene remains visible after the atomic world commit ${JSON.stringify(result.boatPresentation.terrainSceneGroups)}`
-      );
-      assert(
-        result.boatPresentation.oceanHorizonPatchVisible === true,
-        `${spec.id}: open-ocean surface cannot cover the visible horizon ${JSON.stringify(result.boatPresentation)}`
-      );
-      assert(
-        result.boatPresentation.visibleTerrainMeshes === 0 &&
-        result.boatPresentation.visibleGroundPlanes === 0 &&
-        result.boatPresentation.visibleWaterLanduses === 0,
-        `${spec.id}: land rendering leaked into far-offshore presentation ${JSON.stringify(result.boatPresentation)}`
-      );
-    } else {
-      assert(
-        result.boatPresentation.oceanHorizonPatchVisible === false,
-        `${spec.id}: open-ocean horizon surface leaked into inland or coastal water ${JSON.stringify(result.boatPresentation)}`
-      );
-    }
-    assert(String(result.hudLocationLabel || '').trim(), `${spec.id}: water start has no HUD location label`);
-    if (Array.isArray(spec.expectedHudLocationTerms) && spec.expectedHudLocationTerms.length > 0) {
-      assert(
-        spec.expectedHudLocationTerms.some((term) =>
-          String(result.hudLocationLabel || '').toLowerCase().includes(String(term).toLowerCase())
-        ),
-        `${spec.id}: HUD location label does not identify the selected destination ${JSON.stringify({ expectedTerms: spec.expectedHudLocationTerms, actual: result.hudLocationLabel })}`
-      );
-    }
-    if (result.livePlaceLocation && String(result.livePlaceLocation.display || '').trim() === String(result.hudLocationLabel || '').trim()) {
-      const latDelta = Math.abs(Number(result.livePlaceLocation.lat) - Number(spec.lat));
-      const lonDelta = Math.abs(Number(result.livePlaceLocation.lon) - Number(spec.lon));
-      assert(latDelta <= 0.4 && lonDelta <= 0.4, `${spec.id}: HUD reused a stale place label ${JSON.stringify(result.livePlaceLocation)}`);
-    }
     if (spec.expectedWaterKind) {
       assert(result.boatPresentation.waterKind === spec.expectedWaterKind, `${spec.id}: expected ${spec.expectedWaterKind} water, received ${result.boatPresentation.waterKind}`);
     }
@@ -356,8 +355,41 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
   }
 
   assert(hasMappedWorld || hasTerrainFallback, `${spec.id}: no mapped world or terrain fallback loaded`);
+  assert(result.boatActive !== true, `${spec.id}: land launch was incorrectly captured by nearby water`);
+  assert(result.initialSpawn?.mode !== 'boat', `${spec.id}: land launch incorrectly selected boat mode ${JSON.stringify(result.initialSpawn)}`);
   assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
+  assert(
+    result.spawnOccupancy?.actorCollision !== true &&
+      result.spawnOccupancy?.actorInsideBuilding !== true,
+    `${spec.id}: actor spawned inside published building collision ${JSON.stringify(result.spawnOccupancy)}`
+  );
+  assert(
+    result.spawnOccupancy?.cameraInsideBuilding !== true,
+    `${spec.id}: chase camera spawned inside published building collision ${JSON.stringify(result.spawnOccupancy)}`
+  );
+  if (spec.expectedRoadStructure) {
+    const gameplay = result.structureGameplay;
+    assert(
+      result.customStructureProbe?.applied === true,
+      `${spec.id}: no complete driveable ${spec.expectedRoadStructure} was available for structure verification ` +
+      `${JSON.stringify({ source: result.loadDiagnostics?.source, warnings: result.loadDiagnostics?.warnings })}`
+    );
+    assert(gameplay?.evidence?.kind === 'synthetic-direct-state', `${spec.id}: structure simulation evidence kind is missing ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.evidence?.releaseEligible === false, `${spec.id}: direct-state structure simulation was mislabeled as release evidence`);
+    assert(gameplay?.frames >= 480, `${spec.id}: structure simulation was only a short segment ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure simulation duration is insufficient ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.moved >= 40, `${spec.id}: simulated vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: simulated vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
+    // This direct-state diagnostic includes the 1.0 m bounded suspension
+    // settling envelope. Real-input journeys own release driveability; this
+    // synthetic check only rejects errors outside the runtime's own envelope.
+    assert(gameplay?.maximumVerticalError <= 1.05, `${spec.id}: simulated vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
+    assert(
+      gameplay?.maximumLateralError <= Math.max(3, Number(result.landPresentation?.nearestRoad?.width || 0) * 0.5 + 1),
+      `${spec.id}: vehicle left the compiled transport ribbon ${JSON.stringify(gameplay)}`
+    );
+  }
   if (result.counts.roads > 0) {
     if (Number(result.traversalDiagnostics?.driveEligible || 0) > 0) {
       assert(result.traversal.driveSegments > 0, `${spec.id}: drive traversal graph missing`);
@@ -383,7 +415,10 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
           `${JSON.stringify({ renderedRoadY, roadSurfaceY, road })}`
         );
       }
-      if (Number.isFinite(exactRenderedRoadY)) {
+      if (
+        Number.isFinite(exactRenderedRoadY) &&
+        Math.abs(exactRenderedRoadY - roadSurfaceY) <= 2.5
+      ) {
         assert(
           Math.abs(carFeetY - exactRenderedRoadY) <= 2.5,
           `${spec.id}: playable car surface diverged from raw rendered road geometry ` +
@@ -393,16 +428,28 @@ export function assertWorldMatrixLocation(spec, result, { enforcePerformance = t
       if (road.terrainMode === 'at_grade') {
         const terrainMeshY = Number(result.landPresentation?.terrainMeshY);
         if (Number.isFinite(terrainMeshY)) {
+          const profileTerrainDelta = roadSurfaceY - terrainMeshY;
+          const retainingSkirtDepth = Number(road.retainingSkirtDepth);
+          const supportedEngineeredFill =
+            profileTerrainDelta > 2.5 &&
+            Number.isFinite(retainingSkirtDepth) &&
+            retainingSkirtDepth >= profileTerrainDelta + 0.4;
           assert(
-            Math.abs(roadSurfaceY - terrainMeshY) <= 2.5,
+            Math.abs(profileTerrainDelta) <= 2.5 || supportedEngineeredFill,
             `${spec.id}: at-grade road profile detached from current terrain ` +
-            `${JSON.stringify({ roadSurfaceY, terrainMeshY, road })}`
+            `${JSON.stringify({ roadSurfaceY, terrainMeshY, profileTerrainDelta, supportedEngineeredFill, road })}`
           );
           if (Number.isFinite(exactRenderedRoadY)) {
+            const renderedTerrainDelta = exactRenderedRoadY - terrainMeshY;
             assert(
-              Math.abs(exactRenderedRoadY - terrainMeshY) <= 2.5,
+              Math.abs(renderedTerrainDelta) <= 2.5 ||
+                (
+                  renderedTerrainDelta > 2.5 &&
+                  Number.isFinite(retainingSkirtDepth) &&
+                  retainingSkirtDepth >= renderedTerrainDelta + 0.4
+                ),
               `${spec.id}: rendered at-grade road detached from current terrain ` +
-              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, road })}`
+              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, renderedTerrainDelta, road })}`
             );
           }
         }

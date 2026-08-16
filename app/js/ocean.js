@@ -17,13 +17,14 @@ import {
   getSeabedTextureSet as getSeabedTextureSetAsset
 } from "./ocean/scene-textures.js?v=1";
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=1";
-import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=1";
+import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=3";
 import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=2";
 import {
-  beginEnvironmentTransition,
   commitEnvironment,
-  exitCurrentEnvironmentSync
+  exitCurrentEnvironmentSync,
+  registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
 const OCEAN_SITE = Object.freeze({
   name: 'Coral Shelf Reserve',
@@ -85,6 +86,9 @@ Object.assign(oceanMode, {
   localBathymetryGrid: null,
   localBathymetryReady: false,
   localBathymetryPromise: null,
+  globalBathymetryGrid: null,
+  globalBathymetryReady: false,
+  globalBathymetryPromise: null,
   weatherRefreshTimer: 0,
   submarine: {
     mesh: null,
@@ -97,19 +101,8 @@ Object.assign(oceanMode, {
     verticalSpeed: 0
   }
 });
-
-const oceanFrameOwnerDefinition = Object.freeze({
-  id: 'ocean.mode-renderer',
-  label: 'Ocean mode renderer',
-  kind: 'continuous-renderer',
-  exclusiveGroup: 'environment-renderer',
-  getState: () => ({
-    active: !!oceanMode.active && oceanMode.animationId != null && !document.hidden,
-    scheduled: !!oceanMode.active && oceanMode.animationId != null,
-    suspended: !!oceanMode.active && oceanMode.animationId != null && document.hidden
-  })
-});
 appCtx.oceanMode = oceanMode;
+const oceanModuleScope = createLifecycleScope('ocean-module');
 let oceanSessionScope = null;
 
 const _tmpVecA = new THREE.Vector3();
@@ -373,6 +366,9 @@ function resetOceanLaunchSite(site = null) {
   oceanMode.bathymetryCache.clear();
   oceanMode.bathymetryTileKeys = [];
   oceanMode.bathymetryPromise = null;
+  oceanMode.globalBathymetryGrid = null;
+  oceanMode.globalBathymetryReady = false;
+  oceanMode.globalBathymetryPromise = null;
   oceanMode.bathymetryReady = false;
   oceanMode.bathymetryBlend = 0;
   return true;
@@ -500,16 +496,7 @@ function updateSubmarine(dt) {
 
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
-  if (document.hidden) {
-    oceanMode.animationId = null;
-    oceanMode.lastFrameMs = nowMs;
-    return;
-  }
   oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
-  if (oceanMode.animationId == null) {
-    oceanMode.active = false;
-    return;
-  }
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
   const dt = Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
@@ -535,36 +522,31 @@ function animateOceanMode(nowMs = 0) {
   oceanMode.renderer.render(oceanMode.scene, oceanMode.camera);
 }
 
-function bindOceanSessionVisibility(destinationScope) {
-  destinationScope.listen(document, 'visibilitychange', () => {
-    if (oceanSessionScope !== destinationScope || !oceanMode.active) return;
-    if (document.hidden) {
-      destinationScope.cancelAnimationFrame(oceanMode.animationId);
-      oceanMode.animationId = null;
-      oceanMode.lastFrameMs = performance.now();
-      return;
-    }
-    if (oceanMode.animationId == null) {
-      oceanMode.animationId = destinationScope.animationFrame(animateOceanMode);
-    }
-  });
-}
-
 function startOceanMode(options = {}) {
-  if (oceanMode.active) return true;
-  try {
-    const transition = beginEnvironmentTransition(appCtx.ENV.OCEAN, { source: 'ocean_start' });
-    if (appCtx.ENV?.OCEAN) exitCurrentEnvironmentSync(appCtx.ENV.OCEAN, { source: 'ocean_start' });
-    if (!commitEnvironment(appCtx.ENV.OCEAN, { token: transition })) {
-      throw new Error('Ocean destination commit was rejected.');
+  if (oceanMode.active) {
+    if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
+      resetSubmarineAtLaunch(options.submarinePose || null);
+      rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
+      void primeBathymetryTiles().then((ready) => {
+        if (ready && oceanMode.active && oceanMode.scene) {
+          rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
+        }
+      });
+      updateOceanHud(performance.now() * 0.001);
     }
-    oceanSessionScope = transition.session.scope;
-    bindOceanSessionVisibility(oceanSessionScope);
+    return true;
+  }
+  try {
+    if (appCtx.ENV?.OCEAN) exitCurrentEnvironmentSync(appCtx.ENV.OCEAN, { source: 'ocean_start' });
+    if (appCtx.ENV?.OCEAN) commitEnvironment(appCtx.ENV.OCEAN, { source: 'ocean_start' });
+    oceanSessionScope?.dispose('ocean-session-replaced');
+    oceanSessionScope = createLifecycleScope('ocean-session');
 
     if (options.launchSite) {
       resetOceanLaunchSite(options.launchSite);
     }
     if (!oceanMode.scene || !oceanMode.renderer || !oceanMode.camera) createOceanScene();
+    oceanSessionScope.defer(() => destroyOceanScene(), 'renderer');
     resetSubmarineAtLaunch(options.submarinePose || null);
     rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
 
@@ -575,9 +557,7 @@ function startOceanMode(options = {}) {
     oceanMode.active = true;
     oceanMode.lastFrameMs = 0;
     oceanMode.weatherRefreshTimer = 0;
-    oceanMode.animationId = document.hidden
-      ? null
-      : oceanSessionScope.animationFrame(animateOceanMode);
+    oceanMode.animationId = oceanSessionScope.animationFrame(animateOceanMode);
     if (typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(true);
     }
@@ -621,7 +601,7 @@ function startOceanMode(options = {}) {
 function stopOceanMode(options = {}) {
   const wasActive = !!oceanMode.active;
   oceanMode.active = false;
-  oceanSessionScope?.dispose('ocean-mode-exit');
+  oceanSessionScope?.dispose('ocean-exit');
   oceanSessionScope = null;
   if (oceanMode.animationId) {
     cancelAnimationFrame(oceanMode.animationId);
@@ -637,8 +617,6 @@ function stopOceanMode(options = {}) {
   const indBrake = document.getElementById('indBrake');
   const indBoost = document.getElementById('indBoost');
   const indDrift = document.getElementById('indDrift');
-  const indOff = document.getElementById('indOff');
-  const offRoadWarn = document.getElementById('offRoadWarn');
   if (speedUnitEl) speedUnitEl.textContent = 'MPH';
   if (limitLabelEl) limitLabelEl.textContent = 'LIMIT';
   if (indBrake) {
@@ -650,22 +628,16 @@ function stopOceanMode(options = {}) {
     indBoost.classList.remove('on');
   }
   if (indDrift) indDrift.textContent = 'DRIFT';
-  if (indOff) {
-    indOff.textContent = 'OFF';
-    indOff.classList.remove('on', 'warn');
-  }
-  if (offRoadWarn) offRoadWarn.classList.remove('active');
-
   if (options.commitEnvironment !== false && appCtx.ENV?.EARTH) {
     commitEnvironment(appCtx.ENV.EARTH, { source: 'ocean_stop' });
   }
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
   if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
-  destroyOceanScene();
+  if (oceanMode.scene || oceanMode.renderer) destroyOceanScene();
   return wasActive;
 }
 
-const oceanDestinationAdapter = Object.freeze({
+registerEnvironmentLifecycle(appCtx.ENV.OCEAN, {
   exitSync: () => stopOceanMode({ commitEnvironment: false }),
   snapshot: () => ({
     active: !!oceanMode.active,
@@ -697,7 +669,7 @@ function initOceanModeUI() {
   const legacyHud = document.getElementById('oceanModeHUD');
   if (legacyHud && legacyHud.parentElement) legacyHud.parentElement.removeChild(legacyHud);
 
-  window.addEventListener('resize', () => {
+  oceanModuleScope.listen(window, 'resize', () => {
     if (!oceanMode.renderer || !oceanMode.camera) return;
     oceanMode.camera.aspect = window.innerWidth / window.innerHeight;
     oceanMode.camera.updateProjectionMatrix();
@@ -714,7 +686,6 @@ function getOceanModeDebugState() {
     pitch: Number.isFinite(sub.pitch) ? sub.pitch : null,
     roll: Number.isFinite(sub.roll) ? sub.roll : null,
     speed: Number.isFinite(sub.speed) ? sub.speed : null,
-    turnSpeed: Number.isFinite(sub.turnSpeed) ? sub.turnSpeed : null,
     verticalSpeed: Number.isFinite(sub.verticalSpeed) ? sub.verticalSpeed : null,
     position: sub.position ? {
       x: Number.isFinite(sub.position.x) ? sub.position.x : null,
@@ -734,15 +705,14 @@ Object.assign(appCtx, {
   getOceanModeDebugState
 });
 
-export {
-  animateOceanMode,
-  initOceanModeUI,
-  oceanDestinationAdapter,
-  oceanFrameOwnerDefinition,
-  startOceanMode,
-  stopOceanMode
-};
+export { animateOceanMode, startOceanMode, stopOceanMode };
 
 if (typeof globalThis !== 'undefined') {
   globalThis.getOceanModeDebugState = getOceanModeDebugState;
+}
+
+if (document.readyState === 'loading') {
+  oceanModuleScope.listen(document, 'DOMContentLoaded', initOceanModeUI, { once: true });
+} else {
+  initOceanModeUI();
 }

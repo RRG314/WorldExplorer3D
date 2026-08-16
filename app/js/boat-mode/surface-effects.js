@@ -7,42 +7,16 @@ import {
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
-} from "./water-query.js?v=14";
+} from "./water-query.js?v=18";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";
 
-function ensureBoatOceanHorizonPatch() {
-  if (appCtx.boatMode?.oceanHorizonPatch || typeof THREE === 'undefined' || !appCtx.scene) {
-    return appCtx.boatMode?.oceanHorizonPatch || null;
-  }
-  const palette = getWaterPalette();
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1, 1, 1).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({
-      color: palette.surface,
-      emissive: palette.emissive,
-      emissiveIntensity: 0.1,
-      roughness: 0.5,
-      metalness: 0.02,
-      side: THREE.DoubleSide
-    })
-  );
-  mesh.name = 'BoatOceanHorizonPatch';
-  mesh.visible = false;
-  mesh.frustumCulled = false;
-  mesh.renderOrder = -1;
-  appCtx.scene.add(mesh);
-  appCtx.boatMode.oceanHorizonPatch = mesh;
-  return mesh;
-}
-
 function ensureBoatWaterPatch() {
-  ensureBoatOceanHorizonPatch();
   if (appCtx.boatMode?.waterPatch || typeof THREE === 'undefined' || !appCtx.scene) return appCtx.boatMode?.waterPatch || null;
   const geometry = new THREE.PlaneGeometry(1, 1, 128, 128);
   geometry.rotateX(-Math.PI / 2);
-  const palette = getWaterPalette();
+  const palette = getWaterPalette(appCtx.boatMode?.waterKind);
   const material = new THREE.MeshStandardMaterial({
     color: palette.surface,
     emissive: palette.emissive,
@@ -63,7 +37,7 @@ function ensureBoatWaterPatch() {
       waveBase: 1.28,
       visualBase: 0.78,
       foamBase: 1.38,
-      edgeFade: 0.08,
+      edgeFade: 0.46,
       useRuntimeKind: true,
       localPatch: true,
       shaderKey: 'boatPatchWake',
@@ -94,20 +68,17 @@ function updateBoatWaterPatch(candidate = null) {
   if (!patch) return false;
   if (!appCtx.boatMode?.active) {
     patch.visible = false;
-    if (appCtx.boatMode?.oceanHorizonPatch) appCtx.boatMode.oceanHorizonPatch.visible = false;
     return false;
   }
   const waterKind = String(candidate?.waterKind || appCtx.boatMode?.waterKind || 'coastal').toLowerCase();
-  const palette = getWaterPalette();
-  const baseRadius =
+  const palette = getWaterPalette(waterKind);
+  const radius =
     waterKind === 'harbor' ? 110 :
     waterKind === 'channel' ? 90 :
     waterKind === 'lake' ? 150 :
-    waterKind === 'open_ocean' ? 96 : 210;
-  const shorelineDistance = Number(candidate?.shorelineDistance ?? appCtx.boatMode?.shorelineDistance);
-  const radius = Number.isFinite(shorelineDistance) && shorelineDistance > 0 && waterKind !== 'open_ocean'
-    ? Math.min(baseRadius, Math.max(18, shorelineDistance * 0.8))
-    : baseRadius;
+    // One fixed open-ocean location surface reaches the horizon without
+    // terrain streaming or a moving ring of newly loaded tiles.
+    waterKind === 'open_ocean' ? 14000 : 210;
   patch.visible = true;
   patch.position.set(
     appCtx.boat.x,
@@ -117,7 +88,6 @@ function updateBoatWaterPatch(candidate = null) {
   // The geometry is pre-rotated onto the XZ plane, so scale the footprint on X/Z.
   // Scaling Y here collapses the patch into a moving strip and exaggerates wave height.
   patch.scale.set(radius * 2.05, 1, radius * 2.05);
-  patch.userData.waterPatchRadius = radius;
   patch.material.opacity = 1;
   if (patch.material.color?.setHex) patch.material.color.setHex(palette.surface);
   if (patch.material.emissive?.setHex) patch.material.emissive.setHex(palette.emissive);
@@ -127,14 +97,6 @@ function updateBoatWaterPatch(candidate = null) {
     waterKind === 'harbor' || waterKind === 'channel' ? 0.4 :
     0.42;
   patch.material.metalness = 0.02;
-  const horizonPatch = ensureBoatOceanHorizonPatch();
-  if (horizonPatch) {
-    horizonPatch.visible = waterKind === 'open_ocean';
-    if (horizonPatch.visible) {
-      horizonPatch.position.set(appCtx.boat.x, patch.position.y - 0.025, appCtx.boat.z);
-      horizonPatch.scale.set(24000, 1, 24000);
-    }
-  }
   if (!patch.material.userData?.weWaterWaveShader) patch.material.needsUpdate = true;
   return true;
 }
@@ -240,191 +202,6 @@ function updateBoatPatchWakeUniforms(profile = null) {
     0,
     2.5
   );
-  return true;
-}
-
-function syncBoatTerrainSuppression() {
-  const active = !!appCtx.boatMode?.active;
-  const shoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
-  const waterKind = String(appCtx.boatMode?.waterKind || '').toLowerCase();
-  const offshore = Math.max(
-    shoreline,
-    Number(appCtx.boatMode?.offshoreDistance || 0)
-  );
-  const farOffshoreWater =
-    active &&
-    offshore > 160 &&
-    (waterKind === 'open_ocean' || waterKind === 'coastal');
-  const clutterRadius = active ?
-    farOffshoreWater ? clamp(offshore * 4.5, 1080, 6200) :
-    waterKind === 'open_ocean' ? clamp(offshore * 0.92, 160, 460) :
-    waterKind === 'coastal' ? clamp(offshore * 0.7, 110, 300) :
-    waterKind === 'lake' ? 34 :
-    waterKind === 'harbor' ? 24 :
-    waterKind === 'channel' ? 18 :
-    0 :
-    0;
-  const hideVegetation = active && (
-    farOffshoreWater ? true :
-    waterKind === 'open_ocean' ? offshore > 34 :
-    waterKind === 'coastal' ? offshore > 86 :
-    false
-  );
-
-  const terrainMeshes = Array.isArray(appCtx.terrainGroup?.children) ? appCtx.terrainGroup.children : [];
-  const groundPlanes = [];
-  (appCtx.earthSceneRoot || appCtx.scene)?.traverse?.((object) => {
-    if (object?.userData?.isGroundPlane) groundPlanes.push(object);
-  });
-  const urbanSurfaceMeshes = Array.isArray(appCtx.urbanSurfaceMeshes) ? appCtx.urbanSurfaceMeshes : [];
-  const landuseMeshes = Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes : [];
-  const streetFurnitureMeshes = Array.isArray(appCtx.streetFurnitureMeshes) ? appCtx.streetFurnitureMeshes : [];
-  const vegetationMeshes = Array.isArray(appCtx.vegetationMeshes) ? appCtx.vegetationMeshes : [];
-  const linearFeatureMeshes = Array.isArray(appCtx.linearFeatureMeshes) ? appCtx.linearFeatureMeshes : [];
-
-  const clearSuppression = (mesh, restoreVisible = true) => {
-    if (!mesh?.userData?.boatSuppressed) return;
-    mesh.userData.boatSuppressed = false;
-    if (restoreVisible) mesh.visible = true;
-  };
-  const meshCenterXZ = (mesh) => {
-    if (!mesh) return null;
-    const furniturePos = mesh.userData?.furniturePos;
-    if (furniturePos && Number.isFinite(furniturePos.x) && Number.isFinite(furniturePos.z)) {
-      return { x: furniturePos.x, z: furniturePos.z };
-    }
-    const geom = mesh.geometry;
-    if (geom) {
-      if (!geom.boundingSphere) geom.computeBoundingSphere();
-      if (geom.boundingSphere) {
-        const center = geom.boundingSphere.center.clone();
-        mesh.localToWorld(center);
-        if (Number.isFinite(center.x) && Number.isFinite(center.z)) {
-          return { x: center.x, z: center.z };
-        }
-      }
-    }
-    if (mesh.position && Number.isFinite(mesh.position.x) && Number.isFinite(mesh.position.z)) {
-      return { x: mesh.position.x, z: mesh.position.z };
-    }
-    return null;
-  };
-  const meshRadius = (mesh) => {
-    const geom = mesh?.geometry;
-    if (geom && !geom.boundingSphere) geom.computeBoundingSphere();
-    return Number(geom?.boundingSphere?.radius || 0);
-  };
-  const overlapSuppressed = (mesh, radius) => {
-    const center = meshCenterXZ(mesh);
-    if (!center || radius <= 0) return false;
-    const dx = center.x - appCtx.boat.x;
-    const dz = center.z - appCtx.boat.z;
-    const overlapRadius = radius + meshRadius(mesh);
-    return dx * dx + dz * dz <= overlapRadius * overlapRadius;
-  };
-  const isWaterSurfaceMesh = (mesh) => {
-    if (!mesh) return false;
-    if (mesh.userData?.isWaterwayLine) return true;
-    const landuseType = String(mesh.userData?.landuseType || '').toLowerCase();
-    const surfaceVariant = String(mesh.userData?.surfaceVariant || '').toLowerCase();
-    return landuseType === 'water' || surfaceVariant === 'water' || surfaceVariant === 'ice';
-  };
-
-  const suppressFallbackGround = farOffshoreWater;
-  const replaceMappedWaterSurface = active && waterKind === 'open_ocean';
-  for (let i = 0; i < groundPlanes.length; i++) {
-    const mesh = groundPlanes[i];
-    if (!suppressFallbackGround) {
-      clearSuppression(mesh, true);
-      continue;
-    }
-    mesh.userData.boatSuppressed = true;
-    mesh.visible = false;
-  }
-
-  for (let i = 0; i < terrainMeshes.length; i++) {
-    const mesh = terrainMeshes[i];
-    if (!mesh) continue;
-    if (!active) {
-      clearSuppression(mesh, true);
-      continue;
-    }
-    const suppressed = farOffshoreWater
-      ? waterKind === 'open_ocean' || overlapSuppressed(mesh, clutterRadius)
-      : clutterRadius > 0 && overlapSuppressed(mesh, clutterRadius);
-    mesh.userData.boatSuppressed = suppressed;
-    if (suppressed) mesh.visible = false;
-    else clearSuppression(mesh, true);
-  }
-
-  for (let i = 0; i < landuseMeshes.length; i++) {
-    const mesh = landuseMeshes[i];
-    if (!mesh) continue;
-    const waterSurface = isWaterSurfaceMesh(mesh);
-    if (waterSurface) {
-      if (replaceMappedWaterSurface) {
-        mesh.userData.boatSuppressed = true;
-        mesh.visible = false;
-      } else {
-        clearSuppression(mesh, mesh.userData?.alwaysVisible || !!appCtx.landUseVisible);
-      }
-      continue;
-    }
-    if (!active || clutterRadius <= 0) {
-      clearSuppression(mesh, mesh.userData?.alwaysVisible || !!appCtx.landUseVisible);
-      continue;
-    }
-    const suppressed = overlapSuppressed(mesh, clutterRadius);
-    mesh.userData.boatSuppressed = suppressed;
-    if (suppressed) mesh.visible = false;
-  }
-
-  for (let i = 0; i < urbanSurfaceMeshes.length; i++) {
-    const mesh = urbanSurfaceMeshes[i];
-    if (!mesh) continue;
-    if (!active || clutterRadius <= 0) {
-      clearSuppression(mesh, true);
-      continue;
-    }
-    const suppressed = overlapSuppressed(mesh, clutterRadius * 0.9);
-    mesh.userData.boatSuppressed = suppressed;
-    if (suppressed) mesh.visible = false;
-  }
-
-  for (let i = 0; i < linearFeatureMeshes.length; i++) {
-    const mesh = linearFeatureMeshes[i];
-    if (!mesh) continue;
-    if (!active || clutterRadius <= 0) {
-      clearSuppression(mesh, appCtx.showPathOverlays !== false);
-      continue;
-    }
-    const suppressed = overlapSuppressed(mesh, clutterRadius * 0.88);
-    mesh.userData.boatSuppressed = suppressed;
-    if (suppressed) mesh.visible = false;
-  }
-
-  for (let i = 0; i < streetFurnitureMeshes.length; i++) {
-    const mesh = streetFurnitureMeshes[i];
-    if (!mesh) continue;
-    if (!active || clutterRadius <= 0) {
-      clearSuppression(mesh, true);
-      continue;
-    }
-    const suppressed = overlapSuppressed(mesh, clutterRadius * 0.72);
-    mesh.userData.boatSuppressed = suppressed;
-    if (suppressed) mesh.visible = false;
-  }
-
-  for (let i = 0; i < vegetationMeshes.length; i++) {
-    const mesh = vegetationMeshes[i];
-    if (!mesh) continue;
-    if (!hideVegetation) {
-      clearSuppression(mesh, true);
-      continue;
-    }
-    mesh.userData.boatSuppressed = true;
-    mesh.visible = false;
-  }
   return true;
 }
 
@@ -715,7 +492,6 @@ export {
   applyBoatWavePose,
   ensureBoatWaterPatch,
   resetBoatFoamFx,
-  syncBoatTerrainSuppression,
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals

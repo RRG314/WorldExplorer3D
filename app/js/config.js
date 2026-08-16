@@ -2,6 +2,11 @@
 // config.js - Game configuration, locations, and constants
 // ============================================================================
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import {
+  createLocalEnuFrame,
+  geographicToLocalEnu,
+  localEnuToGeographic
+} from "./terrain/source-contract.js?v=2";
 
 const LOCS = {
   baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122 },
@@ -24,7 +29,45 @@ const locKeys = Object.keys(LOCS);
 const SCALE = 100000;
 let LOC = { lat: 39.2904, lon: -76.6122 };
 let customLoc = null;
-const geoToWorld = (lat, lon) => ({ x: (lon - LOC.lon) * SCALE * Math.cos(LOC.lat * Math.PI / 180), z: -(lat - LOC.lat) * SCALE });
+let projectionFrameKey = '';
+let projectionFrame = null;
+function localProjectionFrame() {
+  const key = `${Number(LOC.lat).toFixed(9)}:${Number(LOC.lon).toFixed(9)}`;
+  if (projectionFrameKey !== key) {
+    projectionFrameKey = key;
+    projectionFrame = createLocalEnuFrame({ latitude: Number(LOC.lat), longitude: Number(LOC.lon) });
+  }
+  return projectionFrame;
+}
+const usesPolarLocalProjection = () => Math.abs(Number(LOC.lat) || 0) >= 84;
+const geoToWorld = (lat, lon) => {
+  if (!usesPolarLocalProjection()) {
+    return { x: (lon - LOC.lon) * SCALE * Math.cos(LOC.lat * Math.PI / 180), z: -(lat - LOC.lat) * SCALE };
+  }
+  const local = geographicToLocalEnu(localProjectionFrame(), {
+    latitude: Number(lat),
+    longitude: Number(lon),
+    heightMeters: 0
+  });
+  return {
+    x: local.eastMeters * WORLD_UNITS_PER_METER,
+    z: -local.northMeters * WORLD_UNITS_PER_METER
+  };
+};
+const worldToGeo = (x, z) => {
+  if (!usesPolarLocalProjection()) {
+    return {
+      lat: LOC.lat - z / SCALE,
+      lon: LOC.lon + x / (SCALE * Math.cos(LOC.lat * Math.PI / 180))
+    };
+  }
+  const geographic = localEnuToGeographic(localProjectionFrame(), {
+    eastMeters: Number(x) / WORLD_UNITS_PER_METER,
+    northMeters: -Number(z) / WORLD_UNITS_PER_METER,
+    upMeters: 0
+  });
+  return { lat: geographic.latitude, lon: geographic.longitude };
+};
 
 // =====================
 // TERRAIN (Terrarium tiles)
@@ -48,8 +91,6 @@ const WORLD_UNITS_PER_METER = 1 / METERS_PER_WORLD_UNIT; // ~0.90
 const terrainTileCache = new Map(); // key: `${z}/${x}/${y}` => {loaded, elev, w, h}
 let terrainGroup = null; // THREE.Group holding terrain meshes
 let terrainEnabled = true; // toggle for terrain system
-let roadsNeedRebuild = true; // rebuild roads after terrain loads
-let lastRoadRebuildCheck = 0; // throttle rebuild checks
 
 // Land use styles for massive visual realism - ground truth rendering
 const LANDUSE_STYLES = {
@@ -130,8 +171,6 @@ exposeMutableGlobal('LOC', () => LOC, (v) => {LOC = v;});
 exposeMutableGlobal('customLoc', () => customLoc, (v) => {customLoc = v;});
 exposeMutableGlobal('terrainGroup', () => terrainGroup, (v) => {terrainGroup = v;});
 exposeMutableGlobal('terrainEnabled', () => terrainEnabled, (v) => {terrainEnabled = v;});
-exposeMutableGlobal('roadsNeedRebuild', () => roadsNeedRebuild, (v) => {roadsNeedRebuild = v;});
-exposeMutableGlobal('lastRoadRebuildCheck', () => lastRoadRebuildCheck, (v) => {lastRoadRebuildCheck = v;});
 
 Object.assign(appCtx, {
   LANDUSE_STYLES,
@@ -146,6 +185,7 @@ Object.assign(appCtx, {
   TERRAIN_ZOOM,
   WORLD_UNITS_PER_METER,
   geoToWorld,
+  worldToGeo,
   locKeys,
   terrainTileCache
 });
@@ -165,9 +205,8 @@ export {
   WORLD_UNITS_PER_METER,
   customLoc,
   geoToWorld,
-  lastRoadRebuildCheck,
+  worldToGeo,
   locKeys,
-  roadsNeedRebuild,
   terrainEnabled,
   terrainGroup,
   terrainTileCache };

@@ -34,19 +34,24 @@ const SOURCES = Object.freeze({
     url: 'https://sci.esa.int/web/hubble/-/38599-hubble-s-sharpest-view-of-the-orion-nebula'
   }),
   nasaCarina: Object.freeze({
-    id: 'nasa-hubble-carina-dss',
-    label: 'NASA Hubble / Digitized Sky Survey Carina image',
-    url: 'https://science.nasa.gov/asset/hubble/dss-image-of-the-carina-nebula/'
+    id: 'nasa-webb-carina-cosmic-cliffs',
+    label: 'NASA Webb NIRCam / MIRI Carina Cosmic Cliffs composite',
+    url: 'https://science.nasa.gov/asset/webb/cosmic-cliffs-in-the-carina-nebula-nircam-and-miri-composite-image/'
   }),
   nasaCrab: Object.freeze({
-    id: 'nasa-hubble-crab-nebula',
-    label: 'NASA Hubble Crab Nebula image',
-    url: 'https://science.nasa.gov/asset/hubble/scale-and-compass-for-crab-nebula/'
+    id: 'nasa-webb-crab-nebula',
+    label: 'NASA Webb NIRCam / MIRI Crab Nebula composite',
+    url: 'https://science.nasa.gov/asset/webb/crab-nebula-nircam-and-miri-image/'
   }),
   nasaAndromeda: Object.freeze({
     id: 'nasa-galex-spitzer-andromeda',
     label: 'NASA GALEX / Spitzer Andromeda composite',
     url: 'https://science.nasa.gov/photojournal/amazing-andromeda-galaxy/'
+  }),
+  nasaMilkyWay: Object.freeze({
+    id: 'nasa-spitzer-milky-way-plane',
+    label: 'NASA Spitzer Galactic Legacy Infrared Mid-Plane Survey Extraordinaire',
+    url: 'https://science.nasa.gov/photojournal/a-glimpse-of-the-milky-way/'
   })
 });
 
@@ -85,7 +90,7 @@ const CATALOG = [
     objectClass: 'universe',
     parentId: null,
     address: 'universe',
-    accuracy: 'model-derived',
+    accuracy: 'observed panorama / model-derived exterior',
     visualProfile: { kind: 'cosmic-web', seed: 1447 },
     provenance: [SOURCES.ned]
   }),
@@ -110,8 +115,19 @@ const CATALOG = [
     accuracy: 'model-derived',
     canonicalPosition: { frame: 'galactocentric', xLy: 0, yLy: 0, zLy: 0 },
     physical: { radiusLy: 50000, thicknessLy: 1000 },
-    visualProfile: { kind: 'barred-spiral', arms: 4, seed: 271828 },
-    provenance: [SOURCES.gaia]
+    visualProfile: {
+      kind: 'barred-spiral',
+      arms: 4,
+      seed: 271828,
+      image: 'assets/textures/universe/milky-way-spitzer.jpg',
+      imageAspect: 4.511,
+      imageCredit: 'NASA/JPL-Caltech/University of Wisconsin',
+      imageSourceUrl: SOURCES.nasaMilkyWay.url,
+      imageRole: 'inside-galaxy-observed-plane',
+      displayWidth: 15000
+    },
+    generatedFlags: ['observational-sky-projection'],
+    provenance: [SOURCES.gaia, SOURCES.nasaMilkyWay]
   }),
   entity({
     id: 'sol',
@@ -300,14 +316,15 @@ const CATALOG = [
     physical: { radiusLy: 12 },
     visualProfile: {
       kind: 'observational-nebula',
-      image: 'assets/textures/universe/orion-nebula-nasa.jpg?v=2',
-      imageAspect: 1,
+      image: 'assets/textures/universe/orion-nebula-nasa.jpg?v=3',
+      imageAspect: 2.0833,
+      displayWidth: 24000,
       imageCredit: 'NASA, ESA, M. Robberto (STScI/ESA), Hubble Orion Treasury Project Team',
       seed: 1976,
       tint: 0x89a7ff,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['volumetric-density-model', 'display-time-acceleration'],
+    generatedFlags: ['observational-image-projection'],
     uncertainty: { distance: 'Published estimates vary by method and sub-region.' },
     provenance: [SOURCES.nasaOrion]
   }),
@@ -323,14 +340,15 @@ const CATALOG = [
     physical: { radiusLy: 115 },
     visualProfile: {
       kind: 'observational-nebula',
-      image: 'assets/textures/universe/carina-nebula-dss.jpg',
-      imageAspect: 1.263,
-      imageCredit: 'DSS, STScI/AURA, Palomar/Caltech, UKSTU/AAO',
+      image: 'assets/textures/universe/carina-nebula-webb.jpg?v=1',
+      imageAspect: 2.8902,
+      displayWidth: 32000,
+      imageCredit: 'NASA, ESA, CSA, STScI',
       seed: 3372,
       tint: 0xff9a73,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['volumetric-density-model', 'display-time-acceleration'],
+    generatedFlags: ['observational-image-projection'],
     uncertainty: { distance: 'Representative distance to the Carina star-forming complex.' },
     provenance: [SOURCES.nasaCarina]
   }),
@@ -346,14 +364,15 @@ const CATALOG = [
     physical: { radiusLy: 5.5 },
     visualProfile: {
       kind: 'observational-nebula',
-      image: 'assets/textures/universe/crab-nebula-hubble.png',
-      imageAspect: 1,
-      imageCredit: 'NASA, ESA, Z. Levay (STScI)',
+      image: 'assets/textures/universe/crab-nebula-webb.jpg?v=1',
+      imageAspect: 1.1488,
+      displayWidth: 20000,
+      imageCredit: 'NASA, ESA, CSA, STScI, Tea Temim (Princeton University); Image Processing: Joseph DePasquale (STScI)',
       seed: 1952,
       tint: 0x7ee0b7,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['volumetric-density-model', 'display-time-acceleration'],
+    generatedFlags: ['observational-image-projection'],
     provenance: [SOURCES.nasaCrab]
   }),
   entity({

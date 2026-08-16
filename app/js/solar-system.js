@@ -3,9 +3,9 @@ import {
   createAsteroidBelt as createSolarSystemAsteroidBelt,
   createKuiperBelt as createSolarSystemKuiperBelt,
   createMoonSystems as createSolarSystemMoonSystems
-} from "./solar-system/minor-bodies.js?v=10";
+} from "./solar-system/minor-bodies.js?v=9";
 import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=2";
-import { initSolarSystemModel } from "./solar-system/init.js?v=2";
+import { initSolarSystemModel } from "./solar-system/init.js?v=5";
 import {
   createInfoPanel as createSolarSystemInfoPanel,
   createToggleButton as createSolarSystemToggleButton,
@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=14";
+} from "./solar-system/ui.js?v=16";
 import {
   ASTEROID_BELT,
   AU_TO_SCENE,
@@ -172,7 +172,7 @@ function computeOrbitPath(planet, numPoints) {
     // Convert AU to scene coords with same mapping as helioToScene
     points.push(new THREE.Vector3(
       pos.x * scale,
-      pos.z * scale * 0.3, // flatten vertical for readability
+      pos.z * scale,
       pos.y * scale // swap y/z for Three.js coordinate system
     ));
   }
@@ -191,7 +191,7 @@ function helioToScene(realPos, visualDist, semiMajorAxis) {
   const scale = visualDist / a;
   return {
     x: realPos.x * scale,
-    y: realPos.z * scale * 0.3, // flatten vertical for readability
+    y: realPos.z * scale,
     z: realPos.y * scale // swap y/z for Three.js coords
   };
 }
@@ -344,6 +344,30 @@ function initSolarSystem(spaceScene) {
   }, spaceScene);
 }
 
+function resetSolarSystemRuntime() {
+  if (appCtx.spaceFlight?.canvas) {
+    appCtx.spaceFlight.canvas.removeEventListener('click', onSolarSystemClick);
+  }
+  Object.assign(solarSystem, {
+    group: null,
+    sunMesh: null,
+    planetMeshes: [],
+    moonMeshes: [],
+    orbitLines: [],
+    asteroidBelt: null,
+    kuiperBelt: null,
+    asteroidMeshes: [],
+    spacecraftMeshes: [],
+    galaxyMeshes: [],
+    orbitMarkers: [],
+    selectedPlanet: null,
+    raycaster: null,
+    mouse: null,
+    _earthVisualPos: null,
+    initialized: false
+  });
+}
+
 // ---------------------------------------------------------------------------
 // UPDATE MOON POSITIONS
 // ---------------------------------------------------------------------------
@@ -352,7 +376,6 @@ function updateMoonPositions(date) {
 
   const elapsedDays = date.getTime() / 86400000;
   solarSystem.moonMeshes.forEach((moon) => {
-    moon.orbitGroup?.position.copy(moon.planetMesh.position);
     const angularSpeed = Math.PI * 2 / moon.orbitDays;
     const theta = moon.phaseOffset + elapsedDays * angularSpeed * solarSystem.MOON_TIME_SCALE;
     const localX = Math.cos(theta) * moon.orbitRadius;
@@ -483,6 +506,8 @@ function getAllSpaceBodies() {
       name: 'Sun',
       position: solarSystem.sunMesh.position.clone().add(solarSystem.group.position),
       radius: solarSystem.SUN_SIZE,
+      massKg: 1.98847e30,
+      physicalRadiusKm: 695700,
       mesh: solarSystem.sunMesh,
       landable: false
     });
@@ -495,6 +520,8 @@ function getAllSpaceBodies() {
         name: entry.planet.name,
         position: entry.mesh.position.clone().add(solarSystem.group.position),
         radius: entry.planet.radiusScaled,
+        massKg: entry.planet.massKg,
+        physicalRadiusKm: entry.planet.physicalRadiusKm,
         mesh: entry.mesh,
         landable: entry.planet.name === 'Mars'
       });
@@ -545,6 +572,8 @@ function getAllSpaceBodies() {
       name: 'Earth',
       position: appCtx.spaceFlight.earth.position.clone(),
       radius: 50,
+      massKg: 5.97237e24,
+      physicalRadiusKm: 6371,
       mesh: appCtx.spaceFlight.earth,
       landable: true
     });
@@ -556,6 +585,8 @@ function getAllSpaceBodies() {
       name: 'Moon',
       position: appCtx.spaceFlight.moon.position.clone(),
       radius: 13.5,
+      massKg: 7.342e22,
+      physicalRadiusKm: 1737.4,
       mesh: appCtx.spaceFlight.moon,
       landable: true
     });
@@ -592,6 +623,7 @@ Object.assign(appCtx, {
   getMoonScenePosition,
   hideSolarSystemUI,
   initSolarSystem,
+  resetSolarSystemRuntime,
   setSolarSystemCenter,
   setSolarSystemFrameVisibility,
   showSolarSystemUI,
@@ -606,6 +638,7 @@ export {
   getMoonScenePosition,
   hideSolarSystemUI,
   initSolarSystem,
+  resetSolarSystemRuntime,
   setSolarSystemCenter,
   setSolarSystemFrameVisibility,
   showSolarSystemUI,

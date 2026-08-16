@@ -1,4 +1,4 @@
-const admin = require('./firebase-admin-runtime');
+const admin = require('firebase-admin');
 
 const CREATOR_PROFILES_COLLECTION = 'creatorProfiles';
 const CREATOR_SYSTEM_USER_ID = 'system_worldexplorer';

@@ -1,11 +1,15 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { ENV, getEnv } from "../env.js?v=57";
+import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=81";
-import { readSharedExperienceParams } from "./share-links.js?v=61";
+import { readSharedExperienceParams } from "./share-links.js?v=62";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=9';
-
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
+import {
+  clampDetectedCoords,
+  geolocationErrorMessage,
+  requestCurrentPosition
+} from './title-screen/geolocation.js?v=1';
 function initTitleScreenUi({
   lastLocationStorageKey,
   shareExperienceStatus,
@@ -31,7 +35,6 @@ function initTitleScreenUi({
     space: spaceLaunchToggle,
     ocean: oceanLaunchToggle
   };
-  const geolocationOptions = { enableHighAccuracy: true, timeout: 12000, maximumAge: 120000 };
   const sharedExperienceParams = readSharedExperienceParams();
   let titleLaunchMode = 'earth';
   let globeSelector = null;
@@ -83,20 +86,21 @@ function initTitleScreenUi({
     return multiplayerWarmupPromise;
   };
   const hasLoadedEarthWorld = () => appCtx.worldLoading || (Array.isArray(appCtx.roads) && appCtx.roads.length > 0) || (Array.isArray(appCtx.roadMeshes) && appCtx.roadMeshes.length > 0) || (Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0) || (Array.isArray(appCtx.buildingMeshes) && appCtx.buildingMeshes.length > 0);
+  const ensureEarthWorldRuntime = async () => {
+    await appCtx.ensureEarthRuntimeReady?.();
+    if (typeof appCtx.loadRoads !== 'function') {
+      throw new Error('Earth world runtime did not install its location loader.');
+    }
+  };
   const emitTutorialEvent = (eventName, payload = {}) => {
     if (typeof appCtx.tutorialOnEvent === 'function') appCtx.tutorialOnEvent(eventName, payload);
   };
   const resetTitleEarthTravelMode = (source = 'title_earth_start') => {
     appCtx.pendingAutoBoatEntry = null;
-    if (appCtx.Walk?.state) appCtx.Walk.state.view = 'third';
     if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk', source });
     if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
     if (typeof appCtx.setTravelMode === 'function') {
-      appCtx.setTravelMode('walk', {
-        source,
-        emitTutorial: false,
-        refreshSurface: source.endsWith('_ready')
-      });
+      appCtx.setTravelMode('walk', { source, emitTutorial: false });
     } else if (appCtx.Walk?.state?.mode !== 'walk') {
       appCtx.Walk?.setModeWalk?.();
     }
@@ -249,39 +253,6 @@ function initTitleScreenUi({
     }
     if (globeSelector && typeof globeSelector.setLocateButtonBusy === 'function') globeSelector.setLocateButtonBusy(geolocationBusy);
   };
-  const geolocationErrorMessage = (error) => {
-    const code = Number(error?.code);
-    if (code === 1) return 'Location access denied. You can still pick a location manually.';
-    if (code === 2) return 'Could not determine your location. Try again or choose manually.';
-    if (code === 3) return 'Location request timed out. Try again or choose manually.';
-    return 'Could not determine your location. You can still choose manually.';
-  };
-  const requestCurrentPosition = () => new Promise((resolve, reject) => {
-    if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
-      reject({ userMessage: 'Geolocation is not supported in this browser.' });
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = Number(position?.coords?.latitude);
-        const lon = Number(position?.coords?.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          reject({ userMessage: 'Could not determine your location. Try again or choose manually.' });
-          return;
-        }
-        resolve({ lat, lon });
-      },
-      (error) => reject({ ...error, userMessage: geolocationErrorMessage(error) }),
-      geolocationOptions
-    );
-  });
-  const clampDetectedCoords = (lat, lon) => {
-    const safeLat = Math.max(-90, Math.min(90, Number(lat) || 0));
-    let safeLon = Number(lon) || 0;
-    while (safeLon > 180) safeLon -= 360;
-    while (safeLon < -180) safeLon += 360;
-    return { lat: safeLat, lon: safeLon };
-  };
   const runUseMyLocation = async (source = 'menu') => {
     if (geolocationBusy) return;
     if (globeSelector && typeof globeSelector.isOpen === 'function' && !globeSelector.isOpen()) {
@@ -309,9 +280,13 @@ function initTitleScreenUi({
       } else {
         appCtx.setCustomLocation?.({ lat: coords.lat, lon: coords.lon, name: coordsName }, { transient: true });
       }
-      const successMessage = 'Location found. Review it on the globe, then press Explore.';
+      const successMessage = 'Location found. Opening your location…';
       setTitleUseMyLocationStatus(successMessage, '#059669');
       globeSelector?.setSearchStatus?.(successMessage, '#059669');
+      const launched = await globeSelector?.startHere?.();
+      if (launched === false) {
+        throw { userMessage: 'Your location was selected, but the world could not open it. Press Explore to retry.' };
+      }
     } catch (error) {
       const failureMessage = error?.userMessage || geolocationErrorMessage(error);
       setTitleUseMyLocationStatus(failureMessage, '#dc2626');
@@ -349,23 +324,49 @@ function initTitleScreenUi({
       if (!appCtx.gameStarted) {
         return appCtx.triggerTitleStart({ bypassCustomGate: true });
       } else if (typeof appCtx.loadRoads === 'function') {
+        await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
         await appCtx.loadRoads();
         let customSpawn = null;
         if (typeof appCtx.applyCustomLocationSpawn === 'function') {
           customSpawn = appCtx.applyCustomLocationSpawn('walk', {
             source: 'custom_location',
-            preferBoatIfWater: appCtx.customLoc?.arrivalMode !== 'walk'
+            preferBoatIfWater: true
           });
         } else if (typeof appCtx.spawnOnRoad === 'function') {
           appCtx.spawnOnRoad();
         }
         if (customSpawn?.mode !== 'boat' && !appCtx.boatMode?.active) {
-          resetTitleEarthTravelMode('globe_location_ready');
+          resetTitleEarthTravelMode('globe_location_change');
         }
         return true;
       }
       return false;
+    },
+    onOceanShortcut: async (selection = null) => {
+      if (!selection || !Number.isFinite(Number(selection.lat)) || !Number.isFinite(Number(selection.lon))) {
+        return false;
+      }
+      appCtx.setCustomLocation?.({
+        lat: Number(selection.lat),
+        lon: Number(selection.lon),
+        name: String(selection.name || 'Open Ocean'),
+        arrivalMode: 'boat'
+      }, { transient: false });
+      if (!appCtx.gameStarted) {
+        setLaunchMode('ocean');
+        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+      }
+      if (typeof appCtx.startOceanMode !== 'function') return false;
+      if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
+      return appCtx.startOceanMode({
+        launchSite: {
+          lat: Number(selection.lat),
+          lon: Number(selection.lon),
+          name: String(selection.name || 'Open Ocean'),
+          region: 'Selected coordinates'
+        }
+      });
     },
     onMoonShortcut: async () => {
       if (!appCtx.gameStarted) {
@@ -455,7 +456,7 @@ function initTitleScreenUi({
   } catch {}
 
   if (sharedExperienceParams) {
-    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower']);
+    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower', 'deflock', 'livegps']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
       appCtx.gameMode = sharedExperienceParams.gameMode;
       const targetMode = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);
@@ -519,8 +520,12 @@ function initTitleScreenUi({
     const requestedLaunchMode = Object.entries(launchModeButtons)
       .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
     setLaunchMode(requestedLaunchMode);
+    if (requestedLaunchMode === 'earth' && appCtx.gameMode === 'livegps') {
+      const prepared = await appCtx.prepareLiveGpsStart?.({ source: 'title', setWorldLocation: true });
+      if (!prepared) return false;
+    }
     const externalBypassCustomGate = appCtx.pendingCustomLaunchBypass === true;
-    const shouldGateToGlobe = !appCtx.gameStarted && !skipGlobeGateOnce && !externalBypassCustomGate && requestedLaunchMode === 'earth' && String(appCtx.selLoc || '') === 'custom';
+    const shouldGateToGlobe = !appCtx.gameStarted && appCtx.gameMode !== 'livegps' && !skipGlobeGateOnce && !externalBypassCustomGate && requestedLaunchMode === 'earth' && String(appCtx.selLoc || '') === 'custom';
     if (shouldGateToGlobe) {
       setTitleLocationMode('custom');
       globeSelector?.open?.();
@@ -546,7 +551,7 @@ function initTitleScreenUi({
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
-    globalThis.dispatchEvent?.(new CustomEvent('we3d:game-started'));
+    if (requestedLaunchMode !== 'ocean') void appCtx.ensureStarCatalogLoaded?.();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
@@ -554,7 +559,18 @@ function initTitleScreenUi({
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
       if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 1100);
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
-      appCtx.startOceanMode();
+      const selectedOceanLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
+      const oceanStarted = appCtx.startOceanMode({
+        launchSite: Number.isFinite(Number(selectedOceanLocation?.lat)) && Number.isFinite(Number(selectedOceanLocation?.lon))
+          ? {
+              lat: Number(selectedOceanLocation.lat),
+              lon: Number(selectedOceanLocation.lon),
+              name: String(selectedOceanLocation.name || 'Open Ocean'),
+              region: 'Selected coordinates'
+            }
+          : undefined
+      });
+      if (oceanStarted === false) throw new Error('Ocean mode did not accept the selected coordinates.');
       updateControlsModeUI?.();
       appCtx.loadingScreenMode = 'earth';
       return true;
@@ -562,6 +578,8 @@ function initTitleScreenUi({
 
     if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return true;
 
+    await ensureEarthWorldRuntime();
+    appCtx.ensureEnginePbrTextures?.();
     commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
     const explorationMsg = document.getElementById('explorationModeMsg');
@@ -586,20 +604,12 @@ function initTitleScreenUi({
       explorationMsg.style.display = 'none';
     }
 
-    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-      const startRef = appCtx.Walk?.state?.walker || appCtx.car;
-      appCtx.updateTerrainAround(startRef.x || 0, startRef.z || 0);
-    }
     await appCtx.loadRoads();
-    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-      const postLoadRef = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker ? appCtx.Walk.state.walker : appCtx.car;
-      appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
-    }
     let customSpawn = null;
     if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
       customSpawn = appCtx.applyCustomLocationSpawn('walk', {
         source: 'title_custom_start',
-        preferBoatIfWater: appCtx.customLoc?.arrivalMode !== 'walk'
+        preferBoatIfWater: true
       });
     }
 
@@ -686,8 +696,8 @@ function initTitleScreenUi({
     getTitleLaunchMode: () => titleLaunchMode,
     setTitleLaunchMode: (mode) => setLaunchMode(mode),
     getGlobeSelector: () => globeSelector,
+    primeMultiplayerUi,
     isTouchPreferredClient
   };
 }
-
 export { initTitleScreenUi };

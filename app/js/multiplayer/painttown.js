@@ -8,10 +8,10 @@ import {
   query,
   serverTimestamp,
   setDoc
-} from '../platform/firebase/firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=66';
+import { normalizeCode } from './rooms.js?v=67';
 
 const ROOM_COLLECTION = 'rooms';
 const PAINT_CLAIMS_COLLECTION = 'paintClaims';
@@ -94,7 +94,7 @@ async function upsertPaintClaim(roomId, claim = {}) {
   }, { merge: true });
 }
 
-function listenPaintClaims(roomId, callback) {
+function listenPaintClaims(roomId, callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
   const normalizedRoomId = normalizeCode(roomId);
   if (!normalizedRoomId) {
@@ -140,7 +140,7 @@ function listenPaintClaims(roomId, callback) {
     callback(rows);
   }, (err) => {
     console.warn('[multiplayer][painttown] listener failed:', err);
-    callback([]);
+    if (typeof options.onError === 'function') options.onError(err);
   });
 }
 

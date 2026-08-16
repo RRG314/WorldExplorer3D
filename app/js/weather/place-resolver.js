@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { weatherStateService } from './state-service.js?v=1';
 
 const PLACE_API_TIMEOUT_MS = 6500;
 const PLACE_LOCATION_PRECISION = 2;
@@ -22,21 +23,6 @@ function weatherCacheKey(lat, lon) {
 
 function placeCacheKey(lat, lon) {
   return `${lat.toFixed(PLACE_LOCATION_PRECISION)}:${lon.toFixed(PLACE_LOCATION_PRECISION)}`;
-}
-
-function placeStateMatchesLocation(place, location, maxDistanceKm = 30) {
-  const latA = Number(place?.lat);
-  const lonA = Number(place?.lon);
-  const latB = Number(location?.lat);
-  const lonB = Number(location?.lon);
-  if (![latA, lonA, latB, lonB].every(Number.isFinite)) return false;
-  const toRad = Math.PI / 180;
-  const dLat = (latB - latA) * toRad;
-  const dLon = (lonB - lonA) * toRad;
-  const a = Math.sin(dLat * 0.5) ** 2 +
-    Math.cos(latA * toRad) * Math.cos(latB * toRad) * Math.sin(dLon * 0.5) ** 2;
-  const distanceKm = 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a))));
-  return distanceKm <= Math.max(1, Number(maxDistanceKm) || 30);
 }
 
 function cleanCountry(value) {
@@ -95,8 +81,7 @@ function parseReverseAddress(payload) {
   return {
     display,
     shortLabel: city || county || region || country || '',
-    details: { city, county, region, country },
-    resolutionSource: 'reverse-geocode'
+    details: { city, county, region, country }
   };
 }
 
@@ -127,27 +112,24 @@ function getFallbackPlaceLabel(location) {
   return {
     display: activeName,
     shortLabel: activeName,
-    details: null,
-    resolutionSource: 'selection-fallback'
+    details: null
   };
 }
 
 function assignResolvedPlace(place, location) {
   const resolved = place?.display ? place : getFallbackPlaceLabel(location);
-  appCtx.livePlaceState = {
+  return weatherStateService.setPlaceState({
     ...resolved,
     lat: location.lat,
     lon: location.lon,
     key: placeCacheKey(location.lat, location.lon)
-  };
-  return appCtx.livePlaceState;
+  });
 }
 
 async function refreshLivePlace(location, force = false) {
   if (!Number.isFinite(location?.lat) || !Number.isFinite(location?.lon)) return appCtx.livePlaceState || null;
   const key = placeCacheKey(location.lat, location.lon);
-  const cache = appCtx.placeCache instanceof Map ? appCtx.placeCache : (appCtx.placeCache = new Map());
-  const cached = cache.get(key) || null;
+  const cached = weatherStateService.getCachedPlace(key);
   if (!force && cached) return assignResolvedPlace(cached, location);
   if (_pendingPlaceRequest?.key === key && !force) {
     try {
@@ -158,7 +140,7 @@ async function refreshLivePlace(location, force = false) {
     return appCtx.livePlaceState || null;
   }
   const promise = fetchPlaceForLocation(location.lat, location.lon).then((place) => {
-    cache.set(key, place);
+    weatherStateService.setCachedPlace(key, place);
     return assignResolvedPlace(place, location);
   }).catch(() => assignResolvedPlace(getFallbackPlaceLabel(location), location)).finally(() => {
     if (_pendingPlaceRequest?.key === key) _pendingPlaceRequest = null;
@@ -172,7 +154,6 @@ export {
   getActiveWeatherLocationLabel,
   weatherCacheKey,
   placeCacheKey,
-  placeStateMatchesLocation,
   cleanCountry,
   uniqueNonEmptyParts,
   parseReverseAddress,

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=8";
-import { renderCuratedLandmarkModels } from './landmark-models.js?v=15';
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=11";
+import { renderCuratedLandmarkModels } from './landmark-models.js?v=13';
 
 const MAX_PYRAMIDS = 48;
 const MAX_WALL_WAYS = 140;
@@ -68,43 +68,6 @@ function addHistoricSite(way, points, kind, height) {
   });
 }
 
-function createSolidPyramid(footprint, height, baseY) {
-  if (footprint.length < 3) return null;
-  const center = footprint.reduce((sum, point) => ({
-    x: sum.x + point.x,
-    z: sum.z + point.z
-  }), { x: 0, z: 0 });
-  center.x /= footprint.length;
-  center.z /= footprint.length;
-  const positions = [];
-  for (let index = 0; index < footprint.length; index += 1) {
-    const point = footprint[index];
-    const next = footprint[(index + 1) % footprint.length];
-    positions.push(
-      point.x, baseY, point.z,
-      next.x, baseY, next.z,
-      center.x, baseY + height, center.z
-    );
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xb99a68,
-    roughness: 0.98,
-    metalness: 0,
-    flatShading: true,
-    emissive: 0x3c2d1d,
-    emissiveIntensity: 0.16,
-    side: THREE.DoubleSide
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  mesh.frustumCulled = false;
-  return mesh;
-}
-
 function createPyramidMesh(way, nodes, sanitizeFootprint, registerBuildingCollision) {
   const points = wayPoints(way, nodes, sanitizeFootprint, true);
   if (points.length < 3 || typeof THREE === 'undefined') return null;
@@ -119,14 +82,39 @@ function createPyramidMesh(way, nodes, sanitizeFootprint, registerBuildingCollis
 
   const tags = way.tags || {};
   const height = numericMeters(tags.height ?? tags['roof:height'], DEFAULT_PYRAMID_HEIGHT, 3, 220);
+  let centerX = 0;
+  let centerZ = 0;
   let baseY = 0;
   for (let i = 0; i < footprint.length; i++) {
+    centerX += footprint[i].x;
+    centerZ += footprint[i].z;
     baseY += appCtx.elevationWorldYAtWorldXZ(footprint[i].x, footprint[i].z);
   }
+  centerX /= footprint.length;
+  centerZ /= footprint.length;
   baseY /= footprint.length;
 
-  const mesh = createSolidPyramid(footprint, height, baseY);
-  if (!mesh) return null;
+  const positions = [];
+  for (let i = 0; i < footprint.length; i++) {
+    const current = footprint[i];
+    const next = footprint[(i + 1) % footprint.length];
+    positions.push(
+      current.x, baseY, current.z,
+      next.x, baseY, next.z,
+      centerX, baseY + height, centerZ
+    );
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xc9a96a,
+    roughness: 0.96,
+    metalness: 0.01,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.frustumCulled = false;
@@ -178,7 +166,7 @@ function reprojectActorOutsideLandmarks(meshes) {
   appCtx.applySpawnTarget(x, z, {
     mode,
     preferRoad: mode === 'drive',
-    source: 'deferred_landmark_clearance'
+    source: 'publication_landmark_clearance'
   });
   return true;
 }
@@ -187,42 +175,20 @@ function createWallMesh(way, nodes) {
   const points = wayPoints(way, nodes, (value) => value, false);
   if (points.length < 2 || typeof THREE === 'undefined') return null;
   const tags = way.tags || {};
-  const height = numericMeters(tags.height, DEFAULT_WALL_HEIGHT, 1.2, 14);
-  const width = numericMeters(tags.width, DEFAULT_WALL_WIDTH, 0.8, 8);
+  const height = numericMeters(tags.height, DEFAULT_WALL_HEIGHT, 1.2, 30);
+  const width = numericMeters(tags.width, DEFAULT_WALL_WIDTH, 0.8, 14);
   const segments = [];
-  const maxSegmentLength = 14;
-  const maxSegments = 900;
   for (let i = 0; i < points.length - 1; i++) {
     const start = points[i];
     const end = points[i + 1];
-    const sourceDx = end.x - start.x;
-    const sourceDz = end.z - start.z;
-    const horizontalLength = Math.hypot(sourceDx, sourceDz);
-    if (horizontalLength < 0.35 || horizontalLength > 1200) continue;
-    const subdivisions = Math.max(1, Math.ceil(horizontalLength / maxSegmentLength));
-    for (let part = 0; part < subdivisions && segments.length < maxSegments; part++) {
-      const t0 = part / subdivisions;
-      const t1 = (part + 1) / subdivisions;
-      const startX = start.x + sourceDx * t0;
-      const startZ = start.z + sourceDz * t0;
-      const endX = start.x + sourceDx * t1;
-      const endZ = start.z + sourceDz * t1;
-      const startY = appCtx.elevationWorldYAtWorldXZ(startX, startZ) + height * 0.5;
-      const endY = appCtx.elevationWorldYAtWorldXZ(endX, endZ) + height * 0.5;
-      const dx = endX - startX;
-      const dz = endZ - startZ;
-      const length = Math.hypot(dx, dz);
-      if (length < 0.35 || length > maxSegmentLength * 1.05) continue;
-      segments.push({
-        x: (startX + endX) * 0.5,
-        y: (startY + endY) * 0.5,
-        z: (startZ + endZ) * 0.5,
-        dx,
-        dz,
-        length
-      });
-    }
-    if (segments.length >= maxSegments) break;
+    const startY = appCtx.elevationWorldYAtWorldXZ(start.x, start.z) + height * 0.5;
+    const endY = appCtx.elevationWorldYAtWorldXZ(end.x, end.z) + height * 0.5;
+    const dx = end.x - start.x;
+    const dy = endY - startY;
+    const dz = end.z - start.z;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 0.35 || length > 1200) continue;
+    segments.push({ x: (start.x + end.x) * 0.5, y: (startY + endY) * 0.5, z: (start.z + end.z) * 0.5, dx, dy, dz, length });
   }
   if (segments.length === 0) return null;
 
@@ -261,10 +227,9 @@ function createWallMesh(way, nodes) {
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
     position.set(segment.x, segment.y, segment.z);
-    // Wall faces remain vertical while each short segment steps with terrain.
-    // Rotating the local up axis into a 3D slope produces enormous tilted slabs.
-    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(segment.dx, segment.dz));
-    scale.set(width, height, segment.length * 1.04);
+    direction.set(segment.dx, segment.dy, segment.dz).normalize();
+    quaternion.setFromUnitVectors(forward, direction);
+    scale.set(width, height, segment.length);
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(i, matrix);
   }
@@ -288,8 +253,6 @@ function createWallMesh(way, nodes) {
     landmarkName: tags.name || tags['name:en'] || 'Historic Wall',
     heightMeters: height,
     widthMeters: width,
-    segmentCount: segments.length,
-    maxSegmentLength: Math.max(...segments.map((segment) => segment.length)),
     crenellationCount: merlons.length
   };
   addHistoricSite(way, points, 'historic_wall', height);
@@ -315,7 +278,7 @@ function renderLandmarks(data, options) {
       options.geometryGuards
     ), options.registerBuildingCollision);
     if (!mesh) continue;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.historicMarkers.push(mesh);
     createdMeshes.push(mesh);
     pyramids += 1;
@@ -323,7 +286,7 @@ function renderLandmarks(data, options) {
   for (const way of wallWays) {
     const mesh = createWallMesh(way, nodes);
     if (!mesh) continue;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.historicMarkers.push(mesh);
     createdMeshes.push(mesh);
     walls += 1;
@@ -348,42 +311,33 @@ function renderLandmarks(data, options) {
   };
 }
 
-export function scheduleDeferredLandmarkLoad(options = {}) {
-  const query = String(options.query || '');
-  globalThis.setTimeout(async () => {
-    if (!options.isActiveLoadContext?.()) return;
-    const metrics = {
-      requested: 0,
-      pyramids: 0,
-      walls: 0,
-      suspensionBridge: null,
-      actorReprojected: false
-    };
-    let data = null;
-    try {
-      const timeoutMs = Math.max(7000, Math.min(18000, Number(options.timeoutMs) || 14000));
-      const bundledData = await fetchBundledLandmarkData({ lat: appCtx.LOC?.lat, lon: appCtx.LOC?.lon });
-      data = bundledData || (query && typeof options.fetchOverpassJSON === 'function' ? await options.fetchOverpassJSON(
-          query,
-          timeoutMs,
-          performance.now() + timeoutMs + 800,
-          options.cacheMeta || null
-        ) : null);
-    } catch (err) {
-      options.recordLoadWarning?.('deferredLandmarks', err);
-    }
-    if (!options.isActiveLoadContext?.()) return;
-    if (data) Object.assign(metrics, renderLandmarks(data, options));
-    metrics.curatedModels = await renderCuratedLandmarkModels(options);
-    if (!options.isActiveLoadContext?.()) return;
+export async function loadLandmarksForPublication(options = {}) {
+  if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
+  const execute = async (signal = null) => {
+    const data = await fetchBundledLandmarkData({
+      lat: appCtx.LOC?.lat,
+      lon: appCtx.LOC?.lon,
+      signal
+    });
+    if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
+    const metrics = data
+      ? renderLandmarks(data, options)
+      : { pyramids: 0, walls: 0, suspensionBridge: null };
+    metrics.curatedModels = await renderCuratedLandmarkModels({ ...options, signal });
+    if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
     metrics.source = data?._overpassSource || null;
     metrics.packId = data?._landmarkPackId || null;
     options.loadMetrics.landmarks = metrics;
     if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
-    options.updateWorldLod?.(true);
-    console.log(
-      `[WorldLoad] Deferred landmarks ready (${metrics.pyramids} pyramids, ${metrics.walls} walls, ` +
-      `${metrics.suspensionBridge?.towerParts || 0} bridge tower parts).`
-    );
-  }, 240);
+    return { status: 'ready', metrics };
+  };
+  try {
+    return typeof options.runProviderWork === 'function'
+      ? await options.runProviderWork('bundled-landmarks', 'publication', execute)
+      : await execute(options.signal || null);
+  } catch (err) {
+    if (err?.name === 'AbortError' || options.isActiveLoadContext?.() === false) throw err;
+    options.recordLoadWarning?.('landmark publication', err);
+    return { status: 'error', error: err?.message || String(err) };
+  }
 }

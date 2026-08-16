@@ -8,24 +8,6 @@
     ],
     "headers": [
       {
-        "source": "/build-manifest.json",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-store"
-          }
-        ]
-      },
-      {
-        "source": "/asset-manifest.json",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-store"
-          }
-        ]
-      },
-      {
         "source": "/",
         "headers": [
           {
@@ -66,7 +48,16 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=0, must-revalidate"
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "/location-data/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
           }
         ]
       },
@@ -81,6 +72,10 @@
       }
     ],
     "rewrites": [
+      {
+        "source": "/api/geospatial/deflock-cameras",
+        "function": "getDeFlockCameras"
+      },
       {
         "source": "/api/geospatial/street-imagery",
         "function": "getStreetImagery"
@@ -221,5 +216,15 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "emulators": {
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9099
+    },
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8080
+    }
   }
 }

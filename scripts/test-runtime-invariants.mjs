@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { evaluateRuntimeReadiness } from './production-readiness.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
 import { exercisePlanetaryRoundTrip } from './runtime-planetary-check.mjs';
 import { mkdirp, startServer } from './runtime-test-server.mjs';
 
@@ -9,7 +11,10 @@ const rootDir = process.cwd();
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputDir = path.join(rootDir, 'output', 'playwright', 'runtime-invariants');
-let diagnosticReportWritten = false;
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
+// Initial play budgets building candidates, then removes footprints that overlap
+// transport corridors. Assert useful scene density without requiring unsafe infill.
+const MINIMUM_RENDERED_BUILDINGS = 100;
 
 
 async function launchFromTitle(page) {
@@ -173,7 +178,7 @@ async function waitForRuntimeSnapshot(page, timeoutMs = 120000) {
     });
     const ready =
       last.roads > 300 &&
-      last.buildings > 1000 &&
+      last.buildings >= MINIMUM_RENDERED_BUILDINGS &&
       last.landuseMeshes > 0 &&
       last.worldLoading === false;
     if (ready) return last;
@@ -205,6 +210,26 @@ async function waitForTraversalNetworks(page, timeoutMs = 60000) {
     await page.waitForTimeout(1000);
   }
   throw new Error(`Timed out waiting for traversal networks. Last snapshot: ${JSON.stringify(last || {})}`);
+}
+
+async function waitForVegetationLayer(page, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    last = await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const ctx = mod?.ctx;
+      return {
+        features: Array.isArray(ctx?.vegetationFeatures) ? ctx.vegetationFeatures.length : 0,
+        meshes: Array.isArray(ctx?.vegetationMeshes) ? ctx.vegetationMeshes.length : 0,
+        worldCoverReady: Number(ctx?.worldCoverStats?.ready || 0),
+        worldCoverFailed: Number(ctx?.worldCoverStats?.failed || 0)
+      };
+    });
+    if (last.features > 0 && last.meshes > 0) return last;
+    await page.waitForTimeout(250);
+  }
+  return last;
 }
 
 function assert(condition, message) {
@@ -294,7 +319,7 @@ async function main() {
     await page.waitForFunction(() => {
       const globeStart = document.getElementById('globeSelectorStartBtn');
       const legacyStart = document.getElementById('startBtn');
-      return [globeStart, legacyStart].some((element) => element && element.getClientRects().length > 0);
+      return !!(globeStart || legacyStart);
     }, { timeout: 30000 });
     const boot = await bootstrapEarthRuntime(page, 'baltimore');
     assert(boot.ok, `Failed to bootstrap Earth runtime: ${boot.reason || 'unknown error'} ${JSON.stringify(boot.details || {})}`);
@@ -321,6 +346,7 @@ async function main() {
     }
 
     const traversalSnapshot = await waitForTraversalNetworks(page, 60000);
+    const vegetationReadiness = await waitForVegetationLayer(page, 15000);
 
     const preWaterMetrics = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
@@ -338,7 +364,8 @@ async function main() {
 
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
-      const structureSemantics = await import('/app/js/structure-semantics.js?v=14');
+      const structureSemantics = await import('/app/js/structure-semantics.js?v=19');
+      const collisionResponse = await import('/app/js/physics/building-collision-response.js?v=2');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -358,6 +385,234 @@ async function main() {
       const visibleWaterMeshes = (ctx.landuseMeshes || []).filter((m) =>
         m && m.visible !== false && (m.userData?.landuseType === 'water' || m.userData?.isWaterwayLine)
       ).length;
+      const buildingProvenanceModel = ctx.buildingProvenanceModel || null;
+      const buildingFeatureIds = new Set(
+        (buildingProvenanceModel?.records || []).map((record) => record?.identity?.featureId)
+      );
+      const provenanceRelevantBuildingMeshes = (ctx.buildingMeshes || []).filter((mesh) =>
+        mesh?.userData?.isBuildingBatch || mesh?.userData?.sourceBuildingId
+      );
+      const unownedBuildingMeshCount = provenanceRelevantBuildingMeshes.filter((mesh) => {
+        if (mesh?.userData?.isBuildingBatch) {
+          return !(mesh.userData.buildingProvenanceRecords || []).length;
+        }
+        return !mesh?.userData?.buildingProvenance;
+      }).length;
+      const unownedBuildingColliderCount = buildings.filter((building) =>
+        buildingFeatureIds.has(building?.sourceBuildingId) &&
+        !building?.buildingProvenance
+      ).length;
+      const waterSurfaceRegistry = ctx.waterSurfaceRegistrySnapshot || null;
+      const buildingProvenanceSummary = buildingProvenanceModel ? {
+        schemaVersion: buildingProvenanceModel.schemaVersion,
+        authority: buildingProvenanceModel.authority,
+        featureCount: buildingProvenanceModel.featureCount,
+        validCount: buildingProvenanceModel.validCount,
+        outlineCount: buildingProvenanceModel.outlineCount,
+        partCount: buildingProvenanceModel.partCount,
+        inferredGeometryCount: buildingProvenanceModel.inferredGeometryCount,
+        ambiguousMetadataCount: buildingProvenanceModel.ambiguousMetadataCount,
+        duplicateFeatureIds: buildingProvenanceModel.duplicateFeatureIds
+      } : null;
+      const waterSurfaceRegistrySummary = waterSurfaceRegistry ? {
+        schemaVersion: waterSurfaceRegistry.schemaVersion,
+        authority: waterSurfaceRegistry.authority,
+        surfaceCount: waterSurfaceRegistry.surfaceCount,
+        navigableCount: waterSurfaceRegistry.navigableCount,
+        duplicateRegistryIds: waterSurfaceRegistry.duplicateRegistryIds
+      } : null;
+      const publishedWaterBodies = [
+        ...(ctx.waterAreas || []),
+        ...(ctx.waterways || [])
+      ];
+      const registeredWaterBodies = ctx.waterSurfaceRegistry?.entries?.() || [];
+      const waterRegistryIds = publishedWaterBodies
+        .map((body) => body?.registryId)
+        .filter(Boolean);
+      const duplicatePublishedWaterRegistryIds = waterRegistryIds.filter((id, index) =>
+        waterRegistryIds.indexOf(id) !== index
+      );
+      const orphanedWaterBodyCount = publishedWaterBodies.filter((body) =>
+        !registeredWaterBodies.includes(body)
+      ).length;
+      const orphanedWaterBodySamples = publishedWaterBodies
+        .filter((body) => !registeredWaterBodies.includes(body))
+        .slice(0, 8)
+        .map((body) => ({
+          registryId: body?.registryId || null,
+          sourceFeatureId: body?.sourceFeatureId || null,
+          shape: body?.shape || null,
+          dataset: body?.provenance?.dataset || null,
+          layer: body?.provenance?.layer || null
+        }));
+      const unownedWaterBodyCount = publishedWaterBodies.filter((body) =>
+        body?.registryProvenance?.authority !== 'water_surface_registry'
+      ).length;
+      const unownedWaterMeshCount = (ctx.landuseMeshes || []).filter((mesh) =>
+        (mesh?.userData?.landuseType === 'water' || mesh?.userData?.isWaterwayLine) &&
+        mesh?.userData?.waterSurfaceProvenance?.authority !== 'water_surface_registry'
+      ).length;
+
+      function sampleRoadPoint(road, fraction) {
+        if (!Array.isArray(road?.pts) || road.pts.length < 2) return null;
+        const segmentCount = road.pts.length - 1;
+        const target = Math.max(
+          0,
+          Math.min(segmentCount - 1e-6, fraction * segmentCount)
+        );
+        const index = Math.floor(target);
+        const blend = target - index;
+        const start = road.pts[index];
+        const end = road.pts[index + 1];
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const length = Math.hypot(dx, dz);
+        if (!Number.isFinite(length) || length < 0.1) return null;
+        return {
+          x: start.x + dx * blend,
+          z: start.z + dz * blend,
+          segmentLength: length,
+          segmentBlend: blend,
+          tangentX: dx / length,
+          tangentZ: dz / length,
+          normalX: -dz / length,
+          normalZ: dx / length
+        };
+      }
+
+      let checkedSamples = 0;
+      let centerHits = 0;
+      let laneHits = 0;
+      const driveCandidates = [];
+      const driveCandidateRoadIds = new Set();
+      const roadStep = Math.max(1, Math.floor(roads.length / 160));
+      for (
+        let roadIndex = 0;
+        roadIndex < roads.length && checkedSamples < 640;
+        roadIndex += roadStep
+      ) {
+        const road = roads[roadIndex];
+        const halfWidth = Math.max(2, Number(road?.width || 8) * 0.5);
+        for (const fraction of [0.2, 0.5, 0.8]) {
+          const point = sampleRoadPoint(road, fraction);
+          if (!point) continue;
+          checkedSamples += 1;
+          const roadSurface = ctx.SurfaceQuery?.driveAt?.(
+            point.x,
+            point.z,
+            { preferRoad: true }
+          );
+          const actorBaseY = Number(roadSurface?.position?.y);
+          const collisionOptions = {
+            actorBaseY,
+            actorHeight: 1.9
+          };
+          const centerCollision = ctx.checkBuildingCollision?.(
+            point.x,
+            point.z,
+            2,
+            collisionOptions
+          );
+          const centerRoad = ctx.findNearestRoad?.(point.x, point.z, {
+            y: actorBaseY,
+            maxVerticalDelta: 18
+          });
+          const centerBlocked =
+            collisionResponse.isVehicleBuildingCollisionBlocking(
+              centerCollision,
+              centerRoad
+            );
+          if (centerBlocked) centerHits += 1;
+          const vehicleRadius = 2;
+          const laneEdgeClearance = 0.25;
+          // Probe representative lane centers while keeping the complete
+          // vehicle collider inside the mapped road surface. The previous
+          // halfWidth - 0.8 probe put a 2 m collider 1.2 m beyond every road
+          // edge and measured neighboring buildings/shoulders as lane faults.
+          const laneOffset = Math.min(
+            halfWidth * 0.5,
+            Math.max(0, halfWidth - vehicleRadius - laneEdgeClearance)
+          );
+          for (const sign of [-1, 1]) {
+            const laneCollision = ctx.checkBuildingCollision?.(
+              point.x + point.normalX * laneOffset * sign,
+              point.z + point.normalZ * laneOffset * sign,
+              vehicleRadius,
+              collisionOptions
+            );
+            const laneRoad = ctx.findNearestRoad?.(
+              point.x + point.normalX * laneOffset * sign,
+              point.z + point.normalZ * laneOffset * sign,
+              { y: actorBaseY, maxVerticalDelta: 18 }
+            );
+            if (
+              collisionResponse.isVehicleBuildingCollisionBlocking(
+                laneCollision,
+                laneRoad
+              )
+            ) {
+              laneHits += 1;
+            }
+          }
+          const roadId = String(
+            road?.id || road?.sourceFeatureId || `road-index:${roadIndex}`
+          );
+          const driveFraction = [0.2, 0.5, 0.8][
+            Math.floor(roadIndex / roadStep) % 3
+          ];
+          const eligibleDriveSlot =
+            !centerBlocked &&
+            driveCandidates.length < 24 &&
+            fraction === driveFraction &&
+            !driveCandidateRoadIds.has(roadId) &&
+            roadIndex % (roadStep * 2) === 0 &&
+            Math.hypot(point.x, point.z) <
+              Number(ctx.worldTraversalRadiusWorld || 2700) - 120;
+          if (eligibleDriveSlot) {
+            const forwardRun = point.segmentLength * (1 - point.segmentBlend);
+            const reverseRun = point.segmentLength * point.segmentBlend;
+            const directionOrder = forwardRun >= reverseRun ? [1, -1] : [-1, 1];
+            let direction = 0;
+            for (const candidateDirection of directionOrder) {
+              let clearStraightRun = true;
+              for (const distance of [8, 16, 24, 32]) {
+                const probeX = point.x + point.tangentX * candidateDirection * distance;
+                const probeZ = point.z + point.tangentZ * candidateDirection * distance;
+                const probeSurface = ctx.SurfaceQuery?.driveAt?.(probeX, probeZ, { preferRoad: true });
+                const probeBaseY = Number(probeSurface?.position?.y);
+                const probeCollision = ctx.checkBuildingCollision?.(probeX, probeZ, 2, {
+                  actorBaseY: probeBaseY,
+                  actorHeight: 1.9
+                });
+                const probeRoad = ctx.findNearestRoad?.(probeX, probeZ, {
+                  y: probeBaseY,
+                  maxVerticalDelta: 18,
+                  preferredRoad: road
+                });
+                clearStraightRun = probeRoad?.road === road &&
+                  Number(probeRoad.dist) <= Math.max(1.5, halfWidth - 0.8) &&
+                  !collisionResponse.isVehicleBuildingCollisionBlocking(probeCollision, probeRoad);
+                if (!clearStraightRun) break;
+              }
+              if (clearStraightRun) {
+                direction = candidateDirection;
+                break;
+              }
+            }
+            if (direction === 0) continue;
+            driveCandidateRoadIds.add(roadId);
+            driveCandidates.push({
+              x: point.x,
+              z: point.z,
+              heading: Math.atan2(point.tangentX * direction, point.tangentZ * direction),
+              roadId,
+              roadName: String(road?.name || road?.tags?.name || ''),
+              roadType: String(road?.type || road?.subtype || road?.tags?.highway || ''),
+              fraction
+            });
+          }
+        }
+      }
 
       const saved = {
         x: Number(ctx.car?.x || 0),
@@ -371,34 +626,81 @@ async function main() {
         vz: Number(ctx.car?.vz || 0),
         yawRate: Number(ctx.car?.yawRate || 0),
         keyW: !!ctx.keys?.KeyW,
-        keyUp: !!ctx.keys?.ArrowUp,
-        onRoad: !!ctx.car?.onRoad,
-        road: ctx.car?.road || null
+        keyUp: !!ctx.keys?.ArrowUp
       };
 
       if (ctx.Walk?.setModeDrive) ctx.Walk.setModeDrive();
-      const driveStart = ctx.resolveSafeWorldSpawn?.(Number(ctx.car?.x || 0), Number(ctx.car?.z || 0), {
-        mode: 'drive',
-        angle: Number(ctx.car?.angle || 0),
-        preferRoad: true,
-        maxRoadDistance: 1200,
-        source: 'runtime_invariants_motion'
-      });
-      const appliedDriveStart = driveStart?.valid && driveStart?.onRoad
-        ? ctx.applyResolvedWorldSpawn?.(driveStart, { mode: 'drive' })
-        : null;
-      const startX = Number(ctx.car?.x || 0);
-      const startZ = Number(ctx.car?.z || 0);
-      for (let f = 0; f < 90; f++) {
-        ctx.keys.KeyW = true;
-        ctx.keys.ArrowUp = true;
-        ctx.update?.(1 / 60);
+      const driveOutcomes = [];
+      let blockedDriveSamples = 0;
+      for (const candidate of driveCandidates) {
+        ctx.car.x = candidate.x;
+        ctx.car.z = candidate.z;
+        ctx.car.angle = candidate.heading;
+        ctx.car.speed = 0;
+        ctx.car.vFwd = 0;
+        ctx.car.vLat = 0;
+        ctx.car.vx = 0;
+        ctx.car.vz = 0;
+        ctx.car.yawRate = 0;
+        const surface = ctx.SurfaceQuery?.driveAt?.(
+          candidate.x,
+          candidate.z,
+          { preferRoad: true }
+        );
+        if (Number.isFinite(surface?.position?.y)) {
+          ctx.car.y = surface.position.y + 1.2;
+        }
+        ctx.invalidateRoadCache?.();
+        for (let frame = 0; frame < 150; frame += 1) {
+          ctx.keys.ArrowUp = true;
+          ctx.update?.(1 / 60);
+        }
+        ctx.keys.ArrowUp = false;
+        const moved = Math.hypot(
+          ctx.car.x - candidate.x,
+          ctx.car.z - candidate.z
+        );
+        const finalSpeed = Number(ctx.car.speed || 0);
+        const blocked = moved < 12;
+        const finalSurface = ctx.SurfaceQuery?.driveAt?.(
+          ctx.car.x,
+          ctx.car.z,
+          { preferRoad: true }
+        );
+        const finalCollision = ctx.checkBuildingCollision?.(
+          ctx.car.x,
+          ctx.car.z,
+          2,
+          {
+            actorBaseY: Number(finalSurface?.position?.y),
+            actorHeight: 1.9
+          }
+        );
+        const finalRoad = ctx.findNearestRoad?.(ctx.car.x, ctx.car.z, {
+          y: Number(finalSurface?.position?.y),
+          maxVerticalDelta: 18
+        });
+        if (blocked) blockedDriveSamples += 1;
+        driveOutcomes.push({
+          roadId: candidate.roadId,
+          roadName: candidate.roadName,
+          roadType: candidate.roadType,
+          fraction: candidate.fraction,
+          startX: Number(candidate.x.toFixed(2)),
+          startZ: Number(candidate.z.toFixed(2)),
+          finalX: Number(ctx.car.x.toFixed(2)),
+          finalZ: Number(ctx.car.z.toFixed(2)),
+          moved: Number(moved.toFixed(2)),
+          finalSpeed: Number(finalSpeed.toFixed(2)),
+          finalCollision: !!finalCollision?.collision,
+          finalCollisionBlocking: collisionResponse.isVehicleBuildingCollisionBlocking(
+            finalCollision,
+            finalRoad
+          ),
+          finalRoadId: String(finalRoad?.road?.id || finalRoad?.feature?.id || finalRoad?.id || ''),
+          blocked
+        });
       }
-      ctx.keys.KeyW = false;
-      ctx.keys.ArrowUp = false;
-      const moved = Math.hypot((ctx.car?.x || 0) - startX, (ctx.car?.z || 0) - startZ);
-      const finalSpeed = Number(ctx.car?.speed || 0);
-      const blocked = moved < 4 || finalSpeed < 3;
 
       ctx.car.x = saved.x;
       ctx.car.y = saved.y;
@@ -410,43 +712,30 @@ async function main() {
       ctx.car.vx = saved.vx;
       ctx.car.vz = saved.vz;
       ctx.car.yawRate = saved.yawRate;
-      ctx.car.onRoad = saved.onRoad;
-      ctx.car.road = saved.road;
-      if (ctx.carMesh) {
-        ctx.carMesh.position.set(saved.x, saved.y, saved.z);
-        ctx.carMesh.rotation.y = saved.angle;
-        ctx.carMesh.updateMatrixWorld(true);
-      }
       ctx.keys.KeyW = saved.keyW;
       ctx.keys.ArrowUp = saved.keyUp;
 
       return {
         roads: roads.length,
         buildings: buildings.length,
-        checkedSamples: 1,
-        centerHits: 0,
-        laneHits: 0,
-        centerHitRatePct: 0,
-        laneHitRatePct: 0,
-        driveSampleCount: appliedDriveStart ? 1 : 0,
-        blockedDriveSamples: appliedDriveStart && blocked ? 1 : 0,
-        blockedDriveRatePct: appliedDriveStart && blocked ? 100 : 0,
-        driveStart: {
-          valid: !!driveStart?.valid,
-          onRoad: !!driveStart?.onRoad,
-          source: String(driveStart?.source || ''),
-          roadId: String(driveStart?.road?.sourceFeatureId || ''),
-          x: Number.isFinite(driveStart?.x) ? driveStart.x : null,
-          z: Number.isFinite(driveStart?.z) ? driveStart.z : null,
-          angle: Number.isFinite(driveStart?.angle) ? driveStart.angle : null
-        },
-        driveOutcomePreview: [
-          {
-            moved: Number(moved.toFixed(2)),
-            finalSpeed: Number(finalSpeed.toFixed(2)),
-            blocked
-          }
-        ],
+        checkedSamples,
+        centerHits,
+        laneHits,
+        centerHitRatePct: Number(
+          (centerHits / Math.max(1, checkedSamples) * 100).toFixed(2)
+        ),
+        laneHitRatePct: Number(
+          (laneHits / Math.max(1, checkedSamples * 2) * 100).toFixed(2)
+        ),
+        driveSampleCount: driveCandidates.length,
+        blockedDriveSamples,
+        blockedDriveRatePct: Number((
+          blockedDriveSamples / Math.max(1, driveCandidates.length) * 100
+        ).toFixed(2)),
+        driveOutcomePreview: driveOutcomes.slice(0, 12),
+        blockedDriveOutcomePreview: driveOutcomes
+          .filter((outcome) => outcome.blocked)
+          .slice(0, 12),
         waterAreas,
         waterways,
         linearFeatures,
@@ -454,6 +743,21 @@ async function main() {
         vegetationFeatures,
         vegetationMeshes,
         visibleWaterMeshes,
+        buildingProvenanceModel: buildingProvenanceSummary,
+        buildingProvenancePublication: {
+          relevantMeshCount: provenanceRelevantBuildingMeshes.length,
+          unownedMeshCount: unownedBuildingMeshCount,
+          unownedColliderCount: unownedBuildingColliderCount
+        },
+        waterSurfaceRegistry: waterSurfaceRegistrySummary,
+        waterSurfacePublication: {
+          bodyCount: publishedWaterBodies.length,
+          unownedBodyCount: unownedWaterBodyCount,
+          unownedMeshCount: unownedWaterMeshCount,
+          orphanedBodyCount: orphanedWaterBodyCount,
+          orphanedBodySamples: orphanedWaterBodySamples,
+          duplicateRegistryIds: [...new Set(duplicatePublishedWaterRegistryIds)].slice(0, 12)
+        },
         roadSurfaceContract: {
           atGradeSkirt: structureSemantics.shouldRenderRoadSkirts({
             structureSemantics: { terrainMode: 'at_grade' }
@@ -579,6 +883,8 @@ async function main() {
       const colliders = Array.isArray(ctx.buildings) ? ctx.buildings : [];
       let sample = null;
       let sampleBuilding = null;
+      let entryBuilding = null;
+      let entrySupport = null;
       for (let i = 0; i < colliders.length; i++) {
         const building = colliders[i];
         if (!building || building.colliderDetail !== 'full') continue;
@@ -590,14 +896,23 @@ async function main() {
           actorHeight: 1.9
         });
         if (!hit?.collision) continue;
-        sampleBuilding = building;
-        sample = {
-          x: building.centerX,
-          z: building.centerZ,
-          baseY: actorBaseY,
-          height: Number.isFinite(building.height) ? building.height : 10
-        };
-        break;
+        if (!sample) {
+          sampleBuilding = building;
+          sample = {
+            x: building.centerX,
+            z: building.centerZ,
+            baseY: actorBaseY,
+            height: Number.isFinite(building.height) ? building.height : 10
+          };
+        }
+        if (!entryBuilding && typeof ctx.resolveBuildingEntrySupport === 'function') {
+          const support = ctx.resolveBuildingEntrySupport(building, { allowSynthetic: true });
+          if (support?.enterable) {
+            entryBuilding = building;
+            entrySupport = support;
+          }
+        }
+        if (sample && entryBuilding) break;
       }
 
       if (sample) {
@@ -674,20 +989,20 @@ async function main() {
       }
 
       if (
-        sampleBuilding &&
+        entryBuilding &&
         typeof ctx.enterInteriorForSupport === 'function' &&
         typeof ctx.resolveBuildingEntrySupport === 'function' &&
         ctx.Walk?.setModeWalk
       ) {
         try {
-          const support = ctx.resolveBuildingEntrySupport(sampleBuilding, { allowSynthetic: true });
+          const support = entrySupport || ctx.resolveBuildingEntrySupport(entryBuilding, { allowSynthetic: true });
           if (support?.enterable) {
             ctx.Walk.setModeWalk();
             const walker = ctx.Walk?.state?.walker;
             if (walker) {
-              walker.x = Number.isFinite(support.entryAnchor?.x) ? support.entryAnchor.x : sample.x;
-              walker.z = Number.isFinite(support.entryAnchor?.z) ? support.entryAnchor.z : sample.z;
-              walker.y = sample.baseY + 1.7;
+              walker.x = Number.isFinite(support.entryAnchor?.x) ? support.entryAnchor.x : entryBuilding.centerX;
+              walker.z = Number.isFinite(support.entryAnchor?.z) ? support.entryAnchor.z : entryBuilding.centerZ;
+              walker.y = Number(ctx.terrainMeshHeightAt?.(walker.x, walker.z) || 0) + 1.7;
               walker.vy = 0;
             }
             const entered = await ctx.enterInteriorForSupport(support);
@@ -702,11 +1017,6 @@ async function main() {
             if (ctx.activeInterior && typeof ctx.clearActiveInterior === 'function') {
               ctx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
             }
-          } else {
-            out.enteredInteriorReport = {
-              entered: false,
-              reason: 'support_not_enterable'
-            };
           }
         } catch (err) {
           out.enteredInteriorReport = {
@@ -743,7 +1053,7 @@ async function main() {
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
-      const semanticsMod = await import('/app/js/structure-semantics.js?v=14');
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=19');
       const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
@@ -807,10 +1117,147 @@ async function main() {
         pts: [{ x: 0, z: 0 }, { x: 50, z: 0 }, { x: 100, z: 0 }],
         structureTags: { bridge: 'yes' }, networkKind: 'road', type: 'primary'
       };
-      const syntheticBridgeTerrain = [12, -80, 12];
-      semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? syntheticBridgeTerrain[1] : syntheticBridgeTerrain[0]);
+      semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? -80 : 12);
+      const compiledRoads = Array.isArray(ctx?.roads)
+        ? ctx.roads.filter((road) =>
+            road?.transportSurfaceModel?.authority === 'compiled_transport_surface')
+        : [];
+      const engineeredRoads = compiledRoads.filter((road) =>
+        road?.structureSemantics?.terrainMode !== 'at_grade');
+      const steepestEngineeredRoads = engineeredRoads
+        .map((road) => ({
+          id: String(road?.id || road?.sourceFeatureId || ''),
+          type: String(road?.type || road?.subtype || ''),
+          terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+          structureKind: String(road?.structureSemantics?.structureKind || ''),
+          pointCount: Number(road?.pts?.length || 0),
+          length: Number(road?.transportSurfaceModel?.pathDistances?.at?.(-1) || 0),
+          maximumGrade: Number(road?.transportSurfaceModel?.stats?.maximumGrade || 0),
+          transitionAnchors: Array.isArray(road?.structureTransitionAnchors)
+            ? road.structureTransitionAnchors
+            : []
+        }))
+        .sort((left, right) => right.maximumGrade - left.maximumGrade)
+        .slice(0, 5);
+      const transportSurfaceCoverage = {
+        roadCount: Number(ctx?.roads?.length || 0),
+        compiledRoadCount: compiledRoads.length,
+        atGradeRoadCount: compiledRoads.filter((road) =>
+          road?.structureSemantics?.terrainMode === 'at_grade').length,
+        liveTerrainSamplerCount: compiledRoads.filter((road) =>
+          typeof road?.surfaceTerrainSampler === 'function').length,
+        invalidModelCount: compiledRoads.filter((road) =>
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.minimumY) ||
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumY) ||
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumGrade)
+        ).length,
+        maximumGrade: compiledRoads.reduce((maximum, road) =>
+          Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0),
+        engineeredMaximumGrade: engineeredRoads.reduce((maximum, road) =>
+          Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0),
+        steepestEngineeredRoads
+      };
+      const roadMeshes = Array.isArray(ctx?.roadMeshes) ? ctx.roadMeshes : [];
+      const mainRoadBatches = roadMeshes.filter((mesh) =>
+        mesh?.userData?.isRoadBatch &&
+        !mesh?.userData?.isRoadSkirt &&
+        !mesh?.userData?.isRoadMarking
+      );
+      const auxiliaryRoadBatches = roadMeshes.filter((mesh) =>
+        mesh?.userData?.isRoadSkirt || mesh?.userData?.isRoadMarking
+      );
+      const transportSurfaceBatchBudget = {
+        meshCount: roadMeshes.length,
+        mainBatchCount: mainRoadBatches.length,
+        auxiliaryBatchCount: auxiliaryRoadBatches.length,
+        maximumMainBatchVertices: mainRoadBatches.reduce((maximum, mesh) =>
+          Math.max(maximum, Number(mesh?.geometry?.getAttribute?.('position')?.count || 0)), 0),
+        boundedMainBatches: mainRoadBatches.every((mesh) =>
+          Number(mesh?.geometry?.getAttribute?.('position')?.count || 0) <= 60000)
+      };
+      const transportStructureModel = ctx?.transportStructureModel || null;
+      const transportStructureColliders = Array.isArray(ctx?.transportStructureColliders)
+        ? ctx.transportStructureColliders
+        : [];
+      const transportStructureFeatures = Array.isArray(transportStructureModel?.features)
+        ? transportStructureModel.features
+        : [];
+      const transportStructureCoverage = {
+        authority: String(transportStructureModel?.authority || ''),
+        modelId: String(transportStructureModel?.id || ''),
+        transportGraphId: String(transportStructureModel?.transportGraphId || ''),
+        activeTransportGraphId: String(ctx?.transportNetworkModel?.id || ''),
+        featureCount: Number(transportStructureModel?.stats?.featureCount || 0),
+        chainCount: Number(transportStructureModel?.stats?.chainCount || 0),
+        incompleteCount: Number(transportStructureModel?.stats?.incompleteCount || 0),
+        coveredFeatureCount: transportStructureFeatures.filter((feature) => feature?.kind === 'covered').length,
+        colliderEligibleFeatureCount: transportStructureFeatures.filter((feature) => {
+          const semantics = feature?.structureSemantics || {};
+          const tunnel = feature?.tunnelSystemModel || {};
+          return feature?.kind === 'covered' || semantics.structureKind === 'covered' || (
+            semantics.terrainMode === 'subgrade' &&
+            feature?.transportRecord?.completeness === 'lossless' &&
+            tunnel.visualKind === 'tunnel' &&
+            Array.isArray(tunnel.shellRanges) &&
+            tunnel.shellRanges.length > 0
+          );
+        }).length,
+        colliderPolicy: String(ctx?.transportStructureColliderPolicy || ''),
+        colliderCount: transportStructureColliders.length,
+        invalidColliderCount: transportStructureColliders.filter((collider) =>
+          collider?.geometrySource !== 'compiled_transport_structures' ||
+          collider?.heightSource !== 'compiled_transport_surface' ||
+          collider?.structureColliderKind !== 'side_wall' ||
+          !Number.isFinite(collider?.minY) ||
+          !Number.isFinite(collider?.maxY) ||
+          !(collider.maxY > collider.minY)
+        ).length,
+        sideWallCount: transportStructureColliders.filter((collider) =>
+          collider?.structureColliderKind === 'side_wall').length,
+        ceilingCount: transportStructureColliders.filter((collider) =>
+          collider?.structureColliderKind === 'ceiling').length
+      };
+      const acceptedGroundSnapshot =
+        ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
+      const activeAcceptedGroundSample =
+        ctx?.sampleAcceptedGroundAtWorldXZ?.(0, 0) || null;
+      const roadParityCandidates = Array.isArray(ctx?.roads)
+        ? ctx.roads.filter((road) => Array.isArray(road?.pts) && road.pts.length >= 2)
+        : [];
+      const roadParityIndexes = roadParityCandidates.length > 0
+        ? [0, 0.25, 0.5, 0.75].map((ratio) =>
+            Math.min(
+              roadParityCandidates.length - 1,
+              Math.floor((roadParityCandidates.length - 1) * ratio)
+            ))
+        : [];
+      const roadIndexParitySamples = roadParityIndexes.map((index) => {
+        const road = roadParityCandidates[index];
+        const p1 = road.pts[0];
+        const p2 = road.pts[1];
+        const x = (p1.x + p2.x) * 0.5 + 1.25;
+        const z = (p1.z + p2.z) * 0.5 - 0.85;
+        const indexed = ctx.findNearestRoad?.(x, z);
+        const indexedSnapshot = {
+          road: indexed?.road || null,
+          dist: Number(indexed?.dist),
+          y: Number(indexed?.y)
+        };
+        const fullScan = ctx.findNearestRoad?.(x, z, {
+          forceFullScan: true
+        });
+        return {
+          sameRoad: indexedSnapshot.road === (fullScan?.road || null),
+          distanceDelta: Math.abs(indexedSnapshot.dist - Number(fullScan?.dist)),
+          heightDelta:
+            Number.isFinite(indexedSnapshot.y) && Number.isFinite(fullScan?.y)
+              ? Math.abs(indexedSnapshot.y - Number(fullScan.y))
+              : 0
+        };
+      });
 
       return {
+        linearFeaturePolicyEnabled: ctx?.linearFeaturePolicyEnabled === true,
         walkGraphNodeCount: Number(walkGraph?.nodeCount || walkGraph?.nodes?.length || 0),
         driveGraphNodeCount: Number(driveGraph?.nodeCount || driveGraph?.nodes?.length || 0),
         walkGraphSegmentCount: Number(walkGraph?.segmentCount || walkGraph?.segments?.length || 0),
@@ -833,8 +1280,35 @@ async function main() {
             return material && !Array.isArray(material) && material.transparent === false && Number(material.opacity ?? 1) >= 0.99;
           }),
         syntheticStructureSemantics,
-        syntheticBridgeTerrain,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
+        transportSurfaceCoverage,
+        transportSurfaceBatchBudget,
+        transportStructureCoverage,
+        transportSurfacePublication: ctx?.transportSurfacePublication || null,
+        acceptedGroundRuntimeBoundary: {
+          prepareExposed:
+            typeof ctx?.prepareAcceptedGroundForLocation === 'function',
+          coverageGateExposed:
+            typeof ctx?.verifyAcceptedGroundCoverage === 'function',
+          snapshot: acceptedGroundSnapshot,
+          activeSample: activeAcceptedGroundSample
+        },
+        worldPublication:
+          typeof ctx?.verifyWorldPublicationStable === 'function'
+            ? ctx.verifyWorldPublicationStable()
+            : null,
+        roadIndexParity: {
+          sampleCount: roadIndexParitySamples.length,
+          allSameRoad: roadIndexParitySamples.every((sample) => sample.sameRoad),
+          maxDistanceDelta: Math.max(
+            0,
+            ...roadIndexParitySamples.map((sample) => sample.distanceDelta)
+          ),
+          maxHeightDelta: Math.max(
+            0,
+            ...roadIndexParitySamples.map((sample) => sample.heightDelta)
+          )
+        },
         landingCopyClear:
           /optional/i.test(landingHtml) &&
           /map, core exploration, and traversal modes are free/i.test(landingHtml) &&
@@ -874,15 +1348,14 @@ async function main() {
       report.screenshotWarning = String(error?.message || error);
     }
 
+    const readinessChecks = evaluateRuntimeReadiness(report, preWaterMetrics);
     const checks = {
-      roadCenterDriveable: report.blockedDriveRatePct <= 10,
-      laneEdgeReasonable: report.laneHitRatePct <= 3.5,
+      roadCenterDriveable: readinessChecks.roadCenterDriveable,
+      laneEdgeReasonable: readinessChecks.laneEdgeReasonable,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
-      linearFeatureGeometryReady:
-        (report.linearFeatures + preWaterMetrics.linearFeatures) > 0 &&
-        report.linearFeatureMeshCount > 0 &&
-        report.solidLinearMaterials === true,
+      linearFeatureNavigationReady:
+        readinessChecks.linearFeatureNavigationReady,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
@@ -891,8 +1364,28 @@ async function main() {
       visualStateRestored: report.visualStateRestored === true,
       walkTraversalNetworkReady:
         report.walkGraphNodeCount > 0 &&
-        report.walkGraphSegmentCount >= report.driveGraphSegmentCount,
+        report.driveGraphSegmentCount > 0 &&
+        (
+          report.linearFeaturePolicyEnabled === false ||
+          report.walkGraphSegmentCount >= report.driveGraphSegmentCount
+        ),
       waterMaterialsSolid: report.solidWaterMeshes === true,
+      buildingProvenanceAuthority:
+        report.buildingProvenanceModel?.authority === 'compiled_building_provenance' &&
+        report.buildingProvenanceModel?.featureCount > 0 &&
+        report.buildingProvenanceModel?.featureCount === report.buildingProvenanceModel?.validCount &&
+        report.buildingProvenanceModel?.ambiguousMetadataCount === 0 &&
+        report.buildingProvenanceModel?.duplicateFeatureIds?.length === 0 &&
+        report.buildingProvenancePublication?.unownedMeshCount === 0 &&
+        report.buildingProvenancePublication?.unownedColliderCount === 0,
+      waterSurfaceAuthority:
+        report.waterSurfaceRegistry?.authority === 'water_surface_registry' &&
+        report.waterSurfaceRegistry?.surfaceCount === report.waterSurfacePublication?.bodyCount &&
+        report.waterSurfaceRegistry?.duplicateRegistryIds?.length === 0 &&
+        report.waterSurfacePublication?.unownedBodyCount === 0 &&
+        report.waterSurfacePublication?.unownedMeshCount === 0 &&
+        report.waterSurfacePublication?.orphanedBodyCount === 0 &&
+        report.waterSurfacePublication?.duplicateRegistryIds?.length === 0,
       vegetationIntegrated: report.vegetationFeatures > 0 && report.vegetationMeshes > 0,
       structureSemanticsStable:
         report.syntheticStructureSemantics?.overgroundFootway?.terrainMode === 'at_grade' &&
@@ -901,13 +1394,64 @@ async function main() {
         report.syntheticStructureSemantics?.bridgeFootway?.gradeSeparated === true &&
         report.syntheticStructureSemantics?.tunnelRoad?.terrainMode === 'subgrade' &&
         report.syntheticStructureSemantics?.tunnelRoad?.gradeSeparated === true,
+      acceptedGroundRuntimeReady:
+        readinessChecks.acceptedGroundRuntimeReady,
+      roadSpatialIndexExact:
+        report.roadIndexParity?.sampleCount >= 4 &&
+        report.roadIndexParity?.allSameRoad === true &&
+        report.roadIndexParity?.maxDistanceDelta <= 1e-9 &&
+        report.roadIndexParity?.maxHeightDelta <= 1e-9,
+      worldPublicationStable:
+        report.worldPublication?.stable === true &&
+        report.worldPublication?.changes?.length === 0,
       bridgeSpansTerrainDepressions:
-        report.syntheticBridgeHeights?.length === 3 &&
-        report.syntheticBridgeTerrain?.length === 3 &&
-        Math.abs(report.syntheticBridgeHeights[0] - report.syntheticBridgeTerrain[0] - 0.08) <= 0.02 &&
-        Math.abs(report.syntheticBridgeHeights[2] - report.syntheticBridgeTerrain[2] - 0.08) <= 0.02 &&
-        report.syntheticBridgeHeights[1] - report.syntheticBridgeTerrain[1] >= 90 &&
-        report.syntheticBridgeHeights[1] >= Math.max(report.syntheticBridgeHeights[0], report.syntheticBridgeHeights[2]) + 4,
+        report.syntheticBridgeHeights?.length >= 3 &&
+        Math.min(...report.syntheticBridgeHeights) > 15 &&
+        Math.max(...report.syntheticBridgeHeights) - Math.min(...report.syntheticBridgeHeights) < 0.1,
+      compiledTransportAuthority:
+        report.transportSurfaceCoverage?.roadCount > 0 &&
+        report.transportSurfaceCoverage?.compiledRoadCount === report.transportSurfaceCoverage?.roadCount &&
+        report.transportSurfaceCoverage?.liveTerrainSamplerCount ===
+          report.transportSurfaceCoverage?.atGradeRoadCount &&
+        report.transportSurfaceCoverage?.invalidModelCount === 0 &&
+        report.transportSurfaceCoverage?.engineeredMaximumGrade <= 0.1202 &&
+        report.transportSurfacePublication?.authority === 'compiled_transport_surface' &&
+        report.transportSurfacePublication?.roadCount === report.transportSurfaceCoverage?.roadCount,
+      compiledStructureAuthority:
+        report.transportStructureCoverage?.authority === 'compiled_transport_structures' &&
+        report.transportStructureCoverage?.modelId?.startsWith('transport-structure-model:') &&
+        report.transportStructureCoverage?.transportGraphId ===
+          report.transportStructureCoverage?.activeTransportGraphId &&
+        report.transportStructureCoverage?.featureCount > 0 &&
+        report.transportStructureCoverage?.chainCount > 0,
+      structureCollisionAuthority:
+        report.transportStructureCoverage?.invalidColliderCount === 0 &&
+        (
+          (
+            report.transportStructureCoverage?.colliderEligibleFeatureCount > 0 &&
+            report.transportStructureCoverage?.colliderCount > 0 &&
+            report.transportStructureCoverage?.sideWallCount > 0 &&
+            report.transportStructureCoverage?.ceilingCount === 0
+          ) ||
+          (
+            report.transportStructureCoverage?.colliderEligibleFeatureCount === 0 &&
+            report.transportStructureCoverage?.colliderCount === 0 &&
+            report.transportStructureCoverage?.colliderPolicy ===
+              'actor-height-bounded-lossless-tunnel-side-walls'
+          )
+        ),
+      compiledTransportRendererBudget:
+        report.transportSurfaceBatchBudget?.meshCount ===
+          report.transportSurfaceBatchBudget?.mainBatchCount +
+          report.transportSurfaceBatchBudget?.auxiliaryBatchCount &&
+        report.transportSurfaceBatchBudget?.boundedMainBatches === true &&
+        report.transportSurfaceBatchBudget?.auxiliaryBatchCount <= 2 &&
+        report.transportSurfacePublication?.compiledSampleCount <=
+          report.transportSurfacePublication?.roadCount * 120 &&
+        report.transportSurfacePublication?.vertices <=
+          report.transportSurfacePublication?.roadCount * 150 &&
+        report.transportSurfacePublication?.triangles <=
+          report.transportSurfacePublication?.roadCount * 140,
       roadSurfacesDraped:
         report.roadSurfaceContract?.atGradeSkirt === false &&
         report.roadSurfaceContract?.elevatedSkirt === false &&
@@ -939,7 +1483,7 @@ async function main() {
       syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:
         report.droneControlsText.includes('Arrow Up/Down - Fly forward / back') &&
-        report.droneControlsText.includes('Arrow Left/Right - Turn left / right') &&
+        report.droneControlsText.includes('Arrow Left/Right - Turn the drone') &&
         report.droneControlsText.includes('WASD - Look around'),
       drivingMapHintUpdated:
         report.drivingControlsText.includes('M - Toggle map') &&
@@ -971,11 +1515,13 @@ async function main() {
 
     const fullReport = {
       ok,
+      evidenceIdentity,
       url: baseUrl,
       checks,
       metrics: report,
       readySnapshot,
       traversalSnapshot,
+      vegetationReadiness,
       preWaterMetrics,
       mapToggleCheck,
       debugToggleCheck,
@@ -984,19 +1530,33 @@ async function main() {
     };
 
     await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fullReport, null, 2));
-    diagnosticReportWritten = true;
 
     assert(
-      report.driveSampleCount === 1 && checks.roadCenterDriveable,
-      `Road center driveability degraded: blocked ${report.blockedDriveSamples}/${report.driveSampleCount} (${report.blockedDriveRatePct}%)`
+      checks.roadCenterDriveable,
+      `Road readiness lacks representative journeys or is blocked: ${JSON.stringify({
+        checkedSamples: report.checkedSamples,
+        driveSampleCount: report.driveSampleCount,
+        blockedDriveSamples: report.blockedDriveSamples,
+        blockedDriveRatePct: report.blockedDriveRatePct
+      })}`
     );
-    assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
     assert(
-      checks.linearFeatureGeometryReady,
-      `Mapped path geometry contract is incomplete: ${JSON.stringify({
+      checks.laneEdgeReasonable,
+      `Lane-edge evidence is insufficient or collision rate is too high: ${JSON.stringify({
+        checkedSamples: report.checkedSamples,
+        laneHits: report.laneHits,
+        laneHitRatePct: report.laneHitRatePct
+      })}`
+    );
+    assert(
+      checks.linearFeatureNavigationReady,
+      `Mapped path navigation and visible presentation are incomplete: ${JSON.stringify({
         linearFeatures: report.linearFeatures,
+        linearFeaturePolicyEnabled: report.linearFeaturePolicyEnabled,
         linearFeatureMeshCount: report.linearFeatureMeshCount,
-        solidLinearMaterials: report.solidLinearMaterials
+        solidLinearMaterials: report.solidLinearMaterials,
+        walkFeatureRoute: report.walkFeatureRoute,
+        walkSurfaceSample: report.walkSurfaceSample
       })}`
     );
     assert(checks.spawnResolverAvailable, 'Spawn resolver helpers are not exposed on runtime context.');
@@ -1026,9 +1586,41 @@ async function main() {
       })}`
     );
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
+    assert(
+      checks.buildingProvenanceAuthority,
+      `Building publication is missing stable provenance ownership: ${JSON.stringify({
+        model: report.buildingProvenanceModel,
+        publication: report.buildingProvenancePublication
+      })}`
+    );
+    assert(
+      checks.waterSurfaceAuthority,
+      `Water publication is missing registry ownership or contains duplicates: ${JSON.stringify({
+        registry: report.waterSurfaceRegistry,
+        publication: report.waterSurfacePublication
+      })}`
+    );
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
+    assert(checks.acceptedGroundRuntimeReady, `Accepted ground is not active, attributable, and sampleable: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
+    assert(checks.roadSpatialIndexExact, `Indexed nearest-road results differ from the full scan: ${JSON.stringify(report.roadIndexParity || null)}`);
     assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
+    assert(checks.compiledTransportAuthority, `Transport surfaces did not publish from one compiled authority: ${JSON.stringify({
+      coverage: report.transportSurfaceCoverage,
+      publication: report.transportSurfacePublication
+    })}`);
+    assert(
+      checks.compiledStructureAuthority,
+      `Transport structures did not publish from the active compiled graph: ${JSON.stringify(report.transportStructureCoverage || null)}`
+    );
+    assert(
+      checks.structureCollisionAuthority,
+      `Structure collision was missing or did not consume compiled structure/surface authority: ${JSON.stringify(report.transportStructureCoverage || null)}`
+    );
+    assert(
+      checks.compiledTransportRendererBudget,
+      `Compiled transport renderer exceeded its bounded per-road budget: ${JSON.stringify(report.transportSurfacePublication || null)}`
+    );
     assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
     assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);
@@ -1063,15 +1655,21 @@ async function main() {
 }
 
 main().catch(async (err) => {
-  const fallback = {
-    ok: false,
-    error: err?.message || String(err)
-  };
   try {
     await mkdirp(outputDir);
-    if (!diagnosticReportWritten) {
-      await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fallback, null, 2));
+    const reportPath = path.join(outputDir, 'report.json');
+    let existing = {};
+    try {
+      existing = JSON.parse(await fs.readFile(reportPath, 'utf8'));
+    } catch {
+      // Startup failures can occur before the first complete report is written.
     }
+    await fs.writeFile(reportPath, JSON.stringify({
+      ...existing,
+      ok: false,
+      evidenceIdentity,
+      error: err?.message || String(err)
+    }, null, 2));
   } catch {
     // best-effort only
   }

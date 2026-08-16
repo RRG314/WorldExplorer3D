@@ -3,12 +3,15 @@ function finiteNumber(value, fallback = 0) {
 }
 
 function controllerSnapshot(record) {
+  const sortedDurations = [...record.durationsMs].sort((left, right) => left - right);
+  const p95Index = Math.max(0, Math.ceil(sortedDurations.length * 0.95) - 1);
   return {
     id: record.id,
     priority: record.priority,
     updates: record.updates,
     failures: record.failures,
     lastDurationMs: Number(record.lastDurationMs.toFixed(3)),
+    updateDurationP95Ms: Number((sortedDurations[p95Index] || 0).toFixed(3)),
     lastError: record.lastError
   };
 }
@@ -46,6 +49,7 @@ function createTransportControllerRegistry(options = {}) {
       updates: 0,
       failures: 0,
       lastDurationMs: 0,
+      durationsMs: [],
       lastError: ''
     };
     controllers.set(id, record);
@@ -91,6 +95,8 @@ function createTransportControllerRegistry(options = {}) {
       selected.update(Math.max(0, finiteNumber(dt, 0)), context);
       selected.updates++;
       selected.lastDurationMs = Math.max(0, now() - startedAt);
+      selected.durationsMs.push(selected.lastDurationMs);
+      if (selected.durationsMs.length > 600) selected.durationsMs.shift();
       return true;
     } catch (error) {
       selected.failures++;

@@ -1,7 +1,17 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGameplayPluginRegistry } from "../gameplay/plugin-registry.js?v=1";
-import { clearPolice, spawnPolice } from "./police.js?v=1";
+import { clearPolice, spawnPolice } from "./police.js?v=2";
 import { resetPaintTownMode, startPaintTownMode, updateActivePaintTownMode } from "./paint-town.js?v=1";
+import {
+  getDeFlockSnapshot,
+  startDeFlockMode,
+  stopDeFlockMode,
+  getLiveGpsSnapshot,
+  startLiveGpsMode,
+  stopLiveGpsMode,
+  updateDeFlockMode,
+  updateLiveGpsMode
+} from "../runtime/on-demand-location-games.js?v=1";
 
 const gameplayRegistry = createGameplayPluginRegistry({
   onError(error, id, phase) {
@@ -205,6 +215,25 @@ gameplayRegistry.register({
   start: () => appCtx.startFlowerChallenge?.("game-mode"),
   stop: () => appCtx.stopFlowerChallenge?.()
 });
+gameplayRegistry.register({
+  id: "deflock",
+  label: "DeFlock Hunt",
+  category: "location-game",
+  start: startDeFlockMode,
+  update: updateDeFlockMode,
+  stop: stopDeFlockMode,
+  save: getDeFlockSnapshot,
+  leaderboard: () => getDeFlockSnapshot()?.progress || null
+});
+gameplayRegistry.register({
+  id: "livegps",
+  label: "Live GPS Explore",
+  category: "location-game",
+  start: startLiveGpsMode,
+  update: updateLiveGpsMode,
+  stop: stopLiveGpsMode,
+  save: getLiveGpsSnapshot
+});
 
 export function registerGameplayPlugin(definition) {
   return gameplayRegistry.register(definition);
@@ -234,7 +263,7 @@ export function startGameplayPlugin(id, context = {}) {
   const pluginId = String(id || "free");
   if (!gameplayRegistry.has(pluginId)) throw new Error(`Unknown gameplay plugin: ${pluginId}`);
   prepareGameplayTransition("replaced", context);
-  if (!["trial", "checkpoint", "painttown", "police", "flower"].includes(pluginId)) {
+  if (!["trial", "checkpoint", "painttown", "police", "flower", "deflock", "livegps"].includes(pluginId)) {
     appCtx.gameMode = "free";
   }
   return gameplayRegistry.start(pluginId, { appCtx, ...context });

@@ -1,80 +1,81 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-function releaseEnvironment() {
-  const env = { ...process.env };
-  if (process.platform !== 'darwin') return env;
-  const configuredJava = env.JAVA_HOME && path.join(env.JAVA_HOME, 'bin', 'java');
-  if (configuredJava && existsSync(configuredJava)) return env;
-  const candidates = [
-    '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home',
-    '/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home'
-  ];
-  const javaHome = candidates.find((candidate) => existsSync(path.join(candidate, 'bin', 'java')));
-  if (!javaHome) return env;
-  env.JAVA_HOME = javaHome;
-  env.PATH = `${path.join(javaHome, 'bin')}:${env.PATH || ''}`;
-  return env;
-}
-
-const baseEnvironment = releaseEnvironment();
-
 const steps = [
+  { name: 'Release evidence identity', cmd: [process.execPath, 'scripts/test-release-evidence-identity.mjs'] },
+  { name: 'Production readiness semantics', cmd: [process.execPath, 'scripts/test-production-readiness-contract.mjs'] },
+  { name: 'Earth-core isolation boundary', cmd: [process.execPath, 'scripts/test-earth-core-boundaries.mjs'] },
+  { name: 'Immutable world-load request', cmd: [process.execPath, 'scripts/test-world-load-request.mjs'] },
+  { name: 'Published world location identity', cmd: [process.execPath, 'scripts/test-world-location-identity.mjs'] },
+  { name: 'World-load session state machine', cmd: [process.execPath, 'scripts/test-world-load-session.mjs'] },
+  { name: 'World-load coordinator', cmd: [process.execPath, 'scripts/test-world-load-coordinator.mjs'] },
+  { name: 'Immutable WorldSnapshot and atomic store', cmd: [process.execPath, 'scripts/test-world-snapshot.mjs'] },
+  { name: 'Live WorldSnapshot publication adapter', cmd: [process.execPath, 'scripts/test-world-publication-snapshot.mjs'] },
+  { name: 'Provider session cancellation', cmd: [process.execPath, 'scripts/test-provider-cancellation.mjs'] },
+  { name: 'Far-terrain elevation request budget', cmd: [process.execPath, 'scripts/test-far-field-elevation-loader.mjs'] },
+  { name: 'Fixed-location shared terrain material', cmd: [process.execPath, 'scripts/test-fixed-location-terrain-material.mjs'] },
+  { name: 'WorldCover mixed-tile material authority', cmd: [process.execPath, 'scripts/test-worldcover-detail-mode.mjs'] },
+  { name: 'Terrain-tile generation cancellation', cmd: [process.execPath, 'scripts/test-terrain-tile-cancellation.mjs'] },
+  { name: 'World-load cancellation browser', cmd: [process.execPath, 'scripts/test-world-load-cancellation-browser.mjs'] },
+  { name: 'Fixed-world sustained travel and Space return', cmd: [process.execPath, 'scripts/test-fixed-world-travel-browser.mjs'] },
+  { name: '4.1.3 cold/warm load performance comparison', cmd: [process.execPath, 'scripts/test-load-performance-comparison.mjs'] },
+  { name: 'City-surface structural ownership', cmd: [process.execPath, 'scripts/test-city-surface-semantics.mjs'] },
+  { name: 'Measured title startup workload', cmd: [process.execPath, 'scripts/test-startup-workload-browser.mjs'] },
+  { name: 'Building publication coverage', cmd: [process.execPath, 'scripts/test-building-publication-coverage.mjs'] },
+  { name: 'Building geometry quality', cmd: [process.execPath, 'scripts/test-building-geometry-quality.mjs'] },
+  { name: 'Mapped-only roof policy', cmd: [process.execPath, 'scripts/test-roof-inference-policy.mjs'] },
+  { name: 'Mapped hydrology integration', cmd: [process.execPath, 'scripts/test-hydrology-integration.mjs'] },
+  { name: 'Road junction envelopes', cmd: [process.execPath, 'scripts/test-road-junction-envelopes.mjs'] },
+  { name: 'Indexed bridge-road conflict queries', cmd: [process.execPath, 'scripts/test-bridge-road-conflict-index.mjs'] },
+  { name: 'Tunnel-system model', cmd: [process.execPath, 'scripts/test-tunnel-system-model.mjs'] },
+  { name: 'Fixed-world horizon ownership', cmd: [process.execPath, 'scripts/test-fixed-world-horizon-architecture.mjs'] },
+  { name: 'Global far-world provider matrix', cmd: [process.execPath, 'scripts/test-far-world-global-contract.mjs'] },
+  { name: 'Globe selector browser journey', cmd: [process.execPath, 'scripts/test-globe-selector-browser.mjs'] },
+  { name: 'Loading transition browser journey', cmd: [process.execPath, 'scripts/test-loading-transition-browser.mjs'] },
+  { name: 'Global ocean bathymetry', cmd: [process.execPath, 'scripts/test-ocean-global-bathymetry.mjs'] },
   { name: 'Maintainability guard', cmd: [process.execPath, 'scripts/test-maintainability-guard.mjs'] },
-  { name: 'Hosting release contract', cmd: [process.execPath, 'scripts/test-hosting-release-contract.mjs'] },
-  { name: 'Release version identity', cmd: [process.execPath, 'scripts/test-release-version.mjs'] },
   { name: 'Cloud Functions dependency install', cmd: [npmCommand, 'ci', '--prefix', 'functions', '--ignore-scripts'] },
-  { name: 'Reviewed production dependency audit', cmd: [process.execPath, 'scripts/test-reviewed-production-audit.mjs'] },
+  { name: 'Cloud Functions security audit', cmd: [npmCommand, 'audit', '--omit=dev', '--prefix', 'functions'] },
   { name: 'Cloud Functions runtime exports', cmd: [process.execPath, 'scripts/test-functions-runtime.mjs'] },
-  { name: 'Open-source distribution', cmd: [process.execPath, 'scripts/test-open-source-distribution.mjs'] },
   { name: 'Build production hosting artifact', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production'] },
   { name: 'Hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] },
-  { name: 'Hosting and cold-title size budgets', cmd: [process.execPath, 'scripts/test-hosting-size-budget.mjs'] },
+  { name: 'Bundled hosting artifact browser boot', cmd: [process.execPath, 'scripts/test-hosting-artifact-browser.mjs'] },
+  { name: 'Immutable release candidate identity', cmd: [process.execPath, 'scripts/test-release-candidate.mjs'] },
   { name: 'Hosted source reachability', cmd: [process.execPath, 'scripts/audit-hosting-reachability.mjs', '--strict'] },
+  { name: 'Hosted asset reachability', cmd: [process.execPath, 'scripts/audit-hosting-assets.mjs', '--strict'] },
   { name: 'CSS integrity', cmd: [process.execPath, 'scripts/test-css-integrity.mjs'] },
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },
+  { name: 'Terrain source contract', cmd: [process.execPath, 'scripts/test-terrain-source-contract.mjs'] },
+  { name: 'Provider outage circuit', cmd: [process.execPath, 'scripts/test-provider-outage-circuit.mjs'] },
+  { name: 'WorldCover outage fan-out', cmd: [process.execPath, 'scripts/test-worldcover-provider-outage-browser.mjs'] },
   { name: 'Surface contract', cmd: [process.execPath, 'scripts/test-surface-contract.mjs'] },
-  { name: 'Shadow policy', cmd: [process.execPath, 'scripts/test-shadow-policy.mjs'] },
+  { name: 'Overture tile source', cmd: [process.execPath, 'scripts/test-overture-tile-source.mjs'] },
   { name: 'Inferred building coverage', cmd: [process.execPath, 'scripts/test-inferred-building-coverage.mjs'] },
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
   { name: 'Local data safety', cmd: [process.execPath, 'scripts/test-local-data-safety.mjs'] },
-  { name: 'Analytics privacy contract', cmd: [process.execPath, '--test', 'scripts/test-analytics-contract.mjs'] },
-  { name: 'Release harness privacy and cleanup', cmd: [process.execPath, 'scripts/test-release-harness-privacy.mjs'] },
-  { name: 'Authoritative room load budget', cmd: [process.execPath, '--expose-gc', 'scripts/test-mmo-load.mjs'] },
-  { name: 'Authoritative MMO contracts and server', cmd: [npmCommand, 'run', 'test:mmo'] },
-  { name: 'Firestore-backed MMO compatibility', cmd: [npmCommand, 'run', 'test:mmo-firestore'] },
-  { name: 'Authoritative room browser gameplay', cmd: [process.execPath, 'scripts/test-mmo-browser-acceptance.mjs'] },
+  { name: 'Disposable lifecycle resources', cmd: [process.execPath, 'scripts/test-lifecycle-scope.mjs'] },
+  { name: 'Weather state one-writer service', cmd: [process.execPath, 'scripts/test-weather-state-service.mjs'] },
   { name: 'Runtime kernel', cmd: [process.execPath, 'scripts/test-runtime-kernel.mjs'] },
-  { name: 'Frame ownership registry', cmd: [process.execPath, 'scripts/test-frame-ownership.mjs'] },
-  { name: 'Lifecycle scope cancellation', cmd: [process.execPath, 'scripts/test-lifecycle-scope.mjs'] },
-  { name: 'Domain dependency boundaries', cmd: [process.execPath, 'scripts/test-domain-dependency-boundaries.mjs'] },
-  { name: 'World load transaction authority', cmd: [process.execPath, 'scripts/test-world-load-transaction.mjs'] },
-  { name: 'World load staged swap', cmd: [process.execPath, 'scripts/test-world-load-stage.mjs'] },
-  { name: 'Navigation surface query', cmd: [process.execPath, 'scripts/test-navigation-surface-query.mjs'] },
-  { name: 'Bridge guardrail contract', cmd: [process.execPath, 'scripts/test-bridge-guardrail-contract.mjs'] },
-  { name: 'Tunnel camera corridor contract', cmd: [process.execPath, 'scripts/test-tunnel-camera-corridor.mjs'] },
-  { name: 'Terrain/boat visibility ownership', cmd: [process.execPath, 'scripts/test-terrain-streaming-boat-suppression.mjs'] },
-  { name: 'Boat prompt subgrade policy', cmd: [process.execPath, 'scripts/test-boat-prompt-policy.mjs'] },
-  { name: 'HUD place-location authority', cmd: [process.execPath, 'scripts/test-place-location-authority.mjs'] },
-  { name: 'World-load location authority', cmd: [process.execPath, 'scripts/test-world-load-location-authority.mjs'] },
-  { name: 'Mapped water terrain validity', cmd: [process.execPath, 'scripts/test-water-surface-validity.mjs'] },
-  { name: 'Structure visual sampling', cmd: [process.execPath, 'scripts/test-structure-visual-sampling.mjs'] },
   { name: 'Transport controller registry', cmd: [process.execPath, 'scripts/test-transport-controller-registry.mjs'] },
   { name: 'Platform service registry', cmd: [process.execPath, 'scripts/test-platform-service-registry.mjs'] },
   { name: 'Account service', cmd: [process.execPath, 'scripts/test-account-service.mjs'] },
   { name: 'Gameplay plugin registry', cmd: [process.execPath, 'scripts/test-gameplay-plugin-registry.mjs'] },
-  { name: 'Activity platform', cmd: [process.execPath, 'scripts/test-activity-platform.mjs'] },
   { name: 'Geospatial data fabric', cmd: [process.execPath, 'scripts/test-geospatial-data-fabric.mjs'] },
-  { name: 'Mobile touch controls', cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'] },
+  { name: 'Mobile Chromium touch controls', cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'] },
+  {
+    name: 'Mobile WebKit touch controls',
+    cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'],
+    env: { MOBILE_BROWSER: 'webkit' }
+  },
   { name: 'Plane and interior lifecycle', cmd: [process.execPath, 'scripts/test-plane-interior-lifecycle.mjs'] },
   { name: 'Environment session lifecycle', cmd: [process.execPath, 'scripts/test-session-lifecycle.mjs'] },
   { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] },
   { name: 'Editor and multiplayer transitions', cmd: [process.execPath, 'scripts/test-editor-multiplayer-surfaces.mjs'] },
   { name: 'Block builder contracts', cmd: [process.execPath, 'scripts/test-block-builder-contract.mjs'] },
   { name: 'Title planetary launches', cmd: [process.execPath, 'scripts/test-title-planetary-launches.mjs'] },
+  { name: 'Multi-axis space-flight controls', cmd: [process.execPath, 'scripts/test-space-flight-controls.mjs'] },
+  { name: 'Space physics and visual ownership', cmd: [process.execPath, 'scripts/test-space-physics-and-visuals.mjs'] },
   { name: 'OSM smoke', cmd: [process.execPath, 'scripts/test-osm-smoke.mjs'] },
   {
     name: 'R7 provider-outage fallback',
@@ -87,36 +88,28 @@ const steps = [
     }
   },
   {
-    name: 'Fixed release geography matrix',
+    name: 'World matrix with elevated terrain-boundary evidence',
     cmd: [process.execPath, 'scripts/test-world-matrix.mjs'],
     env: {
-      WORLD_MATRIX_IDS: [
-        'baltimore',
-        'losangeles',
-        'tokyo',
-        'monaco',
-        'swiss_alps_custom',
-        'sahara_custom',
-        'iowa_farmland_custom',
-        'lake_tahoe_custom',
-        'atlantic_ocean_custom',
-        'golden_gate_custom',
-        'holland_tunnel_custom'
-      ].join(',')
+      WORLD_MATRIX_CAPTURE_DRONE: '1',
+      WORLD_MATRIX_FORCE_DAYLIGHT: '1'
     }
   },
   {
-    name: 'Rebuild final production hosting artifact',
-    cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production']
-  },
-  { name: 'Final production hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
+    name: 'Hardware real-input 10-minute drive',
+    cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'],
+    env: {
+      PLAYER_DRIVE_SECONDS: '600',
+      PLAYER_DRIVE_HEADED: '1'
+    }
+  }
 ];
 
 for (const step of steps) {
   console.log(`\n=== ${step.name} ===`);
   const res = spawnSync(step.cmd[0], step.cmd.slice(1), {
     stdio: 'inherit',
-    env: { ...baseEnvironment, ...(step.env || {}) },
+    env: { ...process.env, ...(step.env || {}) },
     cwd: process.cwd()
   });
   if (res.status !== 0) {
@@ -125,4 +118,8 @@ for (const step of steps) {
   }
 }
 
-console.log('\n[release-verify] All checks passed.');
+console.log(
+  '\n[release-verify] Automated candidate checks passed. ' +
+  'Review the generated world-matrix screenshots, prepare a hash-bound review, ' +
+  'then run npm run release:finalize.'
+);

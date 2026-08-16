@@ -1,4 +1,4 @@
-import { Timestamp, serverTimestamp } from '../platform/firebase/firestore.js';
+import { Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
 const ROOM_CODE_LENGTH = 6;
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

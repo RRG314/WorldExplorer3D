@@ -1,22 +1,21 @@
 # World Explorer 3D
 
-[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
-[![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
-[![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=main)](https://rrg314.github.io/WorldExplorer3D/)
+[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
+[![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
+[![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=semver)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
 World Explorer 3D is a browser-based geospatial exploration game built around real-world map context. Pick a preset city, use the interactive globe, or enter coordinates, then explore by walking, driving, flying, boating, or changing worlds entirely.
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.1
+## Version 4.2.0
 
-Version 4.1 is a focused stabilization release. It simplifies Earth exploration
-to the selected-location OSM runtime, improves dense-world load and frame
-stability, fixes shared road/path/terrain/camera ownership, removes Continuous
-World and Overture/PMTiles runtime paths, and retains the existing Earth,
-ocean, Moon, Mars, space, account, editor, and multiplayer journeys.
+Version 4.2.0 adds DeFlock Hunt and bounded Live GPS Explore while stabilizing
+the fixed-location Earth world introduced in 4.1.3. Location loads publish one
+immutable world, movement does not reload world data, and returning from Space
+restores the retained Earth scene.
 
 Highlights:
 
@@ -24,14 +23,33 @@ Highlights:
 - Preset cities, geolocation, coordinate entry, and an interactive globe for choosing locations worldwide.
 - Live Earth views for observed satellites, earthquakes, aircraft, current weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
 - Walk, drive, drone, plane, boat, underwater, rover, astronaut, and rocket traversal.
+- Selected-location Earth sessions with atomic loading and explicit cancellation.
+- Structure-aware bridges, elevated roads, ramps, underpasses, and tunnels.
+- Material-aware building facades and improved rooftop geometry with restrained fallbacks when mapped detail is unavailable.
+- Terrain, actor, vehicle, and camera interpolation designed to prevent clipping and visible pose drift.
 - In-session Earth, Moon, Mars, ocean, and space transitions without a page reload.
 - A navigable solar system with planets, moons, asteroid and Kuiper belts, spacecraft, and inner/full system maps.
 - Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.
 - Enterable buildings using mapped indoor geometry where available and footprint-aware generated interiors elsewhere.
 - Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
+- [DeFlock Hunt](docs/DEFLOCK_MODE.md), a virtual single-player and cooperative mode built from publicly mapped OpenStreetMap surveillance nodes.
+- Live GPS Explore, an optional foreground-only mode that follows a player's physical location inside one bounded, fixed world without continuous-world streaming.
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
-- Apache-2.0 project licensing, contributor governance, self-hosting guidance, and explicit third-party asset/data notices.
+
+## Multiplayer model
+
+Multiplayer uses bounded shared rooms rather than one continuous MMO server. A
+room keeps one fixed world/location, live player presence, chat, shared blocks,
+artifacts, and room activities together. Private rooms are unlisted and joined
+with a six-character invite code; public rooms are discovered by city; featured
+rooms are curated by administrators. Rooms support 2–32 players, with 8–14
+recommended for the current browser renderer and Firestore presence model.
+
+Run the real two-browser contract with `npm run test:multiplayer-integration`.
+It uses local Auth and Firestore emulators and verifies private-code joining,
+presence/movement, chat, and shared half-grid shape stacks without production
+data.
 
 ## Screenshots
 
@@ -76,7 +94,7 @@ npm run runtime:verify
 npm run release:verify
 ```
 
-`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor/multiplayer surfaces, planetary round trips, world-provider fallbacks, ocean/biome behavior, and the global location matrix.
+`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor and multiplayer surfaces, planetary round trips, provider fallbacks, ocean and biome behavior, and a representative global location matrix.
 
 ## Repository Layout
 
@@ -94,22 +112,13 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 ## Project Documents
 
 - [Changelog](CHANGELOG.md)
-- [Release runbook](RELEASE_RUNBOOK.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
+- [DeFlock Hunt](docs/DEFLOCK_MODE.md)
+- [Data sources and attribution](DATA_SOURCES.md)
 - [Contributing](CONTRIBUTING.md)
-- [Governance](GOVERNANCE.md)
-- [Community conduct](CODE_OF_CONDUCT.md)
-- [Support](SUPPORT.md)
 - [Security policy](SECURITY.md)
-- [Local MMO stack](SELF_HOSTING.md)
-- [Gameplay extension guide](CONTENT_EXTENSION_GUIDE.md)
-- [MMO architecture](MMO_ARCHITECTURE.md)
 
 ## License
 
-Original project code and documentation are open source under the
-[Apache License 2.0](LICENSE). Third-party data, assets, and hosted services are
-not relicensed; review [third-party notices](THIRD_PARTY_NOTICES.md),
-[data licensing](DATA_LICENSES.md), [media licensing](MEDIA_LICENSE.md), and
-[trademark guidance](TRADEMARKS.md) before redistributing a build.
+This repository is source-available under the custom terms in [LICENSE](LICENSE). It is not licensed as OSI open-source software. Third-party data and assets remain subject to their respective licenses.

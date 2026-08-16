@@ -1,3 +1,21 @@
+export function denseSettlementOwnsUrbanSurface({
+  buildings = 0,
+  roads = 0,
+  greenLanduses = 0,
+  urbanRatio = 0,
+  waterRatio = 0
+} = {}) {
+  return Number(greenLanduses) === 0 &&
+    Number(buildings) >= 20 &&
+    Number(roads) >= 8 &&
+    Number(urbanRatio) >= 0.28 &&
+    Number(waterRatio) < 0.45;
+}
+
+export function regionalBuildingTileOwnsUrbanSurface(buildingCount = 0) {
+  return Number(buildingCount) >= 24;
+}
+
 export function createLocalSurfaceAnalysisApi({ appCtx, constants }) {
   const {
     COASTAL_SAMPLE_PADDING_WORLD,

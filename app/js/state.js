@@ -155,7 +155,7 @@ let earthPosition = null; // Store Earth position before moon travel
 let policeOn = false,police = [],policeMeshes = [],policeHits = 0;
 let checkpoints = [],cpMeshes = [],cpCollected = 0;
 let destination = null,destMesh = null,trialDone = false;
-let customTrack = [],trackMesh = null,isRecording = false;
+let customTrack = [],isRecording = false;
 let lastTime = 0;
 // Drone camera variables
 let droneMode = false;
@@ -167,9 +167,6 @@ let Walk = null;
 let skyMode = 'live'; // 'live', 'day', 'sunset', 'night', 'sunrise'
 let timeOfDay = 'day'; // current visible phase: 'day', 'sunset', 'night', 'sunrise'
 let skyState = null;
-let weatherMode = 'live'; // 'live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'fog', 'storm'
-let liveWeatherState = null;
-let weatherState = null;
 let sun, hemiLight, fillLight, ambientLight, sunSphere, moonSphere;
 
 // Star field and sky interaction
@@ -317,9 +314,6 @@ Object.assign(appCtx, {
   showPathOverlays,
   showRoads,
   worldLoading,
-  weatherMode,
-  liveWeatherState,
-  weatherState,
   skyRaycaster,
   skyMode,
   smaaPass,
@@ -333,7 +327,6 @@ Object.assign(appCtx, {
   sun,
   sunSphere,
   timeOfDay,
-  trackMesh,
   traversalNetworks,
   travelingToMoon,
   trialDone,
@@ -448,9 +441,6 @@ export {
   showPathOverlays,
   showRoads,
   worldLoading,
-  weatherMode,
-  liveWeatherState,
-  weatherState,
   skyRaycaster,
   skyMode,
   smaaPass,
@@ -464,7 +454,6 @@ export {
   sun,
   sunSphere,
   timeOfDay,
-  trackMesh,
   traversalNetworks,
   travelingToMoon,
   trialDone,

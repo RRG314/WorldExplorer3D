@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { BLOCK_MATERIALS, BLOCK_SHAPES } from './catalog.js?v=4';
+import { BLOCK_MATERIALS, BLOCK_SHAPES } from './catalog.js?v=2';
 
 let panel = null;
 let status = null;

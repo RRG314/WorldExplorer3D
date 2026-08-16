@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-07-22 for version 4.0.0.
+Last reviewed: 2026-08-15 for version 4.2.0.
 
 World Explorer keeps source identity and truth type in its runtime contracts. Observations, forecasts/models, predictions, mapped features, and visual fallbacks are not interchangeable.
 
@@ -8,16 +8,31 @@ World Explorer keeps source identity and truth type in its runtime contracts. Ob
 
 | Source | Runtime use | Data class | License / terms |
 | --- | --- | --- | --- |
-| OpenStreetMap contributors | Detailed location roads, buildings, land use, water, paths, bridges, tunnels, and place context through Overpass | Community-mapped | ODbL 1.0 |
+| OpenStreetMap contributors | Detailed location roads, buildings, land use, water, paths, bridges, tunnels, place context, and mapped surveillance objectives through Overpass | Community-mapped | ODbL 1.0 |
 | OSM Shortbread vector tiles | Bounded building and water fallback geometry | Community-mapped | ODbL 1.0 and OSM service terms |
 | OSM raster tiles | Minimap and map context | Community-mapped | ODbL 1.0 and tile usage policy |
 | Nominatim | Forward and reverse place lookup | Community-mapped service | OSMF Nominatim policy |
-| Overture Maps Foundation | Tiled transportation, buildings, land cover, and water for optional continuous Earth streaming | Compiled mapped data | Overture source licenses and attribution |
+| Overture Maps Foundation | Bounded building-massing fallback when selected-location OSM building coverage is unavailable | Compiled mapped data | Overture source licenses and attribution |
 | ESA WorldCover 2021 | Global semantic surface classification and land-cover fallback | Remote-sensing classification | CC BY 4.0; contains modified Copernicus Sentinel data |
-| Mapzen Terrarium elevation tiles | Earth terrain height sampling | Elevation model | Provider/source terms |
+| USGS 3DEP accepted-ground artifact | Baltimore bare-earth terrain height and collision | Government elevation model normalized to EGM2008 | Public USGS data |
+| Copernicus DEM GLO-30 classified-ground artifacts | Accepted terrain for the documented worldwide release fixtures | Public DEM-derived, correction-attested ground normalized to EGM2008 | Public free use with required attribution |
+| Mapzen Terrarium elevation tiles | Legacy visual fallback only; never accepted-ground authority | Elevation model | Provider/source terms |
 | GEBCO 2020 via OpenTopodata | Bundled Great Barrier Reef bathymetry seed | Bathymetric model | CC BY 4.0 |
 
 Required map attribution: `© OpenStreetMap contributors`.
+
+## Surveillance Mapping
+
+DeFlock Hunt queries OpenStreetMap nodes tagged `man_made=surveillance` through
+bounded Overpass requests. A dated Baltimore last-good snapshot is bundled only
+as a labeled outage fallback and retains its OSM source IDs, timestamps, and
+ODbL provenance. The mode does not consume license-plate scans, photographs,
+live reader results, or a private surveillance-provider feed.
+
+The game concept is inspired by the independent
+[DeFlock project](https://deflock.org/), whose public tools help contributors
+map surveillance devices into OpenStreetMap. World Explorer 3D is unaffiliated
+with DeFlock and uses no DeFlock application code or DeFlock-owned data feed.
 
 ## Operational Earth Feeds
 
@@ -25,8 +40,8 @@ Required map attribution: `© OpenStreetMap contributors`.
 | --- | --- | --- | --- |
 | CelesTrak GP data | Satellite positions propagated from current orbital elements | Observed orbital elements / propagated position | Two-hour shared cache; partial groups can degrade independently |
 | USGS GeoJSON earthquake feed | Recent earthquake locations and magnitudes | Observed events | Five-minute shared cache |
-| ADSB.lol | Default aircraft observations near the selected location | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
-| OpenSky Network | Optional aircraft state vectors for authorized operators | Observed state vectors | Disabled by default; enable only after obtaining any written operational agreement required by OpenSky |
+| OpenSky Network | Aircraft state vectors near the selected location | Observed state vectors | Same-origin server adapter; hosting egress and provider terms apply |
+| ADSB.lol | Fallback aircraft observations when OpenSky is unavailable | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
 | Open-Meteo Forecast API | Current weather samples | Modeled current conditions | Ten-minute shared cache |
 | Open-Meteo Marine API | Wave, current, temperature, and sea-level guidance | Modeled marine guidance | Fifteen-minute shared cache |
 | NOAA CO-OPS | Water-level station metadata and observations | Observed station data | Coverage is station-dependent; datum and quality are retained |
@@ -53,7 +68,7 @@ When authoritative coverage is missing or a provider is unavailable, the app may
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.
-- Panoramax, KartaView, and ADSB.lol requests use allowlisted same-origin server adapters. Optional OpenSky requests use the same boundary only when explicitly enabled by an authorized operator.
+- Panoramax, KartaView, OpenSky, and ADSB.lol requests use allowlisted same-origin server adapters.
 - Provider requests use bounded caches, timeouts, in-flight deduplication, and health diagnostics.
 - Production Firebase, payment, and administrative credentials are never included in this repository.
 

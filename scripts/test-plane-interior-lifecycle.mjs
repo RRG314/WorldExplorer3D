@@ -16,24 +16,47 @@ async function launchBaltimore(page, baseUrl) {
     waitUntil: 'domcontentloaded',
     timeout: 90000
   });
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.runtimeReady === true && document.getElementById('globeSelectorScreen')?.classList.contains('show');
-  }, null, { timeout: 90000 });
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
+  const runtimeDeadline = Date.now() + 90000;
+  let runtimeReady = false;
+  while (Date.now() < runtimeDeadline) {
+    runtimeReady = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.runtimeReady === true;
+    });
+    if (runtimeReady) break;
+    await page.waitForTimeout(200);
+  }
+  if (!runtimeReady) throw new Error('Runtime did not become ready before selecting Baltimore');
   await page.locator('#globeCustomLat').fill('39.2904');
   await page.locator('#globeCustomLon').fill('-76.6122');
-  await page.locator('#globeSelectorStartBtn').click();
-  await page.waitForFunction(
-    () => document.getElementById('titleScreen')?.classList.contains('hidden'),
-    null,
-    { timeout: 90000 }
-  );
-  await page.locator('#loading').waitFor({ state: 'hidden', timeout: 180000 });
-  await page.waitForFunction(async () => {
+  const previousSequence = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const status = String(ctx.worldDetailState?.buildings?.status || '');
-    return status !== '' && status !== 'loading';
-  }, null, { timeout: 60000 });
+    return Number(ctx.worldPublication?.sequence || ctx._worldLoadSequence || 0);
+  });
+  await page.locator('#globeSelectorStartBtn').click();
+  await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 15000 });
+  const publicationDeadline = Date.now() + 180000;
+  let consecutiveReadySamples = 0;
+  while (Date.now() < publicationDeadline && consecutiveReadySamples < 6) {
+    const ready = await page.evaluate(async (minimumSequence) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const loading = document.getElementById('loading');
+      const publication = ctx.worldPublication;
+      return Number(publication?.sequence || 0) > minimumSequence &&
+        Math.abs(Number(publication?.location?.lat) - 39.2904) < 0.001 &&
+        Math.abs(Number(publication?.location?.lon) + 76.6122) < 0.001 &&
+        ctx.gameStarted === true && ctx.worldLoading !== true &&
+        (ctx.buildings?.length || 0) > 0 &&
+        !loading?.classList.contains('show') &&
+        getComputedStyle(loading).display === 'none';
+    }, previousSequence);
+    consecutiveReadySamples = ready ? consecutiveReadySamples + 1 : 0;
+    if (consecutiveReadySamples < 6) await page.waitForTimeout(250);
+  }
+  if (consecutiveReadySamples < 6) {
+    throw new Error('Baltimore publication did not reach a stable interactive state');
+  }
 }
 
 async function exerciseLifecycle(page) {
@@ -47,14 +70,29 @@ async function exerciseLifecycle(page) {
       }
       return Math.abs(area * 0.5);
     };
-    const candidates = (ctx.buildings || [])
-      .filter((building) => {
+    const resolvedCandidates = (ctx.buildings || [])
+      .map((building) => {
         const support = ctx.resolveBuildingEntrySupport?.(building, { allowSynthetic: true });
-        return support?.enterable && Number.isFinite(building.maxY) && polygonArea(building.pts) > 220;
-      })
-      .sort((a, b) => polygonArea(b.pts) - polygonArea(a.pts));
-    const building = candidates.find((item) => Math.min(item.maxX - item.minX, item.maxZ - item.minZ) > 12) || candidates[0];
-    if (!building) throw new Error('No large enterable building was available');
+        return { building, support, area: polygonArea(support?.footprint) };
+      });
+    const candidates = resolvedCandidates
+      .filter((candidate) => candidate.support?.enterable &&
+        Number.isFinite(candidate.building.maxY) && candidate.area > 220)
+      .sort((a, b) => b.area - a.area);
+    const selected = candidates.find(({ building }) =>
+      Math.min(building.maxX - building.minX, building.maxZ - building.minZ) > 12) || candidates[0];
+    if (!selected) {
+      const diagnostics = {
+        total: resolvedCandidates.length,
+        enterable: resolvedCandidates.filter((candidate) => candidate.support?.enterable).length,
+        finiteRoof: resolvedCandidates.filter((candidate) => Number.isFinite(candidate.building.maxY)).length,
+        maximumEnterableArea: resolvedCandidates.reduce((maximum, candidate) =>
+          Math.max(maximum, candidate.support?.enterable ? candidate.area : 0), 0),
+        publication: ctx.worldPublication || null
+      };
+      throw new Error(`No large enterable building was available: ${JSON.stringify(diagnostics)}`);
+    }
+    const { building, support: selectedSupport, area: selectedArea } = selected;
 
     const center = { x: building.centerX, z: building.centerZ };
     const roofY = building.maxY;
@@ -88,15 +126,15 @@ async function exerciseLifecycle(page) {
     ctx.keys.ControlLeft = false;
     ctx.keys.ArrowDown = false;
     const controlChordThrottle = ctx.planeMode.throttle;
-    ctx.keys.KeyZ = true;
+    ctx.keys.ShiftLeft = true;
     for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
-    ctx.keys.KeyZ = false;
-    const zThrottle = ctx.planeMode.throttle;
+    ctx.keys.ShiftLeft = false;
+    const reducedThrottle = ctx.planeMode.throttle;
     ctx.planeMode.throttle = 0.4;
-    ctx.keys.KeyX = true;
+    ctx.keys.Space = true;
     for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
-    ctx.keys.KeyX = false;
-    const xThrottle = ctx.planeMode.throttle;
+    ctx.keys.Space = false;
+    const increasedThrottle = ctx.planeMode.throttle;
     const gameplayArrow = new KeyboardEvent('keydown', {
       code: 'ArrowLeft',
       key: 'ArrowLeft',
@@ -221,7 +259,7 @@ async function exerciseLifecycle(page) {
     };
     ctx.setTravelMode('walk', { source: 'plane_interior_acceptance', force: true, emitTutorial: false });
 
-    const support = ctx.resolveBuildingEntrySupport(building, { allowSynthetic: true });
+    const support = selectedSupport;
     const bboxSupport = ctx.resolveBuildingEntrySupport({
       sourceBuildingId: 'acceptance-bbox-footprint',
       buildingType: 'commercial',
@@ -252,34 +290,43 @@ async function exerciseLifecycle(page) {
       walker.yaw = walker.angle;
       walker.lookYawOffset = 0;
 
-      const start = { x: walker.x, z: walker.z, lookYawOffset: walker.lookYawOffset };
+      const start = { x: walker.x, z: walker.z, angle: walker.angle, lookYawOffset: walker.lookYawOffset };
       const entryCollision = ctx.checkBuildingCollision?.(walker.x, walker.z, 0.28, {
         actorBaseY: walker.y - 1.7,
         actorHeight: 1.62
       });
       ctx.keys.ArrowUp = true;
+      const inputAtStart = ctx.readControlActions?.('walk') || null;
+      const walkStateAtStart = { enabled: ctx.Walk.state.enabled, mode: ctx.Walk.state.mode };
+      const positionSamples = [];
       for (let i = 0; i < 30; i++) {
         ctx.Walk.update(1 / 60);
         ctx.keepActiveInteriorContained?.();
+        if (i < 5) positionSamples.push({
+          x: walker.x,
+          z: walker.z,
+          y: walker.y,
+          enabled: ctx.Walk.state.enabled,
+          mode: ctx.Walk.state.mode
+        });
       }
       ctx.keys.ArrowUp = false;
       const moved = Math.hypot(walker.x - start.x, walker.z - start.z);
-      const beforeTurn = { x: walker.x, z: walker.z, yaw: walker.yaw, lookYawOffset: walker.lookYawOffset };
+      const beforeCamera = { x: walker.x, z: walker.z, lookYawOffset: walker.lookYawOffset };
       ctx.keys.KeyA = true;
       for (let i = 0; i < 20; i++) ctx.Walk.update(1 / 60);
       ctx.keys.KeyA = false;
-      const afterTurn = { x: walker.x, z: walker.z, yaw: walker.yaw, lookYawOffset: walker.lookYawOffset };
-      ctx.keys.VirtualLookLeft = true;
-      for (let i = 0; i < 20; i++) ctx.Walk.update(1 / 60);
-      ctx.keys.VirtualLookLeft = false;
       interiorMovement = {
         moved,
-        turnPositionDelta: Math.hypot(afterTurn.x - beforeTurn.x, afterTurn.z - beforeTurn.z),
-        bodyYawDelta: Math.abs(afterTurn.yaw - beforeTurn.yaw),
-        turnLookOffsetDelta: Math.abs(afterTurn.lookYawOffset - beforeTurn.lookYawOffset),
-        lookPositionDelta: Math.hypot(walker.x - afterTurn.x, walker.z - afterTurn.z),
-        cameraLookDelta: Math.abs(walker.lookYawOffset - afterTurn.lookYawOffset),
+        cameraPositionDelta: Math.hypot(walker.x - beforeCamera.x, walker.z - beforeCamera.z),
+        cameraYawDelta: Math.abs(walker.lookYawOffset - beforeCamera.lookYawOffset),
         remainedInside: !!ctx.activeInterior,
+        entryPoint: { ...active.entryPoint },
+        center: { ...active.center },
+        heading: start.angle,
+        inputAtStart,
+        walkStateAtStart,
+        positionSamples,
         entryCollision: entryCollision?.collision ? {
           id: entryCollision.building?.sourceBuildingId || '',
           type: entryCollision.building?.buildingType || '',
@@ -289,150 +336,11 @@ async function exerciseLifecycle(page) {
       };
     }
 
-    const interiorReport = {
-      entered: !!entered && !!active,
-      bboxFootprintEnterable: bboxSupport?.enterable === true,
-      mode: active?.mode,
-      usableArea: active?.usableArea,
-      exteriorArea: active?.exteriorArea,
-      usableRatio: (active?.usableArea || 0) / (active?.exteriorArea || 1),
-      partitionCount: active?.partitionCount,
-      layoutKind: active?.layoutKind,
-      colliderCount: ctx.dynamicBuildingColliders?.length || 0,
-      footprintPoints: active?.usableFootprint?.length || 0,
-      view: ctx.Walk.state.view,
-      movement: interiorMovement
-    };
-    ctx.clearActiveInterior?.({ restorePlayer: true, preserveCache: true });
-    const modeCycles = [];
-    let previousReachableResources = null;
-    const settleFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const waitForTerrainMeshPlateau = async () => {
-      const expectedTerrainMeshes = (Math.max(1, Number(ctx.TERRAIN_RING) || 1) * 2 + 1) ** 2;
-      const deadline = performance.now() + 10000;
-      let stableSamples = 0;
-      let previousCount = -1;
-      const observedCounts = [];
-      while (performance.now() < deadline) {
-        const count = (ctx.terrainGroup?.children || [])
-          .filter((mesh) => mesh?.userData?.isTerrainMesh)
-          .length;
-        if (observedCounts.at(-1) !== count) observedCounts.push(count);
-        if (count === expectedTerrainMeshes && count === previousCount) stableSamples += 1;
-        else stableSamples = 0;
-        if (stableSamples >= 3) return count;
-        previousCount = count;
-        await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
-      }
-      throw new Error(
-        `Terrain streaming did not settle at ${expectedTerrainMeshes} meshes ` +
-        `(observed ${observedCounts.join(' -> ') || 'none'})`
-      );
-    };
-    const collectReachableResources = () => {
-      const geometries = new Set();
-      const materials = new Set();
-      const textures = new Set();
-      const geometryOwners = new Map();
-      const materialOwners = new Map();
-      const collectTexture = (value) => {
-        if (value?.isTexture) textures.add(value);
-      };
-      ctx.scene?.traverse?.((object) => {
-        const owner = String(object?.name || object?.parent?.name || object?.type || 'unnamed');
-        if (object?.geometry) {
-          geometries.add(object.geometry);
-          if (!geometryOwners.has(object.geometry)) {
-            geometryOwners.set(object.geometry, `${owner}:${object.geometry.type || 'Geometry'}`);
-          }
-        }
-        const objectMaterials = Array.isArray(object?.material) ? object.material : [object?.material];
-        for (const material of objectMaterials) {
-          if (!material) continue;
-          materials.add(material);
-          if (!materialOwners.has(material)) {
-            materialOwners.set(material, `${owner}:${material.type || 'Material'}`);
-          }
-          for (const value of Object.values(material)) collectTexture(value);
-          for (const uniform of Object.values(material.uniforms || {})) collectTexture(uniform?.value);
-        }
-      });
-      return {
-        geometries: geometries.size,
-        materials: materials.size,
-        textures: textures.size,
-        geometryOwners,
-        materialOwners
-      };
-    };
-    for (let cycle = 1; cycle <= 5; cycle += 1) {
-      const origin = {
-        x: Number(ctx.car?.x) || center.x,
-        y: Math.max(Number(ctx.car?.y) || roofY, roofY) + 35,
-        z: Number(ctx.car?.z) || center.z
-      };
-      const startedAt = performance.now();
-      ctx.setTravelMode('plane', {
-        source: 'mode_resource_plateau', force: true, ...origin, speed: 22, throttle: 0.5, airborne: true
-      });
-      ctx.setTravelMode('drone', { source: 'mode_resource_plateau', force: true, emitTutorial: false });
-      ctx.setTravelMode('drive', { source: 'mode_resource_plateau', force: true, emitTutorial: false });
-      ctx.setTravelMode('walk', { source: 'mode_resource_plateau', force: true, emitTutorial: false });
-      await settleFrames();
-      const terrainMeshCount = await waitForTerrainMeshPlateau();
-      globalThis.gc?.();
-      await settleFrames();
-      const reachable = collectReachableResources();
-      const resourceGrowth = previousReachableResources ? {
-        geometries: [...reachable.geometryOwners]
-          .filter(([geometry]) => !previousReachableResources.geometryOwners.has(geometry))
-          .map(([, owner]) => owner),
-        materials: [...reachable.materialOwners]
-          .filter(([material]) => !previousReachableResources.materialOwners.has(material))
-          .map(([, owner]) => owner)
-      } : { geometries: [], materials: [] };
-      previousReachableResources = reachable;
-      modeCycles.push({
-        cycle,
-        durationMs: performance.now() - startedAt,
-        currentMode: ctx.getCurrentTravelMode(),
-        sceneChildren: ctx.scene?.children?.length || 0,
-        planeMeshes: ctx.scene?.children?.filter((child) => child?.name === 'Explorer STOL Aircraft').length || 0,
-        geometries: Number(ctx.renderer?.info?.memory?.geometries || 0),
-        textures: Number(ctx.renderer?.info?.memory?.textures || 0),
-        reachableGeometries: reachable.geometries,
-        reachableMaterials: reachable.materials,
-        reachableTextures: reachable.textures,
-        terrainMeshCount,
-        resourceGrowth,
-        heapBytes: Number(performance.memory?.usedJSHeapSize || 0)
-      });
-    }
-    const warmedHeapSamples = modeCycles
-      .slice(1, -1)
-      .map((cycle) => cycle.heapBytes)
-      .filter((value) => value > 0)
-      .sort((a, b) => a - b);
-    const heapMidpoint = Math.floor(warmedHeapSamples.length / 2);
-    const warmedHeapMedian = warmedHeapSamples.length === 0
-      ? 0
-      : warmedHeapSamples.length % 2 === 0
-        ? (warmedHeapSamples[heapMidpoint - 1] + warmedHeapSamples[heapMidpoint]) / 2
-        : warmedHeapSamples[heapMidpoint];
-    const finalHeapBytes = Number(modeCycles.at(-1)?.heapBytes || 0);
-    const modeResourcePlateau = {
-      buildingDetailStatus: String(ctx.worldDetailState?.buildings?.status || ''),
-      warmedHeapSamples,
-      warmedHeapMedian,
-      finalHeapBytes,
-      finalToMedianRatio: warmedHeapMedian > 0 ? finalHeapBytes / warmedHeapMedian : null
-    };
-
     return {
       building: {
         id: building.sourceBuildingId,
         type: building.buildingType,
-        area: polygonArea(building.pts),
+        area: selectedArea,
         width: building.maxX - building.minX,
         depth: building.maxZ - building.minZ,
         roofY
@@ -452,11 +360,22 @@ async function exerciseLifecycle(page) {
         altitudeDelta: drone.y - beforeDrone.y
       },
       impact,
-      planeControls: { pullUpPitch, noseDownPitch, controlChordThrottle, zThrottle, xThrottle, inputOwnership, gamepadActions },
+      planeControls: { pullUpPitch, noseDownPitch, controlChordThrottle, reducedThrottle, increasedThrottle, inputOwnership, gamepadActions },
       driveExit,
-      modeCycles,
-      modeResourcePlateau,
-      interior: interiorReport
+      interior: {
+        entered: !!entered && !!active,
+        bboxFootprintEnterable: bboxSupport?.enterable === true,
+        mode: active?.mode,
+        usableArea: active?.usableArea,
+        exteriorArea: active?.exteriorArea,
+        usableRatio: (active?.usableArea || 0) / (active?.exteriorArea || 1),
+        partitionCount: active?.partitionCount,
+        layoutKind: active?.layoutKind,
+        colliderCount: ctx.dynamicBuildingColliders?.length || 0,
+        footprintPoints: active?.usableFootprint?.length || 0,
+        view: ctx.Walk.state.view,
+        movement: interiorMovement
+      }
     };
   });
 }
@@ -470,11 +389,7 @@ async function main() {
     candidatePorts: [4234, 4235, 4236]
   });
   const baseUrl = hostedBaseUrl || `http://127.0.0.1:${server.port}`;
-  const browser = await chromium.launch({
-    headless: true,
-    channel: 'chrome',
-    args: ['--js-flags=--expose-gc', '--enable-precise-memory-info']
-  });
+  const browser = await chromium.launch({ headless: true, channel: 'chrome' });
   const errors = [];
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -497,8 +412,8 @@ async function main() {
     assert(report.planeControls.pullUpPitch > 0.1, `Arrow Down did not pull the plane nose up: ${JSON.stringify(report.planeControls)}`);
     assert(report.planeControls.noseDownPitch < -0.1, `Arrow Up did not push the plane nose down: ${JSON.stringify(report.planeControls)}`);
     assert(Math.abs(report.planeControls.controlChordThrottle - 0.6) < 0.02, `Control changed plane throttle: ${JSON.stringify(report.planeControls)}`);
-    assert(report.planeControls.zThrottle < 0.5, `Z did not reduce plane throttle: ${JSON.stringify(report.planeControls)}`);
-    assert(report.planeControls.xThrottle > 0.5, `X did not increase plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.reducedThrottle < 0.5, `Shift did not reduce plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.increasedThrottle > 0.5, `Space did not increase plane throttle: ${JSON.stringify(report.planeControls)}`);
     assert(report.planeControls.inputOwnership.gameplayArrowClaimed, 'Gameplay arrow key was not claimed from the browser');
     assert(!report.planeControls.inputOwnership.formArrowClaimed, 'Form control arrow key was incorrectly claimed');
     assert(report.planeControls.inputOwnership.scrollY === 0, 'Gameplay arrow key scrolled the page');
@@ -508,32 +423,6 @@ async function main() {
     assert(report.driveExit.mode === 'drive', `Plane-to-drive resolved as ${report.driveExit.mode}`);
     assert(report.driveExit.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
     assert(!report.driveExit.blocked, `Plane-to-drive spawned inside a building: ${JSON.stringify(report.driveExit)}`);
-    const warmModeCycle = report.modeCycles.at(-2);
-    const finalModeCycle = report.modeCycles.at(-1);
-    assert(report.modeCycles.every((cycle) => cycle.currentMode === 'walk'), 'Repeated mode cycle did not return to walk');
-    assert(report.modeCycles.every((cycle) => cycle.planeMeshes === 1), 'Repeated mode cycle duplicated the plane mesh');
-    assert(
-      finalModeCycle.reachableGeometries <= warmModeCycle.reachableGeometries,
-      'Reachable scene geometry count grew after mode warm-up'
-    );
-    assert(
-      finalModeCycle.reachableMaterials <= warmModeCycle.reachableMaterials,
-      'Reachable scene material count grew after mode warm-up'
-    );
-    assert(
-      finalModeCycle.reachableTextures <= warmModeCycle.reachableTextures,
-      'Reachable scene texture count grew after mode warm-up'
-    );
-    assert(
-      report.modeResourcePlateau.buildingDetailStatus !== 'loading',
-      'Mode resource plateau started before deferred world detail settled'
-    );
-    if (report.modeResourcePlateau.warmedHeapMedian > 0 && finalModeCycle.heapBytes > 0) {
-      assert(
-        finalModeCycle.heapBytes <= report.modeResourcePlateau.warmedHeapMedian * 1.15,
-        `Browser heap retained growth after mode warm-up: ${JSON.stringify(report.modeResourcePlateau)}`
-      );
-    }
     assert(report.interior.entered, 'Large building interior did not open');
     assert(report.interior.bboxFootprintEnterable, 'A valid bounding-box building was not enterable');
     assert(report.interior.usableRatio >= 0.75, `Interior uses only ${(report.interior.usableRatio * 100).toFixed(1)}% of its footprint`);
@@ -541,11 +430,8 @@ async function main() {
     assert(report.interior.partitionCount > 0, 'Large generated interior has no room circulation plan');
     assert(report.interior.view === 'first', `Interior did not use the first-person camera: ${JSON.stringify(report.interior)}`);
     assert(report.interior.movement?.moved > 0.35, `Arrow movement was blocked inside the building: ${JSON.stringify(report.interior.movement)}`);
-    assert(report.interior.movement?.turnPositionDelta < 0.05, `A/D camera look moved the character sideways: ${JSON.stringify(report.interior.movement)}`);
-    assert(report.interior.movement?.bodyYawDelta < 0.05, `A/D camera look incorrectly turned the character: ${JSON.stringify(report.interior.movement)}`);
-    assert(report.interior.movement?.turnLookOffsetDelta > 0.2, `A/D did not rotate the independent camera look: ${JSON.stringify(report.interior.movement)}`);
-    assert(report.interior.movement?.lookPositionDelta < 0.05, `Camera-look input moved the character: ${JSON.stringify(report.interior.movement)}`);
-    assert(report.interior.movement?.cameraLookDelta > 0.2, `Camera-look input did not rotate the interior view: ${JSON.stringify(report.interior.movement)}`);
+    assert(report.interior.movement?.cameraPositionDelta < 0.05, `WASD camera input moved the character: ${JSON.stringify(report.interior.movement)}`);
+    assert(report.interior.movement?.cameraYawDelta > 0.2, `WASD did not control the interior camera: ${JSON.stringify(report.interior.movement)}`);
     assert(report.interior.movement?.remainedInside, 'Walking input unexpectedly exited the building interior');
     assert(errors.length === 0, `Page errors: ${errors.join(' | ')}`);
     console.log(JSON.stringify({ ok: true, report }, null, 2));

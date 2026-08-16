@@ -79,8 +79,8 @@ assert.equal(occupied.footprints.length, 0, 'inferred footprints must not overla
 
 const sparseData = {
   elements: [],
-  _overpassSource: 'shortbread-vector-buildings',
-  _shortbreadTiles: { loaded: 4, requested: 4, failed: 0, zoom: 14 }
+  _overpassSource: 'overture-buildings-pmtiles',
+  _overtureBuildings: { buildingsAndParts: 0 }
 };
 const sparseContext = {
   selLoc: 'custom',
@@ -105,7 +105,7 @@ assert(sparseSummary.added >= 10, 'custom sparse integration should append bound
 assert.equal(inferredWays.length, sparseSummary.added);
 assert(inferredWays.every((way) => way.tags?._geometrySource === 'inferred_road_frontage'));
 assert(inferredWays.every((way) => way.tags?._inferenceBasis === 'mapped_residential_road_frontage'));
-assert.equal(sparseData._inferredBuildings.added, sparseSummary.added);
+assert.equal(sparseData._overtureBuildings.inferredFootprints.added, sparseSummary.added);
 
 console.log(JSON.stringify({
   ok: true,

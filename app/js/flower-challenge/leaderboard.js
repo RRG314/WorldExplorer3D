@@ -24,10 +24,12 @@ function createFlowerChallengeLeaderboardApi(context) {
   const {
     FIREBASE_COLLECTION,
     FIREBASE_EXPLORER_COLLECTION,
+    FIREBASE_DEFLOCK_COLLECTION,
     FIREBASE_FISHING_COLLECTION,
     FIREBASE_PAINT_COLLECTION,
     LOCAL_LEADERBOARD_KEY,
     LOCAL_EXPLORER_LEADERBOARD_KEY,
+    LOCAL_DEFLOCK_LEADERBOARD_KEY,
     LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
   } = constants;
@@ -37,6 +39,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
     if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
     if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
+    if (type === 'deflock') return LOCAL_DEFLOCK_LEADERBOARD_KEY;
     return LOCAL_LEADERBOARD_KEY;
   }
 
@@ -45,6 +48,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
     if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
     if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
+    if (type === 'deflock') return FIREBASE_DEFLOCK_COLLECTION;
     return FIREBASE_COLLECTION;
   }
 
@@ -108,7 +112,7 @@ function createFlowerChallengeLeaderboardApi(context) {
       }
 
       try {
-        const services = typeof getFirebaseServices === 'function' ? await getFirebaseServices() : null;
+        const services = typeof getFirebaseServices === 'function' ? getFirebaseServices() : null;
         if (!services?.db) throw new Error('Firebase services are unavailable.');
         const firestoreMod = await import(FIREBASE_STORE_MODULE);
         const db = services.db;
@@ -145,7 +149,7 @@ function createFlowerChallengeLeaderboardApi(context) {
       if (Math.abs(pctDelta) > 0.0001) return pctDelta;
       return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
     }
-    if (normalizedType === 'fishing' || normalizedType === 'explorer') {
+    if (normalizedType === 'fishing' || normalizedType === 'explorer' || normalizedType === 'deflock') {
       const scoreDelta = (Number(b.score) || 0) - (Number(a.score) || 0);
       if (scoreDelta !== 0) return scoreDelta;
       if (normalizedType === 'fishing') {
@@ -230,6 +234,15 @@ function createFlowerChallengeLeaderboardApi(context) {
           waterKind: entry.waterKind
         });
       }
+      if (normalizedType === 'deflock') {
+        Object.assign(payload, {
+          score: entry.score,
+          disabledCameras: entry.disabledCameras,
+          totalCameras: entry.totalCameras,
+          detections: entry.detections,
+          distance: entry.distance
+        });
+      }
       await firestoreMod.addDoc(firestoreMod.collection(db, getLeaderboardCollection(normalizedType)), payload);
       challengeState.leaderboardBackend = 'firebase';
       return true;
@@ -240,25 +253,20 @@ function createFlowerChallengeLeaderboardApi(context) {
     }
   }
 
-  async function refreshFlowerLeaderboard(
-    challengeType = challengeState.leaderboardView || 'flower',
-    options = {}
-  ) {
+  async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
     challengeState.leaderboardView = normalizedType;
     if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
     if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
     if (ui.titleFishingTabBtn) ui.titleFishingTabBtn.classList.toggle('active', normalizedType === 'fishing');
     if (ui.titleExplorerTabBtn) ui.titleExplorerTabBtn.classList.toggle('active', normalizedType === 'explorer');
+    if (ui.titleDeFlockTabBtn) ui.titleDeFlockTabBtn.classList.toggle('active', normalizedType === 'deflock');
     if (ui.titleStartBtn) {
       const flowerView = normalizedType === 'flower';
       ui.titleStartBtn.style.display = flowerView ? '' : 'none';
       ui.titleStartBtn.disabled = !flowerView;
     }
-    const useRemote = options.remote !== false;
-    const entries = (useRemote ? await readRemoteLeaderboard(normalizedType) : null) ||
-      readLocalLeaderboard(normalizedType);
-    if (!useRemote) challengeState.leaderboardBackend = 'local';
+    const entries = await readRemoteLeaderboard(normalizedType) || readLocalLeaderboard(normalizedType);
     renderLeaderboard(entries);
 
     if (ui.titleHint) {
@@ -266,13 +274,14 @@ function createFlowerChallengeLeaderboardApi(context) {
         flower: 'Fastest red-flower runs. Signed-in scores publish to the shared board.',
         painttown: 'Most buildings painted during the two-minute rooftop challenge.',
         fishing: 'Best catches ranked by species rarity, size, strength, and line control.',
-        explorer: 'Community score from joining rooms, sharing artifacts, and making connections.'
+        explorer: 'Community score from joining rooms, sharing artifacts, and making connections.',
+        deflock: 'Completed virtual-camera hunts ranked by score, then completion time.'
       }[normalizedType];
     }
     if (ui.status) {
       const prefix = {
         flower: 'Flower leaderboard', painttown: 'Paint leaderboard',
-        fishing: 'Fishing leaderboard', explorer: 'Explorer leaderboard'
+        fishing: 'Fishing leaderboard', explorer: 'Explorer leaderboard', deflock: 'DeFlock leaderboard'
       }[normalizedType];
       ui.status.dataset.backend = challengeState.leaderboardBackend === 'firebase'
         ? `${prefix}: Firebase live`
@@ -362,6 +371,23 @@ function createFlowerChallengeLeaderboardApi(context) {
     return entry;
   }
 
+  async function submitDeFlockScore(payload = {}) {
+    const entry = normalizeLeaderboardEntry({
+      ...payload,
+      id: String(payload.id || `deflock_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
+      challenge: 'deflock',
+      player: resolvePlayerName(),
+      location: payload.location || getRuntimeLocationLabel(),
+      mode: String(payload.mode || inferTravelMode()),
+      foundAt: payload.completedAt || new Date().toISOString()
+    }, 'deflock');
+    if (!entry) return null;
+    if (!(await writeRemoteLeaderboard('deflock', entry))) storeLocalResult('deflock', entry);
+    if (challengeState.leaderboardView === 'deflock') await refreshFlowerLeaderboard('deflock');
+    setTitleStatus(`${entry.player} virtually disabled ${entry.disabledCameras}/${entry.totalCameras} mapped cameras at ${entry.location}.`, 'ok');
+    return entry;
+  }
+
   function setChallengeLeaderboardView(challengeType = 'flower') {
     challengeState.leaderboardView = normalizeChallengeType(challengeType);
     return refreshFlowerLeaderboard(challengeState.leaderboardView);
@@ -379,6 +405,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     sortLeaderboardEntries,
     storeLocalResult,
     submitFishingScore,
+    submitDeFlockScore,
     submitPaintTownScore,
     writeRemoteLeaderboard
   };

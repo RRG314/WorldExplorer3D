@@ -3,10 +3,16 @@
 .playwright-cli/
 node_modules/
 functions/node_modules/
+.datum-venv/
+.datum-grids/
+.ground-datum-grids/
+__pycache__/
+*.pyc
 output/
 test-results/
 coverage/
 dist/
+.local-candidates/
 public/
 *.log
 progress.md

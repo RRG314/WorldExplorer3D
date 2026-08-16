@@ -4,6 +4,7 @@ const PROPERTY_MARKER_HIT_RADIUS = 10;
 const POI_MARKER_HIT_RADIUS = 8;
 const HISTORIC_MARKER_HIT_RADIUS = 8;
 const ACTIVITY_MARKER_HIT_RADIUS = 10;
+const DEFLOCK_MARKER_HIT_RADIUS = 10;
 const MINIMAP_ZOOM_MIN = 12;
 const MINIMAP_ZOOM_MAX = 18;
 
@@ -42,6 +43,19 @@ function bindLargeMapCanvasInteractions() {
     if (!appCtx.showLargeMap) return;
 
     const clickPoint = canvasPointerPoint(largeMapCanvas, event);
+
+    if (appCtx.gameMode === 'deflock' && Array.isArray(appCtx.deFlockMapMarkers)) {
+      const cameraHit = findFirstMapHit(
+        appCtx.deFlockMapMarkers,
+        clickPoint,
+        DEFLOCK_MARKER_HIT_RADIUS,
+        (camera) => appCtx.worldToScreenLarge(camera.x, camera.z)
+      );
+      if (cameraHit) {
+        appCtx.showMapInfo('deflock', cameraHit);
+        return;
+      }
+    }
 
     if (appCtx.mapLayers.activities !== false && Array.isArray(appCtx.activityDiscoveryMapMarkers) && appCtx.activityDiscoveryMapMarkers.length > 0) {
       const activityHit = findFirstMapHit(

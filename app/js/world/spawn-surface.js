@@ -1,5 +1,16 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=22";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=48";
+
+function roadHeadingAtSegment(road, segmentIndex, fallbackAngle = 0) {
+  const points = Array.isArray(road?.pts) ? road.pts : [];
+  if (points.length < 2) return fallbackAngle;
+  const index = Math.max(0, Math.min(points.length - 2, Math.trunc(Number(segmentIndex) || 0)));
+  const start = points[index];
+  const end = points[index + 1];
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  return Math.hypot(dx, dz) > 1e-6 ? Math.atan2(dx, dz) : fallbackAngle;
+}
 
 function createWorldSpawnSurfaceApi(context) {
   const { getDeps } = context;
@@ -127,62 +138,13 @@ function createWorldSpawnSurfaceApi(context) {
     return Number.isFinite(gradient) ? Math.atan(gradient) * 180 / Math.PI : 0;
   }
 
-  function terrainVistaHeadingAt(x, z, fallbackAngle = 0) {
-    const step = 6;
-    const slopeX = (terrainYAtWorld(x + step, z) - terrainYAtWorld(x - step, z)) / (step * 2);
-    const slopeZ = (terrainYAtWorld(x, z + step) - terrainYAtWorld(x, z - step)) / (step * 2);
-    const gradient = Math.hypot(slopeX, slopeZ);
-    if (!Number.isFinite(slopeX) || !Number.isFinite(slopeZ) || gradient < 0.03) {
-      return { angle: fallbackAngle, score: 0 };
-    }
-
-    const uphillAngle = Math.atan2(slopeX, slopeZ);
-    const headings = [
-      uphillAngle + Math.PI * 0.5,
-      uphillAngle - Math.PI * 0.5,
-      uphillAngle + Math.PI,
-      uphillAngle
-    ];
-    const baseY = terrainYAtWorld(x, z);
-    let best = null;
-    for (const angle of headings) {
-      const forwardX = Math.sin(angle);
-      const forwardZ = Math.cos(angle);
-      let score = 0;
-      for (const distance of [12, 24, 48, 72]) {
-        const rise = terrainYAtWorld(x + forwardX * distance, z + forwardZ * distance) - baseY;
-        score += Math.max(0, rise - distance * 0.12) * (72 / distance);
-      }
-      for (const distance of [5, 9, 14]) {
-        const cameraRise = terrainYAtWorld(x - forwardX * distance, z - forwardZ * distance) - baseY;
-        score += Math.max(0, cameraRise - distance * 0.18) * 5;
-      }
-      const fallbackDelta = Math.abs(Math.atan2(Math.sin(angle - fallbackAngle), Math.cos(angle - fallbackAngle)));
-      score += fallbackDelta * 0.12;
-      if (!best || score < best.score) best = { angle, score };
-    }
-    return best || { angle: fallbackAngle, score: 0 };
-  }
-
-  function cameraTerrainObstructionAt(x, z, angle) {
-    const baseY = terrainYAtWorld(x, z);
-    const backwardX = -Math.sin(angle);
-    const backwardZ = -Math.cos(angle);
-    let obstruction = 0;
-    for (const distance of [5, 9, 14]) {
-      const terrainY = terrainYAtWorld(x + backwardX * distance, z + backwardZ * distance);
-      obstruction = Math.max(obstruction, terrainY - (baseY + distance * 0.22));
-    }
-    return Number.isFinite(obstruction) ? obstruction : Infinity;
-  }
-
   function resolveRoadHeading(road, pointIndex, fallbackAngle = 0) {
     if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return fallbackAngle;
     if (pointIndex < road.pts.length - 1) {
-      return Math.atan2(road.pts[pointIndex + 1].x - road.pts[pointIndex].x, road.pts[pointIndex + 1].z - road.pts[pointIndex].z);
+      return roadHeadingAtSegment(road, pointIndex, fallbackAngle);
     }
     if (pointIndex > 0) {
-      return Math.atan2(road.pts[pointIndex].x - road.pts[pointIndex - 1].x, road.pts[pointIndex].z - road.pts[pointIndex - 1].z);
+      return roadHeadingAtSegment(road, pointIndex - 1, fallbackAngle);
     }
     return fallbackAngle;
   }
@@ -399,8 +361,6 @@ function createWorldSpawnSurfaceApi(context) {
     spawnDepartureAssessment,
     slopeDegreesAt,
     slopePenaltyAt,
-    terrainVistaHeadingAt,
-    cameraTerrainObstructionAt,
     spawnEnclosurePenalty,
     spawnSurfacePenalty,
     terrainYAtWorld,
@@ -409,4 +369,4 @@ function createWorldSpawnSurfaceApi(context) {
   };
 }
 
-export { createWorldSpawnSurfaceApi };
+export { createWorldSpawnSurfaceApi, roadHeadingAtSegment };

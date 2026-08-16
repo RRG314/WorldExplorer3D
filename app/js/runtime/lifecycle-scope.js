@@ -1,6 +1,9 @@
+const activeScopes = new Map();
+let scopeSequence = 0;
+
 function createLifecycleScope(owner = 'runtime') {
+  const id = ++scopeSequence;
   const records = new Set();
-  const animationFrameRecords = new Map();
   let active = true;
   let disposedReason = '';
 
@@ -18,7 +21,7 @@ function createLifecycleScope(owner = 'runtime') {
     if (record) records.delete(record);
   }
 
-  function timeoutFn(callback, delay = 0) {
+  function timeout(callback, delay = 0) {
     let record = null;
     const handle = globalThis.setTimeout(() => {
       release(record);
@@ -27,8 +30,6 @@ function createLifecycleScope(owner = 'runtime') {
     record = track('timeout', () => globalThis.clearTimeout(handle));
     return handle;
   }
-
-  const timeout = timeoutFn;
 
   function interval(callback, delay = 0) {
     const handle = globalThis.setInterval(() => {
@@ -43,38 +44,9 @@ function createLifecycleScope(owner = 'runtime') {
     let record = null;
     const handle = globalThis.requestAnimationFrame((timestamp) => {
       release(record);
-      animationFrameRecords.delete(handle);
       if (active) callback(timestamp);
     });
-    record = track('animation-frame', () => {
-      animationFrameRecords.delete(handle);
-      globalThis.cancelAnimationFrame?.(handle);
-    });
-    if (record) animationFrameRecords.set(handle, record);
-    return handle;
-  }
-
-  function cancelAnimationFrame(handle) {
-    const record = animationFrameRecords.get(handle);
-    if (!record) return false;
-    record.cancel();
-    release(record);
-    return true;
-  }
-
-  function idle(callback, timeout = 2000) {
-    if (typeof globalThis.requestIdleCallback !== 'function') {
-      return timeoutFn(
-        () => callback({ didTimeout: true, timeRemaining: () => 0 }),
-        Math.min(50, Math.max(0, Number(timeout) || 0))
-      );
-    }
-    let record = null;
-    const handle = globalThis.requestIdleCallback((deadline) => {
-      release(record);
-      if (active) callback(deadline);
-    }, { timeout: Math.max(0, Number(timeout) || 0) });
-    record = track('idle-callback', () => globalThis.cancelIdleCallback?.(handle));
+    record = track('animation-frame', () => globalThis.cancelAnimationFrame?.(handle));
     return handle;
   }
 
@@ -116,6 +88,7 @@ function createLifecycleScope(owner = 'runtime') {
         console.warn(`[lifecycle:${owner}] ${record.type} cleanup failed`, error);
       }
     }
+    activeScopes.delete(id);
     return true;
   }
 
@@ -124,6 +97,7 @@ function createLifecycleScope(owner = 'runtime') {
     for (const record of records) counts[record.type] = (counts[record.type] || 0) + 1;
     return {
       owner,
+      id,
       active,
       disposedReason,
       resourceCount: records.size,
@@ -131,13 +105,11 @@ function createLifecycleScope(owner = 'runtime') {
     };
   }
 
-  return Object.freeze({
+  const scope = Object.freeze({
     animationFrame,
-    cancelAnimationFrame,
     defer,
     dispose,
     guard,
-    idle,
     interval,
     isActive: () => active,
     listen,
@@ -145,6 +117,30 @@ function createLifecycleScope(owner = 'runtime') {
     snapshot,
     timeout
   });
+  activeScopes.set(id, scope);
+  return scope;
 }
 
-export { createLifecycleScope };
+function getLifecycleRegistrySnapshot() {
+  const scopes = [...activeScopes.values()].map((scope) => scope.snapshot());
+  const owners = {};
+  const resources = {};
+  for (const scope of scopes) {
+    const owner = owners[scope.owner] || { scopes: 0, resources: 0 };
+    owner.scopes += 1;
+    owner.resources += scope.resourceCount;
+    owners[scope.owner] = owner;
+    for (const [type, count] of Object.entries(scope.resources)) {
+      resources[type] = (resources[type] || 0) + count;
+    }
+  }
+  return {
+    activeScopeCount: scopes.length,
+    resourceCount: scopes.reduce((total, scope) => total + scope.resourceCount, 0),
+    owners,
+    resources,
+    scopes
+  };
+}
+
+export { createLifecycleScope, getLifecycleRegistrySnapshot };

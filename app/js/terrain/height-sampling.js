@@ -1,17 +1,12 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=22";
+} from "../structure-semantics.js?v=48";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
     appCtx,
     terrainTileDeps,
-    worldToLatLon,
-    latLonToTileXY,
-    getOrLoadTerrainTile,
-    sampleTileElevationMeters,
-    clampElevationMeters,
     elevationWorldYAtWorldXZ
   } = deps;
 
@@ -20,6 +15,10 @@ function createTerrainHeightSamplingApi(deps = {}) {
   let terrainHeightCacheEnabled = true;
 
   function terrainMeshHeightAt(x, z) {
+    if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+      const polarY = appCtx.samplePolarCryosphereWorldYAt?.(x, z);
+      return Number.isFinite(polarY) ? polarY : elevationWorldYAtWorldXZ(x, z);
+    }
     if (!appCtx.terrainGroup || appCtx.terrainGroup.children.length === 0) {
       return elevationWorldYAtWorldXZ(x, z);
     }
@@ -29,6 +28,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
     for (let c = 0; c < appCtx.terrainGroup.children.length; c++) {
       const mesh = appCtx.terrainGroup.children[c];
+      if (mesh?.visible === false || mesh?.userData?.pendingTerrainTile) {
+        continue;
+      }
       const info = mesh.userData?.terrainTile;
       if (!info) continue;
 
@@ -65,18 +67,11 @@ function createTerrainHeightSamplingApi(deps = {}) {
   }
 
   function baseTerrainHeightAt(x, z) {
-    const { lat, lon } = worldToLatLon(x, z);
-    const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-    const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y, terrainTileDeps);
-    if (tile.loaded) {
-      const u = t.xf - t.x;
-      const v = t.yf - t.y;
-      const meters = sampleTileElevationMeters(tile, u, v, clampElevationMeters);
-      return meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
-    }
+    const authoritativeY = elevationWorldYAtWorldXZ(x, z);
+    if (Number.isFinite(authoritativeY)) return authoritativeY;
     const meshY = terrainMeshHeightAt(x, z);
     if (Number.isFinite(meshY)) return meshY;
-    return elevationWorldYAtWorldXZ(x, z, terrainTileDeps);
+    return null;
   }
 
   function cachedBaseTerrainHeight(x, z) {
@@ -87,19 +82,21 @@ function createTerrainHeightSamplingApi(deps = {}) {
     return h;
   }
 
-  function applyStructureTerrainCuts(worldX, worldZ, terrainY, candidateCuts = appCtx.structureTerrainCuts) {
-    if (!Array.isArray(candidateCuts) || candidateCuts.length === 0 || !Number.isFinite(terrainY)) {
+  function applyStructureTerrainCuts(worldX, worldZ, terrainY) {
+    if (!Array.isArray(appCtx.structureTerrainCuts) || appCtx.structureTerrainCuts.length === 0 || !Number.isFinite(terrainY)) {
       return terrainY;
     }
 
     let adjustedY = terrainY;
-    for (let i = 0; i < candidateCuts.length; i++) {
-      const cut = candidateCuts[i];
+    const candidates = appCtx.structureTerrainCuts;
+    for (let i = 0; i < candidates.length; i++) {
+      const cut = candidates[i];
       if (!cut?.feature || !cut?.bounds) continue;
       if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
 
       const projected = projectPointToFeature(cut.feature, worldX, worldZ);
       if (!projected) continue;
+
       const width = Math.max(4.5, Number(cut.width) || Number(cut.feature?.width) || 6);
       const influenceRadius = width * 0.82 + 3.4;
       if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
@@ -113,7 +110,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
       const lateralT = Math.max(0, Math.min(1, projected.dist / Math.max(0.5, influenceRadius)));
       let fade = 1 - (lateralT * lateralT * (3 - 2 * lateralT));
-      const distances = cut.feature?.surfaceDistances;
+      const distances = cut.feature?.transportSurfaceModel?.pathDistances || cut.feature?.surfaceDistances;
       const points = cut.feature?.pts;
       if (distances instanceof Float32Array && Array.isArray(points) && points.length >= 2) {
         const lastIndex = distances.length - 1;

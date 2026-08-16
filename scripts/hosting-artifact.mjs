@@ -2,9 +2,9 @@
 
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { build as buildJavaScript } from 'esbuild';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { assertProductionArtifact } from './hosting-release-contract.mjs';
 
 const ROOT = process.cwd();
 const OUTPUT_DIR = path.join(ROOT, 'dist');
@@ -26,6 +26,12 @@ const GENERATED_PATHS = new Set([
   '__/firebase/init.json',
   '__/firebase/init.js'
 ]);
+const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
+  'app-shell-fragments': 'app/js/app-shell-fragments.js',
+  'app-auth-shell': 'app/js/app-auth-shell.js',
+  bootstrap: 'app/js/bootstrap.js',
+  'app-entry': 'app/js/app-entry.js'
+});
 
 function normalizePath(value) {
   return value.split(path.sep).join('/');
@@ -37,15 +43,6 @@ function sha256(value) {
 
 function canonicalJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
-}
-
-function releaseHashFor({ contentHash, environment, firebaseProjectId, hostingConfigHash }) {
-  return sha256(canonicalJson({
-    contentHash,
-    firebaseEnvironment: environment,
-    firebaseProjectId,
-    hostingConfigHash
-  }));
 }
 
 function readFlag(name, fallback = '') {
@@ -61,10 +58,6 @@ function git(args, fallback = '') {
   } catch {
     return fallback;
   }
-}
-
-function workingTreeDirty() {
-  return git(['status', '--porcelain', '--untracked-files=all'], '').length > 0;
 }
 
 async function listFiles(directory, base = '') {
@@ -95,13 +88,111 @@ async function collectSourceFiles() {
   return new Map([...files.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
+function isGameRuntimeSource(relative) {
+  return relative.startsWith('app/js/');
+}
+
+function isGroundDataSource(relative) {
+  return relative.startsWith('app/assets/ground/');
+}
+
 async function copySources(sourceFiles) {
   await fs.rm(OUTPUT_DIR, { recursive: true, force: true });
   for (const [relative, source] of sourceFiles) {
+    if (isGameRuntimeSource(relative) || isGroundDataSource(relative)) continue;
     const target = path.join(OUTPUT_DIR, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.copyFile(source, target);
   }
+}
+
+async function copyGroundData(sourceFiles, releaseId) {
+  const outputRoot = `location-data/ground/${releaseId}`;
+  let fileCount = 0;
+  let bytes = 0;
+  for (const [relative, source] of sourceFiles) {
+    if (!isGroundDataSource(relative)) continue;
+    const groundRelative = relative.slice('app/assets/ground/'.length);
+    const target = path.join(OUTPUT_DIR, outputRoot, groundRelative);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.copyFile(source, target);
+    const stat = await fs.stat(source);
+    fileCount += 1;
+    bytes += stat.size;
+  }
+  return Object.freeze({
+    releaseId,
+    outputRoot,
+    catalogUrl: `/${outputRoot}/manifest-catalog.json`,
+    fileCount,
+    bytes
+  });
+}
+
+function bundleOutputForEntry(metafile, sourceEntry) {
+  const match = Object.entries(metafile.outputs).find(([, details]) =>
+    String(details.entryPoint || '').split('?', 1)[0] === sourceEntry
+  );
+  if (!match) throw new Error(`Bundler did not emit entry point: ${sourceEntry}`);
+  return normalizePath(path.relative(path.join(OUTPUT_DIR, 'app'), path.resolve(ROOT, match[0])));
+}
+
+async function buildGameRuntime() {
+  const result = await buildJavaScript({
+    absWorkingDir: ROOT,
+    entryPoints: GAME_RUNTIME_ENTRYPOINTS,
+    outdir: path.join(OUTPUT_DIR, 'app', 'js'),
+    bundle: true,
+    splitting: true,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2022',
+    minify: true,
+    legalComments: 'none',
+    entryNames: 'bundles/[name]-[hash]',
+    chunkNames: 'bundles/chunk-[hash]',
+    external: ['https://*'],
+    metafile: true,
+    write: true,
+    logLevel: 'warning'
+  });
+  const outputFiles = Object.entries(result.metafile.outputs)
+    .filter(([, details]) => Number(details.bytes || 0) > 0);
+  const entries = Object.fromEntries(
+    Object.entries(GAME_RUNTIME_ENTRYPOINTS).map(([name, source]) => [
+      name,
+      bundleOutputForEntry(result.metafile, source)
+    ])
+  );
+  return Object.freeze({
+    strategy: 'esbuild-esm-code-splitting',
+    entries: Object.freeze(entries),
+    fileCount: outputFiles.length,
+    entryFileCount: Object.keys(entries).length,
+    bytes: outputFiles.reduce((sum, [, details]) => sum + Number(details.bytes || 0), 0)
+  });
+}
+
+async function rewriteGameHtml(runtime, groundData) {
+  const htmlPath = path.join(OUTPUT_DIR, 'app', 'index.html');
+  let html = await fs.readFile(htmlPath, 'utf8');
+  const productionConfig = canonicalJson({
+    appEntrypoint: `./${runtime.entries['app-entry'].replace(/^js\/bundles\//, '')}`,
+    groundCatalogUrl: groundData.catalogUrl,
+    groundReleaseId: groundData.releaseId
+  }).trim();
+  const replacement = [
+    `<script>globalThis.__WORLD_EXPLORER_PRODUCTION__ = Object.freeze(${productionConfig});</script>`,
+    `<script type="module" src="${runtime.entries['app-shell-fragments']}"></script>`,
+    `<script type="module" src="${runtime.entries['app-auth-shell']}"></script>`,
+    `<script type="module" src="${runtime.entries.bootstrap}"></script>`
+  ].join('\n');
+  const sourceScripts = /<script type="module" src="js\/app-shell-fragments\.js\?v=\d+"><\/script>\s*<script type="module" src="js\/app-auth-shell\.js\?v=\d+"><\/script>\s*<script type="module" src="js\/bootstrap\.js\?v=\d+"><\/script>/;
+  if (!sourceScripts.test(html)) {
+    throw new Error('Game HTML no longer contains the expected source entry scripts.');
+  }
+  html = html.replace(sourceScripts, replacement);
+  await fs.writeFile(htmlPath, html, 'utf8');
 }
 
 function firebaseConfigPath(environment) {
@@ -161,22 +252,42 @@ async function sourceFingerprint(sourceFiles, environment, config) {
     records.push([relative, await hashFile(absolute)]);
   }
   records.push([`config/firebase.${environment}.json`, sha256(canonicalJson(config))]);
-  records.push(['firebase.json', await hashFile(path.join(ROOT, 'firebase.json'))]);
   return sha256(canonicalJson(records));
+}
+
+async function sourceReleaseFingerprint(sourceFiles) {
+  const records = [];
+  for (const [relative, absolute] of sourceFiles) {
+    if (
+      relative === 'app/assets/ground/manifest-catalog.json' ||
+      /\/ground-manifest\.json$/.test(relative)
+    ) {
+      records.push([relative, await hashFile(absolute)]);
+    }
+  }
+  return {
+    sha256: sha256(canonicalJson(records)),
+    manifestCount: records.length
+  };
 }
 
 async function readPackage() {
   return JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
 }
 
+async function packageLockSha256() {
+  return hashFile(path.join(ROOT, 'package-lock.json'));
+}
+
 async function buildArtifact(environment) {
-  const dirty = workingTreeDirty();
-  if (environment === 'production' && dirty) {
-    throw new Error('Production artifacts must be built from a clean working tree, including untracked files.');
-  }
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
+  const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
+  const groundReleaseId = sourceReleases.sha256.slice(0, 16);
   await copySources(sourceFiles);
+  const groundData = await copyGroundData(sourceFiles, groundReleaseId);
+  const runtimePackaging = await buildGameRuntime();
+  await rewriteGameHtml(runtimePackaging, groundData);
   await writeGeneratedFirebaseFiles(environment, config);
 
   const files = await hashOutputFiles();
@@ -184,33 +295,37 @@ async function buildArtifact(environment) {
   const commit = git(['rev-parse', 'HEAD'], 'unknown');
   const shortCommit = commit.slice(0, 12);
   const contentHash = sha256(canonicalJson(files));
-  const hostingConfigHash = await hashFile(path.join(ROOT, 'firebase.json'));
-  const firebaseProjectId = String(config.projectId || '');
-  const releaseHash = releaseHashFor({
-    contentHash,
-    environment,
-    firebaseProjectId,
-    hostingConfigHash
-  });
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
+  const dirty = git(['status', '--porcelain'], '').length > 0;
   const commitTime = git(['show', '-s', '--format=%cI', 'HEAD'], 'unknown');
-  const buildId = `${packageJson.version}+${shortCommit}.${releaseHash.slice(0, 16)}.${environment}`;
+  const dependencyLockSha256 = await packageLockSha256();
+  const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
+  const assetManifest = { schemaVersion: 1, files };
+  const assetManifestSha256 = sha256(canonicalJson(assetManifest));
 
-  await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson({ schemaVersion: 1, files }));
+  await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson(assetManifest));
   await fs.writeFile(path.join(OUTPUT_DIR, BUILD_MANIFEST), canonicalJson({
     schemaVersion: 2,
     product: packageJson.name,
     version: packageJson.version,
     buildId,
+    candidateId: buildId,
     commit,
     commitTime,
+    buildTimestamp: commitTime,
     sourceDirty: dirty,
     sourceFingerprint: fingerprint,
+    sourceReleaseManifestSha256: sourceReleases.sha256,
+    sourceReleaseManifestCount: sourceReleases.manifestCount,
+    runtimePackaging,
+    groundData,
     contentHash,
-    hostingConfigHash,
-    releaseHash,
+    assetManifestSha256,
+    dependencyLockSha256,
+    nodeVersion: process.version,
     firebaseEnvironment: environment,
-    firebaseProjectId,
+    firebaseProjectId: String(config.projectId || ''),
+    deploymentTarget: `${String(config.projectId || '')}:live`,
     fileCount: Object.keys(files).length
   }));
 
@@ -228,9 +343,6 @@ async function verifyArtifact() {
     throw new Error('firebase.json must serve the generated dist artifact.');
   }
   const environment = String(buildManifest.firebaseEnvironment || '');
-  if (buildManifest.schemaVersion !== 2) {
-    throw new Error(`Unsupported build manifest schema "${buildManifest.schemaVersion || 'unknown'}". Rebuild the artifact.`);
-  }
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   const expectedFiles = assetManifest.files || {};
   const actualFiles = (await listFiles(OUTPUT_DIR)).filter((relative) =>
@@ -249,12 +361,55 @@ async function verifyArtifact() {
   }
 
   const sourceFiles = await collectSourceFiles();
+  const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
   for (const [relative, source] of sourceFiles) {
     if (GENERATED_PATHS.has(relative)) continue;
-    const outputHash = expectedFiles[relative];
+    if (isGameRuntimeSource(relative) || relative === 'app/index.html') continue;
+    const outputRelative = isGroundDataSource(relative)
+      ? `location-data/ground/${sourceReleases.sha256.slice(0, 16)}/${relative.slice('app/assets/ground/'.length)}`
+      : relative;
+    const outputHash = expectedFiles[outputRelative];
     if (!outputHash || outputHash !== await hashFile(source)) {
-      throw new Error(`Hosting artifact differs from canonical source: ${relative}`);
+      throw new Error(`Hosting artifact differs from canonical source: ${relative} -> ${outputRelative}`);
     }
+  }
+
+  const runtimePackaging = buildManifest.runtimePackaging || {};
+  const runtimeFiles = expectedNames.filter((relative) => relative.startsWith('app/js/bundles/'));
+  if (
+    runtimePackaging.strategy !== 'esbuild-esm-code-splitting' ||
+    runtimePackaging.entryFileCount !== Object.keys(GAME_RUNTIME_ENTRYPOINTS).length ||
+    runtimePackaging.fileCount !== runtimeFiles.length ||
+    expectedNames.some((relative) => relative.startsWith('app/js/') && !relative.startsWith('app/js/bundles/'))
+  ) {
+    throw new Error('Hosting artifact runtime packaging no longer matches the bundled-runtime contract.');
+  }
+  const groundData = buildManifest.groundData || {};
+  const expectedGroundReleaseId = sourceReleases.sha256.slice(0, 16);
+  const expectedGroundRoot = `location-data/ground/${expectedGroundReleaseId}`;
+  const groundFiles = expectedNames.filter((relative) => relative.startsWith(`${expectedGroundRoot}/`));
+  if (
+    groundData.releaseId !== expectedGroundReleaseId ||
+    groundData.outputRoot !== expectedGroundRoot ||
+    groundData.catalogUrl !== `/${expectedGroundRoot}/manifest-catalog.json` ||
+    groundData.fileCount !== groundFiles.length ||
+    expectedNames.some((relative) => relative.startsWith('app/assets/ground/'))
+  ) {
+    throw new Error('Hosting artifact ground data no longer matches the immutable release contract.');
+  }
+  const gameHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'index.html'), 'utf8');
+  for (const entry of Object.values(runtimePackaging.entries || {})) {
+    if (!gameHtml.includes(entry) && entry !== runtimePackaging.entries?.['app-entry']) {
+      throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
+    }
+  }
+  const configuredAppEntrypoint = `./${path.basename(runtimePackaging.entries?.['app-entry'] || '')}`;
+  if (
+    configuredAppEntrypoint === './' ||
+    !gameHtml.includes(configuredAppEntrypoint) ||
+    !gameHtml.includes(groundData.catalogUrl || '__missing_ground_catalog__')
+  ) {
+    throw new Error('Game HTML does not publish the bundled app or immutable ground release.');
   }
 
   const expectedConfig = firebaseProjectScript(environment, config);
@@ -262,33 +417,29 @@ async function verifyArtifact() {
     throw new Error('Hosting artifact contains the wrong Firebase environment configuration.');
   }
   const contentHash = sha256(canonicalJson(expectedFiles));
-  const hostingConfigHash = await hashFile(path.join(ROOT, 'firebase.json'));
-  const releaseHash = releaseHashFor({
-    contentHash,
-    environment,
-    firebaseProjectId: String(config.projectId || ''),
-    hostingConfigHash
-  });
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
+  const dependencyLockSha256 = await packageLockSha256();
   const commit = git(['rev-parse', 'HEAD'], 'unknown');
-  const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${releaseHash.slice(0, 16)}.${environment}`;
+  const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
+  const assetManifestSha256 = sha256(canonicalJson(assetManifest));
   if (
+    buildManifest.schemaVersion !== 2 ||
     buildManifest.buildId !== buildId ||
+    buildManifest.candidateId !== buildId ||
     buildManifest.contentHash !== contentHash ||
-    buildManifest.hostingConfigHash !== hostingConfigHash ||
-    buildManifest.releaseHash !== releaseHash ||
     buildManifest.sourceFingerprint !== fingerprint ||
+    buildManifest.sourceReleaseManifestSha256 !== sourceReleases.sha256 ||
+    buildManifest.sourceReleaseManifestCount !== sourceReleases.manifestCount ||
+    buildManifest.assetManifestSha256 !== assetManifestSha256 ||
+    buildManifest.dependencyLockSha256 !== dependencyLockSha256 ||
+    buildManifest.nodeVersion !== process.version ||
     buildManifest.commit !== commit ||
+    buildManifest.commitTime !== buildManifest.buildTimestamp ||
     buildManifest.firebaseProjectId !== String(config.projectId || '') ||
+    buildManifest.deploymentTarget !== `${String(config.projectId || '')}:live` ||
     buildManifest.fileCount !== expectedNames.length
   ) {
     throw new Error('Hosting build identity no longer matches the current source and artifact.');
-  }
-  if (environment === 'production') {
-    assertProductionArtifact(buildManifest, {
-      expectedProjectId: String(config.projectId || ''),
-      currentCommit: commit
-    });
   }
 
   const result = {
@@ -297,6 +448,14 @@ async function verifyArtifact() {
     firebaseEnvironment: environment,
     firebaseProjectId: buildManifest.firebaseProjectId,
     sourceDirty: buildManifest.sourceDirty,
+    sourceReleaseManifestSha256: sourceReleases.sha256,
+    sourceReleaseManifestCount: sourceReleases.manifestCount,
+    runtimeBundleFileCount: runtimeFiles.length,
+    groundReleaseId: expectedGroundReleaseId,
+    groundFileCount: groundFiles.length,
+    assetManifestSha256,
+    dependencyLockSha256,
+    nodeVersion: process.version,
     fileCount: expectedNames.length
   };
   console.log(JSON.stringify(result, null, 2));

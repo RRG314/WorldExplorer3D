@@ -1,96 +1,62 @@
 import assert from 'node:assert/strict';
-import { createLifecycleScope } from '../app/js/runtime/lifecycle-scope.js';
+import {
+  createLifecycleScope,
+  getLifecycleRegistrySnapshot
+} from '../app/js/runtime/lifecycle-scope.js';
 
-const originalRequestFrame = globalThis.requestAnimationFrame;
-const originalCancelFrame = globalThis.cancelAnimationFrame;
-const originalRequestIdle = globalThis.requestIdleCallback;
-const originalCancelIdle = globalThis.cancelIdleCallback;
-const pendingFrames = new Map();
-const cancelledFrames = [];
-const pendingIdle = new Map();
-const cancelledIdle = [];
-let nextFrameId = 0;
-let nextIdleId = 100;
+const before = getLifecycleRegistrySnapshot();
+const target = new EventTarget();
+const scope = createLifecycleScope('behavior-test');
+let eventCalls = 0;
+let guardedCalls = 0;
+let intervalCalls = 0;
 
-globalThis.requestAnimationFrame = (callback) => {
-  const id = ++nextFrameId;
-  pendingFrames.set(id, callback);
-  return id;
-};
-globalThis.cancelAnimationFrame = (id) => {
-  cancelledFrames.push(id);
-  pendingFrames.delete(id);
-};
-globalThis.requestIdleCallback = (callback) => {
-  const id = ++nextIdleId;
-  pendingIdle.set(id, callback);
-  return id;
-};
-globalThis.cancelIdleCallback = (id) => {
-  cancelledIdle.push(id);
-  pendingIdle.delete(id);
-};
+scope.listen(target, 'ping', () => { eventCalls += 1; });
+const guarded = scope.guard(() => { guardedCalls += 1; });
+const intervalHandle = scope.interval(() => { intervalCalls += 1; }, 5);
+const pendingTimeout = scope.timeout(() => {
+  throw new Error('Disposed timeout executed.');
+}, 10_000);
 
-try {
-  const scope = createLifecycleScope('test-scope');
-  let frameCalls = 0;
-  scope.animationFrame(() => {
-    frameCalls += 1;
-  });
+target.dispatchEvent(new Event('ping'));
+guarded();
+await new Promise((resolve) => setTimeout(resolve, 16));
 
-  assert.deepEqual(scope.snapshot(), {
-    owner: 'test-scope',
-    active: true,
-    disposedReason: '',
-    resourceCount: 1,
-    resources: { 'animation-frame': 1 }
-  });
-  assert.equal(scope.dispose('test-complete'), true);
-  assert.deepEqual(cancelledFrames, [1]);
-  assert.equal(frameCalls, 0);
-  assert.equal(scope.dispose('already-disposed'), false);
-  assert.equal(scope.animationFrame(() => {
-    frameCalls += 1;
-  }), 2);
-  assert.deepEqual(cancelledFrames, [1, 2]);
-  assert.equal(frameCalls, 0);
+const active = scope.snapshot();
+assert.equal(eventCalls, 1, 'Owned listener did not run while its scope was active.');
+assert.equal(guardedCalls, 1, 'Guarded callback did not run while its scope was active.');
+assert.ok(intervalCalls >= 1, 'Owned interval did not run while its scope was active.');
+assert.equal(active.owner, 'behavior-test');
+assert.equal(active.active, true);
+assert.equal(active.resources.listener, 1);
+assert.equal(active.resources.interval, 1);
+assert.equal(active.resources.timeout, 1);
+assert.equal(scope.dispose('test-complete'), true);
+assert.equal(scope.dispose('duplicate-dispose'), false, 'Lifecycle disposal was not idempotent.');
 
-  const completedScope = createLifecycleScope('completed-frame');
-  completedScope.animationFrame(() => {
-    frameCalls += 1;
-  });
-  const completedCallback = pendingFrames.get(3);
-  pendingFrames.delete(3);
-  completedCallback(100);
-  assert.equal(frameCalls, 1);
-  assert.equal(completedScope.snapshot().resourceCount, 0);
+const callsAtDispose = intervalCalls;
+target.dispatchEvent(new Event('ping'));
+guarded();
+await new Promise((resolve) => setTimeout(resolve, 16));
 
-  const cancelledScope = createLifecycleScope('cancelled-frame');
-  const cancelledHandle = cancelledScope.animationFrame(() => {
-    frameCalls += 1;
-  });
-  assert.equal(cancelledScope.cancelAnimationFrame(cancelledHandle), true);
-  assert.equal(cancelledScope.cancelAnimationFrame(cancelledHandle), false);
-  assert.equal(cancelledScope.snapshot().resourceCount, 0);
+const disposed = scope.snapshot();
+const after = getLifecycleRegistrySnapshot();
+assert.equal(eventCalls, 1, 'Disposed listener remained active.');
+assert.equal(guardedCalls, 1, 'Disposed guard still invoked its callback.');
+assert.equal(intervalCalls, callsAtDispose, 'Disposed interval continued running.');
+assert.equal(disposed.active, false);
+assert.equal(disposed.disposedReason, 'test-complete');
+assert.equal(disposed.resourceCount, 0);
+assert.equal(after.activeScopeCount, before.activeScopeCount, 'Disposed scope remained in the registry.');
 
-  const idleScope = createLifecycleScope('idle-scope');
-  let idleCalls = 0;
-  idleScope.idle(() => {
-    idleCalls += 1;
-  });
-  assert.equal(idleScope.snapshot().resources['idle-callback'], 1);
-  assert.equal(idleScope.dispose('idle-cancelled'), true);
-  assert.deepEqual(cancelledIdle, [101]);
-  assert.equal(idleCalls, 0);
-} finally {
-  if (originalRequestFrame) globalThis.requestAnimationFrame = originalRequestFrame;
-  else delete globalThis.requestAnimationFrame;
-  if (originalCancelFrame) globalThis.cancelAnimationFrame = originalCancelFrame;
-  else delete globalThis.cancelAnimationFrame;
-  if (originalRequestIdle) globalThis.requestIdleCallback = originalRequestIdle;
-  else delete globalThis.requestIdleCallback;
-  if (originalCancelIdle) globalThis.cancelIdleCallback = originalCancelIdle;
-  else delete globalThis.cancelIdleCallback;
-}
+// The handles are deliberately referenced so this test also proves disposal,
+// rather than process exit, is what releases both timer types.
+assert.notEqual(intervalHandle, null);
+assert.notEqual(pendingTimeout, null);
 
-console.log(JSON.stringify({ ok: true, cancelledFrames, cancelledIdle }, null, 2));
+console.log(JSON.stringify({
+  ok: true,
+  activeResources: active.resources,
+  disposedResources: disposed.resources,
+  registryRestored: after.activeScopeCount === before.activeScopeCount
+}, null, 2));

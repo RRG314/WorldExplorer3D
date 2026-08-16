@@ -1,6 +1,6 @@
 # Contributing to World Explorer 3D
 
-Last reviewed: 2026-07-21
+Last reviewed: 2026-07-28
 
 Contribution workflow and minimum quality bars for this repository.
 
@@ -10,11 +10,10 @@ Canonical repository:
 
 - `https://github.com/RRG314/WorldExplorer3D`
 
-Suggested branch naming:
+Preferred branch naming:
 
 - `feature/<short-description>`
 - `fix/<short-description>`
-- `docs/<short-description>`
 
 ## 2. Local Setup
 
@@ -26,18 +25,6 @@ cd functions && npm install && cd ..
 npm run build:hosting -- --firebase-env staging
 python3 -m http.server --directory dist 4173
 ```
-
-For authoritative-room work, run the local server in a second terminal:
-
-```bash
-npm run dev:mmo-server
-```
-
-For a credential-free one-command contributor stack, follow
-[SELF_HOSTING.md](SELF_HOSTING.md). Gameplay and builder extension points are
-documented in [CONTENT_EXTENSION_GUIDE.md](CONTENT_EXTENSION_GUIDE.md).
-
-Use local fixtures and the Firebase Emulator Suite for backend tests. Public contributors do not need and must not request production credentials.
 
 ## 3. Source-of-Truth Rule
 
@@ -61,10 +48,8 @@ Do not retain superseded runtime modules: the reachability audit must report zer
 Required:
 
 1. `npm run release:verify` passes.
-2. `npm run test:mmo` passes when room, sandbox, combat, progression, or multiplayer code changed.
-3. Manual smoke covers the complete changed gameplay flow, not only page boot.
-4. UI changes include inspected desktop and phone screenshots.
-5. No new blocking console/runtime errors in critical flows.
+2. Manual smoke for launch flows, geolocation path, and Earth/Ocean mode switching.
+3. No new blocking console/runtime errors in critical flows.
 
 If backend touched:
 
@@ -87,13 +72,7 @@ At minimum, review the affected public documents:
 
 ## 6. PR Format
 
-Use this structure:
-
-1. Summary
-2. Problem
-3. Fix
-4. Validation
-5. Risks/follow-ups
+Describe what changed, why it changed, how it was validated, and any remaining compatibility or deployment risk.
 
 Include screenshots for UI changes and logs for backend behavior changes.
 
@@ -102,36 +81,11 @@ Include screenshots for UI changes and logs for backend behavior changes.
 - never commit real secrets (`sk_live`, `whsec`, tokens)
 - use placeholders in docs/examples
 - keep billing/env values in runtime env, not source files
-- never use production user records as test fixtures
-- do not add client-authoritative inventory, progression, combat, moderation, or rewards
 
-## 8. Realtime World Contributions
-
-- keep room commands declarative, schema-validated, permission-checked, and budgeted
-- preserve existing player and room data through additive migrations
-- use server-owned world cells for durable edits and interest management
-- do not accept uploaded executable scripts; creator behavior must use reviewed resource definitions
-- include disconnect, reconnect, duplicate-command, and denial-path tests
-
-## 9. OSM-Facing Quality Bar
+## 8. OSM-Facing Quality Bar
 
 For map/data path changes:
 
 - keep OSM attribution visible and accurate
 - avoid exaggerated performance or coverage claims
 - document known tradeoffs/limitations explicitly
-
-## 10. License and Conduct
-
-Contributions are submitted under [Apache License 2.0](LICENSE) and must comply
-with the [project governance](GOVERNANCE.md) and
-[community code of conduct](CODE_OF_CONDUCT.md). Every commit must certify the
-[Developer Certificate of Origin](DCO.txt) with a sign-off:
-
-```bash
-git commit -s
-```
-
-Do not contribute third-party code, data, models, textures, imagery, or fonts
-without compatible terms and a provenance record. Contributions do not grant
-access to production credentials, infrastructure, or user data.

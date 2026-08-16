@@ -1,16 +1,8 @@
+import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildWaterShaderLibrary,
   inferWaterRenderContext
 } from "../water-dynamics.js?v=4";
-
-let trackWaterWaveMaterialFn = () => {};
-
-export function initWaterMaterialSupport(options = {}) {
-  if (typeof options.trackWaterWaveMaterial !== 'function') {
-    throw new TypeError('Water material support requires trackWaterWaveMaterial().');
-  }
-  trackWaterWaveMaterialFn = options.trackWaterWaveMaterial;
-}
 
 export function registerWaterWaveMaterial(material, options = {}) {
   if (!material || material.userData?.weWaterWavePatched || typeof THREE === 'undefined') return material;
@@ -105,7 +97,8 @@ totalEmissiveRadiance += vec3(0.036, 0.052, 0.072) * (weFoamBands * 0.44 + weWhi
     if (shaderHook) shaderHook(shader, { material, waterKind });
   };
 
-  trackWaterWaveMaterialFn(material);
+  if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);
+  else appCtx.replaceWorldCollection('waterWaveVisuals', [material]);
   material.needsUpdate = true;
   return material;
 }

@@ -47,16 +47,21 @@ export function hideEarthSceneMeshes() {
 
 export function resetWorldForReload(options = {}) {
   const locName = options.locName || 'World';
-  const preserveEarthSceneRoot = options.preserveEarthSceneRoot === true;
   const invalidateTraversalNetworks = typeof options.invalidateTraversalNetworks === 'function' ? options.invalidateTraversalNetworks : () => {};
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
-  appCtx.cancelWorldSurfaceSync?.();
+  if (typeof appCtx.resetEarthStreaming === 'function') {
+    appCtx.resetEarthStreaming('full_world_reload');
+  }
   appCtx.initialEarthDetailRadius = 0;
+  appCtx.plannedEarthDetailRadiusWorld = 0;
+  appCtx.fixedRegionalContextBounds = null;
+  appCtx.fixedRegionalContextRadiusWorld = 0;
 
   appCtx.showLoad(`Loading ${locName}...`);
   appCtx.worldLoading = true;
+  appCtx.beginEarthWorldSceneLoad?.(options.loadSequence);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,
@@ -75,6 +80,10 @@ export function resetWorldForReload(options = {}) {
 
   disposeSceneMeshes(appCtx.roadMeshes);
   appCtx.clearWorldCollections(['roadMeshes', 'roads']);
+  // A publication belongs to exactly one world-load sequence. Clearing it here
+  // prevents the next feature compilation pass from appearing authoritative
+  // before final terrain-aligned meshes have been created.
+  appCtx.transportSurfacePublication = null;
   if (appCtx.car) {
     appCtx.car.road = null;
     appCtx.car.onRoad = false;
@@ -111,6 +120,7 @@ export function resetWorldForReload(options = {}) {
   } else {
     appCtx.worldSurfaceProfile = null;
   }
+  appCtx.worldTraversalRadiusWorld = null;
 
   disposeSceneMeshes(appCtx.linearFeatureMeshes);
   appCtx.clearWorldCollections(['linearFeatureMeshes', 'linearFeatures']);
@@ -133,15 +143,9 @@ export function resetWorldForReload(options = {}) {
 
   // The scene root is the authoritative owner. This removes any deferred or
   // previously batched world objects that are no longer reachable from a list.
-  if (!preserveEarthSceneRoot) appCtx.clearEarthWorldSceneObjects?.();
+  appCtx.clearEarthWorldSceneObjects?.();
 
   resetWorldFurnitureCaches();
-  if (typeof appCtx.clearWindowTextureCache === 'function') {
-    appCtx.clearWindowTextureCache();
-  } else {
-    appCtx.windowTextures = {};
-  }
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
 
-  appCtx.roadsNeedRebuild = true;
 }

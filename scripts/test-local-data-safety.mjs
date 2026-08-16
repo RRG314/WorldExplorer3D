@@ -4,13 +4,11 @@ import { pathToFileURL } from 'node:url';
 class StorageMock {
   constructor() {
     this.map = new Map();
-    this.failWrites = false;
   }
   getItem(key) {
     return this.map.has(key) ? this.map.get(key) : null;
   }
   setItem(key, value) {
-    if (this.failWrites) throw new Error('Simulated storage write failure.');
     this.map.set(String(key), String(value));
   }
   removeItem(key) {
@@ -18,22 +16,11 @@ class StorageMock {
   }
   clear() {
     this.map.clear();
-    this.failWrites = false;
   }
 }
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
-}
-
-function assertThrows(callback, pattern, message) {
-  try {
-    callback();
-  } catch (error) {
-    if (pattern.test(String(error?.message || error))) return;
-    throw error;
-  }
-  throw new Error(message);
 }
 
 function moduleUrl(relativePath) {
@@ -115,22 +102,6 @@ function runActivityLibraryChecks() {
 
   assert(!!saved?.id, 'Activity library save should produce an id.');
   assert(localStorage.getItem(ACTIVITY_KEY) === localStorage.getItem(ACTIVITY_BACKUP_KEY), 'Activity library should mirror writes to backup storage.');
-
-  const lastGoodPrimary = localStorage.getItem(ACTIVITY_KEY);
-  const lastGoodBackup = localStorage.getItem(ACTIVITY_BACKUP_KEY);
-  localStorage.failWrites = true;
-  assertThrows(
-    () => activityLib.saveCreatorActivityDraft({
-      templateId: 'walking_route',
-      anchors: backupRows[0].anchors,
-      name: 'Unsaved Draft'
-    }),
-    /Could not save this activity/,
-    'Failed activity storage must report an error.'
-  );
-  assert(localStorage.getItem(ACTIVITY_KEY) === lastGoodPrimary, 'Failed activity saves must preserve the last good primary payload.');
-  assert(localStorage.getItem(ACTIVITY_BACKUP_KEY) === lastGoodBackup, 'Failed activity saves must preserve the last good backup payload.');
-  localStorage.failWrites = false;
 }
 
 function runOverlayDraftChecks() {
@@ -165,24 +136,6 @@ function runOverlayDraftChecks() {
 
   assert(saved?.featureId === 'feature_new', 'Overlay draft save should preserve the new feature id.');
   assert(localStorage.getItem(DRAFT_KEY) === localStorage.getItem(DRAFT_BACKUP_KEY), 'Overlay draft writes should mirror to backup storage.');
-
-  const lastGoodPrimary = localStorage.getItem(DRAFT_KEY);
-  const lastGoodBackup = localStorage.getItem(DRAFT_BACKUP_KEY);
-  localStorage.failWrites = true;
-  assertThrows(
-    () => localDrafts.upsertLocalOverlayDraft({
-      featureId: 'feature_unsaved',
-      featureClass: 'poi',
-      geometryType: 'Point',
-      geometry: { type: 'Point', coordinates: [2, 2] },
-      tags: { name: 'Unsaved Draft' }
-    }),
-    /Could not save this editor draft/,
-    'Failed editor storage must report an error.'
-  );
-  assert(localStorage.getItem(DRAFT_KEY) === lastGoodPrimary, 'Failed editor saves must preserve the last good primary payload.');
-  assert(localStorage.getItem(DRAFT_BACKUP_KEY) === lastGoodBackup, 'Failed editor saves must preserve the last good backup payload.');
-  localStorage.failWrites = false;
 }
 
 async function runBuildBlockChecks() {

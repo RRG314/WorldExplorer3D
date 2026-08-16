@@ -65,7 +65,9 @@ function segmentIntersection2D(a1, a2, b1, b2) {
 }
 
 function roadIsAtGrade(road) {
-  return !road?.structureSemantics?.terrainMode || road.structureSemantics.terrainMode === "at_grade";
+  const semantics = road?.structureSemantics;
+  return (!semantics?.terrainMode || semantics.terrainMode === "at_grade") &&
+    semantics?.topologySeparated !== true;
 }
 
 function normalizeBranchDirection(dx, dz) {
@@ -179,12 +181,12 @@ function collectRoadCandidatePairs(roadInfos = []) {
   return pairs;
 }
 
-function getOrCreateIntersection(intersections, spatialMap, x, z) {
+function getOrCreateIntersection(intersections, spatialMap, x, z, surfaceGroup = 'at_grade') {
   const cellX = Math.floor(x / INTERSECTION_CLUSTER_SIZE);
   const cellZ = Math.floor(z / INTERSECTION_CLUSTER_SIZE);
   for (let ox = -1; ox <= 1; ox++) {
     for (let oz = -1; oz <= 1; oz++) {
-      const key = `${cellX + ox},${cellZ + oz}`;
+      const key = `${surfaceGroup}:${cellX + ox},${cellZ + oz}`;
       const bucket = spatialMap.get(key);
       if (!bucket) continue;
       for (let i = 0; i < bucket.length; i++) {
@@ -200,8 +202,8 @@ function getOrCreateIntersection(intersections, spatialMap, x, z) {
     }
   }
 
-  const intersection = { x, z, roads: [], maxWidth: 0, hasGradeSeparatedRoad: false, samples: 1, _branchKeys: new Set() };
-  const key = `${cellX},${cellZ}`;
+  const intersection = { x, z, roads: [], maxWidth: 0, hasGradeSeparatedRoad: false, samples: 1, surfaceGroup, _branchKeys: new Set() };
+  const key = `${surfaceGroup}:${cellX},${cellZ}`;
   let bucket = spatialMap.get(key);
   if (!bucket) {
     bucket = [];
@@ -212,26 +214,54 @@ function getOrCreateIntersection(intersections, spatialMap, x, z) {
   return intersection;
 }
 
+function nearbyAtGradeIntersection(intersections, x, z) {
+  return intersections.find((intersection) =>
+    !intersection.hasGradeSeparatedRoad &&
+    Math.hypot(intersection.x - x, intersection.z - z) <= INTERSECTION_MERGE_RADIUS
+  ) || null;
+}
+
 export function detectRoadIntersections(roads) {
   const intersections = [];
   const spatialMap = new Map();
+  const sourceNodeIntersections = new Map();
   const roadInfos = [];
 
   roads.forEach((road, roadIdx) => {
     if (!Array.isArray(road?.pts) || road.pts.length < 2) return;
     const pad = Math.max(8, Number(road.width) || 0);
-    roadInfos.push({
-      index: roadInfos.length,
-      roadIdx,
-      road,
-      bounds: pointsBoundsLocal(road.pts, pad),
-      width: Number(road.width) || 8,
-      atGrade: roadIsAtGrade(road)
-    });
+    // Fixed regional centerlines already retain their canonical source-node
+    // junctions below. Pairwise geometric crossing discovery is only needed
+    // in the detailed location core; running it again over thousands of
+    // metropolitan LOD roads spent seconds finding junction caps that are too
+    // distant to resolve and duplicated the transport topology authority.
+    if (road.fixedRegionalContext !== true) {
+      roadInfos.push({
+        index: roadInfos.length,
+        roadIdx,
+        road,
+        bounds: pointsBoundsLocal(road.pts, pad),
+        width: Number(road.width) || 8,
+        atGrade: roadIsAtGrade(road)
+      });
+    }
 
     [0, road.pts.length - 1].forEach((idx) => {
       const point = road.pts[idx];
-      const intersection = getOrCreateIntersection(intersections, spatialMap, point.x, point.z);
+      const sourceNodeId = String(
+        idx === 0 ? road.sourceNodeIds?.[0] || '' : road.sourceNodeIds?.at(-1) || ''
+      );
+      let intersection = sourceNodeId ? sourceNodeIntersections.get(sourceNodeId) : null;
+      if (!intersection) {
+        const semantics = road.structureSemantics || {};
+        const surfaceGroup = sourceNodeId
+          ? `source:${sourceNodeId}`
+          : roadIsAtGrade(road)
+            ? 'at_grade'
+            : String(semantics.verticalGroup || `${semantics.terrainMode || 'structure'}:${semantics.verticalOrder || 0}`);
+        intersection = getOrCreateIntersection(intersections, spatialMap, point.x, point.z, surfaceGroup);
+        if (sourceNodeId) sourceNodeIntersections.set(sourceNodeId, intersection);
+      }
       registerRoadIntersectionBranches(intersection, road, roadIdx, idx === 0 ? 0 : road.pts.length - 2, idx === 0 ? 0 : 1, point);
     });
   });
@@ -263,7 +293,17 @@ export function detectRoadIntersections(roads) {
           (segB === roadB.road.pts.length - 2 && intersectionPoint.u >= 1 - INTERSECTION_ENDPOINT_EPSILON);
         if (sharedEndpointA && sharedEndpointB) continue;
 
-        const intersection = getOrCreateIntersection(intersections, spatialMap, intersectionPoint.x, intersectionPoint.z);
+        const intersection = nearbyAtGradeIntersection(
+          intersections,
+          intersectionPoint.x,
+          intersectionPoint.z
+        ) || getOrCreateIntersection(
+          intersections,
+          spatialMap,
+          intersectionPoint.x,
+          intersectionPoint.z,
+          'at_grade'
+        );
         registerRoadIntersectionBranches(intersection, roadA.road, roadA.roadIdx, segA, intersectionPoint.t, intersectionPoint);
         registerRoadIntersectionBranches(intersection, roadB.road, roadB.roadIdx, segB, intersectionPoint.u, intersectionPoint);
       }

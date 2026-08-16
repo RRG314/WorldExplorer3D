@@ -1,11 +1,20 @@
-import { worldLoadTransactions } from './load-transaction.js?v=2';
-import { beginWorldLoadStage } from './load-stage.js?v=3';
-import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
-import { commitWorldLocationAuthority } from './load-location-authority.js?v=1';
+import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
+import {
+  markFirstPlayReady,
+  scheduleAfterFirstPlay
+} from '../runtime/workload-policy.js?v=1';
+import {
+  createSelectionRestoreCommand,
+  createWorldLoadRequest,
+  isWorldLoadRequestActive
+} from '../earth-core/world-load-request.js?v=1';
+import { createWorldLoadSession } from '../earth-core/world-load-session.js?v=1';
+import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
+import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=1';
+import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=2';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
-    addBuildingToSpatialIndex,
     appCtx,
     clearBuildingSpatialIndex,
     earthSceneSuppressed,
@@ -14,6 +23,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     getRuntimeDynamicBudget,
     getWorldLodThresholds,
     invalidateTraversalNetworks,
+    registerWorldLoadCancellation,
     resetWorldForReload,
     resetWorldFurnitureCaches,
     retryPass = 0,
@@ -21,7 +31,9 @@ export function createWorldLoadRuntimeSession(options = {}) {
   } = options;
 
   const locationSelection = appCtx.resolveLocationSelection?.() || null;
-  const locName = locationSelection?.name || 'Unknown location';
+  const nextLoadSequence = Number(appCtx._worldLoadSequence || 0) + 1;
+  const loadRequest = createWorldLoadRequest(locationSelection, nextLoadSequence);
+  const locName = loadRequest?.name || 'Unknown location';
   const perfModeNow = getPerfModeValue();
   const useRdtBudgeting = perfModeNow === 'rdt';
   const loadMetrics = {
@@ -49,6 +61,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
     phases: {}
   };
+  const traceWorldLoad = typeof globalThis.location?.search === 'string' &&
+    new URLSearchParams(globalThis.location.search).get('worldLoadTrace') === '1';
+  const traceLoadPhase = (event, name, details = {}) => {
+    if (!traceWorldLoad) return;
+    console.warn(`[WorldLoadTrace] ${event} ${name}`, JSON.stringify(details));
+  };
 
   appCtx._lastBuildingBatchStats = null;
   appCtx._lastLanduseBatchStats = null;
@@ -67,9 +85,18 @@ export function createWorldLoadRuntimeSession(options = {}) {
 
   const phaseStartedAt = Object.create(null);
   const phaseTotals = Object.create(null);
+  let runtimeState = null;
   const startLoadPhase = (name) => {
     if (!name) return;
     phaseStartedAt[name] = performance.now();
+    traceLoadPhase('start', name, {
+      roads: Number(appCtx.roads?.length || 0),
+      roadMeshes: Number(appCtx.roadMeshes?.length || 0)
+    });
+    if (runtimeState) {
+      runtimeState.activePhases = Object.keys(phaseStartedAt);
+      runtimeState.updatedAt = performance.now();
+    }
   };
   const endLoadPhase = (name) => {
     if (!name) return;
@@ -77,70 +104,118 @@ export function createWorldLoadRuntimeSession(options = {}) {
     if (!Number.isFinite(startedAt)) return;
     const dt = performance.now() - startedAt;
     phaseTotals[name] = (phaseTotals[name] || 0) + dt;
+    traceLoadPhase('end', name, { durationMs: Math.round(dt) });
     delete phaseStartedAt[name];
+    if (runtimeState) {
+      runtimeState.activePhases = Object.keys(phaseStartedAt);
+      runtimeState.lastCompletedPhase = name;
+      runtimeState.updatedAt = performance.now();
+    }
   };
 
-  if (!locationSelection) {
+  resetWorldForReload({
+    clearBuildingSpatialIndex,
+    invalidateTraversalNetworks,
+    loadSequence: nextLoadSequence,
+    locName,
+    resetWorldFurnitureCaches
+  });
+  appCtx.initialEarthWorldReady = false;
+  appCtx.worldDetailState = {};
+  appCtx.buildingProvenanceRecords = [];
+  appCtx.buildingProvenanceFeatureIds = new Set();
+  appCtx.buildingProvenanceModel = null;
+  appCtx.waterSurfaceRegistry = null;
+  appCtx.waterSurfaceRegistrySnapshot = null;
+
+  if (!loadRequest) {
     appCtx.showLoad('Choose a valid location');
+    appCtx.worldLoading = false;
+    appCtx.discardEarthWorldSceneLoad?.(nextLoadSequence);
+    appCtx.enforceEnvironmentSceneOwnership?.();
     finalizePerfLoad(false, { reason: 'invalid_location_selection' });
     return { aborted: true };
   }
-  const loadLocation = {
-    lat: Number(locationSelection.lat),
-    lon: Number(locationSelection.lon)
+  appCtx.LOC = { ...loadRequest.location };
+  if (loadRequest.selection.key === 'custom') {
+    appCtx.setCustomLocation?.(loadRequest.selection, { syncInputs: false });
+  }
+  appCtx.setTravelMode?.('walk', {
+    source: 'location_load',
+    force: true,
+    emitTutorial: false
+  });
+
+  const loadLocation = loadRequest.location;
+  const worldSession = createWorldLoadSession(loadRequest, { now: () => performance.now() });
+  const providerAbortController = new AbortController();
+  const restoreCommand = createSelectionRestoreCommand(loadRequest);
+  const restoreRequestedSelection = () => {
+    if (restoreCommand?.method === 'setCustomLocation') {
+      appCtx.setCustomLocation?.(restoreCommand.selection, restoreCommand.options);
+    } else if (restoreCommand?.method === 'selectPresetLocation') {
+      appCtx.selectPresetLocation?.(restoreCommand.key);
+    }
   };
-  const transaction = worldLoadTransactions.begin({
-    signature: `${loadLocation.lat.toFixed(7)}:${loadLocation.lon.toFixed(7)}:${retryPass}`,
-    source: retryPass > 0 ? 'location-osm-retry' : 'location-osm',
-    location: { ...loadLocation, name: locName }
-  });
-  let worldLoadStage;
-  try {
-    worldLoadStage = beginWorldLoadStage(appCtx, {
-      label: `${locName}:${transaction.id}`
+  const loadSequence = appCtx._worldLoadSequence = loadRequest.sequence;
+  runtimeState = appCtx.worldLoadRuntimeState = {
+    sequence: loadSequence,
+    status: 'loading',
+    location: { ...loadLocation, name: locName },
+    retryPass,
+    startedAt: performance.now(),
+    updatedAt: performance.now(),
+    activePhases: [],
+    lastCompletedPhase: '',
+    geometryReady: false,
+    session: worldSession.snapshot()
+  };
+  const syncWorldSessionState = () => {
+    if (runtimeState) runtimeState.session = worldSession.snapshot();
+    return runtimeState?.session || null;
+  };
+  worldSession.transition('fetching', 'world-load-started');
+  syncWorldSessionState();
+  const isActiveLoadContext = () => {
+    const active = isWorldLoadRequestActive(loadRequest, {
+      activeSequence: appCtx._worldLoadSequence,
+      activeLocation: appCtx.LOC,
+      sameLocation,
+      suppressed: earthSceneSuppressed()
     });
-  } catch (error) {
-    transaction.fail(error);
-    throw error;
-  }
-  const releaseStageRollback = transaction.deferRollback((reason) => {
-    const rolledBack = worldLoadStage.rollback(reason);
-    if (!rolledBack) return false;
-    restoreWorldRuntimeAfterRollback(appCtx, {
-      addBuildingToSpatialIndex,
-      clearBuildingSpatialIndex,
-      invalidateTraversalNetworks,
-      reason
-    });
-    return true;
-  });
-
-  try {
-    resetWorldForReload({
-      clearBuildingSpatialIndex,
-      invalidateTraversalNetworks,
-      locName,
-      resetWorldFurnitureCaches,
-      preserveEarthSceneRoot: true
-    });
-  } catch (error) {
-    transaction.fail(error);
-    throw error;
-  }
-  appCtx.initialEarthWorldReady = false;
-  appCtx.worldDetailState = {};
-
-  appCtx.LOC = { lat: locationSelection.lat, lon: locationSelection.lon };
-  if (locationSelection.key === 'custom') {
-    appCtx.setCustomLocation?.(locationSelection, { syncInputs: false });
-  }
-
-  const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
-  const isActiveLoadContext = () =>
-    transaction.isCurrent() &&
-    appCtx._worldLoadSequence === loadSequence &&
-    sameLocation(appCtx.LOC, loadLocation) &&
-    !earthSceneSuppressed();
+    if (!active && worldSession.isActive()) {
+      providerAbortController.abort('world-load-context-changed');
+      worldSession.supersede('world-load-context-changed');
+      syncWorldSessionState();
+    }
+    return active;
+  };
+  const runProviderWork = async (provider, operation, task) => {
+    const token = worldSession.beginProviderWork(provider, operation);
+    syncWorldSessionState();
+    try {
+      const result = await task(providerAbortController.signal);
+      if (token) worldSession.settleProviderWork(token, isActiveLoadContext() ? 'completed' : 'discarded');
+      syncWorldSessionState();
+      return result;
+    } catch (error) {
+      const outcome = providerAbortController.signal.aborted || error?.name === 'AbortError'
+        ? 'aborted'
+        : 'failed';
+      if (token) worldSession.settleProviderWork(token, outcome);
+      syncWorldSessionState();
+      throw error;
+    }
+  };
+  const releaseWorldLoadCancellation = typeof registerWorldLoadCancellation === 'function'
+    ? registerWorldLoadCancellation((reason = 'superseded') => {
+        if (!worldSession.isActive()) return false;
+        providerAbortController.abort(reason);
+        worldSession.supersede(reason);
+        syncWorldSessionState();
+        return true;
+      })
+    : () => {};
 
   appCtx.car.x = 0;
   appCtx.car.z = 0;
@@ -158,9 +233,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
   }
 
   if (appCtx.terrainEnabled && !appCtx.onMoon) {
-    if (typeof appCtx.resetTerrainStreamingState === 'function') appCtx.resetTerrainStreamingState();
+    if (typeof appCtx.resetLocationTerrainPublication === 'function') appCtx.resetLocationTerrainPublication();
     if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
-    if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(0, 0);
   }
 
   appCtx.rdtSeed = appCtx.hashGeoToInt(
@@ -182,6 +256,10 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
   const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow, dynamicBudgetState.budgetScale);
   const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
+  const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
+  appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
+    ? Math.max(800, Math.round(plannedDetailRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
+    : 1050;
   appCtx.dynamicBudgetScale = dynamicBudgetState.budgetScale;
   appCtx.dynamicLodScale = dynamicBudgetState.lodScale;
 
@@ -216,64 +294,73 @@ export function createWorldLoadRuntimeSession(options = {}) {
     isActiveLoadContext,
     loadMetrics,
     loadProfile,
-    locationSelection,
     lodThresholds,
     perfModeNow,
     phaseTotals,
     rdtLoadComplexity,
+    runtimeState,
+    restoreRequestedSelection,
+    releaseWorldLoadCancellation,
+    runProviderWork,
     startLoadPhase,
-    transaction,
-    worldLoadStage,
-    releaseStageRollback,
+    syncWorldSessionState,
     useRdtBudgeting,
     useSyntheticFallbackRoads:
       appCtx.gameMode === 'trial' ||
       appCtx.gameMode === 'checkpoint' ||
-      appCtx.gameMode === 'painttown'
+      appCtx.gameMode === 'painttown',
+    worldSession
   };
 }
 
-export function recordWorldSourceMetrics(loadMetrics = {}, data = null) {
-  if (!data || typeof data !== 'object') return loadMetrics;
-  if (data._overpassSource) loadMetrics.overpassSource = data._overpassSource;
-  if (data._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
-  if (data._shortbreadTiles) loadMetrics.sourceCoverage = { ...data._shortbreadTiles };
-  if (Number.isFinite(data._overpassCacheAgeMs)) {
-    loadMetrics.overpassCacheAgeMs = Math.floor(data._overpassCacheAgeMs);
+export function worldPublicationCounts(appCtx = {}) {
+  return Object.freeze(Object.fromEntries(
+    WORLD_COLLECTION_NAMES.map((name) => [
+      name,
+      Array.isArray(appCtx[name]) ? appCtx[name].length : 0
+    ])
+  ));
+}
+
+export function verifyWorldPublicationStable(appCtx = {}, publication = null) {
+  const expected = publication?.counts || null;
+  const actual = worldPublicationCounts(appCtx);
+  if (!expected) {
+    return Object.freeze({
+      stable: false,
+      reason: 'publication-snapshot-missing',
+      changes: Object.freeze([]),
+      actual
+    });
   }
-  return loadMetrics;
+  const changes = WORLD_COLLECTION_NAMES
+    .filter((name) => Number(expected[name]) !== Number(actual[name]))
+    .map((name) => Object.freeze({
+      collection: name,
+      expected: Number(expected[name]),
+      actual: Number(actual[name])
+    }));
+  return Object.freeze({
+    stable: changes.length === 0,
+    reason: changes.length === 0 ? null : 'published-world-mutated',
+    changes: Object.freeze(changes),
+    actual
+  });
 }
 
 export function finishWorldLoadRuntimeSession(session = {}) {
   const {
-    appCtx,
-    finalizePerfLoad,
-    isActiveLoadContext,
-    loadMetrics,
-    locationSelection,
-    phaseTotals,
-    transaction,
-    releaseStageRollback,
-    loaded = false
+    appCtx, finalizePerfLoad, loadMetrics, phaseTotals, releaseWorldLoadCancellation,
+    runtimeState, syncWorldSessionState, worldSession, loaded = false
   } = session;
   if (!appCtx) return;
-
-  if (!transaction?.isCurrent?.() || isActiveLoadContext?.() === false) {
-    transaction?.abort?.('stale-before-finalize');
-    finalizePerfLoad(false, { reason: 'stale_before_finalize' });
-    return;
-  }
 
   const loadedRadiusDeg = Number(loadMetrics?.activeRadiusDeg);
   appCtx.initialEarthDetailRadius = Number.isFinite(loadedRadiusDeg)
     ? Math.max(800, Math.round(loadedRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
     : 1050;
 
-  appCtx.worldLoading = false;
   appCtx.initialEarthWorldReady = !!loaded;
-  if (typeof appCtx.enforceEnvironmentSceneOwnership === 'function') {
-    appCtx.enforceEnvironmentSceneOwnership();
-  }
   if (typeof appCtx.setPerfLiveStat === 'function') {
     appCtx.setPerfLiveStat('lodVisible', { near: loadMetrics.lod.near, mid: loadMetrics.lod.mid });
     appCtx.setPerfLiveStat('worldCounts', {
@@ -287,9 +374,64 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     loadMetrics.phases = Object.fromEntries(
       Object.entries(phaseTotals).map(([name, ms]) => [name, Math.round(ms)])
     );
+    if (runtimeState) runtimeState.phaseTotals = { ...loadMetrics.phases };
   }
   loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
-  appCtx.lastWorldLoadMetrics = loadMetrics;
+  appCtx.buildingProvenanceModel = createBuildingProvenanceSnapshot(
+    appCtx.buildingProvenanceRecords || []
+  );
+  appCtx.waterSurfaceRegistrySnapshot =
+    appCtx.waterSurfaceRegistry?.snapshot?.() || null;
+  appCtx.reconcileActorsAfterSurfaceRebuild?.();
+  const publicationCounts = worldPublicationCounts(appCtx);
+  const terrainCount = Array.isArray(appCtx.terrainGroup?.children)
+    ? appCtx.terrainGroup.children.filter((mesh) => mesh?.userData?.isTerrainMesh).length
+    : 0;
+  const layerProducts = compileWorldLayerProducts({
+    request: worldSession?.request,
+    counts: publicationCounts,
+    runtimeState,
+    loadMetrics,
+    detailRadiusWorld: appCtx.initialEarthDetailRadius,
+    terrainCount,
+    artifacts: {
+      transportSurfacePublication: appCtx.transportSurfacePublication,
+      buildingProvenanceModel: appCtx.buildingProvenanceModel,
+      waterSurfaceRegistrySnapshot: appCtx.waterSurfaceRegistrySnapshot
+    }
+  });
+  if (runtimeState) runtimeState.layerProducts = layerProducts;
+  const publication = publishWorldPublicationSnapshot(appCtx, {
+    request: worldSession?.request,
+    layerProducts,
+    createdAt: performance.now()
+  });
+  appCtx.worldLoading = false;
+  appCtx.publishEarthWorldSceneLoad?.(publication.sequence);
+  appCtx.enforceEnvironmentSceneOwnership?.();
+  appCtx.hideLoad?.();
+  scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
+    appCtx.refreshAstronomicalSky?.(true);
+    return appCtx.refreshLiveWeather?.(true);
+  }, { timeout: 1200 });
+  markFirstPlayReady({
+    environment: 'earth',
+    loadDurationMs: Math.round(performance.now() - Number(runtimeState?.startedAt || performance.now())),
+    publicationSequence: publication.sequence
+  });
+  if (runtimeState) {
+    runtimeState.status = loaded ? 'ready' : 'failed';
+    runtimeState.updatedAt = performance.now();
+    runtimeState.finishedAt = runtimeState.updatedAt;
+    runtimeState.activePhases = [];
+    runtimeState.geometryReady = !!loaded;
+    runtimeState.publication = publication;
+  }
+  if (worldSession?.isActive()) {
+    if (loaded) worldSession.publish('world-publication-committed');
+    else worldSession.fail('world-publication-failed');
+    syncWorldSessionState?.();
+  }
   finalizePerfLoad(loaded, {
     roadsFinal: appCtx.roads.length,
     roadVertices: Math.round(loadMetrics.roads.vertices || 0),
@@ -302,14 +444,29 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     poiMeshes: appCtx.poiMeshes.length,
     landuseMeshes: appCtx.landuseMeshes.length
   });
-  if (loaded) {
-    commitWorldLocationAuthority(appCtx, locationSelection);
-    releaseStageRollback?.();
-    transaction.commit({
-      buildings: appCtx.buildingMeshes.length,
-      roads: appCtx.roads.length
-    });
-  } else {
-    transaction.fail('world-load-not-loaded');
+  releaseWorldLoadCancellation?.();
+  return worldSession?.snapshot?.() || null;
+}
+
+export function finishSupersededWorldLoadRuntimeSession(session = {}, reason = 'superseded') {
+  const {
+    appCtx, finalizePerfLoad, releaseWorldLoadCancellation, runtimeState,
+    syncWorldSessionState, worldSession
+  } = session;
+  if (worldSession?.isActive()) worldSession.supersede(reason);
+  const snapshot = syncWorldSessionState?.() || worldSession?.snapshot?.() || null;
+  if (runtimeState) {
+    runtimeState.status = 'superseded';
+    runtimeState.updatedAt = performance.now();
+    runtimeState.finishedAt = runtimeState.updatedAt;
+    runtimeState.activePhases = [];
   }
+  finalizePerfLoad?.(false, { reason });
+  releaseWorldLoadCancellation?.();
+  if (appCtx?.worldLoadRuntimeState === runtimeState) {
+    appCtx.worldLoading = false;
+    appCtx.discardEarthWorldSceneLoad?.(runtimeState?.sequence);
+    appCtx.enforceEnvironmentSceneOwnership?.();
+  }
+  return snapshot;
 }

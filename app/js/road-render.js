@@ -16,30 +16,14 @@ function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = []
 }
 
 function createRoadSurfaceMaterials({
-  asphaltTex = null,
-  asphaltNormal = null,
-  asphaltRoughness = null,
   sidewalkTex = null,
   sidewalkNormal = null,
   sidewalkRoughness = null,
   includeMarkings = false,
   includeSidewalk = false
 } = {}) {
-  const roadMainMaterial = asphaltTex ? new THREE.MeshStandardMaterial({
-    map: asphaltTex,
-    normalMap: asphaltNormal || undefined,
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: asphaltRoughness || undefined,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  }) : new THREE.MeshStandardMaterial({
-    color: 0x333333,
+  const roadMainMaterial = new THREE.MeshStandardMaterial({
+    color: 0x303236,
     roughness: 0.95,
     metalness: 0.05,
     side: THREE.DoubleSide,
@@ -60,35 +44,9 @@ function createRoadSurfaceMaterials({
     polygonOffsetUnits: -1
   });
 
-  const roadCapMaterial = asphaltTex ? new THREE.MeshStandardMaterial({
-    map: asphaltTex,
-    normalMap: asphaltNormal || undefined,
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: asphaltRoughness || undefined,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  }) : new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  });
-
   const materials = {
     roadMainMaterial,
-    roadSkirtMaterial,
-    roadCapMaterial
+    roadSkirtMaterial
   };
 
   if (includeMarkings) {
@@ -142,9 +100,6 @@ function disposeRoadSurfaceMaterials(materials = null) {
 }
 
 function roadSurfaceMaterialCacheKey({
-  asphaltTex = null,
-  asphaltNormal = null,
-  asphaltRoughness = null,
   sidewalkTex = null,
   sidewalkNormal = null,
   sidewalkRoughness = null,
@@ -152,9 +107,7 @@ function roadSurfaceMaterialCacheKey({
   includeSidewalk = false
 } = {}) {
   return [
-    asphaltTex ? 'tex' : 'flat',
-    asphaltNormal ? 'normal' : 'plain',
-    asphaltRoughness ? 'rough' : 'smooth',
+    'flat-asphalt',
     sidewalkTex ? 'sidewalktex' : 'sidewalkflat',
     sidewalkNormal ? 'sidewalknormal' : 'sidewalkplain',
     sidewalkRoughness ? 'sidewalkrough' : 'sidewalksmooth',

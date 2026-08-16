@@ -15,14 +15,11 @@ const DISCOVERY_CATEGORIES = Object.freeze([
   { id: 'boat', label: 'Boat', icon: '⚓', color: '#0ea5e9' },
   { id: 'fishing', label: 'Fishing', icon: '◌', color: '#14b8a6' },
   { id: 'submarine', label: 'Submarine', icon: '◈', color: '#0284c7' },
-  { id: 'drone', label: 'Drone', icon: '⬡', color: '#6366f1' },
-  { id: 'flight', label: 'Flight', icon: '✈', color: '#60a5fa' },
-  { id: 'search', label: 'Search', icon: '⌖', color: '#f59e0b' }
+  { id: 'drone', label: 'Drone', icon: '⬡', color: '#6366f1' }
 ]);
 
 const TEMPLATE_TO_CATEGORY = Object.freeze({
   driving_route: 'driving',
-  rally_route: 'driving',
   walking_route: 'walking',
   collectible_hunt: 'exploration',
   rooftop_run: 'rooftop',
@@ -30,10 +27,7 @@ const TEMPLATE_TO_CATEGORY = Object.freeze({
   boat_course: 'boat',
   fishing_trip: 'fishing',
   submarine_course: 'submarine',
-  drone_course: 'drone',
-  plane_course: 'flight',
-  location_hunt: 'search',
-  search_rescue: 'search'
+  drone_course: 'drone'
 });
 
 function getDiscoveryCategory(categoryId = 'all') {
@@ -51,7 +45,6 @@ function discoveryCategoryForTemplate(templateId = '', traversalMode = '') {
   const traversalKey = sanitizeText(traversalMode, 32).toLowerCase();
   if (traversalKey === 'boat') return 'boat';
   if (traversalKey === 'drone') return 'drone';
-  if (traversalKey === 'plane') return 'flight';
   if (traversalKey === 'submarine') return 'submarine';
   if (traversalKey === 'walk') return 'walking';
   return 'driving';
@@ -105,8 +98,7 @@ function discoveryMarkerShape(activity = {}) {
   const category = discoveryCategoryForActivity(activity);
   if (category === 'room') return 'diamond';
   if (category === 'boat' || category === 'fishing') return 'ring';
-  if (category === 'drone' || category === 'flight') return 'hex';
-  if (category === 'search') return 'diamond';
+  if (category === 'drone') return 'hex';
   if (category === 'rooftop') return 'triangle';
   return 'beacon';
 }

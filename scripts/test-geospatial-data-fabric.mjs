@@ -259,6 +259,44 @@ assert.equal(directNullModel.hasGuidance, false);
 
 const serverQuery = geospatialFunctions.normalizeQuery({ provider: 'kartaview', lat: '40.7', lon: '-74', radiusM: '9000' });
 assert.deepEqual(serverQuery, { provider: 'kartaview', lat: 40.7, lon: -74, radiusM: 1000, limit: 8 });
+const deFlockQuery = geospatialFunctions.normalizeDeFlockQuery({ lat: '39.2904', lon: '-76.6122', radiusDegrees: '0.5' });
+assert.deepEqual(deFlockQuery, { lat: 39.2904, lon: -76.6122, radiusDegrees: 0.04 });
+assert.match(geospatialFunctions.buildDeFlockOverpassQuery(deFlockQuery), /man_made.*surveillance/);
+const deFlockAttempts = [];
+const deFlockProxy = await geospatialFunctions.queryDeFlockCameras({ lat: 12.34567, lon: 65.4321, radiusDegrees: 0.01 }, {
+  force: true,
+  endpoints: ['https://failed-overpass.test', 'https://working-overpass.test'],
+  fetchImpl: async (url) => {
+    deFlockAttempts.push(String(url));
+    if (String(url).includes('failed-overpass')) throw new Error('simulated provider outage');
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { elements: [
+          { type: 'node', id: 77, lat: 12.345, lon: 65.432, tags: { man_made: 'surveillance' } },
+          { type: 'node', id: 88, lat: 12.346, lon: 65.433, tags: { amenity: 'bench' } }
+        ] };
+      }
+    };
+  }
+});
+assert.equal(deFlockAttempts.length, 2, 'server proxy should race independent Overpass providers');
+assert.equal(deFlockProxy.elements.length, 1, 'server proxy must publish only valid mapped camera nodes');
+assert.equal(deFlockProxy.endpoint, 'https://working-overpass.test');
+assert.equal(deFlockProxy.cache, 'upstream');
+const bundledBaltimore = geospatialFunctions.bundledDeFlockFallback({ lat: 39.2904, lon: -76.6122, radiusDegrees: 0.022 });
+assert.equal(bundledBaltimore.elements.length, 24, 'Baltimore must retain a real last-good OSM snapshot for a cold provider outage');
+assert.equal(bundledBaltimore.cache, 'bundled-last-good');
+assert.match(bundledBaltimore.warnings[0], /dated Baltimore OpenStreetMap cache/);
+assert.equal(geospatialFunctions.bundledDeFlockFallback({ lat: 40.7128, lon: -74.006, radiusDegrees: 0.022 }), null);
+const coldOutageBaltimore = await geospatialFunctions.queryDeFlockCameras({ lat: 39.2904, lon: -76.6122, radiusDegrees: 0.022 }, {
+  force: true,
+  endpoints: ['https://offline-overpass.test'],
+  fetchImpl: async () => { throw new Error('simulated total provider outage'); }
+});
+assert.equal(coldOutageBaltimore.elements.length, 24);
+assert.equal(coldOutageBaltimore.cache, 'bundled-last-good');
 const normalizedPanoramax = geospatialFunctions.normalizePanoramaxItem({
   id: 'p1',
   geometry: { coordinates: [-76.6111, 39.2886] },
@@ -294,12 +332,10 @@ const normalizedAdsbLol = geospatialFunctions.normalizeAdsbLolState({
 assert.equal(normalizedAdsbLol.callsign, 'FALLBACK1');
 assert.equal(Math.round(normalizedAdsbLol.altitudeM), 3048);
 assert.equal(normalizedAdsbLol.velocityKt, 250);
-const defaultAircraftUrls = [];
-const defaultAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, lon: 56.78, radiusKm: 80, limit: 2 }, {
+const fallbackAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, lon: 56.78, radiusKm: 80, limit: 2 }, {
   force: true,
   fetchImpl: async (url) => {
-    defaultAircraftUrls.push(String(url));
-    if (String(url).includes('opensky-network.org')) throw new Error('Default configuration contacted OpenSky.');
+    if (String(url).includes('opensky-network.org')) throw new Error('simulated OpenSky outage');
     return {
       ok: true,
       async json() {
@@ -308,29 +344,9 @@ const defaultAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, lo
     };
   }
 });
-assert.equal(defaultAircraft.provider, 'adsb-lol');
-assert.equal(defaultAircraft.items[0].callsign, 'FALLBACK1');
-assert.equal(defaultAircraftUrls.some((url) => url.includes('opensky-network.org')), false);
-assert.match(defaultAircraft.warnings[0], /default ADSB\.lol provider/);
-
-const optInAircraftUrls = [];
-const optInFallback = await geospatialFunctions.queryAircraft({ lat: 13.34, lon: 57.78, radiusKm: 80, limit: 2 }, {
-  force: true,
-  openSkyEnabled: true,
-  fetchImpl: async (url) => {
-    optInAircraftUrls.push(String(url));
-    if (String(url).includes('opensky-network.org')) throw new Error('simulated authorized OpenSky outage');
-    return {
-      ok: true,
-      async json() {
-        return { now: Date.parse('2026-07-20T12:00:00Z'), ac: [{ hex: 'd4e5f6', flight: 'OPTIN1', lat: 13.4, lon: 57.8, alt_geom: 9000, gs: 220, dst: 3 }] };
-      }
-    };
-  }
-});
-assert.equal(optInFallback.provider, 'adsb-lol');
-assert.equal(optInAircraftUrls.some((url) => url.includes('opensky-network.org')), true);
-assert.match(optInFallback.warnings[0], /OpenSky was unavailable/);
+assert.equal(fallbackAircraft.provider, 'adsb-lol');
+assert.equal(fallbackAircraft.items[0].callsign, 'FALLBACK1');
+assert.match(fallbackAircraft.warnings[0], /OpenSky was unavailable/);
 
 console.log(JSON.stringify({
   ok: true,

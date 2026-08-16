@@ -4,10 +4,6 @@ export function createMoonSystems(ctx) {
   ctx.solarSystem.planetMeshes.forEach((entry) => {
     const moonConfig = ctx.PLANET_MOONS[entry.planet.name];
     if (!moonConfig) return;
-    const orbitGroup = new THREE.Group();
-    orbitGroup.name = `${entry.planet.name}MoonSystem`;
-    orbitGroup.position.copy(entry.mesh.position);
-    ctx.solarSystem.group.add(orbitGroup);
 
     moonConfig.forEach((moon, index) => {
       const moonGeo = new THREE.SphereGeometry(moon.radiusScaled, 14, 14);
@@ -18,7 +14,7 @@ export function createMoonSystems(ctx) {
       });
       const moonMesh = new THREE.Mesh(moonGeo, moonMat);
       moonMesh.name = moon.name;
-      orbitGroup.add(moonMesh);
+      entry.mesh.add(moonMesh);
 
       const moonOrbitGeo = new THREE.RingGeometry(moon.orbitRadius - 0.4, moon.orbitRadius + 0.4, 64);
       const moonOrbitMat = new THREE.MeshBasicMaterial({
@@ -29,12 +25,11 @@ export function createMoonSystems(ctx) {
       });
       const moonOrbit = new THREE.Mesh(moonOrbitGeo, moonOrbitMat);
       moonOrbit.rotation.x = -Math.PI / 2;
-      orbitGroup.add(moonOrbit);
+      entry.mesh.add(moonOrbit);
 
       ctx.solarSystem.moonMeshes.push({
         mesh: moonMesh,
         planetMesh: entry.mesh,
-        orbitGroup,
         orbitRadius: moon.orbitRadius,
         orbitDays: moon.orbitDays,
         radiusScaled: moon.radiusScaled,
@@ -303,4 +298,4 @@ export function createNamedAsteroids(ctx) {
     });
   });
 }
-import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';

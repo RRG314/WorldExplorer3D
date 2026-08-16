@@ -1,26 +1,19 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { currentActorWorldPosition } from "./earth-location.js?v=2";
-import { commitEnvironment } from './session-coordinator.js?v=2';
+import { commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
 
 const REUSE_EXISTING_EARTH_WORLD = true;
 
 function markEarthResumePhase(phase, details = {}) {
   const previous = appCtx.earthResumeDiagnostics || {};
-  const now = performance.now();
-  const startedAt = Number(previous.startedAt) || now;
-  const timeline = Array.isArray(previous.timeline) ? previous.timeline.slice(-23) : [];
-  timeline.push({
-    phase,
-    elapsedMs: Math.round((now - startedAt) * 10) / 10
-  });
+  const startedAt = Number(previous.startedAt) || performance.now();
   appCtx.earthResumeDiagnostics = {
     ...previous,
     ...details,
     phase,
     startedAt,
-    updatedAt: now,
-    elapsedMs: now - startedAt,
-    timeline
+    updatedAt: performance.now(),
+    elapsedMs: performance.now() - startedAt
   };
 }
 
@@ -126,9 +119,7 @@ function stampLoadedSelection() {
 }
 
 function canResumeEarthSession() {
-  const state = getEarthSessionState();
   if (!hasLoadedEarthWorld()) return false;
-  if (appCtx.worldDetailState?.buildings?.status === 'loading') return false;
   return appCtx.isLoadedLocationSelectionCurrent?.() === true;
 }
 
@@ -145,10 +136,6 @@ function restorePoseFromSession() {
   const targetMode = pose?.mode === 'walk' ? 'walk' : 'drive';
   const targetAngle = Number(pose?.angle ?? fallbackAngle) || 0;
 
-  markEarthResumePhase('pose_resolve', {
-    poseMode: String(pose?.mode || targetMode),
-    poseTarget: { x: targetX, z: targetZ }
-  });
   const resolved = typeof appCtx.resolveSafeWorldSpawn === 'function' ?
     appCtx.resolveSafeWorldSpawn(targetX, targetZ, {
       mode: targetMode,
@@ -166,16 +153,10 @@ function restorePoseFromSession() {
       onRoad: false,
       road: null
     };
-  markEarthResumePhase('pose_resolved', {
-    resolvedMode: String(resolved?.mode || targetMode),
-    resolvedSource: String(resolved?.source || ''),
-    resolvedValid: resolved?.valid !== false
-  });
 
   if (typeof appCtx.applyResolvedWorldSpawn === 'function') {
     appCtx.applyResolvedWorldSpawn(resolved, { mode: targetMode });
   }
-  markEarthResumePhase('pose_applied');
 
   if (typeof appCtx.setTravelMode === 'function') {
     const resumeMode =
@@ -205,7 +186,6 @@ function restorePoseFromSession() {
       modeOptions.airborne = pose?.planeAirborne === true;
     }
     appCtx.setTravelMode(resumeMode, modeOptions);
-    markEarthResumePhase('pose_mode_applied', { resumeMode });
     if (resumeMode === 'drone' && appCtx.drone) {
       appCtx.drone.x = Number.isFinite(pose?.x) ? pose.x : appCtx.drone.x;
       appCtx.drone.z = Number.isFinite(pose?.z) ? pose.z : appCtx.drone.z;
@@ -217,37 +197,19 @@ function restorePoseFromSession() {
   }
 
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
-  markEarthResumePhase('pose_ready');
   return resolved;
 }
 
 async function finalizeEarthResume(resolved, isCurrent = () => true, options = {}) {
   if (!isCurrent()) return false;
-  markEarthResumePhase('terrain_streaming');
-  const x = Number.isFinite(resolved?.x) ? resolved.x : Number(appCtx.car?.x) || 0;
-  const z = Number.isFinite(resolved?.z) ? resolved.z : Number(appCtx.car?.z) || 0;
-  if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-    appCtx.updateTerrainAround(x, z);
-  }
-  markEarthResumePhase('terrain_streaming_ready');
-  if (options.syncSurface === true) {
-    markEarthResumePhase('surface_sync');
-    appCtx.requestWorldSurfaceSync?.({ force: true, source: 'earth_reload' });
-    markEarthResumePhase('surface_sync_requested');
-  }
-  markEarthResumePhase('world_lod');
-  appCtx.updateWorldLod?.(true);
-  markEarthResumePhase('world_lod_ready');
+  markEarthResumePhase('restore_world_visibility');
+  appCtx.setEarthSceneVisible?.(true);
   if (typeof appCtx.refreshBoatAvailability === 'function') {
     appCtx.refreshBoatAvailability(true);
   }
-  markEarthResumePhase('boat_availability_ready');
-  if (typeof appCtx.setTimeOfDay === 'function') {
-    appCtx.setTimeOfDay(appCtx.skyMode || 'live');
-  } else if (typeof appCtx.refreshAstronomicalSky === 'function') {
+  if (typeof appCtx.refreshAstronomicalSky === 'function') {
     appCtx.refreshAstronomicalSky(true);
   }
-  markEarthResumePhase('sky_ready');
   if (typeof appCtx.refreshLiveWeather === 'function') {
     void appCtx.refreshLiveWeather(true);
   }
@@ -255,11 +217,9 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
     appCtx.updateControlsModeUI();
   }
   appCtx.earthResumeRenderReady = true;
-  appCtx.setEarthSceneVisible?.(true);
   markEarthResumePhase('render_frames');
   await waitForRenderedFrames();
   if (!isCurrent()) return false;
-  appCtx.updateWorldLod?.(true);
   appCtx.lastTime = performance.now();
   stampLoadedSelection();
   markEarthResumePhase('finalized');
@@ -345,11 +305,9 @@ export async function resumeEarthWorldSession(options = {}) {
     }
 
     restoreSelectionFromState();
-    // A reusable Earth scene is already constructed. Yielding here lets the
-    // newly committed Earth runtime run a full frame before its actor, LOD, and
-    // ownership state are restored. Dense cities can turn that cosmetic delay
-    // into a multi-second main-thread stall, so finish the atomic resume in the
-    // current task and let finalizeEarthResume own the first presented frame.
+    if (transitionDurationMs > 0) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, Math.min(transitionDurationMs, 240)));
+    }
     if (!isCurrent()) return { aborted: true, resumed: false };
 
     const resolved = restorePoseFromSession();
@@ -367,7 +325,7 @@ export async function resumeEarthWorldSession(options = {}) {
   }
 }
 
-export const earthDestinationAdapter = Object.freeze({
+registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
   exitSync: () => captureEarthWorldSession(),
   snapshot: () => ({
     active: appCtx.getEnv?.() === appCtx.ENV.EARTH,

@@ -1,6 +1,7 @@
 const functions = require('firebase-functions/v1');
-const admin = require('./firebase-admin-runtime');
+const admin = require('firebase-admin');
 const { defineString } = require('firebase-functions/params');
+const Stripe = require('stripe');
 const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
 const {
   CREATOR_PROFILES_COLLECTION,
@@ -12,6 +13,11 @@ const {
 } = require('./creator-profile');
 const { buildOverlayExports } = require('./overlay');
 const { buildGeospatialExports } = require('./geospatial');
+const {
+  claimImmutableDeFlockState,
+  isMappedCameraTags,
+  normalizeDeFlockSourceId
+} = require('./deflock');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -155,6 +161,27 @@ function normalizeEmail(value) {
 
 function sanitizeText(value, max = 120) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+async function fetchVerifiedOsmCamera(nodeId) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`https://api.openstreetmap.org/api/0.6/node/${encodeURIComponent(nodeId)}.json`, {
+      headers: { 'User-Agent': 'WorldExplorer3D-DeFlock/1.0 (public OSM verification)' },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const node = Array.isArray(payload?.elements) ? payload.elements[0] : null;
+    if (!node || node.type !== 'node' || String(node.id) !== String(nodeId) || !isMappedCameraTags(node.tags || {})) return null;
+    const lat = Number(node.lat);
+    const lon = Number(node.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon, timestamp: sanitizeText(node.timestamp || '', 40) };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function sanitizeMultilineText(value, max = 320) {
@@ -489,7 +516,6 @@ function getStripeClient() {
   if (!cfg.secret) {
     throw new Error('Stripe secret is missing. Set WE3D_STRIPE_SECRET (Firebase param or env).');
   }
-  const Stripe = require('stripe');
   return new Stripe(cfg.secret, { apiVersion: '2024-06-20' });
 }
 
@@ -1499,6 +1525,81 @@ exports.deleteAccount = functions.region('us-central1').https.onRequest(async (r
   } catch (err) {
     console.error('[deleteAccount] failed:', err);
     res.status(500).json({ error: 'Unable to delete account right now.' });
+  }
+});
+
+exports.claimDeFlockVirtualDisable = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const source = normalizeDeFlockSourceId(req.body && req.body.sourceId);
+  if (!roomCode || !source) {
+    res.status(400).json({ error: 'A valid room and OpenStreetMap camera ID are required.' });
+    return;
+  }
+
+  try {
+    const roomRef = db.collection('rooms').doc(roomCode);
+    const roomSnap = await roomRef.get();
+    if (!roomSnap.exists) {
+      res.status(404).json({ error: 'Room not found.' });
+      return;
+    }
+    const room = roomSnap.data() || {};
+    const memberSnap = await roomRef.collection('players').doc(auth.uid).get();
+    if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+      res.status(403).json({ error: 'Join this room before changing shared DeFlock progress.' });
+      return;
+    }
+    if (String(room.world?.kind || 'earth').toLowerCase() !== 'earth') {
+      res.status(409).json({ error: 'DeFlock shared progress is only available in Earth rooms.' });
+      return;
+    }
+
+    const camera = await fetchVerifiedOsmCamera(source.nodeId);
+    if (!camera) {
+      res.status(422).json({ error: 'The requested source is not a currently mapped OSM surveillance camera.' });
+      return;
+    }
+    const roomLat = Number(room.world?.lat);
+    const roomLon = Number(room.world?.lon);
+    const lonScale = Math.max(0.1, Math.cos(roomLat * Math.PI / 180));
+    const distanceDegrees = Math.hypot((camera.lat - roomLat), (camera.lon - roomLon) * lonScale);
+    if (!Number.isFinite(roomLat) || !Number.isFinite(roomLon) || distanceDegrees > 0.0245) {
+      res.status(422).json({ error: 'That mapped camera is outside this room location.' });
+      return;
+    }
+
+    const authUser = await admin.auth().getUser(auth.uid);
+    const cameraRef = roomRef.collection('deflockStates').doc(`osm-node-${source.nodeId}`);
+    const state = {
+      sourceId: source.sourceId,
+      sourceDataset: 'OpenStreetMap',
+      sourceTimestamp: camera.timestamp || '',
+      action: 'virtually_disabled',
+      uid: auth.uid,
+      displayName: sanitizeText(authUser.displayName || authUser.email || 'Explorer', 48) || 'Explorer',
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    const result = await claimImmutableDeFlockState({
+      cameraRef,
+      state,
+      runTransaction: (callback) => db.runTransaction(callback)
+    });
+    res.status(200).json({
+      awarded: result.awarded === true,
+      sourceId: source.sourceId,
+      action: 'virtually_disabled'
+    });
+  } catch (error) {
+    console.error('[claimDeFlockVirtualDisable] failed:', error);
+    res.status(500).json({ error: 'Could not update shared DeFlock progress right now.' });
   }
 });
 

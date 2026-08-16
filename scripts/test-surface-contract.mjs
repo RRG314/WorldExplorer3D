@@ -5,7 +5,7 @@ import {
   createSurfaceQuery,
   createSurfaceSample,
   createSurfaceTileDescriptor,
-  mappedLandcoverOwnership,
+  landusePresentationOwner,
   provenanceFor,
   surfaceComposition
 } from '../app/js/world/surface-contract.js';
@@ -16,6 +16,17 @@ import {
   reconcileWaterBodySurface,
   resolveWaterBodySurfaceY
 } from '../app/js/world/water-body-contract.js';
+import { isWalkFeatureSurfaceReachable } from '../app/js/ground.js';
+import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
+import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
+import {
+  buildFeatureRibbonEdges,
+  roadSkirtDepth,
+  shouldRenderRoadSkirts,
+  sampleFeatureSurfaceY
+} from '../app/js/structure-semantics.js';
+import { createLinearFeatureRuntime } from '../app/js/world/load-linear-runtime.js';
+import { createWorldLoadRequest } from '../app/js/earth-core/world-load-request.js';
 
 const appCtx = {
   METERS_PER_WORLD_UNIT: 2,
@@ -34,7 +45,11 @@ const GroundHeight = {
 
 const query = createSurfaceQuery(appCtx, GroundHeight);
 assert.equal(query.getSourceProfile(), SOURCE_PROFILE.LOCATION_OSM);
-assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 5000, originRebase: false });
+assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 2700, originRebase: false });
+appCtx.worldTraversalRadiusWorld = 1800;
+assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 1800, originRebase: false });
+assert.equal('clampTraversalPoint' in query, false, 'Earth traversal must not publish a hidden finite-radius clamp');
+appCtx.worldTraversalRadiusWorld = null;
 assert.equal(query.terrainAt(1, 2).kind, SURFACE_KIND.TERRAIN);
 assert.equal(query.walkAt(1, 2).kind, SURFACE_KIND.ROAD);
 assert.deepEqual(query.walkAt(1, 2).contact, { x: 1.2, y: 13, z: 2.1 });
@@ -75,7 +90,7 @@ const elevatedLake = normalizeWaterBody({
   shape: 'area',
   pts: [{ x: -200, z: -200 }, { x: 200, z: -200 }, { x: 200, z: 200 }, { x: -200, z: 200 }],
   surfaceY: 1698.08,
-  geometrySource: 'osm-shortbread',
+  geometrySource: 'overture-vector',
   layer: 'water_polygons'
 });
 assert.equal(elevatedLake.waterKind, 'lake');
@@ -111,21 +126,242 @@ const inferred = provenanceFor({ id: 'fallback-1', tags: { _geometrySource: 'inf
 assert.equal(inferred.fallback, true);
 assert.ok(inferred.confidence <= 0.45);
 
-const surfaceOrder = ['residential', 'farmland', 'grass', 'pedestrian', 'transportation']
+const surfaceOrder = ['grass', 'farmland', 'residential', 'pedestrian', 'transportation']
   .map((kind) => surfaceComposition(kind));
 for (let index = 1; index < surfaceOrder.length; index += 1) {
   assert.ok(surfaceOrder[index].layer > surfaceOrder[index - 1].layer);
   assert.ok(surfaceOrder[index].surfaceOffset > surfaceOrder[index - 1].surfaceOffset);
 }
 assert.ok(surfaceComposition('', 'road').layer > surfaceOrder.at(-1).layer);
+assert.equal(landusePresentationOwner('grass'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('farmland'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('residential'), 'terrain_worldcover');
+assert.equal(landusePresentationOwner('parking'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('paved'), 'mapped_geometry');
+assert.equal(landusePresentationOwner('water'), 'mapped_geometry');
 
-const steepBarren = mappedLandcoverOwnership('barren', { span: 4058, relief: 680 });
-assert.equal(steepBarren.semanticOnly, true);
-assert.equal(steepBarren.owner, 'terrain_worldcover');
-assert.ok(steepBarren.grade > 0.16);
-assert.equal(mappedLandcoverOwnership('meadow', { span: 180, relief: 8 }).semanticOnly, false);
-assert.equal(mappedLandcoverOwnership('parking', { span: 900, relief: 140 }).semanticOnly, false);
-assert.equal(mappedLandcoverOwnership('water', { span: 900, relief: 140 }).semanticOnly, false);
+const projectedPointSamples = [];
+const projectedAtGradeFeature = {
+  pts: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+  surfaceDistances: new Float32Array([0, 10]),
+  surfaceHeights: new Float32Array([2, 2]),
+  surfaceOffsets: new Float32Array([0, 0]),
+  surfaceBias: 0.08,
+  structureSemantics: { terrainMode: 'at_grade' },
+  surfaceTerrainSampler: (x, z) => {
+    projectedPointSamples.push({ x, z });
+    return x + z;
+  }
+};
+assert.equal(
+  sampleFeatureSurfaceY(projectedAtGradeFeature, 5, 1, {
+    pt: { x: 5, z: 0 },
+    segIndex: 0,
+    t: 0.5
+  }),
+  5.08
+);
+assert.deepEqual(projectedPointSamples, [{ x: 5, z: 0 }]);
+
+const steepCrossSlopeTerrain = (x, z) => 20 + x * 0.8 + z * 0.01;
+const steepAtGradeRoad = {
+  pts: [{ x: 0, z: 0 }, { x: 0, z: 20 }],
+  surfaceBias: 0.08,
+  structureSemantics: { terrainMode: 'at_grade' }
+};
+const steepEdges = buildFeatureRibbonEdges(
+  steepAtGradeRoad,
+  steepAtGradeRoad.pts,
+  4,
+  steepCrossSlopeTerrain,
+  { surfaceBias: 0.08 }
+);
+for (const point of [...steepEdges.leftEdge, ...steepEdges.rightEdge]) {
+  assert.ok(
+    Number.isFinite(point.y),
+    `at-grade compiled edge unavailable: ${JSON.stringify(point)}`
+  );
+}
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <=
+    steepAtGradeRoad.transportSurfaceModel.cutFillPolicy.maximumCutMeters + 1e-5
+);
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <= 1e-5 &&
+    steepAtGradeRoad.transportSurfaceModel.stats.maximumFill > 0,
+  'at-grade ribbon was not kept above the rendered cross-section'
+);
+assert.equal(
+  shouldRenderRoadSkirts({ structureSemantics: { terrainMode: 'at_grade' } }),
+  false,
+  'ordinary at-grade road unexpectedly gained a retaining skirt'
+);
+assert.equal(
+  shouldRenderRoadSkirts(steepAtGradeRoad),
+  false,
+  'steep ordinary road gained an artificial elevated-slab wall'
+);
+assert.equal(roadSkirtDepth(steepAtGradeRoad), 0);
+
+const hiddenPathContext = {
+  linearFeatures: [],
+  linearFeatureMeshes: [],
+  scene: { add: () => assert.fail('hidden footways must not publish scene meshes') }
+};
+const hiddenPathRuntime = createLinearFeatureRuntime({
+  appCtx: hiddenPathContext,
+  applyBuildingContextSemanticsToFeature: () => {},
+  classifyLinearFeatureTags: () => ({ kind: 'footway', subtype: 'footway' }),
+  classifyStructureSemantics: () => ({ terrainMode: 'at_grade', gradeSeparated: false }),
+  cloneStructureSemantics: (value) => ({ ...value }),
+  decimatePoints: (points) => points,
+  enableLinearFeatures: true,
+  linearFeatureVisualSpec: () => ({
+    width: 1.8,
+    bias: 0.06,
+    color: 0xffffff,
+    emissive: 0,
+    emissiveIntensity: 0,
+    roughness: 1,
+    metalness: 0,
+    opacity: 1
+  }),
+  polylineBounds: () => null,
+  refreshStructureAwareFeatureProfiles: () => {},
+  sanitizeWorldPathPoints: (points) => points,
+  updateFeatureSurfaceProfile: () => {},
+  worldBaseTerrainY: () => 0
+});
+assert.equal(
+  hiddenPathRuntime.addLinearFeatureRecord(
+    [{ x: 0, z: 0 }, { x: 5, z: 0 }],
+    { highway: 'footway' }
+  ),
+  true
+);
+assert.equal(hiddenPathContext.linearFeatures.length, 1);
+assert.equal(hiddenPathContext.linearFeatureMeshes.length, 0);
+
+const atGradeFootway = {
+  structureSemantics: { gradeSeparated: false, terrainMode: 'at_grade' }
+};
+const tunnelFootway = {
+  structureSemantics: { gradeSeparated: true, terrainMode: 'subgrade' }
+};
+const bridgeFootway = {
+  structureSemantics: { gradeSeparated: true, terrainMode: 'elevated' }
+};
+assert.equal(isWalkFeatureSurfaceReachable(atGradeFootway, {
+  terrainY: 50,
+  surfaceY: 47
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(atGradeFootway, {
+  terrainY: 50,
+  surfaceY: 50.2
+}), true);
+assert.equal(isWalkFeatureSurfaceReachable(tunnelFootway, {
+  terrainY: 50,
+  surfaceY: 47
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(tunnelFootway, {
+  currentY: 50,
+  terrainY: 50,
+  surfaceY: 47
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(tunnelFootway, {
+  currentY: 47.1,
+  terrainY: 50,
+  surfaceY: 47
+}), true);
+assert.equal(isWalkFeatureSurfaceReachable(bridgeFootway, {
+  currentY: 50,
+  terrainY: 50,
+  surfaceY: 55
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(bridgeFootway, {
+  currentY: 50.4,
+  terrainY: 50,
+  surfaceY: 50.6
+}), true);
+
+const elevatedBuildingPart = {
+  minY: 56.1,
+  maxY: 59.3,
+  height: 3.2,
+  collisionKind: 'elevated_part',
+  allowsPassageBelow: true
+};
+assert.equal(buildingOccupiesActorHeight(elevatedBuildingPart, 49.1, 1.62), false);
+assert.equal(buildingOccupiesActorHeight(elevatedBuildingPart, 56.2, 1.62), true);
+assert.equal(buildingOccupiesActorHeight({ baseY: 48.8, height: 8 }, 49.1, 1.62), true);
+assert.equal(buildingOccupiesActorHeight({ height: 8 }, 49.1, 1.62), true);
+
+const loadCommitEvents = [];
+const loadRuntimeState = {
+  status: 'loading',
+  activePhases: ['terrain'],
+  geometryReady: true
+};
+const loadCommitRequest = createWorldLoadRequest({
+  key: 'contract-city',
+  name: 'Contract City',
+  lat: 39.29,
+  lon: -76.61
+}, 1);
+const loadCommitWorldSession = {
+  request: loadCommitRequest,
+  isActive: () => true,
+  publish: () => {},
+  snapshot: () => ({ status: 'published', requestId: loadCommitRequest.id })
+};
+const loadCommitContext = {
+  SCALE: 100000,
+  worldLoading: true,
+  roads: [],
+  buildingMeshes: [],
+  buildings: [],
+  poiMeshes: [],
+  landuseMeshes: [],
+  linearFeatures: [],
+  linearFeatureMeshes: [],
+  publishEarthWorldSceneLoad: () => {
+    assert.equal(loadCommitContext.worldLoading, false);
+    loadCommitEvents.push('publish-scene');
+  },
+  enforceEnvironmentSceneOwnership: () => loadCommitEvents.push('ownership'),
+  setPerfLiveStat: () => {},
+  reconcileActorsAfterSurfaceRebuild: () => {
+    assert.equal(loadCommitContext.worldLoading, true);
+    loadCommitEvents.push('reconcile');
+  },
+  hideLoad: () => {
+    assert.equal(loadCommitContext.worldLoading, false);
+    loadCommitEvents.push('hide');
+  }
+};
+finishWorldLoadRuntimeSession({
+  appCtx: loadCommitContext,
+  finalizePerfLoad: () => loadCommitEvents.push('metrics'),
+  loadMetrics: {
+    activeRadiusDeg: 0.01,
+    lod: { near: 0, mid: 0 },
+    roads: { vertices: 0 },
+    colliders: { full: 0, simplified: 0 }
+  },
+  phaseTotals: {},
+  runtimeState: loadRuntimeState,
+  worldSession: loadCommitWorldSession,
+  loaded: true
+});
+assert.deepEqual(
+  loadCommitEvents.slice(0, 4),
+  ['reconcile', 'publish-scene', 'ownership', 'hide'],
+  'World geometry must reconcile while hidden, then publish once before the loading cover is removed'
+);
+assert.equal(loadCommitContext.worldLoading, false);
+assert.equal(loadCommitContext.initialEarthWorldReady, true);
+assert.equal(loadRuntimeState.status, 'ready');
+assert.equal(loadRuntimeState.activePhases.length, 0);
 
 console.log(JSON.stringify({
   ok: true,
@@ -133,5 +369,10 @@ console.log(JSON.stringify({
   kinds: Object.values(SURFACE_KIND),
   tileKey: tile.key,
   verticalDatum: sample.vertical.id,
-  surfaceLayers: surfaceOrder.map((entry) => entry.layer)
+  surfaceLayers: surfaceOrder.map((entry) => entry.layer),
+  gradeSeparatedWalkAttachment: 'vertical-and-transition-aware',
+  buildingEntryAttachment: 'vertical-occupancy-aware',
+  atGradeRoadClearance: 'rendered-cross-section-clearance-with-bounded-grade',
+  mappedFootwayPresentation: 'navigation-data-only',
+  worldLoadCommit: 'reconcile-before-reveal'
 }, null, 2));

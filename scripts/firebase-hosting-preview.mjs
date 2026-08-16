@@ -9,35 +9,29 @@ import {
 
 const cwd = process.cwd();
 const argv = process.argv.slice(2);
-const releaseCandidate = argv.includes('--release-candidate');
 const channelId = firstPositional(argv) || process.env.FIREBASE_PREVIEW_CHANNEL_ID || '';
-const projectId = parseFlag(
-  argv,
-  '--project',
-  process.env.FIREBASE_PROJECT_ID || (releaseCandidate ? 'worldexplorer3d-d9b83' : 'we3d-staging-20260712')
-);
+const projectId = parseFlag(argv, '--project', process.env.FIREBASE_PROJECT_ID || 'we3d-staging-20260712');
 const expires = parseFlag(argv, '--expires', process.env.FIREBASE_PREVIEW_EXPIRES || '7d');
-const configEnv = parseFlag(
-  argv,
-  '--config-env',
-  process.env.WE3D_FIREBASE_ENV || (releaseCandidate || projectId === 'worldexplorer3d-d9b83' ? 'production' : 'staging')
-);
+const configEnv = parseFlag(argv, '--config-env', process.env.WE3D_FIREBASE_ENV || (projectId === 'worldexplorer3d-d9b83' ? 'production' : 'staging'));
 const skipChecks = argv.includes('--skip-checks');
+const useExistingArtifact = argv.includes('--use-existing-artifact');
 
 if (!channelId) {
-  console.error('Usage: npm run preview:deploy -- <channel-id> [--release-candidate] [--expires 7d] [--project PROJECT_ID] [--config-env staging|production] [--skip-checks]');
+  console.error(
+    'Usage: npm run preview:deploy -- <channel-id> [--expires 7d] ' +
+    '[--project PROJECT_ID] [--config-env production|staging] ' +
+    '[--use-existing-artifact] [--skip-checks]'
+  );
   process.exit(1);
 }
 
 try {
-  if (releaseCandidate) {
-    if (projectId !== 'worldexplorer3d-d9b83' || configEnv !== 'production') {
-      throw new Error('Release candidates must use the production Firebase project and production configuration.');
-    }
-    if (skipChecks) throw new Error('Release candidates cannot skip artifact verification.');
+  if (!useExistingArtifact) {
+    console.log(`[preview:deploy] Building immutable hosting artifact for Firebase environment "${configEnv}"`);
+    runNodeScript('scripts/hosting-artifact.mjs', ['build', '--firebase-env', configEnv], cwd);
+  } else {
+    console.log('[preview:deploy] Reusing the existing immutable hosting artifact without rebuilding');
   }
-  console.log(`[preview:deploy] Building immutable hosting artifact for Firebase environment "${configEnv}"`);
-  runNodeScript('scripts/hosting-artifact.mjs', ['build', '--firebase-env', configEnv], cwd);
 
   if (!skipChecks) {
     console.log('[preview:deploy] Verifying hosting artifact identity and source parity');

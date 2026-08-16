@@ -1,13 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getOverlayPreset } from "../editor/preset-registry.js?v=1";
 import { geometryPolygonRings } from "../editor/schema.js?v=1";
-import { loadTile } from "./tiles.js?v=2";
-
-const roadDrawStats = {
-  candidates: 0,
-  rendered: 0,
-  projectedPoints: 0
-};
+import { loadTile } from "./tiles.js?v=4";
 
 function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
   const {
@@ -45,7 +39,7 @@ function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
 
   drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
-  drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my, view);
+  drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawInteriorLayer(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawContributionOverlayLayer(ctx, w, h, isLarge, latLonToScreen, mx, my);
 }
@@ -161,39 +155,11 @@ function drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
   ctx.restore();
 }
 
-function drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my, view) {
+function drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
   if (!(appCtx.showRoads && appCtx.roads.length > 0)) return;
-  roadDrawStats.candidates = appCtx.roads.length;
-  roadDrawStats.rendered = 0;
-  roadDrawStats.projectedPoints = 0;
-  const latitudeRadians = Number(appCtx.LOC?.lat || 0) * Math.PI / 180;
-  const worldUnitsPerPixel = (
-    Number(appCtx.SCALE || 100000) *
-    (360 / Math.pow(2, Number(view?.zoom || 15))) *
-    Math.max(0.15, Math.cos(latitudeRadians))
-  ) / 256;
-  const viewRadius = Math.hypot(w, h) * 0.62 * worldUnitsPerPixel + 120;
-  const refX = Number(view?.ref?.x || 0);
-  const refZ = Number(view?.ref?.z || 0);
-  const minViewX = refX - viewRadius;
-  const maxViewX = refX + viewRadius;
-  const minViewZ = refZ - viewRadius;
-  const maxViewZ = refZ + viewRadius;
 
   appCtx.roads.forEach((road) => {
     if (!road.pts || road.pts.length < 2) return;
-    const bounds = road.bounds;
-    if (
-      bounds &&
-      (
-        bounds.maxX < minViewX ||
-        bounds.minX > maxViewX ||
-        bounds.maxZ < minViewZ ||
-        bounds.minZ > maxViewZ
-      )
-    ) return;
-    roadDrawStats.rendered += 1;
-    roadDrawStats.projectedPoints += road.pts.length;
 
     let roadColor;
     let roadWidth;
@@ -246,7 +212,6 @@ function drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my, view) {
     ctx.stroke();
     ctx.globalAlpha = 1.0;
   });
-  appCtx.lastMapRoadDrawStats = roadDrawStats;
 }
 
 function drawInteriorLayer(ctx, w, h, isLarge, worldToScreen, mx, my) {

@@ -2,11 +2,39 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=22";
-import { createSurfaceQuery } from './world/surface-contract.js?v=9';
+} from "./structure-semantics.js?v=48";
+import { createSurfaceQuery } from './world/surface-contract.js?v=15';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
+
+function isWalkFeatureSurfaceReachable(feature, options = {}) {
+  const semantics = feature?.structureSemantics || null;
+  const surfaceY = Number(options.surfaceY);
+  const terrainY = Number(options.terrainY);
+  const currentY = Number(options.currentY);
+  if (!Number.isFinite(surfaceY) || !Number.isFinite(terrainY)) return false;
+
+  // An at-grade feature is only valid when its published surface is actually
+  // connected to terrain. Metadata alone cannot authorize a large vertical
+  // jump; stale or pre-terrain feature heights must fall back to terrain.
+  if (!semantics?.gradeSeparated) {
+    return Math.abs(surfaceY - terrainY) <= 1.25;
+  }
+
+  // A new walk session starts on the rendered terrain unless a structure
+  // surface is already at a physical portal/transition. This prevents a
+  // laterally-near tunnel or bridge from capturing an actor on another level.
+  if (!Number.isFinite(currentY)) {
+    return Math.abs(surfaceY - terrainY) <= 0.85;
+  }
+
+  const verticalDelta = Math.abs(surfaceY - currentY);
+  if (verticalDelta <= 1.25) return true;
+
+  const atTerrainTransition = Math.abs(surfaceY - terrainY) <= 0.85;
+  return atTerrainTransition && verticalDelta <= 1.8;
+}
 
 const GroundHeight = {
   // Road surface sits this far above raw terrain (prevents z-fighting)
@@ -25,6 +53,7 @@ const GroundHeight = {
   _roadRayStart: null,
   _roadRayDir: null,
   _walkFeatureCache: null,
+  _walkRoadCache: null,
   _roadSurfaceMeshes: null,
   _roadSurfaceMeshSource: null,
   _roadSurfaceMeshCount: 0,
@@ -115,18 +144,29 @@ const GroundHeight = {
   },
 
   // Exact road mesh sample from rendered road geometry. Falls back to null if unavailable.
-  roadMeshY(x, z, currentY = NaN) {
+  roadMeshY(x, z, currentY = NaN, nearestRoadHint = null) {
     const roadSurfaceMeshes = this._getRoadSurfaceMeshes();
     const currentRoad = appCtx.car?.road || null;
-    const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+    const nearestRoad = nearestRoadHint || (typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
       y: Number.isFinite(currentY) ? currentY : NaN,
       maxVerticalDelta: 16,
       preferredRoad: currentRoad
-    }) : null;
+    }) : null);
     const roadReachable = isRoadSurfaceReachable(nearestRoad, {
       currentRoad,
       extraVerticalAllowance: 0.5
     });
+
+    if (roadReachable && Number.isFinite(currentY)) {
+      const localStartY = currentY + 5.5;
+      const localMeshY = this._raycastMeshY(roadSurfaceMeshes, x, z, localStartY, 26);
+      if (Number.isFinite(localMeshY)) {
+        const profileY = Number(nearestRoad?.y);
+        if (this._shouldUseRoadMeshHeight(nearestRoad?.road, localMeshY, profileY)) {
+          return this._resolveRoadSurfaceY(nearestRoad?.road, localMeshY, profileY);
+        }
+      }
+    }
 
     if (roadReachable && Number.isFinite(nearestRoad?.y)) {
       return nearestRoad.y;
@@ -216,7 +256,8 @@ const GroundHeight = {
 
     const nearest = appCtx.findNearestTraversalFeature(x, z, {
       mode: 'walk',
-      maxDistance: 16
+      maxDistance: 16,
+      excludeRoads: true
     });
     const feature = nearest?.feature || null;
     const kind = String(feature?.kind || feature?.networkKind || '').toLowerCase();
@@ -229,7 +270,34 @@ const GroundHeight = {
     return nearest;
   },
 
-  walkSurfaceInfo(x, z, currentY = NaN) {
+  _nearestWalkRoad(x, z, currentY = NaN) {
+    const cachedRoad = this._walkRoadCache?.road || null;
+    if (cachedRoad) {
+      const projection = this._projectPointToFeature(cachedRoad, x, z);
+      const reuseRadius = Math.max(5, (Number(cachedRoad.width) || 7) * 0.5 + 2.5);
+      if (projection && projection.dist <= reuseRadius) {
+        return {
+          road: cachedRoad,
+          dist: projection.dist,
+          pt: projection.pt,
+          segIndex: projection.segIndex,
+          t: projection.t,
+          y: sampleFeatureSurfaceY(cachedRoad, projection.pt.x, projection.pt.z, projection),
+          verticalDelta: Number.isFinite(currentY)
+            ? Math.abs(sampleFeatureSurfaceY(cachedRoad, projection.pt.x, projection.pt.z, projection) - currentY)
+            : 0
+        };
+      }
+    }
+    const nearest = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+      y: Number.isFinite(currentY) ? currentY : NaN,
+      maxVerticalDelta: 14
+    }) : null;
+    this._walkRoadCache = nearest?.road ? { road: nearest.road } : null;
+    return nearest;
+  },
+
+  walkSurfaceInfo(x, z, currentY = NaN, options = {}) {
     const interiorSurface = typeof appCtx.sampleInteriorWalkSurface === 'function' ?
       appCtx.sampleInteriorWalkSurface(x, z) :
       null;
@@ -244,10 +312,7 @@ const GroundHeight = {
     }
 
     const terrainY = this.terrainY(x, z);
-    const nr = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
-      y: Number.isFinite(currentY) ? currentY : NaN,
-      maxVerticalDelta: 14
-    }) : null;
+    const nr = this._nearestWalkRoad(x, z, currentY);
     const roadOnSurface = isRoadSurfaceReachable(nr, {
       currentRoad: appCtx.car?.road || null,
       extraLateralPadding: -0.1
@@ -261,6 +326,13 @@ const GroundHeight = {
     );
     const preferLinear = !!(
       onLinear &&
+      isWalkFeatureSurfaceReachable(linear?.feature, {
+        currentY,
+        terrainY,
+        surfaceY: Number.isFinite(linear?.pt?.x) && Number.isFinite(linear?.pt?.z)
+          ? sampleFeatureSurfaceY(linear.feature, linear.pt.x, linear.pt.z, linear)
+          : NaN
+      }) &&
       (!roadOnSurface || linear.dist <= (Number.isFinite(nr?.dist) ? nr.dist + 0.15 : Infinity))
     );
 
@@ -273,7 +345,7 @@ const GroundHeight = {
         Number.isFinite(feature?.bias) ?
           feature.bias :
           0.05;
-      const sampledY = sampleFeatureSurfaceY(feature, sampleX, sampleZ);
+      const sampledY = sampleFeatureSurfaceY(feature, sampleX, sampleZ, linear);
       const meshY = Number.isFinite(sampledY) ? sampledY : this.linearFeatureMeshY(sampleX, sampleZ);
       const baseY = this.terrainY(sampleX, sampleZ);
       return {
@@ -288,7 +360,14 @@ const GroundHeight = {
     if (roadOnSurface) {
       const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
       const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;
-      const roadY = Number.isFinite(nr?.y) ? nr.y : this.roadMeshY(sampleX, sampleZ, currentY);
+      const meshY = options.sampleRenderedMesh === false
+        ? Number(nr?.y)
+        : this.roadMeshY(sampleX, sampleZ, currentY, nr);
+      const roadY =
+        this._shouldUseRoadMeshHeight(nr?.road, meshY, nr?.y) ?
+          this._resolveRoadSurfaceY(nr?.road, meshY, nr?.y) :
+        Number.isFinite(nr?.y) ? nr.y :
+          meshY;
       return {
         y: Number.isFinite(roadY) ? roadY : this.roadSurfaceY(sampleX, sampleZ) + 0.05,
         source: 'road',
@@ -298,6 +377,9 @@ const GroundHeight = {
       };
     }
 
+    // Developed fill is below mapped pedestrian/transportation surfaces in
+    // the composition contract. Raycast it only after those authoritative
+    // candidates have been rejected.
     const urbanSurfaceY = this.urbanSurfaceMeshY(x, z);
     if (Number.isFinite(urbanSurfaceY) && urbanSurfaceY > terrainY + 0.12) {
       return {
@@ -323,22 +405,44 @@ const GroundHeight = {
   },
 
   // Ground used for driving, including the selected feature and provenance input.
-  driveSurfaceInfo(x, z, preferRoad = true, currentY = NaN) {
+  driveSurfaceInfo(x, z, preferRoad = true, currentY = NaN, options = {}) {
     const terrainY = this.terrainY(x, z);
     let nearestRoad = null;
     if (preferRoad) {
-      nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
-        y: Number.isFinite(currentY) ? currentY : NaN,
-        maxVerticalDelta: 18,
-        preferredRoad: appCtx.car?.road || null
-      }) : null;
+      if (options.nearestRoad) {
+        nearestRoad = options.nearestRoad;
+      } else if (options.preferredRoadOnly && appCtx.car?.road) {
+        const road = appCtx.car.road;
+        const projection = this._projectPointToFeature(road, x, z);
+        const reuseRadius = Math.max(5, (Number(road.width) || 7) * 0.5 + 2.5);
+        if (projection && projection.dist <= reuseRadius) {
+          const profileY = sampleFeatureSurfaceY(road, projection.pt.x, projection.pt.z, projection);
+          nearestRoad = {
+            road,
+            dist: projection.dist,
+            pt: projection.pt,
+            segIndex: projection.segIndex,
+            t: projection.t,
+            y: profileY,
+            verticalDelta: Number.isFinite(currentY) ? Math.abs(profileY - currentY) : 0
+          };
+        }
+      } else {
+        nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+          y: Number.isFinite(currentY) ? currentY : NaN,
+          maxVerticalDelta: 18,
+          preferredRoad: appCtx.car?.road || null
+        }) : null;
+      }
       if (isRoadSurfaceReachable(nearestRoad, {
         currentRoad: appCtx.car?.road || null,
         extraVerticalAllowance: 0.5
       })) {
         const sampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
         const sampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
-        const meshY = this.roadMeshY(sampleX, sampleZ, currentY);
+        const meshY = options.sampleRenderedMesh === false
+          ? Number(nearestRoad?.y)
+          : this.roadMeshY(sampleX, sampleZ, currentY, nearestRoad);
         if (this._shouldUseRoadMeshHeight(nearestRoad?.road, meshY, nearestRoad?.y)) {
           return {
             y: this._resolveRoadSurfaceY(nearestRoad?.road, meshY, nearestRoad?.y),
@@ -449,6 +553,7 @@ const GroundHeight = {
   // -------------------------------------------------------------------------
   invalidate() {
     this._walkFeatureCache = null;
+    this._walkRoadCache = null;
     this._roadSurfaceMeshes = null;
     this._roadSurfaceMeshSource = null;
     this._roadSurfaceMeshCount = 0;
@@ -457,4 +562,4 @@ const GroundHeight = {
 const SurfaceQuery = createSurfaceQuery(appCtx, GroundHeight);
 Object.assign(appCtx, { GroundHeight, SurfaceQuery });
 
-export { GroundHeight, SurfaceQuery };
+export { GroundHeight, SurfaceQuery, isWalkFeatureSurfaceReachable };

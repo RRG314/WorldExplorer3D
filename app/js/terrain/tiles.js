@@ -1,15 +1,34 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
+  decodeTerrariumRGB,
+  latLonToTileXY,
+  tileXYToLatLonBounds
+} from './tile-coordinates.js?v=1';
+import {
+  clearTerrainMeshes,
+  disposeTerrainMesh,
+  ensureTerrainGroup,
+  getTerrainMeshKey,
+  terrainTileMeshKey
+} from './mesh-lifecycle.js?v=1';
+import {
+  adaptTerrariumTileSample
+} from "./provider-adapter.js?v=2";
+import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
-  releaseTerrainTextureSets,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=35";
+} from "./surface-profiles.js?v=49";
+import { stitchTerrainMeshEdges } from "./seams.js?v=1";
+import {
+  cancelTerrainTileRequest as cancelTileRequest,
+  waitForTerrainTileRequest
+} from './tile-request-lifecycle.js?v=1';
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
-const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 6000;
+const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
 const terrainTileLifetime = { failures: 0, retries: 0, recovered: 0 };
 const recentTerrainFailures = new Map();
 const TERRAIN_FAILURE_HISTORY_MS = 30000;
@@ -104,13 +123,18 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
       if (appCtx.terrainGroup && typeof deps.reapplyTerrainMeshHeights === "function") {
         appCtx.terrainGroup.children.forEach((mesh) => {
           const tileInfo = mesh.userData?.terrainTile;
-          if (tileInfo && tileInfo.z === z && tileInfo.tx === x && tileInfo.ty === y) {
+          const suppliesSharedEdge = tileInfo && tileInfo.z === z && (
+            (tileInfo.tx === x && tileInfo.ty === y) ||
+            (tileInfo.tx + 1 === x && tileInfo.ty === y) ||
+            (tileInfo.tx === x && tileInfo.ty + 1 === y) ||
+            (tileInfo.tx + 1 === x && tileInfo.ty + 1 === y)
+          );
+          if (suppliesSharedEdge) {
             deps.reapplyTerrainMeshHeights(mesh);
           }
         });
       }
 
-      deps.scheduleRoadAndBuildingRebuild?.();
       resolveReady(true);
     } catch (error) {
       console.warn("Terrain tile decode failed:", z, x, y, error);
@@ -120,28 +144,6 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
   img.onerror = () => failTerrainTileAttempt(tile, "terrain tile image request failed");
   img.src = appCtx.TERRAIN_TILE_URL(z, x, y);
   return tile;
-}
-
-export function latLonToTileXY(lat, lon, z) {
-  const n = Math.pow(2, z);
-  const xt = (lon + 180) / 360 * n;
-  const yt = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
-  return { x: Math.floor(xt), y: Math.floor(yt), xf: xt, yf: yt };
-}
-
-export function tileXYToLatLonBounds(x, y, z) {
-  const n = Math.pow(2, z);
-  const lonW = x / n * 360 - 180;
-  const lonE = (x + 1) / n * 360 - 180;
-
-  const latN = 180 / Math.PI * Math.atan(Math.sinh(Math.PI * (1 - 2 * (y / n))));
-  const latS = 180 / Math.PI * Math.atan(Math.sinh(Math.PI * (1 - 2 * ((y + 1) / n))));
-
-  return { latN, latS, lonW, lonE };
-}
-
-export function decodeTerrariumRGB(r, g, b) {
-  return r * 256 + g + b / 256 - 32768;
 }
 
 export function getOrLoadTerrainTile(z, x, y, deps = {}) {
@@ -201,6 +203,11 @@ export function getOrLoadTerrainTile(z, x, y, deps = {}) {
     return tile;
   }
   return startTerrainTileAttempt(tile, z, x, y, deps);
+}
+
+export function peekTerrainTile(z, x, y) {
+  if (![z, x, y].every(Number.isFinite)) return null;
+  return appCtx.terrainTileCache.get(`${z}/${x}/${y}`) || null;
 }
 
 export function terrainTileCacheSnapshot() {
@@ -264,35 +271,19 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   return terrainTileCacheSnapshot();
 }
 
-async function waitForTerrainTileReady(z, x, y, deadline, deps) {
-  while (terrainNow() < deadline) {
-    const tile = getOrLoadTerrainTile(z, x, y, deps);
-    if (tile.loaded) return true;
-    if (tile.failed) {
-      if (tile.attempts >= TERRAIN_TILE_MAX_ATTEMPTS) return false;
-      const delay = Math.min(Math.max(0, tile.nextRetryAt - terrainNow()), deadline - terrainNow());
-      if (delay > 0) await new Promise((resolve) => globalThis.setTimeout(resolve, delay));
-      continue;
-    }
-    if (!(tile.ready instanceof Promise)) return false;
-    const remaining = Math.max(0, deadline - terrainNow());
-    const attemptTimeout = Math.min(TERRAIN_TILE_ATTEMPT_TIMEOUT_MS, remaining);
-    const timedOut = Symbol("terrain-timeout");
-    const result = await Promise.race([
-      tile.ready,
-      new Promise((resolve) => globalThis.setTimeout(() => resolve(timedOut), attemptTimeout))
-    ]);
-    if (result === true) return true;
-    if (result === timedOut) {
-      if (tile.img) {
-        tile.img.onload = null;
-        tile.img.onerror = null;
-        tile.img.src = "";
-      }
-      failTerrainTileAttempt(tile, `terrain tile request timed out after ${Math.round(attemptTimeout)}ms`);
-    }
-  }
-  return false;
+function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
+  return waitForTerrainTileRequest({
+    z, x, y, deadline, deps, signal: options.signal,
+    getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
+    cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
+    maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
+    attemptTimeoutMs: TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
+  });
+}
+
+export async function waitForTerrainTileReadyAtZoom(z, x, y, timeoutMs = 6000, deps = {}, options = {}) {
+  const timeout = Math.max(0, Number(timeoutMs) || 0);
+  return waitForTerrainTileReady(z, x, y, terrainNow() + timeout, deps, options);
 }
 
 export async function waitForTerrainReadyAt(x, z, timeoutMs = 3000, deps = {}) {
@@ -342,7 +333,7 @@ export async function waitForTerrainReadyBounds(bounds, timeoutMs = 6000, deps =
 }
 
 export function sampleTileElevationMeters(tile, u, v, clampElevationMeters = null) {
-  if (!tile || !tile.loaded || !tile.elev) return 0;
+  if (!tile || !tile.loaded || !tile.elev) return null;
 
   const w = 256;
   const h = 256;
@@ -374,6 +365,7 @@ export function sampleTileElevationMeters(tile, u, v, clampElevationMeters = nul
 }
 
 export function worldToLatLon(x, z) {
+  if (typeof appCtx.worldToGeo === 'function') return appCtx.worldToGeo(x, z);
   const lat = appCtx.LOC.lat - z / appCtx.SCALE;
   const lon = appCtx.LOC.lon + x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
   return { lat, lon };
@@ -382,63 +374,71 @@ export function worldToLatLon(x, z) {
 export function elevationMetersAtLatLon(lat, lon, deps = {}) {
   const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
   const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y, deps);
-  if (!tile.loaded) return 0;
+  if (!tile.loaded) return null;
 
   const u = t.xf - t.x;
   const v = t.yf - t.y;
   return sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
 }
 
+export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
+  const preflight = adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile: null
+  });
+  if (preflight.status === "outside-coverage") return preflight;
+  const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
+  const tile = getOrLoadTerrainTile(
+    appCtx.TERRAIN_ZOOM,
+    tilePoint.x,
+    tilePoint.y,
+    deps
+  );
+  return adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile,
+    clampElevationMeters: deps.clampElevationMeters
+  });
+}
+
+export function peekTerrainSourceSampleAtLatLon(lat, lon, deps = {}) {
+  const preflight = adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile: null
+  });
+  if (preflight.status === "outside-coverage") return preflight;
+  const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
+  return adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile: peekTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y),
+    clampElevationMeters: deps.clampElevationMeters
+  });
+}
+
+export function terrainSourceSampleAtWorldXZ(x, z, deps = {}) {
+  const { lat, lon } = worldToLatLon(x, z);
+  return terrainSourceSampleAtLatLon(lat, lon, deps);
+}
+
+export function peekTerrainSourceSampleAtWorldXZ(x, z, deps = {}) {
+  const { lat, lon } = worldToLatLon(x, z);
+  return peekTerrainSourceSampleAtLatLon(lat, lon, deps);
+}
+
 export function elevationWorldYAtWorldXZ(x, z, deps = {}) {
   const { lat, lon } = worldToLatLon(x, z);
   const meters = elevationMetersAtLatLon(lat, lon, deps);
-  return meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
-}
-
-export function ensureTerrainGroup() {
-  if (!appCtx.terrainGroup) {
-    appCtx.terrainGroup = new THREE.Group();
-    appCtx.terrainGroup.name = "TerrainGroup";
-    appCtx.scene.add(appCtx.terrainGroup);
-  }
-}
-
-export function terrainTileMeshKey(z, tx, ty) {
-  return `${z}/${tx}/${ty}`;
-}
-
-export function getTerrainMeshKey(mesh) {
-  const info = mesh?.userData?.terrainTile;
-  if (!info) return "";
-  return terrainTileMeshKey(info.z, info.tx, info.ty);
-}
-
-export function disposeTerrainMesh(mesh) {
-  if (!mesh) return;
-  if (mesh.userData) mesh.userData.terrainDisposed = true;
-  mesh?.userData?.worldCoverAbortController?.abort?.();
-  const ownedTextures = new Set();
-  const registerTexture = (texture) => {
-    if (texture && typeof texture.dispose === "function") ownedTextures.add(texture);
-  };
-  registerTexture(mesh?.userData?.worldCoverTexture);
-  registerTexture(mesh?.userData?.worldCoverResult?.texture);
-  ownedTextures.forEach((texture) => texture.dispose());
-  releaseTerrainTextureSets(mesh);
-  if (mesh.userData) {
-    mesh.userData.worldCoverTexture = null;
-    mesh.userData.worldCoverResult = null;
-  }
-  if (mesh.geometry) mesh.geometry.dispose();
-  if (mesh.material) mesh.material.dispose();
-}
-
-export function clearTerrainMeshes() {
-  if (!appCtx.terrainGroup) return;
-  while (appCtx.terrainGroup.children.length) {
-    const mesh = appCtx.terrainGroup.children.pop();
-    disposeTerrainMesh(mesh);
-  }
+  return Number.isFinite(meters)
+    ? meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION
+    : null;
 }
 
 export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
@@ -462,7 +462,9 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
     color: typeof appCtx.grassDiffuse !== "undefined" && appCtx.grassDiffuse ? 0xffffff : TERRAIN_GRASS_COLOR_HEX,
     roughness: 0.95,
     metalness: 0.0,
-    side: THREE.DoubleSide,
+    // Only the physical top face is visible. Rendering the underside places
+    // terrain over the ceiling from inside a subgrade transport structure.
+    side: THREE.FrontSide,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
@@ -475,131 +477,173 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.position.set(cx, 0, cz);
   mesh.receiveShadow = true;
   mesh.castShadow = false;
-  mesh.frustumCulled = true;
+  mesh.frustumCulled = false;
   mesh.userData = { terrainTile: { z, tx, ty, bounds } };
   mesh.userData.terrainTileKey = terrainTileMeshKey(z, tx, ty);
   mesh.userData.isTerrainMesh = true;
   mesh.userData.terrainTextureRepeats = repeats;
   mesh.userData.renderProvenance = {
     version: 1,
-    profile: 'location_osm',
-    provider: 'AWS Open Data / ESA / mapped vector provider',
-    dataset: 'Mapzen Terrarium elevation + semantic surface classification',
+    profile: 'accepted-ground-pending',
+    provider: null,
+    dataset: 'accepted-ground-artifact-pending',
     release: '',
     tileKey: mesh.userData.terrainTileKey,
     layer: 'terrain',
     role: 'terrain',
-    sources: ['mapzen-terrarium', 'esa-worldcover'],
+    sources: [],
     fallback: false
   };
-
-  applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds), repeats);
 
   if (typeof deps.applyHeightsToTerrainMesh === "function") {
     deps.applyHeightsToTerrainMesh(mesh);
   }
-
   return mesh;
 }
 
-function computeHeightfieldNormals(geometry, segments = appCtx.TERRAIN_SEGMENTS) {
-  const positions = geometry?.attributes?.position;
-  const side = Math.max(2, Math.round(Number(segments) || 0) + 1);
-  if (!positions || positions.count !== side * side) {
-    geometry?.computeVertexNormals?.();
-    return;
-  }
-
-  let normals = geometry.attributes.normal;
-  if (!normals || normals.count !== positions.count) {
-    normals = new THREE.BufferAttribute(new Float32Array(positions.count * 3), 3);
-    geometry.setAttribute('normal', normals);
-  }
-  const sample = (row, column, axis) => {
-    const index = Math.max(0, Math.min(side - 1, row)) * side + Math.max(0, Math.min(side - 1, column));
-    return axis === 'x' ? positions.getX(index) : axis === 'y' ? positions.getY(index) : positions.getZ(index);
-  };
-
-  for (let row = 0; row < side; row += 1) {
-    for (let column = 0; column < side; column += 1) {
-      const left = Math.max(0, column - 1);
-      const right = Math.min(side - 1, column + 1);
-      const north = Math.max(0, row - 1);
-      const south = Math.min(side - 1, row + 1);
-      const dx = sample(row, right, 'x') - sample(row, left, 'x') || 1;
-      const dz = sample(south, column, 'z') - sample(north, column, 'z') || 1;
-      const slopeX = (sample(row, right, 'y') - sample(row, left, 'y')) / dx;
-      const slopeZ = (sample(south, column, 'y') - sample(north, column, 'y')) / dz;
-      const length = Math.hypot(slopeX, 1, slopeZ) || 1;
-      normals.setXYZ(row * side + column, -slopeX / length, 1 / length, -slopeZ / length);
-    }
-  }
-  normals.needsUpdate = true;
-}
-
-export function applyFlatFallbackToTerrainMesh(mesh) {
-  if (!mesh || !mesh.geometry || !mesh.geometry.attributes?.position) return;
-  const pos = mesh.geometry.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    pos.setY(i, 0);
-  }
-  pos.needsUpdate = true;
-  computeHeightfieldNormals(mesh.geometry);
-  mesh.position.y = 0;
-  mesh.visible = true;
-  const bounds = mesh.userData?.terrainTile?.bounds || null;
-  applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds));
-}
-
-export function applyHeightsToTerrainMesh(mesh, deps = {}) {
+export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   const info = mesh.userData?.terrainTile;
   if (!info) return;
 
   const { z, tx, ty, bounds } = info;
-  const tile = getOrLoadTerrainTile(z, tx, ty, deps);
-  if (!tile.loaded) {
+  const usesAcceptedGround = typeof deps.usesAcceptedGround === 'function'
+    ? deps.usesAcceptedGround()
+    : deps.usesAcceptedGround !== false;
+  const acceptedSampler =
+    usesAcceptedGround && typeof deps.sampleAcceptedGroundAtLatLon === 'function'
+      ? deps.sampleAcceptedGroundAtLatLon
+      : null;
+  const tile = acceptedSampler ? null : getOrLoadTerrainTile(z, tx, ty, deps);
+  if (!acceptedSampler && !tile.loaded) {
     mesh.userData.pendingTerrainTile = true;
     mesh.visible = false;
     return;
   }
 
   const pos = mesh.geometry.attributes.position;
+  const cachedBaseElevations = mesh.userData?.baseTerrainWorldY;
+  const reuseBaseElevations = options.reuseBaseElevations === true &&
+    cachedBaseElevations?.length === pos.count;
+  const nextBaseElevations = reuseBaseElevations
+    ? cachedBaseElevations
+    : new Float64Array(pos.count);
   const latRange = bounds.latN - bounds.latS || 1;
   const lonRange = bounds.lonE - bounds.lonW || 1;
-  const latRadians = appCtx.LOC.lat * Math.PI / 180;
-  const lonWorldScale = appCtx.SCALE * Math.cos(latRadians);
-  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-  const tileBounds = mesh.geometry.boundingBox;
-  const tileMinX = Number(tileBounds?.min?.x || 0) + mesh.position.x;
-  const tileMaxX = Number(tileBounds?.max?.x || 0) + mesh.position.x;
-  const tileMinZ = Number(tileBounds?.min?.z || 0) + mesh.position.z;
-  const tileMaxZ = Number(tileBounds?.max?.z || 0) + mesh.position.z;
-  const structureCuts = Array.isArray(appCtx.structureTerrainCuts)
-    ? appCtx.structureTerrainCuts.filter((cut) => cut?.bounds && !(
-      cut.bounds.maxX < tileMinX || cut.bounds.minX > tileMaxX ||
-      cut.bounds.maxZ < tileMinZ || cut.bounds.minZ > tileMaxZ
-    ))
-    : [];
 
   let minElevation = Infinity;
   let maxElevation = -Infinity;
-  const elevations = new Float32Array(pos.count);
+  let waterMaskedVertices = 0;
+  const elevations = [];
   const elevationMetersSamples = [];
+  const segments = Math.max(1, Number(appCtx.TERRAIN_SEGMENTS) || 1);
+  const verticesPerSide = segments + 1;
+  const waterTerrainContext = typeof deps.createWaterTerrainContext === "function"
+    ? deps.createWaterTerrainContext(bounds)
+    : null;
 
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + mesh.position.x;
     const wz = pos.getZ(i) + mesh.position.z;
-    const lat = appCtx.LOC.lat - wz / appCtx.SCALE;
-    const lon = appCtx.LOC.lon + wx / lonWorldScale;
-    const u = (lon - bounds.lonW) / lonRange;
-    const v = (bounds.latN - lat) / latRange;
-    const meters = sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
-    if (i % 16 === 0) elevationMetersSamples.push(meters);
+    let meters;
+    let acceptedSample = null;
+    if (reuseBaseElevations) {
+      const unitsPerMeter =
+        (appCtx.WORLD_UNITS_PER_METER || 1) *
+        (appCtx.TERRAIN_Y_EXAGGERATION || 1);
+      meters = nextBaseElevations[i] / unitsPerMeter;
+    } else if (acceptedSampler) {
+      const { lat, lon } = worldToLatLon(wx, wz);
+      acceptedSample = acceptedSampler(lat, lon);
+      if (
+        acceptedSample?.status !== 'available' ||
+        !Number.isFinite(Number(acceptedSample.groundElevationMeters))
+      ) {
+        mesh.userData.pendingTerrainTile = true;
+        mesh.userData.groundUnavailableReason =
+          acceptedSample?.reason || 'accepted-ground-sample-unavailable';
+        mesh.visible = false;
+        return;
+      }
+      meters = deps.clampElevationMeters(
+        Number(acceptedSample.groundElevationMeters)
+      );
+      if (i === 0) {
+        mesh.userData.renderProvenance = {
+          version: 1,
+          profile: 'accepted-ground',
+          provider: acceptedSample.providerId,
+          dataset: acceptedSample.artifactId,
+          release: acceptedSample.sourceRelease,
+          verticalDatum: acceptedSample.verticalDatum,
+          tileKey: mesh.userData.terrainTileKey,
+          layer: 'terrain',
+          role: 'terrain',
+          sources: [acceptedSample.artifactId],
+          fallback: false
+        };
+      }
+    } else {
+      const { lat, lon } = worldToLatLon(wx, wz);
+      if (i === 0) {
+        mesh.userData.renderProvenance = {
+          version: 1,
+          profile: 'worldwide-terrain-fallback',
+          provider: 'mapzen-terrarium',
+          dataset: 'Mapzen Terrain Tiles',
+          release: '',
+          verticalDatum: 'mixed-source',
+          tileKey: mesh.userData.terrainTileKey,
+          layer: 'terrain',
+          role: 'terrain',
+          sources: ['mapzen-terrarium'],
+          fallback: true
+        };
+      }
+      const u = (lon - bounds.lonW) / lonRange;
+      const v = (bounds.latN - lat) / latRange;
+      const column = i % verticesPerSide;
+      const row = Math.floor(i / verticesPerSide);
+      const eastEdge = column === segments;
+      const southEdge = row === segments;
+      let sampleSource = tile;
+      let sampleU = u;
+      let sampleV = v;
+      if (eastEdge || southEdge) {
+        const tileCount = 2 ** z;
+        const adjacent = getOrLoadTerrainTile(
+          z,
+          eastEdge ? (tx + 1) % tileCount : tx,
+          Math.min(tileCount - 1, ty + (southEdge ? 1 : 0)),
+          deps
+        );
+        if (adjacent.loaded && adjacent.elev) {
+          sampleSource = adjacent;
+          if (eastEdge) sampleU = 0;
+          if (southEdge) sampleV = 0;
+        }
+      }
+      meters = sampleTileElevationMeters(
+        sampleSource,
+        sampleU,
+        sampleV,
+        deps.clampElevationMeters
+      );
+    }
+    if (!Number.isFinite(meters)) {
+      mesh.userData.pendingTerrainTile = true;
+      mesh.userData.groundUnavailableReason = 'invalid-ground-elevation';
+      mesh.visible = false;
+      return;
+    }
+    elevationMetersSamples.push(meters);
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
-    const y = typeof deps.applyStructureTerrainCuts === "function"
-      ? deps.applyStructureTerrainCuts(wx, wz, baseY, structureCuts)
-      : baseY;
-    elevations[i] = y;
+    if (!reuseBaseElevations) nextBaseElevations[i] = baseY;
+    const structureY = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
+    const y = typeof deps.resolveWaterTerrainY === "function"
+      ? deps.resolveWaterTerrainY(wx, wz, structureY, waterTerrainContext)
+      : structureY;
+    if (y < structureY - 1e-6) waterMaskedVertices += 1;
+    elevations.push(y);
     minElevation = Math.min(minElevation, y);
     maxElevation = Math.max(maxElevation, y);
   }
@@ -610,8 +654,12 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   }
 
   pos.needsUpdate = true;
-  computeHeightfieldNormals(mesh.geometry);
+  mesh.geometry.computeVertexNormals();
+  stitchTerrainMeshEdges(appCtx, mesh);
   mesh.userData.pendingTerrainTile = false;
+  mesh.userData.baseTerrainWorldY = nextBaseElevations;
+  mesh.userData.waterMaskedVertices = waterMaskedVertices;
+  mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;
 
   const unitsPerMeter = (appCtx.WORLD_UNITS_PER_METER || 1) * (appCtx.TERRAIN_Y_EXAGGERATION || 1);
@@ -628,3 +676,14 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   mesh.userData.elevationStatsMeters = elevationStats;
   applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
 }
+
+export {
+  clearTerrainMeshes,
+  decodeTerrariumRGB,
+  disposeTerrainMesh,
+  ensureTerrainGroup,
+  getTerrainMeshKey,
+  latLonToTileXY,
+  terrainTileMeshKey,
+  tileXYToLatLonBounds
+};

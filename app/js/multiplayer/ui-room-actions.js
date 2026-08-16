@@ -1,29 +1,29 @@
 import { getCurrentUser } from "../../../js/auth-ui.js";
-import { createArtifact, removeArtifact } from "./artifacts.js?v=56";
-import { sendMessage } from "./chat.js?v=55";
+import { createArtifact, removeArtifact } from "./artifacts.js?v=57";
+import { sendMessage } from "./chat.js?v=56";
 import {
   bumpExplorerLeaderboard,
-} from "./loop.js?v=55";
+} from "./loop.js?v=56";
 import {
   createRoom,
   deleteOwnedRoom,
   findPublicRoomsByCity,
   joinRoomByCode,
   updateRoomSettings
-} from "./rooms.js?v=66";
+} from "./rooms.js?v=67";
 import {
   deleteRoomActivity,
   startRoomActivitySession,
   stopRoomActivitySession
-} from "./room-activities.js?v=1";
+} from "./room-activities.js?v=2";
 import {
   addFriend,
   removeFriend,
   sendInviteToFriend
 } from "./social.js?v=55";
-import { createUiRoomRoomActionsApi } from "./ui-room-room-actions.js?v=1";
-import { createUiRoomRuntime } from "./ui-room-runtime.js?v=4";
-import { createUiRoomSession } from "./ui-room-session.js?v=9";
+import { createUiRoomRoomActionsApi } from "./ui-room-room-actions.js?v=2";
+import { createUiRoomRuntime } from "./ui-room-runtime.js?v=3";
+import { createUiRoomSession } from "./ui-room-session.js?v=2";
 
 export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, callbacks }) {
   const {
@@ -125,7 +125,9 @@ export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, c
     }
     try {
       const nextName = sanitizeText(refs.roomPanelNameInput?.value || state.currentRoom.name || "", 80);
-      const featured = !!refs.roomPanelFeaturedToggle?.checked;
+      const featured = state.entitlement.isAdmin === true
+        ? !!refs.roomPanelFeaturedToggle?.checked
+        : state.currentRoom.featured === true;
       const nextVisibility = featured ? "public" : normalizeVisibilitySelection(readVisibilitySelection());
       const nextLocationTag = sanitizeText(readLocationTagInput() || state.currentRoom.locationTag?.label || "", 80);
       const paintRules = readPaintRulesFromPanel();

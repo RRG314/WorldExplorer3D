@@ -224,8 +224,8 @@ function saveMemoryEntriesToStorage() {
       updatePersistenceHint();
       return false;
     }
-    localStorage.setItem(MEMORY_STORAGE_BACKUP_KEY, payload);
     localStorage.setItem(MEMORY_STORAGE_KEY, payload);
+    localStorage.setItem(MEMORY_STORAGE_BACKUP_KEY, payload);
     return true;
   } catch (err) {
     memoryPersistenceEnabled = false;
