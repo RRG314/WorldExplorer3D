@@ -51,15 +51,31 @@ function createForedeckGeometry() {
   return geometry;
 }
 
-function addRail(group, x, z, length, rotationY = 0) {
+function cylinderBetween(start, end, radius, railMaterial, radialSegments = 8) {
+  const direction = end.clone().sub(start);
   const rail = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.025, length, 8),
-    material(0xdce4e8, 0.28, 0.72)
+    new THREE.CylinderGeometry(radius, radius, direction.length(), radialSegments),
+    railMaterial
   );
-  rail.position.set(x, 1.62, z);
-  rail.rotation.z = Math.PI / 2;
-  rail.rotation.y = rotationY;
-  group.add(rail);
+  rail.position.copy(start).add(end).multiplyScalar(0.5);
+  rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  return rail;
+}
+
+function addBowRail(group, side, railMaterial) {
+  const x = side * 1.23;
+  const lower = [
+    new THREE.Vector3(x, 1.04, 0.85),
+    new THREE.Vector3(x * 0.93, 1.13, 2.75),
+    new THREE.Vector3(side * 0.4, 1.26, 4.55)
+  ];
+  const upper = lower.map((point) => point.clone().add(new THREE.Vector3(0, 0.55, 0)));
+  for (let index = 0; index < upper.length - 1; index += 1) {
+    group.add(cylinderBetween(upper[index], upper[index + 1], 0.025, railMaterial));
+  }
+  lower.forEach((point, index) => {
+    group.add(cylinderBetween(point, upper[index], 0.022, railMaterial));
+  });
 }
 
 function addNavigationLight(group, x, color) {
@@ -73,14 +89,18 @@ function addNavigationLight(group, x, color) {
 
 function createBoatModeMesh() {
   const group = new THREE.Group();
-  group.name = 'BoatModeMesh';
+  group.name = 'Harbor Scout Expedition Boat';
+  group.userData.visualStyle = 'harbor-scout-expedition';
+  group.userData.visualOnly = true;
 
-  const hullMat = material(0x164d69, 0.5, 0.16, { emissive: 0x061923, emissiveIntensity: 0.22 });
-  const deckMat = material(0xf3f5f2, 0.48, 0.04, { emissive: 0x242725, emissiveIntensity: 0.12 });
-  const accentMat = material(0xc83e4d, 0.42, 0.1, { emissive: 0x24080c, emissiveIntensity: 0.18 });
-  const glassMat = material(0x80c9e8, 0.16, 0.08, {
-    transparent: true,
-    opacity: 0.72,
+  const hullMat = material(0x174d55, 0.58, 0.14, { emissive: 0x041517, emissiveIntensity: 0.2 });
+  const deckMat = material(0xd8d3bd, 0.62, 0.04, { emissive: 0x1c1a14, emissiveIntensity: 0.1 });
+  const accentMat = material(0xd66f35, 0.5, 0.08, { emissive: 0x291007, emissiveIntensity: 0.18 });
+  const frameMat = material(0x263238, 0.66, 0.24);
+  const railMat = material(0xb9c4c4, 0.34, 0.62);
+  const glassMat = material(0x173f4f, 0.22, 0.16, {
+    emissive: 0x071a21,
+    emissiveIntensity: 0.32,
     side: THREE.DoubleSide
   });
 
@@ -97,15 +117,26 @@ function createBoatModeMesh() {
   foredeck.position.set(0, 1.08, 3.65);
   group.add(foredeck);
 
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.78, 1.82), deckMat);
-  cabin.position.set(0, 1.42, -0.55);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.06, 0.72, 1.78), deckMat);
+  cabin.position.set(0, 1.39, -0.56);
   cabin.castShadow = true;
   group.add(cabin);
 
-  const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.75, 0.72), glassMat);
-  windshield.position.set(0, 1.78, 0.39);
+  const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 0.62), glassMat);
+  windshield.position.set(0, 1.75, 0.38);
   windshield.rotation.x = -0.34;
   group.add(windshield);
+
+  [-1, 1].forEach((side) => {
+    const sideWindow = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.52), glassMat);
+    sideWindow.position.set(side * 1.035, 1.73, -0.45);
+    sideWindow.rotation.y = side * Math.PI / 2;
+    group.add(sideWindow);
+  });
+
+  const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.12, 2.05), accentMat);
+  cabinRoof.position.set(0, 1.88, -0.5);
+  group.add(cabinRoof);
 
   const cockpit = new THREE.Mesh(
     new THREE.BoxGeometry(1.68, 0.25, 1.12),
@@ -116,18 +147,29 @@ function createBoatModeMesh() {
 
   [-0.52, 0.52].forEach((x) => {
     const seat = new THREE.Mesh(
-      new THREE.BoxGeometry(0.58, 0.72, 0.24),
-      material(0xd8dde0, 0.7, 0.03, { emissive: 0x17191a, emissiveIntensity: 0.1 })
+      new THREE.BoxGeometry(0.56, 0.68, 0.25),
+      material(0x576263, 0.76, 0.03, { emissive: 0x101414, emissiveIntensity: 0.1 })
     );
     seat.position.set(x, 1.55, -1.72);
     seat.rotation.x = -0.14;
     group.add(seat);
   });
 
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.28, 0.12, 3.6), accentMat);
-  stripe.position.set(0, 0.48, -0.15);
-  stripe.scale.x = 1.01;
-  group.add(stripe);
+  [-1, 1].forEach((side) => {
+    const rubRail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.18, 6.7), accentMat);
+    rubRail.position.set(side * 1.57, 0.7, -0.22);
+    rubRail.rotation.x = 0.015;
+    group.add(rubRail);
+  });
+
+  const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 1.55), frameMat);
+  rearDeck.position.set(0, 0.98, -3.55);
+  group.add(rearDeck);
+
+  const console = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.68, 0.52), frameMat);
+  console.position.set(0.52, 1.33, -1.66);
+  console.rotation.x = -0.12;
+  group.add(console);
 
   const motor = new THREE.Mesh(
     new THREE.BoxGeometry(0.68, 0.76, 0.58),
@@ -141,8 +183,28 @@ function createBoatModeMesh() {
   swimPlatform.position.set(0, 0.72, -4.95);
   group.add(swimPlatform);
 
-  addRail(group, -1.18, 1.8, 3.7, -0.08);
-  addRail(group, 1.18, 1.8, 3.7, 0.08);
+  addBowRail(group, -1, railMat);
+  addBowRail(group, 1, railMat);
+
+  const radarMast = cylinderBetween(
+    new THREE.Vector3(0, 1.94, -0.72),
+    new THREE.Vector3(0, 2.58, -0.72),
+    0.04,
+    railMat
+  );
+  group.add(radarMast);
+  const radar = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.09, 0.2), deckMat);
+  radar.position.set(0, 2.62, -0.72);
+  group.add(radar);
+
+  const searchLight = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.19, 10), frameMat);
+  searchLight.rotation.x = Math.PI / 2;
+  searchLight.position.set(0, 2.2, 0.25);
+  group.add(searchLight);
+  const searchLens = new THREE.Mesh(new THREE.CircleGeometry(0.105, 10), new THREE.MeshBasicMaterial({ color: 0xffdf9a }));
+  searchLens.position.set(0, 2.2, 0.355);
+  group.add(searchLens);
+
   addNavigationLight(group, -1.05, 0xff3c45);
   addNavigationLight(group, 1.05, 0x41ff78);
 

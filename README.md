@@ -10,12 +10,17 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.2.0
+![Expanded New York world viewed from the air](assets/landing/gameplay/showcase/new-york-expanded-aerial.webp)
 
-Version 4.2.0 adds DeFlock Hunt and bounded Live GPS Explore while stabilizing
-the fixed-location Earth world introduced in 4.1.3. Location loads publish one
-immutable world, movement does not reload world data, and returning from Space
-restores the retained Earth scene.
+*A current in-game capture of the expanded New York fixed world. Every image below was captured directly from the browser runtime, not rendered as concept art.*
+
+## Version 4.2.1
+
+Version 4.2.1 gives the player, car, boat, plane, and spacecraft a cohesive,
+performance-bounded expedition style and adds a direct browser-gameplay tour of
+the expanded world. It retains the DeFlock Hunt and bounded Live GPS Explore
+features from 4.2.0, the single immutable location publication, and the retained
+Earth scene used when returning from Space.
 
 Highlights:
 
@@ -37,6 +42,42 @@ Highlights:
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
 
+## Gameplay tour
+
+World Explorer 3D is designed to make the scale and structure of a place visible
+from the street, the water, and the air. These captures show the same runtime
+players launch from the live application.
+
+| Baltimore waterfront | Monaco coast |
+| :--: | :--: |
+| ![Baltimore Inner Harbor and surrounding city](assets/landing/gameplay/showcase/baltimore-waterfront-skyline.webp) | ![Monaco's mapped streets, buildings, hills, and coast](assets/landing/gameplay/showcase/monaco-coast-aerial.webp) |
+| **Mapped harbor, roads, and regional city context** | **Dense terrain-aware development along the Mediterranean** |
+
+| San Francisco Bay | Tokyo |
+| :--: | :--: |
+| ![San Francisco skyline and bay](assets/landing/gameplay/showcase/san-francisco-bay-skyline.webp) | ![Shinjuku and the surrounding Tokyo city world](assets/landing/gameplay/showcase/tokyo-shinjuku-aerial.webp) |
+| **City scale shaped by land and water** | **Detailed local buildings inside a much larger urban region** |
+
+### Traversal is part of the world
+
+![Driving a car on the Golden Gate Bridge](assets/landing/gameplay/showcase/golden-gate-car.webp)
+
+Bridges, elevated roads, ramps, tunnels, streets, and terrain are playable
+surfaces rather than background scenery. Players can move through the same
+location by car, on foot, by drone, by plane, or by boat where the environment
+supports it.
+
+### Mobile DeFlock Hunt
+
+| Find a virtual camera | Disable it in the game |
+| :--: | :--: |
+| ![DeFlock Hunt on a phone with a virtual camera standing](assets/landing/gameplay/showcase/deflock-mobile-upright.webp) | ![DeFlock Hunt on a phone after the virtual camera has toppled](assets/landing/gameplay/showcase/deflock-mobile-toppled.webp) |
+
+[DeFlock Hunt](docs/DEFLOCK_MODE.md) is a fictional gameplay mode that places
+virtual representations of publicly mapped OpenStreetMap surveillance nodes in
+the loaded world. Disabling one affects only the game: no physical equipment is
+accessed, controlled, damaged, or otherwise affected.
+
 ## Multiplayer model
 
 Multiplayer uses bounded shared rooms rather than one continuous MMO server. A
@@ -50,12 +91,6 @@ Run the real two-browser contract with `npm run test:multiplayer-integration`.
 It uses local Auth and Firestore emulators and verifies private-code joining,
 presence/movement, chat, and shared half-grid shape stacks without production
 data.
-
-## Screenshots
-
-![Driving through Baltimore](assets/landing/gameplay/drive-baltimore.png)
-![Exploring Monaco by drone](assets/landing/gameplay/drone-monaco.png)
-![Space flight](assets/landing/gameplay/fly-in-space.png)
 
 ## Data and Accuracy
 
@@ -111,6 +146,7 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 
 ## Project Documents
 
+- [Complete system inventory and reconstruction guide](docs/SYSTEM_INVENTORY.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)

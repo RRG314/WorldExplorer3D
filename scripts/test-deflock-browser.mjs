@@ -9,11 +9,23 @@ process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = '1';
 const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'deflock-browser');
 const fixturePath = path.join(rootDir, 'scripts', 'fixtures', 'deflock-surveillance.json');
-const fixtureBody = await fs.readFile(fixturePath, 'utf8');
-const fixture = JSON.parse(fixtureBody);
+const sourceFixture = JSON.parse(await fs.readFile(fixturePath, 'utf8'));
+const showcaseFixture = process.env.DEFLOCK_BROWSER_SHOWCASE_FIXTURE === '1';
+const fixture = showcaseFixture
+  ? {
+      ...sourceFixture,
+      elements: sourceFixture.elements.map((element) => {
+        if (element?.id === 101) return { ...element, lat: 39.2870, lon: -76.6040 };
+        if (element?.id === 102) return { ...element, lat: 39.2872, lon: -76.6038 };
+        return element;
+      })
+    }
+  : sourceFixture;
+const fixtureBody = JSON.stringify(fixture);
 const fixtureCameras = fixture.elements.filter((element) => element?.tags?.man_made === 'surveillance');
 const externalBaseUrl = String(process.env.DEFLOCK_BROWSER_URL || '').trim();
 const headless = process.env.DEFLOCK_BROWSER_HEADED !== '1';
+const mobileOnly = process.env.DEFLOCK_BROWSER_MOBILE_ONLY === '1';
 const server = externalBaseUrl ? null : await startStaticRootServer({
   rootDir,
   host: '127.0.0.1',
@@ -266,6 +278,51 @@ async function aimAtMarker(page, markerIndex = 0) {
     ctx.camera.updateMatrixWorld(true);
     ctx.renderer?.render?.(ctx.scene, ctx.camera);
   }), markerIndex);
+}
+
+async function frameMobileMarker(page, markerIndex = 0, { pause = true } = {}) {
+  return page.evaluate(({ index, shouldPause }) => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    const marker = ctx.deFlockMapMarkers?.[index];
+    const walker = ctx.Walk?.state?.walker;
+    if (!marker || !walker) throw new Error(`Missing mobile DeFlock marker ${index}`);
+    const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(marker.x, marker.z)?.position?.y) || 0;
+    const cameraMesh = ctx.scene?.getObjectByName?.('DeFlockCameraBodies');
+    const beaconBeamMesh = ctx.scene?.getObjectByName?.('DeFlockBeaconBeams');
+    const matrix = new globalThis.THREE.Matrix4();
+    const renderedCamera = new globalThis.THREE.Vector3(marker.x, terrainY + 4.8, marker.z);
+    cameraMesh?.getMatrixAt?.(index, matrix);
+    if (cameraMesh) renderedCamera.setFromMatrixPosition(matrix);
+    if (beaconBeamMesh) beaconBeamMesh.visible = false;
+    const offset = 5.8;
+    walker.x = marker.x + offset;
+    walker.z = marker.z + offset;
+    walker.y = terrainY + 1.7;
+    walker.vx = 0;
+    walker.vy = 0;
+    walker.vz = 0;
+    walker.lookYawOffset = 0;
+    walker.yaw = Math.atan2(marker.x - walker.x, marker.z - walker.z);
+    walker.angle = walker.yaw;
+    const horizontalDistance = Math.hypot(marker.x - walker.x, marker.z - walker.z) || 1;
+    walker.pitch = Math.atan2(renderedCamera.y - walker.y, horizontalDistance);
+    ctx.Walk.state.view = 'first';
+    if (ctx.Walk.state.characterMesh) {
+      ctx.Walk.state.characterMesh.visible = false;
+      ctx.Walk.state.characterMesh.position.set(walker.x, terrainY, walker.z);
+      ctx.Walk.state.characterMesh.rotation.y = walker.yaw;
+      ctx.Walk.state.characterMesh.updateMatrixWorld(true);
+    }
+    ctx.updateDeFlockMode?.(0.016);
+    ctx.setPauseReason?.('deflock-browser-visual', shouldPause);
+    ctx.Walk.applyCameraIfWalking?.();
+    ctx.camera.updateMatrixWorld(true);
+    ctx.renderer?.render?.(ctx.scene, ctx.camera);
+    return {
+      marker: { x: marker.x, y: renderedCamera.y, z: marker.z, state: marker.state },
+      walker: { x: walker.x, y: walker.y, z: walker.z, yaw: walker.yaw, pitch: walker.pitch },
+      nearbySourceId: ctx.getDeFlockSnapshot?.().nearbySourceId
+    };
+  }), { index: markerIndex, shouldPause: pause });
 }
 
 async function assertHudLayout(page) {
@@ -580,7 +637,12 @@ async function runMobile() {
   await instrumentPage(page);
   await prepareTitle(page);
   await launchSelectedMode(page);
-  await moveActorNear(page, 1);
+  await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    ctx.setTimeOfDay?.('day');
+    ctx.setWeatherMode?.('clear');
+    ctx.applyWeatherPresentation?.();
+  }));
+  await moveActorNear(page, 0);
   await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
     ctx.updateControlsModeUI?.();
     ctx.setPauseReason?.('deflock-browser-visual', false);
@@ -611,22 +673,31 @@ async function runMobile() {
     `DeFlock mobile HUD escaped the viewport: ${JSON.stringify(layout)}`);
   assert(layout.hud.right - layout.hud.left <= 224,
     `DeFlock mobile HUD remained too wide for gameplay: ${JSON.stringify(layout)}`);
-  await aimAtMarker(page, 1);
-  await page.screenshot({ path: path.join(outputDir, 'mobile-gameplay.png'), fullPage: false });
+  const uprightFrame = await frameMobileMarker(page, 0, { pause: true });
+  assert.equal(uprightFrame.nearbySourceId, 'osm:node:101', 'mobile showcase framing moved outside the camera interaction radius');
+  await page.screenshot({ path: path.join(outputDir, 'mobile-camera-upright.png'), fullPage: false });
+  await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => {
+    ctx.setPauseReason?.('deflock-browser-visual', false);
+  }));
   const beforeDisabled = Number((await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress?.disabled)) || 0);
   await page.locator('#mobileActionSecondary').dispatchEvent('pointerdown', { pointerId: 7, pointerType: 'touch', isPrimary: true });
   await page.waitForTimeout(100);
   await page.locator('#mobileActionSecondary').dispatchEvent('pointerup', { pointerId: 7, pointerType: 'touch', isPrimary: true });
   await page.waitForFunction((before) => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress?.disabled > before, beforeDisabled);
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.fallingInstances === 0);
+  await frameMobileMarker(page, 0, { pause: true });
+  await page.screenshot({ path: path.join(outputDir, 'mobile-camera-toppled.png'), fullPage: false });
   const progress = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().deflock?.progress);
   await context.close();
   return { layout, progress };
 }
 
 try {
-  report.desktop = await runDesktop();
+  report.desktop = mobileOnly ? { skipped: true, reason: 'DEFLOCK_BROWSER_MOBILE_ONLY=1' } : await runDesktop();
   report.mobile = await runMobile();
-  assert(report.fixtureRequests >= 2, `expected fixture interception in desktop and mobile journeys, received ${report.fixtureRequests}`);
+  const expectedFixtureRequests = mobileOnly ? 1 : 2;
+  assert(report.fixtureRequests >= expectedFixtureRequests,
+    `expected at least ${expectedFixtureRequests} fixture interception(s), received ${report.fixtureRequests}`);
   assert.equal(report.fatalErrors.length, 0, `fatal application console errors: ${JSON.stringify(report.fatalErrors)}`);
   report.ok = true;
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
@@ -642,7 +713,8 @@ try {
       'plane-motion.png',
       'virtually-disabled.png',
       'large-map-markers.png',
-      'mobile-gameplay.png'
+      'mobile-camera-upright.png',
+      'mobile-camera-toppled.png'
     ],
     providerWarningCount: report.providerWarnings.length,
     report: path.join(outputDir, 'report.json')

@@ -1,5 +1,6 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
+import { createExpeditionPlaneMesh } from './plane/expedition-plane-mesh.js?v=1';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -56,86 +57,8 @@ function damp(current, target, rate, dt) {
   return current + (target - current) * (1 - Math.exp(-rate * dt));
 }
 
-function material(color, metalness = 0.22, roughness = 0.52) {
-  return new THREE.MeshStandardMaterial({ color, metalness, roughness });
-}
-
 function createPlaneMesh() {
-  const plane = new THREE.Group();
-  plane.name = 'Explorer STOL Aircraft';
-
-  const white = material(0xf4f6f8, 0.34, 0.42);
-  const blue = material(0x155fa0, 0.42, 0.38);
-  const dark = material(0x1d252b, 0.16, 0.7);
-  const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x69a8c5,
-    transparent: true,
-    opacity: 0.72,
-    roughness: 0.1,
-    metalness: 0.05,
-    transmission: 0.18
-  });
-
-  const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.7, 4.8, 18), white);
-  fuselage.rotation.x = Math.PI / 2;
-  fuselage.position.z = 0.15;
-  plane.add(fuselage);
-
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.05, 18), blue);
-  nose.rotation.x = Math.PI / 2;
-  nose.position.z = 3.05;
-  plane.add(nose);
-
-  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.64, 18, 12), glass);
-  cockpit.scale.set(0.82, 0.58, 1.22);
-  cockpit.position.set(0, 0.47, 1.15);
-  plane.add(cockpit);
-
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.12, 1.28), white);
-  wing.position.set(0, 0.08, 0.2);
-  plane.add(wing);
-  const wingStripe = new THREE.Mesh(new THREE.BoxGeometry(6.58, 0.05, 0.28), blue);
-  wingStripe.position.set(0, 0.16, 0.48);
-  plane.add(wingStripe);
-
-  const tailWing = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.1, 0.64), white);
-  tailWing.position.set(0, 0.2, -2.25);
-  plane.add(tailWing);
-  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.15, 0.9), blue);
-  fin.position.set(0, 0.62, -2.18);
-  fin.rotation.x = -0.18;
-  plane.add(fin);
-
-  const propeller = new THREE.Group();
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.34, 12), dark);
-  hub.rotation.x = Math.PI / 2;
-  propeller.add(hub);
-  const bladeGeometry = new THREE.BoxGeometry(0.12, 1.7, 0.06);
-  const bladeA = new THREE.Mesh(bladeGeometry, dark);
-  const bladeB = new THREE.Mesh(bladeGeometry, dark);
-  bladeB.rotation.z = Math.PI / 2;
-  propeller.add(bladeA, bladeB);
-  propeller.position.z = 3.65;
-  plane.add(propeller);
-
-  const gearMat = material(0x2f3438, 0.18, 0.82);
-  [[-0.72, -0.72, 0.4], [0.72, -0.72, 0.4], [0, -0.52, -1.95]].forEach(([x, y, z], index) => {
-    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.62, 8), dark);
-    strut.position.set(x, y + 0.28, z);
-    strut.rotation.z = index < 2 ? x * 0.3 : 0;
-    plane.add(strut);
-    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 14), gearMat);
-    wheel.rotation.z = Math.PI / 2;
-    wheel.position.set(x, y, z);
-    plane.add(wheel);
-  });
-
-  plane.scale.setScalar(0.92);
-  plane.traverse((object) => {
-    if (!object.isMesh) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
-  });
+  const { plane, propeller } = createExpeditionPlaneMesh();
   plane.visible = false;
   appCtx.scene.add(plane);
   state.mesh = plane;

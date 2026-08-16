@@ -12,7 +12,7 @@ import {
   setSsaoEnabled as engineSetSsaoEnabled,
   setupPostProcessingPipeline as setupEnginePostProcessingPipeline,
   tryEnablePostProcessing as tryEnableEnginePostProcessing
-} from "./engine/quality.js?v=1";
+} from "./engine/quality.js?v=2";
 import {
   createBuildingGroundPatch as createBuildingGroundPatchRuntime,
   ensureEnginePbrTextures as ensureEnginePbrTexturesRuntime,
@@ -20,7 +20,7 @@ import {
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
 } from "./engine/materials-runtime.js?v=21";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=12";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=14";
 import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
 const RENDER_QUALITY_LOW = 'low';

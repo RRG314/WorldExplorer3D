@@ -2,6 +2,30 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.2.1] - 2026-08-16
+
+### Added
+
+- Performance-bounded Field Navigator, Classic Utility car, Harbor Scout boat,
+  Trailblazer plane, and Wayfinder spacecraft procedural presentation.
+- A worldwide browser-gameplay gallery and a developer-facing system inventory.
+- A release regression gate for traversal-model triangle, draw, material,
+  transparency, footprint, propeller, and thrust-effect budgets.
+
+### Changed
+
+- Replaced the simplest player and traversal silhouettes without changing
+  physics, collision, controls, cameras, water ownership, or world loading.
+- Expanded the README, landing page, and GitHub Pages overview with direct
+  browser captures of worldwide gameplay and phone-sized DeFlock states.
+
+### Fixed
+
+- Kept utility-car paint readable across quality tiers instead of inheriting a
+  near-black sports-car material override.
+- Shared spacecraft exhaust materials so the upgraded presentation does not
+  multiply transparent material state.
+
 ## [4.2.0] - 2026-08-15
 
 ### Added
