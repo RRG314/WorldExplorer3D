@@ -273,6 +273,44 @@ function applyEndpointTieIns(
     }
     corrected[index] = clamp(corrected[index], lower, upper);
   }
+
+  // Endpoint cones bound every sample relative to a portal, but they do not
+  // bound adjacent samples relative to each other. Overlapping crossing
+  // stations can therefore leave a short kink inside an otherwise valid
+  // approach. Project the completed profile from both fixed endpoints so the
+  // transition remains exact and every rendered/drivable segment observes
+  // the same engineered grade limit.
+  const lastIndex = corrected.length - 1;
+  const hasFixedStart = Number.isFinite(startDesired);
+  const hasFixedEnd = Number.isFinite(endDesired);
+  for (let pass = 0; pass < 12; pass += 1) {
+    if (hasFixedStart) corrected[0] = startDesired;
+    if (hasFixedStart) {
+      for (let index = 1; index < corrected.length; index += 1) {
+        if (hasFixedEnd && index === lastIndex) continue;
+        const run = Math.max(1e-6, distances[index] - distances[index - 1]);
+        corrected[index] = clamp(
+          corrected[index],
+          corrected[index - 1] - grade * run,
+          corrected[index - 1] + grade * run
+        );
+      }
+    }
+    if (hasFixedEnd) corrected[lastIndex] = endDesired;
+    if (hasFixedEnd) {
+      for (let index = lastIndex - 1; index >= 0; index -= 1) {
+        if (hasFixedStart && index === 0) continue;
+        const run = Math.max(1e-6, distances[index + 1] - distances[index]);
+        corrected[index] = clamp(
+          corrected[index],
+          corrected[index + 1] - grade * run,
+          corrected[index + 1] + grade * run
+        );
+      }
+    }
+  }
+  if (hasFixedStart) corrected[0] = startDesired;
+  if (hasFixedEnd) corrected[lastIndex] = endDesired;
   return new Float32Array(corrected);
 }
 
