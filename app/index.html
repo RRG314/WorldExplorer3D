@@ -22,12 +22,12 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=87">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=93">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=14">
-<link rel="stylesheet" href="styles/start-hub.css?v=11">
+<link rel="stylesheet" href="styles/interface-v4.css?v=16">
+<link rel="stylesheet" href="styles/start-hub.css?v=14">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -157,6 +157,8 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 🎮 Game Mode
 </div>
 <div class="mode-grid">
+<div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
@@ -170,35 +172,40 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div class="tab-content" id="tab-multiplayer">
 <div class="mp-card">
-<div class="mp-title">🌐 Multiplayer Platform</div>
+<div class="mp-title">🌐 Explore Together</div>
 <div id="mpPlanState" class="mp-plan-state">Sign in to access multiplayer rooms.</div>
+<div class="mp-subtitle">Join With A Room Code</div>
 <div class="mp-row">
 <input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
-<button id="mpTitleJoinBtn" class="mp-btn secondary" type="button">Join</button>
-<button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create</button>
+<button id="mpTitleJoinBtn" class="mp-btn primary" type="button">Join Room</button>
 </div>
-<div class="mp-subtitle">My Rooms</div>
-<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
-<ul id="mpOwnedRoomsList" class="mp-room-list">
-<li class="mpRoomEmpty">Sign in to load your rooms.</li>
-</ul>
+<div class="mp-status">Private rooms use an invite code. Public rooms can also be found by city below.</div>
+
+<div class="mp-subtitle">Create A Room At Your Selected Location</div>
 <div class="mp-row">
 <select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
 <option value="private" selected>Private Room</option>
 <option value="public">Public Room</option>
 </select>
 <input id="mpTitleRoomNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
-<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="Optional location tag (Tokyo, Paris, Moon Base)">
+<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="City label for public discovery (optional for private rooms)">
 </div>
 <div class="mp-row">
-<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Room Panel</button>
-<button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
-<button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave</button>
+<button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
+<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Open Active Room</button>
+<button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Copy Invite</button>
+<button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
 </div>
 <div class="mp-row">
-<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Donations</button>
+<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button>
 </div>
 <div id="mpTitleStatus" class="mp-status"></div>
+
+<div class="mp-subtitle">My Rooms</div>
+<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
+<ul id="mpOwnedRoomsList" class="mp-room-list">
+<li class="mpRoomEmpty">Sign in to load your rooms.</li>
+</ul>
 
 <div class="mp-subtitle">Public Rooms Near A City</div>
 <div class="mp-row">
@@ -210,16 +217,18 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <li class="mpRoomEmpty">Search a city to find public rooms.</li>
 </ul>
 
-<div class="mp-subtitle">Featured Public Rooms</div>
+<div class="mp-subtitle">Featured City</div>
 <div class="mp-row">
 <button id="mpFeaturedWeeklyBtn" class="mp-btn primary mpSmallBtn" type="button">Join Weekly City</button>
-<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Featured</button>
+<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Curated Rooms</button>
 </div>
 <div id="mpFeaturedWeeklyMeta" class="mp-status">Weekly city room rotates each week.</div>
 <ul id="mpFeaturedList" class="mp-room-list">
-<li class="mpRoomEmpty">Featured rooms will appear here.</li>
+<li class="mpRoomEmpty">Admin-curated public rooms will appear here.</li>
 </ul>
 
+<details class="mp-secondary-tools">
+<summary>Friends, invites, recent players, and leaderboard</summary>
 <div class="mp-subtitle">Friends</div>
 <div id="mpFriendsStatus" class="mp-status">Add friends by UID or from Recent Players to invite them fast.</div>
 <div class="mp-row">
@@ -245,6 +254,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <ul id="mpLeaderboardList" class="mpFeedList">
 <li class="mpRoomEmpty">Leaderboard updates as explorers participate.</li>
 </ul>
+</details>
 </div>
 </div>
 <div class="tab-content" id="tab-settings">
@@ -403,6 +413,7 @@ Graphics changes apply to the current session.
 <button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
 <button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
 <button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">🧭 Explorer</button>
+<button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
 </div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
@@ -635,6 +646,44 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
 </div>
+<aside id="deFlockHud" aria-live="polite">
+  <div class="deFlockHudHead"><strong>📷 DEFLOCK HUNT</strong><button id="deFlockHelpOpen" type="button" aria-label="DeFlock information">i</button></div>
+  <div id="deFlockCounts">Loading mapped cameras…</div>
+  <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
+</aside>
+<div id="deFlockPrompt" role="status"></div>
+<aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
+  <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
+  <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
+  <p>All actions are fictional and happen only inside World Explorer. “Virtual Camera Disabled” never changes physical equipment.</p>
+  <p>Direction cones and detection range are gameplay approximations, not claims about real camera capabilities. No plates, vehicle photos, live results, or driver data are collected.</p>
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors • ODbL</a>
+</aside>
+<div id="liveGpsPermissionPanel" role="dialog" aria-modal="true" aria-labelledby="liveGpsPermissionTitle">
+  <div class="liveGpsPermissionCard">
+    <div class="liveGpsPermissionIcon">📍</div>
+    <h2 id="liveGpsPermissionTitle">Start Live GPS Explore?</h2>
+    <p>Your location moves the in-world walker while World Explorer remains open and visible. Locking the screen or switching apps may pause movement.</p>
+    <p class="liveGpsSafety"><strong>Stay aware of traffic, terrain, private property, and local rules. Do not use the game while driving.</strong></p>
+    <p>Location samples stay in memory for this session and are not saved as a route.</p>
+    <div id="liveGpsPermissionStatus" aria-live="polite"></div>
+    <div class="liveGpsPermissionActions">
+      <button id="liveGpsPermissionCancel" type="button">Cancel</button>
+      <button id="liveGpsPermissionContinue" type="button">Continue &amp; Allow Location</button>
+    </div>
+  </div>
+</div>
+<section id="liveGpsHud" aria-label="Live GPS status">
+  <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
+  <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span></div>
+  <div class="liveGpsActions">
+    <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
+    <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
+    <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
+    <button id="liveGpsStopBtn" type="button">Stop</button>
+  </div>
+</section>
 <canvas id="minimap" width="150" height="150"></canvas>
 <div id="minimapZoomControls" aria-label="Minimap zoom controls">
   <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
@@ -940,6 +989,8 @@ Explore the area
 <div class="floatMenu" id="gameMenu">
 <button class="floatBtn game" id="gameBtn" type="button" aria-label="Games" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
 <div class="floatItems">
+<div class="floatItem" id="fDeFlock">📷 Start DeFlock Hunt</div>
+<div class="floatItem" id="fLiveGps">📍 Start Live GPS Explore</div>
 <div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fRoomGames">👥 Room Games</div>
 <div class="floatItem" id="fActivityCreator">🧩 Create Game</div>
@@ -980,6 +1031,7 @@ Explore the area
 </div>
 </div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
+</div>
 
 <div id="memoryComposer">
 <div class="memoryComposerTitle">Memory Marker</div>
@@ -1581,7 +1633,7 @@ Explore the area
 </div>
 
 <!-- Real Estate System -->
-<script type="module" src="js/app-shell-fragments.js?v=84"></script>
+<script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=413"></script>
+<script type="module" src="js/bootstrap.js?v=445"></script>
 </body></html>

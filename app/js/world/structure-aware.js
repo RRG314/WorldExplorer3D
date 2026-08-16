@@ -5,11 +5,19 @@ import {
   areRoadsConnected,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
+  sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=40";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=7";
+} from "../structure-semantics.js?v=48";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=13";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { refreshStructureColliders } from "./structure-colliders.js?v=3";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=5";
+import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=2";
+import {
+  createDriveableRoadConflictIndex,
+  supportPointConflictsWithDriveableRoad
+} from "./bridge-safety.js?v=8";
+import { refreshStructureColliders } from "./structure-colliders.js?v=9";
+import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -44,6 +52,53 @@ function structureAwareLinearFeatures() {
     feature?.structureSemantics?.gradeSeparated ||
     feature?.structureSemantics?.structureKind === 'covered'
   );
+}
+
+function createFeatureBoundsIndex(features = [], cellSize = 240) {
+  const buckets = new Map();
+  const boundsByFeature = new Map();
+  const boundsFor = (feature) => {
+    if (boundsByFeature.has(feature)) return boundsByFeature.get(feature);
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    const padding = (Number(feature?.width) || 4) + 24;
+    const bounds = feature?.bounds || points.reduce((result, point) => ({
+      minX: Math.min(result.minX, Number(point?.x) - padding),
+      maxX: Math.max(result.maxX, Number(point?.x) + padding),
+      minZ: Math.min(result.minZ, Number(point?.z) - padding),
+      maxZ: Math.max(result.maxZ, Number(point?.z) + padding)
+    }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    boundsByFeature.set(feature, bounds);
+    return bounds;
+  };
+  for (const feature of features) {
+    const bounds = boundsFor(feature);
+    if (![bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ].every(Number.isFinite)) continue;
+    const minColumn = Math.floor(bounds.minX / cellSize);
+    const maxColumn = Math.floor(bounds.maxX / cellSize);
+    const minRow = Math.floor(bounds.minZ / cellSize);
+    const maxRow = Math.floor(bounds.maxZ / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        const key = `${column}:${row}`;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(feature);
+      }
+    }
+  }
+  return (feature) => {
+    const bounds = boundsFor(feature);
+    const candidates = new Set();
+    const minColumn = Math.floor((bounds.minX - 14) / cellSize);
+    const maxColumn = Math.floor((bounds.maxX + 14) / cellSize);
+    const minRow = Math.floor((bounds.minZ - 14) / cellSize);
+    const maxRow = Math.floor((bounds.maxZ + 14) / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (const candidate of buckets.get(`${column}:${row}`) || []) candidates.add(candidate);
+      }
+    }
+    return [...candidates];
+  };
 }
 
 function featureBuildingContainmentStats(feature) {
@@ -120,10 +175,22 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   const baseSemantics = feature.baseStructureSemantics || feature.structureSemantics || null;
   if (!baseSemantics) return;
 
+  const canBeEmbeddedElevatedFeature =
+    baseSemantics.terrainMode === 'elevated' &&
+    !baseSemantics.isBridge;
+  if (!canBeEmbeddedElevatedFeature) {
+    feature.structureSemantics = {
+      ...cloneStructureSemantics(baseSemantics),
+      embeddedInBuilding: false
+    };
+    if (feature.isStructureConnector === true) {
+      feature.isStructureConnector = feature.structureSemantics.gradeSeparated || feature.structureSemantics.skywalk === true;
+    }
+    return;
+  }
+
   const stats = featureBuildingContainmentStats(feature);
   const embeddedInBuilding =
-    baseSemantics.terrainMode === 'elevated' &&
-    !baseSemantics.isBridge &&
     stats.total > 0 &&
     (
       stats.insideRatio >= 0.62 ||
@@ -157,14 +224,29 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-export function refreshStructureAwareFeatureProfiles() {
+function* compileStructureAwareFeatureProfileSteps() {
+  const now = () => globalThis.performance?.now?.() ?? Date.now();
+  const compilationStartedAt = now();
+  const phaseDurationsMs = Object.create(null);
+  const measure = (name, task) => {
+    const startedAt = now();
+    try {
+      return task();
+    } finally {
+      phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+    }
+  };
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const connectorFeatures = structureAwareLinearFeatures();
   const transportFeatures = roadFeatures.concat(connectorFeatures);
+  const nearbyTransportFeatures = createFeatureBoundsIndex(transportFeatures);
 
-  for (let i = 0; i < transportFeatures.length; i++) {
-    applyBuildingContextSemanticsToFeature(transportFeatures[i]);
-  }
+  measure('buildingContext', () => {
+    for (let i = 0; i < transportFeatures.length; i++) {
+      applyBuildingContextSemanticsToFeature(transportFeatures[i]);
+    }
+  });
+  yield;
 
   if (Array.isArray(appCtx.linearFeatureMeshes)) {
     for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
@@ -177,10 +259,13 @@ export function refreshStructureAwareFeatureProfiles() {
   }
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
-  appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
-  appCtx.transportStructureModel = compileTransportStructureModel(transportFeatures, {
-    transportGraphId: appCtx.transportNetworkModel.id
+  measure('compileConnections', () => {
+    appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
+    appCtx.transportStructureModel = compileTransportStructureModel(transportFeatures, {
+      transportGraphId: appCtx.transportNetworkModel.id
+    });
   });
+  yield;
   if (appCtx.transportSurfacePublication?.authority === 'compiled_transport_surface') {
     appCtx.transportSurfacePublication = Object.freeze({
       ...appCtx.transportSurfacePublication,
@@ -188,82 +273,167 @@ export function refreshStructureAwareFeatureProfiles() {
       roadCount: roadFeatures.length
     });
   }
-  assignStructureStackRanks(structureFeatures, worldBaseTerrainY, { areRoadsConnected });
+  measure('assignStackRanks', () => assignStructureStackRanks(
+    structureFeatures,
+    worldBaseTerrainY,
+    { areRoadsConnected }
+  ));
+  yield;
 
-  for (let i = 0; i < structureFeatures.length; i++) {
-    const feature = structureFeatures[i];
-    if (!feature?.structureSemantics?.gradeSeparated) continue;
-    feature.structureStations = buildFeatureStations(feature, {
-      features: transportFeatures,
-      waterAreas: appCtx.waterAreas,
-      sampleTerrainY: worldBaseTerrainY
-    });
-  }
-
-  // Connection anchors must read surfaces compiled from the current graph and
-  // stack ranks. Reusing the pre-refresh models makes a merge target sample a
-  // stale deck height and leaves visible steps or open-air ramp ends.
-  for (let i = 0; i < transportFeatures.length; i++) {
-    const feature = transportFeatures[i];
-    if (!feature) continue;
-    feature.structureTransitionAnchors = [];
-    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
-      ? worldRenderedTerrainY
-      : worldBaseTerrainY;
-    updateFeatureSurfaceProfile(feature, sampleTerrainY, {
-      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
-    });
-  }
-
-  // Resolve crossing clearances once against the first compiled world-space
-  // surfaces. Nominal layer offsets alone are insufficient when two ramps
-  // have different endpoint-ground chords on sloped terrain.
-  for (let refinement = 0; refinement < 3; refinement += 1) {
+  measure('buildInitialStations', () => {
     for (let i = 0; i < structureFeatures.length; i++) {
       const feature = structureFeatures[i];
+      if (!feature?.structureSemantics?.gradeSeparated) continue;
       feature.structureStations = buildFeatureStations(feature, {
-        features: transportFeatures,
+        features: nearbyTransportFeatures(feature),
         waterAreas: appCtx.waterAreas,
         sampleTerrainY: worldBaseTerrainY
       });
     }
-    for (let i = 0; i < structureFeatures.length; i++) {
-      const feature = structureFeatures[i];
-      updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+  });
+  yield;
+
+  // Connection anchors must read surfaces compiled from the current graph and
+  // stack ranks. Reusing the pre-refresh models makes a merge target sample a
+  // stale deck height and leaves visible steps or open-air ramp ends.
+  measure('buildInitialProfiles', () => {
+    for (let i = 0; i < transportFeatures.length; i++) {
+      const feature = transportFeatures[i];
+      if (!feature) continue;
+      feature.structureTransitionAnchors = [];
+      const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
+        ? worldRenderedTerrainY
+        : worldBaseTerrainY;
+      updateFeatureSurfaceProfile(feature, sampleTerrainY, {
         surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
       });
     }
-  }
+  });
+  yield;
 
-  for (let i = 0; i < transportFeatures.length; i++) {
-    const feature = transportFeatures[i];
-    if (!feature) continue;
-    if (feature.structureSemantics?.terrainMode === 'at_grade') {
-      feature.structureTransitionAnchors = [];
-      continue;
+  // Resolve crossing clearances once against the first compiled world-space
+  // surfaces. Nominal layer offsets alone are insufficient when two ramps
+  // have different endpoint-ground chords on sloped terrain.
+  measure('refineStructureProfiles', () => {
+    for (let refinement = 0; refinement < 3; refinement += 1) {
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        feature.structureStations = buildFeatureStations(feature, {
+          features: nearbyTransportFeatures(feature),
+          waterAreas: appCtx.waterAreas,
+          sampleTerrainY: worldBaseTerrainY
+        });
+      }
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        });
+      }
     }
-    buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
-  }
+  });
+  yield;
 
-  for (let i = 0; i < transportFeatures.length; i++) {
-    const feature = transportFeatures[i];
-    if (!feature) continue;
-    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
-      ? worldRenderedTerrainY
-      : worldBaseTerrainY;
-    updateFeatureSurfaceProfile(feature, sampleTerrainY, {
-      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+  // A ramp endpoint and the interior freeway segment it joins are one physical
+  // surface. A single anchor pass reads the target's provisional profile and
+  // then recompiles both roads independently, which left real merge steps over
+  // two metres high. Compile one shared graph-node constraint set from the
+  // refined profiles, then rebuild only the grade-separated roads once.
+  // Repeatedly deriving constraints from already-constrained profiles creates
+  // positive feedback through stacked interchanges and lifts decks skyward.
+  // Ordinary roads are not rebuilt here.
+  measure('compileJunctionProfiles', () => {
+    const junctionPasses = 1;
+    let junctionProfile = null;
+    for (let pass = 0; pass < junctionPasses; pass += 1) {
+      for (let i = 0; i < transportFeatures.length; i++) {
+        const feature = transportFeatures[i];
+        if (!feature) continue;
+        if (feature.structureSemantics?.terrainMode === 'at_grade') {
+          feature.structureTransitionAnchors = [];
+          continue;
+        }
+        buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
+      }
+      junctionProfile = buildTransportJunctionProfileAnchors(
+        transportFeatures,
+        appCtx.transportNetworkModel,
+        worldBaseTerrainY,
+        sampleFeatureSurfaceY
+      );
+      for (const [feature, anchors] of junctionProfile.anchorsByFeature) {
+        feature.structureTransitionAnchors.push(...anchors);
+      }
+      for (let i = 0; i < structureFeatures.length; i++) {
+        const feature = structureFeatures[i];
+        updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+        });
+      }
+    }
+    appCtx.transportJunctionProfile = Object.freeze({
+      authority: 'compiled_transport_graph_nodes',
+      nodeCount: junctionProfile?.nodeCount || 0,
+      constrainedFeatureCount: junctionProfile?.constrainedFeatureCount || 0,
+      junctionPasses
     });
-  }
+  });
+  yield;
 
-  compileTunnelSystemModels(transportFeatures, worldBaseTerrainY);
-  refreshStructureColliders(appCtx, transportFeatures);
-  appCtx.refreshBridgeGuardrails?.(roadFeatures);
+  measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
+  yield;
+  measure('compileStructureAssemblies', () => {
+    const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
+    appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
+      transportFeatures,
+      worldBaseTerrainY,
+      {
+        supportConflict: (feature, column) => supportPointConflictsWithDriveableRoad(feature, {
+          x: column.x,
+          z: column.z,
+          supportBottomY: column.terrainY,
+          supportTopY: column.topY,
+          columnRadius: column.width * 0.5,
+          roadIndex: supportRoadIndex
+        })
+      }
+    );
+  });
+  yield;
+  measure('refreshStructureColliders', () => refreshStructureColliders(appCtx, transportFeatures));
+  yield;
+  measure('refreshBridgeGuardrails', () => appCtx.refreshBridgeGuardrails?.(roadFeatures));
 
   // Terrain remains the roof above tunnels. Road and tunnel renderers must not
   // mutate the shared ground surface.
   appCtx.structureTerrainCuts = [];
   appCtx.structureTerrainCutIndex = null;
+  appCtx.structureProfileCompilation = Object.freeze({
+    roadCount: roadFeatures.length,
+    structureCount: structureFeatures.length,
+    phaseDurationsMs: Object.freeze({
+      ...phaseDurationsMs,
+      total: Number((now() - compilationStartedAt).toFixed(2))
+    })
+  });
+  return appCtx.structureProfileCompilation;
+}
+
+export function refreshStructureAwareFeatureProfiles() {
+  const steps = compileStructureAwareFeatureProfileSteps();
+  let result = steps.next();
+  while (!result.done) result = steps.next();
+  return result.value;
+}
+
+export async function refreshStructureAwareFeatureProfilesCooperatively() {
+  const steps = compileStructureAwareFeatureProfileSteps();
+  let result = steps.next();
+  while (!result.done) {
+    await yieldToMainThread();
+    result = steps.next();
+  }
+  return result.value;
 }
 
 export function syncLinearFeatureOverlayVisibility() {

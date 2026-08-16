@@ -4,7 +4,7 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=410';
+} from './modules/manifest.js?v=442';
 import { loadScriptList } from './modules/script-loader.js?v=56';
 import {
   initStartupDiagnostics,
@@ -83,7 +83,13 @@ async function boot() {
     recordStartupDiagnostic('bootstrap', 'loading classic scripts', { count: resolvedClassicScripts.length });
     await loadScriptList(resolvedClassicScripts, { timeoutMs: 12000 });
 
-    const entrypoint = new URL(moduleEntrypoint, import.meta.url).toString();
+    const configuredEntrypoint = String(
+      globalThis.__WORLD_EXPLORER_PRODUCTION__?.appEntrypoint || ''
+    );
+    const entrypoint = new URL(
+      configuredEntrypoint || moduleEntrypoint,
+      import.meta.url
+    ).toString();
     recordStartupDiagnostic('bootstrap', 'importing module entrypoint', { entrypoint });
     const appModule = await import(entrypoint);
     const appApi = typeof appModule.bootApp === 'function'

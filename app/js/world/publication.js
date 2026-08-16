@@ -3,8 +3,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 function setSceneObjectVisible(object, visible) {
   if (!object) return;
   object.visible = visible;
-  if (visible && object.parent !== appCtx.scene) appCtx.scene.add(object);
-  if (!visible && object.parent === appCtx.scene) appCtx.scene.remove(object);
+  if (visible && !object.parent) appCtx.addEarthWorldObject(object);
 }
 
 function setListVisible(objects, resolveVisibility = () => true) {

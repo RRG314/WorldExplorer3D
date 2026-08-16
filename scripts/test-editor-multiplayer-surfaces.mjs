@@ -158,6 +158,28 @@ async function settleVisualFrame(page) {
   await page.waitForTimeout(500);
 }
 
+async function readPanelVisualState(page, panelId) {
+  return page.evaluate((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return { exists: false };
+    const style = getComputedStyle(panel);
+    const rect = panel.getBoundingClientRect();
+    return {
+      exists: true,
+      rootedInBody: panel.parentElement === document.body,
+      show: panel.classList.contains('show'),
+      display: style.display,
+      visibility: style.visibility,
+      opacity: Number(style.opacity),
+      width: rect.width,
+      height: rect.height,
+      childCount: panel.children.length,
+      position: style.position,
+      inset: [style.top, style.right, style.bottom, style.left]
+    };
+  }, panelId);
+}
+
 async function runBlockBuilderAudit(page) {
   await page.waitForFunction(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -168,6 +190,7 @@ async function runBlockBuilderAudit(page) {
   const visual = await page.evaluate(async () => {
     const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod?.ctx || {};
+    await ctx.ensureBlockBuilderReady?.();
     ctx.Walk?.setModeWalk?.();
     ctx.setTimeOfDay?.('day');
     ctx.clearAllBuildBlocks?.({ persist: false });
@@ -255,6 +278,42 @@ async function runBlockBuilderAudit(page) {
   await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'block-builder-jump.png') });
 
+  const shapeLandings = [];
+  for (const shape of ['cube', 'slab', 'ramp', 'column']) {
+    const landingSetup = await page.evaluate(async (nextShape) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      ctx.clearAllBuildBlocks({ persist: false });
+      const walker = ctx.Walk.state.walker;
+      const gx = Math.round(walker.x);
+      const gz = Math.round(walker.z);
+      const ground = ctx.terrainMeshHeightAt?.(gx, gz) ?? ctx.elevationWorldYAtWorldXZ?.(gx, gz) ?? 0;
+      const gy = Math.round((ground + 0.5) * 2) / 2;
+      ctx.placeBuildBlock(gx, gy, gz, 0, { shape: nextShape, rotation: 0, persist: false });
+      const blockTop = ctx.getBuildTopSurfaceAtWorldXZ?.(gx, gz);
+      walker.x = gx;
+      walker.z = gz;
+      walker.y = blockTop + 1.7 + 1.4;
+      walker.vy = -2;
+      walker.onGround = false;
+      return { blockTop };
+    }, shape);
+    for (let i = 0; i < 50; i += 1) {
+      const landed = await page.evaluate(async (blockTop) => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const walker = ctx.Walk.state.walker;
+        return walker.onGround === true && Math.abs((walker.y - 1.7) - blockTop) <= 0.12;
+      }, landingSetup.blockTop);
+      if (landed) break;
+      await page.waitForTimeout(40);
+    }
+    const result = await page.evaluate(async ({ nextShape, blockTop }) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const walker = ctx.Walk.state.walker;
+      return { shape: nextShape, blockTop, feetY: walker.y - 1.7, onGround: walker.onGround === true };
+    }, { nextShape: shape, blockTop: landingSetup.blockTop });
+    shapeLandings.push(result);
+  }
+
   const limit = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.clearAllBuildBlocks({ persist: false });
@@ -285,7 +344,7 @@ async function runBlockBuilderAudit(page) {
     return { cube, ramp };
   });
 
-  return { visual, limit, jump, vehicle };
+  return { visual, limit, jump, shapeLandings, vehicle };
 }
 
 async function runAudit(page, baseUrl) {
@@ -329,6 +388,7 @@ async function runAudit(page, baseUrl) {
     return mod.ctx.getEditorSnapshot();
   });
   await settleVisualFrame(page);
+  report.editor.openVisual = await readPanelVisualState(page, 'editorPanel');
   await page.screenshot({ path: path.join(outputDir, 'editor-open.png') });
   console.log('[audit] close editor');
   await page.evaluate(async () => {
@@ -352,6 +412,7 @@ async function runAudit(page, baseUrl) {
     return mod.ctx.getActivityCreatorSnapshot();
   });
   await settleVisualFrame(page);
+  report.activityCreator.openVisual = await readPanelVisualState(page, 'activityCreatorPanel');
   await page.screenshot({ path: path.join(outputDir, 'activity-creator-open.png') });
   console.log('[audit] close activity creator');
   await page.evaluate(async () => {
@@ -539,6 +600,9 @@ function assertReport(report) {
     report.builder.jump?.maxY > report.builder.jump?.startY + 0.5;
   if (!jumpArcObserved || report.builder.jump?.onGround !== true ||
     Math.abs(report.builder.jump.feetY - report.builder.jump.blockTop) > 0.15) throw new Error('Walker did not jump and land on a block.');
+  if (report.builder.shapeLandings?.length !== 4 || report.builder.shapeLandings.some((landing) => (
+    landing.onGround !== true || Math.abs(landing.feetY - landing.blockTop) > 0.15
+  ))) throw new Error(`A build shape is not a valid player landing surface: ${JSON.stringify(report.builder.shapeLandings)}`);
   if (report.builder.vehicle?.cube?.blocked !== true) throw new Error('Car did not collide with a cube.');
   if (report.builder.vehicle?.ramp?.blocked !== false || !Number.isFinite(report.builder.vehicle?.ramp?.supportTopY)) {
     throw new Error('Car ramp contact is not driveable.');
@@ -546,8 +610,20 @@ function assertReport(report) {
   if (!report.multiplayer.init?.hasApi) throw new Error('Multiplayer API did not initialize.');
   if (!report.multiplayer.init?.methods?.syncRoomWorldContext) throw new Error('Multiplayer world sync API is missing.');
   if (report.editor.open?.active !== true) throw new Error('Editor did not open.');
+  if (report.editor.openVisual?.rootedInBody !== true || report.editor.openVisual?.show !== true ||
+    report.editor.openVisual?.display === 'none' ||
+    report.editor.openVisual?.visibility === 'hidden' || report.editor.openVisual?.opacity <= 0 ||
+    report.editor.openVisual?.width < 1 || report.editor.openVisual?.height < 1) {
+    throw new Error(`Editor panel is not visibly rendered: ${JSON.stringify(report.editor.openVisual)}`);
+  }
   if (report.editor.closed?.active !== false) throw new Error('Editor did not close cleanly.');
   if (report.activityCreator.open?.active !== true) throw new Error('Activity creator did not open.');
+  if (report.activityCreator.openVisual?.rootedInBody !== true || report.activityCreator.openVisual?.show !== true ||
+    report.activityCreator.openVisual?.display === 'none' ||
+    report.activityCreator.openVisual?.visibility === 'hidden' || report.activityCreator.openVisual?.opacity <= 0 ||
+    report.activityCreator.openVisual?.width < 1 || report.activityCreator.openVisual?.height < 1) {
+    throw new Error(`Activity creator panel is not visibly rendered: ${JSON.stringify(report.activityCreator.openVisual)}`);
+  }
   if (report.activityCreator.closed?.active !== false) throw new Error('Activity creator did not close cleanly.');
   if (!(report.creatorLibrary.afterSave > report.creatorLibrary.before)) throw new Error('Creator library save did not persist.');
   if (!(report.creatorLibrary.afterRemove <= report.creatorLibrary.afterSave - 1)) throw new Error('Creator library cleanup did not remove the saved draft.');

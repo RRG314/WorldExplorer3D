@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clampNumber } from "./budgets.js?v=10";
-import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=22";
+import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=25";
 import { registerWaterWaveMaterial } from "./render-support.js?v=10";
 import { decimatePoints } from "./world-geometry.js?v=3";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=40";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=48";
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 
@@ -193,7 +193,7 @@ export function addWaterwayRibbon(pts, tags) {
   mesh.userData.waterRegistryId = waterway.registryId;
   mesh.userData.waterSurfaceProvenance = waterway.registryProvenance;
   mesh.visible = true;
-  appCtx.scene.add(mesh);
+  appCtx.addEarthWorldObject(mesh);
   appCtx.landuseMeshes.push(mesh);
   appCtx.waterways.push(waterway);
 }

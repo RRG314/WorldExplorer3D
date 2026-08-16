@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
 import { generateStreetFurniture } from "./furniture.js?v=13";
+import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
   const message = `${label}: ${err?.message || err}`;
@@ -18,7 +19,7 @@ export function safeWorldLoadCall(loadMetrics, label, fn) {
   }
 }
 
-export function finalizeLoadedWorld(options = {}) {
+export async function finalizeLoadedWorld(options = {}) {
   const reason = options.reason || 'primary';
   const loadMetrics = options.loadMetrics || {};
   const markLoaded = typeof options.markLoaded === 'function' ? options.markLoaded : () => {};
@@ -55,15 +56,22 @@ export function finalizeLoadedWorld(options = {}) {
 
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
     runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
+    await yieldToMainThread();
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.applyWaterTerrainMask === 'function') {
     runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
+    await yieldToMainThread();
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
-    const transportPublication = runFinalStep(
-      'publishCompiledTransportMeshes',
-      () => appCtx.publishCompiledTransportMeshes()
-    );
+    startLoadPhase('publishCompiledTransportMeshes');
+    let transportPublication = null;
+    try {
+      transportPublication = await appCtx.publishCompiledTransportMeshes();
+    } catch (error) {
+      recordWorldLoadWarning(loadMetrics, 'publishCompiledTransportMeshes', error);
+    } finally {
+      endLoadPhase('publishCompiledTransportMeshes');
+    }
     if (transportPublication && loadMetrics.roads) {
       loadMetrics.roads.subdividedPoints = Number(transportPublication.compiledSampleCount || 0);
       loadMetrics.roads.vertices = Number(transportPublication.vertices || 0);
@@ -71,6 +79,7 @@ export function finalizeLoadedWorld(options = {}) {
       loadMetrics.roads.finalMeshPublications = 1;
       loadMetrics.structureProfileCompilations = 1;
     }
+    await yieldToMainThread();
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
     runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
@@ -79,6 +88,7 @@ export function finalizeLoadedWorld(options = {}) {
     runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
+  await yieldToMainThread();
   runFinalStep('spawnOnRoad', () => spawnOnRoad());
   if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
     runFinalStep('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
@@ -227,7 +237,7 @@ export function createSyntheticFallbackWorld(options = {}) {
     mesh.renderOrder = 2;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.roadMeshes.push(mesh);
   };
 
@@ -299,7 +309,7 @@ export function createSyntheticFallbackWorld(options = {}) {
 
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.buildingMeshes.push(mesh);
 
     if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
@@ -312,7 +322,7 @@ export function createSyntheticFallbackWorld(options = {}) {
         groundPatch.userData.terrainAvgElevation = avgElevation;
         groundPatch.userData.alwaysVisible = true;
         groundPatch.visible = true;
-        appCtx.scene.add(groundPatch);
+        appCtx.addEarthWorldObject(groundPatch);
         appCtx.landuseMeshes.push(groundPatch);
       });
     }
@@ -372,7 +382,7 @@ export function buildPoiGeometryPass(options = {}) {
         mesh.userData.lodTier = poiTier;
         mesh.castShadow = false;
         mesh.visible = !!appCtx.poiMode;
-        appCtx.scene.add(mesh);
+        appCtx.addEarthWorldObject(mesh);
         appCtx.poiMeshes.push(mesh);
 
         if (poiTier === 'near') {
@@ -389,7 +399,7 @@ export function buildPoiGeometryPass(options = {}) {
           cap.userData.isPOIMarker = true;
           cap.userData.lodTier = 'near';
           cap.visible = !!appCtx.poiMode;
-          appCtx.scene.add(cap);
+          appCtx.addEarthWorldObject(cap);
           appCtx.poiMeshes.push(cap);
         }
       }

@@ -7,7 +7,7 @@ import {
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=4";
+} from "./sky/astronomical-state.js?v=5";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -15,8 +15,9 @@ import {
   clearStarSelection,
   createStarField,
   highlightConstellation,
-  showStarInfo
-} from "./sky/starfield-ui.js?v=13";
+  showStarInfo,
+  ensureStarCatalogLoaded
+} from "./sky/starfield-ui.js?v=15";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
 import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
@@ -351,7 +352,12 @@ async function arriveAtEarth(expectedSessionId = null) {
   commitEnvironment(appCtx.ENV.EARTH, { source: 'moon_return' });
   appCtx.setLunarEarthVisible?.(false);
   appCtx.clearPlanetarySky?.();
-  await appCtx.setPlanetaryVehicle?.('earth');
+  // Earth vehicle restoration is synchronous for this target. Do not yield
+  // after publishing the Earth environment while shared star materials still
+  // carry Moon opacity; the renderer and observers must see one atomic visual
+  // transition.
+  void appCtx.setPlanetaryVehicle?.('earth');
+  refreshAstronomicalSky(true);
   if (!isCurrentArrival()) {
     appCtx.earthResumePending = false;
     return false;
@@ -379,8 +385,6 @@ async function arriveAtEarth(expectedSessionId = null) {
     appCtx.fillLight.intensity = 0.3; // Normal fill light
   }
 
-  // Restore Earth-relative sky state
-  refreshAstronomicalSky(true);
   if (appCtx.car) {
     appCtx.car.vx = 0;
     appCtx.car.vz = 0;
@@ -448,6 +452,7 @@ Object.assign(appCtx, {
   clearStarSelection,
   createMoonSurface,
   createStarField,
+  ensureStarCatalogLoaded,
   cycleTimeOfDay,
   directTravelToMoon,
   hideReturnToEarthButton,
@@ -476,6 +481,7 @@ export {
   clearStarSelection,
   createMoonSurface,
   createStarField,
+  ensureStarCatalogLoaded,
   cycleTimeOfDay,
   directTravelToMoon,
   hideReturnToEarthButton,

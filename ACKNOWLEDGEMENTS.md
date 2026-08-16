@@ -1,6 +1,6 @@
 # Acknowledgements 🙏
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-08-15 for World Explorer 3D 4.2.0.
 
 World Explorer acknowledges and thanks the following third-party projects, services, and individuals that made this software possible.
 
@@ -329,6 +329,13 @@ These are first-party research components used in the engine (not external third
 - By Mojang Studios (Microsoft)
 - Inspiration for block-based world building
 - Reference for procedural generation
+
+**DeFlock**
+- Independent public-interest project for documenting surveillance infrastructure
+- Inspiration for the DeFlock Hunt game concept
+- Website: https://deflock.org/
+- World Explorer 3D is unaffiliated with DeFlock and uses OpenStreetMap data,
+  not DeFlock code or a DeFlock-owned data feed
 
 ### Academic & Technical References
 

@@ -7,7 +7,7 @@ import {
 } from './district-ground-model.js?v=2';
 import {
   filterSelectionToAcceptedGround
-} from './accepted-ground-selection.js?v=1';
+} from './accepted-ground-selection.js?v=2';
 
 function featureBudgetWarning(selection) {
   const requested = selection.requestedCounts || {};
@@ -214,7 +214,8 @@ export function prepareSelectedLocationSource(options = {}) {
     : filterSelectionToAcceptedGround(
         preparedSelection,
         options.nodes,
-        options.sampleGroundAtLatLon
+        options.sampleGroundAtLatLon,
+        { sampleRegionalGroundAtLatLon: options.sampleRegionalGroundAtLatLon }
       );
   const adapted = adaptSelectedLocationSource({
     ...options,

@@ -477,6 +477,7 @@ service cloud.firestore {
         request.resource.data.maxPlayers >= 2 &&
         request.resource.data.maxPlayers <= 32 &&
         (!('featured' in request.resource.data) || request.resource.data.featured is bool) &&
+        (!('featured' in request.resource.data) || request.resource.data.featured == false || isAdminToken()) &&
         (
           !('featured' in request.resource.data) ||
           request.resource.data.featured == false ||
@@ -535,6 +536,7 @@ service cloud.firestore {
         request.resource.data.maxPlayers >= 2 &&
         request.resource.data.maxPlayers <= 32 &&
         (!('featured' in request.resource.data) || request.resource.data.featured is bool) &&
+        (!('featured' in request.resource.data) || request.resource.data.featured == resource.data.featured || isAdminToken()) &&
         (
           !('featured' in request.resource.data) ||
           request.resource.data.featured == false ||
@@ -1195,7 +1197,7 @@ service cloud.firestore {
       return blockId is string &&
         blockId.size() > 0 &&
         blockId.size() <= 64 &&
-        blockId.matches('^-?[0-9]+_-?[0-9]+_-?[0-9]+$');
+        blockId.matches('^-?[0-9]+_-?[0-9]+([.]5)?_-?[0-9]+$');
     }
 
     function validRoomBlockData(blockId) {
@@ -1217,7 +1219,8 @@ service cloud.firestore {
         request.resource.data.gx is int &&
         request.resource.data.gx >= -50000 &&
         request.resource.data.gx <= 50000 &&
-        request.resource.data.gy is int &&
+        request.resource.data.gy is number &&
+        int(request.resource.data.gy * 2) == request.resource.data.gy * 2 &&
         request.resource.data.gy >= -50000 &&
         request.resource.data.gy <= 50000 &&
         request.resource.data.gz is int &&
@@ -1225,7 +1228,7 @@ service cloud.firestore {
         request.resource.data.gz <= 50000 &&
         request.resource.data.materialIndex is int &&
         request.resource.data.materialIndex >= 0 &&
-        request.resource.data.materialIndex <= 64 &&
+        request.resource.data.materialIndex <= 7 &&
         (!('shape' in request.resource.data) ||
           request.resource.data.shape in ['cube', 'slab', 'ramp', 'column']) &&
         (!('rotation' in request.resource.data) ||
@@ -1672,6 +1675,41 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /deflockLeaderboard/{entryId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasOnly([
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt', 'score', 'disabledCameras',
+          'totalCameras', 'detections', 'distance'
+        ]) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.challenge == 'deflock' &&
+        request.resource.data.player is string &&
+        request.resource.data.player.size() > 0 &&
+        request.resource.data.player.size() <= 24 &&
+        request.resource.data.location is string &&
+        request.resource.data.location.size() <= 80 &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 86400000 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 100000 &&
+        request.resource.data.disabledCameras is int &&
+        request.resource.data.disabledCameras > 0 &&
+        request.resource.data.disabledCameras <= 750 &&
+        request.resource.data.totalCameras is int &&
+        request.resource.data.totalCameras == request.resource.data.disabledCameras &&
+        request.resource.data.detections is int &&
+        request.resource.data.detections >= 0 &&
+        request.resource.data.detections <= 100000 &&
+        request.resource.data.distance is number &&
+        request.resource.data.distance >= 0;
+      allow update, delete: if false;
+    }
+
     match /fishingLeaderboard/{entryId} {
       allow read: if true;
       allow create: if isSignedIn() &&
@@ -1708,16 +1746,22 @@ service cloud.firestore {
     }
 
     match /rooms/{roomId} {
-      allow read: if (
+      allow get: if (
         resource.data.visibility == 'public' ||
-        isRoomMember(roomId)
+        isSignedIn()
+      );
+      allow list: if (
+        resource.data.visibility == 'public' ||
+        isRoomOwner(roomId)
       );
       allow create: if isMultiplayerEntitled() && validRoomCore(roomId);
       allow update: if isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
       allow delete: if isSignedIn() && isRoomOwner(roomId);
 
       match /players/{uid} {
-        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        // A signed-in invite holder must be able to count room occupants before
+        // creating membership. The unlisted room code remains the discovery key.
+        allow read: if isMultiplayerEntitled() && roomExists(roomId);
         allow create: if isMultiplayerEntitled() &&
           isSelf(uid) &&
           roomExists(roomId) &&
@@ -1803,6 +1847,13 @@ service cloud.firestore {
           request.auth.uid == resource.data.uid &&
           validPaintClaimUpdate(claimId);
         allow delete: if false;
+      }
+
+      match /deflockStates/{cameraId} {
+        // Shared DeFlock state is written only by the verified Cloud Function.
+        // Room members may observe the immutable overlay for join/rejoin sync.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
       }
 
       match /state/{stateId} {

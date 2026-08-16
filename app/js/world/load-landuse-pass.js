@@ -1,7 +1,10 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
-import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=13';
+import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=15';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
+import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
+
+const WATER_VECTOR_TILE_CONCURRENCY = 8;
 
 function applyWorldSpaceSurfaceUvs(geometry, metersPerTile) {
   const positions = geometry?.attributes?.position;
@@ -52,7 +55,7 @@ function hardscapeMaterialOptions(appCtx, landuseType, composition) {
       : null;
   return {
     material: {
-      color: textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
+      color: textures?.map ? 0xffffff : (appCtx.LANDUSE_STYLES?.[landuseType]?.color ?? 0xb8b8b8),
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
@@ -314,7 +317,7 @@ export function createWorldLandusePass(options = {}) {
     }
     mesh.receiveShadow = false;
     mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
-    appCtx.scene.add(mesh);
+    appCtx.addEarthWorldObject(mesh);
     appCtx.landuseMeshes.push(mesh);
     appCtx.landuses.push({
       type: landuseType,
@@ -465,17 +468,28 @@ export function createWorldLandusePass(options = {}) {
     return false;
   }
 
-  async function loadVectorTileWaterCoverage(runtime, latMin, lonMin, latMax, lonMax) {
+  async function loadVectorTileWaterCoverage(runtime, latMin, lonMin, latMax, lonMax, signal = null) {
     const tr = vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, WATER_VECTOR_TILE_ZOOM);
-    const tileJobs = [];
+    const coordinates = [];
     for (let tx = tr.xMin; tx <= tr.xMax; tx++) {
       for (let ty = tr.yMin; ty <= tr.yMax; ty++) {
-        tileJobs.push(fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty));
+        coordinates.push({ tx, ty });
       }
     }
-    if (tileJobs.length === 0) return { polygons: 0, lines: 0, tiles: 0, okTiles: 0 };
+    if (coordinates.length === 0) {
+      return { polygons: 0, lines: 0, tiles: 0, okTiles: 0, failedTiles: 0, maxInFlight: 0 };
+    }
 
-    const settled = await Promise.allSettled(tileJobs);
+    const { settled, metrics } = await runBoundedProviderBatch(
+      coordinates,
+      ({ tx, ty }, _index, batchSignal) =>
+        fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty, { signal: batchSignal }),
+      {
+        signal,
+        concurrency: WATER_VECTOR_TILE_CONCURRENCY,
+        abortMessage: 'Mapped water coverage aborted'
+      }
+    );
     let polygons = 0;
     let lines = 0;
     let okTiles = 0;
@@ -486,6 +500,7 @@ export function createWorldLandusePass(options = {}) {
         if (errors.length < 4) errors.push(result.reason?.message || String(result.reason || 'tile rejected'));
         return;
       }
+      if (!result.value) return;
       okTiles++;
       const { tile, x, y, z } = result.value;
       const polygonLayers = ['ocean', 'water_polygons'];
@@ -527,7 +542,15 @@ export function createWorldLandusePass(options = {}) {
       });
     });
 
-    return { polygons, lines, tiles: tileJobs.length, okTiles, errors };
+    return {
+      polygons,
+      lines,
+      tiles: coordinates.length,
+      okTiles,
+      failedTiles: metrics.rejected,
+      maxInFlight: metrics.maxInFlight,
+      errors
+    };
   }
 
   async function buildLanduseGeometryPass(runtime = {}) {
@@ -565,18 +588,23 @@ export function createWorldLandusePass(options = {}) {
         appCtx.showLoad('Loading water...');
       }
       try {
-        const waterSummary = await loadVectorTileWaterCoverage(
+        const fetchCoverage = (signal) => loadVectorTileWaterCoverage(
           runtime,
           appCtx.LOC.lat - runtime.featureRadius,
           appCtx.LOC.lon - runtime.featureRadius,
           appCtx.LOC.lat + runtime.featureRadius,
-          appCtx.LOC.lon + runtime.featureRadius
+          appCtx.LOC.lon + runtime.featureRadius,
+          signal
         );
+        const waterSummary = typeof runtime.runProviderWork === 'function'
+          ? await runtime.runProviderWork('openstreetmap-shortbread', 'mapped-water', fetchCoverage)
+          : await fetchCoverage(runtime.signal || null);
         runtime.loadMetrics.vectorWater = { ...waterSummary };
         if (waterSummary.polygons === 0 && waterSummary.lines === 0 && showStatus) {
           console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
         }
       } catch (waterErr) {
+        if (waterErr?.name === 'AbortError' || runtime.isActiveLoadContext?.() === false) throw waterErr;
         console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
       }
       if (injectFallback && ensureWaterFallbackIfEmpty(runtime)) {

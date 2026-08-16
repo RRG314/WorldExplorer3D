@@ -3,12 +3,12 @@ import {
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=11';
+} from './world/compiler/transport-surface-model.js?v=17';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=2';
 import {
   assignFeatureConnections,
   assignStructureStackRanks as assignStructureStackRanksByGraph
-} from './structure-semantics/stacking.js?v=4';
+} from './structure-semantics/stacking.js?v=7';
 import {
   boundsIntersect,
   pointInPolygonXZ,
@@ -208,7 +208,10 @@ function buildFeatureStations(feature, context = {}) {
     }
   }
 
-  if (semantics.terrainMode === 'elevated' && waterAreas.length > 0) {
+  if (
+    (semantics.terrainMode === 'elevated' || semantics.terrainMode === 'subgrade') &&
+    waterAreas.length > 0
+  ) {
     for (let i = 0; i < points.length; i++) {
       const point = points[i];
       const prev = points[Math.max(0, i - 1)];
@@ -226,7 +229,19 @@ function buildFeatureStations(feature, context = {}) {
         }
       }
       if (insideWater) {
-        addStation(distances[i], Math.max(defaultTarget, semantics.deckClearance + 0.6), defaultSpan * 1.1, 'water_crossing');
+        if (semantics.terrainMode === 'subgrade') {
+          // Keep the tunnel crown physically below mapped water. The tunnel
+          // shell clearance is derived from cutDepth, so an additional 2.4 m
+          // provides a real water/terrain cover instead of a visible tube.
+          addStation(
+            distances[i],
+            Math.max(defaultTarget, semantics.cutDepth + 2.4),
+            defaultSpan * 1.1,
+            'underwater_tunnel'
+          );
+        } else {
+          addStation(distances[i], Math.max(defaultTarget, semantics.deckClearance + 0.6), defaultSpan * 1.1, 'water_crossing');
+        }
       }
     }
   }
@@ -398,14 +413,27 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
   const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
+  const fixedRegionalAtGrade = feature.fixedRegionalContext === true && semantics.terrainMode === 'at_grade';
+  const fixedRegionalEngineered = feature.fixedRegionalContext === true && semantics.terrainMode !== 'at_grade';
+  const fixedRegionalLossless = feature?.transportRecord?.completeness === 'lossless';
+  const surfaceSampleStep = fixedRegionalAtGrade
+    ? Math.min(20, Math.max(8, Number(feature.subdivideMaxDist) || 20))
+    : fixedRegionalEngineered
+      // Regional OSM vertices retain the mapped curve. Four-to-five metre
+      // interpolation is sufficient for vehicle-grade profiles and avoids
+      // recompiling metropolitan bridges/tunnels at core-city density.
+      ? fixedRegionalLossless
+        ? Math.min(4, Math.max(2, Number(feature.subdivideMaxDist) || 4))
+        : Math.min(8, Math.max(4, Number(feature.subdivideMaxDist) || 5))
+      : Number.isFinite(feature.subdivideMaxDist)
+      ? Math.min(2, Math.max(0.5, Number(feature.subdivideMaxDist)))
+      : 2;
   const compiledFeature = attachCompiledTransportSurface(
     feature,
     compileTransportSurfaceModel(feature, sampleTerrainY, {
       surfaceBias,
       width: Number.isFinite(options.width) ? Number(options.width) : undefined,
-      sampleStep: Number.isFinite(feature.subdivideMaxDist)
-        ? Math.min(2, Math.max(0.5, Number(feature.subdivideMaxDist)))
-        : 2
+      sampleStep: surfaceSampleStep
     })
   );
   // Ordinary streets follow the live rendered terrain. Compiled profiles own
@@ -525,7 +553,13 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
         : Number.isFinite(storedProfileY)
           ? storedProfileY
           : terrainY + baseTopBias;
-    const centerY = applyJunctionTransitionY(feature, point.x, point.z, rawCenterY);
+    const transitionedCenterY = applyJunctionTransitionY(feature, point.x, point.z, rawCenterY);
+    // Junction planes may smooth the road upward, but without a compiled
+    // terrain cut they may never pull an at-grade surface under the rendered
+    // terrain envelope.
+    const centerY = atGrade && Number.isFinite(terrainY)
+      ? Math.max(transitionedCenterY, terrainY + baseTopBias)
+      : transitionedCenterY;
     centerlineHeights.push(centerY);
 
     const leftX = point.x + nx * (halfWidth + corridorCenterOffset) * joinFactor;
@@ -542,8 +576,16 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       : model
         ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
         : centerY;
-    const leftY = applyJunctionTransitionY(feature, leftX, leftZ, rawLeftY);
-    const rightY = applyJunctionTransitionY(feature, rightX, rightZ, rawRightY);
+    const transitionedLeftY = applyJunctionTransitionY(feature, leftX, leftZ, rawLeftY);
+    const transitionedRightY = applyJunctionTransitionY(feature, rightX, rightZ, rawRightY);
+    const leftTerrainEnvelope = Number(sampleTerrainY(leftX, leftZ)) + baseTopBias;
+    const rightTerrainEnvelope = Number(sampleTerrainY(rightX, rightZ)) + baseTopBias;
+    const leftY = atGrade && Number.isFinite(leftTerrainEnvelope)
+      ? Math.max(transitionedLeftY, leftTerrainEnvelope)
+      : transitionedLeftY;
+    const rightY = atGrade && Number.isFinite(rightTerrainEnvelope)
+      ? Math.max(transitionedRightY, rightTerrainEnvelope)
+      : transitionedRightY;
     leftEdge.push({
       x: leftX,
       y: Number.isFinite(leftY) ? leftY : centerY,

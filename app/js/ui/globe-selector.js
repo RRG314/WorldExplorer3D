@@ -20,11 +20,11 @@ import {
   normalizeCityRecord,
   parseReverseAddress,
   persistSavedFavoriteCities as persistSavedFavoriteCitiesToStorage,
-  resolveCoordinateWaterKind,
+  resolveCoordinateSurfaceEvidence,
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=6";
+} from "./globe-selector/helpers.js?v=7";
 
 function createGlobeSelector(options = {}) {
   const {
@@ -252,7 +252,11 @@ function createGlobeSelector(options = {}) {
       fromGeolocation: !!meta.fromGeolocation,
       arrivalMode: meta.arrivalMode === 'walk' || meta.arrivalMode === 'boat'
         ? meta.arrivalMode
-        : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto'
+        : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto',
+      waterKind: coordsChanged ? null : meta.waterKind || selected?.waterKind || null,
+      surfaceEvidence: coordsChanged
+        ? null
+        : meta.surfaceEvidence || selected?.surfaceEvidence || null
     };
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
@@ -309,10 +313,9 @@ function createGlobeSelector(options = {}) {
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
       selected.locationDetails = cached.details || null;
-      if (cached.waterKind) {
-        selected.arrivalMode = 'boat';
-        selected.waterKind = cached.waterKind;
-      }
+      selected.surfaceEvidence = cached.surfaceEvidence || null;
+      selected.waterKind = cached.surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
+      selected.arrivalMode = selected.waterKind ? 'boat' : 'auto';
       liveNearbyCity = normalizeCityRecord({
         key: 'live-nearby',
         name: cached.queryLabel || cached.display,
@@ -329,11 +332,22 @@ function createGlobeSelector(options = {}) {
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
 
       const parsed = parseReverseAddress(payload);
-      parsed.waterKind = parsed.waterKind || await resolveCoordinateWaterKind(lat, lon, payload);
+      parsed.surfaceEvidence = await resolveCoordinateSurfaceEvidence(lat, lon, payload);
+      parsed.waterKind = parsed.surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
       if (parsed.waterKind) {
-        parsed.details = { ...(parsed.details || {}), waterKind: parsed.waterKind };
+        parsed.details = {
+          ...(parsed.details || {}),
+          waterKind: parsed.waterKind,
+          surfaceEvidence: parsed.surfaceEvidence
+        };
         parsed.display ||= `Open Ocean ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
         parsed.queryLabel ||= 'Open Ocean';
+      } else {
+        parsed.details = {
+          ...(parsed.details || {}),
+          waterKind: null,
+          surfaceEvidence: parsed.surfaceEvidence
+        };
       }
       if (!openState || requestToken !== reverseLookupToken || !selected) return;
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
@@ -350,10 +364,9 @@ function createGlobeSelector(options = {}) {
         if (liveCandidate) liveNearbyCity = liveCandidate;
         selected.name = parsed.display;
         selected.locationDetails = parsed.details;
-        if (parsed.waterKind) {
-          selected.arrivalMode = 'boat';
-          selected.waterKind = parsed.waterKind;
-        }
+        selected.surfaceEvidence = parsed.surfaceEvidence || null;
+        selected.waterKind = parsed.waterKind || null;
+        selected.arrivalMode = parsed.waterKind ? 'boat' : 'auto';
         syncLegacyCustomState(selected);
         renderSelection();
         if (searchInput && !searchInput.value.trim()) searchInput.value = parsed.queryLabel || parsed.display;
@@ -601,8 +614,6 @@ function createGlobeSelector(options = {}) {
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
     if (mobileSearchInput) mobileSearchInput.value = searchInput?.value || appCtx.customLoc?.name || '';
-    if (selected) beginReverseLookup(selected.lat, selected.lon);
-
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
       appCtx.liveEarth.onSelectorOpen();
     }

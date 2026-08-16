@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-07-30 for version 4.1.2.
+Last reviewed: 2026-08-15 for version 4.2.0.
 
 World Explorer keeps source identity and truth type in its runtime contracts. Observations, forecasts/models, predictions, mapped features, and visual fallbacks are not interchangeable.
 
@@ -8,7 +8,7 @@ World Explorer keeps source identity and truth type in its runtime contracts. Ob
 
 | Source | Runtime use | Data class | License / terms |
 | --- | --- | --- | --- |
-| OpenStreetMap contributors | Detailed location roads, buildings, land use, water, paths, bridges, tunnels, and place context through Overpass | Community-mapped | ODbL 1.0 |
+| OpenStreetMap contributors | Detailed location roads, buildings, land use, water, paths, bridges, tunnels, place context, and mapped surveillance objectives through Overpass | Community-mapped | ODbL 1.0 |
 | OSM Shortbread vector tiles | Bounded building and water fallback geometry | Community-mapped | ODbL 1.0 and OSM service terms |
 | OSM raster tiles | Minimap and map context | Community-mapped | ODbL 1.0 and tile usage policy |
 | Nominatim | Forward and reverse place lookup | Community-mapped service | OSMF Nominatim policy |
@@ -20,6 +20,19 @@ World Explorer keeps source identity and truth type in its runtime contracts. Ob
 | GEBCO 2020 via OpenTopodata | Bundled Great Barrier Reef bathymetry seed | Bathymetric model | CC BY 4.0 |
 
 Required map attribution: `© OpenStreetMap contributors`.
+
+## Surveillance Mapping
+
+DeFlock Hunt queries OpenStreetMap nodes tagged `man_made=surveillance` through
+bounded Overpass requests. A dated Baltimore last-good snapshot is bundled only
+as a labeled outage fallback and retains its OSM source IDs, timestamps, and
+ODbL provenance. The mode does not consume license-plate scans, photographs,
+live reader results, or a private surveillance-provider feed.
+
+The game concept is inspired by the independent
+[DeFlock project](https://deflock.org/), whose public tools help contributors
+map surveillance devices into OpenStreetMap. World Explorer 3D is unaffiliated
+with DeFlock and uses no DeFlock application code or DeFlock-owned data feed.
 
 ## Operational Earth Feeds
 

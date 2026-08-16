@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=48";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
 import {
   barrierPointConflictsWithDriveableRoad,
+  createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   isProtectedRoadFeature
-} from "./bridge-safety.js?v=3";
+} from "./bridge-safety.js?v=8";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];
@@ -46,7 +47,7 @@ function colliderBounds(points) {
   };
 }
 
-export function registerBridgeGuardrails(road, owner = null) {
+export function registerBridgeGuardrails(road, owner = null, roadConflictIndex = null) {
   if (!isProtectedRoadFeature(road) || !Array.isArray(road.pts) || road.pts.length < 2) return [];
   if (road._guardrailsRegistered) return road.guardrailColliders || [];
   if (Array.isArray(road.guardrailColliders) && road.guardrailColliders.length > 0) return road.guardrailColliders;
@@ -96,7 +97,8 @@ export function registerBridgeGuardrails(road, owner = null) {
           x: point.x + nx * offset * side,
           z: point.z + nz * offset * side,
           deckY: surfaceY,
-          roads: appCtx.roads
+          roadIndex: roadConflictIndex,
+          roads: roadConflictIndex ? null : appCtx.roads
         })
       );
       if (crossesDriveableCorridor) continue;
@@ -152,11 +154,12 @@ function clearRoadGuardrails(road) {
 
 export function refreshBridgeGuardrails(roads = appCtx.roads) {
   if (!Array.isArray(roads)) return 0;
+  const roadConflictIndex = createDriveableRoadConflictIndex(roads);
   let count = 0;
   roads.forEach((road) => {
     const owner = road?._guardrailOwner || null;
     clearRoadGuardrails(road);
-    count += registerBridgeGuardrails(road, owner).length;
+    count += registerBridgeGuardrails(road, owner, roadConflictIndex).length;
   });
   return count;
 }

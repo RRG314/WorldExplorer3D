@@ -3,6 +3,8 @@ import { pointInWaterBody } from './water-surface-registry.js?v=3';
 const VESSEL_BUILDING_TYPES = new Set(['ship', 'houseboat']);
 const OVERWATER_BUILDING_TYPES = new Set(['boathouse', 'bridge']);
 const OVERWATER_MAN_MADE_TYPES = new Set(['pier', 'quay', 'breakwater', 'groyne']);
+const DEFAULT_WATER_INDEX_CELL_SIZE = 256;
+const NEARBY_WATER_DISTANCE_METERS = 45;
 
 function normalized(value) {
   return String(value || '').trim().toLowerCase();
@@ -31,7 +33,76 @@ function classifyMappedWaterStructure(tags = {}) {
   };
 }
 
-function footprintWaterCoverage(points = [], waterAreas = []) {
+function createWaterAreaSpatialIndex(waterAreas = [], options = {}) {
+  const areas = Array.isArray(waterAreas) ? waterAreas : [];
+  const cellSize = Math.max(32, Number(options.cellSize) || DEFAULT_WATER_INDEX_CELL_SIZE);
+  const nearbyDistance = Math.max(0, Number(options.nearbyDistance) || NEARBY_WATER_DISTANCE_METERS);
+  const cells = new Map();
+  const unboundedAreaIndices = [];
+
+  const addToCell = (cellX, cellZ, areaIndex) => {
+    const key = `${cellX},${cellZ}`;
+    const bucket = cells.get(key);
+    if (bucket) bucket.push(areaIndex);
+    else cells.set(key, [areaIndex]);
+  };
+
+  areas.forEach((area, areaIndex) => {
+    const bounds = area?.bounds;
+    if (
+      !bounds ||
+      !Number.isFinite(Number(bounds.minX)) ||
+      !Number.isFinite(Number(bounds.maxX)) ||
+      !Number.isFinite(Number(bounds.minZ)) ||
+      !Number.isFinite(Number(bounds.maxZ))
+    ) {
+      unboundedAreaIndices.push(areaIndex);
+      return;
+    }
+    const minCellX = Math.floor((Number(bounds.minX) - nearbyDistance) / cellSize);
+    const maxCellX = Math.floor((Number(bounds.maxX) + nearbyDistance) / cellSize);
+    const minCellZ = Math.floor((Number(bounds.minZ) - nearbyDistance) / cellSize);
+    const maxCellZ = Math.floor((Number(bounds.maxZ) + nearbyDistance) / cellSize);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+        addToCell(cellX, cellZ, areaIndex);
+      }
+    }
+  });
+
+  const diagnostics = {
+    areaCount: areas.length,
+    boundedAreaCount: areas.length - unboundedAreaIndices.length,
+    unboundedAreaCount: unboundedAreaIndices.length,
+    cellCount: cells.size,
+    queryCount: 0,
+    candidateCount: 0
+  };
+
+  return Object.freeze({
+    candidates(x, z) {
+      diagnostics.queryCount += 1;
+      const bucket = cells.get(`${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`) || [];
+      const candidateIndices = unboundedAreaIndices.length > 0
+        ? [...new Set([...bucket, ...unboundedAreaIndices])].sort((a, b) => a - b)
+        : bucket;
+      diagnostics.candidateCount += candidateIndices.length;
+      return candidateIndices.map((areaIndex) => areas[areaIndex]);
+    },
+    snapshot() {
+      return Object.freeze({
+        ...diagnostics,
+        averageCandidatesPerQuery: diagnostics.queryCount > 0
+          ? Number((diagnostics.candidateCount / diagnostics.queryCount).toFixed(2))
+          : 0,
+        cellSize,
+        nearbyDistance
+      });
+    }
+  });
+}
+
+function footprintWaterCoverage(points = [], waterAreas = [], options = {}) {
   if (!Array.isArray(points) || points.length < 3 || !Array.isArray(waterAreas) || waterAreas.length === 0) {
     return { total: 0, inside: 0, ratio: 0, centroidInside: false, primaryWater: null };
   }
@@ -55,8 +126,13 @@ function footprintWaterCoverage(points = [], waterAreas = []) {
   const hitCounts = new Map();
   let inside = 0;
   let centroidWater = null;
+  const waterAreaIndex = options?.waterAreaIndex;
+  const candidatesAt = typeof waterAreaIndex?.candidates === 'function'
+    ? (x, z) => waterAreaIndex.candidates(x, z)
+    : () => waterAreas;
   for (const sample of samples) {
-    const water = waterAreas.find((area) => pointInWaterBody(area, sample.x, sample.z)) || null;
+    const water = candidatesAt(sample.x, sample.z)
+      .find((area) => pointInWaterBody(area, sample.x, sample.z)) || null;
     if (!water) continue;
     inside += 1;
     hitCounts.set(water, (hitCounts.get(water) || 0) + 1);
@@ -72,7 +148,7 @@ function footprintWaterCoverage(points = [], waterAreas = []) {
   });
   if (!primaryWater) {
     let nearestDistance = Infinity;
-    for (const water of waterAreas) {
+    for (const water of candidatesAt(centroid.x, centroid.z)) {
       if (!water?.bounds || !Number.isFinite(Number(water.surfaceY))) continue;
       const dx = Math.max(water.bounds.minX - centroid.x, 0, centroid.x - water.bounds.maxX);
       const dz = Math.max(water.bounds.minZ - centroid.z, 0, centroid.z - water.bounds.maxZ);
@@ -92,9 +168,9 @@ function footprintWaterCoverage(points = [], waterAreas = []) {
   };
 }
 
-function classifyBuildingWaterRelationship(tags = {}, points = [], waterAreas = []) {
+function classifyBuildingWaterRelationship(tags = {}, points = [], waterAreas = [], options = {}) {
   const mapped = classifyMappedWaterStructure(tags);
-  const coverage = footprintWaterCoverage(points, waterAreas);
+  const coverage = footprintWaterCoverage(points, waterAreas, options);
   if (mapped.vessel) {
     return { ...mapped, coverage, action: 'render_vessel' };
   }
@@ -234,6 +310,7 @@ function createMappedVesselMesh(points, waterSurfaceY, tags = {}, options = {}) 
 export {
   classifyBuildingWaterRelationship,
   classifyMappedWaterStructure,
+  createWaterAreaSpatialIndex,
   createMappedVesselMesh,
   footprintWaterCoverage,
   mappedVesselVerticalProfile

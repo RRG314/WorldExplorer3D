@@ -198,7 +198,7 @@ function createMultiplayerRoomsDirectoryApi(context) {
     return doc(db, ROOM_COLLECTION, normalizeCode(roomId), ROOM_STATE_COLLECTION, HOME_BASE_DOC);
   }
 
-  function listenHomeBase(roomId, callback) {
+  function listenHomeBase(roomId, callback, options = {}) {
     if (typeof callback !== 'function') return () => {};
     const normalizedRoomId = normalizeCode(roomId);
     if (!normalizedRoomId) {
@@ -237,7 +237,7 @@ function createMultiplayerRoomsDirectoryApi(context) {
       });
     }, (err) => {
       console.warn('[multiplayer][rooms] listenHomeBase failed:', err);
-      callback(null);
+      if (typeof options.onError === 'function') options.onError(err);
     });
   }
 

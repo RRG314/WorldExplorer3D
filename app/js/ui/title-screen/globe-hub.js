@@ -5,7 +5,7 @@ import {
 import {
   loadRecentPlaces,
   loadSavedFavoriteCities
-} from '../globe-selector/helpers.js?v=6';
+} from '../globe-selector/helpers.js?v=7';
 
 const HUB_PANELS = {
   games: { tab: 'games', title: 'Missions & Games' },

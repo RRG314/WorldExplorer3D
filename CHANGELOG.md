@@ -2,6 +2,61 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.2.0] - 2026-08-15
+
+### Added
+
+- DeFlock Hunt, a location game using publicly mapped OpenStreetMap
+  surveillance nodes with single-player and shared-room virtual progress.
+- Live GPS Explore, an optional foreground-only location-following mode inside
+  one bounded fixed world with filtering, smoothing, pause, and low-power controls.
+- Atomic publication of six immutable selected-location products for terrain,
+  water, transport, buildings, land use, and places.
+- Release checks for provider cancellation/failure behavior, 30-second drive
+  and flight, fixed-world boundary traversal, Space return, and cold/warm load
+  performance against the exact 4.1.3 release.
+- Worldwide land, open-ocean, and cryosphere classification with dedicated
+  non-streaming polar surfaces and biome-aware terrain/vegetation presentation.
+- A two-browser multiplayer integration gate for private room joining,
+  presence, movement, chat, and shared half-grid building shapes.
+
+### Changed
+
+- One location-wide PBR base material now spans WorldCover tiles while mapped
+  per-pixel tint retains local grass, built, sand, rock, soil, and snow detail.
+- Far terrain reuses mapped surface colors at the detailed seam and retries a
+  missing elevation child through one bounded parent tile instead of dropping
+  the complete horizon.
+- Location changes cancel superseded provider work and reveal the replacement
+  scene only after its matching immutable snapshot commits.
+- Multiplayer discovery now separates invite-code joining, room creation,
+  saved rooms, city discovery, and administrator-curated featured rooms.
+- Earth, Moon, Mars, and Ocean destination controls are circular at desktop and
+  mobile sizes; Space remains the rectangular destination control.
+
+### Fixed
+
+- Switching between travel modes now preserves the active actor's current
+  traveled position instead of returning the car or character to the original
+  location spawn.
+- Removed rectangular land-cover color changes in farmland, dense cities, and
+  sparse-data polar terrain by giving detailed and far ground one semantic
+  color composition.
+- Prevented a missing far elevation tile from producing a flat or empty inland
+  horizon.
+- Prevented travel-mode changes, ready-world movement, and Space return from
+  reloading or republishing the selected Earth world.
+- Preserved the requested location label and aircraft pose through publication
+  and Earth→Space→Earth transitions.
+- Prevented land coordinates from inheriting boat/open-water state, including
+  provider-limited and polar locations, while retaining mapped water ownership.
+- Restored private invite-room joining, compatible world-frame presence, and
+  exact half-height stacking for shared cubes, slabs, ramps, and columns.
+- Kept dense mapped city blocks developed when optional land-cover tiles are
+  unavailable, while mapped parks and other natural surfaces remain exact.
+- Restored the Shortbread building fallback when Overture is unavailable by
+  awaiting decoded vector-tile elements before publication.
+
 ## [4.1.3] - 2026-08-07
 
 ### Added

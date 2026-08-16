@@ -1,6 +1,6 @@
 # Attribution
 
-Last reviewed: 2026-07-30 for version 4.1.2.
+Last reviewed: 2026-08-15 for version 4.2.0.
 
 This is the concise public attribution index. Asset-level details are in `app/assets/models/ATTRIBUTION.md` and `app/assets/textures/ATTRIBUTION.md`.
 
@@ -11,6 +11,19 @@ This is the concise public attribution index. Asset-level details are in `app/as
 - ESA WorldCover 2021: contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium, CC BY 4.0. <https://esa-worldcover.org/>
 - GEBCO Compilation Group bathymetry: CC BY 4.0. <https://www.gebco.net/>
 - Mapzen Terrarium elevation service and upstream elevation sources: provider terms apply.
+
+### DeFlock Hunt
+
+- DeFlock Hunt reads publicly mapped surveillance nodes from OpenStreetMap and
+  retains `© OpenStreetMap contributors` and ODbL provenance in live responses,
+  cached responses, the bundled Baltimore outage fallback, and the in-game help
+  surface.
+- The mode is inspired by the independent [DeFlock project](https://deflock.org/),
+  which documents public surveillance infrastructure and contributes locations
+  to OpenStreetMap. World Explorer 3D is not affiliated with or endorsed by
+  DeFlock, and it does not bundle DeFlock code or a DeFlock-owned data feed.
+- “Flock Safety” and other mapped manufacturer/operator names are source
+  metadata, not World Explorer 3D partners or endorsements.
 
 ## Operational Feeds
 

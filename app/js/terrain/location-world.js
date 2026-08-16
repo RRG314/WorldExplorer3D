@@ -5,6 +5,7 @@ function createLocationTerrainApi(deps = {}) {
     worldToLatLon,
     latLonToTileXY,
     buildTerrainTileMesh,
+    buildPolarCryosphereSurface,
     terrainTileDeps,
     getTerrainMeshKey,
     terrainTileMeshKey,
@@ -57,12 +58,53 @@ function createLocationTerrainApi(deps = {}) {
     pendingTerrainMeshes.clear();
     resetFarTerrainClipmap?.();
     clearTerrainHeightCache();
+    appCtx.polarCryosphereSurface = null;
+    appCtx.samplePolarCryosphereWorldYAt = null;
   }
 
   function publishLocationTerrain() {
     if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
 
-    const locationOrigin = worldToLatLon(0, 0);
+    const polarCryosphere = appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local';
+    // Polar ENU projection is valid, but the requested geodetic origin is the
+    // publication identity. Using a reverse-projected zero during a location
+    // transition can briefly return the previous pole and publish two meshes.
+    const locationOrigin = polarCryosphere
+      ? { lat: Number(appCtx.LOC?.lat || 0), lon: Number(appCtx.LOC?.lon || 0) }
+      : worldToLatLon(0, 0);
+    if (polarCryosphere) {
+      const locationKey = [
+        'polar-cryosphere-local',
+        Number(locationOrigin.lat).toFixed(7),
+        Number(locationOrigin.lon).toFixed(7)
+      ].join(':');
+      if (publishedLocationKey === locationKey) return false;
+      ensureTerrainGroup();
+      publicationGeneration += 1;
+      pendingTerrainMeshes.clear();
+      resetFarTerrainClipmap?.();
+      while (appCtx.terrainGroup.children.length) {
+        const previous = appCtx.terrainGroup.children[appCtx.terrainGroup.children.length - 1];
+        appCtx.terrainGroup.remove(previous);
+        previous?.geometry?.dispose?.();
+        previous?.material?.map?.dispose?.();
+        previous?.material?.dispose?.();
+      }
+      const mesh = buildPolarCryosphereSurface?.({
+        latitude: locationOrigin.lat,
+        worldUnitsPerMeter: appCtx.WORLD_UNITS_PER_METER
+      });
+      if (!mesh) return false;
+      appCtx.terrainGroup.add(mesh);
+      appCtx.polarCryosphereSurface = mesh;
+      appCtx.samplePolarCryosphereWorldYAt = mesh.userData.heightSampler;
+      publishedLocationKey = locationKey;
+      clearTerrainHeightCache();
+      appCtx.retireGroundFallbackPlaceholder?.();
+      appCtx.setPerfLiveStat?.('terrainRing', 'polar-fixed');
+      appCtx.setPerfLiveStat?.('terrainMeshQueue', 0);
+      return true;
+    }
     const usesAcceptedGround = typeof terrainTileDeps?.usesAcceptedGround === 'function'
       ? terrainTileDeps.usesAcceptedGround()
       : terrainTileDeps?.usesAcceptedGround === true;

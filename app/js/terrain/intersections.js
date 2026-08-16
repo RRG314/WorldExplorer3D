@@ -230,14 +230,21 @@ export function detectRoadIntersections(roads) {
   roads.forEach((road, roadIdx) => {
     if (!Array.isArray(road?.pts) || road.pts.length < 2) return;
     const pad = Math.max(8, Number(road.width) || 0);
-    roadInfos.push({
-      index: roadInfos.length,
-      roadIdx,
-      road,
-      bounds: pointsBoundsLocal(road.pts, pad),
-      width: Number(road.width) || 8,
-      atGrade: roadIsAtGrade(road)
-    });
+    // Fixed regional centerlines already retain their canonical source-node
+    // junctions below. Pairwise geometric crossing discovery is only needed
+    // in the detailed location core; running it again over thousands of
+    // metropolitan LOD roads spent seconds finding junction caps that are too
+    // distant to resolve and duplicated the transport topology authority.
+    if (road.fixedRegionalContext !== true) {
+      roadInfos.push({
+        index: roadInfos.length,
+        roadIdx,
+        road,
+        bounds: pointsBoundsLocal(road.pts, pad),
+        width: Number(road.width) || 8,
+        atGrade: roadIsAtGrade(road)
+      });
+    }
 
     [0, road.pts.length - 1].forEach((idx) => {
       const point = road.pts[idx];

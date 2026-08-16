@@ -9,8 +9,10 @@ import {
 } from './production-readiness.mjs';
 import { assertWorldMatrixLocation } from './world-matrix-assertions.mjs';
 import { startStaticRootServer } from './test-static-server.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
 
 const rootDir = process.cwd();
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputLabel = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_OUTPUT_LABEL || '')) ?
@@ -30,6 +32,7 @@ const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT
   'report.json';
 const visualReviewFile = String(process.env.WORLD_MATRIX_VISUAL_REVIEW_FILE || '').trim();
 const headed = process.env.WORLD_MATRIX_HEADED === '1';
+const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const requestedLocationIds = new Set(
   String(process.env.WORLD_MATRIX_IDS || '')
     .split(',')
@@ -38,7 +41,7 @@ const requestedLocationIds = new Set(
 );
 const testLocations = requestedLocationIds.size > 0 ?
   WORLD_TEST_LOCATIONS.filter((location) => requestedLocationIds.has(String(location.id).toLowerCase())) :
-  WORLD_TEST_LOCATIONS;
+  WORLD_TEST_LOCATIONS.filter((location) => location.regressionOnly !== true);
 
 async function mkdirp(dir) {
   await fs.mkdir(dir, { recursive: true });
@@ -85,17 +88,6 @@ async function ensureRuntime(page) {
 
 async function bootstrapRuntime(page, baseUrl) {
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForFunction(async () => {
-    const mod = await import('/app/js/shared-context.js?v=55');
-    const ctx = mod?.ctx || {};
-    return !!(
-      ctx &&
-      typeof ctx.loadRoads === 'function' &&
-      typeof ctx.switchEnv === 'function' &&
-      ctx.ENV?.EARTH
-    );
-  }, { timeout: 120000 });
-
   await page.evaluate(async () => {
     const deadline = performance.now() + 60000;
     let ctx = null;
@@ -325,6 +317,26 @@ async function loadLocation(page, spec) {
     for (const mesh of ctx.terrainGroup?.children || []) {
       if (!mesh?.userData?.isTerrainMesh) continue;
       const profile = mesh.userData?.terrainVisualProfile || {};
+      const mixA = mesh.geometry?.attributes?.terrainSurfaceMixA;
+      const mixB = mesh.geometry?.attributes?.terrainSurfaceMixB;
+      const materialMix = { grass: 0, urban: 0, sand: 0, forest: 0, soil: 0, rock: 0, snow: 0 };
+      if (mixA && mixB) {
+        for (let index = 0; index < mixA.count; index += 1) {
+          const urban = Math.max(0, Number(mixA.getX(index) || 0));
+          const sand = Math.max(0, Number(mixA.getY(index) || 0));
+          const forest = Math.max(0, Number(mixA.getZ(index) || 0));
+          const soil = Math.max(0, Number(mixA.getW(index) || 0));
+          const rock = Math.max(0, Number(mixB.getX(index) || 0));
+          const snow = Math.max(0, Number(mixB.getY(index) || 0));
+          materialMix.urban += urban;
+          materialMix.sand += sand;
+          materialMix.forest += forest;
+          materialMix.soil += soil;
+          materialMix.rock += rock;
+          materialMix.snow += snow;
+          materialMix.grass += Math.max(0, 1 - urban - sand - forest - soil - rock - snow);
+        }
+      }
       const mode = String(profile.mode || 'unknown');
       const visualMode = String(profile.visualMode || mode);
       const reason = String(profile.reason || 'unknown');
@@ -337,10 +349,39 @@ async function loadLocation(page, spec) {
         visualMode,
         reason,
         distance: Number(Math.hypot(Number(mesh.position?.x || 0) - actorX, Number(mesh.position?.z || 0) - actorZ).toFixed(1)),
-        localSignals: profile.localSignals || null
+        localSignals: profile.localSignals || null,
+        materialMix
       });
     }
     terrainProfileSamples.sort((a, b) => a.distance - b.distance);
+
+    const groundStackAtActor = [];
+    const groundCandidates = [
+      ...(ctx.terrainGroup?.children || []),
+      ...(ctx.landuseMeshes || []),
+      ctx.ground
+    ].filter((mesh, index, values) => mesh?.isMesh && values.indexOf(mesh) === index);
+    for (const mesh of groundCandidates) {
+      if (mesh.visible === false || !mesh.geometry) continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox?.();
+      if (!mesh.geometry.boundingBox) continue;
+      mesh.updateWorldMatrix?.(true, false);
+      const bounds = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+      if (actorX < bounds.min.x - 1 || actorX > bounds.max.x + 1 ||
+          actorZ < bounds.min.z - 1 || actorZ > bounds.max.z + 1) continue;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      groundStackAtActor.push({
+        name: String(mesh.name || ''),
+        landuseType: String(mesh.userData?.landuseType || ''),
+        terrain: !!mesh.userData?.isTerrainMesh,
+        loadingPlaceholder: !!mesh.userData?.isGroundPlane,
+        renderOrder: Number(mesh.renderOrder || 0),
+        minY: Number(bounds.min.y.toFixed(3)),
+        maxY: Number(bounds.max.y.toFixed(3)),
+        colors: materials.map((material) => material?.color?.getHexString?.() || null),
+        maps: materials.map((material) => String(material?.map?.name || material?.map?.source?.data?.currentSrc || ''))
+      });
+    }
 
     const landusePresentation = {};
     for (const mesh of ctx.landuseMeshes || []) {
@@ -400,14 +441,43 @@ async function loadLocation(page, spec) {
           [];
         for (const connection of connections) {
           if (connection?.endpoint !== 'interior') continue;
+          const sourcePoint = endpoint === 'start' ? road.pts[0] : road.pts[road.pts.length - 1];
+          const targetRoad = connection.feature || null;
+          const sourceSurfaceY = Number(ctx.sampleFeatureSurfaceY?.(
+            road,
+            Number(sourcePoint?.x),
+            Number(sourcePoint?.z)
+          ));
+          const targetSurfaceY = Number(ctx.sampleFeatureSurfaceY?.(
+            targetRoad,
+            Number(connection?.point?.x ?? sourcePoint?.x),
+            Number(connection?.point?.z ?? sourcePoint?.z),
+            {
+              segIndex: Number(connection.segmentIndex),
+              t: Number(connection.segmentT)
+            }
+          ));
           elevatedInteriorConnections.push({
             sourceFeatureId: String(road.sourceFeatureId || ''),
             name: String(road.name || road.type || ''),
+            sourceWidth: Number(Number(road.width || 0).toFixed(3)),
+            sourceDriveable: road.driveable !== false,
+            sourceRouteState: String(road.transportRecord?.routeState || ''),
+            sourceCompleteness: String(road.transportRecord?.completeness || ''),
             endpoint,
             targetFeatureId: String(connection.feature?.sourceFeatureId || ''),
             targetName: String(connection.feature?.name || connection.feature?.type || ''),
+            targetWidth: Number(Number(targetRoad?.width || 0).toFixed(3)),
+            targetDriveable: targetRoad?.driveable !== false,
+            targetRouteState: String(targetRoad?.transportRecord?.routeState || ''),
+            targetCompleteness: String(targetRoad?.transportRecord?.completeness || ''),
             targetSegmentIndex: Number(connection.segmentIndex),
-            lateralGap: Number((Number(connection.distance) || 0).toFixed(3))
+            connectionMethod: String(connection.provenance?.method || ''),
+            connectionConfidence: Number(Number(connection.provenance?.confidence || 0).toFixed(3)),
+            lateralGap: Number((Number(connection.distance) || 0).toFixed(3)),
+            verticalGap: Number.isFinite(sourceSurfaceY) && Number.isFinite(targetSurfaceY)
+              ? Number(Math.abs(sourceSurfaceY - targetSurfaceY).toFixed(3))
+              : null
           });
         }
         if (connections.length > 0) continue;
@@ -615,6 +685,8 @@ async function loadLocation(page, spec) {
       const targetRoad = (ctx.roads || [])
         .filter((road) =>
           road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
+          road?.transportStructureRef?.driveable === true &&
+          road?.transportRecord?.routeState === 'complete' &&
           Array.isArray(road.pts) &&
           road.pts.length >= 2
         )
@@ -1015,12 +1087,42 @@ async function loadLocation(page, spec) {
     const worldCoverStatus = {};
     const terrainRasterUrls = [];
     let terrainImageryOwners = 0;
+    let terrainSemanticMaterialMeshes = 0;
+    const terrainSemanticClassSamples = {
+      grass: 0,
+      urban: 0,
+      sand: 0,
+      forest: 0,
+      soil: 0,
+      rock: 0,
+      snow: 0
+    };
     for (const mesh of worldCoverMeshes) {
       const status = String(mesh?.userData?.worldCoverStatus || 'not_requested');
       worldCoverStatus[status] = Number(worldCoverStatus[status] || 0) + 1;
       if (mesh?.userData?.terrainImageryTexture || mesh?.userData?.terrainImageryStatus) terrainImageryOwners += 1;
       const source = String(mesh?.material?.map?.image?.currentSrc || mesh?.material?.map?.image?.src || '');
       if (/arcgisonline|World_Imagery/i.test(source)) terrainRasterUrls.push(source);
+      if (mesh?.userData?.terrainSurfaceMaterialBlend?.authority === 'single-terrain-semantic-pbr-material') {
+        terrainSemanticMaterialMeshes += 1;
+      }
+      const mixA = mesh?.geometry?.attributes?.terrainSurfaceMixA;
+      const mixB = mesh?.geometry?.attributes?.terrainSurfaceMixB;
+      if (mixA && mixB && mixA.count === mixB.count) {
+        const step = Math.max(1, Math.floor(mixA.count / 4000));
+        for (let index = 0; index < mixA.count; index += step) {
+          const values = [
+            mixA.getX(index), mixA.getY(index), mixA.getZ(index), mixA.getW(index),
+            mixB.getX(index), mixB.getY(index)
+          ];
+          const classNames = ['urban', 'sand', 'forest', 'soil', 'rock', 'snow'];
+          const classWeight = values.reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
+          terrainSemanticClassSamples.grass += Math.max(0, 1 - classWeight);
+          values.forEach((value, classIndex) => {
+            terrainSemanticClassSamples[classNames[classIndex]] += Math.max(0, Number(value) || 0);
+          });
+        }
+      }
     }
 
     // Keep actor pose and road evidence from the same frame. The nearest-road API
@@ -1081,6 +1183,12 @@ async function loadLocation(page, spec) {
         null;
     }
 
+    // The location identity contract includes the player-visible HUD, so drive the
+    // real HUD presentation owner before reading its output. World loading alone
+    // does not guarantee that an animation frame has presented the resolved label.
+    if (typeof ctx.updateHUD === 'function') ctx.updateHUD();
+    const renderedHudLabel = String(document.getElementById('locationLine')?.textContent || '');
+
     return {
       id: locationSpec.id,
       label: locationSpec.label,
@@ -1092,8 +1200,19 @@ async function loadLocation(page, spec) {
         sequence: Number(completedLoad.sequence),
         status: String(completedLoad.status || ''),
         location: { ...(completedLoad.location || {}) },
-        publicationSequence: Number(publication.sequence)
+        publicationSequence: Number(publication.sequence),
+        groundMode: String(completedLoad.groundMode || ''),
+        surfaceDomain: completedLoad.surfaceDomain
+          ? JSON.parse(JSON.stringify(completedLoad.surfaceDomain))
+          : null,
+        loadPlan: completedLoad.worldLoadPlan
+          ? JSON.parse(JSON.stringify(completedLoad.worldLoadPlan))
+          : null
       },
+      worldSurfaceProfile: ctx.worldSurfaceProfile
+        ? JSON.parse(JSON.stringify(ctx.worldSurfaceProfile))
+        : null,
+      farTerrainClipmap: ctx.farTerrainClipmapState ? { ...ctx.farTerrainClipmapState } : null,
       buildingDetailWaitMs: Number(buildingDetailWaitMs.toFixed(1)),
       landmarkWaitMs: Number(landmarkWaitMs.toFixed(1)),
       baselineWaitMs: Number(baselineWaitMs.toFixed(1)),
@@ -1109,6 +1228,12 @@ async function loadLocation(page, spec) {
         waterAreas: Array.isArray(ctx.waterAreas) ? ctx.waterAreas.length : 0,
         waterways: Array.isArray(ctx.waterways) ? ctx.waterways.length : 0,
         vegetationMeshes: Array.isArray(ctx.vegetationMeshes) ? ctx.vegetationMeshes.length : 0,
+        vegetationRenderedCrowns: Array.isArray(ctx.vegetationMeshes)
+          ? ctx.vegetationMeshes.reduce(
+              (sum, mesh) => sum + Number(mesh?.userData?.renderedCrownCount || 0),
+              0
+            )
+          : 0,
         vegetationFeatures: Array.isArray(ctx.vegetationFeatures) ? ctx.vegetationFeatures.length : 0,
         vegetationPlacementCandidates,
         streetFurnitureMeshes: Array.isArray(ctx.streetFurnitureMeshes) ? ctx.streetFurnitureMeshes.length : 0,
@@ -1118,17 +1243,33 @@ async function loadLocation(page, spec) {
       terrainProfiles,
       terrainVisualModes,
       terrainProfileSamples: terrainProfileSamples.slice(0, 5),
+      groundStackAtActor,
       worldCover: {
         stats: ctx.worldCoverStats ? JSON.parse(JSON.stringify(ctx.worldCoverStats)) : null,
+        provider: ctx.getWorldCoverProviderSnapshot?.() || null,
         status: worldCoverStatus,
         samples: worldCoverMeshes
           .filter((mesh) => mesh?.userData?.worldCoverSummary)
           .slice(0, 5)
           .map((mesh) => ({ ...mesh.userData.worldCoverSummary }))
       },
+      transportPublication: ctx.transportSurfacePublication
+        ? JSON.parse(JSON.stringify(ctx.transportSurfacePublication))
+        : null,
+      structureProfileCompilation: ctx.structureProfileCompilation
+        ? JSON.parse(JSON.stringify(ctx.structureProfileCompilation))
+        : null,
       terrainSurface: {
         imageryOwners: terrainImageryOwners,
         rasterUrls: terrainRasterUrls,
+        locationBaseDetailMode: String(ctx.worldCoverBaseDetailMode || ''),
+        publishedDetailModes: [...new Set(worldCoverMeshes
+          .filter((mesh) => mesh?.userData?.worldCoverStatus === 'ready')
+          .map((mesh) => String(mesh?.userData?.terrainDetailProvenance?.mode || ''))
+          .filter(Boolean))],
+        semanticMaterialMeshes: terrainSemanticMaterialMeshes,
+        semanticClassSamples: Object.fromEntries(Object.entries(terrainSemanticClassSamples)
+          .map(([name, count]) => [name, Number(count.toFixed(2))])),
         samples: worldCoverMeshes.slice(0, 5).map((mesh) => ({
           key: mesh?.userData?.terrainTileKey || null,
           visualMode: mesh?.userData?.terrainVisualProfile?.visualMode || mesh?.userData?.terrainVisualProfile?.mode || null,
@@ -1169,7 +1310,7 @@ async function loadLocation(page, spec) {
         } : null,
         resolvedHudLabel: typeof ctx.getHudLocationLabel === 'function' ?
           String(ctx.getHudLocationLabel() || '') : '',
-        renderedHudLabel: String(document.getElementById('location')?.textContent || '')
+        renderedHudLabel
       },
       spawnOccupancy: expectedStart !== 'water' ? {
         actorCollision: finalActorCollision?.collision === true,
@@ -1274,7 +1415,10 @@ async function main() {
   await mkdirp(outputDir);
   const server = externalBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts });
   const baseUrl = externalBaseUrl || `http://${host}:${server.port}`;
-  const browser = await chromium.launch({ headless: !headed });
+  const browser = await chromium.launch({
+    headless: !headed,
+    ...(browserChannel ? { channel: browserChannel } : {})
+  });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   if (blockWorldCover) await page.route('https://titiler.terrascope.be/**', (route) => route.abort('blockedbyclient'));
   const consoleErrors = [];
@@ -1301,6 +1445,7 @@ async function main() {
   });
 
   const report = {
+    evidenceIdentity,
     generatedAt: new Date().toISOString(),
     baseUrl,
     locations: []
@@ -1432,6 +1577,7 @@ main().catch(async (err) => {
       JSON.stringify(
         {
           ...existingReport,
+          evidenceIdentity,
           generatedAt: new Date().toISOString(),
           pass: false,
           error: String(err?.message || err)

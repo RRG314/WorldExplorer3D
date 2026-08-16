@@ -9,12 +9,14 @@ const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';
 const LOCAL_FISHING_LEADERBOARD_KEY = 'worldExplorer3D.fishing.localLeaderboard.v1';
 const LOCAL_EXPLORER_LEADERBOARD_KEY = 'worldExplorer3D.explorer.localLeaderboard.v1';
+const LOCAL_DEFLOCK_LEADERBOARD_KEY = 'worldExplorer3D.deflock.localLeaderboard.v1';
 const PLAYER_NAME_KEY = 'worldExplorer3D.flowerChallenge.playerName';
 const FIREBASE_CONFIG_KEY = 'worldExplorer3D.firebaseConfig';
 const FIREBASE_COLLECTION = 'flowerLeaderboard';
 const FIREBASE_PAINT_COLLECTION = 'paintTownLeaderboard';
 const FIREBASE_FISHING_COLLECTION = 'fishingLeaderboard';
 const FIREBASE_EXPLORER_COLLECTION = 'explorerLeaderboard';
+const FIREBASE_DEFLOCK_COLLECTION = 'deflockLeaderboard';
 const LEADERBOARD_LIMIT = 10;
 const FLOWER_MIN_DISTANCE = 120;
 const FLOWER_MAX_DISTANCE = 2600;
@@ -51,6 +53,7 @@ const ui = {
   titlePaintTabBtn: null,
   titleFishingTabBtn: null,
   titleExplorerTabBtn: null,
+  titleDeFlockTabBtn: null,
   titleHint: null,
   titleList: null,
   hud: null,
@@ -89,7 +92,7 @@ function safeText(value) {
 
 function normalizeChallengeType(raw) {
   const value = String(raw || '').toLowerCase();
-  return ['flower', 'painttown', 'fishing', 'explorer'].includes(value) ? value : 'flower';
+  return ['flower', 'painttown', 'fishing', 'explorer', 'deflock'].includes(value) ? value : 'flower';
 }
 
 function getLeaderboardStorageKey(challengeType) {
@@ -97,6 +100,7 @@ function getLeaderboardStorageKey(challengeType) {
   if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
   if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
   if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
+  if (type === 'deflock') return LOCAL_DEFLOCK_LEADERBOARD_KEY;
   return LOCAL_LEADERBOARD_KEY;
 }
 
@@ -105,6 +109,7 @@ function getLeaderboardCollection(challengeType) {
   if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
   if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
   if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
+  if (type === 'deflock') return FIREBASE_DEFLOCK_COLLECTION;
   return FIREBASE_COLLECTION;
 }
 
@@ -250,10 +255,12 @@ const leaderboardApi = createFlowerChallengeLeaderboardApi({
   constants: {
     FIREBASE_COLLECTION,
     FIREBASE_EXPLORER_COLLECTION,
+    FIREBASE_DEFLOCK_COLLECTION,
     FIREBASE_FISHING_COLLECTION,
     FIREBASE_PAINT_COLLECTION,
     LOCAL_LEADERBOARD_KEY,
     LOCAL_EXPLORER_LEADERBOARD_KEY,
+    LOCAL_DEFLOCK_LEADERBOARD_KEY,
     LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
   },
@@ -281,6 +288,7 @@ const {
   setChallengeLeaderboardView,
   sortLeaderboardEntries,
   storeLocalResult,
+  submitDeFlockScore,
   submitFishingScore,
   submitPaintTownScore,
   writeRemoteLeaderboard
@@ -528,6 +536,7 @@ function setupFlowerChallenge() {
   ui.titlePaintTabBtn = document.getElementById('leaderboardTabPaintTown');
   ui.titleFishingTabBtn = document.getElementById('leaderboardTabFishing');
   ui.titleExplorerTabBtn = document.getElementById('leaderboardTabExplorer');
+  ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
   ui.titleHint = document.getElementById('gameLeaderboardHint');
   ui.titleList = document.getElementById('flowerLeaderboardList');
   ui.hud = document.getElementById('flowerChallengeHud');
@@ -599,6 +608,12 @@ function setupFlowerChallenge() {
     });
   }
 
+  if (ui.titleDeFlockTabBtn) {
+    ui.titleDeFlockTabBtn.addEventListener('click', () => {
+      setChallengeLeaderboardView('deflock');
+    });
+  }
+
   document.addEventListener('click', (event) => {
     if (!ui.titlePanel || !ui.titlePanel.classList.contains('open')) return;
     if (!(event.target instanceof Element)) return;
@@ -629,6 +644,7 @@ Object.assign(appCtx, {
   setChallengeLeaderboardView,
   setupFlowerChallenge,
   startFlowerChallenge,
+  submitDeFlockScore,
   submitFishingScore,
   submitPaintTownScore,
   stopFlowerChallenge,

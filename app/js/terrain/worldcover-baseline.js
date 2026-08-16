@@ -1,3 +1,6 @@
+import { createProviderOutageCircuit } from '../earth-core/provider-outage-circuit.js?v=1';
+import { terrainSurfaceClassForWorldCover } from './surface-material-blend.js?v=1';
+
 const WORLDCOVER_WMS_ENDPOINT = 'https://titiler.terrascope.be/wms';
 const WORLDCOVER_LAYER = 'esa-worldcover-map-10m-2021-v2_map';
 const WORLDCOVER_DATE = '2021-01-01';
@@ -10,13 +13,22 @@ const CACHE_STORE_NAME = 'tiles';
 const CACHE_MAX_ENTRIES = 160;
 const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PARALLEL_REQUESTS = 6;
+const PROVIDER_OUTAGE_COOLDOWN_MS = 60 * 1000;
+const providerCircuit = createProviderOutageCircuit({
+  provider: 'esa-worldcover-titiler',
+  cooldownMs: PROVIDER_OUTAGE_COOLDOWN_MS
+});
 
 const WORLD_COVER_CLASSES = [
   { id: 10, name: 'tree', source: [0, 100, 0], tint: [0.76, 0.88, 0.72] },
   { id: 20, name: 'shrub', source: [255, 187, 34], tint: [0.96, 0.98, 0.78] },
   { id: 30, name: 'grass', source: [255, 255, 76], tint: [1.03, 1.05, 0.94] },
   { id: 40, name: 'crop', source: [240, 150, 255], tint: [1.08, 0.97, 0.74] },
-  { id: 50, name: 'built', source: [250, 0, 0], tint: [0.92, 0.96, 0.92] },
+  // Built-up classification is a neutral urban continuity tint, not proof
+  // that every pixel is asphalt. Exact mapped roads and developed land-use
+  // polygons still own their physical surfaces; this only prevents uncovered
+  // regional city pixels from reverting to bright grass.
+  { id: 50, name: 'built', source: [250, 0, 0], tint: [0.76, 0.78, 0.80] },
   { id: 60, name: 'bare', source: [180, 180, 180], tint: [1.08, 0.94, 0.76] },
   { id: 70, name: 'snow', source: [240, 240, 240], tint: [1.32, 1.34, 1.38] },
   { id: 80, name: 'water', source: [0, 100, 200], tint: [0.82, 0.91, 0.96] },
@@ -26,36 +38,6 @@ const WORLD_COVER_CLASSES = [
 ];
 
 const SURFACE_TINT_ENCODING_SCALE = 170;
-
-function buildSmoothedClassWeight(classes, size, className) {
-  const encoded = new Uint8Array(size * size);
-  for (let pixel = 0; pixel < classes.length; pixel += 1) {
-    encoded[pixel] = classes[pixel]?.name === className ? 255 : 0;
-  }
-
-  const radius = 3;
-  const horizontal = new Uint8Array(encoded.length);
-  const smoothed = new Uint8Array(encoded.length);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const from = Math.max(0, x - radius);
-      const to = Math.min(size - 1, x + radius);
-      let sum = 0;
-      for (let sx = from; sx <= to; sx += 1) sum += encoded[y * size + sx];
-      horizontal[y * size + x] = Math.round(sum / (to - from + 1));
-    }
-  }
-  for (let y = 0; y < size; y += 1) {
-    const from = Math.max(0, y - radius);
-    const to = Math.min(size - 1, y + radius);
-    for (let x = 0; x < size; x += 1) {
-      let sum = 0;
-      for (let sy = from; sy <= to; sy += 1) sum += horizontal[sy * size + x];
-      smoothed[y * size + x] = Math.round(sum / (to - from + 1));
-    }
-  }
-  return smoothed;
-}
 
 function buildSmoothedSurfaceTints(classes, size) {
   const encoded = new Uint8Array(size * size * 3);
@@ -123,6 +105,12 @@ function drainRequestQueue() {
       entry.reject(new DOMException('WorldCover request aborted', 'AbortError'));
       continue;
     }
+    try {
+      providerCircuit.assertAvailable();
+    } catch (error) {
+      entry.reject(error);
+      continue;
+    }
     activeRequests += 1;
     Promise.resolve()
       .then(entry.task)
@@ -142,6 +130,12 @@ function scheduleRequestDrain() {
 
 function withRequestSlot(task, signal, priority = 0) {
   return new Promise((resolve, reject) => {
+    try {
+      providerCircuit.assertAvailable();
+    } catch (error) {
+      reject(error);
+      return;
+    }
     requestQueue.push({ task, signal, priority: Number(priority) || 0, resolve, reject });
     scheduleRequestDrain();
   });
@@ -290,7 +284,14 @@ function buildWorldCoverUrl(bounds, size) {
   return `${WORLDCOVER_WMS_ENDPOINT}?${params.toString()}`;
 }
 
-async function fetchWorldCoverBlob(bounds, size, key, signal = null, priority = 0) {
+async function fetchWorldCoverBlob(
+  bounds,
+  size,
+  key,
+  signal = null,
+  priority = 0,
+  requestTimeoutMs = REQUEST_TIMEOUT_MS
+) {
   const memoryBlob = memoryBlobCache.get(key);
   if (memoryBlob) {
     rememberBlob(key, memoryBlob);
@@ -304,9 +305,15 @@ async function fetchWorldCoverBlob(bounds, size, key, signal = null, priority = 
   return withRequestSlot(async () => {
     if (signal?.aborted) throw new DOMException('WorldCover request aborted', 'AbortError');
     const controller = new AbortController();
+    const untrackController = providerCircuit.track(controller);
     const relayAbort = () => controller.abort();
     signal?.addEventListener?.('abort', relayAbort, { once: true });
-    const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let timedOut = false;
+    const timeoutMs = Math.max(25, Number(requestTimeoutMs) || REQUEST_TIMEOUT_MS);
+    const timeoutId = globalThis.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       const response = await fetch(buildWorldCoverUrl(bounds, size), {
         mode: 'cors',
@@ -314,15 +321,34 @@ async function fetchWorldCoverBlob(bounds, size, key, signal = null, priority = 
         cache: 'default',
         signal: controller.signal
       });
-      if (!response.ok) throw new Error(`WorldCover WMS HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = new Error(`WorldCover WMS HTTP ${response.status}`);
+        error.status = Number(response.status);
+        throw error;
+      }
       const blob = await response.blob();
       if (!String(blob.type || '').startsWith('image/')) throw new Error('WorldCover WMS returned a non-image response');
       rememberBlob(key, blob);
       void writeCachedBlob(key, blob);
       return { blob, source: 'network' };
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason || error;
+      if (providerCircuit.isOpen()) throw providerCircuit.unavailableError();
+      const status = Number(error?.status || 0);
+      const outage = timedOut || error instanceof TypeError || status === 429 || status >= 500;
+      if (outage) {
+        const reason = timedOut
+          ? `request timed out after ${timeoutMs} ms`
+          : status
+            ? `HTTP ${status}`
+            : String(error?.message || 'network request failed');
+        throw providerCircuit.trip(reason, controller);
+      }
+      throw error;
     } finally {
       globalThis.clearTimeout(timeoutId);
       signal?.removeEventListener?.('abort', relayAbort);
+      untrackController();
     }
   }, signal, priority);
 }
@@ -362,7 +388,7 @@ async function imageFromBlob(blob) {
   });
 }
 
-async function createSemanticTexture(blob, size) {
+async function createSemanticTexture(blob, size, bounds = null) {
   const sourceImage = await imageFromBlob(blob);
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -376,6 +402,7 @@ async function createSemanticTexture(blob, size) {
   const imageData = context.getImageData(0, 0, size, size);
   const counts = {};
   const classes = new Array(size * size);
+  const surfaceMaterialClasses = new Uint8Array(size * size);
   let recognized = 0;
 
   for (let i = 0; i < imageData.data.length; i += 4) {
@@ -405,6 +432,12 @@ async function createSemanticTexture(blob, size) {
       if (nearbyBuilt >= 12) entry = builtClass;
     }
     classes[pixel] = entry;
+    surfaceMaterialClasses[pixel] = terrainSurfaceClassForWorldCover(
+      entry?.name || '',
+      Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS)
+        ? (bounds.latN + bounds.latS) * 0.5
+        : 0
+    );
   }
   if (recognized < size * size * 0.2) throw new Error('WorldCover tile contained insufficient classified coverage');
   const vegetationSamples = [];
@@ -425,8 +458,8 @@ async function createSemanticTexture(blob, size) {
     surfaceTints: buildSmoothedSurfaceTints(classes, size),
     surfaceTintSize: size,
     surfaceTintEncodingScale: SURFACE_TINT_ENCODING_SCALE,
-    surfaceBuiltWeights: buildSmoothedClassWeight(classes, size, 'built'),
-    surfaceBuiltWeightSize: size,
+    surfaceMaterialClasses,
+    surfaceMaterialClassSize: size,
     counts,
     recognizedPixels: recognized,
     totalPixels: size * size,
@@ -444,10 +477,15 @@ export async function loadWorldCoverBaseline(bounds, options = {}) {
     size,
     key,
     options.signal || null,
-    Number(options.priority) || 0
+    Number(options.priority) || 0,
+    Number(options.timeoutMs) || REQUEST_TIMEOUT_MS
   );
-  const result = await createSemanticTexture(loaded.blob, size);
+  const result = await createSemanticTexture(loaded.blob, size, bounds);
   return { ...result, key, source: loaded.source };
+}
+
+export function worldCoverProviderSnapshot() {
+  return providerCircuit.snapshot();
 }
 
 export const WORLD_COVER_ATTRIBUTION =

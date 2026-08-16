@@ -186,6 +186,38 @@ export const WORLD_TEST_LOCATIONS = [
     acceptableStartTerrainModes: ['snow', 'snowRock']
   },
   {
+    id: 'antarctica_glacier_custom',
+    kind: 'custom',
+    lat: -77.846,
+    lon: 166.668,
+    label: 'Antarctica Glacier',
+    category: 'polar_glacier_custom',
+    expectedStart: 'land',
+    expectedTerrainMode: 'snowRock',
+    acceptableTerrainModes: ['snow', 'snowRock'],
+    acceptableStartTerrainModes: ['snow', 'snowRock']
+  },
+  {
+    id: 'north_pole_custom',
+    kind: 'custom',
+    lat: 90,
+    lon: 0,
+    label: 'North Pole, Arctic Ocean',
+    category: 'polar_sea_ice_custom',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'cryosphere'
+  },
+  {
+    id: 'south_pole_custom',
+    kind: 'custom',
+    lat: -90,
+    lon: 0,
+    label: 'South Pole, Antarctica',
+    category: 'polar_ice_sheet_custom',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'cryosphere'
+  },
+  {
     id: 'sahara_custom',
     kind: 'custom',
     lat: 31.1342,
@@ -202,6 +234,41 @@ export const WORLD_TEST_LOCATIONS = [
     lon: -62.2159,
     label: 'Amazon Basin, Brazil',
     category: 'tropical_forest_river_custom',
+    expectedStart: 'land',
+    minimumWaterways: 1,
+    minimumVegetationFeatures: 10000,
+    minimumVegetationMeshes: 4,
+    minimumVegetationRenderedCrowns: 60000
+  },
+  {
+    id: 'ivory_coast_inland_regression',
+    kind: 'custom',
+    lat: 7.8939,
+    lon: -4.9369,
+    label: 'Gbêkê, Vallée du Bandama, Côte d’Ivoire',
+    category: 'inland_surface_authority_regression',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'land',
+    regressionOnly: true
+  },
+  {
+    id: 'svalbard_land_regression',
+    kind: 'custom',
+    lat: 78.2232,
+    lon: 15.6469,
+    label: 'Longyearbyen, Svalbard',
+    category: 'arctic_land_surface_authority_regression',
+    expectedStart: 'land',
+    expectedSurfaceDomain: 'land',
+    regressionOnly: true
+  },
+  {
+    id: 'grand_canyon_custom',
+    kind: 'custom',
+    lat: 36.1069,
+    lon: -112.1129,
+    label: 'Grand Canyon, Arizona',
+    category: 'canyon_geology_custom',
     expectedStart: 'land'
   },
   {

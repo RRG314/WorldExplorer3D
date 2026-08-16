@@ -1,14 +1,14 @@
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
-import { createGhostManager } from "./ghosts.js?v=57";
-import { listenExplorerLeaderboard } from "./loop.js?v=55";
-import { stopPresence } from "./presence.js?v=60";
+import { createGhostManager } from "./ghosts.js?v=58";
+import { listenExplorerLeaderboard } from "./loop.js?v=56";
+import { stopPresence } from "./presence.js?v=61";
 import {
   deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,
   leaveRoom,
   listenMyRooms
-} from "./rooms.js?v=66";
-import { listenPaintClaims, upsertPaintClaim } from "./painttown.js?v=55";
+} from "./rooms.js?v=67";
+import { listenPaintClaims, upsertPaintClaim } from "./painttown.js?v=56";
 import {
   listenFriends,
   listenIncomingInvites,
@@ -319,7 +319,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (!appCtx.scene) return;
 
     state.ghostManager = createGhostManager(appCtx.scene, {
-      getSelfUid: () => state.authUser?.uid || state.entitlement.uid || ""
+      getSelfUid: () => state.authUser?.uid || state.entitlement.uid || "",
+      getLocalFrame: () => helpers.readPoseSnapshot?.()?.frame || null
     });
     state.ghostManager.setVisible(state.ghostsEnabled);
   }

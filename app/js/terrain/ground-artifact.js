@@ -117,7 +117,8 @@ export function compileGroundArtifact({ manifest = {}, artifact = {} } = {}) {
 export async function loadGroundArtifact({
   manifest = {},
   url,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  signal = null
 } = {}) {
   const validation = validateGroundArtifactManifest(manifest);
   if (!validation.valid) {
@@ -132,8 +133,9 @@ export async function loadGroundArtifact({
 
   let response;
   try {
-    response = await fetchImpl(String(url || ''), { cache: 'no-store' });
+    response = await fetchImpl(String(url || ''), { cache: 'no-store', signal });
   } catch (error) {
+    if (signal?.aborted) throw error;
     return rejection('artifact-fetch-failed', {
       artifactId: manifest.artifactId,
       message: String(error?.message || error)
@@ -145,8 +147,14 @@ export async function loadGroundArtifact({
       httpStatus: Number(response?.status || 0)
     });
   }
+  if (signal?.aborted) throw signal.reason instanceof Error
+    ? signal.reason
+    : new DOMException(String(signal.reason || 'Ground artifact load aborted'), 'AbortError');
 
   const text = await response.text();
+  if (signal?.aborted) throw signal.reason instanceof Error
+    ? signal.reason
+    : new DOMException(String(signal.reason || 'Ground artifact load aborted'), 'AbortError');
   const actualSha256 = await sha256Text(text);
   if (actualSha256 !== String(manifest.contentSha256).toLowerCase()) {
     return rejection('artifact-integrity-failed', {

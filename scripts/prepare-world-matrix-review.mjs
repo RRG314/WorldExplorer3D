@@ -42,7 +42,7 @@ for (const file of files) {
     file,
     sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
     outcome: approved ? 'approved' : 'pending',
-    notes: approved ? 'Visually inspected against the 4.1.3 release checklist.' : ''
+    notes: approved ? 'Visually inspected against the 4.2.0 release checklist.' : ''
   });
 }
 

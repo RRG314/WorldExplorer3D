@@ -1,15 +1,18 @@
 import {
   fetchShortbreadBuildingData,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=9";
+} from "./shortbread-source.js?v=17";
 import {
   OVERTURE_RELEASE,
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl
-} from './overture-tile-source.js?v=1';
+} from './overture-tile-source.js?v=4';
 import { shouldSuppressBuildingParent } from './building-provenance-model.js?v=1';
+import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
+import { throwIfWorldLoadAborted } from '../earth-core/request-cancellation.js?v=1';
 
 const OVERTURE_BUILDING_ZOOM = 14;
+const OVERTURE_TILE_CONCURRENCY = 8;
 
 function geometryParts(geometry) {
   if (geometry?.type === 'Polygon') {
@@ -235,15 +238,21 @@ function fulfilledTiles(settled) {
     .map((entry) => entry.value);
 }
 
-function isTimeoutFailure(entry) {
-  if (entry.status !== 'rejected') return false;
-  const reason = entry.reason;
-  return reason?.name === 'AbortError' || /abort|timeout/i.test(String(reason?.message || reason || ''));
-}
-
-async function fetchArchiveTileBatch(coordinates) {
-  return Promise.allSettled(
-    coordinates.map(({ x, y }) => fetchOvertureThemeTile('buildings', OVERTURE_BUILDING_ZOOM, x, y))
+async function fetchArchiveTileBatch(coordinates, options = {}) {
+  const fetchTile = typeof options.fetchTile === 'function'
+    ? options.fetchTile
+    : fetchOvertureThemeTile;
+  throwIfWorldLoadAborted(options.signal, 'Overture building coverage aborted');
+  return runBoundedProviderBatch(
+    coordinates,
+    ({ x, y }, _index, signal) => fetchTile(
+      'buildings', OVERTURE_BUILDING_ZOOM, x, y, { signal }
+    ),
+    {
+      signal: options.signal,
+      concurrency: options.concurrency || OVERTURE_TILE_CONCURRENCY,
+      abortMessage: 'Overture building coverage aborted'
+    }
   );
 }
 
@@ -266,23 +275,14 @@ export async function fetchOvertureBuildingData(options = {}) {
     OVERTURE_BUILDING_ZOOM
   );
   const coordinates = orderedTileCoordinates(range, lat, lon);
-  let attempts = 1;
-  let settled = await fetchArchiveTileBatch(coordinates);
-  let tiles = fulfilledTiles(settled);
-  const fastTransientFailure = tiles.length === 0 &&
-    settled.some((entry) => entry.status === 'rejected') &&
-    !settled.some(isTimeoutFailure);
-  if (fastTransientFailure) {
-    attempts += 1;
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
-    settled = await fetchArchiveTileBatch(coordinates);
-    tiles = fulfilledTiles(settled);
-  }
-  if (tiles.length === 0) {
+  const { settled, metrics } = await fetchArchiveTileBatch(coordinates, options);
+  throwIfWorldLoadAborted(options.signal, 'Overture building coverage aborted');
+  const tiles = fulfilledTiles(settled);
+  if (metrics.fulfilled === 0) {
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Overture building coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  const coverageComplete = tiles.length === coordinates.length;
+  const coverageComplete = metrics.fulfilled === coordinates.length;
   const converted = convertTilesToElements(tiles, bounds, { coverageComplete });
   const ways = converted.elements.filter((element) => element.type === 'way');
   const parts = ways.filter((way) => way.tags?.['building:part']);
@@ -293,13 +293,25 @@ export async function fetchOvertureBuildingData(options = {}) {
     _overpassSource: 'overture-buildings-pmtiles',
     _overpassEndpoint: overtureThemeArchiveUrl('buildings'),
     _overpassCacheAgeMs: 0,
+    _buildingProviderDecision: {
+      selected: 'overture',
+      authority: 'authoritative',
+      status: ways.length > 0 ? 'available' : 'authoritative-empty',
+      fallbackStarted: false
+    },
     _overtureBuildings: {
       release: OVERTURE_RELEASE,
       zoom: OVERTURE_BUILDING_ZOOM,
-      attempts,
-      loadedTiles: tiles.length,
+      attempts: 1,
+      loadedTiles: metrics.fulfilled,
+      decodedTiles: tiles.length,
+      emptyTiles: metrics.fulfilled - tiles.length,
+      failedTiles: metrics.rejected,
       requestedTiles: coordinates.length,
+      maxInFlight: metrics.maxInFlight,
       coverageComplete,
+      status: ways.length > 0 ? 'available' : 'authoritative-empty',
+      capabilities: { buildings: 'authoritative' },
       radiusDegrees: radius,
       approximateRadiusMeters: Math.round(radius * 111320),
       buildingsAndParts: ways.length,
@@ -319,12 +331,22 @@ export async function fetchGlobalBuildingData(options = {}, onFallback = null) {
     // turned dense locations into the much sparser fallback dataset.
     return await fetchOvertureBuildingData(options);
   } catch (error) {
+    throwIfWorldLoadAborted(options.signal, 'Global building coverage aborted');
     if (typeof onFallback === 'function') onFallback(error);
-    return fetchShortbreadBuildingData(options);
+    const fallback = await fetchShortbreadBuildingData(options);
+    fallback._buildingProviderDecision = {
+      selected: 'shortbread',
+      authority: 'generalized',
+      status: fallback._shortbreadTiles?.status || 'available',
+      fallbackStarted: true,
+      reason: 'overture-unavailable'
+    };
+    return fallback;
   }
 }
 
 export {
   OVERTURE_BUILDING_ZOOM,
+  OVERTURE_TILE_CONCURRENCY,
   OVERTURE_RELEASE
 };

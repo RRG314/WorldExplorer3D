@@ -167,9 +167,6 @@ let Walk = null;
 let skyMode = 'live'; // 'live', 'day', 'sunset', 'night', 'sunrise'
 let timeOfDay = 'day'; // current visible phase: 'day', 'sunset', 'night', 'sunrise'
 let skyState = null;
-let weatherMode = 'live'; // 'live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'fog', 'storm'
-let liveWeatherState = null;
-let weatherState = null;
 let sun, hemiLight, fillLight, ambientLight, sunSphere, moonSphere;
 
 // Star field and sky interaction
@@ -317,9 +314,6 @@ Object.assign(appCtx, {
   showPathOverlays,
   showRoads,
   worldLoading,
-  weatherMode,
-  liveWeatherState,
-  weatherState,
   skyRaycaster,
   skyMode,
   smaaPass,
@@ -447,9 +441,6 @@ export {
   showPathOverlays,
   showRoads,
   worldLoading,
-  weatherMode,
-  liveWeatherState,
-  weatherState,
   skyRaycaster,
   skyMode,
   smaaPass,

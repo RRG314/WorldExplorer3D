@@ -18,6 +18,17 @@ import {
 import { getBuildingMaterial } from "./building-facade-materials.js?v=11";
 
 const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
+export const LOCAL_PBR_ASSET_IDS = Object.freeze({
+  grass: 'grass_001',
+  pavement: 'brushed_concrete',
+  concrete: 'concrete',
+  brick: 'brick_wall_001',
+  forest: 'forest_ground_04',
+  sand: 'sand_01',
+  soil: 'dirt',
+  rock: 'rock_ground',
+  snow: 'snow_01'
+});
 
 function localPbrUrls(assetId) {
   return {
@@ -393,7 +404,7 @@ function initPbrTextures(ctx, maxAniso) {
   };
   const emptyFallback = () => ({ diff: null, nor: null, rough: null });
 
-  loadPbrTextureSet('grass', localPbrUrls('grass_001'), (diff, nor, rough, fromPrimary) => {
+  loadPbrTextureSet('grass', localPbrUrls(LOCAL_PBR_ASSET_IDS.grass), (diff, nor, rough, fromPrimary) => {
     state.grassDiffuse = diff;
     state.grassNormal = nor;
     state.grassRoughness = rough;
@@ -409,7 +420,7 @@ function initPbrTextures(ctx, maxAniso) {
     };
   });
 
-  loadPbrTextureSet('pavement', localPbrUrls('brushed_concrete'), (diff, nor, rough, fromPrimary) => {
+  loadPbrTextureSet('pavement', localPbrUrls(LOCAL_PBR_ASSET_IDS.pavement), (diff, nor, rough, fromPrimary) => {
     state.pavementDiffuse = diff;
     state.pavementNormal = nor;
     state.pavementRoughness = rough;
@@ -424,7 +435,7 @@ function initPbrTextures(ctx, maxAniso) {
     };
   });
 
-  loadPbrTextureSet('concrete', localPbrUrls('concrete'), (diff, nor, rough, fromPrimary) => {
+  loadPbrTextureSet('concrete', localPbrUrls(LOCAL_PBR_ASSET_IDS.concrete), (diff, nor, rough, fromPrimary) => {
     state.concreteDiffuse = diff;
     state.concreteNormal = nor;
     state.concreteRoughness = rough;
@@ -440,7 +451,7 @@ function initPbrTextures(ctx, maxAniso) {
     };
   });
 
-  loadPbrTextureSet('brick', localPbrUrls('brick_wall_001'), (diff, nor, rough, fromPrimary) => {
+  loadPbrTextureSet('brick', localPbrUrls(LOCAL_PBR_ASSET_IDS.brick), (diff, nor, rough, fromPrimary) => {
     state.brickDiffuse = diff;
     state.brickNormal = nor;
     state.brickRoughness = rough;
@@ -457,11 +468,11 @@ function initPbrTextures(ctx, maxAniso) {
   });
 
   [
-    ['forest', 'forest_ground_04'],
-    ['sand', 'sand_01'],
-    ['soil', 'dirt'],
-    ['rock', 'rock_ground'],
-    ['snow', 'snow_01']
+    ['forest', LOCAL_PBR_ASSET_IDS.forest],
+    ['sand', LOCAL_PBR_ASSET_IDS.sand],
+    ['soil', LOCAL_PBR_ASSET_IDS.soil],
+    ['rock', LOCAL_PBR_ASSET_IDS.rock],
+    ['snow', LOCAL_PBR_ASSET_IDS.snow]
   ].forEach(([mode, assetId]) => {
     loadPbrTextureSet(mode, localPbrUrls(assetId), (diff, nor, rough, fromPrimary) => {
       tuneSet([diff, nor, rough]);
@@ -472,6 +483,14 @@ function initPbrTextures(ctx, maxAniso) {
   });
 }
 
+export function ensureEnginePbrTextures(ctx) {
+  const { state } = ctx;
+  if (state.pbrTextureLoadStarted) return false;
+  state.pbrTextureLoadStarted = true;
+  initPbrTextures(ctx, state.textureMaxAnisotropy || 1);
+  return true;
+}
+
 export function initEngineTextures(ctx, renderer) {
   const { state } = ctx;
   state.asphaltTex = createAsphaltTexture();
@@ -479,12 +498,12 @@ export function initEngineTextures(ctx, renderer) {
   state.asphaltRoughness = createRoughnessMap();
 
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  state.textureMaxAnisotropy = maxAniso;
   const aniso = Math.min(maxAniso, 8);
   if (state.asphaltTex) state.asphaltTex.anisotropy = aniso;
   if (state.asphaltNormal) state.asphaltNormal.anisotropy = aniso;
   if (state.asphaltRoughness) state.asphaltRoughness.anisotropy = aniso;
 
-  initPbrTextures(ctx, maxAniso);
   syncTextureGlobals(ctx);
 }
 

@@ -6,7 +6,7 @@ import {
 } from './geometry.js?v=1';
 import {
   compileTransportNetworkModel
-} from '../world/compiler/transport-network-model.js?v=2';
+} from '../world/compiler/transport-network-model.js?v=4';
 
 function structureFeatureStableKey(candidate) {
   const sourceId = String(candidate?.sourceFeatureId || candidate?.id || '').trim();
@@ -21,6 +21,42 @@ function structureFeatureStableKey(candidate) {
     Number(last.z || 0).toFixed(3),
     String(candidate?.type || '')
   ].join(':');
+}
+
+function spatialCandidatePairs(features = [], padding = 8, cellSize = 240) {
+  const buckets = new Map();
+  for (let index = 0; index < features.length; index += 1) {
+    const feature = features[index];
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    const bounds = feature?.bounds || polylineBounds(points, (Number(feature?.width) || 4) + padding);
+    if (!bounds) continue;
+    const minColumn = Math.floor((Number(bounds.minX) - padding) / cellSize);
+    const maxColumn = Math.floor((Number(bounds.maxX) + padding) / cellSize);
+    const minRow = Math.floor((Number(bounds.minZ) - padding) / cellSize);
+    const maxRow = Math.floor((Number(bounds.maxZ) + padding) / cellSize);
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (let row = minRow; row <= maxRow; row += 1) {
+        const key = `${column}:${row}`;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(index);
+      }
+    }
+  }
+  const pairKeys = new Set();
+  const pairs = [];
+  for (const indices of buckets.values()) {
+    for (let left = 0; left < indices.length; left += 1) {
+      for (let right = left + 1; right < indices.length; right += 1) {
+        const leftIndex = Math.min(indices[left], indices[right]);
+        const rightIndex = Math.max(indices[left], indices[right]);
+        const key = `${leftIndex}:${rightIndex}`;
+        if (pairKeys.has(key)) continue;
+        pairKeys.add(key);
+        pairs.push([leftIndex, rightIndex]);
+      }
+    }
+  }
+  return pairs;
 }
 
 function featureCrossingsAwayFromSharedEndpoint(feature, other, areRoadsConnected) {
@@ -102,11 +138,10 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
         structureFeatureStableKey(leftRoot).localeCompare(structureFeatureStableKey(rightRoot)) <= 0;
       parent.set(leftOwnsComponent ? rightRoot : leftRoot, leftOwnsComponent ? leftRoot : rightRoot);
     };
-    for (let leftIndex = 0; leftIndex < group.length; leftIndex += 1) {
-      for (let rightIndex = leftIndex + 1; rightIndex < group.length; rightIndex += 1) {
-        if (areRoadsStackContinuous(group[leftIndex], group[rightIndex])) {
-          union(group[leftIndex], group[rightIndex]);
-        }
+    const candidatePairs = spatialCandidatePairs(group);
+    for (const [leftIndex, rightIndex] of candidatePairs) {
+      if (areRoadsStackContinuous(group[leftIndex], group[rightIndex])) {
+        union(group[leftIndex], group[rightIndex]);
       }
     }
 
@@ -127,19 +162,17 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
 
     const adjacency = new Map(components.map((component) => [component, new Set()]));
     const crossingEdges = [];
-    for (let leftIndex = 0; leftIndex < group.length; leftIndex += 1) {
-      for (let rightIndex = leftIndex + 1; rightIndex < group.length; rightIndex += 1) {
-        const left = group[leftIndex];
-        const right = group[rightIndex];
-        const leftComponent = componentFor.get(left);
-        const rightComponent = componentFor.get(right);
-        if (leftComponent === rightComponent) continue;
-        const crossings = featureCrossingsAwayFromSharedEndpoint(left, right, areRoadsConnected);
-        if (crossings.length === 0) continue;
-        adjacency.get(leftComponent).add(rightComponent);
-        adjacency.get(rightComponent).add(leftComponent);
-        crossingEdges.push({ left, right, leftComponent, rightComponent, crossings });
-      }
+    for (const [leftIndex, rightIndex] of candidatePairs) {
+      const left = group[leftIndex];
+      const right = group[rightIndex];
+      const leftComponent = componentFor.get(left);
+      const rightComponent = componentFor.get(right);
+      if (leftComponent === rightComponent) continue;
+      const crossings = featureCrossingsAwayFromSharedEndpoint(left, right, areRoadsConnected);
+      if (crossings.length === 0) continue;
+      adjacency.get(leftComponent).add(rightComponent);
+      adjacency.get(rightComponent).add(leftComponent);
+      crossingEdges.push({ left, right, leftComponent, rightComponent, crossings });
     }
 
     const ordered = [...components].sort((left, right) =>

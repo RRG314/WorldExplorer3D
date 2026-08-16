@@ -98,6 +98,18 @@ openOcean.appCtx.LOC = {
   lon: -40,
   name: 'Atlantic Ocean'
 };
+openOcean.appCtx.customLoc = {
+  lat: 30,
+  lon: -40,
+  name: 'Atlantic Ocean',
+  arrivalMode: 'boat',
+  surfaceEvidence: {
+    kind: 'open_ocean',
+    verified: true,
+    source: 'gebco-elevation-sample',
+    elevationMeters: -4200
+  }
+};
 assert.equal(await openOcean.run(), true);
 assert.equal(openOcean.terrainUpdates(), 0);
 assert.equal(openOcean.finalizations.length, 0);
@@ -131,9 +143,10 @@ explicitBoat.appCtx.customLoc = {
   arrivalMode: 'boat'
 };
 assert.equal(await explicitBoat.run(), true);
-assert.equal(explicitBoat.runtimeState.groundMode, 'open-ocean-surface-only');
-assert.equal(explicitBoat.runtimeState.acceptedGround.requestedBoatArrival, true);
-assert.equal(explicitBoat.groundSuppressions(), 1);
+assert.equal(explicitBoat.runtimeState.groundMode, 'worldwide-terrain-fallback');
+assert.equal(explicitBoat.runtimeState.surfaceDomain.kind, 'land');
+assert.equal(explicitBoat.terrainUpdates(), 1);
+assert.equal(explicitBoat.groundSuppressions(), 0);
 
 console.log(JSON.stringify({
   ok: true,
@@ -141,6 +154,6 @@ console.log(JSON.stringify({
   worldwideLandFallbackStarts: true,
   acceptedArtifactStartsTerrain: true,
   openOceanDoesNotFabricateGround: true,
-  explicitBoatArrivalSurvivesNormalization: true,
+  unverifiedBoatArrivalCannotOverrideLand: true,
   diagnosticsUseAcceptedArtifact: true
 }, null, 2));

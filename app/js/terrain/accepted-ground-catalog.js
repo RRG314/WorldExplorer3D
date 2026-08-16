@@ -1,6 +1,9 @@
 export const ACCEPTED_GROUND_CATALOG_SCHEMA_VERSION = 1;
 export const DEFAULT_ACCEPTED_GROUND_CATALOG_URL =
-  '/app/assets/ground/manifest-catalog.json';
+  String(
+    globalThis.__WORLD_EXPLORER_PRODUCTION__?.groundCatalogUrl ||
+    '/app/assets/ground/manifest-catalog.json'
+  );
 
 function result(status, reason, details = {}) {
   return Object.freeze({
@@ -50,15 +53,17 @@ export function parseAcceptedGroundCatalog(value, { url = '' } = {}) {
 
 export async function loadAcceptedGroundCatalog({
   url = DEFAULT_ACCEPTED_GROUND_CATALOG_URL,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  signal = null
 } = {}) {
   if (typeof fetchImpl !== 'function') {
     return result('rejected', 'catalog-fetch-unavailable', { url });
   }
   let response;
   try {
-    response = await fetchImpl(String(url), { cache: 'no-store' });
-  } catch {
+    response = await fetchImpl(String(url), { cache: 'no-store', signal });
+  } catch (error) {
+    if (signal?.aborted) throw error;
     return result('rejected', 'catalog-fetch-failed', { url });
   }
   if (!response?.ok) {

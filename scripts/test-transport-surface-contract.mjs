@@ -352,6 +352,84 @@ assert.ok(
   'an infeasible endpoint tie-in reintroduced an unsafe bridge grade'
 );
 
+const conflictingGraphNodeTieIn = straightFeature({
+  id: 'conflicting-graph-node-tie-in',
+  length: 60,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+conflictingGraphNodeTieIn.minimumStructureSurfaceY = 42;
+conflictingGraphNodeTieIn.structureTransitionAnchors = [
+  {
+    distance: 60,
+    targetOffset: -20,
+    targetSurfaceY: 10,
+    graphEndpoint: 'end',
+    source: 'transport_graph_node'
+  }
+];
+const conflictingGraphNodeModel = compileTransportSurfaceModel(
+  conflictingGraphNodeTieIn,
+  () => 30,
+  { sampleStep: 1 }
+);
+assert.ok(
+  conflictingGraphNodeModel.stats.minimumY >= 42 - EPSILON,
+  'an infeasible graph-node constraint cut below the bridge clearance envelope'
+);
+assert.ok(
+  conflictingGraphNodeModel.stats.maximumGrade <= 0.1201,
+  'an infeasible graph-node constraint created a vertical bridge/ramp wall'
+);
+
+const tunnelPortalTieIn = straightFeature({
+  id: 'tunnel-portal-graph-tie-in',
+  length: 100,
+  semantics: {
+    featureCategory: 'road',
+    structureKind: 'tunnel',
+    terrainMode: 'subgrade',
+    gradeSeparated: true,
+    isTunnel: true,
+    cutDepth: 4.6,
+    verticalGroup: 'subgrade:-1:tunnel'
+  }
+});
+tunnelPortalTieIn.structureTransitionAnchors = [{
+  endpoint: 'end',
+  graphEndpoint: 'end',
+  distance: 100,
+  targetOffset: 0,
+  targetSurfaceY: 30.08,
+  span: 46,
+  source: 'transport_graph_node'
+}];
+tunnelPortalTieIn.structureStations = [{
+  distance: 76,
+  span: 28,
+  targetOffset: 7.2,
+  reason: 'underwater_tunnel'
+}];
+const tunnelPortalTieInModel = compileTransportSurfaceModel(
+  tunnelPortalTieIn,
+  () => 30,
+  { sampleStep: 1 }
+);
+assert.ok(
+  Math.abs(tunnelPortalTieInModel.centerHeights[tunnelPortalTieInModel.centerHeights.length - 1] - 30.08) <= EPSILON,
+  'a feasible tunnel portal must meet its graph-owned surface without a vertical step'
+);
+assert.ok(
+  tunnelPortalTieInModel.stats.maximumGrade <= 0.1201,
+  'an exact tunnel portal tie-in must preserve the road grade limit'
+);
+
 const layerOnlyDriveway = straightFeature({
   id: 'layer-only-driveway',
   length: 52,
@@ -402,6 +480,62 @@ assert.ok(
   'tunnel surface escaped its subgrade layer'
 );
 
+// A tunnel whose portals sit on high banks must follow the lower local
+// cross-section below a river/valley. Using the portal endpoint chord here
+// exposes the entire tunnel above the intervening terrain and water.
+const riverTunnelGround = (x) => (x < 20 || x > 220 ? 20 : 0);
+const riverTunnel = straightFeature({
+  id: 'tunnel-below-river',
+  semantics: {
+    terrainMode: 'subgrade',
+    gradeSeparated: true,
+    isTunnel: true,
+    cutDepth: 4.6,
+    rampCandidate: false,
+    verticalGroup: 'subgrade:-1:tunnel'
+  }
+});
+const riverTunnelModel = compileTransportSurfaceModel(riverTunnel, riverTunnelGround, {
+  sampleStep: 1
+});
+assert.ok(
+  sampleTransportSurfaceAtDistance(riverTunnelModel, 120) <= -4.5,
+  'river tunnel inherited the high portal chord instead of staying below local ground'
+);
+
+const junctionEnvelopeRoad = straightFeature({
+  id: 'junction-terrain-envelope',
+  length: 80,
+  semantics: {
+    terrainMode: 'at_grade',
+    gradeSeparated: false,
+    verticalGroup: 'at_grade:0:at_grade'
+  }
+});
+junctionEnvelopeRoad.junctionTransitions = [{
+  x: 40,
+  z: 0,
+  radius: 30,
+  plane: { centerY: -20, slopeX: 0, slopeZ: 0 }
+}];
+const junctionTerrain = () => 10;
+updateFeatureSurfaceProfile(junctionEnvelopeRoad, junctionTerrain);
+const junctionRibbon = buildFeatureRibbonEdges(
+  junctionEnvelopeRoad,
+  junctionEnvelopeRoad.pts,
+  5,
+  junctionTerrain
+);
+assert.ok(
+  junctionRibbon.centerlineHeights.every((height) => height >= 10 + SURFACE_BIAS - EPSILON),
+  'junction smoothing buried an at-grade road center beneath terrain'
+);
+assert.ok(
+  [...junctionRibbon.leftEdge, ...junctionRibbon.rightEdge]
+    .every((point) => point.y >= 10 + SURFACE_BIAS - EPSILON),
+  'junction smoothing buried an at-grade road edge beneath terrain'
+);
+
 const ramp = straightFeature({
   id: 'smooth-ramp',
   length: 140,
@@ -447,6 +581,30 @@ for (let index = 1; index < longRoadDistances.length; index += 1) {
 assert.ok(
   maximumLongRoadSampleGap <= 2.01,
   'long at-grade roads were sampled too coarsely to remain above rendered terrain'
+);
+
+const regionalTunnelProfile = straightFeature({
+  id: 'regional-tunnel-profile-budget',
+  length: 1200,
+  semantics: {
+    terrainMode: 'subgrade',
+    gradeSeparated: true,
+    isTunnel: true,
+    cutDepth: 4.6,
+    verticalGroup: 'subgrade:-1:tunnel'
+  }
+});
+regionalTunnelProfile.fixedRegionalContext = true;
+regionalTunnelProfile.subdivideMaxDist = 5;
+regionalTunnelProfile.transportRecord = { completeness: 'generalized' };
+updateFeatureSurfaceProfile(regionalTunnelProfile, () => 20);
+assert.ok(
+  regionalTunnelProfile.transportSurfaceModel.distances.length <= 302,
+  'regional generalized tunnel was recompiled at duplicate core-city sample density'
+);
+assert.ok(
+  regionalTunnelProfile.transportSurfaceModel.distances.length >= 150,
+  'regional generalized tunnel profile became too coarse for vehicle traversal'
 );
 
 const stackGround = () => 40;
@@ -813,6 +971,20 @@ intersectionRoads.forEach((road) => updateFeatureSurfaceProfile(road, () => 10))
 const detectedIntersection = detectRoadIntersections(intersectionRoads)
   .find((intersection) => intersection.roads.length === 4);
 assert.ok(detectedIntersection, 'four-branch graph intersection was not detected');
+const regionalSourceJunctionRoads = [
+  intersectionRoad('regional-east', 80, 0),
+  intersectionRoad('regional-north', 0, -80)
+].map((road) => ({
+  ...road,
+  fixedRegionalContext: true,
+  sourceNodeIds: ['shared-regional-node', `${road.sourceFeatureId}:end`]
+}));
+const regionalSourceJunction = detectRoadIntersections(regionalSourceJunctionRoads)
+  .find((intersection) => intersection.roads.length === 2);
+assert.ok(
+  regionalSourceJunction,
+  'regional source-node junction was lost when duplicate geometric crossing discovery was skipped'
+);
 assert.equal(
   fs.existsSync(path.join(repositoryRoot, 'app', 'js', 'terrain', 'intersection-geometry.js')),
   false,
@@ -891,21 +1063,6 @@ assert.deepEqual(publicationCallers, [
   'app/js/terrain/rebuild.js',
   'app/js/world/load-support.js'
 ]);
-const terrainTileSource = fs.readFileSync(path.join(sourceRoot, 'terrain', 'tiles.js'), 'utf8');
-assert.ok(
-  terrainTileSource.includes('side: THREE.FrontSide'),
-  'terrain underside must not occlude subgrade transport interiors'
-);
-const transportPublisherSource = fs.readFileSync(path.join(sourceRoot, 'terrain', 'rebuild.js'), 'utf8');
-const markingGuard = transportPublisherSource.slice(
-  transportPublisherSource.indexOf('function appendRoadCenterMarkings'),
-  transportPublisherSource.indexOf('export function buildRoadSkirts')
-);
-assert.equal(
-  markingGuard.includes('terrainMode !== "at_grade"'),
-  false,
-  'bridge and tunnel primary roads lost their compiled center markings'
-);
 const retiredEarthDrivingTerms = /\b(?:offRoad|offroad|off-road|offMax|offFriction|indOff)\b/i;
 for (const relativePath of [
   'app/index.html',

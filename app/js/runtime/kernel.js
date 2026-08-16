@@ -147,6 +147,12 @@ function createRuntimeKernel(options = {}) {
     const rawDelta = previousTimestamp === null ? 0 : Math.max(0, (currentTimestamp - previousTimestamp) / 1000);
     previousTimestamp = currentTimestamp;
 
+    return executeFrame(currentTimestamp, rawDelta, suppliedContext, frameStartedAt);
+  }
+
+  function executeFrame(currentTimestamp, rawDelta, suppliedContext = {}, frameStartedAt = now()) {
+    if (disposed) return false;
+
     const sharedContext = {
       ...getContext(),
       ...suppliedContext
@@ -188,6 +194,47 @@ function createRuntimeKernel(options = {}) {
     }
     lastFrameDurationMs = Math.max(0, now() - frameStartedAt);
     return true;
+  }
+
+  function advanceBy(milliseconds = 0, suppliedContext = {}) {
+    if (disposed) throw new Error('Runtime kernel is disposed.');
+    const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
+    if (requestedMs === 0) {
+      return Object.freeze({ requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0 });
+    }
+
+    const wasRunning = running;
+    if (frameHandle !== null && typeof cancelFrame === 'function') cancelFrame(frameHandle);
+    frameHandle = null;
+
+    const frameDurationMs = fixedDelta * 1000;
+    const endTimestamp = now();
+    const startTimestamp = endTimestamp - requestedMs;
+    let simulatedMs = 0;
+    let frames = 0;
+    let manualSuspendedFrames = 0;
+    while (simulatedMs < requestedMs - 1e-7) {
+      const stepMs = Math.min(frameDurationMs, requestedMs - simulatedMs);
+      simulatedMs += stepMs;
+      const ran = executeFrame(
+        startTimestamp + simulatedMs,
+        stepMs / 1000,
+        { ...suppliedContext, manualAdvance: true }
+      );
+      frames += 1;
+      if (!ran) manualSuspendedFrames += 1;
+    }
+
+    // Manual stepping ends at the current real clock so the next browser frame
+    // cannot count the simulated duration a second time.
+    previousTimestamp = endTimestamp;
+    if (wasRunning) scheduleNextFrame();
+    return Object.freeze({
+      requestedMs,
+      simulatedMs: Number(simulatedMs.toFixed(6)),
+      frames,
+      suspendedFrames: manualSuspendedFrames
+    });
   }
 
   function scheduleNextFrame() {
@@ -259,6 +306,7 @@ function createRuntimeKernel(options = {}) {
   }
 
   return Object.freeze({
+    advanceBy,
     dispose,
     registerSystem,
     runFrame,

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
+import { serveMutableSourceManifest } from './source-preview-manifest.mjs';
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -37,6 +38,11 @@ async function serveStaticRoot({ rootDir, host, port }) {
   const server = http.createServer(async (req, res) => {
     try {
       const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+      if (await serveMutableSourceManifest({
+        pathname: reqUrl.pathname,
+        rootDir,
+        response: res
+      })) return;
       const requestPath = decodeURIComponent(reqUrl.pathname === '/' ? '/index.html' : reqUrl.pathname);
       const resolved = path.resolve(rootDir, `.${requestPath}`);
       if (!isInsideRoot(rootDir, resolved)) {

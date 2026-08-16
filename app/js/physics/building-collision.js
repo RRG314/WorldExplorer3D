@@ -12,6 +12,9 @@ function createBuildingCollisionQuery(appCtx) {
     if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return { collision: false };
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
+    const acceptCollision = typeof options?.acceptCollision === 'function'
+      ? options.acceptCollision
+      : null;
     const candidates = typeof appCtx.getNearbyBuildings === 'function'
       ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
       : appCtx.buildings;
@@ -82,7 +85,7 @@ function createBuildingCollisionQuery(appCtx) {
       }
 
       if ((isInside || nearestEdgeDist < carRadius) && nearestEdgeInfo) {
-        return {
+        const collision = {
           collision: true,
           building,
           actorBaseY,
@@ -92,6 +95,11 @@ function createBuildingCollisionQuery(appCtx) {
           pushZ: nearestEdgeInfo.pushZ,
           penetration: carRadius - nearestEdgeDist
         };
+        // A caller can reject a non-blocking overlap (for example a coarse
+        // road ghost or a tunnel wall belonging to another vertical level)
+        // without hiding a real building collision later in this bucket.
+        if (acceptCollision && !acceptCollision(collision)) continue;
+        return collision;
       }
     }
     return { collision: false };

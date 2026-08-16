@@ -153,7 +153,7 @@ function terrainNeighborhoodSnapshot(centerX, centerZ) {
     for (const offsetX of offsets) {
       const x = centerX + offsetX;
       const z = centerZ + offsetZ;
-      const sourceY = safeCall(() => appCtx.elevationWorldYAtWorldXZ?.(x, z), null);
+      const sourceY = safeCall(() => appCtx.peekElevationWorldYAtWorldXZ?.(x, z), null);
       const renderedY = safeCall(() => appCtx.terrainMeshHeightAt?.(x, z), null);
       samples.push({
         offsetX,
@@ -189,12 +189,12 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
   const lat = Number(geographic?.lat);
   const lon = Number(geographic?.lon);
   const sourceElevationMeters = Number.isFinite(lat) && Number.isFinite(lon)
-    ? safeCall(() => appCtx.elevationMetersAtLatLon?.(lat, lon), null)
+    ? safeCall(() => appCtx.peekElevationMetersAtLatLon?.(lat, lon), null)
     : null;
   const terrainSourceSample = Number.isFinite(lat) && Number.isFinite(lon)
-    ? safeCall(() => appCtx.terrainSourceSampleAtLatLon?.(lat, lon), null)
+    ? safeCall(() => appCtx.peekTerrainSourceSampleAtLatLon?.(lat, lon), null)
     : null;
-  const sourceWorldY = safeCall(() => appCtx.elevationWorldYAtWorldXZ?.(x, z), null);
+  const sourceWorldY = safeCall(() => appCtx.peekElevationWorldYAtWorldXZ?.(x, z), null);
   const renderedTerrainY = safeCall(() => appCtx.terrainMeshHeightAt?.(x, z), null);
   const terrain = safeCall(() => appCtx.SurfaceQuery?.terrainAt?.(x, z), null);
   const walk = safeCall(() => appCtx.SurfaceQuery?.walkAt?.(x, z, { currentY: feetY }), null);
@@ -363,6 +363,8 @@ function getWorldExplorerRuntimeDiagnostics() {
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    deflock: appCtx.getDeFlockSnapshot?.() || { active: false },
+    liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     activeActor,
     surfaceChain: surfaceChainSnapshot(activeActor),
@@ -485,23 +487,34 @@ globalThis.render_game_to_text = () => JSON.stringify({
   terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
+  liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,
     terrainTiles: appCtx.terrainTileCache?.size ?? null
   }
 });
-globalThis.advanceTime = (milliseconds = 0) => new Promise((resolve) => {
+globalThis.advanceTime = async (milliseconds = 0) => {
   const duration = Math.max(0, Number(milliseconds) || 0);
-  if (duration === 0) {
-    resolve();
-    return;
+  if (!appCtx.gameStarted) {
+    if (duration === 0) return { requestedMs: 0, simulatedMs: 0, frames: 0, mode: 'title-idle' };
+    await new Promise((resolve) => {
+      const startedAt = performance.now();
+      const waitForTitleFrame = (now) => {
+        if (now - startedAt >= duration) resolve();
+        else globalThis.requestAnimationFrame(waitForTitleFrame);
+      };
+      globalThis.requestAnimationFrame(waitForTitleFrame);
+    });
+    return { requestedMs: duration, simulatedMs: 0, frames: 0, mode: 'title-idle' };
   }
-  // The runtime owns a continuously scheduled render loop. One requested
-  // animation frame therefore advances one observable game frame; waiting for
-  // wall-clock duration here double-counts frames in automated clients.
-  globalThis.requestAnimationFrame(() => resolve());
-});
+  if (typeof appCtx.advanceRuntimeTime === 'function') {
+    return appCtx.advanceRuntimeTime(duration);
+  }
+  if (duration === 0) return { requestedMs: 0, simulatedMs: 0, frames: 0 };
+  await new Promise((resolve) => globalThis.setTimeout(resolve, duration));
+  return { requestedMs: duration, simulatedMs: 0, frames: 0, fallback: 'wall-clock' };
+};
 
 function publishRuntimeDiagnostics() {
   if (!document?.documentElement) return;

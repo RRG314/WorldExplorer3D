@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { LOCS } from '../app/js/config.js';
 import { createGlobeSelectorLaunch } from '../app/js/ui/globe-selector/launch.js';
-import { getMenuFavoriteCities, parseReverseAddress } from '../app/js/ui/globe-selector/helpers.js';
+import {
+  getMenuFavoriteCities,
+  parseReverseAddress,
+  resolveCoordinateSurfaceEvidence
+} from '../app/js/ui/globe-selector/helpers.js';
 
 const expectedV3Cities = {
   baltimore: [39.2904, -76.6122],
@@ -54,15 +58,47 @@ assert.deepEqual(receivedSelection, {
 
 assert.equal(parseReverseAddress({ type: 'sea', display_name: 'North Atlantic Ocean' }).waterKind, 'open_ocean');
 assert.equal(parseReverseAddress({ address: { lake: 'Lake Erie' } }).waterKind, 'lake');
+assert.equal(parseReverseAddress({
+  category: 'boundary',
+  type: 'administrative',
+  name: 'Watertown',
+  display_name: 'Watertown, Jefferson County, New York'
+}).waterKind, null);
 
-const selectorSource = fs.readFileSync(new URL('../app/js/ui/globe-selector.js', import.meta.url), 'utf8');
+const originalFetch = globalThis.fetch;
+try {
+  globalThis.fetch = async () => new Response(
+    "GetFeatureInfo results:\nvalue_list = '284'",
+    { status: 200, headers: { 'content-type': 'text/plain' } }
+  );
+  const africaLand = await resolveCoordinateSurfaceEvidence(7.8939, -4.9369, {
+    category: 'boundary',
+    type: 'administrative',
+    display_name: 'Gbêkê, Vallée du Bandama, Côte d’Ivoire'
+  });
+  assert.equal(africaLand.kind, 'land');
+  assert.equal(africaLand.elevationMeters, 284);
+
+  globalThis.fetch = async () => new Response(
+    "GetFeatureInfo results:\nvalue_list = '-4300'",
+    { status: 200, headers: { 'content-type': 'text/plain' } }
+  );
+  const verifiedOcean = await resolveCoordinateSurfaceEvidence(0, -140, {});
+  assert.equal(verifiedOcean.kind, 'open_ocean');
+
+  let polarFetches = 0;
+  globalThis.fetch = async () => {
+    polarFetches += 1;
+    throw new Error('polar classification must not call GEBCO');
+  };
+  const polar = await resolveCoordinateSurfaceEvidence(90, 0, {});
+  assert.equal(polar.kind, 'cryosphere');
+  assert.equal(polarFetches, 0);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
 const sceneSource = fs.readFileSync(new URL('../app/js/ui/globe-selector/scene.js', import.meta.url), 'utf8');
-const titleSource = fs.readFileSync(new URL('../app/js/ui/title-screen.js', import.meta.url), 'utf8');
-assert.match(selectorSource, /onOceanShortcut\(\{ \.\.\.selected \}\)/);
-assert.match(sceneSource, /addEventListener\('dblclick'/);
-assert.match(titleSource, /await globeSelector\?\.startHere\?\.\(\)/);
-assert.match(titleSource, /startOceanMode\(\{\s*launchSite:/);
-assert.match(selectorSource, /await selectionResolvePromise/);
 assert.match(sceneSource, /earth_atmos_2048\.jpg/);
 assert.doesNotMatch(sceneSource, /createGlobeDetailTiles|detailTiles|World_Imagery/);
 assert.equal(fs.existsSync(new URL('../app/js/ui/globe-selector/detail-tiles.js', import.meta.url)), false);
@@ -71,8 +107,7 @@ console.log(JSON.stringify({
   ok: true,
   featuredCities: Object.keys(expectedV3Cities).length,
   coordinateAuthority: 'selected-coordinates-through-launch',
-  globeActivation: 'double-click',
-  globeDetailZooms: 'smooth-camera-on-original-globe',
+  browserActivationOwner: 'test-globe-selector-browser',
   globeImagery: 'original-earth-texture-only',
-  oceanLaunch: 'selected-coordinate-launch-site'
+  oceanLaunchOwner: 'test-globe-selector-browser'
 }, null, 2));

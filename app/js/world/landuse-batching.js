@@ -134,7 +134,7 @@ export function batchLanduseMeshes() {
       };
       mergedMesh.visible = group.anyVisible || group.alwaysVisible;
 
-      appCtx.scene.add(mergedMesh);
+      appCtx.addEarthWorldObject(mergedMesh);
       batched.push(mergedMesh);
       for (let i = 0; i < group.meshes.length; i++) disposeSceneMesh(group.meshes[i]);
       sourceCount += group.meshes.length;

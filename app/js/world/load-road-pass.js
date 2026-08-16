@@ -1,29 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=40";
-import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=10";
-import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=1";
+import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=48";
+// Installs the final-publication guardrail owner. Guardrails are compiled once
+// after the complete transport graph and accepted terrain are ready.
+import "./bridge-guardrails.js?v=15";
+import { normalizeTransportSource } from "./compiler/transport-source-normalizer.js?v=3";
 import { yieldToMainThread as defaultYieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.18;
-
-export function applySafeTunnelRoadPresentation(structureSemantics) {
-  if (structureSemantics?.isTunnel !== true) return structureSemantics;
-  return {
-    ...structureSemantics,
-    // Keep the tunnel identity and separated topology, but present the route
-    // on the accepted terrain until a trustworthy terrain aperture exists.
-    // This prevents the player, road, and nearby world from being rendered
-    // below the terrain in an empty/inverted scene.
-    structureKind: 'tunnel',
-    terrainMode: 'at_grade',
-    gradeSeparated: false,
-    topologySeparated: true,
-    deckClearance: 0,
-    cutDepth: 0,
-    presentationFallback: 'terrain_draped_tunnel_road',
-    verticalGroup: `at_grade:${Number(structureSemantics.verticalOrder) || -1}:tunnel_fallback`
-  };
-}
 
 // This pass owns transport feature compilation only. Visual publication is
 // intentionally deferred until accepted terrain and structure profiles are
@@ -58,6 +41,12 @@ export async function buildRoadGeometryPass(options = {}) {
   startLoadPhase('buildRoadGeometry');
 
   let yieldCount = 0;
+  const diagnostics = {
+    rejectedMissingNodes: 0,
+    rejectedByGeometryGuards: 0,
+    maximumSourceRadius: 0,
+    maximumPublishedRadius: 0
+  };
   for (let roadIndex = 0; roadIndex < roadWays.length; roadIndex += 1) {
     const way = roadWays[roadIndex];
     try {
@@ -67,16 +56,33 @@ export async function buildRoadGeometryPass(options = {}) {
     const rawPts = rawNodeRecords.map((entry) =>
       appCtx.geoToWorld(entry.node.lat, entry.node.lon)
     );
+    if (rawPts.length < 2) {
+      diagnostics.rejectedMissingNodes += 1;
+      continue;
+    }
+    for (const point of rawPts) {
+      diagnostics.maximumSourceRadius = Math.max(
+        diagnostics.maximumSourceRadius,
+        Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
+      );
+    }
     const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-    if (pts.length < 2) continue;
+    if (pts.length < 2) {
+      diagnostics.rejectedByGeometryGuards += 1;
+      continue;
+    }
+    for (const point of pts) {
+      diagnostics.maximumPublishedRadius = Math.max(
+        diagnostics.maximumPublishedRadius,
+        Math.hypot(Number(point?.x) || 0, Number(point?.z) || 0)
+      );
+    }
 
     const type = way.tags?.highway || 'residential';
-    const structureSemantics = applySafeTunnelRoadPresentation(
-      classifyStructureSemantics(way.tags || {}, {
-        featureKind: 'road',
-        subtype: type
-      })
-    );
+    const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+      featureKind: 'road',
+      subtype: type
+    });
     const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
     const transportRecord = normalizeTransportSource({
       sourceId: sourceFeatureId,
@@ -98,11 +104,20 @@ export async function buildRoadGeometryPass(options = {}) {
     const centerLatLon = wayCenterLatLon(way, nodes);
     const roadTileKey = centerLatLon ? featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees) : null;
     const roadTileDepth = useRdtBudgeting && roadTileKey ? rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees) : 0;
-    const roadSubdivideStepBase = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+    const fixedRegionalRoad = way.tags?._regionalContext === 'fixed-location';
+    const roadSubdivideStepBase = fixedRegionalRoad
+      ? Math.max(20, getRoadSubdivisionStep(type, roadTileDepth, perfModeNow))
+      : getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+    const engineeredRegionalStep = fixedRegionalRoad
+      ? 5
+      : 0.55;
+    const regionalRampStep = fixedRegionalRoad ? 4 : 0.65;
     const roadSubdivideStep =
-      structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade' ? Math.min(roadSubdivideStepBase, 0.55) :
-      structureSemantics?.rampCandidate ? Math.min(roadSubdivideStepBase, 0.65) :
-      roadSubdivideStepBase;
+      structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade'
+        ? Math.min(roadSubdivideStepBase, engineeredRegionalStep)
+        : structureSemantics?.rampCandidate
+          ? Math.min(roadSubdivideStepBase, regionalRampStep)
+          : roadSubdivideStepBase;
     const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
     if (decimatedRoadPts.length < 2) continue;
 
@@ -126,6 +141,7 @@ export async function buildRoadGeometryPass(options = {}) {
       litTag: String(way.tags?.lit || '').toLowerCase(),
       sidewalkHint: String(way.tags?.sidewalk || '').toLowerCase(),
       networkKind: 'road',
+      fixedRegionalContext: fixedRegionalRoad,
       walkable: transportRecord.access.pedestrian !== 'prohibited',
       driveable: transportRecord.safeForDriving,
       structureTags: transportRecord.rawTags,
@@ -138,10 +154,6 @@ export async function buildRoadGeometryPass(options = {}) {
     };
     appCtx.roads.push(roadFeature);
     updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: ROAD_SURFACE_BIAS });
-    if (roadFeature.structureSemantics?.terrainMode === 'elevated') {
-      registerBridgeGuardrails(roadFeature);
-    }
-
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
     } finally {
@@ -155,6 +167,7 @@ export async function buildRoadGeometryPass(options = {}) {
   loadMetrics.roads.initialMeshPublications = 0;
   loadMetrics.roads.featureCompilationYieldCount = yieldCount;
   loadMetrics.roads.featureCompilationChunkSize = yieldEveryRoads;
+  loadMetrics.roads.compilationDiagnostics = diagnostics;
   endLoadPhase('buildRoadGeometry');
   return Object.freeze({
     roadCount: appCtx.roads.length,

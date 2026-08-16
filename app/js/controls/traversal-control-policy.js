@@ -1,6 +1,12 @@
 const PRIMARY_TRAVEL_MODE_ORDER = Object.freeze(['walk', 'drive', 'plane', 'drone']);
 const MAX_STEERING_ANGLE_RAD = 1.22;
 
+function cameraSmoothingBlend(rate = 8, dt = 1 / 60) {
+  const safeRate = Math.max(0, Number(rate) || 0);
+  const step = Math.max(0, Math.min(0.1, Number(dt) || 0));
+  return 1 - Math.exp(-safeRate * step);
+}
+
 function earthDrivingSteeringProfile(speed = 0) {
   const speedAbs = Math.abs(Number(speed) || 0);
   const steerBlend = Math.max(0, Math.min(1, (speedAbs - 5) / 105));
@@ -140,6 +146,7 @@ export {
   aircraftChaseOffset,
   aircraftBankTurnFactor,
   aircraftForwardVector,
+  cameraSmoothingBlend,
   earthDrivingSteeringProfile,
   integrateAerobaticAttitude,
   nextPrimaryTravelMode,

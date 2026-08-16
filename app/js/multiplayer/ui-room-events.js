@@ -1,4 +1,4 @@
-import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=55';
+import { CHAT_MAX_LENGTH, reportMessage } from './chat.js?v=56';
 import {
   dismissInvite,
   markInviteSeen,

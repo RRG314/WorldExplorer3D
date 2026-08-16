@@ -187,7 +187,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         lodRadius: maxRadius
       };
 
-      appCtx.scene.add(mergedMesh);
+      appCtx.addEarthWorldObject(mergedMesh);
       batchedMeshes.push(mergedMesh);
       for (let i = 0; i < sourceMeshes.length; i++) disposeSceneMesh(sourceMeshes[i]);
       sourceMeshCount += sourceMeshes.length;

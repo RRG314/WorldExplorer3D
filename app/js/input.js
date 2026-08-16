@@ -23,12 +23,23 @@ function onKey(code, event) {
 
   if (code === 'KeyE') {
     if (event?.repeat) return;
-    if (typeof appCtx.handleInteriorAction === 'function') {
-      Promise.resolve(appCtx.handleInteriorAction()).catch((err) => {
-        console.warn('[interior] Interaction failed:', err);
+    const runInteriorFallback = () => {
+      if (typeof appCtx.handleInteriorAction !== 'function') return;
+      return appCtx.handleInteriorAction();
+    };
+    if (typeof appCtx.handleGameplayInteraction === 'function') {
+      Promise.resolve(appCtx.handleGameplayInteraction()).then((handled) => {
+        if (handled !== true) return runInteriorFallback();
+        return undefined;
+      }).catch((err) => {
+        console.warn('[interaction] Primary action failed:', err);
       });
       return;
     }
+    Promise.resolve(runInteriorFallback()).catch((err) => {
+      console.warn('[interior] Interaction failed:', err);
+    });
+    return;
   }
 
   // Primary travel mode cycle (F key)

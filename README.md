@@ -10,12 +10,12 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.1.3
+## Version 4.2.0
 
-Version 4.1.3 restores a complete fixed-location Earth horizon without
-restoring continuous streaming or the false blue city square. Detailed ground,
-mapped water, roads, dense buildings, distant land/building context, and the
-astronomical sky retain explicit, non-overlapping render ownership.
+Version 4.2.0 adds DeFlock Hunt and bounded Live GPS Explore while stabilizing
+the fixed-location Earth world introduced in 4.1.3. Location loads publish one
+immutable world, movement does not reload world data, and returning from Space
+restores the retained Earth scene.
 
 Highlights:
 
@@ -32,8 +32,24 @@ Highlights:
 - Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.
 - Enterable buildings using mapped indoor geometry where available and footprint-aware generated interiors elsewhere.
 - Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
+- [DeFlock Hunt](docs/DEFLOCK_MODE.md), a virtual single-player and cooperative mode built from publicly mapped OpenStreetMap surveillance nodes.
+- Live GPS Explore, an optional foreground-only mode that follows a player's physical location inside one bounded, fixed world without continuous-world streaming.
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
+
+## Multiplayer model
+
+Multiplayer uses bounded shared rooms rather than one continuous MMO server. A
+room keeps one fixed world/location, live player presence, chat, shared blocks,
+artifacts, and room activities together. Private rooms are unlisted and joined
+with a six-character invite code; public rooms are discovered by city; featured
+rooms are curated by administrators. Rooms support 2–32 players, with 8–14
+recommended for the current browser renderer and Firestore presence model.
+
+Run the real two-browser contract with `npm run test:multiplayer-integration`.
+It uses local Auth and Firestore emulators and verifies private-code joining,
+presence/movement, chat, and shared half-grid shape stacks without production
+data.
 
 ## Screenshots
 
@@ -98,7 +114,8 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
-- [Regression ledger](docs/REGRESSION_LEDGER.md)
+- [DeFlock Hunt](docs/DEFLOCK_MODE.md)
+- [Data sources and attribution](DATA_SOURCES.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

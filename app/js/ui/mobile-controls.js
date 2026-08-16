@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { createLifecycleScope } from "../runtime/lifecycle-scope.js?v=2";
 
 const MOBILE_CONTROL_PROFILES = {
   driving: {
@@ -133,6 +134,7 @@ const MOBILE_CONTROL_PROFILES = {
 };
 
 function initMobileControls() {
+  const mobileControlScope = createLifecycleScope('mobile-controls');
   const controlsTab = document.getElementById('controlsTab');
   const ctrlHeader = document.getElementById('ctrlHeader');
   const ctrlContent = document.getElementById('ctrlContent');
@@ -322,16 +324,16 @@ function initMobileControls() {
     };
 
     if (typeof window !== 'undefined' && 'PointerEvent' in window) {
-      btn.addEventListener('pointerdown', onPointerPress);
-      btn.addEventListener('pointerup', onPointerRelease);
-      btn.addEventListener('pointercancel', onPointerRelease);
-      btn.addEventListener('lostpointercapture', onPointerRelease);
+      mobileControlScope.listen(btn, 'pointerdown', onPointerPress);
+      mobileControlScope.listen(btn, 'pointerup', onPointerRelease);
+      mobileControlScope.listen(btn, 'pointercancel', onPointerRelease);
+      mobileControlScope.listen(btn, 'lostpointercapture', onPointerRelease);
     } else {
-      btn.addEventListener('touchstart', onTouchPress, { passive: false });
-      btn.addEventListener('touchend', onTouchRelease, { passive: false });
-      btn.addEventListener('touchcancel', onTouchRelease, { passive: false });
+      mobileControlScope.listen(btn, 'touchstart', onTouchPress, { passive: false });
+      mobileControlScope.listen(btn, 'touchend', onTouchRelease, { passive: false });
+      mobileControlScope.listen(btn, 'touchcancel', onTouchRelease, { passive: false });
     }
-    btn.addEventListener('contextmenu', (event) => event.preventDefault());
+    mobileControlScope.listen(btn, 'contextmenu', (event) => event.preventDefault());
   }
 
   function detectControlsMode() {
@@ -371,9 +373,14 @@ function initMobileControls() {
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
+    let actions = profile.actions;
+    if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {
+      actions = Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : [];
+      actions.push({ label: 'DeFlock', binding: { channel: 'earth', key: 'KeyE' } });
+    }
     applyPadProfile('mobileMove', mobileMovePad, profile.move, mobileMoveLabel, profile.moveLabel || 'Move');
     applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
-    applyActionProfile(profile.actions);
+    applyActionProfile(actions);
     mobileTouchControls.classList.add('show');
   }
 
@@ -385,6 +392,9 @@ function initMobileControls() {
       '#mainMenuBtn',
       '#memoryFlowerFloatBtn',
       '#flowerActionMenu',
+      '#deFlockHud',
+      '#deFlockPrompt',
+      '#deFlockHelp',
       '#gameShareFloatBtn',
       '#gameShareMenu',
       '#mobileTouchControls',
@@ -399,7 +409,12 @@ function initMobileControls() {
     };
     const events = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchend'];
     shieldTargets.forEach((el) => {
-      events.forEach((eventName) => el.addEventListener(eventName, stop, eventName.startsWith('touch') ? { passive: true } : undefined));
+      events.forEach((eventName) => mobileControlScope.listen(
+        el,
+        eventName,
+        stop,
+        eventName.startsWith('touch') ? { passive: true } : undefined
+      ));
     });
   }
 
@@ -449,11 +464,10 @@ function initMobileControls() {
 
   if (mobileTouchControls && isTouchPreferredClient) {
     mobileHoldButtons.forEach((btn) => bindMobileHoldButton(btn));
-    window.addEventListener('blur', clearVirtualHeldInputs);
-    document.addEventListener('visibilitychange', () => {
+    mobileControlScope.listen(window, 'blur', clearVirtualHeldInputs);
+    mobileControlScope.listen(document, 'visibilitychange', () => {
       if (document.hidden) clearVirtualHeldInputs();
     });
-    setInterval(() => updateMobileTouchControls(), 220);
   } else {
     mobileTouchControls?.classList.remove('show');
   }
@@ -462,12 +476,21 @@ function initMobileControls() {
   appCtx.updateControlsModeUI = updateControlsModeUI;
   appCtx.updateMobileTouchControls = updateMobileTouchControls;
 
+  const dispose = (reason = 'mobile-controls-disposed') => {
+    clearVirtualHeldInputs();
+    mobileTouchControls?.classList.remove('show');
+    return mobileControlScope.dispose(reason);
+  };
+  appCtx.disposeMobileControls = dispose;
+
   return {
     controlsTab,
     ctrlHeader,
     ctrlContent,
     isTouchPreferredClient,
     clearVirtualHeldInputs,
+    dispose,
+    lifecycleSnapshot: () => mobileControlScope.snapshot(),
     updateControlsModeUI
   };
 }

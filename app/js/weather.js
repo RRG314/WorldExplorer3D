@@ -12,9 +12,11 @@ import {
   refreshLivePlace,
   uniqueNonEmptyParts,
   weatherCacheKey
-} from './weather/place-resolver.js?v=1';
+} from './weather/place-resolver.js?v=2';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
+import { weatherStateService } from './weather/state-service.js?v=1';
 import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
 const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const WEATHER_CHECK_INTERVAL_MS = 5000;
@@ -25,16 +27,19 @@ const WEATHER_MODES = ['live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'f
 const WEATHER_FOG_COLOR = 0x9aa4b2;
 const WEATHER_CLOUD_COLOR = 0xc5cdd6;
 const WEATHER_CLEAR_COLOR = 0xf5fbff;
-const MIN_EARTH_EXPOSURE = 0.92;
-const MIN_EARTH_AMBIENT_INTENSITY = 0.32;
-const MIN_EARTH_HEMISPHERE_INTENSITY = 0.34;
+// Weather can mute the sun, but it must not make an Earth location unreadable.
+// These floors preserve time-of-day color while keeping streets, terrain, and
+// gameplay objects visible in overcast conditions and at night.
+const MIN_EARTH_EXPOSURE = 1.02;
+const MIN_EARTH_AMBIENT_INTENSITY = 0.48;
+const MIN_EARTH_HEMISPHERE_INTENSITY = 0.55;
 const _weatherColorA = new THREE.Color();
 const _weatherColorB = new THREE.Color();
 let _lastWeatherVisualSignature = '';
 let _lastWeatherUiSignature = '';
 let _lastWeatherCheckMs = 0;
 let _pendingWeatherRequest = null;
-let _weatherUiClockInterval = null;
+const weatherLifecycleScope = createLifecycleScope('weather-ui');
 
 const WEATHER_PRESETS = {
   clear: { label: 'Clear', icon: '☀️', category: 'clear', cloudCover: 8, haze: 0.92, sunFactor: 1, fillFactor: 1, exposureFactor: 1.02, cloudColor: WEATHER_CLEAR_COLOR, skyTint: 0xd8efff },
@@ -444,9 +449,9 @@ function buildManualWeatherState(mode) {
 
 function syncActiveWeatherState() {
   if ((appCtx.weatherMode || 'live') === 'live') {
-    appCtx.weatherState = appCtx.liveWeatherState || null;
+    weatherStateService.setActiveState(appCtx.liveWeatherState || null);
   } else {
-    appCtx.weatherState = buildManualWeatherState(appCtx.weatherMode);
+    weatherStateService.setActiveState(buildManualWeatherState(appCtx.weatherMode));
   }
   applyWeatherPresentation();
   return appCtx.weatherState;
@@ -474,15 +479,15 @@ async function fetchWeatherForLocation(lat, lon, { ocean = false, force = false 
 
 async function getResolvedPlaceForLocation(lat, lon, force = false) {
   const key = placeCacheKey(lat, lon);
-  const cache = appCtx.placeCache instanceof Map ? appCtx.placeCache : (appCtx.placeCache = new Map());
-  if (!force && cache.has(key)) return cache.get(key);
+  const cached = weatherStateService.getCachedPlace(key);
+  if (!force && cached) return cached;
   try {
     const place = await fetchPlaceForLocation(lat, lon);
-    cache.set(key, place);
+    weatherStateService.setCachedPlace(key, place);
     return place;
   } catch {
     const fallback = getFallbackPlaceLabel({ lat, lon });
-    cache.set(key, fallback);
+    weatherStateService.setCachedPlace(key, fallback);
     return fallback;
   }
 }
@@ -492,9 +497,8 @@ async function getWeatherSnapshotForLocation(lat, lon, { force = false, ocean = 
   const safeLon = Number(lon);
   if (!Number.isFinite(safeLat) || !Number.isFinite(safeLon)) return null;
   const cacheKey = weatherCacheKey(safeLat, safeLon);
-  const cache = appCtx.weatherCache instanceof Map ? appCtx.weatherCache : (appCtx.weatherCache = new Map());
   const now = Date.now();
-  const cached = cache.get(cacheKey) || null;
+  const cached = weatherStateService.getCachedWeather(cacheKey);
   if (!force && cached && (now - Number(cached.fetchedAtMs || 0)) < WEATHER_REFRESH_INTERVAL_MS) {
     return { ...cached };
   }
@@ -505,7 +509,7 @@ async function getWeatherSnapshotForLocation(lat, lon, { force = false, ocean = 
   const state = buildLiveWeatherState({ lat: safeLat, lon: safeLon, source: 'live_earth_lookup' }, payload);
   state.locationDisplay = String(place?.display || '').trim();
   state.locationShortLabel = String(place?.shortLabel || '').trim();
-  cache.set(cacheKey, state);
+  weatherStateService.setCachedWeather(cacheKey, state);
   return { ...state };
 }
 
@@ -539,19 +543,11 @@ async function refreshLiveWeather(force = false) {
   }
 
   const cacheKey = weatherCacheKey(location.lat, location.lon);
-  const cache = appCtx.weatherCache instanceof Map ? appCtx.weatherCache : (appCtx.weatherCache = new Map());
-  const cached = cache.get(cacheKey) || null;
+  const cached = weatherStateService.getCachedWeather(cacheKey);
   if (!force && cached && (now - Number(cached.fetchedAtMs || 0)) < WEATHER_REFRESH_INTERVAL_MS) {
-    appCtx.liveWeatherState = cached;
+    weatherStateService.setLiveState(cached);
     void refreshLivePlace(location, false).then(() => {
-      if (appCtx.liveWeatherState) {
-        appCtx.liveWeatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.liveWeatherState.locationDisplay || '').trim();
-        appCtx.liveWeatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.liveWeatherState.locationShortLabel || '').trim();
-      }
-      if (appCtx.weatherState) {
-        appCtx.weatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.weatherState.locationDisplay || '').trim();
-        appCtx.weatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.weatherState.locationShortLabel || '').trim();
-      }
+      weatherStateService.updatePlaceLabels();
       updateWeatherUi();
     });
     if ((appCtx.weatherMode || 'live') === 'live') syncActiveWeatherState();
@@ -571,22 +567,15 @@ async function refreshLiveWeather(force = false) {
 
   const ocean = !!appCtx.oceanMode?.active;
   void refreshLivePlace(location, force).then(() => {
-    if (appCtx.liveWeatherState) {
-      appCtx.liveWeatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.liveWeatherState.locationDisplay || '').trim();
-      appCtx.liveWeatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.liveWeatherState.locationShortLabel || '').trim();
-    }
-    if (appCtx.weatherState) {
-      appCtx.weatherState.locationDisplay = String(appCtx.livePlaceState?.display || appCtx.weatherState.locationDisplay || '').trim();
-      appCtx.weatherState.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || appCtx.weatherState.locationShortLabel || '').trim();
-    }
+    weatherStateService.updatePlaceLabels();
     updateWeatherUi();
   });
   const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean, force }).then((payload) => {
     const state = buildLiveWeatherState(location, payload);
     state.locationDisplay = String(appCtx.livePlaceState?.display || state.locationDisplay || '').trim();
     state.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || state.locationShortLabel || '').trim();
-    appCtx.liveWeatherState = state;
-    cache.set(cacheKey, state);
+    weatherStateService.setLiveState(state);
+    weatherStateService.setCachedWeather(cacheKey, state);
     return state;
   }).catch((err) => {
     console.warn('[weather] live weather fetch failed:', err?.message || err);
@@ -603,7 +592,7 @@ async function refreshLiveWeather(force = false) {
 
 function setWeatherMode(mode = 'live') {
   const nextMode = WEATHER_MODES.includes(mode) ? mode : 'live';
-  appCtx.weatherMode = nextMode;
+  weatherStateService.setMode(nextMode);
   if (nextMode === 'live') {
     syncActiveWeatherState();
     void refreshLiveWeather(false);
@@ -643,14 +632,6 @@ function getWeatherSnapshot() {
   };
 }
 
-function ensureWeatherUiClockTicker() {
-  if (_weatherUiClockInterval || typeof window === 'undefined') return;
-  _weatherUiClockInterval = window.setInterval(() => {
-    if (document?.hidden) return;
-    updateWeatherUi();
-  }, 1000);
-}
-
 function inspectWeatherDescriptor(weatherCode, cloudCover = 0, isDay = true) {
   const descriptor = weatherCodeDescriptor(weatherCode);
   return {
@@ -663,27 +644,33 @@ function inspectWeatherDescriptor(weatherCode, cloudCover = 0, isDay = true) {
   };
 }
 
+function disposeWeatherUi(reason = 'weather-ui-disposed') {
+  return weatherLifecycleScope.dispose(reason);
+}
+
 Object.assign(appCtx, {
   applyWeatherPresentation,
   cycleWeatherMode,
+  disposeWeatherUi,
   fetchWeatherSnapshotForLocation: getWeatherSnapshotForLocation,
   getHudLocationLabel,
   getWeatherSnapshot,
   inspectWeatherDescriptor,
+  updateWeatherUi,
   refreshLiveWeather,
   setWeatherMode,
   syncWeatherState: syncActiveWeatherState
 });
 
-ensureWeatherUiClockTicker();
 updateWeatherUi();
 if (typeof window !== 'undefined') {
-  window.addEventListener('resize', positionHudClock);
+  weatherLifecycleScope.listen(window, 'resize', positionHudClock);
 }
 
 export {
   applyWeatherPresentation,
   cycleWeatherMode,
+  disposeWeatherUi,
   getWeatherSnapshotForLocation,
   getHudLocationLabel,
   getWeatherSnapshot,

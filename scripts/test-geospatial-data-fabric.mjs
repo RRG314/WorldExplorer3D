@@ -259,6 +259,44 @@ assert.equal(directNullModel.hasGuidance, false);
 
 const serverQuery = geospatialFunctions.normalizeQuery({ provider: 'kartaview', lat: '40.7', lon: '-74', radiusM: '9000' });
 assert.deepEqual(serverQuery, { provider: 'kartaview', lat: 40.7, lon: -74, radiusM: 1000, limit: 8 });
+const deFlockQuery = geospatialFunctions.normalizeDeFlockQuery({ lat: '39.2904', lon: '-76.6122', radiusDegrees: '0.5' });
+assert.deepEqual(deFlockQuery, { lat: 39.2904, lon: -76.6122, radiusDegrees: 0.04 });
+assert.match(geospatialFunctions.buildDeFlockOverpassQuery(deFlockQuery), /man_made.*surveillance/);
+const deFlockAttempts = [];
+const deFlockProxy = await geospatialFunctions.queryDeFlockCameras({ lat: 12.34567, lon: 65.4321, radiusDegrees: 0.01 }, {
+  force: true,
+  endpoints: ['https://failed-overpass.test', 'https://working-overpass.test'],
+  fetchImpl: async (url) => {
+    deFlockAttempts.push(String(url));
+    if (String(url).includes('failed-overpass')) throw new Error('simulated provider outage');
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { elements: [
+          { type: 'node', id: 77, lat: 12.345, lon: 65.432, tags: { man_made: 'surveillance' } },
+          { type: 'node', id: 88, lat: 12.346, lon: 65.433, tags: { amenity: 'bench' } }
+        ] };
+      }
+    };
+  }
+});
+assert.equal(deFlockAttempts.length, 2, 'server proxy should race independent Overpass providers');
+assert.equal(deFlockProxy.elements.length, 1, 'server proxy must publish only valid mapped camera nodes');
+assert.equal(deFlockProxy.endpoint, 'https://working-overpass.test');
+assert.equal(deFlockProxy.cache, 'upstream');
+const bundledBaltimore = geospatialFunctions.bundledDeFlockFallback({ lat: 39.2904, lon: -76.6122, radiusDegrees: 0.022 });
+assert.equal(bundledBaltimore.elements.length, 24, 'Baltimore must retain a real last-good OSM snapshot for a cold provider outage');
+assert.equal(bundledBaltimore.cache, 'bundled-last-good');
+assert.match(bundledBaltimore.warnings[0], /dated Baltimore OpenStreetMap cache/);
+assert.equal(geospatialFunctions.bundledDeFlockFallback({ lat: 40.7128, lon: -74.006, radiusDegrees: 0.022 }), null);
+const coldOutageBaltimore = await geospatialFunctions.queryDeFlockCameras({ lat: 39.2904, lon: -76.6122, radiusDegrees: 0.022 }, {
+  force: true,
+  endpoints: ['https://offline-overpass.test'],
+  fetchImpl: async () => { throw new Error('simulated total provider outage'); }
+});
+assert.equal(coldOutageBaltimore.elements.length, 24);
+assert.equal(coldOutageBaltimore.cache, 'bundled-last-good');
 const normalizedPanoramax = geospatialFunctions.normalizePanoramaxItem({
   id: 'p1',
   geometry: { coordinates: [-76.6111, 39.2886] },

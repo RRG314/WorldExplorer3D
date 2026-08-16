@@ -21,6 +21,7 @@ const nearRoadResult = {
 const ROAD_SEARCH_CELL_SIZE = 160;
 const ROAD_SEARCH_RADII = Object.freeze([96, 320, 960]);
 let roadSearchIndex = new Map();
+let roadSearchFeatureSet = new Set();
 let roadSearchBaseRef = null;
 let roadSearchBaseCount = -1;
 let roadSearchOverlayRef = null;
@@ -94,6 +95,7 @@ function rebuildRoadSearchIndexIfNeeded() {
 
   roadSearchIndex = new Map();
   const roads = rawRuntimeRoadFeatures();
+  roadSearchFeatureSet = new Set(roads);
   for (let i = 0; i < roads.length; i += 1) {
     const road = roads[i];
     const pts = Array.isArray(road?.pts) ? road.pts : null;
@@ -415,9 +417,10 @@ export function findNearestRoad(x, z, options = {}) {
   const maxVerticalDelta = Number.isFinite(options?.maxVerticalDelta) ? Math.max(0.5, Number(options.maxVerticalDelta)) : Infinity;
   let bestWeighted = Infinity;
 
-  const roads = runtimeRoadFeatures();
+  rebuildRoadSearchIndexIfNeeded();
   const requestedPreferredRoad = options?.preferredRoad || null;
-  const preferredRoad = requestedPreferredRoad && roads.includes(requestedPreferredRoad) ? requestedPreferredRoad : null;
+  const preferredRoad = requestedPreferredRoad && roadSearchFeatureSet.has(requestedPreferredRoad) &&
+    !runtime.isSuppressedBaseRoad(requestedPreferredRoad) ? requestedPreferredRoad : null;
   const evaluated = new Set();
   const evaluateRoad = (road) => {
     if (!road || evaluated.has(road)) return;
@@ -451,8 +454,7 @@ export function findNearestRoad(x, z, options = {}) {
     }
   }
 
-  let searchComplete = options.forceFullScan === true;
-  if (!searchComplete) {
+  if (options.forceFullScan !== true) {
     for (let i = 0; i < ROAD_SEARCH_RADII.length; i += 1) {
       const radius = ROAD_SEARCH_RADII[i];
       const candidates = indexedRoadCandidates(x, z, radius);
@@ -463,13 +465,18 @@ export function findNearestRoad(x, z, options = {}) {
       // A result comfortably inside this radius cannot be beaten by a road
       // whose bounding box lies outside the indexed search square.
       if (nearRoadResult.road && nearRoadResult.dist <= radius - 4) {
-        searchComplete = true;
         break;
       }
     }
   }
 
-  if (options.forceFullScan === true || !searchComplete) {
+  // A miss after the bounded spatial search is authoritative for normal
+  // gameplay. Scanning every road here made walking/driving progressively
+  // slower after leaving mapped road coverage, and could select a road several
+  // kilometres away. Explicit diagnostics may still compare against a full
+  // scan without putting that work in an actor frame.
+  if (options.forceFullScan === true) {
+    const roads = runtimeRoadFeatures();
     for (let r = 0; r < roads.length; r += 1) evaluateRoad(roads[r]);
   }
   return nearRoadResult;

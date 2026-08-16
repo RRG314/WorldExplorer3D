@@ -138,65 +138,7 @@ try {
     }
 
     const originalRadius = ctx.worldTraversalRadiusWorld;
-    ctx.worldTraversalRadiusWorld = 120;
-
-    Object.assign(ctx.car, {
-      x: 114,
-      z: 0,
-      y: ctx.SurfaceQuery.terrainAt(114, 0).position.y + 1.2,
-      angle: Math.PI / 2,
-      speed: 24,
-      vFwd: 24,
-      vLat: 0,
-      vx: 0,
-      vz: 0,
-      yawRate: 0,
-      rearSlip: 0,
-      steerSm: 0,
-      onRoad: false,
-      road: null,
-      _roadContinuityTimer: 0
-    });
-    activeActions = { steer: 0, throttle: 1, reverse: 0, brake: 0, boost: 0 };
-    stepCar(90);
-    const carBoundaryDistance = Math.hypot(ctx.car.x, ctx.car.z);
-
-    ctx.Walk.state.mode = 'walk';
-    Object.assign(ctx.Walk.state.walker, {
-      x: 116,
-      z: 0,
-      y: ctx.SurfaceQuery.terrainAt(116, 0).position.y + ctx.Walk.CFG.eyeHeight,
-      angle: Math.PI / 2,
-      yaw: Math.PI / 2,
-      vy: 0
-    });
-    activeActions = { move: 1, turn: 0, lookYaw: 0, lookPitch: 0, sprint: 1, jump: 0 };
-    for (let index = 0; index < 90; index += 1) ctx.Walk.update(1 / 60);
-    const walkBoundaryDistance = Math.hypot(ctx.Walk.state.walker.x, ctx.Walk.state.walker.z);
-
-    ctx.Walk.state.mode = 'drive';
-    Object.assign(ctx.drone, { x: 107, z: 0, y: 100, yaw: -Math.PI / 2 });
-    activeActions = { move: 1, turn: 0, lookYaw: 0, lookPitch: 0, vertical: 0 };
-    for (let index = 0; index < 90; index += 1) ctx.updateDrone(1 / 60);
-    const droneBoundaryDistance = Math.hypot(ctx.drone.x, ctx.drone.z);
-
     ctx.startPlaneMode?.({ source: 'travel-control-contract' });
-    Object.assign(ctx.planeMode, {
-      active: true,
-      x: 89,
-      z: 0,
-      yaw: Math.PI / 2,
-      speed: 35,
-      throttle: 1,
-      airborne: true,
-      y: ctx.SurfaceQuery.terrainAt(89, 0).position.y + 80
-    });
-    activeActions = { pitch: 0, roll: 0, throttleAdjust: 0, brake: 0 };
-    for (let index = 0; index < 30; index += 1) ctx.updatePlane(1 / 60);
-    const planeSnapshot = ctx.getPlaneSnapshot();
-    const planeBoundaryDistance = Math.hypot(planeSnapshot.x, planeSnapshot.z);
-
-    ctx.worldTraversalRadiusWorld = originalRadius;
     Object.assign(ctx.planeMode, {
       active: true,
       x: 0,
@@ -241,8 +183,69 @@ try {
       accumulatedRoll: accumulatedTriggeredRoll,
       finalRoll: ctx.planeMode.roll
     };
-    ctx.readControlActions = originalReadControlActions;
+
     ctx.stopPlaneMode?.({ targetMode: 'drive' });
+    const handoffRoad = ctx.roads.find((candidate) =>
+      candidate?.pts?.some((point) => Math.hypot(point.x, point.z) > 1200)
+    ) || ctx.roads[ctx.roads.length - 1];
+    const handoffPoint = handoffRoad?.pts?.find((point) =>
+      Math.hypot(point.x, point.z) > 1200
+    ) || handoffRoad?.pts?.[0];
+    if (!handoffPoint) throw new Error('Mode handoff test could not find a distant mapped point');
+    const handoffY = ctx.SurfaceQuery.terrainAt(handoffPoint.x, handoffPoint.z).position.y;
+    const originalSpawn = { x: 0, z: 0 };
+    const positionDroneAtHandoff = () => {
+      ctx.Walk.state.mode = 'drive';
+      Object.assign(ctx.car, { x: originalSpawn.x, z: originalSpawn.z, angle: 0, speed: 0 });
+      Object.assign(ctx.drone, {
+        x: handoffPoint.x,
+        y: handoffY + 80,
+        z: handoffPoint.z,
+        yaw: Number(handoffRoad?.angle) || 0,
+        pitch: -0.3,
+        roll: 0
+      });
+      ctx.droneMode = true;
+    };
+
+    positionDroneAtHandoff();
+    const droneToDriveSource = { x: ctx.drone.x, z: ctx.drone.z };
+    ctx.setTravelMode('drive', {
+      source: 'travel-control-position-handoff',
+      emitTutorial: false,
+      force: true
+    });
+    const droneToDrive = {
+      mode: ctx.getCurrentTravelMode(),
+      source: droneToDriveSource,
+      target: { x: ctx.car.x, z: ctx.car.z },
+      distanceFromSource: Math.hypot(ctx.car.x - droneToDriveSource.x, ctx.car.z - droneToDriveSource.z),
+      distanceFromOriginal: Math.hypot(ctx.car.x - originalSpawn.x, ctx.car.z - originalSpawn.z)
+    };
+
+    positionDroneAtHandoff();
+    const droneToWalkSource = { x: ctx.drone.x, z: ctx.drone.z };
+    ctx.setTravelMode('walk', {
+      source: 'travel-control-position-handoff',
+      emitTutorial: false,
+      force: true
+    });
+    const droneToWalk = {
+      mode: ctx.getCurrentTravelMode(),
+      source: droneToWalkSource,
+      target: { x: ctx.Walk.state.walker.x, z: ctx.Walk.state.walker.z },
+      distanceFromSource: Math.hypot(
+        ctx.Walk.state.walker.x - droneToWalkSource.x,
+        ctx.Walk.state.walker.z - droneToWalkSource.z
+      ),
+      distanceFromOriginal: Math.hypot(
+        ctx.Walk.state.walker.x - originalSpawn.x,
+        ctx.Walk.state.walker.z - originalSpawn.z
+      )
+    };
+    const modePositionHandoff = { droneToDrive, droneToWalk };
+
+    ctx.readControlActions = originalReadControlActions;
     ctx.spawnOnRoad?.();
     ctx.setTravelMode?.('drive', { source: 'travel-control-contract', emitTutorial: false, force: true });
     document.getElementById('titleScreen')?.classList.add('hidden');
@@ -332,13 +335,8 @@ try {
       traversalRadius: originalRadius,
       steeringCases,
       steeringCaptures,
-      boundaries: {
-        car: carBoundaryDistance,
-        walk: walkBoundaryDistance,
-        drone: droneBoundaryDistance,
-        plane: planeBoundaryDistance
-      },
       planeDoubleTap,
+      modePositionHandoff,
       waterAreas: waterAreas.length,
       duplicateWaterPairs,
       duplicateWaterPairPreview
@@ -365,7 +363,10 @@ try {
   if (!gameplayPng) throw new Error('Gameplay canvas capture was empty');
   await fs.writeFile(path.join(outputDir, 'gameplay.png'), Buffer.from(gameplayPng, 'base64'));
 
-  assert.ok(Number(report.traversalRadius) >= 900 && Number(report.traversalRadius) <= 3000);
+  assert.ok(
+    Number(report.traversalRadius) >= 10000 && Number(report.traversalRadius) <= 22000,
+    `fixed-location traversal radius was not published (${report.traversalRadius})`
+  );
   for (const steering of report.steeringCases) {
     assert.ok(
       steering.wrongWayDelta >= -1e-5,
@@ -376,14 +377,21 @@ try {
       `${steering.id} did not turn in the requested direction`
     );
   }
-  assert.ok(report.boundaries.car <= 115.001, `car crossed boundary (${report.boundaries.car})`);
-  assert.ok(report.boundaries.walk <= 117.001, `walker crossed boundary (${report.boundaries.walk})`);
-  assert.ok(report.boundaries.drone <= 108.001, `drone crossed boundary (${report.boundaries.drone})`);
-  assert.ok(report.boundaries.plane <= 90.001, `plane crossed boundary (${report.boundaries.plane})`);
   assert.equal(report.planeDoubleTap.started, true, 'plane double-tap did not start a barrel roll');
   assert.equal(report.planeDoubleTap.completed, true, 'plane double-tap barrel roll did not complete');
   assert.ok(report.planeDoubleTap.accumulatedRoll < -Math.PI * 1.9, `plane double-tap did not complete a right roll (${report.planeDoubleTap.accumulatedRoll})`);
   assert.ok(Math.abs(report.planeDoubleTap.finalRoll) < 0.05, `plane did not settle after double-tap roll (${report.planeDoubleTap.finalRoll})`);
+  for (const [transition, handoff] of Object.entries(report.modePositionHandoff)) {
+    assert.equal(handoff.mode, transition === 'droneToDrive' ? 'drive' : 'walk');
+    assert.ok(
+      handoff.distanceFromSource <= 220,
+      `${transition} moved ${handoff.distanceFromSource.toFixed(2)} m away from the traveled position`
+    );
+    assert.ok(
+      handoff.distanceFromOriginal >= 600,
+      `${transition} returned to the original spawn (${handoff.distanceFromOriginal.toFixed(2)} m)`
+    );
+  }
   assert.deepEqual(consoleErrors, []);
   console.log(JSON.stringify({ ok: true, ...report }, null, 2));
 } finally {

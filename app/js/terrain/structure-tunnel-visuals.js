@@ -1,82 +1,19 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=40";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=48";
 
 function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY) {
   return { x, y, z, scaleX, scaleY, scaleZ, rotationY };
 }
 
-export function collectCoveredVisualInstances(feature, structurePts, deps = {}) {
-  const samplePoint = deps.samplePointAlongPolyline;
-  const portals = [];
-  const walls = [];
-  const roofs = [];
-  const lights = [];
-  const shells = [];
-  const semantics = feature?.structureSemantics || {};
-  if (
-    semantics.structureKind !== 'covered' ||
-    !Array.isArray(structurePts) ||
-    structurePts.length < 2
-  ) {
-    return { portals, walls, roofs, lights, shells };
-  }
-  const width = Math.max(3.4, Number(feature?.width) || 6);
-  const clearance = Math.max(
-    3,
-    Math.min(5.2, Number(feature?.transportRecord?.maxHeightMeters) || 4.4)
-  );
-  const enclosedSides = semantics.buildingPassage || semantics.indoor;
-  for (let index = 0; index < structurePts.length - 1; index += 1) {
-    const p1 = structurePts[index];
-    const p2 = structurePts[index + 1];
-    const dx = p2.x - p1.x;
-    const dz = p2.z - p1.z;
-    const length = Math.hypot(dx, dz);
-    if (!(length > 0.2)) continue;
-    const x = (p1.x + p2.x) * 0.5;
-    const z = (p1.z + p2.z) * 0.5;
-    const roadY = sampleFeatureSurfaceY(feature, x, z);
-    if (!Number.isFinite(roadY)) continue;
-    const rotationY = Math.atan2(dx, dz);
-    roofs.push(beam(x, roadY + clearance + 0.16, z, width + 1.1, 0.32, length, rotationY));
-    if (enclosedSides) {
-      const nx = -dz / length;
-      const nz = dx / length;
-      const offset = width * 0.5 + 0.54;
-      for (const side of [-1, 1]) {
-        walls.push(beam(
-          x + nx * offset * side,
-          roadY + clearance * 0.5,
-          z + nz * offset * side,
-          0.28,
-          clearance,
-          length,
-          rotationY
-        ));
-      }
-    }
-  }
-  if (semantics.buildingPassage && typeof samplePoint === 'function') {
-    const total = structurePts.slice(1).reduce((distance, point, index) =>
-      distance + Math.hypot(
-        point.x - structurePts[index].x,
-        point.z - structurePts[index].z
-      ), 0);
-    for (const distance of [0, total]) {
-      const point = samplePoint(structurePts, distance);
-      if (!point) continue;
-      const roadY = sampleFeatureSurfaceY(feature, point.x, point.z);
-      if (!Number.isFinite(roadY)) continue;
-      const nx = -point.tangentZ;
-      const nz = point.tangentX;
-      const rotationY = Math.atan2(point.tangentX, point.tangentZ);
-      const pillarWidth = Math.max(0.65, width * 0.13);
-      const sideOffset = width * 0.5 + 0.54 + pillarWidth * 0.5;
-      portals.push(beam(point.x + nx * sideOffset, roadY + clearance * 0.5, point.z + nz * sideOffset, pillarWidth, clearance, Math.max(0.8, width * 0.3), rotationY));
-      portals.push(beam(point.x - nx * sideOffset, roadY + clearance * 0.5, point.z - nz * sideOffset, pillarWidth, clearance, Math.max(0.8, width * 0.3), rotationY));
-      portals.push(beam(point.x, roadY + clearance + 0.24, point.z, width + pillarWidth * 2.2, 0.48, Math.max(0.8, width * 0.28), rotationY));
-    }
-  }
-  return { portals, walls, roofs, lights, shells };
+export function canPublishTunnelVisual(feature) {
+  const model = feature?.tunnelSystemModel;
+  const record = feature?.transportRecord;
+  if (feature?.structureSemantics?.terrainMode !== 'subgrade') return false;
+  if (record?.routeState !== 'complete' || record?.safeForDriving === false) return false;
+  if (record?.completeness === 'lossless') return true;
+  // Generalized geometry cannot own collision or engineered bridge details,
+  // but a mapped tunnel centerline plus measured terrain cover can own a
+  // non-colliding shell. Without it fallback routes render beneath raw terrain.
+  return record?.completeness === 'generalized' && model?.visualKind === 'tunnel';
 }
 
 export function collectTunnelVisualInstances(feature, structurePts, total, deps = {}) {
@@ -91,6 +28,7 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
   if (!Array.isArray(structurePts) || structurePts.length < 2) return { portals, walls, roofs, lights, shells, portalMasks };
 
   const model = feature?.tunnelSystemModel || null;
+  if (!canPublishTunnelVisual(feature)) return { portals, walls, roofs, lights, shells, portalMasks };
   if (!['tunnel', 'underpass'].includes(model?.visualKind)) return { portals, walls, roofs, lights, shells, portalMasks };
   const width = Math.max(3.4, Number(feature?.width) || 6);
   const clearance = Number(model.clearance) || Math.max(3.2, Math.min(4.8, Number(feature?.structureSemantics?.cutDepth || 4.6) - 0.35));
@@ -107,37 +45,41 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
       : [];
   if (shellRanges.length === 0) return { portals, walls, roofs, lights, shells, portalMasks };
 
-  let traveled = 0;
-  let lastLightStation = -1;
-  for (let i = 0; i < structurePts.length - 1; i++) {
-    const p1 = structurePts[i];
-    const p2 = structurePts[i + 1];
-    const dx = p2.x - p1.x;
-    const dz = p2.z - p1.z;
-    const length = Math.hypot(dx, dz);
-    if (!(length > 0.2)) continue;
-    const x = (p1.x + p2.x) * 0.5;
-    const z = (p1.z + p2.z) * 0.5;
-    const roadY = sampleFeatureSurfaceY(feature, x, z);
-    if (!Number.isFinite(roadY)) continue;
-    const segmentStation = traveled + length * 0.5;
-    const insideShell = shellRanges.some((range) =>
-      segmentStation >= range.start && segmentStation <= range.end
-    );
-    if (!insideShell) {
-      traveled += length;
-      continue;
-    }
-    const rotationY = Math.atan2(dx, dz);
-    const lightStation = Math.floor((traveled + length * 0.5) / 24);
-    if (model.visualKind === 'tunnel' && lightStation !== lastLightStation) {
-      lights.push(beam(x, roadY + clearance - 0.08, z, Math.min(3.2, width * 0.48), 0.08, 1.4, rotationY));
-      lastLightStation = lightStation;
-    }
-    traveled += length;
-  }
-
   if (typeof samplePoint !== "function" || typeof sampleTerrain !== "function") return { portals, walls, roofs, lights, shells, portalMasks };
+  if (model.visualKind === 'tunnel') {
+    const lightOffset = Math.max(0.85, width * 0.28);
+    for (const range of shellRanges) {
+      const firstStation = Math.ceil((Number(range.start) + 8) / 24) * 24;
+      for (let station = firstStation; station <= Number(range.end) - 8; station += 24) {
+        const point = samplePoint(structurePts, station);
+        if (!point) continue;
+        const roadY = sampleFeatureSurfaceY(feature, point.x, point.z);
+        const tangentX = Number(point.tangentX);
+        const tangentZ = Number(point.tangentZ);
+        const tangentLength = Math.hypot(tangentX, tangentZ);
+        if (!Number.isFinite(roadY) || !(tangentLength > 0.1)) continue;
+        const tx = tangentX / tangentLength;
+        const tz = tangentZ / tangentLength;
+        const nx = -tz;
+        const nz = tx;
+        const rotationY = Math.atan2(tx, tz);
+        // Paired ceiling strips make the enclosure readable as a tunnel
+        // without adding per-light PointLights (which would multiply GPU work
+        // across a dense fixed city). One instanced batch owns every strip.
+        for (const side of [-1, 1]) {
+          lights.push(beam(
+            point.x + nx * lightOffset * side,
+            roadY + clearance - 0.1,
+            point.z + nz * lightOffset * side,
+            Math.min(0.46, width * 0.08),
+            0.07,
+            1.6,
+            rotationY
+          ));
+        }
+      }
+    }
+  }
   const pointRing = (distance, includeTerrain = false) => {
     const point = samplePoint(structurePts, distance);
     if (!point) return null;
@@ -145,6 +87,7 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     const terrainY = includeTerrain ? Number(sampleTerrain(point.x, point.z)) : NaN;
     if (!Number.isFinite(roadY) || (includeTerrain && !Number.isFinite(terrainY))) return null;
     return {
+      distance,
       x: point.x,
       y: roadY,
       ...(includeTerrain ? { terrainY: Math.max(roadY + 0.65, terrainY + 0.08) } : {}),
@@ -165,8 +108,17 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
         distances.push(cumulative);
       }
     }
+    for (const zone of model.junctionZones || []) {
+      for (const boundary of [Number(zone?.start), Number(zone?.end)]) {
+        if (boundary > startDistance + 0.15 && boundary < endDistance - 0.15) {
+          distances.push(boundary);
+        }
+      }
+    }
     distances.push(endDistance);
-    return distances;
+    return [...new Set(distances.map((distance) => Number(distance).toFixed(4)))]
+      .map(Number)
+      .sort((left, right) => left - right);
   };
   const continuationRing = (endpoint) => {
     const links = Array.isArray(feature?.connectedFeatures?.[endpoint])
@@ -208,11 +160,14 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
       .map((distance) => pointRing(distance))
       .filter(Boolean);
     if (rings.length < 2) continue;
-    if (range.start <= 0.2 && !Number.isFinite(model.portalStart)) {
+    const junctionZones = Array.isArray(model.junctionZones) ? model.junctionZones : [];
+    const junctionAtStart = junctionZones.some((zone) => zone.endpoint === 'start');
+    const junctionAtEnd = junctionZones.some((zone) => zone.endpoint === 'end');
+    if (range.start <= 0.2 && !Number.isFinite(model.portalStart) && !junctionAtStart) {
       const ring = continuationRing('start');
       if (ring) rings.unshift(ring);
     }
-    if (range.end >= total - 0.2 && !Number.isFinite(model.portalEnd)) {
+    if (range.end >= total - 0.2 && !Number.isFinite(model.portalEnd) && !junctionAtEnd) {
       const ring = continuationRing('end');
       if (ring) rings.push(ring);
     }
@@ -275,7 +230,8 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
       halfWidth: interiorHalfWidth,
       clearance,
       roofThickness,
-      visualKind: model.visualKind
+      visualKind: model.visualKind,
+      junctionZones
     });
   }
 
@@ -289,6 +245,38 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     const roadY = sampleFeatureSurfaceY(feature, point.x, point.z);
     const openingHeight = clearance;
     if (!Number.isFinite(roadY) || !(openingHeight > 2.6)) continue;
+    const tangentX = Number(point.tangentX);
+    const tangentZ = Number(point.tangentZ);
+    const tangentLength = Math.hypot(tangentX, tangentZ);
+    if (!(tangentLength > 0.1)) continue;
+    const tx = tangentX / tangentLength;
+    const tz = tangentZ / tangentLength;
+    const nx = -tz;
+    const nz = tx;
+    const rotationY = Math.atan2(tx, tz);
+    const pillarWidth = Math.max(0.58, Math.min(1.15, width * 0.12));
+    const portalDepth = Math.max(0.9, Math.min(2.4, width * 0.24));
+    const sideOffset = width * 0.5 + pillarWidth * 0.62;
+    for (const side of [-1, 1]) {
+      portals.push(beam(
+        point.x + nx * sideOffset * side,
+        roadY + openingHeight * 0.5,
+        point.z + nz * sideOffset * side,
+        pillarWidth,
+        openingHeight,
+        portalDepth,
+        rotationY
+      ));
+    }
+    portals.push(beam(
+      point.x,
+      roadY + openingHeight + roofThickness * 0.75,
+      point.z,
+      width + pillarWidth * 2.25,
+      Math.max(0.42, roofThickness * 1.8),
+      portalDepth,
+      rotationY
+    ));
   }
   return { portals, walls, roofs, lights, shells, portalMasks };
 }

@@ -57,11 +57,21 @@ function assertEarthStarStyle(state, label) {
   const expectedFaintOpacity = Number(stars.faintBaseOpacity || 0) * expectedOpacity;
   assert(
     Math.abs(Number(stars.brightOpacity || 0) - expectedBrightOpacity) <= 0.01,
-    `${label} retained planetary bright-star opacity`
+    `${label} retained planetary bright-star opacity: ${JSON.stringify({
+      actual: Number(stars.brightOpacity || 0),
+      base: Number(stars.brightBaseOpacity || 0),
+      sky: expectedOpacity,
+      expected: expectedBrightOpacity
+    })}`
   );
   assert(
     Math.abs(Number(stars.faintOpacity || 0) - expectedFaintOpacity) <= 0.01,
-    `${label} retained planetary faint-star opacity`
+    `${label} retained planetary faint-star opacity: ${JSON.stringify({
+      actual: Number(stars.faintOpacity || 0),
+      base: Number(stars.faintBaseOpacity || 0),
+      sky: expectedOpacity,
+      expected: expectedFaintOpacity
+    })}`
   );
 }
 
@@ -180,7 +190,14 @@ async function waitForEarthReturn(page, timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
   let state = await readState(page);
   while (Date.now() < deadline) {
-    if (state.env === 'EARTH' && !state.onMoon && state.roads > 0) return state;
+    if (
+      state.env === 'EARTH' &&
+      !state.onMoon &&
+      !state.onMars &&
+      state.roads > 0 &&
+      state.sceneOwnership.earthVisible &&
+      !state.sceneOwnership.marsSurfaceVisible
+    ) return state;
     await page.waitForTimeout(250);
     state = await readState(page);
   }

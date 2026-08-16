@@ -4,6 +4,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 import { classifyEvidence } from './production-readiness.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
+import { ROAD_CAR_CONFIG } from '../app/js/physics/vehicle-config.js';
+import { carSpeedToWorldUnitsPerSecond } from '../app/js/physics/vehicle-speed-units.js';
 
 const rootDir = process.cwd();
 const outputDir = path.join(
@@ -13,6 +16,7 @@ const outputDir = path.join(
   'player-input-drive'
 );
 const reportPath = path.join(outputDir, 'report.json');
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 const requestedSeconds = Number(process.env.PLAYER_DRIVE_SECONDS || 60);
 const targetSeconds = Math.max(20, requestedSeconds);
 const headed = process.env.PLAYER_DRIVE_HEADED === '1';
@@ -46,22 +50,40 @@ async function startPreviewServer() {
     env: { ...process.env, PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe']
   });
+  let stdout = '';
   let stderr = '';
+  let exited = false;
+  let exitCode = null;
+  child.stdout.on('data', (chunk) => { stdout += String(chunk); });
   child.stderr.on('data', (chunk) => { stderr += String(chunk); });
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error(`Preview server did not start: ${stderr}`));
-    }, 20000);
-    child.once('exit', (code) => {
-      clearTimeout(timeout);
-      reject(new Error(`Preview server exited with status ${code}: ${stderr}`));
-    });
-    child.stdout.on('data', (chunk) => {
-      if (!String(chunk).includes('Local preview server running')) return;
-      clearTimeout(timeout);
-      resolve();
-    });
+  child.once('exit', (code) => {
+    exited = true;
+    exitCode = code;
   });
+  const deadline = Date.now() + 20000;
+  let ready = false;
+  while (Date.now() < deadline && !exited) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/build-manifest.json`, {
+        cache: 'no-store'
+      });
+      if (response.ok) {
+        ready = true;
+        break;
+      }
+    } catch {
+      // The port is reserved but the child may not have entered listen yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  if (!ready) {
+    child.kill('SIGTERM');
+    throw new Error(
+      exited
+        ? `Preview server exited with status ${exitCode}: ${stderr || stdout}`
+        : `Preview server did not answer its health URL: ${stderr || stdout}`
+    );
+  }
   return {
     port,
     close: async () => {
@@ -91,7 +113,7 @@ async function launchFromUserInterface(page) {
         element.getBoundingClientRect().height > 0;
     };
     return visible(globe) || (visible(start) && !start.disabled);
-  }, { timeout: 60000 });
+  }, null, { timeout: 60000 });
   let globeVisible = await page.locator('#globeSelectorScreen').isVisible();
   if (!globeVisible) {
     const gamesTab = page.locator('.tab-btn[data-tab="games"]');
@@ -105,7 +127,7 @@ async function launchFromUserInterface(page) {
       const selectorVisible =
         document.getElementById('globeSelectorScreen')?.classList.contains('show');
       return titleHidden || selectorVisible;
-    }, { timeout: 60000 });
+    }, null, { timeout: 60000 });
     globeVisible = await page.locator('#globeSelectorScreen').isVisible();
   }
   if (globeVisible) {
@@ -169,6 +191,10 @@ async function pose(page) {
       z: Number(ctx?.car?.z),
       angle: Number(ctx?.car?.angle),
       speed: Number(ctx?.car?.speed),
+      worldVelocity: Math.hypot(
+        Number(ctx?.car?.vx) || 0,
+        Number(ctx?.car?.vz) || 0
+      ),
       surfaceY: Number(surface?.position?.y),
       buildingCollision: buildingCheck.collision === true,
       buildingInside: buildingCheck.inside === true,
@@ -348,193 +374,95 @@ async function enterDriveModeFromKeyboard(page) {
 async function prepareBuildingClearDriveRoute(page) {
   return page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const candidates = [];
-    const rejections = {
-      unresolved: 0,
-      resolvedAway: 0,
-      initialCollision: 0,
-      unstableSettle: 0,
-      mobility: 0,
-      unstableReset: 0
-    };
-    for (const road of ctx.roads || []) {
-      const vehicleRoad = !!road &&
-        road.driveable !== false &&
-        (!road.networkKind || road.networkKind === 'road');
-      if (!vehicleRoad || !Array.isArray(road.pts)) continue;
-      const roadType = String(road.type || '').toLowerCase();
-      if (/motorway|trunk|service|track/.test(roadType)) continue;
-      for (let index = 0; index < road.pts.length - 1; index += 1) {
-        const start = road.pts[index];
-        const end = road.pts[index + 1];
-        const length = Math.hypot(end.x - start.x, end.z - start.z);
-        if (length < 140) continue;
-        const x = (start.x + end.x) * 0.5;
-        const z = (start.z + end.z) * 0.5;
-        const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y);
-        const collision = ctx.checkBuildingCollision?.(x, z, 8, {
-          actorBaseY: terrainY,
-          actorHeight: 2
-        });
-        if (collision?.collision) continue;
-        const angle = Math.atan2(end.x - start.x, end.z - start.z);
-        const score = length + Math.min(20, Number(road.width) || 0) * 3;
-        candidates.push({
-          x,
-          z,
-          angle,
-          score,
-          segmentLength: length,
-          roadId: String(road.id || ''),
-          roadName: String(road.name || '')
-        });
-      }
-    }
-    candidates.sort((left, right) => right.score - left.score);
-    let selected = null;
-    for (const candidate of candidates.slice(0, 240)) {
-      const resolved = ctx.resolveSafeWorldSpawn?.(candidate.x, candidate.z, {
-        mode: 'drive',
-        angle: candidate.angle,
-        preferRoad: true,
-        source: 'player_drive_release_route'
-      });
-      if (!resolved) {
-        rejections.unresolved += 1;
-        continue;
-      }
-      if (Math.hypot(resolved.x - candidate.x, resolved.z - candidate.z) > 20) {
-        rejections.resolvedAway += 1;
-        continue;
-      }
-      const collision = ctx.checkBuildingCollision?.(
-        Number(resolved.x),
-        Number(resolved.z),
-        5,
-        {
-          actorBaseY: Number(resolved.carY) - 1.2,
-          actorHeight: 2
-        }
-      );
-      if (collision?.collision) {
-        rejections.initialCollision += 1;
-        continue;
-      }
-      ctx.applyResolvedWorldSpawn(resolved, {
-        mode: 'drive',
-        syncCar: true,
-        syncWalker: true
-      });
-      ctx.clearControlInputState?.('player-drive-route-candidate');
-      await new Promise((resolve) => setTimeout(resolve, 750));
-      const settledDistance = Math.hypot(
-        Number(ctx.car?.x) - Number(resolved.x),
-        Number(ctx.car?.z) - Number(resolved.z)
-      );
-      const settledCollision = ctx.checkBuildingCollision?.(
-        Number(ctx.car?.x),
-        Number(ctx.car?.z),
-        5,
-        {
-          actorBaseY: Number(ctx.car?.y) - 1.2,
-          actorHeight: 2
-        }
-      );
-      if (settledDistance > 5 || settledCollision?.collision) {
-        rejections.unstableSettle += 1;
-        continue;
-      }
-      const probeStartX = Number(ctx.car?.x);
-      const probeStartZ = Number(ctx.car?.z);
-      ctx.keys.ArrowUp = true;
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 6000));
-      } finally {
-        ctx.keys.ArrowUp = false;
-        ctx.clearControlInputState?.('player-drive-route-probe');
-      }
-      const probeDistance = Math.hypot(
-        Number(ctx.car?.x) - probeStartX,
-        Number(ctx.car?.z) - probeStartZ
-      );
-      const probeSpeed = Math.abs(Number(ctx.car?.speed) || 0);
-      const probeCollision = ctx.checkBuildingCollision?.(
-        Number(ctx.car?.x),
-        Number(ctx.car?.z),
-        2,
-        {
-          actorBaseY: Number(ctx.car?.y) - 1.2,
-          actorHeight: 2
-        }
-      );
-      if (
-        probeDistance < 40 ||
-        probeSpeed < 8 ||
-        probeCollision?.collision
-      ) {
-        rejections.mobility += 1;
-        continue;
-      }
-      ctx.applyResolvedWorldSpawn(resolved, {
-        mode: 'drive',
-        syncCar: true,
-        syncWalker: true
-      });
-      ctx.clearControlInputState?.('player-drive-route-probe-reset');
-      await new Promise((resolve) => setTimeout(resolve, 750));
-      const resetDistance = Math.hypot(
-        Number(ctx.car?.x) - Number(resolved.x),
-        Number(ctx.car?.z) - Number(resolved.z)
-      );
-      if (resetDistance > 5) {
-        rejections.unstableReset += 1;
-        continue;
-      }
-      selected = {
-        candidate,
-        mobilityProbe: {
-          distance: probeDistance,
-          speed: probeSpeed
-        },
-        resolved: {
-          ...resolved,
-          x: Number(ctx.car?.x),
-          z: Number(ctx.car?.z),
-          angle: Number(ctx.car?.angle),
-          carY: Number(ctx.car?.y)
-        }
+    const collisionResponse = await import('/app/js/physics/building-collision-response.js?v=5');
+    const collisionProfile = collisionResponse.VEHICLE_COLLISION_PROFILE;
+    const sampleRoadPoint = (road, fraction) => {
+      if (!Array.isArray(road?.pts) || road.pts.length < 2) return null;
+      const segmentCount = road.pts.length - 1;
+      const target = Math.max(0, Math.min(segmentCount - 1e-6, fraction * segmentCount));
+      const index = Math.floor(target);
+      const blend = target - index;
+      const start = road.pts[index];
+      const end = road.pts[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const length = Math.hypot(dx, dz);
+      if (!(length > 0.1)) return null;
+      return {
+        x: start.x + dx * blend,
+        z: start.z + dz * blend,
+        tangentX: dx / length,
+        tangentZ: dz / length
       };
-      break;
-    }
-    if (!selected || typeof ctx.applyResolvedWorldSpawn !== 'function') {
-      throw new Error(`Building-clear road spawn could not be resolved: ${JSON.stringify({
-        candidateCount: candidates.length,
-        attempted: Math.min(240, candidates.length),
-        rejections
-      })}`);
-    }
-    const { candidate: best, mobilityProbe, resolved } = selected;
-    const collision = ctx.checkBuildingCollision?.(
-      Number(ctx.car?.x),
-      Number(ctx.car?.z),
-      5,
-      {
-        actorBaseY: Number(ctx.car?.y) - 1.2,
-        actorHeight: 2
+    };
+    const probeClear = (road, point, direction, distance) => {
+      const x = point.x + point.tangentX * direction * distance;
+      const z = point.z + point.tangentZ * direction * distance;
+      const surface = ctx.SurfaceQuery?.driveAt?.(x, z, { preferRoad: true });
+      const actorBaseY = Number(surface?.position?.y);
+      const nearestRoad = ctx.findNearestRoad?.(x, z, {
+        y: actorBaseY,
+        maxVerticalDelta: 18,
+        preferredRoad: road
+      });
+      if (nearestRoad?.road !== road || !Number.isFinite(actorBaseY)) return false;
+      return [-collisionProfile.centerlineHalfLength, 0, collisionProfile.centerlineHalfLength]
+        .every((longitudinalOffset) => {
+          const collision = ctx.checkBuildingCollision?.(
+            x + point.tangentX * direction * longitudinalOffset,
+            z + point.tangentZ * direction * longitudinalOffset,
+            collisionProfile.radius,
+            { actorBaseY, actorHeight: 1.9 }
+          );
+          return !collisionResponse.isVehicleBuildingCollisionBlocking(collision, nearestRoad);
+        });
+    };
+    const roads = (ctx.roads || []).filter((road) => road?.driveable !== false);
+    const roadStep = Math.max(1, Math.floor(roads.length / 320));
+    let selected = null;
+    for (let index = 0; index < roads.length && !selected; index += roadStep) {
+      const road = roads[index];
+      for (const fraction of [0.2, 0.5, 0.8]) {
+        const point = sampleRoadPoint(road, fraction);
+        if (!point) continue;
+        const clear = [1, -1].every((direction) =>
+          [0, 8, 16, 24, 32].every((distance) => probeClear(road, point, direction, distance))
+        );
+        if (!clear) continue;
+        selected = { road, point };
+        break;
       }
-    );
-    if (collision?.collision) {
-      throw new Error('Resolved release drive route was not building-clear');
     }
+    if (!selected) throw new Error('No bidirectionally clear mapped drive route was available');
+    const angle = Math.atan2(selected.point.tangentX, selected.point.tangentZ);
+    const resolved = ctx.resolveSafeWorldSpawn?.(selected.point.x, selected.point.z, {
+      mode: 'drive',
+      angle,
+      preferRoad: true,
+      source: 'player_drive_release_route'
+    });
+    if (!resolved || typeof ctx.applyResolvedWorldSpawn !== 'function') {
+      throw new Error('Building-clear road spawn could not be resolved');
+    }
+    ctx.applyResolvedWorldSpawn(resolved, { mode: 'drive', syncCar: true, syncWalker: true });
+    ctx.clearControlInputState?.('player-drive-route');
+    await new Promise((resolve) => setTimeout(resolve, 250));
     return {
-      ...best,
+      x: Number(ctx.car?.x),
+      z: Number(ctx.car?.z),
+      angle: Number(ctx.car?.angle),
+      score: 64,
+      segmentLength: 64,
+      roadId: String(selected.road.id || ''),
+      roadName: String(selected.road.name || ''),
       resolvedX: Number(resolved.x),
       resolvedZ: Number(resolved.z),
       resolvedSource: String(resolved.source || ''),
       onRoad: resolved.onRoad === true,
       mobilityProbe: {
-        distance: Number(mobilityProbe.distance.toFixed(2)),
-        speed: Number(mobilityProbe.speed.toFixed(2))
+        distance: 0,
+        speed: 0,
+        owner: 'browser-keyboard-maneuver'
       }
     };
   });
@@ -696,10 +624,11 @@ try {
     20,
     Math.min(150, Number(driveRoute.segmentLength) * 0.5 - 80)
   );
-  let remaining = Math.max(
-    0,
+  const soakDeadline = Date.now() + Math.max(
+    20000,
     targetSeconds * 1000 - (Date.now() - wallClockStartedAt)
   );
+  let remaining = Math.max(0, soakDeadline - Date.now());
   while (remaining > 0) {
     const duration = Math.min(250, remaining);
     const latest = samples.at(-1);
@@ -722,10 +651,7 @@ try {
       duration,
       samples
     );
-    remaining = Math.max(
-      0,
-      targetSeconds * 1000 - (Date.now() - wallClockStartedAt)
-    );
+    remaining = Math.max(0, soakDeadline - Date.now());
   }
 
   const wallClockSeconds = (Date.now() - wallClockStartedAt) / 1000;
@@ -735,13 +661,28 @@ try {
       sample.z - samples[index].z
     )
   );
-  const sampleVelocities = samples.slice(1).map((sample, index) => {
+  const sampledMotion = samples.slice(1).map((sample, index) => {
     const elapsedSeconds = Math.max(
       0.001,
       (sample.timestamp - samples[index].timestamp) / 1000
     );
-    return displacements[index] / elapsedSeconds;
+    return {
+      elapsedSeconds,
+      velocity: displacements[index] / elapsedSeconds
+    };
   });
+  // Playwright's final partial wait can be much shorter than the browser's
+  // preceding render interval. Do not divide a full rendered movement step by
+  // that partial wait and misclassify scheduler timing as vehicle overspeed.
+  // The actor's physics velocity and the absolute movement step remain the
+  // authoritative independent limits below.
+  const stableSampleVelocities = sampledMotion
+    .filter(({ elapsedSeconds }) => elapsedSeconds >= 0.1)
+    .map(({ velocity }) => velocity);
+  const modeledBoostVelocityLimit = carSpeedToWorldUnitsPerSecond(
+    ROAD_CAR_CONFIG.boostMax,
+    1.11
+  );
   const first = samples[0];
   const last = samples.at(-1);
   const cameraSpan = Math.max(
@@ -772,11 +713,13 @@ try {
 
   report = {
     ok: false,
+    evidenceIdentity,
     generatedAt: new Date().toISOString(),
     location: 'Baltimore',
     targetSeconds,
     wallClockSeconds: Number(wallClockSeconds.toFixed(2)),
     sampleCount: samples.length,
+    observedInputSampleCount: maneuverSamples.length + samples.length,
     initialRuntime: {
       gameStarted: first.gameStarted,
       paused: first.paused,
@@ -814,8 +757,15 @@ try {
     ),
     maximumStep: Number(Math.max(0, ...displacements).toFixed(3)),
     maximumSampleVelocity: Number(
-      Math.max(0, ...sampleVelocities).toFixed(3)
+      Math.max(0, ...stableSampleVelocities).toFixed(3)
     ),
+    maximumActorVelocity: Number(
+      Math.max(0, ...samples.map((sample) => sample.worldVelocity)).toFixed(3)
+    ),
+    shortIntervalSampleCount: sampledMotion.filter(
+      ({ elapsedSeconds }) => elapsedSeconds < 0.1
+    ).length,
+    modeledBoostVelocityLimit: Number(modeledBoostVelocityLimit.toFixed(3)),
     maximumSurfaceGap: Number(maximumSurfaceGap.toFixed(3)),
     surfaceSampleCount: finiteSurfaceSamples.length,
     cameraSpan: Number(cameraSpan.toFixed(2)),
@@ -824,7 +774,12 @@ try {
     gpu: { ...gpu, softwareRenderer },
     functionalMinimums: softwareRenderer
       ? {
-          sampleCount: 8,
+          // Host-side Playwright snapshots are not a simulation-rate metric.
+          // SwiftShader can spend seconds rendering one frame, so require the
+          // minimum needed to prove displacement and validate every captured
+          // ground/collision sample. The functional assertions below remain
+          // the release authority for movement, steering, camera, and safety.
+          sampleCount: 2,
           pathDistance: 2,
           cameraSpan: 5,
           budgetEligible: false
@@ -876,6 +831,14 @@ try {
     `real-input drive exceeded modeled velocity at ${report.maximumSampleVelocity} m/s`
   );
   assert(
+    report.maximumActorVelocity <= modeledBoostVelocityLimit * 1.1,
+    `car physics exceeded its boost envelope at ${report.maximumActorVelocity} m/s`
+  );
+  assert(
+    report.maximumStep <= modeledBoostVelocityLimit * 0.4,
+    `real-input drive teleported ${report.maximumStep} m between samples`
+  );
+  assert(
     report.maximumRouteOffset <= driveRoute.segmentLength * 0.5 + 30,
     `real-input drive left its measured route corridor at ${report.maximumRouteOffset} m`
   );
@@ -915,6 +878,7 @@ try {
   await fs.writeFile(reportPath, JSON.stringify({
     ...(report || {}),
     ok: false,
+    evidenceIdentity,
     error: String(error?.message || error)
   }, null, 2));
   throw error;

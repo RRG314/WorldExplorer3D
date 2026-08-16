@@ -88,6 +88,7 @@ function getMapReferencePosition() {
 }
 
 function worldToLatLon(worldX, worldZ) {
+  if (typeof appCtx.worldToGeo === 'function') return appCtx.worldToGeo(worldX, worldZ);
   return {
     lat: appCtx.LOC.lat - worldZ / appCtx.SCALE,
     lon: appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180))

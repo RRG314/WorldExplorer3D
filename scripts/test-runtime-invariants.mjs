@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { evaluateRuntimeReadiness } from './production-readiness.mjs';
+import { getReleaseEvidenceIdentity } from './release-evidence-identity.mjs';
 import { exercisePlanetaryRoundTrip } from './runtime-planetary-check.mjs';
 import { mkdirp, startServer } from './runtime-test-server.mjs';
 
@@ -10,6 +11,7 @@ const rootDir = process.cwd();
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputDir = path.join(rootDir, 'output', 'playwright', 'runtime-invariants');
+const evidenceIdentity = getReleaseEvidenceIdentity({ rootDir });
 // Initial play budgets building candidates, then removes footprints that overlap
 // transport corridors. Assert useful scene density without requiring unsafe infill.
 const MINIMUM_RENDERED_BUILDINGS = 100;
@@ -210,6 +212,26 @@ async function waitForTraversalNetworks(page, timeoutMs = 60000) {
   throw new Error(`Timed out waiting for traversal networks. Last snapshot: ${JSON.stringify(last || {})}`);
 }
 
+async function waitForVegetationLayer(page, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    last = await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const ctx = mod?.ctx;
+      return {
+        features: Array.isArray(ctx?.vegetationFeatures) ? ctx.vegetationFeatures.length : 0,
+        meshes: Array.isArray(ctx?.vegetationMeshes) ? ctx.vegetationMeshes.length : 0,
+        worldCoverReady: Number(ctx?.worldCoverStats?.ready || 0),
+        worldCoverFailed: Number(ctx?.worldCoverStats?.failed || 0)
+      };
+    });
+    if (last.features > 0 && last.meshes > 0) return last;
+    await page.waitForTimeout(250);
+  }
+  return last;
+}
+
 function assert(condition, message) {
   if (!condition) {
     const err = new Error(message);
@@ -324,6 +346,7 @@ async function main() {
     }
 
     const traversalSnapshot = await waitForTraversalNetworks(page, 60000);
+    const vegetationReadiness = await waitForVegetationLayer(page, 15000);
 
     const preWaterMetrics = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
@@ -500,12 +523,21 @@ async function main() {
               centerRoad
             );
           if (centerBlocked) centerHits += 1;
-          const laneOffset = Math.max(0.4, halfWidth - 0.8);
+          const vehicleRadius = 2;
+          const laneEdgeClearance = 0.25;
+          // Probe representative lane centers while keeping the complete
+          // vehicle collider inside the mapped road surface. The previous
+          // halfWidth - 0.8 probe put a 2 m collider 1.2 m beyond every road
+          // edge and measured neighboring buildings/shoulders as lane faults.
+          const laneOffset = Math.min(
+            halfWidth * 0.5,
+            Math.max(0, halfWidth - vehicleRadius - laneEdgeClearance)
+          );
           for (const sign of [-1, 1]) {
             const laneCollision = ctx.checkBuildingCollision?.(
               point.x + point.normalX * laneOffset * sign,
               point.z + point.normalZ * laneOffset * sign,
-              2,
+              vehicleRadius,
               collisionOptions
             );
             const laneRoad = ctx.findNearestRoad?.(
@@ -1147,6 +1179,9 @@ async function main() {
       const transportStructureColliders = Array.isArray(ctx?.transportStructureColliders)
         ? ctx.transportStructureColliders
         : [];
+      const transportStructureFeatures = Array.isArray(transportStructureModel?.features)
+        ? transportStructureModel.features
+        : [];
       const transportStructureCoverage = {
         authority: String(transportStructureModel?.authority || ''),
         modelId: String(transportStructureModel?.id || ''),
@@ -1155,15 +1190,24 @@ async function main() {
         featureCount: Number(transportStructureModel?.stats?.featureCount || 0),
         chainCount: Number(transportStructureModel?.stats?.chainCount || 0),
         incompleteCount: Number(transportStructureModel?.stats?.incompleteCount || 0),
-        coveredFeatureCount: Array.isArray(transportStructureModel?.features)
-          ? transportStructureModel.features.filter((feature) => feature?.kind === 'covered').length
-          : 0,
+        coveredFeatureCount: transportStructureFeatures.filter((feature) => feature?.kind === 'covered').length,
+        colliderEligibleFeatureCount: transportStructureFeatures.filter((feature) => {
+          const semantics = feature?.structureSemantics || {};
+          const tunnel = feature?.tunnelSystemModel || {};
+          return feature?.kind === 'covered' || semantics.structureKind === 'covered' || (
+            semantics.terrainMode === 'subgrade' &&
+            feature?.transportRecord?.completeness === 'lossless' &&
+            tunnel.visualKind === 'tunnel' &&
+            Array.isArray(tunnel.shellRanges) &&
+            tunnel.shellRanges.length > 0
+          );
+        }).length,
         colliderPolicy: String(ctx?.transportStructureColliderPolicy || ''),
         colliderCount: transportStructureColliders.length,
         invalidColliderCount: transportStructureColliders.filter((collider) =>
           collider?.geometrySource !== 'compiled_transport_structures' ||
           collider?.heightSource !== 'compiled_transport_surface' ||
-          !['side_wall', 'ceiling'].includes(collider?.structureColliderKind) ||
+          collider?.structureColliderKind !== 'side_wall' ||
           !Number.isFinite(collider?.minY) ||
           !Number.isFinite(collider?.maxY) ||
           !(collider.maxY > collider.minY)
@@ -1384,15 +1428,16 @@ async function main() {
         report.transportStructureCoverage?.invalidColliderCount === 0 &&
         (
           (
+            report.transportStructureCoverage?.colliderEligibleFeatureCount > 0 &&
             report.transportStructureCoverage?.colliderCount > 0 &&
             report.transportStructureCoverage?.sideWallCount > 0 &&
-            report.transportStructureCoverage?.ceilingCount > 0
+            report.transportStructureCoverage?.ceilingCount === 0
           ) ||
           (
-            report.transportStructureCoverage?.coveredFeatureCount === 0 &&
+            report.transportStructureCoverage?.colliderEligibleFeatureCount === 0 &&
             report.transportStructureCoverage?.colliderCount === 0 &&
             report.transportStructureCoverage?.colliderPolicy ===
-              'covered-only-tunnels-withheld-until-trustworthy-portals'
+              'actor-height-bounded-lossless-tunnel-side-walls'
           )
         ),
       compiledTransportRendererBudget:
@@ -1470,11 +1515,13 @@ async function main() {
 
     const fullReport = {
       ok,
+      evidenceIdentity,
       url: baseUrl,
       checks,
       metrics: report,
       readySnapshot,
       traversalSnapshot,
+      vegetationReadiness,
       preWaterMetrics,
       mapToggleCheck,
       debugToggleCheck,
@@ -1620,6 +1667,7 @@ main().catch(async (err) => {
     await fs.writeFile(reportPath, JSON.stringify({
       ...existing,
       ok: false,
+      evidenceIdentity,
       error: err?.message || String(err)
     }, null, 2));
   } catch {

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createGaiaSkyLayers } from '../sky/gaia-catalog.js?v=3';
+import { createGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 
 const CATALOG_RADIUS = 300000;
 

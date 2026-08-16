@@ -7,10 +7,10 @@ import {
   normalizeBlockMaterial,
   normalizeBlockRotation,
   normalizeBlockShape
-} from "./block-builder/catalog.js?v=1";
+} from "./block-builder/catalog.js?v=2";
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
 import { createBlockLocalStore } from './block-builder/local-store.js?v=1';
-import { createSharedBlockSync } from './block-builder/shared-sync.js?v=1';
+import { createSharedBlockSync } from './block-builder/shared-sync.js?v=2';
 // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================

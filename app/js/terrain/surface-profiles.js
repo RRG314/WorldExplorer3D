@@ -5,11 +5,23 @@ import {
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
+  worldCoverProviderSnapshot,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=13";
+} from "./worldcover-baseline.js?v=16";
+import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
+import { latLonToTileXY } from './tile-coordinates.js?v=1';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=17';
+import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
+import {
+  applyTerrainProfileSurfaceMaterialMix,
+  applyTerrainReliefMaterialMix,
+  applyWorldCoverSurfaceMaterialMix,
+  configureTerrainSurfaceMaterialBlend,
+  ensureTerrainSurfaceMixAttributes,
+  setTerrainSurfaceMaterialMixAt
+} from './surface-material-blend.js?v=1';
 
-const SNOW_COLOR_HEX = 0xffffff;
-const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
+const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
 export const TERRAIN_GRASS_COLOR_HEX = 0x6b8e4a;
 const URBAN_GROUND_HEX = 0x8b8f96;
@@ -223,7 +235,7 @@ function getProceduralTerrainTextureBase(mode = "snow") {
   return proceduralTerrainTextureBases[key];
 }
 
-function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
+export function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   if (!mesh || !mesh.userData) return null;
   if (!mesh.userData.terrainTextureSetsByMode) mesh.userData.terrainTextureSetsByMode = {};
   const modeKey =
@@ -236,6 +248,32 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     mode === "rock" ? "rock" :
     mode === "forest" ? "forest" :
     "grass";
+  const source = terrainTextureSource(modeKey);
+  if (!source) return null;
+
+  const textureCacheKey = [
+    modeKey,
+    Number(repeats) || 12,
+    source.map?.uuid || 'none',
+    source.normalMap?.uuid || 'none',
+    source.roughnessMap?.uuid || 'none'
+  ].join(':');
+  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
+    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
+    return mesh.userData.terrainTextureSet;
+  }
+
+  const textureSet = {
+    map: cloneTerrainTextureWithRepeat(source.map, repeats),
+    normalMap: cloneTerrainTextureWithRepeat(source.normalMap, repeats),
+    roughnessMap: cloneTerrainTextureWithRepeat(source.roughnessMap, repeats)
+  };
+  mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
+  mesh.userData.terrainTextureSet = textureSet;
+  return textureSet;
+}
+
+function terrainTextureSource(modeKey = 'grass') {
   let source = null;
   const registeredMode = modeKey === 'snowRock' ? 'rock' : modeKey;
   if (appCtx.surfaceTextureSets?.[registeredMode]?.map) {
@@ -264,28 +302,24 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   } else {
     source = getProceduralTerrainTextureBase(modeKey);
   }
-  if (!source) return null;
+  return source;
+}
 
-  const textureCacheKey = [
-    modeKey,
-    Number(repeats) || 12,
-    source.map?.uuid || 'none',
-    source.normalMap?.uuid || 'none',
-    source.roughnessMap?.uuid || 'none'
-  ].join(':');
-  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
-    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
-    return mesh.userData.terrainTextureSet;
-  }
-
-  const textureSet = {
-    map: cloneTerrainTextureWithRepeat(source.map, repeats),
-    normalMap: cloneTerrainTextureWithRepeat(source.normalMap, repeats),
-    roughnessMap: cloneTerrainTextureWithRepeat(source.roughnessMap, repeats)
+function ensureTerrainSemanticTextureSets(mesh, repeats) {
+  return {
+    grass: terrainTextureSource('grass'),
+    urban: terrainTextureSource('urban'),
+    sand: terrainTextureSource('sand'),
+    forest: terrainTextureSource('forest'),
+    soil: terrainTextureSource('soil'),
+    rock: terrainTextureSource('rock'),
+    biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
   };
-  mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
-  mesh.userData.terrainTextureSet = textureSet;
-  return textureSet;
+}
+
+export function applyTerrainSemanticMaterialBlend(mesh, repeats = 12) {
+  const textureSets = ensureTerrainSemanticTextureSets(mesh, repeats);
+  return configureTerrainSurfaceMaterialBlend(mesh, textureSets);
 }
 
 let cachedGroundFallbackMesh = null;
@@ -366,20 +400,6 @@ export function classifyTerrainVisualProfile(bounds, minElevationMeters = null, 
   });
 }
 
-function worldCoverStats() {
-  if (!appCtx.worldCoverStats) {
-    appCtx.worldCoverStats = {
-      requested: 0,
-      ready: 0,
-      failed: 0,
-      network: 0,
-      persistentCache: 0,
-      classes: {}
-    };
-  }
-  return appCtx.worldCoverStats;
-}
-
 function classifyWorldCoverSurfaceProfile(mesh, result) {
   const current = mesh?.userData?.terrainVisualProfile || null;
   const bounds = mesh?.userData?.terrainTile?.bounds || null;
@@ -397,7 +417,7 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
   };
 }
 
-function applyWorldCoverVertexTints(mesh, result) {
+export function applyWorldCoverVertexTints(mesh, result) {
   const geometry = mesh?.geometry;
   const uvs = geometry?.attributes?.uv;
   const tints = result?.surfaceTints;
@@ -428,109 +448,59 @@ function applyWorldCoverVertexTints(mesh, result) {
   return true;
 }
 
-function sampleWorldCoverScalarAtUv(values, size, u, v) {
-  const sourceX = Math.max(0, Math.min(size - 1, u * (size - 1)));
-  const sourceY = Math.max(0, Math.min(size - 1, (1 - v) * (size - 1)));
-  const x0 = Math.floor(sourceX);
-  const y0 = Math.floor(sourceY);
-  const x1 = Math.min(size - 1, x0 + 1);
-  const y1 = Math.min(size - 1, y0 + 1);
-  const tx = sourceX - x0;
-  const ty = sourceY - y0;
-  const north = values[y0 * size + x0] * (1 - tx) + values[y0 * size + x1] * tx;
-  const south = values[y1 * size + x0] * (1 - tx) + values[y1 * size + x1] * tx;
-  return (north * (1 - ty) + south * ty) / 255;
-}
-
-function applyWorldCoverBuiltSurfaceBlend(mesh, result, builtTextures) {
+export function applyMappedSemanticVertexTints(
+  mesh,
+  mappedContext = appCtx.fixedLocationMappedSurfaceContext,
+  options = {}
+) {
   const geometry = mesh?.geometry;
-  const material = mesh?.material;
-  const uvs = geometry?.attributes?.uv;
-  const weights = result?.surfaceBuiltWeights;
-  const size = Number(result?.surfaceBuiltWeightSize || 0);
-  if (!geometry || !uvs || !material || !weights || size < 2 || !builtTextures?.map) return false;
-
-  const attribute = new Float32Array(uvs.count);
-  let strongestWeight = 0;
-  for (let index = 0; index < uvs.count; index += 1) {
-    const weight = sampleWorldCoverScalarAtUv(weights, size, uvs.getX(index), uvs.getY(index));
-    attribute[index] = weight;
-    strongestWeight = Math.max(strongestWeight, weight);
+  const positions = geometry?.attributes?.position;
+  const contextZoom = Number(mappedContext?.contextZoom || 0);
+  const buckets = mappedContext?.landAreasByTile;
+  if (!geometry || !positions || !buckets?.get || contextZoom <= 0 ||
+      typeof appCtx.worldToLatLon !== 'function') return 0;
+  if (options.force !== true && mesh.userData?.mappedSemanticTintContext === mappedContext) {
+    return Number(mesh.userData?.mappedSemanticTintVertices || 0);
   }
-  geometry.setAttribute('surfaceBuiltWeight', new THREE.Float32BufferAttribute(attribute, 1));
-  geometry.attributes.surfaceBuiltWeight.needsUpdate = true;
-  if (strongestWeight <= 0.001) return false;
 
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.surfaceBuiltMap = { value: builtTextures.map };
-    shader.uniforms.surfaceBuiltNormalMap = { value: builtTextures.normalMap || material.normalMap };
-    shader.uniforms.surfaceBuiltRoughnessMap = { value: builtTextures.roughnessMap || material.roughnessMap };
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nattribute float surfaceBuiltWeight;\nvarying float vSurfaceBuiltWeight;'
-      )
-      .replace(
-        '#include <begin_vertex>',
-        '#include <begin_vertex>\nvSurfaceBuiltWeight = surfaceBuiltWeight;'
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nuniform sampler2D surfaceBuiltMap;\nuniform sampler2D surfaceBuiltNormalMap;\nuniform sampler2D surfaceBuiltRoughnessMap;\nvarying float vSurfaceBuiltWeight;\nfloat surfaceBuiltBlend() { return smoothstep(0.18, 0.72, vSurfaceBuiltWeight); }'
-      )
-      .replace(
-        '#include <map_fragment>',
-        `#ifdef USE_MAP
-          vec4 naturalTexelColor = mapTexelToLinear(texture2D(map, vUv));
-          vec4 builtTexelColor = mapTexelToLinear(texture2D(surfaceBuiltMap, vUv));
-          diffuseColor *= mix(naturalTexelColor, builtTexelColor, surfaceBuiltBlend());
-        #endif`
-      )
-      .replace(
-        '#include <normal_fragment_maps>',
-        `#ifdef OBJECTSPACE_NORMALMAP
-          vec3 naturalMapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
-          vec3 builtMapN = texture2D(surfaceBuiltNormalMap, vUv).xyz * 2.0 - 1.0;
-          normal = normalize(mix(naturalMapN, builtMapN, surfaceBuiltBlend()));
-          #ifdef FLIP_SIDED
-            normal = -normal;
-          #endif
-          #ifdef DOUBLE_SIDED
-            normal = normal * faceDirection;
-          #endif
-          normal = normalize(normalMatrix * normal);
-        #elif defined(TANGENTSPACE_NORMALMAP)
-          vec3 naturalMapN = texture2D(normalMap, vUv).xyz * 2.0 - 1.0;
-          vec3 builtMapN = texture2D(surfaceBuiltNormalMap, vUv).xyz * 2.0 - 1.0;
-          vec3 mapN = normalize(mix(naturalMapN, builtMapN, surfaceBuiltBlend()));
-          mapN.xy *= normalScale;
-          #ifdef USE_TANGENT
-            normal = normalize(vTBN * mapN);
-          #else
-            normal = perturbNormal2Arb(-vViewPosition, normal, mapN, faceDirection);
-          #endif
-        #elif defined(USE_BUMPMAP)
-          normal = perturbNormalArb(-vViewPosition, normal, dHdxy_fwd(), faceDirection);
-        #endif`
-      )
-      .replace(
-        '#include <roughnessmap_fragment>',
-        `float roughnessFactor = roughness;
-        #ifdef USE_ROUGHNESSMAP
-          float naturalRoughness = texture2D(roughnessMap, vUv).g;
-          float builtRoughness = texture2D(surfaceBuiltRoughnessMap, vUv).g;
-          roughnessFactor *= mix(naturalRoughness, builtRoughness, surfaceBuiltBlend());
-        #endif`
-      );
-  };
-  material.customProgramCacheKey = () => 'worldcover-built-surface-blend-v1';
-  material.needsUpdate = true;
-  mesh.userData.worldCoverBuiltBlend = {
-    mode: 'terrain-shader',
-    maxWeight: strongestWeight
-  };
-  return true;
+  let colors = geometry.attributes.color;
+  if (!colors || colors.count !== positions.count) {
+    const neutral = new Float32Array(positions.count * 3);
+    neutral.fill(1);
+    colors = new THREE.Float32BufferAttribute(neutral, 3);
+    geometry.setAttribute('color', colors);
+  }
+  const materialMix = ensureTerrainSurfaceMixAttributes(geometry);
+  let tintedVertices = 0;
+  for (let index = 0; index < positions.count; index += 1) {
+    const geographic = appCtx.worldToLatLon(
+      positions.getX(index) + Number(mesh.position?.x || 0),
+      positions.getZ(index) + Number(mesh.position?.z || 0)
+    );
+    const tile = latLonToTileXY(geographic.lat, geographic.lon, contextZoom);
+    const bucket = buckets.get(`${contextZoom}/${tile.x}/${tile.y}`) || [];
+    const owner = bucket.find((area) => pointInMappedLandArea(
+      geographic.lon,
+      geographic.lat,
+      area
+    ));
+    if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
+    colors.setXYZ(index, owner.tint[0], owner.tint[1], owner.tint[2]);
+    setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);
+    tintedVertices += 1;
+  }
+  if (tintedVertices > 0) {
+    colors.needsUpdate = true;
+    if (materialMix) {
+      materialMix.mixA.needsUpdate = true;
+      materialMix.mixB.needsUpdate = true;
+    }
+    mesh.material.vertexColors = true;
+    mesh.material.needsUpdate = true;
+  }
+  mesh.userData.mappedSemanticTintVertices = tintedVertices;
+  mesh.userData.mappedSemanticTintContext = mappedContext;
+  return tintedVertices;
 }
 
 function applyLoadedWorldCoverBaseline(mesh) {
@@ -553,24 +523,27 @@ function applyLoadedWorldCoverBaseline(mesh) {
     applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
   if (result.surfaceTints) {
-    const detailMode =
-      result.dominantClass === 'built' ? 'grass' :
-      result.dominantClass === 'crop' ? 'soil' :
-      result.dominantClass === 'bare' ? (semanticProfile?.mode === 'sand' ? 'sand' : 'rock') :
-      result.dominantClass === 'snow' ? 'snow' :
-      result.dominantClass === 'tree' || result.dominantClass === 'mangrove' ? 'forest' :
-      'grass';
+    const ownDetailMode = resolveWorldCoverDetailMode(semanticProfile, result);
+    const ownerDistance = Math.hypot(Number(mesh.position?.x || 0), Number(mesh.position?.z || 0));
+    const previousOwnerDistance = Number.isFinite(Number(appCtx.worldCoverBaseDetailModeOwnerDistance)) ?
+      Number(appCtx.worldCoverBaseDetailModeOwnerDistance) : Infinity;
+    const becomesLocationOwner = ownerDistance + 1e-6 < previousOwnerDistance;
+    const previousLocationDetailMode = appCtx.worldCoverBaseDetailMode || null;
+    if (becomesLocationOwner) {
+      appCtx.worldCoverBaseDetailMode = ownDetailMode;
+      appCtx.worldCoverBaseDetailModeOwnerDistance = ownerDistance;
+    }
+    const detailMode = appCtx.worldCoverBaseDetailMode || ownDetailMode;
     const detailTextures = ensureTerrainTextureSet(
       mesh,
       Number(mesh.userData.terrainTextureRepeats) || 12,
-      detailMode
-    );
-    const builtTextures = ensureTerrainTextureSet(
-      mesh,
-      Number(mesh.userData.terrainTextureRepeats) || 12,
-      'built'
+      'grass'
     );
     mesh.userData.terrainTextureSet = detailTextures;
+    // Grass is the neutral natural base. Per-vertex semantic weights below
+    // blend the existing urban, sand, forest, soil, rock and snow treatments
+    // inside this same terrain material, so land-cover classes do not become
+    // competing square meshes or location-wide grass detail.
     material.map = detailTextures?.map || null;
     material.normalMap = detailTextures?.normalMap || null;
     material.roughnessMap = detailTextures?.roughnessMap || null;
@@ -584,7 +557,14 @@ function applyLoadedWorldCoverBaseline(mesh) {
       material.normalScale = new THREE.Vector2(normalStrength[0], normalStrength[1]);
     }
     applyWorldCoverVertexTints(mesh, result);
-    const builtSurfaceBlended = applyWorldCoverBuiltSurfaceBlend(mesh, result, builtTextures);
+    applyWorldCoverSurfaceMaterialMix(mesh, result);
+    applyMappedSemanticVertexTints(mesh, appCtx.fixedLocationMappedSurfaceContext, { force: true });
+    applyTerrainReliefMaterialMix(mesh);
+    applyTerrainSemanticMaterialBlend(
+      mesh,
+      Number(mesh.userData.terrainTextureRepeats) || 12
+    );
+    // Keep shader input neutral so missing PBR maps cannot bleach semantic colors.
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
@@ -592,15 +572,29 @@ function applyLoadedWorldCoverBaseline(mesh) {
     material.metalness = 0;
     material.needsUpdate = true;
     mesh.userData.terrainDetailProvenance = {
-      kind: builtSurfaceBlended ? 'smoothed-worldcover-built-blended-pbr' : 'smoothed-worldcover-tinted-pbr',
+      kind: 'spatial-worldcover-mapped-semantic-pbr',
       source: result.source,
-      mode: detailMode,
-      builtSurfaceBlended
+      mode: 'semantic-pbr',
+      fallbackMode: detailMode,
+      hardscapeOwner: 'exact-mapped-surface-geometry'
     };
+    if (becomesLocationOwner && previousLocationDetailMode !== ownDetailMode &&
+        !appCtx.worldCoverDetailModeRefreshQueued) {
+      appCtx.worldCoverDetailModeRefreshQueued = true;
+      queueMicrotask(() => {
+        appCtx.worldCoverDetailModeRefreshQueued = false;
+        for (const candidate of appCtx.terrainGroup?.children || []) {
+          if (candidate !== mesh && candidate?.userData?.worldCoverResult && !candidate.userData?.terrainDisposed) {
+            applyLoadedWorldCoverBaseline(candidate);
+          }
+        }
+      });
+    }
   } else {
     mesh.userData.terrainDetailProvenance = null;
   }
   appCtx.scheduleWorldCoverVegetationRefresh?.();
+  appCtx.scheduleFarTerrainSurfaceRefresh?.();
   return true;
 }
 
@@ -612,7 +606,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
   }
   if (mesh.userData.worldCoverPromise || mesh.userData.worldCoverStatus === 'unavailable') return;
 
-  const stats = worldCoverStats();
+  const stats = worldCoverStatsForLocation(appCtx);
   const key = String(mesh.userData.terrainTileKey || [
     bounds.latS,
     bounds.lonW,
@@ -643,6 +637,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
       Object.entries(result.counts || {}).forEach(([className, count]) => {
         stats.classes[className] = Number(stats.classes[className] || 0) + Number(count || 0);
       });
+      refreshWorldBiomeFromWorldCoverStats(appCtx, stats);
       applyLoadedWorldCoverBaseline(mesh);
     })
     .catch(() => {
@@ -701,15 +696,16 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.metalness = 0.0;
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.78, 0.42);
   } else if (nextMode === "built") {
-    // A city classification describes the surrounding settlement; it does
-    // not mean every unmapped square metre is concrete. Roads, parking and
-    // mapped hardscape have their own geometry, while the base terrain should
-    // remain natural until the spatial WorldCover texture arrives.
+    // Dense settlement evidence owns a spatial urban fallback while exact
+    // mapped parks and other land classes continue to override it below.
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, "grass");
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(mat.map ? 0xffffff : TERRAIN_GRASS_COLOR_HEX);
+    // The semantic shader owns the visible developed fallback. Its input must
+    // stay neutral even when the optional grass texture is unavailable;
+    // otherwise the legacy grass hex multiplies the urban result green.
+    mat.color.setHex(0xffffff);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = 0.95;
@@ -776,6 +772,10 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   applyGroundFallbackProfile(nextProfile);
   mat.emissiveMap = null;
   mat.needsUpdate = true;
+  applyTerrainProfileSurfaceMaterialMix(mesh, nextMode);
+  applyMappedSemanticVertexTints(mesh);
+  applyTerrainReliefMaterialMix(mesh);
+  applyTerrainSemanticMaterialBlend(mesh, textureRepeats);
   if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
 }
 
@@ -806,4 +806,7 @@ export function refreshTerrainSurfaceProfiles(profile = null) {
 export function setWorldSurfaceProfile(profile = null) {
   appCtx.worldSurfaceProfile = profile || null;
   refreshTerrainSurfaceProfiles(profile || null);
+  appCtx.scheduleFarTerrainSurfaceRefresh?.();
 }
+
+appCtx.getWorldCoverProviderSnapshot = worldCoverProviderSnapshot;

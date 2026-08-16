@@ -290,15 +290,25 @@ async function exerciseLifecycle(page) {
       walker.yaw = walker.angle;
       walker.lookYawOffset = 0;
 
-      const start = { x: walker.x, z: walker.z, lookYawOffset: walker.lookYawOffset };
+      const start = { x: walker.x, z: walker.z, angle: walker.angle, lookYawOffset: walker.lookYawOffset };
       const entryCollision = ctx.checkBuildingCollision?.(walker.x, walker.z, 0.28, {
         actorBaseY: walker.y - 1.7,
         actorHeight: 1.62
       });
       ctx.keys.ArrowUp = true;
+      const inputAtStart = ctx.readControlActions?.('walk') || null;
+      const walkStateAtStart = { enabled: ctx.Walk.state.enabled, mode: ctx.Walk.state.mode };
+      const positionSamples = [];
       for (let i = 0; i < 30; i++) {
         ctx.Walk.update(1 / 60);
         ctx.keepActiveInteriorContained?.();
+        if (i < 5) positionSamples.push({
+          x: walker.x,
+          z: walker.z,
+          y: walker.y,
+          enabled: ctx.Walk.state.enabled,
+          mode: ctx.Walk.state.mode
+        });
       }
       ctx.keys.ArrowUp = false;
       const moved = Math.hypot(walker.x - start.x, walker.z - start.z);
@@ -311,6 +321,12 @@ async function exerciseLifecycle(page) {
         cameraPositionDelta: Math.hypot(walker.x - beforeCamera.x, walker.z - beforeCamera.z),
         cameraYawDelta: Math.abs(walker.lookYawOffset - beforeCamera.lookYawOffset),
         remainedInside: !!ctx.activeInterior,
+        entryPoint: { ...active.entryPoint },
+        center: { ...active.center },
+        heading: start.angle,
+        inputAtStart,
+        walkStateAtStart,
+        positionSamples,
         entryCollision: entryCollision?.collision ? {
           id: entryCollision.building?.sourceBuildingId || '',
           type: entryCollision.building?.buildingType || '',

@@ -3,12 +3,15 @@ import {
   BLOCK_LIMIT_PER_LOCATION,
   BLOCK_MATERIALS,
   BLOCK_SHAPES,
+  blockDocumentIdFromCoords,
   getBlockShapeSurface,
   normalizeBlockMaterial,
   normalizeBlockRotation,
-  normalizeBlockShape
+  normalizeBlockShape,
+  normalizeBlockVerticalGrid
 } from '../app/js/block-builder/catalog.js';
 import { createBuildCollisionQueries } from '../app/js/block-builder/collision.js';
+import { createSharedBlockSync } from '../app/js/block-builder/shared-sync.js';
 
 assert.equal(BLOCK_LIMIT_PER_LOCATION, 200, 'builder must allow 200 blocks per location');
 assert.deepEqual(BLOCK_SHAPES.map((shape) => shape.id), ['cube', 'slab', 'ramp', 'column']);
@@ -18,6 +21,18 @@ assert.equal(normalizeBlockShape('unknown'), 'cube');
 assert.equal(normalizeBlockRotation(-1), 3);
 assert.equal(normalizeBlockRotation(5), 1);
 assert.equal(normalizeBlockMaterial(999), BLOCK_MATERIALS.length - 1);
+assert.equal(normalizeBlockVerticalGrid(2.26), 2.5);
+assert.equal(blockDocumentIdFromCoords(10, 2.5, 4), '10_2.5_4');
+assert.notEqual(blockDocumentIdFromCoords(10, 2.5, 4), blockDocumentIdFromCoords(10, 3, 4));
+
+const sharedSync = createSharedBlockSync({
+  blockKey: (gx, gy, gz) => `${gx}|${gy}|${gz}`,
+  onRefresh: () => {},
+  toVerticalGridCoord: normalizeBlockVerticalGrid
+});
+const sharedHalfBlock = sharedSync.normalizeEntry({ gx: 10, gy: 2.5, gz: 4, shape: 'slab', rotation: 1 });
+assert.equal(sharedHalfBlock.id, '10_2.5_4');
+assert.equal(sharedHalfBlock.gy, 2.5);
 
 const rampLow = getBlockShapeSurface('ramp', 0, 0, 0, 0, 0, -0.49);
 const rampHigh = getBlockShapeSurface('ramp', 0, 0, 0, 0, 0, 0.49);
@@ -45,6 +60,24 @@ const queries = createBuildCollisionQueries({
   toWorldCoord: (value) => value
 });
 
+for (const [index, shape] of BLOCK_SHAPES.map((entry) => entry.id).entries()) {
+  buildBlocks.clear();
+  buildColumns.clear();
+  const gx = index * 3;
+  addBlock(gx, 0, 0, shape, 0);
+  const baseTop = queries.getBuildTopSurfaceAtWorldXZ(gx, 0);
+  assert.ok(Number.isFinite(baseTop), `${shape} must expose a walkable top surface`);
+  const stackedCenterY = normalizeBlockVerticalGrid(baseTop + 0.5);
+  addBlock(gx, stackedCenterY, 0, 'cube', 0);
+  assert.equal(
+    queries.getBuildTopSurfaceAtWorldXZ(gx, 0),
+    stackedCenterY + 0.5,
+    `${shape} must accept a directly stacked block on its center surface`
+  );
+}
+
+buildBlocks.clear();
+buildColumns.clear();
 addBlock(0, 0, 0, 'cube');
 assert.equal(queries.getBuildTopSurfaceAtWorldXZ(0, 0), 0.5);
 assert.equal(queries.getBuildCollisionAtWorldXZ(0, 0, -0.5, 0.3, 1.9).blocked, true);

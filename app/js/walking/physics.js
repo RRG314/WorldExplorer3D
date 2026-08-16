@@ -198,6 +198,10 @@ function createWalkingPhysicsHelpers({
     const startX = finiteOr(state.walker.x, 0);
     const startZ = finiteOr(state.walker.z, 0);
     const actions = appCtx.readControlActions?.('walk') || {};
+    const liveGpsOwnsTranslation = appCtx.liveGpsTranslationOwned?.() === true;
+    const liveGpsTarget = liveGpsOwnsTranslation
+      ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
+      : null;
     const speed = Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
@@ -207,9 +211,14 @@ function createWalkingPhysicsHelpers({
 
     state.walker.lookYawOffset = wrapYaw(state.walker.lookYawOffset);
     state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, state.walker.pitch));
-    state.walker.angle = state.walker.yaw;
+    if (liveGpsOwnsTranslation && Number.isFinite(liveGpsTarget?.headingDegrees)) {
+      state.walker.angle = Math.PI - liveGpsTarget.headingDegrees * Math.PI / 180;
+    } else if (!liveGpsOwnsTranslation) {
+      state.walker.angle = state.walker.yaw;
+    }
 
-    const forward = Number(actions.move) || 0;
+    const forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
+    const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
 
@@ -229,12 +238,12 @@ function createWalkingPhysicsHelpers({
       state.walker.wallJumpTimer -= dt;
     }
 
-    if (Number(actions.jump) > 0.05 && state.walker.onGround) {
+    if (jumpAction > 0.05 && state.walker.onGround) {
       state.walker.vy = jumpVelocity;
       state.walker.onGround = false;
     }
 
-    if (Number(actions.jump) > 0.05 && !state.walker.onGround && state.walker.wallJumpTimer <= 0 && !isPlanetarySurface()) {
+    if (jumpAction > 0.05 && !state.walker.onGround && state.walker.wallJumpTimer <= 0 && !isPlanetarySurface()) {
       const wall = findNearestWall(state.walker.x, state.walker.z);
       if (wall && state.walker.y - CFG.eyeHeight < buildingRoofYAt(wall.building, wall.pointX, wall.pointZ) + 0.35) {
         state.walker.vy = CFG.wallJumpVelocity;
@@ -256,16 +265,24 @@ function createWalkingPhysicsHelpers({
     const speedMultiplier = appCtx.onMoon ? 0.6 : appCtx.onMars ? 0.72 : 1.0;
     const adjustedSpeed = speed * speedMultiplier;
 
-    if (forward !== 0) {
+    const liveGpsMoved = !!liveGpsTarget && Math.hypot(
+      liveGpsTarget.x - state.walker.x,
+      liveGpsTarget.z - state.walker.z
+    ) > 0.002;
+
+    if (forward !== 0 || liveGpsMoved) {
       const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
       const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
 
-      let newX = state.walker.x + moveX;
-      let newZ = state.walker.z + moveZ;
-      const checkBuildings = !isPlanetarySurface() && (getBuildingsArray || getNearbyBuildings);
+      let newX = liveGpsMoved ? liveGpsTarget.x : state.walker.x + moveX;
+      let newZ = liveGpsMoved ? liveGpsTarget.z : state.walker.z + moveZ;
+      const sharedBuildingCollision = !isPlanetarySurface() && typeof appCtx.checkBuildingCollision === "function"
+        ? appCtx.checkBuildingCollision
+        : null;
+      const checkBuildingsFallback = !isPlanetarySurface() && !sharedBuildingCollision && (getBuildingsArray || getNearbyBuildings);
       const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === "function";
-      if (checkBuildings || checkBuildBlocks) {
-        const allBuildings = checkBuildings ? queryBuildings(newX, newZ, 32) || [] : [];
+      if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks) {
+        const allBuildings = checkBuildingsFallback ? queryBuildings(newX, newZ, 32) || [] : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
         const sampleRadius = 0.28;
         const collisionSamples = [
@@ -277,12 +294,20 @@ function createWalkingPhysicsHelpers({
         ];
 
         function isBlockedByWorld(px, pz) {
+          if (sharedBuildingCollision) {
+            const collision = sharedBuildingCollision(px, pz, sampleRadius, {
+              actorBaseY: walkerFeetY,
+              actorHeight: CFG.eyeHeight * 0.95
+            });
+            if (collision?.collision) return true;
+          }
+
           for (let s = 0; s < collisionSamples.length; s += 1) {
             const sample = collisionSamples[s];
             const sx = px + sample[0];
             const sz = pz + sample[1];
 
-            if (checkBuildings) {
+            if (checkBuildingsFallback) {
               for (let i = 0; i < allBuildings.length; i += 1) {
                 const b = allBuildings[i];
                 if (!b || b.collisionDisabled) continue;
@@ -354,7 +379,10 @@ function createWalkingPhysicsHelpers({
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;
-      state.walker.speedMph = adjustedSpeed * 0.68;
+      state.walker.speedMph = liveGpsMoved
+        ? Math.hypot(state.walker.x - startX, state.walker.z - startZ) /
+          Math.max(0.001, dt) * Number(appCtx.METERS_PER_WORLD_UNIT || 1) * 2.236936
+        : adjustedSpeed * 0.68;
     } else {
       state.walker.speedMph = 0;
     }

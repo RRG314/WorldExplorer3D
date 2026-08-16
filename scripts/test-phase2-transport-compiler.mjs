@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { ctx as appCtx } from '../app/js/shared-context.js?v=55';
 import {
@@ -25,7 +23,6 @@ import {
   initWorldNavigation
 } from '../app/js/world/navigation.js';
 
-const root = path.resolve(import.meta.dirname, '..');
 const atGrade = Object.freeze({
   terrainMode: 'at_grade',
   verticalOrder: 0,
@@ -111,6 +108,19 @@ const fallbackCrossSection = normalizeTransportSource({
 assert.equal(fallbackCrossSection.inferredLanes, true);
 assert.equal(fallbackCrossSection.inferredWidth, true);
 assert.equal(fallbackCrossSection.widthSource, 'fallback:road-class');
+const motorwayRampCrossSection = normalizeTransportSource({
+  sourceId: 'osm:way:124-ramp',
+  id: '124-ramp'
+}, { highway: 'motorway_link', oneway: 'yes' }).crossSection;
+assert.equal(motorwayRampCrossSection.lanes, 1);
+assert.equal(motorwayRampCrossSection.widthMeters, 6.2);
+assert.equal(motorwayRampCrossSection.widthSource, 'fallback:road-class');
+const taggedMotorwayRampCrossSection = normalizeTransportSource({
+  sourceId: 'osm:way:124-tagged-ramp',
+  id: '124-tagged-ramp'
+}, { highway: 'motorway_link', oneway: 'yes', lanes: '1' }).crossSection;
+assert.equal(taggedMotorwayRampCrossSection.widthMeters, 6.2);
+assert.equal(taggedMotorwayRampCrossSection.widthSource, 'derived:lanes+link-shoulders');
 const placedCrossSection = normalizeTransportSource({
   sourceId: 'osm:way:125',
   id: 125
@@ -128,8 +138,15 @@ const generalizedBridge = normalizeTransportSource({
   id: -1,
   completeness: 'generalized'
 }, { highway: 'primary', bridge: 'yes' });
-assert.equal(generalizedBridge.routeState, 'uncertain');
-assert.equal(generalizedBridge.safeForDriving, false);
+assert.equal(generalizedBridge.routeState, 'complete');
+assert.equal(generalizedBridge.safeForDriving, true);
+const truncatedGeneralizedBridge = normalizeTransportSource({
+  sourceId: 'shortbread:streets:14:1:2:4:0',
+  id: -2,
+  completeness: 'generalized'
+}, { highway: 'primary', bridge: 'yes', _sourceTruncated: 'yes' });
+assert.equal(truncatedGeneralizedBridge.routeState, 'incomplete');
+assert.equal(truncatedGeneralizedBridge.safeForDriving, false);
 
 const driftA = feature('osm:way:drift-a', [{ x: -10, z: 0 }, { x: 0, z: 0 }]);
 const driftB = feature('osm:way:drift-b', [{ x: 0.42, z: 0 }, { x: 10, z: 0 }]);
@@ -159,6 +176,30 @@ assert.equal(mergeGraph.connections[0].kind, 'endpoint-interior');
 assert.equal(mergeGraph.stats.endpointInteriorCount, 1);
 assert.equal(ramp.connectedFeatures.end[0].feature, main);
 assert.equal(ramp.connectedFeatures.end[0].endpoint, 'interior');
+
+const generalizedStackedA = feature(
+  'shortbread:stacked-a',
+  [{ x: 0, z: 60 }, { x: 20, z: 60 }],
+  { semantics: elevated, completeness: 'generalized' }
+);
+const generalizedStackedB = feature(
+  'shortbread:stacked-b',
+  [{ x: 20.1, z: 60 }, { x: 40, z: 60 }],
+  { semantics: elevated, completeness: 'generalized' }
+);
+generalizedStackedA.transportSurfaceModel = {
+  distances: new Float32Array([0, 20]),
+  centerHeights: new Float32Array([5, 5])
+};
+generalizedStackedB.transportSurfaceModel = {
+  distances: new Float32Array([0, 20]),
+  centerHeights: new Float32Array([14, 14])
+};
+assert.equal(
+  compileTransportNetworkModel([generalizedStackedA, generalizedStackedB]).connections.length,
+  0,
+  'coincident generalized stacked decks became a false topology connection'
+);
 
 const planarA = feature('osm:way:planar-a', [{ x: -20, z: 0 }, { x: 20, z: 0 }]);
 const planarB = feature('osm:way:planar-b', [{ x: 0, z: -20 }, { x: 0, z: 20 }]);
@@ -350,22 +391,6 @@ const spatialQueryP95Ms = percentile95(spatialQueryDurations);
 assert.ok(
   spatialQueryP95Ms <= 0.5,
   `road spatial-query p95 exceeded 0.5 ms (${spatialQueryP95Ms.toFixed(4)} ms)`
-);
-
-const loadRoadsSource = fs.readFileSync(path.join(root, 'app/js/world/load-roads.js'), 'utf8');
-const overpassPosition = loadRoadsSource.indexOf(
-  'data = await fetchOverpassJSON('
-);
-const shortbreadPosition = loadRoadsSource.indexOf(
-  'data = await fetchShortbreadWorldData({',
-  overpassPosition
-);
-assert.ok(overpassPosition >= 0 && shortbreadPosition > overpassPosition);
-const roadPassSource = fs.readFileSync(path.join(root, 'app/js/world/load-road-pass.js'), 'utf8');
-assert.equal(
-  roadPassSource.includes('appCtx.terrainMeshHeightAt'),
-  false,
-  'road publication still samples terrain instead of the compiled transport surface'
 );
 
 console.log(JSON.stringify({

@@ -55,9 +55,13 @@ export function resetWorldForReload(options = {}) {
     appCtx.resetEarthStreaming('full_world_reload');
   }
   appCtx.initialEarthDetailRadius = 0;
+  appCtx.plannedEarthDetailRadiusWorld = 0;
+  appCtx.fixedRegionalContextBounds = null;
+  appCtx.fixedRegionalContextRadiusWorld = 0;
 
   appCtx.showLoad(`Loading ${locName}...`);
   appCtx.worldLoading = true;
+  appCtx.beginEarthWorldSceneLoad?.(options.loadSequence);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,

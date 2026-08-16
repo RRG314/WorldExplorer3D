@@ -15,11 +15,13 @@ import {
 } from "./engine/quality.js?v=1";
 import {
   createBuildingGroundPatch as createBuildingGroundPatchRuntime,
+  ensureEnginePbrTextures as ensureEnginePbrTexturesRuntime,
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=20";
+} from "./engine/materials-runtime.js?v=21";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=12";
+import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
 const RENDER_QUALITY_LOW = 'low';
 const RENDER_QUALITY_MED = 'med';
@@ -61,7 +63,9 @@ const engineState = {
     soil: false,
     rock: false,
     snow: false
-  }
+  },
+  pbrTextureLoadStarted: false,
+  textureMaxAnisotropy: 1
 };
 
 function readStorage(key) {
@@ -102,25 +106,7 @@ function getRenderQualityLevel() {
   return engineState.renderQualityLevel;
 }
 
-const CFG = {
-  // Simulation speed is 2 units per displayed MPH. Keep the road-car
-  // envelope explicit here so the HUD and geospatial movement stay truthful.
-  maxSpd: 180, accel: 80, boostAccel: 120, brake: 150, friction: 25,
-  boostMax: 240, boostDur: 2.5,
-  brakeForce: 4.0,
-  gripRoad: 0.96,
-  gripOff: 0.70,
-  gripBrake: 0.48,
-  gripDrift: 0.3,
-  driftRec: 3.8,
-  turnLow: 1.8,
-  turnHigh: 0.8,
-  turnMin: 30,
-  roadForce: 0.93,
-  roadPushback: 0.3,
-  maxOffDist: 15,
-  cpRadius: 25, trialTime: 120, policeSpd: 140, policeAccel: 60, policeDist: 800
-};
+const CFG = ROAD_CAR_CONFIG;
 
 Object.assign(appCtx, { CFG });
 
@@ -204,6 +190,10 @@ function initEngineTextures(renderer) {
   return initEngineTexturesRuntime(buildEngineModuleContext(), renderer);
 }
 
+function ensureEnginePbrTextures() {
+  return ensureEnginePbrTexturesRuntime(buildEngineModuleContext());
+}
+
 function createBuildingGroundPatch(pts, avgElevation, options = {}) {
   return createBuildingGroundPatchRuntime(buildEngineModuleContext(), pts, avgElevation, options);
 }
@@ -221,6 +211,7 @@ syncTextureGlobals();
 Object.assign(appCtx, {
   canUseSsao,
   createBuildingGroundPatch,
+  ensureEnginePbrTextures,
   getHighQualityEnabled,
   getBuildingMaterial,
   getRenderQualityLevel,
@@ -237,6 +228,7 @@ Object.assign(appCtx, {
 export {
   canUseSsao,
   createBuildingGroundPatch,
+  ensureEnginePbrTextures,
   getHighQualityEnabled,
   getBuildingMaterial,
   getRenderQualityLevel,

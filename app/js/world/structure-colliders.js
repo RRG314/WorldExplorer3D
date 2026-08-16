@@ -1,13 +1,13 @@
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=40";
+} from "../structure-semantics.js?v=48";
 import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=5";
 
-const STRUCTURE_COLLIDER_POLICY = 'covered-only-tunnels-withheld-until-trustworthy-portals';
+const STRUCTURE_COLLIDER_POLICY = 'actor-height-bounded-lossless-tunnel-side-walls';
 
 function pointAtDistance(feature, profile, distance) {
   const points = feature?.pts;
@@ -84,18 +84,37 @@ function descriptor(feature, kind, points, minY, maxY, index) {
     levelsSource: 'not_applicable',
     colliderDetail: 'full',
     structureColliderKind: kind,
+    transportTerrainMode: String(feature?.structureSemantics?.terrainMode || ''),
+    transportStructureKind: String(feature?.structureSemantics?.structureKind || ''),
+    structureSurfaceY: kind === 'side_wall' ? minY + 0.2 : minY,
+    structureClearance: Math.max(0, maxY - minY),
     sourceBuildingId: `${sourceIdentity}:structure-collider:${kind}:${index}`
   };
 }
 
 function colliderRanges(feature, profile) {
   const tunnel = feature?.tunnelSystemModel;
-  if (Array.isArray(tunnel?.shellRanges) && tunnel.shellRanges.length > 0) {
-    return tunnel.shellRanges;
+  const shellRanges = Array.isArray(tunnel?.shellRanges)
+    ? tunnel.shellRanges.filter((range) => Number(range?.end) - Number(range?.start) > 0.5)
+    : [];
+  const junctionZones = Array.isArray(tunnel?.junctionZones) ? tunnel.junctionZones : [];
+  let ranges = shellRanges.map((range) => ({
+    start: Math.max(0, Number(range.start)),
+    end: Math.min(profile.total, Number(range.end))
+  }));
+  for (const zone of junctionZones) {
+    const zoneStart = Math.max(0, Number(zone?.start));
+    const zoneEnd = Math.min(profile.total, Number(zone?.end));
+    if (!(zoneEnd > zoneStart)) continue;
+    ranges = ranges.flatMap((range) => {
+      if (zoneEnd <= range.start || zoneStart >= range.end) return [range];
+      const pieces = [];
+      if (zoneStart - range.start > 0.5) pieces.push({ start: range.start, end: zoneStart });
+      if (range.end - zoneEnd > 0.5) pieces.push({ start: zoneEnd, end: range.end });
+      return pieces;
+    });
   }
-  const semantics = feature?.structureSemantics || {};
-  if (semantics.structureKind === 'covered') return [{ start: 0, end: profile.total }];
-  return [];
+  return ranges;
 }
 
 export function compileStructureColliderDescriptors(features = []) {
@@ -103,19 +122,24 @@ export function compileStructureColliderDescriptors(features = []) {
   for (const feature of features) {
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
     const semantics = feature.structureSemantics || {};
-    // Tunnel collider shells share the same incomplete aperture geometry as
-    // the withheld tunnel presentation. Do not publish invisible ceilings or
-    // walls that can snag a vehicle while no trustworthy portal exists.
-    const tunnelLike = false;
-    const coveredLike = semantics.structureKind === 'covered';
-    if (!tunnelLike && !coveredLike) continue;
+    // Only lossless source geometry with a compiled tunnel system may own
+    // tunnel collision. Generalized centerlines remain non-colliding because
+    // their walls and portal boundaries are not exact enough for traversal.
+    const tunnelLike =
+      semantics.terrainMode === 'subgrade' &&
+      feature?.transportRecord?.completeness === 'lossless' &&
+      feature?.tunnelSystemModel?.visualKind === 'tunnel' &&
+      Array.isArray(feature?.tunnelSystemModel?.shellRanges) &&
+      feature.tunnelSystemModel.shellRanges.length > 0;
+    if (!tunnelLike) continue;
     const profile = polylineDistances(feature.pts);
     if (!(profile.total > 0.5)) continue;
     const specification = feature?.transportStructureRef?.specification || {};
     const width = Math.max(3.4, Number(feature.width) || 6);
-    const clearance = tunnelLike
-      ? Math.max(3, Number(feature?.tunnelSystemModel?.clearance) || Number(specification.tunnelClearance) || 4.2)
-      : Math.max(3, Math.min(5.2, Number(feature?.transportRecord?.maxHeightMeters) || 4.4));
+    const clearance = Math.max(
+      3,
+      Number(feature?.tunnelSystemModel?.clearance) || Number(specification.tunnelClearance) || 4.2
+    );
     const wallOffset = Number(specification.tunnelWallOffset) || width * 0.5 + 0.72;
     const enclosedSides = tunnelLike || semantics.buildingPassage || semantics.indoor;
     let colliderIndex = 0;
@@ -142,22 +166,11 @@ export function compileStructureColliderDescriptors(features = []) {
               feature,
               'side_wall',
               footprint,
-              roadY,
-              roadY + clearance,
+              roadY - 0.2,
+              roadY + Math.min(2.35, Math.max(2.05, clearance - 0.8)),
               colliderIndex++
             ));
           }
-        }
-        const ceilingFootprint = rectangleFootprint(start, end, 0, width * 0.5 + 0.55);
-        if (ceilingFootprint) {
-          colliders.push(descriptor(
-            feature,
-            'ceiling',
-            ceilingFootprint,
-            roadY + clearance,
-            roadY + clearance + 0.4,
-            colliderIndex++
-          ));
         }
       }
     }

@@ -96,9 +96,9 @@ const APP_SHELL_FRAGMENT_HTML = `
       </div>
       <div class="mp-row">
         <input id="roomPanelCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
-        <button id="roomPanelJoinBtn" class="mp-btn secondary" type="button">Join</button>
-        <button id="roomPanelCreateBtn" class="mp-btn primary" type="button">Create</button>
+        <button id="roomPanelJoinBtn" class="mp-btn primary" type="button">Join Room</button>
       </div>
+      <div class="mpMeta">Join an existing room above, or create a new room at your current location below.</div>
       <div class="mp-row">
         <select id="roomPanelVisibilitySelect" class="mp-select" aria-label="Room visibility">
           <option value="private" selected>Private Room</option>
@@ -108,6 +108,7 @@ const APP_SHELL_FRAGMENT_HTML = `
         <input id="roomPanelLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="Optional location tag (Tokyo, Paris, Moon Base)">
       </div>
       <div class="mp-row">
+        <button id="roomPanelCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
         <button id="roomPanelInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
         <button id="roomPanelLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
         <button id="roomPanelTrialBtn" class="mp-btn warn" type="button">Account / Donations</button>
@@ -142,9 +143,9 @@ const APP_SHELL_FRAGMENT_HTML = `
         </label>
       </div>
       <div class="mp-row">
-        <label class="mp-check" for="roomPanelFeaturedToggle">
+        <label id="roomPanelFeaturedControl" class="mp-check" for="roomPanelFeaturedToggle" hidden>
           <input id="roomPanelFeaturedToggle" type="checkbox">
-          Feature this room publicly
+          Admin featured-room approval
         </label>
         <button id="roomPanelSaveSettingsBtn" class="mp-btn secondary mpSmallBtn" type="button">Save Room</button>
       </div>
@@ -218,12 +219,31 @@ const APP_SHELL_FRAGMENT_HTML = `
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
 `;
 
+async function publishImmutableBuildIdentity() {
+  try {
+    const response = await fetch('/build-manifest.json', { cache: 'no-store' });
+    if (!response.ok) return;
+    const manifest = await response.json();
+    const candidateId = String(manifest?.candidateId || '');
+    if (!candidateId || candidateId !== String(manifest?.buildId || '')) return;
+    globalThis.__WORLD_EXPLORER_BUILD__ = Object.freeze(manifest);
+    const hudBox = document.querySelector('.hud-box');
+    if (hudBox) {
+      hudBox.dataset.buildLabel = `V${manifest.version} · ${String(manifest.commit || '').slice(0, 7)}`;
+      hudBox.title = candidateId;
+    }
+  } catch {
+    // A mutable source preview deliberately has no immutable build manifest.
+  }
+}
+
 function ensureAppShellFragments() {
   if (!document.body || document.getElementById('propertyPanel')) {
     return;
   }
 
-  document.body.insertAdjacentHTML('beforeend', APP_SHELL_FRAGMENT_HTML);
+document.body.insertAdjacentHTML('beforeend', APP_SHELL_FRAGMENT_HTML);
+publishImmutableBuildIdentity();
 }
 
 ensureAppShellFragments();

@@ -26,6 +26,7 @@ import {
   sampleFeatureSurfaceY
 } from '../app/js/structure-semantics.js';
 import { createLinearFeatureRuntime } from '../app/js/world/load-linear-runtime.js';
+import { createWorldLoadRequest } from '../app/js/earth-core/world-load-request.js';
 
 const appCtx = {
   METERS_PER_WORLD_UNIT: 2,
@@ -301,6 +302,18 @@ const loadRuntimeState = {
   activePhases: ['terrain'],
   geometryReady: true
 };
+const loadCommitRequest = createWorldLoadRequest({
+  key: 'contract-city',
+  name: 'Contract City',
+  lat: 39.29,
+  lon: -76.61
+}, 1);
+const loadCommitWorldSession = {
+  request: loadCommitRequest,
+  isActive: () => true,
+  publish: () => {},
+  snapshot: () => ({ status: 'published', requestId: loadCommitRequest.id })
+};
 const loadCommitContext = {
   SCALE: 100000,
   worldLoading: true,
@@ -311,6 +324,10 @@ const loadCommitContext = {
   landuseMeshes: [],
   linearFeatures: [],
   linearFeatureMeshes: [],
+  publishEarthWorldSceneLoad: () => {
+    assert.equal(loadCommitContext.worldLoading, false);
+    loadCommitEvents.push('publish-scene');
+  },
   enforceEnvironmentSceneOwnership: () => loadCommitEvents.push('ownership'),
   setPerfLiveStat: () => {},
   reconcileActorsAfterSurfaceRebuild: () => {
@@ -333,9 +350,14 @@ finishWorldLoadRuntimeSession({
   },
   phaseTotals: {},
   runtimeState: loadRuntimeState,
+  worldSession: loadCommitWorldSession,
   loaded: true
 });
-assert.deepEqual(loadCommitEvents.slice(0, 3), ['ownership', 'reconcile', 'hide']);
+assert.deepEqual(
+  loadCommitEvents.slice(0, 4),
+  ['reconcile', 'publish-scene', 'ownership', 'hide'],
+  'World geometry must reconcile while hidden, then publish once before the loading cover is removed'
+);
 assert.equal(loadCommitContext.worldLoading, false);
 assert.equal(loadCommitContext.initialEarthWorldReady, true);
 assert.equal(loadRuntimeState.status, 'ready');

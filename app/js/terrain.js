@@ -1,11 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   clearStructureVisualMeshes,
-  rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=24";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=6";
+  rebuildStructureVisualMeshes,
+  rebuildStructureVisualMeshesCooperatively,
+  updateStructureVisualVisibility
+} from "./terrain/structure-visuals.js?v=44";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=8";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=12";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=16";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -25,7 +27,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=35";
+} from "./terrain/surface-profiles.js?v=49";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -35,6 +37,8 @@ import {
   ensureTerrainGroup,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  peekTerrainSourceSampleAtLatLon,
+  peekTerrainSourceSampleAtWorldXZ,
   pruneTerrainTileCache,
   sampleTileElevationMeters,
   terrainSourceSampleAtLatLon,
@@ -46,19 +50,20 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=41";
+} from "./terrain/tiles.js?v=44";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=28";
+} from "./terrain/rebuild.js?v=38";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=6";
+} from "./terrain/debug-tools.js?v=9";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=15";
+import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=67";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -97,7 +102,8 @@ const prepareAcceptedGroundForLocation = (options) =>
 const prepareAcceptedGroundFromCatalog = async (options = {}) => {
   acceptedGroundCatalogState = await loadAcceptedGroundCatalog({
     url: options.catalogUrl,
-    fetchImpl: options.fetchImpl
+    fetchImpl: options.fetchImpl,
+    signal: options.signal
   });
   if (acceptedGroundCatalogState.status !== 'accepted') {
     return acceptedGroundRuntime.clear(
@@ -108,7 +114,8 @@ const prepareAcceptedGroundFromCatalog = async (options = {}) => {
     latitude: options.latitude,
     longitude: options.longitude,
     manifests: acceptedGroundCatalogState.manifests,
-    coverageProbes: options.coverageProbes
+    coverageProbes: options.coverageProbes,
+    signal: options.signal
   });
 };
 const getAcceptedGroundCatalogSnapshot = () => acceptedGroundCatalogState;
@@ -130,6 +137,11 @@ function clampElevationMeters(meters) {
 }
 
 function elevationMetersAtLatLon(latitude, longitude) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    const world = appCtx.geoToWorld(latitude, longitude);
+    const worldY = appCtx.samplePolarCryosphereWorldYAt?.(world.x, world.z);
+    return Number.isFinite(worldY) ? worldY / appCtx.WORLD_UNITS_PER_METER : null;
+  }
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
     const sample = terrainSourceSampleAtLatLon(latitude, longitude, terrainTileDeps);
     return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
@@ -144,6 +156,10 @@ function elevationMetersAtLatLon(latitude, longitude) {
 }
 
 function elevationWorldYAtWorldXZ(x, z) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    const worldY = appCtx.samplePolarCryosphereWorldYAt?.(x, z);
+    return Number.isFinite(worldY) ? worldY : null;
+  }
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
     const sample = terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps);
     return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
@@ -155,10 +171,37 @@ function elevationWorldYAtWorldXZ(x, z) {
   if (
     sample.status !== 'available' ||
     !Number.isFinite(Number(sample.groundElevationMeters))
-  ) return null;
+  ) {
+    const farTerrainY = appCtx.sampleFarTerrainWorldYAt?.(x, z);
+    return Number.isFinite(farTerrainY) ? farTerrainY : null;
+  }
   return clampElevationMeters(Number(sample.groundElevationMeters)) *
     appCtx.WORLD_UNITS_PER_METER *
     appCtx.TERRAIN_Y_EXAGGERATION;
+}
+
+function peekElevationMetersAtLatLon(latitude, longitude) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    return elevationMetersAtLatLon(latitude, longitude);
+  }
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    const sample = peekTerrainSourceSampleAtLatLon(latitude, longitude, terrainTileDeps);
+    return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
+      ? clampElevationMeters(Number(sample.elevationMeters))
+      : null;
+  }
+  const sample = acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
+  return sample.status === 'available' && Number.isFinite(Number(sample.groundElevationMeters))
+    ? clampElevationMeters(Number(sample.groundElevationMeters))
+    : null;
+}
+
+function peekElevationWorldYAtWorldXZ(x, z) {
+  const { lat, lon } = worldToLatLon(x, z);
+  const meters = peekElevationMetersAtLatLon(lat, lon);
+  return Number.isFinite(meters)
+    ? meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION
+    : null;
 }
 
 function createWaterTerrainContext(tileBounds = null) {
@@ -208,7 +251,7 @@ const terrainTileDeps = {
   clampElevationMeters,
   sampleAcceptedGroundAtLatLon,
   usesAcceptedGround: () =>
-    appCtx.worldLoadRuntimeState?.groundMode !== 'worldwide-terrain-fallback',
+    appCtx.worldLoadRuntimeState?.groundMode === 'accepted-ground',
   applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
   createWaterTerrainContext,
   resolveWaterTerrainY,
@@ -283,11 +326,15 @@ const transportPublicationDeps = {
   pointAlongPolyline,
   polylineCurvatureMetric,
   rebuildStructureVisualMeshes,
+  rebuildStructureVisualMeshesCooperatively,
   validateRoadTerrainConformance
 };
 
 const {
+  refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
+  sampleFarTerrainWorldYAt,
+  scheduleFarTerrainSurfaceRefresh,
   updateFarTerrainClipmap,
   waitForFarTerrainClipmap
 } = createFarFieldTerrainApi({
@@ -312,6 +359,7 @@ const {
   worldToLatLon,
   latLonToTileXY,
   buildTerrainTileMesh,
+  buildPolarCryosphereSurface,
   terrainTileDeps,
   getTerrainMeshKey,
   terrainTileMeshKey,
@@ -326,6 +374,10 @@ const {
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
   if (![x, z].every(Number.isFinite)) return { ready: false, loaded: 0, total: 0 };
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
+    const ready = !!appCtx.polarCryosphereSurface?.parent;
+    return { ready, loaded: ready ? 1 : 0, total: 1, mode: 'polar-cryosphere-local' };
+  }
   if (terrainTileDeps.usesAcceptedGround()) {
     const acceptedSample = sampleAcceptedGroundAtWorldXZ(x, z);
     if (acceptedSample.status !== 'available') {
@@ -438,6 +490,12 @@ Object.assign(appCtx, {
   getAcceptedGroundCatalogSnapshot,
   getAcceptedGroundRuntimeSnapshot,
   latLonToTileXY,
+  peekElevationMetersAtLatLon,
+  peekElevationWorldYAtWorldXZ,
+  peekTerrainSourceSampleAtLatLon: (lat, lon) =>
+    peekTerrainSourceSampleAtLatLon(lat, lon, terrainTileDeps),
+  peekTerrainSourceSampleAtWorldXZ: (x, z) =>
+    peekTerrainSourceSampleAtWorldXZ(x, z, terrainTileDeps),
   loadGroundArtifact,
   prepareAcceptedGroundForLocation,
   prepareAcceptedGroundFromCatalog,
@@ -447,15 +505,19 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
   resetLocationTerrainPublication,
+  sampleFarTerrainWorldYAt,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
+  scheduleFarTerrainSurfaceRefresh,
   terrainSourceSampleAtLatLon: (lat, lon) =>
     terrainSourceSampleAtLatLon(lat, lon, terrainTileDeps),
   terrainSourceSampleAtWorldXZ: (x, z) =>
     terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps),
   terrainTileCacheSnapshot,
+  updateStructureVisualVisibility,
   updateFarTerrainClipmap,
   waitForFarTerrainClipmap,
   setWorldSurfaceProfile,
@@ -494,6 +556,10 @@ export {
   getAcceptedGroundRuntimeSnapshot,
   getAcceptedGroundCatalogSnapshot,
   latLonToTileXY,
+  peekElevationMetersAtLatLon,
+  peekElevationWorldYAtWorldXZ,
+  peekTerrainSourceSampleAtLatLon,
+  peekTerrainSourceSampleAtWorldXZ,
   pruneTerrainTileCache,
   prepareAcceptedGroundForLocation,
   prepareAcceptedGroundFromCatalog,
@@ -508,6 +574,7 @@ export {
   terrainSourceSampleAtLatLon,
   terrainSourceSampleAtWorldXZ,
   terrainTileCacheSnapshot,
+  updateStructureVisualVisibility,
   setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,
