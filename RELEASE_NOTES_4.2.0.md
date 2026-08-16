@@ -5,6 +5,29 @@ stabilizing the fixed selected-location Earth experience released in 4.1.3. It
 does not restore continuous world streaming or add a competing terrain, water,
 road, or building pipeline.
 
+## New: Live GPS Explore
+
+Live GPS Explore lets players test World Explorer 3D outdoors on a compatible
+phone. With explicit browser permission, foreground device-location updates
+move the walking avatar inside one already loaded, bounded world. Accuracy
+filtering, implausible-jump rejection, smoothing, low-power mode, recentering,
+pause/manual control, and a visible Stop control keep the experience predictable
+and user-controlled. It does not continuously stream a new world as the player
+moves, and stopping the mode stops its active location watch.
+
+## New: DeFlock Hunt
+
+DeFlock Hunt is a surveillance-awareness game built around publicly mapped
+OpenStreetMap camera nodes. Players discover objectives and perform a
+**fictional, in-game virtual disable action**. World Explorer 3D does not connect
+to, control, damage, interfere with, or disable any real camera or other physical
+equipment. Camera markers are gameplay approximations based on available public
+map data and may be incomplete, outdated, or imprecise.
+
+The concept is inspired by the independent DeFlock project, but World Explorer
+3D is not affiliated with or endorsed by DeFlock and uses neither DeFlock
+application code nor a DeFlock-owned data feed.
+
 ## Highlights
 
 - A location publishes once from six request-matched immutable products:
@@ -28,8 +51,8 @@ road, or building pipeline.
   axis crossings, and Space remains lazy-loaded outside normal Earth startup.
 - DeFlock Hunt is the first Missions and Games entry. It uses publicly mapped
   OpenStreetMap surveillance nodes, keeps mapped mount/height placement, makes
-  objectives legible in the world and maps, and supports fictional virtual
-  disabling without affecting physical equipment.
+  objectives legible in the world and maps, and supports the fictional virtual
+  gameplay action described above without affecting physical equipment.
 - Live GPS Explore follows foreground browser geolocation inside the existing
   fixed world. Accuracy filtering, jump rejection, smoothing, low-power mode,
   pause/manual control, and bounded edge behavior avoid turning Earth into a
