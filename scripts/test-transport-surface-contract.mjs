@@ -388,6 +388,64 @@ assert.ok(
   'an infeasible graph-node constraint created a vertical bridge/ramp wall'
 );
 
+const openTransitionGraphNodeBridge = straightFeature({
+  id: 'open-transition-interior-graph-node',
+  length: 125,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+openTransitionGraphNodeBridge.structureStations = [{
+  distance: 87,
+  span: 26.1,
+  targetOffset: 5.5,
+  reason: 'feature_crossing'
+}, {
+  distance: 99,
+  span: 26.1,
+  targetOffset: 5.5,
+  reason: 'feature_crossing'
+}, {
+  distance: 116.5,
+  span: 26.1,
+  targetOffset: 5.5,
+  reason: 'feature_crossing'
+}, {
+  distance: 124.2,
+  span: 26.1,
+  targetOffset: 6.2,
+  reason: 'feature_crossing'
+}];
+openTransitionGraphNodeBridge.structureTransitionAnchors = [
+  { endpoint: 'start', distance: 0, targetOffset: 0, span: 44, source: 'open_structure_transition' },
+  { endpoint: 'end', distance: 125, targetOffset: 0, span: 44, source: 'open_structure_transition' },
+  {
+    distance: 87,
+    targetOffset: 9.6,
+    targetSurfaceY: 46.6,
+    span: 35,
+    source: 'transport_graph_node'
+  }
+];
+const openTransitionGraphNodeModel = compileTransportSurfaceModel(
+  openTransitionGraphNodeBridge,
+  (x) => {
+    if (x <= 20) return 36.58 + x * 0.095;
+    if (x <= 43) return 38.48 - (x - 20) * 0.13;
+    if (x <= 92) return 35.49 + (x - 43) * 0.04;
+    return 37.45 + (x - 92) * 0.098;
+  }
+);
+assert.ok(
+  openTransitionGraphNodeModel.stats.maximumGrade <= 0.1201,
+  'open bridge transitions around an interior graph node exceeded the engineered grade limit'
+);
+
 const tunnelPortalTieIn = straightFeature({
   id: 'tunnel-portal-graph-tie-in',
   length: 100,

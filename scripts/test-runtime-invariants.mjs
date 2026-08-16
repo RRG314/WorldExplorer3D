@@ -1125,18 +1125,39 @@ async function main() {
       const engineeredRoads = compiledRoads.filter((road) =>
         road?.structureSemantics?.terrainMode !== 'at_grade');
       const steepestEngineeredRoads = engineeredRoads
-        .map((road) => ({
-          id: String(road?.id || road?.sourceFeatureId || ''),
-          type: String(road?.type || road?.subtype || ''),
-          terrainMode: String(road?.structureSemantics?.terrainMode || ''),
-          structureKind: String(road?.structureSemantics?.structureKind || ''),
-          pointCount: Number(road?.pts?.length || 0),
-          length: Number(road?.transportSurfaceModel?.pathDistances?.at?.(-1) || 0),
-          maximumGrade: Number(road?.transportSurfaceModel?.stats?.maximumGrade || 0),
-          transitionAnchors: Array.isArray(road?.structureTransitionAnchors)
-            ? road.structureTransitionAnchors
-            : []
-        }))
+        .map((road) => {
+          const distances = road?.transportSurfaceModel?.distances || [];
+          const heights = road?.transportSurfaceModel?.centerHeights || [];
+          let steepestSegment = null;
+          for (let index = 1; index < Math.min(distances.length, heights.length); index += 1) {
+            const run = Number(distances[index]) - Number(distances[index - 1]);
+            if (!(run > 0)) continue;
+            const grade = Math.abs(Number(heights[index]) - Number(heights[index - 1])) / run;
+            if (!steepestSegment || grade > steepestSegment.grade) {
+              steepestSegment = {
+                index,
+                grade,
+                startDistance: Number(distances[index - 1]),
+                endDistance: Number(distances[index]),
+                startY: Number(heights[index - 1]),
+                endY: Number(heights[index])
+              };
+            }
+          }
+          return {
+            id: String(road?.id || road?.sourceFeatureId || ''),
+            type: String(road?.type || road?.subtype || ''),
+            terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+            structureKind: String(road?.structureSemantics?.structureKind || ''),
+            pointCount: Number(road?.pts?.length || 0),
+            length: Number(road?.transportSurfaceModel?.pathDistances?.at?.(-1) || 0),
+            maximumGrade: Number(road?.transportSurfaceModel?.stats?.maximumGrade || 0),
+            steepestSegment,
+            transitionAnchors: Array.isArray(road?.structureTransitionAnchors)
+              ? road.structureTransitionAnchors
+              : []
+          };
+        })
         .sort((left, right) => right.maximumGrade - left.maximumGrade)
         .slice(0, 5);
       const transportSurfaceCoverage = {
