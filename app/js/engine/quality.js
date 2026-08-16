@@ -49,9 +49,16 @@ export function applyRenderQuality(ctx, level, options = {}) {
 
   if (ctx.state.carPaintMaterial) {
     const high = normalized === ctx.RENDER_QUALITY_HIGH;
-    ctx.state.carPaintMaterial.envMapIntensity = high ? 1.5 : normalized === ctx.RENDER_QUALITY_MED ? 1.2 : 0.65;
-    ctx.state.carPaintMaterial.roughness = high ? 0.14 : 0.2;
-    ctx.state.carPaintMaterial.metalness = high ? 0.95 : 0.88;
+    const utilityMatte = ctx.state.carPaintMaterial.userData?.vehiclePaintFinish === 'utility-matte';
+    ctx.state.carPaintMaterial.envMapIntensity = utilityMatte
+      ? (high ? 0.9 : normalized === ctx.RENDER_QUALITY_MED ? 0.7 : 0.4)
+      : (high ? 1.5 : normalized === ctx.RENDER_QUALITY_MED ? 1.2 : 0.65);
+    ctx.state.carPaintMaterial.roughness = utilityMatte
+      ? (high ? 0.44 : normalized === ctx.RENDER_QUALITY_MED ? 0.52 : 0.6)
+      : (high ? 0.14 : 0.2);
+    ctx.state.carPaintMaterial.metalness = utilityMatte
+      ? (high ? 0.3 : normalized === ctx.RENDER_QUALITY_MED ? 0.24 : 0.18)
+      : (high ? 0.95 : 0.88);
     if ('clearcoat' in ctx.state.carPaintMaterial) {
       ctx.state.carPaintMaterial.clearcoat = 0.0;
       ctx.state.carPaintMaterial.clearcoatRoughness = 1.0;

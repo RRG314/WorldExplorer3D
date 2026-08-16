@@ -307,6 +307,7 @@
     }
 
     .gameplayCard {
+      margin: 0;
       border: 1px solid var(--line);
       border-radius: 4px;
       overflow: hidden;
@@ -318,6 +319,22 @@
       aspect-ratio: 16 / 9;
       object-fit: cover;
       display: block;
+    }
+
+    .gameplayMobilePair {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      background: #07111d;
+    }
+
+    .gameplayCard .gameplayMobilePair img {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      aspect-ratio: auto;
+      object-fit: contain;
     }
 
     .gameplayMeta {
@@ -500,6 +517,8 @@
         <article class="feature"><h3>Live Earth</h3><p>Open satellites, earthquakes, and weather on the globe, then jump straight from those layers into the local world.</p></article>
         <article class="feature"><h3>Real Weather + Time</h3><p>Local time, sun, moon, and live weather follow the place you are actually exploring, not just your own device clock.</p></article>
         <article class="feature"><h3>Ground, Air, Water & Space Travel</h3><p>Drive, walk, drone, boat, and rocket through one connected runtime instead of separate disconnected modes.</p></article>
+        <article class="feature"><h3>Live GPS Travel</h3><p>Use an opted-in phone location to explore the same place in the 3D world, with a low-overhead mobile session designed for real movement.</p></article>
+        <article class="feature"><h3>DeFlock Hunt</h3><p>Find and virtually disable publicly mapped camera locations in a fictional game mode. No real camera or physical equipment is affected.</p></article>
         <article class="feature"><h3>Buildings + Interiors</h3><p>Enter supported buildings on demand and move from streets into mapped or generated interiors without leaving the world.</p></article>
         <article class="feature"><h3>Land & Property</h3><p>Browse place context, property-linked destinations, and real-world location details while you explore.</p></article>
         <article class="feature"><h3>Multiplayer Rooms</h3><p>Share locations with other explorers, see live presence, and keep exploration social without putting core access behind a paywall.</p></article>
@@ -513,6 +532,57 @@
       <div class="gameplayGalleryWrap">
         <div class="gameplayGallery">
           <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/new-york-expanded-aerial.webp" alt="Wide aerial view showing expanded New York City coverage across Manhattan and surrounding boroughs" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Expanded New York</h3><p>A regional aerial view showing the much larger connected city, road, shoreline, and building footprint.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/new-york-harbor-skyline.webp" alt="New York City skyline and harbor rendered in World Explorer 3D" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>New York Harbor Skyline</h3><p>Lower Manhattan rises beyond the harbor while the expanded surrounding city remains visible in the same world.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/golden-gate-car.webp" alt="Player car driving on the elevated deck of the Golden Gate Bridge" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Drive the Golden Gate</h3><p>The car follows the bridge's elevated road surface with a continuous, playable deck and suspension structure.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/golden-gate-aerial.webp" alt="Bird's-eye view of the full Golden Gate Bridge span over the bay" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Golden Gate Aerial</h3><p>A full-span bird's-eye view across the water, including towers, cables, deck, shoreline, and regional terrain.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/baltimore-waterfront-skyline.webp" alt="Baltimore Inner Harbor and downtown skyline from an aerial waterfront view" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Baltimore Inner Harbor</h3><p>Waterfront, downtown towers, neighborhoods, roads, and parks rendered together across the expanded Baltimore world.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/monaco-coast-aerial.webp" alt="Bird's-eye view of Monaco's dense coastline, harbor, roads, and hills" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Monaco Coast</h3><p>Dense coastal development, hillside streets, marina geometry, and open water in one high-altitude view.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/san-francisco-bay-skyline.webp" alt="San Francisco skyline and bay-facing neighborhoods from the air" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>San Francisco Bay</h3><p>A bay-facing skyline view with dense city coverage extending across San Francisco's terrain.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/los-angeles-hollywood-aerial.webp" alt="Wide aerial view across the Los Angeles and Hollywood basin toward the hills" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Los Angeles Basin</h3><p>Hollywood and the surrounding Los Angeles street grid spread toward the hills with thousands of mapped buildings.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/london-thames-aerial.webp" alt="Aerial view across London and the River Thames" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>London and the Thames</h3><p>The River Thames anchors an expanded London view with mapped buildings, roads, crossings, and waterfront districts.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/tokyo-shinjuku-aerial.webp" alt="Dense aerial skyline view over Shinjuku in Tokyo" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Tokyo: Shinjuku</h3><p>High-rise Shinjuku and its dense surrounding street and building network rendered at city scale.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/showcase/dubai-skyline.webp" alt="Dubai skyline and multilane road network from an aerial view" loading="lazy" decoding="async">
+            <figcaption class="gameplayMeta"><h3>Dubai Skyline</h3><p>Downtown towers, major roads, and the wider desert city demonstrate the same worldwide rendering system.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <div class="gameplayMobilePair" role="group" aria-label="Mobile DeFlock Hunt before and after gameplay">
+              <img src="./assets/landing/gameplay/showcase/deflock-mobile-upright.webp" alt="Mobile DeFlock Hunt with a virtual camera upright" loading="lazy" decoding="async">
+              <img src="./assets/landing/gameplay/showcase/deflock-mobile-toppled.webp" alt="Mobile DeFlock Hunt after the virtual camera has toppled" loading="lazy" decoding="async">
+            </div>
+            <figcaption class="gameplayMeta"><h3>Mobile DeFlock Hunt</h3><p>Phone gameplay before and after a virtual camera is disabled. This is fictional gameplay; no real equipment is affected.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/baltimore-session-walk-guft.png" alt="Walking mode in a Baltimore alley session with GUFT teammate tag">
             <figcaption class="gameplayMeta"><h3>Multiplayer Alley Walk</h3><p>On-foot exploration with live teammate presence, mode HUD, and build controls in-session.</p></figcaption>
           </figure>
@@ -523,10 +593,6 @@
           <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/baltimore-session-drone-guft.png" alt="Drone mode above the same alley showing 5 meter AGL HUD telemetry">
             <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drone</h3><p>Low-altitude drone camera with AGL telemetry for tactical aerial visibility during shared play.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/drone-baltimore.png" alt="Drone view over Baltimore skyline">
-            <figcaption class="gameplayMeta"><h3>Drone Recon: Baltimore</h3><p>High-altitude drone mode with full city coverage and live HUD telemetry.</p></figcaption>
           </figure>
           <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/fly-in-space.png" alt="Space flight view with orbital paths and controls">
@@ -547,10 +613,6 @@
           <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/drive-on-moon.png" alt="Driving a car on the moon">
             <figcaption class="gameplayMeta"><h3>Moon Driving</h3><p>Low-gravity vehicle traversal tuned for stable traction on lunar surfaces.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/drone-monaco.png" alt="Drone view over Monaco coastline">
-            <figcaption class="gameplayMeta"><h3>Drone Recon: Monaco</h3><p>Coastal city flyovers with broad terrain visibility and persistent map context.</p></figcaption>
           </figure>
           <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/drone-on-moon.png" alt="Drone mode on moon with star field">

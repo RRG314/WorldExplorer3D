@@ -76,6 +76,7 @@ const steps = [
   { name: 'Title planetary launches', cmd: [process.execPath, 'scripts/test-title-planetary-launches.mjs'] },
   { name: 'Multi-axis space-flight controls', cmd: [process.execPath, 'scripts/test-space-flight-controls.mjs'] },
   { name: 'Space physics and visual ownership', cmd: [process.execPath, 'scripts/test-space-physics-and-visuals.mjs'] },
+  { name: 'Traversal vehicle visual budgets', cmd: [process.execPath, 'scripts/test-vehicle-visual-budgets.mjs'] },
   { name: 'OSM smoke', cmd: [process.execPath, 'scripts/test-osm-smoke.mjs'] },
   {
     name: 'R7 provider-outage fallback',

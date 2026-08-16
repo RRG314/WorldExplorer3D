@@ -1,6 +1,6 @@
 # Attribution
 
-Last reviewed: 2026-08-15 for version 4.2.0.
+Last reviewed: 2026-08-16 for version 4.2.1.
 
 This is the concise public attribution index. Asset-level details are in `app/assets/models/ATTRIBUTION.md` and `app/assets/textures/ATTRIBUTION.md`.
 

@@ -1,6 +1,6 @@
 {
   "name": "worldexplorer3d",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "type": "module",
   "main": "three.js",
@@ -84,6 +84,7 @@
     "test:deflock-model": "node scripts/test-deflock-model.mjs",
     "test:deflock-multiplayer": "node scripts/test-deflock-multiplayer.mjs",
     "test:deflock-browser": "node scripts/test-deflock-browser.mjs",
+    "capture:showcase": "node scripts/capture-showcase-screenshots.mjs",
     "smoke:deflock-live": "node scripts/smoke-deflock-live.mjs",
     "test:local-data": "node scripts/test-local-data-safety.mjs",
     "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
@@ -94,6 +95,7 @@
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
     "test:space-flight-controls": "node scripts/test-space-flight-controls.mjs && node scripts/test-space-physics-and-visuals.mjs",
+    "test:vehicle-visuals": "node scripts/test-vehicle-visual-budgets.mjs",
     "test:space-physics-visuals": "node scripts/test-space-physics-and-visuals.mjs",
     "test:roof-inference": "node scripts/test-roof-inference-policy.mjs",
     "test:session-lifecycle": "node scripts/test-session-lifecycle.mjs",
