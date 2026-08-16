@@ -96,6 +96,7 @@
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
     "test:space-flight-controls": "node scripts/test-space-flight-controls.mjs && node scripts/test-space-physics-and-visuals.mjs",
     "test:vehicle-visuals": "node scripts/test-vehicle-visual-budgets.mjs",
+    "test:living-world-model": "node scripts/test-living-world-model.mjs",
     "test:space-physics-visuals": "node scripts/test-space-physics-and-visuals.mjs",
     "test:roof-inference": "node scripts/test-roof-inference-policy.mjs",
     "test:session-lifecycle": "node scripts/test-session-lifecycle.mjs",
