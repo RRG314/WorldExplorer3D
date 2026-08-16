@@ -6,14 +6,12 @@ import {
   getDeFlockSnapshot,
   startDeFlockMode,
   stopDeFlockMode,
-  updateDeFlockMode
-} from "../deflock/runtime.js?v=5";
-import {
   getLiveGpsSnapshot,
   startLiveGpsMode,
   stopLiveGpsMode,
+  updateDeFlockMode,
   updateLiveGpsMode
-} from "../live-gps/runtime.js?v=1";
+} from "../runtime/on-demand-location-games.js?v=1";
 
 const gameplayRegistry = createGameplayPluginRegistry({
   onError(error, id, phase) {

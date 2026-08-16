@@ -44,6 +44,7 @@ const optionalFamilies = Object.freeze({
   challenges: /\/app\/js\/flower-challenge(?:\/|\.js)/,
   blockBuilder: /\/app\/js\/(?:blocks\.js|block-builder\/)/,
   liveEarth: /\/app\/js\/live-earth\//,
+  locationGames: /\/app\/js\/(?:deflock|live-gps)\//,
   planetaryWorlds: /\/app\/js\/planetary\/(?:mars-world|vehicles|astronaut|moon-sky|tracks)\.js/
 });
 
@@ -238,6 +239,8 @@ try {
     'idle title loaded the on-demand block-builder implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.liveEarth, 0,
     'idle title loaded the on-demand Live Earth implementation');
+  assert.equal(report.measurements.eagerOptionalFamilies.locationGames, 0,
+    'idle title loaded an on-demand location game implementation');
   assert.equal(report.measurements.eagerOptionalFamilies.planetaryWorlds, 4,
     'idle title loaded a planetary world outside the retained Moon support modules');
   assert.deepEqual(forbiddenRequests, [], `idle title requested Earth/location providers: ${JSON.stringify(forbiddenRequests)}`);
