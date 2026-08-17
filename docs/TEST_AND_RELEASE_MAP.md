@@ -134,7 +134,7 @@ The following results were observed in the current working source before this re
 | maintainability guard | pass with nonblocking advisories |
 | production-readiness semantic contract | pass |
 | `git diff --check` | pass before canonical documentation additions |
-| reachability and strict asset audits | pass; 532/532 source modules, 79 reachable assets and 27 dynamic PBR assets; no orphans |
+| reachability and strict asset audits | pass; 532/532 source modules, 93 reachable assets and 27 dynamic PBR assets; no orphans |
 | Firestore rules | pass, 70/70 emulator assertions including accounts, admin claims, rooms, chat, edits, Discovery inventory and trades |
 | multiplayer integration | pass, two independent authenticated browser sessions and 8/8 room/presence/movement/chat/edit assertions |
 | installed-Chrome account/admin journey | pass signed-out, user, admin gate, diagnostics-off, responsive and tutorial states |
@@ -155,7 +155,7 @@ These are focused results, not a substitute for `release:verify` on the final ca
 
 ### REL-001 — Unreachable tracked assets (closed)
 
-The 15 obsolete landing/gameplay files were removed from the working source and retained in a recoverable local archive. The strict source and asset audits now pass without exclusions or weakened rules.
+The 15 obsolete landing/gameplay files plus five newly tracked but superseded release-media files were removed from the working source and retained in a recoverable local archive. The strict source and asset audits now pass without exclusions or weakened rules.
 
 ### REL-002 — Companion browser contract acceptance (closed)
 

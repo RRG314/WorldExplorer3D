@@ -714,7 +714,7 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Symptom: strict asset reachability failed on 15 obsolete landing/gameplay images, and the module graph contained a second, unused Discovery progression implementation whose only consumer was its own test.
 - Root cause: current landing media and Explorer progression had replaced older artifacts without removing the displaced files and self-only module.
 - Resolution: the obsolete images and orphan `app/js/discovery/progression.js` were removed from the working source. The active Explorer progress/goals authority remains unchanged. Recovery copies are stored under `/Users/stevenreid/.codex/recovery/worldexplorer3d-unused-assets-20260817/`.
-- Guard: `npm run audit:reachability` (532/532 modules, zero orphans), `npm run audit:assets` (79 reachable assets and 27 dynamic PBR assets), `npm run test:module-versions` and `npm run runtime:verify`.
+- Guard: `npm run audit:reachability` (532/532 modules, zero orphans), `npm run audit:assets` (93 reachable assets and 27 dynamic PBR assets), `npm run test:module-versions` and `npm run runtime:verify`.
 - Never reintroduce: weakening strict audits, keeping self-tested production modules without a runtime consumer, or restoring legacy media without an intentional current-page reference.
 
 ## Verification rule

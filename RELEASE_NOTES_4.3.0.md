@@ -52,7 +52,7 @@ or permanently open systems.
 - Moon, Earth, Mars, Space and Ocean lifecycle journeys passed without duplicate
   renderer or world ownership.
 - Strict reachability passed 532/532 production modules with zero orphans; all
-  79 hosted assets and 27 dynamic PBR assets are owned.
+  93 hosted assets and 27 dynamic PBR assets are owned.
 - A fresh title-release journey removed 1,020 geometries and reduced measured
   JavaScript heap from 689.5 MB to 469.8 MB before a clean Earth reload.
 

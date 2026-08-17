@@ -136,7 +136,7 @@ Each catalog record owns world scale, AR scale, size class and behavior archetyp
 | Moon/Mars/Ocean data/assets | `app/assets`, `app/data`, runtime catalogs | source-specific metadata and project transformation |
 | ground artifacts | `app/data`/location-data build products | manifest with provider, release, datum and hash |
 
-The production artifact builder includes only declared/reachable public assets. The strict current audit reports 15 tracked but unreachable legacy landing/gameplay images totaling about 7.8 MB. Until resolved, asset reachability is a production blocker even though those files are not runtime providers.
+The production artifact builder includes only declared/reachable public assets. The strict 4.3.0 audit passes 93 tracked hosting assets plus 27 dynamic PBR assets with no unreachable files. Obsolete and superseded release media were removed recoverably rather than excluded from the gate.
 
 ## 9. Cache and fallback policy
 

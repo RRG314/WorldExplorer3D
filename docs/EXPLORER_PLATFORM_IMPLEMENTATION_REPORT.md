@@ -417,7 +417,7 @@ The two Explorer blockers found by the earlier broader gate are closed:
    subject and companions are fully framed with the gameplay panel collapsed.
 2. **Hosting asset reachability:** the 15 obsolete landing/gameplay images were
    removed recoverably. Strict reachability now passes 532/532 modules with no
-   orphan, and the asset audit passes 79 reachable assets plus 27 dynamic PBR
+   orphan, and the asset audit passes 93 reachable assets plus 27 dynamic PBR
    assets without exclusions.
 
 Whole-product production gates still remain outside the Explorer feature: the
