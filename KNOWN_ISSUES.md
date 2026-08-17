@@ -1,6 +1,12 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-16 for version 4.2.1.
+Last reviewed: 2026-08-17 for version 4.3.0 release source. The exact immutable commit and content hash are recorded by the hosting build manifest.
+
+## Current Release Status
+
+Version 4.3.0 completed its immutable preview gate and is approved for production promotion. The production-configured candidate passed source/artifact identity, bundled browser boot, deployed visual inspection and the privileged operational endpoint check. Firestore rules and the seven new DeFlock/Discovery Functions were deployed before hosting promotion; existing parameterized billing/admin Functions were intentionally left untouched so their production configuration was not replaced.
+
+The Living/Editable World 2.02 GB heap high-water observation is accepted as a disclosed 4.3.0 risk, not marked fixed. The fresh title-release journey still proves that the loaded world is released rather than retained as a duplicate.
 
 ## Map Coverage
 
@@ -13,6 +19,7 @@ Last reviewed: 2026-08-16 for version 4.2.1.
 - Dense cities, rapid plane travel, detailed facades, and large structure networks can be demanding on GPU memory and network bandwidth.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
+- A fresh installed-Chrome release journey correctly released the loaded Earth world at the title screen (heap 689.5 MB to 469.8 MB; geometries 1,251 to 231) and rebuilt it without duplicate ownership. A heavier Living/Editable World edit-and-reload journey nevertheless reached a reported 2.02 GB JavaScript heap high-water mark. This is not evidence of a retained duplicate world, but it remains a production-risk observation requiring target-hardware review before deployment.
 - Provider latency can make the same location load at different speeds even when the generated world is unchanged.
 - Narrow or tightly mapped service roads can leave little vehicle clearance.
   The runtime gate samples all road centers and lanes for building collisions,
@@ -26,6 +33,7 @@ Last reviewed: 2026-08-16 for version 4.2.1.
 - Panoramax and KartaView street imagery is an inspection layer with uneven global coverage. It is not used as an unlicensed facade texture source.
 - Live vessel positions are not currently presented as observed AIS data. Shipping corridors remain labeled reference data until an AIS source and redistribution license are selected.
 - NOAA water-level observations and tide predictions are limited to supported stations, primarily in the United States. Open-Meteo marine values are modeled guidance and remain labeled separately.
+- Provider timing can delay exact bridge/tunnel records. The fixed regional fallback and connected-structure compiler preserve visible continuity, but well-known structures must still be visually checked in the preview candidate rather than inferred from source record counts.
 
 ## Generated Content
 
@@ -38,6 +46,11 @@ Last reviewed: 2026-08-16 for version 4.2.1.
 
 - Sign-in, multiplayer, cloud saves, social features, moderation, leaderboards, and optional support flows require the production backend.
 - Local or forked copies do not receive production credentials or administrative access.
+- The current Firestore rules and emulator-backed two-client multiplayer journeys pass. Production-only privileged endpoint behavior still requires a deployed preview URL and cannot be certified from localhost alone.
+
+## Test Harness Limitations
+
+- Two older bundled-Chromium matrix scripts (`test:fixed-world-travel-browser` and `test:editor-multiplayer`) did not reach a terminal report under their SwiftShader path during this check. They produced no failing assertion before being stopped. Installed-Google-Chrome journeys independently passed the corresponding travel-control, world-cancellation, title lifecycle, two-client multiplayer, rules, building-edit persistence, and session-lifecycle behaviors. The legacy harnesses should be bounded or migrated, but they are not counted as passing evidence.
 
 ## Product Scope
 

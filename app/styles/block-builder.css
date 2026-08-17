@@ -12,11 +12,31 @@
   border: 1px solid rgba(148, 163, 184, 0.45);
   border-radius: 8px;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+  max-height: calc(100vh - 104px);
+  overflow: auto;
 }
 
 #blockBuilderPanel.show { display: grid; gap: 10px; }
 .blockBuilderHeader { display: flex; align-items: center; justify-content: space-between; }
 .blockBuilderHeader strong { font-size: 14px; }
+.blockBuilderTruthNote {
+  margin: 0;
+  padding: 8px;
+  color: #bae6fd;
+  background: rgba(14, 116, 144, 0.18);
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 6px;
+  font: 500 11px/1.4 Inter, sans-serif;
+}
+.editableWorldBuildingTools {
+  display: grid;
+  gap: 7px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+.editableWorldBuildingTools > strong { font-size: 12px; }
+.editableWorldBuildingTools .blockBuilderActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#editableWorldSelection { color: #cbd5e1; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
 .blockBuilderHeader button {
   width: 30px;
   height: 30px;
@@ -81,6 +101,8 @@
 #coordsOsmLink[hidden] { display: none; }
 
 @media (max-width: 640px) {
-  #blockBuilderPanel { top: 72px; right: 10px; width: min(276px, calc(100vw - 20px)); }
+  #blockBuilderPanel { top: 72px; right: 10px; width: min(310px, calc(100vw - 20px)); max-height: calc(100vh - 86px); }
+  .blockBuilderShapes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .editableWorldBuildingTools .blockBuilderActions { grid-template-columns: 1fr; }
 }
 }

@@ -357,6 +357,7 @@ function toRoomObject(roomSnap) {
     featured: normalizeFeatured(data.featured),
     maxPlayers: normalizeMaxPlayers(data.maxPlayers),
     ownerUid: String(data.ownerUid || ''),
+    mods: data.mods && typeof data.mods === 'object' ? { ...data.mods } : {},
     createdBy: String(data.createdBy || ''),
     createdAtMs,
     cityKey,

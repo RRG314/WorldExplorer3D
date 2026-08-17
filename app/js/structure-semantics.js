@@ -221,10 +221,17 @@ function buildFeatureStations(feature, context = {}) {
         z: (prev.z + next.z) * 0.5
       } : point;
       let insideWater = false;
+      let mappedWaterSurfaceY = NaN;
       for (let w = 0; w < waterAreas.length; w++) {
-        const polygon = waterAreas[w]?.pts;
+        const area = waterAreas[w];
+        const polygon = area?.pts;
         if (pointInPolygonXZ(midpoint.x, midpoint.z, polygon) || pointInPolygonXZ(point.x, point.z, polygon)) {
           insideWater = true;
+          if (Number.isFinite(Number(area?.surfaceY))) {
+            mappedWaterSurfaceY = Number.isFinite(mappedWaterSurfaceY)
+              ? Math.max(mappedWaterSurfaceY, Number(area.surfaceY))
+              : Number(area.surfaceY);
+          }
           break;
         }
       }
@@ -240,7 +247,19 @@ function buildFeatureStations(feature, context = {}) {
             'underwater_tunnel'
           );
         } else {
-          addStation(distances[i], Math.max(defaultTarget, semantics.deckClearance + 0.6), defaultSpan * 1.1, 'water_crossing');
+          const segmentIndex = Math.min(points.length - 2, i);
+          const segmentT = i >= points.length - 1 ? 1 : 0;
+          const ownApproachY = approachSurfaceAt(feature, segmentIndex, segmentT);
+          const waterClearanceOffset = Number.isFinite(mappedWaterSurfaceY) && Number.isFinite(ownApproachY)
+            ? mappedWaterSurfaceY + semantics.deckClearance + 0.6 - ownApproachY -
+              (Number(feature.surfaceBias) || 0.08)
+            : semantics.deckClearance + 0.6;
+          addStation(
+            distances[i],
+            Math.max(defaultTarget, waterClearanceOffset),
+            defaultSpan * 1.1,
+            'water_crossing'
+          );
         }
       }
     }

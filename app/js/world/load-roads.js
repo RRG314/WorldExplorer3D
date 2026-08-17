@@ -31,7 +31,7 @@ import {
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=3";
+} from "./fixed-regional-structures.js?v=4";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -167,6 +167,7 @@ export function createWorldRoadLoader(deps = {}) {
     pointInPolygon: deps.pointInPolygon
   });
   async function loadRoadsInternal(retryPass = 0) {
+    await appCtx.ensureEditableWorldRuntime?.();
     const session = createWorldLoadRuntimeSession({
       appCtx,
       clearBuildingSpatialIndex,

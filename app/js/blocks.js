@@ -42,6 +42,7 @@ let buildActionHistory = [];
 const buildBlocks = new Map();
 const buildColumns = new Map();
 const buildMaterials = [];
+const buildSpecialMaterials = new Map();
 
 const {
   getBuildCollisionAtWorldXZ,
@@ -271,6 +272,21 @@ function ensureBuildMaterials() {
   });
 }
 
+function getBuildMaterial(shape, materialIndex) {
+  if (shape !== 'window' && shape !== 'glass_wall' && shape !== 'storefront') return buildMaterials[materialIndex];
+  const key = `${shape}:${materialIndex}`;
+  if (!buildSpecialMaterials.has(key)) {
+    buildSpecialMaterials.set(key, new THREE.MeshStandardMaterial({
+      color: shape === 'storefront' ? 0x76a9b8 : 0x5d93a5,
+      roughness: 0.24,
+      metalness: 0.48,
+      emissive: 0x162e38,
+      emissiveIntensity: 0.08
+    }));
+  }
+  return buildSpecialMaterials.get(key);
+}
+
 function getBuildGeometry(shape) {
   const normalizedShape = normalizeBlockShape(shape);
   if (buildGeometries.has(normalizedShape)) return buildGeometries.get(normalizedShape);
@@ -424,7 +440,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
 
   const idx = normalizeBlockMaterial(materialIndex);
 
-  const mesh = new THREE.Mesh(shapeGeometry.geometry, buildMaterials[idx]);
+  const mesh = new THREE.Mesh(shapeGeometry.geometry, getBuildMaterial(shape, idx));
   mesh.position.set(toWorldCoord(gx), toWorldCoord(gy) + shapeGeometry.yOffset, toWorldCoord(gz));
   mesh.rotation.y = rotation * Math.PI * 0.5;
   mesh.castShadow = true;

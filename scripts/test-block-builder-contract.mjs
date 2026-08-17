@@ -14,7 +14,10 @@ import { createBuildCollisionQueries } from '../app/js/block-builder/collision.j
 import { createSharedBlockSync } from '../app/js/block-builder/shared-sync.js';
 
 assert.equal(BLOCK_LIMIT_PER_LOCATION, 200, 'builder must allow 200 blocks per location');
-assert.deepEqual(BLOCK_SHAPES.map((shape) => shape.id), ['cube', 'slab', 'ramp', 'column']);
+assert.deepEqual(BLOCK_SHAPES.map((shape) => shape.id), [
+  'cube', 'slab', 'ramp', 'column', 'wall', 'floor', 'roof', 'window',
+  'door', 'storefront', 'glass_wall', 'stairs', 'fence', 'sign'
+]);
 assert.equal(new Set(BLOCK_MATERIALS.map((material) => material.color)).size, BLOCK_MATERIALS.length);
 assert.equal(normalizeBlockShape(undefined), 'cube', 'old records must default to cube');
 assert.equal(normalizeBlockShape('unknown'), 'cube');

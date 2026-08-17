@@ -45,9 +45,11 @@ const RDT_NOISE_DEFAULTS = Object.freeze({
   variant: 'standard',
   chaos: 0
 });
-const RDT_NOISE_CELL_CACHE_LIMIT = 220000;
+// RDT noise is an experimental visual diagnostic, not part of the shipping
+// procedural identity system below. Keep its opt-in cache deliberately small.
+const RDT_NOISE_CELL_CACHE_LIMIT = 8192;
 const _rdtNoiseCellCache = new Map();
-let rdtNoiseEnabled = true;
+let rdtNoiseEnabled = false;
 let rdtNoiseVariant = RDT_NOISE_DEFAULTS.variant;
 let rdtNoiseChaos = RDT_NOISE_DEFAULTS.chaos;
 
@@ -341,7 +343,9 @@ function sampleRoadGrassExclusionMask(worldX, worldZ, options = {}) {
 }
 
 function setRdtNoiseEnabled(enabled) {
-  rdtNoiseEnabled = !!enabled;
+  const nextEnabled = !!enabled;
+  if (!nextEnabled) clearRdtNoiseCaches();
+  rdtNoiseEnabled = nextEnabled;
   return rdtNoiseEnabled;
 }
 
@@ -368,6 +372,8 @@ function getRdtNoiseConfig() {
     enabled: rdtNoiseEnabled,
     variant: rdtNoiseVariant,
     chaos: rdtNoiseChaos,
+    cachedCells: _rdtNoiseCellCache.size,
+    cacheLimit: RDT_NOISE_CELL_CACHE_LIMIT,
     constants: {
       Rphi: RDT_NOISE_RPHI,
       Rdelta: RDT_NOISE_RDELTA
@@ -477,6 +483,7 @@ let rdtComplexity = 0; // rdtDepth result for current location
   if (Math.abs(a - c) < 1e-7) {
     console.warn('[RDT] Noise variant self-test warning: standard and twisted sampled too similarly at probe point');
   }
+  clearRdtNoiseCaches();
 })();
 
 function exposeMutableGlobal(name, getter, setter) {

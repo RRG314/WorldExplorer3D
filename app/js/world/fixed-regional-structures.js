@@ -28,6 +28,124 @@ function normalizedStructureName(tags = {}) {
     .trim();
 }
 
+const STRUCTURE_DUPLICATE_DISTANCE_METERS = 42;
+const STRUCTURE_DUPLICATE_GRID_METERS = 120;
+const STRUCTURE_DUPLICATE_MIN_DIRECTION_DOT = 0.72;
+
+function structureNodeMap(elements = []) {
+  return new Map(
+    elements
+      .filter((element) => element?.type === 'node' && Number.isFinite(Number(element.lat)) && Number.isFinite(Number(element.lon)))
+      .map((node) => [node.id, node])
+  );
+}
+
+function structureProjectionOriginLatitude(...nodeMaps) {
+  for (const nodes of nodeMaps) {
+    for (const node of nodes.values()) return Number(node.lat) || 0;
+  }
+  return 0;
+}
+
+function projectedStructurePoint(node, originLatitude) {
+  if (!node) return null;
+  const latitude = Number(node.lat);
+  const longitude = Number(node.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    x: longitude * 111320 * Math.cos(originLatitude * Math.PI / 180),
+    y: latitude * 110540
+  };
+}
+
+function projectedStructureSegments(way, nodes, originLatitude) {
+  const points = (way?.nodes || [])
+    .map((nodeId) => projectedStructurePoint(nodes.get(nodeId), originLatitude))
+    .filter(Boolean);
+  const segments = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const a = points[index];
+    const b = points[index + 1];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy);
+    if (!(length > 0.5)) continue;
+    segments.push({
+      a,
+      b,
+      dx: dx / length,
+      dy: dy / length,
+      length,
+      midX: (a.x + b.x) * 0.5,
+      midY: (a.y + b.y) * 0.5
+    });
+  }
+  return segments;
+}
+
+function structureGridKey(family, x, y) {
+  return `${family}:${Math.floor(x / STRUCTURE_DUPLICATE_GRID_METERS)}:${Math.floor(y / STRUCTURE_DUPLICATE_GRID_METERS)}`;
+}
+
+function pointToStructureSegmentDistance(x, y, segment) {
+  const vx = segment.b.x - segment.a.x;
+  const vy = segment.b.y - segment.a.y;
+  const lengthSq = vx * vx + vy * vy;
+  const t = lengthSq > 0
+    ? Math.max(0, Math.min(1, ((x - segment.a.x) * vx + (y - segment.a.y) * vy) / lengthSq))
+    : 0;
+  return Math.hypot(x - (segment.a.x + vx * t), y - (segment.a.y + vy * t));
+}
+
+function buildExactStructureSpatialIndex(exactWays, exactNodes, originLatitude) {
+  const index = new Map();
+  const padding = STRUCTURE_DUPLICATE_DISTANCE_METERS;
+  for (const way of exactWays) {
+    const family = structureFamily(way.tags);
+    if (!family) continue;
+    for (const segment of projectedStructureSegments(way, exactNodes, originLatitude)) {
+      const minCellX = Math.floor((Math.min(segment.a.x, segment.b.x) - padding) / STRUCTURE_DUPLICATE_GRID_METERS);
+      const maxCellX = Math.floor((Math.max(segment.a.x, segment.b.x) + padding) / STRUCTURE_DUPLICATE_GRID_METERS);
+      const minCellY = Math.floor((Math.min(segment.a.y, segment.b.y) - padding) / STRUCTURE_DUPLICATE_GRID_METERS);
+      const maxCellY = Math.floor((Math.max(segment.a.y, segment.b.y) + padding) / STRUCTURE_DUPLICATE_GRID_METERS);
+      for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+        for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+          const key = `${family}:${cellX}:${cellY}`;
+          if (!index.has(key)) index.set(key, []);
+          index.get(key).push(segment);
+        }
+      }
+    }
+  }
+  return index;
+}
+
+function generalizedStructureDuplicatesExact(way, worldNodes, originLatitude, exactSpatialIndex) {
+  const family = structureFamily(way?.tags);
+  if (!family) return false;
+  const generalizedSegments = projectedStructureSegments(way, worldNodes, originLatitude);
+  if (generalizedSegments.length === 0) return false;
+  let totalLength = 0;
+  let matchedLength = 0;
+  for (const segment of generalizedSegments) {
+    totalLength += segment.length;
+    const candidates = exactSpatialIndex.get(structureGridKey(family, segment.midX, segment.midY)) || [];
+    const matched = candidates.some((exactSegment) => {
+      const directionDot = Math.abs(segment.dx * exactSegment.dx + segment.dy * exactSegment.dy);
+      if (directionDot < STRUCTURE_DUPLICATE_MIN_DIRECTION_DOT) return false;
+      return pointToStructureSegmentDistance(segment.midX, segment.midY, exactSegment) <=
+        STRUCTURE_DUPLICATE_DISTANCE_METERS;
+    });
+    if (matched) matchedLength += segment.length;
+  }
+  // Names and refs frequently change at a bridge anchorage, tunnel bore, or
+  // jurisdiction boundary. A substantial same-family, same-direction spatial
+  // overlap is the durable identity contract between generalized and exact
+  // sources. Requiring length coverage prevents a nearby crossing structure
+  // from deleting an unrelated way at one point.
+  return matchedLength >= Math.min(18, totalLength) && matchedLength / totalLength >= 0.35;
+}
+
 function isDriveableStructureWay(element) {
   if (element?.type !== 'way' || !Array.isArray(element.nodes) || element.nodes.length < 2) {
     return false;
@@ -140,6 +258,14 @@ export function mergeExactRegionalStructures(worldData, structureData) {
   const worldElements = Array.isArray(worldData?.elements) ? worldData.elements : [];
   const exact = retainExactRegionalStructures(structureData);
   const exactWays = exact.elements.filter((element) => element.type === 'way');
+  const worldNodes = structureNodeMap(worldElements);
+  const exactNodes = structureNodeMap(exact.elements);
+  const structureProjectionLatitude = structureProjectionOriginLatitude(exactNodes, worldNodes);
+  const exactStructureSpatialIndex = buildExactStructureSpatialIndex(
+    exactWays.filter((way) => structureFamily(way.tags)),
+    exactNodes,
+    structureProjectionLatitude
+  );
   const existingExactWayIds = new Set(
     worldElements
       .filter((element) => element?.type === 'way' && Number(element.id) > 0)
@@ -164,8 +290,14 @@ export function mergeExactRegionalStructures(worldData, structureData) {
     if (element?.type !== 'way') return true;
     if (String(element.tags?._sourceCompleteness || '') !== 'generalized') return true;
     const name = normalizedStructureName(element.tags);
-    if (!name) return true;
-    return !exactNamedFamilies.has(`${structureFamily(element.tags)}:${name}`);
+    const namedDuplicate = name && exactNamedFamilies.has(`${structureFamily(element.tags)}:${name}`);
+    const spatialDuplicate = generalizedStructureDuplicatesExact(
+      element,
+      worldNodes,
+      structureProjectionLatitude,
+      exactStructureSpatialIndex
+    );
+    return !namedDuplicate && !spatialDuplicate;
   });
 
   const retainedNodeIds = new Set(
@@ -284,6 +416,7 @@ export async function completeFixedRegionalStructureLoad(options = {}) {
 
 export {
   DRIVEABLE_HIGHWAYS,
+  generalizedStructureDuplicatesExact,
   normalizedStructureName,
   structureFamily
 };

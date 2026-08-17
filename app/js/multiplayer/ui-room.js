@@ -164,6 +164,7 @@ function initMultiplayerPlatform() {
     unsubChat: null,
     unsubArtifacts: null,
     unsubSharedBlocks: null,
+    unsubWorldModifications: null,
     unsubHomeBase: null,
     unsubPaintClaims: null,
     unsubRoomActivities: null,

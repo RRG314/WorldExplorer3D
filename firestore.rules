@@ -1230,7 +1230,10 @@ service cloud.firestore {
         request.resource.data.materialIndex >= 0 &&
         request.resource.data.materialIndex <= 7 &&
         (!('shape' in request.resource.data) ||
-          request.resource.data.shape in ['cube', 'slab', 'ramp', 'column']) &&
+          request.resource.data.shape in [
+            'cube', 'slab', 'ramp', 'column', 'wall', 'floor', 'roof',
+            'window', 'door', 'storefront', 'glass_wall', 'stairs', 'fence', 'sign'
+          ]) &&
         (!('rotation' in request.resource.data) ||
           (request.resource.data.rotation is int &&
             request.resource.data.rotation >= 0 &&
@@ -1244,6 +1247,98 @@ service cloud.firestore {
     function validRoomBlockUpdate(blockId) {
       return validRoomBlockData(blockId) &&
         request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    function validWorldModificationVector(vector, scaleVector) {
+      return vector is map &&
+        vector.keys().hasOnly(['x', 'y', 'z']) &&
+        vector.x is number &&
+        vector.y is number &&
+        vector.z is number &&
+        (
+          (scaleVector == true &&
+            vector.x >= 0.1 && vector.x <= 20 &&
+            vector.y >= 0.1 && vector.y <= 20 &&
+            vector.z >= 0.1 && vector.z <= 20) ||
+          (scaleVector == false &&
+            vector.x >= -50000 && vector.x <= 50000 &&
+            vector.y >= -1200 && vector.y <= 1200 &&
+            vector.z >= -50000 && vector.z <= 50000)
+        );
+    }
+
+    function validWorldModificationTransform(transform) {
+      return transform is map &&
+        transform.keys().hasOnly(['position', 'rotation', 'scale']) &&
+        validWorldModificationVector(transform.position, false) &&
+        validWorldModificationVector(transform.rotation, false) &&
+        validWorldModificationVector(transform.scale, true);
+    }
+
+    function validRoomWorldModificationData(roomId, modificationId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'worldId', 'worldSeed', 'kind', 'sourceFeatureId', 'objectId',
+          'objectType', 'catalogId', 'materialId', 'transform', 'active',
+          'createdBy', 'updatedBy', 'revision', 'history', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.id == modificationId &&
+        request.resource.data.worldSeed == roomData(roomId).world.seed &&
+        request.resource.data.worldId is string &&
+        request.resource.data.worldId.size() > 0 &&
+        request.resource.data.worldId.size() <= 220 &&
+        request.resource.data.kind in ['suppression', 'object'] &&
+        request.resource.data.sourceFeatureId is string &&
+        request.resource.data.sourceFeatureId.size() <= 180 &&
+        request.resource.data.objectId is string &&
+        request.resource.data.objectId.size() <= 120 &&
+        request.resource.data.objectType in [
+          'none', 'wall', 'floor', 'roof', 'window', 'door', 'storefront',
+          'stairs', 'ramp', 'column', 'fence', 'glass_wall', 'sign', 'decorative_facade'
+        ] &&
+        request.resource.data.catalogId is string &&
+        request.resource.data.catalogId.size() <= 80 &&
+        request.resource.data.materialId is string &&
+        request.resource.data.materialId.size() <= 60 &&
+        validWorldModificationTransform(request.resource.data.transform) &&
+        request.resource.data.active is bool &&
+        request.resource.data.createdBy is string &&
+        request.resource.data.createdBy.size() > 0 &&
+        request.resource.data.createdBy.size() <= 128 &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision > 0 &&
+        request.resource.data.history is list &&
+        request.resource.data.history.size() <= 20 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          (request.resource.data.kind == 'suppression' &&
+            request.resource.data.sourceFeatureId.size() > 0 &&
+            request.resource.data.objectId == '' &&
+            request.resource.data.objectType == 'none') ||
+          (request.resource.data.kind == 'object' &&
+            request.resource.data.sourceFeatureId == '' &&
+            request.resource.data.objectId.size() > 0 &&
+            request.resource.data.objectType != 'none')
+        );
+    }
+
+    function canCreateRoomWorldModification(roomId) {
+      return (
+        request.resource.data.kind == 'suppression' && canManageRoom(roomId)
+      ) || (
+        request.resource.data.kind == 'object' && isRoomMember(roomId)
+      );
+    }
+
+    function canUpdateRoomWorldModification(roomId) {
+      return (
+        resource.data.kind == 'suppression' && canManageRoom(roomId)
+      ) || (
+        resource.data.kind == 'object' &&
+        (resource.data.createdBy == request.auth.uid || canManageRoom(roomId))
+      );
     }
 
     function validPaintClaimId(claimId) {
@@ -1604,6 +1699,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /explorerProfiles/{userId} {
+      // Discovery ownership, claims, companions, mastery, and museum records
+      // are minted or changed only by trusted Cloud Functions. Owners may read
+      // their complete profile tree; browser clients cannot forge inventory.
+      allow read: if isSelf(userId);
+      allow create, update, delete: if false;
+
+      match /{document=**} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /discoveryTrades/{tradeId} {
+      allow read: if isSignedIn() &&
+        (resource.data.ownerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
     match /editorSubmissions/{submissionId} {
       allow read: if isAdminToken() ||
         resource.data.status == 'approved' ||
@@ -1835,6 +1949,31 @@ service cloud.firestore {
         allow delete: if isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           (resource.data.createdBy == request.auth.uid || canManageRoom(roomId));
+      }
+
+      match /worldModifications/{modificationId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          validRoomWorldModificationData(roomId, modificationId) &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.revision == 1 &&
+          request.resource.data.createdAt == request.time &&
+          canCreateRoomWorldModification(roomId);
+        allow update: if isMultiplayerEntitled() &&
+          validRoomWorldModificationData(roomId, modificationId) &&
+          request.resource.data.worldId == resource.data.worldId &&
+          request.resource.data.worldSeed == resource.data.worldSeed &&
+          request.resource.data.kind == resource.data.kind &&
+          request.resource.data.sourceFeatureId == resource.data.sourceFeatureId &&
+          request.resource.data.objectId == resource.data.objectId &&
+          request.resource.data.objectType == resource.data.objectType &&
+          request.resource.data.createdBy == resource.data.createdBy &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.revision == resource.data.revision + 1 &&
+          canUpdateRoomWorldModification(roomId);
+        allow delete: if isMultiplayerEntitled() &&
+          (canManageRoom(roomId) ||
+            (resource.data.kind == 'object' && resource.data.createdBy == request.auth.uid));
       }
 
       match /paintClaims/{claimId} {

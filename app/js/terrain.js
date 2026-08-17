@@ -63,7 +63,7 @@ import {
 } from "./terrain/debug-tools.js?v=9";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=67";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=68";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {

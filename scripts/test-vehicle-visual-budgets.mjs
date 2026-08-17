@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { startStaticRootServer } from './test-static-server.mjs';
 
@@ -11,6 +12,13 @@ const server = await startStaticRootServer({
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const fatalErrors = [];
+
+const [sceneBootstrapSource, walkingCharacterSource] = await Promise.all([
+  readFile(new URL('../app/js/engine/scene-bootstrap.js', import.meta.url), 'utf8'),
+  readFile(new URL('../app/js/walking/character.js', import.meta.url), 'utf8')
+]);
+assert.match(sceneBootstrapSource, /createClassicUtilityCar\(THREE\)/, 'engine runtime is not wired to Car D');
+assert.match(walkingCharacterSource, /createFieldNavigatorMesh\(THREE\)/, 'walking runtime is not wired to Character C');
 
 page.on('pageerror', (error) => fatalErrors.push(String(error?.message || error)));
 page.on('console', (message) => {
@@ -28,13 +36,24 @@ try {
 
   const models = await page.evaluate(async () => {
     const THREE = globalThis.THREE;
-    const [{ createExpeditionPlaneMesh }, { createBoatModeMesh }, { createExpeditionSpacecraftMesh }] = await Promise.all([
+    const [
+      { createClassicUtilityCar },
+      { createFieldNavigatorMesh },
+      { createExpeditionPlaneMesh },
+      { createBoatModeMesh },
+      { createExpeditionSpacecraftMesh }
+    ] = await Promise.all([
+      import('/app/js/engine/classic-utility-car.js?v=2'),
+      import('/app/js/walking/field-navigator-mesh.js?v=1'),
       import('/app/js/plane/expedition-plane-mesh.js?v=1'),
       import('/app/js/boat-mode/boat-model.js?v=2'),
       import('/app/js/space/expedition-spacecraft-mesh.js?v=1')
     ]);
+    const carResult = createClassicUtilityCar(THREE);
     const planeResult = createExpeditionPlaneMesh();
     const roots = {
+      car: carResult.car,
+      character: createFieldNavigatorMesh(THREE),
       plane: planeResult.plane,
       boat: createBoatModeMesh(),
       spacecraft: createExpeditionSpacecraftMesh()
@@ -72,6 +91,18 @@ try {
     }
 
     return {
+      car: {
+        ...measure(roots.car),
+        style: roots.car.userData.vehicleStyle,
+        wheels: carResult.wheels.length,
+        headlightLenses: roots.car.children.filter((child) => child.userData?.vehicleHeadlightLens).length,
+        paintFinish: carResult.paintMaterial.userData.vehiclePaintFinish || ''
+      },
+      character: {
+        ...measure(roots.character),
+        style: roots.character.userData.characterStyle,
+        limbHooks: Object.keys(roots.character.userData.limbs || {}).filter((key) => key !== 'scale').length
+      },
       plane: {
         ...measure(roots.plane),
         propellerHook: planeResult.propeller === roots.plane.getObjectByName('propeller')
@@ -84,6 +115,18 @@ try {
       }
     };
   });
+
+  assert.equal(models.car.style, 'classic-utility-d');
+  assert.equal(models.car.wheels, 4, 'car lost its four wheel-owner hooks');
+  assert.equal(models.car.headlightLenses, 2, 'car lost its two headlight lens hooks');
+  assert.equal(models.car.paintFinish, 'utility-matte', 'car lost its readable matte paint policy');
+  assert.ok(models.car.meshes <= 50 && models.car.triangles <= 1100 && models.car.materials <= 8);
+  assert.equal(models.car.transparentMaterials, 0, 'car added transparent draw-order work');
+
+  assert.equal(models.character.style, 'field-navigator-c');
+  assert.equal(models.character.limbHooks, 5, 'character lost its body/arm/leg animation hooks');
+  assert.ok(models.character.meshes <= 26 && models.character.triangles <= 650 && models.character.materials <= 7);
+  assert.equal(models.character.transparentMaterials, 0, 'character added transparent draw-order work');
 
   assert.equal(models.plane.style, 'trailblazer-expedition');
   assert.ok(models.plane.propellerHook, 'plane lost its animated propeller hook');

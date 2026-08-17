@@ -1,5 +1,11 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
+const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
+const diagnosticsHost = String(globalThis.location?.hostname || '').toLowerCase();
+const developerDiagnosticsEnabled = diagnosticsParams.get('diagnostics') === '1' ||
+  diagnosticsHost === 'localhost' || diagnosticsHost === '127.0.0.1' || diagnosticsHost === '::1';
+appCtx.developerDiagnosticsEnabled = developerDiagnosticsEnabled;
+
 const runtimeErrors = [];
 function recordRuntimeError(kind, value) {
   const message = value instanceof Error
@@ -357,6 +363,11 @@ function worldCompositionSnapshot() {
 function getWorldExplorerRuntimeDiagnostics() {
   const activeActor = appCtx.activeTransportActor?.() || null;
   return {
+    developerDiagnostics: {
+      enabled: developerDiagnosticsEnabled,
+      networkWrites: false,
+      capturedErrors: runtimeErrors.length
+    },
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
     runtimeErrors: [...runtimeErrors],
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
@@ -365,6 +376,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
     deflock: appCtx.getDeFlockSnapshot?.() || { active: false },
     liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
+    augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     activeActor,
     surfaceChain: surfaceChainSnapshot(activeActor),
@@ -477,6 +489,11 @@ function getWorldExplorerRuntimeDiagnostics() {
 
 globalThis.getWorldExplorerRuntimeDiagnostics = getWorldExplorerRuntimeDiagnostics;
 globalThis.render_game_to_text = () => JSON.stringify({
+  developerDiagnostics: {
+    enabled: developerDiagnosticsEnabled,
+    networkWrites: false,
+    capturedErrors: runtimeErrors.length
+  },
   environment: appCtx.getEnv?.() || null,
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
@@ -488,6 +505,10 @@ globalThis.render_game_to_text = () => JSON.stringify({
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
+  augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
+  livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
+  worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
+  editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

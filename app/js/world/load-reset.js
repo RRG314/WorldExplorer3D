@@ -51,6 +51,11 @@ export function resetWorldForReload(options = {}) {
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
+  appCtx.disposeLivingWorldRuntime?.('world_reload');
+  appCtx.disposeWorldDiscoveryRuntime?.('world_reload');
+  appCtx.closeArExperience?.('world_reload');
+  appCtx.disposeEditableWorldPresentation?.();
+
   if (typeof appCtx.resetEarthStreaming === 'function') {
     appCtx.resetEarthStreaming('full_world_reload');
   }
@@ -58,10 +63,11 @@ export function resetWorldForReload(options = {}) {
   appCtx.plannedEarthDetailRadiusWorld = 0;
   appCtx.fixedRegionalContextBounds = null;
   appCtx.fixedRegionalContextRadiusWorld = 0;
+  appCtx.fixedRegionalStructureWaterAreas = [];
 
-  appCtx.showLoad(`Loading ${locName}...`);
+  if (options.showLoading !== false) appCtx.showLoad(`Loading ${locName}...`);
   appCtx.worldLoading = true;
-  appCtx.beginEarthWorldSceneLoad?.(options.loadSequence);
+  if (options.beginSceneLoad !== false) appCtx.beginEarthWorldSceneLoad?.(options.loadSequence);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,

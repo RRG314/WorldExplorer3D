@@ -14,7 +14,17 @@ const BLOCK_SHAPES = Object.freeze([
   Object.freeze({ id: 'cube', label: 'Cube' }),
   Object.freeze({ id: 'slab', label: 'Slab' }),
   Object.freeze({ id: 'ramp', label: 'Ramp' }),
-  Object.freeze({ id: 'column', label: 'Column' })
+  Object.freeze({ id: 'column', label: 'Column' }),
+  Object.freeze({ id: 'wall', label: 'Wall' }),
+  Object.freeze({ id: 'floor', label: 'Floor' }),
+  Object.freeze({ id: 'roof', label: 'Roof' }),
+  Object.freeze({ id: 'window', label: 'Window' }),
+  Object.freeze({ id: 'door', label: 'Door' }),
+  Object.freeze({ id: 'storefront', label: 'Storefront' }),
+  Object.freeze({ id: 'glass_wall', label: 'Glass Wall' }),
+  Object.freeze({ id: 'stairs', label: 'Stairs' }),
+  Object.freeze({ id: 'fence', label: 'Fence' }),
+  Object.freeze({ id: 'sign', label: 'Sign' })
 ]);
 
 const BLOCK_SHAPE_IDS = new Set(BLOCK_SHAPES.map((shape) => shape.id));
@@ -74,6 +84,17 @@ function getBlockShapeSurface(shapeValue, rotation, centerX, centerY, centerZ, x
     return { shape, bottomY: centerY - 0.5, topY: centerY + 0.5 };
   }
 
+  if (shape === 'wall' || shape === 'window' || shape === 'door' || shape === 'storefront' || shape === 'glass_wall' || shape === 'fence' || shape === 'sign') {
+    if (Math.abs(local.x) > 0.5 + epsilon || Math.abs(local.z) > 0.12 + epsilon) return null;
+    const height = shape === 'fence' ? 0.72 : shape === 'sign' ? 0.65 : 1;
+    return { shape, bottomY: centerY - height * 0.5, topY: centerY + height * 0.5 };
+  }
+
+  if (shape === 'floor' || shape === 'roof') {
+    if (Math.abs(local.x) > 0.5 + epsilon || Math.abs(local.z) > 0.5 + epsilon) return null;
+    return { shape, bottomY: centerY - 0.09, topY: centerY + 0.09 };
+  }
+
   if (Math.abs(local.x) > 0.5 + epsilon || Math.abs(local.z) > 0.5 + epsilon) return null;
   if (shape === 'slab') {
     return { shape, bottomY: centerY - 0.5, topY: centerY };
@@ -93,6 +114,24 @@ function createBlockShapeGeometry(THREE, shapeValue) {
   }
   if (shape === 'column') {
     return { geometry: new THREE.CylinderGeometry(0.36, 0.36, 1, 12), yOffset: 0 };
+  }
+  if (shape === 'wall') return { geometry: new THREE.BoxGeometry(1, 1, 0.18), yOffset: 0 };
+  if (shape === 'floor' || shape === 'roof') return { geometry: new THREE.BoxGeometry(1, 0.18, 1), yOffset: 0 };
+  if (shape === 'window' || shape === 'storefront' || shape === 'glass_wall') return { geometry: new THREE.BoxGeometry(1, 1, 0.08), yOffset: 0 };
+  if (shape === 'door') return { geometry: new THREE.BoxGeometry(0.78, 1, 0.1), yOffset: 0 };
+  if (shape === 'fence') return { geometry: new THREE.BoxGeometry(1, 0.72, 0.12), yOffset: -0.14 };
+  if (shape === 'sign') return { geometry: new THREE.BoxGeometry(1, 0.65, 0.1), yOffset: 0.18 };
+  if (shape === 'stairs') {
+    const group = new THREE.BoxGeometry(1, 1, 1);
+    const positions = group.attributes.position;
+    for (let i = 0; i < positions.count; i += 1) {
+      const z = positions.getZ(i);
+      const y = positions.getY(i);
+      if (y > 0) positions.setY(i, Math.round((z + 0.5) * 4) / 4 - 0.5);
+    }
+    positions.needsUpdate = true;
+    group.computeVertexNormals();
+    return { geometry: group, yOffset: 0 };
   }
   if (shape === 'ramp') {
     const geometry = new THREE.BoxGeometry(1, 1, 1);

@@ -70,6 +70,10 @@ const generalized = {
     { type: 'node', id: -2, lat: 40.707, lon: -73.996 },
     { type: 'node', id: -3, lat: 40.71, lon: -74.0 },
     { type: 'node', id: -4, lat: 40.711, lon: -74.001 },
+    { type: 'node', id: -5, lat: 40.70601, lon: -73.99701 },
+    { type: 'node', id: -6, lat: 40.70701, lon: -73.99601 },
+    { type: 'node', id: -7, lat: 40.706, lon: -73.9967 },
+    { type: 'node', id: -8, lat: 40.707, lon: -73.9977 },
     {
       type: 'way',
       id: -10,
@@ -96,6 +100,24 @@ const generalized = {
         highway: 'primary_link', name: 'Lincoln Tunnel Approach',
         _sourceCompleteness: 'generalized'
       }
+    },
+    {
+      type: 'way',
+      id: -13,
+      nodes: [-5, -6],
+      tags: {
+        highway: 'primary', bridge: 'yes', name: 'Different regional route label',
+        _sourceCompleteness: 'generalized'
+      }
+    },
+    {
+      type: 'way',
+      id: -14,
+      nodes: [-7, -8],
+      tags: {
+        highway: 'primary', bridge: 'yes', name: 'Nearby crossing bridge',
+        _sourceCompleteness: 'generalized'
+      }
     }
   ]
 };
@@ -104,9 +126,11 @@ const mergedWays = merged.elements.filter((element) => element.type === 'way');
 assert.equal(mergedWays.some((way) => way.id === -10), false, 'exact named bridge must replace generalized copy');
 assert.equal(mergedWays.some((way) => way.id === -11), true, 'unrelated nearby bridge must remain');
 assert.equal(mergedWays.some((way) => way.id === -12), true, 'an exact connector must not erase generalized regional road continuity by name');
+assert.equal(mergedWays.some((way) => way.id === -13), false, 'spatially overlapping generalized bridge must yield despite a different name');
+assert.equal(mergedWays.some((way) => way.id === -14), true, 'a nearby crossing bridge must not be removed by proximity alone');
 assert.equal(mergedWays.some((way) => way.id === 101), true);
 assert.equal(mergedWays.some((way) => way.id === 102), true);
-assert.equal(merged._fixedRegionalStructures.replacedGeneralizedWays, 1);
+assert.equal(merged._fixedRegionalStructures.replacedGeneralizedWays, 2);
 
 let requestedQuery = '';
 const request = beginFixedRegionalStructureLoad({

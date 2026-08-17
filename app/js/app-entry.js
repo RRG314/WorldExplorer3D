@@ -154,6 +154,14 @@ function registerPlatformServices() {
             return api;
         }
     });
+    platformServices.register({
+        id: 'augmented-reality', category: 'presentation',
+        load: async () => {
+            const mod = await import('./ar/session-service.js?v=1');
+            mod.initArPlatform?.(appCtx);
+            return mod;
+        }
+    });
 }
 
 function ensurePlatformService(id) {
@@ -454,6 +462,19 @@ function registerLazySubsystemEntrypoints() {
     appCtx.ensureOverlayRuntimeReady = ensureOverlayRuntimeLayer;
     appCtx.kickOptionalRuntimeBoot = kickOptionalRuntimeBoot;
     appCtx.ensurePlatformService = ensurePlatformService;
+    appCtx.openArExperience = async (request = {}) => {
+        const mod = await ensurePlatformService('augmented-reality');
+        const platform = mod.initArPlatform?.(appCtx);
+        return platform?.open?.(request) ?? false;
+    };
+    appCtx.closeArExperience = async (reason = 'user-exit') => {
+        const mod = platformServices.peek('augmented-reality');
+        if (!mod) return false;
+        return mod.initArPlatform?.(appCtx)?.end?.(reason) ?? false;
+    };
+    appCtx.getArPlatformSnapshot = () => platformServices.peek('augmented-reality')?.getArPlatformSnapshot?.() || {
+        type: 'ArPlatformSnapshot', phase: 'idle', active: false
+    };
     appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
     appCtx.getAccountSnapshot = () => platformServices.peek('account')?.snapshot?.() || {
         started: false,

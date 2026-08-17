@@ -2,6 +2,41 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.3.0] - 2026-08-17
+
+### Added
+
+- A coherent World Discovery loop with contextual wildlife, geology, field
+  tools, Journal, Field Guide, Collection, Explorer progression and regional
+  goals.
+- Multiple dog, cat and bird companions with catalog-owned scale, grounded or
+  airborne following, care state and contextual AR presentation.
+- A capability-aware AR platform for companions, recorded specimens and
+  habitat-gated virtual wildlife challenges, with WebXR, camera-overlay and
+  interactive-3D fallback modes.
+- Consolidated account/admin operations, guided onboarding, current analytics
+  events and trusted Discovery inventory/trading backend contracts.
+
+### Changed
+
+- Reorganized Explorer UI into collapsible, task-focused surfaces that reuse the
+  existing application shell instead of occupying the play view continuously.
+- Expanded living-world pedestrian and vehicle variety while retaining bounded
+  logical draw-call and triangle budgets.
+- Updated the landing page with current gameplay media and a clearer explanation
+  of the connected real-location exploration experience.
+
+### Fixed
+
+- Restored visible regional bridge, ramp and tunnel continuity for Baltimore,
+  San Francisco and connected multi-segment tunnel systems.
+- Prevented Discovery targets, equipment, wildlife and companions from sampling
+  the wrong surface coordinates or appearing inside buildings.
+- Preserved fixed-world ownership through travel, editor, multiplayer,
+  planetary, Ocean and title transitions, with explicit world-memory release.
+- Removed obsolete landing media and an orphaned duplicate Discovery progression
+  implementation so strict production reachability is green.
+
 ## [4.2.1] - 2026-08-16
 
 ### Added

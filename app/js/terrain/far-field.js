@@ -98,6 +98,7 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   function removeCurrentMesh() {
+    appCtx.fixedRegionalStructureWaterAreas = [];
     if (farFieldMesh) {
       farFieldMesh.parent?.remove?.(farFieldMesh);
       disposeFarFieldMesh(farFieldMesh);
@@ -468,6 +469,26 @@ function createFarFieldTerrainApi(deps = {}) {
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const builtWater = buildFarWaterGeometry(appCtx, mappedContext);
+    const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities;
+    const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
+      .filter((area) =>
+        Number.isFinite(Number(area?.surfaceMeters)) &&
+        (!publishedWaterAreaIdentities || publishedWaterAreaIdentities.has(String(area?.identity || '')))
+      )
+      .map((area) => {
+        const pts = (area.outer || []).map((coordinate) => {
+          const lon = Number(coordinate?.[0]);
+          const lat = Number(coordinate?.[1]);
+          return Number.isFinite(lat) && Number.isFinite(lon) ? appCtx.geoToWorld(lat, lon) : null;
+        }).filter(Boolean);
+        return {
+          pts,
+          surfaceY: Number(area.surfaceMeters) * Number(appCtx.WORLD_UNITS_PER_METER || 1) *
+            Number(appCtx.TERRAIN_Y_EXAGGERATION || 1) + FAR_WATER_SURFACE_CLEARANCE_WORLD,
+          source: 'fixed-regional-mapped-water'
+        };
+      })
+      .filter((area) => area.pts.length >= 3);
     const waterGeometryBuildMs = performance.now() - waterBuildStartedAt;
     const waterMaskBuildStartedAt = performance.now();
     const waterTerrainMask = buildMappedWaterTerrainOwnershipMask(
@@ -496,6 +517,7 @@ function createFarFieldTerrainApi(deps = {}) {
     // Clearing after material setup erased the new surface authority and left the
     // outer terrain frozen on its initial coarse fallback.
     removeCurrentMesh();
+    appCtx.fixedRegionalStructureWaterAreas = fixedRegionalStructureWaterAreas;
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       vertexColors: true,

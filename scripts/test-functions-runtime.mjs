@@ -10,6 +10,10 @@ assert.match(functionsPackage.dependencies?.['firebase-admin'] || '', /^\^13\./,
 assert.match(functionsPackage.dependencies?.['firebase-functions'] || '', /^\^6\./, 'Firebase Functions must remain on the audited Gen 1-compatible major.');
 
 const expectedExports = [
+  'acceptDiscoveryTrade',
+  'cancelDiscoveryTrade',
+  'claimExplorerDiscovery',
+  'createDiscoveryTrade',
   'createCheckoutSession',
   'createPortalSession',
   'deleteAccount',
@@ -18,6 +22,7 @@ const expectedExports = [
   'getAircraftStates',
   'getStreetImagery',
   'listBillingReceipts',
+  'listExplorerDiscoveries',
   'moderateOverlayFeature',
   'saveOverlayFeatureDraft',
   'startTrial',

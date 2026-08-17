@@ -108,6 +108,36 @@ function publicRoomDoc() {
   };
 }
 
+function roomWorldModificationDoc(overrides = {}) {
+  const kind = overrides.kind || 'suppression';
+  const sourceFeatureId = kind === 'suppression' ? (overrides.sourceFeatureId || 'osm:way:123') : '';
+  const objectId = kind === 'object' ? (overrides.objectId || 'structure_1') : '';
+  const actorId = overrides.actorId || OWNER_UID;
+  return {
+    id: overrides.id || (kind === 'suppression' ? 's_test_osm_way_123' : 'o_test_structure_1'),
+    worldId: 'room-world:AB12CD:earth:latlon:0_0',
+    worldSeed: 'latlon:0,0',
+    kind,
+    sourceFeatureId,
+    objectId,
+    objectType: kind === 'object' ? (overrides.objectType || 'wall') : 'none',
+    catalogId: kind === 'object' ? (overrides.catalogId || 'wall') : 'none',
+    materialId: kind === 'object' ? (overrides.materialId || 'brick') : 'none',
+    transform: {
+      position: { x: 4, y: 2, z: 6 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 }
+    },
+    active: overrides.active !== false,
+    createdBy: overrides.createdBy || actorId,
+    updatedBy: actorId,
+    revision: overrides.revision || 1,
+    history: [{ revision: overrides.revision || 1, action: 'create', actorId, atMs: Date.now() }],
+    createdAt: overrides.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+}
+
 function roomCreateDoc(roomCode, ownerUid, overrides = {}) {
   const base = {
     code: roomCode,
@@ -268,6 +298,16 @@ const testEnv = await initializeTestEnvironment({
 });
 
 await seedData(testEnv);
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'explorerProfiles', OWNER_UID), { uid: OWNER_UID, schemaVersion: 1 });
+  await setDoc(doc(db, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item'), {
+    instanceId: 'trusted_item', ownerUid: OWNER_UID, authority: 'trusted-server', tradeable: true
+  });
+  await setDoc(doc(db, 'discoveryTrades', 'trade_1'), {
+    ownerUid: OWNER_UID, recipientUid: MEMBER_UID, status: 'pending'
+  });
+});
 
 const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
 const adminClaimsDb = testEnv.authenticatedContext(OWNER_UID, { admin: true, role: 'admin' }).firestore();
@@ -290,6 +330,31 @@ async function runCheck(name, fn) {
     console.error(`FAIL ${name}: ${err?.message || err}`);
   }
 }
+
+await runCheck('explorer can read their trusted discovery inventory', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item')));
+});
+
+await runCheck('other players cannot read a trusted discovery inventory', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item')));
+});
+
+await runCheck('browser clients cannot forge trusted discovery items', async () => {
+  await assertFails(setDoc(doc(ownerDb, 'explorerProfiles', OWNER_UID, 'items', 'forged_item'), {
+    instanceId: 'forged_item', ownerUid: OWNER_UID, authority: 'trusted-server', tradeable: true
+  }));
+});
+
+await runCheck('trade participants can read their server-owned offer', async () => {
+  await assertSucceeds(getDoc(doc(memberDb, 'discoveryTrades', 'trade_1')));
+});
+
+await runCheck('unrelated players cannot read or write discovery trades', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'discoveryTrades', 'trade_1')));
+  await assertFails(setDoc(doc(attackerDb, 'discoveryTrades', 'forged_trade'), {
+    ownerUid: ATTACKER_UID, recipientUid: OWNER_UID, status: 'pending'
+  }));
+});
 
 await runCheck('anon cannot read private room doc', async () => {
   await assertFails(getDoc(doc(anonDb, 'rooms', ROOM_ID)));
@@ -1036,6 +1101,106 @@ await runCheck('member cannot overwrite shared block owned by another user', asy
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   }, { merge: true }));
+});
+
+await runCheck('room owner can create a bounded mapped-building suppression', async () => {
+  const payload = roomWorldModificationDoc({
+    id: 's_test_osm_way_123',
+    kind: 'suppression',
+    actorId: OWNER_UID
+  });
+  await assertSucceeds(setDoc(
+    doc(ownerDb, 'rooms', ROOM_ID, 'worldModifications', payload.id),
+    payload
+  ));
+});
+
+await runCheck('ordinary room member cannot suppress a mapped building', async () => {
+  const payload = roomWorldModificationDoc({
+    id: 's_test_osm_way_456',
+    kind: 'suppression',
+    sourceFeatureId: 'osm:way:456',
+    actorId: MEMBER_UID
+  });
+  await assertFails(setDoc(
+    doc(memberDb, 'rooms', ROOM_ID, 'worldModifications', payload.id),
+    payload
+  ));
+});
+
+await runCheck('room member can create a safe catalog structure', async () => {
+  const payload = roomWorldModificationDoc({
+    id: 'o_test_structure_1',
+    kind: 'object',
+    objectId: 'structure_1',
+    objectType: 'glass_wall',
+    actorId: MEMBER_UID
+  });
+  await assertSucceeds(setDoc(
+    doc(memberDb, 'rooms', ROOM_ID, 'worldModifications', payload.id),
+    payload
+  ));
+});
+
+await runCheck('room modification rejects unbounded transforms', async () => {
+  const payload = roomWorldModificationDoc({
+    id: 'o_test_structure_unsafe',
+    kind: 'object',
+    objectId: 'structure_unsafe',
+    objectType: 'wall',
+    actorId: MEMBER_UID
+  });
+  payload.transform.scale.x = 500;
+  await assertFails(setDoc(
+    doc(memberDb, 'rooms', ROOM_ID, 'worldModifications', payload.id),
+    payload
+  ));
+});
+
+await runCheck('room modification rejects stale or skipped revisions', async () => {
+  const reference = doc(memberDb, 'rooms', ROOM_ID, 'worldModifications', 'o_test_structure_1');
+  await assertFails(setDoc(reference, {
+    active: false,
+    updatedBy: MEMBER_UID,
+    revision: 3,
+    history: [
+      { revision: 1, action: 'create', actorId: MEMBER_UID, atMs: Date.now() },
+      { revision: 3, action: 'delete', actorId: MEMBER_UID, atMs: Date.now() }
+    ],
+    updatedAt: serverTimestamp()
+  }, { merge: true }));
+});
+
+await runCheck('room member cannot edit another creators structure', async () => {
+  const ownerPayload = roomWorldModificationDoc({
+    id: 'o_test_owner_structure',
+    kind: 'object',
+    objectId: 'owner_structure',
+    objectType: 'wall',
+    actorId: OWNER_UID
+  });
+  await assertSucceeds(setDoc(
+    doc(ownerDb, 'rooms', ROOM_ID, 'worldModifications', ownerPayload.id),
+    ownerPayload
+  ));
+  await assertFails(setDoc(
+    doc(memberDb, 'rooms', ROOM_ID, 'worldModifications', ownerPayload.id),
+    {
+      active: false,
+      updatedBy: MEMBER_UID,
+      revision: 2,
+      history: [
+        ...ownerPayload.history,
+        { revision: 2, action: 'delete', actorId: MEMBER_UID, atMs: Date.now() }
+      ],
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  ));
+});
+
+await runCheck('non-member cannot read private room world modifications', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'worldModifications', 's_test_osm_way_123')));
 });
 
 await runCheck('user can save own room shortcut entry', async () => {

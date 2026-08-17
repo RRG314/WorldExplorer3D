@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=48";
+} from "./structure-semantics.js?v=49";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -161,7 +161,7 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=36";
+} from "./world/structure-aware.js?v=38";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=107";
 import {
   fetchShortbreadWorldData,
@@ -299,6 +299,41 @@ async function refreshAuthoritativeMapData() {
   return loadRoads();
 }
 
+function releaseEarthWorldForTitle() {
+  const before = Object.freeze({
+    roads: Number(appCtx.roads?.length || 0),
+    buildings: Number(appCtx.buildings?.length || 0),
+    rendererGeometries: Number(appCtx.renderer?.info?.memory?.geometries || 0),
+    rendererTextures: Number(appCtx.renderer?.info?.memory?.textures || 0)
+  });
+  resetWorldForReload({
+    beginSceneLoad: false,
+    clearBuildingSpatialIndex,
+    invalidateTraversalNetworks,
+    locName: appCtx.LOC?.name || 'World',
+    resetWorldFurnitureCaches,
+    showLoading: false
+  });
+  appCtx.worldSnapshotStore?.clear?.('title_screen_release');
+  appCtx.worldPublication = null;
+  appCtx.initialEarthWorldReady = false;
+  appCtx.worldDetailState = {};
+  appCtx.buildingProvenanceRecords = [];
+  appCtx.buildingProvenanceFeatureIds = new Set();
+  appCtx.buildingProvenanceModel = null;
+  appCtx.waterSurfaceRegistry = null;
+  appCtx.waterSurfaceRegistrySnapshot = null;
+  appCtx.worldLoading = false;
+  appCtx.renderer?.renderLists?.dispose?.();
+  appCtx.worldProviderStagingRelease = Object.freeze({
+    shortbread: releaseShortbreadRuntimeCache(),
+    overpass: releaseOverpassRuntimeCache(),
+    releasedAt: performance.now(),
+    reason: 'title_screen_release'
+  });
+  return Object.freeze({ released: true, before });
+}
+
 initWorldSpawning({
   buildingContainingPoint,
   findNearestRoad,
@@ -317,6 +352,20 @@ initWorldNavigation({
   sampleFeatureSurfaceY,
   tryAutoEnterBoatAt
 });
+let editableWorldRuntimePromise = null;
+appCtx.ensureEditableWorldRuntime = () => {
+  if (typeof appCtx.getSuppressedEditableBuildingIds === 'function') return Promise.resolve(true);
+  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=1')
+    .then(({ initEditableWorldRuntime }) => {
+      initEditableWorldRuntime(appCtx);
+      return true;
+    })
+    .catch((error) => {
+      editableWorldRuntimePromise = null;
+      throw error;
+    });
+  return editableWorldRuntimePromise;
+};
 initWorldBudgets({
   getPerfModeValue,
   limitNodesByDistance,
@@ -379,6 +428,7 @@ Object.assign(appCtx, {
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
   refreshAuthoritativeMapData,
+  releaseEarthWorldForTitle,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,

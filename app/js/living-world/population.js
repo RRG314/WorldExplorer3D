@@ -1,0 +1,444 @@
+import { selectNpcVehicleVariant } from './vehicle-catalog.js?v=2';
+import { createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=2';
+
+const POPULATION_BUDGET_BY_TIER = Object.freeze({
+  low: Object.freeze({ pedestrians: 6, vehicles: 4 }),
+  performance: Object.freeze({ pedestrians: 12, vehicles: 8 }),
+  balanced: Object.freeze({ pedestrians: 24, vehicles: 14 }),
+  quality: Object.freeze({ pedestrians: 38, vehicles: 24 })
+});
+
+const POPULATION_VISIBILITY_POLICY = Object.freeze({
+  enterDistance: 760,
+  exitDistance: 1080,
+  fadeInPerSecond: 1.7,
+  fadeOutPerSecond: 1.05,
+  relocationHideSeconds: 1.25
+});
+
+const PEDESTRIAN_ARCHETYPES = Object.freeze([
+  Object.freeze({ id: 'city-casual', label: 'City casual', torso: 1, leg: 1, pack: 0 }),
+  Object.freeze({ id: 'field-walker', label: 'Field walker', torso: 1.05, leg: 1.04, pack: 1 }),
+  Object.freeze({ id: 'commuter', label: 'Commuter', torso: .96, leg: 1.02, pack: .7 }),
+  Object.freeze({ id: 'weekend-explorer', label: 'Weekend explorer', torso: 1.08, leg: .96, pack: 1.15 }),
+  Object.freeze({ id: 'local-runner', label: 'Local runner', torso: .9, leg: 1.08, pack: 0 })
+]);
+
+const OUTFIT_PALETTE = Object.freeze([0x3f5961, 0x8d6048, 0x3f6577, 0x6b7550, 0x73566f, 0x8a783f, 0x48536a]);
+const PANTS_PALETTE = Object.freeze([0x202832, 0x34393d, 0x3e4854, 0x443b36, 0x273746]);
+const HAIR_PALETTE = Object.freeze([0x171513, 0x38271d, 0x6b4a2f, 0x8b735b, 0x2d2422]);
+const VEHICLE_PALETTE = Object.freeze([0x3f6172, 0x65745c, 0x9a3e35, 0xb2aa91, 0x353c46, 0x7a6044, 0x5e4d72, 0xc1b446]);
+
+function createMesh(geometry, material, count, name) {
+  if (count <= 0) return null;
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
+  mesh.name = name;
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  // Population instances move continuously. Static automatic instance bounds can
+  // otherwise leave the group culled after actors have moved out of the old bound.
+  mesh.frustumCulled = false;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  return mesh;
+}
+
+function edgeLookup(graph) {
+  const outgoing = new Map();
+  if (!Array.isArray(graph?.edges)) return outgoing;
+  for (let index = 0; index < graph.edges.length; index += 1) {
+    const edge = graph.edges[index];
+    const list = outgoing.get(edge.from) || [];
+    list.push(index);
+    outgoing.set(edge.from, list);
+  }
+  return outgoing;
+}
+
+function edgeSpawnWeight(edge, kind) {
+  if (kind === 'pedestrian') {
+    if (edge.role === 'entrance') return edge.commercial ? 4 : 2;
+    if (edge.provenance === 'mapped_path') return 2.2;
+    if (edge.role === 'crossing') return .55;
+    return 1;
+  }
+  const roadClass = String(edge.roadClass || '').toLowerCase();
+  if (/motorway|trunk|primary/.test(roadClass)) return 2.8;
+  if (/secondary|tertiary/.test(roadClass)) return 1.8;
+  if (/service|track/.test(roadClass)) return .45;
+  return 1;
+}
+
+function selectSpawnEdgeIndex(graph, random, kind) {
+  const weights = graph.edges.map((edge) => edgeSpawnWeight(edge, kind));
+  let target = random() * weights.reduce((sum, weight) => sum + weight, 0);
+  for (let index = 0; index < weights.length; index += 1) {
+    target -= weights[index];
+    if (target <= 0) return index;
+  }
+  return 0;
+}
+
+function paletteColor(palette, random) {
+  return new THREE.Color(palette[Math.floor(random() * palette.length) % palette.length]);
+}
+
+function vehicleColor(variant, random) {
+  const serviceColors = { taxi: 0xd4b82d, delivery_van: 0xc8c7bd, box_truck: 0xaeb9bd, city_bus: 0x3f6685 };
+  return new THREE.Color(serviceColors[variant?.id] || VEHICLE_PALETTE[Math.floor(random() * VEHICLE_PALETTE.length) % VEHICLE_PALETTE.length]);
+}
+
+function createAgents(count, graph, random, kind) {
+  if (!graph?.edges?.length) return [];
+  const agents = [];
+  for (let index = 0; index < count; index += 1) {
+    const edgeIndex = selectSpawnEdgeIndex(graph, random, kind);
+    const edge = graph.edges[edgeIndex];
+    const variant = kind === 'vehicle'
+      ? selectNpcVehicleVariant(random, { majorRoad: /motorway|trunk|primary|secondary/i.test(edge.roadClass || '') })
+      : null;
+    const archetype = kind === 'pedestrian' ? PEDESTRIAN_ARCHETYPES[Math.floor(random() * PEDESTRIAN_ARCHETYPES.length)] : null;
+    const heightScale = kind === 'pedestrian' ? .86 + random() * .28 : 1;
+    agents.push({
+      id: `${kind}:${index}`,
+      edgeIndex,
+      progress: (.08 + random() * .78) * edge.length,
+      speed: kind === 'vehicle'
+        ? Math.min(edge.speedLimit || 12, (6.5 + random() * 5.5) * variant.speedFactor)
+        : .8 + random() * .65,
+      variant,
+      archetype,
+      heightScale,
+      color: kind === 'vehicle' ? vehicleColor(variant, random) : paletteColor(OUTFIT_PALETTE, random),
+      secondaryColor: paletteColor(PANTS_PALETTE, random),
+      hairColor: paletteColor(HAIR_PALETTE, random),
+      skinColor: kind === 'pedestrian' ? new THREE.Color().setHSL(.045 + random() * .045, .28 + random() * .26, .34 + random() * .42) : null,
+      activityAffinity: random(),
+      visibility: 0,
+      visibleTarget: false,
+      relocationCooldown: 0,
+      motionTime: random() * Math.PI * 2,
+      waiting: false
+    });
+  }
+  return agents;
+}
+
+function agentPose(agent, graph) {
+  const edge = graph.edges[agent.edgeIndex];
+  if (!edge) return null;
+  const t = Math.max(0, Math.min(1, agent.progress / Math.max(.01, edge.length)));
+  const x = edge.p1.x + (edge.p2.x - edge.p1.x) * t;
+  const y = edge.p1.y + (edge.p2.y - edge.p1.y) * t;
+  const z = edge.p1.z + (edge.p2.z - edge.p1.z) * t;
+  return { x, y, z, yaw: Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z) };
+}
+
+function selectSafeRelocationEdge(graph, random, kind, reference) {
+  const distant = reference ? graph.edges.map((edge, index) => ({ edge, index })).filter(({ edge }) => {
+    const x = (edge.p1.x + edge.p2.x) * .5;
+    const z = (edge.p1.z + edge.p2.z) * .5;
+    return Math.hypot(x - reference.x, z - reference.z) > 420;
+  }) : [];
+  if (distant.length) return distant[Math.floor(random() * distant.length) % distant.length].index;
+  return selectSpawnEdgeIndex(graph, random, kind);
+}
+
+function relocateAgent(agent, graph, random, kind, reference) {
+  agent.edgeIndex = selectSafeRelocationEdge(graph, random, kind, reference);
+  agent.progress = Math.max(.05, random() * .3) * (graph.edges[agent.edgeIndex]?.length || 1);
+  agent.visibleTarget = false;
+  agent.relocationCooldown = POPULATION_VISIBILITY_POLICY.relocationHideSeconds;
+}
+
+function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {}) {
+  const occupancy = new Map();
+  if (kind === 'vehicle') {
+    agents.forEach((agent) => {
+      const list = occupancy.get(agent.edgeIndex) || [];
+      list.push(agent);
+      occupancy.set(agent.edgeIndex, list);
+    });
+    occupancy.forEach((list) => list.sort((a, b) => b.progress - a.progress));
+  }
+  for (const agent of agents) {
+    agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
+    const edge = graph.edges[agent.edgeIndex];
+    if (!edge) continue;
+    const pose = agentPose(agent, graph);
+    const reference = behavior.reference;
+    const distance = pose && reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+    const stride = distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
+    if (behavior.tick % stride !== 0) continue;
+    let speed = agent.speed;
+    if (kind === 'vehicle') {
+      const sameEdge = occupancy.get(agent.edgeIndex) || [];
+      const rank = sameEdge.indexOf(agent);
+      const leader = rank > 0 ? sameEdge[rank - 1] : null;
+      if (leader && leader.progress - agent.progress < 7.5) speed *= .12;
+      if (edge.structure?.terrainMode === 'subgrade') speed *= .82;
+      if (agent.progress > edge.length * .78 && (outgoing.get(edge.to)?.length || 0) > 1) speed *= .55;
+      if (reference && pose && Math.hypot(pose.x - reference.x, pose.z - reference.z) < 7) speed *= .12;
+    } else if (edge.role === 'crossing') {
+      speed *= behavior.crossingBlocked?.(edge) ? 0 : .86;
+    }
+    agent.waiting = speed < agent.speed * .5;
+    agent.motionTime += speed * dt * stride * (kind === 'vehicle' ? .42 : 3.1);
+    agent.progress += speed * dt * stride;
+    while (agent.progress >= edge.length) {
+      agent.progress -= edge.length;
+      const next = outgoing.get(edge.to) || [];
+      if (kind === 'pedestrian' && edge.role === 'entrance' && graph.nodes?.[edge.to]?.role === 'entrance') {
+        relocateAgent(agent, graph, random, kind, reference);
+        agent.virtualizedEntries = Number(agent.virtualizedEntries || 0) + 1;
+        break;
+      }
+      if (next.length === 0) {
+        relocateAgent(agent, graph, random, kind, reference);
+        break;
+      }
+      agent.edgeIndex = next[Math.floor(random() * next.length) % next.length];
+      const nextEdge = graph.edges[agent.edgeIndex];
+      if (!nextEdge || agent.progress < nextEdge.length) break;
+    }
+  }
+}
+
+function updateAgentVisibility(agent, distance, activeRatio, dt) {
+  const withinDistance = agent.visibleTarget
+    ? distance <= POPULATION_VISIBILITY_POLICY.exitDistance
+    : distance <= POPULATION_VISIBILITY_POLICY.enterDistance;
+  agent.visibleTarget = agent.relocationCooldown <= 0 && withinDistance && agent.activityAffinity <= activeRatio;
+  const rate = agent.visibleTarget ? POPULATION_VISIBILITY_POLICY.fadeInPerSecond : POPULATION_VISIBILITY_POLICY.fadeOutPerSecond;
+  const target = agent.visibleTarget ? 1 : 0;
+  if (agent.visibility < target) agent.visibility = Math.min(target, agent.visibility + rate * dt);
+  else if (agent.visibility > target) agent.visibility = Math.max(target, agent.visibility - rate * dt);
+}
+
+function localTransform(pose, transform, visibility, output) {
+  const yaw = pose.yaw;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const x = Number(transform.x || 0);
+  const z = Number(transform.z || 0);
+  output.position.set(pose.x + x * cos + z * sin, pose.y + Number(transform.y || 0), pose.z - x * sin + z * cos);
+  output.baseQuaternion.setFromAxisAngle(output.yAxis, yaw);
+  output.localQuaternion.setFromEuler(output.euler.set(Number(transform.rx || 0), Number(transform.ry || 0), Number(transform.rz || 0), 'XYZ'));
+  output.quaternion.multiplyQuaternions(output.baseQuaternion, output.localQuaternion);
+  const visibleScale = Math.max(.001, visibility);
+  output.scale.set(Number(transform.sx || 1) * visibleScale, Number(transform.sy || 1) * visibleScale, Number(transform.sz || 1) * visibleScale);
+  output.matrix.compose(output.position, output.quaternion, output.scale);
+  return output.matrix;
+}
+
+function pedestrianTransform(role, agent, slot = 0) {
+  const h = agent.heightScale;
+  const swing = agent.waiting ? 0 : Math.sin(agent.motionTime) * .55;
+  const side = slot === 0 ? -1 : 1;
+  const torso = agent.archetype.torso;
+  if (role === 'torso') return { y: .97 * h, sx: .44 * torso, sy: .64 * h, sz: .28 };
+  if (role === 'head') return { y: 1.51 * h, sx: .34, sy: .38, sz: .34 };
+  if (role === 'hair') return { y: 1.66 * h, sx: .35, sy: .14, sz: .35 };
+  if (role === 'arms') return { x: side * .29 * torso, y: .98 * h, sx: .115, sy: .5 * h, sz: .115, rx: -side * swing };
+  if (role === 'hands') return { x: side * .29 * torso, y: .69 * h, z: side * swing * .11, sx: .12, sy: .13, sz: .12 };
+  if (role === 'legs') return { x: side * .12, y: .42 * h, z: side * swing * .09, sx: .16, sy: .58 * h * agent.archetype.leg, sz: .17, rx: side * swing };
+  if (role === 'shoes') return { x: side * .12, y: .1, z: .07 + side * swing * .11, sx: .2, sy: .14, sz: .34 };
+  return { y: 1.02 * h, z: -.2, sx: .36 * agent.archetype.pack, sy: .48 * h * agent.archetype.pack, sz: .16 * agent.archetype.pack };
+}
+
+function vehicleLayout(agent) {
+  const variant = agent.variant;
+  const style = variant.bodyStyle || variant.id;
+  const length = variant.length;
+  const height = variant.height;
+  const truck = style === 'box-truck';
+  const bus = style === 'bus';
+  const pickup = style === 'pickup';
+  const van = style === 'van';
+  const suv = style === 'suv';
+  const cabinLength = bus ? length * .88 : truck ? length * .24 : pickup ? length * .34 : van ? length * .7 : suv ? length * .58 : length * .47;
+  const cabinZ = truck ? length * .31 : pickup ? length * .17 : van ? -length * .04 : -length * .07;
+  const cabinHeight = bus ? height * .7 : truck ? height * .55 : van ? height * .62 : suv ? height * .53 : height * .46;
+  return { variant, style, length, height, truck, bus, pickup, van, suv, cabinLength, cabinZ, cabinHeight };
+}
+
+function vehicleTransform(role, agent, slot = 0) {
+  const l = vehicleLayout(agent);
+  const width = l.variant.width;
+  const wheelRadius = l.variant.wheelRadius || Math.min(.5, l.height * .23);
+  if (role === 'body') return { y: wheelRadius + l.height * .2, sx: width, sy: l.height * .43, sz: l.length };
+  if (role === 'cabin') return { y: wheelRadius + l.height * .58, z: l.cabinZ, sx: width * .86, sy: l.cabinHeight, sz: l.cabinLength };
+  if (role === 'glass') return { y: wheelRadius + l.height * .63, z: l.cabinZ + (l.truck ? .04 : 0), sx: width * .875, sy: Math.max(.24, l.cabinHeight * .48), sz: l.cabinLength * .82 };
+  if (role === 'detail') {
+    if (l.bus) return slot === 0
+      ? { y: wheelRadius + l.height * .95, sx: width * .82, sy: .09, sz: l.length * .78 }
+      : { y: wheelRadius + l.height * .45, z: -l.length * .49, sx: width * .86, sy: .12, sz: .08 };
+    if (l.truck) return slot === 0
+      ? { y: wheelRadius + l.height * .69, z: -l.length * .15, sx: width * .95, sy: l.height * .7, sz: l.length * .58 }
+      : { y: wheelRadius + l.height * .41, z: l.length * .47, sx: width * .9, sy: .16, sz: l.length * .1 };
+    if (l.pickup) return slot === 0
+      ? { y: wheelRadius + l.height * .44, z: -l.length * .33, sx: width * .92, sy: l.height * .25, sz: l.length * .34 }
+      : { y: wheelRadius + l.height * .52, z: l.length * .39, sx: width * .88, sy: l.height * .18, sz: l.length * .19 };
+    return slot === 0
+      ? { y: wheelRadius + l.height * .47, z: l.length * .39, sx: width * .88, sy: l.height * .19, sz: l.length * .2 }
+      : { y: wheelRadius + l.height * .46, z: -l.length * .43, sx: width * .86, sy: l.height * .17, sz: l.length * .13 };
+  }
+  if (role === 'wheels') {
+    const side = slot % 2 === 0 ? -1 : 1;
+    const front = slot < 2 ? 1 : -1;
+    return { x: side * width * .52, y: wheelRadius, z: front * l.length * (l.bus ? .35 : l.truck ? .34 : .3), sx: wheelRadius, sy: width * .12, sz: wheelRadius, rz: Math.PI / 2, rx: agent.motionTime };
+  }
+  if (role === 'bumpers') {
+    const front = slot === 0 ? 1 : -1;
+    return { y: wheelRadius + .02, z: front * l.length * .505, sx: width * 1.02, sy: .16, sz: .16 };
+  }
+  if (role === 'headlights' || role === 'taillights') {
+    const side = slot === 0 ? -1 : 1;
+    const front = role === 'headlights' ? 1 : -1;
+    return { x: side * width * .3, y: wheelRadius + l.height * .28, z: front * l.length * .512, sx: .22, sy: .14, sz: .055 };
+  }
+  return { y: 0, sx: 0, sy: 0, sz: 0 };
+}
+
+function createPart(spec, material, agentCount, name) {
+  const repeats = spec.repeats || 1;
+  const mesh = createMesh(spec.geometry, material, agentCount * repeats, name);
+  return mesh ? { ...spec, mesh, repeats } : null;
+}
+
+function updateInstances(agents, graph, parts, kind, options = {}) {
+  const output = {
+    position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), baseQuaternion: new THREE.Quaternion(),
+    localQuaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), matrix: new THREE.Matrix4(),
+    yAxis: new THREE.Vector3(0, 1, 0), euler: new THREE.Euler()
+  };
+  const reference = options.reference;
+  const activeRatio = Number(options.activeRatio ?? 1);
+  const dt = Math.max(.016, Number(options.dt) || .1);
+  agents.forEach((agent, agentIndex) => {
+    const pose = agentPose(agent, graph);
+    if (!pose) return;
+    const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+    updateAgentVisibility(agent, distance, activeRatio, dt);
+    for (const part of parts) {
+      for (let slot = 0; slot < part.repeats; slot += 1) {
+        const instanceIndex = agentIndex * part.repeats + slot;
+        const transform = kind === 'pedestrian' ? pedestrianTransform(part.role, agent, slot) : vehicleTransform(part.role, agent, slot);
+        part.mesh.setMatrixAt(instanceIndex, localTransform(pose, transform, agent.visibility, output));
+        const color = part.colorKey ? agent[part.colorKey] : null;
+        if (color) part.mesh.setColorAt(instanceIndex, color);
+      }
+    }
+  });
+  parts.forEach((part) => {
+    part.mesh.instanceMatrix.needsUpdate = true;
+    if (part.mesh.instanceColor) part.mesh.instanceColor.needsUpdate = true;
+  });
+}
+
+export function createLivingWorldPopulation(options = {}) {
+  const tier = String(options.tier || 'balanced').toLowerCase();
+  const budget = POPULATION_BUDGET_BY_TIER[tier] || POPULATION_BUDGET_BY_TIER.balanced;
+  const pedestrianGraph = options.pedestrianGraph;
+  const trafficGraph = options.trafficGraph;
+  const random = typeof options.random === 'function' ? options.random : Math.random;
+  const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian');
+  const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle');
+  const group = new THREE.Group();
+  group.name = 'Living World Population';
+
+  const materials = {
+    outfit: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .86, metalness: .02, flatShading: true, vertexColors: true }),
+    skin: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, flatShading: true, vertexColors: true }),
+    cloth: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .92, metalness: .01, flatShading: true, vertexColors: true }),
+    hair: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .94, flatShading: true, vertexColors: true }),
+    gear: new THREE.MeshStandardMaterial({ color: 0x26343b, roughness: .88, metalness: .03, flatShading: true }),
+    vehicle: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .58, metalness: .2, flatShading: true, vertexColors: true }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x213640, roughness: .3, metalness: .28, flatShading: true }),
+    rubber: new THREE.MeshStandardMaterial({ color: 0x151819, roughness: .96, metalness: .01, flatShading: true }),
+    trim: new THREE.MeshStandardMaterial({ color: 0x3d4549, roughness: .74, metalness: .34, flatShading: true }),
+    headlight: new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffd37a, emissiveIntensity: .38, roughness: .28, flatShading: true }),
+    taillight: new THREE.MeshStandardMaterial({ color: 0xb72e2a, emissive: 0x87120f, emissiveIntensity: .42, roughness: .32, flatShading: true })
+  };
+  const pedestrianParts = [
+    createPart({ role: 'torso', geometry: new THREE.BoxGeometry(1, 1, 1), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Bodies'),
+    createPart({ role: 'head', geometry: new THREE.SphereGeometry(.5, 8, 6), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Heads'),
+    createPart({ role: 'hair', geometry: new THREE.SphereGeometry(.5, 8, 4), colorKey: 'hairColor' }, materials.hair, pedestrians.length, 'Living World Pedestrian Hair'),
+    createPart({ role: 'arms', repeats: 2, geometry: new THREE.CylinderGeometry(.5, .43, 1, 6), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Arms'),
+    createPart({ role: 'hands', repeats: 2, geometry: new THREE.SphereGeometry(.5, 6, 4), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Hands'),
+    createPart({ role: 'legs', repeats: 2, geometry: new THREE.CylinderGeometry(.48, .42, 1, 6), colorKey: 'secondaryColor' }, materials.cloth, pedestrians.length, 'Living World Pedestrian Legs'),
+    createPart({ role: 'shoes', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.gear, pedestrians.length, 'Living World Pedestrian Shoes'),
+    createPart({ role: 'gear', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.gear, pedestrians.length, 'Living World Pedestrian Gear')
+  ].filter(Boolean);
+  const vehicleParts = [
+    createPart({ role: 'body', geometry: createTaperedPrismGeometry(THREE, { widthBottom: 1, widthTop: .91, height: 1, length: 1, frontInset: .06, rearInset: .03 }), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Bodies'),
+    createPart({ role: 'cabin', geometry: createTaperedPrismGeometry(THREE, { widthBottom: 1, widthTop: .82, height: 1, length: 1, frontInset: .13, rearInset: .08 }), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Cabins'),
+    createPart({ role: 'glass', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.glass, vehicles.length, 'Living World Traffic Windows'),
+    createPart({ role: 'detail', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Body Details'),
+    createPart({ role: 'wheels', repeats: 4, geometry: new THREE.CylinderGeometry(1, 1, 1, 10) }, materials.rubber, vehicles.length, 'Living World Traffic Wheels'),
+    createPart({ role: 'bumpers', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.trim, vehicles.length, 'Living World Traffic Bumpers'),
+    createPart({ role: 'headlights', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.headlight, vehicles.length, 'Living World Traffic Headlights'),
+    createPart({ role: 'taillights', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.taillight, vehicles.length, 'Living World Traffic Taillights')
+  ].filter(Boolean);
+  [...pedestrianParts, ...vehicleParts].forEach((part) => group.add(part.mesh));
+  const pedestrianOutgoing = edgeLookup(pedestrianGraph);
+  const trafficOutgoing = edgeLookup(trafficGraph);
+  let accumulator = 0;
+  let tick = 0;
+  const referencePosition = () => options.getReferencePosition?.() || null;
+  const activeRatio = () => {
+    const phase = String(options.getTimePhase?.() || 'day');
+    return phase === 'night' ? .58 : phase === 'sunrise' || phase === 'sunset' ? .76 : 1;
+  };
+  updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
+  updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
+
+  return Object.freeze({
+    group,
+    diagnostics: Object.freeze({
+      tier,
+      pedestrians: pedestrians.length,
+      vehicles: vehicles.length,
+      drawCalls: pedestrianParts.length + vehicleParts.length,
+      simulationHz: 10,
+      visibilityPolicy: POPULATION_VISIBILITY_POLICY,
+      characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
+      vehicleCategories: Object.freeze([...new Set(vehicles.map((agent) => agent.variant.id))].sort())
+    }),
+    fixedUpdate(dt) {
+      accumulator += dt;
+      if (accumulator < .1) return;
+      const step = Math.min(.2, accumulator);
+      accumulator = 0;
+      tick += 1;
+      const reference = referencePosition();
+      advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, step, 'vehicle', { reference, tick });
+      const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph)).filter(Boolean);
+      advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, step, 'pedestrian', {
+        reference,
+        tick,
+        crossingBlocked: (edge) => {
+          const x = (edge.p1.x + edge.p2.x) * .5;
+          const z = (edge.p1.z + edge.p2.z) * .5;
+          return vehiclePoses.some((pose) => Math.hypot(pose.x - x, pose.z - z) < 9);
+        }
+      });
+      const ratio = activeRatio();
+      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference, activeRatio: ratio, dt: step });
+      updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', { reference, activeRatio: ratio, dt: step });
+    },
+    activeCounts() {
+      return Object.freeze({
+        pedestrians: pedestrians.filter((agent) => agent.visibility > .08).length,
+        vehicles: vehicles.filter((agent) => agent.visibility > .08).length,
+        entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
+      });
+    },
+    dispose() {
+      group.removeFromParent?.();
+      [...pedestrianParts, ...vehicleParts].forEach((part) => part.mesh.geometry?.dispose?.());
+      Object.values(materials).forEach((material) => material.dispose());
+    }
+  });
+}
+
+export { PEDESTRIAN_ARCHETYPES, POPULATION_BUDGET_BY_TIER, POPULATION_VISIBILITY_POLICY };

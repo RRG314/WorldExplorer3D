@@ -10,6 +10,7 @@ const ports = [4230, 4231, 4232, 4233];
 const browserName = process.env.MOBILE_BROWSER === 'webkit' ? 'webkit' : 'chromium';
 const browserType = browserName === 'webkit' ? webkit : chromium;
 const headed = process.env.MOBILE_HEADED === '1';
+const browserChannel = String(process.env.MOBILE_BROWSER_CHANNEL || '').trim();
 
 const devices = {
   iphone: {
@@ -248,7 +249,10 @@ async function main() {
   const hostedBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
   const server = hostedBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts: ports });
   const baseUrl = hostedBaseUrl || `http://${host}:${server.port}`;
-  const browser = await browserType.launch({ headless: !headed });
+  const browser = await browserType.launch({
+    headless: !headed,
+    ...(browserName === 'chromium' && browserChannel ? { channel: browserChannel } : {})
+  });
   const errors = [];
   try {
     console.log('[mobile-controls] iPhone title touch');

@@ -35,6 +35,15 @@
         ]
       },
       {
+        "source": "/app/**",
+        "headers": [
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(self), geolocation=(self), microphone=(), xr-spatial-tracking=(self)"
+          }
+        ]
+      },
+      {
         "source": "**/*.@(js|css)",
         "headers": [
           {
