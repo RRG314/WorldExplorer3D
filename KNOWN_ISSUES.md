@@ -4,11 +4,7 @@ Last reviewed: 2026-08-17 for version 4.3.0 release source. The exact immutable 
 
 ## Current Release Status
 
-Version 4.3.0 is approved to enter the immutable production release flow. Promotion is allowed only after:
-
-- the accepted changes are committed so an immutable candidate can be created and tied to an exact source identity;
-- a Firebase preview URL is available for the privileged operational-endpoint checks and final preview review;
-- the preview browser and operational-endpoint checks pass against that same artifact.
+Version 4.3.0 completed its immutable preview gate and is approved for production promotion. The production-configured candidate passed source/artifact identity, bundled browser boot, deployed visual inspection and the privileged operational endpoint check. Firestore rules and the seven new DeFlock/Discovery Functions were deployed before hosting promotion; existing parameterized billing/admin Functions were intentionally left untouched so their production configuration was not replaced.
 
 The Living/Editable World 2.02 GB heap high-water observation is accepted as a disclosed 4.3.0 risk, not marked fixed. The fresh title-release journey still proves that the loaded world is released rather than retained as a duplicate.
 

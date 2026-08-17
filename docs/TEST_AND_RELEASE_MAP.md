@@ -4,11 +4,9 @@ Status: authoritative verification/release inventory for version 4.3.0 release s
 
 ## 1. Current release verdict
 
-**Approved to enter the immutable production release flow.** Real installed-Chrome journeys, emulator-backed security/multiplayer tests, lifecycle checks, transport visuals and static audits pass. The previous unreachable-asset and Discovery-occlusion blockers are closed. Promotion still requires the release process itself to complete:
+**Approved for production promotion.** Real installed-Chrome journeys, emulator-backed security/multiplayer tests, lifecycle checks, transport visuals and static audits pass. The immutable 4.3.0 candidate was deployed to a Firebase preview channel, visually inspected, and passed the production operational-endpoint check. The previous unreachable-asset, Discovery-occlusion, candidate-identity and preview-endpoint blockers are closed.
 
-1. the working tree must be reviewed and committed before an immutable candidate can be created;
-2. privileged operational endpoints require the exact artifact on a Firebase preview URL;
-3. the 2.02 GB heap high-water observation remains a disclosed known risk; the 2026-08-17 deployment authorization accepts it for 4.3.0 while post-release memory optimization remains open.
+The 2.02 GB heap high-water observation remains a disclosed known risk; the 2026-08-17 deployment authorization accepts it for 4.3.0 while post-release memory optimization remains open.
 
 No Git commit, push, preview deployment or production promotion is part of this inventory work.
 
@@ -146,9 +144,10 @@ The following results were observed in the current working source before this re
 | planetary/ocean/session lifecycle | pass Moon/Earth/Mars/Space transitions, GEBCO bathymetry and 10 Space + 10 Ocean ownership cycles |
 | title memory release | pass; 689.5 MB loaded to 469.8 MB released, 1,020 geometries removed, no duplicate world on reload |
 | heavy Living/Editable World journey | functional assertions pass; 112 entrances, moving population, persisted suppression/restore and bounded 20 logical added draw calls; **2.02 GB heap high-water remains a manual gate** |
-| production artifact | build, verify and browser boot pass for `4.2.1+8410cdbf6e00.27bede825cea0080.production` |
+| production artifact | 4.3.0 clean-source production candidate build, identity verification and bundled browser boot pass; exact final identity is recorded in `dist/build-manifest.json` |
 | legacy bundled-Chromium matrices | inconclusive: fixed-world travel and editor-multiplayer harnesses stalled without a failing assertion; equivalent installed-Chrome focused journeys pass |
-| operational endpoints | not run; requires a deployed preview URL |
+| deployed preview | pass at Firebase channel `v4-3-0-59332cb`; production-configured globe/title shell visually inspected with zero captured errors |
+| operational endpoints | pass against the deployed preview; approved `adsb-lol` provider returned five observations |
 
 These are focused results, not a substitute for `release:verify` on the final candidate.
 
@@ -162,9 +161,9 @@ The 15 obsolete landing/gameplay files were removed from the working source and 
 
 The Discovery journey now verifies airborne behavior, visibility, a 0.241 m rendered City Pigeon and 1.513 m clearance, then completes successfully. Runtime telemetry records clearance from the same accepted/fallback surface used to place the companion.
 
-### REL-003 — Final-candidate memory evidence
+### REL-003 — Final-candidate memory evidence (accepted known risk)
 
-The project previously reported Chrome heap/resource use around 1.4 GB. The fresh title-release journey proves the loaded Earth world is released (689.5 MB to 469.8 MB and 1,020 geometries removed) and can be rebuilt without duplicate ownership. The heavier editable-world journey still reached a 2.02 GB reported heap high-water mark, so final-candidate measurement on installed Chrome/hardware remains required. Required evidence:
+The project previously reported Chrome heap/resource use around 1.4 GB. The fresh title-release journey proves the loaded Earth world is released (689.5 MB to 469.8 MB and 1,020 geometries removed) and can be rebuilt without duplicate ownership. The heavier editable-world journey still reached a 2.02 GB reported heap high-water mark. The user accepted this disclosed risk for 4.3.0 deployment; the following evidence remains required for post-release optimization:
 
 - title-only idle memory;
 - first Earth load peak and settled state;
@@ -178,9 +177,9 @@ The project previously reported Chrome heap/resource use around 1.4 GB. The fres
 
 Discovery targets now use the shared accepted walk/terrain surface authority and reject building collisions. The installed-Chrome journey collapses the Journal for play-scale captures and human review confirms the field subject, dog and airborne bird are fully framed without the earlier foreground building occlusion.
 
-### REL-005 — Preview operational endpoints
+### REL-005 — Preview operational endpoints (closed)
 
-Privileged production rewrites and endpoint behavior cannot be certified from localhost. After the accepted work is committed and the exact immutable artifact is deployed to a Firebase preview channel, run `test:operational-endpoints` with that preview base URL and retain the report with the candidate evidence.
+The production-configured immutable candidate was deployed to Firebase preview channel `v4-3-0-59332cb`. `test:operational-endpoints` passed through its hosting rewrite and returned five live observations from the approved `adsb-lol` provider.
 
 ### REL-006 — Legacy bundled-browser harness reliability
 
