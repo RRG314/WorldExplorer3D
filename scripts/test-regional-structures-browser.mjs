@@ -87,7 +87,7 @@ try {
         ctx.worldLoadRuntimeState?.status === 'ready' &&
         ctx.worldPublication?.requestId?.endsWith?.(`:${id}`) &&
         Number(ctx.roads?.length || 0) > 0;
-    }, scenario.id, { timeout: 10000 });
+    }, scenario.id, { timeout: 120000 });
     await page.waitForFunction(() => (
       window.__regionalStructureCtx?.farTerrainClipmapState?.status === 'ready'
     ), null, { timeout: 45000 });

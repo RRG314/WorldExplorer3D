@@ -420,10 +420,16 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       appCtx.worldPublication?.sequence !== publication.sequence
     ) return null;
     const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=1');
-    return startLivingWorldRuntime(appCtx, {
+    const livingWorld = startLivingWorldRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
     });
+    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=1');
+    const worldDiscovery = await startWorldDiscoveryRuntime(appCtx, {
+      snapshot: publication,
+      request: worldSession?.request
+    });
+    return { livingWorld, worldDiscovery };
   }, { timeout: 900 });
   markFirstPlayReady({
     environment: 'earth',

@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=48";
+} from "../structure-semantics.js?v=49";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,

@@ -44,13 +44,13 @@ const VIEW_META = {
     title: 'Site Content',
     subtitle: 'Manage landing-page messaging with draft, preview, and publish flow instead of editing file copy by hand.'
   },
-  diagnostics: {
-    title: 'Layer Diagnostics',
-    subtitle: 'Operational readiness indicators for overlays, featured rooms, moderation notifications, and published content.'
+  analytics: {
+    title: 'Product Analytics',
+    subtitle: 'Engagement, retention, onboarding, and discovery signals in the linked analytics property.'
   },
-  operations: {
-    title: 'Operations Settings',
-    subtitle: 'Read-only platform operations state, admin boundaries, and moderation infrastructure status.'
+  system: {
+    title: 'System & Readiness',
+    subtitle: 'Operational readiness, permission boundaries, service configuration, and safe diagnostics in one place.'
   },
   activity: {
     title: 'Audit Activity',
@@ -1246,8 +1246,10 @@ function renderAllVisible() {
     renderSiteContentForm();
     renderLandingContentPreview(refs.siteContentPreview, state.siteContentDraft || state.siteContent?.draft || {});
   }
-  if (state.currentView === 'diagnostics') renderDiagnostics();
-  if (state.currentView === 'operations') renderOperations();
+  if (state.currentView === 'system') {
+    renderDiagnostics();
+    renderOperations();
+  }
   if (state.currentView === 'activity') {
     renderActivityFilters();
     renderActivity();
@@ -1363,14 +1365,11 @@ async function ensureViewLoaded(view) {
     await loadSiteContent();
     return;
   }
-  if (view === 'diagnostics') {
+  if (view === 'analytics') return;
+  if (view === 'system') {
     if (!state.dashboardOverview || !state.operations) {
       await loadOverviewBundle();
     }
-    return;
-  }
-  if (view === 'operations') {
-    await loadOperations();
     return;
   }
   if (view === 'activity') {
@@ -1397,7 +1396,9 @@ async function refreshCurrentView() {
 }
 
 function setView(view, { pushHistory = true } = {}) {
-  const next = VIEW_META[view] ? view : 'overview';
+  const legacyAliases = { diagnostics: 'system', operations: 'system' };
+  const requested = legacyAliases[view] || view;
+  const next = VIEW_META[requested] ? requested : 'overview';
   state.currentView = next;
   if (pushHistory) {
     const url = new URL(window.location.href);
@@ -1913,7 +1914,8 @@ window.addEventListener('popstate', () => {
 });
 
 const initialUrl = new URL(window.location.href);
-state.currentView = VIEW_META[initialUrl.searchParams.get('view')] ? initialUrl.searchParams.get('view') : 'overview';
+const initialView = initialUrl.searchParams.get('view') || 'overview';
+state.currentView = ({ diagnostics: 'system', operations: 'system' })[initialView] || (VIEW_META[initialView] ? initialView : 'overview');
 renderAllVisible();
 observeAuth((user) => {
   handleAuthUser(user);

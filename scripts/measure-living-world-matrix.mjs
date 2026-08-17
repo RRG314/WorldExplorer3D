@@ -36,15 +36,11 @@ async function sampleMode(mode, frameCount = 75) {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const facades = ctx.earthSceneRoot?.getObjectByName?.('Living World Facade Depth');
     const population = ctx.earthSceneRoot?.getObjectByName?.('Living World Population');
-    const pedestrianBodies = population?.getObjectByName?.('Living World Pedestrian Bodies');
-    const pedestrianHeads = population?.getObjectByName?.('Living World Pedestrian Heads');
-    const trafficBodies = population?.getObjectByName?.('Living World Traffic Bodies');
-    const trafficCabins = population?.getObjectByName?.('Living World Traffic Cabins');
+    const pedestrianParts = population?.children?.filter?.((child) => child.name.startsWith('Living World Pedestrian')) || [];
+    const trafficParts = population?.children?.filter?.((child) => child.name.startsWith('Living World Traffic')) || [];
     if (facades) facades.visible = mode.facades;
-    if (pedestrianBodies) pedestrianBodies.visible = mode.pedestrians;
-    if (pedestrianHeads) pedestrianHeads.visible = mode.pedestrians;
-    if (trafficBodies) trafficBodies.visible = mode.traffic;
-    if (trafficCabins) trafficCabins.visible = mode.traffic;
+    pedestrianParts.forEach((part) => { part.visible = mode.pedestrians; });
+    trafficParts.forEach((part) => { part.visible = mode.traffic; });
     const frames = [];
     const maxima = { calls: 0, triangles: 0 };
     await new Promise((resolve) => {

@@ -42,6 +42,16 @@ function onKey(code, event) {
     return;
   }
 
+  if (code === 'KeyX' && !appCtx.spaceFlight?.active) {
+    if (event?.repeat) return;
+    if (typeof appCtx.handleWorldDiscoveryQuickAction === 'function') {
+      Promise.resolve(appCtx.handleWorldDiscoveryQuickAction()).catch((err) => {
+        console.warn('[world-discovery] Quick action failed:', err);
+      });
+    }
+    return;
+  }
+
   // Primary travel mode cycle (F key)
   if (code === 'KeyF') {
     if (event?.repeat) return;
@@ -93,6 +103,7 @@ function onKey(code, event) {
 
   // Performance overlay toggle (F8)
   if (isPerfToggleKey(code)) {
+    if (!appCtx.developerDiagnosticsEnabled) return;
     if (event?.repeat) return;
     const nextEnabled = !(typeof appCtx.getPerfOverlayEnabled === 'function' ?
     appCtx.getPerfOverlayEnabled() :
@@ -112,6 +123,7 @@ function onKey(code, event) {
 
   // Debug overlay toggle (Backtick key)
   if (isDebugToggleKey(code, event)) {
+    if (!appCtx.developerDiagnosticsEnabled) return;
     if (event?.repeat) return;
     window._debugMode = !window._debugMode;
     const overlay = document.getElementById('debugOverlay');

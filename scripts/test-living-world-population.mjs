@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { POPULATION_BUDGET_BY_TIER } from '../app/js/living-world/population.js';
+import { PEDESTRIAN_ARCHETYPES, POPULATION_BUDGET_BY_TIER, POPULATION_VISIBILITY_POLICY } from '../app/js/living-world/population.js';
 import {
   NPC_VEHICLE_CATALOG,
   selectNpcVehicleVariant
@@ -12,6 +12,10 @@ assert.deepEqual(NPC_VEHICLE_CATALOG.map((entry) => entry.id), [
 assert.ok(NPC_VEHICLE_CATALOG.every((entry) => entry.width > 0 && entry.length > 0 && entry.weight > 0));
 assert.ok(POPULATION_BUDGET_BY_TIER.low.vehicles < POPULATION_BUDGET_BY_TIER.balanced.vehicles);
 assert.ok(POPULATION_BUDGET_BY_TIER.performance.pedestrians < POPULATION_BUDGET_BY_TIER.quality.pedestrians);
+assert.ok(PEDESTRIAN_ARCHETYPES.length >= 5, 'ambient character variety regressed');
+assert.ok(POPULATION_VISIBILITY_POLICY.exitDistance > POPULATION_VISIBILITY_POLICY.enterDistance, 'population visibility needs distance hysteresis');
+assert.ok(POPULATION_VISIBILITY_POLICY.fadeInPerSecond > 0 && POPULATION_VISIBILITY_POLICY.fadeOutPerSecond > 0);
+assert.ok(NPC_VEHICLE_CATALOG.every((entry) => entry.bodyStyle && entry.wheelRadius > 0), 'vehicle visual profiles are incomplete');
 
 let state = 123456789;
 const random = () => {
@@ -29,12 +33,15 @@ assert.equal(majorRoadVariants.has('city_bus'), true, 'major-road catalog never 
 assert.equal(localRoadVariants.size, 8, 'local-road vehicle variety regressed');
 
 const source = fs.readFileSync(new URL('../app/js/living-world/population.js', import.meta.url), 'utf8');
-assert.match(source, /accumulator < 0\.1/, 'population simulation lost its 10 Hz cap');
+assert.match(source, /accumulator < \.1/, 'population simulation lost its 10 Hz cap');
 assert.match(source, /distance > 900 \? 8 : distance > 480 \? 4 : distance > 220 \? 2 : 1/, 'distance-aware update LOD is missing');
 assert.match(source, /crossingBlocked/, 'pedestrian crossing occupancy check is missing');
 assert.match(source, /leader\.progress - agent\.progress < 7\.5/, 'vehicle spacing check is missing');
 assert.match(source, /virtualizedEntries/, 'building entry virtualization is missing');
-assert.match(source, /phase === 'night' \? 0\.58/, 'time-of-day population scaling is missing');
+assert.match(source, /phase === 'night' \? \.58/, 'time-of-day population scaling is missing');
+assert.match(source, /frustumCulled = false/, 'moving instance bounds can still pop traffic unexpectedly');
+assert.match(source, /Living World Pedestrian Arms/, 'articulated pedestrian presentation is missing');
+assert.match(source, /Living World Traffic Wheels/, 'complete vehicle presentation is missing');
 
 console.log(JSON.stringify({
   ok: true,

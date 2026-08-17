@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>World Explorer Admin Dashboard</title>
+  <title>Administration · World Explorer Account Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
@@ -29,6 +29,9 @@
       --radius-lg: 18px;
       --radius-md: 14px;
       --sidebar-width: 286px;
+      --radius-xl: 2px;
+      --radius-lg: 2px;
+      --radius-md: 2px;
     }
 
     * { box-sizing: border-box; }
@@ -966,20 +969,54 @@
         align-items: flex-start;
       }
     }
+
+    /* Match the in-game V4 interface instead of presenting a second visual product. */
+    :root {
+      --bg: #05090d;
+      --bg-2: #0b151e;
+      --panel: rgba(5, 12, 18, .97);
+      --panel-2: #071018;
+      --panel-3: #0b151e;
+      --line: rgba(157, 174, 186, .28);
+      --line-strong: #53606a;
+      --ink: #f4f7f9;
+      --muted: #9aa8b2;
+      --accent: #2d7dff;
+      --accent-2: #f4b942;
+      --ok: #35d272;
+      --danger: #ef5b5b;
+    }
+    body { background: var(--bg); font-family: Inter, 'Barlow', system-ui, sans-serif; }
+    body::before { opacity: .22; }
+    .brand-title, .topbar h1, .view-head h2 { font-family: Orbitron, 'Chakra Petch', sans-serif; text-transform: uppercase; }
+    .nav-btn { border-radius: 2px; }
+    .nav-link { text-decoration: none; }
+    .primary-btn, .secondary-btn, .danger-btn, input, textarea, select { border-radius: 2px; }
+    .analytics-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; }
+    .analytics-contract-grid { margin-top: 18px; }
+    .analytics-contract-grid .ops-card strong { display: block; margin: 7px 0; color: var(--ink); font: 600 16px/1.2 Orbitron, sans-serif; }
   </style>
 </head>
 <body>
   <div class="shell">
     <aside class="sidebar">
       <div class="brand-block">
-        <div class="brand-eyebrow">World Explorer</div>
-        <h1 class="brand-title">Admin<br>Dashboard</h1>
-        <p class="brand-copy">A dedicated moderation and operations console for editor workflows, rooms, users, and public platform messaging.</p>
+        <div class="brand-eyebrow">World Explorer · Account Center</div>
+        <h1 class="brand-title">Administration</h1>
+        <p class="brand-copy">One permission-gated workspace for people, safety, publishing, analytics, and platform governance.</p>
       </div>
 
       <div class="nav-scroll">
         <section class="nav-group">
-          <div class="nav-label">Overview</div>
+          <div class="nav-label">Account</div>
+          <a class="nav-btn nav-link" href="./">
+            <div><strong>My Account</strong><span>Profile, friends, support, security</span></div>
+            <span class="nav-badge">Me</span>
+          </a>
+        </section>
+
+        <section class="nav-group">
+          <div class="nav-label">Administration</div>
           <button type="button" class="nav-btn" data-view="overview">
             <div><strong>Dashboard</strong><span>Summary, alerts, and shortcuts</span></div>
             <span class="nav-badge">Home</span>
@@ -987,19 +1024,11 @@
         </section>
 
         <section class="nav-group">
-          <div class="nav-label">Content & Review</div>
+          <div class="nav-label">Safety & Community</div>
           <button type="button" class="nav-btn" data-view="moderation">
-            <div><strong>Editor Moderation</strong><span>Overlay and legacy review queues</span></div>
+            <div><strong>Moderation</strong><span>Overlay and contribution queues</span></div>
             <span class="nav-badge" id="navModerationBadge">0</span>
           </button>
-          <button type="button" class="nav-btn" data-view="content">
-            <div><strong>Site Content</strong><span>Landing-page draft and publish flow</span></div>
-            <span class="nav-badge" id="navContentBadge">Draft</span>
-          </button>
-        </section>
-
-        <section class="nav-group">
-          <div class="nav-label">Community</div>
           <button type="button" class="nav-btn" data-view="users">
             <div><strong>Users</strong><span>Accounts, roles, and submissions</span></div>
             <span class="nav-badge" id="navUsersBadge">0</span>
@@ -1011,24 +1040,32 @@
         </section>
 
         <section class="nav-group">
-          <div class="nav-label">Platform</div>
-          <button type="button" class="nav-btn" data-view="diagnostics">
-            <div><strong>Diagnostics</strong><span>Live layer and readiness indicators</span></div>
+          <div class="nav-label">Publishing & Insights</div>
+          <button type="button" class="nav-btn" data-view="content">
+            <div><strong>Site Content</strong><span>Draft, preview, and publish</span></div>
+            <span class="nav-badge" id="navContentBadge">Draft</span>
+          </button>
+          <button type="button" class="nav-btn" data-view="analytics">
+            <div><strong>Product Analytics</strong><span>Engagement and onboarding funnel</span></div>
+            <span class="nav-badge">GA4</span>
+          </button>
+        </section>
+
+        <section class="nav-group">
+          <div class="nav-label">Governance</div>
+          <button type="button" class="nav-btn" data-view="system">
+            <div><strong>System</strong><span>Readiness and configuration</span></div>
             <span class="nav-badge">Ops</span>
           </button>
-          <button type="button" class="nav-btn" data-view="operations">
-            <div><strong>Operations</strong><span>Settings and safe platform controls</span></div>
-            <span class="nav-badge">Cfg</span>
-          </button>
           <button type="button" class="nav-btn" data-view="activity">
-            <div><strong>Activity</strong><span>Audit trail and admin action history</span></div>
+            <div><strong>Audit Log</strong><span>Administrative action history</span></div>
             <span class="nav-badge" id="navActivityBadge">0</span>
           </button>
         </section>
       </div>
 
       <div class="sidebar-foot">
-        Admin tools are separated from the normal account page to keep review, operations, and multiplayer management cleanly scoped.
+        Access is verified on every server request. Navigation visibility never grants a role or permission.
       </div>
     </aside>
 
@@ -1163,7 +1200,43 @@
           </div>
         </section>
 
-        <section class="view-panel" data-view-panel="diagnostics" hidden>
+        <section class="view-panel" data-view-panel="analytics" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Product Analytics</h2>
+              <p>Retention, engagement, and onboarding are measured in the linked Google Analytics property. Player coordinates and free-form text are not included in the product event contract.</p>
+            </div>
+            <a class="primary-btn analytics-link" href="https://analytics.google.com/analytics/web/#/p524797711/reports/dashboard?r=firebase-overview" target="_blank" rel="noopener noreferrer">Open Live Analytics</a>
+          </div>
+          <div class="ops-grid analytics-contract-grid">
+            <article class="ops-card">
+              <span class="label">Core engagement</span>
+              <strong>World sessions</strong>
+              <p>Runtime ready, world start/end, duration, travel-mode changes, environment changes, and multiplayer state.</p>
+            </article>
+            <article class="ops-card">
+              <span class="label">Onboarding funnel</span>
+              <strong>Begin → steps → complete</strong>
+              <p>GA4 recommended tutorial events plus bounded step outcomes make completion and abandonment measurable.</p>
+            </article>
+            <article class="ops-card">
+              <span class="label">Discovery loop</span>
+              <strong>Start → record → return</strong>
+              <p>Activity, catalog family, discipline, context band, and result only—never exact player location.</p>
+            </article>
+            <article class="ops-card">
+              <span class="label">Validation</span>
+              <strong>Realtime / DebugView</strong>
+              <p>Use Realtime or DebugView after a candidate build; normal dashboard reporting is delayed and aggregated.</p>
+            </article>
+          </div>
+          <div class="alert-card" data-severity="warning">
+            <strong>Interpretation rule</strong>
+            <p>Use cohorts and funnels, not raw event counts, when deciding whether onboarding improved return behavior. Compare equivalent release windows and traffic sources.</p>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view-panel="system" hidden>
           <div class="view-head">
             <div>
               <h2>Layer and Readiness Diagnostics</h2>
@@ -1173,7 +1246,7 @@
           <div id="diagnosticsGrid" class="ops-grid"></div>
         </section>
 
-        <section class="view-panel" data-view-panel="operations" hidden>
+        <section class="view-panel" data-view-panel="system" hidden>
           <div class="view-head">
             <div>
               <h2>Operations Settings</h2>

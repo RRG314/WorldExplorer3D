@@ -1,12 +1,53 @@
 # World Explorer 3D — Complete System Inventory and Reconstruction Guide
 
-Status: describes the version 4.2.1 source tree and runtime architecture.
+Status: **authoritative release-source inventory** for version 4.3.0 as inspected on 2026-08-17.
+
+Source baseline: branch `steven/living-editable-world`, commit `8410cdbf6e00038eefd0d9bb7e652d2abd8dabce`, plus the explicitly inventoried working-tree implementation. The working tree is not a release artifact: it currently contains 56 modified tracked files and 29 untracked paths. Any later commit or deployment must record a new baseline here.
 
 Audience: developers, technical partners, maintainers, and non-developers who need a precise explanation of what the application does and how its parts fit together.
 
 This is the system blueprint for World Explorer 3D. It inventories the user-facing product, browser runtime, world-generation pipeline, movement and gameplay systems, online services, persistence, security model, build and release process, and important design constraints. A developer should use it together with the source code, data licenses, and tests. It is intentionally more detailed than the README.
 
 The document is sufficient to understand the systems that must exist in a compatible reconstruction. Exact geometry algorithms, visual assets, tuning values, provider schemas, and security validation still need to be implemented from source or independently engineered; a prose document cannot substitute for those implementation details.
+
+## 0. Audit baseline and document authority
+
+This inventory was derived from the live source, HTML shells, Firebase configuration and rules, package scripts, workflows, assets, and automated tests. It does not treat older planning documents as proof that a feature exists.
+
+| Baseline fact | Current value |
+| --- | --- |
+| Product version | 4.3.0 |
+| Git baseline | `8410cdbf6e00038eefd0d9bb7e652d2abd8dabce` |
+| Tracked files | 955 |
+| Browser modules under `app/js` | 506 |
+| Automated test files | 138 |
+| Script files | 180 |
+| Application/account/functions source size | about 145,556 lines |
+| Test/tooling source size | about 41,022 lines |
+| Primary game shell | `app/index.html` |
+| Production hosting root | generated `dist/`, not the source tree |
+
+Status labels used in the capability tables are intentionally strict:
+
+- **Implemented and user-accessible** — a current UI or direct player action reaches working runtime code.
+- **Implemented but hidden/internal** — working infrastructure or diagnostics without a normal player entry point.
+- **Partial** — meaningful implementation exists, but coverage, integration, evidence, or product completeness is limited.
+- **Placeholder/scaffold** — an entry point or contract exists but does not yet provide the full stated experience.
+- **Experimental** — intentionally limited, device-dependent, speculative, or R&D-grade behavior.
+- **Deprecated/legacy** — retained for compatibility, migration, or history; not the current design authority.
+- **Planned only** — described in planning material but not implemented in the inspected runtime.
+- **Unknown** — source evidence was insufficient to classify safely.
+
+The canonical document set is:
+
+1. `docs/SYSTEM_INVENTORY.md` — whole-product system and subsystem catalog.
+2. `docs/ARCHITECTURE_MAP.md` — runtime ownership, environment, world-load, map, and dependency diagrams.
+3. `docs/DATA_AND_PROVENANCE.md` — provider, truth-class, generated-content, asset, and attribution map.
+4. `docs/PERSISTENCE_AND_TRUST.md` — browser storage, Firestore, authentication, rules, Cloud Functions, and deletion boundaries.
+5. `docs/PRODUCT_CAPABILITIES.md` — player-facing capability and maturity matrix.
+6. `docs/TEST_AND_RELEASE_MAP.md` — test ownership, production gates, artifact identity, blockers, and release procedure.
+
+Focused implementation reports such as `docs/EXPLORER_PLATFORM_IMPLEMENTATION_REPORT.md` remain component evidence. They do not replace this whole-system inventory.
 
 ## 1. Product definition
 
@@ -464,6 +505,40 @@ The activity platform contains:
 - activity runtime and completion storage;
 - creator profiles;
 - multiplayer activity definitions and shared activity state.
+
+### 11.7 World Discovery, field interaction, and progression
+
+World Discovery is a location-contextual Explorer layer over the fixed Earth world. It is not a second world loader and does not make extra provider requests while the player moves. `app/js/discovery/environment-context.js` compiles bounded habitat/context cells from the already-published world; pacing then creates deterministic encounter and activity slots from that context.
+
+The current user-accessible loop is:
+
+1. Open the Field Journal from Explore.
+2. Choose a contextual activity or tool.
+3. Follow a compact in-world signal or subject presentation.
+4. Classify, excavate, photograph, inspect, or otherwise complete the activity.
+5. Project the result to the Journal and Field Guide.
+6. Add only acquired virtual objects to Collection.
+7. Award Explorer specialty/rank progress for new identification or new-region evidence.
+
+Implemented subsystems include the detector/refinement/excavation state machine, held field tools, geology and natural-history specimens, contextual wildlife presentation, field photography, observation evidence, journal filtering, Field Guide identification records, virtual Collection ownership, goals, Explorer rank/specialties, tool entitlement/progression, anonymous IndexedDB profiles, authenticated trusted claims, server-validated trading, telemetry events, and tutorials. The generated encounter is explicitly procedural; a licensed reference image is identification context and is not evidence that a real animal or object occupies the selected coordinate.
+
+The companion catalog contains multiple dogs, cats, birds, and a fox. Each catalog entry owns its size class and world/AR scale. Ground companions follow near the walker; bird companions use a bounded airborne follower behavior. Companion state is separate from real wildlife observation state.
+
+### 11.8 Augmented Reality platform
+
+AR is a lazily loaded presentation service, not a separate game world. It supports three current experience types: owned companion viewing, recorded tabletop specimen viewing, and a habitat-gated virtual waterfowl photo challenge. Eligibility is Earth-only and blocks moving vehicles or fast Live GPS movement.
+
+Capability levels are selected at runtime:
+
+- WebXR immersive AR with local-floor placement and optional hit test/anchors where supported;
+- camera overlay with device-local video and screen-relative placement;
+- interactive 3D fallback without camera access.
+
+Camera permission is requested only after an explanatory preview. Audio is never requested. Frames are not uploaded or stored by the AR runtime. Exiting stops media tracks, XR animation, the auxiliary renderer, listeners, and presentation objects. Detector sweeps, portal-scale AR, and multiplayer spectator AR are explicitly deferred rather than implied as complete.
+
+### 11.9 Jobs, service activities, and coherence boundary
+
+Delivery, virtual search-and-rescue, urban survey, farm plot, forest survey, camp expedition, drone survey, weather observation, astronomy observation, treasure clue, virtual archaeology, forage, beachcomb, fossil, sonar, and dive activities exist in the contextual activity catalog. A catalog record makes an activity eligible; it does not by itself mean every activity has a unique deep minigame. Current deep interaction is strongest for detector finds, field inspection/photography, fishing, DeFlock, and the established mission plugins. The other catalog activities are **Partial** and use the shared field-session interaction pattern.
 
 ## 12. Interiors and editable world content
 
@@ -958,3 +1033,58 @@ For a new developer, the recommended reading path is:
 8. `scripts/hosting-artifact.mjs`, verification runners, and release workflows.
 
 This path follows actual runtime ownership: boot, lifecycle, Earth publication, visible world, player systems, shared services, then delivery.
+
+## 26. Whole-system status register
+
+| System | Current status | Evidence/qualification |
+| --- | --- | --- |
+| Public landing site | Implemented and user-accessible | Current responsive landing shell and current gameplay media; server-published copy is optional. |
+| Fixed Earth world | Implemented and user-accessible | Atomic load/session/snapshot pipeline with mapped terrestrial, open-ocean, and polar domains. |
+| Terrain and accepted ground | Implemented and user-accessible | Multiple ground authorities and explicit fallback contracts; global precision varies. |
+| Roads, bridges, ramps, tunnels | Implemented and user-accessible | Compiler, ownership, collision, camera, regional context, and browser journeys exist; provider coverage still varies. |
+| Buildings, landmarks, hydrology, vegetation | Implemented and user-accessible | Mapped plus explicitly inferred/generated presentation. |
+| Living World traffic and pedestrians | Implemented and user-accessible | Derived from the published world with bounded population budgets; visual variety is catalog-limited. |
+| Walking, driving, drone, plane, boat | Implemented and user-accessible | Normalized control and surface contracts. |
+| Moon | Implemented and user-accessible | Apollo 11/Mare Tranquillitatis destination with astronaut/rover traversal. |
+| Mars | Implemented and user-accessible | Mars destination with terrain, atmosphere, astronaut/rover traversal. |
+| Space flight and solar system | Implemented and user-accessible | Separate lazy renderer, travel/landing, orbital catalog, maps and information. |
+| Deep space/universe | Experimental | Navigable catalog and effects; transformed scale and speculative wormhole gameplay. |
+| Underwater Ocean | Implemented and user-accessible | Separate lazy scene, submarine, bathymetry, reef/fish/shark/HUD; ecosystem and physics are modeled. |
+| Earth surface boating and fishing | Implemented and user-accessible | Water-owned travel and fishing loop. |
+| Maps | Implemented and user-accessible | Globe selector, minimap, large Earth map, Live Earth globe, Ocean HUD/sonar, Moon and solar/deep-space maps. |
+| Live Earth | Partial | Multiple observed/modeled/reference feeds; provider availability and freshness vary; no live AIS claim. |
+| Live GPS Explore | Implemented and user-accessible | Foreground geolocation companion with filtering, bounds, consent and recenter policy. |
+| World Discovery | Implemented and user-accessible | Contextual finds, wildlife/geology, tools, Journal, Guide, Collection, progression and companions. |
+| AR | Experimental | Working capability ladder and three experience types; device support varies and deferred modes remain explicit. |
+| Core mission plugins | Implemented and user-accessible | Free, trial, checkpoint, Paint Town, Police, Flower, DeFlock, Live GPS. |
+| Long-tail contextual activities/jobs | Partial | Catalog, eligibility and shared interaction exist; many do not have unique deep mechanics. |
+| Interiors | Partial | Mapped/generated layouts and lifecycle exist; not every building is enterable and generated layouts are not factual. |
+| Block builder | Implemented and user-accessible | Local and room-shared bounded pieces. |
+| Edit This World | Implemented and user-accessible | Local semantic deltas and room-scoped shared modifications; source data remains immutable. |
+| Moderated public overlays | Implemented and user-accessible | Draft, submit, review, publish and public rendering paths. |
+| Multiplayer/social/chat | Implemented and user-accessible | Firebase-dependent bounded rooms; no continuous MMO server. |
+| Account and billing | Implemented and user-accessible | Auth, profile, plans/trials, Stripe checkout/portal/receipts, deletion. |
+| Admin operations | Implemented and user-accessible for authorized admins | Consolidated dashboard for overview, moderation, users, rooms, content, analytics, system and activity. |
+| Analytics | Partial | Firebase Analytics and product events exist; meaningful reports require configured production data/consent context. |
+| Debug/performance diagnostics | Implemented but hidden/internal | Startup/runtime/provider/frame/memory evidence; production UI is gated and debugging does not grant trust. |
+
+## 27. Current issue register
+
+| ID | Severity | State | Finding | Release effect |
+| --- | --- | --- | --- | --- |
+| INV-001 | Blocking | Closed 2026-08-17 | The 15 unreachable legacy landing/gameplay files were removed from the working source and retained in a recoverable Codex archive. `audit:assets` now passes all 79 reachable assets and 27 dynamic PBR assets. | The strict asset graph is green; restoration requires intentionally adding a current reference rather than weakening the audit. |
+| INV-002 | Major | Closed 2026-08-17 | The installed-Chrome World Discovery journey verifies a 0.241 m City Pigeon model at 1.513 m clearance and completes detector, field, companion, AR fallback and mobile assertions. | Contract, browser and visual evidence are green. |
+| INV-003 | Major | Open manual acceptance | A fresh Chrome title-release journey drops heap from 689.5 MB loaded to 469.8 MB released and removes 1,020 geometries, then reloads without duplicate ownership. The heavier Living/Editable World edit-and-reload journey still records a 2.02 GB heap high-water mark. | The retained-world regression is cleared, but target-device Chrome review and an explicit memory acceptance decision remain required before production promotion. |
+| INV-004 | Moderate | Known limitation | Several contextual activity catalog entries share generic field-session mechanics rather than unique minigames. | Do not market every catalog record as a separate complete game. |
+| INV-005 | Moderate | Known limitation | Provider-backed coverage, truth freshness and availability vary globally. | UI and release notes must preserve fallback/provenance wording. |
+| INV-006 | Moderate | Historical documentation | Architecture/R&D and preimplementation audits contain intentionally stale gap findings. | The six canonical documents listed in section 0 override those papers for current status. |
+| INV-007 | Blocking visual acceptance | Closed 2026-08-17 | Discovery target placement now uses the shared walk/terrain surface sampler and rejects building collisions. The journey collapses the Journal and visibly frames the character with ground and airborne companions; dog, bird and field-subject captures were human-reviewed. | The earlier occlusion and unproven-scale blocker is resolved and guarded in the installed-Chrome journey. |
+| INV-008 | Blocking release gate | Open | `test:operational-endpoints` requires a deployed preview base URL; localhost cannot prove privileged production rewrites and endpoint behavior. | Create the immutable candidate, deploy that exact artifact to a preview channel, then run the endpoint and preview checks before promotion. |
+| INV-009 | Moderate test infrastructure | Open | The legacy bundled-Chromium `test:fixed-world-travel-browser` and `test:editor-multiplayer` harnesses stalled without a terminal assertion under SwiftShader. Installed-Chrome travel, lifecycle, rules and two-client multiplayer journeys pass. | Do not count the stalled scripts as evidence; bound or migrate them while retaining the installed-Chrome coverage. |
+| INV-010 | Blocking release process | Open | The working tree contains the accepted integration work and cannot produce an immutable candidate until it is reviewed and committed. | User testing may proceed locally; commit, candidate creation, release evidence and preview promotion remain separate authorized steps. |
+
+## 28. Documentation authority and change rule
+
+When source and prose disagree, the tested current source wins and this document must be corrected. A feature plan is never implementation evidence. A passing model/unit test is not visual evidence. A screenshot is not persistence or security evidence. A deployment is not production-ready merely because it boots.
+
+Any material change to environment ownership, world layers, map surfaces, persistence paths, rules/functions, provider truth, or release gates must update the corresponding canonical document in the same change. Component handoffs and the regression ledger may add history, but they must link back to the canonical owner rather than creating a competing inventory.

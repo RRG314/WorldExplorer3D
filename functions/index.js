@@ -13,6 +13,7 @@ const {
 } = require('./creator-profile');
 const { buildOverlayExports } = require('./overlay');
 const { buildGeospatialExports } = require('./geospatial');
+const { buildDiscoveryExports } = require('./discovery');
 const {
   claimImmutableDeFlockState,
   isMappedCameraTags,
@@ -762,6 +763,7 @@ async function deleteUserData(uid) {
 
   const userRef = db.collection('users').doc(uid);
   const creatorProfileRef = db.collection(CREATOR_PROFILES_COLLECTION).doc(uid);
+  const explorerProfileRef = db.collection('explorerProfiles').doc(uid);
 
   const ownedRoomsSnap = await db.collection('rooms').where('ownerUid', '==', uid).get();
   for (const roomDoc of ownedRoomsSnap.docs) {
@@ -793,6 +795,13 @@ async function deleteUserData(uid) {
     await userRef.delete().catch(() => {});
   }
   await creatorProfileRef.delete().catch(() => {});
+  if (db && typeof db.recursiveDelete === 'function') {
+    await db.recursiveDelete(explorerProfileRef).catch(() => {});
+  } else {
+    await deleteDocsByQuery(explorerProfileRef.collection('items'), 200, 'explorerProfiles/{uid}/items');
+    await deleteDocsByQuery(explorerProfileRef.collection('claims'), 200, 'explorerProfiles/{uid}/claims');
+    await explorerProfileRef.delete().catch(() => {});
+  }
 }
 
 function timestampToMillis(value) {
@@ -1976,4 +1985,12 @@ Object.assign(exports, buildAdminDashboardExports({
 Object.assign(exports, buildGeospatialExports({
   functions,
   setCors
+}));
+
+Object.assign(exports, buildDiscoveryExports({
+  functions,
+  setCors,
+  verifyAuth,
+  db,
+  admin
 }));

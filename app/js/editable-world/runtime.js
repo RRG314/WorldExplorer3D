@@ -103,6 +103,34 @@ function commit(appCtx, operation) {
   return result;
 }
 
+export function placeDiscoveryWorldObject(appCtx, input = {}) {
+  if (sharedState.enabled) {
+    return Object.freeze({ committed: false, reason: 'use-room-editing-tools' });
+  }
+  const position = input.position || actorPosition(appCtx) || {};
+  const x = Number(position.x);
+  const z = Number(position.z);
+  const sampledY = Number(appCtx.sampleFeatureSurfaceY?.(x, z));
+  const y = Number.isFinite(Number(position.y)) ? Number(position.y) : Number.isFinite(sampledY) ? sampledY : 0;
+  if (![x, y, z].every(Number.isFinite)) return Object.freeze({ committed: false, reason: 'invalid-position' });
+  const result = commit(appCtx, {
+    action: 'upsert_object',
+    object: {
+      id: String(input.id || ''),
+      type: String(input.type || 'sign'),
+      catalogId: String(input.catalogId || 'world-discovery'),
+      materialId: String(input.materialId || 'wood'),
+      transform: {
+        position: { x, y: y + Number(input.heightOffset || 0), z },
+        rotation: { x: 0, y: Number(input.rotationY || 0), z: 0 },
+        scale: input.scale || { x: 1, y: 1, z: 1 }
+      }
+    }
+  });
+  if (result.committed) refreshEditableWorldPresentation(appCtx);
+  return result;
+}
+
 export async function suppressSelectedEditableBuilding(appCtx) {
   const target = selectedBuilding || (lastSelectedSourceId ? { sourceFeatureId: lastSelectedSourceId, building: {} } : null);
   if (!target) return Object.freeze({ committed: false, reason: 'no-building-selected' });
@@ -267,6 +295,7 @@ export function initEditableWorldRuntime(appCtx) {
     getSuppressedEditableBuildingIds: () => getSuppressedEditableBuildingIds(appCtx),
     getLocalWorldModificationSnapshot: () => getLocalWorldModificationSnapshot(appCtx),
     isLocalBuildingSuppressed: (sourceFeatureId) => isLocalBuildingSuppressed(appCtx, sourceFeatureId),
+    placeDiscoveryWorldObject: (input) => placeDiscoveryWorldObject(appCtx, input),
     refreshEditableWorldPresentation: () => refreshEditableWorldPresentation(appCtx),
     resetLocalEditableWorld: () => resetLocalEditableWorld(appCtx),
     restoreSelectedEditableBuilding: () => restoreSelectedEditableBuilding(appCtx),

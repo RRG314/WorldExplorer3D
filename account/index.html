@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>World Explorer Account</title>
+  <title>Account Center · World Explorer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
@@ -536,15 +536,203 @@
       .top { flex-wrap: wrap; }
       .top a { width: 100%; text-align: center; }
     }
+
+    /* Account Center uses the same restrained V4 shell as the game. */
+    :root {
+      --bg: #05090d;
+      --panel: #071018;
+      --line: rgba(157, 174, 186, 0.28);
+      --ink: #f4f7f9;
+      --muted: #9aa8b2;
+      --accent: #2d7dff;
+      --gold: #f4b942;
+      --ok: #35d272;
+      --warn: #ef5b5b;
+    }
+
+    [hidden] { display: none !important; }
+
+    body {
+      background:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        var(--bg);
+      background-size: 34px 34px;
+      font-family: Inter, 'Barlow', system-ui, sans-serif;
+    }
+
+    .account-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .account-rail {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 28px 14px 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(5, 12, 18, .98);
+    }
+
+    .account-brand { padding: 0 10px 24px; border-bottom: 1px solid var(--line); }
+    .account-brand > span,
+    .account-eyebrow,
+    .account-section-heading span {
+      display: block;
+      color: var(--accent);
+      font: 600 9px/1.2 Orbitron, 'Chakra Petch', sans-serif;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .account-brand strong {
+      display: block;
+      margin: 8px 0;
+      color: var(--ink);
+      font: 700 22px/1.1 Orbitron, 'Chakra Petch', sans-serif;
+      text-transform: uppercase;
+    }
+    .account-brand small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+    .account-nav { display: grid; gap: 3px; margin-top: 20px; }
+    .account-nav button,
+    .account-nav-admin {
+      width: 100%;
+      display: block;
+      min-height: 54px;
+      padding: 10px 12px;
+      border: 0;
+      border-left: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+      text-decoration: none;
+    }
+    .account-nav button:hover,
+    .account-nav button.active,
+    .account-nav-admin:hover {
+      transform: none;
+      background: rgba(45, 125, 255, .11);
+      border-left-color: var(--accent);
+      color: var(--ink);
+    }
+    .account-nav strong { display: block; color: inherit; font-size: 12px; }
+    .account-nav span { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 500; }
+    .account-nav-admin { margin-top: 10px; border-top: 1px solid var(--line); }
+    .account-nav-admin strong { color: var(--gold); }
+    .account-back { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-decoration: none; }
+
+    .wrap { width: min(1180px, calc(100vw - 280px)); margin: 0 auto; padding: 34px 28px 48px; }
+    .top { align-items: flex-end; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+    .top h1 { margin-top: 7px; font: 700 clamp(26px, 4vw, 40px)/1 Orbitron, 'Chakra Petch', sans-serif; text-transform: uppercase; }
+    .top a { border-radius: 2px; background: #101921; font-size: 12px; }
+    .sub { margin-top: 8px; font-size: 13px; }
+
+    #accountPanel { padding: 0; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+    .account-view,
+    #authPrompt {
+      margin-top: 18px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: rgba(7, 16, 24, .96);
+      box-shadow: 0 22px 48px rgba(0,0,0,.3);
+    }
+    .account-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+    .account-section-heading h2 { margin: 6px 0 0; font: 700 20px/1.1 Orbitron, sans-serif; text-transform: uppercase; }
+    .section-title { margin: 10px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); color: var(--ink); font: 700 16px/1.2 Orbitron, sans-serif; text-transform: uppercase; }
+    .section-title:not(:first-child) { margin-top: 28px; }
+
+    .status { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .status-item,
+    .identity-card,
+    .creator-card,
+    .plan {
+      border-color: var(--line);
+      border-radius: 2px;
+      background: #0b151e;
+    }
+    .value { font-family: Orbitron, 'Chakra Petch', sans-serif; font-size: 20px; }
+    .label { font-size: 9px; letter-spacing: .12em; }
+    .hint, .creator-meta, .creator-bio, .receipt-meta, .social-meta { color: var(--muted); }
+
+    button,
+    .btn-link {
+      min-height: 38px;
+      border-radius: 2px;
+      padding: 9px 13px;
+      font-family: Inter, sans-serif;
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: #101921; border-color: var(--line); }
+    .btn-supporter, .btn-pro { background: #163b66; color: #fff; }
+    input, textarea, select { border-radius: 2px; background: #03090e; border-color: var(--line); color: var(--ink); }
+    .creator-avatar { border-radius: 2px; background: #101921; }
+    .creator-badge { border-radius: 2px; }
+    .danger-card { border-color: rgba(239, 91, 91, .55); }
+    .danger-card .btn-danger { margin-top: 18px; }
+    .privacy-links { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+    .privacy-links a { color: #bcd3ff; font-size: 12px; }
+    .links { border-top-color: var(--line); }
+
+    @media (max-width: 980px) {
+      .account-shell { grid-template-columns: 1fr; }
+      .account-rail { position: static; align-self: start; height: auto; padding: 14px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .account-brand small, .account-back { display: none; }
+      .account-brand { padding: 2px 4px 12px; }
+      .account-brand strong { font-size: 17px; }
+      .account-nav { display: flex; overflow-x: auto; margin-top: 10px; }
+      .account-nav button, .account-nav-admin { flex: 0 0 auto; width: auto; min-height: 44px; border-left: 0; border-bottom: 2px solid transparent; }
+      .account-nav button:hover, .account-nav button.active, .account-nav-admin:hover { border-left-color: transparent; border-bottom-color: var(--accent); }
+      .account-nav span { display: none; }
+      .account-nav-admin { margin: 0; border-top: 0; }
+      .wrap { width: 100%; padding: 22px 14px 34px; }
+      .status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      .top { align-items: flex-start; }
+      .top > a { width: auto; }
+      .account-view, #authPrompt { padding: 15px; }
+      .status { grid-template-columns: 1fr; }
+      .account-section-heading { align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top">
-      <h1>Account</h1>
-      <a href="../app/">Back to App</a>
-    </div>
-    <p class="sub">Manage your account, optional monthly donations, and multiplayer profile settings.</p>
+  <div class="account-shell">
+    <aside class="account-rail" aria-label="Account Center navigation">
+      <div class="account-brand">
+        <span>World Explorer</span>
+        <strong>Account Center</strong>
+        <small>Your identity, community, support, privacy, and authorized administration.</small>
+      </div>
+      <nav class="account-nav">
+        <button type="button" data-account-target="overview"><strong>Overview</strong><span>Status and shortcuts</span></button>
+        <button type="button" data-account-target="profile"><strong>Profile</strong><span>Identity and creator card</span></button>
+        <button type="button" data-account-target="social"><strong>Friends & Rooms</strong><span>Friends and invitations</span></button>
+        <button type="button" data-account-target="support"><strong>Support & Receipts</strong><span>Donations and billing history</span></button>
+        <button type="button" data-account-target="security"><strong>Security & Privacy</strong><span>Sign-in details and account controls</span></button>
+        <a id="moderationPanelLink" class="account-nav-admin" href="./admin.html" hidden><strong>Administration</strong><span>Authorized workspace</span></a>
+      </nav>
+      <a class="account-back" href="../app/">Return to World Explorer</a>
+    </aside>
+
+    <main class="wrap">
+      <div class="top">
+        <div>
+          <span class="account-eyebrow">Account Center</span>
+          <h1 id="accountPageTitle">Overview</h1>
+          <p id="accountPageSubtitle" class="sub">Account status, access, and the actions you use most.</p>
+        </div>
+        <a href="../app/">Open App</a>
+      </div>
 
     <section class="panel" id="authPrompt">
       <p class="hint">Sign in to manage account details, optional donations, and multiplayer identity.</p>
@@ -553,7 +741,12 @@
       </div>
     </section>
 
-    <section class="panel" id="accountPanel">
+    <section class="panel" id="accountPanel" hidden>
+      <section class="account-view" data-account-view="overview">
+        <div class="account-section-heading">
+          <div><span>At a glance</span><h2>Account overview</h2></div>
+          <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh</button>
+        </div>
       <div class="status">
         <article class="status-item">
           <span class="label">Current Plan</span>
@@ -583,18 +776,15 @@
       </div>
 
       <div class="actions">
-        <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Donate as Supporter ($1/mo)</button>
-        <button id="upgradeProBtn" class="btn-pro" type="button">Donate as Pro ($5/mo)</button>
         <button id="enableAdminBtn" class="btn-ghost" type="button">Enable Admin Test Access</button>
-        <a id="moderationPanelLink" class="btn-ghost btn-link" href="./admin.html" hidden>Open Admin Dashboard</a>
-        <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Donations</button>
-        <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
-        <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
-        <button id="deleteAccountBtn" class="btn-danger" type="button">Delete Account</button>
+        <button class="btn-primary" type="button" data-account-target="profile">Edit Profile</button>
+        <button class="btn-ghost" type="button" data-account-target="social">View Friends & Rooms</button>
       </div>
 
       <p id="statusLine"></p>
+      </section>
 
+      <section class="account-view" data-account-view="profile" hidden>
       <h2 class="section-title">Identity</h2>
       <div class="identity-grid">
         <article class="identity-card">
@@ -670,7 +860,9 @@
           </ul>
         </article>
       </div>
+      </section>
 
+      <section class="account-view" data-account-view="social" hidden>
       <h2 class="section-title">Friends & Invites</h2>
       <div class="identity-grid">
         <article class="identity-card">
@@ -698,7 +890,9 @@
           </div>
         </article>
       </div>
+      </section>
 
+      <section class="account-view" data-account-view="support" hidden>
       <h2 class="section-title">Donations & Receipts</h2>
       <div class="identity-grid">
         <article class="identity-card">
@@ -737,6 +931,34 @@
         </article>
       </div>
 
+      <div class="actions">
+        <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Donate as Supporter ($1/mo)</button>
+        <button id="upgradeProBtn" class="btn-pro" type="button">Donate as Pro ($5/mo)</button>
+        <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Donations</button>
+      </div>
+      </section>
+
+      <section class="account-view" data-account-view="security" hidden>
+        <h2 class="section-title">Security & Privacy</h2>
+        <div class="identity-grid">
+          <article class="identity-card">
+            <span class="label">Session controls</span>
+            <p class="hint">Signing out ends this browser session. It does not remove saved account data.</p>
+            <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
+          </article>
+          <article class="identity-card danger-card">
+            <span class="label">Delete account</span>
+            <p class="hint">Permanently removes the account and associated stored data after a separate confirmation.</p>
+            <button id="deleteAccountBtn" class="btn-danger" type="button">Delete Account</button>
+          </article>
+        </div>
+        <div class="privacy-links">
+          <a href="../legal/privacy">Privacy policy</a>
+          <a href="../legal/terms">Terms</a>
+          <a href="mailto:mail@worldexplorer3d.io">Contact support</a>
+        </div>
+      </section>
+
       <div class="links">
         <a href="../about/">About</a>
         <a href="../legal/privacy">Privacy</a>
@@ -745,7 +967,10 @@
         <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </section>
+    </main>
   </div>
+
+  <script src="./account-center.js" defer></script>
 
   <script type="module">
     import { hasFirebaseConfig } from '../js/firebase-init.js?v=55';
@@ -1280,6 +1505,8 @@
     }
 
     function renderSignedOutState() {
+      authPrompt.hidden = !hasFirebaseConfig();
+      accountPanel.hidden = hasFirebaseConfig();
       authPrompt.style.display = hasFirebaseConfig() ? 'block' : 'none';
       accountPanel.style.display = hasFirebaseConfig() ? 'none' : 'block';
       resetIdentityUi();
@@ -1409,6 +1636,8 @@
 
     async function handleSignedIn(user) {
       signedInUser = user;
+      authPrompt.hidden = true;
+      accountPanel.hidden = false;
       authPrompt.style.display = 'none';
       accountPanel.style.display = 'block';
 

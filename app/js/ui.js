@@ -194,6 +194,11 @@ function setupUI() {
     updateControlsModeUI();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     if (typeof appCtx.refreshFlowerLeaderboard === 'function') appCtx.refreshFlowerLeaderboard();
+    // Starting Earth from the title always recompiles the selected location.
+    // Keeping the previous fixed world behind that screen only retains its JS
+    // graph and WebGL buffers, which can make Chrome report >1 GB for an idle tab.
+    appCtx.releaseEarthWorldForTitle?.();
+    appCtx.hideLoad?.();
   }
 
   // Float menu

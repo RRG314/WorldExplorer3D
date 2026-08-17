@@ -1699,6 +1699,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /explorerProfiles/{userId} {
+      // Discovery ownership, claims, companions, mastery, and museum records
+      // are minted or changed only by trusted Cloud Functions. Owners may read
+      // their complete profile tree; browser clients cannot forge inventory.
+      allow read: if isSelf(userId);
+      allow create, update, delete: if false;
+
+      match /{document=**} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /discoveryTrades/{tradeId} {
+      allow read: if isSignedIn() &&
+        (resource.data.ownerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
     match /editorSubmissions/{submissionId} {
       allow read: if isAdminToken() ||
         resource.data.status == 'approved' ||

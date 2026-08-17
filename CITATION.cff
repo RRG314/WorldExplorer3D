@@ -8,7 +8,7 @@ authors:
 repository-code: "https://github.com/RRG314/WorldExplorer3D"
 url: "https://worldexplorer3d.io"
 license: "Proprietary"
-version: "4.2.1"
+version: "4.3.0"
 date-released: "2026-08-16"
 abstract: >-
   Browser-based 3D geospatial exploration application using OpenStreetMap-derived

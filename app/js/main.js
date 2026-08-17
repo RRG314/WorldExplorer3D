@@ -88,6 +88,7 @@ function shouldUseComposer() {
 function dedicatedRendererActive() {
   return !!(
     appCtx.worldLoading ||
+    appCtx.arSessionActive ||
     appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) ||
     appCtx.spaceFlight?.active ||
     appCtx.oceanMode?.active
@@ -144,6 +145,8 @@ function registerRuntimeSystems() {
     phase: 'render',
     priority: 100,
     critical: false,
+    enabled: () => appCtx.developerDiagnosticsEnabled === true &&
+      appCtx.getPerfOverlayEnabled?.() === true && appCtx.gameStarted === true,
     update(frame) {
       perfPanelTimer += frame.dt;
       if (perfPanelTimer <= 0.2) return;

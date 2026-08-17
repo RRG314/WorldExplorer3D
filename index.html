@@ -3,699 +3,297 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>World Explorer 3D | Explore Any Place on Earth and Beyond</title>
-  <meta name="description" content="Explore real places, Live Earth systems, local weather, buildings, oceans, orbit, and the Moon in one browser-based world.">
+  <title>World Explorer 3D | Your Next Expedition Starts Anywhere</title>
+  <meta name="description" content="Enter real locations as your explorer. Travel, investigate wildlife and geology, record discoveries, build, and explore a connected world from the ground to orbit.">
+  <meta name="theme-color" content="#070b0e">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles/landing.css?v=2">
   <script src="./js/firebase-project-config.js"></script>
-  <style>
-    :root {
-      --bg-0: #05090d;
-      --bg-1: #0a1219;
-      --bg-2: #101921;
-      --ink: #f4f7f9;
-      --muted: #9aa8b2;
-      --card: #0a1219;
-      --line: rgba(157, 174, 186, 0.3);
-      --accent: #f4b942;
-      --accent-2: #2d7dff;
-      --ok: #35d272;
-      --danger: #ef5b5b;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      color: var(--ink);
-      background: var(--bg-0);
-      min-height: 100vh;
-      font-family: 'Barlow', sans-serif;
-      letter-spacing: 0;
-      line-height: 1.45;
-    }
-
-    a { color: inherit; }
-
-    .shell {
-      width: 100%;
-      margin: 0;
-      padding: 0;
-    }
-
-    .landing-masthead {
-      position: sticky;
-      z-index: 20;
-      top: 0;
-      height: 68px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 clamp(18px, 4vw, 64px);
-      background: rgba(3, 9, 14, 0.96);
-      border-bottom: 1px solid var(--line);
-    }
-
-    .landing-brand {
-      color: var(--ink);
-      font: 700 16px/1 'Chakra Petch', sans-serif;
-      text-decoration: none;
-      text-transform: uppercase;
-    }
-
-    .landing-brand strong { color: var(--accent-2); }
-
-    .landing-nav { display: flex; align-items: center; gap: 26px; }
-    .landing-nav a {
-      color: var(--muted);
-      font: 600 11px/1 'Chakra Petch', sans-serif;
-      text-decoration: none;
-      text-transform: uppercase;
-    }
-    .landing-nav a:hover { color: var(--ink); }
-    .landing-nav .nav-launch { padding: 11px 16px; color: #fff; background: var(--accent-2); border: 1px solid #65a1ff; }
-    }
-
-    .hero {
-      position: relative;
-      padding: 0;
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      border-radius: 0;
-      overflow: hidden;
-      background: var(--bg-0);
-      box-shadow: none;
-      margin: 0;
-    }
-
-    .announcement {
-      margin: 0;
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      border-radius: 0;
-      background: var(--bg-1);
-      box-shadow: none;
-      padding: 18px clamp(18px, 4vw, 64px);
-    }
-
-    .announcement[data-tone="success"] { border-color: rgba(77, 214, 159, 0.34); }
-    .announcement[data-tone="warning"] { border-color: rgba(255, 200, 87, 0.34); }
-
-    .announcement-eyebrow {
-      display: inline-flex;
-      color: var(--accent-2);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      font-size: 12px;
-      margin-bottom: 8px;
-    }
-
-    .announcement h2 {
-      margin: 0 0 8px;
-      font-family: 'Chakra Petch', sans-serif;
-      font-size: clamp(22px, 3vw, 30px);
-      line-height: 1.02;
-    }
-
-    .announcement p {
-      margin: 0;
-      color: var(--muted);
-      max-width: 860px;
-    }
-
-    .announcement a {
-      display: inline-flex;
-      align-items: center;
-      margin-top: 12px;
-      border-radius: 2px;
-      padding: 10px 14px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.05);
-      text-decoration: none;
-      font-weight: 700;
-    }
-
-    .hero-grid {
-      display: grid;
-      position: relative;
-      display: block;
-      min-height: calc(100svh - 118px);
-    }
-
-    .hero-copy {
-      position: relative;
-      z-index: 2;
-      min-height: calc(100svh - 118px);
-      padding: clamp(44px, 8vw, 112px) clamp(20px, 7vw, 110px);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 16px;
-      width: min(760px, 82vw);
-    }
-
-    h1 {
-      margin: 0;
-      font-family: 'Chakra Petch', sans-serif;
-      font-size: 44px;
-      line-height: 1.02;
-      letter-spacing: 0;
-    }
-
-    .hero-brand {
-      display: block;
-      margin-bottom: 10px;
-      color: var(--ink);
-      font-size: 58px;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-
-    .hero-headline {
-      display: block;
-      font-size: 30px;
-      letter-spacing: 0;
-      color: #dbe8ef;
-      line-height: 1.08;
-    }
-
-    .lead {
-      margin: 0;
-      color: var(--muted);
-      font-size: clamp(17px, 2vw, 21px);
-      max-width: 48ch;
-    }
-
-    .cta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .btn {
-      border: 1px solid transparent;
-      border-radius: 2px;
-      padding: 12px 18px;
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0;
-      text-decoration: none;
-      cursor: pointer;
-      transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
-    }
-
-    .btn:hover { transform: translateY(-1px); filter: brightness(1.04); }
-
-    .btn-play {
-      background: var(--accent-2);
-      color: #fff;
-      box-shadow: none;
-    }
-
-    .btn-trial {
-      background: var(--accent);
-      color: #271900;
-      box-shadow: none;
-    }
-
-    .btn-ghost {
-      background: rgba(9, 24, 44, 0.6);
-      color: var(--ink);
-      border-color: var(--line);
-    }
-
-    .status-note {
-      min-height: 20px;
-      margin: 0;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .perf-note {
-      margin: 0;
-      font-size: 13px;
-      color: var(--muted);
-      border-top: 1px solid var(--line);
-      padding-top: 12px;
-    }
-
-    .hero-media {
-      position: absolute;
-      inset: 0;
-      min-height: 0;
-      background: #020913;
-      overflow: hidden;
-    }
-
-    .hero-media-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
-      display: block;
-      transform: none;
-    }
-
-    .hero-media::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(2, 7, 11, 0.48);
-      box-shadow: inset 60vw 0 120px rgba(2, 7, 11, 0.74);
-    }
-
-    section {
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      border-radius: 0;
-      background: var(--card);
-      padding: 64px clamp(18px, 6vw, 96px);
-      margin: 0;
-      backdrop-filter: none;
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-family: 'Chakra Petch', sans-serif;
-      letter-spacing: 0;
-      font-size: clamp(24px, 3vw, 31px);
-    }
-
-    .gameplayGalleryWrap {
-      max-height: min(72vh, 980px);
-      overflow-y: auto;
-      padding-right: 6px;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(183, 205, 224, 0.45) transparent;
-    }
-
-    .gameplayGalleryWrap::-webkit-scrollbar {
-      width: 10px;
-    }
-
-    .gameplayGalleryWrap::-webkit-scrollbar-thumb {
-      background: rgba(183, 205, 224, 0.34);
-      border-radius: 2px;
-    }
-
-    .gameplayGallery {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .gameplayCard {
-      margin: 0;
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      overflow: hidden;
-      background: #030a14;
-    }
-
-    .gameplayCard img {
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      object-fit: cover;
-      display: block;
-    }
-
-    .gameplayMobilePair {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      aspect-ratio: 16 / 9;
-      overflow: hidden;
-      background: #07111d;
-    }
-
-    .gameplayCard .gameplayMobilePair img {
-      width: 100%;
-      height: 100%;
-      min-width: 0;
-      aspect-ratio: auto;
-      object-fit: contain;
-    }
-
-    .gameplayMeta {
-      padding: 10px 11px 12px;
-    }
-
-    .gameplayMeta h3 {
-      margin: 0 0 5px;
-      font-size: 15px;
-      font-family: 'Chakra Petch', sans-serif;
-      color: #dceeff;
-    }
-
-    .gameplayMeta p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.35;
-    }
-
-    .features {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .feature {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 12px;
-      background: rgba(4, 12, 24, 0.35);
-    }
-
-    .feature h3 {
-      margin: 0 0 6px;
-      font-size: 17px;
-      font-family: 'Chakra Petch', sans-serif;
-    }
-
-    .feature p { margin: 0; color: var(--muted); font-size: 14px; }
-
-    .pricing {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .price-card {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: rgba(4, 12, 24, 0.35);
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .price-card strong {
-      font-size: 22px;
-      font-family: 'Chakra Petch', sans-serif;
-    }
-
-    .price-card ul {
-      margin: 0;
-      padding-left: 18px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .price-card .donate-btn {
-      margin-top: auto;
-      width: 100%;
-      justify-content: center;
-    }
-
-    .price-card.pro { border-color: rgba(255, 200, 87, 0.5); }
-    .price-card.supporter { border-color: rgba(83, 196, 255, 0.45); }
-
-    .faq {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .qa {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 12px;
-      background: rgba(4, 12, 24, 0.35);
-    }
-
-    .qa h3 {
-      margin: 0 0 6px;
-      font-size: 16px;
-      font-family: 'Chakra Petch', sans-serif;
-    }
-
-    .qa p { margin: 0; color: var(--muted); font-size: 14px; }
-
-    footer {
-      border-top: 1px solid var(--line);
-      margin-top: 18px;
-      padding-top: 12px;
-      color: var(--muted);
-      font-size: 13px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 16px;
-      align-items: center;
-    }
-
-    footer a { color: #d5e9ff; text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
-
-    @media (max-width: 980px) {
-      .hero-grid { grid-template-columns: 1fr; }
-      .gameplayGallery { grid-template-columns: 1fr; }
-      .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .pricing { grid-template-columns: 1fr; }
-      .faq { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 640px) {
-      .shell { width: 100%; }
-      .landing-masthead { height: 58px; padding: 0 14px; }
-      .landing-nav a:not(.nav-launch) { display: none; }
-      .landing-nav .nav-launch { padding: 9px 11px; font-size: 9px; }
-      .hero-grid, .hero-copy { min-height: calc(100svh - 104px); }
-      .hero-copy { width: 100%; padding: 36px 20px; }
-      .hero-brand { font-size: 40px; }
-      .hero-headline { font-size: 23px; }
-      .lead { font-size: 16px; }
-      .hero-media::before { background: rgba(2, 7, 11, 0.62); box-shadow: none; }
-      .gameplayGalleryWrap { max-height: min(76vh, 1020px); }
-      .features { grid-template-columns: 1fr; }
-      .btn { width: 100%; text-align: center; }
-    }
-  </style>
 </head>
 <body>
-  <div class="shell">
-    <header class="landing-masthead">
-      <a class="landing-brand" href="./">World Explorer <strong>3D</strong></a>
-      <nav class="landing-nav" aria-label="Site navigation">
-        <a href="#highlights">Platform</a>
-        <a href="#gameplay">Gameplay</a>
-        <a href="#faq">FAQ</a>
-        <a class="nav-launch" href="./app/">Launch Explorer</a>
-      </nav>
-    </header>
-    <section id="landingAnnouncement" class="announcement" hidden>
-      <div id="landingAnnouncementEyebrow" class="announcement-eyebrow">Platform Update</div>
-      <h2 id="landingAnnouncementTitle"></h2>
-      <p id="landingAnnouncementBody"></p>
-      <a id="landingAnnouncementLink" href="#" hidden></a>
-    </section>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-    <section class="hero">
+  <header class="landing-masthead" aria-label="Main navigation">
+    <a class="landing-brand" href="./" aria-label="World Explorer 3D home">
+      <span class="brand-mark" aria-hidden="true"><span>W</span></span>
+      <span>World Explorer 3D</span>
+    </a>
+    <nav class="landing-nav" aria-label="Landing page sections">
+      <a href="#expedition">The experience</a>
+      <a href="#gameplay">Current gameplay</a>
+      <a href="#world">The world</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="masthead-actions">
+      <a class="account-link" id="landingTertiaryCta" href="./account/">Account</a>
+      <a class="nav-launch" href="./app/">Enter world</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <aside class="announcement" id="landingAnnouncement" hidden>
+      <div class="announcement-eyebrow" id="landingAnnouncementEyebrow">World update</div>
+      <h2 id="landingAnnouncementTitle">A new expedition is ready.</h2>
+      <p id="landingAnnouncementBody"></p>
+      <a id="landingAnnouncementLink" href="./app/" hidden>See what changed</a>
+    </aside>
+
+    <section class="hero" aria-labelledby="landingHeroHeadline">
       <div class="hero-grid">
         <div class="hero-copy">
-          <h1><span id="landingHeroBrand" class="hero-brand">World Explorer 3D</span><span id="landingHeroHeadline" class="hero-headline">An interactive digital Earth for exploration, discovery, and contribution.</span></h1>
-          <p id="landingHeroLead" class="lead">Explore real locations by land, sea, air, or space, experience the real sky and environment, and help expand a shared 3D world built from geographic data.</p>
+          <span class="hero-brand" id="landingHeroBrand">A playable world built from real places</span>
+          <h1 id="landingHeroHeadline"><span class="hero-headline">Your next expedition starts anywhere on Earth.</span></h1>
+          <p class="lead" id="landingHeroLead">Choose a real location. Enter it as your explorer. Walk, drive, fly, investigate wildlife and geology, record what you find, build, or meet friends—then keep going from Earth to orbit.</p>
           <div class="cta-row">
-            <a class="btn btn-play" id="landingPrimaryCta" href="./app/">Play Now</a>
-            <button class="btn btn-trial" id="landingSecondaryCta" type="button">Sign In for Multiplayer</button>
-            <a class="btn btn-ghost" id="landingTertiaryCta" href="./account/">Account</a>
+            <a class="btn btn-primary" id="landingPrimaryCta" href="./app/">Start exploring — free</a>
+            <button class="btn btn-secondary" id="landingSecondaryCta" type="button">Explore with friends</button>
           </div>
-          <p id="multiplayerStatus" class="status-note"></p>
-          <p id="landingPerformanceNote" class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
+          <ul class="hero-notes" aria-label="Access details">
+            <li>Runs in your browser</li>
+            <li>No download required</li>
+            <li>Optional sign-in</li>
+          </ul>
+          <p class="perf-note" id="landingPerformanceNote">Desktop is recommended for the highest world detail. Mobile field controls are included.</p>
+          <p class="status" id="multiplayerStatus" aria-live="polite"></p>
         </div>
-        <div class="hero-media" aria-hidden="true">
-          <img class="hero-media-img" src="./assets/landing/hero-interface.png" alt="">
-        </div>
-      </div>
-    </section>
 
-    <section id="highlights">
-      <h2 id="landingHighlightsTitle">Platform Highlights</h2>
-      <div id="landingHighlights" class="features">
-        <article class="feature"><h3>Live Earth</h3><p>Open satellites, earthquakes, and weather on the globe, then jump straight from those layers into the local world.</p></article>
-        <article class="feature"><h3>Real Weather + Time</h3><p>Local time, sun, moon, and live weather follow the place you are actually exploring, not just your own device clock.</p></article>
-        <article class="feature"><h3>Ground, Air, Water & Space Travel</h3><p>Drive, walk, drone, boat, and rocket through one connected runtime instead of separate disconnected modes.</p></article>
-        <article class="feature"><h3>Live GPS Travel</h3><p>Use an opted-in phone location to explore the same place in the 3D world, with a low-overhead mobile session designed for real movement.</p></article>
-        <article class="feature"><h3>DeFlock Hunt</h3><p>Find and virtually disable publicly mapped camera locations in a fictional game mode. No real camera or physical equipment is affected.</p></article>
-        <article class="feature"><h3>Buildings + Interiors</h3><p>Enter supported buildings on demand and move from streets into mapped or generated interiors without leaving the world.</p></article>
-        <article class="feature"><h3>Land & Property</h3><p>Browse place context, property-linked destinations, and real-world location details while you explore.</p></article>
-        <article class="feature"><h3>Multiplayer Rooms</h3><p>Share locations with other explorers, see live presence, and keep exploration social without putting core access behind a paywall.</p></article>
-        <article class="feature"><h3>Contribute / Edit</h3><p>Stage place, building, interior, and photo contributions for review without directly changing the live world.</p></article>
-        <article class="feature"><h3>Open Access</h3><p>Core exploration stays free. Optional donations help an independent solo build keep growing the platform.</p></article>
-      </div>
-    </section>
-
-    <section id="gameplay">
-      <h2>Gameplay</h2>
-      <div class="gameplayGalleryWrap">
-        <div class="gameplayGallery">
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/new-york-expanded-aerial.webp" alt="Wide aerial view showing expanded New York City coverage across Manhattan and surrounding boroughs" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Expanded New York</h3><p>A regional aerial view showing the much larger connected city, road, shoreline, and building footprint.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/new-york-harbor-skyline.webp" alt="New York City skyline and harbor rendered in World Explorer 3D" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>New York Harbor Skyline</h3><p>Lower Manhattan rises beyond the harbor while the expanded surrounding city remains visible in the same world.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/golden-gate-car.webp" alt="Player car driving on the elevated deck of the Golden Gate Bridge" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Drive the Golden Gate</h3><p>The car follows the bridge's elevated road surface with a continuous, playable deck and suspension structure.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/golden-gate-aerial.webp" alt="Bird's-eye view of the full Golden Gate Bridge span over the bay" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Golden Gate Aerial</h3><p>A full-span bird's-eye view across the water, including towers, cables, deck, shoreline, and regional terrain.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/baltimore-waterfront-skyline.webp" alt="Baltimore Inner Harbor and downtown skyline from an aerial waterfront view" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Baltimore Inner Harbor</h3><p>Waterfront, downtown towers, neighborhoods, roads, and parks rendered together across the expanded Baltimore world.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/monaco-coast-aerial.webp" alt="Bird's-eye view of Monaco's dense coastline, harbor, roads, and hills" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Monaco Coast</h3><p>Dense coastal development, hillside streets, marina geometry, and open water in one high-altitude view.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/san-francisco-bay-skyline.webp" alt="San Francisco skyline and bay-facing neighborhoods from the air" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>San Francisco Bay</h3><p>A bay-facing skyline view with dense city coverage extending across San Francisco's terrain.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/los-angeles-hollywood-aerial.webp" alt="Wide aerial view across the Los Angeles and Hollywood basin toward the hills" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Los Angeles Basin</h3><p>Hollywood and the surrounding Los Angeles street grid spread toward the hills with thousands of mapped buildings.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/london-thames-aerial.webp" alt="Aerial view across London and the River Thames" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>London and the Thames</h3><p>The River Thames anchors an expanded London view with mapped buildings, roads, crossings, and waterfront districts.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/tokyo-shinjuku-aerial.webp" alt="Dense aerial skyline view over Shinjuku in Tokyo" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Tokyo: Shinjuku</h3><p>High-rise Shinjuku and its dense surrounding street and building network rendered at city scale.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/showcase/dubai-skyline.webp" alt="Dubai skyline and multilane road network from an aerial view" loading="lazy" decoding="async">
-            <figcaption class="gameplayMeta"><h3>Dubai Skyline</h3><p>Downtown towers, major roads, and the wider desert city demonstrate the same worldwide rendering system.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <div class="gameplayMobilePair" role="group" aria-label="Mobile DeFlock Hunt before and after gameplay">
-              <img src="./assets/landing/gameplay/showcase/deflock-mobile-upright.webp" alt="Mobile DeFlock Hunt with a virtual camera upright" loading="lazy" decoding="async">
-              <img src="./assets/landing/gameplay/showcase/deflock-mobile-toppled.webp" alt="Mobile DeFlock Hunt after the virtual camera has toppled" loading="lazy" decoding="async">
-            </div>
-            <figcaption class="gameplayMeta"><h3>Mobile DeFlock Hunt</h3><p>Phone gameplay before and after a virtual camera is disabled. This is fictional gameplay; no real equipment is affected.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/baltimore-session-walk-guft.png" alt="Walking mode in a Baltimore alley session with GUFT teammate tag">
-            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Walk</h3><p>On-foot exploration with live teammate presence, mode HUD, and build controls in-session.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/baltimore-session-drive-guft.png" alt="Driving mode in the same Baltimore session with obstacles and teammate ahead">
-            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drive</h3><p>Drive through obstacle-filled lanes while synced to the same room and player context.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/baltimore-session-drone-guft.png" alt="Drone mode above the same alley showing 5 meter AGL HUD telemetry">
-            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drone</h3><p>Low-altitude drone camera with AGL telemetry for tactical aerial visibility during shared play.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/fly-in-space.png" alt="Space flight view with orbital paths and controls">
-            <figcaption class="gameplayMeta"><h3>Orbital Space Flight</h3><p>Rocket traversal in a solar-system scene with moon targeting and flight metrics.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/walk-on-moon.png" alt="Walking on the moon surface">
-            <figcaption class="gameplayMeta"><h3>Moon Surface Walking</h3><p>Switch from vehicle to on-foot exploration directly on lunar terrain.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/build-with-blocks.png" alt="Block building mode with placed structures">
-            <figcaption class="gameplayMeta"><h3>Block Builder</h3><p>Minecraft-style block placement for custom structures and world experimentation.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/drive-baltimore.png" alt="Driving through Baltimore streets">
-            <figcaption class="gameplayMeta"><h3>Street Driving</h3><p>Third-person car handling through dense urban blocks and road networks.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/drive-on-moon.png" alt="Driving a car on the moon">
-            <figcaption class="gameplayMeta"><h3>Moon Driving</h3><p>Low-gravity vehicle traversal tuned for stable traction on lunar surfaces.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/drone-on-moon.png" alt="Drone mode on moon with star field">
-            <figcaption class="gameplayMeta"><h3>Moon Drone Mode</h3><p>Aerial lunar scans with crater visibility and navigation overlays.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/paint-town-red.png" alt="Paint the Town Red rooftop challenge in progress">
-            <figcaption class="gameplayMeta"><h3>Paint the Town Red</h3><p>Timed challenge mode where rooftops and buildings are painted as objectives.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/place-flower-memory.png" alt="Memory flower marker with popup details">
-            <figcaption class="gameplayMeta"><h3>Memory Flower Markers</h3><p>Place location-linked memories with quick actions for review and cleanup.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/police-chase.png" alt="Police pursuing the player car">
-            <figcaption class="gameplayMeta"><h3>Police Chase</h3><p>Dynamic pursuit encounters while driving through the city.</p></figcaption>
-          </figure>
-          <figure class="gameplayCard">
-            <img src="./assets/landing/gameplay/flee-cops.png" alt="Busted modal after getting caught by police">
-            <figcaption class="gameplayMeta"><h3>Failure State Feedback</h3><p>Clear in-game fail screens with immediate retry flow.</p></figcaption>
+        <div class="hero-media">
+          <div class="hero-coordinate">Current browser build</div>
+          <figure class="hero-frame">
+            <img src="./assets/landing/current/baltimore-harbor-hero.webp" width="1280" height="720" alt="Baltimore skyline and Inner Harbor rendered in the current World Explorer browser build" fetchpriority="high">
+            <figcaption class="hero-caption">
+              <strong>A real city becomes a world you can enter.</strong>
+              <span>Baltimore · Inner Harbor</span>
+            </figcaption>
           </figure>
         </div>
       </div>
     </section>
 
-    <section>
-      <h2>Optional Donations</h2>
-      <div class="pricing">
-        <article class="price-card">
-          <strong>Free Access</strong>
-          <div>$0 / month</div>
-          <ul>
-            <li>Full core exploration loop</li>
-            <li>Map, core exploration, and traversal modes are free</li>
-            <li>Multiplayer for any signed-in account</li>
-            <li>No payment required to play</li>
-            <li>Open access for everyone</li>
-          </ul>
+    <div class="promise-bar" aria-label="World Explorer promises">
+      <div class="promise"><strong>Real places</strong><span>Start from mapped cities, coastlines, terrain, weather, and live world data.</span></div>
+      <div class="promise"><strong>Your explorer</strong><span>The character on screen is you—not a disposable hero from somebody else's story.</span></div>
+      <div class="promise"><strong>A world that remembers</strong><span>Keep discoveries, companions, builds, contributions, and places worth returning to.</span></div>
+      <div class="promise"><strong>Free core world</strong><span>The map, core exploration, and traversal modes are free.</span></div>
+    </div>
+
+    <section class="section" id="expedition">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Your expedition</span>
+          <h2>Pick a place. Find your own reason to stay.</h2>
+        </div>
+        <p>World Explorer is not a tour you watch from above. It is a place you enter: choose where to begin, move through it as your own character, notice what is there, and decide what matters to you.</p>
+      </div>
+      <div class="journey-grid">
+        <article class="journey-card">
+          <span class="journey-number">01 / ARRIVE</span>
+          <h3>Choose anywhere</h3>
+          <p>Search for a real destination or begin where you are curious—from a nearby street to another continent.</p>
         </article>
-        <article class="price-card supporter">
-          <strong>Supporter Donation</strong>
-          <div>$1 / month (optional)</div>
-          <ul>
-            <li>Optional monthly contribution</li>
-            <li>Helps cover hosting and active development</li>
-            <li>Keeps the project open and accessible</li>
-          </ul>
-          <button class="btn btn-play donate-btn" id="donateSupporterBtn" type="button">Donate $1 / month</button>
+        <article class="journey-card">
+          <span class="journey-number">02 / MOVE</span>
+          <h3>Explore your way</h3>
+          <p>Walk at street level, drive farther, launch a boat, take to the air, or pull back to the living globe.</p>
         </article>
-        <article class="price-card pro">
-          <strong>Pro Donation</strong>
-          <div>$5 / month (optional)</div>
-          <ul>
-            <li>Everything in Supporter Donation</li>
-            <li>Optional donation recognition on the account page</li>
-            <li>Bigger monthly support for the solo dev roadmap</li>
-          </ul>
-          <button class="btn btn-trial donate-btn" id="donateProBtn" type="button">Donate $5 / month</button>
+        <article class="journey-card">
+          <span class="journey-number">03 / DISCOVER</span>
+          <h3>Pay attention</h3>
+          <p>Look for wildlife, plants, geology, metal finds, landmarks, changing weather, and other field opportunities.</p>
+        </article>
+        <article class="journey-card">
+          <span class="journey-number">04 / CONTINUE</span>
+          <h3>Make it yours</h3>
+          <p>Build a field journal, earn trust with companions, save places, create rooms, contribute edits, and return.</p>
         </article>
       </div>
     </section>
 
-    <section id="faq">
-      <h2>FAQ</h2>
+    <section class="section" id="gameplay">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Current gameplay</span>
+          <h2>One world, seen from where you stand.</h2>
+        </div>
+        <p>These images come from the current browser build. They show the actual exploration, discovery, and companion systems instead of a separate marketing prototype.</p>
+      </div>
+
+      <div class="story-stack">
+        <article class="story">
+          <figure class="story-media">
+            <span class="media-label">Explorer Progress · current build</span>
+            <img src="./assets/landing/current/explorer-progress.webp" width="1440" height="900" loading="lazy" alt="Current World Explorer gameplay showing a character, wildlife encounter, Explorer progress, regional goals, and specialties">
+          </figure>
+          <div class="feature-copy">
+            <span class="eyebrow">One coherent Explorer loop</span>
+            <h2>Notice something. Investigate it. Keep the story.</h2>
+            <p>Nearby leads respond to the place you entered. Choose one, minimize the Journal, follow the equipped tool in the world, then record a result with a clear destination and next goal.</p>
+            <ul class="feature-list">
+              <li>Journal is your chronology; Field Guide is what you identified.</li>
+              <li>Collection contains only virtual objects you actually acquired.</li>
+              <li>Regional goals and capability unlocks give each expedition a reason to continue.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="story">
+          <figure class="story-media">
+            <span class="media-label">Companions + AR preview</span>
+            <img src="./assets/landing/current/companion-ar.webp" width="1440" height="900" loading="lazy" alt="World Explorer companion Trail Hound shown in the current augmented reality preview">
+          </figure>
+          <div class="feature-copy">
+            <span class="eyebrow">Encounters that continue</span>
+            <h2>Discover more than objects.</h2>
+            <p>Some wildlife encounters can develop into trusted companions. Learn where they belong, build trust over time, then view a companion in the world or through the AR preview.</p>
+            <ul class="feature-list">
+              <li>Habitat-aware encounters respond to the kind of place you are exploring.</li>
+              <li>Real reference photography supports field identification where reliable imagery is available.</li>
+              <li>Companions, records, and progress belong to your explorer and persist between visits.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="story">
+          <figure class="story-media mobile-composite">
+            <span class="media-label">Mobile field kit</span>
+            <img src="./assets/landing/current/field-tools-mobile-current.webp" width="390" height="844" loading="lazy" alt="Current mobile Explorer Journal with a saved wildlife result, regional goal, and nearby field leads">
+          </figure>
+          <div class="feature-copy">
+            <span class="eyebrow">Tools with a purpose</span>
+            <h2>Carry the right equipment into the field.</h2>
+            <p>A camera, detector, shovel, sampling tools, and other equipment are part of the explorer's activity—not permanent dashboard furniture. On supported activities, your character carries and uses the selected tool.</p>
+            <ul class="feature-list">
+              <li>Desktop and mobile controls are designed around the same expedition.</li>
+              <li>Tools surface as the activity calls for them and can be put away again.</li>
+              <li>Pathfinder and Field Explorer ranks unlock additional wildlife, geology, and excavation capabilities.</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="world">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">One connected world</span>
+          <h2>More depth, without becoming ten separate apps.</h2>
+        </div>
+        <p>The systems are organized around what you are trying to do. Travel changes your point of view. Field work deepens a place. Creation and multiplayer let your time there leave a trace.</p>
+      </div>
+      <div class="features" id="landingHighlights">
+        <article class="feature">
+          <h3>Explore and move</h3>
+          <p>Search the globe, enter a location, then walk, drive, boat, fly, orbit, or visit the Moon without leaving the connected world.</p>
+        </article>
+        <article class="feature">
+          <h3>Investigate and collect</h3>
+          <p>Use a field journal and activity-specific tools to study wildlife, plants, rocks, landmarks, and finds tied to place.</p>
+        </article>
+        <article class="feature">
+          <h3>Create and share</h3>
+          <p>Build rooms and objects, contribute reviewed world edits, preserve memories, and explore together through multiplayer.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="landingHighlightsTitle">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">World scale</span>
+          <h2 id="landingHighlightsTitle">A few places from the current world.</h2>
+        </div>
+        <p>A deliberately small gallery replaces the outdated screenshot archive. The landing page will now show only representative images from the current experience.</p>
+      </div>
+      <div class="gallery">
+        <figure>
+          <img src="./assets/landing/gameplay/showcase/new-york-expanded-aerial.webp" width="1600" height="900" loading="lazy" alt="Aerial view of New York in World Explorer">
+          <figcaption><strong>New York</strong><span>Expanded aerial view</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/gameplay/showcase/baltimore-waterfront-skyline.webp" width="1600" height="900" loading="lazy" alt="Baltimore waterfront skyline in World Explorer">
+          <figcaption><strong>Baltimore</strong><span>Waterfront</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/gameplay/showcase/monaco-coast-aerial.webp" width="1600" height="900" loading="lazy" alt="Aerial view of the Monaco coast in World Explorer">
+          <figcaption><strong>Monaco</strong><span>Coastal exploration</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/gameplay/showcase/new-york-harbor-skyline.webp" width="1600" height="900" loading="lazy" alt="New York harbor and skyline in World Explorer">
+          <figcaption><strong>New York Harbor</strong><span>City scale</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="access">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Open access</span>
+          <h2>Explore first. Decide what matters later.</h2>
+        </div>
+        <p>The world is available without a payment decision at the door. An account keeps multiplayer and persistent progress together. Donations are optional and support hosting and continued development.</p>
+      </div>
+      <div class="support-grid">
+        <article class="support-card">
+          <h3>Free exploration</h3>
+          <p>Start in the browser, learn the controls in context, and use the core world before creating an account.</p>
+          <ul class="free-list">
+            <li>Map and location search</li>
+            <li>Core traversal modes</li>
+            <li>Field discovery activities</li>
+            <li>Live Earth and world systems</li>
+          </ul>
+        </article>
+        <article class="support-card">
+          <h3>Support the world</h3>
+          <p>If World Explorer becomes a place you value, you can help keep it online. Support never gates the core experience.</p>
+          <div class="support-options">
+            <button class="btn btn-secondary donate-btn" id="donateSupporterBtn" type="button">Donate $1 monthly</button>
+            <button class="btn btn-secondary donate-btn" id="donateProBtn" type="button">Donate $5 monthly</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Before you enter</span>
+          <h2>Useful answers, plainly stated.</h2>
+        </div>
+      </div>
       <div class="faq">
-        <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. The runtime includes mobile controls, but desktop is still the best way to see the full visual range and larger city scenes.</p></article>
-        <article class="qa"><h3>What is Live Earth?</h3><p>Live Earth is the real-time globe section inside World Explorer. It currently brings satellites, earthquakes, and weather into the same platform as the local 3D world.</p></article>
-        <article class="qa"><h3>Can I go inside buildings?</h3><p>Supported buildings can be entered on demand. The platform uses mapped interiors when they exist and enclosed generated interiors when they do not.</p></article>
-        <article class="qa"><h3>Is multiplayer free?</h3><p>Yes. Multiplayer is free for signed-in accounts. Donations are optional and only support continued development.</p></article>
-        <article class="qa"><h3>Can I contribute edits?</h3><p>Yes. The Contribute/Edit flow lets you submit staged place, building, interior, and photo updates for review instead of editing the live world directly.</p></article>
-        <article class="qa"><h3>Where does the data come from?</h3><p>World Explorer combines OpenStreetMap with open real-world feeds such as CelesTrak, USGS, and Open-Meteo, plus optional user-configured provider APIs where available.</p></article>
+        <article class="qa"><h3>Is this a game?</h3><p>It is an open exploration experience with game systems, but no single required storyline. Your goals can be travel, discovery, collection, creation, learning, or spending time with other explorers.</p></article>
+        <article class="qa"><h3>Does it use real locations?</h3><p>Yes. World Explorer builds its world from geographic data and open real-world feeds, then adds playable systems and generated detail where the source data does not provide it.</p></article>
+        <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. Mobile includes touch controls and field activities. A desktop browser is currently recommended for the highest rendering quality and the largest city scenes.</p></article>
+        <article class="qa"><h3>Do I need an account?</h3><p>No account is required for core exploration. Sign in when you want multiplayer and persistent account-linked progress.</p></article>
+        <article class="qa"><h3>Can I contribute?</h3><p>Yes. You can submit staged place, building, interior, and photo updates for review. Contributions never overwrite the live shared world without review.</p></article>
       </div>
     </section>
 
-    <footer>
-      <a href="./about/">About</a>
-      <a href="./legal/privacy">Privacy</a>
-      <a href="./legal/terms">Terms</a>
-      <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
-      <a href="mailto:mail@worldexplorer3d.io">Contact</a>
-      <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
-    </footer>
-  </div>
+    <section class="section">
+      <div class="final-cta">
+        <div>
+          <span class="section-kicker">Choose a starting point</span>
+          <h2>See what is waiting there.</h2>
+          <p>Enter the world now, or begin with a familiar place and discover what changes when it becomes somewhere you can inhabit.</p>
+        </div>
+        <a class="btn btn-primary" href="./app/">Start exploring — free</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>World Explorer 3D</span>
+    <a href="./about/">About</a>
+    <a href="./legal/privacy">Privacy</a>
+    <a href="./legal/terms">Terms</a>
+    <a href="mailto:mail@worldexplorer3d.io">Contact</a>
+    <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
+    <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
+  </footer>
 
   <script type="module">
     import { hasFirebaseConfig } from './js/firebase-init.js?v=55';
@@ -713,28 +311,28 @@
       statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
     }
 
-    openMultiplayerBtn.addEventListener('click', async () => {
+    openMultiplayerBtn?.addEventListener('click', async () => {
       openMultiplayerBtn.disabled = true;
-      setStatus('Checking account...');
+      setStatus('Checking your account…');
 
       try {
         if (!hasFirebaseConfig()) {
-          setStatus('Firebase config not set yet. Opening app in free mode until config is provided.', true);
+          setStatus('Opening the world in free mode. Multiplayer will be available after Firebase is configured.', true);
           window.location.assign('./app/?tab=multiplayer');
           return;
         }
 
         const user = await ensureSignedIn();
         if (!user) {
-          setStatus('Continue sign-in in the popup/redirect to open multiplayer.');
+          setStatus('Finish signing in to enter multiplayer.');
           return;
         }
 
-        setStatus('Signed in. Opening multiplayer...');
+        setStatus('Opening multiplayer…');
         window.location.assign('./app/?tab=multiplayer');
       } catch (err) {
         console.error('[landing] Multiplayer sign-in failed:', err);
-        setStatus(err && err.message ? err.message : 'Could not open multiplayer right now.', true);
+        setStatus(err?.message || 'Multiplayer could not open right now.', true);
       } finally {
         openMultiplayerBtn.disabled = false;
       }
@@ -743,25 +341,25 @@
     async function startDonationCheckout(plan, button, planLabel) {
       if (!button) return;
       button.disabled = true;
-      setStatus(`Preparing ${planLabel} donation checkout...`);
+      setStatus(`Preparing the ${planLabel} donation checkout…`);
 
       try {
         if (!hasFirebaseConfig()) {
-          setStatus('Firebase config not set yet. Open Account to complete donations.', true);
+          setStatus('Open Account to complete a donation after Firebase is configured.', true);
           window.location.assign('./account/');
           return;
         }
 
         const user = await ensureSignedIn();
         if (!user) {
-          setStatus('Continue sign-in in the popup/redirect to continue donation checkout.');
+          setStatus('Finish signing in to continue the donation checkout.');
           return;
         }
 
         await redirectToCheckout(plan);
       } catch (err) {
         console.error('[landing] Donation checkout failed:', err);
-        setStatus(err && err.message ? err.message : 'Could not start donation checkout right now.', true);
+        setStatus(err?.message || 'Donation checkout could not start right now.', true);
       } finally {
         button.disabled = false;
       }

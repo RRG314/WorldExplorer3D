@@ -59,6 +59,7 @@ export function disposeLivingWorldRuntime(appCtx, reason = 'world-reload') {
 export function startLivingWorldRuntime(appCtx, options = {}) {
   appCtx.disposeLivingWorldRuntime = (reason = 'disposed') => disposeLivingWorldRuntime(appCtx, reason);
   appCtx.livingWorldRuntimeSnapshot = () => livingWorldRuntimeSnapshot(appCtx);
+  if (!globalThis.THREE) return null;
   const snapshot = options.snapshot;
   const request = options.request;
   if (!appCtx || snapshot?.type !== 'WorldSnapshot' || !request?.id) return null;

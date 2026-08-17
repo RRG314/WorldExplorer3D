@@ -14,13 +14,14 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 *A current in-game capture of the expanded New York fixed world. Every image below was captured directly from the browser runtime, not rendered as concept art.*
 
-## Version 4.2.1
+## Version 4.3.0
 
-Version 4.2.1 gives the player, car, boat, plane, and spacecraft a cohesive,
-performance-bounded expedition style and adds a direct browser-gameplay tour of
-the expanded world. It retains the DeFlock Hunt and bounded Live GPS Explore
-features from 4.2.0, the single immutable location publication, and the retained
-Earth scene used when returning from Space.
+Version 4.3.0 turns the existing fixed world into a more coherent Explorer
+experience. It adds contextual Discovery, wildlife and geology, field tools,
+progression, companions and capability-aware AR while integrating those systems
+with the existing Journal, account, admin, tutorial, multiplayer and world
+lifecycles. It also strengthens visible bridge/tunnel continuity and expands the
+performance-bounded living population without creating another world loader.
 
 Highlights:
 
@@ -39,6 +40,7 @@ Highlights:
 - Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
 - [DeFlock Hunt](docs/DEFLOCK_MODE.md), a virtual single-player and cooperative mode built from publicly mapped OpenStreetMap surveillance nodes.
 - Live GPS Explore, an optional foreground-only mode that follows a player's physical location inside one bounded, fixed world without continuous-world streaming.
+- Contextual AR for owned companions, recorded specimens, and habitat-aware virtual wildlife photo surveys, with WebXR, camera-overlay, and interactive-3D capability levels.
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
 
@@ -146,7 +148,17 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 
 ## Project Documents
 
-- [Complete system inventory and reconstruction guide](docs/SYSTEM_INVENTORY.md)
+- [Complete system inventory and reconstruction guide](docs/SYSTEM_INVENTORY.md) — canonical whole-product inventory
+- [Architecture map](docs/ARCHITECTURE_MAP.md) — runtime, environments, world load, coordinates, surfaces, movement, maps, and lifecycle
+- [Data and provenance inventory](docs/DATA_AND_PROVENANCE.md) — providers, truth classes, generated content, caches, assets, and attribution
+- [Persistence and trust inventory](docs/PERSISTENCE_AND_TRUST.md) — browser storage, Firestore, rules, Functions, privacy, and deletion
+- [Product capability and maturity map](docs/PRODUCT_CAPABILITIES.md) — user-facing systems, subsystems, limitations, and status
+- [Test and release map](docs/TEST_AND_RELEASE_MAP.md) — verification ownership, current blockers, candidate and promotion flow
+- [Explorer platform implementation report](docs/EXPLORER_PLATFORM_IMPLEMENTATION_REPORT.md) — focused recent-build evidence
+- [World Discovery and Interaction architecture/R&D](docs/WORLD_DISCOVERY_INTERACTION_ARCHITECTURE_RND.md)
+- [World Discovery playable-build handoff](docs/WORLD_DISCOVERY_IMPLEMENTATION_HANDOFF.md)
+- [Augmented Reality platform architecture/R&D](docs/AUGMENTED_REALITY_PLATFORM_ARCHITECTURE_RND.md)
+- [Augmented Reality implementation handoff](docs/AUGMENTED_REALITY_IMPLEMENTATION_HANDOFF.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)

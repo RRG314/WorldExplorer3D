@@ -236,6 +236,33 @@ assert.ok(
   bridgeA.transportStructureRef.specification.barrierOffset > bridgeA.width * 0.5,
   'bridge barrier was not constrained to the deck side'
 );
+
+const regionalWaterBridge = structureFeature(
+  'osm:way:regional-water-bridge',
+  [{ x: 0, z: 40 }, { x: 60, z: 40 }, { x: 120, z: 40 }],
+  { highway: 'motorway', bridge: 'yes', layer: '1' },
+  { width: 12, surfaceY: -8 }
+);
+regionalWaterBridge.structureStations = buildFeatureStations(regionalWaterBridge, {
+  features: [],
+  waterAreas: [{
+    pts: [
+      { x: -20, z: 20 }, { x: 140, z: 20 },
+      { x: 140, z: 60 }, { x: -20, z: 60 }
+    ],
+    surfaceY: 0.04
+  }],
+  sampleTerrainY: () => -8
+});
+updateFeatureSurfaceProfile(regionalWaterBridge, () => -8, { surfaceBias: 0.08 });
+assert.ok(
+  regionalWaterBridge.structureStations.some((station) => station.source.includes('water_crossing')),
+  'mapped regional water must create a physical bridge-clearance station'
+);
+assert.ok(
+  Math.min(...regionalWaterBridge.transportSurfaceModel.centerHeights) >= 6.1 - 1e-3,
+  'bridge clearance must be measured above the published water surface, not bathymetric terrain'
+);
 bridgeA.transportRecord.completeness = 'lossless';
 assert.equal(isProtectedRoadFeature(bridgeA), true);
 compileTransportStructureAssemblies([bridgeA], () => -8);

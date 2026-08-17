@@ -15,6 +15,16 @@ let trackingStarted = false;
 let trackingInterval = 0;
 let unloadBound = false;
 let authUnsubscribe = null;
+let productEventsBound = false;
+let discoveryEventListener = null;
+let tutorialEventListener = null;
+
+const ALLOWED_PRODUCT_EVENTS = new Set([
+  'tutorial_begin',
+  'tutorial_complete',
+  'we3d_tutorial_step',
+  'we3d_discovery_action'
+]);
 
 const state = {
   enabled: false,
@@ -27,6 +37,7 @@ const state = {
   worldSessionStartedAt: 0,
   worldSessionCount: 0,
   flushCount: 0,
+  productEventCount: 0,
   lastMode: '',
   lastEnvironment: '',
   lastLocationKey: '',
@@ -144,6 +155,67 @@ async function logAnalyticsEvent(eventName, params = {}) {
     state.errors.push(String(error?.message || error));
     return false;
   }
+}
+
+function sanitizeEventParams(params = {}) {
+  const safe = {};
+  Object.entries(params && typeof params === 'object' ? params : {}).slice(0, 20).forEach(([rawKey, rawValue]) => {
+    const key = sanitizeAnalyticsName(rawKey, '', 40);
+    if (!key || rawValue == null) return;
+    if (typeof rawValue === 'boolean') safe[key] = rawValue;
+    else if (typeof rawValue === 'number' && Number.isFinite(rawValue)) safe[key] = rawValue;
+    else if (Array.isArray(rawValue)) safe[key] = rawValue.map((value) => sanitizeAnalyticsName(value, '', 32)).filter(Boolean).slice(0, 4).join('|');
+    else safe[key] = sanitizeAnalyticsName(rawValue, 'unknown', 80);
+  });
+  return safe;
+}
+
+async function trackProductEvent(eventName, params = {}) {
+  const name = String(eventName || '').trim();
+  if (!ALLOWED_PRODUCT_EVENTS.has(name)) return false;
+  const logged = await logAnalyticsEvent(name, sanitizeEventParams(params));
+  if (logged) state.productEventCount += 1;
+  return logged;
+}
+
+function bindProductEvents() {
+  if (productEventsBound || typeof globalThis.addEventListener !== 'function') return;
+  productEventsBound = true;
+  discoveryEventListener = (event) => {
+    const detail = event?.detail || {};
+    void trackProductEvent('we3d_discovery_action', {
+      action: detail.type,
+      activity_id: detail.activityId,
+      catalog_family: detail.catalogFamily,
+      discipline: detail.discipline,
+      context_bands: detail.contextBands,
+      result: detail.result,
+      multiplayer: detail.multiplayer,
+      live_gps: detail.liveGps,
+      schema_version: detail.schemaVersion
+    });
+  };
+  tutorialEventListener = (event) => {
+    const detail = event?.detail || {};
+    void trackProductEvent(detail.name, detail.params || {});
+  };
+  globalThis.addEventListener('we3d:discovery-telemetry', discoveryEventListener);
+  globalThis.addEventListener('we3d:tutorial-telemetry', tutorialEventListener);
+  globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ = true;
+  const queuedTutorialEvents = Array.isArray(globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__)
+    ? globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__.splice(0)
+    : [];
+  queuedTutorialEvents.forEach((detail) => tutorialEventListener({ detail }));
+}
+
+function unbindProductEvents() {
+  if (!productEventsBound || typeof globalThis.removeEventListener !== 'function') return;
+  productEventsBound = false;
+  globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ = false;
+  if (discoveryEventListener) globalThis.removeEventListener('we3d:discovery-telemetry', discoveryEventListener);
+  if (tutorialEventListener) globalThis.removeEventListener('we3d:tutorial-telemetry', tutorialEventListener);
+  discoveryEventListener = null;
+  tutorialEventListener = null;
 }
 
 async function syncAnalyticsUser(user = null) {
@@ -269,6 +341,7 @@ function startAnalyticsTracking(appCtx) {
 
   void ensureAnalyticsTools();
   bindLifecycle(appCtx);
+  bindProductEvents();
 
   authUnsubscribe = observeAuth((user) => {
     void syncAnalyticsUser(user || null);
@@ -293,6 +366,7 @@ function stopAnalyticsTracking() {
     authUnsubscribe();
     authUnsubscribe = null;
   }
+  unbindProductEvents();
 }
 
 function getAnalyticsSessionSnapshot(appCtx = null) {
@@ -309,6 +383,7 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     worldSessionAgeSec: state.worldSessionActive ? clampDurationSec((now - state.worldSessionStartedAt) / 1000) : 0,
     worldSessionCount: state.worldSessionCount,
     flushCount: state.flushCount,
+    productEventCount: state.productEventCount,
     currentMode: ctx ? currentTravelMode(ctx) : '',
     currentEnvironment: ctx ? currentEnvironment(ctx) : '',
     lastLocationKey: state.lastLocationKey || '',
@@ -320,5 +395,6 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
 export {
   getAnalyticsSessionSnapshot,
   startAnalyticsTracking,
-  stopAnalyticsTracking
+  stopAnalyticsTracking,
+  trackProductEvent
 };

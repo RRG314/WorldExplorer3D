@@ -7,7 +7,7 @@ import {
   buildFeatureTransitionAnchors,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=48";
+} from "../structure-semantics.js?v=49";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=13";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=5";
@@ -98,6 +98,41 @@ function createFeatureBoundsIndex(features = [], cellSize = 240) {
       }
     }
     return [...candidates];
+  };
+}
+
+function createWaterAreaBoundsFilter(waterAreas = []) {
+  const entries = waterAreas.map((area) => {
+    const points = Array.isArray(area?.pts) ? area.pts : [];
+    const bounds = points.reduce((result, point) => ({
+      minX: Math.min(result.minX, Number(point?.x)),
+      maxX: Math.max(result.maxX, Number(point?.x)),
+      minZ: Math.min(result.minZ, Number(point?.z)),
+      maxZ: Math.max(result.maxZ, Number(point?.z))
+    }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    return [area, bounds];
+  }).filter(([, bounds]) => (
+    [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ].every(Number.isFinite)
+  ));
+  const cache = new Map();
+  return (feature) => {
+    if (cache.has(feature)) return cache.get(feature);
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    const padding = (Number(feature?.width) || 4) + 8;
+    const bounds = points.reduce((result, point) => ({
+      minX: Math.min(result.minX, Number(point?.x) - padding),
+      maxX: Math.max(result.maxX, Number(point?.x) + padding),
+      minZ: Math.min(result.minZ, Number(point?.z) - padding),
+      maxZ: Math.max(result.maxZ, Number(point?.z) + padding)
+    }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    const candidates = entries.filter(([, waterBounds]) => !(
+      waterBounds.maxX < bounds.minX ||
+      waterBounds.minX > bounds.maxX ||
+      waterBounds.maxZ < bounds.minZ ||
+      waterBounds.minZ > bounds.maxZ
+    )).map(([area]) => area);
+    cache.set(feature, candidates);
+    return candidates;
   };
 }
 
@@ -259,6 +294,15 @@ function* compileStructureAwareFeatureProfileSteps() {
   }
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+  const structureWaterAreas = []
+    .concat(Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [])
+    .concat(Array.isArray(appCtx.fixedRegionalStructureWaterAreas)
+      ? appCtx.fixedRegionalStructureWaterAreas
+      : []);
+  // A regional world can publish hundreds of complex water rings. Candidate
+  // them once by bounds so station refinement does not run every structure
+  // vertex through every remote polygon on each of the three profile passes.
+  const nearbyStructureWaterAreas = createWaterAreaBoundsFilter(structureWaterAreas);
   measure('compileConnections', () => {
     appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
     appCtx.transportStructureModel = compileTransportStructureModel(transportFeatures, {
@@ -286,7 +330,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       if (!feature?.structureSemantics?.gradeSeparated) continue;
       feature.structureStations = buildFeatureStations(feature, {
         features: nearbyTransportFeatures(feature),
-        waterAreas: appCtx.waterAreas,
+        waterAreas: nearbyStructureWaterAreas(feature),
         sampleTerrainY: worldBaseTerrainY
       });
     }
@@ -314,13 +358,14 @@ function* compileStructureAwareFeatureProfileSteps() {
   // Resolve crossing clearances once against the first compiled world-space
   // surfaces. Nominal layer offsets alone are insufficient when two ramps
   // have different endpoint-ground chords on sloped terrain.
-  measure('refineStructureProfiles', () => {
-    for (let refinement = 0; refinement < 3; refinement += 1) {
+  for (let refinement = 0; refinement < 3; refinement += 1) {
+    const refinementPassStartedAt = now();
+    try {
       for (let i = 0; i < structureFeatures.length; i++) {
         const feature = structureFeatures[i];
         feature.structureStations = buildFeatureStations(feature, {
           features: nearbyTransportFeatures(feature),
-          waterAreas: appCtx.waterAreas,
+          waterAreas: nearbyStructureWaterAreas(feature),
           sampleTerrainY: worldBaseTerrainY
         });
       }
@@ -330,9 +375,20 @@ function* compileStructureAwareFeatureProfileSteps() {
           surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
+    } finally {
+      phaseDurationsMs[`refineStructureProfilesPass${refinement + 1}`] = Number(
+        (now() - refinementPassStartedAt).toFixed(2)
+      );
     }
-  });
-  yield;
+    // Dense cities must remain responsive while the shared stacked-structure
+    // solver converges. Each pass is independent until the following pass.
+    yield;
+  }
+  phaseDurationsMs.refineStructureProfiles = Number(
+    [1, 2, 3].reduce((total, pass) => (
+      total + Number(phaseDurationsMs[`refineStructureProfilesPass${pass}`] || 0)
+    ), 0).toFixed(2)
+  );
 
   // A ramp endpoint and the interior freeway segment it joins are one physical
   // surface. A single anchor pass reads the target's provisional profile and
@@ -416,6 +472,10 @@ function* compileStructureAwareFeatureProfileSteps() {
       total: Number((now() - compilationStartedAt).toFixed(2))
     })
   });
+  // Regional mapped-water rings are compilation staging. Bridge/tunnel
+  // profiles now own the derived elevations, so retaining the source polygons
+  // would recreate the fixed-world memory regression.
+  appCtx.fixedRegionalStructureWaterAreas = [];
   return appCtx.structureProfileCompilation;
 }
 

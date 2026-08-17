@@ -1,0 +1,1113 @@
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
+import { createCompanionRuntime } from './companion-runtime.js?v=1';
+import { createDetectorSession } from './detector-session.js?v=1';
+import { compileEnvironmentContext } from './environment-context.js?v=1';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=1';
+import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
+import { explorerProgressSnapshot } from './explorer-events.js?v=1';
+import {
+  RELEASED_EXPLORER_TOOLS,
+  explorerGoalSnapshot,
+  explorerToolProgress,
+  regionalProgressSnapshot
+} from './explorer-goals.js?v=1';
+import {
+  compileEncounterPlan,
+  compileGeographicEligibility,
+  compileWorldInteractionPublication,
+  createDiscoveryPublication,
+  createDiscoveryPublicationStore,
+  resolveContextActions
+} from './model.js?v=1';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=1';
+import { fieldProgress } from './pacing.js?v=1';
+import { emitDiscoveryTelemetry } from './telemetry.js?v=1';
+import { sampleDiscoverySurfaceY } from './surface.js?v=1';
+import { createExplorationEntitlementService } from './tools.js?v=1';
+import { tutorialForActivity } from './tutorials.js?v=1';
+import { visualForCatalogId } from './visual-content.js?v=1';
+import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=1';
+import { createStableWorldIdentity } from '../living-world/model.js?v=1';
+import { evaluateArEligibility } from '../ar/eligibility.js?v=1';
+
+const RELEASED_EXPLORER_ACTIVITIES = new Set([
+  'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
+  'fossil-document', 'forage', 'wildlife-track', 'beachcomb', 'fish'
+]);
+
+const TOOL_FIELD_USE = Object.freeze({
+  'field-lens': 'Inspect plants, surfaces, and close field evidence.',
+  'field-camera': 'Record wildlife and habitat observations without collecting them.',
+  'metal-detector': 'Locate and classify stable virtual signals in suitable ground.',
+  'hand-trowel': 'Excavate surface and shallow detector finds.',
+  'fishing-rod': 'Launch the full fishing activity near compatible water.',
+  'field-binoculars': 'Observe and track wildlife from a respectful distance.',
+  'rock-hammer': 'Inspect virtual rock and mineral survey points.',
+  'sediment-pan': 'Survey virtual sediment along suitable streams and riverbanks.',
+  'fossil-brush': 'Clean and document virtual fossil evidence.',
+  'specimen-brush': 'Reveal delicate virtual fossil and specimen details.',
+  'field-shovel': 'Excavate moderate-depth detector finds after classification.'
+});
+
+const EXPLORER_SECTION_TUTORIALS = Object.freeze({
+  workspace: Object.freeze({ id: 'explorer-workspace-v1', title: 'Your Explorer loop', steps: Object.freeze([
+    'Choose one nearby lead. The first option is the best fit for this place; the next two are alternatives.',
+    'Begin, then minimize this Journal so the equipped tool and world-space signal can guide you.',
+    'Record the result. Every completed action enters the Journal and Field Guide; only acquired virtual objects enter Collection.',
+    'Current Goal and Progress show what to pursue next without forcing every system at once.'
+  ]) }),
+  guide: Object.freeze({ id: 'explorer-guide-v1', title: 'Field Guide', steps: Object.freeze([
+    'The Field Guide answers what exists and what you have identified; it is not an inventory.',
+    'Unknown silhouettes are future identification targets. Search and category filters narrow the catalog.',
+    'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
+  ]) }),
+  collection: Object.freeze({ id: 'explorer-collection-v1', title: 'Collection', steps: Object.freeze([
+    'Collection contains virtual objects you actually acquired: finds, specimens, catch trophies, or creations.',
+    'Wildlife sightings, photographs, and field notes remain in the Journal and Field Guide instead.'
+  ]) }),
+  gear: Object.freeze({ id: 'explorer-gear-v1', title: 'Gear', steps: Object.freeze([
+    'Equip a released tool here or let a compatible nearby lead equip it automatically.',
+    'Locked gear represents a real capability unlock. Explorer points persist and reveal the next field kit at rank milestones.',
+    'How to use explains the purpose and field context before you begin.'
+  ]) }),
+  progress: Object.freeze({ id: 'explorer-progress-v1', title: 'Explorer Progress', steps: Object.freeze([
+    'New identifications earn the strongest rank credit; documenting known evidence in a new region also counts.',
+    'Regional goals mix Nature, Earth, Places, and field activities so one repeated action cannot complete everything.',
+    'Specialties describe your Explorer story while rank unlocks additional ways to play.'
+  ]) })
+});
+
+function playerPosition(appCtx) {
+  if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) return appCtx.Walk.state.walker;
+  if (appCtx.boatMode?.active) return appCtx.boat;
+  if (appCtx.droneMode) return appCtx.drone;
+  return appCtx.car || { x: 0, y: 0, z: 0, angle: 0 };
+}
+
+function displayDiscoveryLabel(value, fallback = 'Discovery') {
+  const key = String(value || '').trim().toLowerCase();
+  const labels = {
+    'procedural-game-encounter': 'Virtual field encounter',
+    'domestic-companion': 'Domestic companion',
+    'virtual-wildlife-companion': 'Wildlife companion',
+    'wildlife-clue': 'Wildlife sign',
+    'wildlife-record': 'Wildlife observation',
+    'botany-record': 'Plant observation',
+    'fossil-representation': 'Fossil study',
+    'fictional-find': 'Expedition find',
+    'fictional-history': 'Expedition history',
+    'exploration-record': 'Field note',
+    'creation-record': 'Stewardship record',
+    'service-record': 'Survey record',
+    'not-tradeable': 'Personal record'
+  };
+  if (labels[key]) return labels[key];
+  const spaced = key.replaceAll('-', ' ').replaceAll('_', ' ').replace(/\s+/g, ' ').trim();
+  if (!spaced) return fallback;
+  return spaced.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function discoveryCatalogEntry(catalogId) {
+  return [...BUILTIN_DISCOVERY_CATALOGS.finds, ...BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries]
+    .find((entry) => entry.id === catalogId);
+}
+
+function guideCategoryFor(record = {}) {
+  const family = String(record.family || discoveryCatalogEntry(record.catalogId)?.family || '').toLowerCase();
+  if (/wildlife|animal|bird|fish|marine/.test(family)) return family.includes('marine') || family === 'fish' ? 'ocean' : 'wildlife';
+  if (/botany|plant|fung/.test(family)) return 'plants';
+  if (/fossil/.test(family)) return 'fossils';
+  if (/rock|mineral|sediment|gem|ore|metal/.test(family)) return 'geology';
+  if (/water-survey|ocean/.test(family)) return 'ocean';
+  return 'places';
+}
+
+function createDiscoveryUi(state) {
+  const byId = (id) => document.getElementById(id);
+  const elements = {
+    panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
+    title: byId('discoveryPanelTitle'), actions: byId('discoveryActionList'), quickLabel: byId('discoveryQuickToolBtn')?.querySelector('strong'),
+    quickSignal: byId('discoveryQuickSignal'), prompt: byId('discoveryContextPrompt'), promptText: byId('discoveryContextText'),
+    promptOpen: byId('discoveryContextOpenBtn'), phase: byId('discoveryPhase'), bearing: byId('discoveryBearing'),
+    fill: byId('discoverySignalFill'), distance: byId('discoveryDistance'), classification: byId('discoveryClassification'),
+    message: byId('discoveryMessage'), primary: byId('discoveryPrimaryBtn'), secondary: byId('discoverySecondaryBtn'),
+    journal: byId('discoveryJournalList'), journalCategory: byId('discoveryJournalCategory'), journalRegion: byId('discoveryJournalRegion'), result: byId('discoveryResultCard'),
+    fieldGuide: byId('discoveryFieldGuideList'), collection: byId('discoveryCollectionList'),
+    guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'),
+    guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
+    companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
+    equipped: byId('discoveryEquippedSummary'),
+    tutorial: byId('discoveryTutorial'), tutorialTitle: byId('discoveryTutorialTitle'),
+    tutorialSteps: byId('discoveryTutorialSteps'), tutorialDone: byId('discoveryTutorialDoneBtn'),
+    sectionTutorial: byId('discoverySectionTutorial'), sectionTutorialTitle: byId('discoverySectionTutorialTitle'),
+    sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
+    inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal')
+  };
+  const listeners = [];
+  let activeTab = 'today';
+  let open = false;
+  let actionSignature = '';
+  let guideRecords = [];
+  let journalRecords = [];
+
+  function listen(element, type, handler) {
+    if (!element) return;
+    element.addEventListener(type, handler);
+    listeners.push(() => element.removeEventListener(type, handler));
+  }
+
+  function setOpen(next) {
+    open = !!next;
+    elements.panel?.classList.toggle('show', open);
+    elements.panel?.setAttribute('aria-hidden', open ? 'false' : 'true');
+    elements.quick?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      void refreshData();
+      void state.showSectionTutorial?.('workspace');
+    }
+    return open;
+  }
+
+  function renderGuide() {
+    if (!elements.fieldGuide) return;
+    const search = String(elements.guideSearch?.value || '').trim().toLowerCase();
+    const category = String(elements.guideCategory?.value || 'all');
+    const knownIds = new Set(guideRecords.map((entry) => entry.catalogId));
+    const known = guideRecords.filter((entry) => {
+      const catalog = discoveryCatalogEntry(entry.catalogId);
+      if (category !== 'all' && guideCategoryFor(entry) !== category) return false;
+      const haystack = `${entry.name || ''} ${entry.family || ''} ${catalog?.names?.scientific || ''}`.toLowerCase();
+      return !search || haystack.includes(search);
+    });
+    const unknown = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.filter((entry) => {
+      if (knownIds.has(entry.id)) return false;
+      if (category !== 'all' && guideCategoryFor(entry) !== category) return false;
+      const haystack = `${entry.names?.common || ''} ${entry.family || ''} ${entry.names?.scientific || ''}`.toLowerCase();
+      return !search || haystack.includes(search);
+    }).slice(0, 6);
+    const knownMarkup = known.map((entry) => {
+      const catalog = discoveryCatalogEntry(entry.catalogId);
+      const regions = Array.isArray(entry.regionLabels) ? entry.regionLabels.filter(Boolean) : [];
+      return visualCard(entry, `${displayDiscoveryLabel(entry.family || catalog?.family)} · ${entry.observations || 1} observation${entry.observations === 1 ? '' : 's'} · ${regions.length || 1} region${regions.length === 1 ? '' : 's'} · ${displayDiscoveryLabel(entry.evidenceClass, 'Field record')}`, 'field-guide');
+    }).join('');
+    const unknownMarkup = unknown.map((entry) => `<article class="discoveryItem discoveryUnknown"><span class="discoveryUnknownMark" aria-hidden="true">?</span><div><strong>Unknown ${escapeHtml(displayDiscoveryLabel(entry.family, 'discovery'))}</strong><small>Explore a compatible place and use the right field tool to identify this entry.</small></div></article>`).join('');
+    elements.fieldGuide.innerHTML = knownMarkup || unknownMarkup
+      ? `${knownMarkup}${unknownMarkup}`
+      : '<div class="discoveryEmpty">No Guide entries match this search.</div>';
+    if (elements.guideOverview) {
+      const total = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.length;
+      elements.guideOverview.innerHTML = `<article><strong>${guideRecords.length}</strong><span>identified</span></article><article><strong>${Math.max(0, total - guideRecords.length)}</strong><span>unknown in this catalog</span></article><article><strong>${new Set(guideRecords.flatMap((entry) => entry.regionLabels || [])).size}</strong><span>named regions</span></article>`;
+    }
+  }
+
+  function renderJournal() {
+    if (!elements.journal) return;
+    const specialty = String(elements.journalCategory?.value || 'all');
+    const regionId = String(elements.journalRegion?.value || 'all');
+    const filtered = journalRecords.filter((event) =>
+      (specialty === 'all' || event.specialtyId === specialty) &&
+      (regionId === 'all' || event.regionId === regionId)
+    );
+    elements.journal.innerHTML = filtered.length ? filtered.slice(0, 16).map((event) => {
+      const when = new Date(Number(event.occurredAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const destination = event.projections?.collection ? 'Guide + Collection' : 'Guide record';
+      const returnButton = event.locationKey ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${displayDiscoveryLabel(event.activityId, 'Field work')} · ${destination}`)}</small><span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Documented · no repeat rank credit'}</span>${returnButton}</article>`;
+    }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
+  }
+
+  async function refreshData() {
+    const [profile, items, guide, events] = await Promise.all([
+      state.profileStore.getProfile(),
+      state.profileStore.listItems(100),
+      state.profileStore.listFieldGuide?.(200) || [],
+      state.profileStore.listEvents?.(100) || []
+    ]);
+    guideRecords = guide;
+    journalRecords = events;
+    if (elements.journalRegion) {
+      const selectedRegion = elements.journalRegion.value || 'all';
+      const regions = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, event.regionLabel || 'Saved region'])).entries()];
+      elements.journalRegion.innerHTML = `<option value="all">All regions</option>${regions.map(([id, label]) => `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`).join('')}`;
+      elements.journalRegion.value = regions.some(([id]) => id === selectedRegion) ? selectedRegion : 'all';
+    }
+    const rank = explorerProgressSnapshot(profile.explorerProgress);
+    if (elements.rank) elements.rank.innerHTML = `<span>EXPLORER RANK</span><strong>${escapeHtml(rank.rankLabel)}</strong><small>${rank.next ? `${rank.next.pointsRemaining} points to ${escapeHtml(rank.next.label)} · new identifications and new-region evidence count` : 'Highest current rank · keep building your regional story'}</small>`;
+    const goal = explorerGoalSnapshot({ profile, guide, items, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
+    if (elements.goal) elements.goal.innerHTML = `<div class="discoveryGoalCopy"><span>CURRENT GOAL</span><strong>${escapeHtml(goal.label)}</strong><small>${escapeHtml(goal.detail)}</small></div><div class="discoveryGoalMeter" aria-label="${escapeHtml(`${goal.current} of ${goal.target}`)}"><i style="width:${goal.progressPercent}%"></i></div><div class="discoveryGoalFoot"><b>${goal.current}/${goal.target}</b><span>${escapeHtml(goal.reward)}</span></div>`;
+    renderGuide();
+    renderJournal();
+    if (elements.collection) {
+      elements.collection.innerHTML = items.length ? items.map((item) =>
+        visualCard(item, `${displayDiscoveryLabel(item.rarityBand, 'Common')} · ${displayDiscoveryLabel(item.depthBand || item.qualityBand || 'surface')} · Acquired virtual item`, 'collection')
+      ).join('') : '<div class="discoveryEmpty">Observations do not become owned items. Collect a virtual specimen, detector find, catch trophy, or created artifact to begin this Collection.</div>';
+    }
+    if (elements.tools) {
+      const equippedToolId = String(profile.equippedToolId || 'field-lens');
+      const available = state.entitlements.listAvailableTools();
+      const lockedProgress = new Map((state.toolProgress?.lockedTools || []).map((entry) => [entry.toolId, entry]));
+      const availableMarkup = available.map((tool) =>
+        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Equipped' : ''}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-equip="${escapeHtml(tool.id)}" type="button" ${tool.id === equippedToolId ? 'disabled' : ''}>${tool.id === equippedToolId ? 'Equipped' : 'Equip'}</button><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
+      ).join('');
+      const lockedMarkup = state.entitlements.listLockedTools().map((tool) => {
+        const unlock = lockedProgress.get(tool.id);
+        return `<article class="discoveryItem discoveryGearItem locked"><span class="discoveryGearLock">LOCKED</span><strong>${escapeHtml(tool.label)}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || 'A later Explorer capability.')}</small><span class="discoveryGearUnlock">${escapeHtml(unlock?.label || 'Raise Explorer rank')} · ${unlock?.pointsRemaining || 0} points remaining</span></article>`;
+      }).join('');
+      elements.tools.innerHTML = `${availableMarkup}${lockedMarkup}`;
+      const equippedTool = state.entitlements.listAvailableTools().find((tool) => tool.id === equippedToolId);
+      if (elements.equipped) elements.equipped.innerHTML = `<span>EQUIPPED TOOL</span><strong>${escapeHtml(equippedTool?.label || 'Field Lens')}</strong><small>${escapeHtml(equippedTool ? equippedTool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · ') : 'Inspect · Classify')}</small>`;
+    }
+    if (elements.companions) {
+      const owned = state.companionRuntime?.snapshot?.().companions || [];
+      elements.companions.innerHTML = COMPANION_CATALOG.map((catalog) => {
+        const companion = owned.find((entry) => entry.catalogId === catalog.id);
+        if (!companion) {
+          const eligible = state.isCompanionEligible?.(catalog) === true;
+          const encounter = state.companionEncounterState?.(catalog.id) || { step: 0 };
+          const domesticLabels = ['Approach Carefully', 'Offer Virtual Care', 'Adopt'];
+          const wildlifeLabels = ['Observe Safely', 'Complete Observation', 'Unlock Virtual Companion'];
+          const labels = catalog.companionPolicy === 'adoptable-domestic' ? domesticLabels : wildlifeLabels;
+          const guidance = eligible
+            ? catalog.companionPolicy === 'adoptable-domestic'
+              ? 'This companion can be met here. Spend time together to build trust before adoption.'
+              : 'A wildlife companion encounter is available here. Observe real wildlife only from a safe distance.'
+            : 'Explore a compatible habitat to begin this companion encounter.';
+          const visual = visualForCatalogId(catalog.id);
+          return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(`${displayDiscoveryLabel(catalog.family)} · ${displayDiscoveryLabel(catalog.rarityBand, 'Common')} · ${guidance}`)}</small>${eligible ? `<div class="discoveryCompanionActions"><button data-companion-action="meet" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">${escapeHtml(labels[Math.min(2, encounter.step)])}</button></div>` : ''}${visual ? '</div>' : ''}</article>`;
+        }
+        const visual = visualForCatalogId(companion.catalogId);
+        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Trust ${companion.care?.trust || 0} · Fullness ${companion.care?.fullness || 0} · Find training ${companion.training?.find || 0}/5`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? 'Following' : 'Make Active'}</button><button data-companion-action="feed" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Feed</button><button data-companion-action="train" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Train Find</button><button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+      }).join('');
+    }
+    if (elements.progress) {
+      const progress = rank;
+      const regional = regionalProgressSnapshot({ guide, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
+      const specialties = Object.entries(progress.specialties || {});
+      const regionEvents = new Map();
+      events.forEach((event) => {
+        const key = event.regionId || event.worldIdentity || 'local-region';
+        const row = regionEvents.get(key) || { label: event.regionLabel || 'Current region', records: 0, catalogs: new Set() };
+        row.records += 1;
+        if (event.catalogId) row.catalogs.add(event.catalogId);
+        regionEvents.set(key, row);
+      });
+      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.uniqueDiscoveries || 0} unique identifications · ${progress.regions?.length || 0} regions</small></article><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.catalogs.size}</strong>${escapeHtml(region.label)}<small>${region.records} Journal record${region.records === 1 ? '' : 's'} · ${region.catalogs.size} identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first completed field record will start regional progress.</div>'}`;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+  }
+
+  function visualCard(record, meta = '', source = 'field-guide') {
+    const catalog = discoveryCatalogEntry(record.catalogId);
+    const visual = visualForCatalogId(record.catalogId);
+    const name = record.name || catalog?.names?.common || record.catalogId;
+    const details = meta || `${displayDiscoveryLabel(record.family || catalog?.family)} · ${displayDiscoveryLabel(record.evidenceClass, 'Field reference')}`;
+    if (!visual) return `<article class="discoveryItem"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(details)}</small></article>`;
+    return `<article class="discoveryItem discoveryItemVisual"><img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div><strong>${escapeHtml(name)}</strong><div class="discoveryScientific">${escapeHtml(catalog?.names?.scientific || visual.scientificName)}</div><small>${escapeHtml(details)}</small><span class="discoveryEvidence">Reference image</span><a class="discoveryCredit" href="${escapeHtml(visual.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(`${visual.author} · ${visual.license}`)}</a><div class="discoveryCompanionActions"><button class="discoveryArLaunch" data-ar-record="${escapeHtml(record.instanceId || record.catalogId)}" data-ar-source="${escapeHtml(source)}" type="button">Place in AR</button></div></div></article>`;
+  }
+
+  function setTab(tab) {
+    activeTab = tab;
+    const tabTitles = { today: 'Today', guide: 'Field Guide', collection: 'Collection', gear: 'Gear', progress: 'Explorer Progress' };
+    if (tab !== 'today' && elements.title) elements.title.textContent = tabTitles[tab] || 'Explorer Journal';
+    document.querySelectorAll('.discoveryTab').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === tab));
+    document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === tab));
+    const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${tab}"]`);
+    if (activePane) activePane.scrollTop = 0;
+    if (tab !== 'today') void refreshData();
+    if (tab !== 'today') void state.showSectionTutorial?.(tab);
+  }
+
+  function showResult(outcome) {
+    const event = outcome?.event;
+    if (!elements.result) return false;
+    if (!event) {
+      elements.result.hidden = true;
+      elements.result.innerHTML = '';
+      return false;
+    }
+    const collection = event.projections?.collection === true;
+    const points = Number(event.progress?.points) || 0;
+    elements.result.hidden = false;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · New Field Guide evidence · Item added to Collection' : 'Journal updated · New Field Guide evidence · No owned item created')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation documented · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-result-tab="collection" type="button">View Collection</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
+    document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
+    return true;
+  }
+
+  document.querySelectorAll('.discoveryTab').forEach((button) => listen(button, 'click', () => setTab(button.dataset.discoveryTab || 'today')));
+  listen(elements.quick, 'click', () => setOpen(!open));
+  listen(elements.menu, 'click', () => {
+    document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
+    setTab('today');
+    setOpen(true);
+  });
+  listen(elements.promptOpen, 'click', () => setOpen(true));
+  listen(elements.close, 'click', () => setOpen(false));
+  listen(elements.help, 'click', () => {
+    if (activeTab === 'guide' && elements.guideHelp) {
+      elements.guideHelp.hidden = !elements.guideHelp.hidden;
+      elements.guideHelpButton?.setAttribute('aria-expanded', elements.guideHelp.hidden ? 'false' : 'true');
+    } else void state.showActivityTutorial(true);
+  });
+  listen(elements.guideHelpButton, 'click', () => {
+    if (!elements.guideHelp) return;
+    elements.guideHelp.hidden = !elements.guideHelp.hidden;
+    elements.guideHelpButton.setAttribute('aria-expanded', elements.guideHelp.hidden ? 'false' : 'true');
+  });
+  listen(elements.guideSearch, 'input', renderGuide);
+  listen(elements.guideCategory, 'change', renderGuide);
+  listen(elements.journalCategory, 'change', renderJournal);
+  listen(elements.journalRegion, 'change', renderJournal);
+  listen(elements.journal, 'click', (event) => {
+    const button = event.target?.closest?.('[data-journal-return]');
+    if (button) void state.returnToJournalEvent?.(button.dataset.journalReturn);
+  });
+  listen(elements.tutorialDone, 'click', () => void state.dismissActivityTutorial());
+  listen(elements.sectionTutorialDone, 'click', () => void state.dismissActivityTutorial());
+  listen(elements.primary, 'click', () => void state.handlePrimary());
+  listen(elements.secondary, 'click', () => void state.handleSecondary());
+  listen(elements.actions, 'click', (event) => {
+    const button = event.target?.closest?.('[data-discovery-action]');
+    if (button) void state.selectActivity(button.dataset.discoveryAction);
+  });
+  listen(elements.companions, 'click', (event) => {
+    const button = event.target?.closest?.('[data-companion-action]');
+    if (button) void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog);
+  });
+  listen(elements.tools, 'click', (event) => {
+    const equip = event.target?.closest?.('[data-tool-equip]');
+    const help = event.target?.closest?.('[data-tool-help]');
+    if (equip) void state.equipTool?.(equip.dataset.toolEquip);
+    else if (help) void state.showToolHelp?.(help.dataset.toolHelp);
+  });
+  listen(elements.result, 'click', (event) => {
+    const button = event.target?.closest?.('[data-result-tab]');
+    if (button) setTab(button.dataset.resultTab || 'today');
+  });
+  [elements.fieldGuide, elements.collection].forEach((container) => listen(container, 'click', (event) => {
+    const button = event.target?.closest?.('[data-ar-record]');
+    if (button) void state.handleArRecord(button.dataset.arRecord, button.dataset.arSource);
+  }));
+  listen(elements.arChallenge, 'click', () => void state.handleArChallenge());
+
+  function render(actions, snapshot, activityId = 'metal-detect') {
+    const detectorAvailable = actions.some((action) => action.id === 'metal-detect');
+    const operationActive = !!snapshot?.active && !['complete', 'collected', 'recorded', 'left'].includes(snapshot?.phase);
+    elements.quick?.classList.toggle('show', state.active && !open && operationActive && (detectorAvailable || activityId !== 'metal-detect'));
+    elements.prompt?.classList.remove('show');
+    if (elements.promptText) elements.promptText.textContent = actions.length
+      ? `${actions.slice(0, 3).map((action) => action.label).join(' · ')} available here`
+      : 'Inspect the current area.';
+    const nextSignature = `${activityId}|${actions.map((action) => action.id).join('|')}`;
+    if (elements.actions && nextSignature !== actionSignature) {
+      actionSignature = nextSignature;
+      elements.actions.innerHTML = actions.slice(0, 3).map((action, index) =>
+        `<button class="discoveryActionChip${action.id === activityId ? ' active' : ''}" data-discovery-action="${escapeHtml(action.id)}" type="button"><span>${escapeHtml(action.label)}</span><small>${action.id === 'fish' ? 'Full game' : index === 0 ? 'Recommended nearby lead' : 'Alternative lead'}</small></button>`
+      ).join('');
+    }
+    const activeAction = actions.find((action) => action.id === activityId);
+    const arEligibility = state.getArChallengeEligibility?.();
+    if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
+    if (elements.title && activeTab === 'today') elements.title.textContent = activeAction?.label || (activityId === 'metal-detect' ? 'Metal Detector' : 'Today');
+    if (elements.quickLabel) elements.quickLabel.textContent = `Resume ${activeAction?.label || 'Field Activity'}`;
+    if (!snapshot) return;
+    if (elements.inspection) {
+      const catalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.find((entry) => entry.id === snapshot.targetCatalogId);
+      const visual = visualForCatalogId(snapshot.targetCatalogId);
+      const visible = !!(visual && catalog && ['revealed', 'recorded'].includes(snapshot.phase));
+      elements.inspection.hidden = !visible;
+      if (visible) elements.inspection.innerHTML = `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}"><div class="discoveryInspectionBody"><span class="discoveryEvidence">Identification reference</span><b>${escapeHtml(catalog.names.common)}</b><em>${escapeHtml(catalog.names.scientific || visual.scientificName)}</em><p>${escapeHtml(catalog.description)}</p><a href="${escapeHtml(visual.sourceUrl)}" target="_blank" rel="noopener noreferrer">Photo: ${escapeHtml(visual.author)} · ${escapeHtml(visual.license)}</a></div>`;
+    }
+    if (elements.phase) elements.phase.textContent = snapshot.phase.replaceAll('-', ' ').replace(/^./, (value) => value.toUpperCase());
+    const isDetector = activityId === 'metal-detect';
+    if (elements.bearing) elements.bearing.textContent = isDetector
+      ? snapshot.bearingDegrees == null ? 'No signal' : `${Math.round(snapshot.bearingDegrees)}° bearing`
+      : snapshot.bearingDegrees == null ? snapshot.evidenceClass ? 'Virtual field record' : 'Current survey area' : `${Math.round(snapshot.bearingDegrees)}° field bearing`;
+    if (elements.fill) elements.fill.style.width = `${isDetector ? Math.round(Number(snapshot.signalStrength || 0) * 100) : snapshot.phase === 'seeking' ? 18 : snapshot.phase === 'observing' ? 62 : ['revealed', 'recorded'].includes(snapshot.phase) ? 100 : 0}%`;
+    if (elements.distance) elements.distance.textContent = isDetector
+      ? snapshot.distanceMeters == null ? '—' : `${snapshot.distanceMeters.toFixed(1)} m`
+      : snapshot.distanceMeters == null ? 'Local cell' : `${snapshot.distanceMeters.toFixed(1)} m`;
+    if (elements.classification) elements.classification.textContent = snapshot.targetName || snapshot.signalClass?.replaceAll('-', ' ') || snapshot.depthBand || (isDetector ? 'Unknown' : 'Pending');
+    if (elements.message) {
+      elements.message.textContent = snapshot.error || snapshot.message;
+      elements.message.classList.toggle('error', !!snapshot.error);
+    }
+    if (elements.quickSignal) elements.quickSignal.textContent = isDetector && snapshot.signalStrength > 0.7 ? 'Strong' : isDetector && snapshot.signalStrength > 0.25 ? 'Signal' : isDetector ? 'Sweeping' : snapshot.phase === 'seeking' && snapshot.distanceMeters != null ? `${Math.ceil(snapshot.distanceMeters)} m · ${Math.round(snapshot.bearingDegrees)}°` : snapshot.phase === 'revealed' ? 'Result ready' : 'Observing';
+    const detectorControls = {
+      idle: ['Start Sweep', 'Close'], complete: ['Search Again', 'Close'], sweeping: ['Refine Signal', 'Close'],
+      signal: ['Refine Signal', 'Close'], classified: ['Excavate', 'Leave'], excavating: ['Excavating…', 'Close'],
+      revealed: ['Collect', 'Leave'], collected: ['Search Again', 'Close'], left: ['Search Again', 'Close']
+    };
+    const fieldControls = {
+      idle: ['Begin', 'Close'], seeking: ['Locating…', 'Close'], observing: ['Observing…', 'Close'], revealed: ['Record', 'Leave'],
+      recorded: ['Do Again', 'Close'], left: ['Try Again', 'Close'], complete: ['Try Again', 'Close']
+    };
+    const controls = (isDetector ? detectorControls : fieldControls)[snapshot.phase] || ['Begin', 'Close'];
+    if (elements.primary) {
+      elements.primary.textContent = controls[0];
+      elements.primary.disabled = snapshot.phase === 'excavating' || snapshot.phase === 'observing' || snapshot.phase === 'seeking';
+    }
+    if (elements.secondary) elements.secondary.textContent = controls[1];
+  }
+
+  function showTutorial(tutorial) {
+    if (!elements.tutorial) return;
+    elements.tutorial.hidden = !tutorial;
+    if (!tutorial) return;
+    elements.tutorialTitle.textContent = `${tutorial.title} · quick guide`;
+    elements.tutorialSteps.innerHTML = tutorial.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('');
+  }
+
+  function showSectionTutorial(tutorial) {
+    if (!elements.sectionTutorial) return;
+    elements.sectionTutorial.hidden = !tutorial;
+    if (!tutorial) return;
+    elements.sectionTutorialTitle.textContent = tutorial.title;
+    elements.sectionTutorialSteps.innerHTML = tutorial.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('');
+  }
+
+  return Object.freeze({
+    get activeTab() { return activeTab; }, get open() { return open; },
+    dispose() { listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
+    refreshData, render, setOpen, setTab, showResult, showSectionTutorial, showTutorial
+  });
+}
+
+function playDetectorTone(state, snapshot, dt) {
+  if (!['sweeping', 'signal'].includes(snapshot.phase)) return;
+  state.toneTimer -= dt;
+  if (state.toneTimer > 0) return;
+  state.toneTimer = Math.max(0.12, 0.8 - snapshot.signalStrength * 0.65);
+  try {
+    const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!AudioContext) return;
+    state.audioContext ||= new AudioContext();
+    if (state.audioContext.state === 'suspended') return;
+    const oscillator = state.audioContext.createOscillator();
+    const gain = state.audioContext.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 280 + snapshot.signalStrength * 680;
+    gain.gain.setValueAtTime(0.0001, state.audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.045, state.audioContext.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, state.audioContext.currentTime + 0.08);
+    oscillator.connect(gain).connect(state.audioContext.destination);
+    oscillator.start();
+    oscillator.stop(state.audioContext.currentTime + 0.09);
+  } catch (_) {}
+}
+
+function resumeDiscoveryAudio(state) {
+  try {
+    const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!AudioContext) return false;
+    state.audioContext ||= new AudioContext();
+    if (state.audioContext.state === 'suspended') void state.audioContext.resume();
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function playDiscoveryCue(state, kind = 'revealed') {
+  try {
+    const context = state.audioContext;
+    if (!context || context.state === 'suspended') return false;
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(kind === 'revealed' ? 0.05 : 0.025, context.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.32);
+    gain.connect(context.destination);
+    const frequencies = kind === 'revealed' ? [392, 523.25] : [310];
+    frequencies.forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      oscillator.type = kind === 'revealed' ? 'triangle' : 'sine';
+      oscillator.frequency.value = frequency;
+      oscillator.connect(gain);
+      oscillator.start(context.currentTime + index * 0.07);
+      oscillator.stop(context.currentTime + 0.24 + index * 0.07);
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function discoveryHaptic(pattern = 18) {
+  try { globalThis.navigator?.vibrate?.(pattern); } catch (_) {}
+}
+
+async function syncTrustedReceipt(appCtx, profileStore, item) {
+  if (!item || appCtx.getAccountSnapshot?.().signedIn !== true) return null;
+  try {
+    const { claimExplorerDiscovery } = await import('../../../js/discovery-api.js?v=1');
+    const receipt = await claimExplorerDiscovery({
+      claimId: item.claimId,
+      catalogId: item.catalogId,
+      worldIdentity: item.worldIdentity,
+      activityId: item.activityId || 'metal-detect',
+      evidenceClass: item.evidenceClass,
+      name: item.name,
+      family: item.family,
+      rarityBand: item.rarityBand,
+      qualityBand: item.qualityBand,
+      catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
+    });
+    const updated = await profileStore.applyTrustedReceipt?.(item.instanceId, receipt);
+    appCtx.worldDiscoveryRuntime?.ui?.refreshData?.();
+    return updated;
+  } catch (error) {
+    console.warn('[world-discovery] Trusted receipt sync deferred:', error?.message || error);
+    return null;
+  }
+}
+
+async function hydrateSignedInReceipts(appCtx, profileStore, claimedIds) {
+  if (appCtx.getAccountSnapshot?.().signedIn !== true) return 0;
+  try {
+    const { listExplorerDiscoveries } = await import('../../../js/discovery-api.js?v=1');
+    const response = await listExplorerDiscoveries();
+    let imported = 0;
+    for (const receipt of response.items || []) {
+      if (!receipt?.claimId || !receipt?.catalogId) continue;
+      const result = await profileStore.collect({
+        instanceId: `item:${receipt.itemId || receipt.instanceId}`,
+        claimId: receipt.claimId,
+        catalogId: receipt.catalogId,
+        name: receipt.name || receipt.catalogId,
+        family: receipt.family || 'discovery',
+        rarityBand: receipt.rarityBand || 'common',
+        qualityBand: receipt.qualityBand || 'observed',
+        discipline: 'exploration',
+        activityId: receipt.activityId || 'inspect',
+        regionId: receipt.worldIdentity || 'server-region',
+        worldIdentity: receipt.worldIdentity || 'server-region',
+        evidenceClass: receipt.evidenceClass || 'procedural-game-encounter',
+        collectedAt: Date.now()
+      });
+      const instanceId = result.item?.instanceId;
+      if (instanceId) await profileStore.applyTrustedReceipt?.(instanceId, receipt);
+      claimedIds.add(receipt.claimId);
+      if (result.collected) imported++;
+    }
+    return imported;
+  } catch (error) {
+    console.warn('[world-discovery] Signed-in receipt hydration deferred:', error?.message || error);
+    return 0;
+  }
+}
+
+function applyDiscoveryWorldEdit(appCtx, item, position) {
+  const configs = {
+    'farm-plot': { type: 'fence', materialId: 'wood', scale: { x: 5, y: 1.1, z: 1 }, heightOffset: 0.55 },
+    'forest-survey': { type: 'sign', materialId: 'wood', scale: { x: 1.4, y: 1.4, z: 1 }, heightOffset: 0.8 },
+    'camp-expedition': { type: 'floor', materialId: 'wood', scale: { x: 2.8, y: 1, z: 2.8 }, heightOffset: 0.08 }
+  };
+  const config = configs[item?.activityId];
+  if (!config || typeof appCtx.placeDiscoveryWorldObject !== 'function') return null;
+  return appCtx.placeDiscoveryWorldObject({
+    id: `discovery:${item.claimId}`,
+    catalogId: item.activityId,
+    position,
+    ...config
+  });
+}
+
+function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
+  const state = appCtx?.worldDiscoveryRuntime;
+  if (!state || state.disposed) return false;
+  state.disposed = true;
+  state.reason = reason;
+  void appCtx.closeArExperience?.(`discovery_${reason}`);
+  appCtx.unregisterRuntimeOwner?.(state.owner);
+  state.ui?.dispose?.();
+  state.presentation?.dispose?.();
+  state.companionRuntime?.dispose?.();
+  state.wildlifeRuntime?.dispose?.();
+  state.audioContext?.close?.().catch?.(() => {});
+  appCtx.worldDiscoveryPublicationStore?.clear?.();
+  appCtx.worldDiscoveryPublication = null;
+  appCtx.worldDiscoveryRuntime = null;
+  return true;
+}
+
+async function startWorldDiscoveryRuntime(appCtx, options = {}) {
+  const { snapshot, request } = options;
+  appCtx.disposeWorldDiscoveryRuntime = (reason) => disposeWorldDiscoveryRuntime(appCtx, reason);
+  if (!appCtx || snapshot?.type !== 'WorldSnapshot' || !request?.id) return null;
+  if (!globalThis.indexedDB && !appCtx.discoveryProfileStore) return null;
+  if (snapshot.requestId !== request.id || appCtx.worldPublication?.sequence !== snapshot.sequence) return null;
+  disposeWorldDiscoveryRuntime(appCtx, 'replacement');
+  const validation = validateDiscoveryCatalogs(BUILTIN_DISCOVERY_CATALOGS);
+  if (!validation.ok) throw new Error(`World Discovery catalog rejected: ${validation.errors.join('; ')}`);
+  const worldIdentity = appCtx.livingWorldPublication?.worldIdentity || createStableWorldIdentity(request, {
+    locationKey: request.selection?.key,
+    dataProfile: 'fixed-earth-living-world-v1'
+  });
+  const environment = compileEnvironmentContext({
+    snapshot, worldIdentity,
+    buildings: appCtx.buildings, roads: appCtx.roads, landuses: appCtx.landuses,
+    waterAreas: appCtx.waterAreas, waterways: appCtx.waterways,
+    pointInPolygon: appCtx.pointInPolygon,
+    sampleSurfaceY: (x, z) => sampleDiscoverySurfaceY(appCtx, x, z),
+    localTimeBand: appCtx.timeOfDay
+  });
+  const eligibility = compileGeographicEligibility(environment);
+  const interaction = compileWorldInteractionPublication(environment, eligibility);
+  const isPositionEligible = (position) => {
+    const surfaceY = sampleDiscoverySurfaceY(appCtx, position.x, position.z);
+    if (!Number.isFinite(surfaceY)) return false;
+    const collision = appCtx.checkBuildingCollision?.(position.x, position.z, 1.8, {
+      actorBaseY: surfaceY,
+      actorHeight: 2.1
+    });
+    return collision?.collision !== true;
+  };
+  const encounters = compileEncounterPlan(environment, eligibility, BUILTIN_DISCOVERY_CATALOGS, { isPositionEligible });
+  const fieldActivities = compileFieldActivityPlan(environment, eligibility, { isPositionEligible });
+  const wildlife = compileAmbientWildlifePlan(environment);
+  const publication = createDiscoveryPublication({ snapshot, environment, eligibility, interaction, encounters, fieldActivities, wildlife });
+  appCtx.worldDiscoveryPublicationStore ||= createDiscoveryPublicationStore();
+  const published = appCtx.worldDiscoveryPublicationStore.publish(publication, { requestId: request.id, sequence: snapshot.sequence });
+  if (!published.published) return null;
+
+  const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
+  appCtx.discoveryProfileStore = profileStore;
+  const [existingItems, existingEvents, existingGuide, discoveryProfile] = await Promise.all([
+    profileStore.listItems(10000).catch(() => []),
+    profileStore.listEvents?.(10000).catch(() => []) || [],
+    profileStore.listFieldGuide?.(10000).catch(() => []) || [],
+    profileStore.getProfile().catch(() => ({ tutorials: {} }))
+  ]);
+  const claimedIds = new Set([...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean));
+  const observedCatalogIds = new Set([...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean));
+  const progress = fieldProgress(discoveryProfile);
+  const initialToolProgress = explorerToolProgress(discoveryProfile);
+  const entitlements = createExplorationEntitlementService({
+    unlockedToolIds: initialToolProgress.unlockedToolIds,
+    visibleToolIds: RELEASED_EXPLORER_TOOLS
+  });
+  const regionLabel = String(
+    request.selection?.name ||
+    request.location?.name ||
+    appCtx.customLoc?.name ||
+    appCtx.LOCS?.[appCtx.selLoc]?.name ||
+    'Current region'
+  ).trim() || 'Current region';
+  const initialEquippedToolId = entitlements.canUseTool(discoveryProfile.equippedToolId).allowed
+    ? String(discoveryProfile.equippedToolId)
+    : 'field-lens';
+  const session = createDetectorSession({
+    plan: encounters, claimedIds,
+    observedCatalogIds, progress,
+    availableToolIds: entitlements.listAvailableTools().map((tool) => tool.id)
+  });
+  const fieldSession = createFieldActivitySession({ plan: fieldActivities, claimedIds, observedCatalogIds, progress });
+  const owner = `world-discovery:${snapshot.sequence}`;
+  const state = {
+    type: 'WorldDiscoveryRuntime', owner, appCtx, publication, profileStore, entitlements, session, fieldSession,
+    actions: [], currentCellId: null, presentation: null, ui: null,
+    disposed: false, reason: null, actionTimer: 0, toneTimer: 0, audioContext: null, fieldFeedbackPhase: 'idle',
+    active: true, activeActivityId: 'metal-detect', equippedToolId: initialEquippedToolId,
+    toolProgress: initialToolProgress, regionLabel, worldIdentityId: worldIdentity.id,
+    locationKey: String(request.selection?.key || (appCtx.selLoc !== 'custom' ? appCtx.selLoc : '') || ''),
+    tutorials: { ...(discoveryProfile.tutorials || {}) }, companionEncounters: new Map(), detectorSnapshot: session.snapshot(playerPosition(appCtx)),
+    lastSnapshot: session.snapshot(playerPosition(appCtx))
+  };
+  state.presentation = createFieldEquipmentPresentation(appCtx);
+  state.companionRuntime = await createCompanionRuntime(appCtx, {
+    profileStore,
+    worldIdentity: worldIdentity.id,
+    onChange: () => state.ui?.refreshData?.()
+  });
+  state.wildlifeRuntime = createAmbientWildlifeRuntime(appCtx, wildlife);
+  state.refreshToolProgress = async () => {
+    const profile = await profileStore.getProfile();
+    const previous = new Set(state.toolProgress?.unlockedToolIds || []);
+    state.toolProgress = explorerToolProgress(profile);
+    state.entitlements = createExplorationEntitlementService({
+      unlockedToolIds: state.toolProgress.unlockedToolIds,
+      visibleToolIds: RELEASED_EXPLORER_TOOLS
+    });
+    state.session.setAvailableToolIds?.(state.entitlements.listAvailableTools().map((tool) => tool.id));
+    const unlocked = state.toolProgress.unlockedToolIds.filter((toolId) => !previous.has(toolId));
+    if (unlocked.length) {
+      const labels = state.entitlements.listAvailableTools().filter((tool) => unlocked.includes(tool.id)).map((tool) => tool.label);
+      appCtx.showToast?.(`Explorer capability unlocked: ${labels.join(', ')}`);
+    }
+    return state.toolProgress;
+  };
+  state.activeTutorialId = '';
+  state.presentTutorial = (tutorial, force = false) => {
+    if (!tutorial || (!force && state.tutorials[tutorial.id])) {
+      if (tutorial?.section) state.ui?.showSectionTutorial(null);
+      else state.ui?.showTutorial(null);
+      return false;
+    }
+    state.activeTutorialId = tutorial.id;
+    if (tutorial.section) state.ui?.showSectionTutorial(tutorial);
+    else state.ui?.showTutorial(tutorial);
+    return true;
+  };
+  state.showSectionTutorial = async (sectionId, force = false) => {
+    const tutorial = EXPLORER_SECTION_TUTORIALS[sectionId];
+    return state.presentTutorial(tutorial ? { ...tutorial, section: true } : null, force);
+  };
+  state.showActivityTutorial = async (force = false) => {
+    const tutorial = tutorialForActivity(state.activeActivityId, BUILTIN_DISCOVERY_CATALOGS);
+    return state.presentTutorial(tutorial, force);
+  };
+  state.dismissActivityTutorial = async () => {
+    state.ui?.showTutorial(null);
+    state.ui?.showSectionTutorial(null);
+    const tutorialId = state.activeTutorialId || tutorialForActivity(state.activeActivityId, BUILTIN_DISCOVERY_CATALOGS)?.id;
+    state.activeTutorialId = '';
+    if (!tutorialId || state.tutorials[tutorialId]) return true;
+    state.tutorials[tutorialId] = true;
+    const profile = await profileStore.getProfile();
+    await profileStore.saveProfile({ ...profile, tutorials: { ...profile.tutorials, [tutorialId]: true } });
+    return true;
+  };
+  state.equipTool = async (toolId, options = {}) => {
+    const id = String(toolId || 'field-lens');
+    const tool = state.entitlements.listAvailableTools().find((entry) => entry.id === id);
+    if (!tool || state.entitlements.canUseTool(id).allowed !== true) return false;
+    const profile = await profileStore.getProfile();
+    await profileStore.saveProfile({ ...profile, equippedToolId: id });
+    state.equippedToolId = id;
+    if (!options.silent) appCtx.showToast?.(`${tool.label} equipped`);
+    await state.ui?.refreshData?.();
+    return true;
+  };
+  state.showToolHelp = async (toolId) => {
+    const tool = state.entitlements.listAvailableTools().find((entry) => entry.id === String(toolId));
+    if (!tool) return false;
+    state.ui?.setTab('today');
+    state.presentTutorial({
+      id: `tool-help:${tool.id}`,
+      title: tool.label,
+      steps: [
+        'Equip this tool from Gear. Compatible nearby leads will also equip it automatically.',
+        `Use it for ${tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(', ')}.`,
+        'Begin the activity, minimize the Journal, and follow the world-space direction or signal.',
+        'Return to record the result. The result card names every place where it was saved.'
+      ]
+    }, true);
+    return true;
+  };
+  state.returnToJournalEvent = async (eventId) => {
+    const events = await profileStore.listEvents?.(500) || [];
+    const event = events.find((entry) => entry.eventId === String(eventId));
+    const locationKey = String(event?.locationKey || '');
+    if (!event || !locationKey) return false;
+    if (!appCtx.LOCS?.[locationKey] || typeof appCtx.selectPresetLocation !== 'function') {
+      appCtx.showToast?.('This saved location can be reviewed here, but it is not a reusable preset.');
+      return false;
+    }
+    state.ui?.setOpen(false);
+    if (String(appCtx.selLoc) === locationKey) {
+      appCtx.showToast?.(`Already exploring ${event.regionLabel || 'this location'}`);
+      return true;
+    }
+    appCtx.selectPresetLocation(locationKey);
+    if (appCtx.ENV?.EARTH && appCtx.getEnv?.() !== appCtx.ENV.EARTH) appCtx.switchEnv?.(appCtx.ENV.EARTH);
+    await appCtx.loadRoads?.();
+    appCtx.spawnOnRoad?.();
+    appCtx.showToast?.(`Returned to ${event.regionLabel || appCtx.LOCS[locationKey].name}`);
+    return true;
+  };
+  const telemetryContextBands = () => environment.cells.find((cell) => cell.cellId === state.currentCellId)?.contexts || [];
+  state.isCompanionEligible = (catalog) => catalog?.contexts?.some((context) => telemetryContextBands().includes(context)) === true;
+  state.companionEncounterState = (catalogId) => state.companionEncounters.get(String(catalogId)) || { step: 0 };
+  state.getArChallengeEligibility = () => evaluateArEligibility({ type: 'field-challenge' }, {
+    environmentName: appCtx.getEnv?.() || 'EARTH',
+    environment,
+    position: playerPosition(appCtx),
+    travelMode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car',
+    liveGpsSnapshot: appCtx.getLiveGpsSnapshot?.() || { active: false }
+  });
+  state.handleArRecord = async (recordId, source = 'field-guide') => {
+    const records = source === 'collection'
+      ? await profileStore.listItems(200)
+      : await profileStore.listFieldGuide(500);
+    const record = records.find((entry) => String(entry.instanceId || entry.catalogId) === String(recordId));
+    if (!record) return false;
+    const catalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.find((entry) => entry.id === record.catalogId);
+    state.ui?.setOpen(false);
+    return appCtx.openArExperience?.({
+      type: 'specimen',
+      record: { ...record, name: record.name || catalog?.names?.common || record.catalogId }
+    });
+  };
+  state.handleArChallenge = async () => {
+    const eligibility = state.getArChallengeEligibility();
+    if (!eligibility.allowed) return false;
+    const activeCompanion = state.companionRuntime.snapshot().companions.find((entry) => entry.active) || null;
+    state.ui?.setOpen(false);
+    return appCtx.openArExperience?.({
+      type: 'field-challenge',
+      challengeId: 'waterfowl-photo-v1',
+      cellId: eligibility.cellId,
+      habitat: eligibility.habitat,
+      companion: activeCompanion?.catalogId === 'trail-hound' ? activeCompanion : null
+    });
+  };
+  state.handleCompanionAction = async (action, instanceId, catalogId) => {
+    if (action === 'meet') {
+      const catalog = COMPANION_CATALOG.find((entry) => entry.id === String(catalogId));
+      if (!catalog || !state.isCompanionEligible(catalog)) return false;
+      const current = state.companionEncounterState(catalog.id);
+      const nextStep = Math.min(3, Number(current.step || 0) + 1);
+      state.companionEncounters.set(catalog.id, { step: nextStep });
+      if (nextStep >= 3) await state.companionRuntime.adopt(catalog.id);
+    }
+    else if (action === 'ar') {
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
+      if (!companion) return false;
+      state.ui?.setOpen(false);
+      return appCtx.openArExperience?.({ type: 'companion', companion });
+    }
+    else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
+    else if (action === 'feed') await state.companionRuntime.feed(instanceId);
+    else if (action === 'train') await state.companionRuntime.train(instanceId, 'find');
+    emitDiscoveryTelemetry(
+      action === 'meet' && state.companionEncounterState(catalogId).step >= 3 ? 'companion_adopted' : action === 'activate' ? 'companion_activated' : 'companion_cared_for',
+      { result: action, contextBands: telemetryContextBands() }
+    );
+    await state.ui.refreshData();
+    return true;
+  };
+  state.selectActivity = async (activityId) => {
+    const id = String(activityId || 'inspect');
+    const selectedAction = state.actions.find((action) => action.id === id);
+    const activityToolId = ACTIVITY_TOOL[id];
+    if (activityToolId && !state.entitlements.canUseTool(activityToolId).allowed) {
+      appCtx.showToast?.(`${displayDiscoveryLabel(activityToolId)} unlocks at a later Explorer rank.`);
+      return false;
+    }
+    emitDiscoveryTelemetry('activity_started', {
+      activityId: id,
+      discipline: selectedAction?.discipline,
+      contextBands: telemetryContextBands(),
+      liveGps: appCtx.liveGpsActive === true
+    });
+    if (id === 'fish') {
+      await appCtx.openFishingGame?.();
+      return true;
+    }
+    if (activityToolId) await state.equipTool(activityToolId, { silent: true });
+    state.activeActivityId = id;
+    if (id === 'metal-detect') {
+      state.fieldSession.reset();
+      state.lastSnapshot = state.detectorSnapshot;
+    } else {
+      state.session.reset();
+      state.detectorSnapshot = state.session.snapshot(playerPosition(appCtx));
+      state.fieldSession.reset();
+      state.lastSnapshot = state.fieldSession.snapshot(playerPosition(appCtx));
+    }
+    state.presentation.setRevealed(null, false);
+    state.presentation.setExcavation(null, 'idle');
+    state.ui.showResult(null);
+    state.ui.setOpen(true);
+    state.ui.setTab('today');
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    void state.showActivityTutorial(false);
+    return true;
+  };
+  state.handlePrimary = async () => {
+    resumeDiscoveryAudio(state);
+    const position = playerPosition(appCtx);
+    if (state.activeActivityId !== 'metal-detect') {
+      const fieldPhase = state.fieldSession.snapshot().phase;
+      if (['idle', 'complete', 'recorded', 'left'].includes(fieldPhase)) {
+        state.fieldSession.reset();
+        const began = state.fieldSession.begin(state.activeActivityId, environment, position);
+        if (began) state.ui.setOpen(false);
+      } else if (fieldPhase === 'revealed') {
+        const recorded = await state.fieldSession.record(profileStore, {
+          toolId: ACTIVITY_TOOL[state.activeActivityId] || '',
+          regionLabel,
+          locationKey: state.locationKey,
+          environment: appCtx.getEnv?.() || 'EARTH',
+          localPosition: position
+        });
+        if (recorded) await state.refreshToolProgress();
+        await state.ui.refreshData();
+        const outcome = state.fieldSession.snapshot().collectionResult;
+        const instanceId = outcome?.instanceId;
+        const item = (await profileStore.listItems(200)).find((entry) => entry.instanceId === instanceId);
+        const resultRecord = item || outcome?.event || null;
+        applyDiscoveryWorldEdit(appCtx, resultRecord, position);
+        void syncTrustedReceipt(appCtx, profileStore, item);
+        if (recorded) emitDiscoveryTelemetry('discovery_recorded', {
+          activityId: state.activeActivityId,
+          catalogFamily: resultRecord?.family,
+          discipline: resultRecord?.specialtyId || resultRecord?.discipline,
+          contextBands: telemetryContextBands(),
+          result: outcome?.collected ? 'collected' : 'recorded'
+        });
+        if (recorded) {
+          discoveryHaptic([18, 36, 28]);
+          state.ui.showResult(outcome);
+        }
+      }
+      state.lastSnapshot = state.fieldSession.snapshot(position);
+      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+      return true;
+    }
+    const phase = state.session.snapshot(position).phase;
+    if (['idle', 'complete', 'collected', 'left'].includes(phase)) {
+      state.session.sweep(position);
+      state.ui.setOpen(false);
+    }
+    else if (['sweeping', 'signal'].includes(phase)) {
+      if (state.session.refine(position)) discoveryHaptic(20);
+    }
+    else if (phase === 'classified') {
+      if (state.session.excavate()) discoveryHaptic([16, 28, 16]);
+    }
+    else if (phase === 'revealed') {
+      const recorded = await state.session.collect(profileStore, {
+        toolId: 'metal-detector',
+        regionLabel,
+        locationKey: state.locationKey,
+        environment: appCtx.getEnv?.() || 'EARTH',
+        localPosition: position
+      });
+      if (recorded) await state.refreshToolProgress();
+      await state.ui.refreshData();
+      const instanceId = state.session.snapshot(position).collectionResult?.instanceId;
+      const item = (await profileStore.listItems(200)).find((entry) => entry.instanceId === instanceId);
+      void syncTrustedReceipt(appCtx, profileStore, item);
+      if (recorded) emitDiscoveryTelemetry('discovery_recorded', {
+        activityId: 'metal-detect',
+        catalogFamily: item?.family,
+        discipline: item?.discipline,
+        contextBands: telemetryContextBands(),
+        result: 'collected'
+      });
+      if (recorded) {
+        discoveryHaptic([20, 35, 40]);
+        state.ui.showResult(state.session.snapshot(position).collectionResult);
+      }
+    }
+    state.detectorSnapshot = state.session.snapshot(position);
+    state.lastSnapshot = state.detectorSnapshot;
+    const slot = encounters.slots.find((entry) => entry.id === state.lastSnapshot.targetId);
+    state.presentation.setRevealed(slot, state.lastSnapshot.phase === 'revealed');
+    state.presentation.setExcavation(slot, state.lastSnapshot.phase);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    return true;
+  };
+  state.handleSecondary = async () => {
+    const position = playerPosition(appCtx);
+    if (state.activeActivityId !== 'metal-detect') {
+      if (state.fieldSession.snapshot().phase === 'revealed') state.fieldSession.leave();
+      else state.ui.setOpen(false);
+      state.lastSnapshot = state.fieldSession.snapshot();
+      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+      return true;
+    }
+    const phase = state.session.snapshot(position).phase;
+    if (['classified', 'revealed'].includes(phase)) state.session.leave();
+    else state.ui.setOpen(false);
+    state.detectorSnapshot = state.session.snapshot(position);
+    state.lastSnapshot = state.detectorSnapshot;
+    state.presentation.setRevealed(null, false);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    return true;
+  };
+  state.ui = createDiscoveryUi(state);
+  appCtx.worldDiscoveryPublication = publication;
+  appCtx.worldDiscoveryRuntime = state;
+  appCtx.worldDiscoveryRuntimeSnapshot = () => worldDiscoveryRuntimeSnapshot(appCtx);
+  void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => state.ui?.refreshData?.());
+  appCtx.handleWorldDiscoveryQuickAction = async () => {
+    if (!state.ui.open) {
+      state.activeActivityId = 'metal-detect';
+      state.fieldSession.reset();
+      state.lastSnapshot = state.detectorSnapshot;
+      state.ui.setOpen(true);
+      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+      void state.showActivityTutorial(false);
+      return true;
+    }
+    return state.handlePrimary();
+  };
+  appCtx.registerRuntimeSystem?.({
+    id: `${owner}:runtime`, owner, phase: 'presentation', priority: 24, critical: false,
+    enabled: () => !state.disposed && appCtx.worldPublication?.requestId === publication.requestId && appCtx.worldPublication?.sequence === publication.sequence,
+    update(frame) {
+      const position = playerPosition(appCtx);
+      state.actionTimer -= frame.dt;
+      if (state.actionTimer <= 0) {
+        state.actionTimer = 0.2;
+        state.actions = resolveContextActions({ environment, interaction, position, limit: 25 })
+          .filter((action) => RELEASED_EXPLORER_ACTIVITIES.has(action.id))
+          .filter((action) => {
+            const toolId = ACTIVITY_TOOL[action.id];
+            return !toolId || state.entitlements.canUseTool(toolId).allowed;
+          })
+          .slice(0, 3);
+        state.currentCellId = state.actions[0]?.cellId || null;
+      }
+      state.detectorSnapshot = state.session.update(position, frame.dt);
+      if (state.activeActivityId === 'metal-detect') {
+        state.lastSnapshot = state.detectorSnapshot;
+      } else {
+        state.lastSnapshot = state.fieldSession.update(frame.dt, position);
+        if (state.lastSnapshot.phase !== state.fieldFeedbackPhase) {
+          if (state.lastSnapshot.phase === 'observing') {
+            discoveryHaptic(14);
+            playDiscoveryCue(state, 'focus');
+          } else if (state.lastSnapshot.phase === 'revealed') {
+            discoveryHaptic([16, 24, 32]);
+            playDiscoveryCue(state, 'revealed');
+          }
+          state.fieldFeedbackPhase = state.lastSnapshot.phase;
+        }
+      }
+      const targetSlot = encounters.slots.find((entry) => entry.id === state.detectorSnapshot.targetId);
+      const fieldTargetSlot = fieldActivities.slots.find((entry) => entry.id === state.lastSnapshot.targetId);
+      state.presentation.setRevealed(targetSlot, state.activeActivityId === 'metal-detect' && state.detectorSnapshot.phase === 'revealed');
+      state.presentation.setExcavation(targetSlot, state.activeActivityId === 'metal-detect' ? state.detectorSnapshot.phase : 'idle');
+      state.presentation.setFieldRevealed(fieldTargetSlot, state.activeActivityId !== 'metal-detect' && ['revealed', 'recorded'].includes(state.lastSnapshot.phase));
+      state.presentation.update(position, state.lastSnapshot, frame.dt, state.activeActivityId);
+      const travelMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car';
+      state.companionRuntime?.update?.(position, frame.dt, travelMode, appCtx.getEnv?.() || 'EARTH');
+      state.wildlifeRuntime?.update?.(position, frame.dt, appCtx.getEnv?.() || 'EARTH');
+      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+      if (state.activeActivityId === 'metal-detect') playDetectorTone(state, state.detectorSnapshot, frame.dt);
+    }
+  });
+  state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+  return state;
+}
+
+function worldDiscoveryRuntimeSnapshot(appCtx) {
+  const state = appCtx?.worldDiscoveryRuntime;
+  if (!state) return Object.freeze({ active: false });
+  return Object.freeze({
+    active: !state.disposed,
+    requestId: state.publication.requestId,
+    sequence: state.publication.sequence,
+    worldIdentity: state.publication.worldIdentity.id,
+    currentCellId: state.currentCellId,
+    actions: state.actions.map((action) => ({ id: action.id, label: action.label, suitabilityBand: action.suitabilityBand })),
+    activeActivityId: state.activeActivityId,
+    equippedToolId: state.equippedToolId,
+    entitlement: state.entitlements.snapshot(),
+    interaction: state.lastSnapshot,
+    logicalEncounterSlots: state.publication.encounters.slots.length,
+    logicalFieldActivitySlots: state.publication.fieldActivities?.slots.length || 0,
+    presentation: state.presentation.diagnostics,
+    companions: state.companionRuntime?.snapshot?.() || { owned: 0, activeInstanceId: null },
+    wildlife: state.wildlifeRuntime?.snapshot?.() || { active: 0, logical: state.publication.wildlife?.actors?.length || 0 },
+    generatedWithAdditionalProviderQueries: false,
+    error: state.lastSnapshot?.error || ''
+  });
+}
+
+export { disposeWorldDiscoveryRuntime, startWorldDiscoveryRuntime, worldDiscoveryRuntimeSnapshot };

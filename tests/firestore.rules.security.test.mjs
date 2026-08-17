@@ -298,6 +298,16 @@ const testEnv = await initializeTestEnvironment({
 });
 
 await seedData(testEnv);
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'explorerProfiles', OWNER_UID), { uid: OWNER_UID, schemaVersion: 1 });
+  await setDoc(doc(db, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item'), {
+    instanceId: 'trusted_item', ownerUid: OWNER_UID, authority: 'trusted-server', tradeable: true
+  });
+  await setDoc(doc(db, 'discoveryTrades', 'trade_1'), {
+    ownerUid: OWNER_UID, recipientUid: MEMBER_UID, status: 'pending'
+  });
+});
 
 const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
 const adminClaimsDb = testEnv.authenticatedContext(OWNER_UID, { admin: true, role: 'admin' }).firestore();
@@ -320,6 +330,31 @@ async function runCheck(name, fn) {
     console.error(`FAIL ${name}: ${err?.message || err}`);
   }
 }
+
+await runCheck('explorer can read their trusted discovery inventory', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item')));
+});
+
+await runCheck('other players cannot read a trusted discovery inventory', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item')));
+});
+
+await runCheck('browser clients cannot forge trusted discovery items', async () => {
+  await assertFails(setDoc(doc(ownerDb, 'explorerProfiles', OWNER_UID, 'items', 'forged_item'), {
+    instanceId: 'forged_item', ownerUid: OWNER_UID, authority: 'trusted-server', tradeable: true
+  }));
+});
+
+await runCheck('trade participants can read their server-owned offer', async () => {
+  await assertSucceeds(getDoc(doc(memberDb, 'discoveryTrades', 'trade_1')));
+});
+
+await runCheck('unrelated players cannot read or write discovery trades', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'discoveryTrades', 'trade_1')));
+  await assertFails(setDoc(doc(attackerDb, 'discoveryTrades', 'forged_trade'), {
+    ownerUid: ATTACKER_UID, recipientUid: OWNER_UID, status: 'pending'
+  }));
+});
 
 await runCheck('anon cannot read private room doc', async () => {
   await assertFails(getDoc(doc(anonDb, 'rooms', ROOM_ID)));

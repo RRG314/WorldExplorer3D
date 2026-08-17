@@ -28,6 +28,9 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
 <link rel="stylesheet" href="styles/interface-v4.css?v=16">
 <link rel="stylesheet" href="styles/start-hub.css?v=14">
+<link rel="stylesheet" href="styles/discovery.css?v=5">
+<link rel="stylesheet" href="styles/tutorial.css?v=1">
+<link rel="stylesheet" href="styles/ar.css?v=1">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -584,6 +587,87 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a></div>
 <div id="interiorPrompt" aria-live="polite"></div>
 <div id="boatPrompt" aria-live="polite"></div>
+<div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
+<button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
+<aside id="discoveryPanel" aria-label="World discovery tools" aria-hidden="true">
+  <header class="discoveryHead">
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">Explorer Journal</span><strong id="discoveryPanelTitle">Metal Detector</strong></div></div>
+    <div class="discoveryHeadActions"><button id="discoveryHelpBtn" type="button" aria-label="Show tool help">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize discovery panel" title="Minimize during play">—</button></div>
+  </header>
+  <div class="discoveryWorkspace">
+    <nav class="discoveryTabs" aria-label="Explorer Journal sections">
+      <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
+      <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Field Guide</button>
+      <button class="discoveryTab" data-discovery-tab="collection" type="button"><span>◇</span>Collection</button>
+      <button class="discoveryTab" data-discovery-tab="gear" type="button"><span>⌁</span>Gear</button>
+      <button class="discoveryTab" data-discovery-tab="progress" type="button"><span>↗</span>Progress</button>
+    </nav>
+    <div class="discoveryContent">
+      <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
+      <section class="discoveryPane active" data-discovery-pane="today">
+        <div class="discoveryModeNote"><b>EXPLORE THIS PLACE</b><span>Choose one nearby lead, then minimize this journal. Your tool and the world will guide the active field action.</span></div>
+        <div id="discoveryRankSummary" class="discoveryRankSummary"><span>FIELD RANK</span><strong>Trailhead</strong><small>Build records to reveal follow-up opportunities.</small></div>
+        <div id="discoveryGoal" class="discoveryGoal" aria-live="polite"></div>
+        <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
+        <div class="discoverySectionHead"><span>NEARBY LEADS</span><small>ONE RECOMMENDED / TWO ALTERNATIVES</small></div>
+        <div id="discoveryActionList" class="discoveryActionList" aria-label="Available activities"></div>
+        <div id="discoveryTutorial" class="discoveryTutorial" hidden><strong id="discoveryTutorialTitle">Tool guide</strong><ol id="discoveryTutorialSteps"></ol><button id="discoveryTutorialDoneBtn" type="button">Understood</button></div>
+        <div id="discoveryInspection" class="discoveryInspection" hidden></div>
+        <div class="discoveryOperation">
+          <div class="discoveryOperationHead"><span id="discoveryPhase">Ready</span><span id="discoveryBearing">No signal</span></div>
+          <div class="discoveryMeter"><i id="discoverySignalFill"></i></div>
+          <div class="discoveryReadout"><span>DISTANCE<strong id="discoveryDistance">—</strong></span><span>CLASSIFICATION<strong id="discoveryClassification">Unknown</strong></span></div>
+          <div id="discoveryMessage" class="discoveryMessage">Sweep a suitable area to begin.</div>
+        </div>
+        <div class="discoverySafety"><b>EXPLORE RESPONSIBLY</b><span>Activities are virtual and do not grant access, collecting, or excavation permission in the real world.</span></div>
+        <button id="discoveryArChallengeBtn" class="discoveryArContextAction" type="button" hidden><span>AR FIELD CHALLENGE</span><strong>Photograph virtual waterfowl</strong></button>
+        <div class="discoveryActions"><button id="discoverySecondaryBtn" type="button">Close</button><button id="discoveryPrimaryBtn" class="primary" type="button">Start Sweep</button></div>
+        <div class="discoverySubsection discoveryTodayHistory"><h3>Recent Journal</h3><p>Your latest Explorer events in this and other places.</p><div class="discoveryJournalFilters"><select id="discoveryJournalCategory" aria-label="Filter Journal by specialty"><option value="all">All specialties</option><option value="nature">Nature</option><option value="earth">Earth</option><option value="places">Places</option></select><select id="discoveryJournalRegion" aria-label="Filter Journal by region"><option value="all">All regions</option></select></div><div id="discoveryJournalList" class="discoveryList"></div></div>
+      </section>
+      <section class="discoveryPane" data-discovery-pane="guide">
+        <div class="discoverySectionHead"><span>FIELD GUIDE</span><small>WHAT EXISTS / WHAT YOU IDENTIFIED</small></div>
+        <div class="discoveryGuideControls"><input id="discoveryGuideSearch" type="search" placeholder="Search your Field Guide" aria-label="Search your Field Guide"><select id="discoveryGuideCategory" aria-label="Filter Field Guide category"><option value="all">All categories</option><option value="wildlife">Wildlife</option><option value="plants">Plants &amp; Fungi</option><option value="geology">Geology</option><option value="fossils">Fossils</option><option value="places">Places &amp; History</option><option value="ocean">Ocean</option></select><button id="discoveryGuideHelpBtn" type="button">How This Works</button></div>
+        <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Procedural</dt><dd>A virtual gameplay encounter generated from broad world context, not a live occurrence claim.</dd></div><div><dt>Collection</dt><dd>Only a virtual specimen, find, catch trophy, or created artifact you actually acquired.</dd></div><div><dt>Rarity</dt><dd>Gameplay opportunity frequency, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
+        <div id="discoveryGuideOverview" class="discoveryGuideOverview"></div>
+        <div id="discoveryFieldGuideList" class="discoveryList"></div>
+      </section>
+      <section class="discoveryPane" data-discovery-pane="collection"><div class="discoverySectionHead"><span>COLLECTION</span><small>VIRTUAL OBJECTS YOU ACQUIRED</small></div><div class="discoveryModeNote"><b>OWNED ITEMS ONLY</b><span>Observations and field notes belong in your Journal and Field Guide. This Collection contains specimens, finds, catch trophies, and created artifacts.</span></div><div id="discoveryCollectionList" class="discoveryList"></div></section>
+      <section class="discoveryPane" data-discovery-pane="gear">
+        <div class="discoverySectionHead"><span>GEAR</span><small>EQUIPPED TOOL / LOADOUT / COMPANIONS</small></div>
+        <div id="discoveryEquippedSummary" class="discoveryEquippedSummary"></div>
+        <div class="discoverySubsection"><h3>Tools</h3><p>Equip a tool to make it the default for compatible nearby leads.</p><div id="discoveryToolList" class="discoveryList"></div></div>
+        <div class="discoverySubsection"><h3>Companions</h3><p>Virtual companions you meet, care for, and bring into the world.</p><div id="discoveryCompanionList" class="discoveryList"></div></div>
+      </section>
+      <section class="discoveryPane" data-discovery-pane="progress">
+        <div class="discoverySectionHead"><span>EXPLORER PROGRESS</span><small>RANK / SPECIALTIES / REGIONS</small></div>
+        <div class="discoveryModeNote"><b>YOUR EXPLORER STORY</b><span>New identifications and new-region evidence build rank. Repeating the same record here can still document an observation without adding rank points.</span></div>
+        <div id="discoveryProgress" class="discoveryProgressGrid"></div>
+      </section>
+    </div>
+  </div>
+</aside>
+<section id="arExperience" aria-label="World Explorer augmented reality" aria-hidden="true">
+  <video id="arCameraFeed" playsinline muted aria-hidden="true"></video>
+  <div class="arViewerBackdrop" aria-hidden="true"></div>
+  <canvas id="arCanvas" aria-label="Interactive augmented reality view"></canvas>
+  <header class="arTopBar">
+    <div class="arIdentity"><span class="arMark" aria-hidden="true">◎</span><div><small>WORLD EXPLORER / AR</small><strong id="arTitle">AR Experience</strong></div></div>
+    <div class="arTopMeta"><span id="arPrivacyBadge">No camera recording</span><span id="arModeBadge">Checking device</span><button id="arCloseBtn" type="button" aria-label="Close AR">×</button></div>
+  </header>
+  <div id="arStatus" class="arStatus" role="status" aria-live="polite"></div>
+  <section id="arIntro" class="arIntroCard" role="dialog" aria-modal="true" aria-labelledby="arIntroTitle">
+    <span class="arIntroEyebrow">CONTEXTUAL WORLD VIEW</span>
+    <h2 id="arIntroTitle">Open AR?</h2>
+    <p id="arIntroCopy">Checking this device…</p>
+    <div class="arSafety"><b>LOOK UP OFTEN</b><span>Use a clear, stationary area. Do not use AR while driving, cycling, or crossing traffic.</span></div>
+    <div class="arPrivacyCopy">Camera frames stay in the local browser session. World Explorer does not record, upload, or analyze them.</div>
+    <div class="arIntroActions"><button id="arCancelBtn" type="button">Cancel</button><button id="arContinueBtn" class="primary" type="button">Continue</button></div>
+  </section>
+  <footer id="arControls" class="arControls" hidden>
+    <div><strong id="arInstruction">Drag to rotate.</strong><span id="arMetric">Local presentation</span></div>
+    <div class="arControlActions"><button id="arSmallerBtn" type="button" aria-label="Make object smaller">−</button><button id="arLargerBtn" type="button" aria-label="Make object larger">+</button><button id="arPlaceBtn" class="primary" type="button">Place</button></div>
+  </footer>
+</section>
 <div id="boatWaveDock" aria-hidden="true">
   <div class="boatWaveMeta">
     <span id="boatWaveLabel">Moderate Water</span>
@@ -956,6 +1040,7 @@ Explore the area
 <div class="floatItems">
 <div class="floatItem" id="fDriving">🚗 Driving Mode</div>
 <div class="floatItem" id="fWalk">🚶 Walk Mode</div>
+<div class="floatItem" id="fWorldDiscovery">⌖ Field Journal &amp; Activities</div>
 <div class="floatItem" id="fDrone">🚁 Drone Mode</div>
 <div class="floatItem" id="fPlane">✈️ Plane Mode</div>
 <div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
@@ -1552,6 +1637,7 @@ Explore the area
 • M - Toggle map<br>
 • N - Next city<br>
 • B - Open / close Build with Blocks<br>
+• X - Open / use discovery tool<br>
 </div>
 <div id="boatControls" style="display:none">
 <b>🚤 Boat Mode:</b><br>

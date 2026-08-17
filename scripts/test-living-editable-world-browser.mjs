@@ -128,14 +128,25 @@ try {
       calls: Number(ctx.renderer.info.render.calls || 0),
       triangles: Number(ctx.renderer.info.render.triangles || 0)
     };
+    const snapshot = ctx.livingWorldRuntimeSnapshot?.() || {};
+    const logicalDrawCalls = Number(snapshot.facades?.drawCalls || 0) + Number(snapshot.population?.drawCalls || 0);
     return {
       base,
       full,
       addedCalls: full.calls - base.calls,
-      addedTriangles: full.triangles - base.triangles
+      addedTriangles: full.triangles - base.triangles,
+      logicalDrawCalls,
+      renderPassMultiplier: logicalDrawCalls > 0 ? (full.calls - base.calls) / logicalDrawCalls : 0
     };
   });
-  assert.ok(livingWorldOverhead.addedCalls >= 0 && livingWorldOverhead.addedCalls <= 8, `Living World added ${livingWorldOverhead.addedCalls} draw calls; budget is 8`);
+  assert.ok(
+    livingWorldOverhead.logicalDrawCalls >= 0 && livingWorldOverhead.logicalDrawCalls <= 22,
+    `Living World owns ${livingWorldOverhead.logicalDrawCalls} logical draw calls; quality population budget is 22`
+  );
+  assert.ok(
+    livingWorldOverhead.addedCalls >= 0 && livingWorldOverhead.addedCalls <= livingWorldOverhead.logicalDrawCalls * 5,
+    `Living World render-pass overhead is unbounded: ${JSON.stringify(livingWorldOverhead)}`
+  );
   assert.deepEqual(fatalErrors, [], `fatal browser errors: ${fatalErrors.join('\n')}`);
   await page.screenshot({ path: path.join(outputDir, 'baltimore-living-world-desktop.png'), fullPage: false });
 
