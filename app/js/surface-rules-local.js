@@ -29,7 +29,11 @@ export function denseSettlementOwnsUrbanSurface({
 }
 
 export function regionalBuildingTileOwnsUrbanSurface(buildingCount = 0) {
-  return Number(buildingCount) >= 24;
+  // A z14 context tile is only a few hundred metres across. Eighteen mapped
+  // footprints are sufficient settlement evidence for the otherwise
+  // unclassified ground between them, while exact mapped green areas still
+  // override this fallback in the far-field publisher.
+  return Number(buildingCount) >= 18;
 }
 
 export function createLocalSurfaceAnalysisApi({ appCtx, constants }) {

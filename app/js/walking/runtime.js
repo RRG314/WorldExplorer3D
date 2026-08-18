@@ -204,7 +204,18 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    camera.position.set(resolvedCamX, camY, resolvedCamZ);
+    if (!interiorCamera) {
+      const collisionSafeCamera = resolveThirdPersonCameraCollision({
+        anchor: { x: walker.x, y: baseY + 1.35, z: walker.z },
+        target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
+        checkBuildingCollision: appCtx.checkBuildingCollision
+      });
+      resolvedCamX = collisionSafeCamera.x;
+      resolvedCamZ = collisionSafeCamera.z;
+      camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
+    } else {
+      camera.position.set(resolvedCamX, camY, resolvedCamZ);
+    }
 
     if (state.characterMesh && state.view === "third") {
       state.characterMesh.visible = walker.pitch < 0.98;
@@ -237,3 +248,4 @@ function createWalkingRuntimeHelpers({
 }
 
 export { createWalkingRuntimeHelpers };
+import { resolveThirdPersonCameraCollision } from './camera-collision.js?v=1';

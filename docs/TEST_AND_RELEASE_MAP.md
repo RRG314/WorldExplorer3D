@@ -130,11 +130,11 @@ The following results were observed in the current working source before this re
 | Functions runtime on Node.js 22 | pass; expected exports present |
 | Account/admin/onboarding contract | pass |
 | CSS integrity | pass |
-| module-version consistency | pass across 472 checked targets at run time |
+| module-version consistency | pass across 488 checked targets at run time |
 | maintainability guard | pass with nonblocking advisories |
 | production-readiness semantic contract | pass |
 | `git diff --check` | pass before canonical documentation additions |
-| reachability and strict asset audits | pass; 532/532 source modules, 93 reachable assets and 27 dynamic PBR assets; no orphans |
+| reachability and strict asset audits | pass; 550/550 reportable files, 94 reachable assets and 27 dynamic PBR assets; no orphans |
 | Firestore rules | pass, 70/70 emulator assertions including accounts, admin claims, rooms, chat, edits, Discovery inventory and trades |
 | multiplayer integration | pass, two independent authenticated browser sessions and 8/8 room/presence/movement/chat/edit assertions |
 | installed-Chrome account/admin journey | pass signed-out, user, admin gate, diagnostics-off, responsive and tutorial states |
@@ -147,12 +147,19 @@ The following results were observed in the current working source before this re
 | urban vehicle/equipment/responder journey | local installed-Chrome gate; exact vehicle enter/drive/exit, nine-family promotion contract, NPC talk/take/impact, semantic prop impact, civic witnesses, location-aware responder dispatch/search/contact/return, collapsed desktop/touch inventory and responsive UI; production/user acceptance remains open |
 | urban room authority | pass locally: pure concurrent transaction contract plus two independent Auth clients against Firestore/Functions emulators; single vehicle owner, owner-only plausible motion, release/reclaim, shared server-computed condition and direct-write denial |
 | rapid cross-location replacement | pass locally in installed Chrome; superseded Baltimore work aborted, Monaco alone published, provider ledgers returned to zero, terrain concurrency bounded at 12, no duplicate URLs or console errors |
+| 2026-08-18 blocker repair | pass locally: Baltimore/New York curated dimensions join generalized footprints (21/41 mapped high-rises); Monaco/Miami/Tokyo mapped-density outage fallback; Everglades accepted-ground flat-datum horizon; Tahoe/Panama explicit boat arrival and Holland Tunnel explicit land arrival; immutable vegetation publication; exterior camera/companion framing |
+| full worldwide visual evidence | one 40-location installed-Chrome run completed; its three findings were repaired and passed focused rendered reruns; all 40 generated frames were inspected and approved in a SHA-256-bound manifest |
 | production artifact | 4.3.0 clean-source production candidate build, identity verification and bundled browser boot pass; exact final identity is recorded in `dist/build-manifest.json` |
 | legacy bundled-Chromium matrices | inconclusive: fixed-world travel and editor-multiplayer harnesses stalled without a failing assertion; equivalent installed-Chrome focused journeys pass |
 | deployed preview | pass at Firebase channel `v4-3-0-59332cb`; production-configured globe/title shell visually inspected with zero captured errors |
 | operational endpoints | pass against the deployed preview; approved `adsb-lol` provider returned five observations |
 
 These are focused results, not a substitute for `release:verify` on the final candidate.
+
+The final repair source is deliberately not release-approved yet. The gate still
+requires a clean committed identity, regenerated runtime/matrix evidence, the
+ten-minute real-input drive, hands-on user acceptance, and physical
+phone/tablet/integrated-GPU review. No preview was deployed from this repair.
 
 ## 5. Open blockers and required disposition
 

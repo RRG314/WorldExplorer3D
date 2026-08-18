@@ -1,4 +1,4 @@
-import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=25';
+import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=26';
 import { registerWaterWaveMaterial } from '../world/water-materials.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 

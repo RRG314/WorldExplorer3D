@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=39";
+} from "./load-runtime-session.js?v=41";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=22";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -274,6 +274,12 @@ export function createWorldRoadLoader(deps = {}) {
         endLoadPhase,
         { radiusWorld: 1500, timeoutMs: 7000 }
       );
+      // Terrain classification can debounce a vegetation rebuild. Drain that
+      // bounded refinement before the immutable world publication snapshot so
+      // runtime collections cannot change one frame after readiness.
+      if (typeof appCtx.flushWorldCoverVegetationRefresh === 'function') {
+        appCtx.flushWorldCoverVegetationRefresh();
+      }
     };
     const createSyntheticWorld = () => {
       createSyntheticFallbackWorld({

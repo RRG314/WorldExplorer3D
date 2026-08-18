@@ -160,8 +160,8 @@ assert.equal(denseSettlementOwnsUrbanSurface({
   grassRatio: 0.08,
   waterRatio: 0
 }), true, 'A small mapped green area must not turn a strongly developed tile into grass.');
-assert.equal(regionalBuildingTileOwnsUrbanSurface(24), true);
-assert.equal(regionalBuildingTileOwnsUrbanSurface(23), false);
+assert.equal(regionalBuildingTileOwnsUrbanSurface(18), true);
+assert.equal(regionalBuildingTileOwnsUrbanSurface(17), false);
 assert.match(profileSource, /applyTerrainProfileSurfaceMaterialMix\(mesh, nextMode\)/);
 assert.match(mappedContextSource, /surfaceFallbackByTile/);
 const builtProfileBody = profileSource.slice(
@@ -176,7 +176,7 @@ assert.match(
 assert.doesNotMatch(builtProfileBody, /TERRAIN_GRASS_COLOR_HEX/);
 assert.match(
   materialBlendSource,
-  /surfaceClass === TERRAIN_SURFACE_CLASS\.urban && colors[\s\S]*colors\.setXYZ\(index, 1, 1, 1\)/,
+  /surfaceClass === TERRAIN_SURFACE_CLASS\.urban && colors[\s\S]*setNormalizedTerrainAttribute\(colors, index, \[1, 1, 1\]\)/,
   'Developed fallback must clear the stale green vertex tint before exact mapped land classes override it.'
 );
 assert.match(

@@ -24,6 +24,7 @@ const captureDroneViews = process.env.WORLD_MATRIX_CAPTURE_DRONE === '1';
 const forceDaylight = process.env.WORLD_MATRIX_FORCE_DAYLIGHT === '1';
 const requireWorldCover = process.env.WORLD_MATRIX_REQUIRE_WORLDCOVER === '1';
 const blockWorldCover = process.env.WORLD_MATRIX_BLOCK_WORLDCOVER === '1';
+const blockElevation = process.env.WORLD_MATRIX_BLOCK_ELEVATION === '1';
 const disableNearBuildingBatching = process.env.WORLD_MATRIX_DISABLE_NEAR_BUILDING_BATCHING === '1';
 const locationDelayMs = Math.max(0, Number(process.env.WORLD_MATRIX_LOCATION_DELAY_MS ?? 1200) || 0);
 const buildingDetailWaitLimitMs = 32000;
@@ -136,7 +137,8 @@ async function loadLocation(page, spec) {
       ctx.customLoc = {
         lat: Number(locationSpec.lat),
         lon: Number(locationSpec.lon),
-        name: String(locationSpec.label || 'Custom Location')
+        name: String(locationSpec.label || 'Custom Location'),
+        arrivalMode: expectedStart === 'water' ? 'boat' : 'walk'
       };
       ctx.customLocTransient = false;
       ctx.selLoc = 'custom';
@@ -206,6 +208,7 @@ async function loadLocation(page, spec) {
     const landmarkWaitMs = performance.now() - landmarkWaitStartedAt;
 
     let initialSpawn = null;
+    let initialStructureProbe = null;
     if (locationSpec.kind === 'custom' && typeof ctx.applyCustomLocationSpawn === 'function') {
       initialSpawn = ctx.applyCustomLocationSpawn('walk', {
         emitTutorial: false,
@@ -214,6 +217,15 @@ async function loadLocation(page, spec) {
         preferBoatIfWater: true,
         source: expectedStart === 'water' ? 'world_matrix_custom_water' : 'world_matrix_custom_land'
       });
+      initialStructureProbe = ctx._lastCustomStructureProbe ? {
+        distance: Number.isFinite(ctx._lastCustomStructureProbe.distance)
+          ? Number(ctx._lastCustomStructureProbe.distance.toFixed(2))
+          : null,
+        kind: ctx._lastCustomStructureProbe.kind || null,
+        width: Number.isFinite(ctx._lastCustomStructureProbe.width)
+          ? Number(ctx._lastCustomStructureProbe.width.toFixed(2))
+          : null
+      } : null;
     } else if (typeof ctx.spawnOnRoad === 'function') {
       initialSpawn = ctx.spawnOnRoad();
     }
@@ -1340,6 +1352,7 @@ async function loadLocation(page, spec) {
         terrainCorridorMaxDelta: Number.isFinite(initialSpawn.terrainCorridorMaxDelta) ?
           Number(initialSpawn.terrainCorridorMaxDelta.toFixed(2)) : null
       } : null,
+      initialStructureProbe,
       customStructureProbe,
       structureGameplay,
       boatActive: !!ctx.boatMode?.active,
@@ -1430,6 +1443,9 @@ async function main() {
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   if (blockWorldCover) await page.route('https://titiler.terrascope.be/**', (route) => route.abort('blockedbyclient'));
+  if (blockElevation) {
+    await page.route('https://s3.amazonaws.com/elevation-tiles-prod/**', (route) => route.abort('blockedbyclient'));
+  }
   const consoleErrors = [];
   const requestFailures = [];
 

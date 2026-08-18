@@ -38,6 +38,9 @@ const WILDLIFE_LABELS = Object.freeze({
 function compileAmbientWildlifePlan(environment, options = {}) {
   if (environment?.type !== 'EnvironmentContextPublication') throw new TypeError('Ambient wildlife requires an EnvironmentContextPublication.');
   const maxActors = Math.max(0, Math.min(12, Number(options.maxActors) || 8));
+  const isPositionEligible = typeof options.isPositionEligible === 'function'
+    ? options.isPositionEligible
+    : null;
   const actors = [];
   const candidateCells = environment.cells.slice().sort((a, b) =>
     Math.hypot(a.center.x, a.center.z) - Math.hypot(b.center.x, b.center.z) || a.cellId.localeCompare(b.cellId)
@@ -47,8 +50,17 @@ function compileAmbientWildlifePlan(environment, options = {}) {
     const seed = `${environment.worldIdentity.id}|ambient-wildlife-v1|${cell.cellId}`;
     if (deterministicUnit(`${seed}:presence`) < 0.16) continue;
     const margin = 0.22;
-    const x = cell.bounds.minX + (cell.bounds.maxX - cell.bounds.minX) * (margin + deterministicUnit(`${seed}:x`) * (1 - margin * 2));
-    const z = cell.bounds.minZ + (cell.bounds.maxZ - cell.bounds.minZ) * (margin + deterministicUnit(`${seed}:z`) * (1 - margin * 2));
+    let home = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const suffix = attempt === 0 ? '' : `:${attempt}`;
+      const x = cell.bounds.minX + (cell.bounds.maxX - cell.bounds.minX) * (margin + deterministicUnit(`${seed}:x${suffix}`) * (1 - margin * 2));
+      const z = cell.bounds.minZ + (cell.bounds.maxZ - cell.bounds.minZ) * (margin + deterministicUnit(`${seed}:z${suffix}`) * (1 - margin * 2));
+      if (!isPositionEligible || isPositionEligible({ x, z }, { cell, attempt })) {
+        home = { x, z };
+        break;
+      }
+    }
+    if (!home) continue;
     const archetype = archetypeForCell(cell, seed);
     const speciesId = archetype === 'domestic-wanderer'
       ? domesticSpeciesForCell(cell, seed)
@@ -61,7 +73,7 @@ function compileAmbientWildlifePlan(environment, options = {}) {
       label: archetype === 'domestic-wanderer'
         ? WILDLIFE_LABELS[speciesId]
         : `Procedural ${WILDLIFE_LABELS[speciesId].toLowerCase()} encounter`,
-      home: Object.freeze({ x, z }),
+      home: Object.freeze(home),
       phase: deterministicUnit(`${seed}:phase`) * Math.PI * 2,
       evidenceClass: 'procedural-game-encounter',
       supportingEvidence: Object.freeze(['habitat-plausible']),

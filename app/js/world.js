@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=17";
+} from "./surface-rules.js?v=18";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=32";
+} from "./world/spawn.js?v=34";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -82,7 +82,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=25";
+} from "./world/load-geometry.js?v=26";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=38";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=126";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=128";
 import {
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
@@ -170,7 +170,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=39";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=41";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

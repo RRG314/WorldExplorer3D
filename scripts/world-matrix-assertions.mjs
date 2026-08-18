@@ -8,6 +8,16 @@ function clampHudLocation(value, maxLen = 52) {
   return text.length > maxLen ? `${text.slice(0, Math.max(8, maxLen - 1)).trim()}…` : text;
 }
 
+function haversineKm(latA, lonA, latB, lonB) {
+  if (![latA, lonA, latB, lonB].every(Number.isFinite)) return Infinity;
+  const toRad = Math.PI / 180;
+  const dLat = (latB - latA) * toRad;
+  const dLon = (lonB - lonA) * toRad;
+  const a = Math.sin(dLat * 0.5) ** 2 +
+    Math.cos(latA * toRad) * Math.cos(latB * toRad) * Math.sin(dLon * 0.5) ** 2;
+  return 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
 export function assertWorldLocationIdentity(spec, result) {
   const locationPresentation = result.locationPresentation || {};
   const expectedSelection = spec.kind === 'custom' ? 'custom' : spec.key;
@@ -45,10 +55,13 @@ export function assertWorldLocationIdentity(spec, result) {
     placeState &&
     String(placeState.display || '').trim() === String(locationPresentation.resolvedHudLabel || '').trim()
   ) {
-    const longitudeDelta = Math.abs(Number(placeState.lon) - Number(locationPresentation.origin?.lon));
     assert(
-      Math.abs(Number(placeState.lat) - Number(locationPresentation.origin?.lat)) <= 0.05 &&
-        Math.min(longitudeDelta, Math.abs(longitudeDelta - 360)) <= 0.05,
+      haversineKm(
+        Number(placeState.lat),
+        Number(placeState.lon),
+        Number(locationPresentation.origin?.lat),
+        Number(locationPresentation.origin?.lon)
+      ) <= 6,
       `${spec.id}: HUD accepted a place label from another loaded location ${JSON.stringify(locationPresentation)}`
     );
   }
@@ -241,6 +254,7 @@ export function assertWorldMatrixLocation(spec, result) {
       `${spec.id}: more than 10% of rendered buildings bypassed global or explicit inferred provenance ${JSON.stringify(dimensions.geometrySources)}`
     );
     const sourceDetails = result.buildingDetail?.sourceDetails || {};
+    const metadataDetails = result.buildingDetail?.metadata || {};
     const coverageIsWideEnough = buildingSource === 'shortbread-vector-buildings'
       ? Number(sourceDetails.loaded || 0) >= 4 && Number(sourceDetails.zoom || 0) >= 14
       : Number(sourceDetails.radiusDegrees || 0) >= 0.0135;
@@ -250,6 +264,32 @@ export function assertWorldMatrixLocation(spec, result) {
       Number(dimensions.maxHeightBySource?.fallback || 0) <= 80,
       `${spec.id}: inferred building height exceeded its safety limit ${JSON.stringify(dimensions)}`
     );
+    if (
+      metadataDetails.source === 'bundled-osm-building-metadata' &&
+      Number(metadataDetails.requested || 0) > 0
+    ) {
+      assert(
+        Number(metadataDetails.matched || 0) > 0 &&
+        Number(metadataDetails.mappedDimensions || 0) > 0,
+        `${spec.id}: curated city building dimensions were not joined to generalized footprints ${JSON.stringify(metadataDetails)}`
+      );
+    }
+    if (Number(spec.minimumMappedSkylineHeight || 0) > 0) {
+      const mappedSkylineHeight = Math.max(
+        Number(dimensions.maxHeightBySource?.levels || 0),
+        Number(dimensions.maxHeightBySource?.explicit_height || 0)
+      );
+      assert(
+        mappedSkylineHeight >= Number(spec.minimumMappedSkylineHeight),
+        `${spec.id}: mapped skyline collapsed below ${spec.minimumMappedSkylineHeight} m ${JSON.stringify(dimensions)}`
+      );
+    }
+    if (Number(spec.minimumMappedHighRises || 0) > 0) {
+      assert(
+        Number(dimensions.mappedHighRiseCount || 0) >= Number(spec.minimumMappedHighRises),
+        `${spec.id}: mapped high-rise count collapsed below ${spec.minimumMappedHighRises} ${JSON.stringify(dimensions)}`
+      );
+    }
     assert(
       Number(dimensions.maxHeightBySource?.levels || 0) <= 1000 &&
       Number(dimensions.maxHeightBySource?.explicit_height || 0) <= 1000 &&

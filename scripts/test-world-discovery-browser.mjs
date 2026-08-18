@@ -153,6 +153,10 @@ try {
 
   await page.locator('[data-discovery-tab="today"]').click();
   await page.locator('[data-discovery-action="photograph"]').click();
+  await page.waitForFunction(() => {
+    const discovery = JSON.parse(globalThis.render_game_to_text()).worldDiscovery;
+    return discovery?.activeActivityId === 'photograph' && discovery?.interaction?.phase === 'idle';
+  });
   const photographTutorial = page.locator('#discoveryTutorial:not([hidden])');
   if (await photographTutorial.isVisible().catch(() => false)) await page.locator('#discoveryTutorialDoneBtn').click();
   await page.locator('#discoveryPrimaryBtn').click();
@@ -293,6 +297,43 @@ try {
     await ctx.advanceRuntimeTime?.(800);
   });
   await page.locator('#discoveryPanel').waitFor({ state: 'hidden' });
+  const companionFrame = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const companion = ctx.scene.getObjectByProperty('name', `World Discovery Active Companion ${ctx.worldDiscoveryRuntime?.companionRuntime?.snapshot?.().activeCatalogId}`);
+    const character = ctx.Walk.state.characterMesh;
+    const project = (object) => {
+      const world = new THREE.Vector3();
+      object?.getWorldPosition?.(world);
+      const ndc = world.clone().project(ctx.camera);
+      return {
+        visible: object?.visible === true,
+        world: { x: world.x, y: world.y, z: world.z },
+        ndc: { x: ndc.x, y: ndc.y, z: ndc.z }
+      };
+    };
+    const cameraSurfaceY = Number(ctx.SurfaceQuery?.walkAt?.(ctx.camera.position.x, ctx.camera.position.z)?.position?.y);
+    return {
+      camera: { x: ctx.camera.position.x, y: ctx.camera.position.y, z: ctx.camera.position.z, surfaceY: cameraSurfaceY },
+      walker: { ...ctx.Walk.state.walker },
+      cameraCollision: ctx.checkBuildingCollision?.(ctx.camera.position.x, ctx.camera.position.z, .28, {
+        actorBaseY: ctx.camera.position.y - .28,
+        actorHeight: .56
+      }),
+      walkerCollision: ctx.checkBuildingCollision?.(ctx.Walk.state.walker.x, ctx.Walk.state.walker.z, 1.5, {
+        actorBaseY: ctx.Walk.state.walker.y - 1.7,
+        actorHeight: 2.1
+      }),
+      character: project(character),
+      companion: project(companion)
+    };
+  });
+  assert.equal(companionFrame.cameraCollision?.collision, false, `companion camera remained inside facade geometry: ${JSON.stringify(companionFrame)}`);
+  assert.equal(companionFrame.walkerCollision?.collision, false, `companion journey left the player inside facade geometry: ${JSON.stringify(companionFrame)}`);
+  for (const [label, presentation] of [['player', companionFrame.character], ['companion', companionFrame.companion]]) {
+    assert.equal(presentation?.visible, true, `${label} must be visible in the companion frame: ${JSON.stringify(companionFrame)}`);
+    assert.equal(Math.abs(presentation.ndc.x) < .96 && Math.abs(presentation.ndc.y) < .96 && presentation.ndc.z >= -1 && presentation.ndc.z <= 1,
+      true, `${label} must remain inside the companion frame: ${JSON.stringify(companionFrame)}`);
+  }
   await page.screenshot({ path: path.join(outputDir, 'companion-desktop.png'), fullPage: false });
 
   await page.evaluate(async () => {

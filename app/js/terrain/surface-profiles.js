@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=17";
+} from "../surface-rules.js?v=18";
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
@@ -10,7 +10,7 @@ import {
 } from "./worldcover-baseline.js?v=17";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import { latLonToTileXY } from './tile-coordinates.js?v=1';
-import { pointInMappedLandArea } from './far-field-mapped-context.js?v=17';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=18';
 import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
 import {
   applyTerrainProfileSurfaceMaterialMix,

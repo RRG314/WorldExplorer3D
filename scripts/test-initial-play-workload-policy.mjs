@@ -33,6 +33,17 @@ assert.equal(shouldLoadDetailedBuildings(
   { elements: mappedDesertRoads },
   { worldSurfaceProfile: { terrainModeHint: 'sand' } }
 ).shouldLoad, false);
+const denseCoastalStreetGrid = Array.from({ length: 120 }, (_, index) => ({
+  id: index,
+  type: 'way',
+  tags: { highway: index % 3 === 0 ? 'primary' : 'residential' }
+}));
+const denseCoastalPolicy = shouldLoadDetailedBuildings(
+  { elements: denseCoastalStreetGrid },
+  { worldSurfaceProfile: { terrainModeHint: 'sand' } }
+);
+assert.equal(denseCoastalPolicy.shouldLoad, true);
+assert.equal(denseCoastalPolicy.denseRoadSettlement, true);
 const cityPolicy = shouldLoadDetailedBuildings({
   elements: [{ type: 'way', tags: { landuse: 'residential' } }]
 }, { worldSurfaceProfile: { terrainModeHint: 'sand' } });

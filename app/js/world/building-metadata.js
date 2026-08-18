@@ -1,5 +1,7 @@
 const METERS_PER_LAT_DEGREE = 110540;
 const MATCH_GRID_METERS = 32;
+const BUNDLED_IDENTITY_MAX_DISTANCE_METERS = 7;
+const BUNDLED_IDENTITY_MIN_GAP_METERS = 1.5;
 
 function localMeters(lat, lon, originLat, originLon) {
   const lonScale = Math.max(0.2, Math.cos(originLat * Math.PI / 180)) * 111320;
@@ -57,6 +59,14 @@ function polygonRecord(way, nodes, originLat, originLon, index) {
   };
 }
 
+function metadataPointRecord(way, originLat, originLon, index) {
+  const lat = Number(way?.center?.lat);
+  const lon = Number(way?.center?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const local = localMeters(lat, lon, originLat, originLon);
+  return { index, way, x: local.x, z: local.z };
+}
+
 function gridKey(x, z) {
   return `${Math.floor(x / MATCH_GRID_METERS)},${Math.floor(z / MATCH_GRID_METERS)}`;
 }
@@ -93,6 +103,62 @@ export function mergeBuildingMetadata(footprintData, metadataData, options = {})
     const sourceId = String(way.tags?._sourceFeatureId || '').trim();
     if (sourceId) metadataByStableId.set(sourceId, way);
   });
+  const bundledPackId = String(metadataData._buildingMetadataPackId || '').trim();
+  const bundledMetadata =
+    metadataData._overpassSource === 'bundled-osm-building-metadata' && !!bundledPackId;
+  const originLat = Number(options.lat);
+  const originLon = Number(options.lon);
+  const footprintNodes = new Map(
+    footprintData.elements
+      .filter((element) => element?.type === 'node')
+      .map((node) => [node.id, node])
+  );
+  const footprintRecords = bundledMetadata && Number.isFinite(originLat) && Number.isFinite(originLon)
+    ? footprintWays.map((way, index) => polygonRecord(way, footprintNodes, originLat, originLon, index))
+        .filter(Boolean)
+    : [];
+  const metadataRecords = bundledMetadata && Number.isFinite(originLat) && Number.isFinite(originLon)
+    ? metadataWays.map((way, index) => metadataPointRecord(way, originLat, originLon, index))
+        .filter(Boolean)
+    : [];
+  const metadataGrid = new Map();
+  for (const record of metadataRecords) {
+    const key = gridKey(record.x, record.z);
+    if (!metadataGrid.has(key)) metadataGrid.set(key, []);
+    metadataGrid.get(key).push(record);
+  }
+  const bundledMatches = new Map();
+  const proposedMatches = [];
+  for (const footprintRecord of footprintRecords) {
+    const candidates = nearbyRecords(metadataGrid, footprintRecord.x, footprintRecord.z)
+      .map((metadataRecord) => ({
+        metadataRecord,
+        distance: Math.hypot(
+          metadataRecord.x - footprintRecord.x,
+          metadataRecord.z - footprintRecord.z
+        )
+      }))
+      .filter((candidate) => candidate.distance <= BUNDLED_IDENTITY_MAX_DISTANCE_METERS)
+      .sort((left, right) => left.distance - right.distance);
+    if (!candidates.length) continue;
+    const nearest = candidates[0];
+    const nextDistance = candidates[1]?.distance ?? Infinity;
+    if (nextDistance - nearest.distance < BUNDLED_IDENTITY_MIN_GAP_METERS) continue;
+    proposedMatches.push({ footprintRecord, ...nearest });
+  }
+  // A metadata point is allowed to enrich only its unique nearest footprint.
+  // This prevents adjacent high-rise centers from lending dimensions to the
+  // wrong generalized polygon in dense blocks.
+  const nearestByMetadata = new Map();
+  for (const proposal of proposedMatches) {
+    const key = proposal.metadataRecord.index;
+    const current = nearestByMetadata.get(key);
+    if (!current || proposal.distance < current.distance) nearestByMetadata.set(key, proposal);
+  }
+  for (const proposal of proposedMatches) {
+    if (nearestByMetadata.get(proposal.metadataRecord.index) !== proposal) continue;
+    bundledMatches.set(proposal.footprintRecord.index, proposal.metadataRecord.way);
+  }
 
   let matched = 0;
   let mappedDimensions = 0;
@@ -101,27 +167,34 @@ export function mergeBuildingMetadata(footprintData, metadataData, options = {})
   let mappedNames = 0;
   let rejectedAmbiguous = 0;
   const usedMetadata = new Set();
-  for (const footprint of footprintWays) {
+  for (let footprintIndex = 0; footprintIndex < footprintWays.length; footprintIndex += 1) {
+    const footprint = footprintWays[footprintIndex];
     const geometryId = String(footprint.tags?._sourceFeatureId || '').trim();
     const explicitOsmId = String(
       footprint.tags?._osmFeatureId ||
       (geometryId.startsWith('osm:way:') ? geometryId : '')
     ).trim();
-    if (!explicitOsmId) {
+    const bundledMatch = bundledMatches.get(footprintIndex);
+    if (!explicitOsmId && !bundledMatch) {
       rejectedAmbiguous += 1;
       continue;
     }
-    const metadata = metadataByStableId.get(explicitOsmId);
-    if (!metadata || usedMetadata.has(explicitOsmId)) continue;
-    usedMetadata.add(explicitOsmId);
+    const metadata = explicitOsmId ? metadataByStableId.get(explicitOsmId) : bundledMatch;
+    const metadataStableId = explicitOsmId || `osm:way:${String(metadata?.id ?? '').trim()}`;
+    if (!metadata || !metadataStableId || usedMetadata.has(metadataStableId)) continue;
+    usedMetadata.add(metadataStableId);
     const tags = metadata.tags || {};
+    const mapping = explicitOsmId ? 'explicit_stable_id' : 'bundled_osm_spatial_identity';
     footprint.tags = {
       ...footprint.tags,
       ...tags,
       _sourceFeatureId: geometryId,
-      _buildingMetadataSourceId: explicitOsmId,
+      _buildingMetadataSourceId: metadataStableId,
       _buildingMetadataGeometryId: geometryId,
-      _buildingMetadataMapping: 'explicit_stable_id'
+      _buildingMetadataMapping: mapping,
+      _buildingMetadataProvider: mapping === 'bundled_osm_spatial_identity'
+        ? `bundled-osm:${bundledPackId}`
+        : undefined
     };
     matched += 1;
     if (hasMappedDimension(tags)) mappedDimensions += 1;
@@ -133,7 +206,10 @@ export function mergeBuildingMetadata(footprintData, metadataData, options = {})
   footprintData._buildingMetadata = {
     source: metadataData._overpassSource || 'overpass',
     endpoint: metadataData._overpassEndpoint || null,
-    policy: 'explicit_stable_identity_only',
+    policy: bundledMetadata
+      ? 'explicit_or_curated_bundled_spatial_identity'
+      : 'explicit_stable_identity_only',
+    packId: bundledPackId || null,
     requested: metadataWays.length,
     matched,
     unmatched: Math.max(0, metadataWays.length - matched),

@@ -53,33 +53,25 @@ weapon construction guidance.
 
 The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 
-The 2026-08-18 full release matrix is currently red even though the focused
-facade, runtime, multiplayer, account, movement, transport and lifecycle checks
-pass. Current blockers are:
+The 2026-08-18 local blocker-repair pass closed the seven runtime defects found
+by the worldwide matrix: curated metadata identity, mapped skyline height,
+dense-city outage ownership, degraded far-horizon publication, water/land
+arrival selection, post-publication vegetation mutation and exterior
+third-person camera collision. The fixes live at shared owners; no city-name
+rendering exception or weakened threshold was added.
 
-- Baltimore and New York did not meet mapped-building metadata enrichment and
-  visible fallback coverage requirements; the sampled fallback buildings were
-  uniformly 7–15 m and reported zero metadata matches.
-- Miami and Tokyo produced excessive grass from the dense-city landcover
-  fallback during the provider-outage scenario.
-- Everglades finalized the fixed location without far-horizon terrain when both
-  elevation and parent fallback were unavailable.
-- Lake Tahoe and Panama Canal water starts selected walking rather than their
-  expected boat start.
-- The latest general Baltimore runtime invariant saw vegetation publish one
-  feature after the fixed-world snapshot (410 to 411), so world publication was
-  not stable in that run. The entrance-specific journey did not mutate the world.
-- The Discovery/companion journey passes state, progression, scale and visibility
-  assertions, and the active field animal is visible in its world frame. Some
-  post-adoption companion screenshots still place the third-person camera against
-  or inside nearby facade geometry, obscuring the companion. This remains visual
-  release blocker REL-004/INV-007; camera collision/framing must be corrected and
-  visually rerun rather than inferred from state alone.
+The single 40-location installed-Chrome run produced all 40 screenshots and
+exposed three final edge cases. Monaco's mapped-density fallback, polar HUD
+distance matching and explicit Holland Tunnel land arrival were corrected and
+then passed focused rendered reruns. The 40 screenshots have an approved,
+hash-bound visual manifest. Runtime invariants are also green with all 37 checks
+true and a stable 411-feature/two-mesh vegetation publication.
 
-These are worldwide fallback/readiness failures, not facade-test failures. They
-must be fixed at their shared data and world-start owners and the full matrix
-must pass before 4.3.0 can be deployed. Do not add location-specific visual
-patches or weaken the matrix.
+This does not approve 4.3.0 for deployment. Production remains on 4.2.1, the
+production gate intentionally rejects the dirty/uncommitted evidence identity,
+the required ten-minute real-input drive has not been recorded for the final
+commit, and hands-on phone/tablet/integrated-GPU acceptance remains open. A clean
+candidate must regenerate commit-bound evidence before any preview or release.
 
 ## Map Coverage
 

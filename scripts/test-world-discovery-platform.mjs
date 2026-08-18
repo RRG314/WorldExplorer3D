@@ -18,6 +18,7 @@ import { RELEASED_EXPLORER_TOOLS, explorerGoalSnapshot, explorerToolProgress, re
 import { createExplorationEntitlementService, resolveExcavationTool } from '../app/js/discovery/tools.js?v=1';
 import { tutorialForActivity } from '../app/js/discovery/tutorials.js?v=1';
 import { compileAmbientWildlifePlan } from '../app/js/discovery/wildlife-runtime.js?v=1';
+import { resolveCompanionFollowTarget } from '../app/js/discovery/companion-runtime.js?v=1';
 
 const validation = validateDiscoveryCatalogs(BUILTIN_DISCOVERY_CATALOGS);
 assert.equal(validation.ok, true, validation.errors.join('\n'));
@@ -52,6 +53,13 @@ assert.equal(results.get('forest').fieldActivities.slots.some((slot) => slot.act
 assert.ok(results.get('forest').wildlife.actors.length <= 8, 'ambient wildlife must remain bounded');
 assert.equal(results.get('forest').wildlife.diagnostics.generatedWithAdditionalProviderQueries, false);
 assert.deepEqual(compileAmbientWildlifePlan(results.get('forest').environment).actors, results.get('forest').wildlife.actors, 'ambient wildlife must remain deterministic');
+const filteredWildlife = compileAmbientWildlifePlan(results.get('downtown').environment, {
+  isPositionEligible: (position) => position.x > 0
+});
+assert.equal(filteredWildlife.actors.every((actor) => actor.home.x > 0), true, 'ambient wildlife must search deterministic alternatives outside obstructed geometry');
+assert.equal(compileAmbientWildlifePlan(results.get('downtown').environment, {
+  isPositionEligible: () => false
+}).actors.length, 0, 'fully obstructed cells must not publish unreachable wildlife encounters');
 
 const firstPlan = results.get('field').encounters;
 const repeatedPlan = compileEncounterPlan(results.get('field').environment, results.get('field').eligibility);
@@ -189,6 +197,9 @@ const hound = createCompanionInstance('trail-hound', { worldIdentity: 'fixture:f
 const fox = createCompanionInstance('woodland-fox', { worldIdentity: 'fixture:forest', discoveryId: 'unlock-1', adoptedAt: 1 });
 const pigeon = createCompanionInstance('city-pigeon', { worldIdentity: 'fixture:downtown', discoveryId: 'bird-unlock-1', adoptedAt: 1 });
 assert.equal(pigeon.behaviorArchetype, 'air-follower', 'bird companions must preserve airborne behavior in their durable instance');
+assert.deepEqual(resolveCompanionFollowTarget({ x: 10, z: 20, yaw: 0 }), { x: 11.8, z: 19.15 }, 'a north-facing ground companion must follow beside and behind the player');
+const eastFollower = resolveCompanionFollowTarget({ x: 10, z: 20, yaw: Math.PI / 2 });
+assert.ok(Math.abs(eastFollower.x - 9.15) < 1e-9 && Math.abs(eastFollower.z - 18.2) < 1e-9, 'an east-facing ground companion must preserve the same local side/back formation');
 const active = setActiveCompanion([hound, fox], fox.instanceId);
 assert.equal(active.filter((entry) => entry.active).length, 1, 'only one companion may be active');
 assert.equal(feedCompanion(hound).care.fullness > hound.care.fullness, true);

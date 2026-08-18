@@ -154,6 +154,8 @@
     "test:road-publication-ownership": "node scripts/test-road-publication-ownership.mjs",
     "test:building-publication-scheduling": "node scripts/test-building-publication-scheduling.mjs",
     "test:initial-play-policy": "node scripts/test-initial-play-workload-policy.mjs",
+    "test:spawn-location-arrival": "node scripts/test-spawn-location-arrival.mjs",
+    "test:walking-camera-collision": "node scripts/test-walking-camera-collision.mjs",
     "test:startup-workload-browser": "node scripts/test-startup-workload-browser.mjs",
     "test:initial-play-workload": "npm run test:initial-play-policy && npm run test:startup-workload-browser",
     "test:road-junctions": "node scripts/test-road-junction-envelopes.mjs",

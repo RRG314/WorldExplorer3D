@@ -25,6 +25,16 @@ function createCompanionMesh(appCtx, catalogId) {
   return { group, catalogId, catalog, rawHeight, scale: 1, clearance: 0, profile: group.userData.performanceProfile || {} };
 }
 
+function resolveCompanionFollowTarget(actor, { airborne = false } = {}) {
+  const angle = Number(actor?.angle || actor?.yaw || 0);
+  const followBack = airborne ? .45 : .85;
+  const followSide = airborne ? 2.6 : 1.8;
+  return Object.freeze({
+    x: Number(actor?.x || 0) - Math.sin(angle) * followBack + Math.cos(angle) * followSide,
+    z: Number(actor?.z || 0) - Math.cos(angle) * followBack - Math.sin(angle) * followSide
+  });
+}
+
 async function createCompanionRuntime(appCtx, options = {}) {
   const profileStore = options.profileStore;
   if (!profileStore?.listCompanions) throw new TypeError('Companion runtime requires the discovery profile store.');
@@ -100,11 +110,9 @@ async function createCompanionRuntime(appCtx, options = {}) {
     if (!policy.visible || !actor) return;
     elapsed += Math.max(0, Number(dt) || 0);
     const airborne = presentation.catalog?.behaviorArchetype === 'air-follower';
-    const angle = Number(actor.angle || actor.yaw || 0);
-    const followBack = airborne ? .45 : .85;
-    const followSide = airborne ? 3.4 : 1.8;
-    const targetX = Number(actor.x || 0) - Math.cos(angle) * followBack - Math.sin(angle) * followSide;
-    const targetZ = Number(actor.z || 0) + Math.sin(angle) * followBack - Math.cos(angle) * followSide;
+    const target = resolveCompanionFollowTarget(actor, { airborne });
+    const targetX = target.x;
+    const targetZ = target.z;
     const response = 1 - Math.exp(-Math.max(0, Number(dt) || 0) * (airborne ? 3.4 : 4.2));
     const separation = Math.hypot(targetX - presentation.group.position.x, targetZ - presentation.group.position.z);
     if (!positionInitialized || separation > 25) {
@@ -163,4 +171,4 @@ async function createCompanionRuntime(appCtx, options = {}) {
   });
 }
 
-export { createCompanionRuntime };
+export { createCompanionRuntime, resolveCompanionFollowTarget };

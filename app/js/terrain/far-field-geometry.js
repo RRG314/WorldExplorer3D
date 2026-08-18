@@ -14,6 +14,13 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) * 0.5;
 }
 
+function resolveFarFieldFallbackDatum(acceptedGroundSample) {
+  const acceptedMeters = Number(acceptedGroundSample?.groundElevationMeters);
+  return acceptedGroundSample?.status === 'available' && Number.isFinite(acceptedMeters)
+    ? acceptedMeters
+    : 0;
+}
+
 function appendInterval(values, start, end, interval, includeStart = true) {
   const distance = Math.max(0, end - start);
   const segments = Math.max(1, Math.ceil(distance / Math.max(1, interval)));
@@ -334,7 +341,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     return candidates[Math.min(candidates.length - 1, Math.floor(candidates.length * 0.2))];
   }
 
-  function prepareMappedWaterSurfaces(mappedContext, sourceZoom, loadedTiles, offsetMeters) {
+  function prepareMappedWaterSurfaces(mappedContext, sourceZoom, loadedTiles, offsetMeters, fallbackElevationMeters = null) {
     for (const area of mappedContext?.waterAreas || []) {
       if (area.kind === 'ocean') {
         area.surfaceMeters = 0;
@@ -347,7 +354,10 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const lon = Number(ring[index]?.[0]);
         const lat = Number(ring[index]?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        const sourceMeters = sampleSourceMeters(lat, lon, sourceZoom, loadedTiles);
+        const sampledSourceMeters = sampleSourceMeters(lat, lon, sourceZoom, loadedTiles);
+        const sourceMeters = Number.isFinite(sampledSourceMeters)
+          ? sampledSourceMeters
+          : Number(fallbackElevationMeters);
         if (Number.isFinite(sourceMeters)) samples.push(sourceMeters + offsetMeters);
       }
       area.surfaceMeters = representativeWaterSurfaceMeters(samples);
@@ -373,7 +383,10 @@ function createFarFieldGeometryPlanner(deps = {}) {
     // for a deliberately unloaded neighbor and reject the entire fixed mesh.
     const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
     const { lat, lon } = worldToLatLon(samplePoint.x, samplePoint.z);
-    const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
+    const sampledSourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
+    const sourceMeters = Number.isFinite(sampledSourceMeters)
+      ? sampledSourceMeters
+      : Number(spec.fallbackElevationMeters);
     if (!Number.isFinite(sourceMeters)) return null;
 
     let meters = sourceMeters + offsetMeters;
@@ -578,5 +591,6 @@ export {
   mappedWaterBedMetersAt,
   normalizeMappedWaterSurfaceOwnership,
   parentTerrainTile,
+  resolveFarFieldFallbackDatum,
   sampleFarFieldGridWorldY
 };

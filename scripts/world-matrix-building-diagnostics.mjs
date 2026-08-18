@@ -10,6 +10,8 @@ export function collectBuildingDimensions(buildings = []) {
     buildingParts: 0,
     mappedRoofs: 0,
     mappedRoofHeights: 0,
+    mappedTallBuildingCount: 0,
+    mappedHighRiseCount: 0,
     minHeight: null,
     maxHeight: null,
     maxHeightBySource: {},
@@ -57,6 +59,11 @@ export function collectBuildingDimensions(buildings = []) {
       if (centerDistance >= 1200) dimensions.outerRingCount += 1;
     }
     if (!Number.isFinite(height)) continue;
+
+    if (heightSource !== 'fallback') {
+      if (height >= 35) dimensions.mappedTallBuildingCount += 1;
+      if (height >= 60) dimensions.mappedHighRiseCount += 1;
+    }
 
     dimensions.minHeight = dimensions.minHeight === null ? height : Math.min(dimensions.minHeight, height);
     dimensions.maxHeight = dimensions.maxHeight === null ? height : Math.max(dimensions.maxHeight, height);

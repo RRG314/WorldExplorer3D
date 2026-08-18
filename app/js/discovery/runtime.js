@@ -1,5 +1,5 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
-import { createCompanionRuntime } from './companion-runtime.js?v=1';
+import { createCompanionRuntime } from './companion-runtime.js?v=2';
 import { createDetectorSession } from './detector-session.js?v=1';
 import { compileEnvironmentContext } from './environment-context.js?v=1';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=1';
@@ -26,7 +26,7 @@ import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
 import { tutorialForActivity } from './tutorials.js?v=1';
 import { visualForCatalogId } from './visual-content.js?v=1';
-import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=2';
+import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=3';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=1';
 
@@ -678,7 +678,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   };
   const encounters = compileEncounterPlan(environment, eligibility, BUILTIN_DISCOVERY_CATALOGS, { isPositionEligible });
   const fieldActivities = compileFieldActivityPlan(environment, eligibility, { isPositionEligible });
-  const wildlife = compileAmbientWildlifePlan(environment);
+  const wildlife = compileAmbientWildlifePlan(environment, {
+    isPositionEligible: (position) => {
+      const surfaceY = sampleDiscoverySurfaceY(appCtx, position.x, position.z);
+      if (!Number.isFinite(surfaceY)) return false;
+      const collision = appCtx.checkBuildingCollision?.(position.x, position.z, 4.8, {
+        actorBaseY: surfaceY,
+        actorHeight: 2.1
+      });
+      return collision?.collision !== true;
+    }
+  });
   const publication = createDiscoveryPublication({ snapshot, environment, eligibility, interaction, encounters, fieldActivities, wildlife });
   appCtx.worldDiscoveryPublicationStore ||= createDiscoveryPublicationStore();
   const published = appCtx.worldDiscoveryPublicationStore.publish(publication, { requestId: request.id, sequence: snapshot.sequence });

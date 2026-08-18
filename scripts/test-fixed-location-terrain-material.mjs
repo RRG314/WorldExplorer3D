@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { resolveFarFieldFallbackDatum } from '../app/js/terrain/far-field-geometry.js';
 
 const farFieldSource = await readFile(
   new URL('../app/js/terrain/far-field.js', import.meta.url),
@@ -79,6 +80,14 @@ assert.doesNotMatch(
   /resolveFarFieldSurfaceColor|sampleDetailedWorldCoverSurface|mappedSurfaceColor|applyWorldCoverBuiltSurfaceMaterial/,
   'a second absolute-color terrain presentation pipeline must not return'
 );
+assert.equal(resolveFarFieldFallbackDatum({ status: 'available', groundElevationMeters: 7.25 }), 7.25);
+assert.equal(resolveFarFieldFallbackDatum({ status: 'unavailable' }), 0);
+assert.doesNotMatch(
+  farFieldSource,
+  /if \(!elevation\.ready\) \{[\s\S]{0,300}far-field-elevation-and-parent-fallback-unavailable/,
+  'an elevation-provider outage must degrade to a bounded horizon instead of deleting it'
+);
+assert.match(farFieldSource, /elevationFallbackMode = elevation\.ready \? null : 'accepted-ground-flat-datum'/);
 assert.doesNotMatch(
   mappedContextSource,
   /landByTile|farLandClass|mappedSurfaceColor/,

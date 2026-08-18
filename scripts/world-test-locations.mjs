@@ -5,7 +5,9 @@ export const WORLD_TEST_LOCATIONS = [
     key: 'baltimore',
     label: 'Baltimore, Maryland',
     category: 'dense_downtown_river',
-    minimumAuthoritativeBuildingParts: 20
+    minimumAuthoritativeBuildingParts: 20,
+    minimumMappedSkylineHeight: 60,
+    minimumMappedHighRises: 8
   },
   {
     id: 'hollywood',
@@ -20,7 +22,9 @@ export const WORLD_TEST_LOCATIONS = [
     key: 'newyork',
     label: 'New York, New York',
     category: 'dense_downtown_coastal',
-    minimumAuthoritativeBuildingParts: 100
+    minimumAuthoritativeBuildingParts: 100,
+    minimumMappedSkylineHeight: 100,
+    minimumMappedHighRises: 25
   },
   {
     id: 'miami',

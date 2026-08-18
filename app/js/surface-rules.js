@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import {
   createLocalSurfaceAnalysisApi,
   denseSettlementOwnsUrbanSurface
-} from "./surface-rules-local.js?v=3";
+} from "./surface-rules-local.js?v=4";
 import { classifyBiomeProfile } from "./earth-core/biome-profile.js?v=1";
 
 const POLAR_SNOW_LAT_THRESHOLD = 66;

@@ -265,8 +265,11 @@ try {
                 ? { road: candidate, point: candidatePoint }
                 : best;
             }, null);
-          const road = nearest?.road || null;
-          let point = nearest?.point || null;
+          const preferred = nearestLossless?.point?.distance <= landmark.maximumDistanceMeters
+            ? nearestLossless
+            : nearest;
+          const road = preferred?.road || null;
+          let point = preferred?.point || null;
           if (landmark.kind === 'tunnel') {
             const shellRanges = Array.isArray(road?.tunnelSystemModel?.shellRanges)
               ? road.tunnelSystemModel.shellRanges

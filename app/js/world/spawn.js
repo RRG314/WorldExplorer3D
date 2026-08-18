@@ -3,7 +3,7 @@ import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
 import { isRoadSurfaceReachable } from "../structure-semantics.js?v=49";
 import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=7";
 import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
-import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=2';
+import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=4';
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,

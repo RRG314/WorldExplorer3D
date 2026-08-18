@@ -38,6 +38,28 @@ assert.doesNotThrow(() => assertWorldLocationIdentity(custom, {
   }
 }));
 
+const polarCustom = {
+  id: 'antarctica_glacier_custom',
+  kind: 'custom',
+  lat: -77.846,
+  lon: 166.668,
+  label: 'Antarctica Glacier'
+};
+assert.doesNotThrow(() => assertWorldLocationIdentity(polarCustom, {
+  locationPresentation: {
+    selected: 'custom',
+    customName: 'Antarctica Glacier',
+    origin: { lat: -77.846, lon: 166.668 },
+    resolvedHudLabel: 'Antarctica Glacier',
+    renderedHudLabel: 'Antarctica Glacier',
+    placeState: {
+      display: 'Antarctica Glacier',
+      lat: -77.84500176186583,
+      lon: 166.7636203765869
+    }
+  }
+}));
+
 assert.doesNotThrow(() => assertWorldLocationIdentity(custom, {
   locationPresentation: {
     selected: 'custom',

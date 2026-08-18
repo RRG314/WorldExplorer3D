@@ -425,7 +425,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       request: worldSession?.request,
       livingWorld
     });
-    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=3');
+    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=5');
     const worldDiscovery = await startWorldDiscoveryRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request

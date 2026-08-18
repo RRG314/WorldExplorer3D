@@ -55,13 +55,19 @@ export function shouldLoadDetailedBuildings(data = {}, options = {}) {
     evidence.settlementPlaces > 0 ||
     evidence.settlementAmenities >= 2
   );
+  // Coastal city centers can inherit a coarse `sand` biome hint when the
+  // land-cover provider is unavailable. A large mapped street network is
+  // independent settlement evidence and must not be suppressed by that hint.
+  const denseRoadSettlement = evidence.driveableRoads >= 80;
   const shouldLoad = (
     explicitSettlement ||
+    denseRoadSettlement ||
     (!sparseBiome && evidence.driveableRoads >= 12)
   );
   return Object.freeze({
     shouldLoad,
     sparseBiome,
+    denseRoadSettlement,
     evidence: Object.freeze(evidence)
   });
 }

@@ -147,6 +147,50 @@ mergeBuildingMetadata(stableFootprint, osmMetadata, { lat: 39, lon: -76 });
 assert.equal(stableFootprint.elements[0].tags.height, '40');
 assert.equal(stableFootprint.elements[0].tags._buildingMetadataMapping, 'explicit_stable_id');
 
+const bundledFootprint = {
+  elements: [
+    { type: 'node', id: 1, lat: 39, lon: -76 },
+    { type: 'node', id: 2, lat: 39, lon: -75.9999 },
+    { type: 'node', id: 3, lat: 39.0001, lon: -75.9999 },
+    { type: 'node', id: 4, lat: 39.0001, lon: -76 },
+    {
+      type: 'way', id: 2, nodes: [1, 2, 3, 4, 1],
+      tags: {
+        building: 'yes',
+        _geometrySource: 'shortbread-vector',
+        _sourceFeatureId: 'shortbread:14:1:2:4'
+      }
+    }
+  ]
+};
+const bundledMetadata = {
+  _overpassSource: 'bundled-osm-building-metadata',
+  _buildingMetadataPackId: 'fixture-city',
+  elements: [{
+    type: 'way', id: 44,
+    center: { lat: 39.00005, lon: -75.99995 },
+    tags: { building: 'office', 'building:levels': '28', name: 'Curated Tower' }
+  }]
+};
+mergeBuildingMetadata(bundledFootprint, bundledMetadata, { lat: 39, lon: -76 });
+const bundledTags = bundledFootprint.elements.find((element) => element.type === 'way').tags;
+assert.equal(bundledTags['building:levels'], '28');
+assert.equal(bundledTags._buildingMetadataMapping, 'bundled_osm_spatial_identity');
+assert.equal(compileBuildingProvenance(bundledTags).valid, true);
+
+const untrustedSpatialFootprint = structuredClone(bundledFootprint);
+delete untrustedSpatialFootprint.elements.find((element) => element.type === 'way').tags['building:levels'];
+delete untrustedSpatialFootprint.elements.find((element) => element.type === 'way').tags._buildingMetadataSourceId;
+delete untrustedSpatialFootprint.elements.find((element) => element.type === 'way').tags._buildingMetadataGeometryId;
+delete untrustedSpatialFootprint.elements.find((element) => element.type === 'way').tags._buildingMetadataMapping;
+delete untrustedSpatialFootprint.elements.find((element) => element.type === 'way').tags._buildingMetadataProvider;
+mergeBuildingMetadata(untrustedSpatialFootprint, osmMetadata, { lat: 39, lon: -76 });
+assert.equal(
+  untrustedSpatialFootprint.elements.find((element) => element.type === 'way').tags.height,
+  undefined,
+  'Only a curated bundled pack may use the spatial identity bridge.'
+);
+
 const square = (minX, minZ, maxX, maxZ) => [
   { x: minX, z: minZ },
   { x: maxX, z: minZ },

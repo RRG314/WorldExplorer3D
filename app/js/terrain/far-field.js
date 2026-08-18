@@ -9,7 +9,7 @@ import {
   loadFarMappedContext,
   pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=17';
+} from './far-field-mapped-context.js?v=18';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=3';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -22,6 +22,7 @@ import {
   createFarFieldGeometryPlanner,
   disposeFarFieldMesh,
   parentTerrainTile,
+  resolveFarFieldFallbackDatum,
   sampleFarFieldGridWorldY
 } from './far-field-geometry.js?v=17';
 import {
@@ -33,7 +34,7 @@ import {
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=50';
+} from './surface-profiles.js?v=51';
 import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,
@@ -281,12 +282,15 @@ function createFarFieldTerrainApi(deps = {}) {
         const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
         if (center.x < spec.outer.minX || center.x > spec.outer.maxX ||
             center.z < spec.outer.minZ || center.z > spec.outer.maxZ) continue;
-        const sourceMeters = sampleSourceMeters(
+        const sampledSourceMeters = sampleSourceMeters(
           building.centerLat,
           building.centerLon,
           spec.sourceZoom,
           loadedTiles
         );
+        const sourceMeters = Number.isFinite(sampledSourceMeters)
+          ? sampledSourceMeters
+          : Number(spec.fallbackElevationMeters);
         if (!Number.isFinite(sourceMeters)) continue;
         const widthWorld = Number(building.widthMeters) * unitsPerMeter;
         const depthWorld = Number(building.depthMeters) * unitsPerMeter;
@@ -345,7 +349,10 @@ function createFarFieldTerrainApi(deps = {}) {
       const area = Math.abs(signedArea) * 0.5;
       if (area < 14 || area > 350000) continue;
 
-      const sourceMeters = sampleSourceMeters(center.lat, center.lon, spec.sourceZoom, loadedTiles);
+      const sampledSourceMeters = sampleSourceMeters(center.lat, center.lon, spec.sourceZoom, loadedTiles);
+      const sourceMeters = Number.isFinite(sampledSourceMeters)
+        ? sampledSourceMeters
+        : Number(spec.fallbackElevationMeters);
       if (!Number.isFinite(sourceMeters)) continue;
       const baseY = (sourceMeters + offsetMeters) * unitsPerMeter * yExaggeration + 0.25;
       const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter);
@@ -445,25 +452,29 @@ function createFarFieldTerrainApi(deps = {}) {
     const missingSourceTiles = elevation.missingSourceTiles;
     const fallbackTiles = elevation.fallbackTiles;
     const fallbackElevation = elevation.fallback;
-    if (!elevation.ready) {
-      setState({
-        status: 'unavailable',
-        reason: 'far-field-elevation-and-parent-fallback-unavailable',
-        missingSourceTiles: missingSourceTiles.length,
-        fallbackSourceTiles: fallbackTiles.length
-      });
-      return;
-    }
+    const elevationFallbackMode = elevation.ready ? null : 'accepted-ground-flat-datum';
+    const fallbackElevationMeters = elevation.ready
+      ? null
+      : resolveFarFieldFallbackDatum(sampleAcceptedGroundAtLatLon(appCtx.LOC.lat, appCtx.LOC.lon));
+    spec = { ...spec, fallbackElevationMeters };
     const loadedTiles = new Map([
       ...sourceTiles.map((tile) => [tile.key, getOrLoadTerrainTile(tile.z, tile.tx, tile.ty, deps)]),
       ...fallbackTiles.map((tile) => [tile.key, getOrLoadTerrainTile(tile.z, tile.tx, tile.ty, deps)])
     ]);
-    const offsetMeters = normalizationOffset(spec.inner, spec.sourceZoom, loadedTiles);
+    const offsetMeters = elevation.ready
+      ? normalizationOffset(spec.inner, spec.sourceZoom, loadedTiles)
+      : 0;
     if (!Number.isFinite(offsetMeters)) {
       setState({ status: 'unavailable', reason: 'far-field-datum-normalization-unavailable' });
       return;
     }
-    prepareMappedWaterSurfaces(mappedContext, spec.sourceZoom, loadedTiles, offsetMeters);
+    prepareMappedWaterSurfaces(
+      mappedContext,
+      spec.sourceZoom,
+      loadedTiles,
+      offsetMeters,
+      fallbackElevationMeters
+    );
 
     setState({ status: 'building-geometry', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length, offsetMeters });
     const geometryBuildStartedAt = performance.now();
@@ -554,16 +565,24 @@ function createFarFieldTerrainApi(deps = {}) {
     mesh.userData.renderProvenance = {
       version: 1,
       profile: 'fixed-location-terrain-lod',
-      provider: 'mapzen-terrarium',
-      dataset: 'Mapzen Terrarium elevation-derived landscape',
+      provider: elevationFallbackMode ? 'accepted-ground-flat-datum' : 'mapzen-terrarium',
+      dataset: elevationFallbackMode
+        ? 'Degraded fixed-location flat datum with mapped surface semantics'
+        : 'Mapzen Terrarium elevation-derived landscape',
       verticalDatum: sampleAcceptedGroundAtLatLon(appCtx.LOC.lat, appCtx.LOC.lon)?.verticalDatum || null,
       normalizationOffsetMeters: offsetMeters,
       layer: 'terrain',
       role: 'fixed-location-terrain-lod',
-      sources: ['mapzen-terrarium', 'openstreetmap-shortbread', ...(worldCoverContext ? ['esa-worldcover-2021'] : [])],
-      fallback: offsetMeters === 0 &&
+      sources: [
+        ...(elevationFallbackMode ? ['accepted-ground-flat-datum'] : ['mapzen-terrarium']),
+        'openstreetmap-shortbread',
+        ...(worldCoverContext ? ['esa-worldcover-2021'] : [])
+      ],
+      fallback: !!elevationFallbackMode || (
+        offsetMeters === 0 &&
         typeof terrainTileDeps?.usesAcceptedGround === 'function' &&
         !terrainTileDeps.usesAcceptedGround()
+      )
     };
 
     farFieldMesh = mesh;
@@ -654,6 +673,8 @@ function createFarFieldTerrainApi(deps = {}) {
       fallbackSourceTiles: fallbackTiles.length,
       fallbackElevationRequestsStarted: Number(fallbackElevation?.started || 0),
       fallbackElevationMaxInFlight: Number(fallbackElevation?.maxInFlight || 0),
+      elevationFallbackMode,
+      fallbackElevationMeters,
       offsetMeters,
       columns: built.columns,
       rows: built.rows,

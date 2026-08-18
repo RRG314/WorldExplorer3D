@@ -782,7 +782,7 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Symptom: strict asset reachability failed on 15 obsolete landing/gameplay images, and the module graph contained a second, unused Discovery progression implementation whose only consumer was its own test.
 - Root cause: current landing media and Explorer progression had replaced older artifacts without removing the displaced files and self-only module.
 - Resolution: the obsolete images and orphan `app/js/discovery/progression.js` were removed from the working source. The active Explorer progress/goals authority remains unchanged. Recovery copies are stored under `/Users/stevenreid/.codex/recovery/worldexplorer3d-unused-assets-20260817/`.
-- Guard: `npm run audit:reachability` (532/532 modules, zero orphans), `npm run audit:assets` (93 reachable assets and 27 dynamic PBR assets), `npm run test:module-versions` and `npm run runtime:verify`.
+- Guard: `npm run audit:reachability` (550/550 reportable files, zero orphans), `npm run audit:assets` (94 reachable assets and 27 dynamic PBR assets), `npm run test:module-versions` and `npm run runtime:verify`.
 - Never reintroduce: weakening strict audits, keeping self-tested production modules without a runtime consumer, or restoring legacy media without an intentional current-page reference.
 
 ## 2026-08-18 — Room members diverge on civic response and can forge outcomes
@@ -887,24 +887,48 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   unbounded one-mesh-per-door detail, terrain-only door height, building-center
   interaction range, a visual-only touch prompt, or city-specific door meshes.
 
-## 2026-08-18 — Worldwide release matrix catches shared fallback regressions
+## 2026-08-18 — Worldwide shared fallback and publication blockers
 
-- Status: open; blocks 4.3.0 deployment while production remains on 4.2.1.
-- Symptom: Baltimore/New York building metadata fallback coverage is incomplete;
-  Miami/Tokyo outage landcover overproduces grass; Everglades can finalize
-  without far-horizon terrain; and Lake Tahoe/Panama Canal water starts select
-  walking instead of a boat.
-- Root cause: investigation remains open at the shared building-enrichment,
-  dense-city landcover fallback, far-horizon fallback and arrival-vehicle
-  selection owners. The failures occur across different locations and must not
-  be treated as location-specific art problems.
-- Resolution: none claimed. Focused facade and gameplay checks passing does not
-  override this full-matrix result.
-- Guard: `npm run test:world-matrix` must pass without weakened thresholds,
-  location-name exceptions or hidden placeholder terrain before deployment.
-- Never reintroduce: deploying from syntax/focused tests alone, changing tests to
-  accept missing visual coverage, or adding per-city patches for shared fallback
-  ownership defects.
+- Status: resolved locally on `steven/urban-sandbox-foundation`; not deployed;
+  clean-candidate and real-device release gates remain open.
+- Symptom: generalized Baltimore/New York footprints lost curated heights;
+  dense cities could collapse toward grass during WorldCover outage; Everglades
+  could publish without a far horizon; Tahoe/Panama chose walking on mapped
+  water; vegetation changed after publication; and the exterior companion
+  camera could cross a facade.
+- Root cause: curated identity accepted provider IDs but had no bounded bridge
+  to generalized footprints; sparse-biome and regional-surface policies ignored
+  sufficient mapped settlement evidence; far terrain treated complete elevation
+  failure as terminal; automatic arrival did not consistently honor exact water
+  or the selector's explicit arrival mode; a debounced vegetation refresh crossed
+  the immutable publication boundary; and the exterior camera arm did not query
+  the existing building collision index. Ambient wildlife could also choose a
+  building-occupied home and the companion follow transform swapped lateral and
+  rear offsets.
+- Resolution: add a unique seven-metre curated metadata identity join with both
+  source identities preserved; use mapped roads/building density for spatial
+  urban fallback while exact green polygons retain priority; publish the one far
+  mesh in explicit accepted-ground flat-datum mode when elevation is unavailable;
+  resolve exact/explicit arrival intent before fallback vehicle choice; flush
+  vegetation before snapshot; reject building-occupied ambient homes; correct
+  companion formation axes; and shorten only the exterior camera arm through the
+  shared building collision owner. Polar HUD matching now uses physical distance.
+- Evidence: Baltimore/New York report 21/41 mapped high-rises (161 m/366 m
+  maxima); no-elevation Everglades owns all 97,969 cells with
+  `accepted-ground-flat-datum`; runtime has 37/37 checks and stable 411-feature,
+  two-mesh vegetation; companion, facade, engineered-landmark and Monaco tunnel
+  Chrome journeys pass; the single full matrix captured 40 locations, its three
+  discovered edge cases passed focused rendered reruns, and all 40 frames have a
+  SHA-256-bound approved visual manifest.
+- Guard: `test:phase4-provenance`, `test:city-surface-semantics`,
+  `test:fixed-location-terrain-material`, `test:spawn-location-arrival`,
+  `test:walking-camera-collision`, `test:runtime`, `test:world-discovery-browser`,
+  `test:building-facades-browser`, `test:engineered-transport-landmarks-browser`,
+  `test:monaco-tunnels-browser`, and the worldwide matrix plus visual review.
+- Never reintroduce: untrusted proximity enrichment, city-name exceptions,
+  duplicate terrain/water/camera owners, post-publication collection timers,
+  automatic boat choice that overrides explicit land intent, weakened visual
+  thresholds, or deploying from focused/synthetic evidence alone.
 
 ## Verification rule
 

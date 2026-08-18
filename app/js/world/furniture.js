@@ -540,6 +540,14 @@ export function scheduleWorldCoverVegetationRefresh() {
   }, 500);
 }
 
+export function flushWorldCoverVegetationRefresh() {
+  if (!worldCoverVegetationTimer) return false;
+  globalThis.clearTimeout(worldCoverVegetationTimer);
+  worldCoverVegetationTimer = null;
+  refreshWorldCoverVegetation();
+  return true;
+}
+
 export function resetWorldFurnitureCaches() {
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;
@@ -547,4 +555,7 @@ export function resetWorldFurnitureCaches() {
   signTextGeometry = null;
 }
 
-Object.assign(appCtx, { scheduleWorldCoverVegetationRefresh });
+Object.assign(appCtx, {
+  flushWorldCoverVegetationRefresh,
+  scheduleWorldCoverVegetationRefresh
+});

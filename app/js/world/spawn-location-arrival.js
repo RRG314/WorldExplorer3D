@@ -10,6 +10,11 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     searchNearestSafeRoadSpawn,
     tryAutoEnterBoatAt
   } = deps;
+  const requestedArrivalMode = String(appCtx.customLoc?.arrivalMode || 'auto');
+  const preferBoatIfWater = requestedArrivalMode === 'boat' || (
+    requestedArrivalMode !== 'walk' && options.preferBoatIfWater === true
+  );
+  const arrivalOptions = { ...options, preferBoatIfWater };
   const arrival = featuredArrivalNear(appCtx.LOC);
   if (arrival) {
     const viewpoint = appCtx.geoToWorld(arrival.viewpoint.lat, arrival.viewpoint.lon);
@@ -50,6 +55,19 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     });
   }
 
+  // A destination that explicitly prefers water should test the exact mapped
+  // coordinate before a nearby road pulls the arrival ashore. The boat query
+  // still requires containment in a published navigable water body, so a
+  // waterfront land destination safely falls through to the road policy.
+  if (preferBoatIfWater && structureMode !== 'subgrade') {
+    const preferredBoatSpawn = tryAutoEnterBoatAt(0, 0, {
+      ...arrivalOptions,
+      mode,
+      source: options.source || 'custom_location'
+    });
+    if (preferredBoatSpawn) return preferredBoatSpawn;
+  }
+
   const verifiedOcean = appCtx.worldLoadRuntimeState?.surfaceDomain?.kind === 'ocean';
   if (!verifiedOcean && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
     const mappedWalkApproach = mode === 'walk'
@@ -68,7 +86,7 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
       return applyResolvedWorldSpawn(mappedWalkApproach, options);
     }
     const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
-      ...options,
+      ...arrivalOptions,
       mode,
       preferRoad: mode === 'drive',
       source: options.source || 'custom_land_approach'
@@ -79,13 +97,13 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
   }
 
   const boatSpawn = tryAutoEnterBoatAt(0, 0, {
-    ...options,
+    ...arrivalOptions,
     mode,
     source: options.source || 'custom_location'
   });
   if (boatSpawn) return boatSpawn;
   return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
-    ...options,
+    ...arrivalOptions,
     mode,
     feetY: Number.isFinite(structureFeetY) ? structureFeetY : options.feetY,
     preferRoad: mode === 'drive' || Number.isFinite(structureFeetY)
