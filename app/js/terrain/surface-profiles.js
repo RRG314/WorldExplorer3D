@@ -7,7 +7,7 @@ import {
   loadWorldCoverBaseline,
   worldCoverProviderSnapshot,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=16";
+} from "./worldcover-baseline.js?v=17";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import { latLonToTileXY } from './tile-coordinates.js?v=1';
 import { pointInMappedLandArea } from './far-field-mapped-context.js?v=17';
@@ -18,8 +18,9 @@ import {
   applyWorldCoverSurfaceMaterialMix,
   configureTerrainSurfaceMaterialBlend,
   ensureTerrainSurfaceMixAttributes,
+  setNormalizedTerrainAttribute,
   setTerrainSurfaceMaterialMixAt
-} from './surface-material-blend.js?v=1';
+} from './surface-material-blend.js?v=2';
 
 const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
@@ -425,7 +426,7 @@ export function applyWorldCoverVertexTints(mesh, result) {
   const encodingScale = Number(result?.surfaceTintEncodingScale || 170);
   if (!geometry || !uvs || !tints || size < 2 || encodingScale <= 0) return false;
 
-  const colors = new Float32Array(uvs.count * 3);
+  const colors = new Uint8Array(uvs.count * 3);
   const sample = (x, y, channel) => tints[(y * size + x) * 3 + channel] / encodingScale;
   for (let index = 0; index < uvs.count; index += 1) {
     const sourceX = Math.max(0, Math.min(size - 1, uvs.getX(index) * (size - 1)));
@@ -439,10 +440,12 @@ export function applyWorldCoverVertexTints(mesh, result) {
     for (let channel = 0; channel < 3; channel += 1) {
       const north = sample(x0, y0, channel) * (1 - tx) + sample(x1, y0, channel) * tx;
       const south = sample(x0, y1, channel) * (1 - tx) + sample(x1, y1, channel) * tx;
-      colors[index * 3 + channel] = north * (1 - ty) + south * ty;
+      colors[index * 3 + channel] = Math.round(
+        Math.max(0, Math.min(1, north * (1 - ty) + south * ty)) * 255
+      );
     }
   }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
   geometry.attributes.color.needsUpdate = true;
   mesh.material.vertexColors = true;
   return true;
@@ -465,9 +468,9 @@ export function applyMappedSemanticVertexTints(
 
   let colors = geometry.attributes.color;
   if (!colors || colors.count !== positions.count) {
-    const neutral = new Float32Array(positions.count * 3);
-    neutral.fill(1);
-    colors = new THREE.Float32BufferAttribute(neutral, 3);
+    const neutral = new Uint8Array(positions.count * 3);
+    neutral.fill(255);
+    colors = new THREE.BufferAttribute(neutral, 3, true);
     geometry.setAttribute('color', colors);
   }
   const materialMix = ensureTerrainSurfaceMixAttributes(geometry);
@@ -485,7 +488,7 @@ export function applyMappedSemanticVertexTints(
       area
     ));
     if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
-    colors.setXYZ(index, owner.tint[0], owner.tint[1], owner.tint[2]);
+    setNormalizedTerrainAttribute(colors, index, owner.tint);
     setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);
     tintedVertices += 1;
   }

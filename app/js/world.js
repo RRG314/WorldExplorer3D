@@ -58,12 +58,12 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=29";
+} from "./world/load-support.js?v=30";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=13";
+} from "./world/load-reset.js?v=14";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=11";
@@ -101,12 +101,12 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=35";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=43";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=44";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=10";
+} from "./world/render-support.js?v=11";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -152,7 +152,7 @@ import {
   getNearbyBuildings,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=5";
+} from "./world/building-spatial-index.js?v=6";
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,
@@ -170,7 +170,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=18";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=19";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -355,7 +355,7 @@ initWorldNavigation({
 let editableWorldRuntimePromise = null;
 appCtx.ensureEditableWorldRuntime = () => {
   if (typeof appCtx.getSuppressedEditableBuildingIds === 'function') return Promise.resolve(true);
-  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=1')
+  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=2')
     .then(({ initEditableWorldRuntime }) => {
       initEditableWorldRuntime(appCtx);
       return true;

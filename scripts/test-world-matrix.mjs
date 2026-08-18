@@ -321,13 +321,17 @@ async function loadLocation(page, spec) {
       const mixB = mesh.geometry?.attributes?.terrainSurfaceMixB;
       const materialMix = { grass: 0, urban: 0, sand: 0, forest: 0, soil: 0, rock: 0, snow: 0 };
       if (mixA && mixB) {
+        const component = (attribute, getter, index) => {
+          const value = Number(attribute[getter](index) || 0);
+          return attribute.normalized ? value / 255 : value;
+        };
         for (let index = 0; index < mixA.count; index += 1) {
-          const urban = Math.max(0, Number(mixA.getX(index) || 0));
-          const sand = Math.max(0, Number(mixA.getY(index) || 0));
-          const forest = Math.max(0, Number(mixA.getZ(index) || 0));
-          const soil = Math.max(0, Number(mixA.getW(index) || 0));
-          const rock = Math.max(0, Number(mixB.getX(index) || 0));
-          const snow = Math.max(0, Number(mixB.getY(index) || 0));
+          const urban = Math.max(0, component(mixA, 'getX', index));
+          const sand = Math.max(0, component(mixA, 'getY', index));
+          const forest = Math.max(0, component(mixA, 'getZ', index));
+          const soil = Math.max(0, component(mixA, 'getW', index));
+          const rock = Math.max(0, component(mixB, 'getX', index));
+          const snow = Math.max(0, component(mixB, 'getY', index));
           materialMix.urban += urban;
           materialMix.sand += sand;
           materialMix.forest += forest;
@@ -1109,11 +1113,16 @@ async function loadLocation(page, spec) {
       const mixA = mesh?.geometry?.attributes?.terrainSurfaceMixA;
       const mixB = mesh?.geometry?.attributes?.terrainSurfaceMixB;
       if (mixA && mixB && mixA.count === mixB.count) {
+        const component = (attribute, getter, index) => {
+          const value = Number(attribute[getter](index) || 0);
+          return attribute.normalized ? value / 255 : value;
+        };
         const step = Math.max(1, Math.floor(mixA.count / 4000));
         for (let index = 0; index < mixA.count; index += step) {
           const values = [
-            mixA.getX(index), mixA.getY(index), mixA.getZ(index), mixA.getW(index),
-            mixB.getX(index), mixB.getY(index)
+            component(mixA, 'getX', index), component(mixA, 'getY', index),
+            component(mixA, 'getZ', index), component(mixA, 'getW', index),
+            component(mixB, 'getX', index), component(mixB, 'getY', index)
           ];
           const classNames = ['urban', 'sand', 'forest', 'soil', 'rock', 'snow'];
           const classWeight = values.reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);

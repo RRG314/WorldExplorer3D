@@ -56,9 +56,10 @@ export function resetWorldForReload(options = {}) {
   appCtx.closeArExperience?.('world_reload');
   appCtx.disposeEditableWorldPresentation?.();
 
-  if (typeof appCtx.resetEarthStreaming === 'function') {
-    appCtx.resetEarthStreaming('full_world_reload');
+  if (typeof appCtx.resetEarthStreaming !== 'function') {
+    throw new Error('Earth streaming lifecycle owner is unavailable during world reset.');
   }
+  appCtx.resetEarthStreaming(options.reason || 'full_world_reload');
   appCtx.initialEarthDetailRadius = 0;
   appCtx.plannedEarthDetailRadiusWorld = 0;
   appCtx.fixedRegionalContextBounds = null;
@@ -153,5 +154,6 @@ export function resetWorldForReload(options = {}) {
 
   resetWorldFurnitureCaches();
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
+  appCtx.renderer?.renderLists?.dispose?.();
 
 }

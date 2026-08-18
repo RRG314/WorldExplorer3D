@@ -4,6 +4,53 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-17 — Earth terrain survives reloads and editable buildings rebuild the entire world
+
+- Status: resolved locally on `steven/fix-memory-ownership`; not pushed or
+  deployed. Target-device acceptance remains open.
+- Symptom: dense Earth play settled at 715–730 MB live JavaScript heap, returning
+  to title retained roughly 525 MB, and suppressing/restoring one building could
+  trigger a complete provider/terrain rebuild with a reported 2.02 GB high-water
+  mark. Chrome process memory remained high after the visible world changed.
+- Root cause: `resetWorldForReload` called an optional `resetEarthStreaming`
+  hook that had no implementation. Detailed terrain, the far-field terrain/
+  buildings/water publication, accepted-ground artifact, and 49 elevation tiles
+  survived while a replacement world compiled. Editable-world local/shared
+  transactions called `loadRoads()` even though only one building changed. The
+  4096² water ownership texture retained four RGBA channels although the shader
+  samples only red, and terrain semantic color/material weights used Float32.
+- Resolution: one mandatory Earth-streaming owner now invalidates asynchronous
+  far generations and releases every ground publication/cache before a full
+  reload. Editable building changes update collision filtering, direct meshes,
+  and per-source ranges in batched index buffers without a world reload.
+  Persistent suppressions compile once hidden so restore remains targeted. The
+  water mask is read in bounded yielding chunks and published as R8 at the same
+  4096 resolution; terrain semantic attributes are normalized Uint8, cached
+  base elevations are Float32, and far building/water source descriptors are
+  discarded after their runtime products publish.
+- Evidence: installed Chrome dense New York fell from 644.6 MB immediately
+  before representation work to 533.7 MB post-GC (the original diagnosis was
+  715–730 MB). Terrain attributes fell from 86.42 MB to 47.36 MB; the water mask
+  is exactly 16,777,216 bytes. Title release reaches zero terrain children,
+  terrain bytes, water-mask bytes, far state, accepted ground, provider staging,
+  and elevation tiles, then reloads at 568.3 MB without duplicate ownership.
+  Baltimore suppression stayed on the same load sequence and moved from 729.0
+  MB to 728.2 MB post-GC; persistence and targeted restore pass. San Francisco/
+  London regional water/structure gates pass with R8 masks, and the landmark
+  matrix proves the Baltimore JFX/Fort McHenry plus Bay Bridge/Yerba Buena
+  rendered geometry with framebuffer A/B evidence.
+- Guard: `npm run test:title-memory-release`,
+  `npm run test:living-editable-world-browser`,
+  `npm run test:regional-structures-browser`,
+  `npm run test:engineered-transport-landmarks-browser`, module-identity,
+  fixed-terrain-material, terrain-cancellation, fixed-horizon architecture, and
+  target-device manual Chrome review.
+- Never reintroduce: optional lifecycle owners, terrain resets split across
+  loaders, full `loadRoads()` calls for one editable building, retained RGBA
+  masks sampled as one channel, Float32 semantic weights, source descriptor
+  graphs retained beside compiled GPU products, or memory claims based only on
+  syntax/tests without forced-GC browser and rendered-frame evidence.
+
 ## 2026-08-17 — Regional bridges and tunnels counted but absent, duplicated, or compiled at the waterline
 
 - Status: resolved locally; not pushed or deployed. Installed-Chrome visual

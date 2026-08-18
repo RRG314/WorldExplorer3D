@@ -105,6 +105,9 @@ export async function finalizeLoadedWorld(options = {}) {
   if (typeof publishLocationWorld === 'function') {
     runFinalStep('publishLocationWorld', () => publishLocationWorld());
   }
+  if (typeof appCtx.refreshEditableBuildingVisibility === 'function') {
+    runFinalStep('refreshEditableBuildingVisibility', () => appCtx.refreshEditableBuildingVisibility());
+  }
   markLoaded();
   if (finalizePresentation) appCtx.hideLoad();
   if (finalizePresentation && appCtx.gameStarted) {

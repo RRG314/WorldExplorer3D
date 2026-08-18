@@ -9,7 +9,11 @@ const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'living-editable-world');
 await fs.mkdir(outputDir, { recursive: true });
 const server = await startStaticRootServer({ rootDir, host: '127.0.0.1', candidatePorts: [4324, 4325, 4326] });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({
+  headless: true,
+  channel: 'chrome',
+  args: ['--enable-precise-memory-info']
+});
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const fatalErrors = [];
 const providerWarnings = [];
@@ -24,6 +28,13 @@ page.on('console', (message) => {
   if (recoverable(message.text())) providerWarnings.push(message.text());
   else fatalErrors.push(message.text());
 });
+
+async function collectGarbage() {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('HeapProfiler.collectGarbage');
+  await cdp.detach();
+  await page.waitForTimeout(500);
+}
 
 try {
   const url = `http://127.0.0.1:${server.port}/app/?living-editable-world-browser=1`;
@@ -149,6 +160,8 @@ try {
   );
   assert.deepEqual(fatalErrors, [], `fatal browser errors: ${fatalErrors.join('\n')}`);
   await page.screenshot({ path: path.join(outputDir, 'baltimore-living-world-desktop.png'), fullPage: false });
+  await collectGarbage();
+  const preEditHeap = await page.evaluate(() => Number(performance.memory?.usedJSHeapSize || 0));
 
   const editJourney = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -165,18 +178,29 @@ try {
     const selected = ctx.selectNearestEditableBuilding?.(20);
     const sequence = Number(ctx._worldLoadSequence || 0);
     const result = await ctx.suppressSelectedEditableBuilding?.();
-    return { selected, result, sequence };
+    const visual = ctx.lastEditableBuildingRefresh || null;
+    return { selected, result, sequence, sequenceAfter: Number(ctx._worldLoadSequence || 0), visual };
   });
   assert.equal(editJourney.error, undefined, editJourney.error);
   assert.equal(editJourney.result?.committed, true, `building suppression failed: ${editJourney.result?.reason || 'unknown'}`);
+  assert.equal(editJourney.sequenceAfter, editJourney.sequence, 'building suppression triggered a full world reload');
   const editedSourceId = editJourney.selected.sourceFeatureId;
   await page.waitForFunction(async ({ sequence, sourceFeatureId }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-    return Number(ctx._worldLoadSequence || 0) > sequence && snapshot.worldLoading === false &&
+    const source = ctx.buildings.find((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
+    const nearby = source ? ctx.getNearbyBuildings?.(source.centerX, source.centerZ, 20) || [] : [];
+    return Number(ctx._worldLoadSequence || 0) === sequence && snapshot.worldLoading === false &&
       snapshot.editableWorld?.suppressions === 1 &&
-      !ctx.buildings.some((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
+      ctx.isLocalBuildingSuppressed?.(sourceFeatureId) === true &&
+      !nearby.some((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
   }, { sequence: editJourney.sequence, sourceFeatureId: editedSourceId }, { timeout: 180000 });
+  await collectGarbage();
+  const postEditHeap = await page.evaluate(() => Number(performance.memory?.usedJSHeapSize || 0));
+  assert.ok(
+    postEditHeap <= preEditHeap * 1.15,
+    `targeted building suppression exceeded the 15% heap envelope: ${JSON.stringify({ preEditHeap, postEditHeap })}`
+  );
 
   await page.reload({ waitUntil: 'load', timeout: 120000 });
   await page.waitForTimeout(1800);
@@ -208,7 +232,7 @@ try {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return snapshot.worldLoading === false && snapshot.editableWorld?.suppressions === 1 &&
-      !ctx.buildings.some((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
+      ctx.isLocalBuildingSuppressed?.(sourceFeatureId) === true;
   }, editedSourceId, { timeout: 180000 });
   const restoreJourney = await page.evaluate(async (sourceFeatureId) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -220,9 +244,12 @@ try {
   await page.waitForFunction(async ({ sequence, sourceFeatureId }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-    return Number(ctx._worldLoadSequence || 0) > sequence && snapshot.worldLoading === false &&
+    const source = ctx.buildings.find((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
+    const nearby = source ? ctx.getNearbyBuildings?.(source.centerX, source.centerZ, 20) || [] : [];
+    return Number(ctx._worldLoadSequence || 0) === sequence && snapshot.worldLoading === false &&
       snapshot.editableWorld?.suppressions === 0 &&
-      ctx.buildings.some((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
+      ctx.isLocalBuildingSuppressed?.(sourceFeatureId) === false &&
+      nearby.some((building) => String(building?.sourceBuildingId || '') === sourceFeatureId);
   }, { sequence: restoreJourney.sequence, sourceFeatureId: editedSourceId }, { timeout: 180000 });
   await page.locator('#loading').waitFor({ state: 'hidden', timeout: 180000 });
 
@@ -253,7 +280,14 @@ try {
     livingWorld: after.diagnostics.livingWorld,
     editableWorld: after.diagnostics.editableWorld,
     livingWorldOverhead,
-    editJourney: { sourceFeatureId: editedSourceId, persistedAcrossReload: true, restored: true },
+    editJourney: {
+      sourceFeatureId: editedSourceId,
+      persistedAcrossReload: true,
+      restored: true,
+      fullWorldReloads: 0,
+      preEditHeap,
+      postEditHeap
+    },
     renderer: before.renderer,
     heapBytes: before.heapBytes,
     mobilePanel,

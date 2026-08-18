@@ -23,22 +23,23 @@ import {
   disposeFarFieldMesh,
   parentTerrainTile,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=16';
+} from './far-field-geometry.js?v=17';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
-} from './worldcover-baseline.js?v=16';
+} from './worldcover-baseline.js?v=17';
 import {
   applyMappedSemanticVertexTints,
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=49';
+} from './surface-profiles.js?v=50';
 import {
   applyWorldCoverSurfaceMaterialMix,
+  setNormalizedTerrainAttribute,
   ensureTerrainSurfaceMixAttributes,
   setTerrainSurfaceMaterialMixAt
-} from './surface-material-blend.js?v=1';
+} from './surface-material-blend.js?v=2';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import {
   FAR_WATER_SURFACE_CLEARANCE_WORLD,
@@ -47,7 +48,7 @@ import {
   buildFarWaterGeometry,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
-} from './far-field-water.js?v=4';
+} from './far-field-water.js?v=5';
 import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=8';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
@@ -171,7 +172,11 @@ function createFarFieldTerrainApi(deps = {}) {
     for (let index = 0; index < colors.count; index += 1) {
       const offset = index * 3;
       if (!Number.isFinite(mappedTints[offset])) continue;
-      colors.setXYZ(index, mappedTints[offset], mappedTints[offset + 1], mappedTints[offset + 2]);
+      setNormalizedTerrainAttribute(colors, index, [
+        mappedTints[offset],
+        mappedTints[offset + 1],
+        mappedTints[offset + 2]
+      ]);
       setTerrainSurfaceMaterialMixAt(materialMix, index, mappedModes?.[index] || 'grass');
       owned += 1;
     }
@@ -491,7 +496,7 @@ function createFarFieldTerrainApi(deps = {}) {
       .filter((area) => area.pts.length >= 3);
     const waterGeometryBuildMs = performance.now() - waterBuildStartedAt;
     const waterMaskBuildStartedAt = performance.now();
-    const waterTerrainMask = buildMappedWaterTerrainOwnershipMask(
+    const waterTerrainMask = await buildMappedWaterTerrainOwnershipMask(
       appCtx,
       mappedContext,
       spec,
@@ -702,6 +707,16 @@ function createFarFieldTerrainApi(deps = {}) {
       farBuildings: builtBuildings?.buildings || 0,
       detailedTerrainTilesExcluded: spec.detailedCoverage?.length || 0,
       outerDistanceMeters: FAR_FIELD_OUTER_DISTANCE_METERS
+    });
+    // Building descriptors and mapped-water rings are compilation inputs. The
+    // published GPU geometry and fixedRegionalStructureWaterAreas own their
+    // runtime forms; retain only the land lookup needed by later surface-color
+    // refreshes instead of keeping the complete regional source graph alive.
+    appCtx.fixedLocationMappedSurfaceContext = Object.freeze({
+      contextZoom: mappedContext.contextZoom,
+      landAreas: Number(mappedContext.landAreas || 0),
+      landAreasByTile: mappedContext.landAreasByTile,
+      surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
   }
 

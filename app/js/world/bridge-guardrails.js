@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=49";
-import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
+import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=6";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,

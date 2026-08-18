@@ -5,6 +5,7 @@ import {
   publishedDetailedTerrainTileKeys
 } from './far-field-coverage.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -524,7 +525,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('color', createNormalizedTerrainAttribute(colors, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();

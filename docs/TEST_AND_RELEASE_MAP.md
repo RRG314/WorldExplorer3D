@@ -6,7 +6,7 @@ Status: authoritative verification/release inventory for version 4.3.0 release s
 
 **Approved for production promotion.** Real installed-Chrome journeys, emulator-backed security/multiplayer tests, lifecycle checks, transport visuals and static audits pass. The immutable 4.3.0 candidate was deployed to a Firebase preview channel, visually inspected, and passed the production operational-endpoint check. The previous unreachable-asset, Discovery-occlusion, candidate-identity and preview-endpoint blockers are closed.
 
-The 2.02 GB heap high-water observation remains a disclosed known risk; the 2026-08-17 deployment authorization accepts it for 4.3.0 while post-release memory optimization remains open.
+The earlier 2.02 GB editable-world high-water path is resolved on the local memory-remediation branch by targeted edits and authoritative terrain release. Production remains on 4.2.1; target-device acceptance is still required before a replacement release.
 
 No Git commit, push, preview deployment or production promotion is part of this inventory work.
 
@@ -142,8 +142,9 @@ The following results were observed in the current working source before this re
 | human inspection of Discovery screenshots | pass; field subject and companions are unobstructed, fully framed and shown with the play panel collapsed |
 | Baltimore/San Francisco/Monaco engineered transport | pass visible JFX, Bay Bridge, Fort McHenry and Yerba Buena tunnel structures plus 113 Monaco tunnels and 486 portal instances |
 | planetary/ocean/session lifecycle | pass Moon/Earth/Mars/Space transitions, GEBCO bathymetry and 10 Space + 10 Ocean ownership cycles |
-| title memory release | pass; 689.5 MB loaded to 469.8 MB released, 1,020 geometries removed, no duplicate world on reload |
-| heavy Living/Editable World journey | functional assertions pass; 112 entrances, moving population, persisted suppression/restore and bounded 20 logical added draw calls; **2.02 GB heap high-water remains a manual gate** |
+| title memory release | pass locally; 533.7 MB loaded to 153.8 MB released, zero terrain/far/accepted-ground/elevation ownership, reload at 568.3 MB |
+| heavy Living/Editable World journey | pass locally; 112 entrances, moving population, persisted suppression/restore, no full reload, 729.0 MB to 728.2 MB post-GC edit envelope |
+| rapid cross-location replacement | pass locally in installed Chrome; superseded Baltimore work aborted, Monaco alone published, provider ledgers returned to zero, terrain concurrency bounded at 12, no duplicate URLs or console errors |
 | production artifact | 4.3.0 clean-source production candidate build, identity verification and bundled browser boot pass; exact final identity is recorded in `dist/build-manifest.json` |
 | legacy bundled-Chromium matrices | inconclusive: fixed-world travel and editor-multiplayer harnesses stalled without a failing assertion; equivalent installed-Chrome focused journeys pass |
 | deployed preview | pass at Firebase channel `v4-3-0-59332cb`; production-configured globe/title shell visually inspected with zero captured errors |
@@ -161,15 +162,12 @@ The 15 obsolete landing/gameplay files plus five newly tracked but superseded re
 
 The Discovery journey now verifies airborne behavior, visibility, a 0.241 m rendered City Pigeon and 1.513 m clearance, then completes successfully. Runtime telemetry records clearance from the same accepted/fallback surface used to place the companion.
 
-### REL-003 — Final-candidate memory evidence (accepted known risk)
+### REL-003 — Final-candidate memory evidence (local repair; device gate open)
 
-The project previously reported Chrome heap/resource use around 1.4 GB. The fresh title-release journey proves the loaded Earth world is released (689.5 MB to 469.8 MB and 1,020 geometries removed) and can be rebuilt without duplicate ownership. The heavier editable-world journey still reached a 2.02 GB reported heap high-water mark. The user accepted this disclosed risk for 4.3.0 deployment; the following evidence remains required for post-release optimization:
+The project previously reported Chrome process use around 1.4 GB and a 2.02 GB JavaScript high-water mark during full edit/reload. The local repair reduces dense New York live heap to 533.7 MB, releases all world terrain ownership at title, and keeps a Baltimore edit flat at 729.0 MB to 728.2 MB without a provider reload. Rapid Baltimore-to-Monaco replacement and the Earth/Moon/Space/Ocean session lifecycle also pass. The remaining release evidence is:
 
-- title-only idle memory;
-- first Earth load peak and settled state;
 - sustained drive/walk;
-- location replacement after cleanup;
-- Earth → Space/Ocean/AR → Earth round trips;
+- the complete Earth → Space/Ocean/AR → Earth round trip on target devices;
 - no duplicated renderer, RAF, provider payload or world root;
 - screenshots/state/heap observations tied to candidate hash.
 

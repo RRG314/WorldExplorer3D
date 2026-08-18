@@ -27,10 +27,11 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=49";
+} from "./terrain/surface-profiles.js?v=50";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
+  clearTerrainTileCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
   getTerrainMeshKey,
@@ -50,7 +51,7 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=44";
+} from "./terrain/tiles.js?v=45";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -63,7 +64,7 @@ import {
 } from "./terrain/debug-tools.js?v=9";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=68";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=69";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -125,6 +126,7 @@ const sampleAcceptedGroundAtWorldXZ = (x, z) =>
   acceptedGroundRuntime.sampleAtWorldXZ(x, z);
 const verifyAcceptedGroundCoverage = (locations) =>
   acceptedGroundRuntime.verifyCoverage(locations);
+let earthStreamingReleaseGeneration = 0;
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
@@ -371,6 +373,45 @@ const {
   updateFarTerrainClipmap
 });
 
+function resetEarthStreaming(reason = 'earth_streaming_reset') {
+  earthStreamingReleaseGeneration += 1;
+  const before = Object.freeze({
+    terrainChildren: Number(appCtx.terrainGroup?.children?.length || 0),
+    farFieldActive: !!appCtx.farTerrainClipmapState,
+    acceptedGround: getAcceptedGroundRuntimeSnapshot(),
+    tileCache: terrainTileCacheSnapshot()
+  });
+
+  // This is the single owner for all persistent Earth ground publications.
+  // The far-field reset invalidates asynchronous work synchronously before its
+  // returned drain promise settles, so a replacement world cannot republish an
+  // obsolete generation after this release.
+  resetLocationTerrainPublication();
+  clearTerrainMeshes();
+  clearAcceptedGroundRuntime(reason);
+  const tileCacheRelease = clearTerrainTileCache();
+  appCtx.fixedLocationMappedSurfaceContext = null;
+  appCtx.fixedRegionalStructureWaterAreas = [];
+  appCtx.fixedRegionalContextBounds = null;
+  appCtx.fixedRegionalContextRadiusWorld = 0;
+  appCtx.farTerrainClipmapState = null;
+
+  const release = Object.freeze({
+    generation: earthStreamingReleaseGeneration,
+    reason,
+    before,
+    tileCacheRelease,
+    after: Object.freeze({
+      terrainChildren: Number(appCtx.terrainGroup?.children?.length || 0),
+      farFieldActive: !!appCtx.farTerrainClipmapState,
+      acceptedGround: getAcceptedGroundRuntimeSnapshot(),
+      tileCache: terrainTileCacheSnapshot()
+    })
+  });
+  appCtx.lastEarthStreamingRelease = release;
+  return release;
+}
+
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
   if (![x, z].every(Number.isFinite)) return { ready: false, loaded: 0, total: 0 };
@@ -478,6 +519,7 @@ Object.assign(appCtx, {
   cachedTerrainHeight,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
+  clearTerrainTileCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
   detectRoadIntersections,
@@ -507,6 +549,7 @@ Object.assign(appCtx, {
   refreshTerrainSurfaceProfiles,
   refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
+  resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleFarTerrainWorldYAt,
   sampleAcceptedGroundAtLatLon,
@@ -547,6 +590,7 @@ export {
   classifyTerrainVisualProfile,
   clearAcceptedGroundRuntime,
   clearTerrainHeightCache,
+  clearTerrainTileCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
   detectRoadIntersections,
@@ -568,6 +612,7 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,

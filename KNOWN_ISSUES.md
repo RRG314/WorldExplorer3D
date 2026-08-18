@@ -1,12 +1,12 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-17 for version 4.3.0 release source. The exact immutable commit and content hash are recorded by the hosting build manifest.
+Last reviewed: 2026-08-17 for the local 4.3.0 memory-remediation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
 
 ## Current Release Status
 
-Version 4.3.0 completed its immutable preview gate and is approved for production promotion. The production-configured candidate passed source/artifact identity, bundled browser boot, deployed visual inspection and the privileged operational endpoint check. Firestore rules and the seven new DeFlock/Discovery Functions were deployed before hosting promotion; existing parameterized billing/admin Functions were intentionally left untouched so their production configuration was not replaced.
+Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has a local memory repair on `steven/fix-memory-ownership`; it is not deployed and still requires user/device acceptance before any new release decision.
 
-The Living/Editable World 2.02 GB heap high-water observation is accepted as a disclosed 4.3.0 risk, not marked fixed. The fresh title-release journey still proves that the loaded world is released rather than retained as a duplicate.
+The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 
 ## Map Coverage
 
@@ -19,7 +19,11 @@ The Living/Editable World 2.02 GB heap high-water observation is accepted as a d
 - Dense cities, rapid plane travel, detailed facades, and large structure networks can be demanding on GPU memory and network bandwidth.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
-- A fresh installed-Chrome release journey correctly released the loaded Earth world at the title screen (heap 689.5 MB to 469.8 MB; geometries 1,251 to 231) and rebuilt it without duplicate ownership. A heavier Living/Editable World edit-and-reload journey nevertheless reached a reported 2.02 GB JavaScript heap high-water mark. This is not evidence of a retained duplicate world, but it remains a production-risk observation requiring target-hardware review before deployment.
+- The repaired installed-Chrome dense New York journey uses 533.7 MB post-GC, releases to 153.8 MB, and reloads at 568.3 MB. Terrain children, far-field state, accepted-ground data, the 16 MiB water mask, provider staging, and all 49 elevation tiles reach zero at title release. The earlier comparable dense run used 644.6 MB, while the original diagnosis reproduced 715–730 MB.
+- A Baltimore building suppression stays in the same world-load sequence and moved from 729.0 MB to 728.2 MB post-GC; restore is also targeted and persistence survives reload. The former 2.02 GB edit/reload path is no longer exercised.
+- Rapid Baltimore-to-Monaco replacement passes in installed Chrome: the superseded provider work aborts, the replacement becomes the sole published world, all provider ledgers finish with zero in-flight work, and terrain fetch concurrency remains bounded at 12 without duplicate URLs.
+- Returning to the title after loading Earth still retains the already-booted global runtime and shared actor/renderer assets (153.8 MB, 202 geometries, and 31 textures versus an 11.7 MB cold title). Terrain/world ownership is zero, but reducing that post-boot shared baseline remains an optimization target rather than a closed claim.
+- Manual acceptance on intended phones and integrated-GPU systems is still open. `performance.memory` measures live JavaScript heap, not total Chrome/V8/GPU process RSS.
 - Provider latency can make the same location load at different speeds even when the generated world is unchanged.
 - Narrow or tightly mapped service roads can leave little vehicle clearance.
   The runtime gate samples all road centers and lanes for building collisions,

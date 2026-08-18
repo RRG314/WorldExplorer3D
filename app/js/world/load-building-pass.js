@@ -15,7 +15,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=8";
+} from "./building-batching.js?v=9";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=6';
@@ -305,7 +305,6 @@ export async function buildBuildingGeometryPass(options = {}) {
     );
     if (!knownSourceBuildingId && suppressedBuildingIds.has(sourceBuildingId)) {
       loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
-      continue;
     }
     const roadCorridorOverlap = measureBuildingPhase('apronClassification', () => {
       const expandedFootprint = expandFootprintForGroundApron(pts);
@@ -620,6 +619,7 @@ export async function buildBuildingGeometryPass(options = {}) {
           return;
         }
         groundPatch.userData.landuseFootprint = pts;
+        groundPatch.userData.sourceBuildingId = sourceBuildingId;
         groundPatch.userData.landuseType = 'buildingGround';
         groundPatch.userData.avgElevation = baseElevation;
         groundPatch.userData.terrainAvgElevation = avgElevation;
@@ -670,6 +670,7 @@ export async function buildBuildingGeometryPass(options = {}) {
   if (appCtx._lastBuildingBatchStats) {
     loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
   }
+  appCtx.refreshEditableBuildingVisibility?.();
   endLoadPhase('batchBuildingGeometry');
   return Object.freeze({
     candidateCount: buildingWays.length,

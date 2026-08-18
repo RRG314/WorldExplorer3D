@@ -232,11 +232,6 @@ export function createWorldLoadRuntimeSession(options = {}) {
     appCtx.Walk.state.walker.vy = 0;
   }
 
-  if (appCtx.terrainEnabled && !appCtx.onMoon) {
-    if (typeof appCtx.resetLocationTerrainPublication === 'function') appCtx.resetLocationTerrainPublication();
-    if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
-  }
-
   appCtx.rdtSeed = appCtx.hashGeoToInt(
     appCtx.LOC.lat,
     appCtx.LOC.lon,

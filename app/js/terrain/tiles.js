@@ -18,7 +18,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=49";
+} from "./surface-profiles.js?v=50";
 import { stitchTerrainMeshEdges } from "./seams.js?v=1";
 import {
   cancelTerrainTileRequest as cancelTileRequest,
@@ -241,6 +241,35 @@ export function terrainTileCacheSnapshot() {
   };
 }
 
+function releaseTerrainTile(tile) {
+  if (!tile) return;
+  tile.evicted = true;
+  tile.resolveReady?.(false);
+  tile.resolveReady = null;
+  if (tile.img) {
+    tile.img.onload = null;
+    tile.img.onerror = null;
+    tile.img.src = '';
+  }
+  tile.img = null;
+  tile.elev = null;
+  tile.ready = null;
+  tile.loading = false;
+  tile.loaded = false;
+}
+
+export function clearTerrainTileCache() {
+  const before = terrainTileCacheSnapshot();
+  appCtx.terrainTileCache.forEach(releaseTerrainTile);
+  appCtx.terrainTileCache.clear();
+  recentTerrainFailures.clear();
+  return Object.freeze({
+    releasedEntries: before.entries,
+    releasedElevationBytes: before.elevationBytes,
+    remaining: terrainTileCacheSnapshot()
+  });
+}
+
 export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   const safeLimit = Math.max(25, Math.round(Number(limit) || TERRAIN_TILE_CACHE_LIMIT));
   if (appCtx.terrainTileCache.size <= safeLimit) return terrainTileCacheSnapshot();
@@ -258,14 +287,7 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   for (let i = 0; i < candidates.length && removeCount > 0; i += 1) {
     const [key, tile] = candidates[i];
     if (!appCtx.terrainTileCache.delete(key)) continue;
-    tile.evicted = true;
-    if (tile.img) {
-      tile.img.onload = null;
-      tile.img.onerror = null;
-      tile.img.src = '';
-    }
-    tile.img = null;
-    tile.elev = null;
+    releaseTerrainTile(tile);
     removeCount -= 1;
   }
   return terrainTileCacheSnapshot();
@@ -526,7 +548,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     cachedBaseElevations?.length === pos.count;
   const nextBaseElevations = reuseBaseElevations
     ? cachedBaseElevations
-    : new Float64Array(pos.count);
+    : new Float32Array(pos.count);
   const latRange = bounds.latN - bounds.latS || 1;
   const lonRange = bounds.lonE - bounds.lonW || 1;
 

@@ -40,6 +40,78 @@ function emitChange(appCtx, detail) {
   appCtx?.invalidateTraversalNetworks?.('editable_world_change');
 }
 
+function setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressed) {
+  const index = mesh?.geometry?.index;
+  const ranges = mesh?.userData?.editableBuildingIndexRanges;
+  if (!index?.array || !Array.isArray(ranges) || ranges.length === 0) return false;
+  const matching = ranges.filter((range) => range.sourceBuildingId === sourceFeatureId);
+  if (matching.length === 0) return false;
+  let savedBySource = mesh.userData.editableBuildingSavedIndices;
+
+  if (suppressed) {
+    savedBySource ||= mesh.userData.editableBuildingSavedIndices = new Map();
+    if (savedBySource.has(sourceFeatureId)) return false;
+    const saved = matching.map((range) => ({
+      start: range.start,
+      values: index.array.slice(range.start, range.start + range.count)
+    }));
+    saved.forEach((entry) => {
+      const end = entry.start + entry.values.length;
+      for (let offset = entry.start; offset < end; offset += 3) {
+        const anchor = index.array[offset];
+        index.array[offset + 1] = anchor;
+        index.array[offset + 2] = anchor;
+      }
+    });
+    savedBySource.set(sourceFeatureId, saved);
+  } else {
+    if (!savedBySource) return false;
+    const saved = savedBySource.get(sourceFeatureId);
+    if (!saved) return false;
+    saved.forEach((entry) => index.array.set(entry.values, entry.start));
+    savedBySource.delete(sourceFeatureId);
+  }
+  index.needsUpdate = true;
+  return true;
+}
+
+export function refreshEditableBuildingVisibility(appCtx) {
+  const suppressedIds = new Set(getSuppressedEditableBuildingIds(appCtx));
+  let directMeshes = 0;
+  let batchUpdates = 0;
+  const editableMeshes = [
+    ...(Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : []),
+    ...(Array.isArray(appCtx?.landuseMeshes) ? appCtx.landuseMeshes : [])
+  ];
+  for (const mesh of editableMeshes) {
+    if (!mesh) continue;
+    const ranges = mesh.userData?.editableBuildingIndexRanges || [];
+    if (ranges.length > 0) {
+      const sourceIds = new Set(ranges.map((range) => range.sourceBuildingId).filter(Boolean));
+      sourceIds.forEach((sourceFeatureId) => {
+        if (setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressedIds.has(sourceFeatureId))) {
+          batchUpdates += 1;
+        }
+      });
+      continue;
+    }
+    const sourceFeatureId = String(mesh.userData?.sourceBuildingId || '');
+    if (!sourceFeatureId) continue;
+    mesh.visible = !suppressedIds.has(sourceFeatureId);
+    directMeshes += 1;
+  }
+  appCtx.invalidateTraversalNetworks?.('editable_building_visibility');
+  const result = Object.freeze({
+    suppressed: suppressedIds.size,
+    directMeshes,
+    batchUpdates,
+    loadSequence: Number(appCtx._worldLoadSequence || 0),
+    updatedAt: performance.now()
+  });
+  appCtx.lastEditableBuildingRefresh = result;
+  return result;
+}
+
 export function getLocalWorldModificationSnapshot(appCtx) {
   const worldId = currentWorldId(appCtx);
   if (!store || !worldId) return Object.freeze({ worldId, revision: 0, suppressions: [], objects: [], history: [] });
@@ -99,6 +171,7 @@ function commit(appCtx, operation) {
   if (result.committed) {
     emitChange(appCtx, { action: operation.action, worldId, revision: result.current.revision });
     refreshEditableWorldPresentation(appCtx);
+    refreshEditableBuildingVisibility(appCtx);
   }
   return result;
 }
@@ -153,7 +226,6 @@ export async function suppressSelectedEditableBuilding(appCtx) {
       sourceProvenance: target.building?.geometrySource || target.building?.buildingProvenance?.identity?.source || ''
     }
   });
-  if (result.committed) appCtx.loadRoads?.();
   return result;
 }
 
@@ -174,7 +246,6 @@ export async function restoreSelectedEditableBuilding(appCtx, explicitSourceFeat
   const result = commit(appCtx, { action: 'restore_base_building', sourceFeatureId });
   if (result.committed) {
     lastSelectedSourceId = sourceFeatureId;
-    appCtx.loadRoads?.();
   }
   return result;
 }
@@ -196,7 +267,6 @@ export async function resetLocalEditableWorld(appCtx) {
     appCtx.clearAllBuildBlocks?.();
     selectedBuilding = null;
     lastSelectedSourceId = '';
-    appCtx.loadRoads?.();
   }
   return result;
 }
@@ -265,7 +335,7 @@ export function configureSharedEditableWorld(appCtx, config = {}) {
   }
   refreshEditableWorldPresentation(appCtx);
   if (scopeChanged && hadActiveRoomChanges && appCtx.initialEarthWorldReady && !appCtx.worldLoading) {
-    appCtx.loadRoads?.();
+    refreshEditableBuildingVisibility(appCtx);
   }
 }
 
@@ -278,7 +348,7 @@ export function setSharedEditableWorldRows(appCtx, rows = []) {
   sharedState.signature = signature;
   refreshEditableWorldPresentation(appCtx);
   appCtx.invalidateTraversalNetworks?.('room_world_modifications_changed');
-  if (appCtx.initialEarthWorldReady && !appCtx.worldLoading) appCtx.loadRoads?.();
+  if (appCtx.initialEarthWorldReady && !appCtx.worldLoading) refreshEditableBuildingVisibility(appCtx);
   return true;
 }
 
@@ -297,6 +367,7 @@ export function initEditableWorldRuntime(appCtx) {
     isLocalBuildingSuppressed: (sourceFeatureId) => isLocalBuildingSuppressed(appCtx, sourceFeatureId),
     placeDiscoveryWorldObject: (input) => placeDiscoveryWorldObject(appCtx, input),
     refreshEditableWorldPresentation: () => refreshEditableWorldPresentation(appCtx),
+    refreshEditableBuildingVisibility: () => refreshEditableBuildingVisibility(appCtx),
     resetLocalEditableWorld: () => resetLocalEditableWorld(appCtx),
     restoreSelectedEditableBuilding: () => restoreSelectedEditableBuilding(appCtx),
     restoreEditableBuildingById: (sourceFeatureId) => restoreSelectedEditableBuilding(appCtx, sourceFeatureId),
