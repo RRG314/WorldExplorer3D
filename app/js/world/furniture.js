@@ -6,7 +6,7 @@ import {
 import {
   registerStreetLamp,
   resetStreetLampFixtures
-} from "../engine/night-lighting.js?v=6";
+} from "../engine/night-lighting.js?v=7";
 
 let furnitureMaterialsReady = false;
 let furnitureGeometriesReady = false;

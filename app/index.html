@@ -22,7 +22,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=93">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=94">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
@@ -736,6 +736,14 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
 </aside>
 <div id="deFlockPrompt" role="status"></div>
+<div id="urbanVehiclePrompt" role="status" aria-live="polite" aria-hidden="true">
+  <div class="urbanVehiclePromptCopy">
+    <div id="urbanVehiclePromptTitle">Enter vehicle</div>
+    <div id="urbanVehiclePromptMeta"></div>
+  </div>
+  <kbd id="urbanVehiclePromptKey">E</kbd>
+  <button id="urbanVehiclePromptButton" type="button">Enter</button>
+</div>
 <aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
   <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
   <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
@@ -1732,5 +1740,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=445"></script>
+<script type="module" src="js/bootstrap.js?v=448"></script>
 </body></html>

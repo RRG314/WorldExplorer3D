@@ -20,7 +20,7 @@ import {
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
 } from "./engine/materials-runtime.js?v=21";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=14";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=15";
 import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
 const RENDER_QUALITY_LOW = 'low';

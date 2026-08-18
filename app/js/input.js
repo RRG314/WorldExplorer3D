@@ -27,16 +27,23 @@ function onKey(code, event) {
       if (typeof appCtx.handleInteriorAction !== 'function') return;
       return appCtx.handleInteriorAction();
     };
-    if (typeof appCtx.handleGameplayInteraction === 'function') {
-      Promise.resolve(appCtx.handleGameplayInteraction()).then((handled) => {
+    const runGameplayFallback = () => {
+      if (typeof appCtx.handleGameplayInteraction !== 'function') return runInteriorFallback();
+      return Promise.resolve(appCtx.handleGameplayInteraction()).then((handled) => {
         if (handled !== true) return runInteriorFallback();
+        return undefined;
+      });
+    };
+    if (typeof appCtx.handlePrimaryContextInteraction === 'function') {
+      Promise.resolve(appCtx.handlePrimaryContextInteraction()).then((handled) => {
+        if (handled !== true) return runGameplayFallback();
         return undefined;
       }).catch((err) => {
         console.warn('[interaction] Primary action failed:', err);
       });
       return;
     }
-    Promise.resolve(runInteriorFallback()).catch((err) => {
+    Promise.resolve(runGameplayFallback()).catch((err) => {
       console.warn('[interior] Interaction failed:', err);
     });
     return;

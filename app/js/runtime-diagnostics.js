@@ -507,6 +507,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
   augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
   livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
+  urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   worldCounts: {

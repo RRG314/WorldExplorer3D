@@ -1,5 +1,5 @@
 import { setupEngineInputHandlers } from "./input-handlers.js?v=7";
-import { createVehicleHeadlightRig } from "./night-lighting.js?v=6";
+import { createVehicleHeadlightRig } from "./night-lighting.js?v=7";
 import { createClassicUtilityCar } from './classic-utility-car.js?v=2';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {

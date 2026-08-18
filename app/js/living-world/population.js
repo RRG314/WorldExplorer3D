@@ -117,7 +117,9 @@ function createAgents(count, graph, random, kind) {
       visibleTarget: false,
       relocationCooldown: 0,
       motionTime: random() * Math.PI * 2,
-      waiting: false
+      waiting: false,
+      promoted: false,
+      currentSpeed: 0
     });
   }
   return agents;
@@ -161,6 +163,10 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     occupancy.forEach((list) => list.sort((a, b) => b.progress - a.progress));
   }
   for (const agent of agents) {
+    if (agent.promoted) {
+      agent.currentSpeed = 0;
+      continue;
+    }
     agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
     const edge = graph.edges[agent.edgeIndex];
     if (!edge) continue;
@@ -182,6 +188,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       speed *= behavior.crossingBlocked?.(edge) ? 0 : .86;
     }
     agent.waiting = speed < agent.speed * .5;
+    agent.currentSpeed = speed;
     agent.motionTime += speed * dt * stride * (kind === 'vehicle' ? .42 : 3.1);
     agent.progress += speed * dt * stride;
     while (agent.progress >= edge.length) {
@@ -318,7 +325,12 @@ function updateInstances(agents, graph, parts, kind, options = {}) {
     const pose = agentPose(agent, graph);
     if (!pose) return;
     const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
-    updateAgentVisibility(agent, distance, activeRatio, dt);
+    if (agent.promoted) {
+      agent.visibleTarget = false;
+      agent.visibility = 0;
+    } else {
+      updateAgentVisibility(agent, distance, activeRatio, dt);
+    }
     for (const part of parts) {
       for (let slot = 0; slot < part.repeats; slot += 1) {
         const instanceIndex = agentIndex * part.repeats + slot;
@@ -392,6 +404,31 @@ export function createLivingWorldPopulation(options = {}) {
   updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
   updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
 
+  const vehicleSnapshot = (agent) => {
+    const pose = agentPose(agent, trafficGraph);
+    if (!pose) return null;
+    return Object.freeze({
+      id: agent.id,
+      x: pose.x,
+      y: pose.y,
+      z: pose.z,
+      yaw: pose.yaw,
+      speed: Number(agent.currentSpeed || agent.speed || 0),
+      visible: agent.visibility > 0.08,
+      promoted: agent.promoted === true,
+      variant: agent.variant,
+      color: agent.color?.getHex?.() ?? 0x566675
+    });
+  };
+
+  const refreshVehiclePresentation = () => updateInstances(
+    vehicles,
+    trafficGraph,
+    vehicleParts,
+    'vehicle',
+    { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 }
+  );
+
   return Object.freeze({
     group,
     diagnostics: Object.freeze({
@@ -404,6 +441,31 @@ export function createLivingWorldPopulation(options = {}) {
       characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
       vehicleCategories: Object.freeze([...new Set(vehicles.map((agent) => agent.variant.id))].sort())
     }),
+    nearbyVehicles(reference, radius = 8) {
+      const origin = reference || referencePosition();
+      if (!origin) return Object.freeze([]);
+      const safeRadius = Math.max(1, Math.min(40, Number(radius) || 8));
+      return Object.freeze(vehicles.map(vehicleSnapshot).filter((vehicle) => (
+        vehicle && !vehicle.promoted && vehicle.visible &&
+        Math.hypot(vehicle.x - origin.x, vehicle.z - origin.z) <= safeRadius
+      )).sort((a, b) => (
+        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
+      )));
+    },
+    vehicleSnapshots() {
+      return Object.freeze(vehicles.map(vehicleSnapshot).filter(Boolean));
+    },
+    promoteVehicle(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || agent.promoted) return null;
+      const promoted = vehicleSnapshot(agent);
+      agent.promoted = true;
+      agent.currentSpeed = 0;
+      agent.visibility = 0;
+      agent.visibleTarget = false;
+      refreshVehiclePresentation();
+      return promoted ? Object.freeze({ ...promoted, promoted: true, speed: 0 }) : null;
+    },
     fixedUpdate(dt) {
       accumulator += dt;
       if (accumulator < .1) return;
@@ -429,7 +491,8 @@ export function createLivingWorldPopulation(options = {}) {
     activeCounts() {
       return Object.freeze({
         pedestrians: pedestrians.filter((agent) => agent.visibility > .08).length,
-        vehicles: vehicles.filter((agent) => agent.visibility > .08).length,
+        vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
+        promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
       });
     },

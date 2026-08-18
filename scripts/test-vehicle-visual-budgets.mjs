@@ -41,13 +41,17 @@ try {
       { createFieldNavigatorMesh },
       { createExpeditionPlaneMesh },
       { createBoatModeMesh },
-      { createExpeditionSpacecraftMesh }
+      { createExpeditionSpacecraftMesh },
+      { createUrbanVehicleVisual },
+      { URBAN_VEHICLE_CATALOG }
     ] = await Promise.all([
       import('/app/js/engine/classic-utility-car.js?v=2'),
       import('/app/js/walking/field-navigator-mesh.js?v=1'),
       import('/app/js/plane/expedition-plane-mesh.js?v=1'),
       import('/app/js/boat-mode/boat-model.js?v=2'),
-      import('/app/js/space/expedition-spacecraft-mesh.js?v=1')
+      import('/app/js/space/expedition-spacecraft-mesh.js?v=1'),
+      import('/app/js/urban-sandbox/vehicle-visuals.js?v=1'),
+      import('/app/js/urban-sandbox/vehicle-model.js?v=1')
     ]);
     const carResult = createClassicUtilityCar(THREE);
     const planeResult = createExpeditionPlaneMesh();
@@ -58,6 +62,10 @@ try {
       boat: createBoatModeMesh(),
       spacecraft: createExpeditionSpacecraftMesh()
     };
+    const urbanVehicles = URBAN_VEHICLE_CATALOG.map((variant) => ({
+      variant,
+      visual: createUrbanVehicleVisual(THREE, { id: `budget:${variant.id}`, variant, color: variant.color })
+    }));
 
     function measure(root) {
       let meshes = 0;
@@ -112,7 +120,13 @@ try {
         ...measure(roots.spacecraft),
         engineGlowHook: !!roots.spacecraft.getObjectByName('engineGlow')?.material,
         exhaustParticles: roots.spacecraft.getObjectByName('exhaust')?.children?.length || 0
-      }
+      },
+      urbanVehicles: urbanVehicles.map(({ variant, visual }) => ({
+        id: variant.id,
+        ...measure(visual.root),
+        wheels: visual.wheels.length,
+        doors: Object.keys(visual.doors).length
+      }))
     };
   });
 
@@ -143,6 +157,14 @@ try {
   assert.equal(models.spacecraft.exhaustParticles, 6, 'spacecraft lost its exhaust-particle contract');
   assert.ok(models.spacecraft.meshes <= 26 && models.spacecraft.triangles <= 1500 && models.spacecraft.materials <= 11);
   assert.equal(models.spacecraft.transparentMaterials, 3, 'spacecraft must limit transparency to shared thrust effects');
+
+  for (const vehicle of models.urbanVehicles) {
+    assert.equal(vehicle.wheels, 4, `${vehicle.id} lost its wheel-controller hooks`);
+    assert.equal(vehicle.doors, 2, `${vehicle.id} lost its entry animation hooks`);
+    assert.ok(vehicle.meshes <= 40 && vehicle.triangles <= 1200 && vehicle.materials <= 9,
+      `${vehicle.id} exceeded its close-range visual budget: ${JSON.stringify(vehicle)}`);
+    assert.equal(vehicle.transparentMaterials, 0, `${vehicle.id} added transparent draw-order work`);
+  }
 
   assert.deepEqual(fatalErrors, []);
   console.log(JSON.stringify({ ok: true, models }, null, 2));

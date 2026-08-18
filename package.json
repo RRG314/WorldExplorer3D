@@ -5,6 +5,8 @@
   "type": "module",
   "main": "three.js",
   "scripts": {
+    "test:urban-vehicle-model": "node scripts/test-urban-vehicle-model.mjs",
+    "test:urban-vehicle-browser": "node scripts/test-urban-vehicle-browser.mjs",
     "dev": "node scripts/serve-local-preview.mjs",
     "candidate:create": "node scripts/local-candidate.mjs create",
     "candidate:serve": "node scripts/local-candidate.mjs serve",

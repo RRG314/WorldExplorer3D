@@ -414,17 +414,23 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       appCtx.worldPublication?.requestId !== publication.requestId ||
       appCtx.worldPublication?.sequence !== publication.sequence
     ) return null;
-    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=1');
+    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=2');
     const livingWorld = startLivingWorldRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
+    });
+    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=1');
+    const urbanSandbox = startUrbanSandboxRuntime({
+      snapshot: publication,
+      request: worldSession?.request,
+      livingWorld
     });
     const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=1');
     const worldDiscovery = await startWorldDiscoveryRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
     });
-    return { livingWorld, worldDiscovery };
+    return { livingWorld, urbanSandbox, worldDiscovery };
   }, { timeout: 900 });
   markFirstPlayReady({
     environment: 'earth',

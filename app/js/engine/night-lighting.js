@@ -5,7 +5,7 @@ const HEADLIGHT_COLOR = 0xfff1d2;
 const STREET_LIGHT_DISTANCE = 42;
 const STREET_LIGHT_HEIGHT = 6.05;
 const UPDATE_INTERVAL_MS = 240;
-const HEADLIGHT_INTENSITY = 1100;
+const HEADLIGHT_INTENSITY = 180;
 const STREET_LIGHT_INTENSITY = 72;
 
 const headlightLocalPosition = new THREE.Vector3();
@@ -46,7 +46,7 @@ export function createVehicleHeadlightRig(carMesh) {
   const rig = [];
   for (const x of [-0.56, 0.56]) {
     const target = new THREE.Object3D();
-    const light = new THREE.SpotLight(HEADLIGHT_COLOR, 0, 110, 0.52, 0.52, 1.15);
+    const light = new THREE.SpotLight(HEADLIGHT_COLOR, 0, 76, 0.34, 0.68, 1.35);
     light.target = target;
     light.castShadow = false;
     light.visible = false;
@@ -76,8 +76,8 @@ function updateHeadlights(factor) {
     entry.light.visible = active;
     entry.light.intensity = active ? HEADLIGHT_INTENSITY * factor : 0;
     if (active) {
-      headlightLocalPosition.set(entry.x, -0.55, 1.6);
-      headlightLocalTarget.set(entry.x * 0.25, -3, 38);
+      headlightLocalPosition.set(entry.x, -0.48, 1.65);
+      headlightLocalTarget.set(entry.x * 0.22, -1.25, 32);
       appCtx.carMesh.localToWorld(headlightLocalPosition);
       appCtx.carMesh.localToWorld(headlightLocalTarget);
       entry.light.position.copy(headlightLocalPosition);

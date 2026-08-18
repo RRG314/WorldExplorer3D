@@ -58,12 +58,12 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=30";
+} from "./world/load-support.js?v=31";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=14";
+} from "./world/load-reset.js?v=15";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=11";
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=25";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=13";
+} from "./world/furniture.js?v=14";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=38";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=107";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=108";
 import {
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
@@ -170,7 +170,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=19";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=21";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

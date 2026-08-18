@@ -1,10 +1,16 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-17 for the local 4.3.0 memory-remediation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
+Last reviewed: 2026-08-17 for the local 4.3.0 urban-sandbox foundation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
 
 ## Current Release Status
 
-Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has a local memory repair on `steven/fix-memory-ownership`; it is not deployed and still requires user/device acceptance before any new release decision.
+Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has a committed local memory repair plus an uncommitted urban-sandbox foundation on `steven/urban-sandbox-foundation`; it is not deployed and still requires user/device acceptance before any new release decision.
+
+The GTA-like urban sandbox is a phased product direction, not a completed claim.
+The first parked-car possession loop and supported ambient-car promotion work
+locally. Off-camera traffic demotion, heavy-vehicle close-range models, NPC
+reactions, civic response, missions, garage/economy persistence and multiplayer
+vehicle leases remain open in `docs/URBAN_SANDBOX_PLAN.md`.
 
 The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 
