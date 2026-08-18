@@ -22,7 +22,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=95">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=96">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
@@ -743,7 +743,17 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   </div>
   <kbd id="urbanVehiclePromptKey">E</kbd>
   <button id="urbanVehiclePromptButton" type="button">Enter</button>
+  <kbd id="urbanVehiclePromptSecondaryKey" hidden>V</kbd>
+  <button id="urbanVehiclePromptSecondaryButton" type="button" hidden>Use</button>
+  <kbd id="urbanVehiclePromptTakeKey" hidden>T</kbd>
+  <button id="urbanVehiclePromptTakeButton" type="button" hidden>Take</button>
 </div>
+<aside id="urbanEquipment" aria-hidden="true" aria-label="Equipment inventory">
+  <div class="urbanEquipmentHead"><span>Equipment</span><small>I to close · 1–5 quick equip</small></div>
+  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
+  <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
+</aside>
+<button id="urbanEquipmentToggle" type="button" aria-label="Open equipment inventory" hidden>GEAR</button>
 <aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
   <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
   <div class="urbanCivicStatusCopy">

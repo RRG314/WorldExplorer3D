@@ -10,6 +10,11 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   const pickup = style === 'pickup';
   const crossover = style === 'crossover';
   const compact = style === 'compact';
+  const van = style === 'van';
+  const taxi = style === 'taxi';
+  const boxTruck = style === 'box-truck';
+  const bus = style === 'bus';
+  const deliveryVan = van && /delivery|parcel/i.test(String(variant.id || variant.label || ''));
   const root = new THREE.Group();
   root.name = `${variant.label || 'Urban vehicle'} visual`;
   root.userData.vehicleStyle = `urban-${style}`;
@@ -30,7 +35,8 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   const headlight = new THREE.MeshStandardMaterial({ color: 0xfff6d4, emissive: 0xffd784, emissiveIntensity: 0.5, roughness: 0.28, flatShading: true });
   const taillight = new THREE.MeshStandardMaterial({ color: 0xb91f27, emissive: 0x7c1118, emissiveIntensity: 0.62, roughness: 0.35, flatShading: true });
   const plate = new THREE.MeshStandardMaterial({ color: 0xe4e1cc, roughness: 0.72, metalness: 0.04, flatShading: true });
-  const materials = [paint, darkPaint, glass, trim, chrome, rubber, headlight, taillight, plate];
+  const service = new THREE.MeshStandardMaterial({ color: taxi ? 0xf4dc55 : bus ? 0xe5edf2 : 0xdce4e6, roughness: 0.68, metalness: 0.04, flatShading: true });
+  const materials = [paint, darkPaint, glass, trim, chrome, rubber, headlight, taillight, plate, service];
   const ownedGeometries = new Set();
   const add = (geometry, material, name, position, rotation = null, parent = root) => {
     ownedGeometries.add(geometry);
@@ -45,11 +51,11 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   };
 
   const ground = -1.12;
-  const bodyHeight = crossover || pickup ? 0.66 : compact ? 0.57 : 0.6;
+  const bodyHeight = bus ? height * 0.26 : boxTruck ? 0.72 : van ? height * 0.42 : crossover || pickup ? 0.66 : compact ? 0.57 : 0.6;
   const bodyY = ground + wheelRadius + bodyHeight * 0.55;
-  const cabinLength = pickup ? length * 0.38 : compact ? length * 0.49 : length * 0.5;
-  const cabinZ = pickup ? length * 0.18 : -length * 0.08;
-  const cabinHeight = crossover ? height * 0.52 : pickup ? height * 0.48 : height * 0.47;
+  const cabinLength = bus ? length * 0.9 : boxTruck ? length * 0.27 : van ? length * 0.7 : pickup ? length * 0.38 : compact ? length * 0.49 : length * 0.5;
+  const cabinZ = bus ? 0 : boxTruck ? length * 0.34 : van ? length * 0.02 : pickup ? length * 0.18 : -length * 0.08;
+  const cabinHeight = bus ? height * 0.58 : boxTruck ? height * 0.46 : van ? height * 0.54 : crossover ? height * 0.52 : pickup ? height * 0.48 : height * 0.47;
   const cabinY = bodyY + bodyHeight * 0.48 + cabinHeight * 0.48;
 
   add(createTaperedPrismGeometry(THREE, {
@@ -62,11 +68,11 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   }), paint, 'Urban lower body', [0, bodyY, 0]);
   add(createTaperedPrismGeometry(THREE, {
     widthBottom: width * 0.88,
-    widthTop: width * 0.75,
+    widthTop: width * (bus || van ? 0.84 : 0.75),
     height: cabinHeight,
     length: cabinLength,
-    frontInset: pickup ? 0.2 : 0.34,
-    rearInset: 0.2
+    frontInset: bus ? 0.08 : pickup || boxTruck ? 0.2 : van ? 0.14 : 0.34,
+    rearInset: bus ? 0.05 : van ? 0.12 : 0.2
   }), paint, 'Urban cabin', [0, cabinY, cabinZ]);
   add(new THREE.BoxGeometry(width * 0.78, 0.075, cabinLength * 0.72), darkPaint, 'Urban roof', [0, cabinY + cabinHeight * 0.54, cabinZ - 0.02]);
   add(new THREE.BoxGeometry(width * 0.78, 0.32, 0.04), glass, 'Urban windshield', [0, cabinY + 0.02, cabinZ + cabinLength * 0.45], [-0.35, 0, 0]);
@@ -74,6 +80,28 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   if (pickup) {
     add(new THREE.BoxGeometry(width * 0.9, height * 0.23, length * 0.38), darkPaint, 'Pickup bed', [0, bodyY + 0.16, -length * 0.3]);
     add(new THREE.BoxGeometry(width * 0.84, 0.08, length * 0.31), trim, 'Pickup bed floor', [0, bodyY + 0.3, -length * 0.31]);
+  }
+  if (boxTruck) {
+    add(new THREE.BoxGeometry(width * 0.96, height * 0.74, length * 0.59), service, 'Box truck cargo body', [0, ground + wheelRadius + height * 0.52, -length * 0.17]);
+    add(new THREE.BoxGeometry(width * 0.82, height * 0.56, 0.055), darkPaint, 'Box truck rear shutter', [0, ground + wheelRadius + height * 0.51, -length * 0.475]);
+  }
+  if (bus) {
+    add(new THREE.BoxGeometry(width * 0.9, height * 0.26, length * 0.7), glass, 'Bus side window band', [0, cabinY + cabinHeight * 0.05, -length * 0.03]);
+    add(new THREE.BoxGeometry(width * 0.68, 0.22, 0.06), service, 'Bus destination display', [0, cabinY + cabinHeight * 0.27, length * 0.456]);
+  }
+  if (van) {
+    for (const side of [-1, 1]) {
+      add(
+        new THREE.BoxGeometry(.035, deliveryVan ? .12 : .34, cabinLength * .43),
+        deliveryVan ? service : glass,
+        deliveryVan ? 'Delivery van side identity panel' : 'Passenger van side window band',
+        [side * width * .445, cabinY + .08, cabinZ - cabinLength * .16]
+      );
+    }
+    add(new THREE.BoxGeometry(.035, cabinHeight * .72, height * .03), chrome, 'Van rear door seam', [0, cabinY - .02, -length * .506]);
+  }
+  if (taxi) {
+    add(new THREE.BoxGeometry(0.48, 0.16, 0.22), service, 'Taxi roof lamp', [0, cabinY + cabinHeight * 0.61, cabinZ]);
   }
 
   const doors = {};
@@ -87,7 +115,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     add(new THREE.BoxGeometry(0.05, 0.3, cabinLength * 0.37), glass, 'Urban front side glass', [0, cabinY + 0.2, 0.02], null, driverDoor);
     add(new THREE.BoxGeometry(0.065, 0.04, 0.24), chrome, 'Urban front door handle', [side * 0.02, cabinY - 0.02, -cabinLength * 0.13], null, driverDoor);
     doors[side < 0 ? 'left' : 'right'] = driverDoor;
-    if (!pickup) {
+    if (!pickup && !boxTruck) {
       add(new THREE.BoxGeometry(0.045, 0.5, cabinLength * 0.42), paint, 'Urban rear door', [sideX, cabinY - 0.1, cabinZ - cabinLength * 0.3]);
       add(new THREE.BoxGeometry(0.05, 0.29, cabinLength * 0.31), glass, 'Urban rear side glass', [sideX, cabinY + 0.2, cabinZ - cabinLength * 0.3]);
       add(new THREE.BoxGeometry(0.065, 0.04, 0.22), chrome, 'Urban rear door handle', [sideX + side * 0.02, cabinY - 0.02, cabinZ - cabinLength * 0.39]);
@@ -96,7 +124,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   }
 
   const wheels = [];
-  const axleZ = compact ? length * 0.3 : length * 0.32;
+  const axleZ = bus ? length * 0.37 : boxTruck ? length * 0.35 : compact ? length * 0.3 : length * 0.32;
   for (const [side, front] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
     const wheel = new THREE.Group();
     wheel.name = 'Urban Wheel';
@@ -129,6 +157,13 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     wheels,
     doors: Object.freeze(doors),
     materials: Object.freeze(materials),
+    setCondition(condition = 1) {
+      const value = Math.max(0, Math.min(1, Number(condition) || 0));
+      root.userData.condition = value;
+      paint.color.setHex(Number(definition.color || variant.color || 0x466579)).multiplyScalar(0.42 + value * 0.58);
+      darkPaint.color.copy(paint.color).multiplyScalar(0.72);
+      root.rotation.z = value <= 0 ? 0.035 : 0;
+    },
     dispose() {
       root.removeFromParent?.();
       ownedGeometries.forEach((geometry) => geometry.dispose?.());

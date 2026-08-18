@@ -55,7 +55,7 @@ try {
 
   const prepared = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=1');
+    const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=2');
     const vehicle = ctx.urbanSandboxRuntime.vehicles[0];
     const door = vehicleDoorPosition(vehicle);
     const walker = ctx.Walk.state.walker;
@@ -120,13 +120,106 @@ try {
   assert.ok(Math.hypot(retained.x - beforeExitVehicle.x, retained.z - beforeExitVehicle.z) < 0.15, 'the exited vehicle did not retain its exact pose');
   await page.screenshot({ path: path.join(outputDir, '03-exited-retained-vehicle.png') });
 
+  await page.keyboard.press('KeyI');
+  await page.locator('#urbanEquipment.show').waitFor({ state: 'visible', timeout: 5000 });
+  const equipmentPanel = await page.locator('#urbanEquipment').evaluate((element) => ({
+    slotCount: element.querySelectorAll('[data-equipment-id]').length,
+    width: element.getBoundingClientRect().width,
+    right: element.getBoundingClientRect().right
+  }));
+  assert.equal(equipmentPanel.slotCount, 5, 'equipment inventory did not render its five quick slots');
+  assert.ok(equipmentPanel.right <= 1440 && equipmentPanel.width <= 620, `equipment panel exceeds desktop viewport: ${JSON.stringify(equipmentPanel)}`);
+  await page.screenshot({ path: path.join(outputDir, '04-equipment-inventory.png') });
+  await page.keyboard.press('KeyI');
+
+  const npcPrepared = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const candidates = ctx.livingWorldRuntime.population.pedestrianSnapshots();
+    const possessionAvailable = (id) => [...String(`urban-npc:${ctx.urbanSandboxRuntime.worldIdentity}:${id}`)]
+      .reduce((sum, char) => (sum * 33 + char.charCodeAt(0)) >>> 0, 5381) % 5 !== 0;
+    const pedestrian = candidates.find((entry) => possessionAvailable(entry.id)) || candidates[0];
+    if (!pedestrian) throw new Error('No NPC was available for interaction');
+    const distance = 1.55;
+    const x = pedestrian.x - Math.sin(pedestrian.yaw) * distance;
+    const z = pedestrian.z - Math.cos(pedestrian.yaw) * distance;
+    const angle = Math.atan2(pedestrian.x - x, pedestrian.z - z);
+    Object.assign(ctx.Walk.state.walker, { x, z, y: pedestrian.y + 1.7, angle, yaw: angle, lookYawOffset: 0 });
+    ctx.Walk.state.characterMesh?.position.set(x, pedestrian.y, z);
+    ctx.Walk.state.characterMesh?.rotation.set(0, angle, 0);
+    ctx.camera.position.set(x, pedestrian.y + 1.6, z);
+    ctx.camera.lookAt(pedestrian.x, pedestrian.y + 1.1, pedestrian.z);
+    ctx.camera.updateMatrixWorld(true);
+    ctx.advanceRuntimeTime?.(160);
+    return { id: pedestrian.id };
+  });
+  await page.waitForFunction((pedestrianId) => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}').urbanSandbox;
+    return state?.interaction?.action === 'talk_npc' && state.interactiveNpcs.every((npc) => npc.sourceAgentId !== pedestrianId);
+  }, npcPrepared.id, { timeout: 10000 });
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction((pedestrianId) => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}').urbanSandbox;
+    return state?.lastNpcAction?.type === 'talked' && state.interactiveNpcs.some((npc) => npc.sourceAgentId === pedestrianId);
+  }, npcPrepared.id, { timeout: 10000 });
+  await page.keyboard.press('KeyT');
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').urbanSandbox?.equipment?.sandboxItems === 1, null, { timeout: 10000 });
+  await page.keyboard.press('Digit3');
+  await page.evaluate(async (pedestrianId) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const npc = ctx.urbanSandboxRuntime.npcs.find((entry) => entry.sourceAgentId === pedestrianId);
+    const walker = ctx.Walk.state.walker;
+    ctx.camera.position.set(walker.x, walker.y - .1, walker.z);
+    ctx.camera.lookAt(npc.visual.root.position.x, npc.visual.root.position.y + 1.1, npc.visual.root.position.z);
+    ctx.camera.updateMatrixWorld(true);
+  }, npcPrepared.id);
+  await page.keyboard.press('KeyV');
+  const npcInteraction = await page.waitForFunction((pedestrianId) => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}').urbanSandbox;
+    const npc = state?.interactiveNpcs?.find((entry) => entry.sourceAgentId === pedestrianId);
+    return state?.lastImpactAction?.equipmentId === 'baton' && npc ? state : null;
+  }, npcPrepared.id, { timeout: 10000 }).then((handle) => handle.jsonValue());
+  assert.equal(npcInteraction.lastNpcAction.type, 'took_item');
+  assert.equal(npcInteraction.equipment.equippedId, 'baton');
+  assert.ok(npcInteraction.interactiveNpcs.find((npc) => npc.sourceAgentId === npcPrepared.id).condition < 1,
+    'baton impact did not change the NPC condition');
+
+  const furnitureImpact = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const furniture = ctx.streetFurnitureMeshes.find((entry) => entry.userData?.interactiveWorldObject);
+    if (!furniture) throw new Error('No interactive street furniture was generated');
+    const x = furniture.position.x;
+    const z = furniture.position.z - 3;
+    const angle = Math.atan2(furniture.position.x - x, furniture.position.z - z);
+    Object.assign(ctx.Walk.state.walker, { x, z, y: furniture.position.y + 1.7, angle, yaw: angle, lookYawOffset: 0 });
+    ctx.Walk.state.characterMesh?.position.set(x, furniture.position.y, z);
+    ctx.camera.position.set(x, furniture.position.y + 1.6, z);
+    ctx.camera.lookAt(furniture.position.x, furniture.position.y + 1, furniture.position.z);
+    ctx.camera.updateMatrixWorld(true);
+    ctx.equipUrbanEquipmentSlot(5);
+    await new Promise((resolve) => setTimeout(resolve, 1150));
+    const handled = ctx.handleUrbanEquipmentUse();
+    ctx.advanceRuntimeTime?.(80);
+    return {
+      handled,
+      kind: furniture.userData.furnitureKind,
+      condition: furniture.userData.condition,
+      state: JSON.parse(globalThis.render_game_to_text()).urbanSandbox,
+      furnitureKinds: [...new Set(ctx.streetFurnitureMeshes.map((entry) => entry.userData?.furnitureKind).filter(Boolean))]
+    };
+  });
+  assert.equal(furnitureImpact.handled, true);
+  assert.ok(furnitureImpact.condition < 1, `equipped charge did not affect street furniture: ${JSON.stringify(furnitureImpact)}`);
+  assert.equal(furnitureImpact.state.lastImpactAction.equipmentId, 'concussion-charge');
+  assert.ok(furnitureImpact.furnitureKinds.includes('street_name_sign'));
+  await page.screenshot({ path: path.join(outputDir, '05-living-world-interactions.png') });
+
   const trafficPrepared = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=1');
-    const allowed = new Set(['compact', 'sedan', 'suv', 'pickup', 'taxi']);
+    const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=2');
+    const allowed = new Set(['compact', 'sedan', 'suv', 'pickup', 'taxi', 'van', 'box-truck', 'bus']);
     const parked = ctx.urbanSandboxRuntime.vehicles;
     const snapshots = ctx.livingWorldRuntime.population.vehicleSnapshots();
-    const traffic = snapshots.find((candidate) => candidate.visible && allowed.has(candidate.variant?.bodyStyle) &&
+    const traffic = snapshots.find((candidate) => !candidate.promoted && allowed.has(candidate.variant?.bodyStyle) &&
       parked.every((vehicle) => Math.hypot(vehicle.x - candidate.x, vehicle.z - candidate.z) > 9));
     if (!traffic) throw new Error('No promotable traffic vehicle was available');
     const placeAtCurrentDoor = () => {
@@ -181,7 +274,7 @@ try {
       audibleRadius: 2
     });
     const pedestrians = ctx.livingWorldRuntime.population.pedestrianSnapshots();
-    const target = pedestrians.find((entry) => !entry.reaction) || pedestrians[0];
+    const target = pedestrians.find((entry) => !entry.promoted && !entry.reaction) || pedestrians.find((entry) => !entry.promoted);
     if (!target) throw new Error('No Living World pedestrian was available for civic response');
     Object.assign(ctx.Walk.state.walker, {
       x: target.x,
@@ -233,9 +326,9 @@ try {
   assert.equal(civicEvidence.urban.civicResponse.phase, 'observed');
   assert.equal(civicEvidence.urban.civicResponse.level, 1);
   assert.equal(civicEvidence.pedestrian.reaction, 'reporting');
-  assert.equal(civicEvidence.urban.interactiveNpcs.length, 1, 'the reporting witness was not promoted to a close-range NPC');
-  assert.equal(civicEvidence.urban.interactiveNpcs[0].sourceAgentId, civicEvidence.pedestrian.id);
-  assert.equal(civicEvidence.urban.interactiveNpcs[0].reaction, 'reporting');
+  const promotedWitness = civicEvidence.urban.interactiveNpcs.find((npc) => npc.sourceAgentId === civicEvidence.pedestrian.id);
+  assert.ok(promotedWitness, 'the reporting witness was not promoted to a close-range NPC');
+  assert.equal(promotedWitness.reaction, 'reporting');
   assert.equal(civicEvidence.status.visible, true);
   assert.ok(civicEvidence.status.right <= 1440 && civicEvidence.status.width <= 320);
   await page.screenshot({ path: path.join(outputDir, '05-witnessed-civic-response.png') });
@@ -249,7 +342,7 @@ try {
   assert.equal(promotedVehicle.style, trafficPrepared.style);
   assert.equal(promotedVehicle.color, trafficPrepared.color);
   assert.equal(promotedTraffic.living.activePopulation.promotedVehicles, 1);
-  assert.equal(promotedTraffic.living.activePopulation.promotedPedestrians, 1);
+  assert.ok(promotedTraffic.living.activePopulation.promotedPedestrians >= 1 && promotedTraffic.living.activePopulation.promotedPedestrians <= 3);
   assert.ok(promotedTraffic.living.population.drawCalls <= 22,
     `Living World reaction presentation exceeded its shared draw-call budget: ${promotedTraffic.living.population.drawCalls}`);
   assert.equal(promotedTraffic.urban.worldLoadSequence, trafficPrepared.worldLoadSequence, 'traffic promotion reloaded the world');
@@ -282,6 +375,19 @@ try {
   assert.notEqual(witnessView.phase, 'clear');
   await page.screenshot({ path: path.join(outputDir, '05-witnessed-civic-response.png') });
 
+  const disposal = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const disposed = ctx.disposeUrbanSandboxRuntime?.('browser-lifecycle-check') === true;
+    return {
+      disposed,
+      active: JSON.parse(globalThis.render_game_to_text()).urbanSandbox.active,
+      equippedRoots: ctx.Walk.state.characterMesh?.getObjectsByProperty?.('name', 'Urban equipped item')?.length || 0,
+      promptVisible: document.getElementById('urbanVehiclePrompt')?.classList.contains('show') || false,
+      equipmentVisible: document.getElementById('urbanEquipment')?.classList.contains('show') || false
+    };
+  });
+  assert.deepEqual(disposal, { disposed: true, active: false, equippedRoots: 0, promptVisible: false, equipmentVisible: false });
+
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const mobilePage = await mobileContext.newPage();
   mobilePage.on('pageerror', (error) => fatalErrors.push(`mobile: ${String(error?.stack || error)}`));
@@ -312,7 +418,7 @@ try {
   }, null, { timeout: 180000 });
   const mobilePrepared = await mobilePage.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=1');
+    const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=2');
     const vehicle = ctx.urbanSandboxRuntime.vehicles[0];
     const door = vehicleDoorPosition(vehicle);
     Object.assign(ctx.Walk.state.walker, { x: door.x, z: door.z, y: vehicle.y + 0.5, angle: vehicle.yaw, yaw: vehicle.yaw });
@@ -345,10 +451,21 @@ try {
   }, mobilePrepared.id, { timeout: 10000 });
   const mobileExited = await mobilePage.evaluate(() => JSON.parse(globalThis.render_game_to_text()).urbanSandbox);
   assert.equal(mobileExited.worldLoadSequence, mobilePrepared.sequence, 'mobile enter/exit reloaded the world');
+  await mobilePage.locator('#urbanEquipmentToggle').waitFor({ state: 'visible', timeout: 5000 });
+  await mobilePage.locator('#urbanEquipmentToggle').tap();
+  await mobilePage.locator('#urbanEquipment.show').waitFor({ state: 'visible', timeout: 5000 });
+  const mobileEquipment = await mobilePage.locator('#urbanEquipment').evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, width: rect.width, slots: element.querySelectorAll('[data-equipment-id]').length };
+  });
+  assert.equal(mobileEquipment.slots, 5);
+  assert.ok(mobileEquipment.left >= 0 && mobileEquipment.right <= 390 && mobileEquipment.width <= 370,
+    `mobile equipment exceeds viewport: ${JSON.stringify(mobileEquipment)}`);
+  await mobilePage.locator('#urbanEquipmentToggle').tap();
   const mobileCivic = await mobilePage.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.urbanSandboxRuntime.civic.clear();
-    const pedestrian = ctx.livingWorldRuntime.population.pedestrianSnapshots()[0];
+    const pedestrian = ctx.livingWorldRuntime.population.pedestrianSnapshots().find((entry) => !entry.promoted);
     if (!pedestrian) throw new Error('No mobile civic witness was available');
     Object.assign(ctx.Walk.state.walker, { x: pedestrian.x, z: pedestrian.z, y: pedestrian.y + 1.7 });
     ctx.Walk.state.characterMesh?.position.set(pedestrian.x, pedestrian.y, pedestrian.z);
@@ -397,9 +514,17 @@ try {
       color: trafficPrepared.color,
       promotedCount: promotedTraffic.living.activePopulation.promotedVehicles
     },
+    equipmentPanel,
+    npcInteraction: {
+      npcId: npcPrepared.id,
+      lastNpcAction: npcInteraction.lastNpcAction,
+      equipment: npcInteraction.equipment.equippedId
+    },
+    furnitureImpact,
     civicResponse: civicEvidence,
     witnessView,
-    mobile: { prompt: mobilePrompt, civic: mobileCivic, enteredAndExited: true, worldLoadSequence: mobileExited.worldLoadSequence },
+    disposal,
+    mobile: { prompt: mobilePrompt, equipment: mobileEquipment, civic: mobileCivic, enteredAndExited: true, worldLoadSequence: mobileExited.worldLoadSequence },
     providerWarnings: providerWarnings.slice(0, 20),
     fatalErrors
   };

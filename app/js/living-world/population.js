@@ -21,7 +21,12 @@ const PEDESTRIAN_ARCHETYPES = Object.freeze([
   Object.freeze({ id: 'field-walker', label: 'Field walker', torso: 1.05, leg: 1.04, pack: 1 }),
   Object.freeze({ id: 'commuter', label: 'Commuter', torso: .96, leg: 1.02, pack: .7 }),
   Object.freeze({ id: 'weekend-explorer', label: 'Weekend explorer', torso: 1.08, leg: .96, pack: 1.15 }),
-  Object.freeze({ id: 'local-runner', label: 'Local runner', torso: .9, leg: 1.08, pack: 0 })
+  Object.freeze({ id: 'local-runner', label: 'Local runner', torso: .9, leg: 1.08, pack: 0 }),
+  Object.freeze({ id: 'service-worker', label: 'Service worker', torso: 1.04, leg: .98, pack: .3 }),
+  Object.freeze({ id: 'office-worker', label: 'Office worker', torso: .97, leg: 1.01, pack: .65 }),
+  Object.freeze({ id: 'student', label: 'Student', torso: .94, leg: 1.04, pack: .95 }),
+  Object.freeze({ id: 'traveler', label: 'Traveler', torso: 1.02, leg: .97, pack: 1.05 }),
+  Object.freeze({ id: 'neighborhood-local', label: 'Neighborhood local', torso: 1.06, leg: .94, pack: 0 })
 ]);
 
 const OUTFIT_PALETTE = Object.freeze([0x3f5961, 0x8d6048, 0x3f6577, 0x6b7550, 0x73566f, 0x8a783f, 0x48536a]);
@@ -462,6 +467,7 @@ export function createLivingWorldPopulation(options = {}) {
       z: pose.z,
       yaw: pose.yaw,
       visible: agent.visibility > 0.08,
+      promoted: agent.promoted === true,
       archetype: agent.archetype?.id || 'pedestrian',
       outfitColor: agent.color?.getHex?.() ?? 0x496673,
       pantsColor: agent.secondaryColor?.getHex?.() ?? 0x29333d,
@@ -504,6 +510,17 @@ export function createLivingWorldPopulation(options = {}) {
         Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
       )));
     },
+    nearbyPedestrians(reference, radius = 8) {
+      const origin = reference || referencePosition();
+      if (!origin) return Object.freeze([]);
+      const safeRadius = Math.max(1, Math.min(24, Number(radius) || 8));
+      return Object.freeze(pedestrians.map(pedestrianSnapshot).filter((pedestrian) => (
+        pedestrian && pedestrian.visible && !pedestrian.promoted &&
+        Math.hypot(pedestrian.x - origin.x, pedestrian.z - origin.z) <= safeRadius
+      )).sort((a, b) => (
+        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
+      )));
+    },
     vehicleSnapshots() {
       return Object.freeze(vehicles.map(vehicleSnapshot).filter(Boolean));
     },
@@ -521,6 +538,19 @@ export function createLivingWorldPopulation(options = {}) {
         reference: referencePosition(), activeRatio: activeRatio(), dt: .1
       });
       return promoted ? Object.freeze({ ...promoted, promoted: true }) : null;
+    },
+    releasePedestrian(agentId) {
+      const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.promoted) return false;
+      agent.promoted = false;
+      agent.reaction = '';
+      agent.reactionRemaining = 0;
+      agent.reactionTarget = null;
+      agent.relocationCooldown = .35;
+      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
+        reference: referencePosition(), activeRatio: activeRatio(), dt: .1
+      });
+      return true;
     },
     witnessEvent(event = {}) {
       const position = event.position;

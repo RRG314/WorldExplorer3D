@@ -2,7 +2,10 @@ const URBAN_VEHICLE_CATALOG = Object.freeze([
   Object.freeze({ id: 'sedan', label: 'Aster four-door', bodyStyle: 'sedan', width: 1.8, height: 1.46, length: 4.48, wheelRadius: 0.36, color: 0x315f79 }),
   Object.freeze({ id: 'crossover', label: 'Trailmark crossover', bodyStyle: 'crossover', width: 1.9, height: 1.7, length: 4.66, wheelRadius: 0.4, color: 0x7a5141 }),
   Object.freeze({ id: 'pickup', label: 'Harbor utility pickup', bodyStyle: 'pickup', width: 1.94, height: 1.7, length: 5.08, wheelRadius: 0.42, color: 0x596a48 }),
-  Object.freeze({ id: 'compact', label: 'Metro compact', bodyStyle: 'compact', width: 1.7, height: 1.48, length: 3.82, wheelRadius: 0.34, color: 0x8a3f45 })
+  Object.freeze({ id: 'compact', label: 'Metro compact', bodyStyle: 'compact', width: 1.7, height: 1.48, length: 3.82, wheelRadius: 0.34, color: 0x8a3f45 }),
+  Object.freeze({ id: 'taxi', label: 'Civic taxi', bodyStyle: 'taxi', width: 1.8, height: 1.5, length: 4.5, wheelRadius: 0.36, color: 0xd4b82d }),
+  Object.freeze({ id: 'van', label: 'Wayfarer passenger van', bodyStyle: 'van', width: 1.95, height: 2.12, length: 5.15, wheelRadius: 0.4, color: 0x52697a }),
+  Object.freeze({ id: 'delivery-van', label: 'Parcel delivery van', bodyStyle: 'van', width: 2.02, height: 2.35, length: 5.5, wheelRadius: 0.42, color: 0xc8c7bd })
 ]);
 
 function hashText(value = '') {

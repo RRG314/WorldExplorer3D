@@ -49,6 +49,26 @@ function onKey(code, event) {
     return;
   }
 
+  if (code === 'KeyI' && typeof appCtx.toggleUrbanEquipment === 'function') {
+    if (event?.repeat) return;
+    if (appCtx.toggleUrbanEquipment()) return;
+  }
+
+  if (/^Digit[1-5]$/.test(code) && typeof appCtx.equipUrbanEquipmentSlot === 'function') {
+    if (event?.repeat) return;
+    if (appCtx.equipUrbanEquipmentSlot(Number(code.slice(-1)))) return;
+  }
+
+  if (code === 'KeyV' && typeof appCtx.handleUrbanEquipmentUse === 'function') {
+    if (event?.repeat) return;
+    if (appCtx.handleUrbanEquipmentUse()) return;
+  }
+
+  if (code === 'KeyT' && typeof appCtx.handleUrbanNpcTake === 'function') {
+    if (event?.repeat) return;
+    if (appCtx.handleUrbanNpcTake()) return;
+  }
+
   if (code === 'KeyX' && !appCtx.spaceFlight?.active) {
     if (event?.repeat) return;
     if (typeof appCtx.handleWorldDiscoveryQuickAction === 'function') {

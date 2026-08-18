@@ -4,15 +4,24 @@ Last reviewed: 2026-08-17 for the local 4.3.0 urban-sandbox foundation branch. P
 
 ## Current Release Status
 
-Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has a committed local memory repair plus an uncommitted urban-sandbox foundation on `steven/urban-sandbox-foundation`; it is not deployed and still requires user/device acceptance before any new release decision.
+Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has a local memory repair and an expanded urban-sandbox development line on `steven/urban-sandbox-foundation`; it is not deployed and still requires user/device acceptance before any new release decision.
 
 The GTA-like urban sandbox is a phased product direction, not a completed claim.
-The first parked-car possession loop and supported ambient-car promotion work
-locally. Pedestrian witnessing, one bounded close-range witness promotion and a
-temporary civic-attention lifecycle also work locally. Off-camera actor
-demotion, heavy-vehicle close-range models, general NPC dialogue, responder
-dispatch/pursuit, missions, garage/economy persistence and multiplayer vehicle
-leases remain open in `docs/URBAN_SANDBOX_PLAN.md`.
+The parked-car possession loop and all nine ambient traffic-family promotions
+work locally. Ten pedestrian roles, contextual talk/take/inspect actions,
+semantic street furniture, a five-slot session equipment inventory, held-item
+visuals and condition impacts against people, vehicles and props also work
+locally. Off-camera vehicle demotion, driver/passenger states, active traffic
+signal simulation, responder dispatch/pursuit, missions, garage/economy
+persistence and multiplayer vehicle/impact authority remain open in
+`docs/URBAN_SANDBOX_PLAN.md`.
+
+The current equipment loadout is a local sandbox baseline, not trusted account
+inventory. It does not sync damage or equipment ownership in multiplayer and is
+not eligible for production until age/tone, moderation, authenticated
+progression, backend authority, audio/accessibility and user/device acceptance
+are completed. The fictional pulse sidearm and concussion charge are game-only
+mechanics; the app contains no real-world weapon construction guidance.
 
 The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 

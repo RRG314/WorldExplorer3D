@@ -22,6 +22,10 @@ function eventLabel(kind) {
   if (kind === 'reckless_driving') return 'Reckless driving witnessed';
   if (kind === 'collision') return 'Collision witnessed';
   if (kind === 'trespass') return 'Restricted-area entry witnessed';
+  if (kind === 'theft_from_person') return 'Theft witnessed';
+  if (kind === 'assault') return 'Assault witnessed';
+  if (kind === 'weapon_discharge') return 'Weapon discharge witnessed';
+  if (kind === 'explosive_use') return 'Explosion witnessed';
   return 'Incident witnessed';
 }
 

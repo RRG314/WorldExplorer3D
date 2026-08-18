@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
-import { generateStreetFurniture } from "./furniture.js?v=14";
+import { generateStreetFurniture } from "./furniture.js?v=15";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
@@ -446,10 +446,11 @@ export function buildStreetFurniturePass(options = {}) {
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
   const loadMetrics = options.loadMetrics || {};
+  const mappedFurnitureNodes = Array.isArray(options.mappedFurnitureNodes) ? options.mappedFurnitureNodes : [];
 
   startLoadPhase(phaseName);
   try {
-    generateStreetFurniture();
+    generateStreetFurniture({ mappedFurnitureNodes });
     loadMetrics.vegetation.generated = Array.isArray(appCtx.vegetationFeatures) ? appCtx.vegetationFeatures.length : 0;
   } catch (err) {
     loadMetrics.streetFurnitureError = err?.message || String(err);
@@ -464,6 +465,7 @@ export function buildWorldDetailPasses(options = {}) {
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
   const poiNodes = Array.isArray(options.poiNodes) ? options.poiNodes : [];
+  const mappedFurnitureNodes = Array.isArray(options.mappedFurnitureNodes) ? options.mappedFurnitureNodes : [];
   const poiKeyFromTags = typeof options.poiKeyFromTags === 'function' ? options.poiKeyFromTags : () => null;
   const lodNearDist = Number.isFinite(options.lodNearDist) ? options.lodNearDist : 0;
   const lodMidDist = Number.isFinite(options.lodMidDist) ? options.lodMidDist : 0;
@@ -493,6 +495,7 @@ export function buildWorldDetailPasses(options = {}) {
   buildStreetFurniturePass({
     endLoadPhase,
     loadMetrics,
+    mappedFurnitureNodes,
     phaseName: 'buildStreetFurniture',
     startLoadPhase
   });

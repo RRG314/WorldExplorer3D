@@ -8,6 +8,7 @@
     "test:urban-vehicle-model": "node scripts/test-urban-vehicle-model.mjs",
     "test:urban-vehicle-browser": "node scripts/test-urban-vehicle-browser.mjs",
     "test:urban-civic-model": "node scripts/test-urban-civic-model.mjs",
+    "test:urban-equipment-model": "node scripts/test-urban-equipment-model.mjs",
     "dev": "node scripts/serve-local-preview.mjs",
     "candidate:create": "node scripts/local-candidate.mjs create",
     "candidate:serve": "node scripts/local-candidate.mjs serve",

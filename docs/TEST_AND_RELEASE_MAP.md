@@ -144,6 +144,7 @@ The following results were observed in the current working source before this re
 | planetary/ocean/session lifecycle | pass Moon/Earth/Mars/Space transitions, GEBCO bathymetry and 10 Space + 10 Ocean ownership cycles |
 | title memory release | pass locally; 533.7 MB loaded to 153.8 MB released, zero terrain/far/accepted-ground/elevation ownership, reload at 568.3 MB |
 | heavy Living/Editable World journey | pass locally; 112 entrances, moving population, persisted suppression/restore, no full reload, 729.0 MB to 728.2 MB post-GC edit envelope |
+| urban vehicle/equipment journey | local installed-Chrome gate; exact vehicle enter/drive/exit, nine-family promotion contract, NPC talk/take/impact, semantic prop impact, civic witnesses, collapsed desktop/touch inventory and responsive UI; production/user acceptance remains open |
 | rapid cross-location replacement | pass locally in installed Chrome; superseded Baltimore work aborted, Monaco alone published, provider ledgers returned to zero, terrain concurrency bounded at 12, no duplicate URLs or console errors |
 | production artifact | 4.3.0 clean-source production candidate build, identity verification and bundled browser boot pass; exact final identity is recorded in `dist/build-manifest.json` |
 | legacy bundled-Chromium matrices | inconclusive: fixed-world travel and editor-multiplayer harnesses stalled without a failing assertion; equivalent installed-Chrome focused journeys pass |

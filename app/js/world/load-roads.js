@@ -604,6 +604,11 @@ export function createWorldRoadLoader(deps = {}) {
           loadMetrics,
           lodMidDist,
           lodNearDist,
+          mappedFurnitureNodes: Object.values(normalizedSelection.nodes || {}).filter((node) => {
+            const highway = String(node?.tags?.highway || '').toLowerCase();
+            const amenity = String(node?.tags?.amenity || '').toLowerCase();
+            return /^(traffic_signals|stop|give_way|street_lamp)$/.test(highway) || amenity === 'waste_basket';
+          }),
           poiKeyFromTags,
           poiNodes: normalizedSelection.poiNodes,
           startLoadPhase,

@@ -58,7 +58,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=31";
+} from "./world/load-support.js?v=32";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=25";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=14";
+} from "./world/furniture.js?v=15";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,

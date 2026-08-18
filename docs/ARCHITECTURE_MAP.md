@@ -178,6 +178,8 @@ The Earth compiler is organized by data products rather than UI screens:
 - landmark catalogs and fixed regional structures;
 - POIs/place semantics, entrances, navigation graph and interior eligibility;
 - Living World derivation;
+- bounded Living World actor promotion, contextual urban interactions and
+  session equipment/impact runtime;
 - editable-world suppression and safe semantic objects;
 - World Discovery environment cells, encounter slots and wildlife slots.
 

@@ -65,9 +65,18 @@ function createUrbanNpcVisual(THREE, definition = {}) {
   }
 
   const gearStyle = String(definition.archetype || '');
-  if (/field|weekend/.test(gearStyle)) {
+  if (/field|weekend|student/.test(gearStyle)) {
     add(new THREE.BoxGeometry(.37, .46, .16), outfitDark, 'NPC day pack', [0, 1.08, -.2]);
     add(new THREE.BoxGeometry(.28, .05, .17), trim, 'NPC pack accent', [0, .93, -.29]);
+  } else if (/service-worker/.test(gearStyle)) {
+    add(new THREE.BoxGeometry(.5, .08, .31), trim, 'NPC reflective vest band', [0, 1.06, .165]);
+    add(new THREE.CylinderGeometry(.24, .24, .08, 10), outfitDark, 'NPC work cap', [0, 1.84, 0]);
+  } else if (/traveler/.test(gearStyle)) {
+    add(new THREE.BoxGeometry(.38, .5, .18), outfitDark, 'NPC travel pack', [0, 1.08, -.2]);
+    add(new THREE.BoxGeometry(.2, .28, .12), trim, 'NPC travel pouch', [.3, .82, -.05]);
+  } else if (/office|commuter/.test(gearStyle)) {
+    add(new THREE.BoxGeometry(.28, .36, .12), outfitDark, 'NPC work satchel', [-.33, .86, -.06]);
+    add(new THREE.BoxGeometry(.04, .72, .04), trim, 'NPC satchel strap', [-.18, 1.1, .02], [0, 0, -.34]);
   } else {
     add(new THREE.BoxGeometry(.24, .31, .11), outfitDark, 'NPC shoulder bag', [-.32, .88, -.06]);
   }
@@ -76,9 +85,13 @@ function createUrbanNpcVisual(THREE, definition = {}) {
   const setReaction = (reaction = '') => {
     const reporting = reaction === 'reporting';
     const watching = reaction === 'watching';
-    armPivots.right.rotation.x = reporting ? -1.42 : watching ? -.35 : .04;
-    armPivots.left.rotation.x = watching ? .2 : -.04;
+    const talking = reaction === 'talking';
+    const startled = reaction === 'startled' || reaction === 'hit';
+    const downed = reaction === 'downed';
+    armPivots.right.rotation.x = reporting ? -1.42 : startled ? -1.05 : talking ? -.5 : watching ? -.35 : .04;
+    armPivots.left.rotation.x = startled ? -1.05 : talking ? .38 : watching ? .2 : -.04;
     phone.visible = reporting;
+    root.rotation.z = downed ? Math.PI * .5 : 0;
     root.userData.reaction = reaction;
   };
   setReaction(definition.reaction);

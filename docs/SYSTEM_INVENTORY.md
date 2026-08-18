@@ -344,7 +344,13 @@ The world includes mapped POIs, historic sites, street furniture, public overlay
 
 After one fixed Earth world publishes, a disposable Living World runtime derives a bounded entrance catalog, pedestrian graph, directed traffic graph, façade-depth batches, and procedural ambient populations from that publication. Mapped facts take precedence; inferred entrances, sidewalks, and crossings carry explicit inferred provenance. The traffic graph reuses the accepted transport surface for bridge, ramp, elevated-road, tunnel, and underpass heights.
 
-Pedestrians and vehicles are pooled instanced presentations updated at 10 Hz with distance-based work reduction and quality-tier caps. They are simulated game ambience, not observed people or live traffic. The runtime never requests provider data because an actor or the player moved, and it is disposed on world replacement.
+Pedestrians and vehicles are pooled instanced presentations updated at 10 Hz with distance-based work reduction and quality-tier caps. Ten pedestrian roles and nine traffic families provide bounded variety. Nearby relevant actors can promote into detailed, stable local entities for Talk, Take, vehicle entry and condition reactions while their source instance is hidden. They are simulated game ambience, not observed people or live traffic. The runtime never requests provider data because an actor or the player moved, and it is disposed on world replacement.
+
+The local urban-interaction baseline also derives street lamps, waste baskets,
+street names and traffic controls from mapped data or conservative published-road
+semantics. Its on-demand five-slot equipment loadout and object impacts are
+session-local and explicitly blocked from trusted multiplayer mutation until
+backend authority, account ownership and moderation gates exist.
 
 ## 8. Rendering, lighting, and visual systems
 
@@ -1043,7 +1049,8 @@ This path follows actual runtime ownership: boot, lifecycle, Earth publication, 
 | Terrain and accepted ground | Implemented and user-accessible | Multiple ground authorities and explicit fallback contracts; global precision varies. |
 | Roads, bridges, ramps, tunnels | Implemented and user-accessible | Compiler, ownership, collision, camera, regional context, and browser journeys exist; provider coverage still varies. |
 | Buildings, landmarks, hydrology, vegetation | Implemented and user-accessible | Mapped plus explicitly inferred/generated presentation. |
-| Living World traffic and pedestrians | Implemented and user-accessible | Derived from the published world with bounded population budgets; visual variety is catalog-limited. |
+| Living World traffic and pedestrians | Implemented and user-accessible | Ten pedestrian and nine traffic families derive from the published world with bounded population/promotion budgets. |
+| Urban interaction/equipment | Local implementation / acceptance pending | Contextual actor, vehicle and prop actions work locally; equipment ownership and impacts are not multiplayer-authoritative or production-approved. |
 | Walking, driving, drone, plane, boat | Implemented and user-accessible | Normalized control and surface contracts. |
 | Moon | Implemented and user-accessible | Apollo 11/Mare Tranquillitatis destination with astronaut/rover traversal. |
 | Mars | Implemented and user-accessible | Mars destination with terrain, atmosphere, astronaut/rover traversal. |

@@ -12,7 +12,7 @@ assert.deepEqual(NPC_VEHICLE_CATALOG.map((entry) => entry.id), [
 assert.ok(NPC_VEHICLE_CATALOG.every((entry) => entry.width > 0 && entry.length > 0 && entry.weight > 0));
 assert.ok(POPULATION_BUDGET_BY_TIER.low.vehicles < POPULATION_BUDGET_BY_TIER.balanced.vehicles);
 assert.ok(POPULATION_BUDGET_BY_TIER.performance.pedestrians < POPULATION_BUDGET_BY_TIER.quality.pedestrians);
-assert.ok(PEDESTRIAN_ARCHETYPES.length >= 5, 'ambient character variety regressed');
+assert.ok(PEDESTRIAN_ARCHETYPES.length >= 10, 'ambient character variety regressed');
 assert.ok(POPULATION_VISIBILITY_POLICY.exitDistance > POPULATION_VISIBILITY_POLICY.enterDistance, 'population visibility needs distance hysteresis');
 assert.ok(POPULATION_VISIBILITY_POLICY.fadeInPerSecond > 0 && POPULATION_VISIBILITY_POLICY.fadeOutPerSecond > 0);
 assert.ok(NPC_VEHICLE_CATALOG.every((entry) => entry.bodyStyle && entry.wheelRadius > 0), 'vehicle visual profiles are incomplete');

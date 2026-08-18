@@ -44,6 +44,7 @@ try {
       { createExpeditionSpacecraftMesh },
       { createUrbanVehicleVisual },
       { URBAN_VEHICLE_CATALOG },
+      { NPC_VEHICLE_CATALOG },
       { createUrbanNpcVisual }
     ] = await Promise.all([
       import('/app/js/engine/classic-utility-car.js?v=2'),
@@ -51,9 +52,10 @@ try {
       import('/app/js/plane/expedition-plane-mesh.js?v=1'),
       import('/app/js/boat-mode/boat-model.js?v=2'),
       import('/app/js/space/expedition-spacecraft-mesh.js?v=1'),
-      import('/app/js/urban-sandbox/vehicle-visuals.js?v=1'),
-      import('/app/js/urban-sandbox/vehicle-model.js?v=1'),
-      import('/app/js/urban-sandbox/npc-visuals.js?v=1')
+      import('/app/js/urban-sandbox/vehicle-visuals.js?v=4'),
+      import('/app/js/urban-sandbox/vehicle-model.js?v=2'),
+      import('/app/js/living-world/vehicle-catalog.js?v=2'),
+      import('/app/js/urban-sandbox/npc-visuals.js?v=2')
     ]);
     const carResult = createClassicUtilityCar(THREE);
     const planeResult = createExpeditionPlaneMesh();
@@ -64,9 +66,13 @@ try {
       boat: createBoatModeMesh(),
       spacecraft: createExpeditionSpacecraftMesh()
     };
-    const urbanVehicles = URBAN_VEHICLE_CATALOG.map((variant) => ({
+    const urbanVehicles = [
+      ...URBAN_VEHICLE_CATALOG.map((variant) => ({ source: 'parked', variant })),
+      ...NPC_VEHICLE_CATALOG.map((variant) => ({ source: 'traffic', variant }))
+    ].map(({ source, variant }) => ({
+      source,
       variant,
-      visual: createUrbanVehicleVisual(THREE, { id: `budget:${variant.id}`, variant, color: variant.color })
+      visual: createUrbanVehicleVisual(THREE, { id: `budget:${source}:${variant.id}`, variant, color: variant.color })
     }));
     const urbanNpc = createUrbanNpcVisual(THREE, {
       id: 'budget:witness',
@@ -133,8 +139,8 @@ try {
         engineGlowHook: !!roots.spacecraft.getObjectByName('engineGlow')?.material,
         exhaustParticles: roots.spacecraft.getObjectByName('exhaust')?.children?.length || 0
       },
-      urbanVehicles: urbanVehicles.map(({ variant, visual }) => ({
-        id: variant.id,
+      urbanVehicles: urbanVehicles.map(({ source, variant, visual }) => ({
+        id: `${source}:${variant.id}`,
         ...measure(visual.root),
         wheels: visual.wheels.length,
         doors: Object.keys(visual.doors).length
@@ -179,7 +185,7 @@ try {
   for (const vehicle of models.urbanVehicles) {
     assert.equal(vehicle.wheels, 4, `${vehicle.id} lost its wheel-controller hooks`);
     assert.equal(vehicle.doors, 2, `${vehicle.id} lost its entry animation hooks`);
-    assert.ok(vehicle.meshes <= 40 && vehicle.triangles <= 1200 && vehicle.materials <= 9,
+    assert.ok(vehicle.meshes <= 40 && vehicle.triangles <= 1200 && vehicle.materials <= 10,
       `${vehicle.id} exceeded its close-range visual budget: ${JSON.stringify(vehicle)}`);
     assert.equal(vehicle.transparentMaterials, 0, `${vehicle.id} added transparent draw-order work`);
   }

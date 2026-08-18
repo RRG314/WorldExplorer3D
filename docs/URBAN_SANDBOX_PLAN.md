@@ -8,14 +8,21 @@ Production: unchanged on the verified 4.2.1 rollback
 
 - Phase 1: implemented and locally verified in installed Chrome on desktop and
   390×844 touch. User/device acceptance is still required.
-- Phase 2: exact ambient-car promotion is implemented for car body families;
-  off-camera demotion and player-actor traffic avoidance remain open.
-- Phase 3: pedestrian perception/reaction and bounded close-range witness
-  promotion are implemented; general dialogue, driver/passenger states and
-  traffic-signal behavior remain open.
+- Phase 2: exact ambient-car promotion now supports all nine traffic families,
+  including vans, delivery vans, box trucks and buses. Off-camera vehicle
+  demotion and player-actor traffic avoidance remain open.
+- Phase 3: ten pedestrian archetypes, bounded close-range promotion, contextual
+  talk/take reactions, mapped or junction-derived traffic controls, deterministic
+  roadside waste baskets and inspectable street furniture are implemented.
+  Driver/passenger states and traffic-signal behavior remain open.
 - Phase 4: the witnessed-event and civic-attention lifecycle is implemented;
   purpose-built responder dispatch, pursuit and outcomes remain open. The
   placeholder legacy Police Chase is not used as a shortcut.
+- Interactive equipment baseline: implemented locally with five quick slots,
+  held-item visuals, ammunition/charges/cooldowns, flashlight, melee, fictional
+  pulse-sidearm and concussion-charge impacts against NPCs, vehicles and props.
+  It is deliberately session-local until authenticated progression and
+  multiplayer authority are implemented.
 - Phases 5–8: planned, not implemented by this milestone.
 - Deployment: not authorized; production remains unchanged.
 
@@ -122,9 +129,26 @@ Acceptance journey:
 - escape, warning, ticket, surrender and recovery outcomes;
 - migrate the current Police Chase into this event system.
 
-Violent combat is not a prerequisite for the sandbox. If added later, it must be
-an explicit age/tone decision with separate health, reaction, moderation,
-animation, audio and multiplayer-authority work rather than an incidental input.
+The user explicitly requested combat/equipment on 2026-08-17. The local baseline
+uses fictional, non-gory game equipment and a shared condition/reaction model.
+Age/tone policy, moderation, audio, deeper animation, authenticated ownership and
+server-authoritative multiplayer impacts remain release gates; a room client is
+not allowed to award equipment or publish damage as trusted state yet.
+
+## Interactive equipment and object actions
+
+- one contextual prompt supplies Talk, Take, Enter, Inspect and Use rather than
+  a second permanent gameplay panel;
+- equipment opens on demand with `I`, supports slots `1`–`5`, and is collapsed
+  by default; touch gets one small Gear affordance plus contextual action buttons;
+- the equipped flashlight, baton, fictional pulse sidearm or concussion charge
+  is attached to the existing character hand rather than floating in the world;
+- a single bounded impact contract applies condition changes and blast falloff to
+  promoted NPCs, exact vehicles and street furniture;
+- witnessed theft, assault, discharge and explosion events feed the same civic
+  response lifecycle as vehicle taking and reckless driving;
+- no real-world weapon brands, construction instructions or copied GTA assets,
+  characters, interface or fiction are used.
 
 ## Phase 5 — Missions and continuity
 

@@ -53,10 +53,12 @@ The current landing page represents the player as the explorer, current Earth di
 
 | Capability | Status | Maturity/limits |
 | --- | --- | --- |
-| pedestrian population | Implemented and user-accessible | bounded derivation from entrances/navigation context |
-| traffic vehicles | Implemented and user-accessible | bounded road-graph population |
+| pedestrian population | Implemented and user-accessible | bounded derivation from entrances/navigation context; ten procedural roles |
+| traffic vehicles | Implemented and user-accessible | nine bounded road-graph families; all can promote to detailed local actors |
 | multiple pedestrian archetypes | Implemented and user-accessible | procedural catalog, not photoreal scanned characters |
-| multiple vehicle archetypes | Implemented and user-accessible | catalog models/material variants |
+| multiple vehicle archetypes | Implemented and user-accessible | compact, sedan, SUV, pickup, taxi, passenger/delivery van, box truck and city bus |
+| contextual NPC/object actions | Local implementation / acceptance pending | Talk, Take, Inspect and condition reactions use one contextual prompt |
+| equipment and object impacts | Local implementation / acceptance pending | collapsed five-slot session loadout; not trusted account or multiplayer state |
 | navigation graphs | Implemented and user-accessible | published-world derived; no separate network provider |
 | persistence across visibility | Partial | population is runtime presentation, not a durable global NPC simulation |
 | continuous MMO population | Planned only / not architecture | rooms synchronize bounded players, not worldwide agents |
