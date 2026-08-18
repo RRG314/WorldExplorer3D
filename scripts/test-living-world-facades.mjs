@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import { compileEntranceCatalog } from '../app/js/living-world/entrance-catalog.js';
-import { compileFacadeDetailPlan } from '../app/js/living-world/facade-depth.js';
 
 function building(id, x, z, type = 'apartments') {
   return {
@@ -44,14 +44,16 @@ assert.ok(catalogA.entrances.every((entrance) => entrance.facadeWidth >= 8));
 assert.ok(catalogA.entrances.every((entrance) => entrance.visualVariant >= 0 && entrance.visualVariant < 8));
 assert.ok(catalogA.entrances.every((entrance) => entrance.archetype && entrance.doorStyle));
 
-const facadePlan = compileFacadeDetailPlan({ entrances: catalogA.entrances, tier: 'balanced' });
-assert.equal(facadePlan.doors.length, 2);
-assert.equal(facadePlan.surrounds.length, 8, 'doors lost their four-piece recessed surround');
-assert.equal(facadePlan.handles.length, 2, 'doors lost visible interaction hardware');
-assert.ok(facadePlan.glass.length > facadePlan.diagnostics.windows, 'door/storefront glazing was not added');
-assert.equal(facadePlan.diagnostics.windows, 0, 'duplicate upper-storey window geometry should defer to the facade atlas');
-assert.ok(facadePlan.accents.some((entry) => entry.kind === 'threshold'));
-assert.ok(Object.keys(facadePlan.diagnostics.archetypes).length >= 2, 'different building uses collapsed to one facade archetype');
+const facadeSource = await fs.readFile(new URL('../app/js/engine/building-facade-materials.js', import.meta.url), 'utf8');
+const publicationSource = await fs.readFile(new URL('../app/js/world/building-facade-entrances.js', import.meta.url), 'utf8');
+assert.match(facadeSource, /attribute vec4 facadeEntrance/, 'facade shader does not own entrance data');
+assert.match(facadeSource, /facadeEntranceRect/, 'facade shader lost integrated doorway shaping');
+assert.match(facadeSource, /entrance-atlas-v1\.webp/, 'facade shader lost the shared ground-floor entrance atlas');
+assert.match(facadeSource, /uniform sampler2D facadeEntranceAtlas/, 'facade material does not sample its entrance atlas');
+assert.match(facadeSource, /facadeEntrancesShaderIntegrated: true/, 'facade material does not declare entrance ownership');
+assert.match(publicationSource, /addedDrawCalls: 0/, 'entrance publication added a parallel render layer');
+assert.match(publicationSource, /retainedDecorativeMeshes: 0/, 'entrance publication retained decorative door meshes');
+assert.match(publicationSource, /buildingEntranceByBuilding/, 'interaction does not share the facade entrance identity');
 
 const mappedCatalog = compileEntranceCatalog({
   buildings,
@@ -77,7 +79,9 @@ console.log(JSON.stringify({
   contract: 'living-world-entrance-catalog-v1',
   inferred: catalogA.diagnostics.inferred,
   mappedWins: mapped.provenance === 'mapped',
-  facadeDetails: facadePlan.diagnostics,
+  facadeIntegration: 'shader-integrated-wall-face',
+  addedDrawCalls: 0,
+  retainedDecorativeMeshes: 0,
   deterministic: true,
   additionalProviderQueries: 0
 }, null, 2));

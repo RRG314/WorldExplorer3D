@@ -60,22 +60,28 @@ async function launchBaltimore(page, source) {
     const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return snapshot.worldLoading === false && snapshot.livingWorld?.active === true && snapshot.worldCounts?.buildings > 0;
   }, null, { timeout: 180000 });
+  await page.waitForFunction(async () => {
+    const { buildingExteriorMaterialPoolSnapshot } = await import('/app/js/engine/building-facade-materials.js?v=13');
+    return buildingExteriorMaterialPoolSnapshot().entranceAtlas?.status === 'ready';
+  }, null, { timeout: 30000 });
 }
 
 async function inspectFacade(page) {
   return page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const facade = ctx.earthSceneRoot?.getObjectByName?.('Living World Facade Depth');
-    const entrances = Array.isArray(ctx.livingWorldRuntime?.facades?.plan?.doors)
-      ? ctx.livingWorldRuntime.facades.plan.doors.map((item) => item.entrance)
+    const entrances = Array.isArray(ctx.buildingFacadeEntrances?.renderedEntrances)
+      ? ctx.buildingFacadeEntrances.renderedEntrances
       : [];
-    const meshNames = facade?.children?.map((child) => child.name) || [];
+    const facadeMeshes = (ctx.buildingMeshes || []).filter((mesh) => mesh?.material?.userData?.buildingExterior === true);
+    const attributedMeshes = facadeMeshes.filter((mesh) => !!mesh.geometry?.attributes?.facadeEntrance);
     return {
-      meshNames,
-      diagnostics: ctx.livingWorldRuntime?.facades?.diagnostics ||
+      diagnostics: ctx.buildingFacadeEntrances?.diagnostics ||
         JSON.parse(globalThis.render_game_to_text?.() || '{}').livingWorld?.facades || null,
       entranceCount: entrances.length,
-      archetypes: [...new Set(entrances.map((entry) => entry.archetype))]
+      archetypes: [...new Set(entrances.map((entry) => entry.archetype))],
+      attributedMeshes: attributedMeshes.length,
+      shaderOwners: [...new Set(facadeMeshes.map((mesh) => mesh.material?.userData?.facadeEntranceOwner).filter(Boolean))],
+      integratedClaims: facadeMeshes.filter((mesh) => mesh.material?.userData?.facadeEntrancesShaderIntegrated === true).length
     };
   });
 }
@@ -83,7 +89,7 @@ async function inspectFacade(page) {
 async function poseAtEntrance(page, requestedArchetype, screenshotName) {
   const result = await page.evaluate(async (archetype) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const renderedIds = new Set((ctx.livingWorldRuntime?.facades?.plan?.doors || []).map((item) => item.entrance.id));
+    const renderedIds = new Set((ctx.buildingFacadeEntrances?.renderedEntrances || []).map((item) => item.id));
     const supports = ctx.listEnterableBuildingSupportsNear?.(0, 0, 600, 220, { allowSynthetic: true }) || [];
     const supportedEntrances = supports
       .map((support) => ({ support, entrance: support.exteriorEntrance }))
@@ -123,9 +129,93 @@ async function poseAtEntrance(page, requestedArchetype, screenshotName) {
     );
     ctx.camera.lookAt(entrance.x, entrance.y + 1.3, entrance.z);
     ctx.camera.updateMatrixWorld(true);
+    const rayDirection = new globalThis.THREE.Vector3(
+      entrance.x - ctx.camera.position.x,
+      entrance.y + 1.3 - ctx.camera.position.y,
+      entrance.z - ctx.camera.position.z
+    ).normalize();
+    const facadeRay = new globalThis.THREE.Raycaster(ctx.camera.position.clone(), rayDirection, 0.1, 12);
+    const firstFacadeHit = facadeRay.intersectObjects(ctx.buildingMeshes || [], false)[0] || null;
+    let firstHitSourceId = String(firstFacadeHit?.object?.userData?.sourceBuildingId || '');
+    if (!firstHitSourceId && firstFacadeHit?.object?.userData?.editableBuildingIndexRanges) {
+      const indexCursor = Number(firstFacadeHit.faceIndex || 0) * 3;
+      firstHitSourceId = String(firstFacadeHit.object.userData.editableBuildingIndexRanges.find((range) =>
+        indexCursor >= range.start && indexCursor < range.start + range.count
+      )?.sourceBuildingId || '');
+    }
+    let interpolatedEntrance = null;
+    if (firstFacadeHit?.face && firstFacadeHit.object?.geometry?.attributes?.facadeEntrance) {
+      const object = firstFacadeHit.object;
+      const positions = object.geometry.attributes.position;
+      const entranceAttribute = object.geometry.attributes.facadeEntrance;
+      const localPoint = object.worldToLocal(firstFacadeHit.point.clone());
+      const triangle = new globalThis.THREE.Triangle(
+        new globalThis.THREE.Vector3().fromBufferAttribute(positions, firstFacadeHit.face.a),
+        new globalThis.THREE.Vector3().fromBufferAttribute(positions, firstFacadeHit.face.b),
+        new globalThis.THREE.Vector3().fromBufferAttribute(positions, firstFacadeHit.face.c)
+      );
+      const barycentric = triangle.getBarycoord(localPoint, new globalThis.THREE.Vector3());
+      const interpolate = (component) =>
+        entranceAttribute[component](firstFacadeHit.face.a) * barycentric.x +
+        entranceAttribute[component](firstFacadeHit.face.b) * barycentric.y +
+        entranceAttribute[component](firstFacadeHit.face.c) * barycentric.z;
+      interpolatedEntrance = {
+        tangentX: interpolate('getX'),
+        active: interpolate('getY'),
+        bottomY: interpolate('getZ'),
+        style: interpolate('getW'),
+        localY: localPoint.y
+      };
+    }
     document.getElementById('tutorialHintCard')?.style.setProperty('display', 'none', 'important');
     ctx.paused = true;
     ctx.renderer.render(ctx.scene, ctx.camera);
+    const facadeBinding = {
+      meshes: 0,
+      activeVertices: 0,
+      minimumBottomY: Infinity,
+      maximumBottomY: -Infinity,
+      styleValues: [],
+      normalX: 0,
+      normalZ: 0
+    };
+    for (const mesh of ctx.buildingMeshes || []) {
+      const ranges = Array.isArray(mesh?.userData?.editableBuildingIndexRanges)
+        ? mesh.userData.editableBuildingIndexRanges.filter((range) => range.sourceBuildingId === entrance.buildingSourceId)
+        : [];
+      const direct = String(mesh?.userData?.sourceBuildingId || '') === entrance.buildingSourceId;
+      if (!direct && ranges.length === 0) continue;
+      const attribute = mesh.geometry?.attributes?.facadeEntrance;
+      const normals = mesh.geometry?.attributes?.normal;
+      const index = mesh.geometry?.index;
+      if (!attribute) continue;
+      facadeBinding.meshes += 1;
+      const vertexIndices = new Set();
+      if (direct) {
+        for (let vertex = 0; vertex < attribute.count; vertex += 1) vertexIndices.add(vertex);
+      } else {
+        ranges.forEach((range) => {
+          for (let cursor = range.start; cursor < range.start + range.count; cursor += 1) {
+            vertexIndices.add(index ? index.getX(cursor) : cursor);
+          }
+        });
+      }
+      vertexIndices.forEach((vertex) => {
+        if (attribute.getY(vertex) < 0.5) return;
+        facadeBinding.activeVertices += 1;
+        facadeBinding.minimumBottomY = Math.min(facadeBinding.minimumBottomY, attribute.getZ(vertex));
+        facadeBinding.maximumBottomY = Math.max(facadeBinding.maximumBottomY, attribute.getZ(vertex));
+        facadeBinding.styleValues.push(Number(attribute.getW(vertex).toFixed(4)));
+        facadeBinding.normalX += Number(normals?.getX(vertex) || 0);
+        facadeBinding.normalZ += Number(normals?.getZ(vertex) || 0);
+      });
+    }
+    facadeBinding.styleValues = [...new Set(facadeBinding.styleValues)];
+    const normalLength = Math.hypot(facadeBinding.normalX, facadeBinding.normalZ) || 1;
+    facadeBinding.normalX /= normalLength;
+    facadeBinding.normalZ /= normalLength;
+    facadeBinding.normalDotEntrance = facadeBinding.normalX * entrance.normalX + facadeBinding.normalZ * entrance.normalZ;
+    facadeBinding.approachInside = !!ctx.pointInPolygon?.(entrance.approachX, entrance.approachZ, support.footprint);
     return {
       id: entrance.id,
       buildingSourceId: entrance.buildingSourceId,
@@ -134,10 +224,17 @@ async function poseAtEntrance(page, requestedArchetype, screenshotName) {
       prompt: document.getElementById('interiorPrompt')?.textContent || '',
       walkMode: ctx.Walk?.state?.mode || '',
       paused: ctx.paused,
-      entranceMapSize: Number(ctx.livingWorldEntranceByBuilding?.size || 0),
+      entranceMapSize: Number(ctx.buildingEntranceByBuilding?.size || 0),
       interiorApiLoaded: !String(ctx.updateInteriorInteraction || '').includes('_interiorsModulePromise'),
       groundY: Number(ctx.GroundHeight?.walkSurfaceY?.(entrance.approachX, entrance.approachZ)),
       supportKey: support?.key || '',
+      facadeRay: {
+        firstHitSourceId,
+        targetSourceId: entrance.buildingSourceId,
+        distance: Number(firstFacadeHit?.distance || 0),
+        interpolatedEntrance
+      },
+      facadeBinding,
       entrance: {
         x: entrance.x,
         y: entrance.y,
@@ -152,6 +249,18 @@ async function poseAtEntrance(page, requestedArchetype, screenshotName) {
   assert.match(result.prompt, /Enter/i, `${requestedArchetype} entrance did not publish a door prompt: ${JSON.stringify(result)}`);
   assert.ok(Math.abs(result.groundY - result.entrance.y) <= 0.5,
     `${requestedArchetype} door did not meet the walk surface: ${JSON.stringify(result)}`);
+  assert.ok(result.facadeBinding.activeVertices >= 4,
+    `${requestedArchetype} interaction was not bound to its rendered facade vertices: ${JSON.stringify(result)}`);
+  assert.equal(result.facadeBinding.approachInside, false,
+    `${requestedArchetype} approach was published inside the building: ${JSON.stringify(result)}`);
+  assert.ok(result.facadeBinding.normalDotEntrance > 0.68,
+    `${requestedArchetype} facade normal faces away from its approach: ${JSON.stringify(result)}`);
+  assert.equal(result.facadeRay.firstHitSourceId, result.facadeRay.targetSourceId,
+    `${requestedArchetype} entrance facade was occluded by a different building shell: ${JSON.stringify(result)}`);
+  assert.ok(Number(result.facadeRay.interpolatedEntrance?.active || 0) > 0.9,
+    `${requestedArchetype} center ray did not intersect an active entrance mask: ${JSON.stringify(result)}`);
+  assert.ok(Math.abs(Number(result.facadeRay.interpolatedEntrance?.tangentX || 0)) < 0.12,
+    `${requestedArchetype} center ray missed the entrance atlas center: ${JSON.stringify(result)}`);
   await page.screenshot({ path: path.join(outputDir, screenshotName) });
   return result;
 }
@@ -160,16 +269,17 @@ try {
   const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await launchBaltimore(desktop, 'desktop');
   const facade = await inspectFacade(desktop);
-  const expectedMeshes = [
-    'Living World Entrance Structure',
-    'Living World Architectural Glass',
-    'Living World Door Hardware'
-  ];
-  expectedMeshes.forEach((name) => assert.ok(facade.meshNames.includes(name), `missing facade layer: ${name}`));
   assert.ok(facade.entranceCount > 0, 'Baltimore did not publish entrances');
   assert.ok(facade.archetypes.length >= 3, `expected at least three facade archetypes, saw ${facade.archetypes.join(', ')}`);
-  assert.ok(Number(facade.diagnostics?.drawCalls || 0) <= 3, `facade draw-call budget exceeded: ${facade.diagnostics?.drawCalls}`);
-  assert.ok(Number(facade.diagnostics?.detailInstances || 0) > facade.entranceCount * 2, 'facades did not publish layered detail');
+  assert.ok(facade.attributedMeshes > 0, 'batched building facades did not retain entrance attributes');
+  assert.ok(facade.integratedClaims > 0, 'building materials do not claim integrated entrances');
+  assert.deepEqual(facade.shaderOwners, ['engine/building-facade-materials']);
+  assert.equal(facade.diagnostics?.addedDrawCalls, 0, 'entrances added a parallel draw layer');
+  assert.equal(facade.diagnostics?.retainedDecorativeMeshes, 0, 'decorative door meshes were retained');
+  assert.ok(Number(facade.diagnostics?.attributedVertices || 0) > 0, 'no wall vertices were attributed to entrances');
+  assert.ok(Number(facade.diagnostics?.estimatedBatchedAttributeBytes || Infinity) < 2_000_000,
+    `facade entrance attributes exceeded 2 MB: ${facade.diagnostics?.estimatedBatchedAttributeBytes}`);
+  assert.equal(facade.diagnostics?.facadeIntegration, 'shader-integrated-wall-face');
 
   const requestedArchetypes = ['storefront', 'residential', 'office'];
   const captured = [];
@@ -211,9 +321,10 @@ try {
   await desktop.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.paused = false;
+    ctx.updateInteriorInteraction?.();
   });
   await desktop.keyboard.press('KeyE');
-  await desktop.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interior?.active === true, null, { timeout: 10000 });
+  await desktop.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interior?.active === true, null, { timeout: 30000 });
   await desktop.screenshot({ path: path.join(outputDir, '05-desktop-entered-interior.png') });
   const desktopSequence = await desktop.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -237,24 +348,24 @@ try {
   assert.ok(promptBox && promptBox.height >= 40 && promptBox.x >= 0 && promptBox.x + promptBox.width <= 390,
     `mobile door prompt did not fit its viewport: ${JSON.stringify(promptBox)}`);
   await mobile.locator('#interiorPrompt.show').click();
-  await mobile.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interior?.active === true, null, { timeout: 10000 });
+  await mobile.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interior?.active === true, null, { timeout: 30000 });
   await mobile.screenshot({ path: path.join(outputDir, '07-mobile-entered-interior.png') });
   const mobileState = await mobile.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return {
       worldSequence: Number(ctx._worldLoadSequence || 0),
       active: !!ctx.activeInterior,
-      facadeDrawCalls: Number(ctx.livingWorldRuntime?.facades?.diagnostics?.drawCalls || 0)
+      facadeDrawCalls: Number(ctx.buildingFacadeEntrances?.diagnostics?.addedDrawCalls || 0)
     };
   });
   assert.equal(mobileState.active, true);
-  assert.ok(mobileState.facadeDrawCalls <= 3);
+  assert.equal(mobileState.facadeDrawCalls, 0);
   await mobileContext.close();
 
   assert.deepEqual(fatalErrors, [], `fatal browser errors:\n${fatalErrors.join('\n')}`);
   console.log(JSON.stringify({
     facade,
-    captured: captured.map(({ archetype, doorStyle, prompt }) => ({ archetype, doorStyle, prompt })),
+    captured: captured.map(({ archetype, doorStyle, prompt, facadeBinding, entrance }) => ({ archetype, doorStyle, prompt, facadeBinding, entrance })),
     desktopSequence,
     mobileState,
     providerWarnings: providerWarnings.length,

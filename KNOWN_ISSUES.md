@@ -47,6 +47,9 @@ pass. Current blockers are:
   elevation and parent fallback were unavailable.
 - Lake Tahoe and Panama Canal water starts selected walking rather than their
   expected boat start.
+- The latest general Baltimore runtime invariant saw vegetation publish one
+  feature after the fixed-world snapshot (410 to 411), so world publication was
+  not stable in that run. The entrance-specific journey did not mutate the world.
 
 These are worldwide fallback/readiness failures, not facade-test failures. They
 must be fixed at their shared data and world-start owners and the full matrix
@@ -57,10 +60,14 @@ patches or weaken the matrix.
 
 - Building footprints, heights, roof shapes, indoor details, roads, vegetation, and water depend on available source data. Coverage varies globally.
 - Missing building heights, materials, facade details, and roof equipment use bounded visual fallbacks; those fallbacks are not claims about the real structure.
-- The local candidate adds bounded entrance detail to published building
-  identities. Generic windows remain owned by the facade atlas; close-range
-  doors, frames, handles, lights, thresholds, canopies and storefront side panes
-  are deterministic visual inference, not claims about an exact real doorway.
+- The local candidate adds bounded entrances directly to the owning building
+  facade. Generic windows remain owned by the existing facade material, while
+  one shared generated entrance atlas supplies residential, storefront, office,
+  civic and service variants through wall attributes and the same facade shader.
+  These inferred entrances are not claims about the exact real doorway.
+- Entrances do not create individual door meshes or a parallel facade renderer.
+  The current Baltimore sample publishes 59 wall-bound entrances with zero
+  additional draw calls and about 246 KiB of merged vertex attributes.
 - New OpenStreetMap edits appear only after upstream services and local caches refresh.
 
 ## Loading and Performance
@@ -73,6 +80,10 @@ patches or weaken the matrix.
 - Rapid Baltimore-to-Monaco replacement passes in installed Chrome: the superseded provider work aborts, the replacement becomes the sole published world, all provider ledgers finish with zero in-flight work, and terrain fetch concurrency remains bounded at 12 without duplicate URLs.
 - Returning to the title after loading Earth still retains the already-booted global runtime and shared actor/renderer assets (153.8 MB, 202 geometries, and 31 textures versus an 11.7 MB cold title). Terrain/world ownership is zero, but reducing that post-boot shared baseline remains an optimization target rather than a closed claim.
 - Manual acceptance on intended phones and integrated-GPU systems is still open. `performance.memory` measures live JavaScript heap, not total Chrome/V8/GPU process RSS.
+- The current headless mobile-controls rerun completed iPhone title and Android
+  portrait play, then saturated SwiftShader during the landscape world load and
+  was stopped rather than allowed to monopolize the machine. The focused 390x844
+  touch doorway journey passes, but this does not replace a real-device pass.
 - Provider latency can make the same location load at different speeds even when the generated world is unchanged.
 - Narrow or tightly mapped service roads can leave little vehicle clearance.
   The runtime gate samples all road centers and lanes for building collisions,

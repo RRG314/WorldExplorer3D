@@ -5,7 +5,7 @@ import {
   disposeSceneMesh,
   materialBatchKey,
   appendGeometryWithTransform
-} from "./geometry-batching.js?v=4";
+} from "./geometry-batching.js?v=5";
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 
 const NEAR_BUILDING_BATCH_CELL_METERS = 360;
@@ -106,6 +106,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
       }
 
       const batch = { positions: [], normals: [], uvs: [], indices: [] };
+      if (group.lodTier === 'near') batch.facadeEntrances = [];
       const sourceMeshes = [];
       const xzPoints = [];
       const provenanceByFeatureId = new Map();

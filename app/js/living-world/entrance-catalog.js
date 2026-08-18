@@ -8,10 +8,10 @@ const COMMERCIAL_BUILDING_TYPES = new Set([
 ]);
 
 const ENTRANCE_LIMIT_BY_TIER = Object.freeze({
-  low: 36,
-  performance: 56,
-  balanced: 112,
-  quality: 180
+  low: 24,
+  performance: 40,
+  balanced: 72,
+  quality: 112
 });
 
 function finite(value, fallback = 0) {
@@ -56,12 +56,16 @@ function polygonCentroid(points) {
   }), { x: 0, z: 0 });
 }
 
-function projectToSegment(point, start, end) {
+function projectToSegment(point, start, end, insetMeters = 0.3) {
   const dx = end.x - start.x;
   const dz = end.z - start.z;
   const lengthSquared = dx * dx + dz * dz;
+  const length = Math.sqrt(lengthSquared);
+  const minimumT = length > 1e-6
+    ? Math.min(0.45, Math.max(0.04, finite(insetMeters, 0.3) / length))
+    : 0.5;
   const t = lengthSquared > 1e-9
-    ? Math.max(0.08, Math.min(0.92, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared))
+    ? Math.max(minimumT, Math.min(1 - minimumT, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared))
     : 0.5;
   return {
     x: start.x + dx * t,
@@ -181,10 +185,19 @@ function candidatePriority(building, index) {
   };
 }
 
-function entranceGroundY(sourceY, x, z, normalX, normalZ, sampleGround) {
-  if (typeof sampleGround !== 'function') return sourceY;
+function entranceGroundPlacement(sourceY, x, z, normalX, normalZ, sampleGround) {
+  if (typeof sampleGround !== 'function') return { y: sourceY, surfaceDelta: 0, usable: true };
   const sampled = Number(sampleGround(x + normalX * 1.8, z + normalZ * 1.8));
-  return Number.isFinite(sampled) && Math.abs(sampled - sourceY) <= 10 ? sampled : sourceY;
+  if (!Number.isFinite(sampled)) return { y: sourceY, surfaceDelta: 0, usable: true };
+  const surfaceDelta = sampled - sourceY;
+  return {
+    y: sampled,
+    surfaceDelta,
+    // A road deck, ramp, retaining wall, or terrain shelf several metres above
+    // the facade base cannot be a usable ground-floor approach. Reject it
+    // instead of painting a door below an occluding surface.
+    usable: Math.abs(surfaceDelta) <= 0.9
+  };
 }
 
 function normalizeMappedEntrance(mapped, candidate, sampleGround) {
@@ -199,20 +212,24 @@ function normalizeMappedEntrance(mapped, candidate, sampleGround) {
   const facadeWidth = facadeEdge
     ? Math.hypot(facadeEdge.end.x - facadeEdge.start.x, facadeEdge.end.z - facadeEdge.start.z)
     : 7;
+  const facadeX = facadeEdge ? facadeEdge.projection.x : Number(mapped.x);
+  const facadeZ = facadeEdge ? facadeEdge.projection.z : Number(mapped.z);
   const mappedY = finite(mapped.y, finite(candidate.building?.baseY, finite(candidate.building?.minY, 0)));
-  const baseY = entranceGroundY(mappedY, Number(mapped.x), Number(mapped.z), normalX, normalZ, sampleGround);
+  const ground = entranceGroundPlacement(mappedY, facadeX, facadeZ, normalX, normalZ, sampleGround);
+  if (!ground.usable) return null;
+  const baseY = ground.y;
   return Object.freeze({
     id: `entrance:${candidate.buildingId}:mapped:${String(mapped.id || '0')}`,
     buildingSourceId: candidate.buildingId,
     buildingType: candidate.buildingType,
     commercial: candidate.commercial,
     provenance: 'mapped',
-    x: Number(mapped.x),
+    x: facadeX,
     y: baseY,
-    z: Number(mapped.z),
-    approachX: Number(mapped.x) + normalX * 1.8,
+    z: facadeZ,
+    approachX: facadeX + normalX * 1.8,
     approachY: baseY,
-    approachZ: Number(mapped.z) + normalZ * 1.8,
+    approachZ: facadeZ + normalZ * 1.8,
     normalX,
     normalZ,
     tangentX: -normalZ,
@@ -221,6 +238,8 @@ function normalizeMappedEntrance(mapped, candidate, sampleGround) {
     facadeWidth,
     levels: Math.max(1, Math.round(finite(candidate.building?.levels, 1))),
     height: Math.max(2.7, finite(candidate.building?.height, 3.2)),
+    facadeBaseY: mappedY,
+    approachSurfaceDelta: ground.surfaceDelta,
     ...entranceVisualFields(candidate)
   });
 }
@@ -238,7 +257,7 @@ function inferEntrance(candidate, nearestRoad, sampleGround) {
   for (let index = 0; index < candidate.points.length; index += 1) {
     const start = candidate.points[index];
     const end = candidate.points[(index + 1) % candidate.points.length];
-    const projection = projectToSegment(target, start, end);
+    const projection = projectToSegment(target, start, end, candidate.commercial ? 1.3 : 1.08);
     if (!best || projection.distance < best.projection.distance) {
       best = { start, end, projection, edgeIndex: index };
     }
@@ -248,11 +267,17 @@ function inferEntrance(candidate, nearestRoad, sampleGround) {
   const normalX = outwardNormal.x;
   const normalZ = outwardNormal.z;
   const tangentLength = Math.hypot(best.end.x - best.start.x, best.end.z - best.start.z) || 1;
+  if (tangentLength < (candidate.commercial ? 2.6 : 2.15)) return null;
   const tangentX = (best.end.x - best.start.x) / tangentLength;
   const tangentZ = (best.end.z - best.start.z) / tangentLength;
-  const x = best.projection.x + normalX * 0.08;
-  const z = best.projection.z + normalZ * 0.08;
-  const baseY = entranceGroundY(buildingBaseY, x, z, normalX, normalZ, sampleGround);
+  // Keep the entrance origin on the actual footprint edge. The presentation
+  // owns millimetre-scale reveal offsets; shifting the catalog outward made the
+  // whole assembly read as a prop attached in front of the wall.
+  const x = best.projection.x;
+  const z = best.projection.z;
+  const ground = entranceGroundPlacement(buildingBaseY, x, z, normalX, normalZ, sampleGround);
+  if (!ground.usable) return null;
+  const baseY = ground.y;
   return Object.freeze({
     id: `entrance:${candidate.buildingId}:inferred:${best.edgeIndex}`,
     buildingSourceId: candidate.buildingId,
@@ -275,6 +300,8 @@ function inferEntrance(candidate, nearestRoad, sampleGround) {
     height: Math.max(2.7, finite(building?.height, 3.2)),
     roadDistance: Number.isFinite(roadHit?.dist) ? Number(roadHit.dist) : null,
     roadSourceId: String(roadHit?.road?.sourceRoadId || roadHit?.road?.sourceWayId || roadHit?.road?.id || ''),
+    facadeBaseY: buildingBaseY,
+    approachSurfaceDelta: ground.surfaceDelta,
     ...entranceVisualFields(candidate)
   });
 }

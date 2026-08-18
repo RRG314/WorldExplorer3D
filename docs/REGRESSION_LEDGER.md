@@ -852,35 +852,40 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   mobile prompt looked actionable but did not enter.
 - Root cause: the extrusion material projected the square facade atlas with a
   mesh UV direction that did not represent horizontal wall distance and actual
-  building height. The detail layer depended on Three r128 frustum bounds that
-  do not include later instanced transforms. Entrance IDs did not consistently
-  use the published building identity, the lazy interior runtime started only
-  after an interaction attempt, and inferred entrance height sampled terrain
-  rather than the authoritative walk surface. A draft detail pass also tried to
-  reproduce building-wide windows already owned by the facade material.
-- Resolution: walls now project the existing high-resolution atlases by
-  horizontal perimeter distance and real building height with deterministic
-  repeat/phase variation. One bounded entrance catalog publishes stable urban,
-  residential, office and storefront variants at the sampled walk surface. Three
-  opaque instanced batches add panels, four-piece frames, lights, handles,
-  thresholds, canopies and storefront side panes; their instance-aware culling
-  limitation is handled explicitly. The building-entry owner consumes the same
-  published entrance map, initializes while walking, measures only the doorway
+  building height. The first close-range correction then rendered door parts in
+  separate instanced batches, so entrances still read as attachments instead of
+  part of the architecture and paid extra draw/memory ownership. Entrance IDs
+  also did not consistently use the published building identity, the lazy
+  interior runtime started only after an interaction attempt, and inferred
+  entrance height sampled terrain rather than the authoritative walk surface.
+- Resolution: walls project the existing facade artwork by horizontal perimeter
+  distance and real building height. The building geometry pass compiles the
+  stable entrance catalog and attributes complete triangles on the correct wall;
+  the owning facade shader samples one shared entrance atlas only inside that
+  ground-floor bay. Facade and interaction therefore consume one building-owned
+  entrance identity without door meshes, decorative groups or added draw calls.
+  Physical corner/surface guards reject unsafe inferred entrances. The
+  building-entry owner initializes while walking, measures only the doorway
   approach, aligns the generated interior to that door and routes desktop and
-  touch through the same action handler.
+  touch through the same action handler; a visible door prompt has precedence
+  over nearby NPC actions.
 - Guard: `npm run test:living-world-facades`, `npm run
   test:building-facades-browser`, `npm run test:runtime`, `npm run
   test:mobile-controls`, `npm run test:plane-interiors`, `npm run
   test:interior-floors`, and human review of
   `output/playwright/building-facades/01-storefront-entrance.png`,
   `02-residential-entrance.png`, `03-office-entrance.png`, and
-  `06-mobile-touch-prompt.png`. The browser journey requires 112 published
-  entrances, three facade-detail draw calls, desktop and touch entry, one world
-  sequence, no arbitrary-wall prompt and no fatal browser errors.
+  `06-mobile-touch-prompt.png`. The browser journey requires published wall-bound
+  entrances in residential, storefront and office variants, complete-triangle
+  masks on the correct source geometry, outward approach normals, zero added
+  draw calls, zero retained decorative meshes, desktop and touch entry, one
+  world sequence, no arbitrary-wall prompt and no fatal browser errors. The
+  current Baltimore fixture publishes 59 entrances and carries about 246 KiB of
+  merged entrance attributes plus one 77 KiB atlas.
 - Never reintroduce: a second building-wide window renderer, world-axis facade
-  UVs, unbounded one-mesh-per-door detail, default frustum bounds for transformed
-  r128 instances, terrain-only door height, building-center interaction range,
-  a visual-only touch prompt, or city-specific door meshes.
+  UVs, a parallel post-render door renderer, partial per-vertex triangle masks,
+  unbounded one-mesh-per-door detail, terrain-only door height, building-center
+  interaction range, a visual-only touch prompt, or city-specific door meshes.
 
 ## 2026-08-18 — Worldwide release matrix catches shared fallback regressions
 

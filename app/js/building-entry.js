@@ -322,7 +322,7 @@ function resolveSupportRecord(building, options = {}) {
   };
   const destination = options.destination || null;
   const key = buildingKey(building);
-  const exteriorEntrance = appCtx.livingWorldEntranceByBuilding?.get?.(key) || null;
+  const exteriorEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :
     exteriorEntrance ? { x: exteriorEntrance.x, z: exteriorEntrance.z } : center;

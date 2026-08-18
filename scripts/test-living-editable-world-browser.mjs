@@ -76,7 +76,7 @@ try {
     position.setFromMatrixPosition(matrix);
     return {
       diagnostics: JSON.parse(globalThis.render_game_to_text()),
-      facadeAttached: !!ctx.earthSceneRoot?.getObjectByName?.('Living World Facade Depth'),
+      facadeIntegrated: (ctx.buildingMeshes || []).some((mesh) => !!mesh.geometry?.attributes?.facadeEntrance),
       populationAttached: !!population,
       trafficPosition: { x: position.x, y: position.y, z: position.z },
       providerInFlight: Object.values(ctx.worldLoadRuntimeState?.session?.providers || {}).map((provider) => Number(provider.inFlight || 0)),
@@ -89,7 +89,7 @@ try {
       heapBytes: Number(performance.memory?.usedJSHeapSize || 0)
     };
   });
-  assert.equal(before.facadeAttached, true, 'facade presentation was not attached to the Earth scene owner');
+  assert.equal(before.facadeIntegrated, true, 'entrances were not integrated into building facade geometry');
   assert.equal(before.populationAttached, true, 'population presentation was not attached to the Earth scene owner');
   assert.ok(before.diagnostics.livingWorld.entrances.published > 0, 'Baltimore published no building entrances');
   assert.ok(before.diagnostics.livingWorld.pedestrianGraph.edges > 0, 'Baltimore published no pedestrian graph');
@@ -123,7 +123,6 @@ try {
   const livingWorldOverhead = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const groups = [
-      ctx.earthSceneRoot?.getObjectByName?.('Living World Facade Depth'),
       ctx.earthSceneRoot?.getObjectByName?.('Living World Population')
     ].filter(Boolean);
     const settle = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -140,7 +139,7 @@ try {
       triangles: Number(ctx.renderer.info.render.triangles || 0)
     };
     const snapshot = ctx.livingWorldRuntimeSnapshot?.() || {};
-    const logicalDrawCalls = Number(snapshot.facades?.drawCalls || 0) + Number(snapshot.population?.drawCalls || 0);
+    const logicalDrawCalls = Number(snapshot.facades?.addedDrawCalls || 0) + Number(snapshot.population?.drawCalls || 0);
     return {
       base,
       full,

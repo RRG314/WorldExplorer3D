@@ -5,7 +5,7 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=6";
+} from "../building-entry.js?v=7";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=3";
 
 let nearbyInteriorScanPromise = null;

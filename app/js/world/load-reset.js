@@ -52,6 +52,9 @@ export function resetWorldForReload(options = {}) {
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
   appCtx.disposeLivingWorldRuntime?.('world_reload');
+  appCtx.buildingEntranceCatalog = null;
+  appCtx.buildingEntranceByBuilding = null;
+  appCtx.buildingFacadeEntrances = null;
   appCtx.disposeWorldDiscoveryRuntime?.('world_reload');
   appCtx.closeArExperience?.('world_reload');
   appCtx.disposeEditableWorldPresentation?.();

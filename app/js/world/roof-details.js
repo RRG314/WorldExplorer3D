@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   appendGeometryWithTransform,
   buildMergedGeometry
-} from "./geometry-batching.js?v=4";
+} from "./geometry-batching.js?v=5";
 
 let pointInPolygonFn = () => false;
 let distanceToPolygonEdgeXZFn = () => 0;

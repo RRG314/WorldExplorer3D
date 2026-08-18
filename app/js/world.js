@@ -63,7 +63,7 @@ import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=15";
+} from "./world/load-reset.js?v=16";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=11";
@@ -101,7 +101,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=35";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=44";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=45";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=38";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=117";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=120";
 import {
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
@@ -170,7 +170,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=30";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=33";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

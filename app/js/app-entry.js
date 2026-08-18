@@ -29,7 +29,7 @@ import { initBoatMode } from './boat-mode.js?v=37';
 import './sky.js?v=86';
 import './weather.js?v=9';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=62';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=65';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -40,7 +40,7 @@ import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=1';
 import './game.js?v=62';
-import './input.js?v=62';
+import './input.js?v=63';
 import './hud.js?v=91';
 import './map.js?v=59';
 import { renderLoop } from './main.js?v=72';
@@ -321,7 +321,7 @@ function registerLazySubsystemEntrypoints() {
             !_interiorsModulePromise &&
             appCtx.gameStarted === true &&
             walking &&
-            Number(appCtx.livingWorldEntranceByBuilding?.size || 0) > 0
+            Number(appCtx.buildingEntranceByBuilding?.size || 0) > 0
         ) {
             void ensureInteriorsReady().then((interiors) => interiors.updateInteriorInteraction?.()).catch((error) => {
                 console.warn('[interior] Proximity runtime failed to initialize:', error);

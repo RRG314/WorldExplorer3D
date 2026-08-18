@@ -6,7 +6,7 @@ import {
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
 import { createMidLodBuildingMesh } from "./load-geometry.js?v=25";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=5";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
@@ -15,7 +15,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=9";
+} from "./building-batching.js?v=10";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=6';
@@ -26,6 +26,7 @@ import {
 } from './water-adjacent-structures.js?v=3';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
+import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=2';
 
 export async function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -659,6 +660,10 @@ export async function buildBuildingGeometryPass(options = {}) {
   ));
   loadMetrics.buildings.waterAreaIndex = waterAreaIndex.snapshot();
   endLoadPhase('buildBuildingGeometry');
+  startLoadPhase('publishBuildingFacadeEntrances');
+  const facadeEntrances = publishBuildingFacadeEntrances(appCtx);
+  loadMetrics.buildingFacadeEntrances = { ...facadeEntrances.diagnostics };
+  endLoadPhase('publishBuildingFacadeEntrances');
   startLoadPhase('batchBuildingGeometry');
   const batchScheduling = { yieldToMainThread };
   const batchedNearCount = appCtx.disableNearBuildingBatching

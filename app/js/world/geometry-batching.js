@@ -46,10 +46,12 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
   const posAttr = geometry.attributes.position;
   const normAttr = geometry.attributes.normal;
   const uvAttr = geometry.attributes.uv;
+  const facadeEntranceAttr = geometry.attributes.facadeEntrance;
   const baseVertex = batch.positions.length / 3;
   const startPos = batch.positions.length;
   const startNormals = batch.normals.length;
   const startUvs = batch.uvs.length;
+  const startFacadeEntrances = Array.isArray(batch.facadeEntrances) ? batch.facadeEntrances.length : 0;
   const startIdx = batch.indices.length;
 
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
@@ -60,6 +62,7 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     batch.positions.length = startPos;
     batch.normals.length = startNormals;
     batch.uvs.length = startUvs;
+    if (Array.isArray(batch.facadeEntrances)) batch.facadeEntrances.length = startFacadeEntrances;
     batch.indices.length = startIdx;
   };
 
@@ -89,6 +92,19 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     } else {
       batch.uvs.push(0, 0);
     }
+
+    if (Array.isArray(batch.facadeEntrances)) {
+      if (facadeEntranceAttr?.itemSize === 4) {
+        batch.facadeEntrances.push(
+          facadeEntranceAttr.getX(i),
+          facadeEntranceAttr.getY(i),
+          facadeEntranceAttr.getZ(i) + Number(matrix?.elements?.[13] || 0),
+          facadeEntranceAttr.getW(i)
+        );
+      } else {
+        batch.facadeEntrances.push(0, 0, 0, 0);
+      }
+    }
   }
 
   if (geometry.index) {
@@ -115,6 +131,7 @@ export function buildMergedGeometry(batch) {
   if (batch.positions.length % 3 !== 0 || batch.normals.length % 3 !== 0 || batch.uvs.length % 2 !== 0) return null;
   if (batch.normals.length !== batch.positions.length) return null;
   if (batch.uvs.length !== batch.positions.length / 3 * 2) return null;
+  if (Array.isArray(batch.facadeEntrances) && batch.facadeEntrances.length !== batch.positions.length / 3 * 4) return null;
 
   for (let i = 0; i < batch.positions.length; i++) {
     if (!Number.isFinite(batch.positions[i])) return null;
@@ -135,6 +152,9 @@ export function buildMergedGeometry(batch) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
+  if (Array.isArray(batch.facadeEntrances)) {
+    geometry.setAttribute('facadeEntrance', new THREE.Float32BufferAttribute(batch.facadeEntrances, 4));
+  }
 
   const indexArray = vertexCount > 65535 ? new Uint32Array(batch.indices) : new Uint16Array(batch.indices);
   geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));

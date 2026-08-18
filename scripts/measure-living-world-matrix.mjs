@@ -34,11 +34,9 @@ async function waitForRuntime() {
 async function sampleMode(mode, frameCount = 75) {
   return page.evaluate(async ({ mode, frameCount }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const facades = ctx.earthSceneRoot?.getObjectByName?.('Living World Facade Depth');
     const population = ctx.earthSceneRoot?.getObjectByName?.('Living World Population');
     const pedestrianParts = population?.children?.filter?.((child) => child.name.startsWith('Living World Pedestrian')) || [];
     const trafficParts = population?.children?.filter?.((child) => child.name.startsWith('Living World Traffic')) || [];
-    if (facades) facades.visible = mode.facades;
     pedestrianParts.forEach((part) => { part.visible = mode.pedestrians; });
     trafficParts.forEach((part) => { part.visible = mode.traffic; });
     const frames = [];

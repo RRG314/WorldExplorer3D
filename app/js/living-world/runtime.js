@@ -5,8 +5,7 @@ import {
   createWorldRandom,
   isLivingWorldPublicationActive
 } from './model.js?v=1';
-import { compileEntranceCatalog } from './entrance-catalog.js?v=3';
-import { createFacadeDepthPresentation } from './facade-depth.js?v=6';
+import { compileEntranceCatalog } from './entrance-catalog.js?v=5';
 import { compilePedestrianGraph, compileTrafficGraph } from './navigation-graphs.js?v=1';
 import { createLivingWorldPopulation } from './population.js?v=6';
 
@@ -43,10 +42,6 @@ function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   state.reason = String(reason || 'disposed');
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
-  state.facades?.dispose?.();
-  if (appCtx?.livingWorldEntranceByBuilding === state.entranceByBuilding) {
-    appCtx.livingWorldEntranceByBuilding = null;
-  }
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
 }
@@ -78,22 +73,27 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     locationKey: request.selection?.key,
     dataProfile: 'fixed-earth-living-world-v1'
   });
-  const catalog = compileEntranceCatalog({
+  const catalog = appCtx.buildingEntranceCatalog || compileEntranceCatalog({
     buildings: appCtx.buildings,
     mappedEntrances: appCtx.mappedBuildingEntrances,
     nearestRoad: appCtx.findNearestRoad,
     sampleGround: (x, z) => appCtx.GroundHeight?.walkSurfaceY?.(x, z) ?? appCtx.elevationWorldYAtWorldXZ?.(x, z),
     tier
   });
-  const entranceByBuilding = new Map(
+  const entranceByBuilding = appCtx.buildingEntranceByBuilding || new Map(
     catalog.entrances.map((entrance) => [String(entrance.buildingSourceId), entrance])
   );
-  appCtx.livingWorldEntranceByBuilding = entranceByBuilding;
-  const facades = createFacadeDepthPresentation({
-    entrances: catalog.entrances,
-    tier
+  const facades = appCtx.buildingFacadeEntrances || Object.freeze({
+    renderedEntrances: catalog.entrances,
+    diagnostics: Object.freeze({
+      ...catalog.diagnostics,
+      addedDrawCalls: 0,
+      retainedDecorativeMeshes: 0,
+      facadeIntegration: 'semantic-only-fallback',
+      renderOwner: 'engine/building-facade-materials',
+      interactionOwner: 'building-entry'
+    })
   });
-  appCtx.addEarthWorldObject?.(facades.group);
   const traversal = appCtx.buildTraversalNetworks?.() || { walk: null, drive: null };
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
@@ -139,7 +139,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     semanticDensity: {
       tier,
       buildingCandidates: catalog.diagnostics.considered,
-      facadeInstances: facades.diagnostics.doors + facades.diagnostics.storefronts + facades.diagnostics.windows,
+      facadeInstances: Number(facades.diagnostics.published || catalog.diagnostics.published),
       pedestrians: population.diagnostics.pedestrians,
       vehicles: population.diagnostics.vehicles
     },
@@ -163,7 +163,6 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   });
   if (!result.published) {
     population.dispose();
-    facades.dispose();
     return null;
   }
 
@@ -184,7 +183,6 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   };
   appCtx.livingWorldPublication = publication;
   appCtx.livingWorldRuntime = state;
-  facades.updateNightLighting(appCtx.timeOfDay);
   appCtx.registerRuntimeSystem?.({
     id: `${owner}:presentation`,
     owner,
@@ -192,16 +190,13 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     priority: 30,
     critical: false,
     enabled: () => !state.disposed && publicationIsActive(appCtx, publication),
-    update() {
-      facades.updateNightLighting(appCtx.timeOfDay);
-    },
     fixedUpdate(frame) {
       population.fixedUpdate(frame.dt);
     }
   });
   appCtx.setPerfLiveStat?.('livingWorld', {
     entrances: catalog.diagnostics.published,
-    facadeDrawCalls: facades.diagnostics.drawCalls,
+    facadeDrawCalls: facades.diagnostics.addedDrawCalls,
     facadeInstances: publication.semanticDensity.facadeInstances,
     pedestrians: population.diagnostics.pedestrians,
     vehicles: population.diagnostics.vehicles

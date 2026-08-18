@@ -34,6 +34,23 @@ function onKey(code, event) {
         return undefined;
       });
     };
+    const runPrimaryContext = () => {
+      if (typeof appCtx.handlePrimaryContextInteraction !== 'function') return runGameplayFallback();
+      return Promise.resolve(appCtx.handlePrimaryContextInteraction()).then((handled) => {
+        if (handled !== true) return runGameplayFallback();
+        return undefined;
+      });
+    };
+    const interiorPromptVisible = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
+    if (interiorPromptVisible) {
+      Promise.resolve(runInteriorFallback()).then((handled) => {
+        if (handled !== true) return runPrimaryContext();
+        return undefined;
+      }).catch((err) => {
+        console.warn('[interior] Door interaction failed:', err);
+      });
+      return;
+    }
     if (typeof appCtx.handlePrimaryContextInteraction === 'function') {
       Promise.resolve(appCtx.handlePrimaryContextInteraction()).then((handled) => {
         if (handled !== true) return runGameplayFallback();
