@@ -4,6 +4,27 @@ This is the durable record of visual and loading regressions already encountered
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
 
+## 2026-08-18 — Walking arrival center was clear while the actor body still intersected a building
+
+- Status: resolved locally on `steven/urban-sandbox-foundation`; not pushed or
+  deployed.
+- Symptom: a walk spawn at the center coordinates of a concave building could
+  be reported valid and remain unmoved even though the shared physics query
+  found the actor intersecting the footprint.
+- Root cause: the walk spawn resolver tested point containment, while movement
+  collision and the runtime invariant test the actor's full clearance radius.
+  A point just outside a concave polygon but within body radius of its edge
+  therefore passed the first contract and failed the second.
+- Resolution: world-arrival validation now also uses the authoritative building
+  collision query with a 1.5 m arrival clearance, while retaining the explicit
+  roof-arrival exception. The complete Earth runtime cache identity chain was
+  advanced so deployed browsers cannot keep the stale resolver.
+- Guard: `npm run test:runtime`, `npm run test:module-versions`, and the future
+  multi-floor stair/elevator arrival journey.
+- Never reintroduce: point-only safety checks for an embodied actor, separate
+  building-footprint math in an arrival feature, or source edits without the
+  complete runtime module-version chain.
+
 ## 2026-08-17 — Earth terrain survives reloads and editable buildings rebuild the entire world
 
 - Status: resolved locally on `steven/fix-memory-ownership`; not pushed or

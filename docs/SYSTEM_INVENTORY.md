@@ -447,7 +447,7 @@ Gameplay modes use a plugin registry with `start`, `update`, `stop`, optional sa
 | Time Trial | Reach a generated destination roughly 400–1,200 m away before time expires | Loaded Earth world |
 | Checkpoint Run | Pass through eight road-aligned checkpoints | Loaded road network |
 | Paint the Town | Claim building surfaces by touch or paintball, choose colors, score locally or in a room | Local; Firestore for shared play/leaderboards |
-| Police Chase | Speed/proximity can trigger pursuit; three impacts result in capture | Loaded Earth world |
+| Witnessed civic response | Valid witnesses lead to a dispatch delay, location-aware responder vehicle, bounded search/pursuit and warning/citation/recovery outcome; the duplicate standalone Police Chase entry is retired | Loaded Earth world; local milestone pending production acceptance |
 | Flower Challenge | Find a marked red flower under a timer | Local; optional Firebase leaderboard |
 | DeFlock Hunt | Discover and virtually disable representations of mapped surveillance nodes | OSM/proxy; optional shared room state |
 | Live GPS Explore | Move the walker from foreground device position inside one fixed world | Secure-context browser geolocation |
@@ -552,6 +552,11 @@ Delivery, virtual search-and-rescue, urban survey, farm plot, forest survey, cam
 ### 12.1 Interiors
 
 Interior entry is deliberate, normally through `E` near an eligible building. The system uses mapped indoor geometry where available and footprint-aware generated layouts otherwise. It includes an interior planner, scene builder, runtime lifecycle, UI, camera behavior, and return-to-world handling. Generated interiors are plausible game spaces, not claims about a building's actual interior.
+
+The current runtime selects one level for presentation; it does not yet provide
+complete floor-to-floor traversal. The authoritative urban plan assigns stable
+building/floor IDs, stairs, accessible elevators, active/adjacent-floor streaming,
+level-aware collision and multiplayer floor presence to this same interior owner.
 
 ### 12.2 World editor and overlays
 
@@ -1064,7 +1069,7 @@ This path follows actual runtime ownership: boot, lifecycle, Earth publication, 
 | Live GPS Explore | Implemented and user-accessible | Foreground geolocation companion with filtering, bounds, consent and recenter policy. |
 | World Discovery | Implemented and user-accessible | Contextual finds, wildlife/geology, tools, Journal, Guide, Collection, progression and companions. |
 | AR | Experimental | Working capability ladder and three experience types; device support varies and deferred modes remain explicit. |
-| Core mission plugins | Implemented and user-accessible | Free, trial, checkpoint, Paint Town, Police, Flower, DeFlock, Live GPS. |
+| Core mission plugins | Implemented and user-accessible | Free, trial, checkpoint, Paint Town, Flower, DeFlock, Live GPS. Witnessed civic response is contextual Free Roam behavior, not a duplicate standalone game. |
 | Long-tail contextual activities/jobs | Partial | Catalog, eligibility and shared interaction exist; many do not have unique deep mechanics. |
 | Interiors | Partial | Mapped/generated layouts and lifecycle exist; not every building is enterable and generated layouts are not factual. |
 | Block builder | Implemented and user-accessible | Local and room-shared bounded pieces. |

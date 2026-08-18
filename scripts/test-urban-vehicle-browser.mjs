@@ -52,6 +52,8 @@ try {
     const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return snapshot.worldLoading === false && snapshot.urbanSandbox?.active === true && snapshot.urbanSandbox.vehicleCount > 0;
   }, null, { timeout: 180000 });
+  assert.equal(await page.locator('[data-mode="police"]').count(), 0, 'retired standalone Police Chase remains in the game selector');
+  assert.equal(await page.locator('#fPolice').count(), 0, 'retired Police float toggle remains in play UI');
 
   const prepared = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -339,6 +341,56 @@ try {
   assert.equal(civicEvidence.status.visible, true);
   assert.ok(civicEvidence.status.right <= 1440 && civicEvidence.status.width <= 320);
   await page.screenshot({ path: path.join(outputDir, '05-witnessed-civic-response.png') });
+  const responderEvidence = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    for (let index = 0; index < 46; index += 1) ctx.advanceRuntimeTime?.(160);
+    const state = JSON.parse(globalThis.render_game_to_text()).urbanSandbox;
+    const responder = state.responders?.responders?.[0];
+    if (!responder) throw new Error(`No responder was rendered after dispatch: ${JSON.stringify(state.responders)}`);
+    const visual = ctx.urbanSandboxRuntime.group.children.find((entry) => String(entry?.userData?.vehicleId || '').startsWith('urban-responder:'));
+    if (!visual) throw new Error('Responder state existed without its close-range vehicle visual');
+    const forwardX = Math.sin(responder.yaw);
+    const forwardZ = Math.cos(responder.yaw);
+    ctx.camera.position.set(responder.x - forwardX * 10 + 5, responder.y + 4.5, responder.z - forwardZ * 10 + 5);
+    ctx.camera.lookAt(responder.x, responder.y, responder.z);
+    ctx.camera.updateMatrixWorld(true);
+    let meshCount = 0;
+    let lightbarParts = 0;
+    visual.traverse((entry) => {
+      if (entry?.isMesh) meshCount += 1;
+      if (/Responder (red|blue) light/.test(String(entry?.name || ''))) lightbarParts += 1;
+    });
+    const status = document.getElementById('urbanCivicStatus');
+    const rect = status.getBoundingClientRect();
+    return {
+      phase: state.civicResponse.phase,
+      worldLoadSequence: state.worldLoadSequence,
+      response: state.responders,
+      visual: {
+        meshCount,
+        lightbarParts,
+        vehicleId: visual.userData.vehicleId
+      },
+      status: {
+        visible: getComputedStyle(status).display !== 'none',
+        title: document.getElementById('urbanCivicStatusTitle')?.textContent || '',
+        detail: document.getElementById('urbanCivicStatusDetail')?.textContent || '',
+        right: rect.right,
+        width: rect.width
+      }
+    };
+  });
+  assert.equal(responderEvidence.phase, 'searching');
+  assert.ok(responderEvidence.response.activeCount >= 1 && responderEvidence.response.activeCount <= 2,
+    `desktop responder budget invalid: ${JSON.stringify(responderEvidence.response)}`);
+  assert.equal(responderEvidence.response.responders[0].agencyType, 'civic');
+  assert.ok(['dispatched', 'pursuit', 'searching'].includes(responderEvidence.response.phase));
+  assert.ok(responderEvidence.visual.meshCount >= 38, 'responder vehicle fell back to a low-detail shell');
+  assert.equal(responderEvidence.visual.lightbarParts, 2, 'responder vehicle has no working two-color lightbar');
+  assert.equal(responderEvidence.worldLoadSequence, trafficPrepared.worldLoadSequence, 'responder dispatch reloaded the world');
+  assert.equal(responderEvidence.status.visible, true);
+  assert.ok(responderEvidence.status.right <= 1440 && responderEvidence.status.width <= 320);
+  await page.screenshot({ path: path.join(outputDir, '06-responder-dispatch.png') });
   const promotedTraffic = await page.evaluate(() => {
     const state = JSON.parse(globalThis.render_game_to_text());
     return { urban: state.urbanSandbox, living: state.livingWorld };
@@ -381,6 +433,36 @@ try {
   assert.ok(['reporting', 'watching'].includes(witnessView.pedestrian.reaction));
   assert.notEqual(witnessView.phase, 'clear');
   await page.screenshot({ path: path.join(outputDir, '05-witnessed-civic-response.png') });
+
+  const responderOutcome = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const before = JSON.parse(globalThis.render_game_to_text()).urbanSandbox;
+    const responder = before.responders?.responders?.[0];
+    if (!responder) throw new Error('Responder disappeared before contact outcome verification');
+    Object.assign(ctx.Walk.state.walker, {
+      x: responder.x + 2,
+      z: responder.z + 2,
+      y: responder.y + .5,
+      vx: 0,
+      vz: 0,
+      vy: 0
+    });
+    ctx.Walk.state.characterMesh?.position.set(responder.x + 2, responder.y - 1.2, responder.z + 2);
+    if (ctx.car) {
+      ctx.car.x = responder.x + 2;
+      ctx.car.z = responder.z + 2;
+      ctx.car.speed = 0;
+      ctx.car.vFwd = 0;
+      ctx.car.vLat = 0;
+    }
+    for (let index = 0; index < 16; index += 1) ctx.advanceRuntimeTime?.(250);
+    return JSON.parse(globalThis.render_game_to_text()).urbanSandbox;
+  });
+  assert.equal(responderOutcome.lastCivicOutcome?.type, 'warning');
+  assert.equal(responderOutcome.civicResponse.phase, 'clear');
+  assert.equal(responderOutcome.responders.phase, 'returning');
+  assert.equal(responderOutcome.worldLoadSequence, trafficPrepared.worldLoadSequence, 'responder contact reloaded the world');
+  await page.screenshot({ path: path.join(outputDir, '07-responder-contact-outcome.png') });
 
   const disposal = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -529,6 +611,13 @@ try {
     },
     furnitureImpact,
     civicResponse: civicEvidence,
+    responderDispatch: responderEvidence,
+    responderOutcome: {
+      outcome: responderOutcome.lastCivicOutcome,
+      civicPhase: responderOutcome.civicResponse.phase,
+      responderPhase: responderOutcome.responders.phase,
+      worldLoadSequence: responderOutcome.worldLoadSequence
+    },
     witnessView,
     disposal,
     mobile: { prompt: mobilePrompt, equipment: mobileEquipment, civic: mobileCivic, enteredAndExited: true, worldLoadSequence: mobileExited.worldLoadSequence },

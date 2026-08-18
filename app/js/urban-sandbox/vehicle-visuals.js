@@ -14,6 +14,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   const taxi = style === 'taxi';
   const boxTruck = style === 'box-truck';
   const bus = style === 'bus';
+  const responder = definition.serviceType === 'responder';
   const deliveryVan = van && /delivery|parcel/i.test(String(variant.id || variant.label || ''));
   const root = new THREE.Group();
   root.name = `${variant.label || 'Urban vehicle'} visual`;
@@ -37,7 +38,11 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   const plate = new THREE.MeshStandardMaterial({ color: 0xe4e1cc, roughness: 0.72, metalness: 0.04, flatShading: true });
   const service = new THREE.MeshStandardMaterial({ color: taxi ? 0xf4dc55 : bus ? 0xe5edf2 : 0xdce4e6, roughness: 0.68, metalness: 0.04, flatShading: true });
   const materials = [paint, darkPaint, glass, trim, chrome, rubber, headlight, taillight, plate, service];
+  const responderRed = responder ? new THREE.MeshStandardMaterial({ color: 0x7d111b, emissive: 0xff2435, emissiveIntensity: 0.18, roughness: 0.34, flatShading: true }) : null;
+  const responderBlue = responder ? new THREE.MeshStandardMaterial({ color: 0x12346b, emissive: 0x247cff, emissiveIntensity: 1.6, roughness: 0.34, flatShading: true }) : null;
+  if (responderRed && responderBlue) materials.push(responderRed, responderBlue);
   const ownedGeometries = new Set();
+  const serviceLights = [];
   const add = (geometry, material, name, position, rotation = null, parent = root) => {
     ownedGeometries.add(geometry);
     const mesh = new THREE.Mesh(geometry, material);
@@ -103,6 +108,18 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   if (taxi) {
     add(new THREE.BoxGeometry(0.48, 0.16, 0.22), service, 'Taxi roof lamp', [0, cabinY + cabinHeight * 0.61, cabinZ]);
   }
+  if (responder) {
+    const accent = Number(definition.serviceAccent || 0xe8ecef);
+    service.color.setHex(accent);
+    for (const side of [-1, 1]) {
+      add(new THREE.BoxGeometry(.052, .34, cabinLength * .48), service, 'Responder door identity panel', [side * width * .492, cabinY - .1, cabinZ - cabinLength * .08]);
+    }
+    add(new THREE.BoxGeometry(.92, .055, .26), trim, 'Responder light bar mount', [0, cabinY + cabinHeight * .62, cabinZ]);
+    serviceLights.push(
+      add(new THREE.BoxGeometry(.39, .13, .24), responderRed, 'Responder red light', [-.22, cabinY + cabinHeight * .7, cabinZ]),
+      add(new THREE.BoxGeometry(.39, .13, .24), responderBlue, 'Responder blue light', [.22, cabinY + cabinHeight * .7, cabinZ])
+    );
+  }
 
   const doors = {};
   for (const side of [-1, 1]) {
@@ -156,6 +173,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     root,
     wheels,
     doors: Object.freeze(doors),
+    serviceLights: Object.freeze(serviceLights),
     materials: Object.freeze(materials),
     setCondition(condition = 1) {
       const value = Math.max(0, Math.min(1, Number(condition) || 0));
@@ -163,6 +181,12 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
       paint.color.setHex(Number(definition.color || variant.color || 0x466579)).multiplyScalar(0.42 + value * 0.58);
       darkPaint.color.copy(paint.color).multiplyScalar(0.72);
       root.rotation.z = value <= 0 ? 0.035 : 0;
+    },
+    setServiceLights(elapsed = 0, active = true) {
+      if (!responderRed || !responderBlue) return;
+      const redActive = active && Math.sin(Number(elapsed || 0) * 11) >= 0;
+      responderRed.emissiveIntensity = redActive ? 2.2 : .12;
+      responderBlue.emissiveIntensity = active && !redActive ? 2.2 : .12;
     },
     dispose() {
       root.removeFromParent?.();

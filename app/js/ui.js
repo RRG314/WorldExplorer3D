@@ -411,13 +411,6 @@ function setupUI() {
       closeAllFloatMenus();
     });
   }
-  document.getElementById('fPolice').addEventListener('click', () => {
-    appCtx.policeOn = !appCtx.policeOn;
-    document.getElementById('fPolice').classList.toggle('on', appCtx.policeOn);
-    document.getElementById('police').classList.toggle('show', appCtx.policeOn);
-    if (appCtx.policeOn) appCtx.spawnPolice();else appCtx.clearPolice();
-    closeAllFloatMenus();
-  });
   // Travel mode switchers - mutually exclusive
   document.getElementById('fDriving').addEventListener('click', () => {
     if (typeof appCtx.setTravelMode === 'function') {

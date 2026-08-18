@@ -4,7 +4,7 @@ Status: active implementation plan
 Branch: `steven/urban-sandbox-foundation`  
 Production: unchanged on the verified 4.2.1 rollback
 
-## Implementation state — 2026-08-17
+## Implementation state — 2026-08-18
 
 - Phase 1: implemented and locally verified in installed Chrome on desktop and
   390×844 touch. User/device acceptance is still required.
@@ -15,21 +15,28 @@ Production: unchanged on the verified 4.2.1 rollback
   talk/take reactions, mapped or junction-derived traffic controls, deterministic
   roadside waste baskets and inspectable street furniture are implemented.
   Driver/passenger states and traffic-signal behavior remain open.
-- Phase 4: the witnessed-event and civic-attention lifecycle is implemented;
-  purpose-built responder dispatch, pursuit and outcomes remain open. The
-  placeholder legacy Police Chase is not used as a shortcut.
+- Phase 4: the witnessed-event and civic-attention lifecycle now drives
+  purpose-built location-aware responder vehicles, road-constrained approach,
+  search/pursuit, stopped-player contact, warning/citation/recovery outcomes and
+  return/disposal. The duplicate standalone Police Chase selector/toggle is
+  retired. Shared-room civic authority, responder NPC exit/contact animation,
+  traffic emergency yielding and deeper outcome policy remain open.
 - Interactive equipment baseline: implemented locally with five quick slots,
   held-item visuals, ammunition/charges/cooldowns, flashlight, melee, fictional
   pulse-sidearm and concussion-charge impacts against NPCs, vehicles and props.
   The loadout remains session-local; room vehicle leases and room condition
   impacts now use server-owned transaction state rather than direct client
   writes.
-- Phase 7 authority foundation: implemented locally. Two authenticated emulator
+- Phase 8 authority foundation: implemented locally. Two authenticated emulator
   clients prove one concurrent vehicle lease owner, owner-only plausible motion,
   safe release/reclaim, server-computed condition changes, shared reads and
   denied direct writes. Passengers, cooperative missions, persistent garages,
   account equipment and shared rewards remain open.
-- Phases 5–6 and the remaining Phase 7–8 depth are planned, not implemented by
+- Phase 5 multi-floor interiors: planned against the existing building-entry
+  owner. The current generated/mapped single-floor interior is the foundation;
+  floor-to-floor traversal, vertical streaming and shared floor context are not
+  implemented yet.
+- Phases 5–7 and the remaining Phase 8–9 depth are planned, not implemented by
   this milestone.
 - Deployment: not authorized; production remains unchanged.
 
@@ -65,6 +72,9 @@ inside that world—not unrelated menu modes or world reloads.
    or consequence changes. Room vehicle motion may be client-authored only under
    an explicit lease validated by the backend.
 10. Every phase has desktop, touch, lifecycle, memory and rendered-frame gates.
+11. Building interiors extend the existing `building-entry` and `interiors`
+    owners. Entering a floor never creates a second Earth world, provider graph,
+    building identity or unrelated gameplay mode.
 
 ## System map
 
@@ -75,8 +85,10 @@ flowchart LR
   Ambient --> Promotion["Nearby actor promotion"]
   Parked["Deterministic parked vehicles"] --> Promotion
   Promotion --> Interaction["Context interaction router"]
+  Interaction --> Interior["Building and floor traversal"]
   Interaction --> Vehicle["Vehicle possession and seats"]
   Interaction --> NPC["NPC dialogue and reactions"]
+  Interior --> Mission
   Vehicle --> Consequence["Civic response and witnesses"]
   NPC --> Mission["Mission graph"]
   Consequence --> Mission
@@ -134,7 +146,8 @@ Acceptance journey:
 - alert levels, dispatch delay, search area, pursuit and cooldown;
 - police/security/ranger responders selected by location context;
 - escape, warning, ticket, surrender and recovery outcomes;
-- migrate the current Police Chase into this event system.
+- retire the standalone Police Chase entry and keep civic response inside the
+  witnessed-event system.
 
 The user explicitly requested combat/equipment on 2026-08-17. The local baseline
 uses fictional, non-gory game equipment and a shared condition/reaction model.
@@ -159,7 +172,42 @@ so this is an authority foundation rather than a complete anti-cheat system.
 - no real-world weapon brands, construction instructions or copied GTA assets,
   characters, interface or fiction are used.
 
-## Phase 5 — Missions and continuity
+## Phase 5 — Multi-floor building interiors
+
+- derive one stable interior identity from the authoritative exterior building
+  and entrance ID;
+- derive bounded floor count and story heights from mapped levels/height, with a
+  documented deterministic fallback when source data is incomplete;
+- publish stable floor IDs such as `building-id:level:0` and keep room, mission,
+  discovery and editor anchors attached to those IDs;
+- extend the current generated/mapped interior scene instead of introducing a
+  duplicate interior mode;
+- stream only the active floor plus the immediately connected floor/connector,
+  disposing released geometry, colliders, lights and placement targets;
+- provide physically walkable stairs/ramps where the footprint permits, plus an
+  accessible elevator interaction for eligible multi-story buildings;
+- make stairs own continuous vertical walk surfaces and make elevator travel a
+  controlled door/arrival transition—never a whole-world reload or an unexplained
+  open-space teleport;
+- keep collision, camera containment, ceiling visibility, floor labels and exit
+  ownership level-aware;
+- carry building ID, floor ID and connector state in multiplayer presence so
+  room participants cannot appear on the wrong level;
+- preserve the exterior publication and return through the exact entrance with
+  the same world-load sequence;
+- support contextual objectives and discoveries on specific floors without a
+  permanent interior panel.
+
+Acceptance journey:
+
+> Enter a mapped Baltimore multi-story building through its existing door, walk
+> from the lobby to level two using stairs, use an elevator to another eligible
+> floor, meet or discover a floor-specific target, return to the lobby and exit
+> through the same exterior entrance. Floor identity, collision and objective
+> state remain stable; no Earth reload or provider request occurs; title release
+> disposes every loaded floor.
+
+## Phase 6 — Missions and continuity
 
 - staged mission graph: offered, accepted, active objective, recovery, failed,
   completed and rewarded;
@@ -170,7 +218,7 @@ so this is an authority foundation rather than a complete anti-cheat system.
 - checkpoint/recovery that never requires restarting the whole world;
 - one authored Baltimore chain proving the complete loop.
 
-## Phase 6 — Economy, garages and ownership
+## Phase 7 — Economy, garages and ownership
 
 - one clear Explorer credit/reputation model;
 - garage/service POIs and safe vehicle storage;
@@ -179,7 +227,7 @@ so this is an authority foundation rather than a complete anti-cheat system.
 - outfits/equipment, organizations and location reputation;
 - authenticated persistence plus anonymous local continuity.
 
-## Phase 7 — Social sandbox
+## Phase 8 — Social sandbox
 
 - passengers and seat ownership;
 - room vehicle leases and interpolation;
@@ -188,7 +236,7 @@ so this is an authority foundation rather than a complete anti-cheat system.
 - moderation, abuse limits and authoritative transaction tests;
 - voice remains separate and is not implied by room presence.
 
-## Phase 8 — Production depth and polish
+## Phase 9 — Production depth and polish
 
 - multiple close-range vehicle families with distinct handling;
 - vehicle damage presentation, repair and audio;
@@ -210,4 +258,6 @@ No phase is complete on source assertions alone. Required evidence includes:
 - zero world reload/provider work during local interactions;
 - title/location-change disposal and forced-GC memory envelopes;
 - multiplayer emulator tests before synchronized ownership is enabled;
+- multi-floor stair/elevator traversal, floor collision and bounded floor-stream
+  disposal in installed Chrome before interiors are represented as complete;
 - user acceptance before preview or production deployment.

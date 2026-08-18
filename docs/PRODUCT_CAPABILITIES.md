@@ -138,7 +138,7 @@ Discovery UI is normally collapsed during play. A quick-tool/field prompt appear
 | Time Trial | Implemented and user-accessible |
 | Checkpoint Run | Implemented and user-accessible |
 | Paint the Town | Implemented and user-accessible; room sharing optional |
-| Police Chase | Implemented and user-accessible |
+| Witnessed civic response | Implemented locally: contextual dispatch/search/contact replaces the retired standalone Police Chase toggle; production acceptance remains open |
 | Flower Challenge | Implemented and user-accessible; leaderboard optional |
 | DeFlock Hunt | Implemented and user-accessible; mapped/fallback data and room claims |
 | Live GPS Explore | Implemented and user-accessible on eligible device/context |
@@ -160,6 +160,7 @@ The gameplay registry owns one main plugin at a time. Discovery and auxiliary se
 | Edit This World room shared | Implemented and user-accessible by role | transaction/listener convergence and ownership rules |
 | direct OSM/provider mutation | Not implemented by design | all edits are World Explorer fictional layers |
 | universal exact interiors | Planned only/not a claim | generated/mapped subset only |
+| multi-floor building traversal | Planned | existing interior owner will gain stable floor IDs, stairs/elevators and bounded floor streaming; current runtime is single selected level |
 
 ## 11. Multiplayer and social
 

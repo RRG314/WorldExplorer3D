@@ -180,6 +180,8 @@ The Earth compiler is organized by data products rather than UI screens:
 - Living World derivation;
 - bounded Living World actor promotion, contextual urban interactions and
   session equipment/impact runtime;
+- witnessed civic-response runtime with bounded location-aware responder
+  vehicles, road-constrained search/contact outcomes and no standalone chase mode;
 - room urban authority adapter backed by transaction-owned vehicle leases,
   action clocks and entity condition state;
 - editable-world suppression and safe semantic objects;
@@ -212,13 +214,18 @@ flowchart TD
 
 Keyboard, touch and gamepad inputs normalize to shared actions. Mode dispatch selects one actor/controller. Live GPS may own walker horizontal movement after explicit consent, while terrain/structure collision retains vertical ownership. Companions are presentation followers, never authoritative actors.
 
+The existing `building-entry` and `interiors` modules own indoor traversal. The
+planned multi-floor extension must retain the exterior building identity and add
+level-aware surfaces/connectors to that owner; it must not introduce another
+Earth scene or interior gameplay mode.
+
 ## 8. Map inventory and ownership
 
 | Map surface | Owner | Data/purpose | Interaction |
 | --- | --- | --- | --- |
 | Title globe selector | `ui/globe-selector/*` | preset/custom Earth selection | rotate/select/search/geolocate/launch |
 | Minimap | `map/runtime.js`, `map/earth-*` | player, roads, POIs, objectives | zoom; follows actor |
-| Large Earth map | `map.js`, `ui/map-interactions.js` | properties, navigation, interiors, overlays, activities, POIs, memories, games, police, transport | filters, select/info, navigation aid, permitted teleport |
+| Large Earth map | `map.js`, `ui/map-interactions.js` | properties, navigation, interiors, overlays, activities, POIs, memories, games, civic response/search areas, transport | filters, select/info, navigation aid, permitted teleport |
 | Earth tile layers | `map/tiles.js` | OSM base and optional satellite imagery | base-layer toggle |
 | Moon map | `map/moon.js` | lunar destination context | destination/landing context |
 | Live Earth globe | `live-earth/render-globe.js` | satellites, earthquakes, aircraft, weather, marine, imagery | layer selection and detail |

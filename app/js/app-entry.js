@@ -29,7 +29,7 @@ import { initBoatMode } from './boat-mode.js?v=37';
 import './sky.js?v=86';
 import './weather.js?v=9';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=55';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=56';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -45,7 +45,7 @@ import './hud.js?v=91';
 import './map.js?v=59';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=120';
+import { setupUI } from './ui.js?v=121';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
