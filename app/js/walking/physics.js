@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -259,13 +260,18 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    state.walker.vy += gravity * dt;
+    const parachuteDeployed = appCtx.isUrbanParachuteDeployed?.() === true &&
+      !isPlanetarySurface() && !state.walker.onGround && state.walker.vy < 0;
+    state.walker.vy = parachuteDeployed
+      ? integrateParachuteFall(state.walker.vy, dt, true)
+      : state.walker.vy + gravity * dt;
     state.walker.y += state.walker.vy * dt;
 
     if (state.walker.y <= effectiveGroundY + CFG.eyeHeight) {
       state.walker.y = effectiveGroundY + CFG.eyeHeight;
       state.walker.vy = 0;
       state.walker.onGround = true;
+      appCtx.onUrbanParachuteLanded?.();
     }
 
     const speedMultiplier = appCtx.onMoon ? 0.6 : appCtx.onMars ? 0.72 : 1.0;
@@ -378,10 +384,12 @@ function createWalkingPhysicsHelpers({
           state.walker.y = targetEyeY;
           state.walker.vy = 0;
           state.walker.onGround = true;
+          appCtx.onUrbanParachuteLanded?.();
         } else if (riseToGround >= 0 && riseToGround <= snapUpDistance) {
           state.walker.y = targetEyeY;
           state.walker.vy = 0;
           state.walker.onGround = true;
+          appCtx.onUrbanParachuteLanded?.();
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;

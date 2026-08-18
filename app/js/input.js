@@ -71,7 +71,7 @@ function onKey(code, event) {
     if (appCtx.toggleUrbanEquipment()) return;
   }
 
-  if (/^Digit[1-5]$/.test(code) && typeof appCtx.equipUrbanEquipmentSlot === 'function') {
+  if (/^Digit[1-6]$/.test(code) && typeof appCtx.equipUrbanEquipmentSlot === 'function') {
     if (event?.repeat) return;
     if (appCtx.equipUrbanEquipmentSlot(Number(code.slice(-1)))) return;
   }

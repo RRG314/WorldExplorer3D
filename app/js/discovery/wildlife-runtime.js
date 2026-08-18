@@ -1,6 +1,7 @@
 import { deterministicUnit } from './model.js?v=1';
 import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
+import { COMPANION_CATALOG } from './catalog.js?v=1';
 
 const WILDLIFE_CONTEXTS = new Set(['urban', 'urban-core', 'park', 'field', 'forest', 'wetland', 'riverbank', 'fresh-water', 'coast', 'mountain', 'desert']);
 
@@ -11,6 +12,28 @@ function archetypeForCell(cell, seed) {
   if (contexts.has('forest') || contexts.has('field') || contexts.has('park')) return deterministicUnit(`${seed}:ground`) > 0.46 ? 'small-mammal' : 'flying-bird';
   return 'flying-bird';
 }
+
+function domesticSpeciesForCell(cell, seed) {
+  const contexts = new Set(cell.contexts || []);
+  const choices = contexts.has('coast')
+    ? ['harbor-cat', 'trail-hound', 'park-terrier']
+    : contexts.has('field') || contexts.has('forest')
+      ? ['field-retriever', 'trail-hound', 'meadow-tabby']
+      : ['trail-hound', 'park-terrier', 'harbor-cat', 'midnight-cat'];
+  return choices[Math.min(choices.length - 1, Math.floor(deterministicUnit(`${seed}:domestic-species`) * choices.length))];
+}
+
+const WILDLIFE_LABELS = Object.freeze({
+  'trail-hound': 'Trail Hound',
+  'field-retriever': 'Field Retriever',
+  'park-terrier': 'Park Terrier',
+  'harbor-cat': 'Harbor Cat',
+  'meadow-tabby': 'Meadow Tabby',
+  'midnight-cat': 'Midnight Cat',
+  mallard: 'Mallard',
+  'small-mammal': 'Small Mammal',
+  'rock-pigeon': 'Rock Pigeon'
+});
 
 function compileAmbientWildlifePlan(environment, options = {}) {
   if (environment?.type !== 'EnvironmentContextPublication') throw new TypeError('Ambient wildlife requires an EnvironmentContextPublication.');
@@ -27,12 +50,17 @@ function compileAmbientWildlifePlan(environment, options = {}) {
     const x = cell.bounds.minX + (cell.bounds.maxX - cell.bounds.minX) * (margin + deterministicUnit(`${seed}:x`) * (1 - margin * 2));
     const z = cell.bounds.minZ + (cell.bounds.maxZ - cell.bounds.minZ) * (margin + deterministicUnit(`${seed}:z`) * (1 - margin * 2));
     const archetype = archetypeForCell(cell, seed);
+    const speciesId = archetype === 'domestic-wanderer'
+      ? domesticSpeciesForCell(cell, seed)
+      : archetype === 'waterbird' ? 'mallard' : archetype === 'small-mammal' ? 'small-mammal' : 'rock-pigeon';
     actors.push(Object.freeze({
       id: `wildlife:${cell.cellId}:${actors.length}`,
       cellId: cell.cellId,
       archetype,
-      speciesId: archetype === 'domestic-wanderer' ? 'trail-hound' : archetype === 'waterbird' ? 'mallard' : archetype === 'small-mammal' ? 'small-mammal' : 'rock-pigeon',
-      label: archetype === 'domestic-wanderer' ? 'Virtual trail hound' : archetype === 'waterbird' ? 'Procedural mallard encounter' : archetype === 'small-mammal' ? 'Procedural small mammal encounter' : 'Procedural rock pigeon encounter',
+      speciesId,
+      label: archetype === 'domestic-wanderer'
+        ? WILDLIFE_LABELS[speciesId]
+        : `Procedural ${WILDLIFE_LABELS[speciesId].toLowerCase()} encounter`,
       home: Object.freeze({ x, z }),
       phase: deterministicUnit(`${seed}:phase`) * Math.PI * 2,
       evidenceClass: 'procedural-game-encounter',
@@ -61,7 +89,8 @@ function disposeObject(object) {
 function createActorMesh(THREE, actor) {
   const group = createAnimalModel(THREE, actor.speciesId);
   group.name = `World Discovery ${actor.label}`;
-  group.scale.setScalar(actor.archetype === 'domestic-wanderer' ? .62 : actor.archetype === 'small-mammal' ? .7 : actor.archetype === 'waterbird' ? .7 : .68);
+  const companionScale = COMPANION_CATALOG.find((entry) => entry.id === actor.speciesId)?.worldScale;
+  group.scale.setScalar(Number(companionScale || (actor.archetype === 'small-mammal' ? .4 : actor.archetype === 'waterbird' ? .38 : .28)));
   group.userData.worldDiscoveryWildlife = { id: actor.id, evidenceClass: actor.evidenceClass };
   return { group, profile: group.userData.performanceProfile || {} };
 }
@@ -73,7 +102,11 @@ function createAmbientWildlifeRuntime(appCtx, plan) {
     const mesh = createActorMesh(THREE, actor);
     const surfaceY = sampleDiscoverySurfaceY(appCtx, actor.home.x, actor.home.z);
     appCtx.addEarthWorldObject?.(mesh.group);
-    return { actor, ...mesh, surfaceY: Number.isFinite(surfaceY) ? surfaceY : 0, active: false };
+    return {
+      actor, ...mesh, surfaceY: Number.isFinite(surfaceY) ? surfaceY : 0,
+      active: false, completed: false, interactionUntil: 0, completeAfter: 0,
+      lastInteraction: ''
+    };
   });
   let elapsed = 0;
   let active = 0;
@@ -82,6 +115,12 @@ function createAmbientWildlifeRuntime(appCtx, plan) {
     active = 0;
     presentations.forEach((entry, index) => {
       const { actor, group } = entry;
+      if (entry.completeAfter && elapsed >= entry.completeAfter) entry.completed = true;
+      if (entry.completed) {
+        entry.active = false;
+        group.visible = false;
+        return;
+      }
       const dx = Number(player?.x || 0) - actor.home.x;
       const dz = Number(player?.z || 0) - actor.home.z;
       const distanceSq = dx * dx + dz * dz;
@@ -97,12 +136,52 @@ function createAmbientWildlifeRuntime(appCtx, plan) {
       group.position.z = actor.home.z + Math.sin(time * 0.83) * radius;
       group.position.y = entry.surfaceY + (actor.archetype === 'flying-bird' ? 3.2 + Math.sin(time * 1.7) * 0.7 : actor.archetype === 'waterbird' ? 0.22 : 0);
       group.rotation.y = -time + Math.PI / 2;
+      if (entry.interactionUntil > elapsed) {
+        const response = Math.max(0, Math.min(1, (entry.interactionUntil - elapsed) / 1.15));
+        group.position.y += actor.companionPolicy === 'trust-sequence-required'
+          ? Math.sin(elapsed * 12) * .08 * response
+          : .2 * response;
+        group.rotation.y += Math.sin(elapsed * 8) * .22 * response;
+      }
       animateAnimalModel(group, elapsed + index * .31, actor.archetype.includes('bird') ? 1 : .7);
     });
   }
+  function nearest(player, radius = 5.2) {
+    if (!player) return null;
+    return presentations.map((entry) => {
+      if (!entry.active || entry.completed || !entry.group.visible || entry.interactionUntil > elapsed) return null;
+      const distance = Math.hypot(entry.group.position.x - Number(player.x || 0), entry.group.position.z - Number(player.z || 0));
+      if (distance > radius) return null;
+      return Object.freeze({
+        actor: entry.actor,
+        actorId: entry.actor.id,
+        x: entry.group.position.x,
+        y: entry.group.position.y,
+        z: entry.group.position.z,
+        distance
+      });
+    }).filter(Boolean).sort((a, b) => a.distance - b.distance)[0] || null;
+  }
+  function interact(actorId, kind = 'observe') {
+    const entry = presentations.find((candidate) => candidate.actor.id === String(actorId || ''));
+    if (!entry || !entry.active || entry.completed || entry.interactionUntil > elapsed) return false;
+    entry.lastInteraction = String(kind || 'observe');
+    entry.interactionUntil = elapsed + 1.15;
+    if (kind === 'adopted') entry.completeAfter = elapsed + 1.05;
+    return true;
+  }
   return Object.freeze({
     update,
-    snapshot: () => Object.freeze({ active, logical: plan.actors.length, maxActors: plan.diagnostics.maxActors, models: presentations.map((entry) => ({ speciesId: entry.actor.speciesId, ...entry.profile })), generatedWithAdditionalProviderQueries: false }),
+    nearest,
+    interact,
+    snapshot: () => Object.freeze({
+      active,
+      logical: plan.actors.length,
+      completed: presentations.filter((entry) => entry.completed).length,
+      maxActors: plan.diagnostics.maxActors,
+      models: presentations.map((entry) => ({ speciesId: entry.actor.speciesId, interaction: entry.lastInteraction, ...entry.profile })),
+      generatedWithAdditionalProviderQueries: false
+    }),
     dispose() { presentations.forEach((entry) => disposeObject(entry.group)); }
   });
 }

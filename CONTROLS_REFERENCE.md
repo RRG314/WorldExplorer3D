@@ -25,8 +25,9 @@ Developer overlays only respond when developer diagnostics are enabled.
 
 - `E` / Action: use the one visible nearby door, vehicle, person, or object
 - `I`: open/close carried equipment
-- `1`–`5`: quick-equip a carried item
+- `1`–`6`: quick-equip a carried item (`6` selects the parachute)
 - `V`: use the equipped item
+- With the parachute equipped, press `V` while descending at least 3.25 m above the ground to deploy it. It repacks automatically on landing.
 - `T`: take an available nearby item
 - `X`: open/resume the current field activity
 

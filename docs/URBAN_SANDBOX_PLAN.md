@@ -22,12 +22,13 @@ Production: unchanged on the verified 4.2.1 rollback
   retired. Shared-room civic events, phases and stopped-contact outcomes are now
   server-owned and synchronized. Responder NPC exit/contact animation, traffic
   emergency yielding and deeper outcome policy remain open.
-- Interactive equipment baseline: implemented locally with five quick slots,
+- Interactive equipment baseline: implemented locally with six quick slots,
   held-item visuals, ammunition/charges/cooldowns, flashlight, melee, fictional
-  pulse-sidearm and concussion-charge impacts against NPCs, vehicles and props.
-  The loadout remains session-local; room vehicle leases and room condition
-  impacts now use server-owned transaction state rather than direct client
-  writes.
+  pulse-sidearm and concussion-charge impacts against NPCs, vehicles and props,
+  plus an always-carried parachute that the player explicitly deploys only after
+  beginning a sufficiently high fall. The loadout remains session-local; room
+  vehicle leases and room condition impacts now use server-owned transaction
+  state rather than direct client writes.
 - Phase 8 authority foundation: implemented locally. Two authenticated emulator
   clients prove one concurrent vehicle lease owner, owner-only plausible motion,
   safe release/reclaim, server-computed condition changes, shared reads and
@@ -43,9 +44,15 @@ Production: unchanged on the verified 4.2.1 rollback
   retains whole-building window/material ownership while a deterministic,
   ground-aligned detail plan adds distinct residential, urban, office and
   storefront entrances. Door prompts use the same published entrance identity,
-  mobile prompts are actionable, and three opaque instanced draw calls cover the
-  current Baltimore budget. Authored landmark storefronts, richer rooflines,
+  mobile prompts are actionable, and entrances are encoded in the owning wall
+  geometry/shader with zero additional door draw calls. Authored landmark storefronts, richer rooflines,
   awnings/signage and region-specific facade kits remain future visual depth.
+- Coherence/release slice: nearby pedestrians are promoted into detailed actors
+  before interaction; stopped civic responder vehicles can transfer into the
+  exact drivable fleet and their witnessed taking dispatches replacement pursuit;
+  wildlife, pet trust/adoption and bird observation use the same contextual
+  world Action route as people, cars and street objects. The Field Journal now
+  locates eligible encounters instead of awarding companions from menu clicks.
 - Phases 6–7 and the remaining Phase 5/8–9 depth are planned, not implemented by
   this milestone.
 - Deployment: not authorized; production remains unchanged.
@@ -98,6 +105,8 @@ flowchart LR
   Interaction --> Interior["Building and floor traversal"]
   Interaction --> Vehicle["Vehicle possession and seats"]
   Interaction --> NPC["NPC dialogue and reactions"]
+  Interaction --> Wildlife["Wildlife observation and trust"]
+  Equipment["Authoritative equipment domain"] --> Interaction
   Interior --> Mission
   Vehicle --> Consequence["Civic response and witnesses"]
   NPC --> Mission["Mission graph"]
@@ -171,7 +180,7 @@ so this is an authority foundation rather than a complete anti-cheat system.
 
 - one contextual prompt supplies Talk, Take, Enter, Inspect and Use rather than
   a second permanent gameplay panel;
-- equipment opens on demand with `I`, supports slots `1`–`5`, and is collapsed
+- equipment opens on demand with `I`, supports slots `1`–`6`, and is collapsed
   by default; touch gets one small Gear affordance plus contextual action buttons;
 - the equipped flashlight, baton, fictional pulse sidearm or concussion charge
   is attached to the existing character hand rather than floating in the world;
@@ -179,8 +188,48 @@ so this is an authority foundation rather than a complete anti-cheat system.
   promoted NPCs, exact vehicles and street furniture;
 - witnessed theft, assault, discharge and explosion events feed the same civic
   response lifecycle as vehicle taking and reckless driving;
+- slot 6 carries the Explorer parachute; selecting it never auto-deploys it, and
+  `V`/Use deploys it only while the character is already descending with at least
+  3.25 m of measured clearance above the current walk surface;
 - no real-world weapon brands, construction instructions or copied GTA assets,
   characters, interface or fiction are used.
+
+## Coherent interaction and inventory migration
+
+The world prompt is the interaction authority. A nearby person, enterable car,
+responder vehicle, street object or wildlife encounter competes through the same
+distance-aware router, so only the most relevant Action appears. Systems may
+still own their data and progression, but they cannot require a permanent panel
+for an action that is visibly happening in the world.
+
+The Field Journal remains the authority for observations, geology records,
+collection provenance and current detector activities in this candidate. Its
+detectors and excavation tools should migrate behind the same authoritative
+equipment/item domain in the next bounded phase, with the Journal becoming the
+record/progression view. Creating a second inventory or moving save data during
+the release pass would duplicate ownership and risk account/multiplayer state.
+Until that migration is complete, Journal tools are explicitly a remaining
+coherence limitation rather than being represented as finished inventory work.
+
+Companion progression begins in the world: domestic animals require three
+visible actions (meet, offer care, adopt), while observations write directly to
+the Field Guide and repeated eligible bird observations unlock the corresponding
+bird companion. Feed/train management can remain in the Journal after adoption.
+The menu may locate a published encounter, but it cannot capture an animal.
+
+## Next bounded milestone — personal home
+
+A home must be an owned use of the existing building, entrance and floor IDs,
+not a detached local room or another map mode. The first complete slice is:
+
+- choose one eligible residence through its real published entrance;
+- create an authenticated server-owned home claim for that stable building/floor;
+- return through the same door and place a small bounded set of persistent items;
+- expose the home as a travel destination and safe recovery point;
+- synchronize owner/guest permissions and dispose streamed interior content on exit.
+
+Garages, property economy, broad furnishing and multiple residences follow only
+after that slice passes account, two-client and lifecycle tests.
 
 ## Phase 5 — Multi-floor building interiors
 
@@ -271,3 +320,13 @@ No phase is complete on source assertions alone. Required evidence includes:
 - multi-floor stair/elevator traversal, floor collision and bounded floor-stream
   disposal in installed Chrome before interiors are represented as complete;
 - user acceptance before preview or production deployment.
+
+## 2026-08-18 release decision
+
+This coherence slice is ready for local hands-on testing, not production
+promotion. Its focused model, desktop, 390×844 touch, rendered-frame and browser
+journeys pass without fatal errors. Production remains blocked by the worldwide
+fallback/readiness matrix and device checks recorded in `KNOWN_ISSUES.md`.
+Personal homes, account-owned equipment and the Journal-tool inventory migration
+are next milestones, not reasons to destabilize this candidate with another
+late parallel system.

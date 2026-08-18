@@ -1,5 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
+import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 
 function createUrbanEquipmentRuntime(options = {}) {
   const state = options.state;
@@ -28,7 +29,10 @@ function createUrbanEquipmentRuntime(options = {}) {
     }).join('');
     const equipped = inventory.items.find((item) => item.equipped);
     state.equipmentVisual?.setEquipped?.(equipped?.id || 'hands');
-    ui.status.textContent = `${equipped?.label || 'Hands'} equipped${inventory.sandboxItems ? ` · ${inventory.sandboxItems} sandbox item${inventory.sandboxItems === 1 ? '' : 's'}` : ''}`;
+    const parachuteState = equipped?.id === 'parachute'
+      ? state.parachute?.deployed ? ' · canopy deployed' : ' · deploy after jumping'
+      : '';
+    ui.status.textContent = `${equipped?.label || 'Hands'} equipped${parachuteState}${inventory.sandboxItems ? ` · ${inventory.sandboxItems} sandbox item${inventory.sandboxItems === 1 ? '' : 's'}` : ''}`;
   }
 
   function toggle(force) {
@@ -207,11 +211,52 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (!isActive() || appCtx.Walk?.state?.mode !== 'walk') return false;
     const currentEquipment = state.equipment.equipped();
     const roomActive = !!appCtx.getCurrentMultiplayerRoom?.();
-    if (roomActive && currentEquipment?.category !== 'utility' && !state.authority) {
+    if (currentEquipment?.id === 'parachute') {
+      const actor = appCtx.Walk?.state?.walker;
+      if (state.parachute?.deployed) {
+        setStatus('Parachute is already deployed.', 1400);
+        return true;
+      }
+      const groundY = Number(actor?._resolvedGroundState?.effectiveGroundY ??
+        appCtx.SurfaceQuery?.walkAt?.(actor?.x, actor?.z)?.position?.y ??
+        appCtx.elevationWorldYAtWorldXZ?.(actor?.x, actor?.z) ?? 0);
+      const feetY = Number(appCtx.Walk?.state?.characterMesh?.position?.y ?? groundY);
+      const deployment = evaluateParachuteDeployment({
+        environment: appCtx.onMoon || appCtx.onMars ? 'SPACE' : 'EARTH',
+        travelMode: appCtx.Walk?.state?.mode,
+        onGround: actor?.onGround,
+        feetY,
+        groundY,
+        verticalVelocity: actor?.vy
+      });
+      if (!deployment.allowed) {
+        const messages = {
+          'earth-only': 'The parachute is only available in Earth exploration.',
+          'walking-only': 'Exit the vehicle before using the parachute.',
+          'on-ground': 'Jump from a high place before deploying the parachute.',
+          'not-descending': 'Deploy after you begin falling.',
+          'too-low': 'Too close to the ground to deploy safely.'
+        };
+        setStatus(messages[deployment.reason] || 'The parachute cannot deploy here.', 1900);
+        return true;
+      }
+      const prepared = state.equipment.prepareUse(Date.now());
+      if (!prepared.ok) {
+        setStatus('Parachute release is resetting.', 1200);
+        return true;
+      }
+      state.parachute.deployed = true;
+      state.parachute.deployedAt = clock();
+      state.equipmentVisual?.setParachuteDeployed?.(true);
+      setStatus(`Parachute deployed · ${deployment.clearance.toFixed(1)} m clearance`, 2200);
+      render();
+      return true;
+    }
+    if (roomActive && currentEquipment?.category !== 'utility' && currentEquipment?.category !== 'mobility' && !state.authority) {
       setStatus('Shared impact authority is connecting. Room damage remains locked.', 2600);
       return true;
     }
-    if (roomActive && state.authorityImpactPending && currentEquipment?.category !== 'utility') {
+    if (roomActive && state.authorityImpactPending && currentEquipment?.category !== 'utility' && currentEquipment?.category !== 'mobility') {
       setStatus('The previous room interaction is still being verified.', 1800);
       return true;
     }

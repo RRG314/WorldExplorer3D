@@ -1,12 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=1';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=2';
-import { createEquipmentVisuals } from './equipment-visuals.js?v=1';
+import { createEquipmentInventory } from './equipment-model.js?v=2';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=3';
+import { createEquipmentVisuals } from './equipment-visuals.js?v=2';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=2';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=1';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=2';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=2';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=5';
 
@@ -14,6 +14,8 @@ const ENTER_DISTANCE = 3.4;
 const EXIT_SPEED_LIMIT = 4;
 const TRANSITION_DURATION = 0.56;
 const NPC_INTERACTION_DISTANCE = 3.2;
+const NPC_DETAIL_PRELOAD_DISTANCE = 16;
+const NPC_DETAIL_RELEASE_DISTANCE = 34;
 let activeRuntime = null;
 
 function now() {
@@ -92,6 +94,15 @@ function nearestEnterableVehicle(state) {
     const distance = Math.hypot(door.x - walker.x, door.z - walker.z);
     if (distance > ENTER_DISTANCE || nearest && distance >= nearest.distance) continue;
     nearest = { vehicle, door, distance, trafficAgentId: agent.id };
+  }
+  const responder = state.responders?.nearestEnterable?.(walker, ENTER_DISTANCE);
+  if (responder && (!nearest || responder.distance < nearest.distance)) {
+    nearest = {
+      vehicle: responder.responder,
+      door: responder.door,
+      distance: responder.distance,
+      responderId: responder.responderId
+    };
   }
   return nearest;
 }
@@ -173,6 +184,29 @@ function promotePedestrian(state, source) {
   return npc;
 }
 
+function maintainNearbyNpcDetails(state) {
+  if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk' || state.transition) return;
+  const walker = appCtx.Walk?.state?.walker;
+  if (!walker) return;
+  state.npcs.slice().forEach((npc) => {
+    if (npc.reaction || npc.reactionUntil === Infinity) return;
+    const pose = npcPose(npc);
+    if (Math.hypot(pose.x - walker.x, pose.z - walker.z) > NPC_DETAIL_RELEASE_DISTANCE) {
+      releasePromotedNpc(state, npc);
+    }
+  });
+  const nearby = (state.population?.nearbyPedestrians?.(walker, NPC_DETAIL_PRELOAD_DISTANCE) || [])
+    .map((pedestrian) => ({
+      pedestrian,
+      distance: Math.hypot(pedestrian.x - walker.x, pedestrian.z - walker.z)
+    }))
+    .sort((a, b) => a.distance - b.distance);
+  for (const entry of nearby) {
+    if (state.npcs.length >= state.npcBudget) break;
+    promotePedestrian(state, entry.pedestrian);
+  }
+}
+
 function resolveNpcFromCandidate(state, candidate) {
   const sourceAgentId = String(candidate?.data?.sourceAgentId || '');
   if (!sourceAgentId) return null;
@@ -247,10 +281,16 @@ function interactionCandidate(state) {
     available: true,
     action: 'enter_vehicle',
     label: `Enter ${nearestVehicle.vehicle.variant.label}`,
-    detail: nearestVehicle.trafficAgentId ? 'Take driver seat' : 'Driver seat',
+    detail: nearestVehicle.responderId
+      ? 'Emergency vehicle · taking it escalates pursuit'
+      : nearestVehicle.trafficAgentId ? 'Take driver seat' : 'Driver seat',
     distance: nearestVehicle.distance,
     secondaryLabel: state.equipment?.equipped?.()?.actionLabel || 'Use',
-    data: { vehicleId: nearestVehicle.vehicle.id, trafficAgentId: nearestVehicle.trafficAgentId || '' }
+    data: {
+      vehicleId: nearestVehicle.vehicle.id,
+      trafficAgentId: nearestVehicle.trafficAgentId || '',
+      responderId: nearestVehicle.responderId || ''
+    }
   };
 }
 
@@ -428,13 +468,28 @@ function promoteCivicWitness(state, witness) {
 
 function reportCivicEvent(state, event = {}) {
   const position = event.position || civicActorPosition(state);
-  const witnesses = state.population?.witnessEvent?.({
+  const witnesses = [...(state.population?.witnessEvent?.({
     kind: event.kind,
     position,
     radius: event.radius,
     audibleRadius: event.audibleRadius,
     maximumWitnesses: event.maximumWitnesses
-  }) || [];
+  }) || [])];
+  const maximumWitnesses = Math.max(1, Number(event.maximumWitnesses) || 3);
+  const knownWitnessIds = new Set(witnesses.map((witness) => witness.id));
+  state.npcs.map((npc) => {
+    const pose = npcPose(npc);
+    return { npc, pose, distance: Math.hypot(pose.x - position.x, pose.z - position.z) };
+  }).filter((entry) => entry.npc.condition > 0 && entry.distance <= Math.max(0, Number(event.radius) || 0))
+    .sort((a, b) => a.distance - b.distance)
+    .forEach((entry) => {
+      if (witnesses.length >= maximumWitnesses || knownWitnessIds.has(entry.npc.sourceAgentId)) return;
+      witnesses.push({ id: entry.npc.sourceAgentId, distance: entry.distance, reaction: 'reporting' });
+      knownWitnessIds.add(entry.npc.sourceAgentId);
+    });
+  if (event.forceWitness && !witnesses.length) {
+    witnesses.push({ id: `responder-witness:${event.vehicleId || 'incident'}`, reaction: 'reporting', synthetic: true });
+  }
   const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
   if (authorityMode !== 'local') {
     if (!witnesses.length) return Object.freeze({ accepted: false, reason: 'unwitnessed' });
@@ -641,19 +696,24 @@ function updateEquipmentEffects(state, dt) {
 
 function enterVehicleAfterClaim(state, vehicle) {
   if (!vehicle) return false;
+  if (!beginEnter(state, vehicle)) return false;
   if (!vehicle.playerClaimed) {
     vehicle.playerClaimed = true;
+    if (vehicle.serviceType === 'responder' && (state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local') === 'local') {
+      state.civic.clear();
+    }
     reportCivicEvent(state, {
       kind: 'vehicle_taken',
       vehicleId: vehicle.id,
       position: vehiclePose(vehicle),
-      severity: 1,
-      radius: 32,
-      audibleRadius: 7,
-      maximumWitnesses: 3
+      severity: vehicle.serviceType === 'responder' ? 3 : 1,
+      radius: vehicle.serviceType === 'responder' ? 52 : 32,
+      audibleRadius: vehicle.serviceType === 'responder' ? 52 : 7,
+      maximumWitnesses: 3,
+      forceWitness: vehicle.serviceType === 'responder'
     });
   }
-  return beginEnter(state, vehicle);
+  return true;
 }
 
 function performInteraction(state, candidate) {
@@ -672,6 +732,24 @@ function performInteraction(state, candidate) {
   }
   const vehicleId = String(candidate?.data?.vehicleId || '');
   let vehicle = state.vehicles.find((entry) => entry.id === vehicleId);
+  const responderId = String(candidate?.data?.responderId || '');
+  if (!vehicle && responderId) {
+    if (appCtx.getCurrentMultiplayerRoom?.()) {
+      setStatus(state, 'Emergency vehicle takeover is locked until room authority confirms it.', 2400);
+      return true;
+    }
+    if (state.vehicles.length >= state.budget) {
+      setStatus(state, 'No vehicle interaction capacity is available nearby.', 1800);
+      return true;
+    }
+    vehicle = state.responders?.claimVehicle?.(responderId);
+    if (!vehicle) {
+      setStatus(state, 'That responder vehicle is still moving.', 1500);
+      return true;
+    }
+    state.vehicles.push(vehicle);
+    return enterVehicleAfterClaim(state, vehicle);
+  }
   const trafficAgentId = String(candidate?.data?.trafficAgentId || '');
   if (!vehicle && trafficAgentId) {
     if (state.vehicles.length >= state.budget) {
@@ -688,7 +766,7 @@ function performInteraction(state, candidate) {
 function updatePrompt(state) {
   const prompt = state.prompt;
   if (!prompt?.root) return;
-  const candidate = interactionCandidate(state);
+  const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
     prompt.secondaryKey.hidden = true;
@@ -706,7 +784,7 @@ function updatePrompt(state) {
     ? ''
     : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`;
   prompt.key.textContent = candidate?.action === 'exit_vehicle' ? 'E' : 'E';
-  prompt.button.textContent = candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter';
+  prompt.button.textContent = candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter');
   if (candidate?.action === 'talk_npc') prompt.button.textContent = 'Talk';
   if (candidate?.action === 'inspect_object') prompt.button.textContent = 'Inspect';
   prompt.button.disabled = !candidate?.available;
@@ -770,6 +848,11 @@ function snapshot(state) {
     lastImpactAction: state.lastImpactAction,
     authority: state.roomAuthorityRuntime?.snapshot?.() || Object.freeze({ mode: 'local' }),
     equipment: state.equipment?.snapshot?.() || null,
+    parachute: Object.freeze({
+      deployed: state.parachute?.deployed === true,
+      deployedAt: Number(state.parachute?.deployedAt || 0),
+      landedAt: Number(state.parachute?.landedAt || 0)
+    }),
     civicResponse: civicSnapshot(state),
     responders: state.responders?.snapshot?.() || null,
     worldLoadSequence: Number(appCtx._worldLoadSequence || 0),
@@ -807,6 +890,8 @@ function disposeRuntime(state, reason = 'disposed') {
   state.npcs.length = 0;
   state.activeVehicle = null;
   state.civic?.clear?.();
+  if (appCtx.isUrbanParachuteDeployed === state.isParachuteDeployed) delete appCtx.isUrbanParachuteDeployed;
+  if (appCtx.onUrbanParachuteLanded === state.onParachuteLanded) delete appCtx.onUrbanParachuteLanded;
   state.reason = String(reason || 'disposed');
   if (activeRuntime === state) activeRuntime = null;
   if (appCtx.urbanSandboxRuntime === state) appCtx.urbanSandboxRuntime = null;
@@ -915,6 +1000,7 @@ function startUrbanSandboxRuntime(options = {}) {
     statusMessage: '',
     statusUntil: 0,
     promptElapsed: 0,
+    npcPromotionElapsed: 0,
     recklessElapsed: 0,
     recklessEventCooldown: 0,
     civicUiElapsed: 0,
@@ -925,6 +1011,7 @@ function startUrbanSandboxRuntime(options = {}) {
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
+    parachute: { deployed: false, deployedAt: 0, landedAt: 0 },
     flashlight,
     authority: null,
     authorityImpactPending: false,
@@ -991,12 +1078,11 @@ function startUrbanSandboxRuntime(options = {}) {
     perform: (candidate) => performInteraction(state, candidate)
   });
   state.onPromptClick = () => {
-    const candidate = interactionCandidate(state);
-    if (candidate) performInteraction(state, candidate);
+    void appCtx.handlePrimaryContextInteraction?.();
   };
   state.onSecondaryClick = () => useEquipped(state);
   state.onTakeClick = () => {
-    const candidate = interactionCandidate(state);
+    const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
     if (candidate?.action === 'talk_npc') performNpcTake(state, candidate);
   };
   state.onEquipmentToggle = () => toggleEquipment(state);
@@ -1025,6 +1111,11 @@ function startUrbanSandboxRuntime(options = {}) {
       updateTransition(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);
+      state.npcPromotionElapsed += frame.dt;
+      if (state.npcPromotionElapsed >= .25) {
+        state.npcPromotionElapsed = 0;
+        maintainNearbyNpcDetails(state);
+      }
       state.promptElapsed += frame.dt;
       if (state.promptElapsed >= 0.08) {
         state.promptElapsed = 0;
@@ -1041,6 +1132,18 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = () => toggleEquipment(state);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
+  state.isParachuteDeployed = () => activeWorldMatches(state) && state.parachute.deployed === true;
+  state.onParachuteLanded = () => {
+    if (!state.parachute.deployed) return false;
+    state.parachute.deployed = false;
+    state.parachute.landedAt = now();
+    state.equipmentVisual?.setParachuteDeployed?.(false);
+    setStatus(state, 'Landed safely · parachute repacked.', 1800);
+    state.equipmentRuntime?.render?.();
+    return true;
+  };
+  appCtx.isUrbanParachuteDeployed = state.isParachuteDeployed;
+  appCtx.onUrbanParachuteLanded = state.onParachuteLanded;
   appCtx.handleUrbanNpcTake = () => {
     const candidate = interactionCandidate(state);
     return candidate?.action === 'talk_npc' ? performNpcTake(state, candidate) : false;

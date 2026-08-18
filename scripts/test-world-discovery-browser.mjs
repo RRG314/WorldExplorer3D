@@ -153,6 +153,8 @@ try {
 
   await page.locator('[data-discovery-tab="today"]').click();
   await page.locator('[data-discovery-action="photograph"]').click();
+  const photographTutorial = page.locator('#discoveryTutorial:not([hidden])');
+  if (await photographTutorial.isVisible().catch(() => false)) await page.locator('#discoveryTutorialDoneBtn').click();
   await page.locator('#discoveryPrimaryBtn').click();
   await page.locator('#discoveryPanel').waitFor({ state: 'hidden' });
   await page.locator('#discoveryQuickToolBtn.show').waitFor({ state: 'visible' });
@@ -216,10 +218,71 @@ try {
   await page.locator('#discoverySectionTutorial:not([hidden])').waitFor({ state: 'visible' });
   await page.locator('#discoverySectionTutorialDoneBtn').click();
   assert.equal(await page.locator('.discoveryGearItem.locked').filter({ hasText: 'Virtual Rock Hammer' }).count(), 1, 'Pathfinder geology gear should be visibly locked before 8 points');
-  for (let step = 0; step < 3; step++) {
-    await page.locator('[data-companion-action="meet"][data-companion-catalog="trail-hound"]').click();
-  }
-  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text()).worldDiscovery?.companions?.activeCatalogId === 'trail-hound');
+  const locateCompanion = page.locator('[data-companion-action="locate"]').first();
+  await locateCompanion.waitFor({ state: 'visible', timeout: 10000 });
+  await locateCompanion.click();
+  await page.locator('#discoveryPanel').waitFor({ state: 'hidden' });
+  const worldCompanion = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const state = ctx.worldDiscoveryRuntime;
+    const actor = state.publication.wildlife.actors.find((entry) => entry.companionPolicy === 'trust-sequence-required') ||
+      state.publication.wildlife.actors.find((entry) => ['rock-pigeon', 'mallard'].includes(entry.speciesId));
+    if (!actor) throw new Error('No world companion encounter was published');
+    const companionId = actor.companionPolicy === 'trust-sequence-required'
+      ? actor.speciesId
+      : actor.speciesId === 'mallard' ? 'marsh-mallard' : 'city-pigeon';
+    const interactions = [];
+    Object.assign(ctx.Walk.state.walker, {
+      x: actor.home.x + 2,
+      z: actor.home.z + 2,
+      y: Number(ctx.SurfaceQuery?.walkAt?.(actor.home.x, actor.home.z)?.position?.y || 0) + 1.7,
+      vy: 0,
+      onGround: true
+    });
+    ctx.advanceRuntimeTime?.(520);
+    for (let step = 0; step < 3; step += 1) {
+      const group = ctx.scene.getObjectByProperty('name', `World Discovery ${actor.label}`);
+      if (!group) throw new Error(`World actor ${actor.id} has no visible model`);
+      const interactionOffset = actor.companionPolicy === 'trust-sequence-required' ? .8 : 3.8;
+      Object.assign(ctx.Walk.state.walker, {
+        x: group.position.x + interactionOffset,
+        z: group.position.z,
+        y: group.position.y + 1.7,
+        vy: 0,
+        onGround: true
+      });
+      ctx.Walk.state.characterMesh?.position.set(group.position.x + interactionOffset, group.position.y, group.position.z);
+      ctx.advanceRuntimeTime?.(320);
+      const context = ctx.contextInteractionSnapshot?.();
+      interactions.push(context?.active || null);
+      if (context?.active?.id !== 'world_discovery_wildlife') throw new Error(`Animal did not own Action prompt: ${JSON.stringify(context)}`);
+      await ctx.handlePrimaryContextInteraction();
+      ctx.advanceRuntimeTime?.(1350);
+    }
+    ctx.advanceRuntimeTime?.(800);
+    return { actorId: actor.id, speciesId: actor.speciesId, companionId, interactions, snapshot: state.companionRuntime.snapshot() };
+  });
+  assert.equal(worldCompanion.snapshot.activeCatalogId, worldCompanion.companionId);
+  assert.equal(worldCompanion.interactions.length, 3);
+  assert.ok(worldCompanion.interactions.every((interaction) => interaction?.id === 'world_discovery_wildlife'));
+  const worldCompanionPresentation = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const walker = ctx.Walk.state.walker;
+    ctx.worldDiscoveryRuntime?.companionRuntime?.update?.(walker, .25, 'walk', 'EARTH');
+    await ctx.advanceRuntimeTime?.(520);
+    return ctx.worldDiscoveryRuntime?.companionRuntime?.snapshot?.().presentation || null;
+  });
+  assert.equal(worldCompanionPresentation?.visible, true, 'adopted world companion must remain visibly embodied beside the player');
+  assert.ok(Math.hypot(
+    worldCompanionPresentation.position.x - (await page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.Walk.state.walker.x)),
+    worldCompanionPresentation.position.z - (await page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.Walk.state.walker.z))
+  ) < 6, 'adopted world companion must follow within the visible player neighborhood');
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.worldDiscoveryRuntime?.ui?.setOpen?.(true);
+    await ctx.worldDiscoveryRuntime?.ui?.refreshData?.();
+  });
+  await page.locator('[data-discovery-tab="gear"]').click();
   await page.locator('[data-companion-action="feed"]').first().click();
   await page.locator('[data-companion-action="train"]').first().click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text()).worldDiscovery?.companions?.companions?.[0]?.training?.find >= 1);
@@ -270,12 +333,25 @@ try {
 
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.worldDiscoveryRuntime?.ui?.setOpen?.(true);
+    const state = ctx.worldDiscoveryRuntime;
+    if (state.companionRuntime.snapshot().companions.some((entry) => entry.catalogId === 'city-pigeon')) {
+      await state.companionRuntime.setActive(state.companionRuntime.snapshot().companions.find((entry) => entry.catalogId === 'city-pigeon').instanceId);
+      return;
+    }
+    const actor = state.publication.wildlife.actors.find((entry) => entry.speciesId === 'rock-pigeon');
+    if (!actor) throw new Error('No rock pigeon world encounter was published for bird companion progression');
+    for (let step = 0; step < 3; step += 1) {
+      await state.handleWorldWildlifeInteraction({ data: {
+        actorId: actor.id,
+        speciesId: actor.speciesId,
+        companionPolicy: actor.companionPolicy,
+        x: actor.home.x,
+        y: Number(ctx.SurfaceQuery?.walkAt?.(actor.home.x, actor.home.z)?.position?.y || 0) + 1.5,
+        z: actor.home.z
+      } });
+      ctx.advanceRuntimeTime?.(1350);
+    }
   });
-  await page.locator('[data-discovery-tab="gear"]').click();
-  for (let step = 0; step < 3; step++) {
-    await page.locator('[data-companion-action="meet"][data-companion-catalog="city-pigeon"]').click();
-  }
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text()).worldDiscovery?.companions?.activeCatalogId === 'city-pigeon');
   const birdCompanion = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');

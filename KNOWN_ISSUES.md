@@ -9,7 +9,7 @@ Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has
 The GTA-like urban sandbox is a phased product direction, not a completed claim.
 The parked-car possession loop and all nine ambient traffic-family promotions
 work locally. Ten pedestrian roles, contextual talk/take/inspect actions,
-semantic street furniture, a five-slot session equipment inventory, held-item
+semantic street furniture, a six-slot session equipment inventory, held-item
 visuals and condition impacts against people, vehicles and props also work
 locally. Off-camera vehicle demotion, driver/passenger states, active traffic
 signal simulation, responder exit/contact animation, missions and garage/economy
@@ -21,7 +21,26 @@ Police Chase menu and float toggle are retired. Transaction-owned room
 vehicle leases and room condition impacts are implemented locally but their new
 Cloud Functions have not been deployed.
 
-The current equipment loadout is a local sandbox baseline, not trusted account
+The latest local coherence slice expands that inventory to six slots and adds a
+player-triggered parachute with measured fall/clearance rules and a rendered
+pack, canopy, harness and lines. Nearby pedestrians are promoted before they can
+appear as interaction placeholders. Stopped civic responder cars can be taken as
+the exact vehicle and a witnessed theft enters the same dispatch/search/pursuit
+lifecycle. Published wildlife now owns the shared world Action prompt for
+observation or a visible meet/care/adopt sequence; the Field Journal can locate
+eligible encounters but no longer awards companions by menu clicking. These
+features pass their focused installed-Chrome desktop and 390×844 touch journeys,
+but have not received user/device acceptance.
+
+Discovery detectors and excavation tools still belong to the Field Journal's
+activity owner rather than the urban equipment inventory. The correct follow-up
+is one save-compatible authoritative item/equipment domain with Journal adapters;
+adding a duplicate inventory or doing an unverified account migration is not
+part of this release candidate. Personal home ownership is likewise not yet
+implemented and must use stable building/entrance/floor identity plus server
+ownership rather than a local-only interior.
+
+The current six-slot equipment loadout is a local sandbox baseline, not trusted account
 inventory. Room condition changes now synchronize through server-owned entity
 documents, but equipment ownership, ammunition, rewards and room movement input
 are not trusted account state. Presence/pose is still client-authored under the
@@ -50,6 +69,12 @@ pass. Current blockers are:
 - The latest general Baltimore runtime invariant saw vegetation publish one
   feature after the fixed-world snapshot (410 to 411), so world publication was
   not stable in that run. The entrance-specific journey did not mutate the world.
+- The Discovery/companion journey passes state, progression, scale and visibility
+  assertions, and the active field animal is visible in its world frame. Some
+  post-adoption companion screenshots still place the third-person camera against
+  or inside nearby facade geometry, obscuring the companion. This remains visual
+  release blocker REL-004/INV-007; camera collision/framing must be corrected and
+  visually rerun rather than inferred from state alone.
 
 These are worldwide fallback/readiness failures, not facade-test failures. They
 must be fixed at their shared data and world-start owners and the full matrix

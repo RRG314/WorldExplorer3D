@@ -7,25 +7,36 @@ function normalizeCandidate(handler, candidate) {
   return Object.freeze({
     id: handler.id,
     priority: handler.priority,
+    available: true,
     action: String(candidate.action || handler.id),
     label: String(candidate.label || 'Interact'),
     detail: String(candidate.detail || ''),
     distance: Number.isFinite(candidate.distance) ? candidate.distance : null,
+    secondaryLabel: candidate.secondaryLabel ? String(candidate.secondaryLabel) : '',
+    takeLabel: candidate.takeLabel ? String(candidate.takeLabel) : '',
     data: candidate.data || null
   });
 }
 
 function resolvePrimaryContextInteraction() {
-  const ordered = [...handlers.values()].sort((a, b) => b.priority - a.priority);
-  for (const handler of ordered) {
+  const candidates = [];
+  for (const handler of handlers.values()) {
     try {
       const candidate = normalizeCandidate(handler, handler.evaluate?.());
-      if (candidate) return candidate;
+      if (candidate) candidates.push(candidate);
     } catch (error) {
       console.warn(`[interaction] ${handler.id} evaluation failed.`, error);
     }
   }
-  return null;
+  candidates.sort((a, b) => {
+    const priorityGap = Math.abs(b.priority - a.priority);
+    if (priorityGap > 5) return b.priority - a.priority;
+    if (a.distance !== null && b.distance !== null && Math.abs(a.distance - b.distance) > .08) {
+      return a.distance - b.distance;
+    }
+    return b.priority - a.priority;
+  });
+  return candidates[0] || null;
 }
 
 async function handlePrimaryContextInteraction() {

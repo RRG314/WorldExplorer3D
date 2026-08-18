@@ -2,6 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=5';
 import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=1';
+import { vehicleDoorPosition } from './vehicle-model.js?v=2';
 
 const RESPONDER_BASE_Y = 1.2;
 const RESPONDER_DESPAWN_DISTANCE = 58;
@@ -114,6 +115,10 @@ function createUrbanResponderRuntime(options = {}) {
     const responder = {
       id,
       profile,
+      variant,
+      color: profile.color,
+      serviceType: 'responder',
+      serviceAccent: profile.accent,
       visual,
       x: anchor.x,
       y: anchor.y + RESPONDER_BASE_Y,
@@ -190,10 +195,50 @@ function createUrbanResponderRuntime(options = {}) {
     else responder.returnElapsed = 0;
   }
 
-  function removeResponder(responder) {
+  function removeResponder(responder, disposeVisual = true) {
     const index = responders.indexOf(responder);
     if (index >= 0) responders.splice(index, 1);
-    responder.visual.dispose();
+    if (disposeVisual) responder.visual.dispose();
+  }
+
+  function nearestEnterable(actor, radius = 3.4) {
+    if (!active() || !actor) return null;
+    return responders.map((responder) => {
+      if (Math.abs(finite(responder.speed)) > 2.5) return null;
+      const door = vehicleDoorPosition({ ...responder, driverSide: -1 });
+      const distance = Math.hypot(door.x - finite(actor.x), door.z - finite(actor.z));
+      return distance <= radius ? { responderId: responder.id, responder, door, distance } : null;
+    }).filter(Boolean).sort((a, b) => a.distance - b.distance)[0] || null;
+  }
+
+  function claimVehicle(responderId) {
+    if (!active()) return null;
+    const responder = responders.find((entry) => entry.id === String(responderId || ''));
+    if (!responder || Math.abs(finite(responder.speed)) > 2.5) return null;
+    removeResponder(responder, false);
+    responder.visual.setServiceLights?.(0, false);
+    responder.visual.root.updateMatrixWorld(true);
+    return {
+      id: responder.id,
+      variant: responder.variant,
+      color: responder.color,
+      serviceType: responder.serviceType,
+      serviceAccent: responder.serviceAccent,
+      profile: responder.profile,
+      visual: responder.visual,
+      x: responder.x,
+      y: responder.y,
+      z: responder.z,
+      yaw: responder.yaw,
+      driverSide: -1,
+      resistance: 185,
+      condition: 1,
+      source: 'civic-responder-taken',
+      attachedToPlayer: false,
+      occupied: false,
+      driver: '',
+      playerClaimed: false
+    };
   }
 
   function update(dt, civic, actor) {
@@ -265,7 +310,7 @@ function createUrbanResponderRuntime(options = {}) {
     return true;
   }
 
-  return Object.freeze({ dispose, snapshot, update });
+  return Object.freeze({ claimVehicle, dispose, nearestEnterable, snapshot, update });
 }
 
 export { createUrbanResponderRuntime, responderVariant };

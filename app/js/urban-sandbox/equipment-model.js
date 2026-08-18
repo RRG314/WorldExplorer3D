@@ -3,7 +3,8 @@ const EQUIPMENT_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'flashlight', label: 'Field light', category: 'utility', slot: 2, range: 18, force: 0, cooldownMs: 180, actionLabel: 'Toggle light', icon: 'LIGHT' }),
   Object.freeze({ id: 'baton', label: 'Impact baton', category: 'melee', slot: 3, range: 2.7, force: 28, cooldownMs: 620, actionLabel: 'Strike', icon: 'BATON' }),
   Object.freeze({ id: 'pulse-sidearm', label: 'Pulse sidearm', category: 'sidearm', slot: 4, range: 42, force: 34, cooldownMs: 310, magazineSize: 12, reserve: 36, actionLabel: 'Fire', icon: 'PULSE' }),
-  Object.freeze({ id: 'concussion-charge', label: 'Concussion charge', category: 'explosive', slot: 5, range: 19, force: 78, blastRadius: 7.5, cooldownMs: 1100, quantity: 4, actionLabel: 'Throw', icon: 'CHARGE' })
+  Object.freeze({ id: 'concussion-charge', label: 'Concussion charge', category: 'explosive', slot: 5, range: 19, force: 78, blastRadius: 7.5, cooldownMs: 1100, quantity: 4, actionLabel: 'Throw', icon: 'CHARGE' }),
+  Object.freeze({ id: 'parachute', label: 'Explorer parachute', category: 'mobility', slot: 6, range: 0, force: 0, cooldownMs: 500, actionLabel: 'Deploy', icon: 'CHUTE' })
 ]);
 
 function definitionFor(id) {
