@@ -5,7 +5,7 @@ import { createEquipmentInventory } from './equipment-model.js?v=1';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=2';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=1';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=2';
-import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=1';
+import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
 import { createUrbanResponderRuntime } from './responder-runtime.js?v=1';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=2';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=5';
@@ -200,7 +200,7 @@ function resolveExitSpawn(vehicle) {
 }
 
 function interactionCandidate(state) {
-  if (!activeWorldMatches(state) || state.transition) return null;
+  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior) return null;
   if (state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk') {
     const speed = Math.abs(Number(appCtx.car?.speed || 0));
     return {
@@ -395,10 +395,16 @@ function civicActorPosition(state) {
   return appCtx.Walk?.state?.walker || appCtx.car || null;
 }
 
+function civicSnapshot(state) {
+  const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
+  if (authorityMode !== 'local') return state.roomAuthorityRuntime?.civicSnapshot?.() || null;
+  return state.civic?.snapshot?.() || null;
+}
+
 function updateCivicStatus(state) {
   const root = state.civicUi?.root;
   if (!root) return;
-  const snapshot = state.civic?.snapshot?.();
+  const snapshot = civicSnapshot(state);
   const responderStatus = state.responders?.snapshot?.()?.status;
   const status = responderStatus?.visible === true ? responderStatus : snapshot?.status;
   root.classList.toggle('show', status?.visible === true);
@@ -429,6 +435,47 @@ function reportCivicEvent(state, event = {}) {
     audibleRadius: event.audibleRadius,
     maximumWitnesses: event.maximumWitnesses
   }) || [];
+  const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
+  if (authorityMode !== 'local') {
+    if (!witnesses.length) return Object.freeze({ accepted: false, reason: 'unwitnessed' });
+    promoteCivicWitness(state, witnesses[0]);
+    const pending = Object.freeze({
+      accepted: true,
+      pending: true,
+      event: Object.freeze({
+        id: 'room-authority-pending',
+        kind: event.kind,
+        witnessCount: witnesses.length
+      })
+    });
+    state.lastCivicAction = Object.freeze({
+      type: event.kind,
+      eventId: pending.event.id,
+      witnessCount: witnesses.length,
+      authority: 'room',
+      at: now()
+    });
+    state.roomAuthorityRuntime.reportCivicEvent({ ...event, position }, witnesses).then((result) => {
+      if (!activeWorldMatches(state)) return;
+      if (!result?.accepted) {
+        setStatus(state, result?.reason === 'cooldown'
+          ? 'The current room incident is already being reported.'
+          : 'Shared civic response is reconnecting.', 2200);
+        return;
+      }
+      state.lastCivicAction = Object.freeze({
+        type: event.kind,
+        eventId: result.state?.eventId || '',
+        witnessCount: result.state?.witnessCount || witnesses.length,
+        authority: 'room',
+        at: now()
+      });
+      updateCivicStatus(state);
+    }).catch(() => {
+      if (activeWorldMatches(state)) setStatus(state, 'Shared civic response is reconnecting.', 2200);
+    });
+    return pending;
+  }
   const result = state.civic.observe({ ...event, position }, witnesses);
   if (result.accepted) {
     promoteCivicWitness(state, witnesses[0]);
@@ -445,7 +492,8 @@ function reportCivicEvent(state, event = {}) {
 
 function updateCivicResponse(state, dt) {
   const step = Math.max(0, Number(dt) || 0);
-  state.civic.update(step, civicActorPosition(state));
+  const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
+  if (authorityMode === 'local') state.civic.update(step, civicActorPosition(state));
   state.recklessEventCooldown = Math.max(0, state.recklessEventCooldown - step);
   if (state.activeVehicle?.attachedToPlayer && appCtx.Walk?.state?.mode !== 'walk') {
     const mph = Math.abs(carSpeedToMph(Number(appCtx.car?.speed || 0)));
@@ -469,11 +517,11 @@ function updateCivicResponse(state, dt) {
   } else {
     state.recklessElapsed = 0;
   }
-  state.responders?.update?.(step, state.civic.snapshot(), civicActorPosition(state));
-  const civicSnapshot = state.civic.snapshot();
-  const witnessReaction = civicSnapshot.phase === 'observed' || civicSnapshot.phase === 'reporting'
+  const currentCivic = civicSnapshot(state);
+  state.responders?.update?.(step, currentCivic, civicActorPosition(state));
+  const witnessReaction = currentCivic?.phase === 'observed' || currentCivic?.phase === 'reporting'
     ? 'reporting'
-    : civicSnapshot.phase === 'searching' ? 'watching' : '';
+    : currentCivic?.phase === 'searching' ? 'watching' : '';
   state.npcs.forEach((npc) => {
     if (npc.reaction === witnessReaction) return;
     npc.reaction = witnessReaction;
@@ -722,7 +770,7 @@ function snapshot(state) {
     lastImpactAction: state.lastImpactAction,
     authority: state.roomAuthorityRuntime?.snapshot?.() || Object.freeze({ mode: 'local' }),
     equipment: state.equipment?.snapshot?.() || null,
-    civicResponse: state.civic?.snapshot?.() || null,
+    civicResponse: civicSnapshot(state),
     responders: state.responders?.snapshot?.() || null,
     worldLoadSequence: Number(appCtx._worldLoadSequence || 0),
     budgets: Object.freeze({ interactiveVehicles: state.budget, interactiveNpcs: state.npcBudget, mobile: state.mobile })
@@ -870,6 +918,7 @@ function startUrbanSandboxRuntime(options = {}) {
     recklessElapsed: 0,
     recklessEventCooldown: 0,
     civicUiElapsed: 0,
+    civicResolutionPending: false,
     civic: null,
     responders: null,
     equipment: createEquipmentInventory(),
@@ -893,9 +942,24 @@ function startUrbanSandboxRuntime(options = {}) {
     worldIdentity,
     isActive: () => activeWorldMatches(state),
     onResolution(outcome) {
-      state.lastCivicOutcome = Object.freeze({ ...outcome, at: now() });
-      state.civic.clear();
-      setStatus(state, `${outcome.label}. Civic attention is clearing.`, 3200);
+      const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
+      if (authorityMode === 'local') {
+        state.lastCivicOutcome = Object.freeze({ ...outcome, at: now() });
+        state.civic.clear();
+        setStatus(state, `${outcome.label}. Civic attention is clearing.`, 3200);
+        return;
+      }
+      if (state.civicResolutionPending) return;
+      state.civicResolutionPending = true;
+      state.roomAuthorityRuntime.resolveCivicOutcome().then((result) => {
+        if (!activeWorldMatches(state)) return;
+        if (result?.accepted) {
+          state.lastCivicOutcome = Object.freeze({ ...result.outcome, authority: 'room', at: now() });
+          setStatus(state, `${result.outcome.label}. Shared civic attention is clearing.`, 3200);
+        }
+      }).catch(() => {
+        if (activeWorldMatches(state)) setStatus(state, 'Shared civic outcome is reconnecting.', 2200);
+      }).finally(() => { state.civicResolutionPending = false; });
     }
   });
   state.equipmentRuntime = createUrbanEquipmentRuntime({

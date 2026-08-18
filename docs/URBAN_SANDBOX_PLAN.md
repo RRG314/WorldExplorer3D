@@ -19,8 +19,9 @@ Production: unchanged on the verified 4.2.1 rollback
   purpose-built location-aware responder vehicles, road-constrained approach,
   search/pursuit, stopped-player contact, warning/citation/recovery outcomes and
   return/disposal. The duplicate standalone Police Chase selector/toggle is
-  retired. Shared-room civic authority, responder NPC exit/contact animation,
-  traffic emergency yielding and deeper outcome policy remain open.
+  retired. Shared-room civic events, phases and stopped-contact outcomes are now
+  server-owned and synchronized. Responder NPC exit/contact animation, traffic
+  emergency yielding and deeper outcome policy remain open.
 - Interactive equipment baseline: implemented locally with five quick slots,
   held-item visuals, ammunition/charges/cooldowns, flashlight, melee, fictional
   pulse-sidearm and concussion-charge impacts against NPCs, vehicles and props.
@@ -32,11 +33,13 @@ Production: unchanged on the verified 4.2.1 rollback
   safe release/reclaim, server-computed condition changes, shared reads and
   denied direct writes. Passengers, cooperative missions, persistent garages,
   account equipment and shared rewards remain open.
-- Phase 5 multi-floor interiors: planned against the existing building-entry
-  owner. The current generated/mapped single-floor interior is the foundation;
-  floor-to-floor traversal, vertical streaming and shared floor context are not
-  implemented yet.
-- Phases 5–7 and the remaining Phase 8–9 depth are planned, not implemented by
+- Phase 5 multi-floor interiors: the first playable slice is implemented inside
+  the existing building-entry owner. It provides stable floor IDs, bounded
+  active/adjacent publication, physical stairs, a proximity elevator,
+  floor-aware collision/presence and exact lobby exit without an Earth reload.
+  Floor-specific mission/discovery anchors, authored room depth and a two-client
+  same-building visual journey remain open before the phase is complete.
+- Phases 6–7 and the remaining Phase 5/8–9 depth are planned, not implemented by
   this milestone.
 - Deployment: not authorized; production remains unchanged.
 

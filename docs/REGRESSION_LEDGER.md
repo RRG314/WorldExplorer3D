@@ -785,6 +785,62 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Guard: `npm run audit:reachability` (532/532 modules, zero orphans), `npm run audit:assets` (93 reachable assets and 27 dynamic PBR assets), `npm run test:module-versions` and `npm run runtime:verify`.
 - Never reintroduce: weakening strict audits, keeping self-tested production modules without a runtime consumer, or restoring legacy media without an intentional current-page reference.
 
+## 2026-08-18 — Room members diverge on civic response and can forge outcomes
+
+- Status: resolved locally on `steven/urban-sandbox-foundation`; not deployed.
+- Symptom: two players could witness the same urban event but run separate local
+  responder timelines, attention levels and consequences, while a browser-owned
+  result would not be trustworthy enough for rewards or progression.
+- Root cause: the existing civic lifecycle was a correct offline presentation
+  model but had no authoritative room event boundary.
+- Resolution: one transactional `urbanCivic/current` document now owns the event
+  ID, actor, level, phase timestamps, last-known position and server-selected
+  warning/citation/recovery outcome. Only the stopped actor inside the bounded
+  search area can resolve contact; room clients can read but cannot write the
+  document. Offline play retains the local model.
+- Guard: `npm run test:urban-authority`, `npm run
+  test:urban-authority-integration`, `npm run test:functions-runtime`, and `npm
+  run test:rules` (77/77). The emulator journey requires two independent users,
+  shared event/outcome IDs, rejected non-actor resolution and denied direct
+  civic writes.
+- Never reintroduce: independent per-client room attention clocks, client-picked
+  outcomes, direct writes to civic state, or rewards derived from local session
+  consequences.
+
+## 2026-08-18 — Multi-floor interiors are state-only or elevator details disappear
+
+- Status: first playable slice resolved locally on
+  `steven/urban-sandbox-foundation`; floor-specific content depth remains open.
+- Symptom: an interior could report a selected level without physical
+  floor-to-floor traversal, retain too many floors, return somewhere other than
+  its entrance, or render a working elevator as a featureless wall.
+- Root cause: the prior runtime built one selected floor and had no stable
+  vertical publication contract. The shared walking solver queried ground with
+  an outdoor `-100` height sentinel, which selected the lowest overlapping
+  streamed floor after elevator arrival. During the first visual pass, the
+  elevator backing also sat in front of its doors and untone-mapped metal turned
+  a nearby light into opaque glare.
+- Resolution: a bounded floor model derives stable IDs from the exterior
+  building, publishes at most active plus adjacent levels, owns continuous stair
+  surfaces and level-aware collision, and exposes only proximity interactions.
+  Elevator travel rebuilds that floor window without reloading Earth; lobby exit
+  restores the exact exterior entrance and disposes interior colliders. Interior
+  ground queries use the actor's feet height and clear cached contact at elevator
+  travel. The elevator backing now sits behind two visible tone-mapped doors,
+  frame, seam and indicator, with fixtures excluded from the connector approach.
+- Guard: `npm run test:interior-floors`, `npm run
+  test:interior-floors-browser`, `npm run test:plane-interiors`, and human review
+  of `output/playwright/multifloor-interior/01-lobby-stairs-elevator.png`,
+  `03-elevator-prompt.png`, `04-elevator-arrival.png` and
+  `05-mobile-elevator-prompt.png`. The Chrome journey must physically hold
+  ArrowUp to climb, retain at most three floor levels, keep one world-load
+  sequence, keep the arrival camera on the destination surface, return to the
+  same doorway and leave zero colliders.
+- Never reintroduce: a floor-selector menu as traversal, whole-world loads on
+  elevator use, unbounded floor scene retention, non-level-aware presence, exact
+  mesh-count acceptance without screenshots, outdoor sentinel heights inside a
+  vertical interior, or elevator backing/lighting that hides interactive details.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

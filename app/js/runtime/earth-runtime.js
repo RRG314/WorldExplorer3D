@@ -3,7 +3,7 @@
 // Keep the title shell and planetary launch choices independent from the
 // comparatively large local-world compiler. Import order preserves the
 // initialization contract that previously lived in app-entry.js.
-import '../ground.js?v=84';
+import '../ground.js?v=85';
 import '../terrain.js?v=254';
 import '../world.js?v=340';
 import '../building-entry.js?v=5';

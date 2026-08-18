@@ -11,6 +11,8 @@
     "test:urban-responder-model": "node scripts/test-urban-responder-model.mjs",
     "test:urban-equipment-model": "node scripts/test-urban-equipment-model.mjs",
     "test:urban-authority": "node scripts/test-urban-authority.mjs",
+    "test:interior-floors": "node scripts/test-interior-floor-model.mjs",
+    "test:interior-floors-browser": "node scripts/test-multifloor-interior-browser.mjs",
     "test:urban-authority-integration": "node scripts/test-urban-authority-integration.mjs",
     "dev": "node scripts/serve-local-preview.mjs",
     "candidate:create": "node scripts/local-candidate.mjs create",

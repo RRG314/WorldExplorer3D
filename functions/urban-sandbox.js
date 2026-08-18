@@ -6,6 +6,19 @@ const VEHICLE_LEASE_MS = 15_000;
 const VEHICLE_MOVE_MAX_METERS_PER_SECOND = 90;
 const ACTION_CLOCK_SKEW_MS = 250;
 const DIRECT_HIT_TOLERANCE_METERS = 3.5;
+const CIVIC_EVENT_COOLDOWN_MS = 1_500;
+const CIVIC_OBSERVED_MS = 2_400;
+const CIVIC_REPORTING_MS = 3_600;
+const CIVIC_KINDS = Object.freeze({
+  vehicle_taken: 'Vehicle takeover witnessed',
+  reckless_driving: 'Reckless driving witnessed',
+  collision: 'Collision witnessed',
+  trespass: 'Restricted-area entry witnessed',
+  theft_from_person: 'Theft witnessed',
+  assault: 'Assault witnessed',
+  weapon_discharge: 'Weapon discharge witnessed',
+  explosive_use: 'Explosion witnessed'
+});
 const URBAN_EQUIPMENT = Object.freeze({
   hands: Object.freeze({ force: 12, range: 2.4, cooldownMs: 520, blastRadius: 0 }),
   baton: Object.freeze({ force: 28, range: 2.7, cooldownMs: 620, blastRadius: 0 }),
@@ -78,6 +91,125 @@ function forceForTarget(equipment, impactPosition, targetPosition) {
   if (distance > equipment.blastRadius) return 0;
   const falloff = 1 - distance / equipment.blastRadius;
   return equipment.force * (0.18 + 0.82 * falloff);
+}
+
+function civicSearchDurationMs(level) {
+  return (14 + clamp(level, 1, 3) * 8) * 1000;
+}
+
+function civicOutcomeForLevel(level) {
+  if (level >= 3) return Object.freeze({ type: 'recovery', label: 'Vehicle recovery required' });
+  if (level >= 2) return Object.freeze({ type: 'citation', label: 'Citation issued' });
+  return Object.freeze({ type: 'warning', label: 'Warning issued' });
+}
+
+async function commitUrbanCivicEvent(options = {}) {
+  const { runTransaction, civicRef, actorRef, uid, input, actorPose, nowMs, timestampFromMs } = options;
+  if (typeof runTransaction !== 'function' || !civicRef || !actorRef || !uid) throw new TypeError('Civic event transaction inputs are required.');
+  const kind = String(input?.kind || '').trim();
+  if (!CIVIC_KINDS[kind]) throw new Error('invalid_civic_kind');
+  const position = normalizePose(input?.position);
+  if (poseDistance(actorPose, position) > 36) throw new Error('civic_event_out_of_range');
+  const witnessCount = Math.max(1, Math.min(4, Math.floor(finiteNumber(input?.witnessCount, 0))));
+  const severity = Math.max(1, Math.min(3, Math.floor(finiteNumber(input?.severity, 1))));
+  return runTransaction(async (transaction) => {
+    const [civicSnapshot, actorSnapshot] = await Promise.all([
+      transaction.get(civicRef),
+      transaction.get(actorRef)
+    ]);
+    const current = snapshotData(civicSnapshot);
+    const actorState = snapshotData(actorSnapshot) || {};
+    const lastEventMs = timestampMillis(actorState.lastCivicEventAt, 0);
+    if (lastEventMs && nowMs - lastEventMs < CIVIC_EVENT_COOLDOWN_MS) {
+      return Object.freeze({ accepted: false, reason: 'cooldown' });
+    }
+    if (current && current.worldSeed !== input.worldSeed) throw new Error('world_conflict');
+    const currentEndsMs = timestampMillis(current?.searchEndsAt, 0);
+    const alreadyActive = current && current.resolved !== true && currentEndsMs > nowMs;
+    const level = Math.max(1, Math.min(3,
+      Math.max(severity, alreadyActive ? finiteNumber(current.level, 1) : 0) + (alreadyActive ? 1 : 0)
+    ));
+    const sequence = Math.max(0, Math.floor(finiteNumber(current?.sequence, 0))) + 1;
+    const eventId = `room-civic:${sequence}:${uid.slice(0, 18)}`;
+    const reportingStartsMs = nowMs + CIVIC_OBSERVED_MS;
+    const searchStartsMs = reportingStartsMs + CIVIC_REPORTING_MS;
+    const searchEndsMs = searchStartsMs + civicSearchDurationMs(level);
+    const state = {
+      authority: 'urban-civic-transaction-v1',
+      worldSeed: String(input.worldSeed || '').slice(0, 180),
+      eventId,
+      sequence,
+      actorUid: uid,
+      kind,
+      label: CIVIC_KINDS[kind],
+      agency: String(input.agency || 'Local civic response').slice(0, 80),
+      level,
+      severity,
+      witnessCount,
+      vehicleId: normalizeUrbanEntityId(input.vehicleId),
+      searchCenter: Object.freeze({ x: position.x, z: position.z }),
+      searchRadius: 70 + level * 35,
+      observedAt: timestampFromMs(nowMs),
+      reportingStartsAt: timestampFromMs(reportingStartsMs),
+      searchStartsAt: timestampFromMs(searchStartsMs),
+      searchEndsAt: timestampFromMs(searchEndsMs),
+      resolved: false,
+      outcome: null,
+      revision: Math.max(0, Math.floor(finiteNumber(current?.revision, 0))) + 1,
+      updatedAt: timestampFromMs(nowMs)
+    };
+    transaction.set(civicRef, state, { merge: false });
+    transaction.set(actorRef, {
+      uid,
+      lastCivicEventAt: timestampFromMs(nowMs),
+      updatedAt: timestampFromMs(nowMs)
+    }, { merge: true });
+    return Object.freeze({
+      accepted: true,
+      state: Object.freeze({
+        ...state,
+        observedAtMs: nowMs,
+        reportingStartsAtMs: reportingStartsMs,
+        searchStartsAtMs: searchStartsMs,
+        searchEndsAtMs: searchEndsMs
+      })
+    });
+  });
+}
+
+async function resolveUrbanCivicOutcome(options = {}) {
+  const { runTransaction, civicRef, uid, actorPose, actorVelocity, nowMs, timestampFromMs } = options;
+  if (typeof runTransaction !== 'function' || !civicRef || !uid) throw new TypeError('Civic resolution transaction inputs are required.');
+  return runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(civicRef);
+    const current = snapshotData(snapshot);
+    if (!current || current.resolved === true) return Object.freeze({ accepted: false, reason: 'inactive' });
+    if (current.actorUid !== uid) return Object.freeze({ accepted: false, reason: 'not_actor' });
+    const searchStartsMs = timestampMillis(current.searchStartsAt, 0);
+    const searchEndsMs = timestampMillis(current.searchEndsAt, 0);
+    if (nowMs < searchStartsMs + 2_500 || nowMs > searchEndsMs) {
+      return Object.freeze({ accepted: false, reason: 'outside_contact_window' });
+    }
+    const speed = Math.hypot(
+      finiteNumber(actorVelocity?.vx),
+      finiteNumber(actorVelocity?.vy),
+      finiteNumber(actorVelocity?.vz)
+    );
+    if (speed > 2.2) return Object.freeze({ accepted: false, reason: 'actor_moving' });
+    if (poseDistance(actorPose, { ...current.searchCenter, y: finiteNumber(actorPose?.y) }) > finiteNumber(current.searchRadius, 105)) {
+      return Object.freeze({ accepted: false, reason: 'outside_search_area' });
+    }
+    const outcome = civicOutcomeForLevel(finiteNumber(current.level, 1));
+    const patch = {
+      resolved: true,
+      outcome,
+      resolvedAt: timestampFromMs(nowMs),
+      revision: Math.max(0, Math.floor(finiteNumber(current.revision, 0))) + 1,
+      updatedAt: timestampFromMs(nowMs)
+    };
+    transaction.update(civicRef, patch);
+    return Object.freeze({ accepted: true, outcome, state: Object.freeze({ ...current, ...patch, resolvedAtMs: nowMs }) });
+  });
 }
 
 async function claimUrbanVehicleLease(options = {}) {
@@ -208,16 +340,19 @@ async function commitUrbanImpacts(options = {}) {
 }
 
 module.exports = {
+  CIVIC_KINDS,
   TARGET_RESISTANCE,
   URBAN_EQUIPMENT,
   DIRECT_HIT_TOLERANCE_METERS,
   VEHICLE_LEASE_MS,
   claimUrbanVehicleLease,
+  commitUrbanCivicEvent,
   commitUrbanImpacts,
   conditionAfterImpact,
   normalizePose,
   normalizeUrbanEntityId,
   poseDistance,
+  resolveUrbanCivicOutcome,
   updateUrbanVehicleLease,
   urbanEntityDocumentId
 };

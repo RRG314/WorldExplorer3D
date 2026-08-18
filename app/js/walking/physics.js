@@ -165,7 +165,13 @@ function createWalkingPhysicsHelpers({
       const hits = raycaster.intersectObject(planetarySurface, false);
       groundY = hits.length > 0 ? hits[0].point.y : -100;
     } else {
-      groundY = getWalkGroundY(x, z, -100);
+      // Overlapping interior floors require a vertical reference. Preserve the
+      // legacy outdoor query path, but choose the nearest published interior
+      // surface to the actor's feet instead of always selecting the lowest one.
+      const surfaceReferenceY = appCtx.activeInterior
+        ? finiteOr(walkerY, 0) - CFG.eyeHeight
+        : -100;
+      groundY = getWalkGroundY(x, z, surfaceReferenceY);
     }
 
     let effectiveGroundY = groundY;

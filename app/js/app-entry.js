@@ -7,7 +7,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=28';
+import './runtime-diagnostics.js?v=29';
 import './state.js?v=61';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
@@ -23,13 +23,13 @@ import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=91';
 import './physics.js?v=104';
-import './walking.js?v=72';
+import './walking.js?v=73';
 import './travel-mode.js?v=20';
 import { initBoatMode } from './boat-mode.js?v=37';
 import './sky.js?v=86';
 import './weather.js?v=9';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=56';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=57';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -149,7 +149,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=76');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=77');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
@@ -172,7 +172,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=9').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=12').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

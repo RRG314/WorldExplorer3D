@@ -508,6 +508,16 @@ globalThis.render_game_to_text = () => JSON.stringify({
   augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
   livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
   urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+  interior: appCtx.activeInterior ? {
+    active: true,
+    key: String(appCtx.activeInterior.key || ''),
+    floorId: String(appCtx.activeInterior.floorId || ''),
+    floorLabel: String(appCtx.activeInterior.floorLabel || 'Lobby'),
+    activeLevel: Number(appCtx.activeInterior.activeLevel || 0),
+    floorCount: Number(appCtx.activeInterior.floorPlan?.floorCount || 1),
+    loadedLevels: Array.isArray(appCtx.activeInterior.loadedLevels) ? [...appCtx.activeInterior.loadedLevels] : [],
+    connectorsAvailable: appCtx.activeInterior.connector != null
+  } : { active: false },
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   worldCounts: {

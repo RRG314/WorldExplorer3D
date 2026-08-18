@@ -194,16 +194,57 @@ async function runIntegration() {
     });
     if (!impact.accepted || impact.results?.[0]?.after >= 1) throw new Error('Server impact did not reduce condition.');
 
+    const civicEvent = await postFunction(functionOrigin, 'commitUrbanCivicEvent', loser.token, {
+      roomCode,
+      worldSeed,
+      kind: 'vehicle_taken',
+      vehicleId: entityId,
+      severity: 1,
+      witnessCount: 2,
+      position: { x: 2, y: 0, z: 1 }
+    });
+    if (!civicEvent.accepted || civicEvent.state?.actorUid !== loser.user.uid) {
+      throw new Error('Server civic event was not committed for the acting player.');
+    }
+
     const vehicleDocId = urbanEntityDocumentId(entityId);
     const npcDocId = urbanEntityDocumentId(npcId);
-    const [ownerVehicle, memberVehicle, ownerNpc, memberNpc] = await Promise.all([
+    const [ownerVehicle, memberVehicle, ownerNpc, memberNpc, ownerCivic, memberCivic] = await Promise.all([
       getDoc(doc(owner.db, 'rooms', roomCode, 'urbanEntities', vehicleDocId)),
       getDoc(doc(member.db, 'rooms', roomCode, 'urbanEntities', vehicleDocId)),
       getDoc(doc(owner.db, 'rooms', roomCode, 'urbanEntities', npcDocId)),
-      getDoc(doc(member.db, 'rooms', roomCode, 'urbanEntities', npcDocId))
+      getDoc(doc(member.db, 'rooms', roomCode, 'urbanEntities', npcDocId)),
+      getDoc(doc(owner.db, 'rooms', roomCode, 'urbanCivic', 'current')),
+      getDoc(doc(member.db, 'rooms', roomCode, 'urbanCivic', 'current'))
     ]);
-    if (![ownerVehicle, memberVehicle, ownerNpc, memberNpc].every((snapshot) => snapshot.exists())) {
-      throw new Error('Both clients did not receive server-owned entity state.');
+    if (![ownerVehicle, memberVehicle, ownerNpc, memberNpc, ownerCivic, memberCivic].every((snapshot) => snapshot.exists())) {
+      throw new Error('Both clients did not receive server-owned urban entity and civic state.');
+    }
+    if (ownerCivic.data().eventId !== memberCivic.data().eventId) {
+      throw new Error('Room clients did not converge on the same civic event.');
+    }
+    const nonActorResolution = await postFunction(functionOrigin, 'resolveUrbanCivicOutcome', winner.token, {
+      roomCode,
+      worldSeed
+    });
+    if (nonActorResolution.accepted || nonActorResolution.reason !== 'not_actor') {
+      throw new Error('A room member other than the acting player could resolve the civic event.');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 8_700));
+    const actorResolution = await postFunction(functionOrigin, 'resolveUrbanCivicOutcome', loser.token, {
+      roomCode,
+      worldSeed
+    });
+    if (!actorResolution.accepted || actorResolution.outcome?.type !== 'warning') {
+      throw new Error('The acting player did not receive the server-selected shared civic outcome.');
+    }
+    const [ownerResolvedCivic, memberResolvedCivic] = await Promise.all([
+      getDoc(doc(owner.db, 'rooms', roomCode, 'urbanCivic', 'current')),
+      getDoc(doc(member.db, 'rooms', roomCode, 'urbanCivic', 'current'))
+    ]);
+    if (!ownerResolvedCivic.data()?.resolved || !memberResolvedCivic.data()?.resolved ||
+      ownerResolvedCivic.data()?.outcome?.type !== memberResolvedCivic.data()?.outcome?.type) {
+      throw new Error('Room clients did not converge on the same civic outcome.');
     }
     let directWriteDenied = false;
     try {
@@ -214,6 +255,15 @@ async function runIntegration() {
       directWriteDenied = String(error?.code || '').includes('permission-denied');
     }
     if (!directWriteDenied) throw new Error('A normal room client could write server-owned urban state.');
+    let directCivicWriteDenied = false;
+    try {
+      await setDoc(doc(loser.db, 'rooms', roomCode, 'urbanCivic', 'current'), {
+        eventId: 'forged', actorUid: loser.user.uid, level: 0, resolved: true
+      });
+    } catch (error) {
+      directCivicWriteDenied = String(error?.code || '').includes('permission-denied');
+    }
+    if (!directCivicWriteDenied) throw new Error('A normal room client could forge server-owned civic state.');
 
     console.log(JSON.stringify({
       ok: true,
@@ -224,7 +274,10 @@ async function runIntegration() {
       reclaimedBy: loser.user.uid,
       synchronizedVehicleRevision: ownerVehicle.data().revision,
       synchronizedNpcCondition: ownerNpc.data().condition,
-      directWriteDenied
+      synchronizedCivicEvent: ownerCivic.data().eventId,
+      synchronizedCivicOutcome: ownerResolvedCivic.data().outcome.type,
+      directWriteDenied,
+      directCivicWriteDenied
     }, null, 2));
   } finally {
     await Promise.allSettled([deleteApp(owner.app), deleteApp(member.app)]);

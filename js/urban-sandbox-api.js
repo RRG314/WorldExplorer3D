@@ -46,9 +46,28 @@ async function commitUrbanImpacts(input = {}) {
   }, { label: 'Urban room authority', forceRefreshToken: false });
 }
 
+async function commitUrbanCivicEvent(input = {}) {
+  return postProtectedFunction('/commitUrbanCivicEvent', {
+    ...roomPayload(input),
+    kind: String(input.kind || '').slice(0, 40),
+    severity: Number(input.severity || 1),
+    witnessCount: Number(input.witnessCount || 0),
+    vehicleId: String(input.vehicleId || '').slice(0, 220),
+    position: input.position || {}
+  }, { label: 'Urban civic authority', forceRefreshToken: false });
+}
+
+async function resolveUrbanCivicOutcome(input = {}) {
+  return postProtectedFunction('/resolveUrbanCivicOutcome', {
+    ...roomPayload(input)
+  }, { label: 'Urban civic authority', forceRefreshToken: false });
+}
+
 export {
   claimUrbanVehicle,
+  commitUrbanCivicEvent,
   commitUrbanImpacts,
   releaseUrbanVehicle,
+  resolveUrbanCivicOutcome,
   updateUrbanVehicle
 };

@@ -282,6 +282,16 @@ async function seedData(testEnv) {
       lastActionAt: Timestamp.fromMillis(Date.now() - 1_000),
       updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
     });
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'urbanCivic', 'current'), {
+      authority: 'urban-civic-transaction-v1',
+      worldSeed: 'latlon:0,0',
+      eventId: 'room-civic:1:member-user',
+      actorUid: MEMBER_UID,
+      kind: 'vehicle_taken',
+      level: 1,
+      resolved: false,
+      updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
 
     await setDoc(doc(db, 'users', OWNER_UID, 'friends', INVITEE_UID), {
       uid: INVITEE_UID,
@@ -485,6 +495,22 @@ await runCheck('room clients cannot forge urban ownership or damage state', asyn
   }));
 });
 
+await runCheck('room member can read shared civic state but cannot forge it', async () => {
+  const reference = doc(memberDb, 'rooms', ROOM_ID, 'urbanCivic', 'current');
+  await assertSucceeds(getDoc(reference));
+  await assertFails(setDoc(reference, {
+    authority: 'urban-civic-transaction-v1',
+    eventId: 'forged',
+    actorUid: MEMBER_UID,
+    level: 0,
+    resolved: true
+  }));
+});
+
+await runCheck('non-member cannot read shared civic state', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'urbanCivic', 'current')));
+});
+
 await runCheck('room actor can read own server action clock but cannot write it', async () => {
   const reference = doc(memberDb, 'rooms', ROOM_ID, 'urbanActors', MEMBER_UID);
   await assertSucceeds(getDoc(reference));
@@ -571,6 +597,14 @@ await runCheck('member can update own presence with valid payload', async () => 
       vx: 0,
       vy: 0,
       vz: 0
+    },
+    frame: {
+      kind: 'earth',
+      locLat: 39.2904,
+      locLon: -76.6122,
+      interiorKey: 'shortbread:building:test',
+      interiorFloorId: 'shortbread:building:test:floor:2',
+      interiorFloorLevel: 2
     }
   };
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'players', MEMBER_UID), payload));

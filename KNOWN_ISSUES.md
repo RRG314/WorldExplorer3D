@@ -12,11 +12,12 @@ work locally. Ten pedestrian roles, contextual talk/take/inspect actions,
 semantic street furniture, a five-slot session equipment inventory, held-item
 visuals and condition impacts against people, vehicles and props also work
 locally. Off-camera vehicle demotion, driver/passenger states, active traffic
-signal simulation, shared-room civic authority, missions and garage/economy
+signal simulation, responder exit/contact animation, missions and garage/economy
 persistence remain open in `docs/URBAN_SANDBOX_PLAN.md`. Local witnessed events
 now dispatch a bounded location-aware responder vehicle with search/pursuit and
-warning/citation/recovery outcomes; the duplicate legacy Police Chase menu and
-float toggle are retired. Transaction-owned room
+warning/citation/recovery outcomes; joined rooms use one server-owned civic
+event/timeline/outcome that normal clients cannot forge. The duplicate legacy
+Police Chase menu and float toggle are retired. Transaction-owned room
 vehicle leases and room condition impacts are implemented locally but their new
 Cloud Functions have not been deployed.
 
@@ -68,9 +69,11 @@ The earlier 2.02 GB editable-world high-water path is resolved locally: building
 
 - Real indoor data is uncommon. Buildings without usable indoor mapping receive a footprint-aware generated interior.
 - Generated interiors are traversable and sized from the building footprint, but may be visually sparse when no authoritative indoor geometry exists.
-- Current mapped/generated interiors publish one selected floor at a time. Stable
-  multi-floor IDs, physically walkable stairs, accessible elevators, adjacent-floor
-  streaming and multiplayer floor presence are planned but not implemented yet.
+- Eligible mapped/generated interiors now publish stable multi-floor IDs,
+  physically walkable stairs, an accessible proximity elevator, active/adjacent
+  floor streaming and multiplayer floor presence. Floor-specific mission and
+  discovery anchors, richer authored rooms, two-client same-building visual
+  acceptance and target-device memory acceptance remain open.
 - Procedural vegetation, inferred buildings, distant aerial context, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
 - Solar-system distances and planetary sizes use documented visual scaling so destinations remain navigable. The experience is educational and exploratory, not an orbital-navigation simulator.
 

@@ -299,7 +299,7 @@ const GroundHeight = {
 
   walkSurfaceInfo(x, z, currentY = NaN, options = {}) {
     const interiorSurface = typeof appCtx.sampleInteriorWalkSurface === 'function' ?
-      appCtx.sampleInteriorWalkSurface(x, z) :
+      appCtx.sampleInteriorWalkSurface(x, z, currentY) :
       null;
     if (interiorSurface && Number.isFinite(interiorSurface.y)) {
       return {

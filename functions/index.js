@@ -22,10 +22,12 @@ const {
 } = require('./deflock');
 const {
   claimUrbanVehicleLease,
+  commitUrbanCivicEvent,
   commitUrbanImpacts,
   normalizePose: normalizeUrbanPose,
   normalizeUrbanEntityId,
   poseDistance: urbanPoseDistance,
+  resolveUrbanCivicOutcome,
   updateUrbanVehicleLease,
   urbanEntityDocumentId
 } = require('./urban-sandbox');
@@ -761,7 +763,7 @@ async function deleteRoomTree(roomRef) {
     return;
   }
 
-  const subcollections = ['players', 'chat', 'chatState', 'artifacts', 'blocks', 'paintClaims', 'state', 'urbanEntities', 'urbanActors'];
+  const subcollections = ['players', 'chat', 'chatState', 'artifacts', 'blocks', 'paintClaims', 'state', 'urbanEntities', 'urbanActors', 'urbanCivic'];
   for (const name of subcollections) {
     await deleteDocsByQuery(roomRef.collection(name));
   }
@@ -1673,6 +1675,15 @@ function urbanTimestampFromMs(value) {
   return AdminTimestamp.fromMillis(Math.floor(Number(value) || Date.now()));
 }
 
+function urbanCivicAgencyForRoom(room = {}) {
+  const label = sanitizeText(room.world?.name || room.world?.label || room.name || '', 72);
+  const normalized = label.toLowerCase();
+  if (/national park|state park|forest|preserve|wilderness/.test(normalized)) return 'Ranger service';
+  if (/campus|university|college/.test(normalized)) return 'Campus safety';
+  if (label) return `${label.replace(/,.*$/, '')} civic response`.slice(0, 80);
+  return 'Local civic response';
+}
+
 exports.claimUrbanVehicle = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
@@ -1787,6 +1798,67 @@ exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(asy
     }
     console.error('[commitUrbanImpacts] failed:', error);
     res.status(500).json({ error: 'Could not commit this room interaction right now.' });
+  }
+});
+
+exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const result = await commitUrbanCivicEvent({
+      runTransaction: (callback) => db.runTransaction(callback),
+      civicRef: context.roomRef.collection('urbanCivic').doc('current'),
+      actorRef: context.roomRef.collection('urbanActors').doc(auth.uid),
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        worldSeed: context.worldSeed,
+        kind: sanitizeText(req.body && req.body.kind, 40).toLowerCase(),
+        severity: req.body && req.body.severity,
+        witnessCount: req.body && req.body.witnessCount,
+        vehicleId: normalizeUrbanEntityId(req.body && req.body.vehicleId),
+        position: normalizeUrbanPose(req.body && req.body.position),
+        agency: urbanCivicAgencyForRoom(context.room)
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = String(error && error.message || '');
+    if (message.startsWith('invalid_') || message === 'civic_event_out_of_range') {
+      return res.status(422).json({ error: 'The witnessed event is not valid from the current room position.' });
+    }
+    console.error('[commitUrbanCivicEvent] failed:', error);
+    res.status(500).json({ error: 'Could not share this civic event right now.' });
+  }
+});
+
+exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const result = await resolveUrbanCivicOutcome({
+      runTransaction: (callback) => db.runTransaction(callback),
+      civicRef: context.roomRef.collection('urbanCivic').doc('current'),
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      actorVelocity: context.player.pose || {},
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('[resolveUrbanCivicOutcome] failed:', error);
+    res.status(500).json({ error: 'Could not resolve this shared civic outcome right now.' });
   }
 });
 

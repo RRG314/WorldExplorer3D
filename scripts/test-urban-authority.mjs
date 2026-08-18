@@ -5,8 +5,10 @@ const require = createRequire(import.meta.url);
 const {
   VEHICLE_LEASE_MS,
   claimUrbanVehicleLease,
+  commitUrbanCivicEvent,
   commitUrbanImpacts,
   normalizeUrbanEntityId,
+  resolveUrbanCivicOutcome,
   updateUrbanVehicleLease,
   urbanEntityDocumentId
 } = require('../functions/urban-sandbox.js');
@@ -189,11 +191,108 @@ await assert.rejects(() => commitUrbanImpacts({
   timestampFromMs
 }), /impact_out_of_range/);
 
+const civicRef = ref('rooms/ABC234/urbanCivic/current');
+const civicEvent = await commitUrbanCivicEvent({
+  runTransaction,
+  civicRef,
+  actorRef,
+  uid: contenderUid,
+  input: {
+    kind: 'vehicle_taken',
+    worldSeed,
+    agency: 'Baltimore civic response',
+    witnessCount: 2,
+    severity: 1,
+    vehicleId: entityId,
+    position: { x: 2, y: 0, z: 1 }
+  },
+  actorPose: { x: 0, y: 0, z: 0 },
+  nowMs: 30_000,
+  timestampFromMs
+});
+assert.equal(civicEvent.accepted, true);
+assert.equal(civicEvent.state.authority, 'urban-civic-transaction-v1');
+assert.equal(civicEvent.state.level, 1);
+assert.equal(civicEvent.state.witnessCount, 2);
+assert.ok(civicEvent.state.searchStartsAtMs > civicEvent.state.reportingStartsAtMs);
+const civicCooldown = await commitUrbanCivicEvent({
+  runTransaction,
+  civicRef,
+  actorRef,
+  uid: contenderUid,
+  input: {
+    kind: 'collision', worldSeed, agency: 'Baltimore civic response', witnessCount: 1,
+    severity: 1, position: { x: 2, y: 0, z: 1 }
+  },
+  actorPose: { x: 0, y: 0, z: 0 },
+  nowMs: 31_000,
+  timestampFromMs
+});
+assert.deepEqual({ accepted: civicCooldown.accepted, reason: civicCooldown.reason }, { accepted: false, reason: 'cooldown' });
+const escalatedCivic = await commitUrbanCivicEvent({
+  runTransaction,
+  civicRef,
+  actorRef,
+  uid: contenderUid,
+  input: {
+    kind: 'reckless_driving', worldSeed, agency: 'Baltimore civic response', witnessCount: 3,
+    severity: 1, position: { x: 4, y: 0, z: 1 }
+  },
+  actorPose: { x: 0, y: 0, z: 0 },
+  nowMs: 32_000,
+  timestampFromMs
+});
+assert.equal(escalatedCivic.accepted, true);
+assert.equal(escalatedCivic.state.level, 2, 'an active shared event escalates instead of creating divergent client state');
+const contactTime = escalatedCivic.state.searchStartsAtMs + 2_500;
+const otherActorResolution = await resolveUrbanCivicOutcome({
+  runTransaction,
+  civicRef,
+  uid: ownerUid,
+  actorPose: { x: 4, y: 0, z: 1 },
+  actorVelocity: { vx: 0, vy: 0, vz: 0 },
+  nowMs: contactTime,
+  timestampFromMs
+});
+assert.deepEqual({ accepted: otherActorResolution.accepted, reason: otherActorResolution.reason }, { accepted: false, reason: 'not_actor' });
+const movingResolution = await resolveUrbanCivicOutcome({
+  runTransaction,
+  civicRef,
+  uid: contenderUid,
+  actorPose: { x: 4, y: 0, z: 1 },
+  actorVelocity: { vx: 4, vy: 0, vz: 0 },
+  nowMs: contactTime,
+  timestampFromMs
+});
+assert.deepEqual({ accepted: movingResolution.accepted, reason: movingResolution.reason }, { accepted: false, reason: 'actor_moving' });
+const resolvedCivic = await resolveUrbanCivicOutcome({
+  runTransaction,
+  civicRef,
+  uid: contenderUid,
+  actorPose: { x: 4, y: 0, z: 1 },
+  actorVelocity: { vx: 0, vy: 0, vz: 0 },
+  nowMs: contactTime,
+  timestampFromMs
+});
+assert.equal(resolvedCivic.accepted, true);
+assert.equal(resolvedCivic.outcome.type, 'citation');
+await assert.rejects(() => commitUrbanCivicEvent({
+  runTransaction,
+  civicRef,
+  actorRef,
+  uid: contenderUid,
+  input: { kind: 'assault', worldSeed, witnessCount: 1, severity: 1, position: { x: 100, y: 0, z: 0 } },
+  actorPose: { x: 0, y: 0, z: 0 },
+  nowMs: 50_000,
+  timestampFromMs
+}), /civic_event_out_of_range/);
+
 console.log(JSON.stringify({
   ok: true,
   contract: 'urban-room-transaction-v1',
   vehicleOwner: documents.get(entityRef.path).leaseOwnerUid,
   vehicleRevision: documents.get(entityRef.path).revision,
   npcCondition: documents.get(npcRef.path).condition,
+  civicOutcome: documents.get(civicRef.path).outcome.type,
   directAuthorityDocuments: documents.size
 }, null, 2));

@@ -63,7 +63,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     state.remoteEntities.clear();
     if (!room) return null;
     try {
-      const { createUrbanRoomAuthority } = await import('../multiplayer/urban-sandbox.js?v=1');
+      const { createUrbanRoomAuthority } = await import('../multiplayer/urban-sandbox.js?v=2');
       if (!active() || generation !== syncGeneration) return null;
       state.authority = createUrbanRoomAuthority({
         room,
@@ -134,14 +134,35 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   }
 
   function snapshot() {
+    const civic = state.authority?.civicSnapshot?.() || null;
     return Object.freeze({
       mode: state.authority ? 'room' : currentRoom() ? 'room_locked' : 'local',
       roomCode: state.authority?.roomCode || '',
       actorUid: state.authority?.actorUid || '',
       pendingVehicleId,
       impactPending,
-      synchronizedEntities: state.remoteEntities?.size || 0
+      synchronizedEntities: state.remoteEntities?.size || 0,
+      civicEventId: civic?.lastEvent?.id || '',
+      civicShared: civic?.shared === true
     });
+  }
+
+  function civicSnapshot() {
+    return state.authority?.civicSnapshot?.() || null;
+  }
+
+  function reportCivicEvent(event, witnesses) {
+    if (!currentRoom()) return Promise.resolve({ accepted: false, reason: 'local_session' });
+    if (!state.authority) {
+      sync();
+      return Promise.resolve({ accepted: false, reason: 'authority_connecting' });
+    }
+    return state.authority.reportCivicEvent(event, witnesses);
+  }
+
+  function resolveCivicOutcome() {
+    if (!state.authority) return Promise.resolve({ accepted: false, reason: 'authority_connecting' });
+    return state.authority.resolveCivicOutcome();
   }
 
   function dispose() {
@@ -160,7 +181,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
 
   globalThis.addEventListener('we3d-room-changed', sync);
   sync();
-  return Object.freeze({ dispose, requestVehicleEntry, snapshot, sync, update });
+  return Object.freeze({ civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update });
 }
 
 export { createUrbanRoomAuthorityRuntime };

@@ -585,10 +585,25 @@ service cloud.firestore {
 
     function validFrameData(frame) {
       return frame is map &&
-        frame.keys().hasOnly(['kind', 'locLat', 'locLon']) &&
+        frame.keys().hasOnly([
+          'kind',
+          'locLat',
+          'locLon',
+          'interiorKey',
+          'interiorFloorId',
+          'interiorFloorLevel'
+        ]) &&
         frame.kind in ['earth', 'moon', 'space'] &&
         frame.locLat is number &&
-        frame.locLon is number;
+        frame.locLon is number &&
+        (!('interiorKey' in frame) ||
+          (frame.interiorKey is string && frame.interiorKey.size() <= 180)) &&
+        (!('interiorFloorId' in frame) ||
+          (frame.interiorFloorId is string && frame.interiorFloorId.size() <= 220)) &&
+        (!('interiorFloorLevel' in frame) ||
+          (frame.interiorFloorLevel is int &&
+            frame.interiorFloorLevel >= 0 &&
+            frame.interiorFloorLevel <= 7));
     }
 
     function validPlayerDoc(roomId, uid) {
@@ -2008,6 +2023,13 @@ service cloud.firestore {
         // by the actor or room managers for support/moderation diagnostics.
         allow read: if isMultiplayerEntitled() && isRoomMember(roomId) &&
           (isSelf(uid) || canManageRoom(roomId));
+        allow create, update, delete: if false;
+      }
+
+      match /urbanCivic/{stateId} {
+        // The active witnessed event and its outcome are written only by the
+        // verified room transaction. Members share one consequence timeline.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
         allow create, update, delete: if false;
       }
 

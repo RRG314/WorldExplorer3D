@@ -71,7 +71,10 @@ function normalizeFrame(rawFrame = {}, fallbackKind = 'earth') {
   return {
     kind,
     locLat: finiteNumber(rawFrame.locLat, 0),
-    locLon: finiteNumber(rawFrame.locLon, 0)
+    locLon: finiteNumber(rawFrame.locLon, 0),
+    interiorKey: String(rawFrame.interiorKey || '').trim().slice(0, 180),
+    interiorFloorId: String(rawFrame.interiorFloorId || '').trim().slice(0, 220),
+    interiorFloorLevel: Math.max(0, Math.min(7, Math.floor(finiteNumber(rawFrame.interiorFloorLevel, 0))))
   };
 }
 
@@ -165,7 +168,10 @@ function toPlayerSnapshot(docSnap, data) {
     frame: {
       kind: String(data.frame?.kind || 'earth'),
       locLat: finiteNumber(data.frame?.locLat, 0),
-      locLon: finiteNumber(data.frame?.locLon, 0)
+      locLon: finiteNumber(data.frame?.locLon, 0),
+      interiorKey: String(data.frame?.interiorKey || ''),
+      interiorFloorId: String(data.frame?.interiorFloorId || ''),
+      interiorFloorLevel: Math.max(0, Math.min(7, Math.floor(finiteNumber(data.frame?.interiorFloorLevel, 0))))
     },
     pose: {
       x: finiteNumber(data.pose?.x, 0),
