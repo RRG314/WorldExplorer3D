@@ -218,9 +218,13 @@ try {
     const { vehicleDoorPosition } = await import('/app/js/urban-sandbox/vehicle-model.js?v=2');
     const allowed = new Set(['compact', 'sedan', 'suv', 'pickup', 'taxi', 'van', 'box-truck', 'bus']);
     const parked = ctx.urbanSandboxRuntime.vehicles;
+    const actor = ctx.Walk.state.walker;
+    ctx.timeOfDay = 'day';
+    ctx.advanceRuntimeTime?.(240);
     const snapshots = ctx.livingWorldRuntime.population.vehicleSnapshots();
-    const traffic = snapshots.find((candidate) => !candidate.promoted && allowed.has(candidate.variant?.bodyStyle) &&
-      parked.every((vehicle) => Math.hypot(vehicle.x - candidate.x, vehicle.z - candidate.z) > 9));
+    const traffic = snapshots.filter((candidate) => !candidate.promoted && allowed.has(candidate.variant?.bodyStyle) &&
+      parked.every((vehicle) => Math.hypot(vehicle.x - candidate.x, vehicle.z - candidate.z) > 9))
+      .sort((a, b) => Math.hypot(a.x - actor.x, a.z - actor.z) - Math.hypot(b.x - actor.x, b.z - actor.z))[0];
     if (!traffic) throw new Error('No promotable traffic vehicle was available');
     const placeAtCurrentDoor = () => {
       const current = ctx.livingWorldRuntime.population.vehicleSnapshots().find((entry) => entry.id === traffic.id);
@@ -236,7 +240,10 @@ try {
       return current;
     };
     let settled = null;
-    for (let index = 0; index < 4; index += 1) {
+    // Crossing the population relocation boundary intentionally hides actors
+    // for 1.25 s. Follow the selected car through that bounded hide window so
+    // this verifies interaction yield rather than depending on prior visibility.
+    for (let index = 0; index < 12; index += 1) {
       settled = placeAtCurrentDoor();
       ctx.advanceRuntimeTime?.(160);
     }

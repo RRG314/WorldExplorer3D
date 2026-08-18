@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-17 for the local 4.3.0 urban-sandbox foundation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
+Last reviewed: 2026-08-18 for the local 4.3.0 urban-sandbox foundation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
 
 ## Current Release Status
 
@@ -13,15 +13,20 @@ semantic street furniture, a five-slot session equipment inventory, held-item
 visuals and condition impacts against people, vehicles and props also work
 locally. Off-camera vehicle demotion, driver/passenger states, active traffic
 signal simulation, responder dispatch/pursuit, missions, garage/economy
-persistence and multiplayer vehicle/impact authority remain open in
-`docs/URBAN_SANDBOX_PLAN.md`.
+persistence remain open in `docs/URBAN_SANDBOX_PLAN.md`. Transaction-owned room
+vehicle leases and room condition impacts are implemented locally but their new
+Cloud Functions have not been deployed.
 
 The current equipment loadout is a local sandbox baseline, not trusted account
-inventory. It does not sync damage or equipment ownership in multiplayer and is
-not eligible for production until age/tone, moderation, authenticated
-progression, backend authority, audio/accessibility and user/device acceptance
-are completed. The fictional pulse sidearm and concussion charge are game-only
-mechanics; the app contains no real-world weapon construction guidance.
+inventory. Room condition changes now synchronize through server-owned entity
+documents, but equipment ownership, ammunition, rewards and room movement input
+are not trusted account state. Presence/pose is still client-authored under the
+existing bounded room rules, so this milestone is not a complete anti-cheat
+claim. It is not eligible for production until age/tone, moderation,
+authenticated progression, deployed-preview verification, audio/accessibility
+and user/device acceptance are completed. The fictional pulse sidearm and
+concussion charge are game-only mechanics; the app contains no real-world
+weapon construction guidance.
 
 The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 

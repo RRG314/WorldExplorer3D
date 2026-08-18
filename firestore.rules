@@ -1995,6 +1995,22 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      match /urbanEntities/{entityId} {
+        // Vehicle leases and condition changes are transaction-owned by Cloud
+        // Functions. Room clients can observe them but cannot forge ownership,
+        // position, damage, repair, or revision fields directly.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
+      match /urbanActors/{uid} {
+        // Server-owned action clocks bound equipment use and are readable only
+        // by the actor or room managers for support/moderation diagnostics.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId) &&
+          (isSelf(uid) || canManageRoom(roomId));
+        allow create, update, delete: if false;
+      }
+
       match /state/{stateId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
         allow create: if isMultiplayerEntitled() &&

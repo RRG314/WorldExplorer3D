@@ -122,6 +122,46 @@ function createUrbanEquipmentRuntime(options = {}) {
     return { kind: 'furniture', id: object.uuid, furnitureKind: object.userData.furnitureKind, ...result };
   }
 
+  function sharedTarget(detailed) {
+    if (!detailed) return null;
+    const ref = detailed.ref;
+    const entityId = detailed.kind === 'furniture'
+      ? String(ref?.userData?.urbanEntityId || '')
+      : String(ref?.id || '');
+    if (!entityId) return null;
+    return {
+      entityId,
+      kind: detailed.kind,
+      pose: { x: detailed.x, y: detailed.y, z: detailed.z, yaw: detailed.yaw || 0 },
+      label: detailed.kind === 'vehicle' ? ref.variant?.label : '',
+      style: detailed.kind === 'vehicle' ? ref.variant?.bodyStyle : '',
+      color: detailed.kind === 'vehicle' ? ref.color : 0
+    };
+  }
+
+  function applyAuthoritativeImpact(detailed, result) {
+    if (!detailed || !result?.state) return null;
+    const after = Number(result.state.condition ?? result.after ?? 1);
+    const destroyed = after <= .001;
+    if (detailed.kind === 'npc') {
+      const npc = detailed.ref;
+      npc.condition = after;
+      npc.reaction = destroyed ? 'downed' : 'hit';
+      npc.reactionUntil = destroyed ? Infinity : clock() + 1300;
+      npc.visual.setReaction(npc.reaction);
+      return { kind: 'npc', id: npc.id, before: result.before, after, destroyed };
+    }
+    if (detailed.kind === 'vehicle') {
+      detailed.ref.condition = after;
+      detailed.ref.visual.setCondition(after);
+      return { kind: 'vehicle', id: detailed.ref.id, before: result.before, after, destroyed };
+    }
+    const object = detailed.ref;
+    object.userData.condition = after;
+    object.rotation.z = destroyed ? .72 : Math.min(.18, (1 - after) * .2);
+    return { kind: 'furniture', id: object.userData.urbanEntityId, before: result.before, after, destroyed };
+  }
+
   function terrainHeight(x, z) {
     return typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ?.(x, z) || 0;
   }
@@ -166,8 +206,13 @@ function createUrbanEquipmentRuntime(options = {}) {
   function use() {
     if (!isActive() || appCtx.Walk?.state?.mode !== 'walk') return false;
     const currentEquipment = state.equipment.equipped();
-    if (appCtx.getCurrentMultiplayerRoom?.() && currentEquipment?.category !== 'utility') {
-      setStatus('Impact equipment is locked in rooms until host authority is enabled.', 2600);
+    const roomActive = !!appCtx.getCurrentMultiplayerRoom?.();
+    if (roomActive && currentEquipment?.category !== 'utility' && !state.authority) {
+      setStatus('Shared impact authority is connecting. Room damage remains locked.', 2600);
+      return true;
+    }
+    if (roomActive && state.authorityImpactPending && currentEquipment?.category !== 'utility') {
+      setStatus('The previous room interaction is still being verified.', 1800);
       return true;
     }
     const prepared = state.equipment.prepareUse(Date.now());
@@ -199,15 +244,12 @@ function createUrbanEquipmentRuntime(options = {}) {
       y: terrainHeight(actor.x + direction.x * equipment.range * .68, actor.z + direction.z * equipment.range * .68),
       z: actor.z + direction.z * equipment.range * .68
     };
-    if (equipment.blastRadius) {
-      results = blastTargets(impactPosition, targets, equipment).map((entry) => applyImpact(entry.target, entry.force)).filter(Boolean);
-      impactPulse(impactPosition, equipment.blastRadius);
-    } else if (aimed) {
-      const result = applyImpact(aimed.target, equipment.force);
-      if (result) results.push(result);
-      impactPosition = aimed.target;
-      if (equipment.category === 'sidearm') impactPulse(impactPosition, .8);
-    }
+    const selected = equipment.blastRadius
+      ? blastTargets(impactPosition, targets, equipment).map((entry) => ({ detailed: detailedTarget(entry.target), force: entry.force })).filter((entry) => entry.detailed)
+      : aimed ? [{ detailed: detailedTarget(aimed.target), force: equipment.force }] : [];
+    if (aimed && !equipment.blastRadius) impactPosition = aimed.target;
+    if (equipment.blastRadius) impactPulse(impactPosition, equipment.blastRadius);
+    else if (equipment.category === 'sidearm' && aimed) impactPulse(impactPosition, .8);
     const eventKind = equipment.category === 'explosive' ? 'explosive_use'
       : equipment.category === 'sidearm' ? 'weapon_discharge' : 'assault';
     reportCivicEvent({
@@ -218,8 +260,35 @@ function createUrbanEquipmentRuntime(options = {}) {
       audibleRadius: equipment.category === 'explosive' ? 52 : equipment.category === 'sidearm' ? 34 : 6,
       maximumWitnesses: 4
     });
-    state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, at: clock() });
-    setStatus(results.length ? `${equipment.label} affected ${results.length} target${results.length === 1 ? '' : 's'}.` : `${equipment.label}: no target in view.`);
+    if (roomActive && selected.length) {
+      const shared = selected.map((entry) => sharedTarget(entry.detailed));
+      if (shared.some((entry) => !entry)) {
+        setStatus('That object does not have a stable room identity.', 2200);
+      } else {
+        state.authorityImpactPending = true;
+        setStatus('Verifying shared impact…', 2600);
+        state.authority.commitImpacts(equipment, impactPosition, shared).then((response) => {
+          if (!isActive()) return;
+          state.authorityImpactPending = false;
+          if (!response?.accepted) {
+            setStatus(response?.reason === 'cooldown' ? 'Shared equipment is not ready yet.' : 'The room rejected that impact.', 2200);
+            return;
+          }
+          const byId = new Map((response.results || []).map((entry) => [entry.entityId, entry]));
+          results = selected.map((entry) => applyAuthoritativeImpact(entry.detailed, byId.get(sharedTarget(entry.detailed)?.entityId))).filter(Boolean);
+          state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'room', at: clock() });
+          setStatus(results.length ? `${equipment.label} affected ${results.length} shared target${results.length === 1 ? '' : 's'}.` : `${equipment.label}: no authorized target.`);
+        }).catch((error) => {
+          if (!isActive()) return;
+          state.authorityImpactPending = false;
+          setStatus(String(error?.message || 'Shared impact authority is unavailable.'), 2800);
+        });
+      }
+    } else {
+      results = selected.map((entry) => applyImpact(entry.detailed, entry.force)).filter(Boolean);
+      state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'local', at: clock() });
+      setStatus(results.length ? `${equipment.label} affected ${results.length} target${results.length === 1 ? '' : 's'}.` : `${equipment.label}: no target in view.`);
+    }
     render();
     return true;
   }

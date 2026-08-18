@@ -21,9 +21,16 @@ Production: unchanged on the verified 4.2.1 rollback
 - Interactive equipment baseline: implemented locally with five quick slots,
   held-item visuals, ammunition/charges/cooldowns, flashlight, melee, fictional
   pulse-sidearm and concussion-charge impacts against NPCs, vehicles and props.
-  It is deliberately session-local until authenticated progression and
-  multiplayer authority are implemented.
-- Phases 5–8: planned, not implemented by this milestone.
+  The loadout remains session-local; room vehicle leases and room condition
+  impacts now use server-owned transaction state rather than direct client
+  writes.
+- Phase 7 authority foundation: implemented locally. Two authenticated emulator
+  clients prove one concurrent vehicle lease owner, owner-only plausible motion,
+  safe release/reclaim, server-computed condition changes, shared reads and
+  denied direct writes. Passengers, cooperative missions, persistent garages,
+  account equipment and shared rewards remain open.
+- Phases 5–6 and the remaining Phase 7–8 depth are planned, not implemented by
+  this milestone.
 - Deployment: not authorized; production remains unchanged.
 
 ## Product direction
@@ -132,8 +139,10 @@ Acceptance journey:
 The user explicitly requested combat/equipment on 2026-08-17. The local baseline
 uses fictional, non-gory game equipment and a shared condition/reaction model.
 Age/tone policy, moderation, audio, deeper animation, authenticated ownership and
-server-authoritative multiplayer impacts remain release gates; a room client is
-not allowed to award equipment or publish damage as trusted state yet.
+server-authoritative account inventory and rewards remain release gates. Room
+clients cannot directly publish leases or damage; Cloud Functions transactionally
+compute those state changes. Player pose remains bounded client-authored presence,
+so this is an authority foundation rather than a complete anti-cheat system.
 
 ## Interactive equipment and object actions
 

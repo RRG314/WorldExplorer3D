@@ -264,6 +264,24 @@ async function seedData(testEnv) {
       disabledAt: Timestamp.fromMillis(Date.now() - 20_000),
       source: 'OpenStreetMap'
     });
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'urbanEntities', 'vehicle-state-1'), {
+      authority: 'urban-room-transaction-v1',
+      entityId: 'urban-vehicle:test-1',
+      kind: 'vehicle',
+      worldSeed: 'latlon:0,0',
+      pose: { x: 4, y: 0, z: 2, yaw: 0 },
+      condition: 1,
+      leaseOwnerUid: OWNER_UID,
+      leaseExpiresAt: Timestamp.fromMillis(Date.now() + 15_000),
+      revision: 1,
+      updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'urbanActors', MEMBER_UID), {
+      uid: MEMBER_UID,
+      lastEquipmentId: 'baton',
+      lastActionAt: Timestamp.fromMillis(Date.now() - 1_000),
+      updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
 
     await setDoc(doc(db, 'users', OWNER_UID, 'friends', INVITEE_UID), {
       uid: INVITEE_UID,
@@ -444,6 +462,37 @@ await runCheck('room clients cannot fabricate shared DeFlock state', async () =>
     disabledAt: serverTimestamp(),
     source: 'OpenStreetMap'
   }));
+});
+
+await runCheck('room member can read server-owned urban vehicle state', async () => {
+  await assertSucceeds(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'urbanEntities', 'vehicle-state-1')));
+});
+
+await runCheck('non-member cannot read private urban vehicle state', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'urbanEntities', 'vehicle-state-1')));
+});
+
+await runCheck('room clients cannot forge urban ownership or damage state', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'urbanEntities', 'forged-vehicle'), {
+    authority: 'urban-room-transaction-v1',
+    entityId: 'urban-vehicle:forged',
+    kind: 'vehicle',
+    worldSeed: 'latlon:0,0',
+    pose: { x: 0, y: 0, z: 0, yaw: 0 },
+    condition: 0,
+    leaseOwnerUid: MEMBER_UID,
+    revision: 999
+  }));
+});
+
+await runCheck('room actor can read own server action clock but cannot write it', async () => {
+  const reference = doc(memberDb, 'rooms', ROOM_ID, 'urbanActors', MEMBER_UID);
+  await assertSucceeds(getDoc(reference));
+  await assertFails(setDoc(reference, { lastActionAt: serverTimestamp() }, { merge: true }));
+});
+
+await runCheck('ordinary member cannot read another room actor action clock', async () => {
+  await assertFails(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'urbanActors', OWNER_UID)));
 });
 
 await runCheck('signed-in invite-code joiner can read private room metadata', async () => {

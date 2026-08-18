@@ -2,9 +2,10 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=1';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=1';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=2';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=1';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=2';
+import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=1';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=2';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=4';
 
@@ -65,7 +66,7 @@ function nearestEnterableVehicle(state) {
   if (!walker) return null;
   let nearest = null;
   for (const vehicle of state.vehicles) {
-    if (vehicle.attachedToPlayer || vehicle.occupied || Number(vehicle.condition ?? 1) <= .05) continue;
+    if (vehicle.attachedToPlayer || vehicle.occupied || vehicle.roomOccupiedByOther || Number(vehicle.condition ?? 1) <= .05) continue;
     const door = vehicleDoorPosition(vehicle);
     const distance = Math.hypot(door.x - walker.x, door.z - walker.z);
     if (distance > ENTER_DISTANCE || nearest && distance >= nearest.distance) continue;
@@ -84,6 +85,8 @@ function nearestEnterableVehicle(state) {
       yaw: agent.yaw,
       driverSide: state.driveOnLeft ? 1 : -1
     };
+    const remote = state.remoteEntities?.get(vehicle.id);
+    if (remote?.leaseOwnerUid && remote.leaseOwnerUid !== state.authority?.actorUid && remote.leaseExpiresMs > Date.now()) continue;
     const door = vehicleDoorPosition(vehicle);
     const distance = Math.hypot(door.x - walker.x, door.z - walker.z);
     if (distance > ENTER_DISTANCE || nearest && distance >= nearest.distance) continue;
@@ -344,6 +347,13 @@ function updateTransition(state, dt) {
   }
   if (t >= 1) {
     setDoorProgress(transition.vehicle, 0);
+    if (transition.kind === 'exit' && state.authority) {
+      state.authority.releaseVehicle(transition.vehicle, vehiclePose(transition.vehicle)).then((result) => {
+        if (!result?.accepted && activeWorldMatches(state)) setStatus(state, 'Vehicle release is still synchronizing with the room.', 1800);
+      }).catch(() => {
+        if (activeWorldMatches(state)) setStatus(state, 'Vehicle release is reconnecting; the lease will expire safely.', 2200);
+      });
+    }
     state.lastAction = Object.freeze({
       type: transition.kind === 'enter' ? 'entered' : 'exited',
       vehicleId: transition.vehicle.id,
@@ -576,6 +586,24 @@ function useEquipped(state) {
 function updateEquipmentEffects(state, dt) {
   state.equipmentRuntime?.update(dt);
 }
+
+function enterVehicleAfterClaim(state, vehicle) {
+  if (!vehicle) return false;
+  if (!vehicle.playerClaimed) {
+    vehicle.playerClaimed = true;
+    reportCivicEvent(state, {
+      kind: 'vehicle_taken',
+      vehicleId: vehicle.id,
+      position: vehiclePose(vehicle),
+      severity: 1,
+      radius: 32,
+      audibleRadius: 7,
+      maximumWitnesses: 3
+    });
+  }
+  return beginEnter(state, vehicle);
+}
+
 function performInteraction(state, candidate) {
   if (candidate?.action === 'exit_vehicle') {
     beginExit(state);
@@ -602,19 +630,7 @@ function performInteraction(state, candidate) {
     vehicle = promoteTrafficVehicle(state, trafficAgentId, vehicleId);
     if (!vehicle) return false;
   }
-  if (vehicle && !vehicle.playerClaimed) {
-    vehicle.playerClaimed = true;
-    reportCivicEvent(state, {
-      kind: 'vehicle_taken',
-      vehicleId: vehicle.id,
-      position: vehiclePose(vehicle),
-      severity: 1,
-      radius: 32,
-      audibleRadius: 7,
-      maximumWitnesses: 3
-    });
-  }
-  return beginEnter(state, vehicle);
+  return state.roomAuthorityRuntime?.requestVehicleEntry(vehicle) === true;
 }
 
 function updatePrompt(state) {
@@ -699,6 +715,7 @@ function snapshot(state) {
     lastCivicAction: state.lastCivicAction,
     lastNpcAction: state.lastNpcAction,
     lastImpactAction: state.lastImpactAction,
+    authority: state.roomAuthorityRuntime?.snapshot?.() || Object.freeze({ mode: 'local' }),
     equipment: state.equipment?.snapshot?.() || null,
     civicResponse: state.civic?.snapshot?.() || null,
     worldLoadSequence: Number(appCtx._worldLoadSequence || 0),
@@ -708,6 +725,7 @@ function snapshot(state) {
 
 function disposeRuntime(state, reason = 'disposed') {
   if (!state || state.disposed) return false;
+  state.roomAuthorityRuntime?.dispose?.();
   state.disposed = true;
   state.unregisterInteraction?.();
   appCtx.unregisterRuntimeOwner?.(state.owner);
@@ -849,7 +867,11 @@ function startUrbanSandboxRuntime(options = {}) {
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
-    flashlight
+    flashlight,
+    authority: null,
+    authorityImpactPending: false,
+    remoteEntities: new Map(),
+    roomAuthorityRuntime: null
   };
   state.civic = createCivicResponseModel({
     request: options.request,
@@ -866,6 +888,15 @@ function startUrbanSandboxRuntime(options = {}) {
     reportCivicEvent: (event) => reportCivicEvent(state, event),
     setStatus: (message, duration) => setStatus(state, message, duration),
     now
+  });
+  state.roomAuthorityRuntime = createUrbanRoomAuthorityRuntime({
+    state,
+    isActive: () => activeWorldMatches(state),
+    vehiclePose,
+    syncVehiclePose,
+    setStatus: (message, duration) => setStatus(state, message, duration),
+    enterVehicle: (vehicle) => enterVehicleAfterClaim(state, vehicle),
+    beginExit: () => beginExit(state)
   });
   state.reportCivicEvent = (event) => reportCivicEvent(state, event);
   state.unregisterInteraction = appCtx.registerContextInteraction?.({
@@ -905,7 +936,7 @@ function startUrbanSandboxRuntime(options = {}) {
     critical: false,
     enabled: () => activeWorldMatches(state),
     update(frame) {
-      if (state.activeVehicle?.attachedToPlayer) syncVehiclePose(state.activeVehicle, vehiclePose(state.activeVehicle));
+      state.roomAuthorityRuntime?.update?.(frame.dt);
       updateTransition(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);

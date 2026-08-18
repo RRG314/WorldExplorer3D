@@ -4,7 +4,7 @@ Status: authoritative verification/release inventory for version 4.3.0 release s
 
 ## 1. Current release verdict
 
-**Approved for production promotion.** Real installed-Chrome journeys, emulator-backed security/multiplayer tests, lifecycle checks, transport visuals and static audits pass. The immutable 4.3.0 candidate was deployed to a Firebase preview channel, visually inspected, and passed the production operational-endpoint check. The previous unreachable-asset, Discovery-occlusion, candidate-identity and preview-endpoint blockers are closed.
+**Local development line; not approved for production promotion.** Production remains on the verified 4.2.1 rollback. The current 4.3.0 urban-sandbox branch has focused installed-Chrome and emulator evidence, but its new authority functions are not deployed and user/device acceptance remains open.
 
 The earlier 2.02 GB editable-world high-water path is resolved on the local memory-remediation branch by targeted edits and authoritative terrain release. Production remains on 4.2.1; target-device acceptance is still required before a replacement release.
 
@@ -145,6 +145,7 @@ The following results were observed in the current working source before this re
 | title memory release | pass locally; 533.7 MB loaded to 153.8 MB released, zero terrain/far/accepted-ground/elevation ownership, reload at 568.3 MB |
 | heavy Living/Editable World journey | pass locally; 112 entrances, moving population, persisted suppression/restore, no full reload, 729.0 MB to 728.2 MB post-GC edit envelope |
 | urban vehicle/equipment journey | local installed-Chrome gate; exact vehicle enter/drive/exit, nine-family promotion contract, NPC talk/take/impact, semantic prop impact, civic witnesses, collapsed desktop/touch inventory and responsive UI; production/user acceptance remains open |
+| urban room authority | pass locally: pure concurrent transaction contract plus two independent Auth clients against Firestore/Functions emulators; single vehicle owner, owner-only plausible motion, release/reclaim, shared server-computed condition and direct-write denial |
 | rapid cross-location replacement | pass locally in installed Chrome; superseded Baltimore work aborted, Monaco alone published, provider ledgers returned to zero, terrain concurrency bounded at 12, no duplicate URLs or console errors |
 | production artifact | 4.3.0 clean-source production candidate build, identity verification and bundled browser boot pass; exact final identity is recorded in `dist/build-manifest.json` |
 | legacy bundled-Chromium matrices | inconclusive: fixed-world travel and editor-multiplayer harnesses stalled without a failing assertion; equivalent installed-Chrome focused journeys pass |

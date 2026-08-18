@@ -348,9 +348,10 @@ Pedestrians and vehicles are pooled instanced presentations updated at 10 Hz wit
 
 The local urban-interaction baseline also derives street lamps, waste baskets,
 street names and traffic controls from mapped data or conservative published-road
-semantics. Its on-demand five-slot equipment loadout and object impacts are
-session-local and explicitly blocked from trusted multiplayer mutation until
-backend authority, account ownership and moderation gates exist.
+semantics. Its on-demand five-slot equipment loadout remains session-local. Room
+vehicle claims and entity condition changes now pass through Cloud Functions and
+read-only synchronized room documents; account equipment, ammunition and rewards
+are still not trusted persistence.
 
 ## 8. Rendering, lighting, and visual systems
 
@@ -1050,7 +1051,7 @@ This path follows actual runtime ownership: boot, lifecycle, Earth publication, 
 | Roads, bridges, ramps, tunnels | Implemented and user-accessible | Compiler, ownership, collision, camera, regional context, and browser journeys exist; provider coverage still varies. |
 | Buildings, landmarks, hydrology, vegetation | Implemented and user-accessible | Mapped plus explicitly inferred/generated presentation. |
 | Living World traffic and pedestrians | Implemented and user-accessible | Ten pedestrian and nine traffic families derive from the published world with bounded population/promotion budgets. |
-| Urban interaction/equipment | Local implementation / acceptance pending | Contextual actor, vehicle and prop actions work locally; equipment ownership and impacts are not multiplayer-authoritative or production-approved. |
+| Urban interaction/equipment | Local implementation / acceptance pending | Contextual actor, vehicle and prop actions work locally; room leases and condition impacts are transaction-owned, but equipment ownership/rewards and full movement authority are not production-approved. |
 | Walking, driving, drone, plane, boat | Implemented and user-accessible | Normalized control and surface contracts. |
 | Moon | Implemented and user-accessible | Apollo 11/Mare Tranquillitatis destination with astronaut/rover traversal. |
 | Mars | Implemented and user-accessible | Mars destination with terrain, atmosphere, astronaut/rover traversal. |

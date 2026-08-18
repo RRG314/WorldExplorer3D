@@ -13,6 +13,8 @@ const expectedExports = [
   'acceptDiscoveryTrade',
   'cancelDiscoveryTrade',
   'claimExplorerDiscovery',
+  'claimUrbanVehicle',
+  'commitUrbanImpacts',
   'createDiscoveryTrade',
   'createCheckoutSession',
   'createPortalSession',
@@ -25,11 +27,13 @@ const expectedExports = [
   'listExplorerDiscoveries',
   'moderateOverlayFeature',
   'saveOverlayFeatureDraft',
+  'releaseUrbanVehicle',
   'startTrial',
   'stripeWebhook',
   'submitContribution',
   'submitOverlayFeature',
-  'updateAccountProfile'
+  'updateAccountProfile',
+  'updateUrbanVehicle'
 ];
 
 for (const exportName of expectedExports) {

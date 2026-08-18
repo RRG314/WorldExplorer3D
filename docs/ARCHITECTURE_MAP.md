@@ -180,6 +180,8 @@ The Earth compiler is organized by data products rather than UI screens:
 - Living World derivation;
 - bounded Living World actor promotion, contextual urban interactions and
   session equipment/impact runtime;
+- room urban authority adapter backed by transaction-owned vehicle leases,
+  action clocks and entity condition state;
 - editable-world suppression and safe semantic objects;
 - World Discovery environment cells, encounter slots and wildlife slots.
 

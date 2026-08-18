@@ -126,6 +126,22 @@
         "function": "deleteAccount"
       },
       {
+        "source": "/claimUrbanVehicle",
+        "function": "claimUrbanVehicle"
+      },
+      {
+        "source": "/updateUrbanVehicle",
+        "function": "updateUrbanVehicle"
+      },
+      {
+        "source": "/releaseUrbanVehicle",
+        "function": "releaseUrbanVehicle"
+      },
+      {
+        "source": "/commitUrbanImpacts",
+        "function": "commitUrbanImpacts"
+      },
+      {
         "source": "/submitContribution",
         "function": "submitContribution"
       },
@@ -234,6 +250,10 @@
     "firestore": {
       "host": "127.0.0.1",
       "port": 8080
+    },
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
     }
   }
 }

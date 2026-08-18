@@ -80,6 +80,8 @@ rooms/{roomId}
   worldModifications/{modificationId}
   paintClaims/{claimId}
   deflockStates/{cameraId}
+  urbanEntities/{entityId}
+  urbanActors/{uid}
 
 overlayFeatures/{featureId}
   revisions/{revisionId}
@@ -116,6 +118,8 @@ Room meshes/world provider data are not stored in Firestore. Every participant b
 - append-only or constrained leaderboard/activity behavior;
 - ordinary clients cannot publish public overlays, site content or admin activity;
 - discovery server-owned claims/items/trades cannot be forged through a normal client write.
+- urban vehicle leases, entity condition and equipment action clocks are readable
+  by permitted room participants but writable only by Cloud Functions.
 
 Rules are a server-enforced boundary. UI hiding is presentation only and is never authorization.
 
@@ -132,6 +136,20 @@ Rules are a server-enforced boundary. UI hiding is presentation only and is neve
 - `updateAccountProfile`
 - `deleteAccount`
 - `stripeWebhook`
+
+### Urban room authority
+
+- `claimUrbanVehicle`
+- `updateUrbanVehicle`
+- `releaseUrbanVehicle`
+- `commitUrbanImpacts`
+
+These endpoints verify authentication, active room membership, the room Earth
+world seed and current presence. Transactions permit one unexpired vehicle lease,
+bounded pose updates, server-owned equipment force/cooldowns and server-owned
+entity condition revisions. Client presence remains the position input and is not
+a complete anti-cheat authority. Account inventory, rewards and repair ownership
+are not part of this milestone.
 
 Stripe secrets, price IDs and webhook verification remain server-side. Browser plan labels are not trusted. The webhook resolves the user and writes plan/subscription state after signature verification.
 

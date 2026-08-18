@@ -58,7 +58,7 @@ The current landing page represents the player as the explorer, current Earth di
 | multiple pedestrian archetypes | Implemented and user-accessible | procedural catalog, not photoreal scanned characters |
 | multiple vehicle archetypes | Implemented and user-accessible | compact, sedan, SUV, pickup, taxi, passenger/delivery van, box truck and city bus |
 | contextual NPC/object actions | Local implementation / acceptance pending | Talk, Take, Inspect and condition reactions use one contextual prompt |
-| equipment and object impacts | Local implementation / acceptance pending | collapsed five-slot session loadout; not trusted account or multiplayer state |
+| equipment and object impacts | Local implementation / acceptance pending | collapsed five-slot session loadout; room condition changes are server-transaction-owned, while account equipment/ammunition remain untrusted session state |
 | navigation graphs | Implemented and user-accessible | published-world derived; no separate network provider |
 | persistence across visibility | Partial | population is runtime presentation, not a durable global NPC simulation |
 | continuous MMO population | Planned only / not architecture | rooms synchronize bounded players, not worldwide agents |

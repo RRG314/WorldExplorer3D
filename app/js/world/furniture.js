@@ -239,6 +239,13 @@ function markFurniture(group, kind, provenance = 'inferred') {
   group.userData.provenance = provenance;
   group.userData.condition = 1;
   group.userData.interactiveWorldObject = true;
+  const identitySeed = `${kind}:${provenance}:${group.position.x.toFixed(1)}:${group.position.z.toFixed(1)}`;
+  let hash = 2166136261;
+  for (const char of identitySeed) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  group.userData.urbanEntityId = `furniture:${kind}:${(hash >>> 0).toString(16)}`;
 }
 
 function createLightPost(x, z, provenance = 'inferred') {
