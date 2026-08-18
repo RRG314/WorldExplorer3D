@@ -8,9 +8,11 @@ Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has
 
 The GTA-like urban sandbox is a phased product direction, not a completed claim.
 The first parked-car possession loop and supported ambient-car promotion work
-locally. Off-camera traffic demotion, heavy-vehicle close-range models, NPC
-reactions, civic response, missions, garage/economy persistence and multiplayer
-vehicle leases remain open in `docs/URBAN_SANDBOX_PLAN.md`.
+locally. Pedestrian witnessing, one bounded close-range witness promotion and a
+temporary civic-attention lifecycle also work locally. Off-camera actor
+demotion, heavy-vehicle close-range models, general NPC dialogue, responder
+dispatch/pursuit, missions, garage/economy persistence and multiplayer vehicle
+leases remain open in `docs/URBAN_SANDBOX_PLAN.md`.
 
 The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 

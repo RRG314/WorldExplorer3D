@@ -1,4 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
+import { createCivicResponseModel } from './civic-response-model.js?v=1';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=1';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=1';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=1';
 
@@ -257,6 +260,116 @@ function beginExit(state) {
   return true;
 }
 
+function civicActorPosition(state) {
+  if (state.activeVehicle) return vehiclePose(state.activeVehicle);
+  return appCtx.Walk?.state?.walker || appCtx.car || null;
+}
+
+function updateCivicStatus(state) {
+  const root = state.civicUi?.root;
+  if (!root) return;
+  const snapshot = state.civic?.snapshot?.();
+  const status = snapshot?.status;
+  root.classList.toggle('show', status?.visible === true);
+  root.setAttribute('aria-hidden', status?.visible === true ? 'false' : 'true');
+  root.dataset.level = String(snapshot?.level || 0);
+  if (status?.visible) {
+    state.civicUi.title.textContent = status.title;
+    state.civicUi.detail.textContent = status.detail;
+    state.civicUi.meter.textContent = '●'.repeat(snapshot.level) + '○'.repeat(Math.max(0, 3 - snapshot.level));
+  }
+}
+
+function promoteCivicWitness(state, witness) {
+  if (!witness?.id) return null;
+  const existing = state.npcs.find((npc) => npc.sourceAgentId === witness.id);
+  if (existing) {
+    existing.reaction = witness.reaction;
+    existing.visual.setReaction(witness.reaction);
+    return existing;
+  }
+  if (state.npcs.length >= state.npcBudget) return null;
+  const promoted = state.population?.promotePedestrian?.(witness.id);
+  if (!promoted) return null;
+  const definition = {
+    ...promoted,
+    id: `urban-npc:${state.worldIdentity}:${promoted.id}`,
+    sourceAgentId: promoted.id,
+    source: 'living-world-promoted-witness'
+  };
+  const visual = createUrbanNpcVisual(THREE, definition);
+  const npc = { ...definition, visual, reaction: promoted.reaction };
+  visual.root.position.set(promoted.x, promoted.y, promoted.z);
+  visual.root.rotation.set(0, promoted.yaw, 0);
+  state.group.add(visual.root);
+  state.npcs.push(npc);
+  return npc;
+}
+
+function reportCivicEvent(state, event = {}) {
+  const position = event.position || civicActorPosition(state);
+  const witnesses = state.population?.witnessEvent?.({
+    kind: event.kind,
+    position,
+    radius: event.radius,
+    audibleRadius: event.audibleRadius,
+    maximumWitnesses: event.maximumWitnesses
+  }) || [];
+  const result = state.civic.observe({ ...event, position }, witnesses);
+  if (result.accepted) {
+    promoteCivicWitness(state, witnesses[0]);
+    state.lastCivicAction = Object.freeze({
+      type: event.kind,
+      eventId: result.event.id,
+      witnessCount: result.event.witnessCount,
+      at: now()
+    });
+  }
+  updateCivicStatus(state);
+  return result;
+}
+
+function updateCivicResponse(state, dt) {
+  const step = Math.max(0, Number(dt) || 0);
+  const civicSnapshot = state.civic.update(step, civicActorPosition(state));
+  const witnessReaction = civicSnapshot.phase === 'observed' || civicSnapshot.phase === 'reporting'
+    ? 'reporting'
+    : civicSnapshot.phase === 'searching' ? 'watching' : '';
+  state.npcs.forEach((npc) => {
+    if (npc.reaction === witnessReaction) return;
+    npc.reaction = witnessReaction;
+    npc.visual.setReaction(witnessReaction);
+  });
+  state.recklessEventCooldown = Math.max(0, state.recklessEventCooldown - step);
+  if (state.activeVehicle?.attachedToPlayer && appCtx.Walk?.state?.mode !== 'walk') {
+    const mph = Math.abs(carSpeedToMph(Number(appCtx.car?.speed || 0)));
+    const roadLimit = Math.max(15, Number(appCtx.car?.road?.limit || 25));
+    const reckless = mph >= Math.max(45, roadLimit + 18);
+    state.recklessElapsed = reckless
+      ? Math.min(4, state.recklessElapsed + step)
+      : Math.max(0, state.recklessElapsed - step * 2);
+    if (state.recklessElapsed >= 2 && state.recklessEventCooldown <= 0) {
+      const result = reportCivicEvent(state, {
+        kind: 'reckless_driving',
+        vehicleId: state.activeVehicle.id,
+        severity: 1,
+        radius: 34,
+        audibleRadius: 18,
+        maximumWitnesses: 3
+      });
+      state.recklessEventCooldown = result.accepted ? 14 : 4;
+      state.recklessElapsed = 0;
+    }
+  } else {
+    state.recklessElapsed = 0;
+  }
+  state.civicUiElapsed += step;
+  if (state.civicUiElapsed >= .1) {
+    state.civicUiElapsed = 0;
+    updateCivicStatus(state);
+  }
+}
+
 function performInteraction(state, candidate) {
   if (candidate?.action === 'exit_vehicle') {
     beginExit(state);
@@ -297,6 +410,15 @@ function performInteraction(state, candidate) {
     syncVehiclePose(vehicle, definition);
     state.group.add(visual.root);
     state.vehicles.push(vehicle);
+    reportCivicEvent(state, {
+      kind: 'vehicle_taken',
+      vehicleId: vehicle.id,
+      position: definition,
+      severity: 1,
+      radius: 32,
+      audibleRadius: 7,
+      maximumWitnesses: 3
+    });
   }
   return beginEnter(state, vehicle);
 }
@@ -353,9 +475,21 @@ function snapshot(state) {
         attachedToPlayer: vehicle.attachedToPlayer
       });
     })),
+    interactiveNpcs: Object.freeze(state.npcs.map((npc) => Object.freeze({
+      id: npc.id,
+      sourceAgentId: npc.sourceAgentId,
+      archetype: npc.archetype,
+      reaction: npc.reaction,
+      x: Number(npc.x.toFixed(2)),
+      y: Number(npc.y.toFixed(2)),
+      z: Number(npc.z.toFixed(2)),
+      yaw: Number(npc.yaw.toFixed(4))
+    }))),
     lastAction: state.lastAction,
+    lastCivicAction: state.lastCivicAction,
+    civicResponse: state.civic?.snapshot?.() || null,
     worldLoadSequence: Number(appCtx._worldLoadSequence || 0),
-    budgets: Object.freeze({ interactiveVehicles: state.budget, mobile: state.mobile })
+    budgets: Object.freeze({ interactiveVehicles: state.budget, interactiveNpcs: state.npcBudget, mobile: state.mobile })
   });
 }
 
@@ -366,15 +500,19 @@ function disposeRuntime(state, reason = 'disposed') {
   appCtx.unregisterRuntimeOwner?.(state.owner);
   state.prompt?.button?.removeEventListener('click', state.onPromptClick);
   state.prompt?.root?.classList.remove('show');
+  state.civicUi?.root?.classList.remove('show');
   if (state.activeVehicle?.attachedToPlayer) {
     appCtx.carMesh?.remove?.(state.activeVehicle.visual.root);
     state.activeVehicle.attachedToPlayer = false;
   }
   resetPlayerVehicleVisual(state);
   state.vehicles.forEach((vehicle) => vehicle.visual.dispose());
+  state.npcs.forEach((npc) => npc.visual.dispose());
   state.group.removeFromParent?.();
   state.vehicles.length = 0;
+  state.npcs.length = 0;
   state.activeVehicle = null;
+  state.civic?.clear?.();
   state.reason = String(reason || 'disposed');
   if (activeRuntime === state) activeRuntime = null;
   if (appCtx.urbanSandboxRuntime === state) appCtx.urbanSandboxRuntime = null;
@@ -429,6 +567,12 @@ function startUrbanSandboxRuntime(options = {}) {
     key: document.getElementById('urbanVehiclePromptKey'),
     button: document.getElementById('urbanVehiclePromptButton')
   };
+  const civicUi = {
+    root: document.getElementById('urbanCivicStatus'),
+    title: document.getElementById('urbanCivicStatusTitle'),
+    detail: document.getElementById('urbanCivicStatusDetail'),
+    meter: document.getElementById('urbanCivicStatusMeter')
+  };
   const owner = `urban-sandbox:${publication.sequence}`;
   const state = {
     owner,
@@ -436,8 +580,11 @@ function startUrbanSandboxRuntime(options = {}) {
     sequence: publication.sequence,
     group,
     vehicles,
+    npcs: [],
     prompt,
+    civicUi,
     budget,
+    npcBudget: mobile ? 1 : 2,
     mobile,
     population: livingWorld.population,
     worldIdentity,
@@ -450,10 +597,20 @@ function startUrbanSandboxRuntime(options = {}) {
     defaultWheelMeshes: [...(appCtx.wheelMeshes || [])],
     defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'classic-utility-d'),
     lastAction: null,
+    lastCivicAction: null,
     statusMessage: '',
     statusUntil: 0,
-    promptElapsed: 0
+    promptElapsed: 0,
+    recklessElapsed: 0,
+    recklessEventCooldown: 0,
+    civicUiElapsed: 0,
+    civic: null
   };
+  state.civic = createCivicResponseModel({
+    request: options.request,
+    getActorPosition: () => civicActorPosition(state)
+  });
+  state.reportCivicEvent = (event) => reportCivicEvent(state, event);
   state.unregisterInteraction = appCtx.registerContextInteraction?.({
     id: 'urban_vehicle',
     priority: 80,
@@ -475,6 +632,7 @@ function startUrbanSandboxRuntime(options = {}) {
     update(frame) {
       if (state.activeVehicle?.attachedToPlayer) syncVehiclePose(state.activeVehicle, vehiclePose(state.activeVehicle));
       updateTransition(state, frame.dt);
+      updateCivicResponse(state, frame.dt);
       state.promptElapsed += frame.dt;
       if (state.promptElapsed >= 0.08) {
         state.promptElapsed = 0;
@@ -489,6 +647,7 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.enterUrbanVehicleByIdForSupport = (vehicleId) => beginEnter(state, vehicles.find((vehicle) => vehicle.id === vehicleId));
   appCtx.exitUrbanVehicleForSupport = () => beginExit(state);
   updatePrompt(state);
+  updateCivicStatus(state);
   return state;
 }
 

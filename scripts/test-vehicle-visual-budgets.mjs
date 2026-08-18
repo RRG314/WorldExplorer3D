@@ -43,7 +43,8 @@ try {
       { createBoatModeMesh },
       { createExpeditionSpacecraftMesh },
       { createUrbanVehicleVisual },
-      { URBAN_VEHICLE_CATALOG }
+      { URBAN_VEHICLE_CATALOG },
+      { createUrbanNpcVisual }
     ] = await Promise.all([
       import('/app/js/engine/classic-utility-car.js?v=2'),
       import('/app/js/walking/field-navigator-mesh.js?v=1'),
@@ -51,7 +52,8 @@ try {
       import('/app/js/boat-mode/boat-model.js?v=2'),
       import('/app/js/space/expedition-spacecraft-mesh.js?v=1'),
       import('/app/js/urban-sandbox/vehicle-visuals.js?v=1'),
-      import('/app/js/urban-sandbox/vehicle-model.js?v=1')
+      import('/app/js/urban-sandbox/vehicle-model.js?v=1'),
+      import('/app/js/urban-sandbox/npc-visuals.js?v=1')
     ]);
     const carResult = createClassicUtilityCar(THREE);
     const planeResult = createExpeditionPlaneMesh();
@@ -66,6 +68,16 @@ try {
       variant,
       visual: createUrbanVehicleVisual(THREE, { id: `budget:${variant.id}`, variant, color: variant.color })
     }));
+    const urbanNpc = createUrbanNpcVisual(THREE, {
+      id: 'budget:witness',
+      archetype: 'weekend-explorer',
+      heightScale: 1,
+      outfitColor: 0x496673,
+      pantsColor: 0x29333d,
+      hairColor: 0x241d18,
+      skinColor: 0x9a6d52,
+      reaction: 'reporting'
+    });
 
     function measure(root) {
       let meshes = 0;
@@ -126,7 +138,13 @@ try {
         ...measure(visual.root),
         wheels: visual.wheels.length,
         doors: Object.keys(visual.doors).length
-      }))
+      })),
+      urbanNpc: {
+        ...measure(urbanNpc.root),
+        armRigs: Object.keys(urbanNpc.armPivots).length,
+        legRigs: urbanNpc.legPivots.length,
+        reportingPhoneVisible: urbanNpc.phone.visible === true
+      }
     };
   });
 
@@ -165,6 +183,12 @@ try {
       `${vehicle.id} exceeded its close-range visual budget: ${JSON.stringify(vehicle)}`);
     assert.equal(vehicle.transparentMaterials, 0, `${vehicle.id} added transparent draw-order work`);
   }
+  assert.equal(models.urbanNpc.armRigs, 2, 'interactive NPC lost its arm animation rigs');
+  assert.equal(models.urbanNpc.legRigs, 2, 'interactive NPC lost its leg animation rigs');
+  assert.equal(models.urbanNpc.reportingPhoneVisible, true, 'reporting NPC lost its contextual prop');
+  assert.ok(models.urbanNpc.meshes <= 24 && models.urbanNpc.triangles <= 1000 && models.urbanNpc.materials <= 8,
+    `interactive NPC exceeded its close-range visual budget: ${JSON.stringify(models.urbanNpc)}`);
+  assert.equal(models.urbanNpc.transparentMaterials, 0, 'interactive NPC added transparent draw-order work');
 
   assert.deepEqual(fatalErrors, []);
   console.log(JSON.stringify({ ok: true, models }, null, 2));

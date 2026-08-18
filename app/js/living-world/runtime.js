@@ -8,7 +8,7 @@ import {
 import { compileEntranceCatalog } from './entrance-catalog.js?v=1';
 import { createFacadeDepthPresentation } from './facade-depth.js?v=1';
 import { compilePedestrianGraph, compileTrafficGraph } from './navigation-graphs.js?v=1';
-import { createLivingWorldPopulation } from './population.js?v=2';
+import { createLivingWorldPopulation } from './population.js?v=5';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -110,6 +110,15 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car,
     getTimePhase: () => appCtx.timeOfDay,
+    hasPedestrianLineOfSight(from, to) {
+      const samples = [.33, .66];
+      return samples.every((amount) => appCtx.checkBuildingCollision?.(
+        from.x + (to.x - from.x) * amount,
+        from.z + (to.z - from.z) * amount,
+        .22,
+        { actorBaseY: Math.min(from.y, to.y), actorHeight: 1.7 }
+      )?.collision !== true);
+    },
     tier
   });
   appCtx.addEarthWorldObject?.(population.group);

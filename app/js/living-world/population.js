@@ -119,7 +119,10 @@ function createAgents(count, graph, random, kind) {
       motionTime: random() * Math.PI * 2,
       waiting: false,
       promoted: false,
-      currentSpeed: 0
+      currentSpeed: null,
+      reaction: '',
+      reactionRemaining: 0,
+      reactionTarget: null
     });
   }
   return agents;
@@ -132,7 +135,11 @@ function agentPose(agent, graph) {
   const x = edge.p1.x + (edge.p2.x - edge.p1.x) * t;
   const y = edge.p1.y + (edge.p2.y - edge.p1.y) * t;
   const z = edge.p1.z + (edge.p2.z - edge.p1.z) * t;
-  return { x, y, z, yaw: Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z) };
+  let yaw = Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z);
+  if (agent.reactionRemaining > 0 && agent.reactionTarget) {
+    yaw = Math.atan2(agent.reactionTarget.x - x, agent.reactionTarget.z - z);
+  }
+  return { x, y, z, yaw };
 }
 
 function selectSafeRelocationEdge(graph, random, kind, reference) {
@@ -184,8 +191,17 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       if (edge.structure?.terrainMode === 'subgrade') speed *= .82;
       if (agent.progress > edge.length * .78 && (outgoing.get(edge.to)?.length || 0) > 1) speed *= .55;
       if (reference && pose && Math.hypot(pose.x - reference.x, pose.z - reference.z) < 7) speed *= .12;
-    } else if (edge.role === 'crossing') {
-      speed *= behavior.crossingBlocked?.(edge) ? 0 : .86;
+    } else {
+      if (agent.reactionRemaining > 0) {
+        agent.reactionRemaining = Math.max(0, agent.reactionRemaining - dt * stride);
+        if (agent.reaction === 'reporting' || agent.reaction === 'watching') speed = 0;
+        else if (agent.reaction === 'startled') speed *= 1.65;
+        if (agent.reactionRemaining <= 0) {
+          agent.reaction = '';
+          agent.reactionTarget = null;
+        }
+      }
+      if (edge.role === 'crossing') speed *= behavior.crossingBlocked?.(edge) ? 0 : .86;
     }
     agent.waiting = speed < agent.speed * .5;
     agent.currentSpeed = speed;
@@ -244,11 +260,22 @@ function pedestrianTransform(role, agent, slot = 0) {
   const torso = agent.archetype.torso;
   if (role === 'torso') return { y: .97 * h, sx: .44 * torso, sy: .64 * h, sz: .28 };
   if (role === 'head') return { y: 1.51 * h, sx: .34, sy: .38, sz: .34 };
+  if (role === 'face') return { y: 1.49 * h, z: .16, sx: .23, sy: .27, sz: .055 };
   if (role === 'hair') return { y: 1.66 * h, sx: .35, sy: .14, sz: .35 };
-  if (role === 'arms') return { x: side * .29 * torso, y: .98 * h, sx: .115, sy: .5 * h, sz: .115, rx: -side * swing };
-  if (role === 'hands') return { x: side * .29 * torso, y: .69 * h, z: side * swing * .11, sx: .12, sy: .13, sz: .12 };
+  if (role === 'waist') return { y: .7 * h, sx: .4 * torso, sy: .12 * h, sz: .29 };
+  if (role === 'arms') {
+    if (agent.reaction === 'reporting' && side > 0) return { x: .28 * torso, y: 1.08 * h, z: .12, sx: .115, sy: .5 * h, sz: .115, rx: -1.12 };
+    return { x: side * .29 * torso, y: .98 * h, sx: .115, sy: .5 * h, sz: .115, rx: -side * swing };
+  }
+  if (role === 'hands') {
+    if (agent.reaction === 'reporting' && side > 0) return { x: .29 * torso, y: 1.18 * h, z: .27, sx: .12, sy: .13, sz: .12 };
+    return { x: side * .29 * torso, y: .69 * h, z: side * swing * .11, sx: .12, sy: .13, sz: .12 };
+  }
   if (role === 'legs') return { x: side * .12, y: .42 * h, z: side * swing * .09, sx: .16, sy: .58 * h * agent.archetype.leg, sz: .17, rx: side * swing };
   if (role === 'shoes') return { x: side * .12, y: .1, z: .07 + side * swing * .11, sx: .2, sy: .14, sz: .34 };
+  if (role === 'phone') return agent.reaction === 'reporting'
+    ? { x: .3 * torso, y: 1.2 * h, z: .33, sx: .075, sy: .15, sz: .035, rx: -.2 }
+    : { sx: 0, sy: 0, sz: 0 };
   return { y: 1.02 * h, z: -.2, sx: .36 * agent.archetype.pack, sy: .48 * h * agent.archetype.pack, sz: .16 * agent.archetype.pack };
 }
 
@@ -359,11 +386,12 @@ export function createLivingWorldPopulation(options = {}) {
   group.name = 'Living World Population';
 
   const materials = {
-    outfit: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .86, metalness: .02, flatShading: true, vertexColors: true }),
-    skin: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, flatShading: true, vertexColors: true }),
-    cloth: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .92, metalness: .01, flatShading: true, vertexColors: true }),
-    hair: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .94, flatShading: true, vertexColors: true }),
+    outfit: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x10181b, emissiveIntensity: .2, roughness: .86, metalness: .02, flatShading: true, vertexColors: true }),
+    skin: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x24140d, emissiveIntensity: .24, roughness: .9, flatShading: true, vertexColors: true }),
+    cloth: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x111518, emissiveIntensity: .16, roughness: .92, metalness: .01, flatShading: true, vertexColors: true }),
+    hair: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x100c0a, emissiveIntensity: .12, roughness: .94, flatShading: true, vertexColors: true }),
     gear: new THREE.MeshStandardMaterial({ color: 0x26343b, roughness: .88, metalness: .03, flatShading: true }),
+    device: new THREE.MeshStandardMaterial({ color: 0x18242b, emissive: 0x1c5d82, emissiveIntensity: .38, roughness: .48, metalness: .2, flatShading: true }),
     vehicle: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .58, metalness: .2, flatShading: true, vertexColors: true }),
     glass: new THREE.MeshStandardMaterial({ color: 0x213640, roughness: .3, metalness: .28, flatShading: true }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x151819, roughness: .96, metalness: .01, flatShading: true }),
@@ -372,14 +400,17 @@ export function createLivingWorldPopulation(options = {}) {
     taillight: new THREE.MeshStandardMaterial({ color: 0xb72e2a, emissive: 0x87120f, emissiveIntensity: .42, roughness: .32, flatShading: true })
   };
   const pedestrianParts = [
-    createPart({ role: 'torso', geometry: new THREE.BoxGeometry(1, 1, 1), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Bodies'),
+    createPart({ role: 'torso', geometry: createTaperedPrismGeometry(THREE, { widthBottom: 1, widthTop: .86, height: 1, length: 1, frontInset: .03, rearInset: .03 }), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Bodies'),
     createPart({ role: 'head', geometry: new THREE.SphereGeometry(.5, 8, 6), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Heads'),
+    createPart({ role: 'face', geometry: new THREE.SphereGeometry(.5, 8, 5), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Faces'),
     createPart({ role: 'hair', geometry: new THREE.SphereGeometry(.5, 8, 4), colorKey: 'hairColor' }, materials.hair, pedestrians.length, 'Living World Pedestrian Hair'),
+    createPart({ role: 'waist', geometry: new THREE.BoxGeometry(1, 1, 1), colorKey: 'secondaryColor' }, materials.cloth, pedestrians.length, 'Living World Pedestrian Waist Details'),
     createPart({ role: 'arms', repeats: 2, geometry: new THREE.CylinderGeometry(.5, .43, 1, 6), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Arms'),
     createPart({ role: 'hands', repeats: 2, geometry: new THREE.SphereGeometry(.5, 6, 4), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Hands'),
     createPart({ role: 'legs', repeats: 2, geometry: new THREE.CylinderGeometry(.48, .42, 1, 6), colorKey: 'secondaryColor' }, materials.cloth, pedestrians.length, 'Living World Pedestrian Legs'),
     createPart({ role: 'shoes', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.gear, pedestrians.length, 'Living World Pedestrian Shoes'),
-    createPart({ role: 'gear', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.gear, pedestrians.length, 'Living World Pedestrian Gear')
+    createPart({ role: 'gear', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.gear, pedestrians.length, 'Living World Pedestrian Gear'),
+    createPart({ role: 'phone', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.device, pedestrians.length, 'Living World Pedestrian Reaction Props')
   ].filter(Boolean);
   const vehicleParts = [
     createPart({ role: 'body', geometry: createTaperedPrismGeometry(THREE, { widthBottom: 1, widthTop: .91, height: 1, length: 1, frontInset: .06, rearInset: .03 }), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Bodies'),
@@ -413,11 +444,32 @@ export function createLivingWorldPopulation(options = {}) {
       y: pose.y,
       z: pose.z,
       yaw: pose.yaw,
-      speed: Number(agent.currentSpeed || agent.speed || 0),
+      speed: Number(Number.isFinite(agent.currentSpeed) ? agent.currentSpeed : agent.speed || 0),
       visible: agent.visibility > 0.08,
       promoted: agent.promoted === true,
       variant: agent.variant,
       color: agent.color?.getHex?.() ?? 0x566675
+    });
+  };
+
+  const pedestrianSnapshot = (agent) => {
+    const pose = agentPose(agent, pedestrianGraph);
+    if (!pose) return null;
+    return Object.freeze({
+      id: agent.id,
+      x: pose.x,
+      y: pose.y,
+      z: pose.z,
+      yaw: pose.yaw,
+      visible: agent.visibility > 0.08,
+      archetype: agent.archetype?.id || 'pedestrian',
+      outfitColor: agent.color?.getHex?.() ?? 0x496673,
+      pantsColor: agent.secondaryColor?.getHex?.() ?? 0x29333d,
+      hairColor: agent.hairColor?.getHex?.() ?? 0x241d18,
+      skinColor: agent.skinColor?.getHex?.() ?? 0x9a6d52,
+      heightScale: Number(agent.heightScale || 1),
+      reaction: agent.reaction || '',
+      reactionRemaining: Number(Math.max(0, agent.reactionRemaining || 0).toFixed(2))
     });
   };
 
@@ -455,6 +507,55 @@ export function createLivingWorldPopulation(options = {}) {
     vehicleSnapshots() {
       return Object.freeze(vehicles.map(vehicleSnapshot).filter(Boolean));
     },
+    pedestrianSnapshots() {
+      return Object.freeze(pedestrians.map(pedestrianSnapshot).filter(Boolean));
+    },
+    promotePedestrian(agentId) {
+      const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || agent.promoted) return null;
+      const promoted = pedestrianSnapshot(agent);
+      agent.promoted = true;
+      agent.visibility = 0;
+      agent.visibleTarget = false;
+      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
+        reference: referencePosition(), activeRatio: activeRatio(), dt: .1
+      });
+      return promoted ? Object.freeze({ ...promoted, promoted: true }) : null;
+    },
+    witnessEvent(event = {}) {
+      const position = event.position;
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return Object.freeze([]);
+      const radius = Math.max(4, Math.min(60, Number(event.radius) || 30));
+      const audibleRadius = Math.max(0, Math.min(radius, Number(event.audibleRadius) || 8));
+      const maximum = Math.max(1, Math.min(4, Number(event.maximumWitnesses) || 3));
+      const candidates = pedestrians.map((agent) => {
+        const pose = agentPose(agent, pedestrianGraph);
+        if (!pose || agent.visibility <= .2) return null;
+        const dx = position.x - pose.x;
+        const dz = position.z - pose.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > radius) return null;
+        const facing = distance <= audibleRadius || distance <= .01 ||
+          (Math.sin(pose.yaw) * dx + Math.cos(pose.yaw) * dz) / distance >= -0.08;
+        if (!facing || options.hasPedestrianLineOfSight?.(pose, position) === false) return null;
+        return { agent, pose, distance };
+      }).filter(Boolean).sort((a, b) => a.distance - b.distance).slice(0, maximum);
+      candidates.forEach(({ agent }, index) => {
+        agent.reaction = index === 0 ? 'reporting' : event.kind === 'reckless_driving' ? 'startled' : 'watching';
+        agent.reactionRemaining = index === 0 ? 5.5 : 3.8;
+        agent.reactionTarget = { x: position.x, z: position.z };
+        agent.waiting = agent.reaction !== 'startled';
+      });
+      if (candidates.length) {
+        updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
+          reference: referencePosition(), activeRatio: activeRatio(), dt: .1
+        });
+      }
+      return Object.freeze(candidates.map(({ agent, distance }) => Object.freeze({
+        ...pedestrianSnapshot(agent),
+        distance: Number(distance.toFixed(2))
+      })));
+    },
     promoteVehicle(agentId) {
       const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
       if (!agent || agent.promoted) return null;
@@ -490,8 +591,9 @@ export function createLivingWorldPopulation(options = {}) {
     },
     activeCounts() {
       return Object.freeze({
-        pedestrians: pedestrians.filter((agent) => agent.visibility > .08).length,
+        pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
+        promotedPedestrians: pedestrians.filter((agent) => agent.promoted).length,
         promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
       });

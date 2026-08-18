@@ -10,7 +10,13 @@ Production: unchanged on the verified 4.2.1 rollback
   390×844 touch. User/device acceptance is still required.
 - Phase 2: exact ambient-car promotion is implemented for car body families;
   off-camera demotion and player-actor traffic avoidance remain open.
-- Phases 3–8: planned, not implemented by this milestone.
+- Phase 3: pedestrian perception/reaction and bounded close-range witness
+  promotion are implemented; general dialogue, driver/passenger states and
+  traffic-signal behavior remain open.
+- Phase 4: the witnessed-event and civic-attention lifecycle is implemented;
+  purpose-built responder dispatch, pursuit and outcomes remain open. The
+  placeholder legacy Police Chase is not used as a shortcut.
+- Phases 5–8: planned, not implemented by this milestone.
 - Deployment: not authorized; production remains unchanged.
 
 ## Product direction
