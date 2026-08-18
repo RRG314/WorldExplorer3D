@@ -34,10 +34,33 @@ weapon construction guidance.
 
 The earlier 2.02 GB editable-world high-water path is resolved locally: building suppression and restoration no longer rebuild the full terrain/provider world. This does not certify every device. Chrome process RSS can remain above live JavaScript heap because V8 and the GPU process reserve memory, so target mobile and integrated-GPU checks remain required.
 
+The 2026-08-18 full release matrix is currently red even though the focused
+facade, runtime, multiplayer, account, movement, transport and lifecycle checks
+pass. Current blockers are:
+
+- Baltimore and New York did not meet mapped-building metadata enrichment and
+  visible fallback coverage requirements; the sampled fallback buildings were
+  uniformly 7–15 m and reported zero metadata matches.
+- Miami and Tokyo produced excessive grass from the dense-city landcover
+  fallback during the provider-outage scenario.
+- Everglades finalized the fixed location without far-horizon terrain when both
+  elevation and parent fallback were unavailable.
+- Lake Tahoe and Panama Canal water starts selected walking rather than their
+  expected boat start.
+
+These are worldwide fallback/readiness failures, not facade-test failures. They
+must be fixed at their shared data and world-start owners and the full matrix
+must pass before 4.3.0 can be deployed. Do not add location-specific visual
+patches or weaken the matrix.
+
 ## Map Coverage
 
 - Building footprints, heights, roof shapes, indoor details, roads, vegetation, and water depend on available source data. Coverage varies globally.
 - Missing building heights, materials, facade details, and roof equipment use bounded visual fallbacks; those fallbacks are not claims about the real structure.
+- The local candidate adds bounded entrance detail to published building
+  identities. Generic windows remain owned by the facade atlas; close-range
+  doors, frames, handles, lights, thresholds, canopies and storefront side panes
+  are deterministic visual inference, not claims about an exact real doorway.
 - New OpenStreetMap edits appear only after upstream services and local caches refresh.
 
 ## Loading and Performance

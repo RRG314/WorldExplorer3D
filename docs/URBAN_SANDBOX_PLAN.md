@@ -39,6 +39,13 @@ Production: unchanged on the verified 4.2.1 rollback
   floor-aware collision/presence and exact lobby exit without an Earth reload.
   Floor-specific mission/discovery anchors, authored room depth and a two-client
   same-building visual journey remain open before the phase is complete.
+- Building-exterior polish: implemented locally. The authoritative facade atlas
+  retains whole-building window/material ownership while a deterministic,
+  ground-aligned detail plan adds distinct residential, urban, office and
+  storefront entrances. Door prompts use the same published entrance identity,
+  mobile prompts are actionable, and three opaque instanced draw calls cover the
+  current Baltimore budget. Authored landmark storefronts, richer rooflines,
+  awnings/signage and region-specific facade kits remain future visual depth.
 - Phases 6–7 and the remaining Phase 5/8–9 depth are planned, not implemented by
   this milestone.
 - Deployment: not authorized; production remains unchanged.

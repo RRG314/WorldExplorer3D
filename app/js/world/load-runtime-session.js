@@ -414,7 +414,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       appCtx.worldPublication?.requestId !== publication.requestId ||
       appCtx.worldPublication?.sequence !== publication.sequence
     ) return null;
-    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=6');
+    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=11');
     const livingWorld = startLivingWorldRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request

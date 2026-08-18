@@ -22,7 +22,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=96">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=97">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
@@ -356,6 +356,13 @@ Graphics changes apply to the current session.
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
+<div class="ctrl-section">World Interaction</div>
+<div class="ctrl-row"><span class="ctrl-key">E / Action</span><span class="ctrl-action">Use the visible nearby door, vehicle, person, or object</span></div>
+<div class="ctrl-row"><span class="ctrl-key">I</span><span class="ctrl-action">Open / close carried equipment</span></div>
+<div class="ctrl-row"><span class="ctrl-key">1–5</span><span class="ctrl-action">Quick-equip a carried item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Use equipped item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-action">Take an available nearby item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">X</span><span class="ctrl-action">Resume the current field activity</span></div>
 <div class="ctrl-section">Drone Controls</div>
 <div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
@@ -1655,6 +1662,7 @@ Explore the area
 • WASD - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
+• E - Context action: enter / exit a nearby vehicle or use an object<br>
 • C - Camera view<br>
 • F - Cycle character / car / plane / drone<br>
 • M - Toggle map<br>
@@ -1680,7 +1688,10 @@ Explore the area
 • Arrow Up/Down - Move forward / back<br>
 • Arrow Left/Right - Turn left / right<br>
 • WASD - Look around<br>
-• E - Enter/exit building interior<br>
+• E - Context action at a visible door, vehicle, person, or object<br>
+• I - Open / close carried equipment; 1–5 quick-equip<br>
+• V - Use equipped item; T - take an available nearby item<br>
+• X - Resume the current field activity<br>
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
 • Shift - Run (2x speed)<br>
@@ -1755,5 +1766,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=454"></script>
+<script type="module" src="js/bootstrap.js?v=459"></script>
 </body></html>

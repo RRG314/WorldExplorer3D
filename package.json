@@ -111,6 +111,7 @@
     "test:vehicle-visuals": "node scripts/test-vehicle-visual-budgets.mjs",
     "test:living-world-model": "node scripts/test-living-world-model.mjs",
     "test:living-world-facades": "node scripts/test-living-world-facades.mjs",
+    "test:building-facades-browser": "node scripts/test-building-facade-browser.mjs",
     "test:living-world-navigation": "node scripts/test-living-world-navigation.mjs",
     "test:living-world-population": "node scripts/test-living-world-population.mjs",
     "test:world-discovery": "node scripts/test-world-discovery-platform.mjs",

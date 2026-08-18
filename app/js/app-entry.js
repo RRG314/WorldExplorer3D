@@ -21,7 +21,7 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=91';
+import { init, tryEnablePostProcessing } from './engine.js?v=92';
 import './physics.js?v=104';
 import './walking.js?v=73';
 import './travel-mode.js?v=20';
@@ -29,7 +29,7 @@ import { initBoatMode } from './boat-mode.js?v=37';
 import './sky.js?v=86';
 import './weather.js?v=9';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=57';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=62';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -172,7 +172,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=12').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=13').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -315,7 +315,20 @@ function registerLazySubsystemEntrypoints() {
     };
     appCtx.listSupportedInteriorsNear = () => [];
     appCtx.sampleInteriorWalkSurface = () => null;
-    appCtx.updateInteriorInteraction = () => false;
+    appCtx.updateInteriorInteraction = () => {
+        const walking = appCtx.Walk?.state?.mode === 'walk' || appCtx.travelMode === 'walk';
+        if (
+            !_interiorsModulePromise &&
+            appCtx.gameStarted === true &&
+            walking &&
+            Number(appCtx.livingWorldEntranceByBuilding?.size || 0) > 0
+        ) {
+            void ensureInteriorsReady().then((interiors) => interiors.updateInteriorInteraction?.()).catch((error) => {
+                console.warn('[interior] Proximity runtime failed to initialize:', error);
+            });
+        }
+        return false;
+    };
     appCtx.clearActiveInterior = () => false;
     if (typeof appCtx.getEditorSnapshot !== 'function') {
         appCtx.getEditorSnapshot = () => ({

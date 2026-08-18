@@ -19,7 +19,7 @@ import {
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=21";
+} from "./engine/materials-runtime.js?v=22";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=15";
 import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 

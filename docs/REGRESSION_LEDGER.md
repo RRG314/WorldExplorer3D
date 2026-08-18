@@ -841,6 +841,66 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   mesh-count acceptance without screenshots, outdoor sentinel heights inside a
   vertical interior, or elevator backing/lighting that hides interactive details.
 
+## 2026-08-18 — Building facades smear, entrances disappear or activate from the wrong wall
+
+- Status: resolved locally on `steven/urban-sandbox-foundation`; not deployed.
+- Symptom: generic buildings repeated one facade image without credible
+  ground-level entrances; some facade art stretched into horizontal bands;
+  inferred doors could float above the walk surface, disappear away from the
+  world origin, or duplicate window panels on upper stories. The interior
+  action could activate from an arbitrary side of the same building, and the
+  mobile prompt looked actionable but did not enter.
+- Root cause: the extrusion material projected the square facade atlas with a
+  mesh UV direction that did not represent horizontal wall distance and actual
+  building height. The detail layer depended on Three r128 frustum bounds that
+  do not include later instanced transforms. Entrance IDs did not consistently
+  use the published building identity, the lazy interior runtime started only
+  after an interaction attempt, and inferred entrance height sampled terrain
+  rather than the authoritative walk surface. A draft detail pass also tried to
+  reproduce building-wide windows already owned by the facade material.
+- Resolution: walls now project the existing high-resolution atlases by
+  horizontal perimeter distance and real building height with deterministic
+  repeat/phase variation. One bounded entrance catalog publishes stable urban,
+  residential, office and storefront variants at the sampled walk surface. Three
+  opaque instanced batches add panels, four-piece frames, lights, handles,
+  thresholds, canopies and storefront side panes; their instance-aware culling
+  limitation is handled explicitly. The building-entry owner consumes the same
+  published entrance map, initializes while walking, measures only the doorway
+  approach, aligns the generated interior to that door and routes desktop and
+  touch through the same action handler.
+- Guard: `npm run test:living-world-facades`, `npm run
+  test:building-facades-browser`, `npm run test:runtime`, `npm run
+  test:mobile-controls`, `npm run test:plane-interiors`, `npm run
+  test:interior-floors`, and human review of
+  `output/playwright/building-facades/01-storefront-entrance.png`,
+  `02-residential-entrance.png`, `03-office-entrance.png`, and
+  `06-mobile-touch-prompt.png`. The browser journey requires 112 published
+  entrances, three facade-detail draw calls, desktop and touch entry, one world
+  sequence, no arbitrary-wall prompt and no fatal browser errors.
+- Never reintroduce: a second building-wide window renderer, world-axis facade
+  UVs, unbounded one-mesh-per-door detail, default frustum bounds for transformed
+  r128 instances, terrain-only door height, building-center interaction range,
+  a visual-only touch prompt, or city-specific door meshes.
+
+## 2026-08-18 — Worldwide release matrix catches shared fallback regressions
+
+- Status: open; blocks 4.3.0 deployment while production remains on 4.2.1.
+- Symptom: Baltimore/New York building metadata fallback coverage is incomplete;
+  Miami/Tokyo outage landcover overproduces grass; Everglades can finalize
+  without far-horizon terrain; and Lake Tahoe/Panama Canal water starts select
+  walking instead of a boat.
+- Root cause: investigation remains open at the shared building-enrichment,
+  dense-city landcover fallback, far-horizon fallback and arrival-vehicle
+  selection owners. The failures occur across different locations and must not
+  be treated as location-specific art problems.
+- Resolution: none claimed. Focused facade and gameplay checks passing does not
+  override this full-matrix result.
+- Guard: `npm run test:world-matrix` must pass without weakened thresholds,
+  location-name exceptions or hidden placeholder terrain before deployment.
+- Never reintroduce: deploying from syntax/focused tests alone, changing tests to
+  accept missing visual coverage, or adding per-city patches for shared fallback
+  ownership defects.
+
 ## Verification rule
 
 A code-only pass is not enough for terrain, water, sky, or transitions. Before release:

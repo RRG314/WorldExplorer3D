@@ -160,6 +160,7 @@ function prefersStructuredUrbanFacade(buildingType, options = {}) {
 function facadePresentation(family, buildingType = '', options = {}, buildingSeed = 0) {
   const type = String(buildingType || '').trim().toLowerCase();
   const variant = ((Number(buildingSeed) || 0) >>> 0) % 3;
+  const architectureVariant = (((Number(buildingSeed) || 0) >>> 5) ^ ((Number(buildingSeed) || 0) >>> 11)) & 7;
   if (family === 'brick') {
     return {
       atlasStyle: 'brick',
@@ -186,6 +187,27 @@ function facadePresentation(family, buildingType = '', options = {}, buildingSee
   }
   if (['industrial', 'warehouse', 'hangar', 'transportation', 'service'].includes(type)) {
     return { atlasStyle: 'neutral', facadeStyle: 'industrial_panel' };
+  }
+  if (type === 'yes' && usesOccupiedFacade(type)) {
+    const heightMeters = Number(options.heightMeters || 0);
+    if (heightMeters >= 34) {
+      return architectureVariant % 3 === 0
+        ? { atlasStyle: 'glass', facadeStyle: 'curtain_wall' }
+        : architectureVariant % 3 === 1
+          ? { atlasStyle: 'neutral', facadeStyle: 'hotel_vertical' }
+          : { atlasStyle: 'neutral', facadeStyle: 'office_grid' };
+    }
+    if (heightMeters <= 15) {
+      return architectureVariant % 2 === 0
+        ? { atlasStyle: 'residential', facadeStyle: 'residential_punched' }
+        : { atlasStyle: 'neutral', facadeStyle: 'townhouse' };
+    }
+    return [
+      { atlasStyle: 'neutral', facadeStyle: 'office_grid' },
+      { atlasStyle: 'residential', facadeStyle: 'residential_punched' },
+      { atlasStyle: 'neutral', facadeStyle: 'hotel_vertical' },
+      { atlasStyle: 'residential', facadeStyle: 'apartment_balcony' }
+    ][architectureVariant % 4];
   }
   if (prefersStructuredUrbanFacade(type, options) || usesOccupiedFacade(type)) {
     return {
@@ -234,13 +256,15 @@ function facadeTexture(appCtx, atlasStyle, facadeStyle, variant = 0) {
   texture.name = `building-facade-atlas:${atlasStyle}:${facadeStyle}:v${variantIndex}`;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(repeat.x, repeat.y);
+  const repeatScaleX = [0.9, 1, 1.12, 0.97][variantIndex];
+  const repeatScaleY = [1, 0.965, 1.035, 0.985][variantIndex];
+  texture.repeat.set(repeat.x * repeatScaleX, repeat.y * repeatScaleY);
   // Preserve the proven deterministic facade phasing from the Phase 4
   // renderer without recreating a texture per building.
   // V stays aligned across buildings so a wall begins with a complete
   // storey instead of a random horizontal slice. U phasing is enough to
   // prevent identical neighboring window columns.
-  texture.offset.set(variantIndex * 0.173, 0);
+  texture.offset.set([0.04, 0.223, 0.447, 0.691][variantIndex], 0);
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = true;
@@ -271,19 +295,26 @@ function applyWallOnlyFacadeMap(material, roof) {
   const roofA = glslColor(roof.colorA);
   const roofB = glslColor(roof.colorB);
   const grainScale = Number(roof.grainScale || 0.6).toFixed(4);
+  const facadeRepeatX = Number(material.map?.repeat?.x || 0.08).toFixed(6);
+  const facadeRepeatY = Number(material.map?.repeat?.y || (1 / 16)).toFixed(6);
+  const facadeOffsetX = Number(material.map?.offset?.x || 0).toFixed(6);
+  const facadeOffsetY = Number(material.map?.offset?.y || 0).toFixed(6);
   material.onBeforeCompile = (shader) => {
-    shader.vertexShader = `varying float vFacadeWallMask;\nvarying vec2 vFacadeRoofPosition;\n${shader.vertexShader}`;
+    shader.vertexShader = `varying float vFacadeWallMask;\nvarying vec2 vFacadeRoofPosition;\nvarying vec2 vFacadeWallPosition;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace(
       '#include <beginnormal_vertex>',
       [
         '#include <beginnormal_vertex>',
         'vFacadeWallMask = smoothstep(0.18, 0.72, 1.0 - abs(objectNormal.y));',
-        'vFacadeRoofPosition = position.xz;'
+        'vFacadeRoofPosition = position.xz;',
+        'float facadeHorizontal = abs(objectNormal.x) > abs(objectNormal.z) ? position.z : position.x;',
+        'vFacadeWallPosition = vec2(facadeHorizontal, position.y);'
       ].join('\n')
     );
     shader.fragmentShader = [
       'varying float vFacadeWallMask;',
       'varying vec2 vFacadeRoofPosition;',
+      'varying vec2 vFacadeWallPosition;',
       'float facadeRoofHash(vec2 p) {',
       '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);',
       '}',
@@ -303,7 +334,8 @@ function applyWallOnlyFacadeMap(material, roof) {
         '#include <map_fragment>',
         [
         '#ifdef USE_MAP',
-        '  vec4 facadeTexel = mapTexelToLinear(texture2D(map, vUv));',
+        `  vec2 facadeUv = vec2(vFacadeWallPosition.x * ${facadeRepeatX} + ${facadeOffsetX}, vFacadeWallPosition.y * ${facadeRepeatY} + ${facadeOffsetY});`,
+        '  vec4 facadeTexel = mapTexelToLinear(texture2D(map, facadeUv));',
         `  float roofGrain = facadeRoofNoise(vFacadeRoofPosition * ${grainScale});`,
         `  vec3 roofSurface = mix(${roofA}, ${roofB}, 0.18 + roofGrain * 0.64);`,
         '  diffuseColor.rgb = mix(roofSurface, diffuseColor.rgb * facadeTexel.rgb, vFacadeWallMask);',
@@ -312,7 +344,7 @@ function applyWallOnlyFacadeMap(material, roof) {
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => `building-facade-roof-surface-v2:${roof.key}`;
+  material.customProgramCacheKey = () => `building-facade-world-projection-v3:${roof.key}:${facadeRepeatX}:${facadeRepeatY}:${facadeOffsetX}`;
 }
 
 export function getBuildingMaterial(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {

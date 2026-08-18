@@ -78,6 +78,7 @@
 #interiorPrompt[data-variant="supported"],#interiorPrompt[data-variant="active"]{border-color:rgba(52,211,153,0.65);color:#dcfce7}
 #interiorPrompt[data-variant="loading"]{border-color:rgba(96,165,250,0.65);color:#dbeafe}
 #interiorPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
+@media(hover:none),(pointer:coarse){#interiorPrompt.show{pointer-events:auto;cursor:pointer;min-height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;touch-action:manipulation}}
 #boatPrompt{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);display:none;max-width:min(82vw,480px);padding:10px 14px;border-radius:999px;background:rgba(8,47,73,0.92);border:1px solid rgba(125,211,252,0.5);color:#e0f2fe;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.2px;z-index:141;box-shadow:0 12px 28px rgba(8,47,73,0.28);backdrop-filter:blur(8px);pointer-events:none}
 #boatPrompt.show{display:block}
 #boatPrompt[data-variant="supported"],#boatPrompt[data-variant="active"]{border-color:rgba(56,189,248,0.78);color:#e0f2fe}

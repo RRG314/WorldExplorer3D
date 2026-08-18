@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingKey, pointToSegmentDistance, summarizeSupportType } from "../building-entry.js?v=5";
+import { buildingKey, pointToSegmentDistance, summarizeSupportType } from "../building-entry.js?v=6";
 
 function createInteriorRuntimeUiApi() {
   let transientHint = { text: "", until: 0 };
@@ -7,7 +7,19 @@ function createInteriorRuntimeUiApi() {
   let lastPromptState = { text: "", variant: "" };
 
   function ensurePromptElement() {
-    return document.getElementById("interiorPrompt");
+    const element = document.getElementById("interiorPrompt");
+    if (element && element.dataset.interactionBound !== 'true') {
+      element.dataset.interactionBound = 'true';
+      element.setAttribute('role', 'button');
+      element.setAttribute('aria-label', 'Use nearby building interaction');
+      element.addEventListener('click', () => {
+        if (!element.classList.contains('show')) return;
+        Promise.resolve(appCtx.handleInteriorAction?.()).catch((error) => {
+          console.warn('[interior] Touch interaction failed:', error);
+        });
+      });
+    }
+    return element;
   }
 
   function setPrompt(text, variant = "inspect") {
@@ -22,7 +34,16 @@ function createInteriorRuntimeUiApi() {
       delete el.dataset.variant;
       return;
     }
-    el.textContent = message;
+    const touchPreferred = (() => {
+      try {
+        return (navigator.maxTouchPoints || 0) > 0 || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      } catch (_) {
+        return false;
+      }
+    })();
+    el.textContent = touchPreferred && /^E\s+/.test(message)
+      ? message.replace(/^E\s+/, 'Tap · ')
+      : message;
     el.dataset.variant = variant;
     el.classList.add("show");
   }

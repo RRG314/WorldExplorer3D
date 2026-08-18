@@ -71,12 +71,93 @@ function projectToSegment(point, start, end) {
   };
 }
 
+function pointInPolygon(x, z, points) {
+  let inside = false;
+  for (let index = 0, previous = points.length - 1; index < points.length; previous = index, index += 1) {
+    const a = points[index];
+    const b = points[previous];
+    if ((a.z > z) !== (b.z > z) && x < (b.x - a.x) * (z - a.z) / (b.z - a.z) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+function outwardNormalForEdge(candidate, edge) {
+  const dx = edge.end.x - edge.start.x;
+  const dz = edge.end.z - edge.start.z;
+  const length = Math.hypot(dx, dz) || 1;
+  const options = [
+    { x: -dz / length, z: dx / length },
+    { x: dz / length, z: -dx / length }
+  ];
+  const outside = options.find((normal) => !pointInPolygon(
+    edge.projection.x + normal.x * 0.45,
+    edge.projection.z + normal.z * 0.45,
+    candidate.points
+  ));
+  if (outside) return outside;
+  const fallbackX = edge.projection.x - candidate.center.x;
+  const fallbackZ = edge.projection.z - candidate.center.z;
+  const fallbackLength = Math.hypot(fallbackX, fallbackZ) || 1;
+  return { x: fallbackX / fallbackLength, z: fallbackZ / fallbackLength };
+}
+
 function stableBuildingId(building, index) {
   return String(
     building?.sourceBuildingId ||
     building?.id ||
     `footprint:${Math.round(finite(building?.centerX))}:${Math.round(finite(building?.centerZ))}:${index}`
   );
+}
+
+function stableStringHash(value = '') {
+  let hash = 2166136261;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function entranceArchetype(candidate) {
+  const type = String(candidate?.buildingType || '').toLowerCase();
+  if (/house|residential|detached|terrace|townhouse|apartments/.test(type)) return 'residential';
+  if (/church|cathedral|chapel|civic|public|museum|school|university|hospital/.test(type)) return 'civic';
+  if (/industrial|warehouse|hangar|service|garage|transportation/.test(type)) return 'industrial';
+  if (/retail|commercial|supermarket|mall|hotel/.test(type)) return 'storefront';
+  if (/office|skyscraper/.test(type)) return 'office';
+  const levels = Math.max(1, Math.round(finite(candidate?.building?.levels, 1)));
+  const height = Math.max(2.7, finite(candidate?.building?.height, 3.2));
+  if (levels >= 5 || height >= 18) return 'office';
+  const mixedUseVariant = stableStringHash(candidate?.buildingId) % 10;
+  if (mixedUseVariant <= 1) return 'residential';
+  if (mixedUseVariant === 2) return 'storefront';
+  if (mixedUseVariant === 3 && (levels >= 3 || height >= 10)) return 'office';
+  return 'urban';
+}
+
+function entranceVisualFields(candidate) {
+  const archetype = entranceArchetype(candidate);
+  const visualVariant = stableStringHash(candidate?.buildingId) % 8;
+  const doorStyle = archetype === 'storefront' ? 'glass_double' :
+    archetype === 'office' ? (visualVariant % 2 === 0 ? 'glass_double' : 'metal_glass') :
+      archetype === 'civic' ? 'civic_transom' :
+        archetype === 'industrial' ? 'steel_service' :
+          visualVariant % 3 === 0 ? 'paneled_glass' : 'paneled';
+  return { archetype, visualVariant, doorStyle };
+}
+
+function nearestFacadeEdge(candidate, point) {
+  let best = null;
+  for (let index = 0; index < candidate.points.length; index += 1) {
+    const start = candidate.points[index];
+    const end = candidate.points[(index + 1) % candidate.points.length];
+    const projection = projectToSegment(point, start, end);
+    if (!best || projection.distance < best.projection.distance) {
+      best = { start, end, projection, edgeIndex: index };
+    }
+  }
+  return best;
 }
 
 function candidatePriority(building, index) {
@@ -100,7 +181,13 @@ function candidatePriority(building, index) {
   };
 }
 
-function normalizeMappedEntrance(mapped, candidate) {
+function entranceGroundY(sourceY, x, z, normalX, normalZ, sampleGround) {
+  if (typeof sampleGround !== 'function') return sourceY;
+  const sampled = Number(sampleGround(x + normalX * 1.8, z + normalZ * 1.8));
+  return Number.isFinite(sampled) && Math.abs(sampled - sourceY) <= 10 ? sampled : sourceY;
+}
+
+function normalizeMappedEntrance(mapped, candidate, sampleGround) {
   if (!Number.isFinite(mapped?.x) || !Number.isFinite(mapped?.z)) return null;
   const center = candidate.center;
   let normalX = finite(mapped.normalX, mapped.x - center.x);
@@ -108,7 +195,12 @@ function normalizeMappedEntrance(mapped, candidate) {
   const normalLength = Math.hypot(normalX, normalZ) || 1;
   normalX /= normalLength;
   normalZ /= normalLength;
-  const baseY = finite(mapped.y, finite(candidate.building?.baseY, finite(candidate.building?.minY, 0)));
+  const facadeEdge = nearestFacadeEdge(candidate, mapped);
+  const facadeWidth = facadeEdge
+    ? Math.hypot(facadeEdge.end.x - facadeEdge.start.x, facadeEdge.end.z - facadeEdge.start.z)
+    : 7;
+  const mappedY = finite(mapped.y, finite(candidate.building?.baseY, finite(candidate.building?.minY, 0)));
+  const baseY = entranceGroundY(mappedY, Number(mapped.x), Number(mapped.z), normalX, normalZ, sampleGround);
   return Object.freeze({
     id: `entrance:${candidate.buildingId}:mapped:${String(mapped.id || '0')}`,
     buildingSourceId: candidate.buildingId,
@@ -126,16 +218,18 @@ function normalizeMappedEntrance(mapped, candidate) {
     tangentX: -normalZ,
     tangentZ: normalX,
     yaw: Math.atan2(normalX, normalZ),
+    facadeWidth,
     levels: Math.max(1, Math.round(finite(candidate.building?.levels, 1))),
-    height: Math.max(2.7, finite(candidate.building?.height, 3.2))
+    height: Math.max(2.7, finite(candidate.building?.height, 3.2)),
+    ...entranceVisualFields(candidate)
   });
 }
 
-function inferEntrance(candidate, nearestRoad) {
+function inferEntrance(candidate, nearestRoad, sampleGround) {
   const building = candidate.building;
-  const baseY = finite(building?.baseY, finite(building?.minY, 0));
+  const buildingBaseY = finite(building?.baseY, finite(building?.minY, 0));
   const roadHit = typeof nearestRoad === 'function'
-    ? nearestRoad(candidate.center.x, candidate.center.z, { y: baseY, maxVerticalDelta: 5.5 })
+    ? nearestRoad(candidate.center.x, candidate.center.z, { y: buildingBaseY, maxVerticalDelta: 5.5 })
     : null;
   const target = Number.isFinite(roadHit?.pt?.x) && Number.isFinite(roadHit?.pt?.z)
     ? { x: Number(roadHit.pt.x), z: Number(roadHit.pt.z) }
@@ -150,16 +244,15 @@ function inferEntrance(candidate, nearestRoad) {
     }
   }
   if (!best) return null;
-  let normalX = best.projection.x - candidate.center.x;
-  let normalZ = best.projection.z - candidate.center.z;
-  const normalLength = Math.hypot(normalX, normalZ) || 1;
-  normalX /= normalLength;
-  normalZ /= normalLength;
+  const outwardNormal = outwardNormalForEdge(candidate, best);
+  const normalX = outwardNormal.x;
+  const normalZ = outwardNormal.z;
   const tangentLength = Math.hypot(best.end.x - best.start.x, best.end.z - best.start.z) || 1;
   const tangentX = (best.end.x - best.start.x) / tangentLength;
   const tangentZ = (best.end.z - best.start.z) / tangentLength;
   const x = best.projection.x + normalX * 0.08;
   const z = best.projection.z + normalZ * 0.08;
+  const baseY = entranceGroundY(buildingBaseY, x, z, normalX, normalZ, sampleGround);
   return Object.freeze({
     id: `entrance:${candidate.buildingId}:inferred:${best.edgeIndex}`,
     buildingSourceId: candidate.buildingId,
@@ -181,7 +274,8 @@ function inferEntrance(candidate, nearestRoad) {
     levels: Math.max(1, Math.round(finite(building?.levels, 1))),
     height: Math.max(2.7, finite(building?.height, 3.2)),
     roadDistance: Number.isFinite(roadHit?.dist) ? Number(roadHit.dist) : null,
-    roadSourceId: String(roadHit?.road?.sourceRoadId || roadHit?.road?.sourceWayId || roadHit?.road?.id || '')
+    roadSourceId: String(roadHit?.road?.sourceRoadId || roadHit?.road?.sourceWayId || roadHit?.road?.id || ''),
+    ...entranceVisualFields(candidate)
   });
 }
 
@@ -202,8 +296,8 @@ export function compileEntranceCatalog(options = {}) {
   for (const candidate of candidates) {
     const mapped = mappedByBuilding.get(candidate.buildingId);
     const entrance = mapped
-      ? normalizeMappedEntrance(mapped, candidate)
-      : inferEntrance(candidate, options.nearestRoad);
+      ? normalizeMappedEntrance(mapped, candidate, options.sampleGround)
+      : inferEntrance(candidate, options.nearestRoad, options.sampleGround);
     if (entrance) entrances.push(entrance);
   }
   return Object.freeze({

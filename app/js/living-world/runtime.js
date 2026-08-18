@@ -5,8 +5,8 @@ import {
   createWorldRandom,
   isLivingWorldPublicationActive
 } from './model.js?v=1';
-import { compileEntranceCatalog } from './entrance-catalog.js?v=1';
-import { createFacadeDepthPresentation } from './facade-depth.js?v=1';
+import { compileEntranceCatalog } from './entrance-catalog.js?v=3';
+import { createFacadeDepthPresentation } from './facade-depth.js?v=6';
 import { compilePedestrianGraph, compileTrafficGraph } from './navigation-graphs.js?v=1';
 import { createLivingWorldPopulation } from './population.js?v=6';
 
@@ -44,6 +44,9 @@ function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
   state.facades?.dispose?.();
+  if (appCtx?.livingWorldEntranceByBuilding === state.entranceByBuilding) {
+    appCtx.livingWorldEntranceByBuilding = null;
+  }
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
 }
@@ -79,8 +82,13 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     buildings: appCtx.buildings,
     mappedEntrances: appCtx.mappedBuildingEntrances,
     nearestRoad: appCtx.findNearestRoad,
+    sampleGround: (x, z) => appCtx.GroundHeight?.walkSurfaceY?.(x, z) ?? appCtx.elevationWorldYAtWorldXZ?.(x, z),
     tier
   });
+  const entranceByBuilding = new Map(
+    catalog.entrances.map((entrance) => [String(entrance.buildingSourceId), entrance])
+  );
+  appCtx.livingWorldEntranceByBuilding = entranceByBuilding;
   const facades = createFacadeDepthPresentation({
     entrances: catalog.entrances,
     tier
@@ -169,6 +177,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     pedestrianCompilation,
     trafficCompilation,
     catalog,
+    entranceByBuilding,
     tier,
     disposed: false,
     reason: null

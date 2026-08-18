@@ -1500,7 +1500,7 @@ async function main() {
         report.walkingControlsText.includes('Arrow Up/Down - Move forward / back') &&
         report.walkingControlsText.includes('Arrow Left/Right - Turn left / right') &&
         report.walkingControlsText.includes('WASD - Look around') &&
-        report.walkingControlsText.includes('E - Enter/exit building interior'),
+        report.walkingControlsText.includes('E - Context action at a visible door, vehicle, person, or object'),
       syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:
         report.droneControlsText.includes('Arrow Up/Down - Fly forward / back') &&
