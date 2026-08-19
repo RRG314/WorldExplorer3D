@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=8";
+import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
 import { getWaterPalette } from "../water-palette.js?v=2";
 import {
   getBoatWaveProfile,
@@ -10,7 +10,7 @@ import {
 } from "./water-query.js?v=18";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
-import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";
+import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=2";
 import { modeledWaveRenderControls } from '../world/water-optics-evidence.js?v=2';
 
 function registerBoatWaterPatchMaterial(material) {

@@ -4,7 +4,7 @@ import {
 } from "./surface-rules.js?v=18";
 import {
   inferWaterRenderContext
-} from "./water-dynamics.js?v=8";
+} from "./water-dynamics.js?v=9";
 import {
   areRoadsConnected,
   assignFeatureConnections,

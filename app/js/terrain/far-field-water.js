@@ -1,5 +1,5 @@
 import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=27';
-import { registerWaterWaveMaterial } from '../world/water-materials.js?v=4';
+import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;

@@ -5,7 +5,7 @@ import {
   resolveWaterMotionProfile,
   sampleWaterSurfaceMotion,
   sampleWaterwaySurfaceProfile
-} from "../water-dynamics.js?v=8";
+} from "../water-dynamics.js?v=9";
 import {
   BOAT_AREA_MIN_AREA,
   BOAT_AREA_MIN_SPAN,

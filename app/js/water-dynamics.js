@@ -1,6 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
 const DEFAULT_WAVE_INTENSITY = 0.46;
+// Detailed Earth terrain is guaranteed 0.6 world units below open water.
+// Reserve clearance for wake/interpolation so a rendered trough never exposes
+// the presentation bed. This is a render-safety bound, not bathymetry.
+const MAX_SAFE_WATER_TROUGH_DEPTH = 0.4;
 const SEA_STATE_SEQUENCE = ['calm', 'moderate', 'rough'];
 
 const SEA_STATE_CONFIG = Object.freeze({
@@ -385,9 +389,10 @@ function sampleWaterSurfaceMotion(x, z, time, options = {}) {
     slopeZ: swell.slopeZ + primary.slopeZ + secondary.slopeZ + ripple.slopeZ
   });
 
+  const rawHeight = swell.height + primary.height + secondary.height + ripple.height;
   return {
     profile,
-    height: swell.height + primary.height + secondary.height + ripple.height,
+    height: Math.max(-MAX_SAFE_WATER_TROUGH_DEPTH, rawHeight),
     slopeX: swell.slopeX + primary.slopeX + secondary.slopeX + ripple.slopeX,
     slopeZ: swell.slopeZ + primary.slopeZ + secondary.slopeZ + ripple.slopeZ,
     crest,
@@ -459,6 +464,7 @@ uniform float weWaveSpeed;
 uniform float weWaveVisualStrength;
 uniform float weWaveFoamStrength;
 uniform float weWaveEdgeFade;
+uniform float weWaveTroughDepth;
 uniform float weWaterNormalStrength;
 uniform vec3 weWaterZenithColor;
 uniform vec3 weWaterHorizonColor;
@@ -488,7 +494,8 @@ float weWaveRipples(vec2 worldXZ) {
 }
 
 float weWaveField(vec2 worldXZ) {
-  return weWaveSwell(worldXZ) + weWavePrimary(worldXZ) + weWaveSecondary(worldXZ) + weWaveRipples(worldXZ);
+  float rawHeight = weWaveSwell(worldXZ) + weWavePrimary(worldXZ) + weWaveSecondary(worldXZ) + weWaveRipples(worldXZ);
+  return max(rawHeight, -weWaveTroughDepth);
 }
 
 float weWaveCrest(vec2 worldXZ) {
@@ -516,6 +523,7 @@ vec3 weWaveWorldNormal(vec2 worldXZ, float strength) {
 
 export {
   DEFAULT_WAVE_INTENSITY,
+  MAX_SAFE_WATER_TROUGH_DEPTH,
   SEA_STATE_CONFIG,
   SEA_STATE_SEQUENCE,
   WATER_KIND_CONFIG,

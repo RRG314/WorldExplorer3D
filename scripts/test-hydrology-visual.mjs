@@ -155,6 +155,14 @@ try {
     if (result.waterOptics?.numericUnknownDepthCount !== 0) {
       throw new Error(`${location.id}: an unknown water depth was promoted to a number.`);
     }
+    if (
+      Number.isFinite(result.minimumBedSeparation) &&
+      Number(result.waterOptics?.maximumTroughDepth) >= Number(result.minimumBedSeparation)
+    ) {
+      throw new Error(
+        `${location.id}: water trough ${result.waterOptics.maximumTroughDepth} reaches the rendered bed clearance ${result.minimumBedSeparation}.`
+      );
+    }
     if (!skipScreenshots) {
       await page.waitForTimeout(1500);
       await page.screenshot({

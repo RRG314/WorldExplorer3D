@@ -1,8 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildWaterShaderLibrary,
-  inferWaterRenderContext
-} from "../water-dynamics.js?v=8";
+  inferWaterRenderContext,
+  MAX_SAFE_WATER_TROUGH_DEPTH
+} from "../water-dynamics.js?v=9";
 import { normalizeDepthEvidence } from '../geospatial/bathymetry-evidence.js?v=1';
 
 const WATER_OPTICS_SCHEMA_VERSION = 1;
@@ -38,7 +39,8 @@ function getWaterOpticsSnapshot() {
       sourceId: appCtx.activeWaterOpticsEvidence?.wave?.sourceId || 'none',
       renderUsable: appCtx.activeWaterOpticsEvidence?.wave?.renderUsable === true,
       gridDistanceKm: appCtx.activeWaterOpticsEvidence?.wave?.gridDistanceKm ?? null
-    })
+    }),
+    maximumTroughDepth: MAX_SAFE_WATER_TROUGH_DEPTH
   });
 }
 
@@ -102,6 +104,7 @@ export function registerWaterWaveMaterial(material, options = {}) {
     shader.uniforms.weWaveVisualStrength = { value: 0.16 * visualBase };
     shader.uniforms.weWaveFoamStrength = { value: 0.08 * foamBase };
     shader.uniforms.weWaveEdgeFade = { value: edgeFade };
+    shader.uniforms.weWaveTroughDepth = { value: MAX_SAFE_WATER_TROUGH_DEPTH };
     shader.uniforms.weWaterNormalStrength = { value: waterOpticsQualityStrength() };
     shader.uniforms.weWaterZenithColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.zenithColor ?? 0x397fc2) };
     shader.uniforms.weWaterHorizonColor = { value: new THREE.Color(appCtx.earthAtmosphereProfile?.horizonColor ?? 0xd9edf6) };

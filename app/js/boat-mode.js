@@ -8,7 +8,7 @@ import {
   getWaveIntensity,
   intensityFromSeaState,
   seaStateFromIntensity
-} from "./water-dynamics.js?v=8";
+} from "./water-dynamics.js?v=9";
 import {
   buildSyntheticBoatCandidate,
   findNearestBoatCandidate,
@@ -33,7 +33,7 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=16";
+} from "./boat-mode/surface-effects.js?v=17";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=2";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";

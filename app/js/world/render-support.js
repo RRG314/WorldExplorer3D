@@ -1,6 +1,6 @@
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=5";
 import { initRoofDetailSupport, createRoofDetailMesh } from "./roof-details.js?v=2";
-import { registerWaterWaveMaterial } from "./water-materials.js?v=4";
+import { registerWaterWaveMaterial } from "./water-materials.js?v=5";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
