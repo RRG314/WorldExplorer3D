@@ -1,4 +1,4 @@
-import { resolveWorldSurfaceDomain } from "../earth-core/world-surface-domain.js?v=2";
+import { resolveWorldSurfaceDomain } from "../earth-core/world-surface-domain.js?v=3";
 
 export async function activateAcceptedGroundForWorldLoad(options = {}) {
   const {

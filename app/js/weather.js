@@ -389,6 +389,8 @@ function applyWeatherPresentation() {
     if (appCtx.cloudGroup) appCtx.cloudGroup.visible = appCtx.cloudsVisible;
   }
 
+  appCtx.refreshEarthAtmosphereVisual?.();
+
   updateWeatherUi();
 }
 

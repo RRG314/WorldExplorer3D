@@ -49,7 +49,7 @@ import {
   buildFarWaterGeometry,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
-} from './far-field-water.js?v=5';
+} from './far-field-water.js?v=6';
 import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=8';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 

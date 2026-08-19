@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { normalizeWorldSurfaceEvidence } from './earth-core/world-surface-domain.js?v=2';
+import { normalizeWorldSurfaceEvidence } from './earth-core/world-surface-domain.js?v=3';
 
 let loadedSelection = null;
 

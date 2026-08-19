@@ -308,7 +308,7 @@ export function buildWaterGeometryGuards(baseGuards) {
   };
 }
 
-export { waterSurfaceBaseElevation } from './water-body-contract.js?v=3';
+export { waterSurfaceBaseElevation } from './water-body-contract.js?v=4';
 
 export function resolveWaterSurfaceVisualProfile(bounds = null) {
   const surfaceProfile = classifyWaterSurfaceProfile({
@@ -327,11 +327,11 @@ export function resolveWaterSurfaceVisualProfile(bounds = null) {
   }
   return {
     mode: 'water',
-    color: 0x2d7cad,
-    emissive: 0x0a2542,
-    emissiveIntensity: 0.14,
-    roughness: 0.44,
-    metalness: 0.02
+    color: 0x1b5a76,
+    emissive: 0x061722,
+    emissiveIntensity: 0.03,
+    roughness: 0.3,
+    metalness: 0
   };
 }
 

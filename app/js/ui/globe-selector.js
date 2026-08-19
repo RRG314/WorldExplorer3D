@@ -24,7 +24,7 @@ import {
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=7";
+} from "./globe-selector/helpers.js?v=8";
 
 function createGlobeSelector(options = {}) {
   const {

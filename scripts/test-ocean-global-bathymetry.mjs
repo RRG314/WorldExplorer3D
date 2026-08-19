@@ -38,8 +38,14 @@ try {
   assert.equal(await api.primeGlobalBathymetryGrid(), true);
   assert.equal(requestCount, 25);
   assert.equal(oceanMode.globalBathymetryReady, true);
-  assert.equal(oceanMode.globalBathymetryGrid.dataset, 'GEBCO_2024 Grid');
+  assert.equal(oceanMode.globalBathymetryGrid.dataset, 'GEBCO current WMS grid');
+  assert.equal(oceanMode.globalBathymetryGrid.datasetRelease, 'service-layer-current');
   assert.equal(oceanMode.globalBathymetryGrid.values.length, 25);
+  const centerEvidence = api.sampleSeabedEvidence(0, 0);
+  assert.equal(centerEvidence.bathymetry.truthType, 'modeled');
+  assert.equal(centerEvidence.bathymetry.navigationSafe, false);
+  assert.equal(centerEvidence.presentationMode, 'procedural-bathymetry-blend');
+  assert(centerEvidence.bathymetryBlend > 0 && centerEvidence.bathymetryBlend < 1);
   const centerHeight = api.sampleSeabedHeight(0, 0);
   assert(Number.isFinite(centerHeight));
   assert(centerHeight < -40, `expected deep-ocean seabed, received ${centerHeight}`);
@@ -49,7 +55,7 @@ try {
 
 console.log(JSON.stringify({
   ok: true,
-  provider: 'GEBCO_2024 Grid WMS GetFeatureInfo',
+  provider: 'GEBCO current WMS grid GetFeatureInfo',
   samplesPerLaunch: requestCount,
   grid: '5x5 bilinear',
   fallback: 'local-grid-then-accepted-ground-then-procedural'

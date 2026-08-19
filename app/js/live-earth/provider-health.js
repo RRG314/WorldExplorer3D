@@ -1,5 +1,5 @@
 import { aircraftService } from '../geospatial/aircraft.js?v=1';
-import { marineService } from '../geospatial/marine.js?v=1';
+import { marineService } from '../geospatial/marine.js?v=2';
 import { operationalFeedService } from '../geospatial/operational-feeds.js?v=1';
 import { streetImageryService } from '../geospatial/street-imagery.js?v=1';
 

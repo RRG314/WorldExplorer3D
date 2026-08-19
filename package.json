@@ -166,6 +166,8 @@
     "test:live-gps-browser": "node scripts/test-live-gps-browser.mjs",
     "test:globe-selector-browser": "node scripts/test-globe-selector-browser.mjs",
     "test:ocean-global-bathymetry": "node scripts/test-ocean-global-bathymetry.mjs",
+    "test:water-measurements": "node scripts/test-water-measurement-evidence.mjs",
+    "test:water-sky-optics": "node scripts/test-water-sky-optics-contract.mjs",
     "test:tunnel-system": "node scripts/test-tunnel-system-model.mjs",
     "test:phase5-production": "node scripts/test-release-architecture-and-assets.mjs",
     "test:phase5-controls": "node scripts/test-phase5-controller-contract.mjs",

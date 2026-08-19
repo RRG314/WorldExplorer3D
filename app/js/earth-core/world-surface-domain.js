@@ -1,3 +1,5 @@
+import { normalizeDepthEvidence } from '../geospatial/bathymetry-evidence.js?v=1';
+
 const POLAR_CRYOSPHERE_LATITUDE = 86;
 
 const VERIFIED_SURFACE_KINDS = new Set([
@@ -26,7 +28,8 @@ export function normalizeWorldSurfaceEvidence(evidence = null) {
     kind,
     verified: true,
     source: String(evidence.source || 'unknown').trim().slice(0, 80) || 'unknown',
-    elevationMeters: Number.isFinite(elevationMeters) ? elevationMeters : null
+    elevationMeters: Number.isFinite(elevationMeters) ? elevationMeters : null,
+    bathymetry: normalizeDepthEvidence(evidence.bathymetry)
   });
 }
 

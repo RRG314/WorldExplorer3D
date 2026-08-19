@@ -178,6 +178,12 @@ function createMarineService(options = {}) {
     }
   });
 
+  async function modelAt(location, queryOptions = {}) {
+    const requested = normalizeMarineLocation(location);
+    const result = await registry.query('open-meteo-marine', requested, { force: queryOptions.force === true });
+    return normalizeMarineModel(result.items[0], requested, result.fetchedAt);
+  }
+
   async function selected(location, queryOptions = {}) {
     const requested = normalizeMarineLocation(location);
     const force = queryOptions.force === true;
@@ -209,7 +215,7 @@ function createMarineService(options = {}) {
     return Object.freeze({ requested, model, station, observation, predictions, warnings, noaaCoverageKm: NOAA_COVERAGE_KM });
   }
 
-  return Object.freeze({ selected, diagnostics: () => registry.snapshot() });
+  return Object.freeze({ modelAt, selected, diagnostics: () => registry.snapshot() });
 }
 
 const marineService = createMarineService();

@@ -3,6 +3,10 @@ import { createVehicleHeadlightRig } from "./night-lighting.js?v=7";
 import { createClassicUtilityCar } from './classic-utility-car.js?v=2';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {
+  buildEarthAtmosphereProfile,
+  createEarthAtmosphereVisual
+} from '../sky/earth-atmosphere.js?v=1';
+import {
   recordStartupDiagnostic,
   showStartupDiagnostics,
   summarizeStartupError
@@ -206,6 +210,14 @@ function createRendererWithFallback() {
 }
 
 function addSkyVisuals(appCtx, gpuTier) {
+  const initialAtmosphereProfile = buildEarthAtmosphereProfile(null, null, {
+    phase: 'day',
+    backgroundHex: 0x87ceeb
+  });
+  appCtx.earthAtmosphereProfile = initialAtmosphereProfile;
+  appCtx.earthAtmosphere = createEarthAtmosphereVisual(initialAtmosphereProfile);
+  if (appCtx.earthAtmosphere) appCtx.scene.add(appCtx.earthAtmosphere);
+
   appCtx.sunSphere = new THREE.Mesh(
     new THREE.SphereGeometry(40, 16, 8),
     new THREE.MeshBasicMaterial({ color: 0xffdd00, fog: false })
@@ -249,17 +261,29 @@ function addSkyVisuals(appCtx, gpuTier) {
   appCtx.moonSphere.userData.glow = moonGlow;
 
   const cloudCanvas = document.createElement('canvas');
-  cloudCanvas.width = 128;
-  cloudCanvas.height = 128;
+  cloudCanvas.width = 256;
+  cloudCanvas.height = 256;
   const cloudContext = cloudCanvas.getContext('2d');
-  const cloudGradient = cloudContext.createRadialGradient(64, 62, 5, 64, 64, 62);
-  cloudGradient.addColorStop(0, 'rgba(255,255,255,0.96)');
-  cloudGradient.addColorStop(0.46, 'rgba(255,255,255,0.82)');
-  cloudGradient.addColorStop(0.78, 'rgba(255,255,255,0.28)');
-  cloudGradient.addColorStop(1, 'rgba(255,255,255,0)');
-  cloudContext.fillStyle = cloudGradient;
-  cloudContext.fillRect(0, 0, 128, 128);
-  const cloudPixels = cloudContext.getImageData(0, 0, 128, 128);
+  // Keep clouds under the existing sky owner, but give each point an
+  // asymmetric multi-lobe silhouette instead of the previous circular disc.
+  // These dimensions are artistic presentation values, not weather measures.
+  const cloudLobes = [
+    [70, 143, 47, 0.56],
+    [104, 124, 58, 0.72],
+    [145, 116, 66, 0.78],
+    [185, 139, 50, 0.58],
+    [127, 153, 73, 0.64]
+  ];
+  for (const [x, y, radius, alpha] of cloudLobes) {
+    const cloudGradient = cloudContext.createRadialGradient(x, y, radius * 0.08, x, y, radius);
+    cloudGradient.addColorStop(0, `rgba(255,255,255,${alpha})`);
+    cloudGradient.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.82})`);
+    cloudGradient.addColorStop(0.82, `rgba(255,255,255,${alpha * 0.24})`);
+    cloudGradient.addColorStop(1, 'rgba(255,255,255,0)');
+    cloudContext.fillStyle = cloudGradient;
+    cloudContext.fillRect(0, 0, cloudCanvas.width, cloudCanvas.height);
+  }
+  const cloudPixels = cloudContext.getImageData(0, 0, cloudCanvas.width, cloudCanvas.height);
   for (let i = 3; i < cloudPixels.data.length; i += 4) {
     if (cloudPixels.data[i] === 0) continue;
     const dither = ((i * 17) % 9) - 4;
@@ -282,15 +306,14 @@ function addSkyVisuals(appCtx, gpuTier) {
     fog: true
   });
 
-  const cloudCount = gpuTier === 'low' ? 28 : 52;
+  const cloudCount = gpuTier === 'low' ? 22 : 36;
   const cloudPositions = new Float32Array(cloudCount * 3);
   for (let i = 0; i < cloudCount; i++) {
-    const cluster = Math.floor(i / 3);
-    const clusterAngle = cluster * 2.399963229728653;
-    const clusterRadius = 520 + (cluster % 9) * 230;
-    cloudPositions[i * 3] = Math.cos(clusterAngle) * clusterRadius + (i % 3 - 1) * 72;
-    cloudPositions[i * 3 + 1] = 320 + (cluster % 5) * 38 + (i % 3) * 9;
-    cloudPositions[i * 3 + 2] = Math.sin(clusterAngle) * clusterRadius + ((i * 37) % 3 - 1) * 68;
+    const angle = i * 2.399963229728653;
+    const radius = 540 + (i % 10) * 205;
+    cloudPositions[i * 3] = Math.cos(angle) * radius;
+    cloudPositions[i * 3 + 1] = 350 + (i % 6) * 41;
+    cloudPositions[i * 3 + 2] = Math.sin(angle) * radius;
   }
   const cloudGeometry = new THREE.BufferGeometry();
   cloudGeometry.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));

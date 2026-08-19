@@ -2,7 +2,7 @@ import {
   WATER_BODY_SHAPE,
   normalizeWaterBody,
   polygonMetrics
-} from './water-body-contract.js?v=3';
+} from './water-body-contract.js?v=4';
 
 const WATER_SURFACE_REGISTRY_SCHEMA_VERSION = 1;
 

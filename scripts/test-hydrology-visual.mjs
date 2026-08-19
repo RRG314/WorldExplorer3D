@@ -4,11 +4,20 @@ import { chromium } from 'playwright';
 import { mkdirp, startServer } from './runtime-test-server.mjs';
 
 const rootDir = process.cwd();
-const outputDir = path.join(rootDir, 'output', 'playwright', 'hydrology-v442');
+const outputDir = path.join(rootDir, 'output', 'playwright', 'water-sky-realism');
 const locations = [
-  { id: 'baltimore-inner-harbor', lat: 39.28532, lon: -76.61155, label: 'Baltimore Inner Harbor' },
-  { id: 'monaco-harbor', lat: 43.7355, lon: 7.4252, label: 'Monaco Harbor' },
-  { id: 'lake-tahoe', lat: 39.0968, lon: -120.0324, label: 'Lake Tahoe' }
+  {
+    id: 'baltimore-inner-harbor', lat: 39.28532, lon: -76.61155, label: 'Baltimore Inner Harbor',
+    waterView: { camera: [39.2755, -76.606], target: [39.2895, -76.613] }
+  },
+  {
+    id: 'monaco-harbor', lat: 43.7355, lon: 7.4252, label: 'Monaco Harbor',
+    waterView: { camera: [43.7285, 7.422], target: [43.7384, 7.4246] }
+  },
+  {
+    id: 'lake-tahoe', lat: 39.0968, lon: -120.0324, label: 'Lake Tahoe',
+    waterView: { camera: [39.0968, -120.0324], target: [39.101, -120.037] }
+  }
 ];
 const requested = String(process.env.HYDROLOGY_LOCATION || '').trim();
 const selected = requested ? locations.filter((location) => location.id === requested) : locations;
@@ -18,7 +27,7 @@ if (!selected.length) throw new Error(`Unknown HYDROLOGY_LOCATION: ${requested}`
 
 await mkdirp(outputDir);
 const server = await startServer({ rootDir, host: '127.0.0.1', candidatePorts: [portBase, portBase + 1, portBase + 2] });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 const consoleErrors = [];
 page.on('pageerror', (error) => consoleErrors.push(String(error?.message || error)));
@@ -51,6 +60,10 @@ try {
       document.getElementById('titleScreen')?.classList.add('hidden');
       document.getElementById('globeSelectorScreen')?.classList.remove('show');
       await ctx.loadRoads();
+      ctx.setWeatherMode?.('clear');
+      ctx.setTimeOfDay?.('day');
+      ctx.applyWeatherPresentation?.();
+      document.getElementById('tutorialHintCard')?.style?.setProperty('display', 'none');
       return { invoked: true };
     }, location);
     if (!boot.invoked) throw new Error(`${location.id}: world load was not invoked`);
@@ -59,6 +72,10 @@ try {
       return ctx.worldLoading === false &&
         (ctx.waterSurfaceRegistry?.snapshot?.()?.surfaceCount || 0) > 0;
     }, null, { timeout: 240000 });
+    await page.waitForFunction(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.waterEnvironmentStatus?.state !== 'loading';
+    }, null, { timeout: 12000 }).catch(() => {});
 
     const result = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -118,14 +135,25 @@ try {
         probeCount: probes.length,
         minimumBedSeparation: probes.length ? Math.min(...probes.map((probe) => probe.separation)) : null,
         maximumBedSeparation: probes.length ? Math.max(...probes.map((probe) => probe.separation)) : null
+        ,atmosphere: ctx.getEarthAtmosphereSnapshot?.() || null
+        ,environmentLighting: ctx.getEnvironmentLightingSnapshot?.() || null
+        ,waterOptics: ctx.getWaterOpticsSnapshot?.() || null
+        ,waterEnvironment: ctx.waterEnvironmentStatus || null
       };
     });
     console.log(`[hydrology-visual] ${location.id}: ${JSON.stringify(result)}`);
     if (location.id === 'baltimore-inner-harbor') {
-      if (!result.vessels.length) throw new Error('Baltimore Inner Harbor: no mapped vessel rendered.');
       if (result.vessels.some((vessel) => Number(vessel.waterlineClearance) < 1.18)) {
         throw new Error('Baltimore Inner Harbor: mapped vessel remains submerged by the water sheet.');
       }
+    }
+    if (result.atmosphere?.meshCount !== 1) throw new Error(`${location.id}: expected exactly one Earth atmosphere mesh.`);
+    if (result.environmentLighting?.targetCount !== 1) throw new Error(`${location.id}: expected exactly one PMREM environment target.`);
+    if (result.waterOptics?.renderTargetCount !== 0 || result.waterOptics?.animationLoopCount !== 0) {
+      throw new Error(`${location.id}: water optics created a competing render target or loop.`);
+    }
+    if (result.waterOptics?.numericUnknownDepthCount !== 0) {
+      throw new Error(`${location.id}: an unknown water depth was promoted to a number.`);
     }
     if (!skipScreenshots) {
       await page.waitForTimeout(1500);
@@ -134,23 +162,160 @@ try {
         timeout: 0,
         animations: 'disabled'
       });
-      await page.evaluate(async () => {
+      const landView = await page.evaluate(async (nextLocation) => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
-        const target = ctx.waterAreas?.find((area) => Number.isFinite(Number(area?.surfaceY)));
-        if (!target) return;
-        const x = Number(target.centerX || 0);
-        const z = Number(target.centerZ || 0);
-        const y = Number(target.surfaceY || 0);
-        ctx.camera.position.set(x + 52, y + 12, z + 58);
-        ctx.camera.lookAt(x, y + 0.5, z);
-        ctx.camera.userData.lookTarget = { x, y: y + 0.5, z };
-      });
+        const { pointInWaterBody } = await import('/app/js/world/water-surface-registry.js?v=3');
+        const cameraWorld = ctx.geoToWorld(nextLocation.waterView.camera[0], nextLocation.waterView.camera[1]);
+        const candidate = ctx.inspectBoatCandidate?.(cameraWorld.x, cameraWorld.z, 5000, { requireContainment: false });
+        const target = candidate?.source || null;
+        if (!target || !candidate || !Array.isArray(target.pts) || target.pts.length < 3) {
+          return { ready: false, reason: 'no-polygon-water-target' };
+        }
+        const insideX = Number(candidate.spawnX);
+        const insideZ = Number(candidate.spawnZ);
+        let nearest = null;
+        for (const ring of [target.pts, ...(target.holes || [])]) {
+          for (let index = 0; index < ring.length; index += 1) {
+            const a = ring[index];
+            const b = ring[(index + 1) % ring.length];
+            const dx = b.x - a.x;
+            const dz = b.z - a.z;
+            const lengthSquared = dx * dx + dz * dz;
+            const t = lengthSquared > 1e-9
+              ? Math.max(0, Math.min(1, ((insideX - a.x) * dx + (insideZ - a.z) * dz) / lengthSquared))
+              : 0;
+            const edgeX = a.x + dx * t;
+            const edgeZ = a.z + dz * t;
+            const distance = Math.hypot(insideX - edgeX, insideZ - edgeZ);
+            if (!nearest || distance < nearest.distance) nearest = { edgeX, edgeZ, dx, dz, distance };
+          }
+        }
+        if (!nearest) return { ready: false, reason: 'shoreline-not-found' };
+        const edgeLength = Math.hypot(nearest.dx, nearest.dz) || 1;
+        const normals = [
+          { x: -nearest.dz / edgeLength, z: nearest.dx / edgeLength },
+          { x: nearest.dz / edgeLength, z: -nearest.dx / edgeLength }
+        ];
+        let outward = null;
+        let outsideDistance = null;
+        for (const distance of [4, 8, 16, 32, 64, 128]) {
+          outward = normals.find((normal) => !pointInWaterBody(
+            target,
+            nearest.edgeX + normal.x * distance,
+            nearest.edgeZ + normal.z * distance
+          ));
+          if (outward) {
+            outsideDistance = distance;
+            break;
+          }
+        }
+        if (!outward) return { ready: false, reason: 'outside-normal-not-found' };
+        const x = nearest.edgeX + outward.x * (outsideDistance + 1);
+        const z = nearest.edgeZ + outward.z * (outsideDistance + 1);
+        const lookX = nearest.edgeX - outward.x * 28;
+        const lookZ = nearest.edgeZ - outward.z * 28;
+        const waterY = Number(candidate?.surfaceY ?? target.surfaceY ?? 0);
+        const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? ctx.terrainMeshHeightAt?.(x, z));
+        const cameraY = Math.max(waterY + 2.2, Number.isFinite(terrainY) ? terrainY + 1.8 : waterY + 2.2);
+        // This is a disposable browser page. Stop its owner kernel so the
+        // travel camera cannot reclaim the deliberately composed test view.
+        ctx.stopRuntimeKernel?.('hydrology-visual-static-capture');
+        ctx.setDroneModeActive?.(false);
+        ctx.paused = true;
+        ctx.setPauseReason?.('hydrology-capture', true);
+        ctx.camera.fov = 58;
+        ctx.camera.updateProjectionMatrix?.();
+        ctx.camera.position.set(x, cameraY, z);
+        ctx.camera.lookAt(lookX, waterY + 0.28, lookZ);
+        ctx.camera.userData.lookTarget = { x: lookX, y: waterY + 0.28, z: lookZ };
+        ctx.camera.updateMatrixWorld?.(true);
+        ctx.renderer?.render?.(ctx.scene, ctx.camera);
+        document.getElementById('tutorialHintCard')?.style?.setProperty('display', 'none');
+        return {
+          ready: true,
+          waterKind: target.waterKind,
+          shorelineDistanceFromSpawn: nearest.distance,
+          shorelineOutsideProbeDistance: outsideDistance,
+          cameraHeightAboveWater: cameraY - waterY,
+          cameraInsideWater: pointInWaterBody(target, x, z),
+          lookInsideWater: pointInWaterBody(target, lookX, lookZ)
+        };
+      }, location);
+      if (!landView?.ready || landView.cameraInsideWater || !landView.lookInsideWater || landView.cameraHeightAboveWater > 12) {
+        throw new Error(`${location.id}: land waterline camera gate failed: ${JSON.stringify(landView)}`);
+      }
+      result.landView = landView;
       await page.waitForTimeout(750);
       await page.screenshot({
         path: path.join(outputDir, `${location.id}-waterline.png`),
         timeout: 0,
         animations: 'disabled'
       });
+
+      const boatResult = await page.evaluate(async (nextLocation) => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const cameraWorld = ctx.geoToWorld(nextLocation.waterView.camera[0], nextLocation.waterView.camera[1]);
+        const candidate = ctx.inspectBoatCandidate?.(cameraWorld.x, cameraWorld.z, 5000, { requireContainment: false });
+        const target = candidate?.source || null;
+        if (!target) return { started: false, reason: 'no-water-target' };
+        if (!candidate) return { started: false, reason: 'no-boat-candidate' };
+        ctx.setDroneModeActive?.(false);
+        if (ctx.Walk?.state?.mode === 'walk') ctx.Walk.setModeDrive?.();
+        ctx.car.x = Number(candidate.spawnX);
+        ctx.car.z = Number(candidate.spawnZ);
+        ctx.car.y = Number(candidate.surfaceY || 0) + 1.1;
+        ctx.car.angle = 0;
+        const started = ctx.startBoatMode?.({
+          candidate,
+          spawnX: candidate.spawnX,
+          spawnZ: candidate.spawnZ,
+          emitTutorial: false,
+          source: 'water-sky-visual-gate'
+        }) === true;
+        if (!started) return { started: false, reason: 'boat-start-rejected' };
+        ctx.setBoatWaveIntensity?.(0.5, { skipUi: true });
+        ctx.boat.forwardSpeed = 16;
+        ctx.boat.speed = 16;
+        for (let index = 0; index < 36; index += 1) ctx.updateBoatMode?.(1 / 60);
+        ctx.updateWaterWaveVisuals?.();
+        const angle = Number(ctx.boat.angle || 0);
+        const backX = -Math.sin(angle);
+        const backZ = -Math.cos(angle);
+        ctx.camera.position.set(ctx.boat.x + backX * 12, ctx.boat.y + 3.8, ctx.boat.z + backZ * 12);
+        ctx.camera.lookAt(ctx.boat.x, ctx.boat.y + 0.8, ctx.boat.z);
+        ctx.camera.userData.lookTarget = { x: ctx.boat.x, y: ctx.boat.y + 0.8, z: ctx.boat.z };
+        ctx.camera.updateMatrixWorld?.(true);
+        ctx.renderer?.render?.(ctx.scene, ctx.camera);
+        return {
+          started,
+          mode: ctx.getBoatModeSnapshot?.() || null,
+          patchVisible: ctx.boatMode?.waterPatch?.visible === true,
+          patchShaderReady: !!ctx.boatMode?.waterPatch?.material?.userData?.weWaterWaveShader,
+          waterOptics: ctx.getWaterOpticsSnapshot?.() || null
+        };
+      }, location);
+      await page.waitForTimeout(750);
+      const boatReady = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        ctx.renderer?.compile?.(ctx.scene, ctx.camera);
+        ctx.updateWaterWaveVisuals?.();
+        ctx.renderer?.render?.(ctx.scene, ctx.camera);
+        document.getElementById('tutorialHintCard')?.style?.setProperty('display', 'none');
+        return {
+          patchVisible: ctx.boatMode?.waterPatch?.visible === true,
+          patchShaderReady: !!ctx.boatMode?.waterPatch?.material?.userData?.weWaterWaveShader
+        };
+      });
+      Object.assign(boatResult, boatReady);
+      if (!boatResult.started || !boatResult.patchVisible || !boatResult.patchShaderReady) {
+        throw new Error(`${location.id}: boat close-up water gate failed: ${JSON.stringify(boatResult)}`);
+      }
+      await page.screenshot({
+        path: path.join(outputDir, `${location.id}-boat-closeup.png`),
+        timeout: 0,
+        animations: 'disabled'
+      });
+      result.boatCloseup = boatResult;
     }
     evidence.push({ location, ...result });
   }

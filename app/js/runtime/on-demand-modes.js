@@ -43,7 +43,7 @@ export function ensureSpaceRuntime() {
 
 export function ensureOceanRuntime() {
   if (!modeLoads.ocean) {
-    modeLoads.ocean = import('../ocean.js?v=8').catch((error) => {
+    modeLoads.ocean = import('../ocean.js?v=9').catch((error) => {
       modeLoads.ocean = null;
       throw error;
     });

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getSeaStateConfig } from "../water-dynamics.js?v=4";
+import { getSeaStateConfig } from "../water-dynamics.js?v=8";
 import { clamp } from "./dynamics.js?v=1";
 
 let boatFoamTexture = null;

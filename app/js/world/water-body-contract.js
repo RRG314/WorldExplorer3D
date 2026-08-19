@@ -1,4 +1,6 @@
-const WATER_BODY_SCHEMA_VERSION = 2;
+import { normalizeDepthEvidence } from '../geospatial/bathymetry-evidence.js?v=1';
+
+const WATER_BODY_SCHEMA_VERSION = 3;
 
 const WATER_BODY_SHAPE = Object.freeze({
   AREA: 'area',
@@ -154,6 +156,7 @@ function normalizeWaterBody(options = {}) {
     explicitlyNavigable ||
     (shape === WATER_BODY_SHAPE.AREA ? areaNavigable : finiteNumber(options.width, 0) >= 12)
   );
+  const depthEvidence = normalizeDepthEvidence(options.depthEvidence);
   return {
     ...options,
     waterSchemaVersion: WATER_BODY_SCHEMA_VERSION,
@@ -176,7 +179,8 @@ function normalizeWaterBody(options = {}) {
     access: access || null,
     boatAccess: boatAccess || null,
     shorelineModel: shape === WATER_BODY_SHAPE.AREA ? 'polygon-boundary' : 'centerline-width',
-    depthConfidence: options.depthConfidence || 'unknown',
+    depthConfidence: depthEvidence.truthType,
+    depthEvidence,
     datum: {
       ...WATER_SURFACE_DATUM,
       method: options.datumMethod || (surfaceY === null ? 'terrain-profile' : 'dem-water-surface'),

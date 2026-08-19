@@ -4,7 +4,7 @@ import {
 } from "./surface-rules.js?v=18";
 import {
   inferWaterRenderContext
-} from "./water-dynamics.js?v=4";
+} from "./water-dynamics.js?v=8";
 import {
   areRoadsConnected,
   assignFeatureConnections,
@@ -82,7 +82,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=26";
+} from "./world/load-geometry.js?v=27";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -106,7 +106,7 @@ import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=11";
+} from "./world/render-support.js?v=14";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -142,7 +142,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=25";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=26";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=16";
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=38";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=128";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=129";
 import {
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
@@ -277,7 +277,9 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
 
 async function loadRoads(retryPass = 0) {
   try {
-    return await loadOsmRoads(retryPass);
+    const result = await loadOsmRoads(retryPass);
+    void appCtx.refreshWaterEnvironmentEvidence?.(false);
+    return result;
   } finally {
     // Vector-tile decoders and raw provider responses are compilation staging,
     // not part of the fixed playable world. HTTP/IndexedDB remain the reload
