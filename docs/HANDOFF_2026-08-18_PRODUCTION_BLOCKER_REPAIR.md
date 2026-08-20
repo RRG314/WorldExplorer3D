@@ -838,3 +838,86 @@ Next bounded task: identify the first shared publication or grounding stage
 that permits buildings and roads to occupy incompatible final space across
 London, Monaco, Manhattan, Baltimore, and Tokyo. Do not patch a city or alter
 the already-checkpointed NPC/traffic authority. Do not push or deploy.
+
+## 2026-08-20 audit checkpoint 3 — structure authority after ground acceptance
+
+### First authoritative loss
+
+- The Golden Gate outage was not a missing generalized map feature. A direct
+  decode of the same z13 Shortbread coverage found the named bridge footway,
+  cycleway, and both motorway decks; the closest motorway centerlines passed
+  12-21 m from the audit coordinate. A complete assembled run with every exact
+  Overpass operation deliberately unavailable rendered the generalized bridge
+  and grounded the walker on it.
+- The first loss was provider reconciliation order. When exact core transport
+  arrived, `retainRegionalTransportOutsideCore` removed every generalized core
+  way before accepted-ground validation. `mergeExactRegionalStructures` then
+  removed generalized structure copies before validation and, for an identical
+  positive OSM id already present in core data, did not apply the regional exact
+  record's provenance. If that remaining exact deck failed its ground contract,
+  no bridge authority remained and custom water arrival could select a boat.
+- This explains why the same coordinate/artifact could alternate between a
+  visible bridge and an empty-water boat frame while count-only checks remained
+  green. It also explains why a total exact-provider outage could behave better
+  than a partially successful response.
+
+### Completed bounded authority repair
+
+- Generalized bridges, tunnels, covered roads, underground roads, and nonzero-
+  layer transport inside the exact core are retained as explicit fallback
+  candidates. Ordinary generalized core roads remain excluded, so this does not
+  create a second street network.
+- Exact regional records now upgrade matching exact core ways with lossless
+  identity and regional-ground provenance. Generalized structure deduplication
+  is deferred until accepted-ground filtering. That post-ground pass is the
+  single owner-selection boundary: a surviving exact structure supersedes its
+  generalized spatial/name match; a rejected exact structure leaves one
+  generalized owner. No bridge renderer, visual ramp, inferred measurement,
+  city exception, or provider identity was added.
+- Source verification exercises all three provider-order states and verifies
+  that core fallback retention excludes an ordinary residential way. Runtime
+  diagnostics record retained/superseded authority counts.
+- The assembled verifier now records provider outcomes, selected transport
+  source, and accepted-ground selection. Its JFX and Golden Gate anchors must
+  end with a non-boat player on a visible engineered surface. Counts alone can
+  no longer approve the former empty-water frame.
+
+### Verified result
+
+- Local staged artifact:
+  `4.3.0+8ef28985a726.6bf7dad502796dbe.staging` (`sourceDirty: true`, never
+  deployed).
+- In a real assembled Golden Gate run with all exact Overpass requests blocked,
+  the final walking surface was generalized mapped feature
+  `shortbread:streets:13:1308:3165:7:0`, named `Golden Gate Bridge`, classified
+  as an elevated bridge, with one attached/visible structure mesh. The complete
+  frame showed the deck, towers, terrain, water, HUD, collision-controlled
+  walker, active vehicle traffic, and zero pedestrian NPCs.
+- `verify:source`, artifact build/hash verification,
+  `verify:assembled-locations`, and `verify:actors-vehicles` passed. The complete
+  matrix covered Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural
+  Iowa, and Tokyo. JFX and Golden Gate both passed the new visible-structure
+  arrival check and all six assembled locations reported zero exact continuity
+  breaks. Baltimore/London/Tokyo retained 11-14 visible vehicles and zero
+  pedestrians. Every final installed-Chrome frame was inspected.
+
+### Still open; do not call the world repaired
+
+1. London, Monaco, Baltimore, Manhattan, and Tokyo still visibly disagree at
+   building foundations, road corridors, or terrain. Tokyo buildings clip the
+   road corridor; London/Monaco show severe road/ground shaping.
+2. The grade verifier remains incomplete: it reports all-road steepness but
+   fails only engineered roads. A prior Golden Gate final report contained an
+   ordinary mapped road grade of 2.617 while
+   `compiledRoadGradesWithinDesignBounds` stayed green.
+3. Rural Iowa's complete frame starts on terrain despite mapped transport in
+   the loaded world. Arrival-to-nearest-valid-road coherence needs its own
+   worldwide audit; do not change it as part of bridge authority.
+4. Far-field building height semantics and road/building footprint conflicts
+   remain independent of this transport-source repair.
+
+Next bounded task: trace the shared road/building/terrain disagreement from
+accepted base ground and footprint conflict guards through final mesh/collision
+publication, using the visibly failing London, Monaco, Baltimore, Manhattan,
+and Tokyo frames. Keep the repaired provider-order and NPC authorities intact.
+Do not push or deploy.

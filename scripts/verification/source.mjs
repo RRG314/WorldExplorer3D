@@ -3,6 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchBundledBuildingMetadata } from '../../app/js/world/preset-building-metadata.js';
+import { filterSelectionToAcceptedGround } from '../../app/js/world/compiler/accepted-ground-selection.js';
+import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-regional-context.js';
+import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
 
 const root = process.cwd();
 const reportPath = path.join(root, 'output', 'verification', 'source', 'report.json');
@@ -111,6 +114,89 @@ if (ruralMetadataWithPublicationCoverage !== null) {
   buildingMetadataCoverageFailures.push('rural Iowa incorrectly selects an unrelated bundled building metadata pack');
 }
 
+const structureFallbackNodes = {
+  1: { type: 'node', id: 1, lat: 10, lon: 20 },
+  2: { type: 'node', id: 2, lat: 10, lon: 20.001 },
+  '-1': { type: 'node', id: -1, lat: 10, lon: 20 },
+  '-2': { type: 'node', id: -2, lat: 10, lon: 20.001 }
+};
+const exactBridge = {
+  type: 'way', id: 100, nodes: [1, 2],
+  tags: { highway: 'primary', bridge: 'yes', name: 'Mapped Bridge' }
+};
+const generalizedBridge = {
+  type: 'way', id: -100, nodes: [-1, -2],
+  tags: {
+    highway: 'primary', bridge: 'yes', name: 'Mapped Bridge',
+    _sourceCompleteness: 'generalized',
+    _regionalContext: 'fixed-location',
+    _fallbackStructureAuthority: 'generalized'
+  }
+};
+const emptySelection = {
+  roadWays: [exactBridge, generalizedBridge], buildingWays: [], landuseWays: [],
+  waterwayWays: [], railwayWays: [], footwayWays: [], cyclewayWays: [],
+  structureConnectorWays: [], treeRowWays: [], treeNodes: [], poiNodes: []
+};
+const exactStructureAccepted = filterSelectionToAcceptedGround(
+  emptySelection,
+  structureFallbackNodes,
+  () => ({ status: 'available' }),
+  { sampleRegionalGroundAtLatLon: () => ({ status: 'available' }) }
+);
+const exactStructureRejected = filterSelectionToAcceptedGround(
+  emptySelection,
+  structureFallbackNodes,
+  (_lat, lon) => lon < 0 ? { status: 'available' } : { status: 'unavailable' },
+  { sampleRegionalGroundAtLatLon: () => ({ status: 'available' }) }
+);
+const regionalFallbackFixture = retainRegionalTransportOutsideCore({
+  elements: [
+    { type: 'node', id: -1, lat: 10, lon: 20 },
+    { type: 'node', id: -2, lat: 10, lon: 20.001 },
+    { type: 'node', id: -3, lat: 10.001, lon: 20 },
+    generalizedBridge,
+    { type: 'way', id: -101, nodes: [-1, -3], tags: { highway: 'residential' } }
+  ]
+}, {
+  location: { lat: 10, lon: 20 },
+  coreRadiusMeters: 1000,
+  radiusMeters: 14000
+});
+const deferredStructureMergeFixture = mergeExactRegionalStructures({
+  elements: [
+    structureFallbackNodes[1], structureFallbackNodes[2],
+    structureFallbackNodes['-1'], structureFallbackNodes['-2'],
+    exactBridge, generalizedBridge
+  ]
+}, {
+  elements: [structureFallbackNodes[1], structureFallbackNodes[2], exactBridge]
+});
+const structureFallbackAuthorityFailures = [];
+if (exactStructureAccepted.selection.roadWays.length !== 1 ||
+    exactStructureAccepted.selection.roadWays[0].id !== exactBridge.id ||
+    exactStructureAccepted.diagnostics.supersededGeneralizedStructures !== 1) {
+  structureFallbackAuthorityFailures.push('accepted exact structure did not supersede its generalized fallback');
+}
+if (exactStructureRejected.selection.roadWays.length !== 1 ||
+    exactStructureRejected.selection.roadWays[0].id !== generalizedBridge.id ||
+    exactStructureRejected.diagnostics.retainedGeneralizedStructureFallbacks !== 1) {
+  structureFallbackAuthorityFailures.push('generalized structure fallback did not survive rejection of exact authority');
+}
+if (regionalFallbackFixture._regionalContext?.retainedCoreStructureFallbacks !== 1 ||
+    regionalFallbackFixture.elements.some((element) => element?.id === -101)) {
+  structureFallbackAuthorityFailures.push('core fallback retention did not isolate engineered transport');
+}
+const upgradedExactBridge = deferredStructureMergeFixture.elements.find(
+  (element) => element?.type === 'way' && element.id === exactBridge.id
+);
+if (upgradedExactBridge?.tags?._fixedRegionalStructure !== 'exact' ||
+    upgradedExactBridge?.tags?._regionalContext !== 'fixed-location' ||
+    !deferredStructureMergeFixture.elements.some((element) => element?.id === generalizedBridge.id) ||
+    deferredStructureMergeFixture._fixedRegionalStructures?.upgradedExistingWays !== 1) {
+  structureFallbackAuthorityFailures.push('exact structure merge did not defer deduplication until ground acceptance');
+}
+
 const missingRequiredFiles = [];
 for (const relative of requiredFiles) {
   if (!(await exists(path.join(root, relative)))) missingRequiredFiles.push(relative);
@@ -185,6 +271,7 @@ const report = {
     missingModuleTargets,
     duplicateModuleIdentities,
     buildingMetadataCoverageFailures,
+    structureFallbackAuthorityFailures,
     staleGeneratedImages,
     productionDebugDefaultOff: productionDebugDefaultOff ? [] : ['runtime diagnostics are not opt-in']
   }

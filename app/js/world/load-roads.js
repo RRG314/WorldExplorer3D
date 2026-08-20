@@ -31,7 +31,7 @@ import {
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=5";
+} from "./fixed-regional-structures.js?v=6";
 
 export function createWorldRoadLoader(deps = {}) {
   const {

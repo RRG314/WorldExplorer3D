@@ -1,3 +1,5 @@
+import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=6';
+
 const WAY_COLLECTION_KEYS = Object.freeze([
   'roadWays',
   'buildingWays',
@@ -82,6 +84,11 @@ export function filterSelectionToAcceptedGround(
       return accepted;
     });
   }
+  const structureAuthority = pruneSupersededGeneralizedStructures(
+    filtered.roadWays,
+    nodes
+  );
+  filtered.roadWays = structureAuthority.ways;
   for (const key of NODE_COLLECTION_KEYS) {
     if (!Array.isArray(selection[key])) continue;
     filtered[key] = selection[key].filter((node) => {
@@ -99,7 +106,13 @@ export function filterSelectionToAcceptedGround(
       regionalAcceptedNodeCount: regionalNodeIds.size,
       regionalRejectedNodeCount: rejectedRegionalNodeIds.size,
       rejectedWayCount: rejectedWays,
-      rejectedPointFeatureCount: rejectedPointFeatures
+      rejectedPointFeatureCount: rejectedPointFeatures,
+      exactStructureAuthorities: structureAuthority.exactStructures,
+      supersededGeneralizedStructures:
+        structureAuthority.supersededGeneralizedStructures,
+      retainedGeneralizedStructureFallbacks: filtered.roadWays.filter((way) =>
+        way?.tags?._fallbackStructureAuthority === 'generalized'
+      ).length
     })
   });
 }

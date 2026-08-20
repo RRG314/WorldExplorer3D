@@ -1162,3 +1162,38 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   a valid surface, or an unassociated pedestrian path on engineered transport.
   Restore people only through an authoritative mapped at-grade pedestrian layer
   with its own worldwide final-frame verification.
+
+## 2026-08-20 — Generalized structures pruned before exact ground acceptance
+
+- Status: resolved locally; broader world coherence remains production blocked;
+  not deployed.
+- Symptom: identical Golden Gate coordinates and artifact could finish either
+  on a rendered bridge or in a boat facing empty water. Road/building counts and
+  the engineered-only grade check could remain green.
+- Root cause: generalized core transport was discarded as soon as exact core
+  data arrived, before ground validation. Exact-structure reconciliation also
+  pruned generalized decks before validation and failed to upgrade an already-
+  present positive OSM way with the regional exact record. A rejected exact deck
+  could therefore leave zero physical-surface owners. Total exact outage was
+  paradoxically safer because it retained the generalized core bridge.
+- Resolution: retain only generalized engineered core structures as fallbacks;
+  upgrade identical exact ways with lossless regional provenance; defer spatial/
+  name deduplication to one post-ground authority pass. A surviving exact deck
+  removes its generalized duplicate; a rejected exact deck leaves one mapped
+  generalized owner. Ordinary core roads remain single-source.
+- Guard: source fixtures cover accepted exact, rejected exact, enriched exact
+  merge, and exclusion of ordinary core roads. The complete assembled verifier
+  now requires JFX and Golden Gate to arrive on an attached, visible engineered
+  structure and records provider/ground authority state.
+- Worldwide evidence: local staging artifact
+  `4.3.0+8ef28985a726.6bf7dad502796dbe.staging`; forced exact-provider failure
+  still rendered and selected the generalized Golden Gate deck; the normal
+  Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, and rural Iowa matrix
+  passed with zero exact discontinuities; Baltimore/London/Tokyo retained
+  vehicle traffic and zero pedestrians. All final frames were inspected.
+- Never reintroduce: provider-success as proof that geometry can publish,
+  generalized structure deletion before accepted-ground validation, duplicate
+  renderers, city/landmark branches, or count-only structure acceptance.
+- Adjacent blockers: ordinary-road grades are not part of the failing grade
+  gate despite infeasible reported values; urban building/road/terrain conflicts
+  and rural arrival coherence remain open.

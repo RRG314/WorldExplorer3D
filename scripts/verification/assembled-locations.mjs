@@ -16,8 +16,8 @@ const capture = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
 // These are product-owned catalog/audit anchors, selected by current release
 // requirements rather than inherited legacy screenshots.
 const allLocations = [
-  { id: 'baltimore-jfx', name: 'Jones Falls Expressway', lat: 39.309728, lon: -76.621428, class: 'urban-structure', driveOnLeft: false },
-  { id: 'golden-gate', name: 'Golden Gate Bridge', lat: 37.8115, lon: -122.4774, class: 'coastal-structure', driveOnLeft: false },
+  { id: 'baltimore-jfx', name: 'Jones Falls Expressway', lat: 39.309728, lon: -76.621428, class: 'urban-structure', driveOnLeft: false, expectsStructureArrival: true },
+  { id: 'golden-gate', name: 'Golden Gate Bridge', lat: 37.8115, lon: -122.4774, class: 'coastal-structure', driveOnLeft: false, expectsStructureArrival: true },
   { id: 'london', name: 'London', lat: 51.5074, lon: -0.1278, class: 'coastal-urban', driveOnLeft: true },
   { id: 'monaco', name: 'Monaco', lat: 43.7384, lon: 7.4246, class: 'terrain-structure', driveOnLeft: false },
   { id: 'manhattan', name: 'Manhattan', lat: 40.7580, lon: -73.9855, class: 'dense-urban', driveOnLeft: false },
@@ -81,6 +81,11 @@ try {
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
           surfaceChain: diagnostics.surfaceChain || null,
+          worldLoad: {
+            providers: diagnostics.worldLoad?.session?.providers || {},
+            transportSource: diagnostics.worldLoad?.layerProducts?.transport?.source || null,
+            acceptedGroundSelection: diagnostics.worldLoad?.acceptedGroundSelection || null
+          },
           runtimeErrors: diagnostics.runtimeErrors || [],
           visiblePrimaryCanvasCount: [...document.querySelectorAll('canvas')].filter((canvas) => {
             const style = getComputedStyle(canvas);
@@ -105,6 +110,13 @@ try {
           Number(snapshot.livingWorld?.pedestrianGraph?.engineeredTransportEdges || 0) === 0 &&
           Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredSidewalks || 0) === 0 &&
           Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredCrossings || 0) === 0,
+        mappedStructureArrivalVisible: location.expectsStructureArrival !== true || (
+          snapshot.surfaceChain?.actor?.mode !== 'boat' &&
+          /^(?:bridge|overpass|ramp|elevated_road)$/.test(String(
+            snapshot.surfaceChain?.surfaces?.walk?.feature?.structureKind || ''
+          )) &&
+          Number(snapshot.surfaceChain?.surfaces?.walk?.feature?.structureVisual?.visibleMeshCount || 0) > 0
+        ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         noRuntimeErrors: snapshot.runtimeErrors.length === 0,
