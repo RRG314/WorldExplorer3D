@@ -6,7 +6,7 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=4';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=5';
 import { createLivingWorldPopulation } from './population.js?v=10';
 
 function livingWorldTier(appCtx) {
@@ -217,6 +217,17 @@ export function livingWorldRuntimeSnapshot(appCtx) {
     ).toLowerCase();
     return /^(?:motorway|motorway_link)$/.test(roadClass);
   }).length;
+  const pedestrianVehicleTransportEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
+    const feature = state.pedestrianCompilation.runtimeFeatureByEdge.get(edge.id);
+    return String(feature?.networkKind || feature?.kind || '').toLowerCase() === 'road' ||
+      edge.provenance === 'inferred_sidewalk' || edge.provenance === 'inferred_crossing';
+  }).length;
+  const pedestrianEngineeredTransportEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
+    const structure = edge?.structure || {};
+    const structureKind = String(structure.structureKind || 'none');
+    return String(structure.terrainMode || 'at_grade') !== 'at_grade' ||
+      !['none', 'at_grade'].includes(structureKind);
+  }).length;
   const trafficDirectionViolations = state.publication.trafficGraph.edges.filter((edge) =>
     (edge.sourceDirection === 'forward' && edge.direction !== 'forward') ||
     (edge.sourceDirection === 'reverse' && edge.direction !== 'reverse')
@@ -242,7 +253,9 @@ export function livingWorldRuntimeSnapshot(appCtx) {
       edges: state.publication.pedestrianGraph.edges.length,
       provenance: state.publication.pedestrianGraph.provenance,
       diagnostics: state.publication.pedestrianGraph.diagnostics,
-      prohibitedMotorwayEdges: pedestrianMotorwayEdges
+      prohibitedMotorwayEdges: pedestrianMotorwayEdges,
+      vehicleTransportEdges: pedestrianVehicleTransportEdges,
+      engineeredTransportEdges: pedestrianEngineeredTransportEdges
     }),
     trafficGraph: Object.freeze({
       nodes: state.publication.trafficGraph.nodes.length,

@@ -126,16 +126,18 @@ function pedestrianSegmentAllowed(segment) {
   if (!feature) return false;
   if (feature.walkable === false || feature?.transportGraphRef?.walkable === false) return false;
   if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return false;
-  const roadClass = String(
-    feature?.transportRecord?.sourceTags?.highway ||
-    feature?.transportRecord?.rawTags?.highway ||
-    feature?.type ||
-    ''
-  ).toLowerCase();
-  // This is a defensive publication boundary. Motorway paths must arrive as
-  // separately mapped footways; the traffic carriageway itself never becomes
-  // an inferred sidewalk or crossing.
-  return !/^(?:motorway|motorway_link)$/.test(roadClass);
+  // Pedestrian population may consume only an explicitly mapped pedestrian
+  // path. A vehicle-road centerline is not evidence of a sidewalk or crossing,
+  // regardless of road class. Engineered transport also stays closed until a
+  // mapped pedestrian path has been associated with its own physical surface;
+  // offsetting the vehicle deck produced people beside or inside bridges,
+  // ramps, and tunnels.
+  if (featureKind(feature) !== 'footway') return false;
+  const structure = structureState(feature);
+  const ordinaryAtGradeKind = structure.structureKind === 'none' || structure.structureKind === 'at_grade';
+  return structure.terrainMode === 'at_grade' &&
+    ordinaryAtGradeKind &&
+    feature?.structureSemantics?.rampCandidate !== true;
 }
 
 export function compilePedestrianGraph(options = {}) {
@@ -176,24 +178,13 @@ export function compilePedestrianGraph(options = {}) {
 
   for (let index = 0; index < sourceSegments.length && edges.length < networkEdgeLimit; index += 1) {
     const segment = sourceSegments[index];
-    const kind = featureKind(segment.feature);
-    const mappedPath = kind === 'footway' || kind === 'cycleway';
-    const roadHalfWidth = Math.max(2.4, finite(segment.feature?.width, finite(segment.feature?.transportRecord?.crossSection?.widthMeters, 6)) * 0.5);
-    const offsets = mappedPath ? [0] : [roadHalfWidth + 1.35, -(roadHalfWidth + 1.35)];
-    const pairs = offsets.map((offset) => edgePointPair(segment, offset, options.sampleSurface)).filter(Boolean);
-    for (let side = 0; side < pairs.length && edges.length + 1 < networkEdgeLimit; side += 1) {
-      const pair = pairs[side];
-      if (typeof options.isBlockedPoint === 'function' && (
-        options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
-      )) continue;
-      const provenance = mappedPath ? 'mapped_path' : 'inferred_sidewalk';
-      addEdge(pair, segment, `${side}:forward`, pair.p1, pair.p2, provenance);
-      addEdge(pair, segment, `${side}:reverse`, pair.p2, pair.p1, provenance);
-    }
-    if (!mappedPath && pairs.length === 2 && index % 4 === 0 && edges.length + 1 < networkEdgeLimit) {
-      addEdge(pairs[0], segment, 'crossing:forward', pairs[0].p1, pairs[1].p1, 'inferred_crossing', 'crossing');
-      addEdge(pairs[0], segment, 'crossing:reverse', pairs[1].p1, pairs[0].p1, 'inferred_crossing', 'crossing');
-    }
+    const pair = edgePointPair(segment, 0, options.sampleSurface);
+    if (!pair) continue;
+    if (typeof options.isBlockedPoint === 'function' && (
+      options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
+    )) continue;
+    addEdge(pair, segment, 'forward', pair.p1, pair.p2, 'mapped_path');
+    addEdge(pair, segment, 'reverse', pair.p2, pair.p1, 'mapped_path');
   }
 
   for (const entrance of Array.isArray(options.entrances) ? options.entrances : []) {
@@ -254,6 +245,16 @@ export function compilePedestrianGraph(options = {}) {
         excludedNonPedestrianSegments: traversalSegments.filter((segment) =>
           segment?.p1 && segment?.p2 && !pedestrianSegmentAllowed(segment)
         ).length,
+        excludedVehicleTransportSegments: traversalSegments.filter((segment) =>
+          segment?.p1 && segment?.p2 && featureKind(segment.feature) === 'road'
+        ).length,
+        excludedEngineeredTransportSegments: traversalSegments.filter((segment) => {
+          if (!segment?.p1 || !segment?.p2) return false;
+          const structure = structureState(segment.feature);
+          const ordinaryAtGradeKind = structure.structureKind === 'none' || structure.structureKind === 'at_grade';
+          return structure.terrainMode !== 'at_grade' || !ordinaryAtGradeKind ||
+            segment?.feature?.structureSemantics?.rampCandidate === true;
+        }).length,
         edgeLimit: budget.pedestrianEdges
       })
     }),

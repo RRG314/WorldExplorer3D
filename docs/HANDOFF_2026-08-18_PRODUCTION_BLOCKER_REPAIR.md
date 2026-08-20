@@ -753,3 +753,88 @@ surface choice at Golden Gate and JFX. Keep foundation/terrain conflicts and
 far-field height semantics separate. Update all three audit records and create a
 new checkpoint only after the worldwide final frames improve. Do not push or
 deploy.
+
+## 2026-08-20 audit checkpoint 2 — NPC pedestrian transport exclusion
+
+### User correction and first authoritative loss
+
+- The user clarified that controlled-player arrival is not the defect to repair.
+  The requirement is that pedestrian NPCs never occupy street carriageways,
+  ramps, bridges, tunnels, or other vehicle-transport surfaces. The earlier
+  next-task paragraph is therefore superseded; no player-spawn change was made.
+- The complete-world reports proved the previous motorway check was a false
+  green. Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, and rural Iowa
+  each reported `mappedPaths: 0` while publishing 456-602 inferred sidewalk
+  edges, 58-76 inferred crossings, and up to 24 pedestrian agents. The separate
+  Baltimore/London/Tokyo actor run likewise published 24 people in every city.
+- The first authoritative loss was `compilePedestrianGraph`: it accepted vehicle
+  traversal segments and invented two offset sidewalks plus periodic crossings
+  from each road centerline. Excluding only motorway classes did not prevent
+  NPCs from being derived from ordinary streets, ramps, bridges, or tunnels.
+
+### Completed bounded authority repair
+
+- Pedestrian population may now consume only an explicitly mapped, at-grade
+  `footway`. Vehicle roads, cycleways, inferred sidewalks/crossings, ramps,
+  elevated paths, bridges, and tunnels fail closed. Building entrances can join
+  only an eligible mapped graph; they cannot bootstrap a synthetic network.
+- No pedestrian geometry provider was enabled and no new renderer, inferred
+  measurement, city exception, or visual offset was added. Because the current
+  world publication deliberately publishes no mapped footway layer, current
+  locations honestly publish zero pedestrian agents instead of placing them on
+  unsupported surfaces. Vehicle traffic and the Living World/urban owners remain
+  active.
+- Diagnostics now expose vehicle-transport and engineered-transport pedestrian
+  edges. The assembled and actor verifiers require both to be zero and also
+  require inferred sidewalk/crossing counts to be zero. Fixture guards retain a
+  real mapped at-grade footway using the runtime's actual
+  `structureKind: at_grade` label and reject an unassociated footway bridge.
+
+### Verified result
+
+- Local staged artifact:
+  `4.3.0+2382d5c48d49.20ae3a1745990bf7.staging` (`sourceDirty: true`, never
+  deployed).
+- `verify:source`, artifact build/hash verification, and
+  `verify:actors-vehicles` passed. Baltimore, London, and Tokyo each reported
+  zero pedestrian agents and zero transport-derived pedestrian edges while
+  keeping 13-14 visible traffic vehicles and detailed vehicle presentation.
+- The initial artifact
+  `4.3.0+1ddf6fd0c723.6485dc545babc8dc.staging` passed
+  `verify:assembled-locations` for Baltimore/JFX, Golden Gate, London, Monaco,
+  Manhattan, and rural Iowa with active terrain, roads, traffic, Living World,
+  urban sandbox, HUD, controls, and collision diagnostics. Every complete final
+  frame was manually inspected. Tokyo was inspected in the actor matrix.
+- A second complete assembled run after correcting the ordinary at-grade
+  structure label kept the NPC check green at all six locations but failed the
+  overall matrix at Golden Gate. That provider response started the player in a
+  boat with no bridge at the selected coordinate and reported one 6.051 m exact
+  at-grade discontinuity between `osm:way:12180960` and
+  `osm:way:415852093`. The same artifact's immediately preceding Golden Gate
+  run showed the bridge and zero discontinuities. This is fresh evidence for
+  the already-open provider/transport authority blocker, not an NPC regression;
+  do not report the latest overall matrix as green.
+- The generic web-game client also reached a settled Iowa Earth runtime and its
+  text state independently confirmed zero pedestrian edges/agents and active
+  traffic. Its SwiftShader canvas was black and external provider/CORS console
+  noise was present, so that image is not visual acceptance evidence; installed
+  Chrome matrix frames remain the visual authority.
+
+### Still open
+
+1. A future pedestrian population may return only after a real mapped at-grade
+   pedestrian-surface owner is published and verified worldwide. Do not restore
+   road-offset sidewalks or inferred crossings to satisfy a population count.
+2. London, Monaco, Manhattan, Baltimore, and Tokyo still show terrain,
+   building-base, or road-corridor incoherence; Tokyo visibly clips buildings
+   into roads and London still has an incoherent road vehicle. Green transport
+   topology checks do not close these visual blockers.
+3. Far-field height semantics and provider-dependent exact transport continuity
+   remain separate audits. The latest Golden Gate run proves the latter can
+   remove the selected bridge and vary from zero to a 6.051 m discontinuity.
+   Do not combine either with the NPC authority.
+
+Next bounded task: identify the first shared publication or grounding stage
+that permits buildings and roads to occupy incompatible final space across
+London, Monaco, Manhattan, Baltimore, and Tokyo. Do not patch a city or alter
+the already-checkpointed NPC/traffic authority. Do not push or deploy.

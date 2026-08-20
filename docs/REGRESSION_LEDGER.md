@@ -1117,3 +1117,48 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Never reintroduce: multiple arrival owners, mode-only state with implicit
   position authority, cached lower-layer walking surfaces across a respawn, or
   landing images that were not captured from the assembled player runtime.
+
+## 2026-08-20 — Pedestrian NPCs derived entirely from vehicle transport
+
+- Status: resolved locally; mapped pedestrian-surface publication remains open;
+  not deployed.
+- Symptom: the release matrix reported zero pedestrian motorway violations even
+  though NPCs could appear on ordinary streets, crossings, ramps, bridges, and
+  tunnels. The check was class-specific and did not ask where the complete NPC
+  graph came from.
+- Root cause: every audited location reported zero mapped pedestrian paths.
+  `compilePedestrianGraph` nevertheless converted eligible vehicle-road
+  centerlines into two offset `inferred_sidewalk` edges and periodically added
+  `inferred_crossing` edges through the carriageway. Baltimore/JFX, Golden Gate,
+  London, Monaco, Manhattan, and rural Iowa each published hundreds of these
+  invented edges; Baltimore, London, and Tokyo each populated 24 agents on them.
+- Resolution: pedestrian publication accepts only mapped, at-grade footways and
+  rejects vehicle roads plus every ramp/elevated/bridge/tunnel path. No mapped
+  footway owner is currently enabled, so population fails closed at zero rather
+  than fabricating a surface. Traffic vehicles and the one Living World runtime
+  remain active.
+- Guard: `npm run verify:source`, `WE3D_VERIFY_ROOT=dist npm run
+  verify:actors-vehicles`, and `WE3D_VERIFY_ROOT=dist npm run
+  verify:assembled-locations`. The actor fixture requires ordinary roads to
+  publish no pedestrian edge, retains a mapped at-grade footway with the real
+  `structureKind: at_grade` runtime label, and rejects an unassociated footway
+  bridge. Browser checks require zero vehicle-transport, engineered-transport,
+  inferred-sidewalk, and inferred-crossing edges.
+- Worldwide evidence: complete installed-Chrome frames were inspected for
+  Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo.
+  Baltimore/London/Tokyo retain 13-14 visible traffic vehicles with zero
+  pedestrians. The six-location assembled matrix retains active terrain, roads,
+  traffic, Living World, sandbox, atmosphere, HUD, collision diagnostics, and
+  controls.
+- Adjacent failure observed during revalidation: the NPC authority remained
+  green at every location, but a later Golden Gate response omitted the bridge
+  at the selected coordinate, entered boat mode, and exposed one 6.051 m exact
+  at-grade discontinuity (`osm:way:12180960` to `osm:way:415852093`). The
+  immediately preceding run had rendered the bridge with zero discontinuities.
+  This does not reopen the NPC repair; it is evidence that provider-dependent
+  transport completeness remains production-blocking.
+- Never reintroduce: motorway-only pedestrian checks, road-centerline sidewalk
+  offsets, periodic inferred crossings, pedestrian population count as proof of
+  a valid surface, or an unassociated pedestrian path on engineered transport.
+  Restore people only through an authoritative mapped at-grade pedestrian layer
+  with its own worldwide final-frame verification.

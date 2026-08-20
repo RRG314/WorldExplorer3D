@@ -54,6 +54,61 @@ const prohibitedPedestrianGraph = compilePedestrianGraph({
 assert.equal(prohibitedPedestrianGraph.edges.length, 0, 'Motorway must publish no inferred sidewalks or crossings.');
 assert.equal(prohibitedPedestrianGraph.diagnostics.excludedNonPedestrianSegments, 1, 'Pedestrian exclusion must be observable.');
 
+const ordinaryRoadPedestrianGraph = compilePedestrianGraph({
+  traversal: {
+    authority: 'actor-vehicle-verification',
+    segments: [{
+      p1: { x: -50, y: 0, z: 0 },
+      p2: { x: 50, y: 0, z: 0 },
+      segIndex: 0,
+      direction: 'both',
+      feature: { id: 'ordinary-road', kind: 'road', type: 'residential', walkable: true }
+    }]
+  }
+}).publication;
+assert.equal(ordinaryRoadPedestrianGraph.edges.length, 0, 'Vehicle roads must never fabricate pedestrian sidewalks or crossings.');
+
+const mappedPedestrianGraph = compilePedestrianGraph({
+  traversal: {
+    authority: 'actor-vehicle-verification',
+    segments: [{
+      p1: { x: -20, y: 0, z: 0 },
+      p2: { x: 20, y: 0, z: 0 },
+      segIndex: 0,
+      direction: 'both',
+      feature: {
+        id: 'mapped-footway',
+        kind: 'footway',
+        networkKind: 'footway',
+        walkable: true,
+        structureSemantics: { terrainMode: 'at_grade', structureKind: 'at_grade' }
+      }
+    }]
+  }
+}).publication;
+assert.equal(mappedPedestrianGraph.edges.length, 2, 'A mapped at-grade pedestrian path must remain eligible.');
+assert.equal(mappedPedestrianGraph.provenance.mappedPaths, 2, 'Mapped pedestrian provenance must remain observable.');
+
+const mappedBridgePedestrianGraph = compilePedestrianGraph({
+  traversal: {
+    authority: 'actor-vehicle-verification',
+    segments: [{
+      p1: { x: -20, y: 8, z: 0 },
+      p2: { x: 20, y: 8, z: 0 },
+      segIndex: 0,
+      direction: 'both',
+      feature: {
+        id: 'unassociated-footway-bridge',
+        kind: 'footway',
+        networkKind: 'footway',
+        walkable: true,
+        structureSemantics: { terrainMode: 'elevated', structureKind: 'bridge' }
+      }
+    }]
+  }
+}).publication;
+assert.equal(mappedBridgePedestrianGraph.edges.length, 0, 'An unassociated pedestrian bridge path must fail closed.');
+
 const connectedBridgeFeature = {
   pts: [{ x: 0, z: 0 }, { x: 0, z: 100 }],
   width: 8,
@@ -208,21 +263,30 @@ try {
         parking: vehicle.parking
       }));
       const population = second?.livingWorld?.population || {};
+      const pedestrianGraph = second?.livingWorld?.pedestrianGraph || {};
       const firstVisibleVehicles = Number(first?.livingWorld?.activePopulation?.vehicles || 0) + Number(first?.livingWorld?.activePopulation?.promotedVehicles || 0);
       const secondVisibleVehicles = Number(second?.livingWorld?.activePopulation?.vehicles || 0) + Number(second?.livingWorld?.activePopulation?.promotedVehicles || 0);
       const firstVisiblePeople = Number(first?.livingWorld?.activePopulation?.pedestrians || 0) + Number(first?.livingWorld?.activePopulation?.promotedPedestrians || 0);
       const secondVisiblePeople = Number(second?.livingWorld?.activePopulation?.pedestrians || 0) + Number(second?.livingWorld?.activePopulation?.promotedPedestrians || 0);
       const checks = {
-        canonicalFarNpc: population.pedestrianRepresentation === 'articulated-instanced-character-v2' && population.pedestrianLegacyBlockFallback === false,
-        articulatedFarNpc: Number(population.pedestrianRenderedParts || 0) >= 17,
-        peopleRemainPublished: firstVisiblePeople > 0 && secondVisiblePeople > 0,
+        canonicalFarNpc: Number(population.pedestrians || 0) === 0 ||
+          population.pedestrianRepresentation === 'articulated-instanced-character-v2' && population.pedestrianLegacyBlockFallback === false,
+        articulatedFarNpc: Number(population.pedestrians || 0) === 0 || Number(population.pedestrianRenderedParts || 0) >= 17,
+        pedestrianPopulationRequiresMappedPaths:
+          Number(pedestrianGraph.provenance?.mappedPaths || 0) > 0
+            ? firstVisiblePeople > 0 && secondVisiblePeople > 0
+            : Number(population.pedestrians || 0) === 0 && firstVisiblePeople === 0 && secondVisiblePeople === 0,
         trafficRemainsPublished: firstVisibleVehicles > 0 && secondVisibleVehicles > 0,
         detailedVehiclesPresent: vehicles.length > 0,
         parkedCarsOutsideTravelLane: vehicles.filter((vehicle) => vehicle.parking).every((vehicle) => vehicle.parking.fullyOutsideTravelLane === true),
         correctJurisdictionLaneSide: second?.livingWorld?.trafficGraph?.provenance?.driveOnLeft === location.driveOnLeft,
         noTrafficDirectionViolations: Number(second?.livingWorld?.trafficGraph?.directionViolations || 0) === 0,
         noTrafficLaneSideViolations: Number(second?.livingWorld?.trafficGraph?.laneSideViolations || 0) === 0,
-        noPedestriansOnMotorways: Number(second?.livingWorld?.pedestrianGraph?.prohibitedMotorwayEdges || 0) === 0,
+        noPedestriansOnVehicleTransport:
+          Number(pedestrianGraph.vehicleTransportEdges || 0) === 0 &&
+          Number(pedestrianGraph.engineeredTransportEdges || 0) === 0 &&
+          Number(pedestrianGraph.provenance?.inferredSidewalks || 0) === 0 &&
+          Number(pedestrianGraph.provenance?.inferredCrossings || 0) === 0,
         vehicleHeightFitsCatalog: envelopes.filter((entry) => entry.envelope && entry.dimensions).every((entry) => entry.envelope.height <= entry.dimensions.height + .08 && entry.envelope.roofOverflow <= .08),
         vehicleWidthFitsCatalog: envelopes.filter((entry) => entry.envelope && entry.dimensions).every((entry) => entry.envelope.width <= entry.dimensions.width + .12),
         noRuntimeErrors: (second?.runtimeErrors || []).length === 0,

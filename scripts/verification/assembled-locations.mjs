@@ -100,8 +100,11 @@ try {
           Number(snapshot.livingWorld?.trafficGraph?.directionViolations || 0) === 0,
         noTrafficLaneSideViolations:
           Number(snapshot.livingWorld?.trafficGraph?.laneSideViolations || 0) === 0,
-        noPedestriansOnMotorways:
-          Number(snapshot.livingWorld?.pedestrianGraph?.prohibitedMotorwayEdges || 0) === 0,
+        noPedestriansOnVehicleTransport:
+          Number(snapshot.livingWorld?.pedestrianGraph?.vehicleTransportEdges || 0) === 0 &&
+          Number(snapshot.livingWorld?.pedestrianGraph?.engineeredTransportEdges || 0) === 0 &&
+          Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredSidewalks || 0) === 0 &&
+          Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredCrossings || 0) === 0,
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         noRuntimeErrors: snapshot.runtimeErrors.length === 0,
