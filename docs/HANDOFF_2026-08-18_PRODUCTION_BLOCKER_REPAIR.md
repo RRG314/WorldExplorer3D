@@ -1014,3 +1014,83 @@ foundation/apron geometry, batching, collision base, and final visibility.
 Compare the same London, Monaco, Manhattan, Baltimore, and Tokyo gameplay paths.
 Do not reopen the repaired structure, NPC, or cross-section authorities. Do not
 push or deploy.
+
+## 2026-08-20 audit checkpoint 5 — rendered building foundations own collision
+
+### First authoritative loss
+
+- Final-world sampling ruled out a general stale-terrain explanation. Across
+  6,000 Tokyo buildings, the accepted-ground values recorded at compilation and
+  samples from the final terrain after water masking agreed within 0.000004 m.
+  Equivalent Baltimore samples agreed within 0.000005 m. London, Monaco, and
+  Manhattan were likewise stable except for a small, separate set of waterfront
+  footprints affected by the later water mask.
+- The first widespread loss was collision publication. The renderer extended
+  every sloped building body down to its bounded low-ground foundation, but the
+  collider began at the high-ground sample and retained only the mapped body
+  height. The visible top and collision top matched while the visible downhill
+  wall below the high sample had no collider.
+- Before repair, the split exceeded 0.1 m in 4,203/6,000 sampled Tokyo
+  buildings, 3,645/4,000 Baltimore, 3,833/4,000 London, 3,967/4,000 Monaco, and
+  3,494/4,000 Manhattan. Gaps reached 8.96 m in Tokyo and the existing 12 m
+  foundation cap in London/Monaco. Direct final collision queries found 3, 6,
+  93, 695, and 10 respectively sampled downhill foundation interiors whose
+  visible walls could be traversed.
+- The same visual/collision split exists in the user-approved `fcc82f2`
+  baseline and the recovery commit. It is a latent shared building-authority
+  defect, not evidence that the current bridge compiler introduced the visual
+  terrain shaping.
+
+### Completed bounded authority repair
+
+- Solid building collision now uses the exact rendered building-body extent:
+  the accepted-ground visual base through mapped/inferred body height plus the
+  bounded foundation rise. This preserves the same roof/top elevation while
+  closing the non-colliding downhill segment.
+- Passage-below semantics, mapped heights, footprint identity, provider
+  provenance, terrain geometry, batching, facade geometry, and transport are
+  unchanged. No terrain flattening, city exception, duplicate collider, fake
+  foundation, or inferred measurement claim was added.
+- The building layer product now publishes foundation-collision profile and
+  mismatch counts. The complete assembled verifier requires a populated single
+  authority and zero mismatches, and Tokyo is now a first-class member of the
+  assembled location matrix rather than relying only on the actor check.
+
+### Verified result
+
+- Local staged artifact:
+  `4.3.0+84c09596f92d.618c047d7d80a818.staging` (`sourceDirty: true`, never
+  deployed).
+- `verify:source`, hosting build/hash verification, the complete mutable-source
+  seven-location matrix, the complete immutable-artifact seven-location matrix,
+  and `verify:actors-vehicles` passed. Every location reported a nonzero
+  foundation-collision population and zero mismatches. Baltimore/London/Tokyo
+  retained 10-14 visible vehicles and exactly zero pedestrian NPCs.
+- Complete artifact frames were opened and inspected for Baltimore/JFX, Golden
+  Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo with terrain, water,
+  buildings, transport, population, atmosphere, HUD, collision, and player
+  control active.
+
+### Still open; do not call the world repaired
+
+1. This physical collision repair does not correct the visible ordinary-road
+   and terrain shaping. London, Monaco, and Tokyo remain visibly incoherent;
+   rural Iowa still arrives off-road. Those are separate authority traces.
+2. Final water masking changed accepted-ground samples by more than 0.1 m for
+   3/4,000 London, 7/4,000 Monaco, and 1/4,000 Manhattan sampled building
+   footprints, reaching 4.88 m in Monaco. These waterfront cases need a separate
+   hydrology/building ordering decision; they were not folded into this repair.
+3. The user clarified that facade doors and glass storefronts should face the
+   mapped street so the street wall reads naturally. The current frames do not
+   prove that outcome. Audit mapped entrance provenance, facade-edge selection,
+   street association, batching, and final visibility as its own bounded task;
+   do not put NPCs on the transport graph or invent mapped entrances.
+4. Ordinary-road grades, far-field building height/LOD, and rural arrival remain
+   open production blockers.
+
+Next bounded task: trace street-facing facade and entrance publication from
+mapped entrance identity (or explicitly labeled non-mapped presentation) through
+nearest eligible street association, facade edge selection, mesh batching, and
+final complete-world visibility. Preserve the repaired foundation collision,
+road clearance, provider-order, and no-pedestrian-on-transport authorities. Do
+not push or deploy.

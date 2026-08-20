@@ -21,7 +21,8 @@ const allLocations = [
   { id: 'london', name: 'London', lat: 51.5074, lon: -0.1278, class: 'coastal-urban', driveOnLeft: true },
   { id: 'monaco', name: 'Monaco', lat: 43.7384, lon: 7.4246, class: 'terrain-structure', driveOnLeft: false },
   { id: 'manhattan', name: 'Manhattan', lat: 40.7580, lon: -73.9855, class: 'dense-urban', driveOnLeft: false },
-  { id: 'iowa-rural', name: 'Iowa Rural', lat: 42.08, lon: -93.87, class: 'rural', driveOnLeft: false }
+  { id: 'iowa-rural', name: 'Iowa Rural', lat: 42.08, lon: -93.87, class: 'rural', driveOnLeft: false },
+  { id: 'tokyo', name: 'Tokyo', lat: 35.6762, lon: 139.6503, class: 'dense-urban', driveOnLeft: true }
 ];
 const requestedLocations = new Set(String(process.env.WE3D_VERIFY_LOCATIONS || '')
   .split(',').map((value) => value.trim()).filter(Boolean));
@@ -118,6 +119,9 @@ try {
             Number(snapshot.worldLoad?.buildingRoadAuthority?.constrainedRoads || 0) === 0 ||
             Number(snapshot.worldLoad?.buildingRoadAuthority?.minimumResolvedWidth || 0) >= 1.2
           ),
+        oneBuildingFoundationCollisionAuthority:
+          Number(snapshot.worldLoad?.buildingRoadAuthority?.foundationCollisionProfiles || 0) > 0 &&
+          Number(snapshot.worldLoad?.buildingRoadAuthority?.foundationCollisionMismatches || 0) === 0,
         mappedStructureArrivalVisible: location.expectsStructureArrival !== true || (
           snapshot.surfaceChain?.actor?.mode !== 'boat' &&
           /^(?:bridge|overpass|ramp|elevated_road)$/.test(String(

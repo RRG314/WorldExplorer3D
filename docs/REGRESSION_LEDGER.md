@@ -1241,3 +1241,35 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   surface, treating inferred road-class width as surveyed data, suppressing
   mapped buildings merely to preserve an untagged class-default width, or a
   city-specific clearance branch.
+
+## 2026-08-20 — Visible downhill building foundations had no collision owner
+
+- Status: resolved locally; visible road/terrain shaping and facade frontage
+  remain production blockers; not deployed.
+- Symptom: on sloped ground, the rendered building body extended downhill but
+  players and other collision consumers could pass through part of that visible
+  wall. Count-only building checks could not detect the physical disagreement.
+- Root cause: rendering used `baseElevation` plus `height + foundationRise`,
+  while collision used `maximumGroundY + 0.03` plus only `height`. Tops matched,
+  but collision omitted the entire rendered foundation rise. The defect also
+  exists in the approved `fcc82f2` baseline; it was not introduced by bridge or
+  road-width repair.
+- Resolution: the rendered building body is the single vertical owner for solid
+  building collision. Collider minimum, maximum, and height now match that body
+  exactly. Passage-below semantics and source height/provenance remain intact.
+- Guard: the building layer product records foundation collision profiles and
+  mismatches; the seven-location assembled gate requires a populated authority
+  and zero mismatches. Tokyo is explicitly included. Source and immutable
+  artifact matrices passed for Baltimore/JFX, Golden Gate, London, Monaco,
+  Manhattan, rural Iowa, and Tokyo. Actor verification retained vehicle traffic
+  and exactly zero pedestrian NPCs.
+- Evidence: staged artifact
+  `4.3.0+84c09596f92d.618c047d7d80a818.staging`; pre-repair sampled pass-through
+  interiors were Baltimore 6/4,000, London 93/4,000, Monaco 695/4,000,
+  Manhattan 10/4,000, and Tokyo 3/6,000. All final artifact frames were opened.
+- Never reintroduce: a collider that begins above a rendered solid wall,
+  post-batching per-building reprojection as a second vertical owner, or claims
+  that a rendered foundation height is a surveyed measurement.
+- Adjacent blockers: London/Monaco/Tokyo ordinary-road shaping, rural arrival,
+  a small set of post-building water-mask changes, far-field height/LOD, and the
+  user-required mapped-street-facing doors and glass storefronts remain open.

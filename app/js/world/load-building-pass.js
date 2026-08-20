@@ -62,8 +62,16 @@ export async function buildBuildingGeometryPass(options = {}) {
     farLod: 0,
     implausibleGeometry: 0,
     provenanceRejected: 0,
-    renderedFeatures: 0
+    renderedFeatures: 0,
+    foundationCollisionProfiles: 0,
+    foundationCollisionMismatches: 0
   };
+  loadMetrics.buildingPublication.foundationCollisionProfiles = Number(
+    loadMetrics.buildingPublication.foundationCollisionProfiles || 0
+  );
+  loadMetrics.buildingPublication.foundationCollisionMismatches = Number(
+    loadMetrics.buildingPublication.foundationCollisionMismatches || 0
+  );
   loadMetrics.buildingWater ||= {
     vessels: 0,
     explicitOverwaterStructures: 0,
@@ -451,7 +459,6 @@ export async function buildBuildingGeometryPass(options = {}) {
       appCtx.buildingProvenanceFeatureIds.add(buildingProvenance.identity.featureId);
     }
     const baseElevation = baseElevationRaw + structureBaseOffset;
-    const collisionBaseElevation = maxElevation + 0.03 + structureBaseOffset;
     // Bound downhill foundations so cliff outliers cannot create towers.
     const mappedRoof = measureBuildingPhase('meshCreation', () => resolveMappedRoof(
       way.tags,
@@ -540,7 +547,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.bodyHeightMeters = bodyHeight;
     mesh.userData.renderedHeightMeters = renderedHeight;
     mesh.userData.terrainFoundationRise = terrainFoundationRise;
-    mesh.userData.collisionBaseElevation = collisionBaseElevation;
+    mesh.userData.collisionBaseElevation = baseElevation;
     mesh.userData.heightSource = buildingSemantics.heightSource;
     mesh.userData.levels = resolvedLevels;
     mesh.userData.levelsSource = levelsSource;
@@ -566,7 +573,10 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.structureBaseOffset = structureBaseOffset;
     mesh.userData.structureSemantics = structureSemantics;
 
-    const colliderRef = measureBuildingPhase('collisionPublication', () => registerBuildingCollision(pts, height, {
+    // The rendered body owns the downhill foundation segment. Publish that
+    // same vertical extent to collision so a visible wall cannot be traversed
+    // below the former uphill-only collision base.
+    const colliderRef = measureBuildingPhase('collisionPublication', () => registerBuildingCollision(pts, renderedHeight, {
       detail: colliderDetail,
       centerX,
       centerZ,
@@ -590,16 +600,23 @@ export async function buildBuildingGeometryPass(options = {}) {
       metadataSourceId: way.tags._buildingMetadataSourceId || '',
       buildingProvenance,
       minLevels: Number.isFinite(buildingSemantics.buildingMinLevel) ? buildingSemantics.buildingMinLevel : null,
-      baseY: collisionBaseElevation,
+      baseY: baseElevation,
       buildingSemantics,
       structureSemantics
     }));
     if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
     else loadMetrics.colliders.simplified += 1;
     if (colliderRef) {
-      colliderRef.baseY = collisionBaseElevation;
-      colliderRef.minY = collisionBaseElevation;
-      colliderRef.maxY = collisionBaseElevation + height;
+      colliderRef.baseY = baseElevation;
+      colliderRef.minY = baseElevation;
+      colliderRef.maxY = baseElevation + renderedHeight;
+      loadMetrics.buildingPublication.foundationCollisionProfiles += 1;
+      if (
+        Math.abs(colliderRef.minY - baseElevation) > 1e-6 ||
+        Math.abs(colliderRef.maxY - (baseElevation + renderedHeight)) > 1e-6
+      ) {
+        loadMetrics.buildingPublication.foundationCollisionMismatches += 1;
+      }
     }
 
     appCtx.addEarthWorldObject(mesh);
@@ -739,6 +756,8 @@ export async function buildBuildingGeometryPass(options = {}) {
   return Object.freeze({
     candidateCount: buildingWays.length,
     renderedFeatureCount: Number(loadMetrics.buildingPublication.renderedFeatures || 0),
+    foundationCollisionProfiles: Number(loadMetrics.buildingPublication.foundationCollisionProfiles || 0),
+    foundationCollisionMismatches: Number(loadMetrics.buildingPublication.foundationCollisionMismatches || 0),
     yieldCount: buildingYieldCount,
     ...loadMetrics.buildingRoadAuthority
   });

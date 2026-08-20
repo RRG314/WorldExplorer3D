@@ -149,6 +149,7 @@ export function compileWorldLayerProducts(options = {}) {
         ]),
         ...compactScalars(loadMetrics.buildings?.geometryPublication, [
           'candidateCount', 'renderedFeatureCount', 'yieldCount',
+          'foundationCollisionProfiles', 'foundationCollisionMismatches',
           'constrainedBuildings', 'constrainedRoads', 'gradeSeparatedOverlaps',
           'newlyNonDriveableRoads', 'minimumResolvedWidth',
           'suppressedCenterlineConflicts', 'suppressedMappedCrossSectionConflicts',
