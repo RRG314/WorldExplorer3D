@@ -995,6 +995,44 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 5. Record screenshots, runtime state, and the exact commit tested.
 6. Include an ocean-only location, a mountainous location, and a city outside North America; confirm that glaciers are terrain, open ocean has no land placeholder, and location labels follow the published origin.
 
+## 2026-08-20 — Detailed-building metadata coverage diverged from publication coverage
+
+- Status: resolved locally at audit checkpoint 1; not deployed; broader world
+  coherence remains production-blocked.
+- Symptom: the complete JFX world reported more than 24,000 rendered buildings
+  while the expected Baltimore tall skyline was absent from the relevant world
+  context. Count-only and bridge-surface checks stayed green.
+- Root cause: detailed footprint publication covered 0.022 degrees around the
+  selected origin, but bundled mapped metadata selection covered only 0.006
+  degrees around the pack center and the live fallback queried only the small
+  origin-centered metadata radius. JFX was inside footprint reach but outside
+  metadata reach. A provider-type guard also prevented the compatible bundled
+  semantic join when Overture successfully owned geometry.
+- Resolution: one shared metadata authority now selects the nearest declared
+  pack whose coverage intersects the existing building publication coverage.
+  Bundled semantic enrichment is provider-independent, but cross-provider
+  identity is still accepted only by the existing unique seven-metre join.
+  Geometry IDs and mapped OSM semantic IDs remain separately recorded; inferred
+  values are not described as mapped or surveyed.
+- Evidence: staged JFX publishes 303 unique matches, 72 mapped-dimension matches,
+  and 12 mapped tall buildings; downtown Baltimore visibly contains tall towers.
+  Source, artifact, JFX, actor/vehicle, and six-location assembled checks pass.
+  Rural Iowa does not select a city pack. Final frames for all required locations
+  were manually inspected.
+- Guard: `npm run verify:source`, `WE3D_VERIFY_ROOT=dist npm run
+  verify:jfx-player-surface`, building metadata selection/provenance diagnostics,
+  and complete-world visual review. A building count or generic visible-mesh
+  count is never sufficient skyline proof.
+- Never reintroduce: origin-only metadata eligibility narrower than published
+  footprint coverage; geometry-provider branches that silently discard
+  compatible mapped semantics; ambiguous proximity joins; city-name/radius
+  exceptions; or claims that one NE-facing JFX frame proves downtown visibility.
+- Open adjacent failures: controlled-player motorway arrival is not covered by
+  the NPC motorway check; London/Monaco/Manhattan/Tokyo still show terrain,
+  foundation, road, or building-corridor conflicts; the far-field height path
+  remains independently inferred; and provider-response transport variability
+  requires a separate bounded repair.
+
 ## 2026-08-20 — Derived-terrain feedback and cross-location release failure
 
 - Status: partially repaired; production blocked.

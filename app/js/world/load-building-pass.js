@@ -39,6 +39,8 @@ export async function buildBuildingGeometryPass(options = {}) {
     metadataMatched: 0,
     mappedHeight: 0,
     mappedLevels: 0,
+    mappedTall: 0,
+    metadataMatchedTall: 0,
     inferredHeight: 0,
     inferredFullHeight: 0,
     inferredFullMinHeight: null,
@@ -287,6 +289,10 @@ export async function buildBuildingGeometryPass(options = {}) {
         dimensions.inferredFullMaxHeight = dimensions.inferredFullMaxHeight === null ? height : Math.max(dimensions.inferredFullMaxHeight, height);
         dimensions.inferredFullHeightBuckets[bucket] = (dimensions.inferredFullHeightBuckets[bucket] || 0) + 1;
       }
+    }
+    if (height >= 60 && ['explicit_height', 'levels'].includes(buildingSemantics.heightSource)) {
+      loadMetrics.buildingDimensions.mappedTall += 1;
+      if (way.tags._buildingMetadataSourceId) loadMetrics.buildingDimensions.metadataMatchedTall += 1;
     }
     if (bt !== 'yes') loadMetrics.buildingDimensions.mappedType += 1;
     if (roofShape) loadMetrics.buildingDimensions.mappedRoof += 1;

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
+import { mergeBuildingMetadata } from "./building-metadata.js?v=2";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
 import {
   mappedWaterStructurePriority,
@@ -62,7 +62,7 @@ export function resolveBuildingPublicationSelection(options = {}) {
   });
 }
 
-async function fetchBuildingMetadata(options, metadataState) {
+async function fetchBuildingMetadata(options, metadataState, fetchOptions = {}) {
   if (!options.fetchPreferredMetadata && !(options.metadataQuery && typeof options.fetchOverpassJSON === 'function')) {
     return null;
   }
@@ -77,6 +77,11 @@ async function fetchBuildingMetadata(options, metadataState) {
         }
         options.recordLoadWarning?.('bundled building metadata', preferredMetadataErr);
       }
+    }
+    if (!metadata && fetchOptions.preferredOnly === true) {
+      metadataState.status = 'skipped';
+      metadataState.reason = 'no-compatible-cross-provider-metadata';
+      return null;
     }
     if (!metadata) {
       metadata = await options.fetchOverpassJSON(
@@ -169,8 +174,15 @@ export async function loadBuildingDetailForPublication(options = {}) {
           options.recordLoadWarning?.('mapped water structures', waterStructureError);
         }
       }
-      if (data && !authoritativeMassing) {
-        const metadata = await fetchBuildingMetadata(options, metadataState);
+      if (data) {
+        // Geometry and mapped semantics are separate authorities. Overture may
+        // own the footprint while a uniquely matched bundled OSM identity owns
+        // missing height, level, roof, type, or name metadata. Live Overpass
+        // metadata cannot be joined to Overture without a shared stable id, so
+        // authoritative Overture massing uses only the curated bundled join.
+        const metadata = await fetchBuildingMetadata(options, metadataState, {
+          preferredOnly: authoritativeMassing
+        });
         if (!isActiveLoadContext()) return;
         if (metadata) {
           mergeBuildingMetadata(data, metadata, {
@@ -247,7 +259,10 @@ export async function loadBuildingDetailForPublication(options = {}) {
         provenanceFeatures: Array.isArray(appCtx.buildingProvenanceRecords)
           ? appCtx.buildingProvenanceRecords.length
           : 0,
-        publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
+        publicationDiagnostics: {
+          ...(options.loadMetrics.buildingPublication || {}),
+          buildingDimensions: { ...(options.loadMetrics.buildingDimensions || {}) }
+        },
         coveragePolicy: {
           globalCap: publicationSelection.globalCap,
           targetRatio: publicationSelection.coverageTarget,

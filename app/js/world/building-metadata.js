@@ -218,7 +218,8 @@ export function mergeBuildingMetadata(footprintData, metadataData, options = {})
     mappedDimensions,
     mappedTypes,
     mappedRoofs,
-    mappedNames
+    mappedNames,
+    selection: metadataData._buildingMetadataSelection || null
   };
   return footprintData;
 }

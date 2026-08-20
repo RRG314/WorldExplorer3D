@@ -43,6 +43,7 @@ const server = await startStaticServer({ rootDir: servedRoot, ports: [4390, 4391
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'transport', 'jfx-player-surface.json');
 const screenshotPath = path.join(root, 'output', 'release-evidence', 'current', 'jfx-player-surface.png');
+const skylineScreenshotPath = path.join(root, 'output', 'release-evidence', 'current', 'jfx-player-surface-downtown-view.png');
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const overpassProxyResults = [];
@@ -236,6 +237,8 @@ try {
       surfaceChain: diagnostics.surfaceChain || null,
       transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
       transportStructures: diagnostics.transportStructures || null,
+      worldDetail: diagnostics.worldDetail || null,
+      worldCounts: diagnostics.worldCounts || null,
       worldLoad: diagnostics.worldLoad || null,
       runtimeErrors: diagnostics.runtimeErrors || [],
       environment: diagnostics.environment,
@@ -245,6 +248,8 @@ try {
   const drive = snapshot.surfaceChain?.surfaces?.drive;
   const structure = drive?.feature || {};
   const sourceIsExact = structure.transportSource?.completeness === 'lossless';
+  const buildingDetail = snapshot.worldDetail?.buildings || {};
+  const buildingDimensions = buildingDetail.publicationDiagnostics?.buildingDimensions || {};
   const checks = {
     finalVisibleActorIsDriving: snapshot.environment === 'EARTH' && snapshot.surfaceChain?.actor?.mode === 'drive',
     losslessJfxSourceLoaded: sourceIsExact,
@@ -274,6 +279,15 @@ try {
     ),
     engineeredProfilesRespectDesignGrades:
       Number(snapshot.transportStructures?.gradeProfile?.violationCount || 0) === 0,
+    buildingMetadataCoverageReachesPublishedSkyline:
+      buildingDetail.metadata?.packId === 'baltimore' &&
+      buildingDetail.metadata?.selection?.authority === 'building-publication-coverage' &&
+      buildingDetail.metadata?.selection?.reason === 'publication-coverage-intersection',
+    mappedTallBuildingsPublished:
+      Number(buildingDimensions.mappedTall || 0) > 0 &&
+      Number(buildingDimensions.metadataMatchedTall || 0) > 0,
+    finalBuildingMeshesVisible:
+      Number(snapshot.worldCounts?.visibleBuildingMeshes || 0) > 0,
     noRuntimeErrors: snapshot.runtimeErrors.length === 0,
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
@@ -293,9 +307,17 @@ try {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
-  assert.ok(ok, 'Final visible vehicle did not settle on the authoritative JFX deck.');
   await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
   await page.screenshot({ path: screenshotPath });
+  // Use the shipped keyboard-look control (D), not a camera mutation, to turn
+  // from the one-way ramp's NE heading toward downtown Baltimore at ~160°.
+  // This preserves the exact player position and complete assembled world.
+  await page.keyboard.down('d');
+  await page.waitForTimeout(1250);
+  await page.keyboard.up('d');
+  await page.waitForTimeout(120);
+  await page.screenshot({ path: skylineScreenshotPath });
+  assert.ok(ok, 'The complete JFX world failed transport or skyline authority verification.');
 } finally {
   await context.close().catch(() => {});
   await browser.close().catch(() => {});

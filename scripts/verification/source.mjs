@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fetchBundledBuildingMetadata } from '../../app/js/world/preset-building-metadata.js';
 
 const root = process.cwd();
 const reportPath = path.join(root, 'output', 'verification', 'source', 'report.json');
@@ -66,6 +68,48 @@ function moduleReferences(source) {
 const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
 assert.equal(policy.status, 'legacy-suite-quarantined');
+
+const localJsonFetch = async (input) => {
+  try {
+    const json = JSON.parse(await fs.readFile(fileURLToPath(input), 'utf8'));
+    return { ok: true, status: 200, json: async () => json };
+  } catch {
+    return { ok: false, status: 404, json: async () => null };
+  }
+};
+const jfxMetadataWithoutPublicationCoverage = await fetchBundledBuildingMetadata({
+  fetchImpl: localJsonFetch,
+  locationKey: 'custom',
+  lat: 39.309728,
+  lon: -76.621428
+});
+const jfxMetadataWithPublicationCoverage = await fetchBundledBuildingMetadata({
+  coverageRadiusDegrees: 0.022,
+  fetchImpl: localJsonFetch,
+  locationKey: 'custom',
+  lat: 39.309728,
+  lon: -76.621428
+});
+const ruralMetadataWithPublicationCoverage = await fetchBundledBuildingMetadata({
+  coverageRadiusDegrees: 0.022,
+  fetchImpl: localJsonFetch,
+  locationKey: 'custom',
+  lat: 41.878,
+  lon: -93.0977
+});
+const buildingMetadataCoverageFailures = [];
+if (jfxMetadataWithoutPublicationCoverage !== null) {
+  buildingMetadataCoverageFailures.push('JFX origin unexpectedly selects a downtown-only pack without publication coverage');
+}
+if (jfxMetadataWithPublicationCoverage?._buildingMetadataPackId !== 'baltimore') {
+  buildingMetadataCoverageFailures.push('JFX building publication coverage does not select the intersecting Baltimore metadata pack');
+}
+if (jfxMetadataWithPublicationCoverage?._buildingMetadataSelection?.reason !== 'publication-coverage-intersection') {
+  buildingMetadataCoverageFailures.push('JFX metadata pack selection does not record publication-coverage authority');
+}
+if (ruralMetadataWithPublicationCoverage !== null) {
+  buildingMetadataCoverageFailures.push('rural Iowa incorrectly selects an unrelated bundled building metadata pack');
+}
 
 const missingRequiredFiles = [];
 for (const relative of requiredFiles) {
@@ -140,6 +184,7 @@ const report = {
     htmlFailures,
     missingModuleTargets,
     duplicateModuleIdentities,
+    buildingMetadataCoverageFailures,
     staleGeneratedImages,
     productionDebugDefaultOff: productionDebugDefaultOff ? [] : ['runtime diagnostics are not opt-in']
   }

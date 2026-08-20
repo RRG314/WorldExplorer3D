@@ -684,3 +684,72 @@ actual evidence:
 
 The immediate task is release-blocker repair and candidate verification, not
 adding more GTA-like features.
+
+## 2026-08-20 audit checkpoint 1 — mapped building metadata coverage
+
+### Completed bounded authority repair
+
+- Recovery base: `2b31c93620fdf9872240011eeb16d7906d57b3bc`.
+- First authoritative skyline loss: metadata provider selection, before
+  footprint selection, batching, LOD, attachment, or rendering. JFX lies about
+  2.28 km from the Baltimore pack center. The 0.022-degree detailed building
+  publication included downtown footprints, but the 0.006-degree pack-origin
+  selector and roughly 0.004-degree live metadata query did not include their
+  mapped dimensions. Successful Overture geometry also bypassed the compatible
+  bundled metadata join.
+- Resolution: metadata pack eligibility follows intersection with the existing
+  building publication coverage. Compatible bundled semantics are evaluated
+  independently of the geometry provider; Overture/Shortbread geometry identity
+  is preserved and the OSM semantic identity is accepted only through the
+  existing unique seven-metre join. No radius was widened for Baltimore and no
+  city-specific branch was added.
+- Persistent guard: `verify:source` checks JFX without publication coverage does
+  not select Baltimore, JFX with 0.022-degree publication coverage does select
+  it by recorded coverage intersection, and rural Iowa selects no city pack.
+  The JFX complete-world verifier now records metadata/dimension state and saves
+  final evidence before failing another invariant.
+
+### Verified result
+
+- Local staged artifact:
+  `4.3.0+2b31c93620fd.445425dd75fb5412.staging` (`sourceDirty: true`, never
+  deployed).
+- Complete JFX gameplay: Baltimore pack selected by publication-coverage
+  intersection; 303/319 records matched; 72 matched records carry mapped
+  dimensions; 12 mapped tall buildings were published; 1,430 building meshes
+  were visible. Exact way 12115981, compiled bridge body, graph connections,
+  drive contact, terrain clearance, exact continuity, grade limits, runtime,
+  browser, and local resources all passed.
+- Downtown Baltimore gameplay visibly contains the tall tower cluster. The
+  default JFX chase frame faces NE 33 degrees while downtown is at bearing about
+  160 degrees, and an ordinary keyboard-look turn is occluded by a nearby
+  building. That original frame is not a valid pixel-level skyline guard even
+  though its data/provenance failure was real.
+- The required complete-world matrix was rerun and visually inspected for
+  Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo.
+
+### Still-open production blockers; do not call the world repaired
+
+1. `verify:assembled-locations` reports `noPedestriansOnMotorways`, but that
+   check covers the NPC graph only. Its Golden Gate and JFX final frames place
+   the controlled walker in motorway lanes.
+2. London, Monaco, Manhattan, Baltimore, and Tokyo show building foundations or
+   terrain elevations visibly disagreeing. London also shows severe road/terrain
+   grades and a boat-like vehicle published as road traffic.
+3. Tokyo shows buildings occupying or clipping the road corridor. Current
+   counts and collision summaries do not reject the final visual conflict.
+4. The far-field building path still infers generic heights directly from
+   Shortbread when explicit height is absent; its semantics remain separate
+   from the repaired detailed-building metadata authority and require a later
+   bounded audit.
+5. Provider-response variability remains a required transport audit target. An
+   earlier JFX run reported 27 exact discontinuities while the current lossless
+   response reports three connections and zero discontinuities. Do not weaken
+   the thresholds or accept one provider shape as worldwide proof.
+
+Next bounded task: trace controlled-player arrival and traversal eligibility
+from mapped access tags through provider/dedup/topology/publication to the final
+surface choice at Golden Gate and JFX. Keep foundation/terrain conflicts and
+far-field height semantics separate. Update all three audit records and create a
+new checkpoint only after the worldwide final frames improve. Do not push or
+deploy.
