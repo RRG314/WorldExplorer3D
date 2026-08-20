@@ -18,7 +18,7 @@ import {
 } from "./building-batching.js?v=10";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
-import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=6';
+import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=7';
 import {
   classifyBuildingWaterRelationship,
   createWaterAreaSpatialIndex,
@@ -69,6 +69,18 @@ export async function buildBuildingGeometryPass(options = {}) {
     explicitOverwaterStructures: 0,
     suppressedOverlaps: 0
   };
+  loadMetrics.buildingRoadAuthority ||= {
+    constrainedBuildings: 0,
+    constrainedRoads: 0,
+    gradeSeparatedOverlaps: 0,
+    newlyNonDriveableRoads: 0,
+    minimumResolvedWidth: null,
+    suppressedCenterlineConflicts: 0,
+    suppressedMappedCrossSectionConflicts: 0,
+    suppressedInferredFootprintConflicts: 0,
+    suppressedInsufficientClearanceConflicts: 0,
+    unresolvedAtGradeConflicts: 0
+  };
   appCtx.buildingProvenanceRecords ||= [];
   appCtx.buildingProvenanceFeatureIds ||= new Set(
     appCtx.buildingProvenanceRecords
@@ -106,10 +118,10 @@ export async function buildBuildingGeometryPass(options = {}) {
   startLoadPhase('buildBuildingRoadGuards');
   const {
     expandFootprintForGroundApron,
-    footprintIntersectsRoadCenterline,
     isBuildingNearLoadedRoad,
     overlapsRoadCorridor,
     pointOnRoadCorridor,
+    resolveFootprintTransportAuthority,
     sampleFootprintCoverage
   } = await createBuildingRoadFootprintGuards({
     roads: appCtx.roads,
@@ -189,12 +201,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       loadMetrics.buildingPublication.outsideRoadCoverage += 1;
       continue;
     }
-    const roadCoreConflict = measureBuildingPhase('roadEligibility', () => footprintIntersectsRoadCenterline(pts));
-    if (roadCoreConflict) {
-      loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
-      loadMetrics.buildingPublication.roadOverlap += 1;
-      continue;
-    }
+    let roadCoreConflict = false;
     let centerX = 0;
     let centerZ = 0;
     let minFootprintX = Infinity;
@@ -310,6 +317,41 @@ export async function buildBuildingGeometryPass(options = {}) {
       way.id ||
       `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`
     );
+    const roadAuthority = measureBuildingPhase('roadEligibility', () =>
+      resolveFootprintTransportAuthority(pts, {
+        allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
+        inferredFootprint: way.tags._geometrySource === 'inferred_road_frontage',
+        sourceBuildingId
+      })
+    );
+    loadMetrics.buildingRoadAuthority.gradeSeparatedOverlaps +=
+      Number(roadAuthority.gradeSeparatedOverlaps || 0);
+    if (roadAuthority.action === 'constrain_inferred_width') {
+      loadMetrics.buildingRoadAuthority.constrainedBuildings += 1;
+      loadMetrics.buildingRoadAuthority.constrainedRoads += Number(roadAuthority.constrainedRoads || 0);
+      loadMetrics.buildingRoadAuthority.newlyNonDriveableRoads +=
+        Number(roadAuthority.newlyNonDriveableRoads || 0);
+      const resolvedWidth = Number(roadAuthority.minimumResolvedWidth);
+      if (Number.isFinite(resolvedWidth)) {
+        const currentMinimum = Number(loadMetrics.buildingRoadAuthority.minimumResolvedWidth);
+        loadMetrics.buildingRoadAuthority.minimumResolvedWidth = Number.isFinite(currentMinimum) && currentMinimum > 0
+          ? Math.min(currentMinimum, resolvedWidth)
+          : resolvedWidth;
+      }
+    } else if (roadAuthority.action === 'suppress_building') {
+      roadCoreConflict = true;
+      const counter = {
+        mapped_centerline_conflict: 'suppressedCenterlineConflicts',
+        mapped_cross_section_conflict: 'suppressedMappedCrossSectionConflicts',
+        inferred_footprint_conflict: 'suppressedInferredFootprintConflicts',
+        insufficient_centerline_clearance: 'suppressedInsufficientClearanceConflicts'
+      }[roadAuthority.reason];
+      if (counter) loadMetrics.buildingRoadAuthority[counter] += 1;
+      else loadMetrics.buildingRoadAuthority.unresolvedAtGradeConflicts += 1;
+      loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
+      loadMetrics.buildingPublication.roadOverlap += 1;
+      continue;
+    }
     if (!knownSourceBuildingId && suppressedBuildingIds.has(sourceBuildingId)) {
       loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
     }
@@ -697,6 +739,7 @@ export async function buildBuildingGeometryPass(options = {}) {
   return Object.freeze({
     candidateCount: buildingWays.length,
     renderedFeatureCount: Number(loadMetrics.buildingPublication.renderedFeatures || 0),
-    yieldCount: buildingYieldCount
+    yieldCount: buildingYieldCount,
+    ...loadMetrics.buildingRoadAuthority
   });
 }

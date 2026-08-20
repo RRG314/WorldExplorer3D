@@ -1197,3 +1197,47 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Adjacent blockers: ordinary-road grades are not part of the failing grade
   gate despite infeasible reported values; urban building/road/terrain conflicts
   and rural arrival coherence remain open.
+
+## 2026-08-20 — Inferred road widths occupy mapped building footprints
+
+- Status: resolved locally; vertical terrain/foundation coherence remains a
+  production blocker; not deployed.
+- Symptom: final Tokyo buildings visibly occupied road lanes while automated
+  building and road counts remained high. Direct final-world measurement found
+  835 London, 475 Monaco, 97 Manhattan, and 3,679 Tokyo building footprints
+  inside rendered road widths. Only 16, 14, 3, and 59 respectively crossed the
+  centerline recognized by the existing guard.
+- Root cause: building reconciliation tested the centerline as a zero-width
+  segment and ignored the compiled cross-section. All vertically confirmed
+  London (702) and Tokyo (3,627) conflicts used inferred
+  `fallback:road-class` widths and none involved a >=60 m building. Movement
+  then ignored likely road-core building collisions, while Living World traffic
+  inflated narrow roads back to 4.8 m. Mapped building and centerline identities
+  were present; inferred width was the first stage that contradicted them.
+- Resolution: mapped footprints constrain class-default at-grade road width
+  before final mesh/traversal/traffic publication and publish explicit inferred
+  provenance. Mapped width/lane authority, centerline intersections, inferred
+  footprints, and insufficient clearance fail closed by suppressing the
+  conflicting building. Grade-separated/passable structures are not flattened
+  into this rule. Resolved surfaces below 4.8 m remain visible but non-driveable;
+  traffic uses the resolved width and cannot recreate a wider lane.
+- Guard: `verify:source` covers inferred-width resolution, mapped-width
+  precedence, grade separation, centerline rejection, and non-driveable narrow
+  roads. `verify:assembled-locations` requires the non-null final building-road
+  authority, zero unresolved at-grade conflicts, and a >=1.2 m published width.
+  `verify:actors-vehicles` requires narrow constrained roads to publish no
+  traffic edge and validates the actual 17-part traffic model when no vehicle is
+  close enough for near-detail promotion.
+- Worldwide evidence: the corrected Baltimore/JFX, Golden Gate, London, Monaco,
+  Manhattan, and rural Iowa assembled matrix passed with zero unresolved
+  at-grade conflicts. Constrained/newly-non-driveable road counts were 318/249,
+  42/31, 610/458, 304/202, 44/36, and 3/3 respectively. Tokyo retained 12-14
+  visible traffic vehicles and zero pedestrians. Complete final frames were
+  inspected; direct horizontal road/building occupation is absent in the
+  inspected Tokyo/London paths, while the separate vertical foundation/terrain
+  failure remains visible.
+- Never reintroduce: centerline-only proof of road clearance, collision-ignore
+  rules as physical reconciliation, widening traffic beyond the final road
+  surface, treating inferred road-class width as surveyed data, suppressing
+  mapped buildings merely to preserve an untagged class-default width, or a
+  city-specific clearance branch.

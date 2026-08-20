@@ -266,7 +266,12 @@ export function compileTrafficGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
   const sourceSegments = (Array.isArray(options.traversal?.segments) ? options.traversal.segments : [])
-    .filter((segment) => segment?.p1 && segment?.p2 && segmentPriority(segment) <= 1200)
+    .filter((segment) =>
+      segment?.p1 && segment?.p2 &&
+      segmentPriority(segment) <= 1200 &&
+      segment.feature?.driveable !== false &&
+      finite(segment.feature?.width, segment.feature?.transportRecord?.crossSection?.widthMeters) >= 4.8
+    )
     .sort((a, b) => segmentPriority(a) - segmentPriority(b));
   const store = makeNodeStore();
   const edges = [];
@@ -312,7 +317,7 @@ export function compileTrafficGraph(options = {}) {
   for (const segment of sourceSegments) {
     if (edges.length >= budget.trafficEdges) break;
     const direction = String(segment.direction || 'both');
-    const width = Math.max(4.8, finite(segment.feature?.width, finite(segment.feature?.transportRecord?.crossSection?.widthMeters, 7)));
+    const width = finite(segment.feature?.width, finite(segment.feature?.transportRecord?.crossSection?.widthMeters, 7));
     const laneOffset = Math.min(2.25, width * 0.24);
     const forwardOffset = driveOnLeft ? laneOffset : -laneOffset;
     const reverseOffset = -forwardOffset;

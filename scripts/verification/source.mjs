@@ -6,6 +6,7 @@ import { fetchBundledBuildingMetadata } from '../../app/js/world/preset-building
 import { filterSelectionToAcceptedGround } from '../../app/js/world/compiler/accepted-ground-selection.js';
 import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-regional-context.js';
 import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
+import { createBuildingRoadFootprintGuards } from '../../app/js/world/building-road-footprint.js';
 
 const root = process.cwd();
 const reportPath = path.join(root, 'output', 'verification', 'source', 'report.json');
@@ -197,6 +198,63 @@ if (upgradedExactBridge?.tags?._fixedRegionalStructure !== 'exact' ||
   structureFallbackAuthorityFailures.push('exact structure merge did not defer deduplication until ground acceptance');
 }
 
+const buildingRoadAuthorityFailures = [];
+const inferredWidthRoad = {
+  pts: [{ x: -10, z: 0 }, { x: 10, z: 0 }],
+  width: 5,
+  driveable: true,
+  structureSemantics: { terrainMode: 'at_grade' },
+  transportRecord: { crossSection: { widthMeters: 5, widthSource: 'fallback:road-class' } }
+};
+const mappedWidthRoad = {
+  pts: [{ x: -10, z: 20 }, { x: 10, z: 20 }],
+  width: 5,
+  driveable: true,
+  structureSemantics: { terrainMode: 'at_grade' },
+  transportRecord: { crossSection: { widthMeters: 5, widthSource: 'source:width' } }
+};
+const tunnelRoad = {
+  pts: [{ x: -10, z: 40 }, { x: 10, z: 40 }],
+  width: 7,
+  driveable: true,
+  structureSemantics: { terrainMode: 'subgrade' },
+  transportRecord: { crossSection: { widthMeters: 7, widthSource: 'fallback:road-class' } }
+};
+const buildingRoadGuards = await createBuildingRoadFootprintGuards({
+  roads: [inferredWidthRoad, mappedWidthRoad, tunnelRoad],
+  yieldToMainThread: async () => {}
+});
+const inferredResolution = buildingRoadGuards.resolveFootprintTransportAuthority([
+  { x: -4, z: 1.8 }, { x: 4, z: 1.8 }, { x: 4, z: 6 }, { x: -4, z: 6 }
+], { sourceBuildingId: 'mapped-building' });
+if (inferredResolution.action !== 'constrain_inferred_width' ||
+    !(inferredWidthRoad.width < 5 && inferredWidthRoad.width > 3.2) ||
+    inferredWidthRoad.driveable !== false ||
+    inferredWidthRoad.resolvedCrossSection?.authority !== 'mapped_building_clearance' ||
+    inferredWidthRoad.resolvedCrossSection?.inferenceMethod !== 'mapped-footprint-clearance') {
+  buildingRoadAuthorityFailures.push('mapped footprint did not constrain a conflicting inferred road width with explicit provenance');
+}
+const mappedWidthConflict = buildingRoadGuards.resolveFootprintTransportAuthority([
+  { x: -4, z: 21.8 }, { x: 4, z: 21.8 }, { x: 4, z: 26 }, { x: -4, z: 26 }
+], { sourceBuildingId: 'mapped-building' });
+if (mappedWidthConflict.action !== 'suppress_building' ||
+    mappedWidthConflict.reason !== 'mapped_cross_section_conflict' ||
+    mappedWidthRoad.width !== 5) {
+  buildingRoadAuthorityFailures.push('mapped road width did not retain authority over a conflicting building footprint');
+}
+const tunnelOverlap = buildingRoadGuards.resolveFootprintTransportAuthority([
+  { x: -4, z: 41.8 }, { x: 4, z: 41.8 }, { x: 4, z: 46 }, { x: -4, z: 46 }
+], { sourceBuildingId: 'mapped-building' });
+if (tunnelOverlap.action !== 'none' || tunnelOverlap.gradeSeparatedOverlaps !== 1 || tunnelRoad.width !== 7) {
+  buildingRoadAuthorityFailures.push('grade-separated transport was incorrectly treated as an at-grade footprint conflict');
+}
+const centerlineConflict = buildingRoadGuards.resolveFootprintTransportAuthority([
+  { x: -2, z: -1 }, { x: 2, z: -1 }, { x: 2, z: 1 }, { x: -2, z: 1 }
+], { sourceBuildingId: 'mapped-building' });
+if (centerlineConflict.action !== 'suppress_building' || centerlineConflict.reason !== 'mapped_centerline_conflict') {
+  buildingRoadAuthorityFailures.push('irreconcilable mapped centerline conflict was not rejected');
+}
+
 const missingRequiredFiles = [];
 for (const relative of requiredFiles) {
   if (!(await exists(path.join(root, relative)))) missingRequiredFiles.push(relative);
@@ -271,6 +329,7 @@ const report = {
     missingModuleTargets,
     duplicateModuleIdentities,
     buildingMetadataCoverageFailures,
+    buildingRoadAuthorityFailures,
     structureFallbackAuthorityFailures,
     staleGeneratedImages,
     productionDebugDefaultOff: productionDebugDefaultOff ? [] : ['runtime diagnostics are not opt-in']

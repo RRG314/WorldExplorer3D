@@ -148,7 +148,12 @@ export function compileWorldLayerProducts(options = {}) {
           'inferredGeometryCount', 'ambiguousMetadataCount'
         ]),
         ...compactScalars(loadMetrics.buildings?.geometryPublication, [
-          'candidateCount', 'renderedFeatureCount', 'yieldCount'
+          'candidateCount', 'renderedFeatureCount', 'yieldCount',
+          'constrainedBuildings', 'constrainedRoads', 'gradeSeparatedOverlaps',
+          'newlyNonDriveableRoads', 'minimumResolvedWidth',
+          'suppressedCenterlineConflicts', 'suppressedMappedCrossSectionConflicts',
+          'suppressedInferredFootprintConflicts', 'suppressedInsufficientClearanceConflicts',
+          'unresolvedAtGradeConflicts'
         ])
       }
     }),

@@ -84,7 +84,8 @@ try {
           worldLoad: {
             providers: diagnostics.worldLoad?.session?.providers || {},
             transportSource: diagnostics.worldLoad?.layerProducts?.transport?.source || null,
-            acceptedGroundSelection: diagnostics.worldLoad?.acceptedGroundSelection || null
+            acceptedGroundSelection: diagnostics.worldLoad?.acceptedGroundSelection || null,
+            buildingRoadAuthority: diagnostics.worldLoad?.layerProducts?.buildings?.record?.compilation || null
           },
           runtimeErrors: diagnostics.runtimeErrors || [],
           visiblePrimaryCanvasCount: [...document.querySelectorAll('canvas')].filter((canvas) => {
@@ -110,6 +111,13 @@ try {
           Number(snapshot.livingWorld?.pedestrianGraph?.engineeredTransportEdges || 0) === 0 &&
           Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredSidewalks || 0) === 0 &&
           Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredCrossings || 0) === 0,
+        oneAtGradeBuildingRoadAuthority:
+          snapshot.worldLoad?.buildingRoadAuthority !== null &&
+          Number(snapshot.worldLoad?.buildingRoadAuthority?.unresolvedAtGradeConflicts || 0) === 0 &&
+          (
+            Number(snapshot.worldLoad?.buildingRoadAuthority?.constrainedRoads || 0) === 0 ||
+            Number(snapshot.worldLoad?.buildingRoadAuthority?.minimumResolvedWidth || 0) >= 1.2
+          ),
         mappedStructureArrivalVisible: location.expectsStructureArrival !== true || (
           snapshot.surfaceChain?.actor?.mode !== 'boat' &&
           /^(?:bridge|overpass|ramp|elevated_road)$/.test(String(

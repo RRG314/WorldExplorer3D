@@ -1,5 +1,12 @@
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 
+const BUILDING_EDGE_CLEARANCE_METERS = 0.12;
+const MIN_PUBLISHED_ROAD_WIDTH_METERS = 1.2;
+// The traffic graph's smallest supported two-way vehicle cross-section is
+// 4.8 m. Anything narrower remains a mapped surface for walking and context,
+// but cannot honestly publish vehicle traversal.
+const MIN_DRIVEABLE_ROAD_WIDTH_METERS = 4.8;
+
 export async function createBuildingRoadFootprintGuards(options = {}) {
   const roads = Array.isArray(options.roads) ? options.roads : [];
   const useRdtBudgeting = options.useRdtBudgeting === true;
@@ -34,13 +41,13 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
   };
   const markRoadCorridorCell = (x, z, radius) =>
     markCell(roadCorridorCells, roadCorridorCellSize, x, z, radius);
-  const registerRoadCenterlineSegment = (p0, p1, radius) => {
+  const registerRoadCenterlineSegment = (p0, p1, radius, road, indexRadius = radius) => {
     const segmentIndex = roadCenterlineSegments.length;
-    roadCenterlineSegments.push({ p0, p1, radius });
-    const minCellX = Math.floor((Math.min(p0.x, p1.x) - radius) / roadCenterlineCellSize);
-    const maxCellX = Math.floor((Math.max(p0.x, p1.x) + radius) / roadCenterlineCellSize);
-    const minCellZ = Math.floor((Math.min(p0.z, p1.z) - radius) / roadCenterlineCellSize);
-    const maxCellZ = Math.floor((Math.max(p0.z, p1.z) + radius) / roadCenterlineCellSize);
+    roadCenterlineSegments.push({ p0, p1, radius, road });
+    const minCellX = Math.floor((Math.min(p0.x, p1.x) - indexRadius) / roadCenterlineCellSize);
+    const maxCellX = Math.floor((Math.max(p0.x, p1.x) + indexRadius) / roadCenterlineCellSize);
+    const minCellZ = Math.floor((Math.min(p0.z, p1.z) - indexRadius) / roadCenterlineCellSize);
+    const maxCellZ = Math.floor((Math.max(p0.z, p1.z) + indexRadius) / roadCenterlineCellSize);
     for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
       for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
         const key = `${cellX},${cellZ}`;
@@ -78,7 +85,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
       markRoadCorridorCell(point.x, point.z, corridorRadiusCells);
       if (index >= road.pts.length - 1) continue;
       const next = road.pts[index + 1];
-      registerRoadCenterlineSegment(point, next, coreRadius);
+      registerRoadCenterlineSegment(point, next, coreRadius, road, halfWidth);
       await markRoadSegment(
         point,
         next,
@@ -182,6 +189,48 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
       (o4 === 0 && onSegment(c, b, d));
   };
 
+  const pointToSegmentDistance = (point, start, end) => {
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const lengthSq = dx * dx + dz * dz;
+    const amount = lengthSq > 0
+      ? Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSq))
+      : 0;
+    return Math.hypot(
+      point.x - (start.x + dx * amount),
+      point.z - (start.z + dz * amount)
+    );
+  };
+
+  const segmentToSegmentDistance = (a, b, c, d) => {
+    if (segmentsIntersect(a, b, c, d)) return 0;
+    return Math.min(
+      pointToSegmentDistance(a, c, d),
+      pointToSegmentDistance(b, c, d),
+      pointToSegmentDistance(c, a, b),
+      pointToSegmentDistance(d, a, b)
+    );
+  };
+
+  const segmentToFootprintDistance = (segment, points) => {
+    if (pointInFootprint(segment.p0.x, segment.p0.z, points) ||
+        pointInFootprint(segment.p1.x, segment.p1.z, points)) return 0;
+    let minimum = Infinity;
+    for (let index = 0; index < points.length; index += 1) {
+      minimum = Math.min(
+        minimum,
+        segmentToSegmentDistance(
+          segment.p0,
+          segment.p1,
+          points[index],
+          points[(index + 1) % points.length]
+        )
+      );
+      if (minimum <= 1e-7) return 0;
+    }
+    return minimum;
+  };
+
   const footprintIntersectsRoadCenterline = (points) => {
     if (!Array.isArray(points) || points.length < 3 || roadCenterlineSegments.length === 0) return false;
     const bounds = footprintBounds(points);
@@ -197,6 +246,117 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
       }
     }
     return false;
+  };
+
+  // Mapped road centerlines and mapped building outlines are stronger inputs
+  // than a class-default road width. Resolve that inferred cross-section here,
+  // before final road meshes, traversal, and traffic consume it. This keeps the
+  // source identities intact while preventing two physical owners from
+  // occupying the same at-grade surface.
+  const resolveFootprintTransportAuthority = (points, options = {}) => {
+    if (!Array.isArray(points) || points.length < 3 || roadCenterlineSegments.length === 0) {
+      return Object.freeze({ action: 'none', constrainedRoads: 0 });
+    }
+    if (options.allowsPassageBelow === true) {
+      return Object.freeze({ action: 'passage_preserved', constrainedRoads: 0 });
+    }
+
+    const bounds = footprintBounds(points);
+    const constraints = new Map();
+    let gradeSeparatedOverlaps = 0;
+    for (const segment of candidateRoadCenterlineSegments(bounds)) {
+      const road = segment?.road;
+      if (!road) continue;
+      const distance = segmentToFootprintDistance(segment, points);
+      const halfWidth = Math.max(0.6, Number(road.width || 0) * 0.5);
+      if (!(distance < halfWidth - 1e-7)) continue;
+
+      const terrainMode = String(road?.structureSemantics?.terrainMode || 'at_grade');
+      if (terrainMode !== 'at_grade') {
+        gradeSeparatedOverlaps += 1;
+        continue;
+      }
+      if (distance <= 1e-7) {
+        return Object.freeze({
+          action: 'suppress_building',
+          reason: 'mapped_centerline_conflict',
+          constrainedRoads: 0,
+          gradeSeparatedOverlaps
+        });
+      }
+
+      const widthSource = String(road?.transportRecord?.crossSection?.widthSource || '');
+      if (options.inferredFootprint === true) {
+        return Object.freeze({
+          action: 'suppress_building',
+          reason: 'inferred_footprint_conflict',
+          constrainedRoads: 0,
+          gradeSeparatedOverlaps
+        });
+      }
+      if (widthSource !== 'fallback:road-class') {
+        return Object.freeze({
+          action: 'suppress_building',
+          reason: 'mapped_cross_section_conflict',
+          constrainedRoads: 0,
+          gradeSeparatedOverlaps
+        });
+      }
+
+      const resolvedHalfWidth = distance - BUILDING_EDGE_CLEARANCE_METERS;
+      if (resolvedHalfWidth < MIN_PUBLISHED_ROAD_WIDTH_METERS * 0.5) {
+        return Object.freeze({
+          action: 'suppress_building',
+          reason: 'insufficient_centerline_clearance',
+          constrainedRoads: 0,
+          gradeSeparatedOverlaps
+        });
+      }
+      const resolvedWidth = resolvedHalfWidth * 2;
+      const previous = constraints.get(road);
+      if (!previous || resolvedWidth < previous.resolvedWidth) {
+        constraints.set(road, { resolvedWidth, distance });
+      }
+    }
+
+    let minimumResolvedWidth = Infinity;
+    let newlyNonDriveableRoads = 0;
+    for (const [road, constraint] of constraints) {
+      const sourceWidth = Number(
+        road?.resolvedCrossSection?.sourceWidthMeters ||
+        road?.transportRecord?.crossSection?.widthMeters ||
+        road?.width
+      );
+      const previousWidth = Number(road.width || sourceWidth);
+      const resolvedWidth = Math.max(
+        MIN_PUBLISHED_ROAD_WIDTH_METERS,
+        Math.min(previousWidth, constraint.resolvedWidth)
+      );
+      const wasDriveable = road.driveable !== false;
+      road.width = resolvedWidth;
+      if (resolvedWidth < MIN_DRIVEABLE_ROAD_WIDTH_METERS) road.driveable = false;
+      if (wasDriveable && road.driveable === false) newlyNonDriveableRoads += 1;
+      road.resolvedCrossSection = Object.freeze({
+        authority: 'mapped_building_clearance',
+        sourceWidthMeters: sourceWidth,
+        sourceWidthSource: String(road?.transportRecord?.crossSection?.widthSource || ''),
+        resolvedWidthMeters: resolvedWidth,
+        clearanceMeters: BUILDING_EDGE_CLEARANCE_METERS,
+        minimumMappedFootprintDistanceMeters: constraint.distance,
+        inferenceMethod: 'mapped-footprint-clearance',
+        constraintFeatureId: String(options.sourceBuildingId || '') || null,
+        driveable: road.driveable !== false
+      });
+      minimumResolvedWidth = Math.min(minimumResolvedWidth, resolvedWidth);
+    }
+
+    return Object.freeze({
+      action: constraints.size > 0 ? 'constrain_inferred_width' : 'none',
+      constrainedRoads: constraints.size,
+      gradeSeparatedOverlaps,
+      newlyNonDriveableRoads,
+      minimumResolvedWidth: Number.isFinite(minimumResolvedWidth) ? minimumResolvedWidth : null
+    });
   };
 
   const pointOnRoadCore = (x, z) => {
@@ -261,6 +421,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
     },
     pointOnRoadCore,
     pointOnRoadCorridor: (x, z) => roadCorridorCells.has(cellKey(x, z, roadCorridorCellSize)),
+    resolveFootprintTransportAuthority,
     sampleFootprintCoverage,
     scheduling: Object.freeze({
       chunkSize: yieldEveryRoads,

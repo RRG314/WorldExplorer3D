@@ -921,3 +921,96 @@ accepted base ground and footprint conflict guards through final mesh/collision
 publication, using the visibly failing London, Monaco, Baltimore, Manhattan,
 and Tokyo frames. Keep the repaired provider-order and NPC authorities intact.
 Do not push or deploy.
+
+## 2026-08-20 audit checkpoint 4 — mapped building clearance owns inferred road width
+
+### First authoritative loss
+
+- The visible Tokyo road/building conflict was reproduced in the complete
+  assembled game and then measured from the final published road and building
+  collections. Before this change, London published 835 building footprints
+  inside a rendered road width while only 16 crossed the mathematical
+  centerline tested by the guard. Monaco was 475/14, Manhattan 97/3, and Tokyo
+  3,679/59. The omitted conflicts were therefore real final geometry, not a
+  camera or count interpretation.
+- The first loss was the shared building/transport reconciliation stage.
+  `footprintIntersectsRoadCenterline` rejected a building only when the exact
+  centerline entered its polygon; it ignored the compiled road width. Later
+  movement code treated road-core building collisions as likely ghosts and the
+  traffic graph expanded every narrow road back to at least 4.8 m. These two
+  downstream workarounds hid two physical owners occupying the same space.
+- A vertical refinement of the same live data found 702 physical London and
+  3,627 physical Tokyo at-grade conflicts. Every one used
+  `fallback:road-class` width, not mapped `width=*`; none involved a building
+  at least 60 m tall. The mapped centerlines and mapped building outlines were
+  intact. The disappearing information was that an inferred cross-section had
+  to yield to their mapped clearance.
+
+### Completed bounded authority repair
+
+- Mapped building outlines now constrain only class-default inferred at-grade
+  road widths before final road mesh, traversal, collision, and traffic
+  publication. The road keeps its source identity and original normalized
+  cross-section; `resolvedCrossSection` records
+  `authority=mapped_building_clearance`, source/resolved widths, mapped
+  footprint distance, clearance, constraint feature id, and the explicit
+  `mapped-footprint-clearance` inference method. It is not described as a
+  surveyed measurement.
+- A mapped centerline intersection, an explicit/mapped road cross-section
+  conflict, an inferred building-footprint conflict, or less than the 1.2 m
+  minimum publishable surface suppresses the conflicting building instead of
+  creating overlapping owners. Grade-separated roads and buildings that
+  explicitly allow passage below keep their independent vertical ownership.
+- A resolved road narrower than the traffic renderer's actual 4.8 m vehicle
+  envelope remains visible mapped context but becomes non-driveable. The
+  traffic graph now consumes the resolved width exactly and excludes narrow or
+  non-driveable segments; it no longer inflates them back through buildings.
+- The building layer product publishes all reconciliation counts and the
+  assembled verifier requires a non-null authority record, zero unresolved
+  at-grade conflicts, and a minimum resolved surface width of at least 1.2 m.
+  The actor verifier separately proves that a constrained narrow road produces
+  no traffic edge and validates either promoted near vehicles or the actual
+  17-part Living World traffic geometry.
+
+### Verified result
+
+- Local staged artifact:
+  `4.3.0+dd5dbd250cd4.e082da92aee9a145.staging` (`sourceDirty: true`, never
+  deployed).
+- The corrected complete assembled matrix passed Baltimore/JFX, Golden Gate,
+  London, Monaco, Manhattan, and rural Iowa. It reported zero unresolved
+  at-grade conflicts everywhere. Resolved road/building counts were:
+  Baltimore 318 constrained roads/249 newly non-driveable; Golden Gate 42/31;
+  London 610/458; Monaco 304/202; Manhattan 44/36; and rural Iowa 3/3. Each
+  minimum final width remained above 1.2 m. Building publication remained
+  24,032 at JFX, 14,351 London, 5,714 Monaco, 10,763 Manhattan, and 144 rural
+  Iowa, so the repair did not trade the skyline for empty road corridors.
+- The final Tokyo actor run retained 12-14 visible articulated traffic vehicles
+  and zero pedestrians. Its complete gameplay frame shows the narrow road
+  ending at the mapped building edge instead of passing through the building.
+  Final London, Monaco, Manhattan, Baltimore/JFX, Golden Gate, Iowa, and Tokyo
+  frames were visually inspected with the assembled terrain, water, buildings,
+  transport, population, atmosphere, HUD, collision, and player active.
+- `verify:source`, staging artifact build/hash verification, the corrected full
+  `verify:assembled-locations`, and final full Baltimore/London/Tokyo
+  `verify:actors-vehicles` passed. The actor matrix retained 11-14, 12-13, and
+  13 visible vehicles respectively with zero pedestrian NPCs.
+
+### Still open; do not call the world repaired
+
+1. The direct horizontal road/building overlap is closed, but London and Monaco
+   still show severe ordinary-road/terrain shaping, and Tokyo, Monaco,
+   Manhattan, Baltimore, and London still show building foundations that float,
+   bury, or disagree with final terrain. The new Tokyo frame makes that vertical
+   failure especially clear.
+2. Ordinary at-grade road grades are still reported but not failed by the
+   engineered-only grade gate. This is independent of cross-section width.
+3. Rural Iowa still arrives on terrain rather than a nearby mapped transport
+   surface. Far-field building heights and final LOD/culling remain separate.
+
+Next bounded task: trace building base elevation from accepted terrain through
+building-time terrain sampling, final terrain publication/water masking,
+foundation/apron geometry, batching, collision base, and final visibility.
+Compare the same London, Monaco, Manhattan, Baltimore, and Tokyo gameplay paths.
+Do not reopen the repaired structure, NPC, or cross-section authorities. Do not
+push or deploy.

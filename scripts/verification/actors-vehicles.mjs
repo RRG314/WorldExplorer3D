@@ -68,6 +68,27 @@ const ordinaryRoadPedestrianGraph = compilePedestrianGraph({
 }).publication;
 assert.equal(ordinaryRoadPedestrianGraph.edges.length, 0, 'Vehicle roads must never fabricate pedestrian sidewalks or crossings.');
 
+const narrowTrafficGraph = compileTrafficGraph({
+  traversal: {
+    authority: 'actor-vehicle-verification',
+    segments: [{
+      p1: { x: -20, y: 0, z: 0 },
+      p2: { x: 20, y: 0, z: 0 },
+      segIndex: 0,
+      direction: 'both',
+      feature: {
+        id: 'building-constrained-road',
+        kind: 'road',
+        networkKind: 'road',
+        width: 3.6,
+        driveable: false,
+        transportRecord: { crossSection: { widthMeters: 5, widthSource: 'fallback:road-class' } }
+      }
+    }]
+  }
+}).publication;
+assert.equal(narrowTrafficGraph.edges.length, 0, 'Traffic must not inflate or enter a building-constrained narrow road.');
+
 const mappedPedestrianGraph = compilePedestrianGraph({
   traversal: {
     authority: 'actor-vehicle-verification',
@@ -277,7 +298,16 @@ try {
             ? firstVisiblePeople > 0 && secondVisiblePeople > 0
             : Number(population.pedestrians || 0) === 0 && firstVisiblePeople === 0 && secondVisiblePeople === 0,
         trafficRemainsPublished: firstVisibleVehicles > 0 && secondVisibleVehicles > 0,
-        detailedVehiclesPresent: vehicles.length > 0,
+        detailedVehiclesPresent:
+          vehicles.length > 0 ||
+          (
+            firstVisibleVehicles > 0 && secondVisibleVehicles > 0 &&
+            Number(population.vehicleRenderedParts || 0) >= 17 &&
+            Array.isArray(population.vehicleDimensions) && population.vehicleDimensions.length > 0
+          ),
+        articulatedTrafficVehicles:
+          Number(population.vehicles || 0) === 0 ||
+          Number(population.vehicleRenderedParts || 0) >= 17,
         parkedCarsOutsideTravelLane: vehicles.filter((vehicle) => vehicle.parking).every((vehicle) => vehicle.parking.fullyOutsideTravelLane === true),
         correctJurisdictionLaneSide: second?.livingWorld?.trafficGraph?.provenance?.driveOnLeft === location.driveOnLeft,
         noTrafficDirectionViolations: Number(second?.livingWorld?.trafficGraph?.directionViolations || 0) === 0,
