@@ -1,12 +1,7 @@
-const URBAN_VEHICLE_CATALOG = Object.freeze([
-  Object.freeze({ id: 'sedan', label: 'Aster four-door', bodyStyle: 'sedan', width: 1.8, height: 1.46, length: 4.48, wheelRadius: 0.36, color: 0x315f79 }),
-  Object.freeze({ id: 'crossover', label: 'Trailmark crossover', bodyStyle: 'crossover', width: 1.9, height: 1.7, length: 4.66, wheelRadius: 0.4, color: 0x7a5141 }),
-  Object.freeze({ id: 'pickup', label: 'Harbor utility pickup', bodyStyle: 'pickup', width: 1.94, height: 1.7, length: 5.08, wheelRadius: 0.42, color: 0x596a48 }),
-  Object.freeze({ id: 'compact', label: 'Metro compact', bodyStyle: 'compact', width: 1.7, height: 1.48, length: 3.82, wheelRadius: 0.34, color: 0x8a3f45 }),
-  Object.freeze({ id: 'taxi', label: 'Civic taxi', bodyStyle: 'taxi', width: 1.8, height: 1.5, length: 4.5, wheelRadius: 0.36, color: 0xd4b82d }),
-  Object.freeze({ id: 'van', label: 'Wayfarer passenger van', bodyStyle: 'van', width: 1.95, height: 2.12, length: 5.15, wheelRadius: 0.4, color: 0x52697a }),
-  Object.freeze({ id: 'delivery-van', label: 'Parcel delivery van', bodyStyle: 'van', width: 2.02, height: 2.35, length: 5.5, wheelRadius: 0.42, color: 0xc8c7bd })
-]);
+import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=1';
+
+// Compatibility export only. Parked and traffic vehicles now share one data owner.
+const URBAN_VEHICLE_CATALOG = PARKED_VEHICLE_CATALOG;
 
 function hashText(value = '') {
   let hash = 2166136261;
@@ -53,26 +48,47 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
     distance >= minDistance && distance <= maxDistance &&
     Number(edge?.length || 0) >= 12 &&
     !/motorway|trunk/i.test(String(edge?.roadClass || ''))
-  )).sort((a, b) => a.distance - b.distance || a.edgeIndex - b.edgeIndex);
+  )).sort((a, b) => {
+    const parkingPriority = (entry) => /residential|living_street|service|unclassified/i.test(String(entry.edge?.roadClass || '')) ? 0 : 1;
+    return parkingPriority(a) - parkingPriority(b) || a.distance - b.distance || a.edgeIndex - b.edgeIndex;
+  });
 
   const selected = [];
   for (const candidate of candidates) {
     if (selected.length >= count) break;
     const yaw = edgeYaw(candidate.edge);
     const definition = stableVehicleDefinition(worldIdentity, candidate.edgeIndex, selected.length);
-    const side = ((hashText(definition.id) & 1) === 0 ? -1 : 1) * (driveOnLeft ? -1 : 1);
-    const lateralOffset = Math.min(2.6, Math.max(1.25, Number(candidate.edge?.width || 5.4) * 0.34));
-    const x = candidate.x + Math.cos(yaw) * lateralOffset * side;
-    const z = candidate.z - Math.sin(yaw) * lateralOffset * side;
+    // Traffic graph positions are lane centers, not road centerlines. Move to
+    // the curb on the lane's outside only; choosing a random side can put a
+    // parked vehicle back in the opposing or through lane.
+    const roadHalfWidth = Math.max(2.4, Number(candidate.edge?.roadWidth || 5.4) * .5);
+    const laneOffset = Math.max(0, Number(candidate.edge?.laneOffset || 0));
+    const vehicleHalfWidth = Number(definition.variant.width || 1.8) * .5;
+    const curbMargin = .18;
+    const curbSpace = roadHalfWidth - laneOffset;
+    // A road without a full vehicle-width curb zone is not a valid parking
+    // source. Skipping it is preferable to fabricating a car in a travel lane.
+    if (curbSpace < vehicleHalfWidth * 2 + curbMargin) continue;
+    const lateralOffset = Math.max(0, roadHalfWidth - vehicleHalfWidth - curbMargin - laneOffset);
+    const curbNormalX = Number(candidate.edge?.curbNormalX);
+    const curbNormalZ = Number(candidate.edge?.curbNormalZ);
+    if (![curbNormalX, curbNormalZ].every(Number.isFinite) || Math.hypot(curbNormalX, curbNormalZ) < .9) continue;
+    const x = candidate.x + curbNormalX * lateralOffset;
+    const z = candidate.z + curbNormalZ * lateralOffset;
     if (selected.some((anchor) => Math.hypot(anchor.x - x, anchor.z - z) < 8)) continue;
     if (options.isBlocked?.(x, candidate.y, z, definition.variant) === true) continue;
     selected.push(Object.freeze({
       ...definition,
       edgeIndex: candidate.edgeIndex,
       x,
-      y: candidate.y + 1.2,
+      y: candidate.y + VEHICLE_ROOT_TO_GROUND_METERS,
       z,
       yaw,
+      roadHalfWidth,
+      laneOffset,
+      curbOffset: laneOffset + lateralOffset,
+      curbNormalX,
+      curbNormalZ,
       driverSide: driveOnLeft ? 1 : -1
     }));
   }

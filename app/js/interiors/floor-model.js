@@ -13,17 +13,22 @@ function clampInteger(value, min, max) {
 
 function deriveInteriorFloorPlan(definition = {}, footprintBounds = {}) {
   const building = definition.support?.building || definition.building || {};
-  const mappedLevels = finite(building.levels, 0);
-  const heightLevels = finite(building.height, 0) > 0
-    ? Math.round(finite(building.height, 0) / DEFAULT_STORY_HEIGHT)
+  const mappedLevels = Math.max(0, Math.round(finite(building.levels, 0)));
+  const buildingHeight = Math.max(0, finite(building.height, 0));
+  const heightLevels = buildingHeight > 0
+    ? Math.max(1, Math.round(buildingHeight / DEFAULT_STORY_HEIGHT))
     : 0;
-  const requestedFloors = Math.max(1, mappedLevels, heightLevels);
+  // Explicit mapped levels own the floor count when present. Height is a
+  // fallback, not a competing reason to add floors beyond the mapped roof.
+  const requestedFloors = Math.max(1, mappedLevels || heightLevels);
   const width = Math.max(0, finite(footprintBounds.width, 0));
   const depth = Math.max(0, finite(footprintBounds.depth, 0));
   const footprintArea = Math.max(0, width * depth);
   const connectorEligible = requestedFloors >= 2 && Math.min(width, depth) >= 8.5 && footprintArea >= 92;
   const floorCount = connectorEligible ? clampInteger(requestedFloors, 2, MAX_BUILDING_FLOORS) : 1;
-  const storyHeight = DEFAULT_STORY_HEIGHT;
+  const storyHeight = buildingHeight > 0
+    ? Math.max(2.7, Math.min(5.6, buildingHeight / requestedFloors))
+    : DEFAULT_STORY_HEIGHT;
   const key = String(definition.key || building.sourceBuildingId || building.id || 'interior');
   const floors = Array.from({ length: floorCount }, (_, level) => Object.freeze({
     id: `${key}:floor:${level}`,
@@ -34,6 +39,8 @@ function deriveInteriorFloorPlan(definition = {}, footprintBounds = {}) {
     key,
     floorCount,
     storyHeight,
+    requestedFloors,
+    buildingHeight: buildingHeight || null,
     connectorEligible,
     floors: Object.freeze(floors)
   });

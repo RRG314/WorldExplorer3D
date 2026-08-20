@@ -75,9 +75,14 @@ function parseLaneCount(value) {
 function normalizedDirection(tags = {}) {
   const raw = sourceString(tags.oneway).trim().toLowerCase();
   const junction = sourceString(tags.junction).trim().toLowerCase();
+  const highway = sourceString(tags.highway).trim().toLowerCase();
   if (raw === '-1' || raw === 'reverse') return 'reverse';
   if (['yes', '1', 'true'].includes(raw) || junction === 'roundabout') return 'forward';
   if (['reversible', 'alternating'].includes(raw)) return 'controlled';
+  // OSM defines motorway carriageways as one-way even when the optional
+  // oneway=yes tag is omitted. An explicit oneway=no still wins because it
+  // reaches the ordinary two-way fallback below.
+  if (!raw && highway === 'motorway') return 'forward';
   return 'both';
 }
 
@@ -90,17 +95,24 @@ function accessValue(tags = {}, keys = []) {
 }
 
 function normalizedAccess(tags = {}) {
+  const highway = sourceString(tags.highway).trim().toLowerCase();
   const motor = accessValue(tags, ['motor_vehicle', 'motorcar', 'vehicle', 'access']);
   const foot = accessValue(tags, ['foot', 'access']);
   const motorImpassable = IMPASSABLE_ACCESS.has(motor.value);
   const footImpassable = IMPASSABLE_ACCESS.has(foot.value);
+  const motorwayDefault = !foot.key && /^(?:motorway|motorway_link)$/.test(highway);
+  const separatelyMappedSidewalk = !foot.key && sourceString(tags.sidewalk).trim().toLowerCase() === 'separate';
   return Object.freeze({
     motorVehicle: motorImpassable ? 'prohibited' :
       RESTRICTED_ACCESS.has(motor.value) ? 'restricted' : 'allowed',
     pedestrian: footImpassable ? 'prohibited' :
-      RESTRICTED_ACCESS.has(foot.value) ? 'restricted' : 'allowed',
+      RESTRICTED_ACCESS.has(foot.value) ? 'restricted' :
+        motorwayDefault || separatelyMappedSidewalk ? 'prohibited' : 'allowed',
     motorSource: motor.key || null,
-    pedestrianSource: foot.key || null
+    pedestrianSource: foot.key || (
+      motorwayDefault ? 'default:highway=motorway' :
+        separatelyMappedSidewalk ? 'sidewalk=separate' : null
+    )
   });
 }
 

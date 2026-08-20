@@ -20,6 +20,18 @@ function toggleLargeMap() {
 
 function onKey(code, event) {
   if (!appCtx.gameStarted) return;
+  const target = event?.target;
+  const typing = target?.isContentEditable === true || ['INPUT', 'TEXTAREA', 'SELECT'].includes(String(target?.tagName || '').toUpperCase());
+  if (typing && code !== 'Escape') return;
+
+  if (appCtx.fishingGame?.open) {
+    if (code === 'Escape') {
+      event?.preventDefault?.();
+      appCtx.closeFishingGame?.();
+      return;
+    }
+    if (['KeyE', 'Space', 'KeyQ', 'KeyJ', 'KeyK', 'KeyL', 'ArrowLeft', 'ArrowRight'].includes(code)) return;
+  }
 
   if (code === 'KeyE') {
     if (event?.repeat) return;
@@ -68,7 +80,14 @@ function onKey(code, event) {
 
   if (code === 'KeyI' && typeof appCtx.toggleUrbanEquipment === 'function') {
     if (event?.repeat) return;
+    appCtx.toggleWorldDiscoveryJournal?.(false);
     if (appCtx.toggleUrbanEquipment()) return;
+  }
+
+  if (code === 'KeyJ' && typeof appCtx.toggleWorldDiscoveryJournal === 'function') {
+    if (event?.repeat) return;
+    appCtx.toggleUrbanEquipment?.(false);
+    if (appCtx.toggleWorldDiscoveryJournal()) return;
   }
 
   if (/^Digit[1-6]$/.test(code) && typeof appCtx.equipUrbanEquipmentSlot === 'function') {
@@ -84,16 +103,6 @@ function onKey(code, event) {
   if (code === 'KeyT' && typeof appCtx.handleUrbanNpcTake === 'function') {
     if (event?.repeat) return;
     if (appCtx.handleUrbanNpcTake()) return;
-  }
-
-  if (code === 'KeyX' && !appCtx.spaceFlight?.active) {
-    if (event?.repeat) return;
-    if (typeof appCtx.handleWorldDiscoveryQuickAction === 'function') {
-      Promise.resolve(appCtx.handleWorldDiscoveryQuickAction()).catch((err) => {
-        console.warn('[world-discovery] Quick action failed:', err);
-      });
-    }
-    return;
   }
 
   // Primary travel mode cycle (F key)
@@ -194,7 +203,12 @@ function onKey(code, event) {
   if (code === 'KeyR') {
     // Shift+R: Toggle Road Debug Mode (terrain conformance visualization)
     // R: Toggle track recording (default)
-    if (event && event.shiftKey && typeof appCtx.toggleRoadDebugMode === 'function') {
+    if (
+      appCtx.developerDiagnosticsEnabled &&
+      event &&
+      event.shiftKey &&
+      typeof appCtx.toggleRoadDebugMode === 'function'
+    ) {
       appCtx.toggleRoadDebugMode();
     } else {
       toggleTrackRecording();
@@ -218,6 +232,14 @@ function onKey(code, event) {
     }
   }
   if (code === 'Escape' && !document.getElementById('resultScreen').classList.contains('show') && !document.getElementById('caughtScreen').classList.contains('show')) {
+    if (appCtx.worldDiscoveryRuntime?.ui?.open) {
+      appCtx.toggleWorldDiscoveryJournal?.(false);
+      return;
+    }
+    if (appCtx.urbanSandboxRuntime?.equipmentOpen) {
+      appCtx.toggleUrbanEquipment?.(false);
+      return;
+    }
     if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
       appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
       return;

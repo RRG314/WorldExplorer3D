@@ -466,7 +466,8 @@ body.deflock-active .floatBtn::after {
   border-left: 1px solid var(--wx-line-soft);
   overflow-y: auto;
 }
-.floatItems::before { content: 'SYSTEM CONTROLS'; position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 Orbitron, sans-serif; }
+.floatItems::before { content: attr(data-menu-title); position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 Orbitron, sans-serif; }
+.floatItems:not([data-menu-title])::before { content: 'SYSTEM CONTROLS'; }
 .floatItem {
   min-height: 54px;
   box-sizing: border-box;
@@ -489,6 +490,11 @@ body.deflock-active .floatBtn::after {
   font: 600 9px/1 Orbitron, sans-serif;
   letter-spacing: 0.1em;
 }
+#gameMenu .floatItems { padding-bottom: 18px; }
+#gameMenu .floatItemSection { padding-top: 16px; }
+#gameMenu .floatItemSection:first-of-type { padding-top: 4px; }
+#gameMenu .floatItem { min-height: 50px; }
+[hidden] { display: none !important; }
 .mainMenuBtn {
   top: 0;
   right: 0;
@@ -606,6 +612,9 @@ body.deflock-active .floatBtn::after {
   }
   .floatMenu.open .floatItems { display: grid; }
   .floatItem { min-height: 48px; padding: 8px; font-size: 9px; white-space: normal; }
+  #gameMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
+  #gameMenu .floatItemSection:first-of-type { padding-top: 0; }
+  #gameMenu .floatItem { min-height: 48px; }
   #mobileTouchControls.show { display: block; }
   .mobilePad { width: 136px; height: 136px; top: auto; transform: none; gap: 3px; }
   #mobileMovePad { left: 16px; right: auto; bottom: 104px; border: 1px solid rgba(255,255,255,0.45); border-radius: 50%; background: rgba(3,9,14,0.34); }

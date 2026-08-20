@@ -1,12 +1,12 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-18 for the local 4.3.0 urban-sandbox foundation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
+Last reviewed: 2026-08-19 for the local 4.3.0 urban-sandbox foundation branch. Production remains intentionally rolled back to the verified 4.2.1 artifact.
 
 ## Current Release Status
 
 Production is serving the verified 4.2.1 rollback artifact. The 4.3.0 source has a local memory repair and an expanded urban-sandbox development line on `steven/urban-sandbox-foundation`; it is not deployed and still requires user/device acceptance before any new release decision.
 
-The GTA-like urban sandbox is a phased product direction, not a completed claim.
+The urban sandbox is a phased product direction, not a completed claim.
 The parked-car possession loop and all nine ambient traffic-family promotions
 work locally. Ten pedestrian roles, contextual talk/take/inspect actions,
 semantic street furniture, a six-slot session equipment inventory, held-item
@@ -33,7 +33,8 @@ features pass their focused installed-Chrome desktop and 390×844 touch journeys
 but have not received user/device acceptance.
 
 Discovery detectors and excavation tools still belong to the Field Journal's
-activity owner rather than the urban equipment inventory. The correct follow-up
+activity owner rather than the character Backpack equipment inventory, and
+digging does not yet deform the rendered/collision terrain. The correct follow-up
 is one save-compatible authoritative item/equipment domain with Journal adapters;
 adding a duplicate inventory or doing an unverified account migration is not
 part of this release candidate. Personal home ownership is likewise not yet
@@ -136,7 +137,17 @@ candidate must regenerate commit-bound evidence before any preview or release.
 
 ## Test Harness Limitations
 
-- Two older bundled-Chromium matrix scripts (`test:fixed-world-travel-browser` and `test:editor-multiplayer`) did not reach a terminal report under their SwiftShader path during this check. They produced no failing assertion before being stopped. Installed-Google-Chrome journeys independently passed the corresponding travel-control, world-cancellation, title lifecycle, two-client multiplayer, rules, building-edit persistence, and session-lifecycle behaviors. The legacy harnesses should be bounded or migrated, but they are not counted as passing evidence.
+- All pre-2026-08-19 tests and their screenshots are quarantined outside the
+  repository and are not release evidence. Current checks are requirement-led:
+  source/entry-graph health, full assembled gameplay at six representative
+  locations, JFX final-player surface ordering, four destination environments,
+  Live GPS camera/mode behavior, Firestore authorization and two-client
+  multiplayer convergence. Release captures use the same assembled entry point
+  and are written only when explicitly requested.
+- The representative matrix intentionally fails if either an exact mapped
+  structure join exceeds 0.25 m or a product-owned engineered profile exceeds
+  its compiled design envelope. It does not pretend a universal road slope is
+  source data for ordinary terrain-fitted streets.
 
 ## Product Scope
 
@@ -145,3 +156,38 @@ candidate must regenerate commit-bound evidence before any preview or release.
 - Tunnels, bridges, ramps, and stacked roads depend on mapped structure and layer tags. Incomplete source tagging can reduce geometric detail or cause the safer fallback profile to be used.
 
 Please report reproducible problems through [GitHub Issues](https://github.com/RRG314/WorldExplorer3D/issues).
+
+## Current local review candidate (2026-08-20)
+
+- The current staging-shaped artifact is built from a dirty working tree and is
+  for local review only. It has not been pushed or deployed.
+- The original aerial Baltimore harbor/skyline hero is restored byte-for-byte.
+  Marketing media is not accepted as gameplay evidence.
+- The transport audit now runs Baltimore/JFX, Golden Gate, London, Monaco,
+  Manhattan and rural Iowa through the normal assembled game. The former tunnel
+  profile mutation—which rewrote an already-compiled road back to raw terrain—
+  is removed, and tunnel shell publication no longer competes with the roadway
+  profile authority.
+- Monaco exact graph joins are closed in the best local run, but short
+  structure-connected approach profiles still fail the engineered-grade gate.
+  This is a production blocker, not an accepted limitation.
+- The current immutable review artifact
+  `4.3.0+96bc2c7c8888.7405ae87d4436a98.staging` was exercised through the normal
+  assembled entry flow at Baltimore/JFX, Golden Gate, London, Monaco,
+  Manhattan and rural Iowa. Rural Iowa passes. The other five locations fail
+  the engineered-profile gate; Manhattan also has three exact elevated joins
+  above the 0.25 m continuity limit. London visibly retains broken road/terrain
+  composition and Manhattan visibly buries lower building floors. These visual
+  failures remain release blockers even where the exact-join metric passes.
+- Transport compilation now reads one accepted base-DEM authority instead of
+  feeding the derived rendered terrain back into the road solver. This closed
+  the sampled exact joins in Baltimore, Golden Gate, London and Monaco and cut
+  Baltimore grade failures from twelve to one. Exact graph samples also replace
+  nearby synthetic samples, removing the former Golden Gate 535x one-sample
+  tunnel spike. The remaining short-profile constraints require a graph-level
+  feasibility repair; they are not waived or hidden by a looser threshold.
+- Firestore rules pass 79/79 current authorization and legacy-account cases;
+  root and Functions dependency audits report zero known vulnerabilities.
+  Firebase App Check, an enforced production CSP, deployed privileged-endpoint
+  checks, real-device/integrated-GPU acceptance, the real-input drive, final
+  clean commit-bound artifact identity and user acceptance remain open.

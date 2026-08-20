@@ -2,25 +2,24 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=49";
+} from "../structure-semantics.js?v=59";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,
   updateStructureVisualVisibilityForContext
-} from "./structure-visual-meshes.js?v=20";
+} from "./structure-visual-meshes.js?v=25";
 import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=20";
+} from "./structure-tunnel-visuals.js?v=23";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
-} from "../world/bridge-safety.js?v=8";
+} from "../world/bridge-safety.js?v=12";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
-import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=5';
 
 export function canPublishElevatedStructureVisual(feature) {
   if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;
@@ -136,32 +135,21 @@ export function collectStructureVisualInstances(deps = {}) {
         feature.pts;
     const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
     const { distances, total } = polylineDistances(structurePts);
-    const structureAssembly = semantics.terrainMode === 'elevated'
-      ? feature.transportStructureAssembly || compileElevatedAssembly(
-          feature,
-          sampleTerrainHeight,
-          {
-            supportConflict: (candidateFeature, column) => supportPointConflictsWithDriveableRoad(
-              candidateFeature,
-              {
-                x: column.x,
-                z: column.z,
-                supportBottomY: column.terrainY,
-                supportTopY: column.topY,
-                columnRadius: column.width * 0.5,
-                roadIndex: roadConflictIndex
-              }
-            )
-          }
-        )
-      : null;
+    // The transport compiler is the only structure-assembly authority. The
+    // renderer must never repair a missing compilation product locally: that
+    // created provider/order-dependent bridges whose visual body could disagree
+    // with collision, navigation, and junction profiles.
+    const structureAssembly = feature.transportStructureAssembly || null;
     const transitionAnchorDistances =
       Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0 ?
         feature.structureTransitionAnchors
           .map((anchor) => Number(anchor?.distance))
           .filter((distance) => Number.isFinite(distance)) :
         [];
-    if (semantics.terrainMode === "elevated") {
+    if (
+      (semantics.terrainMode === "elevated" && structureAssembly?.family === 'elevated_road') ||
+      structureAssembly?.family === 'engineered_approach'
+    ) {
       if (suppressExteriorVisuals) continue;
       // Structural coverage is compiled once. Curvature, ramp classification,
       // nearby elevated roads, and feature length may tune detail, but may not
@@ -488,7 +476,8 @@ export function collectStructureVisualInstances(deps = {}) {
               z: column.z,
               scaleX: column.width,
               scaleY: column.height,
-              scaleZ: Math.max(1, column.width * 1.1)
+              scaleZ: Math.max(1, column.width * 1.1),
+              structureFamily: structureAssembly.family
             });
           }
           const capHalfSpan = Math.max(
@@ -553,7 +542,9 @@ export function collectStructureVisualInstances(deps = {}) {
             scaleX: Math.max(2.4, width * 0.92),
             scaleY: abutment.height,
             scaleZ: Math.max(1.4, width * 0.38),
-            supportKind: 'abutment'
+            rotationY: Number(abutment.rotationY) || 0,
+            supportKind: 'abutment',
+            structureFamily: structureAssembly.family
           });
         }
       }

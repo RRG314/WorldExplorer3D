@@ -124,14 +124,15 @@ Core exploration can run locally without production credentials. Account, multip
 ## Verify a Change
 
 ```bash
-npm run build:hosting -- --firebase-env staging
-npm run verify:hosting
-npm run audit:reachability
-npm run runtime:verify
-npm run release:verify
+npm run verify:source
+npm run verify:world
 ```
 
-`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor and multiplayer surfaces, planetary round trips, provider fallbacks, ocean and biome behavior, and a representative global location matrix.
+The pre-2026-08-19 test suite is quarantined and is not trusted release
+evidence. New checks are admitted from current requirements and reproduced
+failure modes only. `npm run release:verify` builds the immutable artifact and
+runs the same complete player journey against it. See
+`docs/VERIFICATION_STRATEGY_2026-08-19.md`.
 
 ## Repository Layout
 

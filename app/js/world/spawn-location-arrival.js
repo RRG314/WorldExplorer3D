@@ -35,12 +35,20 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
 
   const exactRoad = findGradeSeparatedRoadAt(0, 0);
   const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || 'at_grade';
+  const structureKind = exactRoad?.road?.structureSemantics?.structureKind || '';
   const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);
+  // Exact OSM and generalized vector geometry can place the same bridge
+  // centerline several metres apart. Accept a tightly bounded bridge snap so
+  // an arrival selected at the real structure does not fall underneath it
+  // merely because this provider response used the alternate alignment.
+  const bridgeArrivalDistance = structureKind === 'bridge'
+    ? Math.max(roadHalfWidth, Math.min(24, roadHalfWidth + 12))
+    : roadHalfWidth;
   // Preserve a bridge deck at the selected coordinates. A tunnel arrival is
   // redirected to a safe surface so entry happens through a mapped portal.
   const structureFeetY =
     structureMode === 'elevated' &&
-    exactRoad?.dist <= roadHalfWidth &&
+    exactRoad?.dist <= bridgeArrivalDistance &&
     Number.isFinite(exactRoad?.y)
       ? exactRoad.y
       : null;
@@ -48,6 +56,7 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     return applySpawnTarget(exactRoad.x, exactRoad.z, {
       ...options,
       mode,
+      angle: exactRoad.angle,
       feetY: structureFeetY,
       preferRoad: true,
       preserveElevatedSurface: true,

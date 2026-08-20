@@ -116,16 +116,8 @@ function ensureSceneVisual(fish, appCtx) {
   disposeVisual();
   const fishMesh = createFishMesh(fish);
   if (!fishMesh) return null;
-  const lineGeometry = new THREE.BufferGeometry();
-  lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3));
-  const line = new THREE.Line(
-    lineGeometry,
-    new THREE.LineBasicMaterial({ color: 0xd9eef5, transparent: true, opacity: 0.78 })
-  );
-  line.frustumCulled = false;
   appCtx.scene.add(fishMesh);
-  appCtx.scene.add(line);
-  sceneVisual = { fishId: fish.id, fishMesh, line, phase: Math.random() * Math.PI * 2 };
+  sceneVisual = { fishId: fish.id, fishMesh, line: null, phase: Math.random() * Math.PI * 2 };
   return sceneVisual;
 }
 
@@ -139,14 +131,14 @@ function updateFishingScene(state, appCtx, dt) {
   visual.phase += dt * (state.stage === 'fighting' ? 3.2 + state.currentBurst * 5 : 1.1);
   const boat = appCtx.boat || { x: 0, y: 0, z: 0, angle: 0 };
   const direction = Number(state.fishDirection || 1);
-  const distance = state.stage === 'landed' ? 3.2 : 8 + (1 - state.reelProgress) * 18;
-  const side = direction * (4 + Math.sin(visual.phase * 0.7) * 3.5);
+  const outboard = state.stage === 'landed' ? 2.4 : 8 + (1 - state.reelProgress) * 15;
+  const foreAft = 4 + direction * (2.4 + Math.sin(visual.phase * 0.7) * 2.8);
   const forwardX = Math.sin(boat.angle);
   const forwardZ = Math.cos(boat.angle);
   const rightX = Math.cos(boat.angle);
   const rightZ = -Math.sin(boat.angle);
-  const fishX = boat.x + forwardX * distance + rightX * side;
-  const fishZ = boat.z + forwardZ * distance + rightZ * side;
+  const fishX = boat.x + forwardX * foreAft + rightX * outboard;
+  const fishZ = boat.z + forwardZ * foreAft + rightZ * outboard;
   const surfaceY = Number(appCtx.waterSurfaceYAt?.(fishX, fishZ));
   const waterY = Number.isFinite(surfaceY) ? surfaceY : Number(boat.y) || 0;
   const fishY = state.stage === 'landed'
@@ -161,17 +153,8 @@ function updateFishingScene(state, appCtx, dt) {
   const tail = visual.fishMesh.getObjectByName('fishingFishTail');
   if (tail) tail.rotation.y = Math.sin(visual.phase * 2.1) * (0.25 + state.currentBurst * 0.35);
 
-  const rodX = boat.x + forwardX * 1.4 + rightX * 0.7;
-  const rodZ = boat.z + forwardZ * 1.4 + rightZ * 0.7;
-  const positions = visual.line.geometry.attributes.position.array;
-  positions[0] = rodX;
-  positions[1] = (Number(boat.y) || 0) + 2.4;
-  positions[2] = rodZ;
-  positions[3] = fishX;
-  positions[4] = fishY + 0.2;
-  positions[5] = fishZ;
-  visual.line.geometry.attributes.position.needsUpdate = true;
-  visual.line.visible = state.stage !== 'landed';
+  // The screen-space rod owns the single readable line presentation in the
+  // deck camera. The world fish remains the authoritative 3D target.
 }
 
 function roundedFishPath(ctx, cx, cy, width, height, shape = 'bass') {
@@ -189,192 +172,81 @@ function drawFishPortrait(canvas, fish, animation = {}) {
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, '#08354a');
-  gradient.addColorStop(1, '#071c29');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  for (let i = 0; i < 18; i++) {
-    const x = (i * 83 + 29) % width;
-    const y = (i * 47 + 17) % height;
-    ctx.fillStyle = `rgba(160,220,235,${0.06 + i % 3 * 0.025})`;
-    ctx.beginPath();
-    ctx.arc(x, y, 1 + i % 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   const stage = String(animation.stage || 'idle');
   const phase = Number(animation.phase || 0);
   const tension = Math.max(0, Math.min(1, Number(animation.tension) || 0));
   const progress = Math.max(0, Math.min(1, Number(animation.progress) || 0));
   const burst = Math.max(0, Math.min(1, Number(animation.burst) || 0));
   const rodDirection = Math.max(-1, Math.min(1, Number(animation.rodDirection) || 0));
+  const pixel = Math.max(1, Math.min(width / 1280, height / 720));
+  const surfaceY = height * 0.54;
+  const direction = animation.direction === -1 ? -1 : 1;
+  const targetX = width * (0.5 + direction * (0.12 + (1 - progress) * 0.12)) + Math.sin(phase * 0.8) * width * 0.018;
+  const targetY = surfaceY + Math.sin(phase * 1.6) * 4 * pixel;
+  const rodBaseX = width * 0.91;
+  const rodBaseY = height * 0.96;
+  const rodTipX = width * (0.68 + rodDirection * 0.09);
+  const rodTipY = height * (0.3 + tension * 0.08);
 
-  const surfaceY = height * 0.22;
-  ctx.strokeStyle = 'rgba(150,226,242,0.34)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let x = 0; x <= width; x += 8) {
-    const y = surfaceY + Math.sin(x * 0.055 + phase * 1.3) * 2.2;
-    if (x === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+  const vignette = ctx.createLinearGradient(0, height * 0.55, 0, height);
+  vignette.addColorStop(0, 'rgba(2,9,15,0)');
+  vignette.addColorStop(1, 'rgba(2,9,15,.25)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, height * 0.55, width, height * 0.45);
 
-  const rodBaseX = width * 0.9;
-  const rodBaseY = height * 0.92;
-  const rodTipX = width * (0.72 + rodDirection * 0.08);
-  const rodTipY = height * (0.12 + tension * 0.1);
-  ctx.strokeStyle = '#d4a373';
-  ctx.lineWidth = 5;
+  ctx.strokeStyle = tension > 0.84 ? '#ff5869' : '#d8ad78';
+  ctx.lineWidth = 8 * pixel;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(rodBaseX, rodBaseY);
-  ctx.quadraticCurveTo(width * 0.88, height * 0.48, rodTipX, rodTipY);
+  ctx.quadraticCurveTo(width * (0.84 + rodDirection * 0.025), height * (0.58 + tension * 0.07), rodTipX, rodTipY);
   ctx.stroke();
 
-  if (!fish) {
-    if (stage === 'casting' || stage === 'waiting') {
-      const bobberX = width * 0.36 + Math.sin(phase * 0.8) * 9;
-      const bobberY = surfaceY + Math.sin(phase * 2.1) * 2;
-      ctx.strokeStyle = 'rgba(222,244,248,0.8)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(rodTipX, rodTipY);
-      ctx.quadraticCurveTo(width * 0.57, height * 0.02, bobberX, bobberY);
-      ctx.stroke();
-      ctx.fillStyle = '#f8fafc';
-      ctx.beginPath();
-      ctx.arc(bobberX, bobberY, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(bobberX - 5, bobberY - 5, 10, 5);
-      ctx.strokeStyle = 'rgba(186,230,253,0.35)';
-      ctx.beginPath();
-      ctx.ellipse(bobberX, bobberY + 4, 13 + Math.sin(phase) * 2, 4, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = 'rgba(221,241,247,0.72)';
-      ctx.font = '600 15px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Cast into open water', width * 0.43, height * 0.56);
-    }
-    return;
-  }
-
-  const visual = fish.visual || {};
-  const direction = animation.direction === -1 ? -1 : 1;
-  const cx = width * (0.48 + direction * (1 - progress) * 0.18) + Math.sin(phase) * (5 + burst * 9);
-  const cy = height * (0.5 + burst * 0.13) + Math.cos(phase * 0.72) * (3 + burst * 5);
-  const fishWidth = Math.min(width * 0.64, 250);
-  const shapeHeight = visual.shape === 'long' || visual.shape === 'billfish' ? 52 : visual.shape === 'deep' ? 84 : 68;
-
-  const mouthX = cx + direction * fishWidth * 0.45;
-  const mouthY = cy - shapeHeight * 0.05;
-  ctx.strokeStyle = tension > 0.84 ? '#fb7185' : tension < 0.18 && stage === 'fighting' ? '#facc15' : 'rgba(224,247,250,0.88)';
-  ctx.lineWidth = 1.4 + tension * 1.8;
-  ctx.beginPath();
-  ctx.moveTo(rodTipX, rodTipY);
-  const sag = (1 - tension) * 35;
-  ctx.quadraticCurveTo((rodTipX + mouthX) * 0.5, Math.min(height - 8, (rodTipY + mouthY) * 0.5 + sag), mouthX, mouthY);
-  ctx.stroke();
-
-  if (burst > 0.32) {
-    const splashX = Math.max(18, Math.min(width - 18, cx));
-    const splashAlpha = Math.min(0.8, 0.2 + burst * 0.65);
-    ctx.strokeStyle = `rgba(186,230,253,${splashAlpha})`;
-    for (let i = 0; i < 3; i++) {
-      const radius = 8 + i * 10 + Math.sin(phase * 2 + i) * 3;
-      ctx.beginPath();
-      ctx.ellipse(splashX, surfaceY + 3, radius, radius * 0.28, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(direction, 1);
-  ctx.translate(-cx, -cy);
-  const tailWave = Math.sin(phase * 2.4) * 8;
-  ctx.fillStyle = visual.fin || visual.body;
-  ctx.beginPath();
-  ctx.moveTo(cx - fishWidth * 0.46, cy);
-  ctx.lineTo(cx - fishWidth * 0.65, cy - shapeHeight * 0.58 + tailWave);
-  ctx.lineTo(cx - fishWidth * 0.61, cy);
-  ctx.lineTo(cx - fishWidth * 0.65, cy + shapeHeight * 0.58 - tailWave);
-  ctx.closePath();
-  ctx.fill();
-
-  const bodyGradient = ctx.createLinearGradient(cx, cy - shapeHeight, cx, cy + shapeHeight);
-  bodyGradient.addColorStop(0, visual.body || '#78909c');
-  bodyGradient.addColorStop(0.58, visual.body || '#78909c');
-  bodyGradient.addColorStop(1, visual.belly || '#e5e7df');
-  roundedFishPath(ctx, cx, cy, fishWidth, shapeHeight, visual.shape);
-  ctx.fillStyle = bodyGradient;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(230,245,245,0.24)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  if (visual.stripes) {
-    ctx.strokeStyle = visual.stripe || '#263b43';
-    ctx.lineWidth = 3;
-    for (let i = 0; i < visual.stripes; i++) {
-      const y = cy - shapeHeight * 0.28 + i * shapeHeight * 0.14;
-      ctx.beginPath();
-      ctx.moveTo(cx - fishWidth * 0.28, y);
-      ctx.lineTo(cx + fishWidth * 0.34, y + 3);
-      ctx.stroke();
-    }
-  } else if (visual.stripe) {
-    ctx.strokeStyle = visual.stripe;
-    ctx.lineWidth = 4;
+  const lineVisible = ['casting', 'waiting', 'bite', 'fighting'].includes(stage);
+  if (lineVisible) {
+    const lineTargetX = fish ? targetX : width * 0.45;
+    const lineTargetY = fish ? targetY : surfaceY;
+    ctx.strokeStyle = tension > 0.84 ? '#ff5869' : tension < 0.16 && stage === 'fighting' ? '#f4c85d' : 'rgba(230,246,252,.92)';
+    ctx.lineWidth = (1.6 + tension * 1.5) * pixel;
     ctx.beginPath();
-    ctx.moveTo(cx - fishWidth * 0.32, cy);
-    ctx.quadraticCurveTo(cx, cy - 5, cx + fishWidth * 0.36, cy - 1);
+    ctx.moveTo(rodTipX, rodTipY);
+    const sag = stage === 'fighting' ? (1 - tension) * height * 0.05 : height * 0.035;
+    ctx.quadraticCurveTo((rodTipX + lineTargetX) * 0.5, Math.min(height * 0.7, (rodTipY + lineTargetY) * 0.5 + sag), lineTargetX, lineTargetY);
     ctx.stroke();
-  }
 
-  if (visual.spots) {
-    ctx.fillStyle = visual.stripe || 'rgba(30,45,48,0.7)';
-    for (let i = 0; i < 14; i++) {
-      const x = cx - fishWidth * 0.28 + i % 7 * fishWidth * 0.09;
-      const y = cy - shapeHeight * 0.28 + Math.floor(i / 7) * shapeHeight * 0.34 + (i % 2) * 3;
+    const biteScale = stage === 'bite' ? 1.5 + Math.sin(phase * 10) * 0.28 : 1;
+    ctx.fillStyle = '#f4f7f8';
+    ctx.beginPath();
+    ctx.arc(lineTargetX, lineTargetY, 6 * pixel * biteScale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f05a5a';
+    ctx.fillRect(lineTargetX - 6 * pixel * biteScale, lineTargetY - 6 * pixel * biteScale, 12 * pixel * biteScale, 5 * pixel * biteScale);
+
+    const splash = stage === 'bite' ? 1 : Math.max(burst, stage === 'casting' ? 0.42 : 0.12);
+    ctx.strokeStyle = `rgba(201,239,251,${Math.min(.9, .2 + splash * .7)})`;
+    ctx.lineWidth = 1.5 * pixel;
+    for (let ring = 0; ring < 3; ring += 1) {
+      const radius = (11 + ring * 13 + Math.sin(phase * 2 + ring) * 3) * pixel * (0.75 + splash * 0.45);
       ctx.beginPath();
-      ctx.arc(x, y, 1.5 + i % 3 * 0.7, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.ellipse(lineTargetX, lineTargetY + 5 * pixel, radius, radius * .24, 0, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 
-  ctx.fillStyle = visual.fin || visual.body;
-  ctx.beginPath();
-  ctx.moveTo(cx - 12, cy - shapeHeight * 0.45);
-  ctx.lineTo(cx + 25, cy - shapeHeight * (visual.sail ? 1.1 : 0.72));
-  ctx.lineTo(cx + 46, cy - shapeHeight * 0.4);
-  ctx.closePath();
-  ctx.fill();
-
-  if (visual.shape === 'billfish') {
-    ctx.fillStyle = visual.body;
-    ctx.beginPath();
-    ctx.moveTo(cx + fishWidth * 0.45, cy - 3);
-    ctx.lineTo(cx + fishWidth * 0.72, cy);
-    ctx.lineTo(cx + fishWidth * 0.45, cy + 3);
-    ctx.closePath();
-    ctx.fill();
+  if (stage === 'fighting' && fish) {
+    const pull = direction < 0 ? -1 : 1;
+    ctx.strokeStyle = tension > .84 ? '#ff5869' : '#9fceff';
+    ctx.lineWidth = 3 * pixel;
+    for (let index = 0; index < 3; index += 1) {
+      const x = targetX - pull * index * 18 * pixel;
+      const y = targetY - 34 * pixel;
+      ctx.beginPath();
+      ctx.moveTo(x - pull * 10 * pixel, y - 8 * pixel);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x - pull * 10 * pixel, y + 8 * pixel);
+      ctx.stroke();
+    }
   }
-
-  const eyeX = cx + fishWidth * 0.34;
-  ctx.fillStyle = '#eef6f3';
-  ctx.beginPath();
-  ctx.arc(eyeX, cy - shapeHeight * 0.15, 5.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#061017';
-  ctx.beginPath();
-  ctx.arc(eyeX + 1.2, cy - shapeHeight * 0.15, 2.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 }
 
 export { disposeVisual as clearFishingScene, drawFishPortrait, updateFishingScene };

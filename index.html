@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles/landing.css?v=2">
+  <link rel="stylesheet" href="./styles/landing.css?v=3">
   <script src="./js/firebase-project-config.js"></script>
 </head>
 <body>
@@ -61,12 +61,12 @@
         </div>
 
         <div class="hero-media">
-          <div class="hero-coordinate">Current browser build</div>
+          <div class="hero-coordinate">Baltimore Inner Harbor · rendered gameplay</div>
           <figure class="hero-frame">
-            <img src="./assets/landing/current/baltimore-harbor-hero.webp" width="1280" height="720" alt="Baltimore skyline and Inner Harbor rendered in the current World Explorer browser build" fetchpriority="high">
+            <img src="./assets/landing/current/baltimore-harbor-hero.webp" width="1280" height="720" alt="Baltimore skyline and tall downtown buildings viewed across the rendered Inner Harbor water" fetchpriority="high">
             <figcaption class="hero-caption">
-              <strong>A real city becomes a world you can enter.</strong>
-              <span>Baltimore · Inner Harbor</span>
+              <strong>Real mapped city, water, terrain, and skyline in one world.</strong>
+              <span>Inner Harbor · Baltimore</span>
             </figcaption>
           </figure>
         </div>
@@ -118,60 +118,45 @@
           <span class="section-kicker">Current gameplay</span>
           <h2>One world, seen from where you stand.</h2>
         </div>
-        <p>These images come from the current browser build. They show the actual exploration, discovery, and companion systems instead of a separate marketing prototype.</p>
+        <p>These are automated captures from the bundled release candidate, reached through the normal location selector and player launch—not a separate marketing renderer.</p>
       </div>
 
       <div class="story-stack">
         <article class="story">
           <figure class="story-media">
-            <span class="media-label">Explorer Progress · current build</span>
-            <img src="./assets/landing/current/explorer-progress.webp" width="1440" height="900" loading="lazy" alt="Current World Explorer gameplay showing a character, wildlife encounter, Explorer progress, regional goals, and specialties">
+            <span class="media-label">World entry · bundled release candidate</span>
+            <img src="./assets/landing/current/world-entry-2026-08-19.png" width="1280" height="720" loading="lazy" alt="World Explorer location selector rendered from the bundled release candidate">
           </figure>
           <div class="feature-copy">
-            <span class="eyebrow">One coherent Explorer loop</span>
-            <h2>Notice something. Investigate it. Keep the story.</h2>
-            <p>Nearby leads respond to the place you entered. Choose one, minimize the Journal, follow the equipped tool in the world, then record a result with a clear destination and next goal.</p>
+            <span class="eyebrow">Enter through the actual player flow</span>
+            <h2>Choose a real location, then arrive in the rendered world.</h2>
+            <p>The release check opens this exact bundled selector, enters coordinates, uses the visible Explore button, and waits for the playable world to finish loading.</p>
             <ul class="feature-list">
-              <li>Journal is your chronology; Field Guide is what you identified.</li>
-              <li>Collection contains only virtual objects you actually acquired.</li>
-              <li>Regional goals and capability unlocks give each expedition a reason to continue.</li>
+              <li>The capture is produced from the deployable artifact.</li>
+              <li>The public landing page and game are tested from the same server root.</li>
+              <li>Older promotional captures are not presented as current gameplay.</li>
             </ul>
           </div>
         </article>
+      </div>
 
-        <article class="story">
-          <figure class="story-media">
-            <span class="media-label">Companions + AR preview</span>
-            <img src="./assets/landing/current/companion-ar.webp" width="1440" height="900" loading="lazy" alt="World Explorer companion Trail Hound shown in the current augmented reality preview">
-          </figure>
-          <div class="feature-copy">
-            <span class="eyebrow">Encounters that continue</span>
-            <h2>Discover more than objects.</h2>
-            <p>Some wildlife encounters can develop into trusted companions. Learn where they belong, build trust over time, then view a companion in the world or through the AR preview.</p>
-            <ul class="feature-list">
-              <li>Habitat-aware encounters respond to the kind of place you are exploring.</li>
-              <li>Real reference photography supports field identification where reliable imagery is available.</li>
-              <li>Companions, records, and progress belong to your explorer and persist between visits.</li>
-            </ul>
-          </div>
-        </article>
-
-        <article class="story">
-          <figure class="story-media mobile-composite">
-            <span class="media-label">Mobile field kit</span>
-            <img src="./assets/landing/current/field-tools-mobile-current.webp" width="390" height="844" loading="lazy" alt="Current mobile Explorer Journal with a saved wildlife result, regional goal, and nearby field leads">
-          </figure>
-          <div class="feature-copy">
-            <span class="eyebrow">Tools with a purpose</span>
-            <h2>Carry the right equipment into the field.</h2>
-            <p>A camera, detector, shovel, sampling tools, and other equipment are part of the explorer's activity—not permanent dashboard furniture. On supported activities, your character carries and uses the selected tool.</p>
-            <ul class="feature-list">
-              <li>Desktop and mobile controls are designed around the same expedition.</li>
-              <li>Tools surface as the activity calls for them and can be put away again.</li>
-              <li>Pathfinder and Field Explorer ranks unlock additional wildlife, geology, and excavation capabilities.</li>
-            </ul>
-          </div>
-        </article>
+      <div class="gallery" aria-label="Current World Explorer gameplay">
+        <figure>
+          <img src="./assets/landing/current/explorer-progress.webp" width="1440" height="900" loading="lazy" alt="Explorer Journal progress and discoveries open over the live Baltimore world">
+          <figcaption><strong>Explorer Journal</strong><span>Progress, discoveries, and field guidance</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/companion-ar.webp" width="1440" height="900" loading="lazy" alt="World Explorer animal companion in the augmented reality viewer">
+          <figcaption><strong>AR Companion</strong><span>Bring a discovered companion into your space</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/field-tools-mobile-current.webp" width="390" height="844" loading="lazy" alt="Current mobile Explorer Journal and field tools interface">
+          <figcaption><strong>Mobile field tools</strong><span>The same expedition from a phone</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/world-entry-2026-08-19.png" width="1280" height="720" loading="lazy" alt="Current rendered World Explorer location selector with Baltimore selected">
+          <figcaption><strong>Choose the destination</strong><span>Search Earth or begin with a featured city</span></figcaption>
+        </figure>
       </div>
     </section>
 
@@ -196,34 +181,6 @@
           <h3>Create and share</h3>
           <p>Build rooms and objects, contribute reviewed world edits, preserve memories, and explore together through multiplayer.</p>
         </article>
-      </div>
-    </section>
-
-    <section class="section" aria-labelledby="landingHighlightsTitle">
-      <div class="section-heading">
-        <div>
-          <span class="section-kicker">World scale</span>
-          <h2 id="landingHighlightsTitle">A few places from the current world.</h2>
-        </div>
-        <p>A deliberately small gallery replaces the outdated screenshot archive. The landing page will now show only representative images from the current experience.</p>
-      </div>
-      <div class="gallery">
-        <figure>
-          <img src="./assets/landing/gameplay/showcase/new-york-expanded-aerial.webp" width="1600" height="900" loading="lazy" alt="Aerial view of New York in World Explorer">
-          <figcaption><strong>New York</strong><span>Expanded aerial view</span></figcaption>
-        </figure>
-        <figure>
-          <img src="./assets/landing/gameplay/showcase/baltimore-waterfront-skyline.webp" width="1600" height="900" loading="lazy" alt="Baltimore waterfront skyline in World Explorer">
-          <figcaption><strong>Baltimore</strong><span>Waterfront</span></figcaption>
-        </figure>
-        <figure>
-          <img src="./assets/landing/gameplay/showcase/monaco-coast-aerial.webp" width="1600" height="900" loading="lazy" alt="Aerial view of the Monaco coast in World Explorer">
-          <figcaption><strong>Monaco</strong><span>Coastal exploration</span></figcaption>
-        </figure>
-        <figure>
-          <img src="./assets/landing/gameplay/showcase/new-york-harbor-skyline.webp" width="1600" height="900" loading="lazy" alt="New York harbor and skyline in World Explorer">
-          <figcaption><strong>New York Harbor</strong><span>City scale</span></figcaption>
-        </figure>
       </div>
     </section>
 

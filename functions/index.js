@@ -663,7 +663,10 @@ async function verifyAuth(req, res) {
   }
 
   try {
-    return await admin.auth().verifyIdToken(token);
+    // Authentication-sensitive HTTP endpoints must reject sessions that an
+    // account owner or administrator has explicitly revoked. Signature and
+    // expiry checks alone do not consult Firebase's revocation state.
+    return await admin.auth().verifyIdToken(token, true);
   } catch (err) {
     console.error('[auth] verifyIdToken failed:', err);
     res.status(401).json({ error: 'Invalid auth token.' });
@@ -763,11 +766,63 @@ async function deleteRoomTree(roomRef) {
     return;
   }
 
-  const subcollections = ['players', 'chat', 'chatState', 'artifacts', 'blocks', 'paintClaims', 'state', 'urbanEntities', 'urbanActors', 'urbanCivic'];
+  // Keep the fallback exhaustive with the room collections authorized by
+  // firestore.rules. Production Admin SDKs expose recursiveDelete, but the
+  // explicit path is still used by emulators and older runtimes.
+  const subcollections = [
+    'players',
+    'chat',
+    'chatState',
+    'artifacts',
+    'activities',
+    'activityState',
+    'blocks',
+    'worldModifications',
+    'paintClaims',
+    'deflockStates',
+    'state',
+    'urbanEntities',
+    'urbanActors',
+    'urbanCivic'
+  ];
   for (const name of subcollections) {
     await deleteDocsByQuery(roomRef.collection(name));
   }
   await roomRef.delete();
+}
+
+async function deleteDiscoveryTradesForUser(uid) {
+  const tradeRefs = new Map();
+  for (const field of ['ownerUid', 'recipientUid']) {
+    const snapshot = await db.collection('discoveryTrades').where(field, '==', uid).get();
+    snapshot.docs.forEach((tradeDoc) => tradeRefs.set(tradeDoc.ref.path, tradeDoc.ref));
+  }
+
+  for (const tradeRef of tradeRefs.values()) {
+    await db.runTransaction(async (transaction) => {
+      const tradeSnap = await transaction.get(tradeRef);
+      if (!tradeSnap.exists) return;
+      const trade = tradeSnap.data() || {};
+      if (trade.status === 'pending' && trade.ownerUid) {
+        const offeredRefs = (Array.isArray(trade.offeredItemIds) ? trade.offeredItemIds : [])
+          .slice(0, 20)
+          .map((itemId) => db.collection('explorerProfiles')
+            .doc(String(trade.ownerUid))
+            .collection('items')
+            .doc(String(itemId)));
+        const offered = await Promise.all(offeredRefs.map((itemRef) => transaction.get(itemRef)));
+        offered.forEach((itemSnap) => {
+          if (itemSnap.exists && itemSnap.data()?.lockedByTradeId === tradeSnap.id) {
+            transaction.update(itemSnap.ref, {
+              lockedByTradeId: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        });
+      }
+      transaction.delete(tradeRef);
+    });
+  }
 }
 
 async function deleteUserData(uid) {
@@ -790,12 +845,15 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid), 200, 'artifacts(ownerUid)');
   await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid), 200, 'blocks(createdBy)');
   await deleteDocsByQuery(db.collectionGroup('paintClaims').where('uid', '==', uid), 200, 'paintClaims(uid)');
+  await deleteDocsByQuery(db.collectionGroup('worldModifications').where('createdBy', '==', uid), 200, 'worldModifications(createdBy)');
 
   await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid), 200, 'flowerLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid), 200, 'paintTownLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('fishingLeaderboard').where('uid', '==', uid), 200, 'fishingLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
   await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+  await deleteDiscoveryTradesForUser(uid);
 
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(userRef);

@@ -1,7 +1,8 @@
-import { polylineDistances } from '../../structure-semantics/geometry.js?v=1';
+import { polylineDistances } from '../../structure-semantics/geometry.js?v=2';
 
 const TRANSPORT_NETWORK_SCHEMA_VERSION = 1;
 const DEFAULT_JOIN_TOLERANCE_METERS = 0.75;
+const DEFAULT_CROSS_PROVIDER_JOIN_TOLERANCE_METERS = 2.25;
 const DEFAULT_SEGMENT_CELL_METERS = 12;
 
 function finite(value, fallback = 0) {
@@ -43,6 +44,76 @@ function featureIsLink(feature) {
   return /_link$/i.test(String(feature?.type || ''));
 }
 
+function sourceCompleteness(feature) {
+  return String(feature?.transportRecord?.completeness || 'generalized');
+}
+
+function crossProviderPair(leftFeature, rightFeature) {
+  const values = new Set([
+    sourceCompleteness(leftFeature),
+    sourceCompleteness(rightFeature)
+  ]);
+  return values.has('lossless') && values.has('generalized');
+}
+
+function roadFamily(feature) {
+  const type = String(
+    feature?.transportRecord?.sourceTags?.highway ||
+    feature?.transportRecord?.rawTags?.highway ||
+    feature?.type ||
+    ''
+  ).replace(/_link$/i, '').toLowerCase();
+  if (type === 'motorway' || type === 'trunk') return 'high_speed';
+  if (type === 'primary' || type === 'secondary') return 'arterial';
+  if (type === 'tertiary' || type === 'unclassified') return 'collector';
+  if (type === 'residential' || type === 'living_street' || type === 'service') return 'local';
+  return type || 'unknown';
+}
+
+function endpointDirection(descriptor, endpoint) {
+  const points = descriptor?.points || [];
+  if (points.length < 2) return null;
+  const atStart = endpoint === 'start';
+  const a = atStart ? points[0] : points[points.length - 2];
+  const b = atStart ? points[1] : points[points.length - 1];
+  const length = Math.hypot(b.x - a.x, b.z - a.z);
+  if (!(length > 1e-6)) return null;
+  return { x: (b.x - a.x) / length, z: (b.z - a.z) / length };
+}
+
+function crossProviderEndpointCompatible(leftDescriptor, leftEndpoint, rightDescriptor, rightEndpoint) {
+  if (!crossProviderPair(leftDescriptor?.feature, rightDescriptor?.feature)) return false;
+  if (rightEndpoint !== 'start' && rightEndpoint !== 'end') return false;
+  const leftFamily = roadFamily(leftDescriptor?.feature);
+  const rightFamily = roadFamily(rightDescriptor?.feature);
+  if (leftFamily !== rightFamily && !featureIsLink(leftDescriptor?.feature) && !featureIsLink(rightDescriptor?.feature)) {
+    return false;
+  }
+  const leftDirection = endpointDirection(leftDescriptor, leftEndpoint);
+  const rightDirection = endpointDirection(rightDescriptor, rightEndpoint);
+  if (!leftDirection || !rightDirection) return false;
+  const alignment = Math.abs(
+    leftDirection.x * rightDirection.x + leftDirection.z * rightDirection.z
+  );
+  const leftPoint = leftEndpoint === 'start'
+    ? leftDescriptor.points[0]
+    : leftDescriptor.points[leftDescriptor.points.length - 1];
+  const rightPoint = rightEndpoint === 'start'
+    ? rightDescriptor.points[0]
+    : rightDescriptor.points[rightDescriptor.points.length - 1];
+  const gapX = rightPoint.x - leftPoint.x;
+  const gapZ = rightPoint.z - leftPoint.z;
+  const gapLength = Math.hypot(gapX, gapZ);
+  const gapFollowsAlignment = gapLength <= 0.15 || (
+    Math.abs((gapX * leftDirection.x + gapZ * leftDirection.z) / gapLength) >= 0.72 &&
+    Math.abs((gapX * rightDirection.x + gapZ * rightDirection.z) / gapLength) >= 0.72
+  );
+  // This is endpoint conflation, not proximity topology. Perpendicular and
+  // parallel-nearby streets remain separate even when their provider tiles
+  // happen to place vertices within the expanded drift envelope.
+  return alignment >= 0.82 && gapFollowsAlignment;
+}
+
 function sampleCompiledSurface(feature, distance) {
   const model = feature?.transportSurfaceModel;
   const distances = model?.distances;
@@ -62,6 +133,13 @@ function metricConnectionCompatible(leftDescriptor, rightDescriptor, leftDistanc
   const leftFeature = leftDescriptor.feature;
   const rightFeature = rightDescriptor.feature;
   if (!verticalCompatible(leftFeature, rightFeature)) {
+    const leftMode = String(leftFeature?.structureSemantics?.terrainMode || 'at_grade');
+    const rightMode = String(rightFeature?.structureSemantics?.terrainMode || 'at_grade');
+    // Different OSM layers are explicit non-connection evidence. In
+    // particular, two otherwise at-grade ways at different layers describe a
+    // crossing, not a ramp, even if provider geometry places vertices at the
+    // same horizontal coordinate.
+    if (leftMode === 'at_grade' && rightMode === 'at_grade') return false;
     // Generalized vector geometry does not retain OSM node identities. A
     // cross-mode tie-in is still valid at a near-exact ramp endpoint, but a
     // generic nearby crossing is not topology.
@@ -80,14 +158,24 @@ function occurrenceIsEndpoint(occurrence) {
 }
 
 function sharedSourceNodeCompatible(leftOccurrence, rightOccurrence) {
-  if (verticalCompatible(leftOccurrence?.descriptor?.feature, rightOccurrence?.descriptor?.feature)) {
+  const leftFeature = leftOccurrence?.descriptor?.feature;
+  const rightFeature = rightOccurrence?.descriptor?.feature;
+  if (verticalCompatible(leftFeature, rightFeature)) {
     return true;
   }
+  const leftMode = String(leftFeature?.structureSemantics?.terrainMode || 'at_grade');
+  const rightMode = String(rightFeature?.structureSemantics?.terrainMode || 'at_grade');
+  if (leftMode === 'at_grade' && rightMode === 'at_grade') return false;
   // OSM commonly splits one physical route at a bridge, ramp, or layer
-  // boundary. A shared source node at either way endpoint is an explicit
-  // topology tie-in. Interior/interior crossings still require matching
-  // vertical groups so stacked decks remain separate.
-  return occurrenceIsEndpoint(leftOccurrence) || occurrenceIsEndpoint(rightOccurrence);
+  // boundary. Two way endpoints are an explicit topology tie-in. A ramp link
+  // may deliberately merge into the interior of its through route. Other
+  // endpoint/interior cross-layer pairs are ordinary grade-separated
+  // crossings and must remain disconnected.
+  const leftEndpoint = occurrenceIsEndpoint(leftOccurrence);
+  const rightEndpoint = occurrenceIsEndpoint(rightOccurrence);
+  if (leftEndpoint && rightEndpoint) return true;
+  return (leftEndpoint || rightEndpoint) &&
+    (featureIsLink(leftFeature) || featureIsLink(rightFeature));
 }
 
 function sourceNodeProvenance(endpoint, candidate) {
@@ -105,6 +193,14 @@ function metricProvenance(distance, tolerance, kind) {
   return Object.freeze({
     method: kind === 'endpoint-endpoint' ? 'metric-endpoint-drift' : 'metric-endpoint-interior',
     confidence: Number((0.72 + normalized * 0.23).toFixed(3))
+  });
+}
+
+function crossProviderProvenance(distance, tolerance) {
+  const normalized = Math.max(0, Math.min(1, 1 - distance / Math.max(0.01, tolerance)));
+  return Object.freeze({
+    method: 'cross-provider-endpoint-conflation',
+    confidence: Number((0.76 + normalized * 0.16).toFixed(3))
   });
 }
 
@@ -133,8 +229,16 @@ function compileTransportNetworkModel(features = [], options = {}) {
     0.1,
     finite(options.joinToleranceMeters, DEFAULT_JOIN_TOLERANCE_METERS)
   );
+  const crossProviderTolerance = Math.max(
+    tolerance,
+    finite(
+      options.crossProviderJoinToleranceMeters,
+      DEFAULT_CROSS_PROVIDER_JOIN_TOLERANCE_METERS
+    )
+  );
+  const searchTolerance = Math.max(tolerance, crossProviderTolerance);
   const cellSize = Math.max(
-    tolerance * 2,
+    searchTolerance * 2,
     finite(options.segmentCellMeters, DEFAULT_SEGMENT_CELL_METERS)
   );
   const descriptors = [];
@@ -186,10 +290,10 @@ function compileTransportNetworkModel(features = [], options = {}) {
         b,
         distanceBefore: finite(descriptor.pathDistances[segmentIndex])
       };
-      const minX = Math.floor((Math.min(a.x, b.x) - tolerance) / cellSize);
-      const maxX = Math.floor((Math.max(a.x, b.x) + tolerance) / cellSize);
-      const minZ = Math.floor((Math.min(a.z, b.z) - tolerance) / cellSize);
-      const maxZ = Math.floor((Math.max(a.z, b.z) + tolerance) / cellSize);
+      const minX = Math.floor((Math.min(a.x, b.x) - searchTolerance) / cellSize);
+      const maxX = Math.floor((Math.max(a.x, b.x) + searchTolerance) / cellSize);
+      const minZ = Math.floor((Math.min(a.z, b.z) - searchTolerance) / cellSize);
+      const maxZ = Math.floor((Math.max(a.z, b.z) + searchTolerance) / cellSize);
       for (let x = minX; x <= maxX; x += 1) {
         for (let z = minZ; z <= maxZ; z += 1) {
           const key = cellKey(x, z);
@@ -352,9 +456,22 @@ function compileTransportNetworkModel(features = [], options = {}) {
           projected.x - endpoint.point.x,
           projected.z - endpoint.point.z
         );
-        if (distance > tolerance) continue;
+        const projectedEndpoint = segmentT <= 0.001
+          ? 'start'
+          : segmentT >= 0.999
+            ? 'end'
+            : 'interior';
+        const conflatedEndpoint = distance <= crossProviderTolerance &&
+          crossProviderEndpointCompatible(
+            descriptor,
+            endpoint.endpoint,
+            candidate.descriptor,
+            projectedEndpoint
+          );
+        const acceptedTolerance = conflatedEndpoint ? crossProviderTolerance : tolerance;
+        if (distance > acceptedTolerance) continue;
         const candidateDistanceAlong = candidate.distanceBefore + Math.sqrt(lengthSq) * segmentT;
-        if (!metricConnectionCompatible(
+        if (!conflatedEndpoint && !metricConnectionCompatible(
           descriptor,
           candidate.descriptor,
           endpoint.endpoint === 'start' ? 0 : descriptor.totalDistance,
@@ -369,7 +486,9 @@ function compileTransportNetworkModel(features = [], options = {}) {
             segmentT,
             projected,
             distance,
-            distanceAlong: candidateDistanceAlong
+            distanceAlong: candidateDistanceAlong,
+            conflatedEndpoint,
+            acceptedTolerance
           });
         }
       }
@@ -416,7 +535,11 @@ function compileTransportNetworkModel(features = [], options = {}) {
           left,
           right,
           snapDistanceMeters: match.distance,
-          provenance: topologyProvenance || metricProvenance(match.distance, tolerance, kind)
+          provenance: topologyProvenance || (
+            match.conflatedEndpoint
+              ? crossProviderProvenance(match.distance, match.acceptedTolerance)
+              : metricProvenance(match.distance, tolerance, kind)
+          )
         };
         const previous = connectionsByKey.get(key);
         if (
@@ -540,6 +663,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
     authority: 'compiled_transport_network',
     id: graphId,
     joinToleranceMeters: tolerance,
+    crossProviderJoinToleranceMeters: crossProviderTolerance,
     features: Object.freeze(featureModels),
     connections: Object.freeze(connections),
     stats: Object.freeze({
@@ -555,6 +679,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
 }
 
 export {
+  DEFAULT_CROSS_PROVIDER_JOIN_TOLERANCE_METERS,
   DEFAULT_JOIN_TOLERANCE_METERS,
   TRANSPORT_NETWORK_SCHEMA_VERSION,
   compileTransportNetworkModel

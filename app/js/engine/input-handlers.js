@@ -86,6 +86,17 @@ export function setupEngineInputHandlers(appCtx) {
     }
   });
 
+  // Ranged explorer equipment uses the world canvas as its primary action.
+  // UI controls, build mode, activities and panels retain their own input.
+  inputScope.listen(globalThis, 'pointerdown', (e) => {
+    if (e.button !== 0 || e.target !== appCtx.renderer?.domElement) return;
+    if (!appCtx.gameStarted || appCtx.paused || appCtx.fishingGame?.open || appCtx.blockBuildMode) return;
+    if (appCtx.Walk?.state?.mode !== 'walk' || appCtx.urbanSandboxRuntime?.equipmentOpen || appCtx.worldDiscoveryRuntime?.ui?.open) return;
+    const category = appCtx.urbanSandboxRuntime?.equipment?.equipped?.()?.category;
+    if (category !== 'sidearm' && category !== 'explosive') return;
+    if (appCtx.handleUrbanEquipmentUse?.()) e.preventDefault();
+  });
+
   inputScope.listen(globalThis, 'mousemove', (e) => {
     if (!appCtx.gameStarted) return;
 

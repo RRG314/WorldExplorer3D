@@ -282,6 +282,17 @@ function createWalkingPhysicsHelpers({
       liveGpsTarget.z - state.walker.z
     ) > 0.002;
 
+    if (liveGpsMoved) {
+      // GPS owns translation and heading while following. Camera look remains
+      // temporarily available, then continuously settles behind the explorer
+      // so looking aside cannot make movement direction ambiguous.
+      const headingDelta = wrapYaw(state.walker.angle - state.walker.yaw);
+      const followBlend = 1 - Math.exp(-dt * 4.8);
+      state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
+      state.walker.lookYawOffset *= Math.exp(-dt * 2.8);
+      if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+    }
+
     if (forward !== 0 || liveGpsMoved) {
       const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
       const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
@@ -363,6 +374,15 @@ function createWalkingPhysicsHelpers({
             newZ = state.walker.z;
           }
         }
+      }
+      if (!isPlanetarySurface() && typeof appCtx.resolveUrbanActorCollision === 'function') {
+        const urbanCollision = appCtx.resolveUrbanActorCollision(
+          { x: state.walker.x, z: state.walker.z },
+          { x: newX, z: newZ },
+          { mode: 'walk', radius: .3 }
+        );
+        newX = urbanCollision.x;
+        newZ = urbanCollision.z;
       }
       profileAfterCollision = profileEnabled ? performance.now() : 0;
 

@@ -36,6 +36,34 @@ function createTaperedPrismGeometry(THREE, options = {}) {
   return faceted;
 }
 
+function createBeveledVehicleBoxGeometry(THREE, width = 1, height = 1, length = 1, bevel = 0.08) {
+  const halfWidth = Math.max(0.01, Number(width) * 0.5);
+  const halfHeight = Math.max(0.01, Number(height) * 0.5);
+  const radius = Math.max(0.01, Math.min(Number(bevel) || 0.08, halfWidth * 0.35, halfHeight * 0.35));
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfWidth + radius, -halfHeight);
+  shape.lineTo(halfWidth - radius, -halfHeight);
+  shape.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + radius);
+  shape.lineTo(halfWidth, halfHeight - radius);
+  shape.quadraticCurveTo(halfWidth, halfHeight, halfWidth - radius, halfHeight);
+  shape.lineTo(-halfWidth + radius, halfHeight);
+  shape.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - radius);
+  shape.lineTo(-halfWidth, -halfHeight + radius);
+  shape.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + radius, -halfHeight);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.02, Number(length)),
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: radius * 0.42,
+    bevelThickness: radius * 0.42,
+    curveSegments: 3,
+    steps: 1
+  });
+  geometry.translate(0, 0, -Math.max(0.02, Number(length)) * 0.5);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function createClassicUtilityCar(THREE) {
   const car = new THREE.Group();
   car.name = 'Classic Utility Car D';
@@ -175,4 +203,4 @@ function createClassicUtilityCar(THREE) {
   return { car, paintMaterial: paint, wheels };
 }
 
-export { createClassicUtilityCar, createTaperedPrismGeometry };
+export { createBeveledVehicleBoxGeometry, createClassicUtilityCar, createTaperedPrismGeometry };

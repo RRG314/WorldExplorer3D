@@ -19,7 +19,8 @@ const SOURCE_ENTRIES = [
   'app',
   'assets',
   'js',
-  'legal'
+  'legal',
+  'styles'
 ];
 const GENERATED_PATHS = new Set([
   'js/firebase-project-config.js',
@@ -30,7 +31,8 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'app-shell-fragments': 'app/js/app-shell-fragments.js',
   'app-auth-shell': 'app/js/app-auth-shell.js',
   bootstrap: 'app/js/bootstrap.js',
-  'app-entry': 'app/js/app-entry.js'
+  'app-entry': 'app/js/app-entry.js',
+  'account-social': 'app/js/multiplayer/social.js'
 });
 
 function normalizePath(value) {
@@ -195,6 +197,18 @@ async function rewriteGameHtml(runtime, groundData) {
   await fs.writeFile(htmlPath, html, 'utf8');
 }
 
+async function rewriteAccountHtml(runtime) {
+  const htmlPath = path.join(OUTPUT_DIR, 'account', 'index.html');
+  let html = await fs.readFile(htmlPath, 'utf8');
+  const sourceImport = '../app/js/multiplayer/social.js?v=55';
+  const bundledImport = `../app/${runtime.entries['account-social']}`;
+  if (!html.includes(sourceImport)) {
+    throw new Error('Account HTML no longer contains the expected social source import.');
+  }
+  html = html.replace(sourceImport, bundledImport);
+  await fs.writeFile(htmlPath, html, 'utf8');
+}
+
 function firebaseConfigPath(environment) {
   if (environment !== 'production' && environment !== 'staging') {
     throw new Error(`Unknown Firebase environment "${environment}". Expected production or staging.`);
@@ -288,6 +302,7 @@ async function buildArtifact(environment) {
   const groundData = await copyGroundData(sourceFiles, groundReleaseId);
   const runtimePackaging = await buildGameRuntime();
   await rewriteGameHtml(runtimePackaging, groundData);
+  await rewriteAccountHtml(runtimePackaging);
   await writeGeneratedFirebaseFiles(environment, config);
 
   const files = await hashOutputFiles();
@@ -364,7 +379,7 @@ async function verifyArtifact() {
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
   for (const [relative, source] of sourceFiles) {
     if (GENERATED_PATHS.has(relative)) continue;
-    if (isGameRuntimeSource(relative) || relative === 'app/index.html') continue;
+    if (isGameRuntimeSource(relative) || relative === 'app/index.html' || relative === 'account/index.html') continue;
     const outputRelative = isGroundDataSource(relative)
       ? `location-data/ground/${sourceReleases.sha256.slice(0, 16)}/${relative.slice('app/assets/ground/'.length)}`
       : relative;
@@ -398,8 +413,10 @@ async function verifyArtifact() {
     throw new Error('Hosting artifact ground data no longer matches the immutable release contract.');
   }
   const gameHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'index.html'), 'utf8');
-  for (const entry of Object.values(runtimePackaging.entries || {})) {
-    if (!gameHtml.includes(entry) && entry !== runtimePackaging.entries?.['app-entry']) {
+  const accountHtml = await fs.readFile(path.join(OUTPUT_DIR, 'account', 'index.html'), 'utf8');
+  for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
+    const referenced = name === 'account-social' ? accountHtml.includes(`../app/${entry}`) : gameHtml.includes(entry);
+    if (!referenced && name !== 'app-entry') {
       throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
     }
   }

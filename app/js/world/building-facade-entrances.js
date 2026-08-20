@@ -1,4 +1,4 @@
-import { compileEntranceCatalog } from '../living-world/entrance-catalog.js?v=5';
+import { compileEntranceCatalog } from '../living-world/entrance-catalog.js?v=6';
 
 const STYLE_CODE = Object.freeze({
   paneled: 0,

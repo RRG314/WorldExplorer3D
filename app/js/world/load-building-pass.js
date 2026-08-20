@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=49";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=59";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
@@ -11,7 +11,7 @@ import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
   resolveMappedRoof
-} from "./mapped-roof-geometry.js?v=5";
+} from "./mapped-roof-geometry.js?v=6";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
@@ -26,7 +26,7 @@ import {
 } from './water-adjacent-structures.js?v=3';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
-import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=2';
+import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
 
 export async function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -405,7 +405,18 @@ export async function buildBuildingGeometryPass(options = {}) {
     const baseElevation = baseElevationRaw + structureBaseOffset;
     const collisionBaseElevation = maxElevation + 0.03 + structureBaseOffset;
     // Bound downhill foundations so cliff outliers cannot create towers.
-    const mappedRoof = measureBuildingPhase('meshCreation', () => resolveMappedRoof(way.tags, height, buildingSemantics, pts));
+    const mappedRoof = measureBuildingPhase('meshCreation', () => resolveMappedRoof(
+      way.tags,
+      height,
+      buildingSemantics,
+      pts,
+      {
+        buildingType: bt,
+        denseUrban: denseUrbanContext,
+        footprintArea,
+        levels: resolvedLevels
+      }
+    ));
     const bodyHeight = (mappedRoof ? Math.max(0.05, mappedRoof.wallHeight) : height) + terrainFoundationRise;
     const renderedHeight = height + terrainFoundationRise;
     const fallbackBaseColor = pickBuildingBaseColor(bt, bSeed ^ Math.floor(br2 * 0xffff));

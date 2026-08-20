@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=49';
+import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=59';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
 
 const BRIDGE_COLOR = 0xbf4e3b;
@@ -123,39 +123,6 @@ function projectDistanceToPath(point, points, distances) {
   return bestAlong;
 }
 
-function distanceToPath(point, points) {
-  let bestDistance = Infinity;
-  for (let i = 0; i < points.length - 1; i++) {
-    const start = points[i];
-    const end = points[i + 1];
-    const dx = end.x - start.x;
-    const dz = end.z - start.z;
-    const lengthSq = dx * dx + dz * dz || 1;
-    const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSq));
-    const px = start.x + dx * t;
-    const pz = start.z + dz * t;
-    bestDistance = Math.min(bestDistance, Math.hypot(point.x - px, point.z - pz));
-  }
-  return bestDistance;
-}
-
-function synchronizeNavigableDeck(path) {
-  const worldUnitsPerMeter = Math.max(0.01, Number(appCtx.WORLD_UNITS_PER_METER) || 1);
-  const minimumDeckY = GOLDEN_GATE_DECK_ELEVATION_METERS * worldUnitsPerMeter;
-  let matchedRoads = 0;
-
-  for (const road of appCtx.roads || []) {
-    if (road?.structureSemantics?.terrainMode !== 'elevated' || !Array.isArray(road.pts)) continue;
-    const namedBridge = /golden gate bridge/i.test(String(road.name || ''));
-    const pathMatches = road.pts.filter((point) => distanceToPath(point, path) <= 42).length;
-    if (!namedBridge && pathMatches < Math.min(2, road.pts.length)) continue;
-    road.minimumStructureSurfaceY = minimumDeckY;
-    matchedRoads += 1;
-  }
-
-  return matchedRoads;
-}
-
 function sampleRoadDeckY(x, z) {
   let best = null;
   for (const road of appCtx.roads || []) {
@@ -271,79 +238,6 @@ function createDeckGirderMeshes(path, metrics) {
   return meshes;
 }
 
-function createDeckSurfaceMeshes(path, metrics) {
-  const sampleCount = Math.max(64, Math.ceil(metrics.total / 18));
-  const positions = [];
-  const indices = [];
-  const laneOffsets = [-4.5, 0, 4.5];
-  const laneCurves = laneOffsets.map(() => []);
-  for (let i = 0; i <= sampleCount; i++) {
-    const distance = metrics.total * i / sampleCount;
-    const point = pointAtDistance(path, metrics.distances, distance);
-    const tangentLength = Math.hypot(point.dx, point.dz) || 1;
-    const sideX = -point.dz / tangentLength;
-    const sideZ = point.dx / tangentLength;
-    const deckY = sampleRoadDeckY(point.x, point.z) + 0.18;
-    for (const side of [-1, 1]) {
-      positions.push(
-        point.x + sideX * BRIDGE_HALF_WIDTH_METERS * side,
-        deckY,
-        point.z + sideZ * BRIDGE_HALF_WIDTH_METERS * side
-      );
-    }
-    laneCurves.forEach((curve, laneIndex) => {
-      const laneOffset = laneOffsets[laneIndex];
-      curve.push(new THREE.Vector3(
-        point.x + sideX * laneOffset,
-        deckY + 0.045,
-        point.z + sideZ * laneOffset
-      ));
-    });
-    if (i < sampleCount) {
-      const vertex = i * 2;
-      indices.push(vertex, vertex + 1, vertex + 2, vertex + 1, vertex + 3, vertex + 2);
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  const deck = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-    color: 0x34393d,
-    roughness: 0.9,
-    metalness: 0.04,
-    side: THREE.DoubleSide
-  }));
-  deck.receiveShadow = true;
-  deck.frustumCulled = false;
-  deck.userData = {
-    isHistoricLandmark: true,
-    landmarkKind: 'suspension_bridge_deck',
-    landmarkName: 'Golden Gate Bridge'
-  };
-
-  const laneMaterials = [0xf1f0dc, 0xf0c84b, 0xf1f0dc].map((color) =>
-    new THREE.MeshBasicMaterial({ color, toneMapped: false })
-  );
-  const lanes = laneCurves.map((samples, index) => {
-    const curve = new THREE.CatmullRomCurve3(samples, false, 'centripetal');
-    const lane = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.min(260, sampleCount), 0.07, 5, false),
-      laneMaterials[index]
-    );
-    lane.frustumCulled = false;
-    lane.userData = {
-      isHistoricLandmark: true,
-      landmarkKind: 'suspension_bridge_lane',
-      landmarkName: 'Golden Gate Bridge'
-    };
-    return lane;
-  });
-  return [deck, ...lanes];
-}
-
 function createCableMeshes(path, metrics, towers) {
   const material = new THREE.MeshStandardMaterial({ color: BRIDGE_COLOR, roughness: 0.55, metalness: 0.38 });
   const cableMeshes = [];
@@ -456,8 +350,6 @@ export function renderSuspensionBridgeLandmark(data) {
   const path = pathPoints(spanWay, nodes);
   const metrics = polylineMetrics(path);
   if (path.length < 3 || metrics.total < MIN_SUSPENSION_SPAN_METERS) return null;
-  const synchronizedRoads = synchronizeNavigableDeck(path);
-
   const createdMeshes = [];
   const towerParts = [];
   for (const way of towerWays) {
@@ -472,11 +364,6 @@ export function renderSuspensionBridgeLandmark(data) {
   let structuralDetails = null;
   if (towers.length === 2) {
     const cables = createCableMeshes(path, metrics, towers);
-    for (const mesh of createDeckSurfaceMeshes(path, metrics)) {
-      appCtx.addEarthWorldObject(mesh);
-      appCtx.historicMarkers.push(mesh);
-      createdMeshes.push(mesh);
-    }
     for (const mesh of cables.cableMeshes) {
       appCtx.addEarthWorldObject(mesh);
       appCtx.historicMarkers.push(mesh);
@@ -517,7 +404,8 @@ export function renderSuspensionBridgeLandmark(data) {
     girders: towers.length === 2 ? 2 : 0,
     suspenders: createdMeshes.find((mesh) => mesh.userData?.landmarkKind === 'suspension_bridge_suspender')?.userData?.instanceCount || 0,
     structuralMembers: structuralDetails?.userData?.instanceCount || 0,
-    synchronizedRoads,
+    synchronizedRoads: 0,
+    transportSurfaceOwner: 'compiled_transport_surface',
     spanMeters: Number(metrics.total.toFixed(1))
   };
 }

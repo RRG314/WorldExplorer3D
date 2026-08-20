@@ -1374,6 +1374,54 @@ await runCheck('member valid chat write with state transition succeeds', async (
   await assertSucceeds(batch.commit());
 });
 
+await runCheck('room member can create shared artifact with current interior-aware anchor schema', async () => {
+  await assertSucceeds(setDoc(doc(collection(memberDb, 'rooms', ROOM_ID, 'artifacts')), {
+    ownerUid: MEMBER_UID,
+    ownerDisplayName: 'Member',
+    type: 'pin',
+    title: 'Shared field note',
+    text: 'Current multiplayer artifact schema',
+    visibility: 'room',
+    anchor: {
+      kind: 'earth',
+      lat: 39.2904,
+      lon: -76.6122,
+      x: 1,
+      y: 2,
+      z: 3,
+      interiorKey: '',
+      buildingKey: 'osm-way-123',
+      interiorLabel: 'Lobby'
+    },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('room artifact rejects oversized interior anchor identity', async () => {
+  await assertFails(setDoc(doc(collection(memberDb, 'rooms', ROOM_ID, 'artifacts')), {
+    ownerUid: MEMBER_UID,
+    ownerDisplayName: 'Member',
+    type: 'pin',
+    title: 'Invalid shared field note',
+    text: '',
+    visibility: 'room',
+    anchor: {
+      kind: 'earth',
+      lat: 39.2904,
+      lon: -76.6122,
+      x: 1,
+      y: 2,
+      z: 3,
+      interiorKey: 'x'.repeat(161),
+      buildingKey: '',
+      interiorLabel: ''
+    },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
 await testEnv.withSecurityRulesDisabled(async (ctx) => {
   const db = ctx.firestore();
   await setDoc(doc(db, 'users', OWNER_UID), userDoc(OWNER_UID, 'Owner'));

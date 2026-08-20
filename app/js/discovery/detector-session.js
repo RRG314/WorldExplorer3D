@@ -146,7 +146,7 @@ function createDetectorSession(options = {}) {
     collectionResult = result;
     phase = 'collected';
     activeToolId = 'metal-detector';
-    message = `${result.item.name} saved to your Journal, Field Guide, and Collection.`;
+    message = `${result.item.name} saved to your Journal, Field Guide, and Backpack.`;
     return true;
   }
 

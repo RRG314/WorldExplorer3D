@@ -516,8 +516,6 @@ function buildActivityCatalog() {
   const ref = currentReferencePose();
   const items = [
     ...buildGeneratedActivities(ref),
-    ...buildCreatorActivities(ref),
-    ...buildCurrentRoomActivities(ref),
     ...buildRoomActivities(ref)
   ];
   return items

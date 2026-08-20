@@ -1,10 +1,13 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=5';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=1';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=7';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
 import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=1';
-import { vehicleDoorPosition } from './vehicle-model.js?v=2';
+import { vehicleDoorPosition } from './vehicle-model.js?v=4';
+import { applyConditionImpact } from './impact-model.js?v=1';
 
-const RESPONDER_BASE_Y = 1.2;
+const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
 
 function finite(value, fallback = 0) {
@@ -50,14 +53,12 @@ function roadAnchorNear(x, z, y, preferredRoad = null) {
 
 function responderVariant(profile) {
   const crossover = profile.bodyStyle === 'crossover';
+  const base = vehicleDefinitionById(crossover ? 'suv' : 'sedan');
   return Object.freeze({
+    ...base,
     id: `${profile.id}-response`,
     label: profile.vehicleLabel,
-    bodyStyle: crossover ? 'crossover' : 'sedan',
-    width: crossover ? 1.94 : 1.82,
-    height: crossover ? 1.74 : 1.5,
-    length: crossover ? 4.78 : 4.58,
-    wheelRadius: crossover ? .42 : .37
+    bodyStyle: crossover ? 'suv' : 'sedan'
   });
 }
 
@@ -85,6 +86,7 @@ function createUrbanResponderRuntime(options = {}) {
       };
       const road = roadAnchorNear(candidate.x, candidate.z, candidate.y);
       if (!road || road.distance > 45) continue;
+      if (responders.some((responder) => Math.hypot(responder.x - road.x, responder.z - road.z) < 12)) continue;
       const actorDistance = Math.hypot(road.x - finite(actor?.x), road.z - finite(actor?.z));
       if (actorDistance < 48) continue;
       const score = Math.abs(actorDistance - (72 + index * 12)) + road.distance * .35;
@@ -130,13 +132,100 @@ function createUrbanResponderRuntime(options = {}) {
       navigationTarget: null,
       navigationElapsed: 1,
       surfaceElapsed: 1,
-      returnElapsed: 0
+      returnElapsed: 0,
+      condition: 1,
+      resistance: 190,
+      officer: null
     };
     visual.root.position.set(responder.x, responder.y, responder.z);
     visual.root.rotation.set(0, responder.yaw, 0);
     group.add(visual.root);
     responders.push(responder);
     return responder;
+  }
+
+  function spawnOfficer(responder) {
+    if (responder.officer) return responder.officer;
+    const side = responder.x <= finite(options.getActor?.()?.x) ? -1 : 1;
+    const x = responder.x + Math.cos(responder.yaw) * side * 1.8;
+    const z = responder.z - Math.sin(responder.yaw) * side * 1.8;
+    const visual = createUrbanNpcVisual(THREE, {
+      id: `${responder.id}:officer`,
+      archetype: 'civic-officer',
+      outfitColor: 0x253a52,
+      pantsColor: 0x172334,
+      hairColor: 0x2a211c,
+      skinColor: 0x9a6d52,
+      heldEquipment: 'responder-sidearm',
+      reaction: 'armed'
+    });
+    visual.root.position.set(x, surfaceY(x, z, responder.y - RESPONDER_BASE_Y), z);
+    group.add(visual.root);
+    responder.officer = {
+      id: `${responder.id}:officer`,
+      visual,
+      x,
+      y: visual.root.position.y,
+      z,
+      yaw: responder.yaw,
+      activeElapsed: 0,
+      fireCooldown: .9,
+      shotsFired: 0,
+      condition: 1,
+      resistance: 105,
+      lootClaimed: false
+    };
+    return responder.officer;
+  }
+
+  function updateOfficer(responder, dt, civic, actor, returning) {
+    const distanceToActor = actor ? Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)) : Infinity;
+    if (!responder.officer && !returning && responder.speed <= 2.8 && distanceToActor <= 18) spawnOfficer(responder);
+    const officer = responder.officer;
+    if (!officer) return;
+    if (Number(officer.condition ?? 1) <= .05) {
+      officer.visual.setReaction('downed');
+      return;
+    }
+    officer.activeElapsed += dt;
+    officer.fireCooldown = Math.max(0, officer.fireCooldown - dt);
+    const dx = finite(actor?.x) - officer.x;
+    const dz = finite(actor?.z) - officer.z;
+    const distance = Math.hypot(dx, dz);
+    officer.yaw = Math.atan2(dx, dz);
+    if (!returning && distance > 4.2 && distance < 34) {
+      const speed = Math.min(3.2, Math.max(0, distance - 4) * .9);
+      officer.x += Math.sin(officer.yaw) * speed * dt;
+      officer.z += Math.cos(officer.yaw) * speed * dt;
+      officer.y = surfaceY(officer.x, officer.z, officer.y);
+    }
+    officer.visual.root.position.set(officer.x, officer.y, officer.z);
+    officer.visual.root.rotation.y = officer.yaw;
+    const armedIncident = ['weapon_discharge', 'explosive_use'].includes(String(civic?.lastEvent?.kind || ''));
+    const mayFire = !returning && armedIncident && Number(civic?.level || 0) >= 2 &&
+      officer.activeElapsed >= 1.25 && distance >= 4 && distance <= 32;
+    officer.visual.setReaction(mayFire ? 'armed' : distance <= 7 ? 'watching' : 'armed');
+    if (mayFire && officer.fireCooldown <= 0) {
+      const fired = options.fireNpcProjectile?.({
+        sourceId: officer.id,
+        equipmentId: 'responder-sidearm',
+        label: 'Responder sidearm',
+        projectileKind: 'pulse',
+        projectileSpeed: 66,
+        range: 38,
+        force: 18,
+        origin: { x: officer.x, y: officer.y + 1.34, z: officer.z },
+        target: { x: finite(actor?.x), y: finite(actor?.y) - .5, z: finite(actor?.z) },
+        onPlayerImpact: options.onOfficerShot
+      });
+      if (fired) {
+        officer.shotsFired += 1;
+        officer.fireCooldown = 1.35;
+      }
+    }
+    if (!returning && Number(civic?.level || 0) >= 2 && appCtx.Walk?.state?.mode === 'walk' && distance <= 2.2 && officer.activeElapsed >= 1.2) {
+      options.onArrest?.({ officerId: officer.id, responderId: responder.id });
+    }
   }
 
   function movementTarget(responder, civic, actor, returning, actorWithinSearch) {
@@ -167,8 +256,20 @@ function createUrbanResponderRuntime(options = {}) {
     const targetSpeed = distance <= stopDistance ? 0 : Math.min(22 + civicLevel * 2, 7 + distance * .24);
     const acceleration = targetSpeed > responder.speed ? 7.5 : 11;
     responder.speed += Math.sign(targetSpeed - responder.speed) * Math.min(Math.abs(targetSpeed - responder.speed), acceleration * dt);
-    const nextX = responder.x + Math.sin(responder.yaw) * responder.speed * dt;
-    const nextZ = responder.z + Math.cos(responder.yaw) * responder.speed * dt;
+    let nextX = responder.x + Math.sin(responder.yaw) * responder.speed * dt;
+    let nextZ = responder.z + Math.cos(responder.yaw) * responder.speed * dt;
+    const vehicleBlockers = [
+      ...responders.filter((entry) => entry !== responder),
+      ...(options.getVehicles?.() || []).filter((entry) => !entry.attachedToPlayer)
+    ];
+    const blockedByVehicle = vehicleBlockers.some((entry) =>
+      Math.hypot(finite(entry.x) - nextX, finite(entry.z) - nextZ) < Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9)
+    );
+    if (blockedByVehicle) {
+      responder.speed = 0;
+      nextX = responder.x;
+      nextZ = responder.z;
+    }
     const road = roadAnchorNear(nextX, nextZ, responder.y - RESPONDER_BASE_Y, responder.road);
     if (road && road.distance <= 14) {
       const roadGrip = Math.min(.72, dt * 4.5);
@@ -198,6 +299,8 @@ function createUrbanResponderRuntime(options = {}) {
   function removeResponder(responder, disposeVisual = true) {
     const index = responders.indexOf(responder);
     if (index >= 0) responders.splice(index, 1);
+    responder.officer?.visual?.dispose?.();
+    responder.officer = null;
     if (disposeVisual) responder.visual.dispose();
   }
 
@@ -271,6 +374,7 @@ function createUrbanResponderRuntime(options = {}) {
     const returning = response.phase === 'returning' || civic?.phase === 'clear' || civic?.phase === 'cooling';
     responders.slice().forEach((responder) => {
       updateMotion(responder, step, civic || {}, actor, returning, actorWithinSearch);
+      updateOfficer(responder, step, civic || {}, actor, returning);
       if (!returning) return;
       const originDistance = Math.hypot(responder.x - responder.origin.x, responder.z - responder.origin.z);
       const actorDistance = actor ? Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)) : Infinity;
@@ -292,7 +396,15 @@ function createUrbanResponderRuntime(options = {}) {
         z: Number(responder.z.toFixed(2)),
         yaw: Number(responder.yaw.toFixed(4)),
         speed: Number(responder.speed.toFixed(2)),
-        distanceToActor: actor ? Number(Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)).toFixed(2)) : null
+        distanceToActor: actor ? Number(Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)).toFixed(2)) : null,
+        officer: responder.officer ? Object.freeze({
+          id: responder.officer.id,
+          x: Number(responder.officer.x.toFixed(2)),
+          y: Number(responder.officer.y.toFixed(2)),
+          z: Number(responder.officer.z.toFixed(2)),
+          armed: true,
+          shotsFired: responder.officer.shotsFired
+        }) : null
       })))
     });
     return lastSnapshot;
@@ -300,6 +412,55 @@ function createUrbanResponderRuntime(options = {}) {
 
   function snapshot() {
     return lastSnapshot;
+  }
+
+  function targets() {
+    return Object.freeze(responders.flatMap((responder) => {
+      const entries = [{
+        kind: 'responder_vehicle', ref: responder, x: responder.x, y: responder.y, z: responder.z,
+        yaw: responder.yaw, condition: responder.condition
+      }];
+      if (responder.officer) entries.push({
+        kind: 'responder_officer', ref: responder.officer, x: responder.officer.x, y: responder.officer.y,
+        z: responder.officer.z, yaw: responder.officer.yaw, condition: responder.officer.condition
+      });
+      return entries;
+    }).filter((entry) => Number(entry.condition ?? 1) > .05));
+  }
+
+  function applyImpact(targetId, force) {
+    for (const responder of responders) {
+      if (responder.id === targetId) {
+        const result = applyConditionImpact(responder, force);
+        responder.condition = result.after;
+        responder.visual.setCondition(result.after);
+        return { kind: 'responder_vehicle', id: responder.id, ...result };
+      }
+      if (responder.officer?.id === targetId) {
+        const result = applyConditionImpact(responder.officer, force);
+        responder.officer.condition = result.after;
+        responder.officer.visual.setReaction(result.destroyed ? 'downed' : 'hit');
+        return { kind: 'responder_officer', id: responder.officer.id, ...result };
+      }
+    }
+    return null;
+  }
+
+  function nearestDownedOfficer(reference, radius = 3.2) {
+    if (!reference) return null;
+    return responders.map((responder) => responder.officer ? ({
+      responder,
+      officer: responder.officer,
+      distance: Math.hypot(responder.officer.x - finite(reference.x), responder.officer.z - finite(reference.z))
+    }) : null).filter((entry) => entry && Number(entry.officer.condition ?? 1) <= .05 && entry.distance <= radius)
+      .sort((left, right) => left.distance - right.distance)[0] || null;
+  }
+
+  function lootOfficer(officerId) {
+    const officer = responders.map((responder) => responder.officer).find((entry) => entry?.id === String(officerId || ''));
+    if (!officer || Number(officer.condition ?? 1) > .05 || officer.lootClaimed) return null;
+    officer.lootClaimed = true;
+    return Object.freeze({ weaponId: 'pulse-sidearm', rounds: 24 });
   }
 
   function dispose() {
@@ -310,7 +471,7 @@ function createUrbanResponderRuntime(options = {}) {
     return true;
   }
 
-  return Object.freeze({ claimVehicle, dispose, nearestEnterable, snapshot, update });
+  return Object.freeze({ applyImpact, claimVehicle, dispose, lootOfficer, nearestDownedOfficer, nearestEnterable, snapshot, targets, update });
 }
 
 export { createUrbanResponderRuntime, responderVariant };

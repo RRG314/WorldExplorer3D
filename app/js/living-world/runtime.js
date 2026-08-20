@@ -5,9 +5,9 @@ import {
   createWorldRandom,
   isLivingWorldPublicationActive
 } from './model.js?v=1';
-import { compileEntranceCatalog } from './entrance-catalog.js?v=5';
-import { compilePedestrianGraph, compileTrafficGraph } from './navigation-graphs.js?v=1';
-import { createLivingWorldPopulation } from './population.js?v=6';
+import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=4';
+import { createLivingWorldPopulation } from './population.js?v=10';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -102,12 +102,11 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     isBlockedPoint: (x, z) => pedestrianPointBlocked(appCtx, x, z),
     tier
   });
-  const locationName = String(request.location?.name || request.selection?.name || '').toLowerCase();
-  const driveOnLeft = /london|england|united kingdom|australia|japan|new zealand|singapore/.test(locationName);
+  const drivingSide = resolveDrivingSide(request.selection || request.location || {});
   const trafficCompilation = compileTrafficGraph({
     traversal: traversal.drive,
     sampleSurface: appCtx.sampleFeatureSurfaceY,
-    driveOnLeft,
+    driveOnLeft: drivingSide.driveOnLeft,
     tier
   });
   const population = createLivingWorldPopulation({
@@ -178,6 +177,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     catalog,
     entranceByBuilding,
     tier,
+    drivingSide,
     disposed: false,
     reason: null
   };
@@ -207,6 +207,26 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
 export function livingWorldRuntimeSnapshot(appCtx) {
   const state = appCtx?.livingWorldRuntime;
   if (!state) return Object.freeze({ active: false });
+  const pedestrianMotorwayEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
+    const feature = state.pedestrianCompilation.runtimeFeatureByEdge.get(edge.id);
+    const roadClass = String(
+      feature?.transportRecord?.sourceTags?.highway ||
+      feature?.transportRecord?.rawTags?.highway ||
+      feature?.type ||
+      ''
+    ).toLowerCase();
+    return /^(?:motorway|motorway_link)$/.test(roadClass);
+  }).length;
+  const trafficDirectionViolations = state.publication.trafficGraph.edges.filter((edge) =>
+    (edge.sourceDirection === 'forward' && edge.direction !== 'forward') ||
+    (edge.sourceDirection === 'reverse' && edge.direction !== 'reverse')
+  ).length;
+  const trafficLaneSideViolations = state.publication.trafficGraph.edges.filter((edge) => {
+    const expectedSign = edge.direction === 'forward'
+      ? state.drivingSide.driveOnLeft ? 1 : -1
+      : state.drivingSide.driveOnLeft ? -1 : 1;
+    return Math.sign(Number(edge.centerlineOffset) || 0) !== expectedSign;
+  }).length;
   return Object.freeze({
     active: publicationIsActive(appCtx, state.publication),
     requestId: state.publication.requestId,
@@ -220,12 +240,17 @@ export function livingWorldRuntimeSnapshot(appCtx) {
     pedestrianGraph: Object.freeze({
       nodes: state.publication.pedestrianGraph.nodes.length,
       edges: state.publication.pedestrianGraph.edges.length,
-      provenance: state.publication.pedestrianGraph.provenance
+      provenance: state.publication.pedestrianGraph.provenance,
+      diagnostics: state.publication.pedestrianGraph.diagnostics,
+      prohibitedMotorwayEdges: pedestrianMotorwayEdges
     }),
     trafficGraph: Object.freeze({
       nodes: state.publication.trafficGraph.nodes.length,
       edges: state.publication.trafficGraph.edges.length,
-      provenance: state.publication.trafficGraph.provenance
+      provenance: state.publication.trafficGraph.provenance,
+      drivingSide: state.drivingSide,
+      directionViolations: trafficDirectionViolations,
+      laneSideViolations: trafficLaneSideViolations
     }),
     generatedWithAdditionalProviderQueries: false
   });

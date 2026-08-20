@@ -150,6 +150,8 @@ function generateFish(options = {}) {
     weightKg: Number(weightKg.toFixed(2)),
     strength: Number(strength.toFixed(3)),
     baseScore: score,
+    measurementTruth: 'simulated-estimate',
+    modelBasis: 'species-range-randomized-v1',
     visual: { ...species.visual }
   };
 }
@@ -158,7 +160,7 @@ function fishMetricText(fish) {
   if (!fish) return '';
   const pounds = fish.weightKg * 2.2046226218;
   const inches = fish.lengthCm / 2.54;
-  return `${fish.weightKg.toFixed(2)} kg / ${pounds.toFixed(1)} lb | ${fish.lengthCm.toFixed(1)} cm / ${inches.toFixed(1)} in`;
+  return `Est. ${fish.weightKg.toFixed(2)} kg / ${pounds.toFixed(1)} lb | ${fish.lengthCm.toFixed(1)} cm / ${inches.toFixed(1)} in`;
 }
 
 export { FISH_SPECIES, RARITY, fishMetricText, generateFish, selectSpecies };

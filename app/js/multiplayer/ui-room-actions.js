@@ -1,4 +1,4 @@
-import { getCurrentUser } from "../../../js/auth-ui.js";
+import { getCurrentUser } from "../../../js/auth-ui.js?v=55";
 import { createArtifact, removeArtifact } from "./artifacts.js?v=57";
 import { sendMessage } from "./chat.js?v=56";
 import {

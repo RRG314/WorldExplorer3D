@@ -11,7 +11,7 @@ import {
   pointInMappedWaterArea
 } from './far-field-mapped-context.js?v=18';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
-import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=3';
+import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
   cellInsideDetailedCoverage,

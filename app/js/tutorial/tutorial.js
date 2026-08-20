@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createTutorialUi } from './ui.js?v=2';
+import { createTutorialUi } from './ui.js?v=3';
 
 const STORAGE_KEY = 'worldExplorer3D.tutorialState.v2';
 const LEGACY_STORAGE_KEY = 'worldExplorer3D.tutorialState.v1';
@@ -206,7 +206,7 @@ function presentCurrentStage() {
   } else if (runtime.state.stage === STAGES.DISCOVER) {
     showPrompt(STAGES.DISCOVER, {
       title: 'Record one discovery',
-      body: 'Follow the bearing or signal, approach the target, and document it. Your first record starts the Field Journal.',
+      body: 'Follow the signal and document the find. Knowledge goes to your Journal; any object you keep appears in your Backpack (I).',
       progress: 92,
       autoHideMs: 15000
     });
@@ -242,7 +242,7 @@ function completeTutorial(reason = 'discovery_recorded') {
     contextual: true,
     eyebrow: 'First expedition complete',
     title: 'Your Explorer story has started',
-    body: 'The action is saved chronologically in Journal and identified in Field Guide. Only acquired objects enter Collection. Follow Current Goal here, or choose a new destination for regional credit.',
+    body: 'Journal remembers what you learned. Backpack (I) holds what you carry. Use its pictures and 1–6 quick slots to equip items.',
     progress: 100,
     autoHideMs: 12000
   });

@@ -1,6 +1,8 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { fishMetricText, generateFish } from './fishing/catalog.js?v=1';
-import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=2';
+import { fishMetricText, generateFish } from './fishing/catalog.js?v=2';
+import { normalizeDepthEvidence } from './geospatial/bathymetry-evidence.js?v=1';
+import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=3';
+import { getScreenLayoutService } from './ui/screen-layout.js?v=1';
 
 const CATCH_STORAGE_KEY = 'worldExplorer3D.fishing.catches.v1';
 const MAX_SAVED_CATCHES = 60;
@@ -29,7 +31,9 @@ const state = {
   message: 'Stop the boat and cast into the water.',
   catches: [],
   lastUiAt: 0,
-  portraitPhase: 0
+  portraitPhase: 0,
+  cameraModeBeforeOpen: null,
+  pointerStartY: 0
 };
 
 const refs = {};
@@ -81,6 +85,11 @@ function waterLabel() {
   return kind.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function currentBathymetryEvidence() {
+  const location = appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOC;
+  return normalizeDepthEvidence(location?.surfaceEvidence?.bathymetry);
+}
+
 function boatSpeed() {
   return Math.abs(Number(appCtx.boat?.forwardSpeed ?? appCtx.boat?.speed) || 0);
 }
@@ -90,10 +99,19 @@ function canCast() {
 }
 
 function stageActionLabel() {
-  if (state.stage === 'bite') return 'Set Hook';
-  if (state.stage === 'casting' || state.stage === 'waiting') return 'Line Out';
-  if (state.stage === 'fighting') return 'Fish Hooked';
-  return 'Cast Line';
+  if (state.stage === 'bite') return 'HOOK';
+  if (state.stage === 'casting' || state.stage === 'waiting') return 'LINE OUT';
+  if (state.stage === 'fighting') return 'FIGHT';
+  return 'CAST';
+}
+
+function stageGestureLabel() {
+  if (state.stage === 'bite') return 'LIFT TO SET HOOK';
+  if (state.stage === 'casting') return 'CASTING';
+  if (state.stage === 'waiting') return 'WATCH THE LINE';
+  if (state.stage === 'fighting') return 'DRAG TO STEER · HOLD TO REEL';
+  if (state.stage === 'landed') return 'CATCH LANDED';
+  return 'TAP WATER TO CAST';
 }
 
 function setMessage(message) {
@@ -120,12 +138,12 @@ function stopFight(reason = 'Fishing ended.') {
 
 function startCast() {
   if (!appCtx.boatMode?.active) {
-    setMessage('Fishing is available from the surface boat.');
+    setMessage('BOAT REQUIRED');
     renderUi(true);
     return false;
   }
   if (boatSpeed() > 2.4) {
-    setMessage('Slow below 2.4 m/s before casting. The boat will hold position while you fish.');
+    setMessage('SLOW BOAT');
     renderUi(true);
     return false;
   }
@@ -142,18 +160,30 @@ function startCast() {
   state.slackTimer = 0;
   state.maxTension = 0;
   state.rodDirection = 0;
-  setStage('casting', 'Casting beyond the wake...', 0.9);
+  setStage('casting', 'CASTING', 0.9);
   return true;
 }
 
 function prepareBite() {
   const geo = currentGeo();
-  state.fish = generateFish({
+  const bathymetry = currentBathymetryEvidence();
+  state.fish = {
+    ...generateFish({
     waterKind: appCtx.boatMode?.waterKind || 'coastal',
     latitude: geo.lat
-  });
+    }),
+    occurrenceTruth: 'simulated-gameplay-event',
+    habitatBasis: {
+      model: 'water-kind-latitude-v1',
+      waterKind: String(appCtx.boatMode?.waterKind || 'water'),
+      latitude: Number(geo.lat.toFixed(6)),
+      bathymetryTruth: bathymetry.truthType,
+      depthMeters: bathymetry.depthMeters,
+      depthSourceId: bathymetry.sourceId
+    }
+  };
   state.fishDirection = Math.random() < 0.5 ? -1 : 1;
-  setStage('bite', 'Bite! Set the hook before the fish drops the lure.', 2.35);
+  setStage('bite', 'BITE — LIFT', 2.35);
 }
 
 function setHook() {
@@ -167,7 +197,7 @@ function setHook() {
   state.currentBurst = 0.35;
   state.burstTimer = 0.8;
   state.nextBurstAt = 0.8 + Math.random() * 1.4;
-  setStage('fighting', `${state.fish.species} hooked. Match its pull and protect the line.`);
+  setStage('fighting', 'FISH ON');
   return true;
 }
 
@@ -214,14 +244,14 @@ function catchFish() {
   state.active = false;
   state.reeling = false;
   state.givingLine = false;
-  setStage('landed', `${entry.rarityLabel} ${entry.species} landed. ${fishMetricText(entry)}. Score ${entry.score}.`);
+  setStage('landed', 'LANDED');
   void appCtx.submitFishingScore?.(entry);
   globalThis.dispatchEvent?.(new CustomEvent('we3d-fishing-catch', { detail: entry }));
 }
 
 function updateFight(dt) {
   const fish = state.fish;
-  if (!fish) return loseFish('The fish slipped away.');
+  if (!fish) return loseFish('FISH LOST');
   state.fightElapsed += dt;
   state.portraitPhase += dt * (1.8 + state.currentBurst * 3.2);
   state.nextBurstAt -= dt;
@@ -281,17 +311,17 @@ function updateFight(dt) {
   }
   state.lineIntegrity = clamp(state.lineIntegrity);
 
-  if (state.lineIntegrity <= 0.001) return loseFish('The line snapped under too much tension.');
-  if (state.slackTimer > 2.75) return loseFish('The fish threw the hook while the line was slack.');
-  if (state.fightElapsed > 240) return loseFish('The fish outlasted the tackle.');
+  if (state.lineIntegrity <= 0.001) return loseFish('LINE SNAPPED');
+  if (state.slackTimer > 2.75) return loseFish('HOOK LOST');
+  if (state.fightElapsed > 240) return loseFish('FISH ESCAPED');
   if (state.reelProgress >= 0.995 && state.fishStamina <= 0.28) return catchFish();
 
   const direction = state.fishDirection < 0 ? 'left' : 'right';
-  if (state.lineTension > 0.84) setMessage(`Danger: line overloaded. Give line or lower drag. Fish pulling ${direction}.`);
-  else if (state.lineTension < 0.18) setMessage(`Line is slack. Reel now. Fish pulling ${direction}.`);
-  else if (state.currentBurst > 0.58) setMessage(`Hard ${fish.behavior.replace(/-/g, ' ')} to the ${direction}. Counter with the rod.`);
-  else if (state.fishStamina < 0.3) setMessage('The fish is tiring. Keep steady pressure and reel it home.');
-  else setMessage(`Maintain pressure. Fish pulling ${direction}.`);
+  if (state.lineTension > 0.84) setMessage('GIVE LINE');
+  else if (state.lineTension < 0.18) setMessage('REEL — LINE SLACK');
+  else if (state.currentBurst > 0.58) setMessage(`PULL ${direction.toUpperCase()}`);
+  else if (state.fishStamina < 0.3) setMessage('FISH TIRING');
+  else setMessage('HOLD PRESSURE');
 }
 
 function updateStage(dt) {
@@ -304,14 +334,14 @@ function updateStage(dt) {
     state.stageTimer -= dt;
     if (state.stageTimer <= 0) {
       const wait = 1.8 + Math.random() * 3.8;
-      setStage('waiting', 'Watch the line. A bite can come at any moment.', wait);
+      setStage('waiting', 'WAIT', wait);
     }
   } else if (state.stage === 'waiting') {
     state.stageTimer -= dt;
     if (state.stageTimer <= 0) prepareBite();
   } else if (state.stage === 'bite') {
     state.stageTimer -= dt;
-    if (state.stageTimer <= 0) loseFish('Missed bite. Cast again when ready.');
+    if (state.stageTimer <= 0) loseFish('MISSED BITE');
   } else if (state.stage === 'fighting') {
     updateFight(dt);
   }
@@ -348,6 +378,16 @@ function meter(element, value, danger = false) {
   element.classList.toggle('danger', danger);
 }
 
+function resizeFishingCanvas() {
+  if (!refs.canvas) return;
+  const bounds = refs.canvas.getBoundingClientRect();
+  const ratio = Math.min(2, Math.max(1, Number(globalThis.devicePixelRatio) || 1));
+  const width = Math.max(320, Math.round(bounds.width * ratio));
+  const height = Math.max(240, Math.round(bounds.height * ratio));
+  if (refs.canvas.width !== width) refs.canvas.width = width;
+  if (refs.canvas.height !== height) refs.canvas.height = height;
+}
+
 function renderUi(force = false) {
   const now = performance.now();
   if (!force && now - state.lastUiAt < 65) return;
@@ -359,22 +399,28 @@ function renderUi(force = false) {
   refs.panel?.setAttribute('aria-hidden', state.open ? 'false' : 'true');
   if (!state.open) return;
 
+  refs.panel.dataset.stage = state.stage;
+  resizeFishingCanvas();
+
   if (refs.stage) refs.stage.textContent = state.stage.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
   if (refs.message) refs.message.textContent = state.message;
   if (refs.water) refs.water.textContent = `${waterLabel()} | ${String(appCtx.boatMode?.seaState || 'moderate')} sea`;
   if (refs.speed) refs.speed.textContent = `${boatSpeed().toFixed(1)} m/s`;
   if (refs.action) {
-    refs.action.textContent = stageActionLabel();
+    const actionLabel = stageActionLabel();
+    if (refs.actionLabel) refs.actionLabel.textContent = actionLabel;
+    refs.action.setAttribute('aria-label', actionLabel === 'HOOK' ? 'Set fishing hook' : 'Cast fishing line');
     refs.action.disabled = state.stage === 'casting' || state.stage === 'waiting' || state.stage === 'fighting' || (!canCast() && state.stage !== 'bite');
   }
-  if (refs.fishName) refs.fishName.textContent = state.fish?.species || 'Unknown fish';
-  if (refs.fishMeta) refs.fishMeta.textContent = state.fish ? `${state.fish.rarityLabel} | ${fishMetricText(state.fish)} | Strength ${Math.round(state.fish.strength * 100)}` : 'Cast to discover the fish in this water.';
+  if (refs.gestureLabel) refs.gestureLabel.textContent = stageGestureLabel();
+  if (refs.fishName) refs.fishName.textContent = state.fish?.species || (state.stage === 'waiting' ? 'Line in water' : 'Open water');
+  if (refs.fishMeta) refs.fishMeta.textContent = state.fish && ['landed', 'lost'].includes(state.stage) ? `${state.fish.rarityLabel} · ${fishMetricText(state.fish)}` : '';
   meter(refs.tensionFill, state.lineTension, state.lineTension > 0.84 || state.lineTension < 0.14 && state.stage === 'fighting');
   meter(refs.staminaFill, 1 - state.fishStamina);
   meter(refs.integrityFill, state.lineIntegrity, state.lineIntegrity < 0.35);
   meter(refs.progressFill, state.reelProgress);
   if (refs.tensionValue) refs.tensionValue.textContent = `${Math.round(state.lineTension * 100)}%`;
-  if (refs.staminaValue) refs.staminaValue.textContent = `${Math.round((1 - state.fishStamina) * 100)}% tired`;
+  if (refs.staminaValue) refs.staminaValue.textContent = `${Math.round((1 - state.fishStamina) * 100)}%`;
   if (refs.integrityValue) refs.integrityValue.textContent = `${Math.round(state.lineIntegrity * 100)}%`;
   if (refs.progressValue) refs.progressValue.textContent = `${Math.round(state.reelProgress * 100)}%`;
   if (refs.drag) refs.drag.value = String(Math.round(state.drag * 100));
@@ -386,8 +432,8 @@ function renderUi(force = false) {
   refs.rodRight?.classList.toggle('active', state.rodDirection === 1);
 
   const summary = catchSummary();
-  if (refs.summary) refs.summary.textContent = `${summary.total} catches | ${summary.species} species | Best ${summary.best?.score || 0} pts`;
-  if (refs.record) refs.record.textContent = summary.heaviest ? `Heaviest: ${summary.heaviest.species} ${Number(summary.heaviest.weightKg).toFixed(2)} kg` : 'No personal record yet';
+  if (refs.summary) refs.summary.textContent = `${summary.total} catch${summary.total === 1 ? '' : 'es'} · ${summary.species} species`;
+  if (refs.record) refs.record.textContent = summary.heaviest ? `Est. ${Number(summary.heaviest.weightKg).toFixed(2)} kg best` : '';
   drawFishPortrait(refs.canvas, state.fish, {
     phase: state.portraitPhase,
     direction: state.fishDirection,
@@ -404,9 +450,15 @@ function renderUi(force = false) {
 
 function openFishingGame() {
   if (!appCtx.boatMode?.active) return false;
+  appCtx.toggleWorldDiscoveryJournal?.(false);
+  appCtx.toggleUrbanEquipment?.(false);
+  appCtx.screenLayout ||= getScreenLayoutService();
+  appCtx.screenLayout.setActivityLayer('fishing', true);
+  if (!state.open) state.cameraModeBeforeOpen = Number.isFinite(appCtx.camMode) ? appCtx.camMode : 0;
+  appCtx.setCameraMode?.(0);
   state.open = true;
   if (!['casting', 'waiting', 'bite', 'fighting'].includes(state.stage)) {
-    setMessage(boatSpeed() <= 2.4 ? 'Choose Cast Line when ready.' : 'Slow below 2.4 m/s before casting.');
+    setMessage(boatSpeed() <= 2.4 ? 'READY' : 'SLOW BOAT');
   }
   renderUi(true);
   return true;
@@ -415,6 +467,10 @@ function openFishingGame() {
 function closeFishingGame() {
   if (['casting', 'waiting', 'bite', 'fighting'].includes(state.stage)) stopFight('Fishing session ended.');
   state.open = false;
+  if (Number.isFinite(state.cameraModeBeforeOpen)) appCtx.setCameraMode?.(state.cameraModeBeforeOpen);
+  state.cameraModeBeforeOpen = null;
+  appCtx.screenLayout ||= getScreenLayoutService();
+  appCtx.screenLayout.setActivityLayer('fishing', false);
   renderUi(true);
   return true;
 }
@@ -461,18 +517,32 @@ function bindFishingCanvas() {
   const stop = (event) => {
     if (event?.cancelable) event.preventDefault();
     state.reeling = false;
+    state.givingLine = false;
   };
   refs.canvas.addEventListener('pointerdown', (event) => {
-    if (state.stage !== 'fighting') return;
     if (event.cancelable) event.preventDefault();
+    if (state.stage === 'bite') {
+      setHook();
+      return;
+    }
+    if (!['casting', 'waiting', 'fighting'].includes(state.stage)) {
+      startCast();
+      return;
+    }
+    if (state.stage !== 'fighting') return;
+    state.pointerStartY = event.clientY;
     state.reeling = true;
+    state.givingLine = false;
     setRodFromCanvasPointer(event);
     refs.canvas.setPointerCapture?.(event.pointerId);
   });
   refs.canvas.addEventListener('pointermove', (event) => {
-    if (!state.reeling) return;
+    if (!state.reeling && !state.givingLine) return;
     if (event.cancelable) event.preventDefault();
     setRodFromCanvasPointer(event);
+    const vertical = event.clientY - state.pointerStartY;
+    state.givingLine = vertical > 42;
+    state.reeling = !state.givingLine;
   });
   refs.canvas.addEventListener('pointerup', stop);
   refs.canvas.addEventListener('pointercancel', stop);
@@ -491,6 +561,8 @@ function setupFishingGame() {
     water: document.getElementById('fishingWater'),
     speed: document.getElementById('fishingSpeed'),
     action: document.getElementById('fishingActionBtn'),
+    actionLabel: document.getElementById('fishingActionLabel'),
+    gestureLabel: document.getElementById('fishingGestureLabel'),
     canvas: document.getElementById('fishingCanvas'),
     fishName: document.getElementById('fishingFishName'),
     fishMeta: document.getElementById('fishingFishMeta'),
@@ -540,9 +612,9 @@ function setupFishingGame() {
     } else if (event.code === 'KeyQ' && state.stage === 'fighting') {
       event.preventDefault();
       state.givingLine = true;
-    } else if (event.code === 'KeyJ') state.rodDirection = -1;
+    } else if (event.code === 'KeyJ' || event.code === 'ArrowLeft') state.rodDirection = -1;
     else if (event.code === 'KeyK') state.rodDirection = 0;
-    else if (event.code === 'KeyL') state.rodDirection = 1;
+    else if (event.code === 'KeyL' || event.code === 'ArrowRight') state.rodDirection = 1;
   });
   window.addEventListener('keyup', (event) => {
     if (event.code === 'Space') state.reeling = false;
@@ -568,6 +640,9 @@ function getFishingSnapshot() {
       strength: state.fish.strength,
       rarity: state.fish.rarity,
       behavior: state.fish.behavior,
+      measurementTruth: state.fish.measurementTruth,
+      occurrenceTruth: state.fish.occurrenceTruth,
+      habitatBasis: state.fish.habitatBasis,
       score: state.fish.score || state.fish.baseScore
     } : null,
     tension: state.lineTension,
@@ -575,10 +650,14 @@ function getFishingSnapshot() {
     fishStamina: state.fishStamina,
     reelProgress: state.reelProgress,
     drag: state.drag,
+    reeling: state.reeling,
+    givingLine: state.givingLine,
     fishDirection: state.fishDirection,
     rodDirection: state.rodDirection,
     catches: state.catches.length,
-    boatSpeed: boatSpeed()
+    boatSpeed: boatSpeed(),
+    visualMode: 'in-world-boat',
+    controls: state.stage === 'fighting' ? 'drag horizontally to steer; hold/drag up to reel; drag down to give line' : 'tap water or E to cast/set hook'
   };
 }
 

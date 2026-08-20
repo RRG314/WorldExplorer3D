@@ -1,4 +1,4 @@
-import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
 import { createCompanionRuntime } from './companion-runtime.js?v=2';
 import { createDetectorSession } from './detector-session.js?v=1';
 import { compileEnvironmentContext } from './environment-context.js?v=1';
@@ -29,6 +29,7 @@ import { visualForCatalogId } from './visual-content.js?v=1';
 import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=3';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=1';
+import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
   'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
@@ -40,6 +41,62 @@ const WILDLIFE_OBSERVATION_CATALOG = Object.freeze({
   mallard: 'wetland-waterbird-clue',
   'small-mammal': 'woodland-track-clue'
 });
+
+function fieldToolBackpackDefinition(tool) {
+  return Object.freeze({
+    id: tool.id,
+    label: tool.label,
+    category: 'field-tool',
+    icon: 'TOOL',
+    verbs: ['equip', 'use-context'],
+    capabilities: tool.capabilities,
+    discipline: tool.discipline,
+    sourceRefs: tool.sourceRefs
+  });
+}
+
+function discoveryItemBackpackRecord(item) {
+  if (!item?.instanceId || !item?.catalogId) return null;
+  return {
+    instanceId: item.instanceId,
+    catalogId: item.catalogId,
+    quantity: Number(item.quantity) || 1,
+    authority: item.authority || 'anonymous-local',
+    provenance: item.provenance || 'field-discovery',
+    sourceEventId: item.sourceEventId || item.eventId || item.claimId || '',
+    acquiredAt: Number(item.collectedAt) || 0,
+    tradeable: item.tradeable === true,
+    metadata: {
+      label: item.name || item.catalogId,
+      category: 'specimen',
+      icon: 'FIND',
+      verbs: ['inspect', 'trade', 'quest']
+    }
+  };
+}
+
+function projectDiscoveryItemsToBackpack(appCtx, items = []) {
+  const inventory = appCtx.playerBackpackInventory;
+  if (!inventory) return 0;
+  let projected = 0;
+  for (const item of items) {
+    const record = discoveryItemBackpackRecord(item);
+    if (!record) continue;
+    inventory.upsertItem(record, {
+      definition: {
+        id: record.catalogId,
+        label: record.metadata.label,
+        category: record.metadata.category,
+        icon: record.metadata.icon,
+        verbs: record.metadata.verbs
+      },
+      silent: true
+    });
+    projected += 1;
+  }
+  appCtx.playerBackpackStore?.save?.(inventory.exportState?.());
+  return projected;
+}
 
 const WILDLIFE_COMPANION_CATALOG = Object.freeze({
   'rock-pigeon': 'city-pigeon',
@@ -64,7 +121,7 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
   workspace: Object.freeze({ id: 'explorer-workspace-v1', title: 'Your Explorer loop', steps: Object.freeze([
     'Choose one nearby lead. The first option is the best fit for this place; the next two are alternatives.',
     'Begin, then minimize this Journal so the equipped tool and world-space signal can guide you.',
-    'Record the result. Every completed action enters the Journal and Field Guide; only acquired virtual objects enter Collection.',
+    'Record the result. Every completed action enters the Journal and Field Guide; only acquired virtual objects enter your Backpack.',
     'Current Goal and Progress show what to pursue next without forcing every system at once.'
   ]) }),
   guide: Object.freeze({ id: 'explorer-guide-v1', title: 'Field Guide', steps: Object.freeze([
@@ -72,14 +129,15 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
     'Unknown silhouettes are future identification targets. Search and category filters narrow the catalog.',
     'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
   ]) }),
-  collection: Object.freeze({ id: 'explorer-collection-v1', title: 'Collection', steps: Object.freeze([
-    'Collection contains virtual objects you actually acquired: finds, specimens, catch trophies, or creations.',
-    'Wildlife sightings, photographs, and field notes remain in the Journal and Field Guide instead.'
+  collection: Object.freeze({ id: 'explorer-places-v2', title: 'Places & Contacts', steps: Object.freeze([
+    'Places collects the regions and contacts connected to your Journal records.',
+    'It is a guide to where things happened. Acquired objects live only in the Backpack.'
   ]) }),
-  gear: Object.freeze({ id: 'explorer-gear-v1', title: 'Gear', steps: Object.freeze([
-    'Equip a released tool here or let a compatible nearby lead equip it automatically.',
+  gear: Object.freeze({ id: 'explorer-field-kit-v2', title: 'Field Kit Guide', steps: Object.freeze([
+    'This section explains what each field tool does; it does not own equipment.',
+    'Open the Backpack to equip or organize a released tool. Compatible nearby leads can request it explicitly.',
     'Locked gear represents a real capability unlock. Explorer points persist and reveal the next field kit at rank milestones.',
-    'How to use explains the purpose and field context before you begin.'
+    'How to use explains the purpose and field context before an activity begins.'
   ]) }),
   progress: Object.freeze({ id: 'explorer-progress-v1', title: 'Explorer Progress', steps: Object.freeze([
     'New identifications earn the strongest rank credit; documenting known evidence in a new region also counts.',
@@ -147,7 +205,7 @@ function createDiscoveryUi(state) {
     guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'),
     guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
     companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
-    equipped: byId('discoveryEquippedSummary'),
+    equipped: byId('discoveryEquippedSummary'), openBackpack: byId('discoveryOpenBackpackBtn'),
     tutorial: byId('discoveryTutorial'), tutorialTitle: byId('discoveryTutorialTitle'),
     tutorialSteps: byId('discoveryTutorialSteps'), tutorialDone: byId('discoveryTutorialDoneBtn'),
     sectionTutorial: byId('discoverySectionTutorial'), sectionTutorialTitle: byId('discoverySectionTutorialTitle'),
@@ -169,6 +227,8 @@ function createDiscoveryUi(state) {
 
   function setOpen(next) {
     open = !!next;
+    state.appCtx.screenLayout ||= getScreenLayoutService();
+    state.appCtx.screenLayout.setPanelLayer('journal', open);
     elements.panel?.classList.toggle('show', open);
     elements.panel?.setAttribute('aria-hidden', open ? 'false' : 'true');
     elements.quick?.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -221,7 +281,7 @@ function createDiscoveryUi(state) {
     );
     elements.journal.innerHTML = filtered.length ? filtered.slice(0, 16).map((event) => {
       const when = new Date(Number(event.occurredAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      const destination = event.projections?.collection ? 'Guide + Collection' : 'Guide record';
+      const destination = event.projections?.collection ? 'Guide + Backpack item' : 'Guide record';
       const returnButton = event.locationKey ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
       return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${displayDiscoveryLabel(event.activityId, 'Field work')} · ${destination}`)}</small><span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Documented · no repeat rank credit'}</span>${returnButton}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
@@ -236,6 +296,7 @@ function createDiscoveryUi(state) {
     ]);
     guideRecords = guide;
     journalRecords = events;
+    projectDiscoveryItemsToBackpack(state.appCtx, items);
     if (elements.journalRegion) {
       const selectedRegion = elements.journalRegion.value || 'all';
       const regions = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, event.regionLabel || 'Saved region'])).entries()];
@@ -249,16 +310,22 @@ function createDiscoveryUi(state) {
     renderGuide();
     renderJournal();
     if (elements.collection) {
-      elements.collection.innerHTML = items.length ? items.map((item) =>
-        visualCard(item, `${displayDiscoveryLabel(item.rarityBand, 'Common')} · ${displayDiscoveryLabel(item.depthBand || item.qualityBand || 'surface')} · Acquired virtual item`, 'collection')
-      ).join('') : '<div class="discoveryEmpty">Observations do not become owned items. Collect a virtual specimen, detector find, catch trophy, or created artifact to begin this Collection.</div>';
+      const places = [...new Map(events.filter((event) => event.regionId).map((event) => [event.regionId, {
+        id: event.regionId,
+        label: event.regionLabel || 'Saved region',
+        count: events.filter((candidate) => candidate.regionId === event.regionId).length,
+        lastAt: Math.max(...events.filter((candidate) => candidate.regionId === event.regionId).map((candidate) => Number(candidate.occurredAt) || 0))
+      }])).values()].sort((left, right) => right.lastAt - left.lastAt);
+      elements.collection.innerHTML = places.length ? places.map((place) =>
+        `<article class="discoveryItem"><strong>${escapeHtml(place.label)}</strong><small>${place.count} Journal record${place.count === 1 ? '' : 's'} · saved Explorer region</small></article>`
+      ).join('') : '<div class="discoveryEmpty">Complete an activity or observation to add its region to Places.</div>';
     }
     if (elements.tools) {
-      const equippedToolId = String(profile.equippedToolId || 'field-lens');
+      const equippedToolId = String(state.equippedToolId || 'field-lens');
       const available = state.entitlements.listAvailableTools();
       const lockedProgress = new Map((state.toolProgress?.lockedTools || []).map((entry) => [entry.toolId, entry]));
       const availableMarkup = available.map((tool) =>
-        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Equipped' : ''}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-equip="${escapeHtml(tool.id)}" type="button" ${tool.id === equippedToolId ? 'disabled' : ''}>${tool.id === equippedToolId ? 'Equipped' : 'Equip'}</button><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
+        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Active activity tool' : ' · In Backpack'}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
       ).join('');
       const lockedMarkup = state.entitlements.listLockedTools().map((tool) => {
         const unlock = lockedProgress.get(tool.id);
@@ -266,7 +333,7 @@ function createDiscoveryUi(state) {
       }).join('');
       elements.tools.innerHTML = `${availableMarkup}${lockedMarkup}`;
       const equippedTool = state.entitlements.listAvailableTools().find((tool) => tool.id === equippedToolId);
-      if (elements.equipped) elements.equipped.innerHTML = `<span>EQUIPPED TOOL</span><strong>${escapeHtml(equippedTool?.label || 'Field Lens')}</strong><small>${escapeHtml(equippedTool ? equippedTool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · ') : 'Inspect · Classify')}</small>`;
+      if (elements.equipped) elements.equipped.innerHTML = `<span>BACKPACK FIELD TOOL</span><strong>${escapeHtml(equippedTool?.label || 'Field Lens')}</strong><small>${escapeHtml(equippedTool ? equippedTool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · ') : 'Inspect · Classify')}</small>`;
     }
     if (elements.companions) {
       const owned = state.companionRuntime?.snapshot?.().companions || [];
@@ -321,7 +388,7 @@ function createDiscoveryUi(state) {
 
   function setTab(tab) {
     activeTab = tab;
-    const tabTitles = { today: 'Today', guide: 'Field Guide', collection: 'Collection', gear: 'Gear', progress: 'Explorer Progress' };
+    const tabTitles = { today: 'Activities', guide: 'Field Guide', collection: 'Places & Contacts', gear: 'Field Kit Guide', progress: 'Explorer Progress' };
     if (tab !== 'today' && elements.title) elements.title.textContent = tabTitles[tab] || 'Explorer Journal';
     document.querySelectorAll('.discoveryTab').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === tab));
     document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === tab));
@@ -342,7 +409,7 @@ function createDiscoveryUi(state) {
     const collection = event.projections?.collection === true;
     const points = Number(event.progress?.points) || 0;
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · New Field Guide evidence · Item added to Collection' : 'Journal updated · New Field Guide evidence · No owned item created')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation documented · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-result-tab="collection" type="button">View Collection</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · New Field Guide evidence · Item added to Backpack' : 'Journal updated · New Field Guide evidence · No owned item created')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation documented · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }
@@ -388,12 +455,19 @@ function createDiscoveryUi(state) {
     if (button) void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog);
   });
   listen(elements.tools, 'click', (event) => {
-    const equip = event.target?.closest?.('[data-tool-equip]');
     const help = event.target?.closest?.('[data-tool-help]');
-    if (equip) void state.equipTool?.(equip.dataset.toolEquip);
-    else if (help) void state.showToolHelp?.(help.dataset.toolHelp);
+    if (help) void state.showToolHelp?.(help.dataset.toolHelp);
+  });
+  listen(elements.openBackpack, 'click', () => {
+    setOpen(false);
+    state.appCtx.toggleUrbanEquipment?.(true);
   });
   listen(elements.result, 'click', (event) => {
+    if (event.target?.closest?.('[data-open-backpack]')) {
+      setOpen(false);
+      state.appCtx.toggleUrbanEquipment?.(true);
+      return;
+    }
     const button = event.target?.closest?.('[data-result-tab]');
     if (button) setTab(button.dataset.resultTab || 'today');
   });
@@ -641,6 +715,8 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.worldDiscoveryPublicationStore?.clear?.();
   appCtx.worldDiscoveryPublication = null;
   appCtx.worldDiscoveryRuntime = null;
+  appCtx.toggleWorldDiscoveryJournal = null;
+  appCtx.handleWorldDiscoveryQuickAction = null;
   return true;
 }
 
@@ -717,9 +793,28 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     appCtx.LOCS?.[appCtx.selLoc]?.name ||
     'Current region'
   ).trim() || 'Current region';
-  const initialEquippedToolId = entitlements.canUseTool(discoveryProfile.equippedToolId).allowed
+  const backpackInventory = appCtx.playerBackpackInventory;
+  const hadFieldToolMigration = backpackInventory?.snapshot?.().items?.some((item) => item.category === 'field-tool') === true;
+  const fieldToolDefinitions = TOOL_CATALOG.map(fieldToolBackpackDefinition);
+  backpackInventory?.registerDefinitions?.(fieldToolDefinitions);
+  for (const toolId of entitlements.listAvailableTools().map((tool) => tool.id)) {
+    if (!backpackInventory?.has?.(toolId)) backpackInventory?.upsertItem?.({
+      instanceId: `field-tool:${toolId}`,
+      catalogId: toolId,
+      quantity: 1,
+      authority: 'anonymous-local',
+      provenance: 'explorer-progression',
+      metadata: { category: 'field-tool' }
+    }, { silent: true });
+  }
+  projectDiscoveryItemsToBackpack(appCtx, existingItems);
+  const legacyEquippedToolId = entitlements.canUseTool(discoveryProfile.equippedToolId).allowed
     ? String(discoveryProfile.equippedToolId)
     : 'field-lens';
+  if (!hadFieldToolMigration) backpackInventory?.equip?.(legacyEquippedToolId);
+  appCtx.playerBackpackStore?.save?.(backpackInventory?.exportState?.());
+  const backpackEquipped = backpackInventory?.snapshot?.().equippedCatalogId;
+  const initialEquippedToolId = entitlements.canUseTool(backpackEquipped).allowed ? backpackEquipped : legacyEquippedToolId;
   const session = createDetectorSession({
     plan: encounters, claimedIds,
     observedCatalogIds, progress,
@@ -752,6 +847,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       unlockedToolIds: state.toolProgress.unlockedToolIds,
       visibleToolIds: RELEASED_EXPLORER_TOOLS
     });
+    state.entitlements.listAvailableTools().forEach((tool) => {
+      appCtx.playerBackpackInventory?.upsertItem?.({
+        instanceId: `field-tool:${tool.id}`,
+        catalogId: tool.id,
+        quantity: 1,
+        authority: 'anonymous-local',
+        provenance: 'explorer-progression',
+        metadata: { category: 'field-tool' }
+      }, { silent: true });
+    });
+    appCtx.playerBackpackStore?.save?.(appCtx.playerBackpackInventory?.exportState?.());
     state.session.setAvailableToolIds?.(state.entitlements.listAvailableTools().map((tool) => tool.id));
     const unlocked = state.toolProgress.unlockedToolIds.filter((toolId) => !previous.has(toolId));
     if (unlocked.length) {
@@ -795,8 +901,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     const id = String(toolId || 'field-lens');
     const tool = state.entitlements.listAvailableTools().find((entry) => entry.id === id);
     if (!tool || state.entitlements.canUseTool(id).allowed !== true) return false;
-    const profile = await profileStore.getProfile();
-    await profileStore.saveProfile({ ...profile, equippedToolId: id });
+    if (appCtx.playerBackpackInventory?.equip?.(id) !== true) return false;
+    appCtx.playerBackpackStore?.save?.(appCtx.playerBackpackInventory.exportState?.());
     state.equippedToolId = id;
     if (!options.silent) appCtx.showToast?.(`${tool.label} equipped`);
     await state.ui?.refreshData?.();
@@ -810,7 +916,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       id: `tool-help:${tool.id}`,
       title: tool.label,
       steps: [
-        'Equip this tool from Gear. Compatible nearby leads will also equip it automatically.',
+        'Equip this tool from your Backpack. Compatible nearby leads will also equip it automatically.',
         `Use it for ${tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(', ')}.`,
         'Begin the activity, minimize the Journal, and follow the world-space direction or signal.',
         'Return to record the result. The result card names every place where it was saved.'
@@ -1123,17 +1229,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   appCtx.worldDiscoveryRuntime = state;
   appCtx.worldDiscoveryRuntimeSnapshot = () => worldDiscoveryRuntimeSnapshot(appCtx);
   void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => state.ui?.refreshData?.());
-  appCtx.handleWorldDiscoveryQuickAction = async () => {
-    if (!state.ui.open) {
-      state.activeActivityId = 'metal-detect';
-      state.fieldSession.reset();
-      state.lastSnapshot = state.detectorSnapshot;
-      state.ui.setOpen(true);
-      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-      void state.showActivityTutorial(false);
-      return true;
-    }
-    return state.handlePrimary();
+  appCtx.toggleWorldDiscoveryJournal = (force) => {
+    const next = typeof force === 'boolean' ? force : !state.ui.open;
+    state.ui.setOpen(next);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    return true;
   };
   state.unregisterWildlifeInteraction = appCtx.registerContextInteraction?.({
     id: 'world_discovery_wildlife',

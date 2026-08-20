@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=49";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=59";
 import { updateDrone } from "./physics/drone-flight.js?v=8";
 import { updatePlane } from "./plane-mode.js?v=18";
 import {
@@ -18,7 +18,8 @@ import {
 } from "./controls/traversal-control-policy.js?v=8";
 import {
   carSpeedToMph,
-  carSpeedToWorldUnitsPerSecond
+  carSpeedToWorldUnitsPerSecond,
+  mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=1";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
@@ -132,6 +133,14 @@ function update(dt) {
   if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
 
   if (updateAlternateTravelMode(appCtx, dt, { isPlanetarySurface, updateDrone, updatePlane })) return;
+
+  const liveGpsSnapshot = appCtx.getLiveGpsSnapshot?.() || null;
+  const liveGpsOwnsDrive = !isPlanetarySurface() && liveGpsSnapshot?.active === true &&
+    liveGpsSnapshot?.following === true && liveGpsSnapshot?.travelMode === 'drive' &&
+    appCtx.liveGpsTranslationOwned?.() === true;
+  const liveGpsDriveTarget = liveGpsOwnsDrive
+    ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: appCtx.car.x, z: appCtx.car.z }) || null
+    : null;
 
   appCtx.updateInteriorInteraction?.();
 
@@ -499,6 +508,9 @@ function update(dt) {
   }
   appCtx.car.isDrifting = isDrifting;
 
+  if (liveGpsDriveTarget && Number.isFinite(liveGpsDriveTarget.headingDegrees)) {
+    appCtx.car.angle = Math.PI - liveGpsDriveTarget.headingDegrees * Math.PI / 180;
+  }
   const sinA = Math.sin(appCtx.car.angle),cosA = Math.cos(appCtx.car.angle);
   const lateralVelForPosition = !isPlanetarySurface() && isDrifting ?
     appCtx.car.vLat * 0.34 :
@@ -539,6 +551,10 @@ function update(dt) {
     nx = appCtx.car.x + appCtx.car.vx * dt;
     nz = appCtx.car.z + appCtx.car.vz * dt;
   }
+  if (liveGpsDriveTarget) {
+    nx = liveGpsDriveTarget.x;
+    nz = liveGpsDriveTarget.z;
+  }
 
   // Building collisions remain enforced without a second terrain-handling mode.
 
@@ -551,6 +567,20 @@ function update(dt) {
     );
     nx = resolved.x;
     nz = resolved.z;
+    if (typeof appCtx.resolveUrbanActorCollision === 'function') {
+      const actorCollision = appCtx.resolveUrbanActorCollision(
+        { x: appCtx.car.x, z: appCtx.car.z },
+        { x: nx, z: nz },
+        { mode: 'drive', radius: .92, speedMph: carSpeedToMph(appCtx.car.speed) }
+      );
+      nx = actorCollision.x;
+      nz = actorCollision.z;
+      if (actorCollision.collision) {
+        appCtx.car.speed *= .18;
+        appCtx.car.vFwd *= .18;
+        appCtx.car.vLat *= .12;
+      }
+    }
   }
 
   if (typeof appCtx.getBuildVehicleContact === 'function') {
@@ -578,6 +608,14 @@ function update(dt) {
 
   appCtx.car.x = nx;
   appCtx.car.z = nz;
+  if (liveGpsDriveTarget) {
+    const gpsMph = Math.max(0, Number(liveGpsDriveTarget.speedMps || 0) * 2.236936);
+    appCtx.car.speed = mphToCarSpeed(gpsMph);
+    appCtx.car.vFwd = appCtx.car.speed;
+    appCtx.car.vLat = 0;
+    appCtx.car.rearSlip = 0;
+    appCtx.car.isDrifting = false;
+  }
 
   let carY = 1.2;
 

@@ -1,8 +1,22 @@
 # World Explorer 3D — Complete System Inventory and Reconstruction Guide
 
-Status: **authoritative release-source inventory** for version 4.3.0 as inspected on 2026-08-17.
+Status: **authoritative architecture inventory** for version 4.3.0, with the
+active release audit updated through 2026-08-20.
 
-Source baseline: branch `steven/living-editable-world`, commit `8410cdbf6e00038eefd0d9bb7e652d2abd8dabce`, plus the explicitly inventoried working-tree implementation. The working tree is not a release artifact: it currently contains 56 modified tracked files and 29 untracked paths. Any later commit or deployment must record a new baseline here.
+Source baseline: branch `steven/urban-sandbox-foundation`, commit
+`96bc2c7c888865b246a8149d083cc60a723a8d93`, plus the explicitly inventoried
+working-tree implementation. The working tree is not a release artifact and
+remains intentionally uncommitted while production blockers are open. Any later
+commit or deployment must record a new clean baseline here.
+
+Current audit note: legacy tests are quarantined and are not evidence. The
+current release boundary is the requirement-led command set in
+`docs/TEST_AND_RELEASE_MAP.md`, including six-location assembled gameplay,
+environment ownership, Live GPS, Firestore authorization and two-client
+multiplayer. The current local artifact is not production-approved: engineered
+transport profiles still fail the representative matrix, Firebase App Check
+and an enforced CSP are not yet configured, and user/device acceptance remains
+open.
 
 Audience: developers, technical partners, maintainers, and non-developers who need a precise explanation of what the application does and how its parts fit together.
 
@@ -17,11 +31,11 @@ This inventory was derived from the live source, HTML shells, Firebase configura
 | Baseline fact | Current value |
 | --- | --- |
 | Product version | 4.3.0 |
-| Git baseline | `8410cdbf6e00038eefd0d9bb7e652d2abd8dabce` |
+| Git baseline | `96bc2c7c888865b246a8149d083cc60a723a8d93` plus audited working tree |
 | Tracked files | 955 |
 | Browser modules under `app/js` | 506 |
-| Automated test files | 138 |
-| Script files | 180 |
+| Automated test policy | legacy suite quarantined; current requirement-led checks only |
+| Script inventory | see current source verification report; historical counts are not release evidence |
 | Application/account/functions source size | about 145,556 lines |
 | Test/tooling source size | about 41,022 lines |
 | Primary game shell | `app/index.html` |
@@ -519,15 +533,15 @@ World Discovery is a location-contextual Explorer layer over the fixed Earth wor
 
 The current user-accessible loop is:
 
-1. Open the Field Journal from Explore.
-2. Choose a contextual activity or tool.
+1. Open the Journal with `J` or from Explore.
+2. Choose a contextual activity; tools remain owned by the Backpack.
 3. Follow a compact in-world signal or subject presentation.
 4. Classify, excavate, photograph, inspect, or otherwise complete the activity.
 5. Project the result to the Journal and Field Guide.
-6. Add only acquired virtual objects to Collection.
+6. Add only acquired virtual objects to the one character Backpack.
 7. Award Explorer specialty/rank progress for new identification or new-region evidence.
 
-Implemented subsystems include the detector/refinement/excavation state machine, held field tools, geology and natural-history specimens, contextual wildlife presentation, field photography, observation evidence, journal filtering, Field Guide identification records, virtual Collection ownership, goals, Explorer rank/specialties, tool entitlement/progression, anonymous IndexedDB profiles, authenticated trusted claims, server-validated trading, telemetry events, and tutorials. The generated encounter is explicitly procedural; a licensed reference image is identification context and is not evidence that a real animal or object occupies the selected coordinate.
+Implemented subsystems include the detector/refinement/excavation state machine, held field tools, geology and natural-history specimens, contextual wildlife presentation, field photography, observation evidence, journal filtering, Field Guide identification records, one runtime Backpack with save-compatible legacy item projection, goals, Explorer rank/specialties, tool entitlement/progression, anonymous IndexedDB profiles, authenticated trusted claims, server-validated trading, telemetry events, and tutorials. Discovery's legacy `items` records remain a transitional persistence adapter while the Backpack is the only presented item owner; they are not exposed as a second Collection UI. The generated encounter is explicitly procedural; a licensed reference image is identification context and is not evidence that a real animal or object occupies the selected coordinate.
 
 The companion catalog contains multiple dogs, cats, birds, and a fox. Each catalog entry owns its size class and world/AR scale. Ground companions follow near the walker; bird companions use a bounded airborne follower behavior. Companion state is separate from real wildlife observation state.
 

@@ -1,5 +1,8 @@
-import { polylineDistances } from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=17';
+import { polylineDistances } from '../../structure-semantics/geometry.js?v=2';
+import {
+  DEFAULT_MAX_AT_GRADE_FILL,
+  sampleTransportSurfaceAtDistance
+} from './transport-surface-model.js?v=24';
 
 const TRANSPORT_STRUCTURE_ASSEMBLY_SCHEMA_VERSION = 1;
 
@@ -78,6 +81,18 @@ function inRanges(distance, ranges) {
   return ranges.some((range) => distance >= range.start && distance <= range.end);
 }
 
+function endpointHasCompiledConnection(feature, endpoint) {
+  const connected = feature?.connectedFeatures?.[endpoint];
+  if (Array.isArray(connected) && connected.length > 0) return true;
+  const total = finite(feature?.transportGraphRef?.totalDistance);
+  const tolerance = Math.max(0.2, Math.min(1.25, finite(feature?.width, 6) * 0.08));
+  return (feature?.transportGraphRef?.stations || []).some((station) => {
+    const distance = finite(station?.distanceAlong, NaN);
+    if (!Number.isFinite(distance)) return false;
+    return endpoint === 'start' ? distance <= tolerance : total - distance <= tolerance;
+  });
+}
+
 function compileSupportColumns(feature, station, width, baseThickness, sampleTerrainY, supportConflict) {
   const pierWidth = Math.max(1, Math.min(2.5, width * 0.16));
   const topY = station.surfaceY - baseThickness;
@@ -123,8 +138,13 @@ function compileSupportColumns(feature, station, width, baseThickness, sampleTer
 function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
   const semantics = feature?.structureSemantics || {};
   const profile = feature?.transportSurfaceModel;
+  const elevated = semantics.terrainMode === 'elevated';
+  const engineeredApproach =
+    semantics.terrainMode === 'at_grade' &&
+    profile?.engineeredApproach === true &&
+    Number(profile?.stats?.maximumFill) > DEFAULT_MAX_AT_GRADE_FILL;
   if (
-    semantics.terrainMode !== 'elevated' ||
+    (!elevated && !engineeredApproach) ||
     !Array.isArray(feature?.pts) ||
     feature.pts.length < 2 ||
     !profile ||
@@ -140,8 +160,12 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
   const lossless = feature?.transportRecord?.completeness === 'lossless';
   const generalized = feature?.transportRecord?.completeness === 'generalized';
   const complete = feature?.transportRecord?.routeState !== 'incomplete';
-  const publishBody = complete && (lossless || (generalized && semantics.isBridge === true));
-  const visualSupportDetail = publishBody && (lossless || (generalized && semantics.isBridge === true));
+  const publishBody = complete && (
+    engineeredApproach
+      ? lossless || generalized
+      : lossless || (generalized && semantics.isBridge === true)
+  );
+  const visualSupportDetail = publishBody;
   const sampleStep = generalized ? 12 : Math.max(2, Math.min(6, width * 0.55));
   const sampleCount = Math.max(2, Math.ceil(total / sampleStep));
   const surfaceSamples = [];
@@ -167,7 +191,10 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
       tangentZ: point.tangentZ,
       terrainY,
       undersideClearance,
-      thickness
+      thickness,
+      onMappedWater: typeof options.pointInMappedWater === 'function'
+        ? options.pointInMappedWater(feature, point.x, point.z) === true
+        : false
     }));
   }
 
@@ -204,6 +231,19 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
         options.supportConflict
       );
       if (columns.length === 0) continue;
+      const capHalfSpan = Math.max(
+        width * 0.42,
+        ...columns.map((column) => Math.abs(Number(column.offset) || 0) + column.width * 0.6)
+      );
+      if (typeof options.supportSpanConflict === 'function' && options.supportSpanConflict(feature, {
+        x: station.x,
+        z: station.z,
+        tangentX: station.tangentX,
+        tangentZ: station.tangentZ,
+        bottomY: station.surfaceY - baseThickness - 0.35,
+        topY: station.surfaceY - baseThickness,
+        halfSpan: capHalfSpan
+      })) continue;
       supportStations.push(Object.freeze({
         ...station,
         kind: columns.length >= 2 ? 'paired_pier' : 'single_pier',
@@ -214,15 +254,18 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
 
   const abutments = [];
   if (visualSupportDetail) {
-    for (const endpoint of ['start', 'end']) {
-      const endpointRef = feature?.transportStructureRef?.[endpoint];
-      if (!['surface_transition', 'open_boundary'].includes(String(endpointRef?.state || ''))) continue;
-      const candidates = endpoint === 'start' ? surfaceSamples : [...surfaceSamples].reverse();
-      const sample = candidates.find((entry) =>
-        Math.min(entry.distance, total - entry.distance) <= Math.max(14, width * 1.6) &&
-        entry.undersideClearance > 0.3
-      );
-      if (!sample) continue;
+    const publishAbutment = (endpoint, sample) => {
+      if (endpointHasCompiledConnection(feature, endpoint.replace('_tie_in', ''))) return;
+      const halfSpan = width * 0.46;
+      if (typeof options.supportSpanConflict === 'function' && options.supportSpanConflict(feature, {
+        x: sample.x,
+        z: sample.z,
+        tangentX: sample.tangentX,
+        tangentZ: sample.tangentZ,
+        bottomY: sample.terrainY,
+        topY: sample.y - sample.thickness,
+        halfSpan
+      })) return;
       abutments.push(Object.freeze({
         endpoint,
         distance: sample.distance,
@@ -230,10 +273,42 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
         z: sample.z,
         tangentX: sample.tangentX,
         tangentZ: sample.tangentZ,
+        rotationY: Math.atan2(sample.tangentX, sample.tangentZ),
         surfaceY: sample.y,
         terrainY: sample.terrainY,
-        height: Math.max(0.28, sample.y - sample.thickness - sample.terrainY)
+        height: Math.max(0.28, sample.y - sample.thickness - sample.terrainY),
+        onMappedWater: sample.onMappedWater === true
       }));
+    };
+    if (engineeredApproach) {
+      for (const anchor of feature?.structureTransitionAnchors || []) {
+        if (anchor?.engineeredApproach !== true || !['start', 'end'].includes(anchor?.endpoint)) continue;
+        const endpoint = anchor.endpoint;
+        const approachRun = Math.max(14, Math.min(total, finite(anchor.span, Math.max(14, width * 1.6))));
+        const candidates = surfaceSamples.filter((entry) =>
+          (endpoint === 'start' ? entry.distance <= approachRun : total - entry.distance <= approachRun) &&
+          entry.onMappedWater !== true &&
+          entry.undersideClearance > 0.3
+        ).sort((left, right) => endpoint === 'start'
+          ? right.distance - left.distance
+          : left.distance - right.distance);
+        const sample = candidates[0];
+        if (sample) publishAbutment(`${endpoint}_tie_in`, sample);
+      }
+    } else {
+      for (const endpoint of ['start', 'end']) {
+        const endpointRef = feature?.transportStructureRef?.[endpoint];
+        const structuralBoundary = ['surface_transition', 'open_boundary']
+          .includes(String(endpointRef?.state || ''));
+        if (!structuralBoundary) continue;
+        const candidates = endpoint === 'start' ? surfaceSamples : [...surfaceSamples].reverse();
+        const sample = candidates.find((entry) =>
+          Math.min(entry.distance, total - entry.distance) <= Math.max(14, width * 1.6) &&
+          entry.onMappedWater !== true &&
+          entry.undersideClearance > 0.3
+        );
+        if (sample) publishAbutment(endpoint, sample);
+      }
     }
   }
 
@@ -241,7 +316,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
     schemaVersion: TRANSPORT_STRUCTURE_ASSEMBLY_SCHEMA_VERSION,
     authority: 'compiled_transport_structure_assembly',
     featureId: String(feature?.transportStructureRef?.featureId || feature?.sourceFeatureId || ''),
-    family: 'elevated_road',
+    family: engineeredApproach ? 'engineered_approach' : 'elevated_road',
     structureType: bridgeStructureType(feature),
     publishBody,
     engineeredDetail: lossless && publishBody,

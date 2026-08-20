@@ -1,4 +1,4 @@
-import { smoothstep01 } from '../../structure-semantics/geometry.js?v=1';
+import { smoothstep01 } from '../../structure-semantics/geometry.js?v=2';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 const DEFAULT_SURFACE_BIAS = 0.08;
@@ -52,19 +52,55 @@ function tangentAtDistance(points, pathDistances, distance) {
   };
 }
 
-function createSampleDistances(totalDistance, sampleStep) {
+function createSampleDistances(totalDistance, sampleStep, exactDistances = []) {
   const total = Math.max(0, finiteNumber(totalDistance));
   const step = Math.max(0.5, finiteNumber(sampleStep, DEFAULT_SAMPLE_STEP));
   const segmentCount = Math.max(1, Math.ceil(total / step));
-  const distances = new Float32Array(segmentCount + 1);
+  const exact = exactDistances
+    .map((distance) => clamp(finiteNumber(distance, NaN), 0, total))
+    // Projection round-off can place an endpoint graph station fractions of
+    // a millimetre beside the mathematically identical polyline endpoint.
+    // Canonicalize that station to the endpoint before sampling; keeping both
+    // produces a meaningless near-zero run and an apparent grade spike.
+    .map((distance) => distance <= 0.05 ? 0 : total - distance <= 0.05 ? total : distance)
+    .filter(Number.isFinite)
+    .sort((left, right) => left - right)
+    .filter((value, index, values) => index === 0 || Math.abs(value - values[index - 1]) > 0.01);
+  // Exact graph nodes are hard samples. Keeping a regular sample only a few
+  // centimetres beside one creates a numerically tiny road segment; a later
+  // exact-node assignment then turns an otherwise smooth profile into a
+  // several-hundred-percent one-sample spike. The graph node replaces nearby
+  // synthetic samples, while distinct mapped graph nodes are always retained.
+  const regularExclusionRadius = Math.min(0.35, step * 0.2);
+  const values = [];
   for (let index = 0; index <= segmentCount; index += 1) {
-    distances[index] = total * index / segmentCount;
+    const value = total * index / segmentCount;
+    const endpoint = index === 0 || index === segmentCount;
+    if (!endpoint && exact.some((distance) => Math.abs(distance - value) < regularExclusionRadius)) continue;
+    values.push(value);
   }
-  return distances;
+  values.push(...exact);
+  values.sort((left, right) => left - right);
+  const unique = [];
+  for (const value of values) {
+    if (unique.length === 0 || Math.abs(value - unique[unique.length - 1]) > 0.01) {
+      unique.push(value);
+    }
+  }
+  // Distances are geometric coordinates, not render attributes. Keep them in
+  // double precision: kilometre-scale ways plus an exact mapped station can
+  // collapse to a sub-millimetre interval when coerced to Float32, which in
+  // turn reports a physically meaningless vertical spike at an otherwise
+  // continuous graph node.
+  return Float64Array.from(unique);
 }
 
 function normalizeAnchors(feature, semantics, totalDistance) {
   const total = Math.max(0, finiteNumber(totalDistance));
+  const waterDrivenBridge = semantics?.terrainMode === 'elevated' &&
+    semantics?.isBridge === true &&
+    (feature?.structureStations || []).some((station) =>
+      String(station?.source || '').includes('water_crossing'));
   const tunnelRoofCover = semantics?.structureKind === 'tunnel' || semantics?.isTunnel === true
     ? 0.4
     : 0;
@@ -82,7 +118,13 @@ function normalizeAnchors(feature, semantics, totalDistance) {
       : semantics?.terrainMode === 'elevated'
         ? Math.max(
             0,
-            finiteNumber(semantics?.deckClearance, semantics?.explicitBaseOffset) +
+            // A mapped-water station owns the deck height from the water
+            // surface/profile. `layer=1` and `bridge=yes` are topology, not a
+            // measured 5.5 m clearance, so do not reintroduce that generic
+            // fallback at the endpoints of a water-driven bridge.
+            (waterDrivenBridge
+              ? finiteNumber(semantics?.explicitBaseOffset)
+              : finiteNumber(semantics?.deckClearance, semantics?.explicitBaseOffset)) +
               finiteNumber(feature?.structureStackOffset)
           )
         : 0;
@@ -314,29 +356,6 @@ function applyEndpointTieIns(
   return new Float32Array(corrected);
 }
 
-function applyExactGraphNodeConstraints(feature, heights, distances) {
-  const anchors = Array.isArray(feature?.structureTransitionAnchors)
-    ? feature.structureTransitionAnchors.filter((anchor) =>
-        anchor?.source === 'transport_graph_node' && Number.isFinite(Number(anchor?.targetSurfaceY)))
-    : [];
-  if (anchors.length === 0 || heights.length === 0) return heights;
-  const corrected = new Float32Array(heights);
-  for (const anchor of anchors) {
-    const targetDistance = Math.max(0, finiteNumber(anchor.distance));
-    let nearestIndex = 0;
-    let nearestDistance = Infinity;
-    for (let index = 0; index < distances.length; index += 1) {
-      const delta = Math.abs(finiteNumber(distances[index]) - targetDistance);
-      if (delta < nearestDistance) {
-        nearestDistance = delta;
-        nearestIndex = index;
-      }
-    }
-    corrected[nearestIndex] = Number(anchor.targetSurfaceY);
-  }
-  return corrected;
-}
-
 function reconcileExactGraphNodeConstraints(
   feature,
   heights,
@@ -352,6 +371,7 @@ function reconcileExactGraphNodeConstraints(
 
   const grade = Math.max(0.01, finiteNumber(maximumGrade, DEFAULT_MAX_GRADE));
   const fixedTargets = new Map();
+  const transitionSpanByIndex = new Map();
   for (const anchor of anchors) {
     const targetDistance = clamp(
       finiteNumber(anchor.distance),
@@ -368,6 +388,10 @@ function reconcileExactGraphNodeConstraints(
       }
     }
     fixedTargets.set(nearestIndex, Number(anchor.targetSurfaceY));
+    transitionSpanByIndex.set(
+      nearestIndex,
+      Math.max(1, finiteNumber(anchor?.span, finiteNumber(distances[distances.length - 1])))
+    );
   }
 
   const fixedEntries = [...fixedTargets.entries()];
@@ -388,14 +412,22 @@ function reconcileExactGraphNodeConstraints(
     for (let index = 0; index < heights.length; index += 1) {
       const structuralLowerBound = finiteNumber(lowerBounds?.[index], Number.NEGATIVE_INFINITY);
       const run = Math.abs(distances[index] - distances[leftSample]);
+      const insideMappedTransition = run <= finiteNumber(transitionSpanByIndex.get(leftSample));
       if (
-        (hasAbsoluteStructuralMinimum || hasHardStationAt(distances[index])) &&
+        (hasAbsoluteStructuralMinimum || (!insideMappedTransition && hasHardStationAt(distances[index]))) &&
         structuralLowerBound > leftTarget + grade * run + 1e-6
       ) {
-        // Crossing clearance outranks a stale or physically impossible graph
-        // join. Keep the already grade-limited structural profile rather than
-        // cutting a bridge through the road or water beneath it.
-        return heights;
+        // A measured landmark elevation is absolute and cannot be relaxed.
+        if (hasAbsoluteStructuralMinimum) return heights;
+        // Modeled tunnel cover/bridge clearance is not a surveyed portal
+        // elevation. If its influence reaches farther than the provisional
+        // transition span, extend that one mapped transition to the complete
+        // grade run. Returning the uncorrected profile here and then forcing
+        // the endpoint exact created a one-sample cliff at tunnel portals.
+        transitionSpanByIndex.set(
+          leftSample,
+          Math.max(finiteNumber(transitionSpanByIndex.get(leftSample)), run)
+        );
       }
     }
   }
@@ -407,6 +439,16 @@ function reconcileExactGraphNodeConstraints(
     let upper = Number.POSITIVE_INFINITY;
     for (const [fixedIndex, target] of fixedTargets) {
       const run = Math.abs(finiteNumber(distances[index]) - finiteNumber(distances[fixedIndex]));
+      if (
+        !hasAbsoluteStructuralMinimum &&
+        run <= finiteNumber(transitionSpanByIndex.get(fixedIndex))
+      ) {
+        // Local clearances are modeled constraints, not measured endpoint
+        // elevations. Bound them by the grade cone inside the compiled
+        // transition; beyond that span the original crossing/water lower
+        // bound is preserved unchanged.
+        lower = Math.min(lower, target + grade * run);
+      }
       lower = Math.max(lower, target - grade * run);
       upper = Math.min(upper, target + grade * run);
     }
@@ -616,7 +658,6 @@ export {
   DEFAULT_SURFACE_BIAS,
   DEFAULT_VERTICAL_FIT_RADIUS,
   applyEndpointTieIns,
-  applyExactGraphNodeConstraints,
   reconcileExactGraphNodeConstraints,
   applyStationInfluence,
   clamp,

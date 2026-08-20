@@ -8,10 +8,10 @@ const COMMERCIAL_BUILDING_TYPES = new Set([
 ]);
 
 const ENTRANCE_LIMIT_BY_TIER = Object.freeze({
-  low: 24,
-  performance: 40,
-  balanced: 72,
-  quality: 112
+  low: 40,
+  performance: 72,
+  balanced: 140,
+  quality: 220
 });
 
 function finite(value, fallback = 0) {

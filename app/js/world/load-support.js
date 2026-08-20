@@ -26,7 +26,9 @@ export async function finalizeLoadedWorld(options = {}) {
   const earthSceneSuppressed = typeof options.earthSceneSuppressed === 'function' ? options.earthSceneSuppressed : () => false;
   const hideEarthSceneMeshes = typeof options.hideEarthSceneMeshes === 'function' ? options.hideEarthSceneMeshes : () => {};
   const buildTraversalNetworks = typeof options.buildTraversalNetworks === 'function' ? options.buildTraversalNetworks : () => {};
-  const spawnOnRoad = typeof options.spawnOnRoad === 'function' ? options.spawnOnRoad : () => {};
+  const spawnPlayer = typeof options.spawnPlayer === 'function'
+    ? options.spawnPlayer
+    : typeof options.spawnOnRoad === 'function' ? options.spawnOnRoad : () => {};
   const publishLocationWorld = typeof options.publishLocationWorld === 'function' ? options.publishLocationWorld : null;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
@@ -89,7 +91,10 @@ export async function finalizeLoadedWorld(options = {}) {
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();
-  runFinalStep('spawnOnRoad', () => spawnOnRoad());
+  // World publication owns the one final arrival. Calling a generic road spawn
+  // here and a custom-location spawn later left two systems competing over the
+  // player's vertical surface and made grade-separated arrivals frame-dependent.
+  runFinalStep('spawnPlayer', () => spawnPlayer());
   if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
     runFinalStep('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
   }

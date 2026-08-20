@@ -37,6 +37,11 @@ function traversalFeatureKind(feature) {
 function isWalkSurface(feature) {
   if (!feature) return false;
   if (feature.walkable === false) return false;
+  // The compiled transport graph is the access authority. Ignoring this
+  // decision allowed foot=no motorways to be reintroduced as inferred
+  // sidewalks by the living-world compiler.
+  if (feature?.transportGraphRef?.walkable === false) return false;
+  if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return false;
   const kind = traversalFeatureKind(feature);
   if (!runtime.enableLinearFeatures()) return kind === 'road' || feature?.isStructureConnector === true;
   return kind === 'road' || kind === 'footway' || kind === 'cycleway' || kind === 'railway';

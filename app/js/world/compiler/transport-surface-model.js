@@ -1,7 +1,7 @@
 import {
   polylineDistances,
   sampleProfileAtDistance
-} from '../../structure-semantics/geometry.js?v=1';
+} from '../../structure-semantics/geometry.js?v=2';
 import {
   DEFAULT_MAX_AT_GRADE_CUT,
   DEFAULT_MAX_AT_GRADE_FILL,
@@ -24,9 +24,29 @@ import {
   smoothGradeLimitedProfile,
   smoothSignedCutFillProfile,
   tangentAtDistance
-} from './transport-surface-profile.js?v=4';
+} from './transport-surface-profile.js?v=11';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
+
+function featureRoadType(feature) {
+  return String(
+    feature?.transportRecord?.sourceTags?.highway ||
+    feature?.transportRecord?.rawTags?.highway ||
+    feature?.type ||
+    ''
+  ).toLowerCase();
+}
+
+function engineeredMaximumGrade(feature, semantics = feature?.structureSemantics || {}) {
+  // Tunnel containment/portal reconciliation has a separate mirrored solver.
+  // Preserve its established envelope; this pass changes exposed bridge and
+  // elevated-road approaches only.
+  if (semantics?.terrainMode === 'subgrade') return 0.135;
+  const type = featureRoadType(feature);
+  if (semantics?.rampCandidate === true || /_link$/.test(type)) return 0.1;
+  if (type === 'motorway' || type === 'trunk') return 0.06;
+  return 0.085;
+}
 
 function smoothUpperBoundedGradeProfile(initialHeights, upperBounds, distances, maximumGrade) {
   // The shared smoother is lower-bounded because bridge clearance is a
@@ -114,16 +134,40 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const points = feature.pts;
   const semantics = feature.structureSemantics || { terrainMode: 'at_grade' };
   const { distances: pathDistances, total } = polylineDistances(points);
-  const sampleDistances = createSampleDistances(total, options.sampleStep);
+  const exactGraphNodeDistances = (Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors
+    : [])
+    .filter((anchor) =>
+      anchor?.source === 'transport_graph_node' &&
+      Number.isFinite(Number(anchor?.targetSurfaceY)))
+    .map((anchor) => finiteNumber(anchor?.distance));
+  // Interior freeway/ramp merges are real mapped stations, not visual hints.
+  // Make them samples in the authoritative profile so the shared elevation is
+  // represented exactly rather than rounded to the nearest regular interval.
+  const sampleDistances = createSampleDistances(
+    total,
+    options.sampleStep,
+    exactGraphNodeDistances
+  );
   const surfaceBias = Number.isFinite(options.surfaceBias)
     ? Number(options.surfaceBias)
     : Number.isFinite(feature.surfaceBias)
       ? Number(feature.surfaceBias)
       : DEFAULT_SURFACE_BIAS;
+  const graphApproachAnchors = Array.isArray(feature?.structureTransitionAnchors)
+    ? feature.structureTransitionAnchors.filter((anchor) =>
+        anchor?.source === 'transport_graph_node' &&
+        anchor?.engineeredApproach === true &&
+        Number.isFinite(Number(anchor?.targetSurfaceY)))
+    : [];
+  const engineeredApproach = semantics?.terrainMode === 'at_grade' && graphApproachAnchors.length > 0;
+  const approachMaximumGrade = engineeredApproach
+    ? engineeredMaximumGrade(feature, semantics)
+    : null;
   const maximumGrade = Number.isFinite(options.maximumGrade)
     ? Number(options.maximumGrade)
-    : semantics?.rampCandidate
-      ? 0.1
+    : semantics?.terrainMode !== 'at_grade'
+      ? engineeredMaximumGrade(feature, semantics)
       : DEFAULT_MAX_GRADE;
   const compiledWidth = Number.isFinite(options.width)
     ? Number(options.width)
@@ -296,6 +340,21 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         sampleDistances,
         maximumGrade
       );
+  if (engineeredApproach) {
+    // Graph identity and the complete grade cone are solved together below.
+    // A separate pre-pass that pinned anchor samples could survive an
+    // infeasible solve and recreate the vertical cliff the solver rejected.
+    centerHeights = reconcileExactGraphNodeConstraints(
+      feature,
+      centerHeights,
+      sampleDistances,
+      centerLowerBounds,
+      approachMaximumGrade
+    );
+    // The constrained solver above owns both graph identity and design grade.
+    // Re-pinning nodes after it runs can recreate an infeasible one-sample
+    // cliff on short OSM fragments, so no later writer may overwrite it.
+  }
   if (mode !== 'at_grade') {
     centerHeights = applyEndpointTieIns(
       feature,
@@ -351,6 +410,9 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         sampleDistances,
         maximumGrade
       );
+      // The mirrored constrained solver is the final tunnel authority. A
+      // post-solver exact write would satisfy one node by violating the
+      // drivable grade/containment contract immediately beside it.
     }
   }
   // Publish the same accepted profile at both edges. All gameplay, markings,
@@ -359,20 +421,34 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const leftHeights = new Float32Array(centerHeights);
   const rightHeights = new Float32Array(centerHeights);
 
+  const stats = profileStats(
+    sampleDistances,
+    centerHeights,
+    mode === 'at_grade' ? [groundHeights, leftGround, rightGround] : null,
+    surfaceBias
+  );
   return Object.freeze({
     schemaVersion: TRANSPORT_SURFACE_SCHEMA_VERSION,
     authority: 'compiled_transport_surface',
     sourceFeatureId: String(feature.sourceFeatureId || feature.id || ''),
     terrainMode: mode,
+    engineeredApproach,
     verticalGroup: String(semantics?.verticalGroup || `${mode}:0`),
     width: halfWidth * 2,
     surfaceBias,
     maximumGrade,
-    endpointPolicy: mode === 'at_grade' ? 'terrain_draped' : 'hard_transition_tie_in',
+    approachMaximumGrade,
+    endpointPolicy: engineeredApproach
+      ? 'graph_owned_integrated_approach'
+      : mode === 'at_grade'
+        ? 'terrain_draped'
+        : 'hard_transition_tie_in',
     cutFillPolicy: Object.freeze({
       signed: mode === 'at_grade',
       maximumCutMeters: mode === 'at_grade' ? maximumAtGradeCut : 0,
-      maximumFillMeters: mode === 'at_grade' ? maximumAtGradeFill : 0,
+      maximumFillMeters: mode === 'at_grade'
+        ? Math.max(maximumAtGradeFill, engineeredApproach ? stats.maximumFill : 0)
+        : 0,
       verticalFitRadiusMeters: mode === 'at_grade'
         ? finiteNumber(options.verticalFitRadius, DEFAULT_VERTICAL_FIT_RADIUS)
         : 0
@@ -384,12 +460,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     centerHeights,
     leftHeights,
     rightHeights,
-    stats: profileStats(
-      sampleDistances,
-      centerHeights,
-      mode === 'at_grade' ? [groundHeights, leftGround, rightGround] : null,
-      surfaceBias
-    )
+    stats
   });
 }
 
@@ -418,6 +489,11 @@ function attachCompiledTransportSurface(feature, model) {
   feature.surfaceTerrainSampler = null;
   feature.structureSurfaceMinY = model.stats.minimumY;
   feature.structureSurfaceMaxY = model.stats.maximumY;
+  feature.retainingSkirtDepth = model.engineeredApproach
+    ? Math.max(0, model.stats.maximumFill + 0.5)
+    : model.terrainMode === 'subgrade'
+      ? 0.3
+      : 0;
   return feature;
 }
 
@@ -425,6 +501,17 @@ function roadSkirtDepth(feature) {
   const semantics = feature?.structureSemantics || null;
   if (semantics?.terrainMode === 'elevated') return 0;
   if (semantics?.terrainMode === 'subgrade') return 0.3;
+  if (feature?.transportSurfaceModel?.engineeredApproach === true) {
+    if (
+      feature?.transportStructureAssembly?.family === 'engineered_approach' &&
+      feature.transportStructureAssembly.publishBody === true
+    ) return 0;
+    return Math.max(
+      0.5,
+      finiteNumber(feature?.retainingSkirtDepth),
+      finiteNumber(feature?.transportSurfaceModel?.stats?.maximumFill) + 0.5
+    );
+  }
   // Ordinary streets follow their terrain profile. Tall vertical skirts made
   // steep city streets read as elevated slabs and are reserved for actual
   // grade-separated/subgrade structures.
@@ -435,6 +522,7 @@ export {
   DEFAULT_MAX_GRADE,
   DEFAULT_MAX_AT_GRADE_CUT,
   DEFAULT_MAX_AT_GRADE_FILL,
+  engineeredMaximumGrade,
   TRANSPORT_SURFACE_SCHEMA_VERSION,
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,

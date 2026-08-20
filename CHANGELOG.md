@@ -4,6 +4,36 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ## [4.3.0] - 2026-08-17
 
+### Production-candidate repair — 2026-08-19
+
+- Reconciled exact bridge, ramp, overpass, elevated-road and tunnel joins after
+  all terrain and structural profile finalization, retaining one transport
+  surface authority and measured/provenance-labeled elevation inputs.
+- Rebuilt distant pedestrians and traffic as recognizable multi-part actors,
+  retained stable LOD identity, increased visibility hysteresis and preserved
+  real-scale vehicle family dimensions and curb-aware parked placement.
+- Added segment-continuous pedestrian/vehicle collision, coherent Backpack
+  condition and ammunition presentation, fallen-actor ammunition recovery, and
+  mapped hospital recovery distinct from mapped police custody.
+- Restored Live GPS behind-actor camera alignment for walking and sustained-speed
+  vehicle transition, with one current browser journey covering both states.
+- Kept entrances inside the owning facade shader, added context-gated pitched
+  roofs, restored the previously approved aerial Baltimore harbor/skyline hero
+  byte-for-byte and limited the supporting gallery to current product flows.
+- Replaced the compromised historical test suite with current source,
+  complete-world, Live GPS, environment, security, multiplayer and
+  immutable-artifact release boundaries.
+- Added a full assembled-game location matrix for Baltimore/JFX, Golden Gate,
+  London, Monaco, Manhattan and rural Iowa. It validates exact structure joins
+  and engineered grades while inspecting the same terrain, buildings, water,
+  traffic, pedestrians and renderer delivered to the player.
+- Removed the competing tunnel-system mutation that rewrote compiled road
+  heights back to raw terrain, and changed internal tunnel-way splits to one
+  graph-corridor elevation solve anchored only by real surface portals.
+- Hardened account deletion coverage for discovery trades, room activities,
+  world modifications and DeFlock state; token checks now reject revoked
+  sessions. Added baseline anti-sniffing, referrer, frame and opener headers.
+
 ### Added
 
 - A coherent World Discovery loop with contextual wildlife, geology, field

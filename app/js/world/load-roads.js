@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=41";
+} from "./load-runtime-session.js?v=46";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=22";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -31,7 +31,7 @@ import {
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=4";
+} from "./fixed-regional-structures.js?v=5";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -108,7 +108,7 @@ export function createWorldRoadLoader(deps = {}) {
     buildWorldDetailPasses,
     loadLandmarksForPublication,
     signedPolygonAreaXZ,
-    spawnOnRoad,
+    spawnPlayer,
     updateFeatureSurfaceProfile,
     publishLocationWorld,
     vectorTileRangeForBounds,
@@ -263,7 +263,7 @@ export function createWorldRoadLoader(deps = {}) {
         },
         finalizePresentation: false,
         reason,
-        spawnOnRoad,
+        spawnPlayer,
         publishLocationWorld,
         startLoadPhase,
         endLoadPhase

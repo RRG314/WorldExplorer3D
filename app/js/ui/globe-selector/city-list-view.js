@@ -1,4 +1,4 @@
-import { cityLocationLabel } from './helpers.js?v=8';
+import { cityLocationLabel } from './helpers.js?v=9';
 
 function escapeHtml(value) {
   return String(value ?? '')

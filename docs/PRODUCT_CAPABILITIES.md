@@ -143,7 +143,7 @@ Discovery UI is normally collapsed during play. A quick-tool/field prompt appear
 | DeFlock Hunt | Implemented and user-accessible; mapped/fallback data and room claims |
 | Live GPS Explore | Implemented and user-accessible on eligible device/context |
 | Fishing | Implemented and user-accessible from a stopped valid surface boat |
-| custom activities | Implemented and user-accessible | create/library/discover/complete; depth depends on schema action |
+| custom activities | Prototype retained; production UI disabled | creator-authored and room-authored game routes are excluded until the system is rebuilt and release-qualified |
 
 The gameplay registry owns one main plugin at a time. Discovery and auxiliary services use explicit coexistence policies; opening a UI does not silently start every system.
 
@@ -153,7 +153,7 @@ The gameplay registry owns one main plugin at a time. Discovery and auxiliary se
 | --- | --- | --- |
 | block builder | Implemented and user-accessible | 14 pieces, 8 colors, bounded 200-piece local cap |
 | local memories/flowers/tracks | Implemented and user-accessible | device-local with backup where applicable |
-| activity creator | Implemented and user-accessible | schema/validation/library/guide |
+| activity creator | Prototype retained; production UI disabled | no production dock, browser, catalog, or creator-profile entry point |
 | contribution submission | Implemented and user-accessible when backend configured | trusted moderation required |
 | overlay editor | Implemented and user-accessible | draft/revision/submit/moderate/publish |
 | Edit This World local | Implemented and user-accessible | suppress/restore base buildings plus safe semantic objects |

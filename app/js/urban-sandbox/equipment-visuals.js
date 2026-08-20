@@ -42,8 +42,8 @@ function createEquipmentVisuals(THREE, characterMesh) {
   add(flashlight, new THREE.CircleGeometry(.068, 10), accent, 'Field light lens', [0, 0, .425]);
 
   const baton = makeItem('baton');
-  add(baton, new THREE.CylinderGeometry(.033, .04, .72, 10), dark, 'Impact baton shaft', [0, 0, .33], [Math.PI * .5, 0, 0]);
-  add(baton, new THREE.CylinderGeometry(.055, .055, .18, 10), safety, 'Impact baton grip', [0, 0, -.12], [Math.PI * .5, 0, 0]);
+  add(baton, new THREE.CylinderGeometry(.033, .04, .72, 10), dark, 'Explorer staff shaft', [0, 0, .33], [Math.PI * .5, 0, 0]);
+  add(baton, new THREE.CylinderGeometry(.055, .055, .18, 10), safety, 'Explorer staff grip', [0, 0, -.12], [Math.PI * .5, 0, 0]);
 
   const sidearm = makeItem('pulse-sidearm');
   add(sidearm, new THREE.BoxGeometry(.14, .16, .36), dark, 'Pulse sidearm body', [0, .02, .2]);
@@ -54,6 +54,18 @@ function createEquipmentVisuals(THREE, characterMesh) {
   const charge = makeItem('concussion-charge');
   add(charge, new THREE.IcosahedronGeometry(.16, 1), dark, 'Concussion charge shell', [0, 0, .16]);
   add(charge, new THREE.TorusGeometry(.115, .025, 6, 12), accent, 'Concussion charge status ring', [0, 0, .17]);
+
+  const laser = makeItem('laser-gun');
+  add(laser, new THREE.BoxGeometry(.15, .16, .43), dark, 'Laser gun body', [0, .02, .22]);
+  add(laser, new THREE.BoxGeometry(.11, .27, .13), metal, 'Laser gun grip', [0, -.17, .08], [-.2, 0, 0]);
+  add(laser, new THREE.CylinderGeometry(.045, .062, .32, 10), accent, 'Laser gun emitter', [0, .02, .54], [Math.PI * .5, 0, 0]);
+  add(laser, new THREE.BoxGeometry(.08, .055, .17), safety, 'Laser gun sight', [0, .13, .2]);
+
+  const paintball = makeItem('paintball-gun');
+  add(paintball, new THREE.CylinderGeometry(.045, .052, .5, 10), dark, 'Paintball barrel', [0, .02, .3], [Math.PI * .5, 0, 0]);
+  add(paintball, new THREE.BoxGeometry(.15, .18, .27), metal, 'Paintball receiver', [0, .01, .08]);
+  add(paintball, new THREE.BoxGeometry(.11, .28, .12), dark, 'Paintball grip', [0, -.18, .04], [-.18, 0, 0]);
+  add(paintball, new THREE.SphereGeometry(.13, 10, 7), safety, 'Paintball hopper', [0, .2, .03]);
 
   const parachutePack = new THREE.Group();
   parachutePack.name = 'Explorer parachute pack';

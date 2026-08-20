@@ -292,6 +292,7 @@ export function parseReverseAddress(payload = {}) {
     payload?.principalSubdivision ||
     "";
   const country = cleanCountry(addr.country || payload?.countryName || "");
+  const countryCode = String(addr.country_code || payload?.countryCode || '').trim().toUpperCase();
   const parts = uniqueNonEmptyParts([city, county, region, country]);
   const display =
     parts.join(", ") ||
@@ -322,7 +323,14 @@ export function parseReverseAddress(payload = {}) {
   return {
     display,
     queryLabel: city || county || region || country || "",
-    details: { city, county, region, country, waterKind },
+    details: {
+      city,
+      county,
+      region,
+      country,
+      countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null,
+      waterKind
+    },
     waterKind
   };
 }
@@ -438,7 +446,9 @@ export function syncLegacyCustomSelection(appCtx, selection) {
     name: selection.name || appCtx.customLoc?.name || 'Custom Location',
     arrivalMode: selection.arrivalMode || 'auto',
     waterKind: selection.waterKind || null,
-    surfaceEvidence: selection.surfaceEvidence || null
+    surfaceEvidence: selection.surfaceEvidence || null,
+    countryCode: selection.countryCode || selection.locationDetails?.countryCode || null,
+    locationDetails: selection.locationDetails || null
   }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 

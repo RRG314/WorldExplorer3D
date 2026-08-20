@@ -170,10 +170,10 @@ export function buildFixedRegionalStructureQuery(bounds, timeoutSeconds = 20) {
   way["highway"~"^(${DRIVEABLE_HIGHWAYS})$"]["bridge"]${bbox}->.bridges;
   way["highway"~"^(${DRIVEABLE_HIGHWAYS})$"]["tunnel"]${bbox}->.tunnels;
   (.bridges;.tunnels;)->.structures;
-  node(w.tunnels)->.tunnel_nodes;
+  node(w.structures)->.structure_nodes;
   (
     .structures;
-    way(bn.tunnel_nodes)["highway"~"^(${DRIVEABLE_HIGHWAYS})$"];
+    way(bn.structure_nodes)["highway"~"^(${DRIVEABLE_HIGHWAYS})$"];
   );out body;>;out skel qt;`;
 }
 
@@ -203,15 +203,8 @@ export function retainExactRegionalStructures(data) {
     const structure = structuresByEndpoint.get(endpointId)?.[0];
     const structureHighway = String(structure?.tags?.highway || '');
     const structureName = normalizedStructureName(structure?.tags);
-    const structureType = structureFamily(structure?.tags);
     const candidates = connectorCandidates
       .filter((way) => way.nodes.includes(endpointId))
-      .filter((way) => {
-        // Bridge ramps are themselves exact structure ways, while the regional
-        // source already owns the surrounding at-grade network. Only tunnels
-        // require an extra exact surface mate to locate the physical portal.
-        return structureType === 'tunnel';
-      })
       .sort((left, right) => {
         const score = (way) => {
           const highway = String(way.tags?.highway || '');
@@ -222,6 +215,11 @@ export function retainExactRegionalStructures(data) {
         };
         return score(right) - score(left) || String(left.id).localeCompare(String(right.id));
       });
+    // Every exact structure boundary needs one exact topology mate. Importing
+    // these only for tunnels left bridge ways such as Baltimore's JFX with no
+    // graph stations after the generalized duplicate was correctly removed.
+    // The shared OSM node is explicit connection evidence; the scoring merely
+    // selects the most likely continuation when several ways meet there.
     if (candidates[0]) connectorSet.add(candidates[0]);
   }
   const connectorWays = [...connectorSet];

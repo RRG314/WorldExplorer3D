@@ -7,7 +7,7 @@ const SPECIAL_STEPS = Object.freeze({
   'field-camera': Object.freeze([
     'Choose a plausible subject or clue in the current habitat.',
     'Observe from a respectful virtual distance.',
-    'Record the sighting in your Journal and Field Guide; a photograph is not an owned Collection item.'
+    'Record the sighting in your Journal and Field Guide; a photograph is not an owned Backpack item.'
   ]),
   'field-binoculars': Object.freeze([
     'Look for tracks and other habitat-plausible clues.',
@@ -28,7 +28,7 @@ function tutorialForActivity(activityId, catalogs) {
   const steps = SPECIAL_STEPS[tool.id] || Object.freeze([
     `Use ${tool.label} only in a context where ${activity.label.toLowerCase()} is available.`,
     'Complete the short virtual observation or survey.',
-    'Record the result in your Journal and Field Guide. Collection is updated only when an object is actually acquired.'
+    'Record the result in your Journal and Field Guide. The Backpack is updated only when an object is actually acquired.'
   ]);
   return Object.freeze({ id: tool.tutorialId, toolId: tool.id, title: tool.label, steps });
 }

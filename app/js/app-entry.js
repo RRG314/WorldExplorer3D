@@ -1,17 +1,17 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
-import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
+import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
 import './rdt.js?v=55';
-import './config.js?v=60';
+import './config.js?v=61';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=29';
+import './runtime-diagnostics.js?v=37';
 import './state.js?v=61';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=4';
+import './location-session.js?v=5';
 import './controls/action-input.js?v=6';
 import './interaction/context-router.js?v=4';
 import './transport/actor-contract.js?v=2';
@@ -23,14 +23,14 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=92';
-import './physics.js?v=104';
-import './walking.js?v=74';
+import './physics.js?v=109';
+import './walking.js?v=76';
 import './travel-mode.js?v=20';
 import { initBoatMode } from './boat-mode.js?v=41';
 import './sky.js?v=86';
 import './weather.js?v=10';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=77';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=94';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -41,12 +41,12 @@ import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=1';
 import './game.js?v=62';
-import './input.js?v=64';
-import './hud.js?v=91';
+import './input.js?v=66';
+import './hud.js?v=94';
 import './map.js?v=59';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=121';
+import { setupUI } from './ui.js?v=125';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -115,7 +115,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=5');
+            const mod = await import('./activity-discovery/session.js?v=6');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -173,7 +173,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=13').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=14').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -183,7 +183,7 @@ function ensureInteriorsReady() {
 
 function ensureFishingReady() {
     if (!_fishingModulePromise) {
-        _fishingModulePromise = import('./fishing-game.js?v=2').then((fishing) => {
+        _fishingModulePromise = import('./fishing-game.js?v=4').then((fishing) => {
             fishing.setupFishingGame?.();
             return fishing;
         }).catch((error) => {
@@ -283,7 +283,7 @@ function scheduleTutorialInit() {
     _tutorialInitPromise = new Promise((resolve) => {
         scheduleAfterFirstPlay('tutorial-runtime', async () => {
             try {
-                const mod = await import('./tutorial/tutorial.js?v=2');
+                const mod = await import('./tutorial/tutorial.js?v=3');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
@@ -499,6 +499,12 @@ function registerLazySubsystemEntrypoints() {
         revision: 0
     };
     appCtx.ensureMultiplayerPlatformReady = ensureMultiplayerPlatformReady;
+    appCtx.openMultiplayerPanel = async () => {
+        const api = await ensureMultiplayerPlatformReady();
+        if (typeof api?.openRoomPanel !== 'function') return false;
+        api.openRoomPanel();
+        return true;
+    };
     appCtx.getCurrentMultiplayerRoom = () => platformServices.peek('multiplayer')?.getCurrentRoom?.() || null;
     appCtx.getCurrentMultiplayerRoomActivities = () => platformServices.peek('multiplayer')?.getCurrentRoomActivities?.() || [];
     appCtx.getCurrentMultiplayerRoomActivity = () => platformServices.peek('multiplayer')?.getActiveRoomActivity?.() || null;

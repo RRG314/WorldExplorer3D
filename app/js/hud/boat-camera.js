@@ -75,6 +75,7 @@ function updateBoatCamera() {
     1,
     Number(appCtx.boat?.surfaceNormalZ || 0) * 0.28
   );
+  const fishingOpen = appCtx.fishingGame?.open === true;
 
   if (appCtx.camMode !== 1 && appCtx.boatMode.mesh) {
     appCtx.boatMode.mesh.visible = true;
@@ -90,25 +91,34 @@ function updateBoatCamera() {
       velocityHeading,
       clampValue(0.2 + speedNorm * 0.16, 0.2, 0.42)
     );
-    const desiredYaw = normalizeHeading(followYaw + (Number(appCtx.boatMode?.cameraYawOffset) || 0));
+    const desiredYaw = normalizeHeading(followYaw + (fishingOpen ? 0.12 : Number(appCtx.boatMode?.cameraYawOffset) || 0));
     rig.yaw += shortestHeadingDelta(desiredYaw, rig.yaw) * expBlend(dt, 4.4 + speedNorm * 2.4, 0.05, 0.3);
 
-    const chaseDistance = 10.8 + speedNorm * 4.2 + waveIntensity * 1.15;
+    const chaseDistance = fishingOpen ? 6.4 + waveIntensity * 0.45 : 10.8 + speedNorm * 4.2 + waveIntensity * 1.15;
     const cameraPitch = Number(appCtx.boatMode?.cameraPitch) || 0;
-    const chaseHeight = 4.25 + waveIntensity * 0.82 + Math.abs(appCtx.boat?.pitch || 0) * 2.2 + Math.sin(cameraPitch) * 5.2;
-    const lateralOffset = clampValue(-(appCtx.boat?.turnRate || 0) * (1.08 + speedNorm * 0.72), -1.55, 1.55);
+    const chaseHeight = fishingOpen ? 3.25 + waveIntensity * 0.52 : 4.25 + waveIntensity * 0.82 + Math.abs(appCtx.boat?.pitch || 0) * 2.2 + Math.sin(cameraPitch) * 5.2;
+    const lateralOffset = fishingOpen ? -2.25 : clampValue(-(appCtx.boat?.turnRate || 0) * (1.08 + speedNorm * 0.72), -1.55, 1.55);
     const offsetX = -Math.sin(rig.yaw) * chaseDistance + Math.cos(rig.yaw) * lateralOffset;
     const offsetZ = -Math.cos(rig.yaw) * chaseDistance - Math.sin(rig.yaw) * lateralOffset;
-    const desiredPos = {
+    const boatForwardX = Math.sin(appCtx.boat.angle);
+    const boatForwardZ = Math.cos(appCtx.boat.angle);
+    const boatRightX = Math.cos(appCtx.boat.angle);
+    const boatRightZ = -Math.sin(appCtx.boat.angle);
+    const desiredPos = fishingOpen ? {
+      x: appCtx.boat.x + boatForwardX * 0.2 + boatRightX * 0.48,
+      y: boatY + 2.24 + waveIntensity * 0.16,
+      z: appCtx.boat.z + boatForwardZ * 0.2 + boatRightZ * 0.48
+    } : {
       x: appCtx.boat.x + offsetX,
       y: boatY + chaseHeight + surfaceSteepness * 0.12,
       z: appCtx.boat.z + offsetZ
     };
-    const lookAhead = 7.4 + speedNorm * 12 + waveIntensity * 2;
+    const lookAhead = fishingOpen ? 1.8 : 7.4 + speedNorm * 12 + waveIntensity * 2;
+    const fishingSide = fishingOpen ? 15 + Number(appCtx.fishingGame?.fishDirection || 0) * 1.8 : 0;
     const desiredLook = {
-      x: appCtx.boat.x + Math.sin(appCtx.boat.angle) * lookAhead,
-      y: boatY + 1.3 + (appCtx.boat?.pitch || 0) * 2.6 + speedNorm * 0.42,
-      z: appCtx.boat.z + Math.cos(appCtx.boat.angle) * lookAhead
+      x: appCtx.boat.x + Math.sin(appCtx.boat.angle) * lookAhead + Math.cos(appCtx.boat.angle) * fishingSide,
+      y: fishingOpen ? boatY + 0.35 : boatY + 1.3 + (appCtx.boat?.pitch || 0) * 2.6 + speedNorm * 0.42,
+      z: appCtx.boat.z + Math.cos(appCtx.boat.angle) * lookAhead - Math.sin(appCtx.boat.angle) * fishingSide
     };
     if (Math.abs(rig.pos.y - desiredPos.y) > 18 || Math.abs(rig.look.y - desiredLook.y) > 18) {
       Object.assign(rig.pos, desiredPos);

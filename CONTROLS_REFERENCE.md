@@ -15,7 +15,7 @@ Canonical control map for current runtime behavior.
 - `B`: toggle block build mode
 - `R`: record/stop track
 - `Shift+R`: road debug mode
-- `Esc`: close map or toggle pause
+- `Esc`: close the active Backpack/Journal/map surface, then toggle pause when no surface is open
 - `F4` / `` ` `` / `~`: debug overlay
 - `F8`: performance overlay
 
@@ -24,12 +24,13 @@ Developer overlays only respond when developer diagnostics are enabled.
 ## Contextual World Interaction
 
 - `E` / Action: use the one visible nearby door, vehicle, person, or object
-- `I`: open/close carried equipment
+- `I`: open/close the character Backpack
+- `J`: open/close the Journal / Field Guide
 - `1`–`6`: quick-equip a carried item (`6` selects the parachute)
 - `V`: use the equipped item
 - With the parachute equipped, press `V` while descending at least 3.25 m above the ground to deploy it. It repacks automatically on landing.
 - `T`: take an available nearby item
-- `X`: open/resume the current field activity
+- `X`: currently unassigned; it no longer opens, advances, or cancels field activities
 
 The contextual prompt is the authority. A key does not activate a hidden or
 distant target, and mobile uses the matching on-screen Action button.

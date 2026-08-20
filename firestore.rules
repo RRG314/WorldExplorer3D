@@ -246,13 +246,26 @@ service cloud.firestore {
 
     function validAnchorData(anchor) {
       return anchor is map &&
-        anchor.keys().hasOnly(['kind', 'lat', 'lon', 'x', 'y', 'z']) &&
+        anchor.keys().hasOnly([
+          'kind',
+          'lat',
+          'lon',
+          'x',
+          'y',
+          'z',
+          'interiorKey',
+          'buildingKey',
+          'interiorLabel'
+        ]) &&
         anchor.kind in ['earth', 'moon', 'space'] &&
         anchor.lat is number &&
         anchor.lon is number &&
         anchor.x is number &&
         anchor.y is number &&
-        anchor.z is number;
+        anchor.z is number &&
+        (!('interiorKey' in anchor) || (anchor.interiorKey is string && anchor.interiorKey.size() <= 160)) &&
+        (!('buildingKey' in anchor) || (anchor.buildingKey is string && anchor.buildingKey.size() <= 160)) &&
+        (!('interiorLabel' in anchor) || (anchor.interiorLabel is string && anchor.interiorLabel.size() <= 80));
     }
 
     function validEditorEditType(value) {

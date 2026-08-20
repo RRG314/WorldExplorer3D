@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=3';
+import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=4';
 import { getStoredActivityById, listStoredActivities, removeStoredActivity } from './library.js?v=2';
 import { bindMarkerClicks, refreshWorldMarkers } from './markers.js?v=3';
 import {
@@ -90,8 +90,6 @@ function filteredCatalog() {
     items = items.filter((entry) => entry.featured || entry.isWeekly);
   } else if (state.scope === 'rooms') {
     items = items.filter((entry) => entry.sourceType === 'room' || entry.sourceType === 'room_activity');
-  } else if (state.scope === 'creator') {
-    items = items.filter((entry) => entry.sourceType === 'creator');
   }
   if (state.categoryId !== 'all') {
     items = items.filter((entry) => discoveryCategoryForActivity(entry) === state.categoryId);
@@ -123,7 +121,7 @@ function featuredActivities() {
 function visibleWorldActivities() {
   const selected = selectedActivity();
   const nearby = state.catalog
-    .filter((entry) => finiteNumber(entry.distanceMeters, Infinity) < 2200 && (entry.isNearby || entry.featured || entry.sourceType === 'creator' || entry.sourceType === 'room' || entry.sourceType === 'room_activity'))
+    .filter((entry) => finiteNumber(entry.distanceMeters, Infinity) < 2200 && (entry.isNearby || entry.featured || entry.sourceType === 'room'))
     .slice(0, 12);
   const deduped = [];
   const seen = new Set();
@@ -142,7 +140,7 @@ function updateExternalState() {
   appCtx.activityDiscoveryCatalog = state.catalog.slice();
   appCtx.activityDiscoveryMapMarkers = activitiesVisible
     ? state.catalog
-      .filter((entry) => (entry.featured || entry.isNearby || entry.sourceType === 'creator' || entry.sourceType === 'room') && Number.isFinite(entry.startPoint?.x) && Number.isFinite(entry.startPoint?.z))
+      .filter((entry) => (entry.featured || entry.isNearby || entry.sourceType === 'room') && Number.isFinite(entry.startPoint?.x) && Number.isFinite(entry.startPoint?.z))
       .filter((entry) => entry.sourceType !== 'room_activity' || appCtx.mapLayers?.activities !== false)
       .map((entry) => ({
         id: entry.id,
@@ -175,7 +173,7 @@ function cardHtml(activity = {}) {
         <span class="activityDiscoveryCardDistance">${escapeHtml(distance > 999 ? `${(distance / 1000).toFixed(1)}km` : `${distance}m`)}</span>
       </div>
       <div class="activityDiscoveryCardTitle">${escapeHtml(activity.icon)} ${escapeHtml(activity.title)}</div>
-      <div class="activityDiscoveryCardMeta">${escapeHtml(activity.locationLabel)} • ${escapeHtml(activity.traversalMode)} • Created by ${escapeHtml(activity.creatorName)}${escapeHtml(completionText)}</div>
+      <div class="activityDiscoveryCardMeta">${escapeHtml(activity.locationLabel)} • ${escapeHtml(activity.traversalMode)}${escapeHtml(completionText)}</div>
       <div class="activityDiscoveryCardText">${escapeHtml(activity.description)}</div>
     </button>
   `;
@@ -189,7 +187,7 @@ function renderDetail() {
     refsNow.detail.innerHTML = `
       <div class="activityDiscoveryEmptyDetail">
         <div class="activityDiscoveryDetailTitle">Select an activity</div>
-        <div class="activityDiscoveryDetailText">Choose a world activity, room session, or creator-built route to inspect it and start.</div>
+        <div class="activityDiscoveryDetailText">Choose a ready-to-play world activity or multiplayer room to inspect it and start.</div>
       </div>
     `;
     return;
@@ -210,7 +208,7 @@ function renderDetail() {
     </div>
     <div class="activityDiscoveryDetailText">${escapeHtml(activity.description)}</div>
     <div class="activityDiscoveryStatGrid">
-      <div><span>Creator</span><strong><button type="button" class="activityDiscoveryCreatorLink" id="activityDiscoveryCreatorInline">${escapeHtml(activity.creatorAvatar || '🌍')} ${escapeHtml(activity.creatorName)}</button></strong></div>
+      <div><span>Presented by</span><strong>${escapeHtml(activity.creatorAvatar || '🌍')} ${escapeHtml(activity.creatorName)}</strong></div>
       <div><span>Difficulty</span><strong>${escapeHtml(activity.difficulty)}</strong></div>
       <div><span>Duration</span><strong>${escapeHtml(`${activity.estimatedMinutes} min`)}</strong></div>
       <div><span>Distance</span><strong>${escapeHtml(distance > 999 ? `${(distance / 1000).toFixed(1)}km` : `${distance}m`)}</strong></div>
@@ -218,8 +216,6 @@ function renderDetail() {
     <div class="activityDiscoveryDetailActions">
       <button type="button" class="primary" id="activityDiscoveryPrimaryAction">${escapeHtml(activity.sourceType === 'room' ? 'Join Room' : activity.sourceType === 'room_activity' ? roomActivityRunning ? 'Join Running Game' : roomActivityManager ? 'Start For Room' : 'Wait For Host' : far ? 'Go To Start' : discoveryActionLabel(activity))}</button>
       <button type="button" class="secondary" id="activityDiscoveryReplayAction">${escapeHtml(completion?.count || runtime.activityId === activity.id ? 'Replay' : 'Preview Route')}</button>
-      ${activity.creatorId || activity.creatorName ? '<button type="button" class="secondary" id="activityDiscoveryCreatorAction">View Creator</button>' : ''}
-      ${activity.sourceType === 'creator' ? '<button type="button" class="secondary" id="activityDiscoveryDeleteSavedAction">Remove Saved</button>' : ''}
     </div>
     <div class="activityDiscoveryDetailSection">
       <div class="activityDiscoveryDetailSectionTitle">Route / Anchors</div>
@@ -275,8 +271,7 @@ function renderUi() {
       ['all', 'All'],
       ['nearby', 'Nearby'],
       ['featured', 'Featured'],
-      ['creator', 'Creator'],
-      ['rooms', 'Room Games']
+      ['rooms', 'Multiplayer']
     ].map(([id, label]) => `<button type="button" class="${state.scope === id ? 'active' : ''}" data-activity-scope="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join('');
   }
   if (refsNow.categories) {

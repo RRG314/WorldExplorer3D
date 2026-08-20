@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=81";
-import { readSharedExperienceParams } from "./share-links.js?v=62";
+import { createGlobeSelector } from "./globe-selector.js?v=82";
+import { readSharedExperienceParams } from "./share-links.js?v=63";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
 import {
@@ -327,16 +327,9 @@ function initTitleScreenUi({
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
         await appCtx.loadRoads();
-        let customSpawn = null;
-        if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-          customSpawn = appCtx.applyCustomLocationSpawn('walk', {
-            source: 'custom_location',
-            preferBoatIfWater: true
-          });
-        } else if (typeof appCtx.spawnOnRoad === 'function') {
-          appCtx.spawnOnRoad();
-        }
-        if (customSpawn?.mode !== 'boat' && !appCtx.boatMode?.active) {
+        // loadRoads publishes the world and applies its final arrival once.
+        // Do not run a second title-layer spawn over that resolved surface.
+        if (!appCtx.boatMode?.active) {
           resetTitleEarthTravelMode('globe_location_change');
         }
         return true;
@@ -605,15 +598,7 @@ function initTitleScreenUi({
     }
 
     await appCtx.loadRoads();
-    let customSpawn = null;
-    if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
-      customSpawn = appCtx.applyCustomLocationSpawn('walk', {
-        source: 'title_custom_start',
-        preferBoatIfWater: true
-      });
-    }
-
-    const startedOnWater = customSpawn?.mode === 'boat' || appCtx.boatMode?.active === true;
+    const startedOnWater = appCtx.boatMode?.active === true;
     if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
     if (!startedOnWater && appCtx.Walk) {
       appCtx.Walk.state.view = 'third';
@@ -688,7 +673,10 @@ function initTitleScreenUi({
     titleStartButton.setAttribute('aria-busy', runtimeReady ? 'false' : 'true');
   }
 
-  if (!sharedExperienceParams && !appCtx.gameStarted) {
+  // The hub owns the complete pre-game UI. Shared links pre-populate it; they
+  // do not bypass it. Leaving both titleScreen and globeSelectorScreen hidden
+  // produced a blank sky/ground shell for every lat/lon share URL.
+  if (!appCtx.gameStarted) {
     window.requestAnimationFrame(() => globeSelector.open());
   }
 

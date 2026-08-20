@@ -1,5 +1,334 @@
 # World Explorer 3D production-blocker repair handoff
 
+## Controlling recovery checkpoint — 2026-08-20
+
+This section supersedes every older baseline, status statement, and test command
+later in this document. The older material is retained only as investigation
+history. Do not begin another repair from an older checkout, a similarly named
+repository, or a historical screenshot harness.
+
+### Exact recovery workspace
+
+```text
+worktree: /Users/stevenreid/Developer/WorldExplorer3D-audit-1ec2f70
+branch:   steven/urban-sandbox-foundation
+parent:   96bc2c7 Keep boat wave troughs above submerged terrain
+checkpoint commit: run `git log -1 --oneline`; expect the recovery-checkpoint subject described below
+```
+
+The local checkpoint created with this handoff is a **recovery baseline**, not
+an approved release. It intentionally preserves the complete accumulated source
+so the next thread has a safe way back. It also preserves known regressions and
+therefore must not be promoted to production as-is.
+
+The last assembled staging artifact inspected before the checkpoint was:
+
+```text
+artifact: 4.3.0+96bc2c7c8888.0534cd5d28605e0a.staging
+local URL: http://127.0.0.1:4208/app/?candidate=4.3.0%2B96bc2c7c8888.0534cd5d28605e0a.staging&loc=custom&lat=39.309728&lon=-76.621428&lname=Jones%20Falls%20Expressway&launch=earth&gm=free&mode=driving&rx=-9.772&ry=36.630&rz=-6.575
+```
+
+That artifact was built from dirty source and is useful only to reproduce the
+current state. The next thread must rebuild from the checkpoint commit before
+claiming commit-bound evidence. A local server may no longer be running.
+
+### Why this checkpoint exists
+
+The work after `96bc2c7` was documented in `progress.md` and output reports but
+was not saved as incremental Git commits. That was a process failure. It left a
+large mixed change set with no reliable code-level bisect points and allowed a
+transport repair to coexist with a newly visible skyline regression. Do not
+pretend the missing intermediate history exists, and do not infer which edit
+caused the skyline regression solely from timestamps.
+
+From this checkpoint forward:
+
+1. Reproduce one observable failure in the final assembled game.
+2. Record the failing artifact/hash, location, player mode, coordinates, final
+   frame, runtime diagnostics, and the authoritative data identity involved.
+3. Change only the existing owner or an explicitly documented dependency.
+4. Rebuild and verify the same final assembled path plus the representative
+   location matrix.
+5. Visually inspect the complete frames.
+6. Make a labeled local Git commit immediately after that bounded result.
+7. Never combine an unrelated visual, gameplay, account, or release repair in
+   that commit. Revert the bounded commit if its final render regresses.
+
+### Honest current result
+
+The following were proven against the final assembled `dist` artifact above:
+
+- `npm run verify:source` passed.
+- `WE3D_VERIFY_ROOT=dist WE3D_CAPTURE_RELEASE_EVIDENCE=1 npm run
+  verify:assembled-locations` passed for Baltimore/JFX, Golden Gate, London,
+  Monaco, Manhattan, and rural Iowa with zero reported transport grade,
+  continuity, traffic-direction, lane-side, or motorway-pedestrian violations.
+- `WE3D_VERIFY_ROOT=dist WE3D_CAPTURE_RELEASE_EVIDENCE=1 npm run
+  verify:jfx-player-surface` passed on live OSM way `12115981`; the vehicle was
+  on the compiler-owned bridge surface, the connected endpoint had no abutment
+  wall, the deck was 9.35 m above rendered terrain, and exact continuity/grade
+  checks passed.
+- `WE3D_VERIFY_ROOT=dist WE3D_CAPTURE_RELEASE_EVIDENCE=1 npm run
+  verify:actors-vehicles` passed in Baltimore, London, and Tokyo for canonical
+  articulated NPCs, retained actors/traffic, catalog vehicle dimensions,
+  curbside parking, jurisdiction driving side, direction, and motorway
+  pedestrian exclusion.
+
+Authoritative reports and final-frame evidence:
+
+```text
+output/verification/assembled-locations/report.json
+output/verification/transport/jfx-player-surface.json
+output/verification/actors-vehicles/report.json
+output/release-evidence/current/jfx-player-surface.png
+output/release-evidence/current/
+```
+
+These passes do **not** prove production readiness. The final JFX frame was
+visually inspected and confirms a blocking regression: Baltimore is dominated
+by repeated mid-rise buildings and the expected tall downtown skyline is not
+present. A large building count is not a skyline-quality or height-provenance
+pass. The assembled-location verifier currently checks that buildings exist;
+it does not prove that mapped high-rise identities, heights, selection, and
+final extrusion survive into the visible skyline. That coverage gap must be
+closed before any further transport repair is accepted.
+
+### Audit question for the fresh thread
+
+Determine why a change that improves bridges, ramps, elevated roads, tunnels,
+traffic, or actors can regress buildings or the final city composition. Do not
+assume the bridge compiler itself is the cause. Audit the complete dependency
+and publication graph and identify the first owner that changes the final
+result.
+
+The required authority chain is:
+
+```text
+location identity / country code
+  -> immutable WorldLoadRequest and provider bounds/budgets
+  -> accepted-ground terrain and hydrology
+  -> normalized transport source and topology graph
+  -> compiled transport surface/profile
+  -> compiled transport structure assembly
+  -> renderer + traversal + collision + Living World consumers
+  -> immutable WorldSnapshot publication
+
+building geometry + bundled/live mapped metadata identities
+  -> compiled_building_provenance
+  -> detailed/far building selection and batching
+  -> mapped/inferred height and roof geometry
+  -> building meshes, collision, entrances and landmark replacement
+  -> the same immutable WorldSnapshot and final Earth scene
+```
+
+Transport and buildings are separate layer authorities, but they share load
+identity, provider coverage, terrain, selection budgets, road/building conflict
+guards, publication timing, scene roots, LOD/culling, and render budgets. Those
+shared dependencies are the primary audit boundary. No subsystem may silently
+rewrite another layer after snapshot publication.
+
+### Existing owners that must remain singular
+
+- Transport tag/provenance normalization:
+  `app/js/world/compiler/transport-source-normalizer.js`
+- Transport topology and graph-node identity:
+  `app/js/world/compiler/transport-network-model.js` and
+  `transport-junction-profile.js`
+- Road/bridge/ramp/elevated/tunnel height and cross-section:
+  `app/js/world/compiler/transport-surface-model.js` and
+  `transport-surface-profile.js`
+- Visible structural body/support/abutment description:
+  `app/js/world/compiler/transport-structure-assembly.js`
+- Tunnel corridor semantics only:
+  `app/js/world/compiler/tunnel-system-model.js`; it must not overwrite the
+  compiled roadway profile.
+- Structure publication and cross-road safety:
+  `app/js/world/structure-aware.js` and `bridge-safety.js`
+- Landmark bridges: decorative towers/cables/girders only through
+  `app/js/world/bridge-landmark.js`; they must not own a second drive surface.
+- Building metadata identity and provenance:
+  `app/js/world/building-metadata.js`,
+  `building-provenance-model.js`, and `preset-building-metadata.js`
+- Detailed building selection/geometry/batching:
+  `app/js/world/load-building-detail.js`, `load-building-pass.js`,
+  `load-geometry.js`, and `building-batching.js`
+- Far skyline selection/massing:
+  `app/js/terrain/far-field-mapped-context.js`,
+  `far-building-massing.js`, and `far-field.js`
+- Curated tall landmarks:
+  `app/js/world/landmark-source.js`, `landmark-catalog.js`, and
+  `landmark-models.js`
+- Atomic layer publication:
+  `app/js/world/compiler/world-layer-products.js`,
+  `app/js/world/world-snapshot-adapter.js`, and the world-load session files.
+
+If two of these write the same physical surface, building identity, height, or
+scene object, stop and remove or subordinate the duplicate rather than adding a
+third reconciliation path.
+
+### Tall-building regression: required investigation
+
+Start from the final JFX frame, not a count-only diagnostic. Compare the same
+coordinates and camera/player path between this checkpoint and the last
+user-approved/live build that visibly contained Baltimore high-rises. Capture
+both from their real assembled artifacts with all normal scene layers enabled.
+
+Trace at least these hypotheses with data, not guesses:
+
+1. The selected custom/JFX location identity or provider bounds no longer loads
+   the Baltimore bundled building-metadata pack or downtown core.
+2. Exact versus generalized footprint deduplication replaces the footprint that
+   owns mapped height metadata with a lower-information identity.
+3. A load or publication budget retains many footprints but drops high-rise
+   metadata or tall geometry before final batching.
+4. The detailed/far boundary, LOD distance, culling bounds, or batch cell
+   geometry removes tall meshes from the final camera while counts remain high.
+5. `far-building-massing.js` receives no mapped height and clamps/infer all
+   regional buildings into repeated mid-rise masses.
+6. Curated landmark loading or generic-visual suppression hides a correct
+   generic tower without successfully publishing its measured replacement.
+7. Transport approaches, road conflict guards, terrain masks, or structure
+   support clearance suppress building geometry beyond their intended corridor.
+8. The immutable snapshot diagnostics count provider/building records rather
+   than attached, visible, correctly extruded final meshes.
+
+For each stage record: requested source count, stable identity, provenance,
+mapped height, selected/dropped reason, batch/mesh identity, attached scene
+root, final visibility, bounding box, and distance from the camera. The first
+stage where an approved high-rise identity or height disappears owns the bug.
+
+Do not solve this with a Baltimore-name exception, arbitrary tower heights,
+fake skyline meshes, copied marketing art, a second building renderer, or a
+test-only camera. Real mapped heights may be used only with preserved source
+identity/provenance. When measurements are absent, the existing disclosed
+inference policy may operate; it must not be described as measured.
+
+### Transport audit: required investigation before another fix
+
+Do not change transport merely because the latest JFX image looks imperfect.
+First prove whether the failure is topology, vertical profile, assembly,
+publication, traversal, camera, or a shared scene dependency. For every failing
+bridge/ramp/overpass/elevated/tunnel location record:
+
+- exact OSM/provider way identity and full relevant tags;
+- lossless/generalized provenance and deduplication winner;
+- connected graph endpoints and layer/vertical-order compatibility;
+- profile samples, exact node constraints, design-grade source, and any modeled
+  (not surveyed) lower bounds;
+- structure assembly body, support and abutment decisions;
+- collision/traversal surface identity used by the controlled actor;
+- visible final mesh identity and attachment to the published world root;
+- crossing-road clearance conflicts and whether a road/building was suppressed;
+- final direction, jurisdiction driving side, access and pedestrian policy.
+
+The worldwide representative set must include dense, sparse, left-driving,
+right-driving, tunnel-heavy, bridge-over-water, and rural contexts. The current
+minimum is Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural Iowa,
+plus Tokyo for actor/vehicle behavior. Add a location only for a distinct
+physical/data contract, never as a city-specific patch target.
+
+### Current transport changes preserved in the checkpoint
+
+- Motorway one-way and pedestrian defaults are normalized globally, with
+  explicit mapped exceptions retained.
+- Traffic driving side comes from country code rather than a city-name guess.
+- Connected structure endpoints suppress an abutment wall; supports/abutments
+  are rejected when they obstruct another driveable road's clearance envelope.
+- Transport profile sample distances use `Float64Array`; graph endpoints within
+  0.05 m are canonicalized and exact graph constraints are reconciled inside
+  the shared solver rather than written again afterward.
+- A late integrated-approach writer that could reopen solved graph constraints
+  was removed. Geometry, navigation and diagnostics now consume the same
+  numeric profile representation.
+- JFX verification uses the visible controlled vehicle and compiled final
+  surface; it does not place a walker on a motorway or call a source-only test
+  hook.
+
+These are preserved facts about the checkpoint, not guarantees that every
+location or the complete product is correct.
+
+### Current verification policy
+
+Read `docs/VERIFICATION_STRATEGY_2026-08-19.md` completely. Do not restore the
+quarantined legacy suite. Admit a focused check only after reproducing a current
+failure and identifying its observable contract and owner.
+
+Current commands are:
+
+```bash
+npm run verify:source
+npm run verify:world
+npm run verify:jfx-player-surface
+npm run verify:assembled-locations
+npm run verify:actors-vehicles
+npm run verify:live-gps
+npm run verify:environments
+npm run verify:firestore-rules
+npm run verify:multiplayer
+npm run build:hosting
+npm run verify:hosting
+npm run release:verify
+```
+
+Passing automation is necessary but not sufficient. The acceptance frame must
+be the complete final game: normal terrain, hydrology, buildings, transport,
+population, atmosphere, water, HUD, collision and player control together. A
+focused mesh image, hidden layer, diagnostic scene, marketing asset, raw count,
+or synthetic camera is not production evidence.
+
+### Production and data-safety status
+
+- Do not push, preview-deploy, production-deploy, promote, or mutate user data
+  from this handoff.
+- The latest artifact is dirty-source staging, not a release artifact.
+- Rebuild after the checkpoint so manifest identity is commit-bound.
+- Re-run Firestore rules, multiplayer authorization, dependency/security, exact
+  artifact reachability, environment matrix, and account/data migration checks
+  before production.
+- Preserve backward-compatible user/account/inventory documents. Never run a
+  destructive migration or account cleanup as part of a visual/transport fix.
+- Hands-on user acceptance and intended-device checks remain mandatory.
+
+### Fresh-thread prompt
+
+Copy the following prompt into the new thread:
+
+```text
+Work only in /Users/stevenreid/Developer/WorldExplorer3D-audit-1ec2f70 on the
+current steven/urban-sandbox-foundation recovery checkpoint. Read
+docs/HANDOFF_2026-08-18_PRODUCTION_BLOCKER_REPAIR.md completely, especially the
+2026-08-20 controlling recovery checkpoint, then read progress.md,
+docs/SYSTEM_INVENTORY.md, docs/ARCHITECTURE_MAP.md,
+docs/REGRESSION_LEDGER.md, docs/VERIFICATION_STRATEGY_2026-08-19.md,
+KNOWN_ISSUES.md, and docs/TEST_AND_RELEASE_MAP.md. Run git status, git log -3,
+and the current source verification before editing.
+
+Audit why changes to bridges/ramps/overpasses/elevated roads/tunnels or their
+shared dependencies can regress unrelated final-world systems. The current
+assembled JFX artifact has improved visible transport, but its final frame is
+missing Baltimore's expected tall skyline even though building counts are
+large. Treat that as a confirmed blocker and a test-coverage failure. Determine
+the first authority/dependency stage where approved high-rise identity, mapped
+height, selected geometry, final mesh attachment, or visibility is lost. Also
+audit transport end-to-end from source identity through topology, shared
+vertical solver, assembly, publication, traversal/collision and final render.
+Do not assume the bridge compiler is the root cause; inspect shared provider
+bounds, budgets, terrain, conflict guards, immutable publication, LOD/culling,
+scene roots, and render budgets.
+
+Do not add city-name patches, fake measurements, visual ramps, duplicate road
+or building renderers, test-only cameras, or restore quarantined legacy tests.
+Use the real fully assembled game and compare the same final player/camera path
+against the last user-approved/live build. Make no code change until the failure
+and owner are evidenced. Then change one bounded owner, verify the same final
+frame plus the representative worldwide matrix, visually inspect every final
+image, update the handoff/progress/regression ledger, and create a labeled local
+Git checkpoint immediately. One issue and one authority change per commit. Do
+not push or deploy without explicit user approval.
+```
+
+---
+
 Date: 2026-08-18  
 Status: active local 4.3.0 repair; not committed, not deployed, not release-approved
 
@@ -27,10 +356,29 @@ At the start of the next thread:
 
 1. Read this file completely.
 2. Read `progress.md`, `KNOWN_ISSUES.md`, `docs/REGRESSION_LEDGER.md`, and
-   `docs/TEST_AND_RELEASE_MAP.md`.
+   `docs/VERIFICATION_STRATEGY_2026-08-19.md`.
 3. Run `git status --short`, `git diff --check`, and `git diff --stat` in the
    exact worktree above.
-4. Continue the remaining checks below; do not redesign or restart this pass.
+4. Treat every pre-2026-08-19 test command later in this historical handoff as
+   untrusted. The legacy suite has been quarantined; use only the current
+   verification strategy and newly admitted checks.
+
+## Latest checkpoint — 2026-08-19
+
+- Current source health and Live GPS walk/drive/camera journeys pass.
+- The staging-shaped immutable artifact
+  `4.3.0+96bc2c7c8888.8be777b58e9ccc68.staging` builds, hash-verifies and passes
+  the complete public landing-to-live-world journey.
+- The larger Baltimore response contains 13,459 roads and 817 authoritative
+  exact structure connections with zero discontinuities above the 0.25 m
+  contract; maximum measured delta is 0.241 m.
+- The artifact includes the account social module as a hashed bundle, current
+  landing gallery, active account/admin surfaces, far NPC/traffic detail,
+  pitched roofs, facade-integrated entrances, Backpack condition/ammunition,
+  continuous actor collision and mapped police/hospital recovery policy.
+- It remains `sourceDirty: true`, local-only and not deployed. Hands-on review,
+  a clean commit-bound artifact and explicit user authorization are still
+  required before production promotion.
 
 ## User's current goal
 
@@ -246,18 +594,18 @@ pressed against a facade.
 
 ### B. Protect the existing building/structure work
 
-Run the existing facade and engineered-structure journeys; do not replace them
-with source-only checks:
+The former facade/landmark/tunnel browser programs were quarantined on
+2026-08-19 and must not be reused. Derive a new focused check only after the
+current structure failure is reproduced and its authoritative compiler owner is
+identified. The current complete-world boundary is:
 
 ```bash
-WE3D_BROWSER_CHANNEL=chrome npm run test:building-facades-browser
-WE3D_BROWSER_CHANNEL=chrome npm run test:engineered-transport-landmarks-browser
-WE3D_BROWSER_CHANNEL=chrome npm run test:monaco-tunnels-browser
+npm run verify:source
+npm run verify:world
 ```
 
-Visually confirm Baltimore entrances remain shader-integrated, the JFX/Fort
-McHenry structures are visible, the San Francisco–Oakland Bay Bridge and Yerba
-Buena tunnel remain visible, and Monaco tunnel floors/portals remain coherent.
+`verify:world` must report zero exact transport-node discontinuities before any
+full-frame release evidence can be captured.
 
 ### C. Run the bounded production checks
 

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=49";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=59";
 
 function roadHeadingAtSegment(road, segmentIndex, fallbackAngle = 0) {
   const points = Array.isArray(road?.pts) ? road.pts : [];

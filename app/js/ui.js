@@ -5,10 +5,10 @@ import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-sessi
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=68";
-import { initShareUi } from "./ui/share-links.js?v=62";
+import { initShareUi } from "./ui/share-links.js?v=63";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=98";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=100";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -157,6 +157,7 @@ function setupUI() {
   // Helper function to close all float menus
   function closeAllFloatMenus() {
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+    document.querySelectorAll('.floatBtn[aria-expanded]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
     closeGameShareMenu();
     if (typeof appCtx.toggleFlowerActionMenu === 'function') {
       const menuEl = document.getElementById('flowerActionMenu');
@@ -216,8 +217,10 @@ function setupUI() {
     if (!menu) return;
     const isOpen = menu.classList.contains('open');
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+    document.querySelectorAll('.floatBtn[aria-expanded]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
     if (!isOpen) {
       menu.classList.add('open');
+      document.getElementById(buttonId)?.setAttribute('aria-expanded', 'true');
       const hideTouchTutorial = () => {
         const tutorialCard = document.getElementById('tutorialHintCard');
         if (isTouchPreferredClient && menu.classList.contains('open') && tutorialCard) {
@@ -309,6 +312,13 @@ function setupUI() {
       appCtx.toggleActivityBrowser({ scope: 'rooms' });
     }
     closeAllFloatMenus();
+  });
+  document.getElementById('fMultiplayer')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    void appCtx.openMultiplayerPanel?.().catch((error) => {
+      console.error('[multiplayer] Could not open the room panel.', error);
+      appCtx.showToast?.('Multiplayer is unavailable right now.');
+    });
   });
   document.getElementById('fDeFlock')?.addEventListener('click', () => {
     if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {
@@ -622,7 +632,14 @@ function setupUI() {
   document.getElementById('resumeBtn').addEventListener('click', () => {appCtx.setPauseReason?.('manual_pause', false);document.getElementById('pauseScreen').classList.remove('show');});
   document.getElementById('restartBtn').addEventListener('click', () => {appCtx.setPauseReason?.('manual_pause', false);document.getElementById('pauseScreen').classList.remove('show');appCtx.startMode();});
   document.getElementById('menuBtn').addEventListener('click', () => goToMainMenu());
-  document.getElementById('caughtBtn').addEventListener('click', () => {document.getElementById('caughtScreen').classList.remove('show');appCtx.policeHits = 0;appCtx.setPauseReason?.('caught', false);document.getElementById('police').textContent = '💔 0/3';appCtx.spawnOnRoad();});
+  document.getElementById('caughtBtn').addEventListener('click', () => {
+    document.getElementById('caughtScreen').classList.remove('show');
+    appCtx.policeHits = 0;
+    appCtx.setPauseReason?.('caught', false);
+    document.getElementById('police').textContent = '💔 0/3';
+    if (appCtx.handleUrbanCustodyContinue?.() === true) return;
+    appCtx.spawnOnRoad();
+  });
   document.getElementById('againBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.setPauseReason?.('game_result', false);appCtx.startMode();});
   document.getElementById('freeBtn').addEventListener('click', () => {
     appCtx.hideResult();

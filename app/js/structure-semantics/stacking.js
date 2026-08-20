@@ -3,10 +3,10 @@ import {
   polylineBounds,
   polylineDistances,
   segmentIntersection2D
-} from './geometry.js?v=1';
+} from './geometry.js?v=2';
 import {
   compileTransportNetworkModel
-} from '../world/compiler/transport-network-model.js?v=4';
+} from '../world/compiler/transport-network-model.js?v=6';
 
 function structureFeatureStableKey(candidate) {
   const sourceId = String(candidate?.sourceFeatureId || candidate?.id || '').trim();
@@ -194,7 +194,13 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
         4.2;
       for (const feature of component) {
         feature.structureStackRank = color;
-        feature.structureStackOffset = color * clearance;
+        // Graph coloring separates overlapping structure components for
+        // deterministic ownership; it is not vertical survey data. Mapped
+        // layer/order, accepted terrain, explicit elevations, water surfaces,
+        // and local crossing stations own height. Converting an arbitrary
+        // color into metres made whole ramps float and changed their height
+        // when provider completeness changed.
+        feature.structureStackOffset = 0;
       }
     }
 
@@ -228,33 +234,10 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
         Math.max(0, Number(feature.structureStackOffset) || 0);
     };
 
-    crossingEdges.sort((left, right) =>
-      Math.max(colors.get(left.leftComponent) || 0, colors.get(left.rightComponent) || 0) -
-      Math.max(colors.get(right.leftComponent) || 0, colors.get(right.rightComponent) || 0)
-    );
-    for (let pass = 0; pass < Math.max(2, group.length); pass += 1) {
-      let changed = false;
-      for (const edge of crossingEdges) {
-        const leftColor = colors.get(edge.leftComponent) || 0;
-        const rightColor = colors.get(edge.rightComponent) || 0;
-        const lower = leftColor < rightColor ? edge.left : edge.right;
-        const upper = lower === edge.left ? edge.right : edge.left;
-        const upperComponent = lower === edge.left ? edge.rightComponent : edge.leftComponent;
-        const lowerSide = lower === edge.left ? 'left' : 'right';
-        const upperSide = lower === edge.left ? 'right' : 'left';
-        const clearance = upper.structureSemantics?.featureCategory === 'road' ? 6 : 4.6;
-        let requiredLift = 0;
-        for (const crossing of edge.crossings) {
-          const lowerY = baseSurfaceAtCrossing(lower, crossing, lowerSide);
-          const upperY = baseSurfaceAtCrossing(upper, crossing, upperSide);
-          requiredLift = Math.max(requiredLift, lowerY + clearance - upperY);
-        }
-        if (requiredLift <= 1e-4) continue;
-        for (const feature of upperComponent) feature.structureStackOffset += requiredLift;
-        changed = true;
-      }
-      if (!changed) break;
-    }
+    // Do not turn graph-color ordering into a component-wide elevation. Local
+    // crossing stations below apply the modeled clearance only where two
+    // mapped paths actually cross, preventing provider-order changes from
+    // lifting an entire connected roadway.
   }
   return structureFeatures;
 }

@@ -10,8 +10,8 @@ import {
 } from '../earth-core/world-load-request.js?v=1';
 import { createWorldLoadSession } from '../earth-core/world-load-session.js?v=1';
 import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
-import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=1';
-import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=2';
+import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=2';
+import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=3';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -414,12 +414,12 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       appCtx.worldPublication?.requestId !== publication.requestId ||
       appCtx.worldPublication?.sequence !== publication.sequence
     ) return null;
-    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=14');
+    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=19');
     const livingWorld = startLivingWorldRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
     });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=17');
+    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=29');
     const urbanSandbox = startUrbanSandboxRuntime({
       snapshot: publication,
       request: worldSession?.request,

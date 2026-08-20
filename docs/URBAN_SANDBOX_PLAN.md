@@ -4,7 +4,26 @@ Status: active implementation plan
 Branch: `steven/urban-sandbox-foundation`  
 Production: unchanged on the verified 4.2.1 rollback
 
-## Implementation state — 2026-08-18
+## Implementation state — 2026-08-19
+
+- Current production-candidate repair: the complete player flow now verifies one
+  fixed Earth publication with terrain, water, buildings, facade-integrated
+  entrances, pitched roofs, exact transport surfaces, NPCs, traffic, Backpack,
+  condition, civic response and the account/admin surfaces active together.
+- Distant pedestrians and traffic retain character/vehicle-shaped assemblies;
+  nearby detail is a promotion of the same stable actor, not a competing spawn.
+  Pedestrians use 17 semantic rendered pieces and traffic uses 17, with bounded
+  preload/release hysteresis.
+- Walking and driving use one segment-continuous actor collision owner. Arrest
+  resolves to the nearest loaded mapped police facility; incapacitation resolves
+  separately to the nearest loaded mapped hospital. The older second caught-
+  screen road-respawn handler has been removed from the facility path.
+- One character Backpack owns usable equipment, magazine/reserve ammunition,
+  recoverable fallen-actor ammunition and condition presentation. The Field
+  Journal remains guidance/records rather than a second equipment inventory.
+- Live GPS has a current requirement-specific journey for walking follow,
+  sustained-speed vehicle transition, road-aligned movement and behind-actor
+  camera recovery. This is separate from the complete-world release boundary.
 
 - Phase 1: implemented and locally verified in installed Chrome on desktop and
   390×844 touch. User/device acceptance is still required.
@@ -210,6 +229,25 @@ record/progression view. Creating a second inventory or moving save data during
 the release pass would duplicate ownership and risk account/multiplayer state.
 Until that migration is complete, Journal tools are explicitly a remaining
 coherence limitation rather than being represented as finished inventory work.
+
+## Excavation and terrain deformation contract — planned, not shipped
+
+Digging cannot remain a text reward or a decal. The first acceptable slice must:
+
+- route the shovel/detector through the same Backpack equipment authority;
+- create a bounded, persistent excavation volume at the measured world position;
+- modify the owning accepted-ground render mesh and its walk/collision query from
+  the same deformation record, so the player can see and step into the hole;
+- retain original terrain provenance and label the excavation as a player-authored
+  delta rather than altered source elevation;
+- reject roads, structural decks, building footprints, protected water and other
+  unsafe ownership conflicts;
+- serialize the delta under stable world/location identity and use server
+  authority for shared rooms.
+
+No second terrain renderer, visual-only crater, fabricated depth measurement or
+Journal-owned duplicate item store is acceptable. This is still a release-blocking
+product gap if excavation is advertised as available gameplay.
 
 Companion progression begins in the world: domestic animals require three
 visible actions (meet, offer care, adopt), while observations write directly to

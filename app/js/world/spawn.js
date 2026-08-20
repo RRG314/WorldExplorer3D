@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=49";
-import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=7";
-import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
-import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=4';
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=59";
+import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=10";
+import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=2";
+import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=6';
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -567,6 +567,14 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
     appCtx.car.onRoad = !!resolved.onRoad;
     appCtx.car.road = resolved.road || null;
     if (typeof appCtx.invalidateRoadCache === "function") appCtx.invalidateRoadCache();
+    // GroundHeight keeps its own walking-road cache. A world load first places
+    // the shared actors on a generic road and can then resolve a custom arrival
+    // on a different vertical layer (for example, the Jones Falls Expressway).
+    // Keeping the earlier cached feature makes the first walking physics frame
+    // sample the lower road/terrain and drop the actor through the bridge deck.
+    // Invalidate the surface selector at the same authoritative handoff where
+    // car.road changes so every consumer starts from the resolved feature.
+    appCtx.GroundHeight?.invalidate?.();
     if (appCtx.carMesh) {
       appCtx.carMesh.position.set(resolved.x, resolved.carY, resolved.z);
       appCtx.carMesh.rotation.y = appCtx.car.angle;
@@ -576,6 +584,7 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
 
   if (syncWalker && appCtx.Walk?.state?.walker) {
     const walker = appCtx.Walk.state.walker;
+    walker._resolvedGroundState = null;
     walker.x = resolved.x;
     walker.z = resolved.z;
     walker.y = resolved.walkY;

@@ -1,4 +1,4 @@
-import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=49";
+import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=59";
 
 function distanceToRoadCenterline(road, x, z) {
   let best = Infinity;
@@ -116,6 +116,43 @@ export function supportPointConflictsWithDriveableRoad(feature, options = {}) {
     // placement when any other driveable surface crosses that interval, with
     // enough headroom that the column cannot visually intrude into traffic.
     if (otherY >= supportBottomY - 0.35 && otherY <= supportTopY + 2.2) return true;
+  }
+  return false;
+}
+
+export function supportSpanConflictsWithDriveableRoad(feature, options = {}) {
+  const centerX = Number(options.x);
+  const centerZ = Number(options.z);
+  const tangentX = Number(options.tangentX);
+  const tangentZ = Number(options.tangentZ);
+  const bottomY = Number(options.bottomY);
+  const topY = Number(options.topY);
+  const halfSpan = Math.max(0, Number(options.halfSpan) || 0);
+  const minimumClearance = Math.max(3.8, Number(options.minimumClearance) || 4.6);
+  if (![centerX, centerZ, tangentX, tangentZ, bottomY, topY].every(Number.isFinite) || !(halfSpan > 0)) {
+    return false;
+  }
+  const normalX = -tangentZ;
+  const normalZ = tangentX;
+  const sampleCount = Math.max(3, Math.ceil(halfSpan * 2 / 1.5));
+  for (let index = 0; index <= sampleCount; index += 1) {
+    const offset = -halfSpan + halfSpan * 2 * index / sampleCount;
+    const x = centerX + normalX * offset;
+    const z = centerZ + normalZ * offset;
+    const candidateRoads = typeof options.roadIndex?.candidates === 'function'
+      ? options.roadIndex.candidates(x, z)
+      : options.roads || [];
+    for (const road of candidateRoads) {
+      if (!road || road === feature || road.driveable === false || !Array.isArray(road.pts)) continue;
+      const corridorRadius = Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
+      if (distanceToRoadCenterline(road, x, z) > corridorRadius) continue;
+      const otherY = sampleFeatureSurfaceY(road, x, z);
+      if (!Number.isFinite(otherY)) continue;
+      // No support cap or abutment may occupy a drive corridor or leave less
+      // than ordinary road-vehicle clearance beneath it. The structure body
+      // remains visible; only the unsafe detail station is omitted.
+      if (otherY >= bottomY - minimumClearance && otherY <= topY + 2.2) return true;
+    }
   }
   return false;
 }

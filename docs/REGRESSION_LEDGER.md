@@ -1,8 +1,61 @@
 # Regression Ledger
 
+> Verification reset, 2026-08-19: commands recorded in older ledger entries are
+> historical context only. The legacy suite was quarantined after it proved it
+> could pass obsolete or partial product states. Do not restore or run an old
+> guard without re-deriving it from a current requirement under
+> `docs/VERIFICATION_STRATEGY_2026-08-19.md`.
+
 This is the durable record of visual and loading regressions already encountered in World Explorer 3D. Read it before changing terrain, water, sky, location loading, or asset publication. Add a dated entry whenever a regression is found and resolved.
 
 Each resolved issue records the symptom, root cause, durable resolution, verification, and the shortcut that must not be reintroduced.
+
+## 2026-08-20 — JFX absent after exact-source merge and competing bridge ownership
+
+- Status: resolved in dirty local staging candidate
+  `4.3.0+96bc2c7c8888.4dcef4b7ef9d5f7c.staging`; not committed, pushed or
+  deployed.
+- Symptom: Baltimore could publish thousands of ordinary roads while the JFX
+  bridge was absent or appeared as an isolated flat slab. Other captures showed
+  a raised road but no usable approach. The result changed with provider order,
+  and old height-only evidence could pass either state.
+- Root cause: the fixed regional exact-source query retained bridge/tunnel ways
+  but requested at-grade endpoint neighbors for tunnels only. Exact JFX then
+  replaced its generalized duplicate without importing the mapped approach,
+  leaving the selected bridge with zero graph stations/connections. Separately,
+  the structure renderer could compile its own fallback assembly, and the
+  Golden Gate landmark renderer could mutate road heights and draw another deck.
+  Finally, exact graph endpoints were forced after each road profile was fitted;
+  infeasible endpoint pairs therefore preserved continuity by producing a steep
+  one-sample ramp or tunnel-portal step.
+- Resolution: the regional query now imports one topology-matched, driveable
+  at-grade neighbor at every bridge and tunnel boundary. The transport compiler
+  is the only surface/assembly authority; structure visuals only consume its
+  published assembly, and landmark code is decoration-only. Exact engineered
+  approach nodes participate in the shared feasibility projection, while mapped
+  tunnel transition spans expand to the grade run required to reconcile modeled
+  cover with exact portal nodes. Custom structure arrival uses the selected road
+  tangent, and the HUD reads the authoritative actor surface.
+- Evidence: the current verifier loads live primary-OSM ways 12115980,
+  12115981 and 69531389 for JFX plus 158620175, 158620176 and 650907862 for the
+  Baltimore Harbor Tunnel. The final actor stands on lossless
+  `osm:way:12115981`; its compiler assembly publishes one visible matching body,
+  one graph station and one connection. Across 599 compiled engineered roads,
+  grade violations are zero. Three authoritative exact joins have zero
+  discontinuities and a maximum 0.0115 m delta. The full-page gameplay frame
+  was visually inspected; the generic canvas-only client was rejected after it
+  captured a black non-game canvas while its text state described the loaded
+  world. Source verification also reports no duplicate module identities.
+- Guard: `npm run verify:source` and
+  `WE3D_VERIFY_ROOT=dist node scripts/verification/jfx-player-surface.mjs`.
+  The latter requires lossless JFX identity, a non-vacuous graph connection,
+  compiler-owned visible geometry, exact continuity, zero engineered grade
+  violations, matching actor/deck elevation, a full-page final gameplay image,
+  and no runtime/browser/local-resource errors.
+- Never reintroduce: tunnel-only endpoint neighbor loading, renderer-side
+  assembly compilation, landmark-owned road height/deck geometry, exact-node
+  forcing without grade-feasibility projection, vacuous continuity checks,
+  height-only screenshots, or canvas-only captures in a multi-canvas page.
 
 ## 2026-08-18 — Walking arrival center was clear while the actor body still intersected a building
 
@@ -62,8 +115,8 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   rendered geometry with framebuffer A/B evidence.
 - Guard: `npm run test:title-memory-release`,
   `npm run test:living-editable-world-browser`,
-  `npm run test:regional-structures-browser`,
-  `npm run test:engineered-transport-landmarks-browser`, module-identity,
+  `npm run diag:regional-structures`,
+  `npm run diag:engineered-transport-landmarks`, module-identity,
   fixed-terrain-material, terrain-cancellation, fixed-horizon architecture, and
   target-device manual Chrome review.
 - Never reintroduce: optional lifecycle owners, terrain resets split across
@@ -112,11 +165,12 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   tunnels and 1,068 below-terrain samples; London passes with 930 bridges, 2,087
   tunnels, and Tower Bridge coverage within 2.8 m. The global far-world water
   contract passes all 14 representative locations.
-- Guard: `npm run test:engineered-transport-landmarks-browser`,
+- Guard: `npm run diag:engineered-transport-landmarks`,
   `npm run test:fixed-regional-structures`, `npm run test:phase3-structures`,
-  `npm run test:new-york-regional-continuity-browser`,
-  `npm run test:monaco-tunnels-browser`, and the London scenario of
-  `npm run test:regional-structures-browser`. The old regional browser gate now
+  `npm run diag:new-york-regional-continuity`,
+  `npm run diag:monaco-tunnels`, and the London scenario of
+  `npm run diag:regional-structures`. These are diagnostic state/geometry checks;
+  only `npm run test:integrated-render` has visual release authority. The old regional browser gate now
   allows 120 s for real world publication instead of a stale 10 s timeout.
 - Never reintroduce: city-specific landmark exceptions, name-only source
   identity, count/tag-only visual acceptance, bathymetric terrain as the bridge
@@ -703,7 +757,7 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Symptom: New York could freeze during publication, detailed roads and buildings ended about 1.8–1.9 km from Midtown, the visible New Jersey side of the Hudson became a blank band, and mapped water developed aerial stripes outside the detailed city.
 - Root cause: the exact OSM district remained capped to the detailed city while the far-building pass excluded the much larger terrain rectangle; simply compiling every generalized regional road produced an 18,042-road, 39.7-second transport publication. Regional roads were also rejected by a ground check that understood only detailed accepted-ground tiles. In water, the 320 m terrain grid was not physically masked beneath regional mapped water, overlapping OSM water records could use different heights, and a centroid-only duplicate rule deleted partial triangles.
 - Resolution: one bounded Shortbread request now loads a fixed 6.5 km location context concurrently with the exact core request. The exact core remains lossless; outer roads use a geographically spread 2,400-road generalized LOD, shared decoded and in-flight tile cache, coarser at-grade sampling, and the already loaded fixed terrain as their ground authority. The outer request decodes only streets because terrain/WorldCover already own generalized land. Far-building exclusion now follows the actual detailed building radius. Final geometry publication yields between major stages. Regional mapped water normalizes overlapping records to one physical surface and masks the coarse terrain beneath coastal and inland water without deleting partial triangles.
-- Guard: `npm run test:fixed-regional-context`, `npm run test:phase5-aerial-transition`, and `npm run test:new-york-regional-continuity-browser`. The Chrome journey requires Midtown core density, roads within 120 m and far buildings around Weehawken/Hoboken/Jersey City, finite walk/drive surfaces in Hoboken, no new world sequence after crossing the river, zero duplicate Shortbread tile URLs, no console errors, and no load long task above five seconds. Its aerial Hoboken screenshot is a mandatory visual review artifact.
+- Guard: `npm run test:fixed-regional-context`, `npm run test:phase5-aerial-transition`, and `npm run diag:new-york-regional-continuity`. The Chrome diagnostic requires Midtown core density, roads within 120 m and far buildings around Weehawken/Hoboken/Jersey City, finite walk/drive surfaces in Hoboken, no new world sequence after crossing the river, zero duplicate Shortbread tile URLs, no console errors, and no load long task above five seconds. Its direct-camera aerial image is retired and is not visual release evidence.
 - Never reintroduce: actor-driven streaming, an unbounded all-street regional compile, excluding far buildings by the terrain rectangle, requiring detailed accepted-ground under generalized regional roads, centroid-only water triangle deletion, a depth-biased water overlay, fixed sleep-based readiness, or an asynchronous predicate passed to Playwright's browser-side wait.
 
 ## 2026-08-13 — Regional building gaps and missing engineered transport
@@ -735,8 +789,8 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
   no movement streaming or second location pipeline.
 - Guard: `npm run test:fixed-regional-context`,
   `node scripts/test-fixed-world-horizon-architecture.mjs`,
-  `npm run test:new-york-regional-continuity-browser`, and
-  `npm run test:regional-structures-browser`. The browser evidence requires at
+  `npm run diag:new-york-regional-continuity`, and
+  `npm run diag:regional-structures`. These diagnostics require at
   at least 84% published regional building coverage, hundreds of retained
   mapped structures, Tower Bridge and Golden Gate by source name, and a finite
   driveable road surface at each landmark. Visual
@@ -764,7 +818,7 @@ Each resolved issue records the symptom, root cause, durable resolution, verific
 - Symptom: a real multi-segment tunnel could visibly have portals at the ends of the complete connected system but fail the browser check because an interior OpenStreetMap way segment did not own portal instances itself.
 - Root cause: the acceptance harness treated each source way as a complete isolated tunnel. Real mapped tunnels are commonly split at intersections, tag changes or provider tile boundaries, while portals belong only at the exposed ends of the connected same-layer system.
 - Resolution: the installed-Chrome landmark journey follows the connected same-layer tunnel graph, aggregates portal ownership across the system and records the selected and connected segment counts. The renderer/compiler remains the single generalized and exact structure path.
-- Guard: `npm run test:engineered-transport-landmarks-browser` must visibly verify JFX, the San Francisco–Oakland Bay Bridge, Fort McHenry Tunnel and Yerba Buena Tunnel. `npm run test:monaco-tunnels-browser` must retain finite floors, collision/camera containment and portal coverage; the current evidence includes 113 exact tunnels and 486 portal instances.
+- Guard: `npm run diag:engineered-transport-landmarks` retains nonvisual JFX, San Francisco–Oakland Bay Bridge, Fort McHenry Tunnel and Yerba Buena Tunnel structure diagnostics. `npm run diag:monaco-tunnels` retains finite floors, collision/camera containment and portal coverage. Their manually positioned images are retired; visible acceptance belongs only to `npm run test:integrated-render`.
 - Never reintroduce: per-way portal requirements for interior segments, city-name-only bridge meshes, tests that inspect records without rendered-pixel evidence, or a second bridge/tunnel renderer.
 
 ## 2026-08-17 — Production checks count render passes as logical world draw calls
@@ -940,3 +994,88 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 4. Change locations once in the same session and confirm the old city never appears through the loading screen.
 5. Record screenshots, runtime state, and the exact commit tested.
 6. Include an ocean-only location, a mountainous location, and a city outside North America; confirm that glaciers are terrain, open ocean has no land placeholder, and location labels follow the published origin.
+
+## 2026-08-20 — Derived-terrain feedback and cross-location release failure
+
+- Status: partially repaired; production blocked.
+- Symptom: Baltimore-only evidence could show a bridge while London, Monaco,
+  Golden Gate and Manhattan still contained infeasible approaches, road/terrain
+  breaks or buried ground floors.
+- Root cause: transport profiles sometimes sampled the already-rendered terrain
+  mesh while compiling authoritative graph elevations. Exact OSM stations were
+  also inserted beside nearly coincident regular samples, creating artificial
+  near-zero runs and extreme one-sample grades.
+- Resolution retained: all transport compilation reads the accepted base DEM;
+  rendered terrain is downstream only. Exact graph samples replace nearby
+  synthetic samples. Recursive residual surface promotion is disabled so it
+  cannot become another elevation owner.
+- Evidence: the current six-location assembled run closes exact joins in
+  Baltimore, Golden Gate, London and Monaco and removes the former 535x Golden
+  Gate spike. Rural Iowa passes. Five urban/structure locations still fail the
+  engineered-grade gate, Manhattan retains three exact elevated discontinuities,
+  and London/Manhattan fail visual inspection.
+- Never reintroduce: Baltimore-only approval, rendered-terrain feedback into the
+  transport compiler, coincident synthetic/exact profile samples, city-specific
+  exceptions, relaxed grade/continuity thresholds, or screenshot approval that
+  ignores the final assembled terrain/building result.
+
+## 2026-08-19 — Complete-world transport, population and sandbox coherence boundary
+
+- Status: resolved in mutable local source; immutable-artifact and hands-on
+  acceptance remain open; not deployed.
+- Symptom: structure-focused checks could pass while final bridge joins still
+  separated; distant people appeared as blocks until interaction; traffic was
+  visually underspecified or disappeared; fast movement could pass through an
+  actor; and two caught-screen handlers could relocate a player twice.
+- Root cause: the last structural reconciliation ran before final at-grade node
+  ownership, distant actor assemblies lacked final recognizable features, actor
+  collision sampled only the frame endpoint despite its swept name, and the
+  legacy generic caught handler did not delegate to the urban facility owner.
+- Resolution: run final corridor reconciliation after exact-node finalization;
+  let ordinary terrain-fitted roads own pure-surface rejoins; publish 17-piece
+  distant pedestrian and traffic assemblies with stable LOD identity; use true
+  segment-continuous collision; delegate caught/recovery through one sandbox
+  authority; separate mapped police custody from mapped hospital recovery.
+- Current evidence: the public landing-to-Baltimore journey passes with 300
+  authoritative exact connections, zero discontinuities over 0.25 m, maximum
+  measured delta 0.192 m, 912 structure bodies, 265 guarded roads, 27,169
+  buildings, 10,579 roads, active population/sandbox owners and no runtime,
+  browser or local-resource errors. Source health and the dedicated walking/
+  driving Live GPS camera journey also pass.
+- Never reintroduce: isolated hidden-layer screenshots as release proof,
+  endpoint-only actor collision, actor replacement during LOD promotion, a
+  second facility/road respawn handler, city-name bridge patches, or visual-only
+  transition geometry outside the compiled transport surface.
+
+## 2026-08-19 — Final-player bridge arrival and truthful landing capture
+
+- Status: resolved in local staging candidate
+  `4.3.0+96bc2c7c8888.4469827d9f3bcc8d.staging`; hands-on acceptance and
+  deployment remain open.
+- Symptom: the Jones Falls Expressway geometry existed and a vehicle could be
+  placed on it, but the visible walking player appeared below it. Landing media
+  could therefore be mistaken for proof of a different final player result.
+- Root cause: world publication applied the authoritative custom-location spawn,
+  then the shared-link runtime reapplied a mode-only state as if it also owned
+  position. That second owner wrote the walker to raw terrain. A stale walking
+  surface cache could preserve the lower layer after the overwrite.
+- Resolution: world publication now owns final arrival; title paths no longer
+  spawn again. Shared state may select a mode without moving an actor and may
+  restore position only when complete coordinates are present. All restored
+  positions pass through the shared safe-surface resolver, which invalidates the
+  walking-road cache when changing vertical layers.
+- Actual-player evidence: the normal visible Explore flow at
+  `39.309728,-76.621428` settled with the player feet at 32.051251 m, the
+  published walking surface at 32.051252 m, and rendered terrain at 25.918335 m.
+  The selected surface was `osm:way:12115981`, tagged as an elevated bridge at
+  vertical order 2. The immutable local candidate was then opened through the
+  same visible flow and visually showed the player on the deck with the lower
+  terrain and roads beside it. No camera write, hidden layer, diagnostic scene,
+  or screenshot-only harness was used.
+- Landing evidence: `baltimore-harbor-hero.webp` is now a direct 1280x720 frame
+  from the normal boat-mode player runtime at Baltimore Inner Harbor, including
+  the real HUD, water foreground, boat, waterfront, and visible tall buildings.
+  It is not generated, composited, or rendered by a separate marketing scene.
+- Never reintroduce: multiple arrival owners, mode-only state with implicit
+  position authority, cached lower-layer walking surfaces across a respawn, or
+  landing images that were not captured from the assembled player runtime.

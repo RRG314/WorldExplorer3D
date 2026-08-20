@@ -1,6 +1,30 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
+import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
+
+const ITEM_ICON_PATHS = Object.freeze({
+  hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
+  flashlight: '<path d="M16 10h32l-5 15v27a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V25L16 10Zm8 9h16l2-6H22l2 6Zm3 9v23h10V28H27Z"/>',
+  baton: '<path d="m19 49 7 7 30-38-10-10-8 10 4 4-23 27Zm-7 7 7 0-7-7v7Z"/>',
+  'pulse-sidearm': '<path d="M9 22h37l9 8-9 9H31l-3 17H16l5-17H9V22Zm35 6H16v5h30l3-3-5-2Z"/>',
+  'laser-gun': '<path d="M7 23h39l11 8-11 8H31l-4 18H15l6-18H7V23Zm10 6v4h28l4-2-4-2H17Zm20-12h8v5h-8v-5Z"/>',
+  'paintball-gun': '<path d="M8 25h38l10 7-10 8H31l-4 17H16l5-17H8V25Zm12-14h19l5 12H16l4-12Zm4 5-2 4h15l-2-4H24Z"/>',
+  'concussion-charge': '<path d="M25 6h14v8h5l9 13-5 27H16l-5-27 9-13h5V6Zm6 6h2V8h-2v4Zm-9 9-5 8 3 19h24l3-19-5-8H22Z"/><path d="M29 26h6v16h-6zM24 31h16v6H24z"/>',
+  parachute: '<path d="M6 28C8 13 18 5 32 5s24 8 26 23H6Zm5-5h42c-4-8-11-12-21-12S15 15 11 23Z"/><path d="m10 27 18 24h8l18-24h-7L34 45h-4L17 27h-7Zm17 24h10v7H27z"/>',
+  'field-camera': '<path d="M8 19h13l4-7h14l4 7h13v34H8V19Zm6 6v22h36V25H14Zm18 3a8 8 0 1 1 0 16 8 8 0 0 1 0-16Zm0 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/>',
+  'field-lens': '<path d="M27 7a20 20 0 1 1-12 36l-9 9 6 6 9-9A20 20 0 0 1 27 7Zm0 6a14 14 0 1 0 0 28 14 14 0 0 0 0-28Z"/>',
+  'fishing-rod': '<path d="M12 54 47 8l5 4-35 46-5-4Zm32-35 5-6c8 8 11 18 8 28-2 8-8 13-14 11-5-2-7-8-4-12l5 3c-1 2 0 4 2 4 3 1 6-2 7-7 2-7-1-14-9-21Z"/>',
+  'hand-trowel': '<path d="m35 7 9 5-14 24-9-5L35 7Zm-17 25 13 8c-2 10-8 17-17 20-5-8-3-18 4-28Z"/>',
+  'metal-detector': '<path d="m24 7 7 2-12 37-7-2L24 7Zm4 6h24v7H28v-7ZM20 43c12 0 22 4 22 9s-10 8-22 8S0 57 0 52s8-9 20-9Zm0 6c-8 0-13 2-14 3 1 1 6 2 14 2 9 0 14-1 16-2-2-1-7-3-16-3Z"/>',
+  'found-personal-item': '<path d="M9 13h31l15 15-25 25L9 32V13Zm7 7v9l14 15 16-16-9-8H16Zm8 2a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>'
+});
+
+function itemIconMarkup(item) {
+  const id = String(item?.catalogId || item?.id || '');
+  const path = ITEM_ICON_PATHS[id] || '<path d="M9 18 32 5l23 13v28L32 59 9 46V18Zm7 4v20l13 7V30l-13-8Zm19 8v19l13-7V22l-13 8ZM20 18l12 7 12-7-12-7-12 7Z"/>';
+  return `<svg viewBox="0 0 64 64" focusable="false" aria-hidden="true">${path}</svg>`;
+}
 
 function createUrbanEquipmentRuntime(options = {}) {
   const state = options.state;
@@ -14,6 +38,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   const setStatus = options.setStatus;
   const clock = options.now || (() => performance.now());
   const effects = [];
+  const projectiles = [];
 
   function render() {
     const ui = state.equipmentUi;
@@ -23,21 +48,31 @@ function createUrbanEquipmentRuntime(options = {}) {
     ui.root.classList.toggle('show', visible);
     ui.root.setAttribute('aria-hidden', visible ? 'false' : 'true');
     ui.toggle.hidden = !(state.mobile && appCtx.Walk?.state?.mode === 'walk');
-    ui.slots.innerHTML = inventory.items.map((item) => {
-      const count = item.magazine !== null ? `${item.magazine}/${item.reserve}` : item.quantity !== null ? `${item.quantity} left` : item.category;
-      return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${item.id}" aria-pressed="${item.equipped}"><strong>${item.slot} · ${item.icon}</strong><span>${item.label}</span><span>${count}</span></button>`;
+    const hotbarItems = inventory.items.filter((item) => item.hotbarSlot != null);
+    ui.slots.innerHTML = hotbarItems.map((item) => {
+      const count = item.magazine !== null ? `${item.magazine}/${item.reserve}` : Number(item.quantity || 0) > 1 ? `×${item.quantity}` : '';
+      return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${item.instanceId}" aria-pressed="${item.equipped}" title="${item.hotbarSlot}. ${item.label} · ${count}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${item.label}</strong><span class="urbanItemCount">${count}</span></button>`;
     }).join('');
+    if (ui.contents) {
+      const carried = inventory.items.filter((item) => item.hotbarSlot == null);
+      ui.contents.innerHTML = carried.length ? carried.map((item) => {
+        const verbs = item.verbs?.length ? item.verbs.join(' · ') : 'No available action';
+        return `<button class="urbanBackpackItem${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${item.instanceId}" aria-pressed="${item.equipped}" title="${item.label} · ${verbs}" ${item.verbs?.includes('equip') ? '' : 'disabled'}><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${item.label}</strong>${Number(item.quantity || 0) > 1 ? `<b class="urbanItemQuantity">${item.quantity}</b>` : ''}</button>`;
+      }).join('') : '<div class="urbanBackpackEmpty">No loose items</div>';
+    }
     const equipped = inventory.items.find((item) => item.equipped);
     state.equipmentVisual?.setEquipped?.(equipped?.id || 'hands');
     const parachuteState = equipped?.id === 'parachute'
       ? state.parachute?.deployed ? ' · canopy deployed' : ' · deploy after jumping'
       : '';
-    ui.status.textContent = `${equipped?.label || 'Hands'} equipped${parachuteState}${inventory.sandboxItems ? ` · ${inventory.sandboxItems} sandbox item${inventory.sandboxItems === 1 ? '' : 's'}` : ''}`;
+    ui.status.textContent = `${equipped?.label || 'Hands'} equipped${parachuteState} · ${inventory.items.length} carried`;
   }
 
   function toggle(force) {
     if (!isActive() || appCtx.Walk?.state?.mode !== 'walk') return false;
     state.equipmentOpen = typeof force === 'boolean' ? force : !state.equipmentOpen;
+    appCtx.screenLayout ||= getScreenLayoutService();
+    appCtx.screenLayout.setPanelLayer('backpack', state.equipmentOpen);
     render();
     return true;
   }
@@ -61,6 +96,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       ...(state.population?.nearbyPedestrians?.(actor, range) || []).filter((entry) => !promotedNpcIds.has(entry.id)).map((entry) => ({ kind: 'ambient_npc', ref: entry, ...entry })),
       ...state.vehicles.filter((vehicle) => !vehicle.attachedToPlayer && vehicle.condition > 0).map((vehicle) => ({ kind: 'vehicle', ref: vehicle, ...vehiclePose(vehicle) })),
       ...(state.population?.nearbyVehicles?.(actor, range) || []).filter((entry) => !promotedVehicleIds.has(entry.id)).map((entry) => ({ kind: 'ambient_vehicle', ref: entry, ...entry })),
+      ...(state.responders?.targets?.() || []),
       ...(appCtx.streetFurnitureMeshes || []).filter((object) => object?.userData?.interactiveWorldObject && Number(object.userData.condition ?? 1) > 0).map((object) => ({
         kind: 'furniture', ref: object, x: object.position.x, y: object.position.y, z: object.position.z
       }))
@@ -119,6 +155,9 @@ function createUrbanEquipmentRuntime(options = {}) {
       vehicle.visual.setCondition(result.after);
       return { kind: 'vehicle', id: vehicle.id, ...result };
     }
+    if (detailed.kind === 'responder_officer' || detailed.kind === 'responder_vehicle') {
+      return state.responders?.applyImpact?.(detailed.ref?.id, force) || null;
+    }
     const object = detailed.ref;
     const result = applyConditionImpact({ condition: object.userData.condition, resistance: 72 }, force);
     object.userData.condition = result.after;
@@ -170,10 +209,11 @@ function createUrbanEquipmentRuntime(options = {}) {
     return typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ?.(x, z) || 0;
   }
 
-  function impactPulse(position, radius = 1) {
+  function impactPulse(position, radius = 1, style = 'pulse') {
     const blast = radius > 1.2;
+    const color = style === 'paintball' ? 0xff4f9a : style === 'laser' ? 0x64fff4 : 0xbbe8ff;
     const root = new THREE.Group();
-    root.name = blast ? 'Concussion impact ring' : 'Pulse impact spark';
+    root.name = blast ? 'Concussion impact ring' : `${style} impact mark`;
     const geometries = [];
     const materials = [];
     if (blast) {
@@ -196,7 +236,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       materials.push(shardMaterial);
     } else {
       const geometry = new THREE.IcosahedronGeometry(.14, 1);
-      const material = new THREE.MeshBasicMaterial({ color: 0xbbe8ff, transparent: true, opacity: .72, depthWrite: false });
+      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .72, depthWrite: false });
       root.add(new THREE.Mesh(geometry, material));
       geometries.push(geometry);
       materials.push(material);
@@ -205,6 +245,259 @@ function createUrbanEquipmentRuntime(options = {}) {
     root.scale.setScalar(blast ? .2 : 1);
     state.group.add(root);
     effects.push({ root, geometries, materials, opacities: materials.map((material) => material.opacity), elapsed: 0, duration: blast ? .48 : .24, radius: Math.max(1, radius), blast });
+  }
+
+  function commitImpacts(equipment, impactPosition, selected, roomActive) {
+    let results = [];
+    if (roomActive && selected.length) {
+      const shared = selected.map((entry) => sharedTarget(entry.detailed));
+      if (shared.some((entry) => !entry)) {
+        setStatus('That object does not have a stable room identity.', 2200);
+        return;
+      }
+      state.authorityImpactPending = true;
+      setStatus('Verifying shared impact…', 2600);
+      state.authority.commitImpacts(equipment, impactPosition, shared).then((response) => {
+        if (!isActive()) return;
+        state.authorityImpactPending = false;
+        if (!response?.accepted) {
+          setStatus(response?.reason === 'cooldown' ? 'Shared equipment is not ready yet.' : 'The room rejected that impact.', 2200);
+          return;
+        }
+        const byId = new Map((response.results || []).map((entry) => [entry.entityId, entry]));
+        results = selected.map((entry) => applyAuthoritativeImpact(entry.detailed, byId.get(sharedTarget(entry.detailed)?.entityId))).filter(Boolean);
+        state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'room', at: clock() });
+        if (results.length) setStatus(`${equipment.label} affected ${results.length} shared target${results.length === 1 ? '' : 's'}.`);
+      }).catch((error) => {
+        if (!isActive()) return;
+        state.authorityImpactPending = false;
+        setStatus(String(error?.message || 'Shared impact authority is unavailable.'), 2800);
+      });
+      return;
+    }
+    results = selected.map((entry) => applyImpact(entry.detailed, entry.force)).filter(Boolean);
+    state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'local', at: clock() });
+    if (results.length) setStatus(`${equipment.label} affected ${results.length} target${results.length === 1 ? '' : 's'}.`);
+  }
+
+  function projectileMaterial(kind) {
+    const colors = {
+      pulse: [0xa9e7ff, 0x1b7aa7],
+      laser: [0x73fff4, 0x1fb9ad],
+      paintball: [0xff4f9a, 0x8c174f],
+      'thrown-charge': [0x31434c, 0x14394a]
+    };
+    const [color] = colors[kind] || colors.pulse;
+    return new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .96, depthWrite: kind === 'thrown-charge' });
+  }
+
+  function createProjectileVisual(kind) {
+    const geometry = kind === 'thrown-charge'
+      ? new THREE.IcosahedronGeometry(.16, 1)
+      : kind === 'paintball'
+        ? new THREE.SphereGeometry(.075, 8, 6)
+        : kind === 'laser'
+          ? new THREE.CylinderGeometry(.022, .022, .34, 7)
+          : new THREE.SphereGeometry(.055, 7, 5);
+    const material = projectileMaterial(kind);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `${kind} world projectile`;
+    mesh.castShadow = kind === 'thrown-charge' || kind === 'paintball';
+    state.group.add(mesh);
+    return { root: mesh, geometries: [geometry], materials: [material] };
+  }
+
+  function disposeProjectile(projectile) {
+    projectile.visual.root.removeFromParent?.();
+    projectile.visual.geometries.forEach((geometry) => geometry.dispose?.());
+    projectile.visual.materials.forEach((material) => material.dispose?.());
+  }
+
+  function segmentTarget(projectile, from, to) {
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const lengthSq = dx * dx + dz * dz;
+    let nearest = null;
+    for (const target of worldTargets(projectile.equipment.range + (projectile.equipment.blastRadius || 0))) {
+      const t = lengthSq > .0001
+        ? Math.max(0, Math.min(1, ((target.x - from.x) * dx + (target.z - from.z) * dz) / lengthSq))
+        : 0;
+      const px = from.x + dx * t;
+      const pz = from.z + dz * t;
+      const radius = target.kind.includes('vehicle') ? 1.35 : target.kind === 'furniture' ? .55 : .68;
+      const distance = Math.hypot(target.x - px, target.z - pz);
+      if (distance > radius || nearest && t >= nearest.t) continue;
+      nearest = { target, t, x: px, y: from.y + (to.y - from.y) * t, z: pz };
+    }
+    return nearest;
+  }
+
+  function resolveProjectile(projectile, position, directTarget = null) {
+    const index = projectiles.indexOf(projectile);
+    if (index >= 0) projectiles.splice(index, 1);
+    disposeProjectile(projectile);
+    const equipment = projectile.equipment;
+    const targets = worldTargets(equipment.range + (equipment.blastRadius || 0));
+    const selected = equipment.blastRadius
+      ? blastTargets(position, targets, equipment).map((entry) => ({ detailed: detailedTarget(entry.target), force: entry.force })).filter((entry) => entry.detailed)
+      : directTarget ? [{ detailed: detailedTarget(directTarget), force: equipment.force }] : [];
+    impactPulse(position, equipment.blastRadius || .8, equipment.projectileKind);
+    if (equipment.category === 'explosive') {
+      reportCivicEvent({
+        kind: 'explosive_use', position, severity: 3, radius: 52, audibleRadius: 52, maximumWitnesses: 4
+      });
+    }
+    commitImpacts(equipment, position, selected, projectile.roomActive);
+    state.lastProjectileAction = Object.freeze({
+      equipmentId: equipment.id,
+      phase: 'impact',
+      targetKind: directTarget?.kind || '',
+      x: Number(position.x.toFixed(2)),
+      y: Number(position.y.toFixed(2)),
+      z: Number(position.z.toFixed(2)),
+      at: clock()
+    });
+  }
+
+  function spawnProjectile(equipment, actor, direction, roomActive) {
+    const kind = equipment.projectileKind || 'pulse';
+    const origin = new THREE.Vector3(
+      Number(appCtx.camera?.position?.x ?? actor.x),
+      Number(appCtx.camera?.position?.y ?? actor.y),
+      Number(appCtx.camera?.position?.z ?? actor.z)
+    );
+    const velocityDirection = direction.clone();
+    if (kind === 'thrown-charge') velocityDirection.y = Math.max(.3, velocityDirection.y + .24);
+    velocityDirection.normalize();
+    const speed = Number(equipment.projectileSpeed || 48);
+    const visual = createProjectileVisual(kind);
+    visual.root.position.copy(origin);
+    const projectile = {
+      equipment,
+      kind,
+      roomActive,
+      visual,
+      position: origin,
+      velocity: velocityDirection.multiplyScalar(speed),
+      distance: 0,
+      elapsed: 0,
+      maxLife: kind === 'thrown-charge'
+        ? Number(equipment.fuseSeconds || 1.2)
+        : Math.min(.95, Number(equipment.range || 30) / speed + .12)
+    };
+    projectiles.push(projectile);
+    state.lastProjectileAction = Object.freeze({ equipmentId: equipment.id, phase: 'travel', targetKind: '', at: clock() });
+    if (equipment.category === 'sidearm') {
+      reportCivicEvent({
+        kind: 'weapon_discharge', position: { x: actor.x, y: actor.y, z: actor.z }, severity: 2,
+        radius: 38, audibleRadius: kind === 'paintball' ? 18 : 34, maximumWitnesses: 4
+      });
+    }
+    setStatus(kind === 'thrown-charge' ? 'Charge thrown.' : `${equipment.label} fired.`);
+  }
+
+  function fireNpcProjectile(options = {}) {
+    if (!isActive()) return false;
+    const origin = new THREE.Vector3(Number(options.origin?.x), Number(options.origin?.y), Number(options.origin?.z));
+    const target = new THREE.Vector3(Number(options.target?.x), Number(options.target?.y), Number(options.target?.z));
+    if (![origin.x, origin.y, origin.z, target.x, target.y, target.z].every(Number.isFinite)) return false;
+    const direction = target.sub(origin).normalize();
+    const equipment = Object.freeze({
+      id: String(options.equipmentId || 'responder-sidearm'),
+      label: String(options.label || 'Responder sidearm'),
+      category: 'sidearm',
+      projectileKind: String(options.projectileKind || 'pulse'),
+      projectileSpeed: Number(options.projectileSpeed || 64),
+      range: Number(options.range || 44),
+      force: Number(options.force || 18)
+    });
+    const visual = createProjectileVisual(equipment.projectileKind);
+    visual.root.position.copy(origin);
+    projectiles.push({
+      equipment,
+      kind: equipment.projectileKind,
+      owner: 'npc',
+      sourceId: String(options.sourceId || ''),
+      onPlayerImpact: typeof options.onPlayerImpact === 'function' ? options.onPlayerImpact : null,
+      visual,
+      position: origin,
+      velocity: direction.multiplyScalar(equipment.projectileSpeed),
+      distance: 0,
+      elapsed: 0,
+      maxLife: Math.min(.9, equipment.range / equipment.projectileSpeed + .12)
+    });
+    return true;
+  }
+
+  function segmentHitsPlayer(from, to) {
+    const actor = appCtx.Walk?.state?.walker;
+    if (!actor) return null;
+    const targetX = Number(actor.x);
+    const targetY = Number(actor.y) - .55;
+    const targetZ = Number(actor.z);
+    const segment = to.clone().sub(from);
+    const lengthSq = segment.lengthSq();
+    const toward = new THREE.Vector3(targetX - from.x, targetY - from.y, targetZ - from.z);
+    const t = lengthSq > .0001 ? Math.max(0, Math.min(1, toward.dot(segment) / lengthSq)) : 0;
+    const point = from.clone().addScaledVector(segment, t);
+    return point.distanceTo(new THREE.Vector3(targetX, targetY, targetZ)) <= .72 ? point : null;
+  }
+
+  function updateProjectiles(dt) {
+    const step = Math.max(0, Math.min(.12, Number(dt) || 0));
+    for (const projectile of projectiles.slice()) {
+      projectile.elapsed += step;
+      const from = projectile.position.clone();
+      if (projectile.kind === 'thrown-charge') projectile.velocity.y -= 9.81 * step;
+      else if (Number(projectile.equipment.projectileGravity) > 0) projectile.velocity.y -= Number(projectile.equipment.projectileGravity) * step;
+      const to = from.clone().addScaledVector(projectile.velocity, step);
+      projectile.distance += from.distanceTo(to);
+      const playerHit = projectile.owner === 'npc' ? segmentHitsPlayer(from, to) : null;
+      const collision = projectile.owner === 'npc' ? null : segmentTarget(projectile, from, to);
+      const terrainY = terrainHeight(to.x, to.z);
+      const buildingHit = appCtx.checkBuildingCollision?.(to.x, to.z, .08, {
+        actorBaseY: to.y - .1,
+        actorHeight: .2
+      })?.collision === true;
+      const reachedGround = to.y <= terrainY + .12;
+      if (playerHit) {
+        const index = projectiles.indexOf(projectile);
+        if (index >= 0) projectiles.splice(index, 1);
+        disposeProjectile(projectile);
+        impactPulse(playerHit, .8, projectile.kind);
+        projectile.onPlayerImpact?.({ force: projectile.equipment.force, sourceId: projectile.sourceId, position: playerHit });
+        state.lastProjectileAction = Object.freeze({
+          equipmentId: projectile.equipment.id,
+          phase: 'player-impact',
+          targetKind: 'player',
+          at: clock()
+        });
+        continue;
+      }
+      if (collision) {
+        resolveProjectile(projectile, { x: collision.x, y: collision.y, z: collision.z }, collision.target);
+        continue;
+      }
+      if (buildingHit || reachedGround || projectile.elapsed >= projectile.maxLife || projectile.distance >= Number(projectile.equipment.range || 30)) {
+        if (projectile.owner === 'npc') {
+          const index = projectiles.indexOf(projectile);
+          if (index >= 0) projectiles.splice(index, 1);
+          disposeProjectile(projectile);
+          impactPulse({ x: to.x, y: Math.max(terrainY, to.y), z: to.z }, .8, projectile.kind);
+        } else {
+          resolveProjectile(projectile, { x: to.x, y: Math.max(terrainY, to.y), z: to.z });
+        }
+        continue;
+      }
+      projectile.position.copy(to);
+      projectile.visual.root.position.copy(to);
+      if (projectile.kind === 'thrown-charge') {
+        projectile.visual.root.rotation.x += step * 8;
+        projectile.visual.root.rotation.z += step * 5;
+      } else if (projectile.kind !== 'paintball') {
+        projectile.visual.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), projectile.velocity.clone().normalize());
+      }
+    }
   }
 
   function use() {
@@ -263,6 +556,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const prepared = state.equipment.prepareUse(Date.now());
     if (!prepared.ok) {
       if (prepared.reason === 'reload' && state.equipment.reload()) setStatus('Reloaded.');
+      else if (prepared.reason === 'no_direct_use') setStatus('Use this field tool through a nearby activity or contextual action.');
       else setStatus(prepared.reason === 'cooldown' ? 'Equipment is not ready yet.' : 'No charges or ammunition remaining.');
       render();
       return true;
@@ -275,19 +569,26 @@ function createUrbanEquipmentRuntime(options = {}) {
       render();
       return true;
     }
-    const targets = worldTargets(equipment.range + (equipment.blastRadius || 0));
-    const aimed = aimedTarget(equipment, targets);
     const actor = appCtx.Walk.state.walker;
     const direction = new THREE.Vector3();
     appCtx.camera?.getWorldDirection?.(direction);
-    direction.y = 0;
     if (direction.lengthSq() < .01) direction.set(Math.sin(actor.angle), 0, Math.cos(actor.angle));
     direction.normalize();
-    let results = [];
+    if (equipment.projectileKind) {
+      spawnProjectile(equipment, actor, direction, roomActive);
+      render();
+      return true;
+    }
+    const targets = worldTargets(equipment.range + (equipment.blastRadius || 0));
+    const flatDirection = direction.clone();
+    flatDirection.y = 0;
+    if (flatDirection.lengthSq() < .01) flatDirection.set(Math.sin(actor.angle), 0, Math.cos(actor.angle));
+    flatDirection.normalize();
+    const aimed = aimedTarget(equipment, targets);
     let impactPosition = aimed?.target || {
-      x: actor.x + direction.x * equipment.range * .68,
-      y: terrainHeight(actor.x + direction.x * equipment.range * .68, actor.z + direction.z * equipment.range * .68),
-      z: actor.z + direction.z * equipment.range * .68
+      x: actor.x + flatDirection.x * equipment.range * .68,
+      y: terrainHeight(actor.x + flatDirection.x * equipment.range * .68, actor.z + flatDirection.z * equipment.range * .68),
+      z: actor.z + flatDirection.z * equipment.range * .68
     };
     const selected = equipment.blastRadius
       ? blastTargets(impactPosition, targets, equipment).map((entry) => ({ detailed: detailedTarget(entry.target), force: entry.force })).filter((entry) => entry.detailed)
@@ -295,50 +596,22 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (aimed && !equipment.blastRadius) impactPosition = aimed.target;
     if (equipment.blastRadius) impactPulse(impactPosition, equipment.blastRadius);
     else if (equipment.category === 'sidearm' && aimed) impactPulse(impactPosition, .8);
-    const eventKind = equipment.category === 'explosive' ? 'explosive_use'
-      : equipment.category === 'sidearm' ? 'weapon_discharge' : 'assault';
     reportCivicEvent({
-      kind: eventKind,
+      kind: 'assault',
       position: impactPosition,
-      severity: equipment.category === 'explosive' ? 3 : equipment.category === 'sidearm' ? 2 : 1,
-      radius: equipment.category === 'explosive' ? 52 : equipment.category === 'sidearm' ? 38 : 22,
-      audibleRadius: equipment.category === 'explosive' ? 52 : equipment.category === 'sidearm' ? 34 : 6,
+      severity: 1,
+      radius: 22,
+      audibleRadius: 6,
       maximumWitnesses: 4
     });
-    if (roomActive && selected.length) {
-      const shared = selected.map((entry) => sharedTarget(entry.detailed));
-      if (shared.some((entry) => !entry)) {
-        setStatus('That object does not have a stable room identity.', 2200);
-      } else {
-        state.authorityImpactPending = true;
-        setStatus('Verifying shared impact…', 2600);
-        state.authority.commitImpacts(equipment, impactPosition, shared).then((response) => {
-          if (!isActive()) return;
-          state.authorityImpactPending = false;
-          if (!response?.accepted) {
-            setStatus(response?.reason === 'cooldown' ? 'Shared equipment is not ready yet.' : 'The room rejected that impact.', 2200);
-            return;
-          }
-          const byId = new Map((response.results || []).map((entry) => [entry.entityId, entry]));
-          results = selected.map((entry) => applyAuthoritativeImpact(entry.detailed, byId.get(sharedTarget(entry.detailed)?.entityId))).filter(Boolean);
-          state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'room', at: clock() });
-          setStatus(results.length ? `${equipment.label} affected ${results.length} shared target${results.length === 1 ? '' : 's'}.` : `${equipment.label}: no authorized target.`);
-        }).catch((error) => {
-          if (!isActive()) return;
-          state.authorityImpactPending = false;
-          setStatus(String(error?.message || 'Shared impact authority is unavailable.'), 2800);
-        });
-      }
-    } else {
-      results = selected.map((entry) => applyImpact(entry.detailed, entry.force)).filter(Boolean);
-      state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'local', at: clock() });
-      setStatus(results.length ? `${equipment.label} affected ${results.length} target${results.length === 1 ? '' : 's'}.` : `${equipment.label}: no target in view.`);
-    }
+    commitImpacts(equipment, impactPosition, selected, roomActive);
+    if (!selected.length) setStatus(`${equipment.label} swung.`);
     render();
     return true;
   }
 
   function update(dt) {
+    updateProjectiles(dt);
     const actor = appCtx.Walk?.state?.walker;
     if (actor && state.flashlight.visible) {
       const direction = new THREE.Vector3();
@@ -369,6 +642,8 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function dispose() {
+    projectiles.slice().forEach(disposeProjectile);
+    projectiles.length = 0;
     effects.forEach((effect) => {
       effect.root.removeFromParent?.();
       effect.geometries.forEach((geometry) => geometry.dispose());
@@ -377,7 +652,17 @@ function createUrbanEquipmentRuntime(options = {}) {
     effects.length = 0;
   }
 
-  return Object.freeze({ dispose, equipSlot, render, toggle, update, use });
+  return Object.freeze({
+    applyCollisionImpact: (target, force) => applyImpact(target, force),
+    dispose,
+    equipSlot,
+    fireNpcProjectile,
+    render,
+    snapshot: () => Object.freeze({ activeProjectiles: projectiles.length, lastProjectileAction: state.lastProjectileAction || null }),
+    toggle,
+    update,
+    use
+  });
 }
 
 export { createUrbanEquipmentRuntime };

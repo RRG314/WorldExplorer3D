@@ -30,7 +30,7 @@ import {
   interiorFloorIdentity,
   loadedInteriorLevels,
   nextElevatorLevel
-} from "./floor-model.js?v=1";
+} from "./floor-model.js?v=2";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -232,13 +232,13 @@ function buildInteriorLevelScene(definition, options = {}) {
       Array.isArray(definition.entrances) ? definition.entrances : [],
       desiredEntry
     );
-  const floorY = floorBaseY + finiteNumber(definition.selectedLevel, 0) * INTERIOR_LEVEL_HEIGHT;
-  const buildingLevels = Math.max(1, Math.round(finiteNumber(building?.levels, 1)));
-  const buildingHeight = Math.max(INTERIOR_WALL_HEIGHT, finiteNumber(building?.height, INTERIOR_WALL_HEIGHT));
+  const storyHeight = clamp(finiteNumber(options.storyHeight, INTERIOR_LEVEL_HEIGHT), 2.7, 5.6);
+  const floorY = floorBaseY + finiteNumber(definition.selectedLevel, 0) * storyHeight;
   const type = String(building?.buildingType || '').toLowerCase();
   const openPlan = /warehouse|industrial|hangar|garage|parking|station/.test(type);
-  const mappedStoryHeight = buildingHeight / buildingLevels;
-  const wallHeight = clamp(mappedStoryHeight, INTERIOR_WALL_HEIGHT, openPlan ? 5.6 : 4.6);
+  // Leave a small structural gap below the next slab/roof. The ceiling and
+  // floor now share one story-height authority and cannot cross each other.
+  const wallHeight = clamp(storyHeight - 0.12, 2.65, openPlan ? 5.48 : 4.6);
   const group = new THREE.Group();
   group.name = `interior:${definition.key}`;
 
@@ -707,6 +707,7 @@ export function buildInteriorScene(definition, options = {}) {
     const state = buildInteriorLevelScene(floorDefinition(definition, level), {
       suppressLights: level !== activeLevel,
       connectorLayout: connector,
+      storyHeight: floorPlan.storyHeight,
       floorBaseY: Number.isFinite(options.floorBaseY) ? Number(options.floorBaseY) : undefined
     });
     state.group.name = `interior:${definition.key}:floor:${level}`;

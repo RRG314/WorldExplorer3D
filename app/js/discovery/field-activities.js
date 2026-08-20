@@ -163,7 +163,7 @@ function createFieldActivitySession(options = {}) {
     progress = fieldProgress(result.profile || { collectionCount: progress.records + 1 });
     state.phase = 'recorded';
     state.result = result;
-    const destination = result.collected ? 'Journal, Field Guide, and Collection' : 'Journal and Field Guide';
+    const destination = result.collected ? 'Journal, Field Guide, and Backpack' : 'Journal and Field Guide';
     state.message = `${result.event?.name || result.item?.name || record.name} saved to your ${destination}.`;
     return true;
   }

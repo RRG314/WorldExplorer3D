@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=49";
+} from "./structure-semantics.js?v=59";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=34";
+} from "./world/spawn.js?v=39";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -58,7 +58,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=32";
+} from "./world/load-support.js?v=33";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -100,8 +100,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=35";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=45";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=38";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=49";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -116,7 +116,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=4";
+} from "./world/navigation.js?v=5";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -127,7 +127,7 @@ import {
   pickNavigationTargetPoint,
   surfaceDisplayName,
   traversableFeaturesForMode
-} from "./world/traversal.js?v=2";
+} from "./world/traversal.js?v=3";
 import {
   initWorldVegetation,
   MAX_TREE_NODES,
@@ -142,7 +142,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=26";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=29";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=16";
@@ -161,16 +161,16 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=38";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=129";
+} from "./world/structure-aware.js?v=48";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=135";
 import {
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
 } from "./world/shortbread-source.js?v=17";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=41";
+import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=30";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=46";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -187,6 +187,18 @@ const LINEAR_FEATURE_POLICY = Object.freeze({
 const ENABLE_LINEAR_FEATURES = Object.values(LINEAR_FEATURE_POLICY).some(Boolean);
 appCtx.linearFeaturePolicy = LINEAR_FEATURE_POLICY;
 appCtx.linearFeaturePolicyEnabled = ENABLE_LINEAR_FEATURES;
+
+function spawnPlayerForLoadedWorld() {
+  const mode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive';
+  if (appCtx.selLoc === 'custom') {
+    return applyCustomLocationSpawn(mode, {
+      source: 'published_world_arrival',
+      preferBoatIfWater: true
+    });
+  }
+  return spawnOnRoad();
+}
+
 const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   ENABLE_LINEAR_FEATURES,
   LINEAR_FEATURE_POLICY,
@@ -265,7 +277,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   sanitizeWorldFootprintPoints,
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ,
-  spawnOnRoad,
+  spawnPlayer: spawnPlayerForLoadedWorld,
   updateFeatureSurfaceProfile,
   publishLocationWorld,
   vectorTileRangeForBounds,

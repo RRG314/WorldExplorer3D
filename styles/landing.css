@@ -351,22 +351,6 @@ h1 {
 .story:nth-child(even) .story-media { order: 2; }
 .story-media { position: relative; overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
 .story-media img { width: 100%; height: auto; object-fit: cover; }
-.story-media.mobile-composite { display: grid; place-items: center; min-height: 500px; background: #0a0f12; }
-.story-media.mobile-composite::before {
-  position: absolute;
-  inset: 12% 7%;
-  background: url('../assets/landing/gameplay/showcase/new-york-expanded-aerial.webp') center/cover;
-  opacity: 0.3;
-  content: '';
-}
-.story-media.mobile-composite img {
-  position: relative;
-  width: min(235px, 62%);
-  height: auto;
-  aspect-ratio: auto;
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
-}
 .media-label { position: absolute; z-index: 2; top: 16px; left: 16px; padding: 8px 10px; color: var(--ink); background: rgba(7, 11, 14, 0.85); }
 .feature-copy h2 { margin-bottom: 20px; font-size: clamp(30px, 4vw, 48px); }
 .feature-copy > p { margin: 0; color: var(--muted); font-size: 17px; }
@@ -389,6 +373,7 @@ h1 {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 14px;
+  margin-top: 72px;
 }
 .gallery figure { position: relative; overflow: hidden; min-height: 260px; aspect-ratio: 16 / 9; margin: 0; border: 1px solid var(--line); background: var(--surface); }
 .gallery figure:nth-child(1), .gallery figure:nth-child(4) { grid-column: span 7; }
@@ -512,7 +497,6 @@ footer a:hover { color: var(--ink); }
   .journey-card:nth-child(n+2) { border-top: 1px solid var(--line); }
   .journey-card h3 { margin-top: 36px; }
   .story-stack { gap: 78px; }
-  .story-media.mobile-composite { min-height: 430px; }
   .gallery { grid-template-columns: 1fr; }
   .gallery figure:nth-child(n) { grid-column: auto; width: 100%; min-height: 0; }
   .gallery img { min-height: 0; }

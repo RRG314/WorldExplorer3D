@@ -5,6 +5,36 @@ const GRAPH_BUDGET_BY_TIER = Object.freeze({
   quality: Object.freeze({ pedestrianEdges: 1100, trafficEdges: 900 })
 });
 
+const LEFT_DRIVING_COUNTRY_CODES = new Set([
+  'AG', 'AI', 'AU', 'BB', 'BD', 'BM', 'BN', 'BS', 'BT', 'BW', 'CY', 'DM',
+  'FJ', 'FK', 'GB', 'GD', 'GG', 'GY', 'HK', 'ID', 'IE', 'IM', 'IN', 'JE',
+  'JM', 'JP', 'KE', 'KI', 'KN', 'KY', 'LC', 'LK', 'LS', 'MO', 'MS', 'MT',
+  'MU', 'MV', 'MW', 'MY', 'MZ', 'NA', 'NR', 'NP', 'NZ', 'PG', 'PK', 'PN',
+  'SB', 'SC', 'SG', 'SH', 'SR', 'SZ', 'TC', 'TH', 'TK', 'TO', 'TT', 'TV',
+  'TZ', 'UG', 'VC', 'VG', 'VI', 'WS', 'ZA', 'ZM', 'ZW'
+]);
+
+export function resolveDrivingSide(selection = {}) {
+  const details = selection?.locationDetails || selection?.details || {};
+  const countryCode = String(
+    selection?.countryCode || details?.countryCode || details?.country_code || ''
+  ).trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(countryCode)) {
+    return Object.freeze({
+      driveOnLeft: LEFT_DRIVING_COUNTRY_CODES.has(countryCode),
+      source: 'country-code',
+      countryCode
+    });
+  }
+  const label = [selection?.name, details?.country].filter(Boolean).join(' ').toLowerCase();
+  const leftByLabel = /\b(?:united kingdom|england|scotland|wales|northern ireland|australia|japan|new zealand|singapore|india|ireland|south africa|hong kong|thailand|malaysia|indonesia|pakistan|bangladesh|sri lanka|kenya|tanzania|uganda|zimbabwe|zambia|botswana|namibia|mozambique|london|tokyo|sydney|melbourne|auckland|wellington|dublin|edinburgh|glasgow)\b/.test(label);
+  return Object.freeze({
+    driveOnLeft: leftByLabel,
+    source: leftByLabel ? 'location-label' : 'right-driving-fallback',
+    countryCode: null
+  });
+}
+
 function finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -91,11 +121,29 @@ function segmentPriority(segment) {
   return Math.hypot(midpointX, midpointZ);
 }
 
+function pedestrianSegmentAllowed(segment) {
+  const feature = segment?.feature;
+  if (!feature) return false;
+  if (feature.walkable === false || feature?.transportGraphRef?.walkable === false) return false;
+  if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return false;
+  const roadClass = String(
+    feature?.transportRecord?.sourceTags?.highway ||
+    feature?.transportRecord?.rawTags?.highway ||
+    feature?.type ||
+    ''
+  ).toLowerCase();
+  // This is a defensive publication boundary. Motorway paths must arrive as
+  // separately mapped footways; the traffic carriageway itself never becomes
+  // an inferred sidewalk or crossing.
+  return !/^(?:motorway|motorway_link)$/.test(roadClass);
+}
+
 export function compilePedestrianGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
-  const sourceSegments = (Array.isArray(options.traversal?.segments) ? options.traversal.segments : [])
-    .filter((segment) => segment?.p1 && segment?.p2 && segmentPriority(segment) <= 900)
+  const traversalSegments = Array.isArray(options.traversal?.segments) ? options.traversal.segments : [];
+  const sourceSegments = traversalSegments
+    .filter((segment) => segment?.p1 && segment?.p2 && pedestrianSegmentAllowed(segment) && segmentPriority(segment) <= 900)
     .sort((a, b) => segmentPriority(a) - segmentPriority(b));
   const store = makeNodeStore();
   const edges = [];
@@ -200,7 +248,14 @@ export function compilePedestrianGraph(options = {}) {
         entranceConnections: edges.filter((edge) => edge.role === 'entrance').length,
         additionalProviderQueries: 0
       }),
-      diagnostics: Object.freeze({ tier, sourceSegments: sourceSegments.length, edgeLimit: budget.pedestrianEdges })
+      diagnostics: Object.freeze({
+        tier,
+        sourceSegments: sourceSegments.length,
+        excludedNonPedestrianSegments: traversalSegments.filter((segment) =>
+          segment?.p1 && segment?.p2 && !pedestrianSegmentAllowed(segment)
+        ).length,
+        edgeLimit: budget.pedestrianEdges
+      })
     }),
     runtimeFeatureByEdge
   });
@@ -217,7 +272,7 @@ export function compileTrafficGraph(options = {}) {
   const runtimeFeatureByEdge = new Map();
   const driveOnLeft = options.driveOnLeft === true;
 
-  const addDirected = (segment, pair, reverse, directionName) => {
+  const addDirected = (segment, pair, reverse, directionName, roadWidth, laneOffset) => {
     if (edges.length >= budget.trafficEdges) return;
     const p1 = reverse ? pair.p2 : pair.p1;
     const p2 = reverse ? pair.p1 : pair.p2;
@@ -225,6 +280,7 @@ export function compileTrafficGraph(options = {}) {
     const to = store.upsert(p2, 'lane');
     const record = segment.feature?.transportRecord;
     const id = `traffic:${featureId(segment.feature, 'feature')}:${segment.segIndex}:${directionName}:${edges.length}`;
+    const outwardSign = laneOffset < 0 ? -1 : 1;
     edges.push(Object.freeze({
       id,
       from,
@@ -233,10 +289,19 @@ export function compileTrafficGraph(options = {}) {
       p2: Object.freeze({ ...p2 }),
       length: pair.length,
       speedLimit: Math.max(4.5, Math.min(24, finite(record?.speed?.metersPerSecond, finite(segment.feature?.speedLimit, 12.5)))),
+      roadWidth,
+      laneOffset: Math.abs(laneOffset),
+      centerlineOffset: laneOffset,
+      // This vector points from the lane center toward its actual outside curb.
+      // It is source-geometry data, so downstream parking never has to infer a
+      // side from a directed-edge yaw (which flips on reverse lanes).
+      curbNormalX: pair.normalX * outwardSign,
+      curbNormalZ: pair.normalZ * outwardSign,
       laneCount: Math.max(1, Math.round(finite(record?.crossSection?.lanes, 1))),
       roadClass: String(segment.feature?.type || segment.feature?.networkKind || record?.classification?.highway || 'road'),
       laneProvenance: record?.crossSection?.lanesSource ? 'mapped' : 'inferred',
       direction: directionName,
+      sourceDirection: String(segment.direction || 'both'),
       structure: structureState(segment.feature),
       provenance: record?.completeness === 'lossless' ? 'mapped_transport' : 'compiled_transport'
     }));
@@ -252,18 +317,18 @@ export function compileTrafficGraph(options = {}) {
     const reverseOffset = -forwardOffset;
     if (direction !== 'reverse') {
       const pair = edgePointPair(segment, forwardOffset, options.sampleSurface);
-      if (pair) addDirected(segment, pair, false, 'forward');
+      if (pair) addDirected(segment, pair, false, 'forward', width, forwardOffset);
     }
     if (direction !== 'forward' && edges.length < budget.trafficEdges) {
       const pair = edgePointPair(segment, reverseOffset, options.sampleSurface);
-      if (pair) addDirected(segment, pair, true, 'reverse');
+      if (pair) addDirected(segment, pair, true, 'reverse', width, reverseOffset);
     }
   }
 
   return Object.freeze({
     publication: Object.freeze({
       type: 'TrafficGraph',
-      schemaVersion: 1,
+      schemaVersion: 2,
       nodes: Object.freeze(store.nodes),
       edges: Object.freeze(edges),
       provenance: Object.freeze({

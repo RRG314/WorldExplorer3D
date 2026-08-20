@@ -6,7 +6,7 @@ import {
   serverTimestamp,
   setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { initFirebase } from './firebase-init.js';
+import { initFirebase } from './firebase-init.js?v=55';
 
 const USERS_COLLECTION = 'users';
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
