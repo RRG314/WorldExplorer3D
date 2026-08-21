@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=18";
+} from "./world/osm-loader.js?v=19";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -101,7 +101,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=51";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=52";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -162,13 +162,13 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=138";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=140";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
 } from "./world/shortbread-source.js?v=17";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=12";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=13";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=35";
 import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=48";

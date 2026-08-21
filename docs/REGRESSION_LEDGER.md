@@ -1528,3 +1528,53 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   15,272 buildings, 6,115 visible meshes, 21,225 requested records, 9/9 complete
   Overture tiles, 15,192 mapped heights, 2,929 mapped-tall records, and zero
   runtime/page/local-resource errors. Packaging did not change provider choice.
+
+## 2026-08-21 — Final building LOD advertised mapped skyline outside provider authority
+
+- Status: resolved locally as recovery checkpoint 3; exact transport,
+  composition, far-building identity and resource blockers remain; not deployed.
+- Symptom: Baltimore/JFX reported more than 24,000 rendered buildings but its
+  expected tall skyline disappeared. The mapped Transamerica footprint,
+  161 m height and 40 levels existed in provider and bundled metadata, while
+  One World Trade Center's mapped 417 m record proved the height compiler could
+  preserve a tall building when its identity reached final publication.
+- First authoritative loss: final building LOD advertised a 2,700-world-unit
+  circular domain, while acquisition used a 0.022-degree square. Transamerica
+  was 2,306.861 world units from the JFX origin but beyond the square's latitude
+  edge. Expanding acquisition alone exposed two downstream losses: ordinary
+  footprints consumed the 26,000-record cap, then a coarse loaded-road test
+  discarded the mapped footprint even though exact transport conflict returned
+  `action: none`.
+- Resolution: derive provider bounds from the same local projection and final
+  LOD radius; clip rectangular tile coverage to the circular publication domain
+  before selection; preserve mapped vessels and mapped buildings at or above
+  60 m before ordinary distance distribution; and apply coarse road coverage
+  only to inferred road-frontage geometry. Existing exact transport conflict
+  resolution remains the sole physical road/building exclusion authority.
+- Guard: source verification covers latitude-correct building bounds at
+  Baltimore/London/Tokyo, exact Transamerica inclusion, circular clipping,
+  deterministic vessel/tall/ordinary priority and mapped-versus-inferred road
+  coverage. Complete JFX evidence requires the exact Transamerica Overture ID,
+  bundled OSM provenance, mapped 161 m/40-level record, attached visible mesh,
+  complete provider tiles and no unresolved physical conflict.
+- Result: JFX decoded 65,561 provider records, retained 48,915 within the
+  publication circle, selected 26,000 and rendered 25,623 with 48 mapped-tall
+  records. The comparable pre-repair run rendered 24,510 with 23 mapped-tall
+  records. This is a detail-preserving authority correction, not a count or
+  visual-scale patch.
+- Worldwide control: all seven required final worlds pass pinned building
+  authority, zero pedestrians on transport, one physical bridge surface,
+  lane-direction and runtime/resource checks. The gate remains red for exact
+  transport at Baltimore (13), Golden Gate (7) and Tokyo (12), plus one grade
+  violation each at Baltimore and Tokyo. Their complete frames were inspected.
+- Never reintroduce: provider coverage smaller than advertised final LOD,
+  rectangular tile corners consuming circular publication budgets, ordinary
+  footprints displacing sparse mapped tall identities, coarse road coverage as
+  an exclusion authority for mapped footprints, count-only skyline acceptance,
+  city-specific landmark exceptions or reduced far/world detail.
+- Adjacent blockers: JFX's deck is above terrain but surrounding road/ground
+  joins are visibly disconnected; Golden Gate and Tokyo retain exact joins;
+  unforced JFX heap samples vary from about 626 MB to 1.77 GB and require
+  ownership evidence. Unified near/far building identities, mapped frontage and
+  storefronts, vehicle hill contact and broader final-world composition remain
+  separate checkpoints.

@@ -304,13 +304,27 @@ export async function fetchOvertureBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Overture building location is invalid.');
-  const radius = Math.max(0.004, Math.min(0.04, Number(options.radius) || 0.012));
-  const bounds = {
-    minLat: lat - radius,
-    minLon: lon - radius,
-    maxLat: lat + radius,
-    maxLon: lon + radius
+  const explicitBounds = options.bounds ? {
+    minLat: Number(options.bounds.minLat ?? options.bounds.latS),
+    minLon: Number(options.bounds.minLon ?? options.bounds.lonW),
+    maxLat: Number(options.bounds.maxLat ?? options.bounds.latN),
+    maxLon: Number(options.bounds.maxLon ?? options.bounds.lonE)
+  } : null;
+  if (explicitBounds && (!Object.values(explicitBounds).every(Number.isFinite) ||
+      explicitBounds.minLat >= explicitBounds.maxLat || explicitBounds.minLon >= explicitBounds.maxLon)) {
+    throw new Error('Overture building coverage bounds are invalid.');
+  }
+  const fallbackRadius = Math.max(0.004, Math.min(0.04, Number(options.radius) || 0.012));
+  const bounds = explicitBounds || {
+    minLat: lat - fallbackRadius,
+    minLon: lon - fallbackRadius,
+    maxLat: lat + fallbackRadius,
+    maxLon: lon + fallbackRadius
   };
+  const radius = Math.max(
+    (bounds.maxLat - bounds.minLat) * 0.5,
+    (bounds.maxLon - bounds.minLon) * 0.5
+  );
   const range = vectorTileRangeForBounds(
     bounds.minLat,
     bounds.minLon,
@@ -354,7 +368,15 @@ export async function fetchOvertureBuildingData(options = {}) {
       status: ways.length > 0 ? 'available' : 'authoritative-empty',
       capabilities: { buildings: 'authoritative' },
       radiusDegrees: radius,
-      approximateRadiusMeters: Math.round(radius * 111320),
+      coverageBounds: Object.freeze({ ...bounds }),
+      visibilityRadiusWorld: Number.isFinite(Number(options.visibilityRadiusWorld))
+        ? Number(options.visibilityRadiusWorld)
+        : null,
+      approximateRadiusMeters: Math.round(
+        Number.isFinite(Number(options.visibilityRadiusWorld))
+          ? Number(options.visibilityRadiusWorld)
+          : radius * 111320
+      ),
       buildingsAndParts: ways.length,
       parts: parts.length,
       mappedDimensions: mappedHeights.length,

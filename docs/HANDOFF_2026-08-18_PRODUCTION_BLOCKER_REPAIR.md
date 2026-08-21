@@ -1504,3 +1504,50 @@ The first clean immutable candidate reproduced the source result exactly:
 15,272 buildings, 6,115 visible meshes, 21,225 requested records, 9/9 complete
 Overture tiles, 15,192 mapped heights, 2,929 mapped-tall records, and no
 runtime/page/local-resource errors. Its full frame was opened and inspected.
+
+## Current continuation after 2026-08-21 recovery checkpoint 3
+
+The Baltimore skyline regression is now traced to publication coverage and
+selection, not height resolution or the bridge compiler. The fixed-location
+renderer advertised buildings through a 2,700-world-unit circular far-visible
+domain, but building acquisition stopped at a 0.022-degree square. Transamerica
+was 2,306.861 world units from the JFX origin and therefore visible by final LOD
+authority but outside the provider's latitude edge. After provider coverage was
+aligned, it was still displaced at the 26,000-record selection cap and then
+rejected by a coarse loaded-road proximity test despite the exact conflict
+resolver finding no conflict.
+
+Source now derives building bounds by inverting the renderer projection,
+clips rectangular provider tiles to the circular LOD domain before budgets,
+retains sparse mapped buildings of at least 60 m before ordinary distance
+distribution, and restricts coarse road-coverage eligibility to explicitly
+inferred road-frontage geometry. Mapped Overture and Shortbread footprints flow
+to the existing exact transport-conflict authority. No building height is
+changed, no inferred measurement is labeled surveyed, and no detail tier is
+removed.
+
+The exact mapped Transamerica identity is again an attached visible mid-LOD
+mesh with 161 m height and 40 levels from mapped metadata. Final JFX evidence
+contains 65,561 decoded provider records, 48,915 circular-domain records,
+26,000 selected, 25,623 rendered, 48 mapped-tall records, and 591 mapped
+footprints retained beyond coarse road coverage. One World Trade Center remains
+an attached visible near mesh with its mapped 417 m roof-height record.
+
+Do not call the release production-ready. The fresh complete matrix is red at
+Baltimore (13 exact joins, maximum 12.8544 m, one 15.9978% grade), Golden Gate
+(seven joins, maximum 8.0876 m), and Tokyo (twelve joins, maximum 15.9661 m,
+one 14.6464% grade). London, Monaco, Manhattan and rural Iowa pass. All seven
+pass zero-pedestrian, building-provider, single-surface, lane-direction,
+runtime and resource checks. Visual inspection confirms JFX's central deck is
+above ground; exposed terrain and disconnected strips around it are real
+composition gaps. Trace the earliest shared exact-connection loss through
+source endpoints, deduplication, graph identity, simultaneous vertical solve,
+assembly and final publication as the next bounded authority task.
+
+Memory/data also remains open. An unforced JFX sample reached about 1.77 GB used
+JS heap, while another comparable source load sampled about 626 MB. Establish
+retained ownership with forced-GC/lifecycle evidence before changing caches or
+budgets, and do not lower building, ground or far-region detail. Vehicle hill
+contact, one building identity across near/far LOD, mapped street-facing doors
+and glass storefronts, and broader world composition remain later bounded
+tasks. Do not push, deploy, promote or mutate user data.

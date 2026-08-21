@@ -7,7 +7,7 @@ import {
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=48";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=24";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=7";
@@ -378,6 +378,7 @@ export function createWorldRoadLoader(deps = {}) {
           roadsRadius: radius,
           featureRadiusScale,
           poiRadiusScale,
+          buildingVisibleRadiusWorld: lodThresholds.farVisible,
           overpassTimeoutMs,
           loadStartedAt,
           maxTotalLoadMs
@@ -650,6 +651,8 @@ export function createWorldRoadLoader(deps = {}) {
                     lat: appCtx.LOC.lat,
                     lon: appCtx.LOC.lon,
                     radius: buildingPublicationCacheMeta.featureRadius,
+                    bounds: buildingPublicationCacheMeta.bounds,
+                    visibilityRadiusWorld: buildingPublicationCacheMeta.visibleRadiusWorld,
                     signal
                   })
                 )
@@ -660,6 +663,7 @@ export function createWorldRoadLoader(deps = {}) {
                     lat: appCtx.LOC.lat,
                     lon: appCtx.LOC.lon,
                     radius: buildingPublicationCacheMeta.featureRadius,
+                    bounds: buildingPublicationCacheMeta.bounds,
                     signal
                   });
                   if (fallback?._shortbreadTiles?.coverageComplete !== true) {

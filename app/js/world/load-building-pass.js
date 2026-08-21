@@ -28,6 +28,10 @@ import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-sch
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
 
+export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
+  return String(tags._geometrySource || '') === 'inferred_road_frontage';
+}
+
 export async function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
   const nodes = options.nodes || {};
@@ -205,9 +209,13 @@ export async function buildBuildingGeometryPass(options = {}) {
       continue;
     }
     const nearLoadedRoad = measureBuildingPhase('roadEligibility', () => isBuildingNearLoadedRoad(pts));
-    if (!nearLoadedRoad) {
+    if (!nearLoadedRoad && requiresLoadedRoadCoverageForBuilding(way.tags || {})) {
       loadMetrics.buildingPublication.outsideRoadCoverage += 1;
       continue;
+    }
+    if (!nearLoadedRoad) {
+      loadMetrics.buildingPublication.retainedMappedBeyondRoadCoverage =
+        Number(loadMetrics.buildingPublication.retainedMappedBeyondRoadCoverage || 0) + 1;
     }
     let roadCoreConflict = false;
     let centerX = 0;

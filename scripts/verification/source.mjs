@@ -4,6 +4,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchBundledBuildingMetadata } from '../../app/js/world/preset-building-metadata.js';
+import {
+  buildingPublicationPriority,
+  constrainBuildingWaysToPublicationDomain
+} from '../../app/js/world/load-building-detail.js';
+import { requiresLoadedRoadCoverageForBuilding } from '../../app/js/world/load-building-pass.js';
+import {
+  buildWorldOverpassPlan,
+  resolveBuildingPublicationBounds
+} from '../../app/js/world/osm-loader.js';
 import { filterSelectionToAcceptedGround } from '../../app/js/world/compiler/accepted-ground-selection.js';
 import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-regional-context.js';
 import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
@@ -281,6 +290,65 @@ const ruralMetadataWithPublicationCoverage = await fetchBundledBuildingMetadata(
   lon: -93.0977
 });
 const buildingMetadataCoverageFailures = [];
+const publicationDomainFixtureNodes = {
+  1: { lat: 0, lon: 0 }, 2: { lat: 0, lon: 2 }, 3: { lat: 2, lon: 2 }, 4: { lat: 2, lon: 0 },
+  5: { lat: 20, lon: 20 }, 6: { lat: 20, lon: 22 }, 7: { lat: 22, lon: 22 }, 8: { lat: 22, lon: 20 }
+};
+const publicationDomainFixture = constrainBuildingWaysToPublicationDomain([
+  { id: 'inside', nodes: [1, 2, 3, 4, 1], tags: { building: 'yes' } },
+  { id: 'outside', nodes: [5, 6, 7, 8, 5], tags: { building: 'yes' } }
+], publicationDomainFixtureNodes, {
+  visibleRadiusWorld: 10,
+  geoToWorld: (lat, lon) => ({ x: lon, z: lat })
+});
+if (publicationDomainFixture.ways.length !== 1 ||
+    publicationDomainFixture.ways[0].id !== 'inside' || publicationDomainFixture.clipped !== 1) {
+  buildingMetadataCoverageFailures.push('rectangular provider buildings are not clipped to the circular publication LOD domain');
+}
+if (!(buildingPublicationPriority({ building: 'ship' }) >
+      buildingPublicationPriority({ height: '161', 'building:levels': '40' }) &&
+      buildingPublicationPriority({ height: '161', 'building:levels': '40' }) >
+      buildingPublicationPriority({ height: '18' }))) {
+  buildingMetadataCoverageFailures.push('mapped vessel/tall-building publication priority is not deterministic');
+}
+if (requiresLoadedRoadCoverageForBuilding({ _geometrySource: 'overture' }) ||
+    requiresLoadedRoadCoverageForBuilding({ _geometrySource: 'shortbread-vector' }) ||
+    !requiresLoadedRoadCoverageForBuilding({ _geometrySource: 'inferred_road_frontage' })) {
+  buildingMetadataCoverageFailures.push('mapped building authority still depends on coarse loaded-road proximity');
+}
+const representativeBuildingCoverage = [
+  { id: 'baltimore-jfx', lat: 39.309728, lon: -76.621428 },
+  { id: 'london', lat: 51.5074, lon: -0.1278 },
+  { id: 'tokyo', lat: 35.6762, lon: 139.6503 }
+].map((location) => ({
+  ...location,
+  bounds: resolveBuildingPublicationBounds(location, 2700)
+}));
+for (const coverage of representativeBuildingCoverage) {
+  const latitudeWorld = (coverage.bounds.maxLat - coverage.lat) * 100000;
+  const longitudeWorld = (coverage.bounds.maxLon - coverage.lon) * 100000 *
+    Math.cos(coverage.lat * Math.PI / 180);
+  if (Math.abs(latitudeWorld - 2700) > 1e-6 || Math.abs(longitudeWorld - 2700) > 1e-6 ||
+      coverage.bounds.authority !== 'building-far-visible-lod') {
+    buildingMetadataCoverageFailures.push(`${coverage.id} building provider bounds do not cover the renderer far-visible radius`);
+  }
+}
+const jfxPublicationPlan = buildWorldOverpassPlan({
+  location: { lat: 39.309728, lon: -76.621428 },
+  roadsRadius: 0.02,
+  featureRadiusScale: 1,
+  poiRadiusScale: 1,
+  buildingVisibleRadiusWorld: 2700,
+  overpassTimeoutMs: 30000,
+  loadStartedAt: 0,
+  maxTotalLoadMs: 62000
+});
+if (jfxPublicationPlan.buildingPublicationCacheMeta.bounds.minLat > 39.28728605 ||
+    jfxPublicationPlan.buildingPublicationCacheMeta.bounds.maxLat < 39.28728605 ||
+    jfxPublicationPlan.buildingPublicationCacheMeta.bounds.minLon > -76.6144488 ||
+    jfxPublicationPlan.buildingPublicationCacheMeta.bounds.maxLon < -76.6144488) {
+  buildingMetadataCoverageFailures.push('JFX far-visible building provider bounds exclude mapped Transamerica identity');
+}
 if (jfxMetadataWithoutPublicationCoverage !== null) {
   buildingMetadataCoverageFailures.push('JFX origin unexpectedly selects a downtown-only pack without publication coverage');
 }
