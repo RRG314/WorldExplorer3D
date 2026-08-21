@@ -22,10 +22,29 @@ import {
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
 } from '../../app/js/structure-semantics.js';
+import { selectSpatiallyDistributedContextTiles } from '../../app/js/terrain/far-field-mapped-context.js';
 
 // This verification is derived from the current actor/vehicle product
 // requirements. It does not inherit screenshot baselines or legacy tests.
 assert.equal(URBAN_VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG, 'Parked vehicles must use the canonical parkable catalog.');
+
+const farContextFixtureTiles = Array.from({ length: 20 }, (_, x) =>
+  Array.from({ length: 20 }, (_entry, y) => ({ x, y }))
+).flat();
+const admittedFarContextTiles = selectSpatiallyDistributedContextTiles(farContextFixtureTiles, 160);
+assert.equal(admittedFarContextTiles.length, 160, 'Far-context provider admission must enforce its tile budget before fetch.');
+assert.equal(
+  new Set(admittedFarContextTiles.map((tile) => `${tile.x}/${tile.y}`)).size,
+  admittedFarContextTiles.length,
+  'Far-context tile admission must not duplicate provider requests.'
+);
+assert.ok(
+  Math.min(...admittedFarContextTiles.map((tile) => tile.x)) === 0 &&
+    Math.max(...admittedFarContextTiles.map((tile) => tile.x)) === 19 &&
+    Math.min(...admittedFarContextTiles.map((tile) => tile.y)) === 0 &&
+    Math.max(...admittedFarContextTiles.map((tile) => tile.y)) === 19,
+  'Far-context tile admission must preserve all outer directions.'
+);
 
 const motorwayRecord = normalizeTransportSource(
   { providerNamespace: 'osm', type: 'way', id: 'motorway-with-implied-direction' },

@@ -1406,3 +1406,37 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   15.9661 m and a 14.646% grade. Provider retries passed, proving fallback can
   hide both. London/Monaco/Tokyo terrain shaping, rural Iowa arrival, facade
   frontage, skyline/LOD, and waterfront ordering remain open.
+
+## 2026-08-20 — Far mapped context fetched rejected buildings
+
+- Status: resolved locally; worldwide topology and visual-coherence blockers
+  remain open; not deployed.
+- Symptom: Manhattan's first complete load transferred 23.75 MB of Shortbread
+  vector data and decoded 766,918 far building footprints although only
+  170,748 were published. Count-only checks reported many buildings but could
+  not reveal the wasted requests, decoding, transient memory, or triangles.
+- Root cause: geometry budgets ran after all 256 available z14 far-building
+  tiles had already been requested. Post-fetch rejection was incorrectly
+  serving as the only resource guard.
+- Resolution: one generic pre-fetch authority admits at most 160 tiles using a
+  contiguous near set plus deterministic spatial sampling to preserve every
+  outer direction. Exact far buildings are bounded at 6,000 and all far
+  instances at 120,000. Provider zoom, mapped identities, provenance, near
+  buildings, and renderer ownership are unchanged.
+- Guard: a 400-tile fixture must admit exactly 160 unique tiles and retain both
+  x/y extrema. Every complete assembled location must publish
+  `fixed_far_context_resource_budget`, request no more than 160 tiles, and stay
+  inside both geometry limits.
+- Evidence: the same Manhattan path transferred 17.31 MB of vector data,
+  published 80,241 far buildings, reduced local Chrome backing-store use by
+  about 8.47 MB, and reduced triangles from about 4.32 million to 3.13 million
+  while retaining the tall skyline and 10,763 near buildings. Artifact
+  `4.3.0+88c3ff8b88a7.fa948a89c08ff98e.staging` was local only.
+- Never reintroduce: fetching every available far-building tile before
+  admission, a city-specific range, random tile choice, lower-zoom building
+  inference where the provider has no such layer, or a second far-building
+  renderer.
+- Adjacent blockers: the packaged matrix still found exact discontinuities at
+  Golden Gate, Monaco, Manhattan, and Tokyo plus grade violations at Monaco and
+  Tokyo. Complete London/Monaco/Tokyo/Iowa/Manhattan frames remain visibly
+  incoherent, and mapped-street-facing doors/storefronts remain unproved.
