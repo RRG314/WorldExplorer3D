@@ -7,7 +7,7 @@ import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,
   updateStructureVisualVisibilityForContext
-} from "./structure-visual-meshes.js?v=25";
+} from "./structure-visual-meshes.js?v=26";
 import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
@@ -109,6 +109,15 @@ export function collectStructureVisualInstances(deps = {}) {
     const feature = featuresToProcess[i];
     const semantics = feature?.structureSemantics;
     if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || !semantics) continue;
+    const sharedSurface = feature?.transportSurfacePresentation?.status === 'compiled'
+      ? feature.transportSurfacePresentation
+      : null;
+    if (
+      sharedSurface &&
+      String(feature.sourceFeatureId || '') !== String(sharedSurface.publisherFeatureId || '')
+    ) continue;
+    const visualSurface = sharedSurface || feature;
+    const sampleVisualSurfaceY = (x, z) => sampleFeatureSurfaceY(visualSurface, x, z);
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
     const generalizedRoadVisual =
       category === 'road' &&
@@ -129,8 +138,9 @@ export function collectStructureVisualInstances(deps = {}) {
               4.2
         ) :
         10;
-    const visualPts =
-      typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
+    const visualPts = sharedSurface
+      ? sharedSurface.pts
+      : typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
         appCtx.subdivideRoadPoints(feature.pts, visualDetail) :
         feature.pts;
     const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
@@ -160,7 +170,7 @@ export function collectStructureVisualInstances(deps = {}) {
         Array.isArray(structureAssembly?.supportStations) &&
         structureAssembly.supportStations.length > 0;
       const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
-      const width = Math.max(2, Number(feature.width) || 4);
+      const width = Math.max(2, Number(visualSurface.width) || 4);
       const structureSpecification = feature?.transportStructureRef?.specification || {};
       const deckThickness = Number(structureSpecification.deckThickness) ||
         (isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11)));
@@ -172,11 +182,11 @@ export function collectStructureVisualInstances(deps = {}) {
         const dz = p2.z - p1.z;
         const segLen = Math.hypot(dx, dz);
         if (!(segLen > 0.35)) continue;
-        const startY = sampleFeatureSurfaceY(feature, p1.x, p1.z);
-        const endY = sampleFeatureSurfaceY(feature, p2.x, p2.z);
+        const startY = sampleVisualSurfaceY(p1.x, p1.z);
+        const endY = sampleVisualSurfaceY(p2.x, p2.z);
         const midX = (p1.x + p2.x) * 0.5;
         const midZ = (p1.z + p2.z) * 0.5;
-        const deckY = sampleFeatureSurfaceY(feature, midX, midZ);
+        const deckY = sampleVisualSurfaceY(midX, midZ);
         if (!Number.isFinite(deckY) || !Number.isFinite(startY) || !Number.isFinite(endY)) continue;
         const rotationY = Math.atan2(dx, dz);
         const nx = -dz / (segLen || 1);
@@ -415,18 +425,26 @@ export function collectStructureVisualInstances(deps = {}) {
         structureAssembly?.publishBody === true &&
         structureAssembly.total >= 0.5
       ) {
-        const rings = (structureAssembly.surfaceSamples || []).map((sample) => ({
-          x: sample.x,
-          y: sample.y,
-          z: sample.z,
-          thickness: sample.thickness
-        }));
+        const rings = sharedSurface
+          ? sharedSurface.pts.map((sample) => ({
+              x: sample.x,
+              y: sample.y,
+              z: sample.z,
+              thickness: structureAssembly.baseThickness
+            }))
+          : (structureAssembly.surfaceSamples || []).map((sample) => ({
+              x: sample.x,
+              y: sample.y,
+              z: sample.z,
+              thickness: sample.thickness
+            }));
         if (rings.length >= 2) {
           elevatedDeckShells.push({
             rings,
-            width: structureAssembly.width,
+            width: sharedSurface ? sharedSurface.width : structureAssembly.width,
             thickness: structureAssembly.baseThickness,
-            featureId: structureAssembly.featureId,
+            featureId: sharedSurface ? sharedSurface.id : structureAssembly.featureId,
+            featureIds: sharedSurface ? sharedSurface.memberFeatureIds : undefined,
             structureType: structureAssembly.structureType,
             bodyCoverage: structureAssembly.bodyCoverage
           });
@@ -451,7 +469,7 @@ export function collectStructureVisualInstances(deps = {}) {
           const point = samplePointAlongPolyline(structurePts, distance);
           if (!point) continue;
           const terrainY = sampleTerrainHeight(point.x, point.z);
-          const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+          const deckY = sampleVisualSurfaceY(point.x, point.z);
           const supportHeight = deckY - deckThickness - terrainY;
           if (!(supportHeight > 2.4)) continue;
           const pierWidth = Math.max(0.7, width * 0.22);
@@ -501,7 +519,7 @@ export function collectStructureVisualInstances(deps = {}) {
         const point = samplePointAlongPolyline(structurePts, distance);
         if (!point) return;
         const terrainY = sampleTerrainHeight(point.x, point.z);
-        const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+        const deckY = sampleVisualSurfaceY(point.x, point.z);
         const supportHeight = deckY - 0.45 - terrainY;
         if (!(supportHeight > 1.4)) return;
         const nx = -point.tangentZ;

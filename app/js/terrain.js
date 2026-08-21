@@ -4,7 +4,7 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=55";
+} from "./terrain/structure-visuals.js?v=57";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=12";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=20";
@@ -56,12 +56,12 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=42";
+} from "./terrain/rebuild.js?v=43";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=12";
+} from "./terrain/debug-tools.js?v=13";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=71";

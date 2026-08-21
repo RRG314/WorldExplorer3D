@@ -26,6 +26,7 @@ import {
 } from "./bridge-safety.js?v=13";
 import { refreshStructureColliders } from "./structure-colliders.js?v=13";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
+import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=2';
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -585,6 +586,13 @@ function* compileStructureAwareFeatureProfileSteps() {
   yield;
 
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
+  yield;
+  measure('compileSharedPhysicalSurfaces', () => {
+    appCtx.sharedTransportSurfacePresentation = compileSharedTransportSurfacePresentations(
+      roadFeatures,
+      sampleFeatureSurfaceY
+    );
+  });
   yield;
   measure('compileStructureAssemblies', () => {
     const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);

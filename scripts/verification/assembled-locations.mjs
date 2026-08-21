@@ -80,6 +80,7 @@ try {
           transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
           transportGradeProfile: diagnostics.transportStructures?.gradeProfile || null,
           publishedVerticalControls: diagnostics.transportStructures?.publishedVerticalControls || [],
+          sharedPhysicalSurfaces: diagnostics.transportStructures?.sharedPhysicalSurfaces || [],
           mappedLandmarks: diagnostics.mappedLandmarks || null,
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
@@ -143,10 +144,30 @@ try {
             /^https:\/\/www\.goldengate\.org\//.test(control.sourceUrl)
           )
         ),
+        bridgeRoadwayUsesOneSymmetricPhysicalSurface: location.id !== 'golden-gate'
+          ? snapshot.sharedPhysicalSurfaces.length === 0
+          : (
+              snapshot.sharedPhysicalSurfaces.length === 1 &&
+              snapshot.sharedPhysicalSurfaces[0].authority === 'compiled_transport_surface_group' &&
+              snapshot.sharedPhysicalSurfaces[0].physicalSurfaceKind === 'bridge_deck' &&
+              snapshot.sharedPhysicalSurfaces[0].widthMeters === 19 &&
+              snapshot.sharedPhysicalSurfaces[0].lanes === 6 &&
+              snapshot.sharedPhysicalSurfaces[0].memberFeatureIds.length === 2 &&
+              snapshot.sharedPhysicalSurfaces[0].measurementStatus ===
+                'published_reference_not_surveyed_scene_width' &&
+              /^https:\/\/www\.goldengate\.org\//.test(snapshot.sharedPhysicalSurfaces[0].sourceUrl)
+            ),
         bridgeLandmarkReadsCompiledSurface: location.id !== 'golden-gate' || (
           snapshot.mappedLandmarks?.suspensionBridge?.status === 'published_from_compiled_transport_surface' &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.controlledRoads || 0) === 2 &&
-          snapshot.mappedLandmarks?.suspensionBridge?.transportSurfaceOwner === 'compiled_transport_surface'
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.towers || 0) === 2 &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.cables || 0) === 2 &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.girders || 0) === 2 &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.suspenders || 0) > 0 &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.structuralMembers || 0) > 0 &&
+          snapshot.mappedLandmarks?.suspensionBridge?.transportSurfaceOwner === 'compiled_transport_surface' &&
+          snapshot.mappedLandmarks?.suspensionBridge?.structureAxisAuthority ===
+            'compiled_transport_surface_group'
         ),
         noRuntimeErrors: snapshot.runtimeErrors.length === 0,
         noBrowserErrors: browserErrors.length === 0,

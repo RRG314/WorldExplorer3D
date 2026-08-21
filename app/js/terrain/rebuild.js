@@ -319,14 +319,25 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const markMat = sharedRoadMaterials.markMat;
   await measureAsync('buildRoadRibbons', async () => {
     let sliceStartedAt = now();
+    const publishedSharedSurfaces = new Set();
     for (let roadIndex = 0; roadIndex < baseRoads.length; roadIndex += 1) {
       const road = baseRoads[roadIndex];
       if (!road || !Array.isArray(road.pts) || road.pts.length < 2) continue;
-      const { width } = road;
+      const sharedSurface = road?.transportSurfacePresentation?.status === 'compiled'
+        ? road.transportSurfacePresentation
+        : null;
+      if (sharedSurface) {
+        if (publishedSharedSurfaces.has(sharedSurface.id)) continue;
+        publishedSharedSurfaces.add(sharedSurface.id);
+      }
+      const renderRoad = sharedSurface || road;
+      const { width } = renderRoad;
       const hw = width / 2;
 
-      const requestedDetail = resolveRoadRibbonSubdivisionStep(road);
-      const basePts = subdivideRoadPoints(road.pts, requestedDetail);
+      const requestedDetail = resolveRoadRibbonSubdivisionStep(renderRoad);
+      const basePts = sharedSurface
+        ? sharedSurface.pts
+        : subdivideRoadPoints(road.pts, requestedDetail);
       // Preserve the source road as one continuous ribbon. A separate
       // intersection-cap pass previously trimmed these endpoints and filled
       // junctions with fan polygons, exposing circles and triangle boundaries.
@@ -337,26 +348,26 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const indices = [];
       const leftEdge = [];
       const rightEdge = [];
-      const roadTerrainSampler = road?.structureSemantics?.terrainMode === "at_grade" ?
+      const roadTerrainSampler = renderRoad?.structureSemantics?.terrainMode === "at_grade" ?
         cachedTerrainHeight :
         cachedBaseTerrainHeight;
-      const ribbonEdges = buildFeatureRibbonEdges(road, pts, hw, roadTerrainSampler, {
-        surfaceBias: Number.isFinite(road?.surfaceBias) ? road.surfaceBias : ROAD_SURFACE_BIAS
+      const ribbonEdges = buildFeatureRibbonEdges(renderRoad, pts, hw, roadTerrainSampler, {
+        surfaceBias: Number.isFinite(renderRoad?.surfaceBias) ? renderRoad.surfaceBias : ROAD_SURFACE_BIAS
       });
       leftEdge.push(...ribbonEdges.leftEdge);
       rightEdge.push(...ribbonEdges.rightEdge);
 
       appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
       appendRoadMainGeometry(verts, indices);
-      appendRoadCenterMarkings(road, pts, roadMarkBatchVerts, roadMarkBatchIdx);
+      appendRoadCenterMarkings(renderRoad, pts, roadMarkBatchVerts, roadMarkBatchIdx);
 
-      if (shouldRenderRoadSkirts(road)) {
-        const skirtDepth = roadSkirtDepth(road);
+      if (shouldRenderRoadSkirts(renderRoad)) {
+        const skirtDepth = roadSkirtDepth(renderRoad);
         const skirtData = buildRoadSkirts(
           leftEdge,
           rightEdge,
           skirtDepth,
-          road?.structureSemantics?.terrainMode === "at_grade" ? roadTerrainSampler : null
+          renderRoad?.structureSemantics?.terrainMode === "at_grade" ? roadTerrainSampler : null
         );
         if (skirtData.verts.length > 0) {
           appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);

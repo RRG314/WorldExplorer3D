@@ -13,7 +13,10 @@ import { normalizeTransportSource } from '../../app/js/world/compiler/transport-
 import { compileElevatedAssembly } from '../../app/js/world/compiler/transport-structure-assembly.js';
 import { supportSpanConflictsWithDriveableRoad } from '../../app/js/world/bridge-safety.js';
 import { URBAN_VEHICLE_CATALOG, parkedVehicleAnchors } from '../../app/js/urban-sandbox/vehicle-model.js';
-import { applyPublishedTransportSurfaceControls } from '../../app/js/world/transport-surface-controls.js';
+import {
+  applyPublishedTransportSurfaceControls,
+  compileSharedTransportSurfacePresentations
+} from '../../app/js/world/transport-surface-controls.js';
 import {
   buildFeatureStations,
   sampleFeatureSurfaceY,
@@ -166,6 +169,67 @@ assert.ok(
     Math.abs(sampleFeatureSurfaceY(completeBridgeRoad, 0, 2000) - 0.08) <= 0.001,
   'Complete mapped bridge endpoints must remain tied to their transport graph surfaces.'
 );
+
+const directionalBridgeRoads = [
+  {
+    name: 'Shared Fixture Bridge',
+    sourceFeatureId: 'fixture:shared:northbound',
+    pts: [{ x: -4, z: 0 }, { x: -4, z: 100 }],
+    structureSemantics: { terrainMode: 'elevated' },
+    baseY: 20
+  },
+  {
+    name: 'Shared Fixture Bridge',
+    sourceFeatureId: 'fixture:shared:southbound',
+    pts: [{ x: 4, z: 100 }, { x: 4, z: 0 }],
+    structureSemantics: { terrainMode: 'elevated' },
+    baseY: 20
+  }
+];
+applyPublishedTransportSurfaceControls({
+  controls: [{
+    id: 'fixture-shared-surface',
+    physicalSurfaceKind: 'bridge_deck',
+    match: {
+      mappedName: 'Shared Fixture Bridge',
+      terrainMode: 'elevated',
+      maximumDistanceFromReferencePathMeters: 10
+    },
+    horizontal: {
+      kind: 'shared_directional_carriageway_surface',
+      widthMeters: 19,
+      lanes: 6,
+      requiredDirectionalMembers: 2,
+      measurementStatus: 'published_reference_not_surveyed_scene_width',
+      sourceLabel: 'Fixture authority',
+      sourceUrl: 'https://example.test/fixture-authority'
+    },
+    vertical: {
+      kind: 'minimum_clearance_above_mapped_water',
+      clearanceMeters: 20,
+      referenceDatum: 'published_fixture_datum',
+      measurementStatus: 'published_reference_not_surveyed_scene_elevation',
+      sourceLabel: 'Fixture authority',
+      sourceUrl: 'https://example.test/fixture-authority'
+    }
+  }],
+  roads: directionalBridgeRoads,
+  referencePath: [{ x: 0, z: 0 }, { x: 0, z: 100 }]
+});
+const sharedSurfaceCompilation = compileSharedTransportSurfacePresentations(
+  directionalBridgeRoads,
+  (road) => road.baseY
+);
+assert.equal(sharedSurfaceCompilation.groups, 1, 'Two mapped directions must compile one shared physical surface.');
+assert.equal(sharedSurfaceCompilation.memberRoads, 2, 'Both directional identities must remain members of the shared surface.');
+assert.equal(
+  directionalBridgeRoads[0].transportSurfacePresentation,
+  directionalBridgeRoads[1].transportSurfacePresentation,
+  'Directional traversal records must reference one physical presentation authority.'
+);
+assert.equal(directionalBridgeRoads[0].transportSurfacePresentation.width, 19);
+assert.equal(directionalBridgeRoads[0].transportSurfacePresentation.pts[0].x, 0);
+assert.equal(directionalBridgeRoads[0].transportSurfacePresentation.authority, 'compiled_transport_surface_group');
 
 const motorwayFeature = {
   id: 'pedestrian-prohibited-motorway',

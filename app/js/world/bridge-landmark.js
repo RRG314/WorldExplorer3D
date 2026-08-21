@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=61';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
-import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=1';
+import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=2';
 
 const BRIDGE_COLOR = 0xbf4e3b;
 const MIN_SUSPENSION_SPAN_METERS = 600;
@@ -121,6 +121,47 @@ function projectDistanceToPath(point, points, distances) {
     }
   }
   return bestAlong;
+}
+
+function centerMappedPathOnCompiledSurface(mappedPath, compiledSurfacePath) {
+  if (
+    !Array.isArray(mappedPath) || mappedPath.length < 2 ||
+    !Array.isArray(compiledSurfacePath) || compiledSurfacePath.length < 2
+  ) return mappedPath;
+  const vectors = [];
+  for (const point of compiledSurfacePath) {
+    let closest = null;
+    for (let index = 0; index < mappedPath.length - 1; index += 1) {
+      const start = mappedPath[index];
+      const end = mappedPath[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const lengthSquared = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(
+        1,
+        ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared
+      ));
+      const x = start.x + dx * t;
+      const z = start.z + dz * t;
+      const distance = Math.hypot(point.x - x, point.z - z);
+      if (!closest || distance < closest.distance) closest = { x, z, distance };
+    }
+    if (closest && closest.distance <= 20) {
+      vectors.push({ x: point.x - closest.x, z: point.z - closest.z });
+    }
+  }
+  if (vectors.length < 2) return mappedPath;
+  const offset = vectors.reduce((sum, vector) => ({
+    x: sum.x + vector.x,
+    z: sum.z + vector.z
+  }), { x: 0, z: 0 });
+  offset.x /= vectors.length;
+  offset.z /= vectors.length;
+  return mappedPath.map((point) => ({
+    ...point,
+    x: point.x + offset.x,
+    z: point.z + offset.z
+  }));
 }
 
 function sampleRoadDeckY(x, z) {
@@ -372,6 +413,19 @@ export function renderSuspensionBridgeLandmark(data) {
   };
 
   const publishFromCompiledTransport = () => {
+    const compiledSharedSurface = (appCtx.roads || []).map((road) =>
+      road?.transportSurfacePresentation
+    ).find((surface) =>
+      surface?.status === 'compiled' &&
+      surface?.physicalSurfaceKind === 'bridge_deck' &&
+      surface?.memberFeatureIds?.some((featureId) =>
+        surfaceControl.controls.some((control) => control.sourceFeatureId === featureId)
+      )
+    ) || null;
+    const structurePath = compiledSharedSurface?.pts?.length >= 2
+      ? centerMappedPathOnCompiledSurface(path, compiledSharedSurface.pts)
+      : path;
+    const structureMetrics = polylineMetrics(structurePath);
     const createdMeshes = [];
     const towerParts = [];
     for (const way of towerWays) {
@@ -382,10 +436,10 @@ export function renderSuspensionBridgeLandmark(data) {
       createdMeshes.push(part.mesh);
       towerParts.push(part);
     }
-    const towers = towerStations(towerParts, path, metrics);
+    const towers = towerStations(towerParts, structurePath, structureMetrics);
     let structuralDetails = null;
     if (towers.length === 2) {
-      const cables = createCableMeshes(path, metrics, towers);
+      const cables = createCableMeshes(structurePath, structureMetrics, towers);
       for (const mesh of cables.cableMeshes) {
         appCtx.addEarthWorldObject(mesh);
         appCtx.historicMarkers.push(mesh);
@@ -400,8 +454,8 @@ export function renderSuspensionBridgeLandmark(data) {
       appCtx.historicMarkers.push(cables.suspenders);
       createdMeshes.push(cables.suspenders);
       structuralDetails = createBridgeStructuralDetails({
-        path,
-        metrics,
+        path: structurePath,
+        metrics: structureMetrics,
         towers,
         pointAtDistance,
         sampleRoadDeckY,
@@ -410,8 +464,8 @@ export function renderSuspensionBridgeLandmark(data) {
       if (structuralDetails) createdMeshes.push(structuralDetails);
     }
     appCtx.historicSites.push({
-      x: footprintCenter(path).x,
-      z: footprintCenter(path).z,
+      x: footprintCenter(structurePath).x,
+      z: footprintCenter(structurePath).z,
       type: 'suspension_bridge',
       name: spanWay.tags?.name || 'Golden Gate Bridge',
       wikidata: spanWay.tags?.wikidata || 'Q44440',
@@ -427,7 +481,10 @@ export function renderSuspensionBridgeLandmark(data) {
       girders: towers.length === 2 ? 2 : 0,
       suspenders: createdMeshes.find((mesh) =>
         mesh.userData?.landmarkKind === 'suspension_bridge_suspender')?.userData?.instanceCount || 0,
-      structuralMembers: structuralDetails?.userData?.instanceCount || 0
+      structuralMembers: structuralDetails?.userData?.instanceCount || 0,
+      structureAxisAuthority: compiledSharedSurface
+        ? 'compiled_transport_surface_group'
+        : 'mapped_landmark_path'
     });
     return result.metrics;
   };

@@ -1371,3 +1371,38 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Adjacent blocker: Golden Gate still has two overlapping full-width roadway
   ribbons. Fix their shared physical presentation separately while preserving
   both mapped directional identities and the existing bridge structure.
+
+## 2026-08-20 — Directional Golden Gate roads rendered as duplicate physical decks
+
+- Status: resolved locally; worldwide provider-sensitive topology and world
+  coherence remain production blockers; not deployed.
+- Symptom: Golden Gate's driving surface had a longitudinal/diagonal seam and
+  unequal-looking sides although the bridge structure itself was acceptable.
+- Root cause: both mapped one-way road identities lacked lane/width metadata,
+  so each independently received a full 10.8 m motorway fallback ribbon. Their
+  centerlines were 6.75-10.77 m apart and the physical ribbons overlapped by up
+  to 4.05 m. Vertical continuity and object-count checks could remain green.
+- Resolution: retain both mapped identities for topology, traversal, collision
+  sampling, and directional traffic, but publish one source-bound physical road
+  presentation, one marking set, and one bridge shell. The 19 m/six-lane control
+  is an official published design reference explicitly labeled not surveyed.
+  Landmark structure keeps its complete original path and components and reads
+  the compiled shared center only for lateral alignment.
+- Guard: fixtures require two opposite source identities, one centered shared
+  group, both retained member IDs, 19 m width, and six lanes. Golden Gate final
+  verification requires one group and full tower/cable/girder/suspender counts;
+  all other worldwide matrix locations require zero groups. Source and packaged
+  actor gates passed with active traffic, zero attitude mismatches, and zero
+  pedestrian NPCs on transport. Complete source/artifact frames were inspected.
+- Evidence: local artifact
+  `4.3.0+c633918d4d00.60a184335587db86.staging` (`sourceDirty: true`, never
+  deployed).
+- Never reintroduce: two full-width physical ribbons for a shared directional
+  deck, a landmark-owned duplicate driveable deck, replacement of directional
+  source identities, city logic inside generic compilation, or claims that the
+  published width is surveyed geometry.
+- Adjacent blockers: one lossless Monaco run exposed an 8.9704 m exact mismatch
+  and 47.727% grade; one packaged Tokyo run exposed 12 exact mismatches up to
+  15.9661 m and a 14.646% grade. Provider retries passed, proving fallback can
+  hide both. London/Monaco/Tokyo terrain shaping, rural Iowa arrival, facade
+  frontage, skyline/LOD, and waterfront ordering remain open.

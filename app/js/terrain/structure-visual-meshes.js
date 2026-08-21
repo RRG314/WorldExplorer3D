@@ -381,7 +381,11 @@ function buildElevatedRoadMeshForContext(
     structureVisualType: "elevated_road_shells",
     elevatedRoadOwner: "compiled-transport-structure-assembly",
     structureFeatureIds: Object.freeze([
-      ...new Set((deckShells || []).map((shell) => String(shell?.featureId || '')).filter(Boolean))
+      ...new Set((deckShells || []).flatMap((shell) =>
+        Array.isArray(shell?.featureIds) && shell.featureIds.length > 0
+          ? shell.featureIds.map((featureId) => String(featureId || ''))
+          : [String(shell?.featureId || '')]
+      ).filter(Boolean))
     ]),
     closedStructureEnds: true,
     variableTransitionThickness: true

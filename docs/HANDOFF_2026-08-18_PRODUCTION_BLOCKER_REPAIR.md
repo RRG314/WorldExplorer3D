@@ -1296,3 +1296,72 @@ push or deploy.
 Next bounded task: restore the isolated shared-roadway work, publish one
 physical Golden Gate road presentation while preserving both mapped traffic
 identities, inspect the complete frame, and rerun both worldwide matrices.
+
+## 2026-08-20 audit checkpoint 9 — directional identities share one physical roadway
+
+### First authoritative loss
+
+- At the normal Golden Gate player path, the two real one-way carriageways had
+  no mapped lane or width tags. Normalization therefore assigned each identity
+  the complete 10.8 m motorway fallback width, and final presentation rendered
+  both ribbons independently.
+- Their mapped centerlines were only 6.75-10.77 m apart. The two inferred
+  footprints overlapped by 0.03-4.05 m (mean 2.64 m), which created the visible
+  longitudinal/diagonal seam and unequal roadway sides even after their
+  vertical profiles agreed.
+- This is a horizontal physical-presentation failure upstream of mesh
+  publication. The bridge landmark compiler did not cause it, and tower/cable/
+  support geometry did not need redesign.
+
+### Completed bounded authority repair
+
+- Added a generic shared-directional-carriageway presentation control. It
+  binds exactly the two matched source road identities, orients and resamples
+  their compiled paths, and publishes one averaged physical centerline after
+  vertical transport compilation.
+- The two source identities remain authoritative for provider provenance,
+  topology, traversal, collision sampling, lane direction, and traffic. Only
+  road ribbon, lane markings, and bridge shell share the single physical
+  presentation; the second overlapping ribbon/shell is not published.
+- The group uses the bridge district's published 19 m road-between-curbs and
+  six-lane references. Source data records the official URL and labels the
+  measurement `published_reference_not_surveyed_scene_width`; it is not
+  described as surveyed geometry.
+- The original complete mapped landmark path remains intact. Its axis is moved
+  laterally to the compiled shared road center, while the existing two towers,
+  two cable runs, girders, suspenders, and structure members remain unchanged.
+
+### Verification and observed provider gaps
+
+- Deterministic fixtures require two opposite directional identities to yield
+  exactly one 19 m/six-lane physical presentation while retaining both source
+  IDs. The complete Golden Gate gate additionally requires the landmark
+  structure counts and `compiled_transport_surface_group` axis authority.
+- Source and packaged actor/vehicle gates passed with active traffic, zero
+  slope-attitude mismatches, correct lane side/direction, and zero pedestrian
+  NPCs on transport. Source and packaged worldwide matrices passed complete
+  runs; Baltimore/JFX, London, Monaco, Manhattan, rural Iowa, and Tokyo each
+  must publish zero shared Golden Gate groups. All complete source and artifact
+  frames were opened and inspected. Local-only artifact
+  `4.3.0+c633918d4d00.60a184335587db86.staging` was never deployed.
+- A lossless Monaco source run separately exposed an 8.9704 m exact connection
+  mismatch and 47.727% grade between `osm:way:155081324` and
+  `osm:way:155081354`. One packaged Tokyo lossless run exposed 12 exact
+  discontinuities up to 15.9661 m and one 14.646% grade. Subsequent provider
+  selections passed. This proves fallback-green matrices still do not establish
+  lossless topology correctness; neither defect belongs to the shared Golden
+  Gate group, and neither is patched here.
+
+### Still open
+
+1. Do not call the transport system or world production-ready. Monaco and Tokyo
+   exact-provider topology failures need separate first-loss audits.
+2. London/Monaco/Tokyo road-terrain shaping and rural Iowa arrival remain
+   visibly incoherent in the complete frames.
+3. The user-required mapped-street-facing doors and glass storefronts,
+   skyline/LOD acceptance, and waterfront foundation/water ordering remain
+   separate blockers.
+
+Next bounded task after the user tests this checkpoint: trace mapped entrance
+and street provenance through facade-edge selection, batching, LOD/culling, and
+final visibility. Do not push or deploy.

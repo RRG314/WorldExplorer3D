@@ -10,6 +10,15 @@
         "terrainMode": "elevated",
         "maximumDistanceFromReferencePathMeters": 45
       },
+      "horizontal": {
+        "kind": "shared_directional_carriageway_surface",
+        "widthMeters": 19,
+        "lanes": 6,
+        "requiredDirectionalMembers": 2,
+        "measurementStatus": "published_reference_not_surveyed_scene_width",
+        "sourceLabel": "Golden Gate Bridge Highway and Transportation District — Design & Construction Stats",
+        "sourceUrl": "https://www.goldengate.org/bridge/history-research/statistics-data/design-construction-stats/"
+      },
       "vertical": {
         "kind": "minimum_clearance_above_mapped_water",
         "clearanceMeters": 67,

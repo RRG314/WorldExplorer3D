@@ -510,6 +510,21 @@ function transportStructureSnapshot() {
     record.terrainMode !== 'at_grade' || record.engineeredApproach === true);
   const gradeViolations = engineeredGradeProfiles.filter((record) =>
     record.maximumGrade > record.designMaximumGrade + 0.002);
+  const sharedPhysicalSurfaces = [...new Map(roads.map((road) => {
+    const surface = road?.transportSurfacePresentation;
+    return surface?.status === 'compiled' ? [surface.id, surface] : null;
+  }).filter(Boolean)).values()].map((surface) => ({
+    id: String(surface.id || ''),
+    authority: String(surface.authority || ''),
+    physicalSurfaceKind: String(surface.physicalSurfaceKind || ''),
+    widthMeters: numberOrNull(surface.width),
+    lanes: Number(surface?.transportRecord?.crossSection?.lanes || 0),
+    memberFeatureIds: [...(surface.memberFeatureIds || [])],
+    publisherFeatureId: String(surface.publisherFeatureId || ''),
+    measurementStatus: String(surface.measurementStatus || ''),
+    sourceUrl: String(surface.sourceUrl || ''),
+    sampleCount: Number(surface.pts?.length || 0)
+  }));
   const visualTypes = {};
   for (const mesh of visuals) {
     const type = String(mesh?.userData?.structureVisualType || 'unclassified');
@@ -548,6 +563,7 @@ function transportStructureSnapshot() {
         measurementStatus: String(road.transportSurfaceControlResolution.measurementStatus || ''),
         sourceUrl: String(road.transportSurfaceControlResolution.sourceUrl || '')
       })),
+    sharedPhysicalSurfaces,
     exactStructureSamples,
     junctionContinuity: appCtx.transportJunctionProfile?.continuity || null,
     continuityRepair: appCtx.transportJunctionProfile?.continuityRepair || null,
