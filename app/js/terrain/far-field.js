@@ -9,7 +9,7 @@ import {
   loadFarMappedContext,
   pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=19';
+} from './far-field-mapped-context.js?v=18';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -34,7 +34,7 @@ import {
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=52';
+} from './surface-profiles.js?v=51';
 import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,
@@ -697,16 +697,9 @@ function createFarFieldTerrainApi(deps = {}) {
       detailedMappedSurfaceTintVertices,
       detailedWorldCoverSurfacesReused: 0,
       contextSource: 'openstreetmap-shortbread',
-      resourceBudgetAuthority: 'fixed_far_context_resource_budget',
       contextZoom: mappedContext.contextZoom,
-      contextTileBudget: FAR_CONTEXT_BUILDING_MAX_TILES,
-      contextTilesAvailable: mappedContext.availableTiles,
       contextTilesLoaded: mappedContext.loadedTiles,
       contextTilesRequested: mappedContext.requestedTiles,
-      contextTilesSkipped: Math.max(
-        0,
-        Number(mappedContext.availableTiles || 0) - Number(mappedContext.requestedTiles || 0)
-      ),
       waterOwner: 'exact-mapped-polygon-pipelines',
       waterContextZoom: mappedContext.waterZoom,
       waterContextTilesLoaded: mappedContext.waterTilesLoaded,
@@ -731,8 +724,6 @@ function createFarFieldTerrainApi(deps = {}) {
         : 1,
       farExactBuildings: builtBuildings?.exactBuildings || 0,
       farInstancedBuildings: builtBuildings?.instancedBuildings || 0,
-      farExactBuildingBudget: FAR_CONTEXT_MAX_BUILDINGS,
-      farBuildingInstanceBudget: FAR_CONTEXT_MAX_BUILDING_INSTANCES,
       geometryBuildPasses: 1,
       farBuildings: builtBuildings?.buildings || 0,
       detailedTerrainTilesExcluded: spec.detailedCoverage?.length || 0,

@@ -84,7 +84,6 @@ try {
           mappedLandmarks: diagnostics.mappedLandmarks || null,
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
-          farTerrainClipmap: diagnostics.farTerrainClipmap || null,
           surfaceChain: diagnostics.surfaceChain || null,
           worldLoad: {
             providers: diagnostics.worldLoad?.session?.providers || {},
@@ -132,14 +131,7 @@ try {
             snapshot.surfaceChain?.surfaces?.walk?.feature?.structureKind || ''
           )) &&
           Number(snapshot.surfaceChain?.surfaces?.walk?.feature?.structureVisual?.visibleMeshCount || 0) > 0
-          ),
-        farContextResourceBudgetBounded:
-          snapshot.farTerrainClipmap?.resourceBudgetAuthority === 'fixed_far_context_resource_budget' &&
-          Number(snapshot.farTerrainClipmap?.contextTilesRequested || 0) <= 160 &&
-          Number(snapshot.farTerrainClipmap?.contextTilesAvailable || 0) >=
-            Number(snapshot.farTerrainClipmap?.contextTilesRequested || 0) &&
-          Number(snapshot.farTerrainClipmap?.farBuildings || 0) <= 120000 &&
-          Number(snapshot.farTerrainClipmap?.farExactBuildings || 0) <= 6000,
+        ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         publishedBridgeElevationControlResolved: location.id !== 'golden-gate' || (

@@ -12,15 +12,15 @@ const FAR_WATER_CONTEXT_ZOOM = 11;
 // aerial continuity LOD: retain a spatially distributed subset and publish
 // most of it as inexpensive oriented instances instead of converting nearly
 // a million source footprints that are not individually resolvable.
-const FAR_CONTEXT_MAX_BUILDINGS = 6000;
+const FAR_CONTEXT_MAX_BUILDINGS = 9000;
 const FAR_CONTEXT_BUILDING_COVERAGE_TARGET = 0.45;
-const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 120000;
+const FAR_CONTEXT_MAX_BUILDING_INSTANCES = 280000;
 // The building layer is available at z14, not at the lower generalized zooms.
-// Building geometry exists only at z14. Fetching every tile in the 28 km
-// context decoded hundreds of thousands of footprints that the later visual
-// budget discarded. Keep z14 source identity and distribute a hard admission
-// budget across the complete region before provider work begins.
-const FAR_CONTEXT_BUILDING_MAX_TILES = 160;
+// A 14 km half-extent needs roughly 400 tiles at London's latitude, so this
+// budget must cover every shipped fixed-location preset before zoom selection
+// is allowed to step down. Terrain and mapped water retain their own smaller
+// requests; this budget governs the one regional-building publication pass.
+const FAR_CONTEXT_BUILDING_MAX_TILES = 512;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
 const FAR_LAND_SURFACE_PROFILES = Object.freeze({
@@ -237,47 +237,6 @@ function contextTileCoordinates(bounds, zoom = FAR_CONTEXT_ZOOM) {
   return coordinates;
 }
 
-function selectSpatiallyDistributedContextTiles(coordinates, maxTiles) {
-  const source = Array.isArray(coordinates) ? coordinates.filter((tile) => (
-    Number.isFinite(Number(tile?.x)) && Number.isFinite(Number(tile?.y))
-  )) : [];
-  const limit = Math.max(1, Math.floor(Number(maxTiles) || 1));
-  if (source.length <= limit) return source.slice();
-  const centerX = source.reduce((sum, tile) => sum + Number(tile.x), 0) / source.length;
-  const centerY = source.reduce((sum, tile) => sum + Number(tile.y), 0) / source.length;
-  const ordered = source.slice().sort((left, right) => {
-    const leftDistance = (left.x - centerX) ** 2 + (left.y - centerY) ** 2;
-    const rightDistance = (right.x - centerX) ** 2 + (right.y - centerY) ** 2;
-    return leftDistance - rightDistance || left.x - right.x || left.y - right.y;
-  });
-  // Retain a contiguous inner context for the normal player horizon, then use
-  // deterministic farthest-point sampling so every outer direction remains
-  // represented without requesting the complete tile rectangle.
-  const innerCount = Math.max(1, Math.min(limit, Math.floor(limit * 0.5)));
-  const selected = ordered.slice(0, innerCount);
-  const remaining = ordered.slice(innerCount);
-  while (selected.length < limit && remaining.length > 0) {
-    let bestIndex = 0;
-    let bestDistance = -1;
-    for (let index = 0; index < remaining.length; index += 1) {
-      const candidate = remaining[index];
-      let nearestSelected = Infinity;
-      for (const retained of selected) {
-        nearestSelected = Math.min(
-          nearestSelected,
-          (candidate.x - retained.x) ** 2 + (candidate.y - retained.y) ** 2
-        );
-      }
-      if (nearestSelected > bestDistance) {
-        bestDistance = nearestSelected;
-        bestIndex = index;
-      }
-    }
-    selected.push(remaining.splice(bestIndex, 1)[0]);
-  }
-  return selected.sort((left, right) => left.x - right.x || left.y - right.y);
-}
-
 function roundRobinSelect(buckets, maxCount) {
   const active = buckets
     .filter((bucket) => Array.isArray(bucket) && bucket.length > 0)
@@ -430,12 +389,12 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
 async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds = bounds, options = {}) {
   const contextZoom = Number.isFinite(Number(options.contextZoom))
     ? Number(options.contextZoom)
-    : FAR_CONTEXT_ZOOM;
-  const availableCoordinates = contextTileCoordinates(bounds, contextZoom);
-  const coordinates = selectSpatiallyDistributedContextTiles(
-    availableCoordinates,
-    FAR_CONTEXT_BUILDING_MAX_TILES
-  );
+    : selectContextZoomForTileBudget(
+        bounds,
+        FAR_CONTEXT_ZOOM,
+        FAR_CONTEXT_BUILDING_MAX_TILES
+      );
+  const coordinates = contextTileCoordinates(bounds, contextZoom);
   const fetchTile = typeof options.fetchTile === 'function' ? options.fetchTile : fetchShortbreadTile;
   const [contextBatch, waterContext] = await Promise.all([
     fetchWithConcurrency(
@@ -563,7 +522,6 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     ...waterContext,
     skippedNearBuildings,
     contextZoom,
-    availableTiles: availableCoordinates.length,
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length,
     contextMaxInFlight: contextBatch.metrics.maxInFlight,
@@ -589,7 +547,6 @@ export {
   pointInMappedWaterArea,
   retainFarWaterRing,
   roundRobinSelect,
-  selectSpatiallyDistributedContextTiles,
   selectSpatiallyDistributedBuildings,
   selectContextZoomForTileBudget
 };
