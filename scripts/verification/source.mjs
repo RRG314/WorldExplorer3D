@@ -443,6 +443,24 @@ const exactStructureRejected = filterSelectionToAcceptedGround(
   (_lat, lon) => lon < 0 ? { status: 'available' } : { status: 'unavailable' },
   { sampleRegionalGroundAtLatLon: () => ({ status: 'available' }) }
 );
+const separatedNamedStructureNodes = {
+  ...structureFallbackNodes,
+  3: { type: 'node', id: 3, lat: 10.01, lon: 20 },
+  4: { type: 'node', id: 4, lat: 10.01, lon: 20.001 }
+};
+const separatedNamedExactBridge = {
+  type: 'way', id: 101, nodes: [3, 4],
+  tags: { highway: 'primary', bridge: 'yes', name: 'Mapped Bridge' }
+};
+const separatedNamedStructureAccepted = filterSelectionToAcceptedGround(
+  {
+    ...emptySelection,
+    roadWays: [separatedNamedExactBridge, generalizedBridge]
+  },
+  separatedNamedStructureNodes,
+  () => ({ status: 'available' }),
+  { sampleRegionalGroundAtLatLon: () => ({ status: 'available' }) }
+);
 const regionalFallbackFixture = retainRegionalTransportOutsideCore({
   elements: [
     { type: 'node', id: -1, lat: 10, lon: 20 },
@@ -555,6 +573,10 @@ if (exactStructureAccepted.selection.roadWays.length !== 1 ||
     exactStructureAccepted.selection.roadWays[0].id !== exactBridge.id ||
     exactStructureAccepted.diagnostics.supersededGeneralizedStructures !== 1) {
   structureFallbackAuthorityFailures.push('accepted exact structure did not supersede its generalized fallback');
+}
+if (separatedNamedStructureAccepted.selection.roadWays.length !== 2 ||
+    separatedNamedStructureAccepted.diagnostics.supersededGeneralizedStructures !== 0) {
+  structureFallbackAuthorityFailures.push('a non-overlapping exact fragment deleted a same-name generalized physical surface');
 }
 if (exactStructureRejected.selection.roadWays.length !== 1 ||
     exactStructureRejected.selection.roadWays[0].id !== generalizedBridge.id ||

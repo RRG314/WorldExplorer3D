@@ -1590,3 +1590,36 @@ rural Iowa arrival are visibly incomplete. Memory ownership, vehicle hill
 contact, mapped street-facing doors/glass storefronts and remaining exact joins
 are still open. Do not call this production-ready, reduce world detail, push,
 deploy, promote or mutate user data.
+
+## Current continuation after 2026-08-21 recovery checkpoint 5
+
+The Golden Gate failure is provider reconciliation, not a landmark publication
+race. The failing real exact-provider load published 8,111 roads and 405
+lossless graph connections but had zero matched Golden Gate controls and no
+shared deck. When exact Overpass was unavailable, the same complete world kept
+the two generalized mapped carriageways and passed with one symmetric physical
+surface.
+
+The first code loss was a remaining global name shortcut in post-ground
+structure deduplication. A surviving exact bridge/tunnel fragment could remove
+any generalized way with the same normalized structure name, even without
+physical overlap. Names identify corridors, not surface extents; current OSM
+ways may divide one bridge into deck and approach fragments. Dedup now requires
+the existing same-family spatial/directional segment overlap and coverage proof.
+Coincident exact geometry still supersedes generalized geometry; a separated
+same-name fragment cannot delete a different physical surface. Source fixtures
+guard both cases and `verify:source` passes.
+
+The post-change seven-location assembled matrix passed all automated gates and
+all frames were inspected. Golden Gate shows one centered six-lane roadway with
+matching sides, tower/cable structure, water, terrain, HUD, player collision and
+active gameplay. JFX's deck remains above terrain. These are fallback controls,
+not exact symptom closure: all three configured Overpass operations failed for
+Golden Gate in both focused and matrix verification. The exact-provider rerun
+therefore remains a release gate, as does provider availability. Never relabel
+fallback success as exact topology proof.
+
+London/Monaco/Tokyo world composition, rural Iowa arrival, remaining exact
+joins/grades, vehicle hill contact, mapped facades/storefronts and memory/data
+ownership remain open. Do not push, deploy, promote or call the world
+production-ready.

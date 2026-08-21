@@ -194,29 +194,22 @@ export function pruneSupersededGeneralizedStructures(ways = [], nodes = {}) {
     nodeMap,
     originLatitude
   );
-  const exactNamedFamilies = new Set(
-    exactWays
-      .map((way) => {
-        const family = structureFamily(way.tags);
-        const name = normalizedStructureName(way.tags);
-        return family && name ? `${family}:${name}` : '';
-      })
-      .filter(Boolean)
-  );
   let supersededGeneralizedStructures = 0;
   const retained = worldWays.filter((way) => {
     if (!isDriveableStructureWay(way) ||
         String(way.tags?._sourceCompleteness || '') !== 'generalized') return true;
-    const name = normalizedStructureName(way.tags);
-    const namedDuplicate = name &&
-      exactNamedFamilies.has(`${structureFamily(way.tags)}:${name}`);
     const spatialDuplicate = generalizedStructureDuplicatesExact(
       way,
       nodeMap,
       originLatitude,
       exactSpatialIndex
     );
-    if (!namedDuplicate && !spatialDuplicate) return true;
+    // A structure name identifies a corridor, not a physical surface extent.
+    // Current mapped ways can split one named bridge into deck and approach
+    // fragments. Only proven same-family segment overlap may retire the
+    // generalized fallback; otherwise a surviving approach can delete the
+    // only complete deck after another exact fragment fails ground acceptance.
+    if (!spatialDuplicate) return true;
     supersededGeneralizedStructures += 1;
     return false;
   });

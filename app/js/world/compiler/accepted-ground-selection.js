@@ -1,4 +1,4 @@
-import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=6';
+import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=7';
 
 const WAY_COLLECTION_KEYS = Object.freeze([
   'roadWays',

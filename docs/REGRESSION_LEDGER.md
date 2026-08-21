@@ -1623,3 +1623,39 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   intact. Rural Iowa arrival and London/Monaco/Tokyo composition still look
   incomplete. Memory ownership, hills/vehicle contact, mapped facade frontage
   and remaining exact joins remain open; the release is not production-ready.
+
+## 2026-08-21 — Structure name deleted a non-overlapping fallback surface
+
+- Status: bounded authority corrected locally as recovery checkpoint 5; exact
+  provider symptom revalidation remains open; not deployed.
+- Symptom: a real exact-provider Golden Gate world published 8,111 roads and
+  405 lossless connections but zero bridge controls/shared surfaces, placing a
+  boat beneath the landmark. Exact-provider outage instead retained two
+  generalized mapped carriageways and produced the correct symmetric deck.
+- First code loss: post-ground structure dedup considered any exact and
+  generalized structure with the same normalized family/name duplicates,
+  regardless of spatial overlap. A surviving approach fragment could therefore
+  delete a complete same-name fallback deck after a different exact deck
+  fragment failed acceptance. Landmark rendering, vertical controls and shared
+  surface compilation were downstream and received no road owner to bind.
+- Resolution: remove name-only deletion. The existing generic physical proof—
+  same structure family, compatible direction, bounded segment distance and
+  minimum matched length/coverage—is now the sole dedup criterion. Mapped names
+  remain provenance and do not become physical-surface identity. No city rule,
+  duplicate renderer, geometry offset or detail reduction was added.
+- Guard: a new source fixture requires a separated exact fragment and same-name
+  generalized deck to remain two distinct surfaces. The existing coincident
+  fixture still requires the exact structure to supersede its generalized
+  duplicate. `verify:source` passes.
+- Worldwide fallback control: all seven assembled locations passed the current
+  automated gates and all complete frames were opened. Golden Gate rendered one
+  centered 19 m/six-lane shared deck with two mapped member identities, matching
+  sides, landmark binding and player collision; zero pedestrians remained.
+- Verification limitation: every configured Overpass operation failed at
+  Golden Gate during post-change focused and worldwide runs. Those runs prove
+  fallback/non-regression, not exact closure. A real successful exact response
+  must still retain one usable deck without overlap before release. Provider
+  availability is itself a blocker and fallback-green results cannot waive it.
+- Adjacent blockers: visible London/Monaco/Tokyo composition, rural Iowa arrival,
+  exact joins/grades, vehicle hill contact, mapped street-facing facade detail
+  and memory/data ownership remain open. The release is not production-ready.
