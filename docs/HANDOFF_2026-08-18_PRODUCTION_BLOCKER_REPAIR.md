@@ -1094,3 +1094,78 @@ nearest eligible street association, facade edge selection, mesh batching, and
 final complete-world visibility. Preserve the repaired foundation collision,
 road clearance, provider-order, and no-pedestrian-on-transport authorities. Do
 not push or deploy.
+
+## 2026-08-20 audit checkpoint 6 — directed road attitude owns non-player vehicle pitch
+
+### First authoritative loss
+
+- The defect was reproduced in the normal assembled London and Monaco gameplay
+  path, not an isolated vehicle scene. The traffic graph endpoint heights
+  already matched the final compiled road surface. `agentPose` then discarded
+  their directed vertical slope, and both the instanced and detailed vehicle
+  render paths applied yaw only.
+- Before repair, the worst visible London case predicted 0.2523 m of penetration
+  on a 14.93% road chord; Monaco reached 0.2868 m. A London parked vehicle on an
+  8.81% chord predicted 0.0807 m. These values are comparisons against compiled
+  rendered geometry, not surveyed road or vehicle measurements.
+- The loss covered moving ambient traffic, near-detail promotion, parked cars,
+  and civic responders. The player-controlled vehicle was not the failing
+  authority: its existing five-point road contact already derives terrain pitch
+  and roll and renders with `YXZ` orientation.
+- The recovery commit itself published position/yaw-only ambient traffic. This
+  was therefore a shared latent vehicle-presentation defect, not evidence that
+  the bridge compiler or the preceding building-collision repair changed road
+  heights.
+
+### Completed bounded authority repair
+
+- Each directed traffic edge now publishes `surfacePitch` from the same two
+  compiled surface endpoints that own its position. Reverse edges reverse the
+  pitch naturally. A shared numeric helper only derives attitude; it does not
+  modify topology, elevation, grade, source identity, or provenance.
+- Far instanced traffic, promoted/detailed traffic, parked and claimed vehicles,
+  and responders now consume road attitude through the existing vehicle root.
+  Responders sample the same road surface fore and aft along their actual
+  heading. The player vehicle keeps its existing contact model and receives no
+  competing road-attitude writer.
+- Publication diagnostics record sloped traffic edges, sloped vehicles, the
+  `directed-traffic-edge` attitude authority, and render mismatches. The actor
+  verifier includes Monaco and requires London/Monaco to contain both sloped
+  edges and nonzero-pitch vehicles; matching zeros can no longer pass.
+- No suspension simulation, fake ramp, city exception, duplicate vehicle or
+  road renderer, road elevation rewrite, or inferred-as-surveyed measurement was
+  introduced.
+
+### Verified result
+
+- Pre-commit local staged artifact:
+  `4.3.0+377d10f70693.a5745ef727c68879.staging` (`sourceDirty: true`, never
+  deployed).
+- `verify:source`, hosting build/hash verification, source and packaged
+  `verify:actors-vehicles`, and source and packaged
+  `verify:assembled-locations` passed. Actor diagnostics reported Baltimore
+  258 sloped edges/7 sloped vehicles, London 448/12, Monaco 496/12, and Tokyo
+  366/12, with zero published/rendered attitude mismatches and exactly zero
+  pedestrian NPCs at all four locations.
+- Complete final gameplay frames were inspected for Baltimore/JFX, Golden Gate,
+  London, Monaco, Manhattan, rural Iowa, and Tokyo with terrain, water,
+  buildings, transport, population, atmosphere, HUD, collision, and player
+  control active.
+
+### Still open; do not call the world repaired
+
+1. The inspected Golden Gate frame confirms the user's separate blocker: the
+   driving deck appears vertically misaligned with its supports and contains a
+   conspicuous longitudinal seam. Current continuity/count checks do not reject
+   that visual failure. Trace it next as one structure/deck authority task.
+2. London, Monaco, and Tokyo still visibly show ordinary-road/terrain shaping;
+   rural Iowa still arrives away from mapped transport. This checkpoint changes
+   vehicle attitude only.
+3. Street-facing doors and glass storefronts, waterfront foundation/water-mask
+   ordering, far-field height/LOD, and Baltimore skyline acceptance remain open
+   as recorded blockers.
+
+Next bounded task: at the same Golden Gate coordinates and normal player path,
+compare the final deck surface, support/tower attachment, and seam against the
+last approved/live version. Identify the first authoritative stage where their
+shared geometry diverges before changing any code. Do not push or deploy.

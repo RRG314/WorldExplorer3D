@@ -1273,3 +1273,36 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Adjacent blockers: London/Monaco/Tokyo ordinary-road shaping, rural arrival,
   a small set of post-building water-mask changes, far-field height/LOD, and the
   user-required mapped-street-facing doors and glass storefronts remain open.
+
+## 2026-08-20 — Non-player vehicles discarded final road slope
+
+- Status: resolved locally; Golden Gate deck/support alignment and broader
+  world coherence remain production blockers; not deployed.
+- Symptom: moving and parked vehicles were partially buried in rendered streets
+  on hills. Complete-world measurements predicted up to 0.2523 m penetration in
+  London and 0.2868 m in Monaco. The values compare compiled geometry and are
+  not surveyed measurements.
+- Root cause: traffic graph endpoints already held the final road-surface
+  heights, but `agentPose` published position/yaw only. Instanced traffic,
+  promoted detailed traffic, parked vehicles, and responders all rendered with
+  yaw-only roots. The player car's independent multi-point contact path already
+  handled pitch/roll correctly.
+- Resolution: directed traffic edges publish one derived `surfacePitch`; every
+  non-player vehicle presentation consumes it using the existing `YXZ` vehicle
+  transform convention. Responder pitch samples the same road fore/aft along
+  actual heading. No surface height or source identity changes.
+- Guard: `verify:actors-vehicles` includes Monaco, requires nonzero sloped edges
+  and vehicles in London/Monaco, and rejects any published/rendered pitch
+  mismatch. Source and packaged runs reported Baltimore 258/7, London 448/12,
+  Monaco 496/12, and Tokyo 366/12 sloped edges/vehicles, zero mismatches, and
+  zero pedestrian NPCs. Source and packaged seven-location assembled matrices
+  also passed and all final frames were inspected.
+- Evidence: pre-commit staged artifact
+  `4.3.0+377d10f70693.a5745ef727c68879.staging`; never deployed.
+- Never reintroduce: yaw-only non-player vehicle poses, a second vehicle height
+  owner, city-specific hill offsets, visual-only wheel/body lifting, or a test
+  that accepts matching zero attitudes on a known sloped location.
+- Adjacent blockers: the Golden Gate final frame visibly confirms deck/support
+  misalignment and a longitudinal seam despite green continuity checks. Road/
+  terrain shaping, rural arrival, facade frontage, skyline/LOD, and waterfront
+  foundation ordering remain open.

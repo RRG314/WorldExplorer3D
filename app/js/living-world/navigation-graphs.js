@@ -1,3 +1,5 @@
+import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=1';
+
 const GRAPH_BUDGET_BY_TIER = Object.freeze({
   low: Object.freeze({ pedestrianEdges: 180, trafficEdges: 140 }),
   performance: Object.freeze({ pedestrianEdges: 320, trafficEdges: 260 }),
@@ -309,6 +311,7 @@ export function compileTrafficGraph(options = {}) {
       direction: directionName,
       sourceDirection: String(segment.direction || 'both'),
       structure: structureState(segment.feature),
+      surfacePitch: directedSurfacePitch(p1, p2),
       provenance: record?.completeness === 'lossless' ? 'mapped_transport' : 'compiled_transport'
     }));
     runtimeFeatureByEdge.set(id, segment.feature);
@@ -344,7 +347,12 @@ export function compileTrafficGraph(options = {}) {
         driveOnLeft,
         additionalProviderQueries: 0
       }),
-      diagnostics: Object.freeze({ tier, sourceSegments: sourceSegments.length, edgeLimit: budget.trafficEdges })
+      diagnostics: Object.freeze({
+        tier,
+        sourceSegments: sourceSegments.length,
+        edgeLimit: budget.trafficEdges,
+        slopedEdges: edges.filter((edge) => Math.abs(Number(edge.surfacePitch) || 0) > 0.01).length
+      })
     }),
     runtimeFeatureByEdge
   });

@@ -6,8 +6,8 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=6';
-import { createLivingWorldPopulation } from './population.js?v=10';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=7';
+import { createLivingWorldPopulation } from './population.js?v=11';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -261,6 +261,7 @@ export function livingWorldRuntimeSnapshot(appCtx) {
       nodes: state.publication.trafficGraph.nodes.length,
       edges: state.publication.trafficGraph.edges.length,
       provenance: state.publication.trafficGraph.provenance,
+      diagnostics: state.publication.trafficGraph.diagnostics,
       drivingSide: state.drivingSide,
       directionViolations: trafficDirectionViolations,
       laneSideViolations: trafficLaneSideViolations

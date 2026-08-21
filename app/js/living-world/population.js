@@ -145,7 +145,14 @@ function agentPose(agent, graph) {
   if (agent.reactionRemaining > 0 && agent.reactionTarget) {
     yaw = Math.atan2(agent.reactionTarget.x - x, agent.reactionTarget.z - z);
   }
-  return { x, y, z, yaw };
+  return {
+    x,
+    y,
+    z,
+    yaw,
+    pitch: Number.isFinite(Number(edge.surfacePitch)) ? Number(edge.surfacePitch) : 0,
+    roll: 0
+  };
 }
 
 function selectSafeRelocationEdge(graph, random, kind, reference) {
@@ -245,12 +252,17 @@ function updateAgentVisibility(agent, distance, activeRatio, dt) {
 
 function localTransform(pose, transform, visibility, output) {
   const yaw = pose.yaw;
-  const cos = Math.cos(yaw);
-  const sin = Math.sin(yaw);
   const x = Number(transform.x || 0);
+  const y = Number(transform.y || 0);
   const z = Number(transform.z || 0);
-  output.position.set(pose.x + x * cos + z * sin, pose.y + Number(transform.y || 0), pose.z - x * sin + z * cos);
-  output.baseQuaternion.setFromAxisAngle(output.yAxis, yaw);
+  output.baseQuaternion.setFromEuler(output.baseEuler.set(
+    Number(pose.pitch || 0),
+    yaw,
+    Number(pose.roll || 0),
+    'YXZ'
+  ));
+  output.position.set(x, y, z).applyQuaternion(output.baseQuaternion);
+  output.position.add(output.posePosition.set(pose.x, pose.y, pose.z));
   output.localQuaternion.setFromEuler(output.euler.set(Number(transform.rx || 0), Number(transform.ry || 0), Number(transform.rz || 0), 'XYZ'));
   output.quaternion.multiplyQuaternions(output.baseQuaternion, output.localQuaternion);
   const visibleScale = Math.max(.001, visibility);
@@ -370,7 +382,7 @@ function updateInstances(agents, graph, parts, kind, options = {}) {
   const output = {
     position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), baseQuaternion: new THREE.Quaternion(),
     localQuaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), matrix: new THREE.Matrix4(),
-    yAxis: new THREE.Vector3(0, 1, 0), euler: new THREE.Euler()
+    posePosition: new THREE.Vector3(), euler: new THREE.Euler(), baseEuler: new THREE.Euler()
   };
   const reference = options.reference;
   const activeRatio = Number(options.activeRatio ?? 1);
@@ -378,6 +390,7 @@ function updateInstances(agents, graph, parts, kind, options = {}) {
   agents.forEach((agent, agentIndex) => {
     const pose = agentPose(agent, graph);
     if (!pose) return;
+    if (kind === 'vehicle') agent.renderedPitch = Number(pose.pitch || 0);
     const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
     if (agent.promoted) {
       agent.visibleTarget = false;
@@ -477,6 +490,8 @@ export function createLivingWorldPopulation(options = {}) {
       y: pose.y,
       z: pose.z,
       yaw: pose.yaw,
+      pitch: pose.pitch,
+      renderedPitch: Number(agent.renderedPitch || 0),
       speed: Number(Number.isFinite(agent.currentSpeed) ? agent.currentSpeed : agent.speed || 0),
       visible: agent.detailPromoted === true || agent.visibility > 0.08,
       promoted: agent.promoted === true,
@@ -529,6 +544,7 @@ export function createLivingWorldPopulation(options = {}) {
       pedestrianPartRoles: Object.freeze(pedestrianParts.map((part) => part.role)),
       vehicleRenderedParts: vehicleParts.reduce((sum, part) => sum + Number(part.repeats || 1), 0),
       simulationHz: 10,
+      vehicleAttitudeAuthority: 'directed-traffic-edge',
       visibilityPolicy: POPULATION_VISIBILITY_POLICY,
       characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
       vehicleCategories: Object.freeze([...new Set(vehicles.map((agent) => agent.variant.id))].sort()),
@@ -689,12 +705,21 @@ export function createLivingWorldPopulation(options = {}) {
       updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', { reference, activeRatio: ratio, dt: step });
     },
     activeCounts() {
+      const vehicleAttitudeMismatches = vehicles.filter((agent) => {
+        const pose = agentPose(agent, trafficGraph);
+        return pose && Math.abs(Number(agent.renderedPitch || 0) - Number(pose.pitch || 0)) > 0.001;
+      }).length;
       return Object.freeze({
         pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         promotedPedestrians: pedestrians.filter((agent) => agent.promoted).length,
         promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
         detailedMovingVehicles: vehicles.filter((agent) => agent.detailPromoted).length,
+        slopedVehicles: vehicles.filter((agent) => {
+          const pose = agentPose(agent, trafficGraph);
+          return pose && Math.abs(Number(pose.pitch || 0)) > 0.01;
+        }).length,
+        vehicleAttitudeMismatches,
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
       });
     },

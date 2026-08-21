@@ -215,6 +215,31 @@ assert.ok(fixtureGraph.edges.every((edge) => Math.abs(Math.hypot(edge.curbNormal
 assert.ok(fixtureAnchors.length > 0, 'A road with enough curb space must produce a parked vehicle.');
 assert.ok(fixtureAnchors.every((anchor) => anchor.curbOffset - anchor.variant.width * .5 >= anchor.laneOffset - .001), 'Parked vehicle bodies must remain outside the moving lane center.');
 
+const slopedFixtureGraph = compileTrafficGraph({
+  traversal: {
+    authority: 'actor-vehicle-verification',
+    segments: [{
+      p1: { x: 0, y: 0, z: 0 },
+      p2: { x: 0, y: 10, z: 100 },
+      segIndex: 0,
+      sourceTStart: 0,
+      sourceTEnd: 1,
+      direction: 'forward',
+      feature: fixtureFeature
+    }]
+  },
+  sampleSurface: (_feature, _x, _z, projected) => Number(projected?.t || 0) * 10
+}).publication;
+const expectedSlopePitch = -Math.atan2(10, 100);
+assert.ok(Math.abs(slopedFixtureGraph.edges[0].surfacePitch - expectedSlopePitch) < 1e-6, 'Traffic edge must retain its directed road pitch.');
+const slopedFixtureAnchors = parkedVehicleAnchors(slopedFixtureGraph, { x: 20, z: 50 }, {
+  count: 1,
+  minDistance: 8,
+  maxDistance: 80,
+  worldIdentity: 'sloped-actor-vehicle-verification'
+});
+assert.ok(slopedFixtureAnchors.length === 1 && Math.abs(slopedFixtureAnchors[0].pitch - expectedSlopePitch) < 1e-6, 'Parked vehicle must consume the traffic edge pitch.');
+
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
@@ -228,7 +253,8 @@ if (capture) await fs.mkdir(captureDir, { recursive: true });
 
 const locations = [
   { id: 'baltimore', name: 'Baltimore', lat: 39.2898, lon: -76.6102, driveOnLeft: false },
-  { id: 'london', name: 'London', lat: 51.5074, lon: -0.1278, driveOnLeft: true },
+  { id: 'london', name: 'London', lat: 51.5074, lon: -0.1278, driveOnLeft: true, requiresSlopedTraffic: true },
+  { id: 'monaco', name: 'Monaco', lat: 43.7384, lon: 7.4246, driveOnLeft: false, requiresSlopedTraffic: true },
   { id: 'tokyo', name: 'Tokyo', lat: 35.6762, lon: 139.6503, driveOnLeft: true }
 ];
 const requested = new Set(String(process.env.WE3D_ACTOR_VEHICLE_LOCATIONS || '')
@@ -284,7 +310,9 @@ try {
         parking: vehicle.parking
       }));
       const population = second?.livingWorld?.population || {};
+      const activePopulation = second?.livingWorld?.activePopulation || {};
       const pedestrianGraph = second?.livingWorld?.pedestrianGraph || {};
+      const trafficGraph = second?.livingWorld?.trafficGraph || {};
       const firstVisibleVehicles = Number(first?.livingWorld?.activePopulation?.vehicles || 0) + Number(first?.livingWorld?.activePopulation?.promotedVehicles || 0);
       const secondVisibleVehicles = Number(second?.livingWorld?.activePopulation?.vehicles || 0) + Number(second?.livingWorld?.activePopulation?.promotedVehicles || 0);
       const firstVisiblePeople = Number(first?.livingWorld?.activePopulation?.pedestrians || 0) + Number(first?.livingWorld?.activePopulation?.promotedPedestrians || 0);
@@ -309,6 +337,13 @@ try {
           Number(population.vehicles || 0) === 0 ||
           Number(population.vehicleRenderedParts || 0) >= 17,
         parkedCarsOutsideTravelLane: vehicles.filter((vehicle) => vehicle.parking).every((vehicle) => vehicle.parking.fullyOutsideTravelLane === true),
+        vehicleRoadAttitudeMatches:
+          Number(activePopulation.vehicleAttitudeMismatches || 0) === 0 &&
+          vehicles.every((vehicle) => Math.abs(Number(vehicle.pitch || 0) - Number(vehicle.renderedPitch || 0)) <= 0.001),
+        slopedTrafficAttitudePublished:
+          location.requiresSlopedTraffic !== true ||
+          Number(trafficGraph.diagnostics?.slopedEdges || 0) > 0 &&
+          Number(activePopulation.slopedVehicles || 0) > 0,
         correctJurisdictionLaneSide: second?.livingWorld?.trafficGraph?.provenance?.driveOnLeft === location.driveOnLeft,
         noTrafficDirectionViolations: Number(second?.livingWorld?.trafficGraph?.directionViolations || 0) === 0,
         noTrafficLaneSideViolations: Number(second?.livingWorld?.trafficGraph?.laneSideViolations || 0) === 0,
@@ -326,7 +361,21 @@ try {
       if (capture && Object.values(checks).every(Boolean)) {
         await page.screenshot({ path: path.join(captureDir, `${location.id}.png`) });
       }
-      results.push({ id: location.id, ok: Object.values(checks).every(Boolean), checks, firstVisibleVehicles, secondVisibleVehicles, firstVisiblePeople, secondVisiblePeople, envelopes, browserErrors, localFailures });
+      results.push({
+        id: location.id,
+        ok: Object.values(checks).every(Boolean),
+        checks,
+        firstVisibleVehicles,
+        secondVisibleVehicles,
+        firstVisiblePeople,
+        secondVisiblePeople,
+        slopedTrafficEdges: Number(trafficGraph.diagnostics?.slopedEdges || 0),
+        slopedVehicles: Number(activePopulation.slopedVehicles || 0),
+        vehicleAttitudeMismatches: Number(activePopulation.vehicleAttitudeMismatches || 0),
+        envelopes,
+        browserErrors,
+        localFailures
+      });
     } catch (error) {
       results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
     } finally {

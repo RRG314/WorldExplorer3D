@@ -9,8 +9,8 @@ import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
 import { nearestMappedFacility } from './facility-model.js?v=1';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=6';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=4';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=7';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=5';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=7';
 
 const ENTER_DISTANCE = 3.4;
@@ -57,10 +57,19 @@ function vehiclePose(vehicle) {
       x: Number(appCtx.car?.x || 0),
       y: Number(appCtx.car?.y || 0),
       z: Number(appCtx.car?.z || 0),
-      yaw: Number(appCtx.car?.angle || 0)
+      yaw: Number(appCtx.car?.angle || 0),
+      pitch: Number(appCtx.car?.terrainPitch || 0),
+      roll: Number(appCtx.car?.terrainRoll || 0)
     };
   }
-  return { x: vehicle.x, y: vehicle.y, z: vehicle.z, yaw: vehicle.yaw };
+  return {
+    x: vehicle.x,
+    y: vehicle.y,
+    z: vehicle.z,
+    yaw: vehicle.yaw,
+    pitch: Number(vehicle.pitch || 0),
+    roll: Number(vehicle.roll || 0)
+  };
 }
 
 function syncVehiclePose(vehicle, pose) {
@@ -68,9 +77,12 @@ function syncVehiclePose(vehicle, pose) {
   vehicle.y = Number(pose.y || 0);
   vehicle.z = Number(pose.z || 0);
   vehicle.yaw = Number(pose.yaw || 0);
+  vehicle.pitch = Number(pose.pitch || 0);
+  vehicle.roll = Number(pose.roll || 0);
   if (!vehicle.attachedToPlayer) {
     vehicle.visual.root.position.set(vehicle.x, vehicle.y, vehicle.z);
-    vehicle.visual.root.rotation.set(0, vehicle.yaw, 0);
+    vehicle.visual.root.rotation.order = 'YXZ';
+    vehicle.visual.root.rotation.set(vehicle.pitch, vehicle.yaw, vehicle.roll);
     vehicle.visual.root.updateMatrixWorld(true);
   }
 }
@@ -391,6 +403,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
     y: promoted.y + VEHICLE_ROOT_TO_GROUND_METERS,
     z: promoted.z,
     yaw: promoted.yaw,
+    pitch: promoted.pitch,
     driverSide: state.driveOnLeft ? 1 : -1
   };
   const visual = createUrbanVehicleVisual(THREE, definition);
@@ -419,7 +432,8 @@ function maintainNearbyVehicleDetails(state) {
       x: snapshot.x,
       y: snapshot.y + VEHICLE_ROOT_TO_GROUND_METERS,
       z: snapshot.z,
-      yaw: snapshot.yaw
+      yaw: snapshot.yaw,
+      pitch: snapshot.pitch
     });
   }
   const availableSlots = state.vehicleDetailBudget;
@@ -589,12 +603,15 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;
   appCtx.car.angle = pose.yaw;
+  appCtx.car.terrainPitch = Number(pose.pitch || 0);
+  appCtx.car.terrainRoll = Number(pose.roll || 0);
   appCtx.car.speed = 0;
   appCtx.car.vFwd = 0;
   appCtx.car.vLat = 0;
   appCtx.car.yawRate = 0;
   appCtx.carMesh.position.set(pose.x, pose.y, pose.z);
-  appCtx.carMesh.rotation.set(0, pose.yaw, 0);
+  appCtx.carMesh.rotation.order = 'YXZ';
+  appCtx.carMesh.rotation.set(appCtx.car.terrainPitch, pose.yaw, appCtx.car.terrainRoll);
   appCtx.carMesh.visible = true;
   appCtx.invalidateRoadCache?.();
   state.activeVehicle = vehicle;
@@ -676,7 +693,8 @@ function beginEnter(state, vehicle) {
       x: promoted.x,
       y: promoted.y + VEHICLE_ROOT_TO_GROUND_METERS,
       z: promoted.z,
-      yaw: promoted.yaw
+      yaw: promoted.yaw,
+      pitch: promoted.pitch
     });
   }
   state.transition = { kind: 'enter', vehicle, elapsed: 0, duration: TRANSITION_DURATION, handoffComplete: false };
@@ -952,7 +970,8 @@ function promoteTrafficVehicle(state, trafficAgentId, vehicleId = '') {
       x: promoted.x,
       y: promoted.y + VEHICLE_ROOT_TO_GROUND_METERS,
       z: promoted.z,
-      yaw: promoted.yaw
+      yaw: promoted.yaw,
+      pitch: promoted.pitch
     });
     return existing;
   }
@@ -968,6 +987,7 @@ function promoteTrafficVehicle(state, trafficAgentId, vehicleId = '') {
     y: promoted.y + VEHICLE_ROOT_TO_GROUND_METERS,
     z: promoted.z,
     yaw: promoted.yaw,
+    pitch: promoted.pitch,
     driverSide: state.driveOnLeft ? 1 : -1
   };
   const visual = createUrbanVehicleVisual(THREE, definition);
@@ -1244,6 +1264,8 @@ function snapshot(state) {
         y: Number(pose.y.toFixed(2)),
         z: Number(pose.z.toFixed(2)),
         yaw: Number(pose.yaw.toFixed(4)),
+        pitch: Number(Number(pose.pitch || 0).toFixed(4)),
+        renderedPitch: Number(Number(vehicle.visual?.root?.rotation?.x || 0).toFixed(4)),
         source: vehicle.source || 'parked-world-vehicle',
         playerClaimed: vehicle.playerClaimed === true,
         trafficAgentId: vehicle.trafficAgentId || '',

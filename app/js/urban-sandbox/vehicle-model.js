@@ -1,4 +1,5 @@
 import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=1';
+import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=1';
 
 // Compatibility export only. Parked and traffic vehicles now share one data owner.
 const URBAN_VEHICLE_CATALOG = PARKED_VEHICLE_CATALOG;
@@ -84,6 +85,9 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
       y: candidate.y + VEHICLE_ROOT_TO_GROUND_METERS,
       z,
       yaw,
+      pitch: Number.isFinite(Number(candidate.edge?.surfacePitch))
+        ? Number(candidate.edge.surfacePitch)
+        : directedSurfacePitch(candidate.edge?.p1, candidate.edge?.p2),
       roadHalfWidth,
       laneOffset,
       curbOffset: laneOffset + lateralOffset,

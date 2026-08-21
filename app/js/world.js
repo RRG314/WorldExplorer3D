@@ -170,7 +170,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=30";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=47";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=48";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
