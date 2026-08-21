@@ -1,12 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=1';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=7';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=2';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
 import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=1';
-import { vehicleDoorPosition } from './vehicle-model.js?v=5';
+import { vehicleDoorPosition } from './vehicle-model.js?v=6';
 import { applyConditionImpact } from './impact-model.js?v=1';
-import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=1';
+import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
@@ -34,26 +34,22 @@ function copyRoadAnchor(hit, fallback = {}) {
   };
 }
 
-function roadPitchAtHeading(x, z, y, yaw, preferredRoad = null) {
-  if (typeof appCtx.findNearestRoad !== 'function') return 0;
-  const halfWheelBase = 1.45;
-  const forwardX = Math.sin(finite(yaw));
-  const forwardZ = Math.cos(finite(yaw));
-  const rear = appCtx.findNearestRoad(
-    finite(x) - forwardX * halfWheelBase,
-    finite(z) - forwardZ * halfWheelBase,
-    { y: finite(y), maxVerticalDelta: 24, preferredRoad }
-  );
-  const front = appCtx.findNearestRoad(
-    finite(x) + forwardX * halfWheelBase,
-    finite(z) + forwardZ * halfWheelBase,
-    { y: finite(y), maxVerticalDelta: 24, preferredRoad }
-  );
-  if (!Number.isFinite(rear?.y) || !Number.isFinite(front?.y)) return 0;
-  return directedSurfacePitch(
-    { x: rear.pt?.x, y: rear.y, z: rear.pt?.z },
-    { x: front.pt?.x, y: front.y, z: front.pt?.z }
-  );
+function roadContactPoseAtHeading(x, z, y, yaw, variant, preferredRoad = null, fallback = {}) {
+  return resolveVehicleRoadContactPose({
+    x,
+    y,
+    z,
+    yaw,
+    pitch: fallback.pitch,
+    roll: fallback.roll,
+    variant,
+    sampleSurface(sampleX, sampleZ) {
+      const preferredY = Number(appCtx.sampleFeatureSurfaceY?.(preferredRoad, sampleX, sampleZ));
+      if (preferredRoad && Number.isFinite(preferredY)) return preferredY;
+      const road = roadAnchorNear(sampleX, sampleZ, y, preferredRoad);
+      return Number.isFinite(road?.y) ? Number(road.y) : NaN;
+    }
+  });
 }
 
 function surfaceY(x, z, fallback = 0) {
@@ -137,6 +133,7 @@ function createUrbanResponderRuntime(options = {}) {
     const visual = createUrbanVehicleVisual(THREE, definition);
     const toward = actor || civic.searchCenter || { x: anchor.x, z: anchor.z + 1 };
     const yaw = Math.atan2(finite(toward.x) - anchor.x, finite(toward.z) - anchor.z);
+    const contactPose = roadContactPoseAtHeading(anchor.x, anchor.z, anchor.y, yaw, variant, anchor.road);
     const responder = {
       id,
       profile,
@@ -146,10 +143,12 @@ function createUrbanResponderRuntime(options = {}) {
       serviceAccent: profile.accent,
       visual,
       x: anchor.x,
-      y: anchor.y + RESPONDER_BASE_Y,
+      y: contactPose.y + RESPONDER_BASE_Y,
       z: anchor.z,
       yaw,
-      pitch: roadPitchAtHeading(anchor.x, anchor.z, anchor.y, yaw, anchor.road),
+      pitch: contactPose.pitch,
+      roll: contactPose.roll,
+      wheelContact: contactPose,
       speed: 0,
       road: anchor.road,
       origin: { x: anchor.x, y: anchor.y, z: anchor.z, road: anchor.road },
@@ -163,7 +162,7 @@ function createUrbanResponderRuntime(options = {}) {
     };
     visual.root.position.set(responder.x, responder.y, responder.z);
     visual.root.rotation.order = 'YXZ';
-    visual.root.rotation.set(responder.pitch, responder.yaw, 0);
+    visual.root.rotation.set(responder.pitch, responder.yaw, responder.roll);
     group.add(visual.root);
     responders.push(responder);
     return responder;
@@ -313,16 +312,22 @@ function createUrbanResponderRuntime(options = {}) {
         responder.y = surfaceY(responder.x, responder.z, responder.y - RESPONDER_BASE_Y) + RESPONDER_BASE_Y;
       }
     }
-    responder.pitch = roadPitchAtHeading(
+    const contactPose = roadContactPoseAtHeading(
       responder.x,
       responder.z,
       responder.y - RESPONDER_BASE_Y,
       responder.yaw,
-      responder.road
+      responder.variant,
+      responder.road,
+      responder
     );
+    responder.y = contactPose.y + RESPONDER_BASE_Y;
+    responder.pitch = contactPose.pitch;
+    responder.roll = contactPose.roll;
+    responder.wheelContact = contactPose;
     responder.visual.root.position.set(responder.x, responder.y, responder.z);
     responder.visual.root.rotation.order = 'YXZ';
-    responder.visual.root.rotation.set(responder.pitch, responder.yaw, 0);
+    responder.visual.root.rotation.set(responder.pitch, responder.yaw, responder.roll);
     responder.visual.wheels.forEach((wheel) => { wheel.rotation.x += responder.speed * dt / .38; });
     responder.visual.setServiceLights(elapsed, !returning);
     if (returning) responder.returnElapsed += dt;
@@ -367,6 +372,8 @@ function createUrbanResponderRuntime(options = {}) {
       z: responder.z,
       yaw: responder.yaw,
       pitch: responder.pitch,
+      roll: responder.roll,
+      wheelContact: responder.wheelContact,
       driverSide: -1,
       resistance: 185,
       condition: 1,

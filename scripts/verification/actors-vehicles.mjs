@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG } from '../../app/js/engine/vehicle-catalog.js?v=1';
+import { VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG } from '../../app/js/engine/vehicle-catalog.js?v=2';
+import { resolveVehicleRoadContactPose } from '../../app/js/engine/vehicle-road-attitude.js?v=2';
 import {
   compilePedestrianGraph,
   compileTrafficGraph,
@@ -439,6 +440,21 @@ const slopedFixtureAnchors = parkedVehicleAnchors(slopedFixtureGraph, { x: 20, z
 });
 assert.ok(slopedFixtureAnchors.length === 1 && Math.abs(slopedFixtureAnchors[0].pitch - expectedSlopePitch) < 1e-6, 'Parked vehicle must consume the traffic edge pitch.');
 
+const curvedRoadContact = resolveVehicleRoadContactPose({
+  x: 0,
+  y: 0.08,
+  z: 0,
+  yaw: 0,
+  variant: VEHICLE_CATALOG.find((variant) => variant.id === 'sedan'),
+  // A shallow vertical curve has equal axle heights but sits above the tangent
+  // at the vehicle center. Endpoint pitch alone leaves all four wheels buried.
+  sampleSurface: (_x, z) => 0.08 + z * z * 0.025
+});
+assert.equal(curvedRoadContact.sampledWheelContacts, 4, 'Vehicle contact must sample all four rendered wheel positions.');
+assert.ok(curvedRoadContact.y > 0.1, 'Four-wheel contact must follow a vertical road curve instead of retaining the lower edge-center plane.');
+assert.ok(curvedRoadContact.previousMaximumWheelPenetration > 0.03, 'Fixture must reproduce the former endpoint-plane wheel penetration.');
+assert.ok(curvedRoadContact.maximumWheelPenetration <= 1e-9, 'Resolved vehicle contact must never bury a wheel below the published road surface.');
+
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
@@ -538,7 +554,14 @@ try {
         parkedCarsOutsideTravelLane: vehicles.filter((vehicle) => vehicle.parking).every((vehicle) => vehicle.parking.fullyOutsideTravelLane === true),
         vehicleRoadAttitudeMatches:
           Number(activePopulation.vehicleAttitudeMismatches || 0) === 0 &&
-          vehicles.every((vehicle) => Math.abs(Number(vehicle.pitch || 0) - Number(vehicle.renderedPitch || 0)) <= 0.001),
+          vehicles.every((vehicle) =>
+            Math.abs(Number(vehicle.pitch || 0) - Number(vehicle.renderedPitch || 0)) <= 0.001 &&
+            Math.abs(Number(vehicle.roll || 0) - Number(vehicle.renderedRoll || 0)) <= 0.001
+          ),
+        trafficUsesFourWheelRoadContact:
+          Number(activePopulation.fourWheelContactVehicles || 0) === Number(population.vehicles || 0),
+        noTrafficWheelPenetration: Number(activePopulation.maximumWheelPenetration || 0) <= 0.002,
+        trafficSuspensionGapBounded: Number(activePopulation.maximumWheelGap || 0) <= 0.22,
         slopedTrafficAttitudePublished:
           location.requiresSlopedTraffic !== true ||
           Number(trafficGraph.diagnostics?.slopedEdges || 0) > 0 &&
@@ -571,6 +594,10 @@ try {
         slopedTrafficEdges: Number(trafficGraph.diagnostics?.slopedEdges || 0),
         slopedVehicles: Number(activePopulation.slopedVehicles || 0),
         vehicleAttitudeMismatches: Number(activePopulation.vehicleAttitudeMismatches || 0),
+        fourWheelContactVehicles: Number(activePopulation.fourWheelContactVehicles || 0),
+        maximumWheelPenetration: Number(activePopulation.maximumWheelPenetration || 0),
+        maximumWheelGap: Number(activePopulation.maximumWheelGap || 0),
+        previousMaximumWheelPenetration: Number(activePopulation.previousMaximumWheelPenetration || 0),
         envelopes,
         browserErrors,
         localFailures

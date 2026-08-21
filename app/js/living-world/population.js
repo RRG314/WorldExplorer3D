@@ -1,4 +1,5 @@
-import { selectVehicleVariant } from '../engine/vehicle-catalog.js?v=1';
+import { selectVehicleVariant, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=2';
+import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
 
 const POPULATION_BUDGET_BY_TIER = Object.freeze({
@@ -134,7 +135,7 @@ function createAgents(count, graph, random, kind) {
   return agents;
 }
 
-function agentPose(agent, graph) {
+function agentPose(agent, graph, sampleVehicleSurface = null) {
   const edge = graph.edges[agent.edgeIndex];
   if (!edge) return null;
   const t = Math.max(0, Math.min(1, agent.progress / Math.max(.01, edge.length)));
@@ -145,7 +146,7 @@ function agentPose(agent, graph) {
   if (agent.reactionRemaining > 0 && agent.reactionTarget) {
     yaw = Math.atan2(agent.reactionTarget.x - x, agent.reactionTarget.z - z);
   }
-  return {
+  const edgePose = {
     x,
     y,
     z,
@@ -153,6 +154,12 @@ function agentPose(agent, graph) {
     pitch: Number.isFinite(Number(edge.surfacePitch)) ? Number(edge.surfacePitch) : 0,
     roll: 0
   };
+  if (!agent.variant || typeof sampleVehicleSurface !== 'function') return edgePose;
+  return resolveVehicleRoadContactPose({
+    ...edgePose,
+    variant: agent.variant,
+    sampleSurface: (sampleX, sampleZ) => sampleVehicleSurface(edge, sampleX, sampleZ)
+  });
 }
 
 function selectSafeRelocationEdge(graph, random, kind, reference) {
@@ -190,7 +197,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
     const edge = graph.edges[agent.edgeIndex];
     if (!edge) continue;
-    const pose = agentPose(agent, graph);
+    const pose = agentPose(agent, graph, kind === 'vehicle' ? behavior.sampleVehicleSurface : null);
     const reference = behavior.reference;
     const distance = pose && reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
     const stride = distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
@@ -320,6 +327,7 @@ function vehicleLayout(agent) {
 function vehicleTransform(role, agent, slot = 0) {
   const l = vehicleLayout(agent);
   const width = l.variant.width;
+  const wheelLayout = vehicleWheelContactLayout(l.variant);
   const wheelRadius = l.variant.wheelRadius || Math.min(.5, l.height * .23);
   const bodyBottom = wheelRadius * .42;
   const bodyTop = Math.min(l.height * (l.bus ? .34 : l.truck ? .33 : l.van ? .42 : l.suv || l.pickup ? .46 : .5), l.height - .42);
@@ -347,7 +355,7 @@ function vehicleTransform(role, agent, slot = 0) {
   if (role === 'wheels') {
     const side = slot % 2 === 0 ? -1 : 1;
     const front = slot < 2 ? 1 : -1;
-    return { x: side * width * .43, y: wheelRadius, z: front * l.length * (l.bus ? .35 : l.truck ? .34 : .3), sx: wheelRadius, sy: width * .12, sz: wheelRadius, rz: Math.PI / 2, rx: agent.motionTime };
+    return { x: side * wheelLayout.halfTrack, y: wheelRadius, z: front * wheelLayout.halfWheelbase, sx: wheelRadius, sy: width * .12, sz: wheelRadius, rz: Math.PI / 2, rx: agent.motionTime };
   }
   if (role === 'bumpers') {
     const front = slot === 0 ? 1 : -1;
@@ -388,9 +396,20 @@ function updateInstances(agents, graph, parts, kind, options = {}) {
   const activeRatio = Number(options.activeRatio ?? 1);
   const dt = Math.max(.016, Number(options.dt) || .1);
   agents.forEach((agent, agentIndex) => {
-    const pose = agentPose(agent, graph);
+    const pose = agentPose(agent, graph, kind === 'vehicle' ? options.sampleVehicleSurface : null);
     if (!pose) return;
-    if (kind === 'vehicle') agent.renderedPitch = Number(pose.pitch || 0);
+    if (kind === 'vehicle') {
+      agent.renderedPitch = Number(pose.pitch || 0);
+      agent.renderedRoll = Number(pose.roll || 0);
+      agent.renderedGroundY = Number(pose.y || 0);
+      agent.wheelContact = Object.freeze({
+        authority: String(pose.authority || 'edge-plane-fallback'),
+        sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
+        maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
+        maximumWheelGap: Number(pose.maximumWheelGap || 0),
+        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0)
+      });
+    }
     const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
     if (agent.promoted) {
       agent.visibleTarget = false;
@@ -420,6 +439,7 @@ export function createLivingWorldPopulation(options = {}) {
   const pedestrianGraph = options.pedestrianGraph;
   const trafficGraph = options.trafficGraph;
   const random = typeof options.random === 'function' ? options.random : Math.random;
+  const sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
   const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian');
   const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle');
   const group = new THREE.Group();
@@ -479,10 +499,12 @@ export function createLivingWorldPopulation(options = {}) {
     return phase === 'night' ? .58 : phase === 'sunrise' || phase === 'sunset' ? .76 : 1;
   };
   updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
-  updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
+  updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', {
+    reference: referencePosition(), activeRatio: activeRatio(), dt: .1, sampleVehicleSurface
+  });
 
   const vehicleSnapshot = (agent) => {
-    const pose = agentPose(agent, trafficGraph);
+    const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
     if (!pose) return null;
     return Object.freeze({
       id: agent.id,
@@ -491,7 +513,11 @@ export function createLivingWorldPopulation(options = {}) {
       z: pose.z,
       yaw: pose.yaw,
       pitch: pose.pitch,
+      roll: pose.roll,
       renderedPitch: Number(agent.renderedPitch || 0),
+      renderedRoll: Number(agent.renderedRoll || 0),
+      renderedGroundY: Number(agent.renderedGroundY || 0),
+      wheelContact: agent.wheelContact || null,
       speed: Number(Number.isFinite(agent.currentSpeed) ? agent.currentSpeed : agent.speed || 0),
       visible: agent.detailPromoted === true || agent.visibility > 0.08,
       promoted: agent.promoted === true,
@@ -528,7 +554,7 @@ export function createLivingWorldPopulation(options = {}) {
     trafficGraph,
     vehicleParts,
     'vehicle',
-    { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 }
+    { reference: referencePosition(), activeRatio: activeRatio(), dt: .1, sampleVehicleSurface }
   );
 
   return Object.freeze({
@@ -544,7 +570,7 @@ export function createLivingWorldPopulation(options = {}) {
       pedestrianPartRoles: Object.freeze(pedestrianParts.map((part) => part.role)),
       vehicleRenderedParts: vehicleParts.reduce((sum, part) => sum + Number(part.repeats || 1), 0),
       simulationHz: 10,
-      vehicleAttitudeAuthority: 'directed-traffic-edge',
+      vehicleAttitudeAuthority: 'published-road-four-wheel-contact',
       visibilityPolicy: POPULATION_VISIBILITY_POLICY,
       characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
       vehicleCategories: Object.freeze([...new Set(vehicles.map((agent) => agent.variant.id))].sort()),
@@ -690,7 +716,7 @@ export function createLivingWorldPopulation(options = {}) {
       tick += 1;
       const reference = referencePosition();
       advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, step, 'vehicle', { reference, tick });
-      const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph)).filter(Boolean);
+      const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
       advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, step, 'pedestrian', {
         reference,
         tick,
@@ -702,13 +728,20 @@ export function createLivingWorldPopulation(options = {}) {
       });
       const ratio = activeRatio();
       updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference, activeRatio: ratio, dt: step });
-      updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', { reference, activeRatio: ratio, dt: step });
+      updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', {
+        reference, activeRatio: ratio, dt: step, sampleVehicleSurface
+      });
     },
     activeCounts() {
       const vehicleAttitudeMismatches = vehicles.filter((agent) => {
-        const pose = agentPose(agent, trafficGraph);
-        return pose && Math.abs(Number(agent.renderedPitch || 0) - Number(pose.pitch || 0)) > 0.001;
+        const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+        return pose && (
+          Math.abs(Number(agent.renderedPitch || 0) - Number(pose.pitch || 0)) > 0.001 ||
+          Math.abs(Number(agent.renderedRoll || 0) - Number(pose.roll || 0)) > 0.001 ||
+          Math.abs(Number(agent.renderedGroundY || 0) - Number(pose.y || 0)) > 0.001
+        );
       }).length;
+      const contactSamples = vehicles.map((agent) => agent.wheelContact).filter((contact) => contact?.sampledWheelContacts === 4);
       return Object.freeze({
         pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
         vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
@@ -716,10 +749,14 @@ export function createLivingWorldPopulation(options = {}) {
         promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
         detailedMovingVehicles: vehicles.filter((agent) => agent.detailPromoted).length,
         slopedVehicles: vehicles.filter((agent) => {
-          const pose = agentPose(agent, trafficGraph);
-          return pose && Math.abs(Number(pose.pitch || 0)) > 0.01;
+          const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+          return pose && (Math.abs(Number(pose.pitch || 0)) > 0.01 || Math.abs(Number(pose.roll || 0)) > 0.01);
         }).length,
         vehicleAttitudeMismatches,
+        fourWheelContactVehicles: contactSamples.length,
+        maximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelPenetration || 0))),
+        maximumWheelGap: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelGap || 0))),
+        previousMaximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.previousMaximumWheelPenetration || 0))),
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
       });
     },

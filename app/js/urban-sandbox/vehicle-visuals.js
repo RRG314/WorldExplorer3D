@@ -1,5 +1,5 @@
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
-import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=1';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=2';
 
 function createUrbanVehicleVisual(THREE, definition = {}) {
   const variant = definition.variant || {};
@@ -170,11 +170,11 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   }
 
   const wheels = [];
-  const axleZ = bus ? length * 0.37 : boxTruck ? length * 0.35 : compact ? length * 0.3 : length * 0.32;
+  const wheelLayout = vehicleWheelContactLayout(variant);
   for (const [side, front] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
     const wheel = new THREE.Group();
     wheel.name = 'Urban Wheel';
-    wheel.position.set(side * width * 0.43, ground + wheelRadius, front * axleZ);
+    wheel.position.set(side * wheelLayout.halfTrack, ground + wheelRadius, front * wheelLayout.halfWheelbase);
     const tire = add(new THREE.CylinderGeometry(wheelRadius, wheelRadius, Math.min(.25, width * 0.14), 24), rubber, 'Urban tire', [0, 0, 0], [0, 0, Math.PI / 2], wheel);
     tire.userData.vehicleWheelTire = true;
     add(new THREE.CylinderGeometry(wheelRadius * 0.52, wheelRadius * 0.52, Math.min(.26, width * 0.145), 20), chrome, 'Urban wheel hub', [0, 0, 0], [0, 0, Math.PI / 2], wheel);

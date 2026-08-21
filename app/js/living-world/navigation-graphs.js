@@ -1,4 +1,4 @@
-import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=1';
+import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=2';
 
 const GRAPH_BUDGET_BY_TIER = Object.freeze({
   low: Object.freeze({ pedestrianEdges: 180, trafficEdges: 140 }),

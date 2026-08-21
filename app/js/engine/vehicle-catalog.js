@@ -22,6 +22,22 @@ function vehicleDefinitionById(id, fallbackId = 'sedan') {
   return VEHICLE_BY_ID[String(id || '')] || VEHICLE_BY_ID[fallbackId] || VEHICLE_CATALOG[0];
 }
 
+// Rendered wheels and road-contact sampling must use the same physical layout.
+// Keeping axle placement in individual LOD renderers previously let a vehicle
+// pass an attitude check even when the visible wheels sampled different parts
+// of a curved road surface.
+function vehicleWheelContactLayout(variant = {}) {
+  const width = Math.max(0.8, Number(variant.width) || 1.8);
+  const length = Math.max(1.8, Number(variant.length) || 4.4);
+  const style = String(variant.bodyStyle || variant.id || 'sedan');
+  const axleFactor = style === 'bus' ? 0.37 : style === 'box-truck' ? 0.35 : style === 'compact' ? 0.3 : 0.32;
+  return Object.freeze({
+    halfTrack: width * 0.43,
+    halfWheelbase: length * axleFactor,
+    wheelRadius: Math.max(0.2, Number(variant.wheelRadius) || 0.36)
+  });
+}
+
 function selectVehicleVariant(random, options = {}) {
   const source = VEHICLE_CATALOG.filter((entry) => !entry.majorRoadOnly || options.majorRoad === true);
   const total = source.reduce((sum, entry) => sum + entry.weight, 0);
@@ -39,5 +55,6 @@ export {
   VEHICLE_CATALOG,
   VEHICLE_ROOT_TO_GROUND_METERS,
   selectVehicleVariant,
-  vehicleDefinitionById
+  vehicleDefinitionById,
+  vehicleWheelContactLayout
 };

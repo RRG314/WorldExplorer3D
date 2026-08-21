@@ -1659,3 +1659,41 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Adjacent blockers: visible London/Monaco/Tokyo composition, rural Iowa arrival,
   exact joins/grades, vehicle hill contact, mapped street-facing facade detail
   and memory/data ownership remain open. The release is not production-ready.
+
+## 2026-08-21 — Edge pitch passed while vehicle wheels penetrated curved roads
+
+- Status: resolved locally as recovery checkpoint 6; not deployed. Separate
+  Golden Gate exact-provider and final-world composition blockers remain.
+- Symptom: non-player cars appeared partly below streets on hills even though
+  the actor/vehicle gate reported matching road attitude. The same green gate
+  was reproducible in complete London and Monaco worlds.
+- First authoritative loss: the traffic graph reduced a road interval to two
+  endpoint heights and one pitch. Population placement linearly interpolated
+  that plane and the old test only compared that pitch with rendered pitch.
+  Neither moving, promoted nor parked traffic sampled the final road beneath
+  its four visible wheels; responders sampled only front/rear center points.
+- Resolution: one wheel-contact layout now belongs to the canonical meter-based
+  vehicle catalog and is consumed by both vehicle LOD renderers. Every non-player
+  vehicle class resolves root height, pitch and roll from the final published
+  road at those four locations. The rigid plane is lifted only enough to prevent
+  penetration; remaining road twist is bounded suspension clearance. The player
+  car keeps its existing multipoint physics authority.
+- Guard: a deterministic curved-road fixture proves the old center/edge plane
+  penetrates and requires four sampled contacts plus zero penetration. The real
+  installed-Chrome gate requires all traffic vehicles to use the four-contact
+  authority, zero attitude/root mismatch, at most 0.002 m penetration and at
+  most 0.22 m suspension clearance, while retaining traffic and zero pedestrian
+  NPCs.
+- Evidence: former maximum penetration measured 0.2073 m Baltimore, 1.0254 m
+  London, 1.0663 m Monaco and 0.7302 m Tokyo. Corrected runs sampled 14/14 cars
+  per city with zero penetration; worst residual clearance was 0.1962 m Monaco.
+  No runtime/browser/local-resource failures occurred.
+- Worldwide control: Baltimore/JFX, London, Monaco, Manhattan, Iowa and Tokyo
+  passed the complete assembled gate. Golden Gate remained red on the separate
+  provider-sensitive missing control/shared deck plus one 6.0511 m exact join.
+  All seven full frames were inspected and visible composition/arrival defects
+  remain explicit blockers.
+- Never reintroduce: pitch-equality-only tests, endpoint planes as wheel-contact
+  authority, renderer-specific axle positions, per-city suspension offsets,
+  visual-only road lifts, road-detail reduction or claims that a count/pitch
+  diagnostic proves final contact.

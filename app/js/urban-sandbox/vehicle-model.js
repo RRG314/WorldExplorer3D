@@ -1,5 +1,5 @@
-import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=1';
-import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=1';
+import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=2';
+import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 
 // Compatibility export only. Parked and traffic vehicles now share one data owner.
 const URBAN_VEHICLE_CATALOG = PARKED_VEHICLE_CATALOG;
@@ -78,16 +78,35 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
     const z = candidate.z + curbNormalZ * lateralOffset;
     if (selected.some((anchor) => Math.hypot(anchor.x - x, anchor.z - z) < 8)) continue;
     if (options.isBlocked?.(x, candidate.y, z, definition.variant) === true) continue;
-    selected.push(Object.freeze({
-      ...definition,
-      edgeIndex: candidate.edgeIndex,
+    const contactPose = resolveVehicleRoadContactPose({
       x,
-      y: candidate.y + VEHICLE_ROOT_TO_GROUND_METERS,
+      y: candidate.y,
       z,
       yaw,
       pitch: Number.isFinite(Number(candidate.edge?.surfacePitch))
         ? Number(candidate.edge.surfacePitch)
         : directedSurfacePitch(candidate.edge?.p1, candidate.edge?.p2),
+      variant: definition.variant,
+      sampleSurface: typeof options.sampleVehicleSurface === 'function'
+        ? (sampleX, sampleZ) => options.sampleVehicleSurface(candidate.edge, sampleX, sampleZ)
+        : null
+    });
+    selected.push(Object.freeze({
+      ...definition,
+      edgeIndex: candidate.edgeIndex,
+      x,
+      y: contactPose.y + VEHICLE_ROOT_TO_GROUND_METERS,
+      z,
+      yaw,
+      pitch: contactPose.pitch,
+      roll: contactPose.roll,
+      wheelContact: Object.freeze({
+        authority: contactPose.authority,
+        sampledWheelContacts: contactPose.sampledWheelContacts,
+        maximumWheelPenetration: contactPose.maximumWheelPenetration,
+        maximumWheelGap: contactPose.maximumWheelGap,
+        previousMaximumWheelPenetration: contactPose.previousMaximumWheelPenetration
+      }),
       roadHalfWidth,
       laneOffset,
       curbOffset: laneOffset + lateralOffset,

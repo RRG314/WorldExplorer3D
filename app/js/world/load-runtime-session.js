@@ -414,12 +414,12 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       appCtx.worldPublication?.requestId !== publication.requestId ||
       appCtx.worldPublication?.sequence !== publication.sequence
     ) return null;
-    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=21');
+    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=22');
     const livingWorld = startLivingWorldRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
     });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=30');
+    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=31');
     const urbanSandbox = startUrbanSandboxRuntime({
       snapshot: publication,
       request: worldSession?.request,

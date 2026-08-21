@@ -1623,3 +1623,37 @@ London/Monaco/Tokyo world composition, rural Iowa arrival, remaining exact
 joins/grades, vehicle hill contact, mapped facades/storefronts and memory/data
 ownership remain open. Do not push, deploy, promote or call the world
 production-ready.
+
+## Current continuation after 2026-08-21 recovery checkpoint 6
+
+The non-player vehicle hill-contact failure is repaired at its actual consumer,
+not patched in road or bridge geometry. The prior attitude checkpoint published
+one pitch from each traffic edge's endpoints and verified only that the renderer
+copied it. Final roads may curve vertically or across their width inside that
+interval, so a car could pass the check while its visible wheels/body crossed
+the published surface.
+
+The existing meter-based vehicle catalog now owns one wheel contact layout used
+by both instanced and detailed vehicle renderers. Living World moving traffic,
+promoted traffic, parked vehicles and civic responders sample the final owning
+road at those four wheel locations and derive one bounded rigid ground plane,
+pitch and roll. The plane cannot put a wheel below the road; mild remaining
+twist is suspension clearance, capped by the current 0.22 m verification
+envelope. Player vehicle suspension remains its existing multipoint authority.
+
+Actual complete-world comparison records former maximum penetration of 0.2073 m
+in Baltimore, 1.0254 m in London, 1.0663 m in Monaco and 0.7302 m in Tokyo.
+Post-change runs sampled all 14 traffic vehicles per city with zero penetration;
+maximum residual clearance was 0.1962 m in Monaco and at most 0.0125 m elsewhere.
+Traffic stayed active, pedestrian NPCs stayed at zero, and no provider query or
+movement-time world load was added.
+
+Source health and the four-city installed-Chrome actor gate pass. The complete
+seven-location matrix remains red only at the already-open Golden Gate exact-
+provider symptom: surface controls/shared-deck assertions were absent and one
+exact join measured 6.0511 m, while the visible fallback bridge remained
+symmetric. The other six locations passed current automated gates. All complete
+frames were inspected and still reject London/Monaco/Tokyo composition and Iowa
+arrival as separate release work. Next continue with that composition authority;
+do not change vehicle contact, reduce detail, weaken Golden Gate evidence, push,
+deploy, promote or mutate user data.

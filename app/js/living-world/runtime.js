@@ -6,8 +6,8 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=7';
-import { createLivingWorldPopulation } from './population.js?v=11';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=8';
+import { createLivingWorldPopulation } from './population.js?v=12';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -109,6 +109,13 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     driveOnLeft: drivingSide.driveOnLeft,
     tier
   });
+  const sampleVehicleSurface = (edge, x, z) => {
+    const feature = trafficCompilation.runtimeFeatureByEdge.get(edge?.id);
+    const surfaceY = Number(appCtx.sampleFeatureSurfaceY?.(feature, x, z));
+    // Traffic graph nodes historically carry this small presentation clearance;
+    // keep it while replacing the endpoint plane with final-surface sampling.
+    return Number.isFinite(surfaceY) ? surfaceY + 0.08 : NaN;
+  };
   const population = createLivingWorldPopulation({
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
@@ -117,6 +124,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car,
     getTimePhase: () => appCtx.timeOfDay,
+    sampleVehicleSurface,
     hasPedestrianLineOfSight(from, to) {
       const samples = [.33, .66];
       return samples.every((amount) => appCtx.checkBuildingCollision?.(
@@ -174,6 +182,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     population,
     pedestrianCompilation,
     trafficCompilation,
+    sampleVehicleSurface,
     catalog,
     entranceByBuilding,
     tier,
