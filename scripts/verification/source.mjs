@@ -16,6 +16,7 @@ import {
 import { filterSelectionToAcceptedGround } from '../../app/js/world/compiler/accepted-ground-selection.js';
 import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-regional-context.js';
 import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
+import { compileTransportNetworkModel } from '../../app/js/world/compiler/transport-network-model.js';
 import { createBuildingRoadFootprintGuards } from '../../app/js/world/building-road-footprint.js';
 import { createAcceptedGroundRuntime } from '../../app/js/terrain/accepted-ground-runtime.js';
 import { compileGroundArtifact } from '../../app/js/terrain/ground-artifact.js';
@@ -465,6 +466,91 @@ const deferredStructureMergeFixture = mergeExactRegionalStructures({
   elements: [structureFallbackNodes[1], structureFallbackNodes[2], exactBridge]
 });
 const structureFallbackAuthorityFailures = [];
+const exactTransportFeature = ({ id, points, nodeIds, terrainMode = 'at_grade', type = 'residential', completeness = 'lossless' }) => ({
+  sourceFeatureId: id,
+  type,
+  pts: points,
+  sourceTopologyNodes: nodeIds?.map((nodeId, index) => ({ id: nodeId, ...points[index] })) || [],
+  structureSemantics: {
+    terrainMode,
+    verticalOrder: terrainMode === 'elevated' ? 1 : 0
+  },
+  transportRecord: {
+    identity: id,
+    completeness,
+    routeState: 'complete',
+    sourceTags: { highway: type }
+  }
+});
+const exactSurfaceEndpoint = exactTransportFeature({
+  id: 'osm:way:surface',
+  points: [{ x: 0, z: 0 }, { x: 1, z: 0 }],
+  nodeIds: ['osm:node:surface-start', 'osm:node:surface-end']
+});
+const exactElevatedInterior = exactTransportFeature({
+  id: 'osm:way:elevated-link',
+  points: [{ x: 1.1, z: -1 }, { x: 1.1, z: 1 }],
+  nodeIds: ['osm:node:link-start', 'osm:node:link-end'],
+  terrainMode: 'elevated',
+  type: 'motorway_link'
+});
+const falseExactMetricConnection = compileTransportNetworkModel([
+  exactSurfaceEndpoint,
+  exactElevatedInterior
+]);
+if (falseExactMetricConnection.connections.length !== 0) {
+  structureFallbackAuthorityFailures.push('lossless ways without a shared source node gained a metric endpoint/interior connection');
+}
+const sharedExactMetricConnection = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'osm:way:shared-surface',
+    points: [{ x: 0, z: 0 }, { x: 1, z: 0 }],
+    nodeIds: ['osm:node:shared-start', 'osm:node:physical-join']
+  }),
+  exactTransportFeature({
+    id: 'osm:way:shared-elevated-link',
+    points: [{ x: 1, z: -1 }, { x: 1, z: 0 }, { x: 1, z: 1 }],
+    nodeIds: ['osm:node:elevated-start', 'osm:node:physical-join', 'osm:node:elevated-end'],
+    terrainMode: 'elevated',
+    type: 'motorway_link'
+  })
+]);
+if (sharedExactMetricConnection.connections.length !== 1 ||
+    sharedExactMetricConnection.connections[0].provenance?.method !== 'shared-source-node') {
+  structureFallbackAuthorityFailures.push('lossless bridge/ramp ways lost their authoritative shared-node connection');
+}
+const exactSameSurfaceMetricConnection = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'osm:way:exact-surface-left',
+    points: [{ x: 0, z: 0 }, { x: 1, z: 0 }],
+    nodeIds: ['osm:node:left-start', 'osm:node:left-end']
+  }),
+  exactTransportFeature({
+    id: 'osm:way:exact-surface-right',
+    points: [{ x: 1.1, z: 0 }, { x: 2, z: 0 }],
+    nodeIds: ['osm:node:right-start', 'osm:node:right-end']
+  })
+]);
+if (exactSameSurfaceMetricConnection.connections.length === 0 ||
+    !String(exactSameSurfaceMetricConnection.connections[0].provenance?.method || '').startsWith('metric-')) {
+  structureFallbackAuthorityFailures.push('same-surface exact route fragments lost bounded endpoint-drift continuity');
+}
+const generalizedMetricConnection = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'shortbread:surface',
+    points: [{ x: 0, z: 0 }, { x: 1, z: 0 }],
+    completeness: 'generalized'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:continuation',
+    points: [{ x: 1.1, z: 0 }, { x: 2, z: 0 }],
+    completeness: 'generalized'
+  })
+]);
+if (generalizedMetricConnection.connections.length === 0 ||
+    !String(generalizedMetricConnection.connections[0].provenance?.method || '').startsWith('metric-')) {
+  structureFallbackAuthorityFailures.push('generalized transport lost its bounded metric conflation fallback');
+}
 if (exactStructureAccepted.selection.roadWays.length !== 1 ||
     exactStructureAccepted.selection.roadWays[0].id !== exactBridge.id ||
     exactStructureAccepted.diagnostics.supersededGeneralizedStructures !== 1) {

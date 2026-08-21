@@ -1578,3 +1578,48 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   ownership evidence. Unified near/far building identities, mapped frontage and
   storefronts, vehicle hill contact and broader final-world composition remain
   separate checkpoints.
+
+## 2026-08-21 — Metric proximity invented lossless cross-layer topology
+
+- Status: resolved locally as recovery checkpoint 4; remaining exact joins and
+  a Golden Gate publication-order race remain; not deployed.
+- Symptom: the complete JFX world had 13 exact transport discontinuities up to
+  12.8544 m even though its main deck was visibly above terrain. The four
+  largest conflicts paired West North Avenue/other surface endpoints with the
+  interior of elevated motorway link `osm:way:69531292`.
+- First authoritative loss: the network compiler accepted a bounded metric
+  endpoint-to-interior snap when vertical modes differed if either road type
+  ended in `_link`. Both features had lossless source topology but did not share
+  an OSM node. The graph therefore invented a physical connection before
+  vertical solving, structure assembly, collision or rendering.
+- Resolution: leave spatial candidate search/order unchanged; after the best
+  candidate and provenance are resolved, reject only a lossless cross-layer
+  endpoint-to-interior join with no shared source node. Shared-node ramps,
+  same-surface exact drift and generalized metric conflation retain their
+  existing authority. No city condition, geometry offset or detail/budget
+  change was introduced.
+- Guard: source fixtures reject the false nonshared cross-layer join, require
+  the equivalent mapped shared-node ramp join, preserve same-surface exact
+  endpoint drift and preserve generalized fallback. `verify:source` passes.
+- Evidence: focused lossless JFX drops from 13 discontinuities/12.8544 m to
+  3/5.5400 m. Its final gameplay frame shows the deck above ground and remaining
+  open joins. Focused Golden Gate retains its two controlled directional road
+  identities, compiled shared surface, symmetric six-lane deck and landmark
+  binding; its separate 6.0511 m exact join remains.
+- Rejected variants: rejecting every lossless nonshared metric connection broke
+  legitimate Golden Gate binding. Moving provenance work into the dense match
+  loop also caused the deck publication window to be missed. Never reintroduce
+  either broad rule, topology inferred from `_link` naming without mapped-node
+  evidence, or smoothing/render geometry that hides an invented graph edge.
+- Adjacent blocker exposed: Golden Gate passes focused but, after a longer
+  seven-location browser sequence, can publish towers/cables without surface
+  controls or the shared driving deck and spawn the player in a boat below the
+  span. This is a lifecycle/publication-order failure and must be traced from
+  final road publication into landmark control and shared-surface compilation;
+  bridge proportions are not the first loss. London retains three exact joins
+  up to 5.1451 m; Monaco retains two up to 8.9704 m and a 47.7274% grade.
+- Gate status: all seven complete frames were opened and building provider,
+  skyline, zero-pedestrian, lane-direction and local-resource guards remained
+  intact. Rural Iowa arrival and London/Monaco/Tokyo composition still look
+  incomplete. Memory ownership, hills/vehicle contact, mapped facade frontage
+  and remaining exact joins remain open; the release is not production-ready.

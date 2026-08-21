@@ -1551,3 +1551,42 @@ budgets, and do not lower building, ground or far-region detail. Vehicle hill
 contact, one building identity across near/far LOD, mapped street-facing doors
 and glass storefronts, and broader world composition remain later bounded
 tasks. Do not push, deploy, promote or mutate user data.
+
+## Current continuation after 2026-08-21 recovery checkpoint 4
+
+The first exact JFX topology loss is now repaired locally. Four lossless
+surface-street endpoints were metrically snapped to the interior of elevated
+motorway link `osm:way:69531292` even though the ways shared no mapped OSM node.
+That invented graph topology forced the vertical solver to reconcile physically
+separate layers and created the four largest 12.73-12.85 m failures.
+
+After candidate selection and provenance resolution, the network compiler now
+rejects only lossless endpoint-to-interior cross-layer joins with no shared
+source node. Real mapped shared-node connections, same-surface exact endpoint
+drift and generalized metric fallback remain. Fixtures guard those boundaries.
+Focused lossless JFX evidence drops from 13 discontinuities to 3 with a 5.5400 m
+maximum; the complete frame confirms the main deck is above terrain and the
+remaining visible breaks are open joins. Focused Golden Gate retains its two
+controlled source roads, one symmetric six-lane physical deck and landmark
+surface binding, while retaining one separate 6.0511 m exact discontinuity.
+
+Do not widen this condition or move provenance processing into the dense
+candidate loop. Both variants were tested and rejected because they lost the
+Golden Gate deck/binding. No geometry or city rule belongs in this correction.
+
+The next first-loss audit is a separate publication-order race. Golden Gate
+passes alone/focused and in the clean checkpoint-3 candidate, but in the longer
+seven-location source sequence its landmark structure publishes without road
+surface controls or the shared driving deck and the player arrives by boat
+under the span. Trace landmark control ownership relative to final road
+publication and structure-aware shared-surface compilation. Do not patch bridge
+dimensions or add a duplicate deck. London still has three exact discontinuities
+up to 5.1451 m; Monaco has two up to 8.9704 m plus a 47.7274% grade. Provider-
+sensitive Baltimore/Tokyo outcomes mean a fallback-green matrix is not proof.
+
+All seven full frames were inspected. Building coverage/height authority and
+zero-pedestrian policy remain intact, but London/Monaco/Tokyo composition and
+rural Iowa arrival are visibly incomplete. Memory ownership, vehicle hill
+contact, mapped street-facing doors/glass storefronts and remaining exact joins
+are still open. Do not call this production-ready, reduce world detail, push,
+deploy, promote or mutate user data.

@@ -6,7 +6,7 @@ import {
 } from './geometry.js?v=2';
 import {
   compileTransportNetworkModel
-} from '../world/compiler/transport-network-model.js?v=6';
+} from '../world/compiler/transport-network-model.js?v=7';
 
 function structureFeatureStableKey(candidate) {
   const sourceId = String(candidate?.sourceFeatureId || candidate?.id || '').trim();

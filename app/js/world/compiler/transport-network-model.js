@@ -529,6 +529,20 @@ function compileTransportNetworkModel(features = [], options = {}) {
         const kind = otherEndpoint === 'interior'
           ? 'endpoint-interior'
           : 'endpoint-endpoint';
+        // A lossless endpoint may approach an exact way in plan view without
+        // joining it. Once the best candidate and source-node provenance are
+        // resolved, reject a cross-layer interior snap that has no shared
+        // mapped node. Keep the candidate search itself unchanged: performing
+        // provenance work inside that dense loop perturbs complete-world load
+        // timing and previously caused the Golden Gate deck binding to miss
+        // its publication window.
+        if (
+          kind === 'endpoint-interior' &&
+          topologyProvenance === null &&
+          sourceTopologyIsAuthoritative(descriptor.feature) &&
+          sourceTopologyIsAuthoritative(rightDescriptor.feature) &&
+          !verticalCompatible(descriptor.feature, rightDescriptor.feature)
+        ) continue;
         const connection = {
           key,
           kind,
