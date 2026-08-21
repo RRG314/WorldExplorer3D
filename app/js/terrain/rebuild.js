@@ -7,7 +7,7 @@ import {
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=59";
+} from "../structure-semantics.js?v=60";
 import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import {

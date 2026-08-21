@@ -1,7 +1,10 @@
 const LANDMARK_PACK_URL = new URL('../../data/featured-landmarks.json', import.meta.url);
+const TRANSPORT_SURFACE_CONTROL_URL = new URL('../../data/transport-surface-controls.json', import.meta.url);
 const BUNDLED_LANDMARK_SCHEMA_VERSION = 1;
+const TRANSPORT_SURFACE_CONTROL_SCHEMA_VERSION = 1;
 
 let landmarkPackPromise = null;
+let transportSurfaceControlPromise = null;
 
 async function fetchLandmarkPacks(options = {}) {
   const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
@@ -36,6 +39,34 @@ function loadLandmarkPacks(options = {}) {
   return landmarkPackPromise;
 }
 
+async function fetchTransportSurfaceControls(options = {}) {
+  const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
+  if (typeof fetchImpl !== 'function') throw new TypeError('Transport surface controls: fetch unavailable');
+  const response = await fetchImpl(TRANSPORT_SURFACE_CONTROL_URL, {
+    cache: 'default',
+    signal: options.signal
+  });
+  if (!response?.ok) throw new Error(`Transport surface controls: HTTP ${response?.status || 'unknown'}`);
+  const data = await response.json();
+  if (Number(data?.schemaVersion) !== TRANSPORT_SURFACE_CONTROL_SCHEMA_VERSION) {
+    throw new Error('Transport surface controls: unsupported schema');
+  }
+  if (!Array.isArray(data.controls)) throw new Error('Transport surface controls: controls must be an array');
+  return data.controls;
+}
+
+function loadTransportSurfaceControls(options = {}) {
+  const fixtureFetch = typeof options.fetchImpl === 'function' && options.fetchImpl !== globalThis.fetch;
+  if (fixtureFetch) return fetchTransportSurfaceControls(options);
+  if (transportSurfaceControlPromise) return transportSurfaceControlPromise;
+  transportSurfaceControlPromise = fetchTransportSurfaceControls(options)
+    .catch((error) => {
+      transportSurfaceControlPromise = null;
+      throw error;
+    });
+  return transportSurfaceControlPromise;
+}
+
 function locationMatchesPack(pack, lat, lon) {
   const centerLat = Number(pack?.center?.lat);
   const centerLon = Number(pack?.center?.lon);
@@ -52,7 +83,10 @@ export async function fetchBundledLandmarkData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  const data = await loadLandmarkPacks(options);
+  const [data, transportSurfaceControls] = await Promise.all([
+    loadLandmarkPacks(options),
+    loadTransportSurfaceControls(options)
+  ]);
   const pack = (data?.packs || []).find((candidate) => locationMatchesPack(candidate, lat, lon));
   if (!pack || !Array.isArray(pack.elements)) return null;
   return {
@@ -61,7 +95,9 @@ export async function fetchBundledLandmarkData(options = {}) {
     _overpassEndpoint: String(data.source || 'OpenStreetMap'),
     _landmarkPackId: String(pack.id || ''),
     _landmarkSchemaVersion: BUNDLED_LANDMARK_SCHEMA_VERSION,
-    _landmarkLicense: String(data.license || '')
+    _landmarkLicense: String(data.license || ''),
+    _transportSurfaceControls: transportSurfaceControls.filter((control) =>
+      String(control?.landmarkPackId || '') === String(pack.id || ''))
   };
 }
 

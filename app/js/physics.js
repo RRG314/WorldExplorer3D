@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=59";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=60";
 import { updateDrone } from "./physics/drone-flight.js?v=8";
 import { updatePlane } from "./plane-mode.js?v=18";
 import {

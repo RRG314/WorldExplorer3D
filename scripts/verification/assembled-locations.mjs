@@ -79,6 +79,8 @@ try {
           worldCounts: diagnostics.worldCounts || {},
           transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
           transportGradeProfile: diagnostics.transportStructures?.gradeProfile || null,
+          publishedVerticalControls: diagnostics.transportStructures?.publishedVerticalControls || [],
+          mappedLandmarks: diagnostics.mappedLandmarks || null,
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
           surfaceChain: diagnostics.surfaceChain || null,
@@ -131,6 +133,21 @@ try {
         ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
+        publishedBridgeElevationControlResolved: location.id !== 'golden-gate' || (
+          snapshot.publishedVerticalControls.length === 2 &&
+          snapshot.publishedVerticalControls.every((control) =>
+            control.authority === 'compiled_transport_surface' &&
+            control.mappedWaterSamples > 0 &&
+            control.minimumSurfaceY > 60 &&
+            control.measurementStatus === 'published_reference_not_surveyed_scene_elevation' &&
+            /^https:\/\/www\.goldengate\.org\//.test(control.sourceUrl)
+          )
+        ),
+        bridgeLandmarkReadsCompiledSurface: location.id !== 'golden-gate' || (
+          snapshot.mappedLandmarks?.suspensionBridge?.status === 'published_from_compiled_transport_surface' &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.controlledRoads || 0) === 2 &&
+          snapshot.mappedLandmarks?.suspensionBridge?.transportSurfaceOwner === 'compiled_transport_surface'
+        ),
         noRuntimeErrors: snapshot.runtimeErrors.length === 0,
         noBrowserErrors: browserErrors.length === 0,
         noFailedLocalResources: localFailures.length === 0

@@ -1,4 +1,4 @@
-import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=59";
+import { pointInPolygonXZ, sampleFeatureSurfaceY } from "../structure-semantics.js?v=60";
 
 function distanceToRoadCenterline(road, x, z) {
   let best = Infinity;

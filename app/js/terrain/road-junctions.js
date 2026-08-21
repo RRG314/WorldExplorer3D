@@ -1,4 +1,4 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=59";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=60";
 
 const JUNCTION_SURFACE_LIFT = 0.006;
 const JUNCTION_CAP_SEGMENTS = 16;

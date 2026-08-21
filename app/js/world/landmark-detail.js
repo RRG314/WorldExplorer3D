@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=15";
+import { fetchBundledLandmarkData } from "./landmark-source.js?v=3";
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=16";
 import { renderCuratedLandmarkModels } from './landmark-models.js?v=13';
 
 const MAX_PYRAMIDS = 48;
@@ -297,16 +297,7 @@ function renderLandmarks(data, options) {
     requested: ways.length,
     pyramids,
     walls,
-    suspensionBridge: suspensionBridge ? {
-      towerParts: suspensionBridge.towerParts,
-      towers: suspensionBridge.towers,
-      cables: suspensionBridge.cables,
-      girders: suspensionBridge.girders,
-      suspenders: suspensionBridge.suspenders,
-      structuralMembers: suspensionBridge.structuralMembers,
-      synchronizedRoads: suspensionBridge.synchronizedRoads,
-      spanMeters: suspensionBridge.spanMeters
-    } : null,
+    suspensionBridge: suspensionBridge?.metrics || null,
     actorReprojected: reprojectActorOutsideLandmarks(createdMeshes)
   };
 }
@@ -328,6 +319,7 @@ export async function loadLandmarksForPublication(options = {}) {
     metrics.source = data?._overpassSource || null;
     metrics.packId = data?._landmarkPackId || null;
     options.loadMetrics.landmarks = metrics;
+    appCtx.mappedLandmarkMetrics = metrics;
     if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
     return { status: 'ready', metrics };
   };

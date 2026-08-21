@@ -13,6 +13,7 @@ import { normalizeTransportSource } from '../../app/js/world/compiler/transport-
 import { compileElevatedAssembly } from '../../app/js/world/compiler/transport-structure-assembly.js';
 import { supportSpanConflictsWithDriveableRoad } from '../../app/js/world/bridge-safety.js';
 import { URBAN_VEHICLE_CATALOG, parkedVehicleAnchors } from '../../app/js/urban-sandbox/vehicle-model.js';
+import { applyPublishedTransportSurfaceControls } from '../../app/js/world/transport-surface-controls.js';
 
 // This verification is derived from the current actor/vehicle product
 // requirements. It does not inherit screenshot baselines or legacy tests.
@@ -31,6 +32,43 @@ const explicitTwoWayMotorway = normalizeTransportSource(
 assert.equal(explicitTwoWayMotorway.direction, 'both', 'Explicit OSM oneway=no must override the motorway default.');
 assert.equal(resolveDrivingSide({ countryCode: 'US' }).driveOnLeft, false, 'US traffic must use right-side lanes.');
 assert.equal(resolveDrivingSide({ countryCode: 'JP' }).driveOnLeft, true, 'Japan traffic must use left-side lanes.');
+
+const controlledBridgeRoad = {
+  name: 'Fixture Bridge',
+  sourceFeatureId: 'fixture:bridge:road',
+  pts: [{ x: 2, z: 0 }, { x: 2, z: 100 }],
+  structureSemantics: { terrainMode: 'elevated' }
+};
+const unrelatedBridgeRoad = {
+  name: 'Other Bridge',
+  sourceFeatureId: 'fixture:other:road',
+  pts: [{ x: 3, z: 0 }, { x: 3, z: 100 }],
+  structureSemantics: { terrainMode: 'elevated' }
+};
+const publishedControlBinding = applyPublishedTransportSurfaceControls({
+  controls: [{
+    id: 'fixture-published-clearance',
+    physicalSurfaceKind: 'bridge_deck',
+    match: {
+      mappedName: 'Fixture Bridge',
+      terrainMode: 'elevated',
+      maximumDistanceFromReferencePathMeters: 10
+    },
+    vertical: {
+      kind: 'minimum_clearance_above_mapped_water',
+      clearanceMeters: 20,
+      referenceDatum: 'published_fixture_datum',
+      measurementStatus: 'published_reference_not_surveyed_scene_elevation',
+      sourceLabel: 'Fixture authority',
+      sourceUrl: 'https://example.test/fixture-authority'
+    }
+  }],
+  roads: [controlledBridgeRoad, unrelatedBridgeRoad],
+  referencePath: [{ x: 0, z: 0 }, { x: 0, z: 100 }]
+});
+assert.equal(publishedControlBinding.appliedRoads, 1, 'Published vertical control must bind only to the matched mapped bridge identity.');
+assert.equal(controlledBridgeRoad.transportSurfaceControl?.authority, 'published_transport_surface_control');
+assert.equal(unrelatedBridgeRoad.transportSurfaceControl, undefined, 'Nearby unrelated bridge identity must retain its own authority.');
 
 const motorwayFeature = {
   id: 'pedestrian-prohibited-motorway',

@@ -142,6 +142,8 @@ export function resetWorldForReload(options = {}) {
   disposeSceneMeshes(appCtx.historicMarkers);
   appCtx.clearWorldCollections(['historicMarkers', 'historicSites']);
   appCtx.curatedLandmarkMetrics = null;
+  appCtx.mappedLandmarkMetrics = null;
+  appCtx.deferredTransportLandmarkPublishers = [];
 
   disposeSceneMeshes(appCtx.streetFurnitureMeshes);
   appCtx.replaceWorldCollection('streetFurnitureMeshes');

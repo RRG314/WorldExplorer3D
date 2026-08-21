@@ -64,9 +64,9 @@ export async function finalizeLoadedWorld(options = {}) {
     runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
     await yieldToMainThread();
   }
+  let transportPublication = null;
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
     startLoadPhase('publishCompiledTransportMeshes');
-    let transportPublication = null;
     try {
       transportPublication = await appCtx.publishCompiledTransportMeshes();
     } catch (error) {
@@ -85,6 +85,19 @@ export async function finalizeLoadedWorld(options = {}) {
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
     runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
+  }
+  if (
+    transportPublication?.authority === 'compiled_transport_surface' &&
+    Array.isArray(appCtx.deferredTransportLandmarkPublishers)
+  ) {
+    const publishers = appCtx.deferredTransportLandmarkPublishers.splice(0);
+    for (let index = 0; index < publishers.length; index += 1) {
+      runFinalStep('publishDeferredTransportLandmark', () => publishers[index]?.());
+    }
+  } else if (Array.isArray(appCtx.deferredTransportLandmarkPublishers)) {
+    // A transport-dependent landmark has no safe fallback surface. Discard it
+    // rather than publishing decoration against a stale or provisional deck.
+    appCtx.deferredTransportLandmarkPublishers.splice(0);
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.retireGroundFallbackPlaceholder === 'function') {
     runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());

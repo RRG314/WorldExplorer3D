@@ -536,6 +536,18 @@ function transportStructureSnapshot() {
       road?.transportSurfaceModel?.engineeredApproach === true).length,
     publishedBodies: roads.filter((road) =>
       road?.transportStructureAssembly?.publishBody === true).length,
+    publishedVerticalControls: roads.filter((road) =>
+      road?.transportSurfaceControlResolution?.status === 'resolved').map((road) => ({
+        id: String(road.sourceFeatureId || ''),
+        name: String(road.name || ''),
+        controlId: String(road.transportSurfaceControlResolution.controlId || ''),
+        authority: String(road.transportSurfaceControlResolution.authority || ''),
+        minimumSurfaceY: numberOrNull(road.transportSurfaceControlResolution.minimumSurfaceY),
+        mappedWaterSamples: Number(road.transportSurfaceControlResolution.mappedWaterSamples || 0),
+        referenceDatum: String(road.transportSurfaceControlResolution.referenceDatum || ''),
+        measurementStatus: String(road.transportSurfaceControlResolution.measurementStatus || ''),
+        sourceUrl: String(road.transportSurfaceControlResolution.sourceUrl || '')
+      })),
     exactStructureSamples,
     junctionContinuity: appCtx.transportJunctionProfile?.continuity || null,
     continuityRepair: appCtx.transportJunctionProfile?.continuityRepair || null,
@@ -608,6 +620,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     },
     spaceCatalog: spaceCatalogSnapshot(),
     curatedLandmarks: appCtx.curatedLandmarkMetrics || null,
+    mappedLandmarks: appCtx.mappedLandmarkMetrics || null,
     titleVisible: !!document.getElementById("titleScreen") &&
       !document.getElementById("titleScreen").classList.contains("hidden"),
     camera: appCtx.camera

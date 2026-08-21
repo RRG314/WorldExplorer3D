@@ -1306,3 +1306,37 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   misalignment and a longitudinal seam despite green continuity checks. Road/
   terrain shaping, rural arrival, facade frontage, skyline/LOD, and waterfront
   foundation ordering remain open.
+
+## 2026-08-20 — Landmark deck height split from compiled transport surface
+
+- Status: vertical alignment resolved locally; shared-carriageway seam remains
+  a production blocker; not deployed.
+- Symptom: at the normal Golden Gate player path, the driveable road was at
+  35.063 m while landmark truss/girder/suspender geometry assumed 67 m. The
+  roadway visibly passed far below its supports despite green count and
+  continuity checks.
+- Root cause: local production source `c7871f880d63` used a landmark-specific
+  late road mutation and duplicate visual deck to conceal the generic compiled
+  profile. When the duplicate owner was correctly removed, its published 67 m
+  reference never moved upstream into transport compilation.
+- Resolution: a generic, provenance-bearing transport surface control binds a
+  published 67 m mean-higher-high-water clearance reference to both mapped
+  bridge carriageway identities. Mapped water resolves the world-space minimum
+  before the compiled surface is published. Landmark structure rendering is
+  deferred and reads that final surface; it owns no driveable deck or vertical
+  floor. The reference is explicitly labeled published, not surveyed.
+- Guard: Golden Gate assembled verification requires two resolved controls,
+  mapped-water samples, source URL/datum/status, and deferred landmark
+  publication from `compiled_transport_surface`. A source fixture rejects a
+  nearby road with a different mapped identity. Both source and immutable
+  artifact seven-location matrices and packaged actor verification passed.
+- Evidence: both carriageways resolved 67.08 m minimums from 122/123 water
+  samples; player/walk/drive agreed at 67.919 m within 0.00003 m. All seven
+  artifact frames were inspected. Local artifact
+  `4.3.0+cc3cd0e275b4.88622ca92bcc463a.staging`; never deployed.
+- Never reintroduce: landmark-owned road height, a duplicate landmark deck,
+  visual-only lift, a city conditional inside the generic compiler, or a claim
+  that the published clearance is a surveyed scene elevation.
+- Adjacent blocker: the two 10.8 m carriageway ribbons still overlap by up to
+  4.05 m and retain the visible longitudinal/diagonal seam. Repair shared-deck
+  publication separately without replacing their mapped traffic identities.

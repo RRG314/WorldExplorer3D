@@ -1,7 +1,7 @@
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=59";
+} from "../structure-semantics.js?v=60";
 import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex

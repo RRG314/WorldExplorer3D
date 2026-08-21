@@ -121,6 +121,12 @@ function buildFeatureStations(feature, context = {}) {
     ? semantics.cutDepth + stackOffset
     : semantics.deckClearance + stackOffset;
   const defaultSpan = Math.max(18, laneWidth * 4.5, defaultTarget * 4.2);
+  const publishedVerticalControl = feature?.transportSurfaceControl?.kind ===
+    'minimum_clearance_above_mapped_water'
+    ? feature.transportSurfaceControl
+    : null;
+  let publishedControlMinimumSurfaceY = NaN;
+  let publishedControlWaterSamples = 0;
   const approachProfileCache = new Map();
   const approachSurfaceAt = (candidate, segmentIndex, t) => {
     if (!sampleTerrainY || !Array.isArray(candidate?.pts) || candidate.pts.length < 2) {
@@ -311,7 +317,20 @@ function buildFeatureStations(feature, context = {}) {
             semantics.featureCategory === 'road' && total >= 180
               ? Math.max(0, Number(semantics.deckClearance) || 0)
               : 0;
-          const clearanceLowerBound = Math.max(sourceExplicitOffset, modeledLongSpanLowerBound);
+          const publishedClearance = publishedVerticalControl && Number.isFinite(mappedWaterSurfaceY)
+            ? Math.max(0, Number(publishedVerticalControl.clearanceMeters) || 0)
+            : 0;
+          if (publishedClearance > 0) {
+            publishedControlMinimumSurfaceY = Number.isFinite(publishedControlMinimumSurfaceY)
+              ? Math.max(publishedControlMinimumSurfaceY, mappedWaterSurfaceY + publishedClearance)
+              : mappedWaterSurfaceY + publishedClearance;
+            publishedControlWaterSamples += 1;
+          }
+          const clearanceLowerBound = Math.max(
+            sourceExplicitOffset,
+            modeledLongSpanLowerBound,
+            publishedClearance
+          );
           const waterClearanceOffset = Number.isFinite(mappedWaterSurfaceY) && Number.isFinite(ownApproachY)
             ? mappedWaterSurfaceY + clearanceLowerBound + deckThickness - ownApproachY -
               (Number(feature.surfaceBias) || 0.08)
@@ -320,13 +339,37 @@ function buildFeatureStations(feature, context = {}) {
             distance,
             Math.max(0, waterClearanceOffset),
             defaultSpan * 1.1,
-            modeledLongSpanLowerBound > sourceExplicitOffset
+            publishedClearance > Math.max(sourceExplicitOffset, modeledLongSpanLowerBound)
+              ? 'water_crossing_published_reference_control'
+              : modeledLongSpanLowerBound > sourceExplicitOffset
               ? 'water_crossing_modeled_lower_bound'
               : 'water_crossing'
           );
         }
       }
     }
+  }
+
+  if (publishedVerticalControl) {
+    if (Number.isFinite(publishedControlMinimumSurfaceY)) {
+      const existingMinimum = Number(feature.minimumStructureSurfaceY);
+      feature.minimumStructureSurfaceY = Number.isFinite(existingMinimum)
+        ? Math.max(existingMinimum, publishedControlMinimumSurfaceY)
+        : publishedControlMinimumSurfaceY;
+    }
+    feature.transportSurfaceControlResolution = Object.freeze({
+      authority: 'compiled_transport_surface',
+      controlId: String(publishedVerticalControl.id || ''),
+      kind: String(publishedVerticalControl.kind || ''),
+      status: Number.isFinite(publishedControlMinimumSurfaceY) ? 'resolved' : 'unresolved_mapped_water',
+      mappedWaterSamples: publishedControlWaterSamples,
+      minimumSurfaceY: Number.isFinite(publishedControlMinimumSurfaceY)
+        ? publishedControlMinimumSurfaceY
+        : null,
+      referenceDatum: String(publishedVerticalControl.referenceDatum || ''),
+      measurementStatus: String(publishedVerticalControl.measurementStatus || ''),
+      sourceUrl: String(publishedVerticalControl.sourceUrl || '')
+    });
   }
 
   const requiresFallbackStructureHeight =

@@ -1169,3 +1169,73 @@ Next bounded task: at the same Golden Gate coordinates and normal player path,
 compare the final deck surface, support/tower attachment, and seam against the
 last approved/live version. Identify the first authoritative stage where their
 shared geometry diverges before changing any code. Do not push or deploy.
+
+## 2026-08-20 audit checkpoint 7 — published vertical control belongs to compiled transport
+
+### First authoritative loss
+
+- At the exact Golden Gate audit coordinate (`37.8115,-122.4774`), the complete
+  current game published the selected walk/drive surface at 35.063 m while the
+  separately rendered landmark truss/girders/suspenders assumed a 67 m deck.
+  The resulting 31.94 m disagreement is the direct reason the roadway appeared
+  below its supports. Counts and graph continuity could not detect it.
+- Source comparison against local production commit `c7871f880d63` showed the
+  predecessor mutating matching road features late from
+  `bridge-landmark.js` and drawing a second landmark road deck at 67 m. The
+  duplicate renderer visually concealed the compiled transport profile. Its
+  removal established the correct single deck owner but also exposed that the
+  transport compiler had never received the published bridge elevation input.
+- The bridge district documents 67 m as clearance above mean higher high water.
+  This is a published reference, not a surveyed scene elevation, and is now
+  labeled that way in source data with the authority URL and datum.
+
+### Completed bounded authority repair
+
+- Added a generic transport-surface-control registry. Landmark-pack identity,
+  exact mapped bridge name, elevated semantics, and reference-path proximity
+  bind the control to both real Shortbread carriageway identities without
+  replacing or fabricating either source feature.
+- The structure station compiler resolves the published clearance against the
+  mapped water surface and publishes the resulting minimum through the one
+  compiled transport surface. Structure assembly, collision, traversal, road
+  rendering, and actor contact continue to consume that same authority.
+- Suspension towers/cables/truss now publish after transport compilation and
+  sample the compiled road. The former landmark-only 67 m clamp is deleted; no
+  second deck surface, visual-only ramp, city conditional in the compiler, or
+  inferred-as-surveyed value was introduced.
+- Runtime diagnostics expose control identity, source URL, datum, mapped-water
+  sample count, resolution status, and landmark publication order. The
+  assembled Golden Gate gate requires exactly two resolved controlled roads and
+  a landmark that reports `compiled_transport_surface` ownership.
+
+### Verified result
+
+- Both mapped Golden Gate carriageways resolved a 67.08 m minimum from 122 and
+  123 mapped-water samples. At the normal player path, walk, drive, and player
+  contact agreed at 67.919 m within 0.00003 m. The final frame shows the
+  roadway beside the stiffening truss instead of roughly 32 m below it.
+- `verify:source`, mutable-source and immutable-artifact seven-location
+  assembled matrices, packaged `verify:actors-vehicles`, and hosting artifact
+  build/hash verification passed. Complete artifact frames were inspected for
+  Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo.
+  Staging artifact `4.3.0+cc3cd0e275b4.88622ca92bcc463a.staging` is local only.
+
+### Still open; do not call the bridge or world repaired
+
+1. The Golden Gate longitudinal/diagonal seam remains visible. Before this
+   change, direct final-world geometry measured two 10.8 m mapped ribbons whose
+   centerlines are 6.75-10.77 m apart, overlap by as much as 4.05 m, and had
+   independently compiled vertical differences up to 1.12 m. The vertical
+   checkpoint intentionally does not alter their horizontal surface ownership.
+2. Do not restore the old landmark deck or late road mutation. The next change
+   must publish one shared physical deck presentation while preserving both
+   mapped carriageway identities for traffic and traversal.
+3. London/Monaco/Tokyo road-terrain shaping, rural arrival, mapped-street-facing
+   facade doors/storefronts, skyline/LOD, and waterfront ordering remain
+   separate blockers.
+
+Next bounded task: trace the two mapped carriageways through width inference,
+parallel-road grouping, ribbon/marking batching, structure shells, collision,
+and traversal. Remove the overlap at the first shared-deck authority stage,
+verify the complete Golden Gate frame, then rerun the worldwide matrix. Do not
+push or deploy.
