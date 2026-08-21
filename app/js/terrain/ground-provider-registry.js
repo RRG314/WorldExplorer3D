@@ -222,7 +222,7 @@ export function validateGroundArtifactManifest(manifest = {}) {
   });
 }
 
-export function selectGroundArtifact(options = {}) {
+export function selectGroundArtifacts(options = {}) {
   const latitude = Number(options.latitude);
   const longitude = Number(options.longitude);
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
@@ -268,12 +268,32 @@ export function selectGroundArtifact(options = {}) {
       rejected: Object.freeze(rejected)
     });
   }
-  const selection = accepted[0];
+  const authorityProviderId = accepted[0].provider.id;
+  const selections = accepted.filter(
+    (selection) => selection.provider.id === authorityProviderId
+  );
   return Object.freeze({
     status: 'accepted',
     reason: null,
-    provider: selection.provider,
-    manifest: Object.freeze({ ...selection.manifest }),
+    provider: selections[0].provider,
+    manifests: Object.freeze(selections.map((selection) =>
+      Object.freeze({ ...selection.manifest })
+    )),
     rejected: Object.freeze(rejected)
+  });
+}
+
+export function selectGroundArtifact(options = {}) {
+  const selection = selectGroundArtifacts(options);
+  if (selection.status !== 'accepted') {
+    return Object.freeze({
+      ...selection,
+      provider: null,
+      manifest: null
+    });
+  }
+  return Object.freeze({
+    ...selection,
+    manifest: selection.manifests[0]
   });
 }

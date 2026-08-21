@@ -1406,3 +1406,64 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   15.9661 m and a 14.646% grade. Provider retries passed, proving fallback can
   hide both. London/Monaco/Tokyo terrain shaping, rural Iowa arrival, facade
   frontage, skyline/LOD, and waterfront ordering remain open.
+
+## 2026-08-21 — Classified DSM and Terrarium both owned New York ground
+
+- Status: resolved as recovery checkpoint 1; worldwide transport, building,
+  provider-determinism, frontage, and composition blockers remain; not deployed.
+- Symptom: the complete World Trade Center frame showed artificial terrain
+  embankments while automated checks accepted the world. At the same coordinates
+  preserved candidate `4.3.0+88c3ff8b88a7.60a184335587db86.staging` published
+  a -492.623 m far-field minimum and retained 42 Terrarium elevation tiles.
+  WTC-only retesting could appear fixed while Times Square still crossed the
+  accepted-artifact boundary.
+- Root cause: the runtime accepted a building-contaminated classified DSM as
+  near ground, then independently used Terrarium for far ground. The builder
+  also treated requested ground metres as Web Mercator metres, shrinking real
+  coverage at latitude. Overlapping equal-resolution New York artifacts could
+  remain in the regenerated catalog. Transport and building compilers consumed
+  these results but did not cause the first loss.
+- Resolution: select an ordered detail/regional stack from one highest-priority
+  provider; use it for near/far terrain, water-bed sampling, and far-building
+  bases; scale requested ground extent into projected extent; publish reviewed
+  locked-raster USGS 3DEP New York artifacts normalized to EGM2008; and delete
+  the obsolete overlapping `holland-tunnel-ground` and `newyork-ground` runtime
+  assets. No city branch, visual ramp, duplicate terrain renderer, fake height,
+  or detail reduction was introduced.
+- Data/resource result: 95,290 source-bound samples use hash-verified compact
+  Float64 row-major encoding at unchanged 90 m/320 m delivery spacing. Final
+  Manhattan uses zero Terrarium requests and zero elevation cache bytes instead
+  of retaining fallback data. Source accuracy and uncertainty remain provenance
+  fields and are not described as surveyed measurements.
+- Guard: source verification rejects provider mixing, lower-priority leakage,
+  obsolete catalog identities, Web Mercator extent regression, artifact hash or
+  compact-decoder failure, and missing global sample keys. Browser release waits
+  require a finite published terrain surface rather than nonzero fallback cache.
+  Final Manhattan requires two reviewed artifact identities, far authority
+  `accepted-ground-stack`, zero source tiles/requests, and zero unowned cells.
+- Evidence: the final complete Manhattan frame retains tall buildings, 10,335
+  near buildings, active traffic and sandbox systems, a grounded player, and no
+  runtime/page/local-resource errors. Rendered/source terrain differs by at most
+  0.0021 m in the sampled 80 m neighborhood. Seven worldwide control frames
+  were inspected; the official Manhattan rerun is red only on the separately
+  tracked 5.8597 m exact transport discontinuity.
+- Gate status: final `verify:source` passed. The complete `verify:world` gate
+  remained red on its far-pedestrian expectation (the product requirement is
+  zero pedestrians) and its fallback exact-connection policy (zero
+  authoritative connections and zero discontinuities). These failures are
+  recorded, not waived or relabeled as ground failures.
+- Immutable-candidate evidence: a clean lossless-OSM rerun kept the exact ground
+  result (two reviewed artifacts, zero Terrarium requests/cache bytes, zero
+  unowned cells) while publishing 19,253 near buildings and exposing a 66.453%
+  ordinary-road grade. The generalized source run had 10,335 buildings and a
+  59.136% worst road. This variation belongs to the next provider-determinism
+  checkpoint and must not be hidden by reducing detail.
+- Never reintroduce: accepting a DSM correction because counts/confidence alone
+  are green, separate near/far ground providers inside one covered gameplay
+  envelope, raw EPSG:3857 metres presented as ground extent, overlapping
+  equal-resolution authorities selected by filename order, a terrain gate that
+  requires fallback cache memory, or smoothing transport to conceal bad ground.
+- Adjacent blockers: provider-sensitive source selection; Baltimore/Golden
+  Gate/Monaco/Manhattan exact topology; ordinary-road shaping; unified building
+  identities/heights across LOD; foundation/water ordering; mapped street-facing
+  doors and glass storefronts; and ownership-based memory work.

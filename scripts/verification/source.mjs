@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,14 @@ import { filterSelectionToAcceptedGround } from '../../app/js/world/compiler/acc
 import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-regional-context.js';
 import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
 import { createBuildingRoadFootprintGuards } from '../../app/js/world/building-road-footprint.js';
+import { createAcceptedGroundRuntime } from '../../app/js/terrain/accepted-ground-runtime.js';
+import { compileGroundArtifact } from '../../app/js/terrain/ground-artifact.js';
+import { selectGroundArtifacts } from '../../app/js/terrain/ground-provider-registry.js';
+import {
+  compileDistrictGroundModel,
+  sampleDistrictGroundMeters
+} from '../../app/js/world/compiler/district-ground-model.js';
+import { createGroundBuildPlan } from '../lib/ground-artifact-builder.mjs';
 
 const root = process.cwd();
 const reportPath = path.join(root, 'output', 'verification', 'source', 'report.json');
@@ -72,6 +81,171 @@ function moduleReferences(source) {
 const packageJson = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
 assert.equal(policy.status, 'legacy-suite-quarantined');
+
+const stackedGroundManifest = (artifactId, spacingMeters, coverage, providerId = 'usgs-3dep-best-available') => ({
+  schemaVersion: 1,
+  artifactId,
+  providerId,
+  sourceRelease: `${artifactId}-release`,
+  contentSha256: 'a'.repeat(64),
+  spacingMeters,
+  coverage,
+  verticalDatum: 'EGM2008',
+  complete: true,
+  missingSampleCount: 0,
+  licenseAttested: true,
+  correctionAttested: providerId === 'copernicus-dem-classified-ground-v1',
+  url: `memory://${artifactId}`
+});
+const stackedGroundModel = (districtId, spacingMeters, extent, elevationMeters) => {
+  const samples = [];
+  for (let row = -extent; row <= extent; row += 1) {
+    for (let column = -extent; column <= extent; column += 1) {
+      samples.push({
+        column,
+        row,
+        available: true,
+        rawElevationMeters: elevationMeters,
+        groundElevationMeters: elevationMeters,
+        confidence: 1,
+        correctionReason: 'verification-fixture',
+        provenance: 'verification-fixture'
+      });
+    }
+  }
+  return compileDistrictGroundModel({
+    districtId,
+    sourceClassification: 'accepted-ground',
+    verticalDatum: 'EGM2008',
+    minimumConfidence: 0.75,
+    grid: {
+      spacingMeters,
+      minColumn: -extent,
+      maxColumn: extent,
+      minRow: -extent,
+      maxRow: extent
+    },
+    samples
+  });
+};
+const fineGroundManifest = stackedGroundManifest(
+  'fine-ground', 100,
+  { south: -0.001, north: 0.001, west: -0.001, east: 0.001 }
+);
+const regionalGroundManifest = stackedGroundManifest(
+  'regional-ground', 1000,
+  { south: -0.02, north: 0.02, west: -0.02, east: 0.02 }
+);
+const competingGroundManifest = stackedGroundManifest(
+  'competing-ground', 10,
+  { south: -0.02, north: 0.02, west: -0.02, east: 0.02 },
+  'copernicus-dem-classified-ground-v1'
+);
+const groundFixtures = {
+  'fine-ground': stackedGroundModel('fine-ground', 100, 1, 11),
+  'regional-ground': stackedGroundModel('regional-ground', 1000, 2, 22)
+};
+const stackedGroundRuntime = createAcceptedGroundRuntime({
+  loadArtifact: async ({ manifest }) => ({
+    status: 'accepted',
+    artifactId: manifest.artifactId,
+    providerId: manifest.providerId,
+    sourceRelease: manifest.sourceRelease,
+    contentSha256: manifest.contentSha256,
+    verticalDatum: manifest.verticalDatum,
+    model: groundFixtures[manifest.artifactId]
+  })
+});
+const stackedGroundState = await stackedGroundRuntime.prepare({
+  latitude: 0,
+  longitude: 0,
+  manifests: [competingGroundManifest, regionalGroundManifest, fineGroundManifest]
+});
+assert.equal(stackedGroundState.status, 'accepted');
+assert.deepEqual(stackedGroundState.artifactIds, ['fine-ground', 'regional-ground']);
+assert.equal(stackedGroundRuntime.sampleAtLatLon(0, 0).artifactId, 'fine-ground');
+assert.equal(stackedGroundRuntime.sampleAtLatLon(0.01, 0.01).artifactId, 'regional-ground');
+
+const groundAuthorityFailures = [];
+const groundCatalog = JSON.parse(await fs.readFile(
+  path.join(root, 'app/assets/ground/manifest-catalog.json'),
+  'utf8'
+));
+const newYorkSelection = selectGroundArtifacts({
+  latitude: 40.758,
+  longitude: -73.9855,
+  manifests: groundCatalog.manifests
+});
+const newYorkArtifactIds = newYorkSelection.manifests?.map(
+  (manifest) => manifest.artifactId
+) || [];
+if (newYorkSelection.provider?.id !== 'usgs-3dep-best-available' ||
+    JSON.stringify(newYorkArtifactIds) !== JSON.stringify([
+      'newyork-detail-ground',
+      'newyork-regional-ground'
+    ])) {
+  groundAuthorityFailures.push(
+    `New York ground stack is not one reviewed USGS detail/regional authority: ${newYorkArtifactIds.join(',')}`
+  );
+}
+for (const retiredArtifactId of ['holland-tunnel-ground', 'newyork-ground']) {
+  if (groundCatalog.manifests.some(
+    (manifest) => manifest.artifactId === retiredArtifactId
+  )) {
+    groundAuthorityFailures.push(
+      `retired overlapping ground authority returned to catalog: ${retiredArtifactId}`
+    );
+  }
+}
+const newYorkBuildPlan = createGroundBuildPlan({
+  districtId: 'newyork-regional-verification',
+  centerLatitude: 40.735,
+  centerLongitude: -74.006,
+  widthMeters: 45000,
+  heightMeters: 45000,
+  spacingMeters: 320,
+  maxSamples: 40000
+});
+if (newYorkBuildPlan.projectedExtentMeters.widthMeters <= 45000 ||
+    newYorkBuildPlan.projectedExtentMeters.heightMeters <= 45000 ||
+    newYorkBuildPlan.parts[0].coverage.north - newYorkBuildPlan.parts[0].coverage.south < 0.4 ||
+    newYorkBuildPlan.parts[0].coverage.east - newYorkBuildPlan.parts[0].coverage.west < 0.5) {
+  groundAuthorityFailures.push(
+    'ground build extent no longer compensates for Web Mercator scale at the requested latitude'
+  );
+}
+for (const manifest of groundCatalog.manifests.filter(
+  (entry) => newYorkArtifactIds.includes(entry.artifactId)
+)) {
+  const artifactPath = path.join(
+    root,
+    'app/assets/ground',
+    String(manifest.url).replace(/^\.\//, '')
+  );
+  const artifactText = await fs.readFile(artifactPath, 'utf8');
+  const actualHash = crypto.createHash('sha256').update(artifactText).digest('hex');
+  const artifact = JSON.parse(artifactText);
+  const compiled = compileGroundArtifact({ manifest, artifact });
+  if (actualHash !== manifest.contentSha256 ||
+      compiled.status !== 'accepted' ||
+      compiled.model?.diagnostics?.encoded !== true) {
+    groundAuthorityFailures.push(
+      `reviewed compact ground artifact failed integrity/compile: ${manifest.artifactId}`
+    );
+    continue;
+  }
+  const sample = sampleDistrictGroundMeters(
+    compiled.model,
+    compiled.model.grid.minColumn * compiled.model.grid.spacingMeters,
+    compiled.model.grid.minRow * compiled.model.grid.spacingMeters
+  );
+  if (sample?.status !== 'available' ||
+      sample.sampleKeys?.some((key) => !/^[-0-9]+:[-0-9]+$/.test(String(key)))) {
+    groundAuthorityFailures.push(
+      `compact ground sample lost its global grid identity: ${manifest.artifactId}`
+    );
+  }
+}
 
 const localJsonFetch = async (input) => {
   try {
@@ -331,6 +505,7 @@ const report = {
     buildingMetadataCoverageFailures,
     buildingRoadAuthorityFailures,
     structureFallbackAuthorityFailures,
+    groundAuthorityFailures,
     staleGeneratedImages,
     productionDebugDefaultOff: productionDebugDefaultOff ? [] : ['runtime diagnostics are not opt-in']
   }

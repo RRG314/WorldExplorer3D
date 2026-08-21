@@ -90,6 +90,25 @@ function createFarFieldTerrainApi(deps = {}) {
   let lastAppliedDetailMode = '';
   let lastAppliedFallbackMode = '';
 
+  function acceptedGroundCoversBounds(bounds) {
+    const latitudes = [
+      Number(bounds?.latS),
+      (Number(bounds?.latS) + Number(bounds?.latN)) * 0.5,
+      Number(bounds?.latN)
+    ];
+    const longitudes = [
+      Number(bounds?.lonW),
+      (Number(bounds?.lonW) + Number(bounds?.lonE)) * 0.5,
+      Number(bounds?.lonE)
+    ];
+    if (![...latitudes, ...longitudes].every(Number.isFinite)) return false;
+    return latitudes.every((latitude) => longitudes.every((longitude) => {
+      const sample = sampleAcceptedGroundAtLatLon(latitude, longitude);
+      return sample?.status === 'available' &&
+        Number.isFinite(Number(sample.groundElevationMeters));
+    }));
+  }
+
   function waitForGenerationDrain(buildPromise) {
     if (!buildPromise) return Promise.resolve();
     return Promise.resolve(buildPromise).catch(() => undefined);
@@ -273,6 +292,23 @@ function createFarFieldTerrainApi(deps = {}) {
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let exactPublished = 0;
+    const groundMetersAt = (latitude, longitude) => {
+      const accepted = sampleAcceptedGroundAtLatLon(latitude, longitude);
+      const acceptedMeters = Number(accepted?.groundElevationMeters);
+      if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+        return acceptedMeters;
+      }
+      const sampledSourceMeters = sampleSourceMeters(
+        latitude,
+        longitude,
+        spec.sourceZoom,
+        loadedTiles
+      );
+      const sourceMeters = Number.isFinite(sampledSourceMeters)
+        ? sampledSourceMeters
+        : Number(spec.fallbackElevationMeters);
+      return Number.isFinite(sourceMeters) ? sourceMeters + offsetMeters : null;
+    };
 
     const mappedBuildings = mappedContext?.buildings || [];
     for (let buildingIndex = 0; buildingIndex < mappedBuildings.length; buildingIndex += 1) {
@@ -282,16 +318,8 @@ function createFarFieldTerrainApi(deps = {}) {
         const center = appCtx.geoToWorld(building.centerLat, building.centerLon);
         if (center.x < spec.outer.minX || center.x > spec.outer.maxX ||
             center.z < spec.outer.minZ || center.z > spec.outer.maxZ) continue;
-        const sampledSourceMeters = sampleSourceMeters(
-          building.centerLat,
-          building.centerLon,
-          spec.sourceZoom,
-          loadedTiles
-        );
-        const sourceMeters = Number.isFinite(sampledSourceMeters)
-          ? sampledSourceMeters
-          : Number(spec.fallbackElevationMeters);
-        if (!Number.isFinite(sourceMeters)) continue;
+        const groundMeters = groundMetersAt(building.centerLat, building.centerLon);
+        if (!Number.isFinite(groundMeters)) continue;
         const widthWorld = Number(building.widthMeters) * unitsPerMeter;
         const depthWorld = Number(building.depthMeters) * unitsPerMeter;
         const areaWorld = Number(building.areaMeters) * unitsPerMeter * unitsPerMeter;
@@ -306,7 +334,7 @@ function createFarFieldTerrainApi(deps = {}) {
         instances.push({
           x: center.x,
           z: center.z,
-          baseY: (sourceMeters + offsetMeters) * unitsPerMeter * yExaggeration + 0.25,
+          baseY: groundMeters * unitsPerMeter * yExaggeration + 0.25,
           width: widthWorld,
           depth: depthWorld,
           height: massing.heightMeters * unitsPerMeter,
@@ -349,12 +377,9 @@ function createFarFieldTerrainApi(deps = {}) {
       const area = Math.abs(signedArea) * 0.5;
       if (area < 14 || area > 350000) continue;
 
-      const sampledSourceMeters = sampleSourceMeters(center.lat, center.lon, spec.sourceZoom, loadedTiles);
-      const sourceMeters = Number.isFinite(sampledSourceMeters)
-        ? sampledSourceMeters
-        : Number(spec.fallbackElevationMeters);
-      if (!Number.isFinite(sourceMeters)) continue;
-      const baseY = (sourceMeters + offsetMeters) * unitsPerMeter * yExaggeration + 0.25;
+      const groundMeters = groundMetersAt(center.lat, center.lon);
+      if (!Number.isFinite(groundMeters)) continue;
+      const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
       const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter);
       if (!massing) continue;
       const { heightMeters, color } = massing;
@@ -407,17 +432,28 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   async function buildAndPublish(spec, requestGeneration, signal) {
-    const sourceTiles = sourceTileRange(spec.geographic, spec.sourceZoom);
+    const acceptedRegionalGround = acceptedGroundCoversBounds(spec.geographic);
+    const sourceTiles = acceptedRegionalGround
+      ? []
+      : sourceTileRange(spec.geographic, spec.sourceZoom);
     setState({ status: 'loading-elevation-and-context', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length });
     const [elevation, mappedContext, worldCoverContext] = await Promise.all([
-      loadFarTerrainElevationWithParentFallback({
-        tiles: sourceTiles,
-        isActive: () => requestGeneration === generation,
-        parentTile: parentTerrainTile,
-        loadTile: (tile) => waitForTerrainTileReadyAtZoom(
-          tile.z, tile.tx, tile.ty, 10000, deps, { signal }
-        )
-      }),
+      acceptedRegionalGround
+        ? Promise.resolve({
+            ready: true,
+            missingSourceTiles: [],
+            fallbackTiles: [],
+            fallback: null,
+            primary: { started: 0, maxInFlight: 0 }
+          })
+        : loadFarTerrainElevationWithParentFallback({
+            tiles: sourceTiles,
+            isActive: () => requestGeneration === generation,
+            parentTile: parentTerrainTile,
+            loadTile: (tile) => waitForTerrainTileReadyAtZoom(
+              tile.z, tile.tx, tile.ty, 10000, deps, { signal }
+            )
+          }),
       loadFarMappedContext(
         spec.contextGeographic,
         spec.detailExclusionGeographic,
@@ -461,7 +497,9 @@ function createFarFieldTerrainApi(deps = {}) {
       ...sourceTiles.map((tile) => [tile.key, getOrLoadTerrainTile(tile.z, tile.tx, tile.ty, deps)]),
       ...fallbackTiles.map((tile) => [tile.key, getOrLoadTerrainTile(tile.z, tile.tx, tile.ty, deps)])
     ]);
-    const offsetMeters = elevation.ready
+    const offsetMeters = acceptedRegionalGround
+      ? 0
+      : elevation.ready
       ? normalizationOffset(spec.inner, spec.sourceZoom, loadedTiles)
       : 0;
     if (!Number.isFinite(offsetMeters)) {
@@ -562,27 +600,37 @@ function createFarFieldTerrainApi(deps = {}) {
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     applyMappedSurfaceTintOwnership(mesh);
     applyMappedWaterTerrainOwnership(mesh, material, waterTerrainMask);
+    const centerAcceptedGround = sampleAcceptedGroundAtLatLon(
+      appCtx.LOC.lat,
+      appCtx.LOC.lon
+    );
     mesh.userData.renderProvenance = {
       version: 1,
       profile: 'fixed-location-terrain-lod',
-      provider: elevationFallbackMode ? 'accepted-ground-flat-datum' : 'mapzen-terrarium',
-      dataset: elevationFallbackMode
+      provider: acceptedRegionalGround
+        ? centerAcceptedGround?.providerId
+        : elevationFallbackMode ? 'accepted-ground-flat-datum' : 'mapzen-terrarium',
+      dataset: acceptedRegionalGround
+        ? centerAcceptedGround?.artifactId
+        : elevationFallbackMode
         ? 'Degraded fixed-location flat datum with mapped surface semantics'
         : 'Mapzen Terrarium elevation-derived landscape',
-      verticalDatum: sampleAcceptedGroundAtLatLon(appCtx.LOC.lat, appCtx.LOC.lon)?.verticalDatum || null,
+      verticalDatum: centerAcceptedGround?.verticalDatum || null,
       normalizationOffsetMeters: offsetMeters,
       layer: 'terrain',
       role: 'fixed-location-terrain-lod',
       sources: [
-        ...(elevationFallbackMode ? ['accepted-ground-flat-datum'] : ['mapzen-terrarium']),
+        ...(acceptedRegionalGround
+          ? [centerAcceptedGround?.artifactId].filter(Boolean)
+          : elevationFallbackMode ? ['accepted-ground-flat-datum'] : ['mapzen-terrarium']),
         'openstreetmap-shortbread',
         ...(worldCoverContext ? ['esa-worldcover-2021'] : [])
       ],
-      fallback: !!elevationFallbackMode || (
+      fallback: !acceptedRegionalGround && (!!elevationFallbackMode || (
         offsetMeters === 0 &&
         typeof terrainTileDeps?.usesAcceptedGround === 'function' &&
         !terrainTileDeps.usesAcceptedGround()
-      )
+      ))
     };
 
     farFieldMesh = mesh;
@@ -674,6 +722,9 @@ function createFarFieldTerrainApi(deps = {}) {
       fallbackElevationRequestsStarted: Number(fallbackElevation?.started || 0),
       fallbackElevationMaxInFlight: Number(fallbackElevation?.maxInFlight || 0),
       elevationFallbackMode,
+      groundAuthority: acceptedRegionalGround
+        ? 'accepted-ground-stack'
+        : elevationFallbackMode || 'mapzen-terrarium-offset',
       fallbackElevationMeters,
       offsetMeters,
       columns: built.columns,

@@ -1297,6 +1297,91 @@ Next bounded task: restore the isolated shared-roadway work, publish one
 physical Golden Gate road presentation while preserving both mapped traffic
 identities, inspect the complete frame, and rerun both worldwide matrices.
 
+## 2026-08-21 recovery checkpoint 1 — accepted ground is one provider-coherent stack
+
+### First authoritative loss
+
+- At the same World Trade Center coordinates and arrival camera, preserved
+  candidate `4.3.0+88c3ff8b88a7.60a184335587db86.staging` accepted the
+  `holland-tunnel-ground` classified Copernicus DSM as physical ground. That
+  artifact contained a 69.36 m adjacent jump, 1,274 adjacent edges over 10 m,
+  and 95.45% samples unchanged from the surface model. The final far field was
+  then built independently from 42 Terrarium tiles and reached -492.623 m.
+  Artificial terrain walls were visible in the complete frame. Transport was
+  downstream and was not the first owner to lose correct geometry.
+- The existing artifact builder also interpreted requested ground metres as
+  raw EPSG:3857 metres. At New York latitude, a requested 45 km artifact covered
+  only about 34 km on the ground. WTC happened to fit, but the identical
+  Times Square gameplay envelope extended beyond it and silently reintroduced
+  Terrarium. This was caught by the required game-client run after the first
+  WTC improvement, before checkpointing.
+
+### Completed bounded authority repair
+
+- Runtime selects every covering artifact from exactly one highest-priority
+  accepted provider, ordered finest to coarsest. It never mixes a lower-priority
+  provider into that stack. Detail terrain, regional terrain, mapped-water beds,
+  and far-building bases consume the same sampler.
+- New York now uses reviewed USGS 3DEP 1/3 arc-second bare-earth source members
+  4840 and 5223, locked in the export mosaic and individually bound to metadata
+  hashes. Both 90 m delivery detail and 320 m delivery regional artifacts are
+  normalized to EGM2008 through the pinned datum pipeline. Recorded source
+  accuracy and normalization uncertainty are not claimed as surveyed scene
+  measurements.
+- Ground build plans convert requested ground extent to Web Mercator extent at
+  the target latitude. The regional artifact covers 55 km, enough for the full
+  22 km far field at WTC and Times Square. The superseded overlapping
+  `holland-tunnel-ground` and `newyork-ground` runtime assets are deleted, so a
+  catalog rebuild cannot restore competing physical authorities.
+- Compact row-major Float64 encoding removes repeated per-sample JSON metadata
+  while preserving all 95,290 elevations, grid spacing, extent, confidence,
+  provenance, and hashes. Runtime decoding rejects wrong byte order, count,
+  confidence, non-finite values, or content hash and preserves global sample
+  keys. This is ownership/data reduction, not world-detail reduction.
+- Release waits now prove a finite published terrain surface instead of
+  requiring Terrarium cache entries. Regression fixtures cover provider
+  coherence, finest/coarse fallback order, lower-priority exclusion, projected
+  extent, retired catalog identities, artifact integrity, compact decoding, and
+  grid identity.
+
+### Verified result and remaining blockers
+
+- Final complete Manhattan gameplay reports two artifacts
+  (`newyork-detail-ground`, `newyork-regional-ground`), far authority
+  `accepted-ground-stack`, zero elevation requests/cache bytes, zero unowned
+  cells, 10,335 buildings, active traffic/Living World/Urban Sandbox, no road
+  pedestrians, and no runtime, page, or local-resource errors. The inspected
+  frame retains a tall skyline. The rendered/source neighborhood differs by no
+  more than 0.0021 m.
+- The identical WTC A/B removed the artificial Lower Manhattan walls and the
+  -492.623 m fallback minimum. This does not establish a universal ground fix:
+  it establishes the generic stack/extent/publication rule and replaces the
+  proven-bad New York data with reviewed regional data.
+- The seven-location assembled control run completed with all frames inspected.
+  It correctly stayed red on Baltimore, Golden Gate, Monaco, and Manhattan
+  topology/grade failures. The final Manhattan run passes every assembled gate
+  except one exact 5.8597 m transport discontinuity; its worst ordinary mapped
+  road remains 59.136% grade. Do not smooth or hide either result in the ground
+  layer.
+- `npm test` ran after the final edit. `verify:source` passed. `verify:world`
+  remained red because it expects a far pedestrian character despite the
+  explicit zero-pedestrian product requirement, and because its exact transport
+  policy rejects a fallback run with zero authoritative connections even when
+  the same diagnostic reports zero discontinuities. Do not convert either into
+  a ground exception; resolve them with provider/test-policy authority.
+- The first clean immutable-candidate rerun selected lossless OSM rather than
+  generalized Shortbread. Ground evidence remained identical: two reviewed
+  artifacts, zero Terrarium requests/cache bytes, and zero unowned cells. That
+  run published 19,253 near buildings, retained the tall skyline, reproduced
+  the 5.8597 m exact join, and measured a 66.453% worst ordinary road rather
+  than the generalized run's 59.136%. Preserve both outcomes as provider-
+  determinism evidence; do not lower building detail to force equal counts.
+- Next bounded authority is deterministic provider/location selection, followed
+  by one building identity/height catalog. Transport topology and simultaneous
+  vertical solving, foundation composition, traffic contact, mapped façade
+  frontage/storefronts, and memory ownership remain separate checkpoints. Do
+  not push, deploy, promote, or call the release production-ready.
+
 ## 2026-08-20 audit checkpoint 9 — directional identities share one physical roadway
 
 ### First authoritative loss
@@ -1365,3 +1450,15 @@ identities, inspect the complete frame, and rerun both worldwide matrices.
 Next bounded task after the user tests this checkpoint: trace mapped entrance
 and street provenance through facade-edge selection, batching, LOD/culling, and
 final visibility. Do not push or deploy.
+
+## Current continuation after 2026-08-21 recovery checkpoint 1
+
+Recovery checkpoint 1 above is now the latest authority result. New York near
+and far terrain use the two-artifact reviewed USGS stack with no Terrarium
+elevation requests inside the complete Manhattan gameplay envelope. The
+production gate remains open. Continue with deterministic provider/location
+selection as one bounded authority change; do not resume the older frontage
+instruction immediately above until provider and building identity/height
+authority are complete. Preserve the recorded 5.8597 m Manhattan transport
+discontinuity and 59.136% ordinary-road grade as open evidence. Do not push,
+deploy, promote, or reduce building/world detail.

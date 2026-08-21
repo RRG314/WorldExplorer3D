@@ -66,7 +66,8 @@ try {
         const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return state.gameStarted === true && state.worldLoading === false &&
-          Number(diagnostics.worldCounts?.terrainTiles || 0) > 0 &&
+          diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
+          Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
           Number(diagnostics.worldCounts?.roads || 0) > 0 &&
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
       }, null, { timeout: 360000 });
@@ -101,7 +102,10 @@ try {
       });
       const checks = {
         earthOwnsRuntime: snapshot.environment === 'EARTH',
-        terrainAndRoadsPublished: Number(snapshot.worldCounts.terrainTiles || 0) > 0 && Number(snapshot.worldCounts.roads || 0) > 0,
+        terrainAndRoadsPublished:
+          snapshot.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
+          Number.isFinite(Number(snapshot.surfaceChain?.surfaces?.terrain?.y)) &&
+          Number(snapshot.worldCounts.roads || 0) > 0,
         oneVisibleGameplayCanvas: snapshot.visiblePrimaryCanvasCount === 1,
         livingAndUrbanSystemsActive: snapshot.livingWorld?.active === true && snapshot.urbanSandbox?.active === true,
         correctJurisdictionLaneSide:

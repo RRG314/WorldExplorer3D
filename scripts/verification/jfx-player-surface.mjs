@@ -181,7 +181,8 @@ try {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false &&
-      Number(diagnostics.worldCounts?.terrainTiles || 0) > 0 &&
+      diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
+      Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
       Number(diagnostics.worldCounts?.roads || 0) > 0 &&
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
@@ -211,7 +212,8 @@ try {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false &&
-      Number(diagnostics.worldCounts?.terrainTiles || 0) > 0 &&
+      diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
+      Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
       Number(diagnostics.worldCounts?.roads || 0) > 0 &&
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;

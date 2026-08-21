@@ -354,6 +354,12 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const lon = Number(ring[index]?.[0]);
         const lat = Number(ring[index]?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
+        const acceptedMeters = Number(accepted?.groundElevationMeters);
+        if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+          samples.push(acceptedMeters);
+          continue;
+        }
         const sampledSourceMeters = sampleSourceMeters(lat, lon, sourceZoom, loadedTiles);
         const sourceMeters = Number.isFinite(sampledSourceMeters)
           ? sampledSourceMeters
@@ -383,21 +389,27 @@ function createFarFieldGeometryPlanner(deps = {}) {
     // for a deliberately unloaded neighbor and reject the entire fixed mesh.
     const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
     const { lat, lon } = worldToLatLon(samplePoint.x, samplePoint.z);
-    const sampledSourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
-    const sourceMeters = Number.isFinite(sampledSourceMeters)
-      ? sampledSourceMeters
-      : Number(spec.fallbackElevationMeters);
-    if (!Number.isFinite(sourceMeters)) return null;
-
-    let meters = sourceMeters + offsetMeters;
-    const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
-    const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
-    if (distanceFromSeam <= seamBlendWorld) {
-      const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
-      const acceptedMeters = Number(accepted?.groundElevationMeters);
-      if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
-        const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
-        meters = acceptedMeters + (meters - acceptedMeters) * blend;
+    const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
+    const acceptedMeters = Number(accepted?.groundElevationMeters);
+    let meters;
+    if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+      meters = acceptedMeters;
+    } else {
+      const sampledSourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
+      const sourceMeters = Number.isFinite(sampledSourceMeters)
+        ? sampledSourceMeters
+        : Number(spec.fallbackElevationMeters);
+      if (!Number.isFinite(sourceMeters)) return null;
+      meters = sourceMeters + offsetMeters;
+      const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
+      const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
+      if (distanceFromSeam <= seamBlendWorld) {
+        const seamAccepted = sampleAcceptedGroundAtLatLon(lat, lon);
+        const seamAcceptedMeters = Number(seamAccepted?.groundElevationMeters);
+        if (seamAccepted?.status === 'available' && Number.isFinite(seamAcceptedMeters)) {
+          const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
+          meters = seamAcceptedMeters + (meters - seamAcceptedMeters) * blend;
+        }
       }
     }
     const resolvedMeters = mappedWaterBedMetersAt(

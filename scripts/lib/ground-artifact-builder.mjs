@@ -36,6 +36,47 @@ function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
+function float64Base64(values) {
+  const buffer = new ArrayBuffer(values.length * Float64Array.BYTES_PER_ELEMENT);
+  const view = new DataView(buffer);
+  values.forEach((value, index) => {
+    view.setFloat64(index * Float64Array.BYTES_PER_ELEMENT, Number(value), true);
+  });
+  return Buffer.from(buffer).toString('base64');
+}
+
+function compactGroundSamples(samples) {
+  if (!Array.isArray(samples) || samples.length === 0) return null;
+  const first = samples[0];
+  const sharedFields = [
+    'confidence', 'correctionReason', 'provenance',
+    'normalizationUncertaintyMeters'
+  ];
+  if (samples.some((sample) => sharedFields.some(
+    (field) => sample?.[field] !== first?.[field]
+  ))) return null;
+  return Object.freeze({
+    type: 'row-major-f64-shared-metadata-v1',
+    byteOrder: 'little-endian',
+    sampleCount: samples.length,
+    rawElevationMetersBase64: float64Base64(samples.map(
+      (sample) => sample.rawElevationMeters
+    )),
+    groundElevationMetersBase64: float64Base64(samples.map(
+      (sample) => sample.groundElevationMeters
+    )),
+    shared: Object.freeze({
+      available: true,
+      confidence: Number(first.confidence),
+      correctionReason: String(first.correctionReason || 'none'),
+      provenance: String(first.provenance || 'unknown'),
+      normalizationUncertaintyMeters: Number(
+        first.normalizationUncertaintyMeters
+      )
+    })
+  });
+}
+
 function mercatorY(latitude) {
   const radians = clampWebMercatorLatitude(latitude) * Math.PI / 180;
   return WEB_MERCATOR_RADIUS_METERS *
@@ -150,10 +191,16 @@ export function createGroundBuildPlan(options = {}) {
   const centerX = centerLongitude * Math.PI / 180 *
     WEB_MERCATOR_RADIUS_METERS;
   const centerY = mercatorY(centerLatitude);
-  const west = centerX - widthMeters / 2;
-  const east = centerX + widthMeters / 2;
-  const south = centerY - heightMeters / 2;
-  const north = centerY + heightMeters / 2;
+  const projectionScale = 1 / Math.max(
+    1e-6,
+    Math.cos(centerLatitude * Math.PI / 180)
+  );
+  const projectedWidthMeters = widthMeters * projectionScale;
+  const projectedHeightMeters = heightMeters * projectionScale;
+  const west = centerX - projectedWidthMeters / 2;
+  const east = centerX + projectedWidthMeters / 2;
+  const south = centerY - projectedHeightMeters / 2;
+  const north = centerY + projectedHeightMeters / 2;
   if (south < -WEB_MERCATOR_HALF_WORLD_METERS ||
       north > WEB_MERCATOR_HALF_WORLD_METERS) {
     throw new RangeError('requested height exceeds Web Mercator latitude coverage');
@@ -209,6 +256,11 @@ export function createGroundBuildPlan(options = {}) {
       longitude: centerLongitude
     }),
     requestedExtentMeters: Object.freeze({ widthMeters, heightMeters }),
+    projectedExtentMeters: Object.freeze({
+      widthMeters: projectedWidthMeters,
+      heightMeters: projectedHeightMeters,
+      webMercatorScaleAtCenter: projectionScale
+    }),
     spacingMeters,
     maxSamples,
     crossesAntimeridian: parts.length > 1,
@@ -408,6 +460,9 @@ export function createGroundArtifactBundle({
   if (!part?.grid || !part?.coverage) {
     throw new TypeError('a ground build plan part is required');
   }
+  const sampleEncoding = compactArtifact
+    ? compactGroundSamples(normalizedSamples)
+    : null;
   const artifact = {
     schemaVersion: 1,
     artifactId: String(artifactId || part.id),
@@ -418,7 +473,9 @@ export function createGroundArtifactBundle({
     coverage: part.coverage,
     minimumConfidence: 0.75,
     grid: part.grid,
-    samples: normalizedSamples
+    ...(sampleEncoding
+      ? { sampleEncoding }
+      : { samples: normalizedSamples })
   };
   const artifactText = compactArtifact
     ? `${JSON.stringify(artifact)}\n`
