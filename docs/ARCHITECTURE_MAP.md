@@ -128,6 +128,14 @@ flowchart TD
 
 The six snapshot layers are terrain, hydrology, transport, buildings, landuse and places. Every layer owns an authority, completeness, coverage, source and stable identities. An identical active request may share its promise; a changed signature supersedes it. Publication and provider responses check the current request identity.
 
+Detailed building massing uses one build-pinned Overture release. Publication
+requires every requested PMTiles cell to complete after a bounded retry; a
+partial tile set is not a valid building world. Overture, Shortbread, and
+Overpass are separate provider operations in the world-load ledger, and the
+building layer product records the source that actually published. A fallback
+may keep the world usable, but release verification requires the reviewed
+Overture authority and cannot call a generalized fallback production-equivalent.
+
 Detailed provider coverage is centered on the selection. A one-shot generalized regional context extends visibility to a fixed 14,000 m radius. It is not player-driven streaming. Far-terrain visibility changes are LOD over already-loaded state.
 
 ## 5. Coordinate and surface contracts

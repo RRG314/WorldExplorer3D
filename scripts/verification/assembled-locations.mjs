@@ -89,8 +89,11 @@ try {
           worldLoad: {
             providers: diagnostics.worldLoad?.session?.providers || {},
             transportSource: diagnostics.worldLoad?.layerProducts?.transport?.source || null,
+            buildingSource: diagnostics.worldLoad?.layerProducts?.buildings?.source || null,
+            buildingProviderDecision: diagnostics.worldLoad?.buildingProviderDecision || null,
             acceptedGroundSelection: diagnostics.worldLoad?.acceptedGroundSelection || null,
-            buildingRoadAuthority: diagnostics.worldLoad?.layerProducts?.buildings?.record?.compilation || null
+            buildingRoadAuthority: diagnostics.worldLoad?.layerProducts?.buildings?.record?.compilation || null,
+            buildingDetail: diagnostics.worldDetail?.buildings || null
           },
           runtimeErrors: diagnostics.runtimeErrors || [],
           visiblePrimaryCanvasCount: [...document.querySelectorAll('canvas')].filter((canvas) => {
@@ -129,6 +132,17 @@ try {
         oneBuildingFoundationCollisionAuthority:
           Number(snapshot.worldLoad?.buildingRoadAuthority?.foundationCollisionProfiles || 0) > 0 &&
           Number(snapshot.worldLoad?.buildingRoadAuthority?.foundationCollisionMismatches || 0) === 0,
+        completePinnedBuildingAuthority:
+          snapshot.worldLoad?.buildingSource?.provider === 'overture-buildings-pmtiles' &&
+          snapshot.worldLoad?.buildingDetail?.source === 'overture-buildings-pmtiles' &&
+          snapshot.worldLoad?.buildingDetail?.sourceDetails?.releasePolicy?.authority ===
+            'build-pinned-reviewed-overture-release' &&
+          snapshot.worldLoad?.buildingDetail?.sourceDetails?.coverageComplete === true &&
+          Number(snapshot.worldLoad?.buildingDetail?.sourceDetails?.failedTiles || 0) === 0 &&
+          Number(snapshot.worldLoad?.buildingDetail?.sourceDetails?.loadedTiles || 0) ===
+            Number(snapshot.worldLoad?.buildingDetail?.sourceDetails?.requestedTiles || -1) &&
+          snapshot.worldLoad?.buildingProviderDecision?.selected === 'overture' &&
+          snapshot.worldLoad?.buildingProviderDecision?.authority === 'authoritative',
         mappedStructureArrivalVisible: location.expectsStructureArrival !== true || (
           snapshot.surfaceChain?.actor?.mode !== 'boat' &&
           /^(?:bridge|overpass|ramp|elevated_road)$/.test(String(

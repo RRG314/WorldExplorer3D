@@ -1462,3 +1462,45 @@ instruction immediately above until provider and building identity/height
 authority are complete. Preserve the recorded 5.8597 m Manhattan transport
 discontinuity and 59.136% ordinary-road grade as open evidence. Do not push,
 deploy, promote, or reduce building/world detail.
+
+## Current continuation after 2026-08-21 recovery checkpoint 2
+
+Deterministic building-provider authority is now repaired in source. The first
+loss was not the height resolver: the pinned June Overture PMTiles archive had
+expired and returned 404, while the Overture adapter silently fetched
+Shortbread inside an operation recorded as Overture success. Partial Overture
+tile sets were also considered publishable, and the building layer product did
+not record the actual winning source.
+
+Source now pins reviewed Overture release `2026-08-19.0`, retries only the
+failed tile identities once, rejects any remaining coverage hole, executes
+Shortbread fallback under its own provider token, and publishes the actual
+building source/decision. Candidate creation and release verification reject an
+unreachable archive or one with fewer than fourteen expected public-retention
+days. The official worldwide gate requires complete authoritative Overture
+publication and cannot turn a generalized fallback green.
+
+Two identical fresh Manhattan paths both published 15,272 buildings and 6,115
+visible meshes from 9/9 tiles, with 15,192 mapped heights and 2,929 mapped-tall
+records. Complete Baltimore, Golden Gate, London, Monaco, Manhattan, rural Iowa
+and Tokyo frames were opened; all used the same pinned source with 9/9 or 12/12
+coverage. This did not change height values, budgets, LOD, terrain, or transport.
+
+The next bounded authority is building identity/height across near and far
+publication. Baltimore still has only 23 mapped-tall records against 18,057
+inferred heights; Tokyo has zero mapped-tall records in the tested core against
+20,728 inferred heights. Treat those as the building blocker, not as permission
+to scale all buildings, add city patches, or reduce detail. London/Monaco
+foundation composition, rural Iowa arrival, road grades, transport topology,
+traffic contact and mapped frontage remain separate. Do not push, deploy or
+promote.
+
+`npm test` remains red only on the already recorded far-pedestrian policy
+conflict and zero-authoritative-connection policy conflict. Source verification
+and the provider-release gate pass; no new provider, building, runtime, browser,
+or local-resource failure appeared.
+
+The first clean immutable candidate reproduced the source result exactly:
+15,272 buildings, 6,115 visible meshes, 21,225 requested records, 9/9 complete
+Overture tiles, 15,192 mapped heights, 2,929 mapped-tall records, and no
+runtime/page/local-resource errors. Its full frame was opened and inspected.

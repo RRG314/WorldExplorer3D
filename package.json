@@ -10,6 +10,7 @@
     "candidate:serve": "node scripts/local-candidate.mjs serve",
     "candidate:create-and-serve": "node scripts/local-candidate.mjs create-and-serve",
     "verify:source": "node scripts/verification/source.mjs",
+    "verify:provider-release": "node scripts/verification/provider-release.mjs",
     "verify:firestore-rules": "firebase emulators:exec --only firestore --project we3d-staging-20260712 \"node --test tests/firestore.rules.security.test.mjs\"",
     "verify:multiplayer": "firebase emulators:exec --only auth,firestore --project we3d-staging-20260712 \"node scripts/verification/multiplayer.mjs\"",
     "verify:world": "node scripts/verification/world.mjs",

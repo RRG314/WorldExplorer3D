@@ -16,6 +16,11 @@ import {
   sampleDistrictGroundMeters
 } from '../../app/js/world/compiler/district-ground-model.js';
 import { createGroundBuildPlan } from '../lib/ground-artifact-builder.mjs';
+import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
+import {
+  OVERTURE_RELEASE_POLICY,
+  overtureThemeArchiveUrl
+} from '../../app/js/world/overture-tile-source.js';
 
 const root = process.cwd();
 const reportPath = path.join(root, 'output', 'verification', 'source', 'report.json');
@@ -289,6 +294,50 @@ if (ruralMetadataWithPublicationCoverage !== null) {
   buildingMetadataCoverageFailures.push('rural Iowa incorrectly selects an unrelated bundled building metadata pack');
 }
 
+const buildingProviderAuthorityFailures = [];
+const overtureReleaseDate = Date.parse(`${OVERTURE_RELEASE_POLICY.release.slice(0, 10)}T00:00:00Z`);
+const overtureReviewedDate = Date.parse(`${OVERTURE_RELEASE_POLICY.reviewedOn}T00:00:00Z`);
+const verificationDate = Date.parse('2026-08-21T00:00:00Z');
+if (OVERTURE_RELEASE_POLICY.authority !== 'build-pinned-reviewed-overture-release' ||
+    !Number.isFinite(overtureReleaseDate) || !Number.isFinite(overtureReviewedDate) ||
+    overtureReleaseDate > overtureReviewedDate ||
+    overtureReviewedDate - overtureReleaseDate > 7 * 24 * 60 * 60 * 1000 ||
+    verificationDate - overtureReviewedDate > 45 * 24 * 60 * 60 * 1000 ||
+    OVERTURE_RELEASE_POLICY.publicRetentionDays !== 60 ||
+    !overtureThemeArchiveUrl('buildings').includes(`/${OVERTURE_RELEASE_POLICY.release}/buildings.pmtiles`)) {
+  buildingProviderAuthorityFailures.push('Overture building release is not a current build-pinned reviewed authority');
+}
+const retryCounts = new Map();
+const recoveredTileBatch = await fetchCompleteArchiveTileBatch(
+  [{ x: 1, y: 1 }, { x: 2, y: 2 }],
+  {
+    fetchTile: async (_theme, z, x, y) => {
+      const key = `${z}/${x}/${y}`;
+      const count = (retryCounts.get(key) || 0) + 1;
+      retryCounts.set(key, count);
+      if (x === 2 && count === 1) throw new Error('verification transient');
+      return { z, x, y, tile: { layers: {} } };
+    },
+    maximumAttempts: 2,
+    concurrency: 2
+  }
+);
+if (recoveredTileBatch.metrics.fulfilled !== 2 ||
+    recoveredTileBatch.metrics.rejected !== 0 ||
+    recoveredTileBatch.metrics.attempts !== 2) {
+  buildingProviderAuthorityFailures.push('Overture coverage retry did not recover a complete deterministic tile set');
+}
+await assert.rejects(
+  () => fetchCompleteArchiveTileBatch(
+    [{ x: 3, y: 3 }],
+    {
+      fetchTile: async () => { throw new Error('verification permanent'); },
+      maximumAttempts: 2
+    }
+  ),
+  /coverage incomplete: 0\/1 tiles after 2 attempts/
+);
+
 const structureFallbackNodes = {
   1: { type: 'node', id: 1, lat: 10, lon: 20 },
   2: { type: 'node', id: 2, lat: 10, lon: 20.001 },
@@ -503,6 +552,7 @@ const report = {
     missingModuleTargets,
     duplicateModuleIdentities,
     buildingMetadataCoverageFailures,
+    buildingProviderAuthorityFailures,
     buildingRoadAuthorityFailures,
     structureFallbackAuthorityFailures,
     groundAuthorityFailures,

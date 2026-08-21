@@ -125,7 +125,8 @@ export async function loadBuildingDetailForPublication(options = {}) {
   const query = String(options.query || '');
   const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
   const fetchPreferredData = typeof options.fetchPreferredData === 'function' ? options.fetchPreferredData : null;
-  if (!fetchPreferredData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
+  const fetchFallbackData = typeof options.fetchFallbackData === 'function' ? options.fetchFallbackData : null;
+  if (!fetchPreferredData && !fetchFallbackData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
     setBuildingDetailState('skipped');
     return appCtx.worldDetailState.buildings;
   }
@@ -143,6 +144,14 @@ export async function loadBuildingDetailForPublication(options = {}) {
       } catch (preferredErr) {
         if (preferredErr?.name === 'AbortError' || !isActiveLoadContext()) throw preferredErr;
         options.recordLoadWarning?.('vector building detail', preferredErr);
+      }
+      if (!data && fetchFallbackData) {
+        try {
+          data = await fetchFallbackData();
+        } catch (fallbackErr) {
+          if (fallbackErr?.name === 'AbortError' || !isActiveLoadContext()) throw fallbackErr;
+          options.recordLoadWarning?.('generalized vector building fallback', fallbackErr);
+        }
       }
       const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
       if (authoritativeMassing && options.waterStructureQuery) {
@@ -200,6 +209,18 @@ export async function loadBuildingDetailForPublication(options = {}) {
         );
       }
       if (!isActiveLoadContext()) return;
+      const publicationSource = String(data._overpassSource || 'unknown-building-source');
+      appCtx.worldLoadRuntimeState ||= {};
+      appCtx.worldLoadRuntimeState.publicationSources = {
+        ...(appCtx.worldLoadRuntimeState.publicationSources || {}),
+        buildings: publicationSource
+      };
+      appCtx.worldLoadRuntimeState.buildingProviderDecision = data._buildingProviderDecision || {
+        selected: publicationSource,
+        authority: 'explicit-publication-source',
+        status: 'available',
+        fallbackStarted: false
+      };
       const inferredCoverage = supplementSparseBuildingData(data, appCtx);
 
       const nodes = {};

@@ -1467,3 +1467,64 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   Gate/Monaco/Manhattan exact topology; ordinary-road shaping; unified building
   identities/heights across LOD; foundation/water ordering; mapped street-facing
   doors and glass storefronts; and ownership-based memory work.
+
+## 2026-08-21 — Expired Overture release silently published generalized buildings
+
+- Status: resolved as recovery checkpoint 2; unified building height/LOD and
+  worldwide terrain/transport blockers remain open; local only, not deployed.
+- Symptom: identical Manhattan coordinates published either 10,335 or 19,253
+  near buildings, while the layer product named only the placeholder
+  `selected-location-buildings`. The preserved checkpoint-1 candidate later
+  reproduced 10,335 generalized buildings even though the provider session
+  reported the outer `overture` operation as completed.
+- First authoritative loss: `overture-tile-source.js` pinned release
+  `2026-06-17.0`, whose official PMTiles archive now returns HTTP 404 under
+  Overture's bounded public-release retention policy. `fetchGlobalBuildingData`
+  caught that failure and fetched Shortbread inside the Overture provider task.
+  The session therefore recorded Overture success, the layer product omitted
+  the actual source, and partial Overture tile success was also accepted as a
+  publishable world. Height selection and mesh batching were downstream.
+- Resolution: pin reviewed release `2026-08-19.0`; require the entire requested
+  Overture tile set after at most two bounded attempts; reject partial coverage;
+  move Shortbread fallback into its own provider operation; and publish the
+  winning building source and decision into the immutable layer product/runtime
+  state. No building height, LOD, count budget, city condition, or visual scale
+  was changed.
+- Release guard: source fixtures prove transient failed tiles recover without
+  losing coordinate order and permanent incomplete coverage throws. Candidate
+  creation and full release verification range-check the pinned official
+  archive and reject releases with fewer than fourteen expected retention days.
+  The worldwide assembled gate requires the pinned release, complete coverage,
+  zero failed tiles, matching requested/loaded counts, and authoritative
+  Overture publication.
+- Same-coordinate evidence: two fresh Manhattan source loads both published
+  15,272 buildings and 6,115 visible building meshes from the same 9/9 complete
+  release. Each requested 21,225 building/part records; final dimension evidence
+  contained 15,192 mapped heights, 2,929 mapped-tall records, and only 164
+  inferred heights. The official complete Manhattan assembled gate passed every
+  check including `completePinnedBuildingAuthority`.
+- Worldwide evidence: Baltimore 24,514 buildings (9/9 tiles), Golden Gate 592
+  (9/9), London 16,452 (12/12), Monaco 5,985 (12/12), Manhattan 15,272
+  (9/9), rural Iowa 3,210 (12/12), and Tokyo 24,160 (12/12). Every complete
+  gameplay frame was opened with terrain, water, buildings, transport, living
+  world, atmosphere, HUD, collision and player control active. No run had a
+  runtime/page/local-resource error attributable to this change.
+- Never reintroduce: an expiring provider release without a pre-candidate
+  reachability/lifetime gate, accepting partial authoritative tiles, performing
+  one provider's fallback inside another provider's ledger token, placeholder
+  building source identity after publication, or count-only provider tests.
+- Adjacent blocker exposed rather than hidden: Baltimore still publishes only
+  23 mapped-tall records while 18,057 heights are inferred; Tokyo publishes zero
+  mapped-tall records in the tested core while 20,728 heights are inferred.
+  London/Monaco foundations and rural Iowa arrival remain visibly incoherent.
+  The next bounded authority is one building identity/height catalog across
+  near publication, far context, batching and LOD; do not reduce detail.
+- Full `npm test` kept `verify:source` green and retained only the two previously
+  recorded `verify:world` policy failures: its far-pedestrian expectation
+  conflicts with the required zero pedestrians, and its exact-connection check
+  rejects zero authoritative connections despite also reporting zero
+  discontinuities. No new provider/building/runtime/browser/resource check failed.
+- The first clean immutable candidate reproduced the source result exactly:
+  15,272 buildings, 6,115 visible meshes, 21,225 requested records, 9/9 complete
+  Overture tiles, 15,192 mapped heights, 2,929 mapped-tall records, and zero
+  runtime/page/local-resource errors. Packaging did not change provider choice.

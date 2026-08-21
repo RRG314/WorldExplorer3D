@@ -7,7 +7,7 @@ import {
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=48";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=23";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=24";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=7";
@@ -71,6 +71,7 @@ export function createWorldRoadLoader(deps = {}) {
     fetchOverpassJSON,
     fetchGlobalBuildingData,
     fetchBundledBuildingMetadata,
+    fetchShortbreadBuildingData,
     fetchShortbreadWorldData,
     featureTileKeyForLatLon,
     fetchVectorTileWater,
@@ -650,8 +651,32 @@ export function createWorldRoadLoader(deps = {}) {
                     lon: appCtx.LOC.lon,
                     radius: buildingPublicationCacheMeta.featureRadius,
                     signal
-                  }, (error) => recordLoadWarning('Overture building massing', error))
+                  })
                 )
+              : null,
+            fetchFallbackData: buildingLoadPolicy.shouldLoad
+              ? () => runProviderWork('openstreetmap-shortbread', 'building-detail-fallback', async (signal) => {
+                  const fallback = await fetchShortbreadBuildingData({
+                    lat: appCtx.LOC.lat,
+                    lon: appCtx.LOC.lon,
+                    radius: buildingPublicationCacheMeta.featureRadius,
+                    signal
+                  });
+                  if (fallback?._shortbreadTiles?.coverageComplete !== true) {
+                    throw new Error(
+                      `Shortbread building coverage incomplete: ` +
+                      `${fallback?._shortbreadTiles?.loaded || 0}/${fallback?._shortbreadTiles?.requested || 0} tiles`
+                    );
+                  }
+                  fallback._buildingProviderDecision = {
+                    selected: 'shortbread',
+                    authority: 'generalized',
+                    status: fallback._shortbreadTiles?.status || 'available',
+                    fallbackStarted: true,
+                    reason: 'overture-unavailable'
+                  };
+                  return fallback;
+                })
               : null,
             skipReason: buildingLoadPolicy.shouldLoad
               ? ''

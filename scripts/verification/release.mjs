@@ -6,6 +6,10 @@ const steps = [
     command: [process.execPath, 'scripts/verification/source.mjs']
   },
   {
+    name: 'Pinned external provider release is current and reachable',
+    command: [process.execPath, 'scripts/verification/provider-release.mjs']
+  },
+  {
     name: 'Firebase Functions syntax',
     command: [process.execPath, '--check', 'functions/index.js']
   },

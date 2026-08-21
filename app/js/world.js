@@ -162,12 +162,13 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=137";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=138";
 import {
+  fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
 } from "./world/shortbread-source.js?v=17";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=12";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=35";
 import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=48";
@@ -239,6 +240,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   fetchOverpassJSON,
   fetchGlobalBuildingData,
   fetchBundledBuildingMetadata,
+  fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   featureTileKeyForLatLon,
   fetchVectorTileWater,

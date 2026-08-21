@@ -1,12 +1,10 @@
-import {
-  fetchShortbreadBuildingData,
-  vectorTileRangeForBounds
-} from "./shortbread-source.js?v=17";
+import { vectorTileRangeForBounds } from "./shortbread-source.js?v=17";
 import {
   OVERTURE_RELEASE,
+  OVERTURE_RELEASE_POLICY,
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl
-} from './overture-tile-source.js?v=4';
+} from './overture-tile-source.js?v=5';
 import { shouldSuppressBuildingParent } from './building-provenance-model.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { throwIfWorldLoadAborted } from '../earth-core/request-cancellation.js?v=1';
@@ -256,6 +254,52 @@ async function fetchArchiveTileBatch(coordinates, options = {}) {
   );
 }
 
+async function fetchCompleteArchiveTileBatch(coordinates, options = {}) {
+  const maximumAttempts = Math.max(1, Math.min(3, Math.floor(Number(options.maximumAttempts) || 2)));
+  const settled = new Array(coordinates.length);
+  let attempts = 0;
+  let started = 0;
+  let maxInFlight = 0;
+  let pendingIndices = coordinates.map((_coordinate, index) => index);
+
+  while (pendingIndices.length > 0 && attempts < maximumAttempts) {
+    attempts += 1;
+    const batchCoordinates = pendingIndices.map((index) => coordinates[index]);
+    const batch = await fetchArchiveTileBatch(batchCoordinates, options);
+    started += Number(batch.metrics?.started || 0);
+    maxInFlight = Math.max(maxInFlight, Number(batch.metrics?.maxInFlight || 0));
+    const rejectedIndices = [];
+    for (let batchIndex = 0; batchIndex < batch.settled.length; batchIndex++) {
+      const coordinateIndex = pendingIndices[batchIndex];
+      const entry = batch.settled[batchIndex];
+      settled[coordinateIndex] = entry;
+      if (entry?.status === 'rejected') rejectedIndices.push(coordinateIndex);
+    }
+    pendingIndices = rejectedIndices;
+  }
+
+  const fulfilled = settled.filter((entry) => entry?.status === 'fulfilled').length;
+  const rejected = coordinates.length - fulfilled;
+  if (rejected > 0) {
+    const reason = settled.find((entry) => entry?.status === 'rejected')?.reason;
+    throw new Error(
+      `Overture building coverage incomplete: ${fulfilled}/${coordinates.length} tiles after ` +
+      `${attempts} attempts (${reason?.message || reason || 'provider failure'})`
+    );
+  }
+  return {
+    settled,
+    metrics: Object.freeze({
+      requested: coordinates.length,
+      started,
+      fulfilled,
+      rejected,
+      maxInFlight,
+      attempts
+    })
+  };
+}
+
 export async function fetchOvertureBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
@@ -275,14 +319,10 @@ export async function fetchOvertureBuildingData(options = {}) {
     OVERTURE_BUILDING_ZOOM
   );
   const coordinates = orderedTileCoordinates(range, lat, lon);
-  const { settled, metrics } = await fetchArchiveTileBatch(coordinates, options);
+  const { settled, metrics } = await fetchCompleteArchiveTileBatch(coordinates, options);
   throwIfWorldLoadAborted(options.signal, 'Overture building coverage aborted');
   const tiles = fulfilledTiles(settled);
-  if (metrics.fulfilled === 0) {
-    const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
-    throw new Error(`Overture building coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
-  }
-  const coverageComplete = metrics.fulfilled === coordinates.length;
+  const coverageComplete = true;
   const converted = convertTilesToElements(tiles, bounds, { coverageComplete });
   const ways = converted.elements.filter((element) => element.type === 'way');
   const parts = ways.filter((way) => way.tags?.['building:part']);
@@ -301,8 +341,9 @@ export async function fetchOvertureBuildingData(options = {}) {
     },
     _overtureBuildings: {
       release: OVERTURE_RELEASE,
+      releasePolicy: OVERTURE_RELEASE_POLICY,
       zoom: OVERTURE_BUILDING_ZOOM,
-      attempts: 1,
+      attempts: metrics.attempts,
       loadedTiles: metrics.fulfilled,
       decodedTiles: tiles.length,
       emptyTiles: metrics.fulfilled - tiles.length,
@@ -324,29 +365,17 @@ export async function fetchOvertureBuildingData(options = {}) {
   };
 }
 
-export async function fetchGlobalBuildingData(options = {}, onFallback = null) {
-  try {
-    // A partial archive response still contains authoritative footprints.
-    // Discarding every fulfilled tile because one neighboring tile failed
-    // turned dense locations into the much sparser fallback dataset.
-    return await fetchOvertureBuildingData(options);
-  } catch (error) {
-    throwIfWorldLoadAborted(options.signal, 'Global building coverage aborted');
-    if (typeof onFallback === 'function') onFallback(error);
-    const fallback = await fetchShortbreadBuildingData(options);
-    fallback._buildingProviderDecision = {
-      selected: 'shortbread',
-      authority: 'generalized',
-      status: fallback._shortbreadTiles?.status || 'available',
-      fallbackStarted: true,
-      reason: 'overture-unavailable'
-    };
-    return fallback;
-  }
+export async function fetchGlobalBuildingData(options = {}) {
+  // Provider fallback is deliberately not performed inside this adapter.
+  // Otherwise the world-load ledger records Overture as successful while a
+  // different dataset is silently published. The publication coordinator owns
+  // fallback selection and gives each provider its own lifecycle record.
+  return fetchOvertureBuildingData(options);
 }
 
 export {
   OVERTURE_BUILDING_ZOOM,
   OVERTURE_TILE_CONCURRENCY,
-  OVERTURE_RELEASE
+  OVERTURE_RELEASE,
+  fetchCompleteArchiveTileBatch
 };

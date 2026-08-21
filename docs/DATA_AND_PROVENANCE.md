@@ -1,6 +1,6 @@
 # World Explorer 3D — Data and Provenance Inventory
 
-Status: authoritative release-source data map for version 4.3.0, inspected 2026-08-17.
+Status: authoritative release-source data map for version 4.3.0, inspected 2026-08-21.
 
 ## 1. Truth vocabulary
 
@@ -26,7 +26,7 @@ Every provider-backed record that reaches Live Earth uses source ID/label/operat
 | --- | --- | --- | --- |
 | detailed mapped core | OpenStreetMap through Overpass, `world/osm-loader.js` | roads, paths, buildings, water, landuse, POIs, infrastructure tags | bounded request, timeout, cancellation, IndexedDB cache; global tag/coverage variance |
 | generalized regional context | OSM Shortbread vector tiles, `world/shortbread-source.js` | one-time transport/water/structure context to 14 km | lower detail, fixed tile/feature budgets; not movement streaming |
-| building gap fill | Overture Maps PMTiles, `world/overture-*` | bounded footprint coverage fallback | source identity retained; not merged as exact metadata without stable mapping |
+| detailed building massing | Overture Maps PMTiles, `world/overture-*` | primary bounded footprint, part, height, roof and facade-property coverage | one reviewed release is pinned per build; complete tile coverage is required; candidate creation verifies range reachability and minimum remaining public-retention life; Shortbread/Overpass fallback is explicit and cannot be reported as Overture |
 | accepted ground | USGS 3DEP and approved Copernicus GLO-30 artifacts | physical ground authority where cataloged | explicit datum/source-release manifest required |
 | candidate/corrected ground | FABDEM, classified Copernicus variants | accepted only with required attestation/correction | cannot be silently promoted |
 | legacy visual terrain | Mapzen Terrarium | visual/elevation fallback | not accepted-ground truth |
@@ -41,6 +41,14 @@ Every provider-backed record that reaches Live Earth uses source ID/label/operat
 | property context | Estated, ATTOM or RentCast with user key | optional property/listing information | disabled without user-supplied credential; never legal/survey advice |
 
 Provider work belongs to one active world-load session. It records outstanding work, cancellation and fallback state. A superseded response cannot publish. Large decoded staging payloads are released after geometry publication; HTTP/IndexedDB caches remain bounded and versioned.
+
+Overture public releases have a bounded retention window. The runtime therefore
+does not discover a moving "latest" dataset. Source pins one reviewed release,
+publishes that release and archive identity with the building layer, retries a
+bounded failed-tile set, and rejects incomplete coverage. Candidate and release
+verification fail before publication when the pinned archive is unreachable or
+has fewer than fourteen expected public-retention days remaining. Updating the
+pin is an explicit reviewed data-release change, not a silent runtime switch.
 
 ## 3. Live Earth and operational data
 
