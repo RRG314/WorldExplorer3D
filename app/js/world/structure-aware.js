@@ -8,7 +8,7 @@ import {
   isPointWithinMappedWater,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=60";
+} from "../structure-semantics.js?v=61";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=11";
@@ -23,8 +23,8 @@ import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad,
   supportSpanConflictsWithDriveableRoad
-} from "./bridge-safety.js?v=12";
-import { refreshStructureColliders } from "./structure-colliders.js?v=12";
+} from "./bridge-safety.js?v=13";
+import { refreshStructureColliders } from "./structure-colliders.js?v=13";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 const runtime = {

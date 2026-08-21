@@ -351,12 +351,13 @@ function buildFeatureStations(feature, context = {}) {
   }
 
   if (publishedVerticalControl) {
-    if (Number.isFinite(publishedControlMinimumSurfaceY)) {
-      const existingMinimum = Number(feature.minimumStructureSurfaceY);
-      feature.minimumStructureSurfaceY = Number.isFinite(existingMinimum)
-        ? Math.max(existingMinimum, publishedControlMinimumSurfaceY)
-        : publishedControlMinimumSurfaceY;
-    }
+    // Published navigation clearance applies only at the mapped water
+    // stations that produced the control. Promoting it to one global minimum
+    // lifted both land approaches on complete OSM bridge ways and severed
+    // their exact graph-node tie-ins. The station lower bounds above remain
+    // authoritative locally; endpoints remain authoritative at their mapped
+    // transport connections.
+    delete feature.minimumStructureSurfaceY;
     feature.transportSurfaceControlResolution = Object.freeze({
       authority: 'compiled_transport_surface',
       controlId: String(publishedVerticalControl.id || ''),

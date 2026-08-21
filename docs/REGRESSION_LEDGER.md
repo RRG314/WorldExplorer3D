@@ -1340,3 +1340,34 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Adjacent blocker: the two 10.8 m carriageway ribbons still overlap by up to
   4.05 m and retain the visible longitudinal/diagonal seam. Repair shared-deck
   publication separately without replacing their mapped traffic identities.
+
+## 2026-08-20 — Published mid-span clearance lifted complete bridge endpoints
+
+- Status: resolved locally; shared-carriageway seam remains a production
+  blocker; not deployed.
+- Symptom: when lossless OSM transport succeeded at Golden Gate, 11 exact
+  connections failed by up to 20.545 m and one engineered approach reached
+  23.47%. Generalized fallback runs could remain green because they did not
+  publish those exact approach connections.
+- Root cause: the mapped-water resolver correctly derived the published 67 m
+  reference, then promoted it to `minimumStructureSurfaceY`, an absolute lower
+  bound consumed at every sample of both complete 2.46 km bridge ways. A
+  navigation clearance above mean higher high water is not a surveyed global
+  endpoint elevation.
+- Resolution: the published control remains a hard lower bound only at mapped
+  water stations. Exact graph-node surfaces retain endpoint authority. No
+  landmark deck, visual ramp, horizontal road edit, or city branch was added.
+- Guard: a complete-bridge profile fixture requires its mapped-water midpoint
+  to remain at or above 67 m and both connected endpoints to remain at 0.08 m.
+  Source and immutable-artifact seven-location matrices, source and packaged
+  actor verification, and hosting verification passed; all final frames were
+  inspected.
+- Evidence: temporary local artifact
+  `4.3.0+2bca4bea5a26.41d12289c45bf0ec.staging` (`sourceDirty: true`, never
+  deployed).
+- Never reintroduce: promoting a local clearance station into a global bridge
+  elevation floor, treating published clearance as surveyed endpoint height,
+  or accepting generalized fallback continuity as proof of lossless topology.
+- Adjacent blocker: Golden Gate still has two overlapping full-width roadway
+  ribbons. Fix their shared physical presentation separately while preserving
+  both mapped directional identities and the existing bridge structure.

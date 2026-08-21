@@ -7,13 +7,13 @@ import {
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=60";
+} from "../structure-semantics.js?v=61";
 import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import {
   computeIntersectionCapRadius,
   shouldBuildCompactIntersectionCap
-} from "./road-junctions.js?v=9";
+} from "./road-junctions.js?v=10";
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;

@@ -4,7 +4,7 @@ import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=27";
 import { registerWaterWaveMaterial } from "./render-support.js?v=14";
 import { decimatePoints } from "./world-geometry.js?v=3";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=9";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=60";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=61";
 import { normalizeWaterBody } from './water-body-contract.js?v=4';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 

@@ -4,10 +4,10 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=54";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=11";
+} from "./terrain/structure-visuals.js?v=55";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=12";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=19";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=20";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -56,7 +56,7 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=41";
+} from "./terrain/rebuild.js?v=42";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,

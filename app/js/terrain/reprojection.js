@@ -1,7 +1,7 @@
 import {
   buildFeatureRibbonEdges,
   isRoadSurfaceReachable
-} from "../structure-semantics.js?v=60";
+} from "../structure-semantics.js?v=61";
 import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=27";
 import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=4';
 

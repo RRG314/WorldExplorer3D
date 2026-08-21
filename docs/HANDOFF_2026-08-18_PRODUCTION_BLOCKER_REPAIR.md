@@ -1239,3 +1239,60 @@ parallel-road grouping, ribbon/marking batching, structure shells, collision,
 and traversal. Remove the overlap at the first shared-deck authority stage,
 verify the complete Golden Gate frame, then rerun the worldwide matrix. Do not
 push or deploy.
+
+## 2026-08-20 audit checkpoint 8 — mapped-water clearance is not a global deck floor
+
+### First authoritative loss
+
+- A real fully assembled run with the lossless OSM provider available replaced
+  the generalized Shortbread bridge ways with complete 2.46 km mapped Golden
+  Gate carriageways and their approach topology.
+- Checkpoint 7 correctly resolved the published 67 m reference from mapped
+  water, but then copied the maximum resolved value into
+  `minimumStructureSurfaceY`. The transport surface compiler interpreted that
+  property as an absolute lower bound at every sample, including land
+  endpoints. Eleven exact connections broke, with a maximum 20.545 m delta,
+  and one approach reached a 23.47% compiled grade.
+- The generalized fallback had no authoritative approach connections at this
+  location, so a count-only or fallback-only run could report zero
+  discontinuities while hiding the lossless-source failure.
+
+### Completed bounded authority correction
+
+- Published navigation clearance remains a local hard lower bound at the
+  mapped-water stations that produced it. It is no longer promoted into a
+  global feature elevation floor.
+- Exact transport graph nodes continue to own bridge endpoint tie-ins. The
+  transport compiler still owns vertical profile, assembly, collision,
+  traversal, and rendering; the landmark still owns no road deck or late
+  elevation mutation.
+- Added a complete mapped-bridge fixture that requires a 67 m water midpoint
+  and exact 0.08 m surfaces at both connected endpoints. The reference remains
+  labeled `published_reference_not_surveyed_scene_elevation`.
+
+### Verified result
+
+- `verify:source`, source and immutable-artifact seven-location assembled
+  matrices, source and packaged actor/vehicle verification, and hosting
+  build/hash verification passed. Every matrix location reported zero
+  structure discontinuities and zero engineered-grade violations; actor runs
+  retained zero pedestrian NPCs on transport and zero vehicle-attitude
+  mismatches.
+- Complete source and artifact frames were opened for Baltimore/JFX, Golden
+  Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo. Temporary staged
+  artifact `4.3.0+2bca4bea5a26.41d12289c45bf0ec.staging` was local only and
+  built from dirty source.
+
+### Still open
+
+1. Golden Gate's overlapping directional ribbons and asymmetric roadway-side
+   presentation remain visible and are the next bounded change. Do not alter
+   the tower/cable/support design.
+2. Provider success/fallback must remain covered separately: lossless source
+   exposes real topology that generalized fallback cannot prove.
+3. London/Monaco/Tokyo road-terrain shaping, rural arrival, street-facing
+   facade doors/storefronts, skyline/LOD, and waterfront ordering remain open.
+
+Next bounded task: restore the isolated shared-roadway work, publish one
+physical Golden Gate road presentation while preserving both mapped traffic
+identities, inspect the complete frame, and rerun both worldwide matrices.

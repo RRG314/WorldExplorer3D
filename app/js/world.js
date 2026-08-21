@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=60";
+} from "./structure-semantics.js?v=61";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=39";
+} from "./world/spawn.js?v=40";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -100,8 +100,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=38";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=50";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=51";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -142,7 +142,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=29";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=30";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=16";
@@ -161,7 +161,7 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=48";
+} from "./world/structure-aware.js?v=49";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=137";
 import {
   fetchShortbreadWorldData,
@@ -169,7 +169,7 @@ import {
 } from "./world/shortbread-source.js?v=17";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
-import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=31";
+import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=32";
 import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=48";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================

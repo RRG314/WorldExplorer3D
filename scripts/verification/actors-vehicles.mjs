@@ -14,6 +14,11 @@ import { compileElevatedAssembly } from '../../app/js/world/compiler/transport-s
 import { supportSpanConflictsWithDriveableRoad } from '../../app/js/world/bridge-safety.js';
 import { URBAN_VEHICLE_CATALOG, parkedVehicleAnchors } from '../../app/js/urban-sandbox/vehicle-model.js';
 import { applyPublishedTransportSurfaceControls } from '../../app/js/world/transport-surface-controls.js';
+import {
+  buildFeatureStations,
+  sampleFeatureSurfaceY,
+  updateFeatureSurfaceProfile
+} from '../../app/js/structure-semantics.js';
 
 // This verification is derived from the current actor/vehicle product
 // requirements. It does not inherit screenshot baselines or legacy tests.
@@ -69,6 +74,98 @@ const publishedControlBinding = applyPublishedTransportSurfaceControls({
 assert.equal(publishedControlBinding.appliedRoads, 1, 'Published vertical control must bind only to the matched mapped bridge identity.');
 assert.equal(controlledBridgeRoad.transportSurfaceControl?.authority, 'published_transport_surface_control');
 assert.equal(unrelatedBridgeRoad.transportSurfaceControl, undefined, 'Nearby unrelated bridge identity must retain its own authority.');
+controlledBridgeRoad.width = 10;
+controlledBridgeRoad.surfaceBias = 0.08;
+controlledBridgeRoad.structureSemantics = {
+  terrainMode: 'elevated',
+  gradeSeparated: true,
+  isBridge: true,
+  featureCategory: 'road',
+  deckClearance: 8
+};
+const controlledStations = buildFeatureStations(controlledBridgeRoad, {
+  features: [],
+  waterAreas: [{
+    pts: [
+      { x: -10, z: 40 },
+      { x: 10, z: 40 },
+      { x: 10, z: 60 },
+      { x: -10, z: 60 }
+    ],
+    surfaceY: 0
+  }],
+  sampleTerrainY: () => 0
+});
+assert.ok(controlledStations.some((station) =>
+  station.source === 'water_crossing_published_reference_control'
+), 'Published clearance must remain a mapped-water station lower bound.');
+assert.equal(
+  controlledBridgeRoad.minimumStructureSurfaceY,
+  undefined,
+  'A mid-span clearance reference must not become a global endpoint elevation floor.'
+);
+const completeBridgeRoad = {
+  name: 'Complete Fixture Bridge',
+  sourceFeatureId: 'fixture:complete:bridge',
+  width: 10,
+  surfaceBias: 0.08,
+  pts: [{ x: 0, z: 0 }, { x: 0, z: 2000 }],
+  structureSemantics: {
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    featureCategory: 'road',
+    deckClearance: 8
+  },
+  structureTransitionAnchors: [
+    { distance: 0, targetSurfaceY: 0.08, source: 'transport_graph_node', endpoint: 'start' },
+    { distance: 2000, targetSurfaceY: 0.08, source: 'transport_graph_node', endpoint: 'end' }
+  ]
+};
+applyPublishedTransportSurfaceControls({
+  controls: [{
+    id: 'fixture-complete-clearance',
+    physicalSurfaceKind: 'bridge_deck',
+    match: {
+      mappedName: 'Complete Fixture Bridge',
+      terrainMode: 'elevated',
+      maximumDistanceFromReferencePathMeters: 10
+    },
+    vertical: {
+      kind: 'minimum_clearance_above_mapped_water',
+      clearanceMeters: 67,
+      referenceDatum: 'published_fixture_datum',
+      measurementStatus: 'published_reference_not_surveyed_scene_elevation',
+      sourceLabel: 'Fixture authority',
+      sourceUrl: 'https://example.test/fixture-authority'
+    }
+  }],
+  roads: [completeBridgeRoad],
+  referencePath: completeBridgeRoad.pts
+});
+completeBridgeRoad.structureStations = buildFeatureStations(completeBridgeRoad, {
+  features: [],
+  waterAreas: [{
+    pts: [
+      { x: -20, z: 900 },
+      { x: 20, z: 900 },
+      { x: 20, z: 1100 },
+      { x: -20, z: 1100 }
+    ],
+    surfaceY: 0
+  }],
+  sampleTerrainY: () => 0
+});
+updateFeatureSurfaceProfile(completeBridgeRoad, () => 0, { surfaceBias: 0.08 });
+assert.ok(
+  sampleFeatureSurfaceY(completeBridgeRoad, 0, 1000) >= 67,
+  'Mapped mid-span water clearance must remain enforced on the compiled surface.'
+);
+assert.ok(
+  Math.abs(sampleFeatureSurfaceY(completeBridgeRoad, 0, 0) - 0.08) <= 0.001 &&
+    Math.abs(sampleFeatureSurfaceY(completeBridgeRoad, 0, 2000) - 0.08) <= 0.001,
+  'Complete mapped bridge endpoints must remain tied to their transport graph surfaces.'
+);
 
 const motorwayFeature = {
   id: 'pedestrian-prohibited-motorway',
