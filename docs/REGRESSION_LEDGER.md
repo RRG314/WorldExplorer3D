@@ -2051,3 +2051,25 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Never reintroduce: unreferenced marketing alternates in production hosting,
   allowlisting dead assets, or describing removal of dead package bytes as a
   reduction in mapped world detail.
+
+## 2026-08-22 — Release gate demanded pedestrians without mapped paths
+
+- Status: resolved locally as recovery checkpoint 17; not deployed.
+- Symptom: the complete packaged world was healthy but release verification
+  failed because it required several visible pedestrian archetypes in a world
+  whose authoritative pedestrian graph contained no eligible mapped paths.
+- Root cause: an older visual-detail assertion survived the later removal of
+  fabricated road-centerline sidewalks and crossings. The worldwide actor gate
+  already enforced the corrected mapped-provenance contract, but the general
+  release journey did not.
+- Resolution: require the articulated pedestrian representation only when
+  mapped paths exist. Otherwise require zero agents, zero active/promoted
+  pedestrians, zero vehicle or engineered transport pedestrian edges, and zero
+  inferred sidewalks/crossings.
+- Evidence: the corrected assertion passed in the real packaged Baltimore
+  scene alongside buildings, facades, terrain, water, traffic, collision, HUD,
+  player input and clean browser/resources. The run remained red only on the
+  independently recorded zero-exact-connection provider sequence.
+- Never reintroduce: fabricated pedestrians to satisfy a visual test, inferred
+  sidewalks from vehicle roads, or a test contract that contradicts mapped
+  provenance and the accepted zero-pedestrian transport requirement.

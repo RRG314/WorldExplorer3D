@@ -185,6 +185,9 @@ try {
   const initialMode = String(beforeInput.diagnostics.activeActor?.mode || '');
   const livingWorld = beforeInput.diagnostics.livingWorld || {};
   const population = livingWorld.population || {};
+  const pedestrianGraph = livingWorld.pedestrianGraph || {};
+  const activePedestrianCount = Number(livingWorld.activePopulation?.pedestrians || 0) +
+    Number(livingWorld.activePopulation?.promotedPedestrians || 0);
   const urbanSandbox = beforeInput.diagnostics.urbanSandbox || {};
   const equipmentItems = Array.isArray(urbanSandbox.equipment?.items)
     ? urbanSandbox.equipment.items
@@ -207,13 +210,18 @@ try {
       Number(livingWorld.facades?.published || 0) > 0 &&
       Number(livingWorld.facades?.addedDrawCalls || 0) === 0 &&
       livingWorld.facades?.facadeIntegration === 'shader-integrated-wall-face',
-    farNpcRepresentationIsCharacterShaped:
-      Number(population.pedestrianRenderedParts || 0) >= 16 &&
-      population.pedestrianRepresentation === 'articulated-instanced-character' &&
-      ['torso', 'head', 'arms', 'hands', 'legs', 'shoes'].every((role) =>
-        population.pedestrianPartRoles?.includes(role)
-      ) &&
-      Array.isArray(population.characterArchetypes) && population.characterArchetypes.length >= 4,
+    pedestrianPopulationRequiresMappedPaths:
+      Number(pedestrianGraph.provenance?.mappedPaths || 0) > 0
+        ? Number(population.pedestrians || 0) > 0 &&
+          Number(population.pedestrianRenderedParts || 0) >= 17 &&
+          population.pedestrianRepresentation === 'articulated-instanced-character-v2' &&
+          population.pedestrianLegacyBlockFallback === false
+        : Number(population.pedestrians || 0) === 0 &&
+          activePedestrianCount === 0 &&
+          Number(pedestrianGraph.vehicleTransportEdges || 0) === 0 &&
+          Number(pedestrianGraph.engineeredTransportEdges || 0) === 0 &&
+          Number(pedestrianGraph.provenance?.inferredSidewalks || 0) === 0 &&
+          Number(pedestrianGraph.provenance?.inferredCrossings || 0) === 0,
     npcDetailLoadsBeforeInteraction:
       Number(urbanSandbox.lodPolicy?.npcPreloadDistance || 0) >= 120 &&
       Number(urbanSandbox.lodPolicy?.npcPreloadDistance || 0) >

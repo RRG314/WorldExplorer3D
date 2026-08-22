@@ -2049,3 +2049,27 @@ passes with 95 tracked assets, 27 intentional dynamic PBR assets and no
 unreachable payload. This is ownership-based data cleanup, not detail or LOD
 reduction. Continue the clean production artifact pipeline from this checkpoint;
 do not treat the asset gate alone as release approval.
+
+## Current continuation after 2026-08-22 recovery checkpoint 17
+
+The general packaged-world gate had one stale product assumption: it required
+multiple far-pedestrian archetypes even when the authoritative pedestrian graph
+contained no mapped paths. That requirement directly contradicted checkpoint 2
+and the actor matrix, which deliberately fail closed instead of inventing
+sidewalks or crossings from vehicle-road centerlines.
+
+The gate is now conditional on mapped provenance. A world with mapped paths
+must retain the canonical articulated representation. A world without them
+must have zero pedestrian agents, zero active/promoted people, zero vehicle or
+engineered transport pedestrian edges, and zero inferred sidewalks/crossings.
+The packaged Baltimore journey passes that contract without changing runtime
+population behavior.
+
+The immediately following run exposed the remaining provider authority clearly.
+The same clean artifact and coordinates first produced 11,619 roads and 1,060
+exact connections with zero discontinuities, then produced 9,835 generalized
+roads and zero exact connections when the bounded live Overpass probe did not
+win. The second path also reported zero discontinuities, but it cannot prove
+lossless endpoint topology and therefore remains red. Trace and resolve the
+unpinned live-Overpass versus Shortbread publication contract; do not restore
+pedestrians or make zero exact connections look like exact continuity.
