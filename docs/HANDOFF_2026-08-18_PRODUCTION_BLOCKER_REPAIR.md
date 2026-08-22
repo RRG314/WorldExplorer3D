@@ -2033,3 +2033,19 @@ Firestore authorization/legacy-account checks passing. These results do not
 yet authorize release: the remaining artifact world, environment, GPS, UI/UX,
 memory/data and complete-frame gates still need to pass on a clean committed
 candidate. No deployment, promotion or production data mutation occurred.
+
+## Current continuation after 2026-08-22 recovery checkpoint 16
+
+Strict production asset reachability found one 109,270-byte orphan:
+`assets/landing/gameplay/showcase/new-york-harbor-skyline.webp`. History and
+whole-repository reference tracing show it was introduced as an alternate New
+York capture in the same public-showcase release, but the release selected
+`new-york-expanded-aerial.webp` and never referenced the orphan from any UI,
+documentation, style or runtime path.
+
+The unreachable alternate was removed. The visible expanded New York capture
+and all runtime world/building/transport assets remain. Strict asset audit now
+passes with 95 tracked assets, 27 intentional dynamic PBR assets and no
+unreachable payload. This is ownership-based data cleanup, not detail or LOD
+reduction. Continue the clean production artifact pipeline from this checkpoint;
+do not treat the asset gate alone as release approval.

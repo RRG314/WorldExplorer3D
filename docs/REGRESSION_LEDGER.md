@@ -2033,3 +2033,21 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   spanning duplicated singleton wrappers, source-path imports in artifact
   verification, suppressing Firebase initialization errors, or claiming source
   multiplayer proves packaged multiplayer.
+
+## 2026-08-22 — Unreachable alternate screenshot remained in every release
+
+- Status: resolved locally as recovery checkpoint 16; not deployed.
+- Symptom: strict production asset reachability stopped on
+  `new-york-harbor-skyline.webp`, adding 109,270 bytes to the candidate without
+  any reachable consumer.
+- Root cause: the public showcase release added two New York captures and chose
+  `new-york-expanded-aerial.webp` for the landing page and README, but left the
+  unselected alternate tracked. It was never a runtime world asset.
+- Resolution: remove the unreachable alternate and retain the selected visible
+  expanded-world capture.
+- Guard: `audit:assets --strict` requires every tracked hosting asset to be
+  statically reachable or explicitly recognized as a dynamic PBR asset. It now
+  reports 95 assets, 27 dynamic PBR assets and zero unreachable files.
+- Never reintroduce: unreferenced marketing alternates in production hosting,
+  allowlisting dead assets, or describing removal of dead package bytes as a
+  reduction in mapped world detail.
