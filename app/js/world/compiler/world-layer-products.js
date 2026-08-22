@@ -150,12 +150,16 @@ export function compileWorldLayerProducts(options = {}) {
         ...compactScalars(loadMetrics.buildings?.geometryPublication, [
           'candidateCount', 'renderedFeatureCount', 'yieldCount',
           'foundationCollisionProfiles', 'foundationCollisionMismatches',
-          'constrainedBuildings', 'constrainedRoads', 'gradeSeparatedOverlaps',
-          'newlyNonDriveableRoads', 'minimumResolvedWidth',
+          'constrainedBuildings', 'constrainedRoads', 'constrainedSegments',
+          'gradeSeparatedOverlaps', 'newlyNonDriveableRoads',
+          'newlyNonDriveableSegments', 'nonDriveableSegments', 'minimumResolvedWidth',
           'suppressedCenterlineConflicts', 'suppressedMappedCrossSectionConflicts',
           'suppressedInferredFootprintConflicts', 'suppressedInsufficientClearanceConflicts',
           'unresolvedAtGradeConflicts'
-        ])
+        ]),
+        crossSectionAuthority: String(
+          loadMetrics.buildings?.geometryPublication?.authority || ''
+        ) || null
       }
     }),
     landuse: layerProduct({

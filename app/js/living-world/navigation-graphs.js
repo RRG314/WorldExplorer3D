@@ -1,4 +1,9 @@
 import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=2';
+import {
+  MIN_DRIVEABLE_ROAD_WIDTH_METERS,
+  minimumRoadWidthOnInterval,
+  roadSegmentIsDriveable
+} from '../world/road-cross-section-profile.js?v=1';
 
 const GRAPH_BUDGET_BY_TIER = Object.freeze({
   low: Object.freeze({ pedestrianEdges: 180, trafficEdges: 140 }),
@@ -272,7 +277,12 @@ export function compileTrafficGraph(options = {}) {
       segment?.p1 && segment?.p2 &&
       segmentPriority(segment) <= 1200 &&
       segment.feature?.driveable !== false &&
-      finite(segment.feature?.width, segment.feature?.transportRecord?.crossSection?.widthMeters) >= 4.8
+      roadSegmentIsDriveable(
+        segment.feature,
+        segment.segIndex,
+        segment.sourceTStart,
+        segment.sourceTEnd
+      )
     )
     .sort((a, b) => segmentPriority(a) - segmentPriority(b));
   const store = makeNodeStore();
@@ -320,7 +330,13 @@ export function compileTrafficGraph(options = {}) {
   for (const segment of sourceSegments) {
     if (edges.length >= budget.trafficEdges) break;
     const direction = String(segment.direction || 'both');
-    const width = finite(segment.feature?.width, finite(segment.feature?.transportRecord?.crossSection?.widthMeters, 7));
+    const width = minimumRoadWidthOnInterval(
+      segment.feature,
+      segment.segIndex,
+      segment.sourceTStart,
+      segment.sourceTEnd
+    );
+    if (width < MIN_DRIVEABLE_ROAD_WIDTH_METERS) continue;
     const laneOffset = Math.min(2.25, width * 0.24);
     const forwardOffset = driveOnLeft ? laneOffset : -laneOffset;
     const reverseOffset = -forwardOffset;

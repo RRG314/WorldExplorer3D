@@ -18,6 +18,7 @@ import {
   segmentIntersection2D,
   smoothstep01
 } from './structure-semantics/geometry.js?v=2';
+import { roadWidthAtProjection } from './world/road-cross-section-profile.js?v=1';
 
 function isNumericProfileArray(value) {
   return value instanceof Float32Array || value instanceof Float64Array;
@@ -854,7 +855,7 @@ function roadSurfaceAttachmentThreshold(road, options = {}) {
 }
 
 function roadSurfaceLateralThreshold(road, options = {}) {
-  const halfWidth = Number.isFinite(road?.width) ? Number(road.width) * 0.5 : 0;
+  const halfWidth = roadWidthAtProjection(road, options?.projection) * 0.5;
   const semantics = road?.structureSemantics || null;
   let padding =
     semantics?.terrainMode === 'elevated' ? 1.05 :
@@ -894,7 +895,13 @@ function isRoadSurfaceReachable(nearestRoad, options = {}) {
   // overpasses capture an actor or vehicle at their planar crossing.
   const continuityAccess = sameRoad || connectedRoad;
 
-  let maxDist = roadSurfaceLateralThreshold(road, options);
+  let maxDist = roadSurfaceLateralThreshold(road, {
+    ...options,
+    projection: {
+      segIndex: nearestRoad?.segIndex,
+      t: nearestRoad?.t
+    }
+  });
   if (sameRoad) maxDist += 0.55;
   else if (connectedRoad) maxDist += 0.35;
   if (nearestRoad.dist > maxDist) return false;

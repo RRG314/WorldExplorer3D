@@ -18,6 +18,10 @@ import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-reg
 import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
 import { compileTransportNetworkModel } from '../../app/js/world/compiler/transport-network-model.js';
 import { createBuildingRoadFootprintGuards } from '../../app/js/world/building-road-footprint.js';
+import {
+  roadSegmentIsDriveable,
+  roadWidthAtSegment
+} from '../../app/js/world/road-cross-section-profile.js';
 import { createAcceptedGroundRuntime } from '../../app/js/terrain/accepted-ground-runtime.js';
 import { compileGroundArtifact } from '../../app/js/terrain/ground-artifact.js';
 import { selectGroundArtifacts } from '../../app/js/terrain/ground-provider-registry.js';
@@ -36,6 +40,7 @@ import {
   shouldBuildCompactIntersectionCap
 } from '../../app/js/terrain/road-junctions.js';
 import { detectRoadIntersections } from '../../app/js/terrain/intersections.js';
+import { compileTrafficGraph } from '../../app/js/living-world/navigation-graphs.js';
 import {
   OVERTURE_RELEASE_POLICY,
   overtureThemeArchiveUrl
@@ -711,7 +716,7 @@ if (upgradedExactBridge?.tags?._fixedRegionalStructure !== 'exact' ||
 
 const buildingRoadAuthorityFailures = [];
 const inferredWidthRoad = {
-  pts: [{ x: -10, z: 0 }, { x: 10, z: 0 }],
+  pts: [{ x: -100, z: 0 }, { x: 100, z: 0 }, { x: 120, z: 0 }],
   width: 5,
   driveable: true,
   structureSemantics: { terrainMode: 'at_grade' },
@@ -736,15 +741,8 @@ const buildingRoadGuards = await createBuildingRoadFootprintGuards({
   yieldToMainThread: async () => {}
 });
 const inferredResolution = buildingRoadGuards.resolveFootprintTransportAuthority([
-  { x: -4, z: 1.8 }, { x: 4, z: 1.8 }, { x: 4, z: 6 }, { x: -4, z: 6 }
+  { x: -14, z: 1.8 }, { x: -6, z: 1.8 }, { x: -6, z: 6 }, { x: -14, z: 6 }
 ], { sourceBuildingId: 'mapped-building' });
-if (inferredResolution.action !== 'constrain_inferred_width' ||
-    !(inferredWidthRoad.width < 5 && inferredWidthRoad.width > 3.2) ||
-    inferredWidthRoad.driveable !== false ||
-    inferredWidthRoad.resolvedCrossSection?.authority !== 'mapped_building_clearance' ||
-    inferredWidthRoad.resolvedCrossSection?.inferenceMethod !== 'mapped-footprint-clearance') {
-  buildingRoadAuthorityFailures.push('mapped footprint did not constrain a conflicting inferred road width with explicit provenance');
-}
 const mappedWidthConflict = buildingRoadGuards.resolveFootprintTransportAuthority([
   { x: -4, z: 21.8 }, { x: 4, z: 21.8 }, { x: 4, z: 26 }, { x: -4, z: 26 }
 ], { sourceBuildingId: 'mapped-building' });
@@ -760,10 +758,105 @@ if (tunnelOverlap.action !== 'none' || tunnelOverlap.gradeSeparatedOverlaps !== 
   buildingRoadAuthorityFailures.push('grade-separated transport was incorrectly treated as an at-grade footprint conflict');
 }
 const centerlineConflict = buildingRoadGuards.resolveFootprintTransportAuthority([
-  { x: -2, z: -1 }, { x: 2, z: -1 }, { x: 2, z: 1 }, { x: -2, z: 1 }
+  { x: -12, z: -1 }, { x: -8, z: -1 }, { x: -8, z: 1 }, { x: -12, z: 1 }
 ], { sourceBuildingId: 'mapped-building' });
 if (centerlineConflict.action !== 'suppress_building' || centerlineConflict.reason !== 'mapped_centerline_conflict') {
   buildingRoadAuthorityFailures.push('irreconcilable mapped centerline conflict was not rejected');
+}
+const crossSectionPublication = buildingRoadGuards.publishRoadCrossSectionProfiles();
+if (inferredResolution.action !== 'constrain_inferred_width' ||
+    inferredResolution.constrainedSegments !== 1 ||
+    inferredWidthRoad.width !== 5 ||
+    inferredWidthRoad.driveable !== true ||
+    inferredWidthRoad.resolvedCrossSection?.authority !== 'mapped_building_clearance_by_source_interval' ||
+    inferredWidthRoad.resolvedCrossSection?.inferenceMethod !== 'mapped-footprint-clearance-by-source-interval' ||
+    !(roadWidthAtSegment(inferredWidthRoad, 0, 0.46) < 5) ||
+    roadWidthAtSegment(inferredWidthRoad, 0, 0) !== 5 ||
+    roadWidthAtSegment(inferredWidthRoad, 0, 1) !== 5 ||
+    roadWidthAtSegment(inferredWidthRoad, 1, 1) !== 5 ||
+    roadSegmentIsDriveable(inferredWidthRoad, 0, 0.42, 0.5) !== false ||
+    roadSegmentIsDriveable(inferredWidthRoad, 0, 0, 0.2) !== true ||
+    roadSegmentIsDriveable(inferredWidthRoad, 1, 0.6, 1) !== true ||
+    crossSectionPublication.constrainedRoads !== 1 ||
+    crossSectionPublication.constrainedSegments !== 1 ||
+    crossSectionPublication.nonDriveableSegments !== 1) {
+  buildingRoadAuthorityFailures.push('mapped footprint did not publish one local cross-section constraint while preserving the rest of the road');
+}
+
+const boundaryRoad = {
+  pts: [{ x: -20, z: 80 }, { x: 0, z: 80 }, { x: 20, z: 80 }],
+  width: 6,
+  driveable: true,
+  structureSemantics: { terrainMode: 'at_grade' },
+  transportRecord: { crossSection: { widthMeters: 6, widthSource: 'fallback:road-class' } }
+};
+const boundaryGuards = await createBuildingRoadFootprintGuards({
+  roads: [boundaryRoad],
+  yieldToMainThread: async () => {}
+});
+boundaryGuards.resolveFootprintTransportAuthority([
+  { x: -5, z: 81.8 }, { x: 0, z: 81.8 }, { x: 0, z: 86 }, { x: -5, z: 86 }
+], { sourceBuildingId: 'boundary-building' });
+boundaryGuards.publishRoadCrossSectionProfiles();
+if (!(roadWidthAtSegment(boundaryRoad, 1, 0) < 6) ||
+    roadWidthAtSegment(boundaryRoad, 1, 0.5) !== 6) {
+  buildingRoadAuthorityFailures.push('local cross-section transition stopped abruptly at a source-segment boundary');
+}
+
+const buildOrderedCrossSection = async (footprints) => {
+  const road = {
+    pts: [{ x: -20, z: 60 }, { x: 0, z: 60 }, { x: 20, z: 60 }],
+    width: 6,
+    driveable: true,
+    structureSemantics: { terrainMode: 'at_grade' },
+    transportRecord: { crossSection: { widthMeters: 6, widthSource: 'fallback:road-class' } }
+  };
+  const guards = await createBuildingRoadFootprintGuards({ roads: [road], yieldToMainThread: async () => {} });
+  for (const footprint of footprints) {
+    guards.resolveFootprintTransportAuthority(footprint.points, { sourceBuildingId: footprint.id });
+  }
+  guards.publishRoadCrossSectionProfiles();
+  return Array.from(road.resolvedCrossSection?.segmentWidthsMeters || []);
+};
+const orderedFootprints = [
+  { id: 'wide-clearance', points: [{ x: -16, z: 62.4 }, { x: -12, z: 62.4 }, { x: -12, z: 66 }, { x: -16, z: 66 }] },
+  { id: 'tight-clearance', points: [{ x: -10, z: 61.6 }, { x: -6, z: 61.6 }, { x: -6, z: 66 }, { x: -10, z: 66 }] }
+];
+const forwardCrossSection = await buildOrderedCrossSection(orderedFootprints);
+const reverseCrossSection = await buildOrderedCrossSection([...orderedFootprints].reverse());
+if (JSON.stringify(forwardCrossSection) !== JSON.stringify(reverseCrossSection)) {
+  buildingRoadAuthorityFailures.push('local building-road cross-section authority still depends on building load order');
+}
+const crossSectionTraffic = compileTrafficGraph({
+  traversal: {
+    authority: 'fixture',
+    segments: [
+      {
+        feature: inferredWidthRoad,
+        direction: 'both',
+        segIndex: 0,
+        sourceTStart: 0.42,
+        sourceTEnd: 0.5,
+        p1: { x: -16, z: 0 },
+        p2: { x: 0, z: 0 }
+      },
+      {
+        feature: inferredWidthRoad,
+        direction: 'both',
+        segIndex: 0,
+        sourceTStart: 0,
+        sourceTEnd: 0.2,
+        p1: { x: -100, z: 0 },
+        p2: { x: -60, z: 0 }
+      }
+    ]
+  },
+  sampleSurface: () => 0
+});
+if (crossSectionTraffic.publication.diagnostics.sourceSegments !== 1 ||
+    crossSectionTraffic.publication.edges.length !== 2 ||
+    crossSectionTraffic.publication.edges.some((edge) => edge.roadWidth !== 5)) {
+  buildingRoadAuthorityFailures.push('traffic did not exclude only the locally non-driveable cross-section interval');
 }
 
 const roadSurfaceFootprintFailures = [];

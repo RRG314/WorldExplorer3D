@@ -1808,3 +1808,69 @@ in the first four-city sequence but passed immediately when rerun alone with
 publication precedes and does not consume the changed road render mesh, treat
 that sequencing/provider-sensitive absence as open release evidence, not as
 proof that a visual road patch should own traffic.
+
+## Current continuation after 2026-08-22 recovery checkpoint 11
+
+The Tokyo road/building symptom was an upstream cross-section mutation, not a
+building LOD, road renderer or traffic bug. For a mapped building beside one
+short stretch of a road whose width came from a road-class fallback,
+`building-road-footprint` rewrote `road.width` and `road.driveable` on the whole
+feature. Later buildings then evaluated against the already-mutated width, so
+the result also depended on building load order. Rendering, terrain cuts,
+traversal, traffic, collision and furniture all inherited that global loss.
+
+Mapped footprint clearance now publishes immutable bounded profiles on exact
+source-segment intervals. The mapped/source road width remains unchanged. An
+eight-metre transition is evaluated from the same profile by final road mesh,
+terrain corridor, intersection closure, drive traversal, traffic/lane offsets,
+surface reachability, spawn collision and roadside furniture. Locally narrower
+surfaces remain visible and walkable; only an interval below the existing
+4.8 m vehicle threshold is excluded from drive/traffic graphs. This adds no
+renderer, provider, city rule or building suppression, and changes no building
+height, LOD, selection or detail budget.
+
+Source fixtures prove load-order determinism, preservation of the rest of a
+long source segment, local traffic exclusion and unchanged mapped-width/tunnel
+authority, including a transition continued across a source-node boundary.
+One complete seven-location run passed before that boundary refinement. The
+post-refinement run passed Golden Gate, London, Monaco, Manhattan, Iowa and
+Tokyo, but a different Baltimore provider sequence exposed six vertical joins
+up to 11.3764 m and one grade violation; the identical focused Baltimore rerun
+then passed with zero of both. Treat that as open provider/sequencing release
+evidence, not as proof that local width owns vertical topology. Across the
+runs, 25-1,270 roads have local profiles and 28-2,013 source segments are
+affected, while whole-road disablement is zero in every location. The final
+four-city actor/vehicle gate passes with traffic active, all 14 sampled
+vehicles using four-wheel contact, zero penetration, bounded wheel gap and zero
+pedestrian NPCs.
+
+Every complete frame was opened. Baltimore retains its tall skyline; Golden
+Gate retains one symmetric six-lane deck and matching sides; Tokyo no longer
+shrinks the rest of a long road because of one building conflict. Exact same-
+camera comparison proves London's broad jagged inter-road/turn composition was
+already present in checkpoint 10 and is unchanged by this authority repair.
+The current triangle/cap gate still accepts that visibly incoherent field, so
+it is an explicit next checkpoint rather than waived release evidence. Do not
+call the build production-ready yet, and do not fold that separate footprint-
+classification cause into this checkpoint.
+
+The general `verify:world` journey was also red in its final attempt because
+the selected transport response contained zero authoritative connections and
+its far-NPC representation assertion failed. Neither path consumes the changed
+cross-section, but both remain explicit release evidence; do not report that
+journey as green.
+
+The first immutable packaged-candidate Tokyo run likewise exposed a different
+provider sequence: 42 vertical joins up to 15.9661 m and five grade violations,
+while every local-width, building, population, surface and runtime check passed.
+The identical packaged candidate immediately reran with zero joins and zero
+grade violations. This confirms provider-sequenced transport topology remains
+an independent production blocker; it does not make the package production-
+ready and must not be hidden behind the successful repeat.
+
+Next: identify whether the London shapes are duplicate/parallel source
+identities, branch enclosure gaps, carriageway-versus-island classification or
+another publication owner before editing. Then continue with mapped street-
+facing doors/glass storefronts, ownership-based memory/data work and final
+packaged release/security verification. No push, deployment, promotion,
+continuous streaming, detail reduction or user-data mutation is authorized.

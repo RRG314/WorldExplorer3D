@@ -1,20 +1,21 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
-import { detectRoadIntersections } from "./intersections.js?v=4";
+import { detectRoadIntersections } from "./intersections.js?v=5";
 import { boundsIntersectLocal } from "./context-utils.js?v=1";
 import {
   buildFeatureRibbonEdges,
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=62";
+} from "../structure-semantics.js?v=63";
 import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import {
   computeIntersectionCapRadius,
   shouldBuildCompactIntersectionCap
 } from "./road-junctions.js?v=11";
-import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=1";
+import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=2";
+import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;
@@ -71,9 +72,8 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   }
 }
 
-function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
+function appendRoadCenterMarkings(road, points, targetVerts, targetIndices, widthSamplesMeters = null) {
   if (
-    (Number(road?.width) || 0) < 8.4 ||
     !/(motorway|trunk|primary)/.test(String(road?.type || "")) ||
     !Array.isArray(points) ||
     points.length < 2
@@ -86,27 +86,35 @@ function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
   const corridorOffset = Number(
     road?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
   ) || 0;
-  const markingOffsets = Array.from({ length: Math.max(1, laneCount - 1) }, (_, index) =>
-    laneCount > 1
-      ? -Number(road.width) * 0.5 + Number(road.width) * (index + 1) / laneCount
-      : 0
-  );
-  for (const laneOffset of markingOffsets) {
-    let distanceBeforeSegment = 0;
-    for (let index = 0; index < points.length - 1; index += 1) {
+  let distanceBeforeSegment = 0;
+  for (let index = 0; index < points.length - 1; index += 1) {
       const start = points[index];
       const end = points[index + 1];
       const dx = end.x - start.x;
       const dz = end.z - start.z;
       const segmentLength = Math.hypot(dx, dz);
       if (!(segmentLength > 1e-5)) continue;
+      const localWidth = Math.min(
+        Number(widthSamplesMeters?.[index]) || Number(road.width) || 0,
+        Number(widthSamplesMeters?.[index + 1]) || Number(road.width) || 0
+      );
+      if (localWidth < 8.4) {
+        distanceBeforeSegment += segmentLength;
+        continue;
+      }
       const dirX = dx / segmentLength;
       const dirZ = dz / segmentLength;
       const normalX = -dirZ;
       const normalZ = dirX;
-      const lateralOffset = corridorOffset + laneOffset;
-      let localDistance = 0;
-      while (localDistance < segmentLength) {
+      const markingOffsets = Array.from({ length: Math.max(1, laneCount - 1) }, (_, laneIndex) =>
+        laneCount > 1
+          ? -localWidth * 0.5 + localWidth * (laneIndex + 1) / laneCount
+          : 0
+      );
+      for (const laneOffset of markingOffsets) {
+        const lateralOffset = corridorOffset + laneOffset;
+        let localDistance = 0;
+        while (localDistance < segmentLength) {
         const globalDistance = distanceBeforeSegment + localDistance;
         const phase = ((globalDistance % patternLength) + patternLength) % patternLength;
         const advanceToDash = phase < dashLength ? 0 : patternLength - phase;
@@ -137,9 +145,9 @@ function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
         localDistance = Math.max(dashEnd, dashStart + 0.01);
         const newPhase = (distanceBeforeSegment + localDistance) % patternLength;
         if (newPhase < dashLength) localDistance += dashLength - newPhase;
+        }
       }
       distanceBeforeSegment += segmentLength;
-    }
   }
 }
 
@@ -195,6 +203,36 @@ export function resolveRoadRibbonSubdivisionStep(road) {
   }
   if (hasTransitionAnchors) return Math.min(baseDetail, 0.6);
   return baseDetail;
+}
+
+function mapPublishedPointsToCrossSectionWidths(feature, publishedPoints) {
+  const sourcePoints = feature?.pts;
+  if (!Array.isArray(sourcePoints) || sourcePoints.length < 2 || !Array.isArray(publishedPoints)) {
+    return null;
+  }
+  const widths = new Float32Array(publishedPoints.length);
+  let sourceSegmentIndex = 0;
+  for (let index = 0; index < publishedPoints.length; index += 1) {
+    const point = publishedPoints[index];
+    const start = sourcePoints[sourceSegmentIndex];
+    const end = sourcePoints[sourceSegmentIndex + 1];
+    const dx = Number(end.x) - Number(start.x);
+    const dz = Number(end.z) - Number(start.z);
+    const lengthSquared = dx * dx + dz * dz;
+    const segmentT = lengthSquared > 1e-8
+      ? Math.max(0, Math.min(1,
+          ((Number(point.x) - Number(start.x)) * dx + (Number(point.z) - Number(start.z)) * dz) /
+          lengthSquared
+        ))
+      : 0;
+    widths[index] = roadWidthAtSegment(feature, sourceSegmentIndex, segmentT);
+    const atSourceEndpoint = point === end ||
+      Math.hypot(Number(point.x) - Number(end.x), Number(point.z) - Number(end.z)) <= 1e-6;
+    if (atSourceEndpoint && sourceSegmentIndex < sourcePoints.length - 2) {
+      sourceSegmentIndex += 1;
+    }
+  }
+  return widths;
 }
 
 export async function publishCompiledTransportMeshes(deps = {}) {
@@ -373,11 +411,16 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const surfaceBias = Number.isFinite(renderRoad?.surfaceBias)
         ? renderRoad.surfaceBias
         : ROAD_SURFACE_BIAS;
+      let widthSamplesMeters = null;
       if (renderRoad?.structureSemantics?.terrainMode === 'at_grade') {
+        widthSamplesMeters = sharedSurface
+          ? null
+          : mapPublishedPointsToCrossSectionWidths(road, pts);
         const integrity = appendSolidAtGradeRoadGeometry({
           feature: renderRoad,
           points: pts,
           halfWidth: hw,
+          widthSamplesMeters,
           sampleTerrainY: roadTerrainSampler,
           surfaceBias,
           targetVerts: verts,
@@ -397,7 +440,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
       }
       appendRoadMainGeometry(verts, indices);
-      appendRoadCenterMarkings(renderRoad, pts, roadMarkBatchVerts, roadMarkBatchIdx);
+      appendRoadCenterMarkings(
+        renderRoad,
+        pts,
+        roadMarkBatchVerts,
+        roadMarkBatchIdx,
+        widthSamplesMeters
+      );
 
       if (shouldRenderRoadSkirts(renderRoad)) {
         const skirtDepth = roadSkirtDepth(renderRoad);

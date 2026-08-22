@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=62";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=63";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
@@ -18,7 +18,7 @@ import {
 } from "./building-batching.js?v=10";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
-import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=7';
+import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=8';
 import {
   classifyBuildingWaterRelationship,
   createWaterAreaSpatialIndex,
@@ -84,8 +84,11 @@ export async function buildBuildingGeometryPass(options = {}) {
   loadMetrics.buildingRoadAuthority ||= {
     constrainedBuildings: 0,
     constrainedRoads: 0,
+    constrainedSegments: 0,
     gradeSeparatedOverlaps: 0,
     newlyNonDriveableRoads: 0,
+    newlyNonDriveableSegments: 0,
+    nonDriveableSegments: 0,
     minimumResolvedWidth: null,
     suppressedCenterlineConflicts: 0,
     suppressedMappedCrossSectionConflicts: 0,
@@ -133,6 +136,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     isBuildingNearLoadedRoad,
     overlapsRoadCorridor,
     pointOnRoadCorridor,
+    publishRoadCrossSectionProfiles,
     resolveFootprintTransportAuthority,
     sampleFootprintCoverage
   } = await createBuildingRoadFootprintGuards({
@@ -345,8 +349,11 @@ export async function buildBuildingGeometryPass(options = {}) {
     if (roadAuthority.action === 'constrain_inferred_width') {
       loadMetrics.buildingRoadAuthority.constrainedBuildings += 1;
       loadMetrics.buildingRoadAuthority.constrainedRoads += Number(roadAuthority.constrainedRoads || 0);
+      loadMetrics.buildingRoadAuthority.constrainedSegments += Number(roadAuthority.constrainedSegments || 0);
       loadMetrics.buildingRoadAuthority.newlyNonDriveableRoads +=
         Number(roadAuthority.newlyNonDriveableRoads || 0);
+      loadMetrics.buildingRoadAuthority.newlyNonDriveableSegments +=
+        Number(roadAuthority.newlyNonDriveableSegments || 0);
       const resolvedWidth = Number(roadAuthority.minimumResolvedWidth);
       if (Number.isFinite(resolvedWidth)) {
         const currentMinimum = Number(loadMetrics.buildingRoadAuthority.minimumResolvedWidth);
@@ -732,6 +739,16 @@ export async function buildBuildingGeometryPass(options = {}) {
         buildingWorkChunkStartedAt = now();
       }
     }
+  }
+
+  const roadCrossSectionPublication = publishRoadCrossSectionProfiles();
+  loadMetrics.buildingRoadAuthority.authority = roadCrossSectionPublication.authority;
+  loadMetrics.buildingRoadAuthority.constrainedRoads = roadCrossSectionPublication.constrainedRoads;
+  loadMetrics.buildingRoadAuthority.constrainedSegments = roadCrossSectionPublication.constrainedSegments;
+  loadMetrics.buildingRoadAuthority.nonDriveableSegments = roadCrossSectionPublication.nonDriveableSegments;
+  if (Number.isFinite(Number(roadCrossSectionPublication.minimumResolvedWidth))) {
+    loadMetrics.buildingRoadAuthority.minimumResolvedWidth =
+      Number(roadCrossSectionPublication.minimumResolvedWidth);
   }
 
   loadMetrics.buildings.geometryChunkSize = yieldEveryBuildings;

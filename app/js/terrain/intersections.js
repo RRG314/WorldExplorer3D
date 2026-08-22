@@ -1,3 +1,5 @@
+import { roadWidthAtSegment } from '../world/road-cross-section-profile.js?v=1';
+
 const INTERSECTION_GRID_SIZE = 96;
 const INTERSECTION_CLUSTER_SIZE = 4;
 const INTERSECTION_MERGE_RADIUS = 1.2;
@@ -76,20 +78,23 @@ function normalizeBranchDirection(dx, dz) {
   return { x: dx / len, z: dz / len };
 }
 
-function addIntersectionBranch(intersection, roadIdx, road, key, ptIdx, dx, dz) {
+function addIntersectionBranch(intersection, roadIdx, road, key, ptIdx, dx, dz, width = null) {
   if (!intersection || !road || !key) return;
   if (!intersection._branchKeys) intersection._branchKeys = new Set();
   if (intersection._branchKeys.has(key)) return;
   const dir = normalizeBranchDirection(dx, dz);
   if (!dir) return;
+  const branchWidth = Number.isFinite(Number(width))
+    ? Number(width)
+    : Number(road.width) || 8;
   intersection._branchKeys.add(key);
   intersection.roads.push({
     roadIdx,
     ptIdx,
-    width: road.width || 8,
+    width: branchWidth,
     dir
   });
-  intersection.maxWidth = Math.max(Number(intersection.maxWidth) || 0, Number(road.width) || 8);
+  intersection.maxWidth = Math.max(Number(intersection.maxWidth) || 0, branchWidth);
   if (!roadIsAtGrade(road)) intersection.hasGradeSeparatedRoad = true;
 }
 
@@ -99,6 +104,7 @@ function registerRoadIntersectionBranches(intersection, road, roadIdx, segIndex,
   const lastIndex = points.length - 1;
   const clampedSegIndex = Math.max(0, Math.min(lastIndex - 1, Number(segIndex) || 0));
   const safeT = Math.max(0, Math.min(1, Number(t) || 0));
+  const branchWidth = roadWidthAtSegment(road, clampedSegIndex, safeT);
   const startPoint = points[0];
   const endPoint = points[lastIndex];
   const nearStart =
@@ -111,12 +117,12 @@ function registerRoadIntersectionBranches(intersection, road, roadIdx, segIndex,
       Math.hypot(point.x - endPoint.x, point.z - endPoint.z) <= INTERSECTION_MERGE_RADIUS * 0.5);
 
   if (nearStart) {
-    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:start`, 0, points[1].x - startPoint.x, points[1].z - startPoint.z);
+    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:start`, 0, points[1].x - startPoint.x, points[1].z - startPoint.z, branchWidth);
     return;
   }
 
   if (nearEnd) {
-    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:end`, lastIndex, points[lastIndex - 1].x - endPoint.x, points[lastIndex - 1].z - endPoint.z);
+    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:end`, lastIndex, points[lastIndex - 1].x - endPoint.x, points[lastIndex - 1].z - endPoint.z, branchWidth);
     return;
   }
 
@@ -129,15 +135,38 @@ function registerRoadIntersectionBranches(intersection, road, roadIdx, segIndex,
 
   if (vertexIndex !== null) {
     const vertex = points[vertexIndex];
-    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:vertex:${vertexIndex}:prev`, vertexIndex, points[vertexIndex - 1].x - vertex.x, points[vertexIndex - 1].z - vertex.z);
-    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:vertex:${vertexIndex}:next`, vertexIndex, points[vertexIndex + 1].x - vertex.x, points[vertexIndex + 1].z - vertex.z);
+    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:vertex:${vertexIndex}:prev`, vertexIndex, points[vertexIndex - 1].x - vertex.x, points[vertexIndex - 1].z - vertex.z, branchWidth);
+    addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:vertex:${vertexIndex}:next`, vertexIndex, points[vertexIndex + 1].x - vertex.x, points[vertexIndex + 1].z - vertex.z, branchWidth);
     return;
   }
 
   const p1 = points[clampedSegIndex];
   const p2 = points[clampedSegIndex + 1];
-  addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:seg:${clampedSegIndex}:a`, null, p1.x - point.x, p1.z - point.z);
-  addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:seg:${clampedSegIndex}:b`, null, p2.x - point.x, p2.z - point.z);
+  addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:seg:${clampedSegIndex}:a`, null, p1.x - point.x, p1.z - point.z, branchWidth);
+  addIntersectionBranch(intersection, roadIdx, road, `${roadIdx}:seg:${clampedSegIndex}:b`, null, p2.x - point.x, p2.z - point.z, branchWidth);
+}
+
+function roadWidthAtWorldPoint(road, point) {
+  if (!road || !point || !Array.isArray(road.pts)) return Number(road?.width) || 8;
+  let best = null;
+  for (let index = 0; index < road.pts.length - 1; index += 1) {
+    const start = road.pts[index];
+    const end = road.pts[index + 1];
+    const dx = Number(end.x) - Number(start.x);
+    const dz = Number(end.z) - Number(start.z);
+    const lengthSquared = dx * dx + dz * dz;
+    if (!(lengthSquared > 1e-8)) continue;
+    const t = Math.max(0, Math.min(1,
+      ((Number(point.x) - Number(start.x)) * dx + (Number(point.z) - Number(start.z)) * dz) /
+      lengthSquared
+    ));
+    const distance = Math.hypot(
+      Number(point.x) - (Number(start.x) + dx * t),
+      Number(point.z) - (Number(start.z) + dz * t)
+    );
+    if (!best || distance < best.distance) best = { distance, index, t };
+  }
+  return best ? roadWidthAtSegment(road, best.index, best.t) : Number(road.width) || 8;
 }
 
 function collectRoadCandidatePairs(roadInfos = []) {
@@ -309,6 +338,7 @@ export function detectRoadIntersections(roads) {
     }
     for (const occurrence of occurrences) {
       const { road, roadIdx, topology, topologyIndex, node } = occurrence;
+      const branchWidth = roadWidthAtWorldPoint(road, node);
       const previous = topology[topologyIndex - 1];
       const next = topology[topologyIndex + 1];
       if (previous) {
@@ -319,7 +349,8 @@ export function detectRoadIntersections(roads) {
           `${roadIdx}:source:${sourceNodeId}:previous`,
           null,
           Number(previous.x) - Number(node.x),
-          Number(previous.z) - Number(node.z)
+          Number(previous.z) - Number(node.z),
+          branchWidth
         );
       }
       if (next) {
@@ -330,7 +361,8 @@ export function detectRoadIntersections(roads) {
           `${roadIdx}:source:${sourceNodeId}:next`,
           null,
           Number(next.x) - Number(node.x),
-          Number(next.z) - Number(node.z)
+          Number(next.z) - Number(node.z),
+          branchWidth
         );
       }
     }

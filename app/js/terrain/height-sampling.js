@@ -1,7 +1,8 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=62";
+} from "../structure-semantics.js?v=63";
+import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=1';
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
@@ -107,8 +108,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
       const projected = projectPointToFeature(feature, worldX, worldZ);
       if (!projected) continue;
 
-      const width = Math.max(4.5, Number(cut.width) || Number(feature.width) || 6);
       if (feature?.structureSemantics?.terrainMode === 'at_grade') {
+        const width = roadWidthAtProjection(feature, projected);
         const halfWidth = width * 0.5;
         const shoulderBlend = Math.max(3.5, Math.min(8, width * 0.65));
         const influenceRadius = halfWidth + shoulderBlend;
@@ -128,6 +129,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
         }
         continue;
       }
+      const width = Math.max(4.5, Number(cut.width) || Number(feature.width) || 6);
       const influenceRadius = width * 0.82 + 3.4;
       if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
 

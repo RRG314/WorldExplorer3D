@@ -113,6 +113,7 @@ function appendSolidAtGradeRoadGeometry({
   feature,
   points,
   halfWidth,
+  widthSamplesMeters = null,
   sampleTerrainY,
   surfaceBias = 0.18,
   targetVerts = [],
@@ -137,8 +138,12 @@ function appendSolidAtGradeRoadGeometry({
   const offset = Number(
     feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
   ) || 0;
-  const leftDistance = Math.max(0.3, Number(halfWidth) + offset);
-  const rightDistance = Math.max(0.3, Number(halfWidth) - offset);
+  const widthAt = (index) => {
+    const sampledWidth = Number(widthSamplesMeters?.[index]);
+    return Number.isFinite(sampledWidth) && sampledWidth > 0
+      ? sampledWidth
+      : Number(halfWidth) * 2;
+  };
   const geometryPoints = [];
   const frames = [];
   let segmentQuads = 0;
@@ -153,15 +158,17 @@ function appendSolidAtGradeRoadGeometry({
     const frame = segmentFrame(start, end);
     frames[index] = frame;
     if (!frame) continue;
-    const leftX = frame.normalX * leftDistance;
-    const leftZ = frame.normalZ * leftDistance;
-    const rightX = -frame.normalX * rightDistance;
-    const rightZ = -frame.normalZ * rightDistance;
+    const startHalfWidth = widthAt(index) * 0.5;
+    const endHalfWidth = widthAt(index + 1) * 0.5;
+    const startLeftDistance = Math.max(0.3, startHalfWidth + offset);
+    const startRightDistance = Math.max(0.3, startHalfWidth - offset);
+    const endLeftDistance = Math.max(0.3, endHalfWidth + offset);
+    const endRightDistance = Math.max(0.3, endHalfWidth - offset);
     const indices = [
-      appendPoint(targetVerts, geometryPoints, surfacePoint(start, leftX, leftZ, sampleTerrainY, surfaceBias)),
-      appendPoint(targetVerts, geometryPoints, surfacePoint(start, rightX, rightZ, sampleTerrainY, surfaceBias)),
-      appendPoint(targetVerts, geometryPoints, surfacePoint(end, leftX, leftZ, sampleTerrainY, surfaceBias)),
-      appendPoint(targetVerts, geometryPoints, surfacePoint(end, rightX, rightZ, sampleTerrainY, surfaceBias))
+      appendPoint(targetVerts, geometryPoints, surfacePoint(start, frame.normalX * startLeftDistance, frame.normalZ * startLeftDistance, sampleTerrainY, surfaceBias)),
+      appendPoint(targetVerts, geometryPoints, surfacePoint(start, -frame.normalX * startRightDistance, -frame.normalZ * startRightDistance, sampleTerrainY, surfaceBias)),
+      appendPoint(targetVerts, geometryPoints, surfacePoint(end, frame.normalX * endLeftDistance, frame.normalZ * endLeftDistance, sampleTerrainY, surfaceBias)),
+      appendPoint(targetVerts, geometryPoints, surfacePoint(end, -frame.normalX * endRightDistance, -frame.normalZ * endRightDistance, sampleTerrainY, surfaceBias))
     ];
     const firstArea = upwardTriangle(targetIndices, indices[0], indices[2], indices[1], geometryPoints);
     const secondArea = upwardTriangle(targetIndices, indices[1], indices[2], indices[3], geometryPoints);
@@ -178,12 +185,13 @@ function appendSolidAtGradeRoadGeometry({
     const incoming = frames[index - 1];
     const outgoing = frames[index];
     if (!incoming || !outgoing) continue;
+    const pointHalfWidth = widthAt(index) * 0.5;
     const join = appendTurnJoin({
       point: points[index],
       incoming,
       outgoing,
-      leftDistance,
-      rightDistance,
+      leftDistance: Math.max(0.3, pointHalfWidth + offset),
+      rightDistance: Math.max(0.3, pointHalfWidth - offset),
       sampleTerrainY,
       surfaceBias,
       targetVerts,

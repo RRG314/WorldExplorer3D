@@ -1832,3 +1832,58 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   traffic-island ground. Never pave arbitrary inter-road space, restore broad
   convex-hull fans, add city geometry, use a test-only camera, suppress mapped
   detail, or weaken the vertical-connection gate to make this checkpoint green.
+
+## 2026-08-22 — One local building conflict mutated an entire road
+
+- Status: resolved locally as recovery checkpoint 11; not deployed. London's
+  visually jagged inter-road/turn composition remains the next release blocker.
+- Symptom: complete Tokyo gameplay showed long mapped roads narrowed into thin
+  strips or running incoherently between buildings. Automated building and road
+  counts stayed green because both objects still existed.
+- First authoritative loss: `building-road-footprint` wrote a locally inferred
+  clearance width into feature-wide `road.width` and changed feature-wide
+  `road.driveable`. Subsequent building decisions read that mutation, making
+  publication depend on building load order. Every later road, terrain,
+  traversal, traffic, collision and furniture consumer inherited it.
+- Resolution: preserve mapped source identity and width. Publish immutable
+  footprint-clearance profiles on bounded source-segment intervals with an
+  eight-metre transition. Rendering, terrain, intersection closure, traversal,
+  traffic/lane placement, reachability, spawn collision and furniture consume
+  the same local function. A locally sub-4.8 m interval remains a mapped visual
+  and walk surface but is excluded from vehicle traversal only there.
+- Guard: source fixtures require order-independent profiles, full width outside
+  a conflict on the same long segment, local-only traffic exclusion, unchanged
+  mapped cross-sections/tunnels and non-folding variable-width final geometry.
+  The assembled gate requires the interval authority whenever constraints are
+  present and forbids any new whole-road disablement.
+- Worldwide evidence: one complete seven-world run passed before the final
+  source-boundary refinement. After it, Golden Gate, London, Monaco, Manhattan,
+  Iowa and Tokyo passed, while a provider-sequenced Baltimore run exposed six
+  unrelated vertical joins up to 11.3764 m and one grade violation. The same
+  focused Baltimore path immediately passed with zero of both. Local profiles
+  affect 259 roads/294 source segments in Baltimore, 29/37 Golden Gate, 523/693
+  London, 247/504 Monaco, 42/47 Manhattan, 25/28 Iowa and 1,270/2,013 Tokyo;
+  whole-road disablement is zero everywhere. All final frames were opened.
+  Baltimore mapped-tall visuals remain complete and Golden Gate remains one
+  symmetric six-lane surface. The provider-sensitive vertical result is not
+  waived or attributed to local width.
+- Actor/control evidence: Baltimore, London, Monaco and Tokyo each publish
+  traffic and 14/14 four-wheel-contact vehicles with zero wheel penetration,
+  bounded wheel gap, correct lane side/direction and zero visible pedestrians.
+- Adjacent gate evidence: the final general `verify:world` journey was red with
+  zero authoritative transport connections and a far-NPC representation
+  failure. Neither consumes cross-section profiles; both remain release work.
+- Packaged evidence: the first immutable-candidate Tokyo run exposed 42
+  provider-sequenced vertical joins up to 15.9661 m and five grade violations;
+  all cross-section/building/population/runtime checks passed. The identical
+  packaged rerun reported zero joins and zero violations. Keep both results;
+  the successful repeat does not waive nondeterministic transport topology.
+- Open visual evidence: exact same-camera source/checkpoint-10 London frames
+  contain the same broad jagged inter-road/turn field. It predates and is not
+  worsened by this change, but the current triangle/cap gate still fails to
+  classify it as visually incoherent. Diagnose its source identities and
+  physical enclosure before editing; do not waive it as production-ready.
+- Never reintroduce: feature-wide width mutation from a local footprint,
+  order-dependent building decisions, duplicate road/building renderers,
+  city-specific clearances, fake widths, detail/height reduction, test cameras,
+  continuous streaming or claims that object counts prove composition.

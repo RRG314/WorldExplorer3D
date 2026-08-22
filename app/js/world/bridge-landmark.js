@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=62';
+import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=63';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
 import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=2';
 

@@ -8,7 +8,7 @@ import {
   isPointWithinMappedWater,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=62";
+} from "../structure-semantics.js?v=63";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=11";

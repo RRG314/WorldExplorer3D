@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=62";
+} from "./structure-semantics.js?v=63";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -101,7 +101,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=52";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=53";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -127,7 +127,7 @@ import {
   pickNavigationTargetPoint,
   surfaceDisplayName,
   traversableFeaturesForMode
-} from "./world/traversal.js?v=3";
+} from "./world/traversal.js?v=4";
 import {
   initWorldVegetation,
   MAX_TREE_NODES,
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=30";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=16";
+} from "./world/furniture.js?v=17";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,

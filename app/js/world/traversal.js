@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
 
 const TRAVERSAL_NODE_GRID = 2.5;
 const TRAVERSAL_MAX_ANCHOR_DISTANCE = {
@@ -241,6 +242,12 @@ function buildTraversalGraph(mode = 'walk') {
         pathPoints[i].distanceAlong,
         pathPoints[i + 1].distanceAlong
       );
+      if (mode === 'drive' && !roadSegmentIsDriveable(
+        feature,
+        source.segmentIndex,
+        source.startT,
+        source.endT
+      )) continue;
 
       const weight = length * segmentPenalty;
       if (direction !== 'reverse') adjacency[fromId].push({ to: toId, weight });

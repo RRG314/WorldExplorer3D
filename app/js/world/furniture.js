@@ -7,6 +7,7 @@ import {
   registerStreetLamp,
   resetStreetLampFixtures
 } from "../engine/night-lighting.js?v=7";
+import { roadWidthAtSegment } from './road-cross-section-profile.js?v=1';
 
 let furnitureMaterialsReady = false;
 let furnitureGeometriesReady = false;
@@ -357,7 +358,7 @@ function nearestRoadsidePoint(point) {
       if (best && distance >= best.distance) continue;
       const length = Math.sqrt(lengthSq);
       const side = ((point.x - x) * (-dz / length) + (point.z - z) * (dx / length)) >= 0 ? 1 : -1;
-      const offset = Number(road.width || 6) * .5 + 1.35;
+      const offset = roadWidthAtSegment(road, index, t) * .5 + 1.35;
       best = { x: x + (-dz / length) * offset * side, z: z + (dx / length) * offset * side, distance };
     }
   }
@@ -450,7 +451,7 @@ export function generateStreetFurniture(options = {}) {
         const len = Math.hypot(dx, dz) || 1;
         const nx = -dz / len;
         const nz = dx / len;
-        const offset = road.width / 2 + 2;
+        const offset = roadWidthAtSegment(road, i, 0) / 2 + 2;
         createStreetSign(
           p1.x + nx * offset,
           p1.z + nz * offset,
@@ -485,7 +486,9 @@ export function generateStreetFurniture(options = {}) {
         const len = Math.hypot(dx, dz) || 1;
         const nx = -dz / len;
         const nz = dx / len;
-        const offset = road.width / 2 + 1.5;
+        const localWidth = roadWidthAtSegment(road, i, 0);
+        if (localWidth < budget.minLampRoadWidth) continue;
+        const offset = localWidth / 2 + 1.5;
         const lx = p1.x + nx * offset;
         const lz = p1.z + nz * offset;
         if (!semanticPlacements.some((placement) => placement.kind === 'street_lamp' && Math.hypot(placement.x - lx, placement.z - lz) < 18)) {

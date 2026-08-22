@@ -129,9 +129,15 @@ try {
         oneAtGradeBuildingRoadAuthority:
           snapshot.worldLoad?.buildingRoadAuthority !== null &&
           Number(snapshot.worldLoad?.buildingRoadAuthority?.unresolvedAtGradeConflicts || 0) === 0 &&
+          Number(snapshot.worldLoad?.buildingRoadAuthority?.newlyNonDriveableRoads || 0) === 0 &&
           (
             Number(snapshot.worldLoad?.buildingRoadAuthority?.constrainedRoads || 0) === 0 ||
-            Number(snapshot.worldLoad?.buildingRoadAuthority?.minimumResolvedWidth || 0) >= 1.2
+            (
+              snapshot.worldLoad?.buildingRoadAuthority?.crossSectionAuthority ===
+                'mapped_building_clearance_by_source_interval' &&
+              Number(snapshot.worldLoad?.buildingRoadAuthority?.constrainedSegments || 0) > 0 &&
+              Number(snapshot.worldLoad?.buildingRoadAuthority?.minimumResolvedWidth || 0) >= 1.2
+            )
           ),
         oneBuildingFoundationCollisionAuthority:
           Number(snapshot.worldLoad?.buildingRoadAuthority?.foundationCollisionProfiles || 0) > 0 &&
