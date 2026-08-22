@@ -9,6 +9,10 @@ button, schema, or preview is not considered a complete product feature unless
 the normal player path works in the assembled application and the release
 pipeline verifies the outcome.
 
+For the current ownership and execution model, see the
+[system inventory](docs/SYSTEM_INVENTORY.md) and
+[architecture map](docs/ARCHITECTURE_MAP.md).
+
 ## Status language
 
 - **Released and gated** — ships in 4.3.1 and has a current production journey.
