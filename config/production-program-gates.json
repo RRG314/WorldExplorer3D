@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "programId": "character-explorer-sandbox-unification-2026-08-18",
+  "productionRequired": true,
+  "workstreams": {
+    "productionBlockerRepair": "implemented-awaiting-final-release-evidence",
+    "waterSkyRealism": "implemented-awaiting-final-release-evidence",
+    "phase0EvidenceAndContainment": "in-progress",
+    "phase1PlayerDomainContracts": "in-progress",
+    "phase2BackpackJournalControls": "in-progress",
+    "phase3ItemUtilityCraftingTrade": "in-progress",
+    "phase4PhysicalEmbodimentSpike": "not-started",
+    "phase5VehicleActorPhysics": "in-progress",
+    "phase6CivicResponseCustody": "in-progress",
+    "phase7VerifiedFacilities": "in-progress",
+    "phase8MissionsEconomyContinuity": "not-started",
+    "phase9EngagementLeaderboards": "not-started",
+    "phase10DoorsTransportWorldwideRelease": "not-started"
+  },
+  "requiredCompleteStatus": "complete"
+}

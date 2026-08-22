@@ -4,7 +4,7 @@ import {
 } from "../world/shortbread-source.js?v=17";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
-import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=3';
+import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=4';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;

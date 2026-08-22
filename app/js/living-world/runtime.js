@@ -5,10 +5,9 @@ import {
   createWorldRandom,
   isLivingWorldPublicationActive
 } from './model.js?v=1';
-import { compileEntranceCatalog } from './entrance-catalog.js?v=1';
-import { createFacadeDepthPresentation } from './facade-depth.js?v=1';
-import { compilePedestrianGraph, compileTrafficGraph } from './navigation-graphs.js?v=1';
-import { createLivingWorldPopulation } from './population.js?v=1';
+import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=9';
+import { createLivingWorldPopulation } from './population.js?v=12';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -43,7 +42,6 @@ function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   state.reason = String(reason || 'disposed');
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
-  state.facades?.dispose?.();
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
 }
@@ -75,17 +73,27 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     locationKey: request.selection?.key,
     dataProfile: 'fixed-earth-living-world-v1'
   });
-  const catalog = compileEntranceCatalog({
+  const catalog = appCtx.buildingEntranceCatalog || compileEntranceCatalog({
     buildings: appCtx.buildings,
     mappedEntrances: appCtx.mappedBuildingEntrances,
     nearestRoad: appCtx.findNearestRoad,
+    sampleGround: (x, z) => appCtx.GroundHeight?.walkSurfaceY?.(x, z) ?? appCtx.elevationWorldYAtWorldXZ?.(x, z),
     tier
   });
-  const facades = createFacadeDepthPresentation({
-    entrances: catalog.entrances,
-    tier
+  const entranceByBuilding = appCtx.buildingEntranceByBuilding || new Map(
+    catalog.entrances.map((entrance) => [String(entrance.buildingSourceId), entrance])
+  );
+  const facades = appCtx.buildingFacadeEntrances || Object.freeze({
+    renderedEntrances: catalog.entrances,
+    diagnostics: Object.freeze({
+      ...catalog.diagnostics,
+      addedDrawCalls: 0,
+      retainedDecorativeMeshes: 0,
+      facadeIntegration: 'semantic-only-fallback',
+      renderOwner: 'engine/building-facade-materials',
+      interactionOwner: 'building-entry'
+    })
   });
-  appCtx.addEarthWorldObject?.(facades.group);
   const traversal = appCtx.buildTraversalNetworks?.() || { walk: null, drive: null };
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
@@ -94,14 +102,20 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     isBlockedPoint: (x, z) => pedestrianPointBlocked(appCtx, x, z),
     tier
   });
-  const locationName = String(request.location?.name || request.selection?.name || '').toLowerCase();
-  const driveOnLeft = /london|england|united kingdom|australia|japan|new zealand|singapore/.test(locationName);
+  const drivingSide = resolveDrivingSide(request.selection || request.location || {});
   const trafficCompilation = compileTrafficGraph({
     traversal: traversal.drive,
     sampleSurface: appCtx.sampleFeatureSurfaceY,
-    driveOnLeft,
+    driveOnLeft: drivingSide.driveOnLeft,
     tier
   });
+  const sampleVehicleSurface = (edge, x, z) => {
+    const feature = trafficCompilation.runtimeFeatureByEdge.get(edge?.id);
+    const surfaceY = Number(appCtx.sampleFeatureSurfaceY?.(feature, x, z));
+    // Traffic graph nodes historically carry this small presentation clearance;
+    // keep it while replacing the endpoint plane with final-surface sampling.
+    return Number.isFinite(surfaceY) ? surfaceY + 0.08 : NaN;
+  };
   const population = createLivingWorldPopulation({
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
@@ -110,6 +124,16 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car,
     getTimePhase: () => appCtx.timeOfDay,
+    sampleVehicleSurface,
+    hasPedestrianLineOfSight(from, to) {
+      const samples = [.33, .66];
+      return samples.every((amount) => appCtx.checkBuildingCollision?.(
+        from.x + (to.x - from.x) * amount,
+        from.z + (to.z - from.z) * amount,
+        .22,
+        { actorBaseY: Math.min(from.y, to.y), actorHeight: 1.7 }
+      )?.collision !== true);
+    },
     tier
   });
   appCtx.addEarthWorldObject?.(population.group);
@@ -122,7 +146,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     semanticDensity: {
       tier,
       buildingCandidates: catalog.diagnostics.considered,
-      facadeInstances: facades.diagnostics.doors + facades.diagnostics.storefronts + facades.diagnostics.windows,
+      facadeInstances: Number(facades.diagnostics.published || catalog.diagnostics.published),
       pedestrians: population.diagnostics.pedestrians,
       vehicles: population.diagnostics.vehicles
     },
@@ -146,7 +170,6 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   });
   if (!result.published) {
     population.dispose();
-    facades.dispose();
     return null;
   }
 
@@ -159,14 +182,16 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     population,
     pedestrianCompilation,
     trafficCompilation,
+    sampleVehicleSurface,
     catalog,
+    entranceByBuilding,
     tier,
+    drivingSide,
     disposed: false,
     reason: null
   };
   appCtx.livingWorldPublication = publication;
   appCtx.livingWorldRuntime = state;
-  facades.updateNightLighting(appCtx.timeOfDay);
   appCtx.registerRuntimeSystem?.({
     id: `${owner}:presentation`,
     owner,
@@ -174,16 +199,13 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     priority: 30,
     critical: false,
     enabled: () => !state.disposed && publicationIsActive(appCtx, publication),
-    update() {
-      facades.updateNightLighting(appCtx.timeOfDay);
-    },
     fixedUpdate(frame) {
       population.fixedUpdate(frame.dt);
     }
   });
   appCtx.setPerfLiveStat?.('livingWorld', {
     entrances: catalog.diagnostics.published,
-    facadeDrawCalls: facades.diagnostics.drawCalls,
+    facadeDrawCalls: facades.diagnostics.addedDrawCalls,
     facadeInstances: publication.semanticDensity.facadeInstances,
     pedestrians: population.diagnostics.pedestrians,
     vehicles: population.diagnostics.vehicles
@@ -194,6 +216,37 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
 export function livingWorldRuntimeSnapshot(appCtx) {
   const state = appCtx?.livingWorldRuntime;
   if (!state) return Object.freeze({ active: false });
+  const pedestrianMotorwayEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
+    const feature = state.pedestrianCompilation.runtimeFeatureByEdge.get(edge.id);
+    const roadClass = String(
+      feature?.transportRecord?.sourceTags?.highway ||
+      feature?.transportRecord?.rawTags?.highway ||
+      feature?.type ||
+      ''
+    ).toLowerCase();
+    return /^(?:motorway|motorway_link)$/.test(roadClass);
+  }).length;
+  const pedestrianVehicleTransportEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
+    const feature = state.pedestrianCompilation.runtimeFeatureByEdge.get(edge.id);
+    return String(feature?.networkKind || feature?.kind || '').toLowerCase() === 'road' ||
+      edge.provenance === 'inferred_sidewalk' || edge.provenance === 'inferred_crossing';
+  }).length;
+  const pedestrianEngineeredTransportEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
+    const structure = edge?.structure || {};
+    const structureKind = String(structure.structureKind || 'none');
+    return String(structure.terrainMode || 'at_grade') !== 'at_grade' ||
+      !['none', 'at_grade'].includes(structureKind);
+  }).length;
+  const trafficDirectionViolations = state.publication.trafficGraph.edges.filter((edge) =>
+    (edge.sourceDirection === 'forward' && edge.direction !== 'forward') ||
+    (edge.sourceDirection === 'reverse' && edge.direction !== 'reverse')
+  ).length;
+  const trafficLaneSideViolations = state.publication.trafficGraph.edges.filter((edge) => {
+    const expectedSign = edge.direction === 'forward'
+      ? state.drivingSide.driveOnLeft ? 1 : -1
+      : state.drivingSide.driveOnLeft ? -1 : 1;
+    return Math.sign(Number(edge.centerlineOffset) || 0) !== expectedSign;
+  }).length;
   return Object.freeze({
     active: publicationIsActive(appCtx, state.publication),
     requestId: state.publication.requestId,
@@ -207,12 +260,20 @@ export function livingWorldRuntimeSnapshot(appCtx) {
     pedestrianGraph: Object.freeze({
       nodes: state.publication.pedestrianGraph.nodes.length,
       edges: state.publication.pedestrianGraph.edges.length,
-      provenance: state.publication.pedestrianGraph.provenance
+      provenance: state.publication.pedestrianGraph.provenance,
+      diagnostics: state.publication.pedestrianGraph.diagnostics,
+      prohibitedMotorwayEdges: pedestrianMotorwayEdges,
+      vehicleTransportEdges: pedestrianVehicleTransportEdges,
+      engineeredTransportEdges: pedestrianEngineeredTransportEdges
     }),
     trafficGraph: Object.freeze({
       nodes: state.publication.trafficGraph.nodes.length,
       edges: state.publication.trafficGraph.edges.length,
-      provenance: state.publication.trafficGraph.provenance
+      provenance: state.publication.trafficGraph.provenance,
+      diagnostics: state.publication.trafficGraph.diagnostics,
+      drivingSide: state.drivingSide,
+      directionViolations: trafficDirectionViolations,
+      laneSideViolations: trafficLaneSideViolations
     }),
     generatedWithAdditionalProviderQueries: false
   });

@@ -2,8 +2,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=2";
 import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=1";
 import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
-import { getCurrentUser } from "../../js/auth-ui.js";
-import { initFirebase } from "../../js/firebase-init.js";
+import { getCurrentUser } from "../../js/auth-ui.js?v=55";
+import { initFirebase } from "../../js/firebase-init.js?v=55";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';

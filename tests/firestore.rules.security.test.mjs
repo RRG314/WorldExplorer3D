@@ -264,6 +264,34 @@ async function seedData(testEnv) {
       disabledAt: Timestamp.fromMillis(Date.now() - 20_000),
       source: 'OpenStreetMap'
     });
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'urbanEntities', 'vehicle-state-1'), {
+      authority: 'urban-room-transaction-v1',
+      entityId: 'urban-vehicle:test-1',
+      kind: 'vehicle',
+      worldSeed: 'latlon:0,0',
+      pose: { x: 4, y: 0, z: 2, yaw: 0 },
+      condition: 1,
+      leaseOwnerUid: OWNER_UID,
+      leaseExpiresAt: Timestamp.fromMillis(Date.now() + 15_000),
+      revision: 1,
+      updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'urbanActors', MEMBER_UID), {
+      uid: MEMBER_UID,
+      lastEquipmentId: 'baton',
+      lastActionAt: Timestamp.fromMillis(Date.now() - 1_000),
+      updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'urbanCivic', 'current'), {
+      authority: 'urban-civic-transaction-v1',
+      worldSeed: 'latlon:0,0',
+      eventId: 'room-civic:1:member-user',
+      actorUid: MEMBER_UID,
+      kind: 'vehicle_taken',
+      level: 1,
+      resolved: false,
+      updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
 
     await setDoc(doc(db, 'users', OWNER_UID, 'friends', INVITEE_UID), {
       uid: INVITEE_UID,
@@ -446,6 +474,53 @@ await runCheck('room clients cannot fabricate shared DeFlock state', async () =>
   }));
 });
 
+await runCheck('room member can read server-owned urban vehicle state', async () => {
+  await assertSucceeds(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'urbanEntities', 'vehicle-state-1')));
+});
+
+await runCheck('non-member cannot read private urban vehicle state', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'urbanEntities', 'vehicle-state-1')));
+});
+
+await runCheck('room clients cannot forge urban ownership or damage state', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'urbanEntities', 'forged-vehicle'), {
+    authority: 'urban-room-transaction-v1',
+    entityId: 'urban-vehicle:forged',
+    kind: 'vehicle',
+    worldSeed: 'latlon:0,0',
+    pose: { x: 0, y: 0, z: 0, yaw: 0 },
+    condition: 0,
+    leaseOwnerUid: MEMBER_UID,
+    revision: 999
+  }));
+});
+
+await runCheck('room member can read shared civic state but cannot forge it', async () => {
+  const reference = doc(memberDb, 'rooms', ROOM_ID, 'urbanCivic', 'current');
+  await assertSucceeds(getDoc(reference));
+  await assertFails(setDoc(reference, {
+    authority: 'urban-civic-transaction-v1',
+    eventId: 'forged',
+    actorUid: MEMBER_UID,
+    level: 0,
+    resolved: true
+  }));
+});
+
+await runCheck('non-member cannot read shared civic state', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'urbanCivic', 'current')));
+});
+
+await runCheck('room actor can read own server action clock but cannot write it', async () => {
+  const reference = doc(memberDb, 'rooms', ROOM_ID, 'urbanActors', MEMBER_UID);
+  await assertSucceeds(getDoc(reference));
+  await assertFails(setDoc(reference, { lastActionAt: serverTimestamp() }, { merge: true }));
+});
+
+await runCheck('ordinary member cannot read another room actor action clock', async () => {
+  await assertFails(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'urbanActors', OWNER_UID)));
+});
+
 await runCheck('signed-in invite-code joiner can read private room metadata', async () => {
   await assertSucceeds(getDoc(doc(joinerDb, 'rooms', ROOM_ID)));
 });
@@ -522,6 +597,14 @@ await runCheck('member can update own presence with valid payload', async () => 
       vx: 0,
       vy: 0,
       vz: 0
+    },
+    frame: {
+      kind: 'earth',
+      locLat: 39.2904,
+      locLon: -76.6122,
+      interiorKey: 'shortbread:building:test',
+      interiorFloorId: 'shortbread:building:test:floor:2',
+      interiorFloorLevel: 2
     }
   };
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'players', MEMBER_UID), payload));
@@ -1289,6 +1372,54 @@ await runCheck('member valid chat write with state transition succeeds', async (
     expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
   });
   await assertSucceeds(batch.commit());
+});
+
+await runCheck('room member can create shared artifact with current interior-aware anchor schema', async () => {
+  await assertSucceeds(setDoc(doc(collection(memberDb, 'rooms', ROOM_ID, 'artifacts')), {
+    ownerUid: MEMBER_UID,
+    ownerDisplayName: 'Member',
+    type: 'pin',
+    title: 'Shared field note',
+    text: 'Current multiplayer artifact schema',
+    visibility: 'room',
+    anchor: {
+      kind: 'earth',
+      lat: 39.2904,
+      lon: -76.6122,
+      x: 1,
+      y: 2,
+      z: 3,
+      interiorKey: '',
+      buildingKey: 'osm-way-123',
+      interiorLabel: 'Lobby'
+    },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('room artifact rejects oversized interior anchor identity', async () => {
+  await assertFails(setDoc(doc(collection(memberDb, 'rooms', ROOM_ID, 'artifacts')), {
+    ownerUid: MEMBER_UID,
+    ownerDisplayName: 'Member',
+    type: 'pin',
+    title: 'Invalid shared field note',
+    text: '',
+    visibility: 'room',
+    anchor: {
+      kind: 'earth',
+      lat: 39.2904,
+      lon: -76.6122,
+      x: 1,
+      y: 2,
+      z: 3,
+      interiorKey: 'x'.repeat(161),
+      buildingKey: '',
+      interiorLabel: ''
+    },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
 });
 
 await testEnv.withSecurityRulesDisabled(async (ctx) => {

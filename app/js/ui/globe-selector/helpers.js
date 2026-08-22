@@ -1,4 +1,5 @@
-import { isPolarCryosphereLocation } from '../../earth-core/world-surface-domain.js?v=2';
+import { isPolarCryosphereLocation } from '../../earth-core/world-surface-domain.js?v=3';
+import { fetchGebcoDepthEvidence } from '../../geospatial/bathymetry-evidence.js?v=1';
 
 export const FAVORITE_STORAGE_KEY = "worldExplorer3D.globeSelector.savedFavorites";
 export const MAX_SAVED_FAVORITES = 10;
@@ -291,6 +292,7 @@ export function parseReverseAddress(payload = {}) {
     payload?.principalSubdivision ||
     "";
   const country = cleanCountry(addr.country || payload?.countryName || "");
+  const countryCode = String(addr.country_code || payload?.countryCode || '').trim().toUpperCase();
   const parts = uniqueNonEmptyParts([city, county, region, country]);
   const display =
     parts.join(", ") ||
@@ -321,7 +323,14 @@ export function parseReverseAddress(payload = {}) {
   return {
     display,
     queryLabel: city || county || region || country || "",
-    details: { city, county, region, country, waterKind },
+    details: {
+      city,
+      county,
+      region,
+      country,
+      countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null,
+      waterKind
+    },
     waterKind
   };
 }
@@ -339,38 +348,8 @@ async function fetchJsonWithTimeout(url, timeoutMs = 6000) {
 }
 
 export async function fetchGebcoElevationMeters(lat, lon, timeoutMs = 6500) {
-  const halfSpan = 0.01;
-  const params = new URLSearchParams({
-    SERVICE: 'WMS',
-    VERSION: '1.1.1',
-    REQUEST: 'GetFeatureInfo',
-    LAYERS: 'GEBCO_LATEST_2',
-    QUERY_LAYERS: 'GEBCO_LATEST_2',
-    STYLES: '',
-    SRS: 'EPSG:4326',
-    BBOX: `${lon - halfSpan},${lat - halfSpan},${lon + halfSpan},${lat + halfSpan}`,
-    WIDTH: '64',
-    HEIGHT: '64',
-    FORMAT: 'image/png',
-    INFO_FORMAT: 'text/plain',
-    X: '32',
-    Y: '32'
-  });
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(`https://wms.gebco.net/mapserv?${params.toString()}`, {
-      cache: 'force-cache',
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error(`GEBCO WMS HTTP ${response.status}`);
-    const payload = await response.text();
-    const match = payload.match(/value_list\s*=\s*'(-?\d+(?:\.\d+)?)/i);
-    const elevation = match ? Number(match[1]) : NaN;
-    return Number.isFinite(elevation) ? elevation : null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const evidence = await fetchGebcoDepthEvidence(lat, lon, { timeoutMs });
+  return Number.isFinite(evidence.elevationMeters) ? evidence.elevationMeters : null;
 }
 
 export async function resolveCoordinateSurfaceEvidence(lat, lon, reversePayload = null) {
@@ -384,13 +363,15 @@ export async function resolveCoordinateSurfaceEvidence(lat, lon, reversePayload 
   }
   const parsedKind = parseReverseAddress(reversePayload || {}).waterKind;
   try {
-    const elevation = await fetchGebcoElevationMeters(lat, lon);
+    const bathymetry = await fetchGebcoDepthEvidence(lat, lon);
+    const elevation = bathymetry.elevationMeters;
     if (Number.isFinite(elevation)) {
       return Object.freeze({
         kind: elevation <= -5 ? 'open_ocean' : 'land',
         verified: true,
         source: 'gebco-elevation-sample',
-        elevationMeters: elevation
+        elevationMeters: elevation,
+        bathymetry
       });
     }
   } catch {
@@ -465,7 +446,9 @@ export function syncLegacyCustomSelection(appCtx, selection) {
     name: selection.name || appCtx.customLoc?.name || 'Custom Location',
     arrivalMode: selection.arrivalMode || 'auto',
     waterKind: selection.waterKind || null,
-    surfaceEvidence: selection.surfaceEvidence || null
+    surfaceEvidence: selection.surfaceEvidence || null,
+    countryCode: selection.countryCode || selection.locationDetails?.countryCode || null,
+    locationDetails: selection.locationDetails || null
   }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 

@@ -42,6 +42,69 @@ function rejection(reason, diagnostics) {
   });
 }
 
+function decodeFloat64Base64(value, expectedCount) {
+  const text = String(value || '');
+  let binary;
+  try {
+    binary = globalThis.atob(text);
+  } catch {
+    return null;
+  }
+  if (binary.length !== expectedCount * Float64Array.BYTES_PER_ELEMENT) {
+    return null;
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const view = new DataView(bytes.buffer);
+  const values = new Float64Array(expectedCount);
+  for (let index = 0; index < expectedCount; index += 1) {
+    values[index] = view.getFloat64(
+      index * Float64Array.BYTES_PER_ELEMENT,
+      true
+    );
+  }
+  return values;
+}
+
+function compileEncodedSamples(encoding, expectedCount, minimumConfidence) {
+  if (
+    encoding?.type !== 'row-major-f64-shared-metadata-v1' ||
+    encoding?.byteOrder !== 'little-endian' ||
+    Number(encoding?.sampleCount) !== expectedCount ||
+    encoding?.shared?.available !== true
+  ) return null;
+  const confidence = Number(encoding.shared.confidence);
+  if (!Number.isFinite(confidence) || confidence < minimumConfidence) return null;
+  const rawElevationMeters = decodeFloat64Base64(
+    encoding.rawElevationMetersBase64,
+    expectedCount
+  );
+  const groundElevationMeters = decodeFloat64Base64(
+    encoding.groundElevationMetersBase64,
+    expectedCount
+  );
+  if (!rawElevationMeters || !groundElevationMeters) return null;
+  for (let index = 0; index < expectedCount; index += 1) {
+    if (!Number.isFinite(rawElevationMeters[index]) ||
+        !Number.isFinite(groundElevationMeters[index])) return null;
+  }
+  return Object.freeze({
+    type: encoding.type,
+    rawElevationMeters,
+    groundElevationMeters,
+    shared: Object.freeze({
+      confidence,
+      correctionReason: String(encoding.shared.correctionReason || 'none'),
+      provenance: String(encoding.shared.provenance || 'unknown'),
+      normalizationUncertaintyMeters: Number(
+        encoding.shared.normalizationUncertaintyMeters
+      )
+    })
+  });
+}
+
 export function compileDistrictGroundModel(options = {}) {
   const districtId = String(options.districtId || '');
   const spacingMeters = Number(options.grid?.spacingMeters);
@@ -73,9 +136,21 @@ export function compileDistrictGroundModel(options = {}) {
 
   const expectedCount =
     (maxColumn - minColumn + 1) * (maxRow - minRow + 1);
+  const encodedSamples = compileEncodedSamples(
+    options.encodedSamples,
+    expectedCount,
+    minimumConfidence
+  );
+  if (options.encodedSamples && !encodedSamples) {
+    return rejection('invalid-sample-encoding', {
+      districtId,
+      expectedCount,
+      receivedCount: Number(options.encodedSamples?.sampleCount || 0)
+    });
+  }
   const inputSamples = Array.isArray(options.samples) ? options.samples : [];
   const byKey = new Map();
-  for (const input of inputSamples) {
+  for (const input of encodedSamples ? [] : inputSamples) {
     const column = Number(input?.column);
     const row = Number(input?.row);
     if (!Number.isInteger(column) || !Number.isInteger(row)) {
@@ -118,7 +193,7 @@ export function compileDistrictGroundModel(options = {}) {
   const samples = [];
   const missingKeys = [];
   const lowConfidenceKeys = [];
-  for (let row = minRow; row <= maxRow; row += 1) {
+  for (let row = minRow; !encodedSamples && row <= maxRow; row += 1) {
     for (let column = minColumn; column <= maxColumn; column += 1) {
       const key = sampleKey(column, row);
       const input = byKey.get(key);
@@ -188,13 +263,15 @@ export function compileDistrictGroundModel(options = {}) {
     minimumConfidence,
     samples: Object.freeze(samples),
     samplesByKey,
+    encodedSamples,
     diagnostics: Object.freeze({
       expectedCount,
-      receivedCount: byKey.size,
-      acceptedCount: samples.length,
-      rawGroundProductsSeparated: samples.every((sample) =>
-        Number.isFinite(sample.rawElevationMeters) &&
-        Number.isFinite(sample.groundElevationMeters)
+      receivedCount: encodedSamples ? expectedCount : byKey.size,
+      acceptedCount: encodedSamples ? expectedCount : samples.length,
+      encoded: !!encodedSamples,
+      rawGroundProductsSeparated: encodedSamples ? true : samples.every(
+        (sample) => Number.isFinite(sample.rawElevationMeters) &&
+          Number.isFinite(sample.groundElevationMeters)
       )
     })
   });
@@ -236,11 +313,23 @@ export function sampleDistrictGroundMeters(model, eastingMeters, northingMeters)
     return Object.freeze({ status: 'unavailable', reason: 'outside-model' });
   }
 
+  const encoded = model.encodedSamples;
+  const width = maxColumn - minColumn + 1;
+  const encodedSample = (column, row) => {
+    if (!encoded) return model.samplesByKey[sampleKey(column, row)];
+    const index = (row - minRow) * width + (column - minColumn);
+    return {
+      key: sampleKey(column, row),
+      rawElevationMeters: encoded.rawElevationMeters[index],
+      groundElevationMeters: encoded.groundElevationMeters[index],
+      confidence: encoded.shared.confidence
+    };
+  };
   const samples = [
-    model.samplesByKey[sampleKey(column0, row0)],
-    model.samplesByKey[sampleKey(column1, row0)],
-    model.samplesByKey[sampleKey(column0, row1)],
-    model.samplesByKey[sampleKey(column1, row1)]
+    encodedSample(column0, row0),
+    encodedSample(column1, row0),
+    encodedSample(column0, row1),
+    encodedSample(column1, row1)
   ];
   if (samples.some((sample) => !sample)) {
     return Object.freeze({ status: 'unavailable', reason: 'missing-cell' });

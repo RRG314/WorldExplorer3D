@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "status": "legacy-suite-quarantined",
+  "principles": {
+    "testsFollowCurrentRequirements": true,
+    "testsMayNotDefineProductBehavior": true,
+    "oneTestPerReleaseBoundary": true,
+    "noLegacyTestIsTrustedByDefault": true,
+    "noScreenshotBeforeRuntimePasses": true,
+    "noDirectRuntimeMutationInBrowserJourneys": true,
+    "noImageComparisonAsWorldCorrectnessProof": true
+  },
+  "requiredNow": {
+    "sourceAndArtifactHealth": {
+      "reason": "prevents a deploy that builds successfully but omits or cannot load current landing/game files",
+      "command": "npm run verify:source"
+    },
+    "completeWorldRuntime": {
+      "reason": "proves the public landing, selector, full live Baltimore world, input, UI ownership and transport continuity together",
+      "command": "npm run verify:world"
+    },
+    "immutableArtifactRuntime": {
+      "reason": "repeats the same complete-world journey against the exact dist artifact intended for deployment",
+      "command": "npm run verify:artifact-runtime"
+    }
+  },
+  "featureTestAdmission": {
+    "requiresCurrentRequirement": true,
+    "requiresNamedFailureMode": true,
+    "requiresSingleAuthoritativeOwner": true,
+    "requiresFailureBeforeFix": true,
+    "requiresPassAfterFix": true,
+    "forbidsDeletedFeatureCoverage": true,
+    "forbidsCitySpecificImplementationExceptions": true
+  },
+  "visualEvidence": {
+    "automatedCaptureDefault": false,
+    "captureEnvironmentVariable": "WE3D_CAPTURE_RELEASE_EVIDENCE",
+    "requiresAllAutomatedChecksPassFirst": true,
+    "requiresImmutableArtifact": true,
+    "requiresHumanReview": true,
+    "outputDirectory": "output/release-evidence/current"
+  },
+  "blockedLandingAssets": [
+    "assets/landing/current/jones-falls-player-path-2026-08-19.png"
+  ],
+  "legacyQuarantine": "/Users/stevenreid/.codex/recovery/worldexplorer3d-20260819-legacy-test-quarantine"
+}

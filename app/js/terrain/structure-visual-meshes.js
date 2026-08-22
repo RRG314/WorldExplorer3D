@@ -264,8 +264,41 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   return mesh;
 }
 
-function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegments = []) {
+function buildElevatedRoadMeshForContext(
+  appCtx,
+  deckShells = [],
+  barrierSegments = [],
+  options = { chunkSize: 3000 }
+) {
   if (typeof THREE === "undefined") return null;
+  const chunkSize = Math.max(0, Number(options?.chunkSize) || 0);
+  if (chunkSize > 0) {
+    const chunks = new Map();
+    const chunkFor = (x, z) => {
+      const key = `${Math.floor(Number(x) / chunkSize)}:${Math.floor(Number(z) / chunkSize)}`;
+      if (!chunks.has(key)) chunks.set(key, { shells: [], barriers: [] });
+      return chunks.get(key);
+    };
+    for (const shell of deckShells || []) {
+      const rings = Array.isArray(shell?.rings) ? shell.rings : [];
+      if (rings.length < 2) continue;
+      const midpoint = rings[Math.floor(rings.length * 0.5)];
+      chunkFor(midpoint.x, midpoint.z).shells.push(shell);
+    }
+    for (const segment of barrierSegments || []) {
+      if (!segment?.p1 || !segment?.p2) continue;
+      chunkFor(
+        (Number(segment.p1.x) + Number(segment.p2.x)) * 0.5,
+        (Number(segment.p1.z) + Number(segment.p2.z)) * 0.5
+      ).barriers.push(segment);
+    }
+    return [...chunks.values()].map((chunk) => buildElevatedRoadMeshForContext(
+      appCtx,
+      chunk.shells,
+      chunk.barriers,
+      { chunkSize: 0, frustumCulled: true }
+    )).filter(Boolean);
+  }
   const positions = [];
   const indices = [];
   for (const shell of deckShells || []) {
@@ -335,16 +368,25 @@ function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegment
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
   const material = createStructureVisualMaterial(0x5c6670, 0.9, 0.05);
   material.side = THREE.DoubleSide;
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = false;
   mesh.receiveShadow = true;
-  mesh.frustumCulled = false;
+  mesh.frustumCulled = options?.frustumCulled === true;
   Object.assign(mesh.userData, {
     isStructureVisual: true,
     structureVisualType: "elevated_road_shells",
     elevatedRoadOwner: "compiled-transport-structure-assembly",
+    structureFeatureIds: Object.freeze([
+      ...new Set((deckShells || []).flatMap((shell) =>
+        Array.isArray(shell?.featureIds) && shell.featureIds.length > 0
+          ? shell.featureIds.map((featureId) => String(featureId || ''))
+          : [String(shell?.featureId || '')]
+      ).filter(Boolean))
+    ]),
     closedStructureEnds: true,
     variableTransitionThickness: true
   });
@@ -396,15 +438,37 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
     );
   }
   if (supportInstances.length > 0) {
-    buildStructureVisualMeshForContext(
-      appCtx,
-      supportInstances,
-      createStructureVisualMaterial(0x717983, 0.95, 0.02),
-      { structureVisualType: "supports", staticBridgeSupportBatch: true },
-      // Supports remain shaded by the world but do not need to redraw every
-      // regional instance into the dynamic sun shadow map each frame.
-      { castShadow: false, chunkSize: 600 }
-    );
+    const approachSupports = supportInstances.filter((instance) =>
+      instance?.structureFamily === 'engineered_approach');
+    const bridgeSupports = supportInstances.filter((instance) =>
+      instance?.structureFamily !== 'engineered_approach');
+    if (bridgeSupports.length > 0) {
+      buildStructureVisualMeshForContext(
+        appCtx,
+        bridgeSupports,
+        createStructureVisualMaterial(0x717983, 0.95, 0.02),
+        { structureVisualType: "supports", staticBridgeSupportBatch: true },
+        // Supports remain shaded by the world but do not need to redraw every
+        // regional instance into the dynamic sun shadow map each frame.
+        { castShadow: false, chunkSize: 3000 }
+      );
+    }
+    if (approachSupports.length > 0) {
+      buildStructureVisualMeshForContext(
+        appCtx,
+        approachSupports,
+        createStructureVisualMaterial(0x717983, 0.95, 0.02),
+        {
+          structureVisualType: "approach_supports",
+          staticBridgeSupportBatch: true,
+          engineeredApproachSupportBatch: true
+        },
+        // Integrated approaches cover the full regional graph. Larger static
+        // chunks keep the same 2.2 km visibility envelope while avoiding
+        // hundreds of tiny hidden InstancedMesh objects at metropolitan scale.
+        { castShadow: false, chunkSize: 3000 }
+      );
+    }
   }
   if (PUBLISH_TUNNEL_STRUCTURE_VISUALS && wallInstances.length > 0) {
     buildStructureVisualMeshForContext(

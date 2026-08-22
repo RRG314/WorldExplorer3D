@@ -92,7 +92,7 @@ export function createTutorialUi(options = {}) {
     wrap.innerHTML = `
       <span class="tutorial-settings-eyebrow">Learning</span>
       <h3>First Expedition</h3>
-      <p>Three short, interactive steps: move, choose a field activity, and record one discovery. Advanced systems explain themselves when opened.</p>
+      <p>Three short steps introduce movement, field work, Journal knowledge and Backpack items. Advanced systems explain themselves when first opened.</p>
       <label><input id="tutorialEnabledToggle" type="checkbox"> <span>Show contextual guidance</span></label>
       <div class="tutorial-settings-actions"><button id="tutorialRestartBtn" type="button">Replay First Expedition</button></div>
       <div id="tutorialSettingsStatus" role="status"></div>

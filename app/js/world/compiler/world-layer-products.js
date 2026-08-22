@@ -1,8 +1,8 @@
 const WORLD_LAYER_COLLECTIONS = Object.freeze({
   terrain: Object.freeze([]),
   hydrology: Object.freeze(['waterAreas', 'waterways', 'waterWaveVisuals']),
-  transport: Object.freeze(['roads', 'roadMeshes', 'urbanSurfaceMeshes', 'linearFeatures', 'linearFeatureMeshes']),
-  buildings: Object.freeze(['buildings', 'buildingMeshes', 'dynamicBuildingColliders', 'structureVisualMeshes']),
+  transport: Object.freeze(['roads', 'roadMeshes', 'urbanSurfaceMeshes', 'linearFeatures', 'linearFeatureMeshes', 'structureVisualMeshes']),
+  buildings: Object.freeze(['buildings', 'buildingMeshes', 'dynamicBuildingColliders']),
   landuse: Object.freeze(['landuses', 'surfaceFeatureHints', 'landuseMeshes', 'vegetationFeatures', 'vegetationMeshes']),
   places: Object.freeze(['pois', 'poiMeshes', 'historicSites', 'historicMarkers', 'streetFurnitureMeshes'])
 });
@@ -148,8 +148,18 @@ export function compileWorldLayerProducts(options = {}) {
           'inferredGeometryCount', 'ambiguousMetadataCount'
         ]),
         ...compactScalars(loadMetrics.buildings?.geometryPublication, [
-          'candidateCount', 'renderedFeatureCount', 'yieldCount'
-        ])
+          'candidateCount', 'renderedFeatureCount', 'yieldCount',
+          'foundationCollisionProfiles', 'foundationCollisionMismatches',
+          'constrainedBuildings', 'constrainedRoads', 'constrainedSegments',
+          'gradeSeparatedOverlaps', 'newlyNonDriveableRoads',
+          'newlyNonDriveableSegments', 'nonDriveableSegments', 'minimumResolvedWidth',
+          'suppressedCenterlineConflicts', 'suppressedMappedCrossSectionConflicts',
+          'suppressedInferredFootprintConflicts', 'suppressedInsufficientClearanceConflicts',
+          'unresolvedAtGradeConflicts'
+        ]),
+        crossSectionAuthority: String(
+          loadMetrics.buildings?.geometryPublication?.authority || ''
+        ) || null
       }
     }),
     landuse: layerProduct({

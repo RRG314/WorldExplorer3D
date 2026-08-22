@@ -4,10 +4,11 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=44";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=8";
+} from "./terrain/structure-visuals.js?v=57";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=16";
+import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=20";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -27,10 +28,11 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=49";
+} from "./terrain/surface-profiles.js?v=51";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
+  clearTerrainTileCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
   getTerrainMeshKey,
@@ -50,20 +52,20 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=44";
+} from "./terrain/tiles.js?v=47";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=38";
+} from "./terrain/rebuild.js?v=46";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=9";
+} from "./terrain/debug-tools.js?v=15";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=68";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=71";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -125,6 +127,7 @@ const sampleAcceptedGroundAtWorldXZ = (x, z) =>
   acceptedGroundRuntime.sampleAtWorldXZ(x, z);
 const verifyAcceptedGroundCoverage = (locations) =>
   acceptedGroundRuntime.verifyCoverage(locations);
+let earthStreamingReleaseGeneration = 0;
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
@@ -278,13 +281,38 @@ function applyWaterTerrainMask() {
     applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
     maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
+  const terrainSeams = stitchTerrainGroupEdges(appCtx);
   clearTerrainHeightCache();
   const stats = {
     terrainMeshes: meshes.length,
     waterAreas: waterAreaCount,
-    maskedVertices
+    maskedVertices,
+    terrainSeams
   };
   appCtx.waterTerrainMaskStats = stats;
+  return stats;
+}
+
+function applyTransportTerrainCorridors() {
+  const meshes = (appCtx.terrainGroup?.children || []).filter(
+    (mesh) => mesh?.userData?.isTerrainMesh
+  );
+  let adjustedVertices = 0;
+  for (const mesh of meshes) {
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
+    adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
+  }
+  const terrainSeams = stitchTerrainGroupEdges(appCtx);
+  clearTerrainHeightCache();
+  const stats = Object.freeze({
+    authority: 'compiled_transport_surface',
+    heightSamplingAuthority: 'rendered-triangle-barycentric',
+    terrainMeshes: meshes.length,
+    corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
+    adjustedVertices,
+    terrainSeams
+  });
+  appCtx.transportTerrainCorridorStats = stats;
   return stats;
 }
 
@@ -322,6 +350,8 @@ const transportPublicationDeps = {
   getSharedRoadMaterials,
   cachedTerrainHeight,
   cachedBaseTerrainHeight,
+  applyTransportTerrainCorridors,
+  repositionBuildingsWithTerrain,
   subdivideRoadPoints,
   pointAlongPolyline,
   polylineCurvatureMetric,
@@ -370,6 +400,45 @@ const {
   resetFarTerrainClipmap,
   updateFarTerrainClipmap
 });
+
+function resetEarthStreaming(reason = 'earth_streaming_reset') {
+  earthStreamingReleaseGeneration += 1;
+  const before = Object.freeze({
+    terrainChildren: Number(appCtx.terrainGroup?.children?.length || 0),
+    farFieldActive: !!appCtx.farTerrainClipmapState,
+    acceptedGround: getAcceptedGroundRuntimeSnapshot(),
+    tileCache: terrainTileCacheSnapshot()
+  });
+
+  // This is the single owner for all persistent Earth ground publications.
+  // The far-field reset invalidates asynchronous work synchronously before its
+  // returned drain promise settles, so a replacement world cannot republish an
+  // obsolete generation after this release.
+  resetLocationTerrainPublication();
+  clearTerrainMeshes();
+  clearAcceptedGroundRuntime(reason);
+  const tileCacheRelease = clearTerrainTileCache();
+  appCtx.fixedLocationMappedSurfaceContext = null;
+  appCtx.fixedRegionalStructureWaterAreas = [];
+  appCtx.fixedRegionalContextBounds = null;
+  appCtx.fixedRegionalContextRadiusWorld = 0;
+  appCtx.farTerrainClipmapState = null;
+
+  const release = Object.freeze({
+    generation: earthStreamingReleaseGeneration,
+    reason,
+    before,
+    tileCacheRelease,
+    after: Object.freeze({
+      terrainChildren: Number(appCtx.terrainGroup?.children?.length || 0),
+      farFieldActive: !!appCtx.farTerrainClipmapState,
+      acceptedGround: getAcceptedGroundRuntimeSnapshot(),
+      tileCache: terrainTileCacheSnapshot()
+    })
+  });
+  appCtx.lastEarthStreamingRelease = release;
+  return release;
+}
 
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
@@ -468,6 +537,7 @@ function publishCompiledTransportMeshesRuntime() {
 
 Object.assign(appCtx, {
   applyTerrainVisualProfile,
+  applyTransportTerrainCorridors,
   applyHeightsToTerrainMesh,
   applyWaterTerrainMask,
   baseTerrainHeightAt: cachedBaseTerrainHeight,
@@ -478,6 +548,7 @@ Object.assign(appCtx, {
   cachedTerrainHeight,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
+  clearTerrainTileCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
   detectRoadIntersections,
@@ -507,6 +578,7 @@ Object.assign(appCtx, {
   refreshTerrainSurfaceProfiles,
   refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
+  resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleFarTerrainWorldYAt,
   sampleAcceptedGroundAtLatLon,
@@ -547,6 +619,7 @@ export {
   classifyTerrainVisualProfile,
   clearAcceptedGroundRuntime,
   clearTerrainHeightCache,
+  clearTerrainTileCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
   detectRoadIntersections,
@@ -568,6 +641,7 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,

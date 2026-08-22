@@ -24,7 +24,7 @@ import {
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=7";
+} from "./globe-selector/helpers.js?v=9";
 
 function createGlobeSelector(options = {}) {
   const {
@@ -254,6 +254,8 @@ function createGlobeSelector(options = {}) {
         ? meta.arrivalMode
         : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto',
       waterKind: coordsChanged ? null : meta.waterKind || selected?.waterKind || null,
+      countryCode: coordsChanged ? null : meta.countryCode || selected?.countryCode || null,
+      locationDetails: coordsChanged ? null : meta.locationDetails || selected?.locationDetails || null,
       surfaceEvidence: coordsChanged
         ? null
         : meta.surfaceEvidence || selected?.surfaceEvidence || null
@@ -313,6 +315,7 @@ function createGlobeSelector(options = {}) {
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
       selected.locationDetails = cached.details || null;
+      selected.countryCode = cached.details?.countryCode || null;
       selected.surfaceEvidence = cached.surfaceEvidence || null;
       selected.waterKind = cached.surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
       selected.arrivalMode = selected.waterKind ? 'boat' : 'auto';
@@ -364,6 +367,7 @@ function createGlobeSelector(options = {}) {
         if (liveCandidate) liveNearbyCity = liveCandidate;
         selected.name = parsed.display;
         selected.locationDetails = parsed.details;
+        selected.countryCode = parsed.details?.countryCode || null;
         selected.surfaceEvidence = parsed.surfaceEvidence || null;
         selected.waterKind = parsed.waterKind || null;
         selected.arrivalMode = parsed.waterKind ? 'boat' : 'auto';

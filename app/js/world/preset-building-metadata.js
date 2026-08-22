@@ -49,13 +49,18 @@ function loadIndex(options = {}) {
   return indexPromise;
 }
 
-function locationMatches(pack, lat, lon) {
+function locationDistanceDegrees(pack, lat, lon) {
   const centerLat = Number(pack?.center?.lat);
   const centerLon = Number(pack?.center?.lon);
-  const radius = Math.max(0.001, Number(pack?.matchRadiusDegrees) || 0.006);
-  if (![centerLat, centerLon, lat, lon].every(Number.isFinite)) return false;
+  if (![centerLat, centerLon, lat, lon].every(Number.isFinite)) return Infinity;
   const lonScale = Math.max(0.25, Math.cos(centerLat * Math.PI / 180));
-  return Math.hypot(lat - centerLat, (lon - centerLon) * lonScale) <= radius;
+  return Math.hypot(lat - centerLat, (lon - centerLon) * lonScale);
+}
+
+function locationMatches(pack, lat, lon, coverageRadiusDegrees = 0) {
+  const packRadius = Math.max(0.001, Number(pack?.matchRadiusDegrees) || 0.006);
+  const publicationRadius = Math.max(0, Number(coverageRadiusDegrees) || 0);
+  return locationDistanceDegrees(pack, lat, lon) <= packRadius + publicationRadius;
 }
 
 function loadPack(id, options = {}) {
@@ -88,9 +93,17 @@ export async function fetchBundledBuildingMetadata(options = {}) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   const index = await loadIndex(options);
   const key = String(options.locationKey || '').trim().toLowerCase();
-  const record = (index?.packs || []).find((pack) =>
-    (key && key !== 'custom' && String(pack.id || '') === key) || locationMatches(pack, lat, lon)
-  );
+  const coverageRadiusDegrees = Math.max(0, Number(options.coverageRadiusDegrees) || 0);
+  const packs = index?.packs || [];
+  const keyedRecord = key && key !== 'custom'
+    ? packs.find((pack) => String(pack.id || '') === key)
+    : null;
+  const record = keyedRecord || packs
+    .filter((pack) => locationMatches(pack, lat, lon, coverageRadiusDegrees))
+    .sort((left, right) =>
+      locationDistanceDegrees(left, lat, lon) - locationDistanceDegrees(right, lat, lon) ||
+      String(left?.id || '').localeCompare(String(right?.id || ''))
+    )[0];
   if (!record?.id) return null;
 
   const pack = await loadPack(String(record.id), options);
@@ -100,7 +113,14 @@ export async function fetchBundledBuildingMetadata(options = {}) {
     _overpassEndpoint: String(pack.source || index.source || 'OpenStreetMap'),
     _buildingMetadataPackId: String(pack.id || record.id),
     _buildingMetadataSchemaVersion: BUNDLED_BUILDING_SCHEMA_VERSION,
-    _buildingMetadataLicense: String(pack.license || index.license || '')
+    _buildingMetadataLicense: String(pack.license || index.license || ''),
+    _buildingMetadataSelection: {
+      authority: 'building-publication-coverage',
+      coverageRadiusDegrees,
+      packMatchRadiusDegrees: Math.max(0.001, Number(record.matchRadiusDegrees) || 0.006),
+      distanceDegrees: locationDistanceDegrees(record, lat, lon),
+      reason: keyedRecord ? 'selected-location-identity' : 'publication-coverage-intersection'
+    }
   };
 }
 

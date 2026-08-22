@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=17";
+} from "./surface-rules.js?v=18";
 import {
   inferWaterRenderContext
-} from "./water-dynamics.js?v=4";
+} from "./water-dynamics.js?v=9";
 import {
   areRoadsConnected,
   assignFeatureConnections,
@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=49";
+} from "./structure-semantics.js?v=63";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=31";
+} from "./world/spawn.js?v=40";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=18";
+} from "./world/osm-loader.js?v=19";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -58,12 +58,12 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=29";
+} from "./world/load-support.js?v=34";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=13";
+} from "./world/load-reset.js?v=17";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=11";
@@ -82,7 +82,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=25";
+} from "./world/load-geometry.js?v=27";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -100,13 +100,13 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=35";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=43";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=53";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=10";
+} from "./world/render-support.js?v=14";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -116,7 +116,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=4";
+} from "./world/navigation.js?v=5";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -127,7 +127,7 @@ import {
   pickNavigationTargetPoint,
   surfaceDisplayName,
   traversableFeaturesForMode
-} from "./world/traversal.js?v=2";
+} from "./world/traversal.js?v=4";
 import {
   initWorldVegetation,
   MAX_TREE_NODES,
@@ -142,17 +142,17 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=25";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=30";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=13";
+} from "./world/furniture.js?v=17";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
   getNearbyBuildings,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=5";
+} from "./world/building-spatial-index.js?v=6";
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,
@@ -161,16 +161,17 @@ import {
   refreshStructureAwareFeatureProfilesCooperatively,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=38";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=107";
+} from "./world/structure-aware.js?v=50";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=142";
 import {
+  fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
 } from "./world/shortbread-source.js?v=17";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=11";
-import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=26";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=18";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=13";
+import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
+import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=35";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=49";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -187,6 +188,18 @@ const LINEAR_FEATURE_POLICY = Object.freeze({
 const ENABLE_LINEAR_FEATURES = Object.values(LINEAR_FEATURE_POLICY).some(Boolean);
 appCtx.linearFeaturePolicy = LINEAR_FEATURE_POLICY;
 appCtx.linearFeaturePolicyEnabled = ENABLE_LINEAR_FEATURES;
+
+function spawnPlayerForLoadedWorld() {
+  const mode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive';
+  if (appCtx.selLoc === 'custom') {
+    return applyCustomLocationSpawn(mode, {
+      source: 'published_world_arrival',
+      preferBoatIfWater: true
+    });
+  }
+  return spawnOnRoad();
+}
+
 const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   ENABLE_LINEAR_FEATURES,
   LINEAR_FEATURE_POLICY,
@@ -227,6 +240,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   fetchOverpassJSON,
   fetchGlobalBuildingData,
   fetchBundledBuildingMetadata,
+  fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   featureTileKeyForLatLon,
   fetchVectorTileWater,
@@ -265,7 +279,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   sanitizeWorldFootprintPoints,
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ,
-  spawnOnRoad,
+  spawnPlayer: spawnPlayerForLoadedWorld,
   updateFeatureSurfaceProfile,
   publishLocationWorld,
   vectorTileRangeForBounds,
@@ -277,7 +291,9 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
 
 async function loadRoads(retryPass = 0) {
   try {
-    return await loadOsmRoads(retryPass);
+    const result = await loadOsmRoads(retryPass);
+    void appCtx.refreshWaterEnvironmentEvidence?.(false);
+    return result;
   } finally {
     // Vector-tile decoders and raw provider responses are compilation staging,
     // not part of the fixed playable world. HTTP/IndexedDB remain the reload
@@ -355,7 +371,7 @@ initWorldNavigation({
 let editableWorldRuntimePromise = null;
 appCtx.ensureEditableWorldRuntime = () => {
   if (typeof appCtx.getSuppressedEditableBuildingIds === 'function') return Promise.resolve(true);
-  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=1')
+  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=2')
     .then(({ initEditableWorldRuntime }) => {
       initEditableWorldRuntime(appCtx);
       return true;

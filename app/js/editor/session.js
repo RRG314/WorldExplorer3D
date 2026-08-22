@@ -1,4 +1,4 @@
-import { observeAuth } from '../../../js/auth-ui.js';
+import { observeAuth } from '../../../js/auth-ui.js?v=55';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { featureWorldCenter, sampleSurfaceY, worldToGeoPoint } from './geometry.js?v=1';
 import { EditorHistoryStack } from './history.js?v=1';

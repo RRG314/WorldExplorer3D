@@ -8,6 +8,27 @@
     ],
     "headers": [
       {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin-allow-popups"
+          }
+        ]
+      },
+      {
         "source": "/",
         "headers": [
           {
@@ -126,6 +147,22 @@
         "function": "deleteAccount"
       },
       {
+        "source": "/claimUrbanVehicle",
+        "function": "claimUrbanVehicle"
+      },
+      {
+        "source": "/updateUrbanVehicle",
+        "function": "updateUrbanVehicle"
+      },
+      {
+        "source": "/releaseUrbanVehicle",
+        "function": "releaseUrbanVehicle"
+      },
+      {
+        "source": "/commitUrbanImpacts",
+        "function": "commitUrbanImpacts"
+      },
+      {
         "source": "/submitContribution",
         "function": "submitContribution"
       },
@@ -234,6 +271,10 @@
     "firestore": {
       "host": "127.0.0.1",
       "port": 8080
+    },
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
     }
   }
 }

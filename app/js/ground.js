@@ -2,8 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=49";
+} from "./structure-semantics.js?v=63";
 import { createSurfaceQuery } from './world/surface-contract.js?v=15';
+import { roadWidthAtProjection } from './world/road-cross-section-profile.js?v=1';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
@@ -299,7 +300,7 @@ const GroundHeight = {
 
   walkSurfaceInfo(x, z, currentY = NaN, options = {}) {
     const interiorSurface = typeof appCtx.sampleInteriorWalkSurface === 'function' ?
-      appCtx.sampleInteriorWalkSurface(x, z) :
+      appCtx.sampleInteriorWalkSurface(x, z, currentY) :
       null;
     if (interiorSurface && Number.isFinite(interiorSurface.y)) {
       return {
@@ -414,7 +415,7 @@ const GroundHeight = {
       } else if (options.preferredRoadOnly && appCtx.car?.road) {
         const road = appCtx.car.road;
         const projection = this._projectPointToFeature(road, x, z);
-        const reuseRadius = Math.max(5, (Number(road.width) || 7) * 0.5 + 2.5);
+        const reuseRadius = Math.max(5, roadWidthAtProjection(road, projection) * 0.5 + 2.5);
         if (projection && projection.dist <= reuseRadius) {
           const profileY = sampleFeatureSurfaceY(road, projection.pt.x, projection.pt.z, projection);
           nearestRoad = {

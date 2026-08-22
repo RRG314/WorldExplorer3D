@@ -1,4 +1,4 @@
-import { hashGeoToInt, seededRandom } from '../rdt.js?v=7';
+import { hashGeoToInt, seededRandom } from '../rdt.js?v=55';
 
 const LIVING_WORLD_SCHEMA_VERSION = 1;
 const WORLD_IDENTITY_COORDINATE_SCALE = 1e7;

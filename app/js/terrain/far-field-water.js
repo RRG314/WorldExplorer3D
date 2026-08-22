@@ -1,5 +1,6 @@
-import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=25';
-import { registerWaterWaveMaterial } from '../world/water-materials.js?v=1';
+import { resolveWaterSurfaceVisualProfile } from '../world/load-geometry.js?v=27';
+import { registerWaterWaveMaterial } from '../world/water-materials.js?v=5';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_WATER_SURFACE_CLEARANCE_WORLD = 0.04;
 const FAR_WATER_TERRAIN_MASK_SIZE = 4096;
@@ -61,7 +62,7 @@ function buildFarWaterGeometry(appCtx, mappedContext) {
   return { geometry, polygons, triangles: indices.length / 3, publishedAreaIdentities };
 }
 
-function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publishedAreaIdentities = null) {
+async function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publishedAreaIdentities = null) {
   if (!spec?.outer || typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
   const canvas = document.createElement('canvas');
   canvas.width = FAR_WATER_TERRAIN_MASK_SIZE;
@@ -127,11 +128,22 @@ function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publi
     context.fillRect(x, y, width, height);
   }
   if (polygons === 0) return null;
-  const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
-  // The canvas already owns a GPU-ready RGBA buffer whose red channel is the
-  // mask. Converting 16.7 million pixels into a second red-only array blocked
-  // Chrome for several seconds on large locations without saving peak memory.
-  const texture = new THREE.DataTexture(rgba, canvas.width, canvas.height, THREE.RGBAFormat, THREE.UnsignedByteType);
+  // Read bounded scanline windows instead of materializing the full 64 MiB
+  // RGBA canvas buffer. The shader consumes only red, so the persistent texture
+  // is a 16 MiB single-channel mask and conversion yields between chunks.
+  const red = new Uint8Array(canvas.width * canvas.height);
+  const rowsPerChunk = 256;
+  for (let y = 0; y < canvas.height; y += rowsPerChunk) {
+    const height = Math.min(rowsPerChunk, canvas.height - y);
+    const rgba = context.getImageData(0, y, canvas.width, height).data;
+    let destination = y * canvas.width;
+    for (let source = 0; source < rgba.length; source += 4) {
+      red[destination] = rgba[source];
+      destination += 1;
+    }
+    if (y + height < canvas.height) await yieldToMainThread();
+  }
+  const texture = new THREE.DataTexture(red, canvas.width, canvas.height, THREE.RedFormat, THREE.UnsignedByteType);
   texture.name = 'FarMappedWaterTerrainOwnershipMask';
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.flipY = true;
@@ -165,7 +177,8 @@ function applyMappedWaterTerrainOwnership(mesh, material, ownership) {
     authority: 'published-water-geometry-fragment-mask',
     polygons: ownership.polygons,
     size: ownership.size,
-    format: 'rgba8-red-channel',
+    format: 'r8',
+    bytes: ownership.texture.image?.data?.byteLength || 0,
     shaderDiscard: true,
     delegationRule: 'published-water-geometry-only'
   };

@@ -1,6 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=49';
+import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=63';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
+import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=2';
 
 const BRIDGE_COLOR = 0xbf4e3b;
 const MIN_SUSPENSION_SPAN_METERS = 600;
@@ -8,7 +9,6 @@ const BRIDGE_HALF_WIDTH_METERS = 13.5;
 const MAIN_CABLE_RADIUS_METERS = 0.46;
 const SUSPENDER_RADIUS_METERS = 0.06;
 const SUSPENDER_SPACING_METERS = 15.24;
-const GOLDEN_GATE_DECK_ELEVATION_METERS = 67;
 
 function numberTag(tags, key, fallback = 0) {
   const value = Number.parseFloat(String(tags?.[key] ?? '').replace(',', '.'));
@@ -123,37 +123,45 @@ function projectDistanceToPath(point, points, distances) {
   return bestAlong;
 }
 
-function distanceToPath(point, points) {
-  let bestDistance = Infinity;
-  for (let i = 0; i < points.length - 1; i++) {
-    const start = points[i];
-    const end = points[i + 1];
-    const dx = end.x - start.x;
-    const dz = end.z - start.z;
-    const lengthSq = dx * dx + dz * dz || 1;
-    const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSq));
-    const px = start.x + dx * t;
-    const pz = start.z + dz * t;
-    bestDistance = Math.min(bestDistance, Math.hypot(point.x - px, point.z - pz));
+function centerMappedPathOnCompiledSurface(mappedPath, compiledSurfacePath) {
+  if (
+    !Array.isArray(mappedPath) || mappedPath.length < 2 ||
+    !Array.isArray(compiledSurfacePath) || compiledSurfacePath.length < 2
+  ) return mappedPath;
+  const vectors = [];
+  for (const point of compiledSurfacePath) {
+    let closest = null;
+    for (let index = 0; index < mappedPath.length - 1; index += 1) {
+      const start = mappedPath[index];
+      const end = mappedPath[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const lengthSquared = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(
+        1,
+        ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared
+      ));
+      const x = start.x + dx * t;
+      const z = start.z + dz * t;
+      const distance = Math.hypot(point.x - x, point.z - z);
+      if (!closest || distance < closest.distance) closest = { x, z, distance };
+    }
+    if (closest && closest.distance <= 20) {
+      vectors.push({ x: point.x - closest.x, z: point.z - closest.z });
+    }
   }
-  return bestDistance;
-}
-
-function synchronizeNavigableDeck(path) {
-  const worldUnitsPerMeter = Math.max(0.01, Number(appCtx.WORLD_UNITS_PER_METER) || 1);
-  const minimumDeckY = GOLDEN_GATE_DECK_ELEVATION_METERS * worldUnitsPerMeter;
-  let matchedRoads = 0;
-
-  for (const road of appCtx.roads || []) {
-    if (road?.structureSemantics?.terrainMode !== 'elevated' || !Array.isArray(road.pts)) continue;
-    const namedBridge = /golden gate bridge/i.test(String(road.name || ''));
-    const pathMatches = road.pts.filter((point) => distanceToPath(point, path) <= 42).length;
-    if (!namedBridge && pathMatches < Math.min(2, road.pts.length)) continue;
-    road.minimumStructureSurfaceY = minimumDeckY;
-    matchedRoads += 1;
-  }
-
-  return matchedRoads;
+  if (vectors.length < 2) return mappedPath;
+  const offset = vectors.reduce((sum, vector) => ({
+    x: sum.x + vector.x,
+    z: sum.z + vector.z
+  }), { x: 0, z: 0 });
+  offset.x /= vectors.length;
+  offset.z /= vectors.length;
+  return mappedPath.map((point) => ({
+    ...point,
+    x: point.x + offset.x,
+    z: point.z + offset.z
+  }));
 }
 
 function sampleRoadDeckY(x, z) {
@@ -183,10 +191,8 @@ function sampleRoadDeckY(x, z) {
   }
   const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
   const worldUnitsPerMeter = Math.max(0.01, Number(appCtx.WORLD_UNITS_PER_METER) || 1);
-  const documentedDeckFloor = GOLDEN_GATE_DECK_ELEVATION_METERS * worldUnitsPerMeter;
   const localRoadY = best?.distance <= 45 ? Number(best.y) : NaN;
   return Math.max(
-    documentedDeckFloor,
     terrainY + 8 * worldUnitsPerMeter,
     Number.isFinite(localRoadY) ? localRoadY : -Infinity
   );
@@ -269,79 +275,6 @@ function createDeckGirderMeshes(path, metrics) {
     meshes.push(mesh);
   }
   return meshes;
-}
-
-function createDeckSurfaceMeshes(path, metrics) {
-  const sampleCount = Math.max(64, Math.ceil(metrics.total / 18));
-  const positions = [];
-  const indices = [];
-  const laneOffsets = [-4.5, 0, 4.5];
-  const laneCurves = laneOffsets.map(() => []);
-  for (let i = 0; i <= sampleCount; i++) {
-    const distance = metrics.total * i / sampleCount;
-    const point = pointAtDistance(path, metrics.distances, distance);
-    const tangentLength = Math.hypot(point.dx, point.dz) || 1;
-    const sideX = -point.dz / tangentLength;
-    const sideZ = point.dx / tangentLength;
-    const deckY = sampleRoadDeckY(point.x, point.z) + 0.18;
-    for (const side of [-1, 1]) {
-      positions.push(
-        point.x + sideX * BRIDGE_HALF_WIDTH_METERS * side,
-        deckY,
-        point.z + sideZ * BRIDGE_HALF_WIDTH_METERS * side
-      );
-    }
-    laneCurves.forEach((curve, laneIndex) => {
-      const laneOffset = laneOffsets[laneIndex];
-      curve.push(new THREE.Vector3(
-        point.x + sideX * laneOffset,
-        deckY + 0.045,
-        point.z + sideZ * laneOffset
-      ));
-    });
-    if (i < sampleCount) {
-      const vertex = i * 2;
-      indices.push(vertex, vertex + 1, vertex + 2, vertex + 1, vertex + 3, vertex + 2);
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  const deck = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-    color: 0x34393d,
-    roughness: 0.9,
-    metalness: 0.04,
-    side: THREE.DoubleSide
-  }));
-  deck.receiveShadow = true;
-  deck.frustumCulled = false;
-  deck.userData = {
-    isHistoricLandmark: true,
-    landmarkKind: 'suspension_bridge_deck',
-    landmarkName: 'Golden Gate Bridge'
-  };
-
-  const laneMaterials = [0xf1f0dc, 0xf0c84b, 0xf1f0dc].map((color) =>
-    new THREE.MeshBasicMaterial({ color, toneMapped: false })
-  );
-  const lanes = laneCurves.map((samples, index) => {
-    const curve = new THREE.CatmullRomCurve3(samples, false, 'centripetal');
-    const lane = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, Math.min(260, sampleCount), 0.07, 5, false),
-      laneMaterials[index]
-    );
-    lane.frustumCulled = false;
-    lane.userData = {
-      isHistoricLandmark: true,
-      landmarkKind: 'suspension_bridge_lane',
-      landmarkName: 'Golden Gate Bridge'
-    };
-    return lane;
-  });
-  return [deck, ...lanes];
 }
 
 function createCableMeshes(path, metrics, towers) {
@@ -456,68 +389,108 @@ export function renderSuspensionBridgeLandmark(data) {
   const path = pathPoints(spanWay, nodes);
   const metrics = polylineMetrics(path);
   if (path.length < 3 || metrics.total < MIN_SUSPENSION_SPAN_METERS) return null;
-  const synchronizedRoads = synchronizeNavigableDeck(path);
-
-  const createdMeshes = [];
-  const towerParts = [];
-  for (const way of towerWays) {
-    const part = createTowerPartMesh(way, nodes);
-    if (!part) continue;
-    appCtx.addEarthWorldObject(part.mesh);
-    appCtx.historicMarkers.push(part.mesh);
-    createdMeshes.push(part.mesh);
-    towerParts.push(part);
-  }
-  const towers = towerStations(towerParts, path, metrics);
-  let structuralDetails = null;
-  if (towers.length === 2) {
-    const cables = createCableMeshes(path, metrics, towers);
-    for (const mesh of createDeckSurfaceMeshes(path, metrics)) {
-      appCtx.addEarthWorldObject(mesh);
-      appCtx.historicMarkers.push(mesh);
-      createdMeshes.push(mesh);
-    }
-    for (const mesh of cables.cableMeshes) {
-      appCtx.addEarthWorldObject(mesh);
-      appCtx.historicMarkers.push(mesh);
-      createdMeshes.push(mesh);
-    }
-    for (const mesh of cables.girderMeshes) {
-      appCtx.addEarthWorldObject(mesh);
-      appCtx.historicMarkers.push(mesh);
-      createdMeshes.push(mesh);
-    }
-    appCtx.addEarthWorldObject(cables.suspenders);
-    appCtx.historicMarkers.push(cables.suspenders);
-    createdMeshes.push(cables.suspenders);
-    structuralDetails = createBridgeStructuralDetails({
-      path,
-      metrics,
-      towers,
-      pointAtDistance,
-      sampleRoadDeckY,
-      color: BRIDGE_COLOR
-    });
-    if (structuralDetails) createdMeshes.push(structuralDetails);
-  }
-  appCtx.historicSites.push({
-    x: footprintCenter(path).x,
-    z: footprintCenter(path).z,
-    type: 'suspension_bridge',
-    name: spanWay.tags?.name || 'Golden Gate Bridge',
-    wikidata: spanWay.tags?.wikidata || 'Q44440',
-    sourceFeatureId: `osm-way:${spanWay.id}`,
-    height: Math.max(0, ...towerParts.map((part) => part.height))
+  const surfaceControl = applyPublishedTransportSurfaceControls({
+    controls: data?._transportSurfaceControls,
+    roads: appCtx.roads,
+    referencePath: path
   });
-  return {
-    meshes: createdMeshes,
-    towerParts: towerParts.length,
-    towers: towers.length,
-    cables: towers.length === 2 ? 2 : 0,
-    girders: towers.length === 2 ? 2 : 0,
-    suspenders: createdMeshes.find((mesh) => mesh.userData?.landmarkKind === 'suspension_bridge_suspender')?.userData?.instanceCount || 0,
-    structuralMembers: structuralDetails?.userData?.instanceCount || 0,
-    synchronizedRoads,
-    spanMeters: Number(metrics.total.toFixed(1))
+  const result = {
+    meshes: [],
+    metrics: {
+      status: 'awaiting_compiled_transport_surface',
+      towerParts: 0,
+      towers: 0,
+      cables: 0,
+      girders: 0,
+      suspenders: 0,
+      structuralMembers: 0,
+      controlledRoads: surfaceControl.appliedRoads,
+      surfaceControlAuthority: surfaceControl.authority,
+      synchronizedRoads: 0,
+      transportSurfaceOwner: 'compiled_transport_surface',
+      spanMeters: Number(metrics.total.toFixed(1))
+    }
   };
+
+  const publishFromCompiledTransport = () => {
+    const compiledSharedSurface = (appCtx.roads || []).map((road) =>
+      road?.transportSurfacePresentation
+    ).find((surface) =>
+      surface?.status === 'compiled' &&
+      surface?.physicalSurfaceKind === 'bridge_deck' &&
+      surface?.memberFeatureIds?.some((featureId) =>
+        surfaceControl.controls.some((control) => control.sourceFeatureId === featureId)
+      )
+    ) || null;
+    const structurePath = compiledSharedSurface?.pts?.length >= 2
+      ? centerMappedPathOnCompiledSurface(path, compiledSharedSurface.pts)
+      : path;
+    const structureMetrics = polylineMetrics(structurePath);
+    const createdMeshes = [];
+    const towerParts = [];
+    for (const way of towerWays) {
+      const part = createTowerPartMesh(way, nodes);
+      if (!part) continue;
+      appCtx.addEarthWorldObject(part.mesh);
+      appCtx.historicMarkers.push(part.mesh);
+      createdMeshes.push(part.mesh);
+      towerParts.push(part);
+    }
+    const towers = towerStations(towerParts, structurePath, structureMetrics);
+    let structuralDetails = null;
+    if (towers.length === 2) {
+      const cables = createCableMeshes(structurePath, structureMetrics, towers);
+      for (const mesh of cables.cableMeshes) {
+        appCtx.addEarthWorldObject(mesh);
+        appCtx.historicMarkers.push(mesh);
+        createdMeshes.push(mesh);
+      }
+      for (const mesh of cables.girderMeshes) {
+        appCtx.addEarthWorldObject(mesh);
+        appCtx.historicMarkers.push(mesh);
+        createdMeshes.push(mesh);
+      }
+      appCtx.addEarthWorldObject(cables.suspenders);
+      appCtx.historicMarkers.push(cables.suspenders);
+      createdMeshes.push(cables.suspenders);
+      structuralDetails = createBridgeStructuralDetails({
+        path: structurePath,
+        metrics: structureMetrics,
+        towers,
+        pointAtDistance,
+        sampleRoadDeckY,
+        color: BRIDGE_COLOR
+      });
+      if (structuralDetails) createdMeshes.push(structuralDetails);
+    }
+    appCtx.historicSites.push({
+      x: footprintCenter(structurePath).x,
+      z: footprintCenter(structurePath).z,
+      type: 'suspension_bridge',
+      name: spanWay.tags?.name || 'Golden Gate Bridge',
+      wikidata: spanWay.tags?.wikidata || 'Q44440',
+      sourceFeatureId: `osm-way:${spanWay.id}`,
+      height: Math.max(0, ...towerParts.map((part) => part.height))
+    });
+    result.meshes.push(...createdMeshes);
+    Object.assign(result.metrics, {
+      status: 'published_from_compiled_transport_surface',
+      towerParts: towerParts.length,
+      towers: towers.length,
+      cables: towers.length === 2 ? 2 : 0,
+      girders: towers.length === 2 ? 2 : 0,
+      suspenders: createdMeshes.find((mesh) =>
+        mesh.userData?.landmarkKind === 'suspension_bridge_suspender')?.userData?.instanceCount || 0,
+      structuralMembers: structuralDetails?.userData?.instanceCount || 0,
+      structureAxisAuthority: compiledSharedSurface
+        ? 'compiled_transport_surface_group'
+        : 'mapped_landmark_path'
+    });
+    return result.metrics;
+  };
+  if (!Array.isArray(appCtx.deferredTransportLandmarkPublishers)) {
+    appCtx.deferredTransportLandmarkPublishers = [];
+  }
+  appCtx.deferredTransportLandmarkPublishers.push(publishFromCompiledTransport);
+  return result;
 }

@@ -14,7 +14,9 @@ function polylineDistances(points = []) {
 }
 
 function sampleProfileAtDistance(distances, values, distance) {
-  if (!(distances instanceof Float32Array) || !Array.isArray(values) && !(values instanceof Float32Array)) return NaN;
+  const numericDistances = distances instanceof Float32Array || distances instanceof Float64Array;
+  const numericValues = Array.isArray(values) || values instanceof Float32Array || values instanceof Float64Array;
+  if (!numericDistances || !numericValues) return NaN;
   if (distances.length === 0 || values.length === 0) return NaN;
   if (distance <= 0) {
     const first = Number(values[0]);

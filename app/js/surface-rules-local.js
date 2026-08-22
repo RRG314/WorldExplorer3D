@@ -29,7 +29,13 @@ export function denseSettlementOwnsUrbanSurface({
 }
 
 export function regionalBuildingTileOwnsUrbanSurface(buildingCount = 0) {
-  return Number(buildingCount) >= 24;
+  // A z14 context tile is only a few hundred metres across. The previous
+  // 18-footprint threshold was overly conservative during a WorldCover outage: dense
+  // international cities still left low-rise residential tiles bright green.
+  // Twelve mapped footprints are sufficient settlement evidence for the otherwise
+  // unclassified ground between them, while exact mapped green areas still
+  // override this fallback in the far-field publisher.
+  return Number(buildingCount) >= 12;
 }
 
 export function createLocalSurfaceAnalysisApi({ appCtx, constants }) {

@@ -5,19 +5,28 @@ import {
   areRoadsConnected,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
+  isPointWithinMappedWater,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=49";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=13";
+} from "../structure-semantics.js?v=63";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=5";
-import { buildTransportJunctionProfileAnchors } from "./compiler/transport-junction-profile.js?v=2";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=11";
+import {
+  auditTransportJunctionContinuity,
+  buildExactTransportNodeFinalizationAnchors,
+  buildIntegratedApproachContinuationAnchors,
+  buildTransportContinuityRepairAnchors,
+  buildTransportJunctionProfileAnchors
+} from "./compiler/transport-junction-profile.js?v=21";
 import {
   createDriveableRoadConflictIndex,
-  supportPointConflictsWithDriveableRoad
-} from "./bridge-safety.js?v=8";
-import { refreshStructureColliders } from "./structure-colliders.js?v=9";
+  supportPointConflictsWithDriveableRoad,
+  supportSpanConflictsWithDriveableRoad
+} from "./bridge-safety.js?v=13";
+import { refreshStructureColliders } from "./structure-colliders.js?v=13";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
+import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=2';
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -41,17 +50,41 @@ export function worldBaseTerrainY(x, z) {
   return appCtx.elevationWorldYAtWorldXZ(x, z);
 }
 
-function worldRenderedTerrainY(x, z) {
-  if (typeof appCtx.terrainMeshHeightAt === 'function') return appCtx.terrainMeshHeightAt(x, z);
-  return worldBaseTerrainY(x, z);
-}
-
 function structureAwareLinearFeatures() {
   if (!Array.isArray(appCtx.linearFeatures)) return [];
   return appCtx.linearFeatures.filter((feature) =>
     feature?.structureSemantics?.gradeSeparated ||
     feature?.structureSemantics?.structureKind === 'covered'
   );
+}
+
+function publishAtGradeTerrainCorridors(roads = []) {
+  const indexedFeatures = [];
+  for (const feature of roads) {
+    if (
+      !feature ||
+      feature.driveable === false ||
+      feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+      !feature?.transportSurfaceModel ||
+      !Array.isArray(feature.pts) ||
+      feature.pts.length < 2
+    ) continue;
+    indexedFeatures.push(feature);
+  }
+  // Retain only references to the canonical road objects. Per-road wrapper
+  // records and a second feature map duplicated an entire metropolitan road
+  // set without adding authority or query value.
+  appCtx.structureTerrainCuts = indexedFeatures;
+  appCtx.structureTerrainCutByFeature = null;
+  appCtx.structureTerrainCutIndex = createDriveableRoadConflictIndex(indexedFeatures, {
+    cellSize: 72
+  });
+  appCtx.transportTerrainCorridorPublication = Object.freeze({
+    authority: 'compiled_transport_surface',
+    corridorCount: indexedFeatures.length,
+    index: appCtx.structureTerrainCutIndex.snapshot()
+  });
+  return appCtx.transportTerrainCorridorPublication;
 }
 
 function createFeatureBoundsIndex(features = [], cellSize = 240) {
@@ -296,6 +329,7 @@ function* compileStructureAwareFeatureProfileSteps() {
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
   const structureWaterAreas = []
     .concat(Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [])
+    .concat(Array.isArray(appCtx.waterways) ? appCtx.waterways : [])
     .concat(Array.isArray(appCtx.fixedRegionalStructureWaterAreas)
       ? appCtx.fixedRegionalStructureWaterAreas
       : []);
@@ -345,10 +379,7 @@ function* compileStructureAwareFeatureProfileSteps() {
       const feature = transportFeatures[i];
       if (!feature) continue;
       feature.structureTransitionAnchors = [];
-      const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade'
-        ? worldRenderedTerrainY
-        : worldBaseTerrainY;
-      updateFeatureSurfaceProfile(feature, sampleTerrainY, {
+      updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
         surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
       });
     }
@@ -394,10 +425,11 @@ function* compileStructureAwareFeatureProfileSteps() {
   // surface. A single anchor pass reads the target's provisional profile and
   // then recompiles both roads independently, which left real merge steps over
   // two metres high. Compile one shared graph-node constraint set from the
-  // refined profiles, then rebuild only the grade-separated roads once.
+  // refined profiles, then rebuild every road carrying a graph constraint.
   // Repeatedly deriving constraints from already-constrained profiles creates
   // positive feedback through stacked interchanges and lifts decks skyward.
-  // Ordinary roads are not rebuilt here.
+  // Ordinary roads remain terrain-draped unless they receive an explicit
+  // integrated-approach graph constraint.
   measure('compileJunctionProfiles', () => {
     const junctionPasses = 1;
     let junctionProfile = null;
@@ -420,17 +452,163 @@ function* compileStructureAwareFeatureProfileSteps() {
       for (const [feature, anchors] of junctionProfile.anchorsByFeature) {
         feature.structureTransitionAnchors.push(...anchors);
       }
-      for (let i = 0; i < structureFeatures.length; i++) {
-        const feature = structureFeatures[i];
+      const constrainedFeatures = new Set([
+        ...structureFeatures,
+        ...junctionProfile.anchorsByFeature.keys()
+      ]);
+      for (const feature of constrainedFeatures) {
+        updateFeatureSurfaceProfile(
+          feature,
+          worldBaseTerrainY,
+          {
+          surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+          }
+        );
+      }
+    }
+    const corridorReconciliation = buildTransportContinuityRepairAnchors(
+      transportFeatures,
+      appCtx.transportNetworkModel,
+      sampleFeatureSurfaceY,
+      { sampleTerrainY: worldBaseTerrainY }
+    );
+    for (const [feature, anchors] of corridorReconciliation.anchorsByFeature) {
+      const keyFor = (anchor) =>
+        `${anchor?.endpoint || 'interior'}:${Number(anchor?.distance || 0).toFixed(2)}`;
+      const replacements = new Map(anchors.map((anchor) => [keyFor(anchor), anchor]));
+      feature.structureTransitionAnchors = (feature.structureTransitionAnchors || []).filter((anchor) =>
+        anchor?.source !== 'transport_graph_node' || !replacements.has(keyFor(anchor))
+      );
+      feature.structureTransitionAnchors.push(...replacements.values());
+      updateFeatureSurfaceProfile(
+        feature,
+        worldBaseTerrainY,
+        { surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+      );
+    }
+
+    let approachContinuationPasses = 0;
+    let approachContinuationConnectionCount = 0;
+    for (let pass = 0; pass < 8; pass += 1) {
+      const continuation = buildIntegratedApproachContinuationAnchors(
+        transportFeatures,
+        appCtx.transportNetworkModel,
+        sampleFeatureSurfaceY,
+        worldBaseTerrainY
+      );
+      if (continuation.anchorsByFeature.size === 0) break;
+      approachContinuationPasses += 1;
+      approachContinuationConnectionCount += continuation.connectionCount;
+      for (const [feature, anchors] of continuation.anchorsByFeature) {
+        const replacements = new Map(anchors.map((anchor) => [anchor.endpoint, anchor]));
+        feature.structureTransitionAnchors = (feature.structureTransitionAnchors || []).filter((anchor) =>
+          anchor?.source !== 'transport_graph_node' || !replacements.has(anchor?.endpoint)
+        );
+        feature.structureTransitionAnchors.push(...replacements.values());
         updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
           surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
         });
       }
     }
+    let finalNodePasses = 0;
+    let finalNodeCount = 0;
+    for (let pass = 0; pass < 4; pass += 1) {
+      const finalization = buildExactTransportNodeFinalizationAnchors(
+        transportFeatures,
+        appCtx.transportNetworkModel,
+        sampleFeatureSurfaceY,
+        worldBaseTerrainY
+      );
+      if (finalization.anchorsByFeature.size === 0) break;
+      finalNodePasses += 1;
+      finalNodeCount += finalization.nodeCount;
+      for (const [feature, anchors] of finalization.anchorsByFeature) {
+        const keyFor = (anchor) =>
+          `${anchor?.endpoint || 'interior'}:${Number(anchor?.distance || 0).toFixed(2)}`;
+        const replacements = new Map(anchors.map((anchor) => [keyFor(anchor), anchor]));
+        feature.structureTransitionAnchors = (feature.structureTransitionAnchors || []).filter((anchor) =>
+          anchor?.source !== 'transport_graph_node' || !replacements.has(keyFor(anchor))
+        );
+        feature.structureTransitionAnchors.push(...replacements.values());
+        updateFeatureSurfaceProfile(
+          feature,
+          worldBaseTerrainY,
+          { surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+        );
+      }
+    }
+    let postContinuationFeatureCount = 0;
+    for (let pass = 0; pass < 4; pass += 1) {
+      const postContinuationReconciliation = buildTransportContinuityRepairAnchors(
+        transportFeatures,
+        appCtx.transportNetworkModel,
+        sampleFeatureSurfaceY,
+        { sampleTerrainY: worldBaseTerrainY }
+      );
+      if (postContinuationReconciliation.anchorsByFeature.size === 0) break;
+      postContinuationFeatureCount += postContinuationReconciliation.anchorsByFeature.size;
+      for (const [feature, anchors] of postContinuationReconciliation.anchorsByFeature) {
+        const keyFor = (anchor) =>
+          `${anchor?.endpoint || 'interior'}:${Number(anchor?.distance || 0).toFixed(2)}`;
+        const replacements = new Map(anchors.map((anchor) => [keyFor(anchor), anchor]));
+        feature.structureTransitionAnchors = (feature.structureTransitionAnchors || []).filter((anchor) =>
+          anchor?.source !== 'transport_graph_node' || !replacements.has(keyFor(anchor))
+        );
+        feature.structureTransitionAnchors.push(...replacements.values());
+        updateFeatureSurfaceProfile(
+          feature,
+          worldBaseTerrainY,
+          { surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08 }
+        );
+      }
+    }
+    // Do not recursively promote ordinary streets into engineered approaches.
+    // Exact structural tie-ins are owned by the graph/corridor/finalization
+    // passes above. A residual surface-only pass made every downstream street
+    // inherit a bridge-style hard elevation and amplified DEM differences
+    // across whole city networks.
+    const residualAtGradePasses = 0;
+    const residualAtGradeConnectionCount = 0;
+    const continuity = auditTransportJunctionContinuity(
+      transportFeatures,
+      appCtx.transportNetworkModel,
+      sampleFeatureSurfaceY
+    );
     appCtx.transportJunctionProfile = Object.freeze({
       authority: 'compiled_transport_graph_nodes',
       nodeCount: junctionProfile?.nodeCount || 0,
       constrainedFeatureCount: junctionProfile?.constrainedFeatureCount || 0,
+      continuityRepair: approachContinuationPasses > 0
+        ? Object.freeze({
+            authority: 'exact_transport_corridor_reconciliation',
+            passes: approachContinuationPasses,
+            connectionCount: approachContinuationConnectionCount,
+            corridorSeedNodeCount: corridorReconciliation.seedNodeCount,
+            corridorFeatureCount: corridorReconciliation.anchorsByFeature.size +
+              postContinuationFeatureCount,
+            elevatedNodeCount: 0,
+            elevatedFeatureCount: 0,
+            finalNodePasses,
+            finalNodeCount,
+            residualAtGradePasses,
+            residualAtGradeConnectionCount
+          })
+        : corridorReconciliation.anchorsByFeature.size > 0
+          ? Object.freeze({
+              authority: 'exact_transport_corridor_reconciliation',
+              passes: 1,
+              connectionCount: 0,
+              corridorSeedNodeCount: corridorReconciliation.seedNodeCount,
+              corridorFeatureCount: corridorReconciliation.anchorsByFeature.size,
+              elevatedNodeCount: 0,
+              elevatedFeatureCount: 0,
+              finalNodePasses,
+              finalNodeCount,
+              residualAtGradePasses,
+              residualAtGradeConnectionCount
+            })
+          : null,
+      continuity,
       junctionPasses
     });
   });
@@ -438,18 +616,31 @@ function* compileStructureAwareFeatureProfileSteps() {
 
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
   yield;
+  measure('compileSharedPhysicalSurfaces', () => {
+    appCtx.sharedTransportSurfacePresentation = compileSharedTransportSurfacePresentations(
+      roadFeatures,
+      sampleFeatureSurfaceY
+    );
+  });
+  yield;
   measure('compileStructureAssemblies', () => {
     const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
     appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
       transportFeatures,
       worldBaseTerrainY,
       {
+        pointInMappedWater: (feature, x, z) =>
+          nearbyStructureWaterAreas(feature).some((area) => isPointWithinMappedWater(area, x, z)),
         supportConflict: (feature, column) => supportPointConflictsWithDriveableRoad(feature, {
           x: column.x,
           z: column.z,
           supportBottomY: column.terrainY,
           supportTopY: column.topY,
           columnRadius: column.width * 0.5,
+          roadIndex: supportRoadIndex
+        }),
+        supportSpanConflict: (feature, span) => supportSpanConflictsWithDriveableRoad(feature, {
+          ...span,
           roadIndex: supportRoadIndex
         })
       }
@@ -460,10 +651,10 @@ function* compileStructureAwareFeatureProfileSteps() {
   yield;
   measure('refreshBridgeGuardrails', () => appCtx.refreshBridgeGuardrails?.(roadFeatures));
 
-  // Terrain remains the roof above tunnels. Road and tunnel renderers must not
-  // mutate the shared ground surface.
-  appCtx.structureTerrainCuts = [];
-  appCtx.structureTerrainCutIndex = null;
+  // Tunnels remain below the unmodified terrain roof. At-grade carriageways,
+  // however, are physical terrain corridors: publish their compiled surfaces
+  // as the one bounded cut/fill authority used by the terrain mesh.
+  publishAtGradeTerrainCorridors(roadFeatures);
   appCtx.structureProfileCompilation = Object.freeze({
     roadCount: roadFeatures.length,
     structureCount: structureFeatures.length,

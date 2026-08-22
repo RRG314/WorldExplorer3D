@@ -11,6 +11,11 @@ import {
   toDays
 } from "../astro.js?v=1";
 import { resolveObservedEarthLocation } from "../earth-location.js?v=2";
+import {
+  applyEarthAtmosphereProfile,
+  atmosphereSnapshot,
+  buildEarthAtmosphereProfile
+} from './earth-atmosphere.js?v=1';
 
 const SKY_UPDATE_INTERVAL_MS = 15000;
 const SKY_LOCATION_PRECISION = 3;
@@ -299,6 +304,31 @@ function applyStarVisibility(state) {
   }
 }
 
+function refreshEarthAtmosphereVisual(options = {}) {
+  if (!appCtx.earthAtmosphere || appCtx.onMoon || appCtx.onMars) return null;
+  const profile = buildEarthAtmosphereProfile(
+    appCtx.skyState,
+    appCtx.weatherState,
+    {
+      phase: appCtx.timeOfDay || 'day',
+      weatherMode: appCtx.weatherMode || 'live',
+      backgroundHex: appCtx.scene?.background?.getHex?.() ?? 0x87ceeb
+    }
+  );
+  const changed = appCtx.earthAtmosphereProfile?.signature !== profile.signature;
+  appCtx.earthAtmosphereProfile = profile;
+  applyEarthAtmosphereProfile(appCtx.earthAtmosphere, profile);
+  appCtx.earthAtmosphere.visible = appCtx.getEnv?.() === appCtx.ENV?.EARTH;
+  if (changed || options.force === true) {
+    appCtx.refreshEarthEnvironmentMap?.(profile, { force: options.force === true });
+  }
+  return profile;
+}
+
+function getEarthAtmosphereSnapshot() {
+  return atmosphereSnapshot(appCtx.earthAtmosphere, appCtx.earthAtmosphereProfile);
+}
+
 function applySkyVisualState(config, state) {
   if (!appCtx.scene || !appCtx.sun || !appCtx.hemiLight || !appCtx.fillLight || !appCtx.ambientLight) return;
 
@@ -386,6 +416,8 @@ function applySkyVisualState(config, state) {
     cloudMaterial.color.setHex(mixColorHex(0x9cb9d0, 0xffffff, 0.4 + (state?.sun?.daylightFactor || 0) * 0.6));
     cloudMaterial.opacity = (appCtx.cloudsVisible ? 1 : 0) * (0.16 + (state?.sun?.daylightFactor || 0) * 0.66 + (state?.sun?.twilightFactor || 0) * 0.12);
   }
+
+  refreshEarthAtmosphereVisual();
 
   if (typeof appCtx.applyWeatherPresentation === "function") {
     appCtx.applyWeatherPresentation();
@@ -530,6 +562,13 @@ export function getAstronomicalSkySnapshot() {
     localSiderealTimeDeg: Number(radToDeg(state.localSiderealTimeRad).toFixed(2))
   };
 }
+
+Object.assign(appCtx, {
+  getEarthAtmosphereSnapshot,
+  refreshEarthAtmosphereVisual
+});
+
+export { getEarthAtmosphereSnapshot, refreshEarthAtmosphereVisual };
 
 export function inspectAstronomicalSkyState(lat, lon, dateInput = new Date()) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;

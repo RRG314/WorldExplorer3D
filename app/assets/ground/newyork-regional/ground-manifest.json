@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "newyork-regional-ground",
+  "providerId": "usgs-3dep-best-available",
+  "sourceRelease": "USGS-3DEP:USGS-3DEP-13ARC:20221115+20240925",
+  "contentSha256": "d14a50baf79b8293764a8644b286e7ede5667dde8c5371fe81169ce1f6054c9a",
+  "spacingMeters": 320,
+  "coverage": {
+    "south": 40.486957452342075,
+    "north": 40.983579869839794,
+    "west": -74.33451178254944,
+    "east": -73.67910095125586
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": false,
+  "sourceEvidence": {
+    "sourceClassification": "bare-earth-dem",
+    "acquisitionMode": "bounded-image-service-export",
+    "sourceContentSha256": "ee37a8e88e93994462f4c898ef8cb43edc6ef6cca4f86f440b01f2d471815dad",
+    "sourceExports": [
+      {
+        "partId": "newyork-regional",
+        "request": {
+          "endpoint": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage",
+          "bbox": [
+            -8275040,
+            4936800,
+            -8201760,
+            5010080
+          ],
+          "bboxSR": 3857,
+          "imageSR": 3857,
+          "width": 229,
+          "height": 229,
+          "exportSpacingMeters": 320,
+          "format": "tiff",
+          "pixelType": "F32",
+          "interpolation": "RSP_NearestNeighbor"
+        },
+        "exportContentSha256": "bc1745e4247515d1f86f71f8d0aa157890981ae669fbce6b3c687fd4b89f05d0",
+        "sourceAuthority": {
+          "mode": "locked-raster-mosaic",
+          "lockedRasterIds": [
+            4840,
+            5223
+          ],
+          "sourceMembers": [
+            {
+              "objectId": 4840,
+              "sourceRelease": "20221115",
+              "sourceTitle": "USGS 1/3 Arc Second n41w075 20221115",
+              "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w075/USGS_13_n41w075.tif",
+              "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w075/USGS_13_n41w075.xml",
+              "metadataSha256": "7a040ebabff3e0e460d730d047b0a175395a4bcabe5241c217dddf355f9a5835"
+            },
+            {
+              "objectId": 5223,
+              "sourceRelease": "20240925",
+              "sourceTitle": "USGS 1/3 Arc Second n41w074 20240925",
+              "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w074/USGS_13_n41w074.tif",
+              "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w074/USGS_13_n41w074.xml",
+              "metadataSha256": "a52f5f08e98901fe5258ebe26bf27192533ad75a6a61443647ac3e4b50312454"
+            }
+          ]
+        }
+      }
+    ],
+    "normalizer": {
+      "name": "we3d-proj-vdatum",
+      "version": "1.0.0",
+      "pyprojVersion": "3.7.2",
+      "projVersion": "9.5.1",
+      "datasetSha256": "6fb309e57c2b3214badd0f259bd642d5609c1fda3a9b64dd08e170c9cffa15cc",
+      "operationSha256": "25ba8e74f0c5a305ac2cb84551b842dcb875ed2f3d4c2b5cfde46567a7b3f975",
+      "grids": [
+        {
+          "id": "NOAA_GEOID18_CONUS",
+          "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+        },
+        {
+          "id": "NOAA_VDATUM_EGM2008_1MIN",
+          "sha256": "013efc11e58f5251d1d5f18a737b73dd8cd43857a8c37dcad8dd2f9c98e8da96"
+        }
+      ],
+      "uncertaintyPolicy": "NOAA-VDatum-CONUS-table2-plus-source-95"
+    }
+  }
+}

@@ -1,3 +1,11 @@
+import {
+  DEPTH_TRUTH_TYPE,
+  GEBCO_WMS_ENDPOINT,
+  createGebcoDepthEvidence,
+  fetchGebcoDepthEvidence,
+  normalizeDepthEvidence
+} from '../geospatial/bathymetry-evidence.js?v=1';
+
 export function createOceanBathymetryApi({
   appCtx,
   oceanMode,
@@ -6,7 +14,6 @@ export function createOceanBathymetryApi({
 }) {
   const GEBCO_GRID_SIZE = 5;
   const GEBCO_GRID_EXTENT = 900;
-  const GEBCO_WMS = 'https://wms.gebco.net/mapserv';
   function clamp01(v) {
     return Math.max(0, Math.min(1, v));
   }
@@ -74,7 +81,19 @@ export function createOceanBathymetryApi({
     const lonMax = Number(bounds.lonMax);
     if (![latMin, latMax, lonMin, lonMax].every((v) => Number.isFinite(v))) return null;
     if (latMax <= latMin || lonMax <= lonMin) return null;
-    return { rows, cols, latMin, latMax, lonMin, lonMax, values };
+    return {
+      rows,
+      cols,
+      latMin,
+      latMax,
+      lonMin,
+      lonMax,
+      values,
+      source: payload.source && typeof payload.source === 'object' ? { ...payload.source } : null,
+      generatedAt: String(payload.generatedAt || '') || null,
+      spacingDegreesLat: Number.isFinite(Number(grid.spacingDegreesLat)) ? Number(grid.spacingDegreesLat) : null,
+      spacingDegreesLon: Number.isFinite(Number(grid.spacingDegreesLon)) ? Number(grid.spacingDegreesLon) : null
+    };
   }
 
   function primeLocalBathymetryGrid() {
@@ -129,32 +148,6 @@ export function createOceanBathymetryApi({
     return lerp(h0, h1, fy);
   }
 
-  async function fetchGebcoElevationMeters(lat, lon) {
-    const halfSpan = 0.01;
-    const params = new URLSearchParams({
-      SERVICE: 'WMS',
-      VERSION: '1.1.1',
-      REQUEST: 'GetFeatureInfo',
-      LAYERS: 'GEBCO_LATEST_2',
-      QUERY_LAYERS: 'GEBCO_LATEST_2',
-      STYLES: '',
-      SRS: 'EPSG:4326',
-      BBOX: `${lon - halfSpan},${lat - halfSpan},${lon + halfSpan},${lat + halfSpan}`,
-      WIDTH: '64',
-      HEIGHT: '64',
-      FORMAT: 'image/png',
-      INFO_FORMAT: 'text/plain',
-      X: '32',
-      Y: '32'
-    });
-    const response = await fetch(`${GEBCO_WMS}?${params.toString()}`, { cache: 'force-cache' });
-    if (!response.ok) throw new Error(`GEBCO WMS HTTP ${response.status}`);
-    const payload = await response.text();
-    const match = payload.match(/value_list\s*=\s*'(-?\d+(?:\.\d+)?)/i);
-    const elevation = match ? Number(match[1]) : NaN;
-    return Number.isFinite(elevation) ? elevation : null;
-  }
-
   async function primeGlobalBathymetryGrid() {
     if (oceanMode.globalBathymetryPromise) return oceanMode.globalBathymetryPromise;
     const launchSignature = `${Number(oceanMode.launchSite?.lat).toFixed(6)},${Number(oceanMode.launchSite?.lon).toFixed(6)}`;
@@ -165,7 +158,9 @@ export function createOceanBathymetryApi({
         for (let column = 0; column < GEBCO_GRID_SIZE; column += 1) {
           const x = -GEBCO_GRID_EXTENT + column / (GEBCO_GRID_SIZE - 1) * GEBCO_GRID_EXTENT * 2;
           const geo = oceanWorldToLatLon(x, z);
-          samples.push(fetchGebcoElevationMeters(geo.lat, geo.lon).catch(() => null));
+          samples.push(fetchGebcoDepthEvidence(geo.lat, geo.lon)
+            .then((evidence) => evidence.elevationMeters)
+            .catch(() => null));
         }
       }
       const values = await Promise.all(samples);
@@ -176,8 +171,9 @@ export function createOceanBathymetryApi({
         size: GEBCO_GRID_SIZE,
         extent: GEBCO_GRID_EXTENT,
         values,
-        dataset: 'GEBCO_2024 Grid',
-        source: GEBCO_WMS
+        dataset: 'GEBCO current WMS grid',
+        datasetRelease: 'service-layer-current',
+        source: GEBCO_WMS_ENDPOINT
       };
       oceanMode.globalBathymetryReady = true;
       oceanMode.bathymetryCache.clear();
@@ -220,6 +216,52 @@ export function createOceanBathymetryApi({
     return null;
   }
 
+  function sampleBathymetryEvidence(x, z) {
+    const { lat, lon } = oceanWorldToLatLon(x, z);
+    const localMeters = sampleLocalBathymetryMeters(lat, lon);
+    if (Number.isFinite(localMeters)) {
+      const source = oceanMode.localBathymetryGrid?.source || {};
+      const spacingLat = oceanMode.localBathymetryGrid?.spacingDegreesLat;
+      const spacingLon = oceanMode.localBathymetryGrid?.spacingDegreesLon;
+      return normalizeDepthEvidence({
+        truthType: DEPTH_TRUTH_TYPE.MODELED,
+        elevationMeters: localMeters,
+        sourceId: 'bundled-gebco2020-opentopodata-grid',
+        dataset: source.dataset || 'gebco2020',
+        datasetRelease: 'GEBCO_2020',
+        verticalDatum: 'assumed-mean-sea-level',
+        sampleWindowDegrees: Math.max(Number(spacingLat) || 0, Number(spacingLon) || 0) || null,
+        qualityClass: 'mixed-source-grid-without-tid-cell-classification',
+        fetchedAt: source.queryDateUtc || oceanMode.localBathymetryGrid?.generatedAt,
+        sourceUrl: 'https://www.opentopodata.org/',
+        navigationSafe: false
+      });
+    }
+
+    const globalMeters = sampleGlobalBathymetryMeters(x, z);
+    if (Number.isFinite(globalMeters)) {
+      return createGebcoDepthEvidence(globalMeters, {
+        datasetRelease: oceanMode.globalBathymetryGrid?.datasetRelease || 'service-layer-current',
+        sampleWindowDegrees: 0.02
+      });
+    }
+
+    const terrainMeters = sampleTerrainMetersAtLatLon(lat, lon);
+    if (Number.isFinite(terrainMeters)) {
+      return normalizeDepthEvidence({
+        truthType: DEPTH_TRUTH_TYPE.DERIVED,
+        elevationMeters: terrainMeters,
+        sourceId: 'accepted-ground-elevation-sampler',
+        dataset: 'active accepted ground',
+        verticalDatum: 'accepted-ground-runtime-datum',
+        qualityClass: 'terrain-sample-not-bathymetric-survey',
+        navigationSafe: false
+      });
+    }
+
+    return normalizeDepthEvidence({ reason: 'no-bathymetry-at-coordinate' });
+  }
+
   function mapBathymetryMetersToWorldY(meters) {
     if (!Number.isFinite(meters)) return null;
 
@@ -245,15 +287,8 @@ export function createOceanBathymetryApi({
       return oceanMode.bathymetryCache.get(key);
     }
 
-    const { lat, lon } = oceanWorldToLatLon(x, z);
-    const localMeters = sampleLocalBathymetryMeters(lat, lon);
-    const globalMeters = sampleGlobalBathymetryMeters(x, z);
-    const meters = Number.isFinite(localMeters)
-      ? localMeters
-      : Number.isFinite(globalMeters)
-        ? globalMeters
-        : sampleTerrainMetersAtLatLon(lat, lon);
-    const mapped = mapBathymetryMetersToWorldY(meters);
+    const evidence = sampleBathymetryEvidence(x, z);
+    const mapped = mapBathymetryMetersToWorldY(evidence.elevationMeters);
     const sampled = Number.isFinite(mapped) ? mapped : null;
     oceanMode.bathymetryCache.set(key, sampled);
     return sampled;
@@ -293,6 +328,34 @@ export function createOceanBathymetryApi({
     return lerp(procedural, real, clamp01(blend));
   }
 
+  function sampleSeabedEvidence(x, z) {
+    const bathymetry = sampleBathymetryEvidence(x, z);
+    const proceduralWorldY = sampleProceduralSeabedHeight(x, z);
+    const bathymetryWorldY = mapBathymetryMetersToWorldY(bathymetry.elevationMeters);
+    if (!Number.isFinite(bathymetryWorldY)) {
+      return Object.freeze({
+        bathymetry,
+        presentationMode: 'procedural-only',
+        presentationWorldY: proceduralWorldY,
+        bathymetryWorldY: null,
+        proceduralWorldY,
+        bathymetryBlend: 0
+      });
+    }
+    const reefDx = x - 24;
+    const reefDz = z - 124;
+    const reefWeight = Math.exp(-(reefDx * reefDx + reefDz * reefDz) / 25000);
+    const bathymetryBlend = clamp01(0.52 * (1 - reefWeight * 0.44));
+    return Object.freeze({
+      bathymetry,
+      presentationMode: 'procedural-bathymetry-blend',
+      presentationWorldY: lerp(proceduralWorldY, bathymetryWorldY, bathymetryBlend),
+      bathymetryWorldY,
+      proceduralWorldY,
+      bathymetryBlend
+    });
+  }
+
   function primeBathymetryTiles() {
     if (oceanMode.bathymetryPromise) return oceanMode.bathymetryPromise;
     oceanMode.bathymetryPromise = primeGlobalBathymetryGrid().then((globalReady) => {
@@ -312,6 +375,8 @@ export function createOceanBathymetryApi({
     primeBathymetryTiles,
     primeGlobalBathymetryGrid,
     primeLocalBathymetryGrid,
+    sampleBathymetryEvidence,
+    sampleSeabedEvidence,
     sampleSeabedHeight,
     smoothstep,
     valueNoise2D

@@ -17,6 +17,21 @@ public/
 *.log
 progress.md
 
+# Internal development records are kept outside public release branches.
+docs/*AUDIT*.md
+docs/*HANDOFF*.md
+docs/*RND*.md
+docs/*PLAN*.md
+docs/*IMPLEMENTATION_REPORT*.md
+docs/ARCHITECTURE_MAP.md
+docs/DATA_AND_PROVENANCE.md
+docs/PERSISTENCE_AND_TRUST.md
+docs/PRODUCT_CAPABILITIES.md
+docs/REGRESSION_LEDGER.md
+docs/SYSTEM_INVENTORY.md
+docs/TEST_AND_RELEASE_MAP.md
+docs/VERIFICATION_STRATEGY*.md
+
 # Local env/param files
 .env
 .env.*

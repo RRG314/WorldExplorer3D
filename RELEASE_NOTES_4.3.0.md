@@ -1,5 +1,7 @@
 # World Explorer 3D 4.3.0
 
+> This release has been superseded by 4.3.1, the corrected 4.3 release.
+
 World Explorer 3D 4.3.0 is the Explorer Experience release. It integrates
 contextual discovery, field interaction, wildlife, geology, companions and AR
 into the existing fixed-location world rather than presenting them as separate
@@ -32,6 +34,10 @@ or permanently open systems.
 - Regional bridge and tunnel handling preserves visible JFX, Bay Bridge, Fort
   McHenry, Yerba Buena and Monaco structure continuity without city-specific
   duplicate renderers.
+- Building exteriors now combine the existing high-resolution facade atlases
+  with deterministic ground-level doors, frames, handles, thresholds, lights,
+  canopies and storefront side panes. Contextual entry activates only at the
+  published doorway and works through keyboard and touch controls.
 - Living-world pedestrians and vehicles have broader visual variety with bounded
   population and rendering budgets.
 - Account and administrator surfaces are consolidated around conventional user,
@@ -41,7 +47,7 @@ or permanently open systems.
 
 ## Verification
 
-- Firestore emulator security suite: 70/70 assertions.
+- Firestore emulator security suite: 77/77 assertions.
 - Two independent authenticated multiplayer browsers: 8/8 synchronization and
   shared-edit assertions.
 - Installed-Chrome Discovery journey: detector, excavation, wildlife, Guide,
@@ -53,12 +59,19 @@ or permanently open systems.
   renderer or world ownership.
 - Strict reachability passed 532/532 production modules with zero orphans; all
   93 hosted assets and 27 dynamic PBR assets are owned.
-- A fresh title-release journey removed 1,020 geometries and reduced measured
-  JavaScript heap from 689.5 MB to 469.8 MB before a clean Earth reload.
+- Installed-Chrome facade acceptance publishes 112 entrances with three opaque
+  instanced detail draw calls, verifies desktop entry and a 390x844 touch entry,
+  rejects entry at an arbitrary wall, and retains one world publication.
+- The latest repaired dense New York lifecycle measured 541.4 MB post-GC,
+  released to 150.9 MB at the title and reloaded at 585.7 MB. The former 2.02 GB
+  editable-world rebuild path no longer rebuilds the provider world.
 
-The heavier Living/Editable World edit-and-reload journey reached a 2.02 GB heap
-high-water mark. World release behavior is verified, but this remains a disclosed
-performance risk for dense scenes and lower-memory hardware.
+The release matrix exercises representative locations worldwide. This candidate
+is not approved for deployment: Baltimore and New York building-enrichment
+fallback coverage, Miami and Tokyo outage landcover, Everglades far-horizon
+fallback, and Lake Tahoe and Panama Canal water-start vehicle selection must be
+corrected and rerun. Manual phone and integrated-GPU acceptance also remains
+open. Production therefore remains on the verified 4.2.1 rollback artifact.
 
 ## Rollback
 

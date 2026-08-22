@@ -155,6 +155,26 @@ function ingestSessionPosition(session, position, source = 'watch') {
   if (result.accepted) {
     session.signalLost = false;
     session.lastAcceptedAt = Date.now();
+    const speedMps = Number(result.speedMps || 0);
+    if (speedMps >= 4.8) {
+      session.fastFixCount += 1;
+      session.slowFixCount = 0;
+    } else if (speedMps < 2.4) {
+      session.slowFixCount += 1;
+      session.fastFixCount = 0;
+    } else {
+      session.fastFixCount = 0;
+      session.slowFixCount = 0;
+    }
+    if (session.travelMode !== 'drive' && session.fastFixCount >= 3) {
+      session.travelMode = 'drive';
+      session.notice = 'Vehicle-speed travel detected. GPS-follow is using the road vehicle.';
+      appCtx.setTravelMode?.('drive', { source: 'live_gps_speed_detection', emitTutorial: false });
+    } else if (session.travelMode === 'drive' && session.slowFixCount >= 4) {
+      session.travelMode = 'walk';
+      session.notice = 'Walking-speed travel detected. GPS-follow is using the explorer.';
+      appCtx.setTravelMode?.('walk', { source: 'live_gps_speed_detection', emitTutorial: false });
+    }
   } else if (result.reason === 'poor-accuracy') {
     session.notice = `Poor GPS accuracy (${Math.round(result.fix.accuracy)} m). Position held.`;
   } else if (result.reason === 'jump-quarantined') {
@@ -260,7 +280,10 @@ function startLiveGpsMode() {
     hudUpdatedAt: 0,
     statusTimer: null,
     targetWorld: null,
-    snap: null
+    snap: null,
+    travelMode: 'walk',
+    fastFixCount: 0,
+    slowFixCount: 0
   };
   preparedStart = null;
   if (prepared?.fix) {
@@ -351,13 +374,15 @@ function resolveSnapTarget(session, target) {
   }
   const maxDistanceWorld = LIVE_GPS_POLICY.snapDistanceMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
   const candidate = appCtx.findNearestTraversalFeature(target.x, target.z, {
-    mode: 'walk',
+    mode: session.travelMode === 'drive' ? 'drive' : 'walk',
     maxDistance: maxDistanceWorld,
     maximumCandidates: 1
   });
   const kind = String(candidate?.feature?.networkKind || candidate?.feature?.kind || 'road').toLowerCase();
-  const pathLike = kind === 'footway' || kind === 'path' || kind === 'pedestrian' ||
-    kind === 'cycleway' || candidate?.feature?.isStructureConnector === true;
+  const pathLike = session.travelMode === 'drive'
+    ? !/footway|path|pedestrian|steps/i.test(kind)
+    : kind === 'footway' || kind === 'path' || kind === 'pedestrian' ||
+      kind === 'cycleway' || candidate?.feature?.isStructureConnector === true;
   if (!candidate?.pt || !pathLike || !(candidate.dist <= maxDistanceWorld)) return target;
   session.snap = {
     kind,
@@ -386,6 +411,8 @@ function resolveLiveGpsWalkerTarget(dt, current = {}) {
     movedWorld: 0,
     speedMps: session.model.speedMps,
     headingDegrees: session.model.headingDegrees,
+    movementClass: liveGpsModelSnapshot(session.model).movementClass,
+    travelMode: session.travelMode,
     snapped: !!session.snap
   };
   const safeDt = Math.max(0.001, Math.min(0.1, Number(dt) || 0.016));
@@ -399,6 +426,8 @@ function resolveLiveGpsWalkerTarget(dt, current = {}) {
     movedWorld: stepWorld,
     speedMps: session.model.speedMps,
     headingDegrees: session.model.headingDegrees,
+    movementClass: liveGpsModelSnapshot(session.model).movementClass,
+    travelMode: session.travelMode,
     snapped: !!session.snap
   };
 }
@@ -517,6 +546,7 @@ function getLiveGpsSnapshot() {
     permissionDenied: session.permissionDenied,
     recentering: session.recentering,
     lowPower: session.lowPower,
+    travelMode: session.travelMode,
     watchActive: session.watchId !== null,
     ...model,
     targetWorld: session.targetWorld ? {

@@ -172,11 +172,9 @@ function getHudLocationLabel() {
   const placeLon = Number(appCtx.livePlaceState?.lon);
   const locationLat = Number(appCtx.LOC?.lat);
   const locationLon = Number(appCtx.LOC?.lon);
-  const longitudeDelta = Math.abs(placeLon - locationLon);
   const placeMatchesLoadedLocation =
     [placeLat, placeLon, locationLat, locationLon].every(Number.isFinite) &&
-    Math.abs(placeLat - locationLat) <= 0.05 &&
-    Math.min(longitudeDelta, Math.abs(longitudeDelta - 360)) <= 0.05;
+    haversineKm(placeLat, placeLon, locationLat, locationLon) <= 6;
   const detailed = placeMatchesLoadedLocation ? String(appCtx.livePlaceState?.display || '').trim() : '';
   if (detailed) return detailed;
   return getActiveWeatherLocationLabel();
@@ -390,6 +388,8 @@ function applyWeatherPresentation() {
     cloudMaterial.color.setHex(mixColorHex(WEATHER_CLEAR_COLOR, profile.cloudColor, Math.max(weatherCloudFactor, weatherFogBlend)));
     if (appCtx.cloudGroup) appCtx.cloudGroup.visible = appCtx.cloudsVisible;
   }
+
+  appCtx.refreshEarthAtmosphereVisual?.();
 
   updateWeatherUi();
 }

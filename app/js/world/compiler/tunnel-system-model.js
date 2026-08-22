@@ -1,8 +1,8 @@
 import {
   polylineDistances,
   segmentIntersection2D
-} from '../../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=17';
+} from '../../structure-semantics/geometry.js?v=2';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=25';
 
 // A shell roof that merely touches the sampled terrain is visibly exposed by
 // interpolation and precision differences. Require physical soil/road cover
@@ -426,45 +426,6 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
 export function compileTunnelSystemModels(features = [], sampleTerrainY) {
   for (const feature of features) {
     feature.tunnelSystemModel = compileTunnelSystemModel(feature, sampleTerrainY, { features });
-  }
-  for (const feature of features) {
-    const model = feature?.tunnelSystemModel;
-    const profile = feature?.transportSurfaceModel;
-    const stationDistances = profile?.distances;
-    const pathDistances = profile?.pathDistances;
-    if (
-      model?.visualKind !== 'tunnel' ||
-      !(stationDistances instanceof Float32Array) ||
-      !(pathDistances instanceof Float32Array) ||
-      !(profile.centerHeights instanceof Float32Array)
-    ) continue;
-    const protectedRanges = [
-      ...(model.shellRanges || []),
-      ...(model.portalZones || []).map((zone) => ({
-        start: zone.approachStart,
-        end: zone.approachEnd
-      }))
-    ];
-    const halfWidth = Math.max(1.7, Number(feature.width || profile.width || 6) * 0.5);
-    for (let index = 0; index < stationDistances.length; index += 1) {
-      const distance = Number(stationDistances[index]);
-      if (protectedRanges.some((range) => distance >= range.start - 0.05 && distance <= range.end + 0.05)) continue;
-      const point = pointAtDistance(feature.pts, pathDistances, distance);
-      if (!point) continue;
-      let segmentIndex = 0;
-      while (segmentIndex < pathDistances.length - 2 && pathDistances[segmentIndex + 1] < distance) segmentIndex += 1;
-      const start = feature.pts[segmentIndex];
-      const end = feature.pts[segmentIndex + 1];
-      const length = Math.hypot(end.x - start.x, end.z - start.z) || 1;
-      const nx = -(end.z - start.z) / length;
-      const nz = (end.x - start.x) / length;
-      const centerY = Number(sampleTerrainY(point.x, point.z));
-      const leftY = Number(sampleTerrainY(point.x + nx * halfWidth, point.z + nz * halfWidth));
-      const rightY = Number(sampleTerrainY(point.x - nx * halfWidth, point.z - nz * halfWidth));
-      if (Number.isFinite(centerY)) profile.centerHeights[index] = centerY + 0.08;
-      if (profile.leftHeights instanceof Float32Array && Number.isFinite(leftY)) profile.leftHeights[index] = leftY + 0.08;
-      if (profile.rightHeights instanceof Float32Array && Number.isFinite(rightY)) profile.rightHeights[index] = rightY + 0.08;
-    }
   }
 }
 

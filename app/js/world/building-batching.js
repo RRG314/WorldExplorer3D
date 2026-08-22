@@ -5,7 +5,7 @@ import {
   disposeSceneMesh,
   materialBatchKey,
   appendGeometryWithTransform
-} from "./geometry-batching.js?v=4";
+} from "./geometry-batching.js?v=5";
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 
 const NEAR_BUILDING_BATCH_CELL_METERS = 360;
@@ -106,14 +106,17 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
       }
 
       const batch = { positions: [], normals: [], uvs: [], indices: [] };
+      if (group.lodTier === 'near') batch.facadeEntrances = [];
       const sourceMeshes = [];
       const xzPoints = [];
       const provenanceByFeatureId = new Map();
+      const editableIndexRanges = [];
 
       for (let i = 0; i < group.meshes.length; i++) {
         const mesh = group.meshes[i];
         try {
         mesh.updateMatrixWorld(true);
+        const indexStart = batch.indices.length;
         const appendCount = appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
         if (appendCount <= 0) {
           keep.push(mesh);
@@ -123,6 +126,15 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         const provenance = mesh.userData?.buildingProvenance;
         const featureId = provenance?.identity?.featureId;
         if (featureId) provenanceByFeatureId.set(featureId, provenance);
+        const sourceBuildingId = String(mesh.userData?.sourceBuildingId || featureId || '');
+        const indexCount = batch.indices.length - indexStart;
+        if (sourceBuildingId && indexCount > 0) {
+          editableIndexRanges.push(Object.freeze({
+            sourceBuildingId,
+            start: indexStart,
+            count: indexCount
+          }));
+        }
 
         xzPoints.push(buildingMeshCenter(mesh));
         } finally {
@@ -183,6 +195,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         isNearBuildingBatch: true,
         batchCount: sourceMeshes.length,
         buildingProvenanceRecords: Object.freeze([...provenanceByFeatureId.values()]),
+        editableBuildingIndexRanges: Object.freeze(editableIndexRanges),
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };

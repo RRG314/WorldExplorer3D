@@ -14,7 +14,7 @@ import {
   createUiRoomEventsApi
 } from './ui-room-events.js?v=2';
 import { createUiRoomRenderers } from './ui-room-renderers.js?v=2';
-import { createUiRoomActions } from './ui-room-actions.js?v=3';
+import { createUiRoomActions } from './ui-room-actions.js?v=4';
 import {
   emitTutorialEvent,
   finiteNumber,
@@ -42,7 +42,7 @@ import {
   isWalkModeActive,
   isDroneModeActive
 } from './ui-room-support.js?v=2';
-import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=2';
+import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=3';
 
 let singleton = null;
 function initMultiplayerPlatform() {

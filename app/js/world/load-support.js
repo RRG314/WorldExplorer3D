@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
-import { generateStreetFurniture } from "./furniture.js?v=13";
+import { generateStreetFurniture } from "./furniture.js?v=17";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
@@ -26,7 +26,9 @@ export async function finalizeLoadedWorld(options = {}) {
   const earthSceneSuppressed = typeof options.earthSceneSuppressed === 'function' ? options.earthSceneSuppressed : () => false;
   const hideEarthSceneMeshes = typeof options.hideEarthSceneMeshes === 'function' ? options.hideEarthSceneMeshes : () => {};
   const buildTraversalNetworks = typeof options.buildTraversalNetworks === 'function' ? options.buildTraversalNetworks : () => {};
-  const spawnOnRoad = typeof options.spawnOnRoad === 'function' ? options.spawnOnRoad : () => {};
+  const spawnPlayer = typeof options.spawnPlayer === 'function'
+    ? options.spawnPlayer
+    : typeof options.spawnOnRoad === 'function' ? options.spawnOnRoad : () => {};
   const publishLocationWorld = typeof options.publishLocationWorld === 'function' ? options.publishLocationWorld : null;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
@@ -62,9 +64,9 @@ export async function finalizeLoadedWorld(options = {}) {
     runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
     await yieldToMainThread();
   }
+  let transportPublication = null;
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
     startLoadPhase('publishCompiledTransportMeshes');
-    let transportPublication = null;
     try {
       transportPublication = await appCtx.publishCompiledTransportMeshes();
     } catch (error) {
@@ -84,12 +86,28 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
     runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
   }
+  if (
+    transportPublication?.authority === 'compiled_transport_surface' &&
+    Array.isArray(appCtx.deferredTransportLandmarkPublishers)
+  ) {
+    const publishers = appCtx.deferredTransportLandmarkPublishers.splice(0);
+    for (let index = 0; index < publishers.length; index += 1) {
+      runFinalStep('publishDeferredTransportLandmark', () => publishers[index]?.());
+    }
+  } else if (Array.isArray(appCtx.deferredTransportLandmarkPublishers)) {
+    // A transport-dependent landmark has no safe fallback surface. Discard it
+    // rather than publishing decoration against a stale or provisional deck.
+    appCtx.deferredTransportLandmarkPublishers.splice(0);
+  }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.retireGroundFallbackPlaceholder === 'function') {
     runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();
-  runFinalStep('spawnOnRoad', () => spawnOnRoad());
+  // World publication owns the one final arrival. Calling a generic road spawn
+  // here and a custom-location spawn later left two systems competing over the
+  // player's vertical surface and made grade-separated arrivals frame-dependent.
+  runFinalStep('spawnPlayer', () => spawnPlayer());
   if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
     runFinalStep('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
   }
@@ -104,6 +122,9 @@ export async function finalizeLoadedWorld(options = {}) {
   }
   if (typeof publishLocationWorld === 'function') {
     runFinalStep('publishLocationWorld', () => publishLocationWorld());
+  }
+  if (typeof appCtx.refreshEditableBuildingVisibility === 'function') {
+    runFinalStep('refreshEditableBuildingVisibility', () => appCtx.refreshEditableBuildingVisibility());
   }
   markLoaded();
   if (finalizePresentation) appCtx.hideLoad();
@@ -443,10 +464,11 @@ export function buildStreetFurniturePass(options = {}) {
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
   const loadMetrics = options.loadMetrics || {};
+  const mappedFurnitureNodes = Array.isArray(options.mappedFurnitureNodes) ? options.mappedFurnitureNodes : [];
 
   startLoadPhase(phaseName);
   try {
-    generateStreetFurniture();
+    generateStreetFurniture({ mappedFurnitureNodes });
     loadMetrics.vegetation.generated = Array.isArray(appCtx.vegetationFeatures) ? appCtx.vegetationFeatures.length : 0;
   } catch (err) {
     loadMetrics.streetFurnitureError = err?.message || String(err);
@@ -461,6 +483,7 @@ export function buildWorldDetailPasses(options = {}) {
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
   const poiNodes = Array.isArray(options.poiNodes) ? options.poiNodes : [];
+  const mappedFurnitureNodes = Array.isArray(options.mappedFurnitureNodes) ? options.mappedFurnitureNodes : [];
   const poiKeyFromTags = typeof options.poiKeyFromTags === 'function' ? options.poiKeyFromTags : () => null;
   const lodNearDist = Number.isFinite(options.lodNearDist) ? options.lodNearDist : 0;
   const lodMidDist = Number.isFinite(options.lodMidDist) ? options.lodMidDist : 0;
@@ -490,6 +513,7 @@ export function buildWorldDetailPasses(options = {}) {
   buildStreetFurniturePass({
     endLoadPhase,
     loadMetrics,
+    mappedFurnitureNodes,
     phaseName: 'buildStreetFurniture',
     startLoadPhase
   });

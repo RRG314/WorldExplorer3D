@@ -246,13 +246,26 @@ service cloud.firestore {
 
     function validAnchorData(anchor) {
       return anchor is map &&
-        anchor.keys().hasOnly(['kind', 'lat', 'lon', 'x', 'y', 'z']) &&
+        anchor.keys().hasOnly([
+          'kind',
+          'lat',
+          'lon',
+          'x',
+          'y',
+          'z',
+          'interiorKey',
+          'buildingKey',
+          'interiorLabel'
+        ]) &&
         anchor.kind in ['earth', 'moon', 'space'] &&
         anchor.lat is number &&
         anchor.lon is number &&
         anchor.x is number &&
         anchor.y is number &&
-        anchor.z is number;
+        anchor.z is number &&
+        (!('interiorKey' in anchor) || (anchor.interiorKey is string && anchor.interiorKey.size() <= 160)) &&
+        (!('buildingKey' in anchor) || (anchor.buildingKey is string && anchor.buildingKey.size() <= 160)) &&
+        (!('interiorLabel' in anchor) || (anchor.interiorLabel is string && anchor.interiorLabel.size() <= 80));
     }
 
     function validEditorEditType(value) {
@@ -585,10 +598,25 @@ service cloud.firestore {
 
     function validFrameData(frame) {
       return frame is map &&
-        frame.keys().hasOnly(['kind', 'locLat', 'locLon']) &&
+        frame.keys().hasOnly([
+          'kind',
+          'locLat',
+          'locLon',
+          'interiorKey',
+          'interiorFloorId',
+          'interiorFloorLevel'
+        ]) &&
         frame.kind in ['earth', 'moon', 'space'] &&
         frame.locLat is number &&
-        frame.locLon is number;
+        frame.locLon is number &&
+        (!('interiorKey' in frame) ||
+          (frame.interiorKey is string && frame.interiorKey.size() <= 180)) &&
+        (!('interiorFloorId' in frame) ||
+          (frame.interiorFloorId is string && frame.interiorFloorId.size() <= 220)) &&
+        (!('interiorFloorLevel' in frame) ||
+          (frame.interiorFloorLevel is int &&
+            frame.interiorFloorLevel >= 0 &&
+            frame.interiorFloorLevel <= 7));
     }
 
     function validPlayerDoc(roomId, uid) {
@@ -1991,6 +2019,29 @@ service cloud.firestore {
       match /deflockStates/{cameraId} {
         // Shared DeFlock state is written only by the verified Cloud Function.
         // Room members may observe the immutable overlay for join/rejoin sync.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
+      match /urbanEntities/{entityId} {
+        // Vehicle leases and condition changes are transaction-owned by Cloud
+        // Functions. Room clients can observe them but cannot forge ownership,
+        // position, damage, repair, or revision fields directly.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
+      match /urbanActors/{uid} {
+        // Server-owned action clocks bound equipment use and are readable only
+        // by the actor or room managers for support/moderation diagnostics.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId) &&
+          (isSelf(uid) || canManageRoom(roomId));
+        allow create, update, delete: if false;
+      }
+
+      match /urbanCivic/{stateId} {
+        // The active witnessed event and its outcome are written only by the
+        // verified room transaction. Members share one consequence timeline.
         allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
         allow create, update, delete: if false;
       }

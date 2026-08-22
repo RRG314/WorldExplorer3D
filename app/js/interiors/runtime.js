@@ -5,8 +5,8 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=5";
-import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=2";
+} from "../building-entry.js?v=7";
+import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=3";
 
 let nearbyInteriorScanPromise = null;
 const {
@@ -29,22 +29,52 @@ const {
   shortLabel
 } = createInteriorRuntimeUiApi();
 
-export function sampleInteriorWalkSurface(x, z, deps) {
+export function sampleInteriorWalkSurface(x, z, currentY, deps) {
   const active = appCtx.activeInterior;
   if (!active || !Array.isArray(active.walkSurfaces)) return null;
+  const walkerFeetY = Number.isFinite(currentY)
+    ? Number(currentY)
+    : Number.isFinite(appCtx.Walk?.state?.walker?.y)
+      ? appCtx.Walk.state.walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7)
+      : NaN;
+  const activeFloorY = Number(active.floorBaseY || 0) + Number(active.activeLevel || 0) * Number(active.floorPlan?.storyHeight || 3.4);
   let best = null;
+  const consider = (candidate, priority = 0) => {
+    const referenceY = Number.isFinite(walkerFeetY) ? walkerFeetY : activeFloorY;
+    const score = Math.abs(candidate.y - referenceY) + priority;
+    if (!best || score < best.score) best = { ...candidate, score };
+  };
   for (let i = 0; i < active.walkSurfaces.length; i++) {
     const surface = active.walkSurfaces[i];
+    if (surface.kind === 'ramp' && surface.start && surface.end) {
+      const dx = surface.end.x - surface.start.x;
+      const dz = surface.end.z - surface.start.z;
+      const lengthSquared = dx * dx + dz * dz;
+      if (!(lengthSquared > 0.01)) continue;
+      const t = Math.max(0, Math.min(1, ((x - surface.start.x) * dx + (z - surface.start.z) * dz) / lengthSquared));
+      const px = surface.start.x + dx * t;
+      const pz = surface.start.z + dz * t;
+      const lateral = Math.hypot(x - px, z - pz);
+      if (lateral > Math.max(0.7, deps.finiteNumber(surface.halfWidth, 1))) continue;
+      consider({
+        y: surface.yStart + (surface.yEnd - surface.yStart) * t,
+        source: 'interior_stairs',
+        feature: surface,
+        dist: lateral,
+        pt: { x: px, z: pz }
+      }, -0.08);
+      continue;
+    }
     if (surface.kind === "polygon") {
       if (!Array.isArray(surface.pts) || surface.pts.length < 3) continue;
       if (!deps.pointInPolygonSafe(x, z, surface.pts)) continue;
-      best = {
+      consider({
         y: surface.y,
         source: "interior",
         feature: surface,
         dist: 0
-      };
-      break;
+      });
+      continue;
     }
     if (surface.kind === "line" && Array.isArray(surface.pts) && surface.pts.length >= 2) {
       let bestLineDist = Infinity;
@@ -57,18 +87,111 @@ export function sampleInteriorWalkSurface(x, z, deps) {
         }
       }
       const maxDist = Math.max(0.85, deps.finiteNumber(surface.halfWidth, 1));
-      if (bestLineDist <= maxDist && (!best || bestLineDist < best.dist)) {
-        best = {
+      if (bestLineDist <= maxDist) {
+        consider({
           y: surface.y,
           source: "interior",
           feature: surface,
           dist: bestLineDist,
           pt: bestPoint
-        };
+        }, bestLineDist * 0.01);
       }
     }
   }
+  if (best) delete best.score;
   return best;
+}
+
+function applyInteriorSceneState(active, sceneState) {
+  active.group = sceneState.group;
+  active.walkSurfaces = sceneState.walkSurfaces;
+  active.placementTargets = sceneState.placementTargets;
+  active.center = sceneState.center;
+  active.usableFootprint = sceneState.usableFootprint;
+  active.shellClearanceMin = sceneState.shellClearanceMin;
+  active.requiredShellClearance = sceneState.requiredShellClearance;
+  active.exteriorArea = sceneState.exteriorArea;
+  active.usableArea = sceneState.usableArea;
+  active.partitionCount = sceneState.partitionCount;
+  active.layoutKind = sceneState.layoutKind;
+  active.floorPlan = sceneState.floorPlan;
+  active.floorId = sceneState.floorId;
+  active.floorLabel = sceneState.floorLabel;
+  active.floorBaseY = sceneState.floorBaseY;
+  active.activeLevel = sceneState.activeLevel;
+  active.loadedLevels = sceneState.loadedLevels;
+  active.connector = sceneState.connector;
+  active.stairs = sceneState.stairs;
+  active.interactions = sceneState.interactions;
+  active.floorEntryPoint = { ...sceneState.entryPoint };
+  active.lobbyEntryPoint = { ...sceneState.lobbyEntryPoint };
+}
+
+function replaceActiveInteriorFloor(active, targetLevel, deps) {
+  if (!active?.definition || active.floorTransitionPending) return false;
+  const nextLevel = Math.max(0, Math.min(active.floorPlan.floorCount - 1, Math.round(targetLevel)));
+  if (nextLevel === active.activeLevel) return true;
+  active.floorTransitionPending = true;
+  const previousGroup = active.group;
+  try {
+    const sceneState = deps.buildInteriorScene(active.definition, {
+      activeLevel: nextLevel,
+      floorBaseY: active.floorBaseY
+    });
+    appCtx.scene.add(sceneState.group);
+    appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
+    applyInteriorSceneState(active, sceneState);
+    disposeObject3D(previousGroup);
+    resetInteriorInteractionCache();
+    return true;
+  } finally {
+    active.floorTransitionPending = false;
+  }
+}
+
+function nearestInteriorInteraction(active, walker) {
+  if (!active || !walker || !Array.isArray(active.interactions)) return null;
+  const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
+  return active.interactions.map((interaction) => ({
+    ...interaction,
+    distance: Math.hypot(interaction.x - walker.x, interaction.z - walker.z),
+    verticalDistance: Math.abs(
+      active.floorBaseY + interaction.level * active.floorPlan.storyHeight - feetY
+    )
+  })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
+    .sort((a, b) => a.distance - b.distance)[0] || null;
+}
+
+function travelByElevator(active, interaction, deps) {
+  if (!interaction || interaction.kind !== 'elevator') return false;
+  if (!replaceActiveInteriorFloor(active, interaction.targetLevel, deps)) return false;
+  const walker = appCtx.Walk?.state?.walker;
+  if (!walker || !active.connector) return false;
+  const eyeHeight = appCtx.Walk?.CFG?.eyeHeight || 1.7;
+  walker.x = active.connector.elevator.x + active.connector.axis.x * 1.45;
+  walker.z = active.connector.elevator.z + active.connector.axis.z * 1.45;
+  walker.y = active.floorBaseY + active.activeLevel * active.floorPlan.storyHeight + eyeHeight + 0.05;
+  walker.vy = 0;
+  walker._resolvedGroundState = null;
+  active.lastValidPosition = {
+    x: walker.x,
+    z: walker.z,
+    y: walker.y,
+    yaw: deps.finiteNumber(walker.yaw || walker.angle, 0),
+    angle: deps.finiteNumber(walker.angle, 0)
+  };
+  setTransientHint(`${active.floorLabel} • stairs and elevator are ready.`, 1500, deps);
+  return true;
+}
+
+function refreshActiveFloorFromHeight(active, walker, deps) {
+  if (!active?.floorPlan || active.floorPlan.floorCount <= 1 || active.floorTransitionPending) return;
+  const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
+  const relative = (feetY - active.floorBaseY) / active.floorPlan.storyHeight;
+  const nearestLevel = Math.max(0, Math.min(active.floorPlan.floorCount - 1, Math.round(relative)));
+  const targetFloorY = active.floorBaseY + nearestLevel * active.floorPlan.storyHeight;
+  if (nearestLevel === active.activeLevel || Math.abs(feetY - targetFloorY) > 0.45) return;
+  replaceActiveInteriorFloor(active, nearestLevel, deps);
 }
 
 export function listSupportedInteriorsNear(x, z, radius = 220, limit = 8, deps) {
@@ -202,6 +325,7 @@ export async function enterInteriorForSupport(support, deps) {
     key,
     label: definition.label,
     mode: sceneState.mode,
+    definition,
     support,
     building: support.building,
     group: sceneState.group,
@@ -227,8 +351,10 @@ export async function enterInteriorForSupport(support, deps) {
       yaw: deps.finiteNumber(walker.yaw || walker.angle, 0),
       angle: deps.finiteNumber(walker.angle, 0)
     },
-    containmentNoticeUntil: 0
+    containmentNoticeUntil: 0,
+    floorTransitionPending: false
   };
+  applyInteriorSceneState(appCtx.activeInterior, sceneState);
   appCtx.interiorHint = {
     state: "inside",
     label: definition.label,
@@ -291,12 +417,18 @@ function keepActiveInteriorContained(deps) {
   const walker = appCtx.Walk?.state?.walker;
   if (!walker) return;
 
-  const interiorSurface = sampleInteriorWalkSurface(walker.x, walker.z, deps);
+  const interiorSurface = sampleInteriorWalkSurface(
+    walker.x,
+    walker.z,
+    walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7),
+    deps
+  );
   const inside = Array.isArray(active.usableFootprint) && active.usableFootprint.length >= 3 ?
     deps.pointInPolygonSafe(walker.x, walker.z, active.usableFootprint) :
     true;
 
   if (interiorSurface && inside) {
+    refreshActiveFloorFromHeight(active, walker, deps);
     active.lastValidPosition = {
       x: walker.x,
       z: walker.z,
@@ -366,8 +498,14 @@ function pickNearbyBuildingCandidate(force = false, deps) {
 
 export async function handleInteriorAction(deps) {
   if (appCtx.activeInterior) {
-    clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
-    return true;
+    const active = appCtx.activeInterior;
+    const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
+    if (interaction?.kind === 'exit') {
+      clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
+      return true;
+    }
+    if (interaction?.kind === 'elevator') return travelByElevator(active, interaction, deps);
+    return false;
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);
   if (!candidate?.support?.enterable) return false;
@@ -392,10 +530,21 @@ export function updateInteriorInteraction(deps) {
 
   if (appCtx.activeInterior) {
     keepActiveInteriorContained(deps);
-    const label = appCtx.activeInterior.label || "Interior";
-    appCtx.interiorHint = { state: "inside", label, mode: appCtx.activeInterior.mode || "generated" };
+    const active = appCtx.activeInterior;
+    const label = active.label || "Interior";
+    const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
+    appCtx.interiorHint = {
+      state: "inside",
+      label,
+      mode: active.mode || "generated",
+      floorId: active.floorId || '',
+      floorLabel: active.floorLabel || 'Lobby',
+      activeLevel: active.activeLevel || 0,
+      loadedLevels: active.loadedLevels || []
+    };
     resetInteriorInteractionCache();
-    setPrompt(`E Exit ${shortLabel(label, 24)}`, "active");
+    if (interaction) setPrompt(`E ${interaction.label}`, interaction.kind === 'elevator' ? 'supported' : 'active');
+    else clearPrompt();
     return;
   }
 

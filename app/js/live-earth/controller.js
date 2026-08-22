@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
-import { getWeatherSnapshotForLocation } from "../weather.js?v=9";
+import { getWeatherSnapshotForLocation } from "../weather.js?v=10";
 import { getWeatherSampleSnapshots } from "./weather-samples.js?v=2";
 import { aircraftService } from "../geospatial/aircraft.js?v=1";
-import { marineService } from "../geospatial/marine.js?v=1";
+import { marineService } from "../geospatial/marine.js?v=2";
 import { streetImageryService } from "../geospatial/street-imagery.js?v=1";
 import { createMarineState, ensureSelectedMarineData } from "./marine-state.js?v=1";
 import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=10";

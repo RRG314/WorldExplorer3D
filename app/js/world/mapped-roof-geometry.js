@@ -15,6 +15,9 @@ const NON_FLAT_ROOF_SHAPES = new Set([
 const GENERIC_ROOF_MAX_HEIGHT_METERS = 24;
 const GENERIC_ROOF_MAX_LEVELS = 6;
 const GENERIC_ROOF_MAX_TOP_METERS = 32;
+const CONTEXTUAL_PITCHED_BUILDING_TYPES = new Set([
+  'house', 'detached', 'semidetached_house', 'bungalow', 'farmhouse'
+]);
 
 function numericValue(value, fallback = NaN) {
   const parsed = Number.parseFloat(String(value ?? '').trim());
@@ -225,7 +228,7 @@ function inferredRoofHeight(shape, heightMeters, pts, fullPartRoof) {
   return Math.max(0.8, Math.min(heightMeters * 0.38, span * share, maximum));
 }
 
-export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics = null, pts = []) {
+export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics = null, pts = [], context = {}) {
   const resolvedHeight = Math.max(0, Number(heightMeters) || 0);
   const baseOffset = Math.max(0, Number(buildingSemantics?.baseOffsetMeters) || 0);
   const mappedLevels = numericValue(tags['building:levels']);
@@ -236,7 +239,28 @@ export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics
   ) return null;
   const mappedShape = String(tags['roof:shape'] || '').trim().toLowerCase();
   const shape = NON_FLAT_ROOF_SHAPES.has(mappedShape) ? mappedShape : '';
-  if (!NON_FLAT_ROOF_SHAPES.has(shape) || !stableRoofFootprint(shape, pts)) return null;
+  if (!NON_FLAT_ROOF_SHAPES.has(shape)) {
+    const buildingType = String(tags.building || context.buildingType || '').trim().toLowerCase();
+    const metrics = Array.isArray(pts) && pts.length >= 3 ? footprintMetrics(pts) : null;
+    const levels = numericValue(tags['building:levels'], Number(context.levels));
+    const contextualCandidate = CONTEXTUAL_PITCHED_BUILDING_TYPES.has(buildingType) &&
+      context.denseUrban !== true &&
+      resolvedHeight >= 2.8 && resolvedHeight <= 12 &&
+      (!Number.isFinite(levels) || levels <= 3) &&
+      metrics && metrics.area >= 28 && metrics.area <= 280 &&
+      stableRoofFootprint('gabled', pts);
+    if (!contextualCandidate) return null;
+    const roofHeight = Math.max(.8, Math.min(3.2, Math.min(metrics.width, metrics.depth) * .24, resolvedHeight * .3));
+    return {
+      shape: 'gabled',
+      roofHeight,
+      roofHeightSource: 'context_modeled_from_footprint_span',
+      roofShapeSource: 'context_inferred_explicit_lowrise_residential',
+      wallHeight: Math.max(0, resolvedHeight - roofHeight),
+      fullPartRoof: false
+    };
+  }
+  if (!stableRoofFootprint(shape, pts)) return null;
   const mappedRoofHeight = numericValue(tags['roof:height']);
   const fullPartRoof = !!tags['building:part'] && Number(buildingSemantics?.baseOffsetMeters || 0) > 0.4;
   const roofHeight = Math.min(
@@ -279,15 +303,15 @@ export function createMappedRoofMesh(pts, baseElevation, wallHeight, roofSpec, t
   });
   material.userData = {
     ...(material.userData || {}),
-    buildingBatchKey: `mapped-roof:${roofSpec.shape}:${new THREE.Color(color).getHexString()}:${/metal/.test(String(tags['roof:material'] || '').toLowerCase()) ? 'metal' : 'solid'}`
+    buildingBatchKey: `building-roof:${roofSpec.roofShapeSource}:${roofSpec.shape}:${new THREE.Color(color).getHexString()}:${/metal/.test(String(tags['roof:material'] || '').toLowerCase()) ? 'metal' : 'solid'}`
   };
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.y = baseElevation + Math.max(0, wallHeight);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.isRoofDetail = true;
-  mesh.userData.isMappedRoof = true;
-  mesh.userData.isInferredRoof = false;
+  mesh.userData.isMappedRoof = roofSpec.roofShapeSource === 'mapped';
+  mesh.userData.isInferredRoof = roofSpec.roofShapeSource !== 'mapped';
   mesh.userData.roofShape = roofSpec.shape;
   mesh.userData.roofShapeSource = roofSpec.roofShapeSource;
   mesh.userData.roofHeight = roofSpec.roofHeight;

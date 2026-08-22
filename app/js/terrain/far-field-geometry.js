@@ -5,12 +5,20 @@ import {
   publishedDetailedTerrainTileKeys
 } from './far-field-coverage.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (!sorted.length) return null;
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) * 0.5;
+}
+
+function resolveFarFieldFallbackDatum(acceptedGroundSample) {
+  const acceptedMeters = Number(acceptedGroundSample?.groundElevationMeters);
+  return acceptedGroundSample?.status === 'available' && Number.isFinite(acceptedMeters)
+    ? acceptedMeters
+    : 0;
 }
 
 function appendInterval(values, start, end, interval, includeStart = true) {
@@ -333,7 +341,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     return candidates[Math.min(candidates.length - 1, Math.floor(candidates.length * 0.2))];
   }
 
-  function prepareMappedWaterSurfaces(mappedContext, sourceZoom, loadedTiles, offsetMeters) {
+  function prepareMappedWaterSurfaces(mappedContext, sourceZoom, loadedTiles, offsetMeters, fallbackElevationMeters = null) {
     for (const area of mappedContext?.waterAreas || []) {
       if (area.kind === 'ocean') {
         area.surfaceMeters = 0;
@@ -346,7 +354,16 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const lon = Number(ring[index]?.[0]);
         const lat = Number(ring[index]?.[1]);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        const sourceMeters = sampleSourceMeters(lat, lon, sourceZoom, loadedTiles);
+        const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
+        const acceptedMeters = Number(accepted?.groundElevationMeters);
+        if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+          samples.push(acceptedMeters);
+          continue;
+        }
+        const sampledSourceMeters = sampleSourceMeters(lat, lon, sourceZoom, loadedTiles);
+        const sourceMeters = Number.isFinite(sampledSourceMeters)
+          ? sampledSourceMeters
+          : Number(fallbackElevationMeters);
         if (Number.isFinite(sourceMeters)) samples.push(sourceMeters + offsetMeters);
       }
       area.surfaceMeters = representativeWaterSurfaceMeters(samples);
@@ -372,18 +389,27 @@ function createFarFieldGeometryPlanner(deps = {}) {
     // for a deliberately unloaded neighbor and reject the entire fixed mesh.
     const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
     const { lat, lon } = worldToLatLon(samplePoint.x, samplePoint.z);
-    const sourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
-    if (!Number.isFinite(sourceMeters)) return null;
-
-    let meters = sourceMeters + offsetMeters;
-    const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
-    const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
-    if (distanceFromSeam <= seamBlendWorld) {
-      const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
-      const acceptedMeters = Number(accepted?.groundElevationMeters);
-      if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
-        const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
-        meters = acceptedMeters + (meters - acceptedMeters) * blend;
+    const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
+    const acceptedMeters = Number(accepted?.groundElevationMeters);
+    let meters;
+    if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+      meters = acceptedMeters;
+    } else {
+      const sampledSourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
+      const sourceMeters = Number.isFinite(sampledSourceMeters)
+        ? sampledSourceMeters
+        : Number(spec.fallbackElevationMeters);
+      if (!Number.isFinite(sourceMeters)) return null;
+      meters = sourceMeters + offsetMeters;
+      const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
+      const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
+      if (distanceFromSeam <= seamBlendWorld) {
+        const seamAccepted = sampleAcceptedGroundAtLatLon(lat, lon);
+        const seamAcceptedMeters = Number(seamAccepted?.groundElevationMeters);
+        if (seamAccepted?.status === 'available' && Number.isFinite(seamAcceptedMeters)) {
+          const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
+          meters = seamAcceptedMeters + (meters - seamAcceptedMeters) * blend;
+        }
       }
     }
     const resolvedMeters = mappedWaterBedMetersAt(
@@ -524,7 +550,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('color', createNormalizedTerrainAttribute(colors, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
@@ -577,5 +603,6 @@ export {
   mappedWaterBedMetersAt,
   normalizeMappedWaterSurfaceOwnership,
   parentTerrainTile,
+  resolveFarFieldFallbackDatum,
   sampleFarFieldGridWorldY
 };

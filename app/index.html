@@ -22,11 +22,11 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=93">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=100">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
-<link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=16">
+<link rel="stylesheet" href="styles/fishing-game.css?v=3">
+<link rel="stylesheet" href="styles/interface-v4.css?v=17">
 <link rel="stylesheet" href="styles/start-hub.css?v=14">
 <link rel="stylesheet" href="styles/discovery.css?v=5">
 <link rel="stylesheet" href="styles/tutorial.css?v=1">
@@ -166,7 +166,6 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="police"><div class="mode-icon">🚔</div><div><div class="mode-name">Police Chase</div><div class="mode-desc">Start with police pursuit enabled and survive the chase.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Toggle walking mode anytime with <b>F</b> key or float menu</div>
 </div>
@@ -357,6 +356,13 @@ Graphics changes apply to the current session.
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
+<div class="ctrl-section">World Interaction</div>
+<div class="ctrl-row"><span class="ctrl-key">E / Action</span><span class="ctrl-action">Use the visible nearby door, vehicle, person, or object</span></div>
+<div class="ctrl-row"><span class="ctrl-key">I</span><span class="ctrl-action">Open / close carried equipment</span></div>
+<div class="ctrl-row"><span class="ctrl-key">1–6</span><span class="ctrl-action">Quick-equip a carried item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Use equipped item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-action">Take an available nearby item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">X</span><span class="ctrl-action">Resume the current field activity</span></div>
 <div class="ctrl-section">Drone Controls</div>
 <div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
@@ -596,10 +602,10 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   </header>
   <div class="discoveryWorkspace">
     <nav class="discoveryTabs" aria-label="Explorer Journal sections">
-      <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
+      <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Activities</button>
       <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Field Guide</button>
-      <button class="discoveryTab" data-discovery-tab="collection" type="button"><span>◇</span>Collection</button>
-      <button class="discoveryTab" data-discovery-tab="gear" type="button"><span>⌁</span>Gear</button>
+      <button class="discoveryTab" data-discovery-tab="collection" type="button"><span>◇</span>Places</button>
+      <button class="discoveryTab" data-discovery-tab="gear" type="button"><span>⌁</span>Field Kit</button>
       <button class="discoveryTab" data-discovery-tab="progress" type="button"><span>↗</span>Progress</button>
     </nav>
     <div class="discoveryContent">
@@ -627,15 +633,15 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
       <section class="discoveryPane" data-discovery-pane="guide">
         <div class="discoverySectionHead"><span>FIELD GUIDE</span><small>WHAT EXISTS / WHAT YOU IDENTIFIED</small></div>
         <div class="discoveryGuideControls"><input id="discoveryGuideSearch" type="search" placeholder="Search your Field Guide" aria-label="Search your Field Guide"><select id="discoveryGuideCategory" aria-label="Filter Field Guide category"><option value="all">All categories</option><option value="wildlife">Wildlife</option><option value="plants">Plants &amp; Fungi</option><option value="geology">Geology</option><option value="fossils">Fossils</option><option value="places">Places &amp; History</option><option value="ocean">Ocean</option></select><button id="discoveryGuideHelpBtn" type="button">How This Works</button></div>
-        <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Procedural</dt><dd>A virtual gameplay encounter generated from broad world context, not a live occurrence claim.</dd></div><div><dt>Collection</dt><dd>Only a virtual specimen, find, catch trophy, or created artifact you actually acquired.</dd></div><div><dt>Rarity</dt><dd>Gameplay opportunity frequency, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
+        <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Procedural</dt><dd>A virtual gameplay encounter generated from broad world context, not a live occurrence claim.</dd></div><div><dt>Backpack</dt><dd>A virtual specimen, find, catch trophy, or created artifact enters your Backpack only when you actually acquire it.</dd></div><div><dt>Rarity</dt><dd>Gameplay opportunity frequency, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
         <div id="discoveryGuideOverview" class="discoveryGuideOverview"></div>
         <div id="discoveryFieldGuideList" class="discoveryList"></div>
       </section>
-      <section class="discoveryPane" data-discovery-pane="collection"><div class="discoverySectionHead"><span>COLLECTION</span><small>VIRTUAL OBJECTS YOU ACQUIRED</small></div><div class="discoveryModeNote"><b>OWNED ITEMS ONLY</b><span>Observations and field notes belong in your Journal and Field Guide. This Collection contains specimens, finds, catch trophies, and created artifacts.</span></div><div id="discoveryCollectionList" class="discoveryList"></div></section>
+      <section class="discoveryPane" data-discovery-pane="collection"><div class="discoverySectionHead"><span>PLACES &amp; CONTACTS</span><small>WHERE YOUR EXPLORER STORY HAPPENED</small></div><div class="discoveryModeNote"><b>KNOWLEDGE, NOT STORAGE</b><span>Review regions connected to your Journal records. Acquired objects and tools live only in your Backpack.</span></div><div id="discoveryCollectionList" class="discoveryList"></div></section>
       <section class="discoveryPane" data-discovery-pane="gear">
-        <div class="discoverySectionHead"><span>GEAR</span><small>EQUIPPED TOOL / LOADOUT / COMPANIONS</small></div>
+        <div class="discoverySectionHead"><span>FIELD KIT GUIDE</span><small>HOW TO USE YOUR BACKPACK TOOLS</small></div>
         <div id="discoveryEquippedSummary" class="discoveryEquippedSummary"></div>
-        <div class="discoverySubsection"><h3>Tools</h3><p>Equip a tool to make it the default for compatible nearby leads.</p><div id="discoveryToolList" class="discoveryList"></div></div>
+        <div class="discoverySubsection"><h3>Tools</h3><p>This is guidance only. Equip and organize every carried object in the Backpack.</p><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList" class="discoveryList"></div></div>
         <div class="discoverySubsection"><h3>Companions</h3><p>Virtual companions you meet, care for, and bring into the world.</p><div id="discoveryCompanionList" class="discoveryList"></div></div>
       </section>
       <section class="discoveryPane" data-discovery-pane="progress">
@@ -679,10 +685,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <aside id="fishingGamePanel" aria-label="Fishing game" aria-hidden="true">
   <header class="fishingHeader">
-    <div>
-      <span class="fishingEyebrow">Boat activity</span>
-      <strong>Fishing</strong>
-    </div>
+    <div class="fishingIdentity"><span class="fishingMark" aria-hidden="true">◒</span><div><span class="fishingEyebrow">ANGLING</span><strong>Boat Fishing</strong></div></div>
     <div class="fishingHeaderActions">
       <span id="fishingStage">Idle</span>
       <button id="fishingCloseBtn" type="button" aria-label="Close fishing" title="Close fishing">×</button>
@@ -693,38 +696,36 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
     <span id="fishingSpeed">0.0 m/s</span>
   </div>
   <div class="fishingScene">
-    <canvas id="fishingCanvas" width="420" height="190" aria-label="Current fish"></canvas>
+    <canvas id="fishingCanvas" width="1280" height="720" aria-label="Fishing view. Tap to cast or hook. Drag while fighting to move the rod and reel."></canvas>
+    <div class="fishingGesture" aria-hidden="true"><span class="fishingGesturePointer"></span><b id="fishingGestureLabel">TAP WATER TO CAST</b></div>
     <div class="fishingFishReadout">
       <strong id="fishingFishName">Unknown fish</strong>
-      <span id="fishingFishMeta">Cast to discover the fish in this water.</span>
+      <span id="fishingFishMeta"></span>
     </div>
   </div>
-  <div id="fishingMessage" class="fishingMessage" role="status" aria-live="polite">Stop the boat and cast into the water.</div>
-  <button id="fishingActionBtn" class="fishingPrimary" type="button">Cast Line</button>
+  <div id="fishingMessage" class="fishingMessage" role="status" aria-live="polite">READY</div>
+  <button id="fishingActionBtn" class="fishingPrimary" type="button" aria-label="Cast line"><span class="fishingActionIcon" aria-hidden="true">↗</span><span id="fishingActionLabel">CAST</span></button>
   <div class="fishingMeters" aria-label="Fishing status">
-    <div class="fishingMeterRow"><span>Tension</span><div class="fishingMeter"><i id="fishingTensionFill"></i><b class="safeBand"></b></div><em id="fishingTensionValue">0%</em></div>
-    <div class="fishingMeterRow"><span>Fish fatigue</span><div class="fishingMeter"><i id="fishingStaminaFill"></i></div><em id="fishingStaminaValue">0% tired</em></div>
-    <div class="fishingMeterRow"><span>Line</span><div class="fishingMeter"><i id="fishingIntegrityFill"></i></div><em id="fishingIntegrityValue">100%</em></div>
-    <div class="fishingMeterRow"><span>Distance</span><div class="fishingMeter"><i id="fishingProgressFill"></i></div><em id="fishingProgressValue">0%</em></div>
+    <div class="fishingMeterRow tension" title="Line tension"><span aria-hidden="true">⌁</span><div class="fishingMeter"><i id="fishingTensionFill"></i><b class="safeBand"></b></div><em id="fishingTensionValue">0%</em></div>
+    <div class="fishingMeterRow stamina" title="Fish fatigue"><span aria-hidden="true">◒</span><div class="fishingMeter"><i id="fishingStaminaFill"></i></div><em id="fishingStaminaValue">0%</em></div>
+    <div class="fishingMeterRow integrity" title="Line integrity"><span aria-hidden="true">╱</span><div class="fishingMeter"><i id="fishingIntegrityFill"></i></div><em id="fishingIntegrityValue">100%</em></div>
+    <div class="fishingMeterRow progress" title="Distance reeled"><span aria-hidden="true">◎</span><div class="fishingMeter"><i id="fishingProgressFill"></i></div><em id="fishingProgressValue">0%</em></div>
   </div>
   <label class="fishingDragRow" for="fishingDrag">
-    <span>Reel drag</span>
+    <span title="Reel drag" aria-label="Reel drag">◉</span>
     <input id="fishingDrag" type="range" min="15" max="90" step="1" value="48">
     <em id="fishingDragValue">48%</em>
   </label>
   <div class="fishingFightControls">
-    <button id="fishingGiveBtn" type="button">Give Line <small>Hold Q</small></button>
-    <button id="fishingReelBtn" class="reel" type="button">Reel <small>Hold Space</small></button>
+    <button id="fishingGiveBtn" type="button" aria-label="Hold to give line"><span aria-hidden="true">↘</span><small>Q</small></button>
+    <button id="fishingReelBtn" class="reel" type="button" aria-label="Hold to reel"><span aria-hidden="true">⟳</span><small>SPACE</small></button>
   </div>
   <div class="fishingRodControls" role="group" aria-label="Rod direction">
-    <button id="fishingRodLeft" type="button">Rod Left <small>J</small></button>
-    <button id="fishingRodCenter" class="active" type="button">Center <small>K</small></button>
-    <button id="fishingRodRight" type="button">Rod Right <small>L</small></button>
+    <button id="fishingRodLeft" type="button" aria-label="Rod left"><span aria-hidden="true">↖</span><small>J</small></button>
+    <button id="fishingRodCenter" class="active" type="button" aria-label="Rod center"><span aria-hidden="true">↑</span><small>K</small></button>
+    <button id="fishingRodRight" type="button" aria-label="Rod right"><span aria-hidden="true">↗</span><small>L</small></button>
   </div>
-  <div class="fishingLogHeader">
-    <div><strong id="fishingSummary">0 catches | 0 species | Best 0 pts</strong><span id="fishingRecord">No personal record yet</span></div>
-  </div>
-  <ol id="fishingCatchList" class="fishingCatchList"><li>No catches yet.</li></ol>
+  <details class="fishingCatchBook"><summary><strong id="fishingSummary">0 catches</strong><span id="fishingRecord"></span></summary><ol id="fishingCatchList" class="fishingCatchList"><li>No catches yet.</li></ol></details>
 </aside>
 <div id="flowerChallengeHud">
 <span id="flowerChallengeHudStatus"></span>
@@ -736,6 +737,38 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
 </aside>
 <div id="deFlockPrompt" role="status"></div>
+<div id="urbanVehiclePrompt" role="status" aria-live="polite" aria-hidden="true">
+  <div class="urbanVehiclePromptCopy">
+    <div id="urbanVehiclePromptTitle">Enter vehicle</div>
+    <div id="urbanVehiclePromptMeta"></div>
+  </div>
+  <kbd id="urbanVehiclePromptKey">E</kbd>
+  <button id="urbanVehiclePromptButton" type="button">Enter</button>
+  <kbd id="urbanVehiclePromptSecondaryKey" hidden>V</kbd>
+  <button id="urbanVehiclePromptSecondaryButton" type="button" hidden>Use</button>
+  <kbd id="urbanVehiclePromptTakeKey" hidden>T</kbd>
+  <button id="urbanVehiclePromptTakeButton" type="button" hidden>Take</button>
+</div>
+<aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
+  <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
+  <div id="urbanPlayerCondition" class="urbanPlayerCondition" role="status" aria-label="Explorer health">
+    <span><b>Explorer condition</b><small id="urbanPlayerConditionText">100%</small></span>
+    <i aria-hidden="true"><b id="urbanPlayerConditionFill"></b></i>
+  </div>
+  <div class="urbanBackpackLabel">Quick access</div>
+  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
+  <div class="urbanBackpackLabel">Pack contents</div>
+  <div id="urbanBackpackContents" class="urbanBackpackContents"></div>
+  <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
+</aside>
+<button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden>PACK</button>
+<aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
+  <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
+  <div class="urbanCivicStatusCopy">
+    <div id="urbanCivicStatusTitle">Incident witnessed</div>
+    <div id="urbanCivicStatusDetail">Local civic response</div>
+  </div>
+</aside>
 <aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
   <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
   <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
@@ -1069,31 +1102,35 @@ Explore the area
 
 </div>
 
-<!-- Bottom Row: Game Mode and Real Estate -->
+<!-- Bottom Row: Games and Real Estate -->
 <div class="floatMenuRow">
 <div class="floatMenu" id="gameMenu">
-<button class="floatBtn game" id="gameBtn" type="button" aria-label="Games" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
-<div class="floatItems">
-<div class="floatItem" id="fDeFlock">📷 Start DeFlock Hunt</div>
-<div class="floatItem" id="fLiveGps">📍 Start Live GPS Explore</div>
-<div class="floatItem" id="fActivities">🌍 Browse Games</div>
-<div class="floatItem" id="fRoomGames">👥 Room Games</div>
-<div class="floatItem" id="fActivityCreator">🧩 Create Game</div>
-<div class="floatItem" id="fMemoryFlower">🌸 Place Memory Flower</div>
+<button class="floatBtn game" id="gameBtn" type="button" aria-label="Open games" aria-expanded="false" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Games</span></button>
+<div class="floatItems" data-menu-title="GAMES">
+<div class="floatItemSection" role="separator">PLAY</div>
+<div class="floatItem" id="fActivities">🎮 Choose a Game</div>
+<div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
 <div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
-<div class="floatItem" id="fPolice">🚔 Police</div>
-<div class="floatItem" id="fTrack">🏁 Record Track</div>
-<div class="floatItem" id="fEraseTrack">🗑️ Erase Track</div>
-<div class="floatItem" id="fRespawn">🎯 Respawn</div>
-<div class="floatItem" id="fRespawnRand">🎲 Random Respawn</div>
-<div class="floatItemSection" role="separator">MULTIPLAYER</div>
-<div class="floatItem" id="fMpCreate">🆕 Create Room</div>
-<div class="floatItem" id="fMpJoin">🔑 Join Room</div>
-<div class="floatItem" id="fMpInvite">🔗 Invite Link</div>
-<div class="floatItem" id="fMpLeave">🚪 Leave Room</div>
-<div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
-<div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
+<div class="floatItemSection" role="separator">LIVE</div>
+<div class="floatItem" id="fLiveGps">📍 Live GPS Explore</div>
+<div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
+<div class="floatItemSection" role="separator">RECOVERY</div>
+<div class="floatItem" id="fRespawn">🎯 Return to Safe Ground</div>
+
+<!-- Preserved for future product work, intentionally absent from production UI. -->
+<div class="floatItem" id="fRoomGames" hidden>👥 Room Games</div>
+<div class="floatItem" id="fActivityCreator" hidden>🧩 Create Game</div>
+<div class="floatItem" id="fMemoryFlower" hidden>🌸 Place Memory Flower</div>
+<div class="floatItem" id="fTrack" hidden>🏁 Record Track</div>
+<div class="floatItem" id="fEraseTrack" hidden>🗑️ Erase Track</div>
+<div class="floatItem" id="fRespawnRand" hidden>🎲 Random Respawn</div>
+<div class="floatItem" id="fMpCreate" hidden>🆕 Create Room</div>
+<div class="floatItem" id="fMpJoin" hidden>🔑 Join Room</div>
+<div class="floatItem" id="fMpInvite" hidden>🔗 Invite Link</div>
+<div class="floatItem" id="fMpLeave" hidden>🚪 Leave Room</div>
+<div class="floatItem on" id="fMpGhosts" hidden>👻 Toggle Ghosts</div>
+<div class="floatItem" id="fMpChat" hidden>💬 Toggle Chat</div>
 </div>
 </div>
 
@@ -1499,10 +1536,10 @@ Explore the area
   <div class="activityDiscoveryTopBar">
     <div class="activityDiscoveryTitleWrap">
       <div id="activityDiscoveryTitle">Games &amp; Activities</div>
-      <div id="activityDiscoverySubline">Discover public games, room sessions, and creator-built activities tied to real places in the world.</div>
+      <div id="activityDiscoverySubline">Choose a ready-to-play activity tied to the current real-world location.</div>
     </div>
     <div class="activityDiscoveryHeaderActions">
-      <button id="activityDiscoveryOpenCreatorBtn" type="button">Create Game</button>
+      <button id="activityDiscoveryOpenCreatorBtn" type="button" hidden>Create Game</button>
       <button id="activityDiscoveryCloseBtn" type="button">Close</button>
     </div>
   </div>
@@ -1510,7 +1547,7 @@ Explore the area
   <aside class="activityDiscoveryPanelCol activityDiscoveryBrowseCol">
     <div class="activityDiscoverySectionTitle">Browse</div>
     <div class="activityDiscoverySearchRow">
-      <input id="activityDiscoverySearchInput" type="text" maxlength="120" placeholder="Search activities, creators, locations">
+      <input id="activityDiscoverySearchInput" type="text" maxlength="120" placeholder="Search games and locations">
       <select id="activityDiscoverySortSelect">
         <option value="recommended">Recommended</option>
         <option value="title">Title</option>
@@ -1632,6 +1669,7 @@ Explore the area
 • WASD - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
+• E - Context action: enter / exit a nearby vehicle or use an object<br>
 • C - Camera view<br>
 • F - Cycle character / car / plane / drone<br>
 • M - Toggle map<br>
@@ -1657,7 +1695,10 @@ Explore the area
 • Arrow Up/Down - Move forward / back<br>
 • Arrow Left/Right - Turn left / right<br>
 • WASD - Look around<br>
-• E - Enter/exit building interior<br>
+• E - Context action at a visible door, vehicle, person, or object<br>
+• I - Open / close carried equipment; 1–6 quick-equip<br>
+• V - Use equipped item; T - take an available nearby item<br>
+• X - Resume the current field activity<br>
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
 • Shift - Run (2x speed)<br>
@@ -1732,5 +1773,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=445"></script>
+<script type="module" src="js/bootstrap.js?v=488"></script>
 </body></html>

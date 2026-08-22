@@ -28,7 +28,9 @@ function createPoseSnapshotBase(world) {
       locLon: world.lon,
       interiorKey: String(activeInterior?.key || '').trim(),
       buildingKey: String(activeInterior?.support?.key || activeInterior?.building?.sourceBuildingId || '').trim(),
-      interiorLabel: String(activeInterior?.label || '').trim()
+      interiorLabel: String(activeInterior?.label || '').trim(),
+      interiorFloorId: String(activeInterior?.floorId || '').trim(),
+      interiorFloorLevel: Math.max(0, Math.floor(finiteNumber(activeInterior?.activeLevel, 0)))
     },
     pose: {
       x: 0,

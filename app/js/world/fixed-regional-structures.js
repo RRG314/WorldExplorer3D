@@ -40,6 +40,17 @@ function structureNodeMap(elements = []) {
   );
 }
 
+function structureNodeMapFromLookup(nodes = {}) {
+  if (nodes instanceof Map) return nodes;
+  const map = new Map();
+  for (const node of Object.values(nodes)) {
+    if (!Number.isFinite(Number(node?.lat)) || !Number.isFinite(Number(node?.lon))) continue;
+    map.set(node.id, node);
+    map.set(String(node.id), node);
+  }
+  return map;
+}
+
 function structureProjectionOriginLatitude(...nodeMaps) {
   for (const nodes of nodeMaps) {
     for (const node of nodes.values()) return Number(node.lat) || 0;
@@ -163,6 +174,52 @@ function isDriveableWay(element) {
   return new RegExp(`^(?:${DRIVEABLE_HIGHWAYS})$`).test(highway);
 }
 
+export function pruneSupersededGeneralizedStructures(ways = [], nodes = {}) {
+  const worldWays = Array.isArray(ways) ? ways : [];
+  const nodeMap = structureNodeMapFromLookup(nodes);
+  const exactWays = worldWays.filter((way) =>
+    isDriveableStructureWay(way) &&
+    String(way.tags?._sourceCompleteness || '') !== 'generalized'
+  );
+  if (exactWays.length === 0) {
+    return Object.freeze({
+      ways: worldWays,
+      exactStructures: 0,
+      supersededGeneralizedStructures: 0
+    });
+  }
+  const originLatitude = structureProjectionOriginLatitude(nodeMap);
+  const exactSpatialIndex = buildExactStructureSpatialIndex(
+    exactWays,
+    nodeMap,
+    originLatitude
+  );
+  let supersededGeneralizedStructures = 0;
+  const retained = worldWays.filter((way) => {
+    if (!isDriveableStructureWay(way) ||
+        String(way.tags?._sourceCompleteness || '') !== 'generalized') return true;
+    const spatialDuplicate = generalizedStructureDuplicatesExact(
+      way,
+      nodeMap,
+      originLatitude,
+      exactSpatialIndex
+    );
+    // A structure name identifies a corridor, not a physical surface extent.
+    // Current mapped ways can split one named bridge into deck and approach
+    // fragments. Only proven same-family segment overlap may retire the
+    // generalized fallback; otherwise a surviving approach can delete the
+    // only complete deck after another exact fragment fails ground acceptance.
+    if (!spatialDuplicate) return true;
+    supersededGeneralizedStructures += 1;
+    return false;
+  });
+  return Object.freeze({
+    ways: retained,
+    exactStructures: exactWays.length,
+    supersededGeneralizedStructures
+  });
+}
+
 export function buildFixedRegionalStructureQuery(bounds, timeoutSeconds = 20) {
   const bbox = boundsExpression(bounds);
   const timeout = Math.max(8, Math.floor(Number(timeoutSeconds) || 20));
@@ -170,10 +227,10 @@ export function buildFixedRegionalStructureQuery(bounds, timeoutSeconds = 20) {
   way["highway"~"^(${DRIVEABLE_HIGHWAYS})$"]["bridge"]${bbox}->.bridges;
   way["highway"~"^(${DRIVEABLE_HIGHWAYS})$"]["tunnel"]${bbox}->.tunnels;
   (.bridges;.tunnels;)->.structures;
-  node(w.tunnels)->.tunnel_nodes;
+  node(w.structures)->.structure_nodes;
   (
     .structures;
-    way(bn.tunnel_nodes)["highway"~"^(${DRIVEABLE_HIGHWAYS})$"];
+    way(bn.structure_nodes)["highway"~"^(${DRIVEABLE_HIGHWAYS})$"];
   );out body;>;out skel qt;`;
 }
 
@@ -203,15 +260,8 @@ export function retainExactRegionalStructures(data) {
     const structure = structuresByEndpoint.get(endpointId)?.[0];
     const structureHighway = String(structure?.tags?.highway || '');
     const structureName = normalizedStructureName(structure?.tags);
-    const structureType = structureFamily(structure?.tags);
     const candidates = connectorCandidates
       .filter((way) => way.nodes.includes(endpointId))
-      .filter((way) => {
-        // Bridge ramps are themselves exact structure ways, while the regional
-        // source already owns the surrounding at-grade network. Only tunnels
-        // require an extra exact surface mate to locate the physical portal.
-        return structureType === 'tunnel';
-      })
       .sort((left, right) => {
         const score = (way) => {
           const highway = String(way.tags?.highway || '');
@@ -222,6 +272,11 @@ export function retainExactRegionalStructures(data) {
         };
         return score(right) - score(left) || String(left.id).localeCompare(String(right.id));
       });
+    // Every exact structure boundary needs one exact topology mate. Importing
+    // these only for tunnels left bridge ways such as Baltimore's JFX with no
+    // graph stations after the generalized duplicate was correctly removed.
+    // The shared OSM node is explicit connection evidence; the scoring merely
+    // selects the most likely continuation when several ways meet there.
     if (candidates[0]) connectorSet.add(candidates[0]);
   }
   const connectorWays = [...connectorSet];
@@ -258,47 +313,35 @@ export function mergeExactRegionalStructures(worldData, structureData) {
   const worldElements = Array.isArray(worldData?.elements) ? worldData.elements : [];
   const exact = retainExactRegionalStructures(structureData);
   const exactWays = exact.elements.filter((element) => element.type === 'way');
-  const worldNodes = structureNodeMap(worldElements);
-  const exactNodes = structureNodeMap(exact.elements);
-  const structureProjectionLatitude = structureProjectionOriginLatitude(exactNodes, worldNodes);
-  const exactStructureSpatialIndex = buildExactStructureSpatialIndex(
-    exactWays.filter((way) => structureFamily(way.tags)),
-    exactNodes,
-    structureProjectionLatitude
-  );
+  const exactWaysById = new Map(exactWays.map((way) => [way.id, way]));
   const existingExactWayIds = new Set(
     worldElements
       .filter((element) => element?.type === 'way' && Number(element.id) > 0)
       .map((element) => element.id)
   );
   const additions = exactWays.filter((way) => !existingExactWayIds.has(way.id));
-
-  // Shortbread supplies regional continuity, but its schema intentionally omits
-  // most engineered structure detail. Once the exact named OSM way is present,
-  // the generalized copy is no longer an authority and must not be published as
-  // a second deck/tunnel alongside it.
-  const exactNamedFamilies = new Set(
-    exactWays
-      .map((way) => {
-        const family = structureFamily(way.tags);
-        const name = normalizedStructureName(way.tags);
-        return family && name ? `${family}:${name}` : '';
-      })
-      .filter(Boolean)
-  );
-  const retainedWorldElements = worldElements.filter((element) => {
-    if (element?.type !== 'way') return true;
-    if (String(element.tags?._sourceCompleteness || '') !== 'generalized') return true;
-    const name = normalizedStructureName(element.tags);
-    const namedDuplicate = name && exactNamedFamilies.has(`${structureFamily(element.tags)}:${name}`);
-    const spatialDuplicate = generalizedStructureDuplicatesExact(
-      element,
-      worldNodes,
-      structureProjectionLatitude,
-      exactStructureSpatialIndex
-    );
-    return !namedDuplicate && !spatialDuplicate;
+  let upgradedExistingWays = 0;
+  const retainedWorldElements = worldElements.map((element) => {
+    if (element?.type !== 'way') return element;
+    const exactWay = exactWaysById.get(element.id);
+    if (!exactWay || Number(element.id) <= 0) return element;
+    upgradedExistingWays += 1;
+    return {
+      ...element,
+      nodes: exactWay.nodes,
+      tags: { ...element.tags, ...exactWay.tags }
+    };
   });
+
+  // Keep generalized engineered ways until accepted-ground filtering has
+  // established which exact structures can actually publish. That later pass
+  // is the single deduplication authority; pruning here can leave zero decks
+  // when an exact response exists but its ground contract is rejected.
+  const deferredGeneralizedWays = retainedWorldElements.filter((element) =>
+    element?.type === 'way' &&
+    isDriveableStructureWay(element) &&
+    String(element.tags?._sourceCompleteness || '') === 'generalized'
+  ).length;
 
   const retainedNodeIds = new Set(
     retainedWorldElements
@@ -326,7 +369,9 @@ export function mergeExactRegionalStructures(worldData, structureData) {
     _fixedRegionalStructures: {
       ...exact._fixedRegionalStructures,
       addedWays: additions.length,
-      replacedGeneralizedWays: worldElements.length - retainedWorldElements.length
+      upgradedExistingWays,
+      deferredGeneralizedWays,
+      replacedGeneralizedWays: 0
     }
   };
 }

@@ -10,8 +10,8 @@ import {
   serverTimestamp,
   setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { getCurrentUser } from '../../../js/auth-ui.js';
-import { initFirebase } from '../../../js/firebase-init.js';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
+import { initFirebase } from '../../../js/firebase-init.js?v=55';
 import { normalizeCityKey, normalizeCode } from './rooms.js?v=67';
 import {
   WEEKLY_CITY_ROTATION,

@@ -52,13 +52,18 @@ export function resetWorldForReload(options = {}) {
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
   appCtx.disposeLivingWorldRuntime?.('world_reload');
+  appCtx.buildingEntranceCatalog = null;
+  appCtx.buildingEntranceByBuilding = null;
+  appCtx.buildingFacadeEntrances = null;
   appCtx.disposeWorldDiscoveryRuntime?.('world_reload');
   appCtx.closeArExperience?.('world_reload');
   appCtx.disposeEditableWorldPresentation?.();
+  appCtx.disposeUrbanSandboxRuntime?.('world_reload');
 
-  if (typeof appCtx.resetEarthStreaming === 'function') {
-    appCtx.resetEarthStreaming('full_world_reload');
+  if (typeof appCtx.resetEarthStreaming !== 'function') {
+    throw new Error('Earth streaming lifecycle owner is unavailable during world reset.');
   }
+  appCtx.resetEarthStreaming(options.reason || 'full_world_reload');
   appCtx.initialEarthDetailRadius = 0;
   appCtx.plannedEarthDetailRadiusWorld = 0;
   appCtx.fixedRegionalContextBounds = null;
@@ -137,6 +142,8 @@ export function resetWorldForReload(options = {}) {
   disposeSceneMeshes(appCtx.historicMarkers);
   appCtx.clearWorldCollections(['historicMarkers', 'historicSites']);
   appCtx.curatedLandmarkMetrics = null;
+  appCtx.mappedLandmarkMetrics = null;
+  appCtx.deferredTransportLandmarkPublishers = [];
 
   disposeSceneMeshes(appCtx.streetFurnitureMeshes);
   appCtx.replaceWorldCollection('streetFurnitureMeshes');
@@ -153,5 +160,6 @@ export function resetWorldForReload(options = {}) {
 
   resetWorldFurnitureCaches();
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
+  appCtx.renderer?.renderLists?.dispose?.();
 
 }

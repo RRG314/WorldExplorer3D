@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
+import { mergeBuildingMetadata } from "./building-metadata.js?v=2";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
 import {
   mappedWaterStructurePriority,
@@ -9,6 +9,59 @@ import {
 const COMPLETE_BUILDING_TILE_CAP = 1200;
 const BUILDING_COVERAGE_TARGET = 0.85;
 const EXPANDED_COVERAGE_FLOOR = 9001;
+
+function mappedBuildingHeightMeters(tags = {}) {
+  const explicitHeight = Number.parseFloat(tags.height);
+  if (Number.isFinite(explicitHeight)) return explicitHeight;
+  const levels = Number.parseFloat(tags['building:levels']);
+  return Number.isFinite(levels) ? levels * 3.2 : null;
+}
+
+export function buildingPublicationPriority(tags = {}) {
+  if (mappedWaterStructurePriority(tags) > 0) return 1000000;
+  const mappedHeight = mappedBuildingHeightMeters(tags);
+  return Number.isFinite(mappedHeight) && mappedHeight >= 60
+    ? 10000 + Math.min(2000, mappedHeight)
+    : 0;
+}
+
+function buildingWayCenterWorld(way, nodes, geoToWorld) {
+  const points = (way?.nodes || [])
+    .map((id) => nodes[id])
+    .filter((node) => Number.isFinite(Number(node?.lat)) && Number.isFinite(Number(node?.lon)))
+    .map((node) => geoToWorld(Number(node.lat), Number(node.lon)))
+    .filter((point) => Number.isFinite(Number(point?.x)) && Number.isFinite(Number(point?.z)));
+  if (points.length < 3) return null;
+  if (points.length > 3) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (Math.hypot(first.x - last.x, first.z - last.z) <= 1e-4) points.pop();
+  }
+  if (points.length < 3) return null;
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    z: points.reduce((sum, point) => sum + point.z, 0) / points.length
+  };
+}
+
+export function constrainBuildingWaysToPublicationDomain(ways, nodes, options = {}) {
+  const visibleRadiusWorld = Math.max(0, Number(options.visibleRadiusWorld) || 0);
+  const geoToWorld = typeof options.geoToWorld === 'function' ? options.geoToWorld : appCtx.geoToWorld;
+  if (!Array.isArray(ways) || visibleRadiusWorld <= 0 || typeof geoToWorld !== 'function') {
+    return Object.freeze({ ways: Array.isArray(ways) ? ways : [], clipped: 0 });
+  }
+  const eligible = [];
+  let clipped = 0;
+  for (const way of ways) {
+    const center = buildingWayCenterWorld(way, nodes, geoToWorld);
+    if (center && Math.hypot(center.x, center.z) > visibleRadiusWorld) {
+      clipped += 1;
+      continue;
+    }
+    eligible.push(way);
+  }
+  return Object.freeze({ ways: eligible, clipped });
+}
 
 export function shouldFetchSupplementalWaterStructures(options = {}) {
   return options.authoritativeMassing === true &&
@@ -62,7 +115,7 @@ export function resolveBuildingPublicationSelection(options = {}) {
   });
 }
 
-async function fetchBuildingMetadata(options, metadataState) {
+async function fetchBuildingMetadata(options, metadataState, fetchOptions = {}) {
   if (!options.fetchPreferredMetadata && !(options.metadataQuery && typeof options.fetchOverpassJSON === 'function')) {
     return null;
   }
@@ -77,6 +130,11 @@ async function fetchBuildingMetadata(options, metadataState) {
         }
         options.recordLoadWarning?.('bundled building metadata', preferredMetadataErr);
       }
+    }
+    if (!metadata && fetchOptions.preferredOnly === true) {
+      metadataState.status = 'skipped';
+      metadataState.reason = 'no-compatible-cross-provider-metadata';
+      return null;
     }
     if (!metadata) {
       metadata = await options.fetchOverpassJSON(
@@ -120,7 +178,8 @@ export async function loadBuildingDetailForPublication(options = {}) {
   const query = String(options.query || '');
   const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
   const fetchPreferredData = typeof options.fetchPreferredData === 'function' ? options.fetchPreferredData : null;
-  if (!fetchPreferredData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
+  const fetchFallbackData = typeof options.fetchFallbackData === 'function' ? options.fetchFallbackData : null;
+  if (!fetchPreferredData && !fetchFallbackData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
     setBuildingDetailState('skipped');
     return appCtx.worldDetailState.buildings;
   }
@@ -138,6 +197,14 @@ export async function loadBuildingDetailForPublication(options = {}) {
       } catch (preferredErr) {
         if (preferredErr?.name === 'AbortError' || !isActiveLoadContext()) throw preferredErr;
         options.recordLoadWarning?.('vector building detail', preferredErr);
+      }
+      if (!data && fetchFallbackData) {
+        try {
+          data = await fetchFallbackData();
+        } catch (fallbackErr) {
+          if (fallbackErr?.name === 'AbortError' || !isActiveLoadContext()) throw fallbackErr;
+          options.recordLoadWarning?.('generalized vector building fallback', fallbackErr);
+        }
       }
       const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
       if (authoritativeMassing && options.waterStructureQuery) {
@@ -169,8 +236,15 @@ export async function loadBuildingDetailForPublication(options = {}) {
           options.recordLoadWarning?.('mapped water structures', waterStructureError);
         }
       }
-      if (data && !authoritativeMassing) {
-        const metadata = await fetchBuildingMetadata(options, metadataState);
+      if (data) {
+        // Geometry and mapped semantics are separate authorities. Overture may
+        // own the footprint while a uniquely matched bundled OSM identity owns
+        // missing height, level, roof, type, or name metadata. Live Overpass
+        // metadata cannot be joined to Overture without a shared stable id, so
+        // authoritative Overture massing uses only the curated bundled join.
+        const metadata = await fetchBuildingMetadata(options, metadataState, {
+          preferredOnly: authoritativeMassing
+        });
         if (!isActiveLoadContext()) return;
         if (metadata) {
           mergeBuildingMetadata(data, metadata, {
@@ -188,15 +262,40 @@ export async function loadBuildingDetailForPublication(options = {}) {
         );
       }
       if (!isActiveLoadContext()) return;
+      const publicationSource = String(data._overpassSource || 'unknown-building-source');
+      appCtx.worldLoadRuntimeState ||= {};
+      appCtx.worldLoadRuntimeState.publicationSources = {
+        ...(appCtx.worldLoadRuntimeState.publicationSources || {}),
+        buildings: publicationSource
+      };
+      appCtx.worldLoadRuntimeState.buildingProviderDecision = data._buildingProviderDecision || {
+        selected: publicationSource,
+        authority: 'explicit-publication-source',
+        status: 'available',
+        fallbackStarted: false
+      };
       const inferredCoverage = supplementSparseBuildingData(data, appCtx);
 
       const nodes = {};
       for (const element of data.elements || []) {
         if (element?.type === 'node') nodes[element.id] = element;
       }
-      const requested = (data.elements || []).filter((element) =>
+      const providerRequested = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
+      // Vector providers fetch rectangular tile coverage. Publication owns a
+      // circular fixed-location LOD domain, so clip the decoded rectangle with
+      // the same footprint-center measurement used by the renderer before any
+      // selection budget can be consumed by never-visible corner features.
+      const publicationDomain = constrainBuildingWaysToPublicationDomain(
+        providerRequested,
+        nodes,
+        {
+          geoToWorld: appCtx.geoToWorld,
+          visibleRadiusWorld: options.lodThresholds?.farVisible
+        }
+      );
+      const requested = publicationDomain.ways;
       const publicationSelection = resolveBuildingPublicationSelection({
         ...options,
         requestedBuildingWays: requested.length
@@ -205,14 +304,23 @@ export async function loadBuildingDetailForPublication(options = {}) {
       const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
         ...publicationSelection,
         tileDegrees: options.tileBudgetCfg.tileDegrees,
-        // Vessels remain the only semantic exception to distance ordering.
-        // Ordinary height/roof metadata must not displace closer buildings.
+        // Mapped vessels and mapped tall-building identities are sparse,
+        // authoritative skyline features. Preserve those mapped records before
+        // distributing the remaining ordinary footprint budget by distance.
         compareFn: (a, b) =>
-          mappedWaterStructurePriority(b?.tags || {}) - mappedWaterStructurePriority(a?.tags || {})
+          buildingPublicationPriority(b?.tags || {}) - buildingPublicationPriority(a?.tags || {})
       });
 
+      options.loadMetrics.buildings.providerRequested = providerRequested.length;
       options.loadMetrics.buildings.requested = requested.length;
       options.loadMetrics.buildings.selected = buildingWays.length;
+      options.loadMetrics.buildings.publicationDomain = {
+        authority: 'building-far-visible-lod',
+        visibleRadiusWorld: Number(options.lodThresholds?.farVisible || 0),
+        providerRequested: providerRequested.length,
+        eligible: requested.length,
+        clipped: publicationDomain.clipped
+      };
       options.loadMetrics.buildings.provenancePublicationCap = provenancePublicationCap;
       options.loadMetrics.buildings.publicationSelection = publicationSelection;
       const buildingPublication = await options.buildBuildingGeometryPass({
@@ -240,6 +348,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
       // final world-publication owner after landmarks are also complete.
       appCtx.clearTerrainHeightCache?.();
       setBuildingDetailState('ready', {
+        providerRequested: providerRequested.length,
         requested: requested.length,
         selected: buildingWays.length,
         selectionRetention: requested.length > 0 ? buildingWays.length / requested.length : 1,
@@ -247,8 +356,12 @@ export async function loadBuildingDetailForPublication(options = {}) {
         provenanceFeatures: Array.isArray(appCtx.buildingProvenanceRecords)
           ? appCtx.buildingProvenanceRecords.length
           : 0,
-        publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
+        publicationDiagnostics: {
+          ...(options.loadMetrics.buildingPublication || {}),
+          buildingDimensions: { ...(options.loadMetrics.buildingDimensions || {}) }
+        },
         coveragePolicy: {
+          publicationDomain: options.loadMetrics.buildings.publicationDomain,
           globalCap: publicationSelection.globalCap,
           targetRatio: publicationSelection.coverageTarget,
           basePerTile: publicationSelection.basePerTile,

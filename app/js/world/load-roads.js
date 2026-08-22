@@ -1,16 +1,16 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=38";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=39";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
 import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=18";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=22";
+} from "./load-runtime-session.js?v=49";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
-import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=7";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=8";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
   waitForInitialTerrain,
@@ -31,7 +31,7 @@ import {
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=4";
+} from "./fixed-regional-structures.js?v=7";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -71,6 +71,7 @@ export function createWorldRoadLoader(deps = {}) {
     fetchOverpassJSON,
     fetchGlobalBuildingData,
     fetchBundledBuildingMetadata,
+    fetchShortbreadBuildingData,
     fetchShortbreadWorldData,
     featureTileKeyForLatLon,
     fetchVectorTileWater,
@@ -108,7 +109,7 @@ export function createWorldRoadLoader(deps = {}) {
     buildWorldDetailPasses,
     loadLandmarksForPublication,
     signedPolygonAreaXZ,
-    spawnOnRoad,
+    spawnPlayer,
     updateFeatureSurfaceProfile,
     publishLocationWorld,
     vectorTileRangeForBounds,
@@ -263,7 +264,7 @@ export function createWorldRoadLoader(deps = {}) {
         },
         finalizePresentation: false,
         reason,
-        spawnOnRoad,
+        spawnPlayer,
         publishLocationWorld,
         startLoadPhase,
         endLoadPhase
@@ -274,6 +275,12 @@ export function createWorldRoadLoader(deps = {}) {
         endLoadPhase,
         { radiusWorld: 1500, timeoutMs: 7000 }
       );
+      // Terrain classification can debounce a vegetation rebuild. Drain that
+      // bounded refinement before the immutable world publication snapshot so
+      // runtime collections cannot change one frame after readiness.
+      if (typeof appCtx.flushWorldCoverVegetationRefresh === 'function') {
+        appCtx.flushWorldCoverVegetationRefresh();
+      }
     };
     const createSyntheticWorld = () => {
       createSyntheticFallbackWorld({
@@ -371,6 +378,7 @@ export function createWorldRoadLoader(deps = {}) {
           roadsRadius: radius,
           featureRadiusScale,
           poiRadiusScale,
+          buildingVisibleRadiusWorld: lodThresholds.farVisible,
           overpassTimeoutMs,
           loadStartedAt,
           maxTotalLoadMs
@@ -604,6 +612,11 @@ export function createWorldRoadLoader(deps = {}) {
           loadMetrics,
           lodMidDist,
           lodNearDist,
+          mappedFurnitureNodes: Object.values(normalizedSelection.nodes || {}).filter((node) => {
+            const highway = String(node?.tags?.highway || '').toLowerCase();
+            const amenity = String(node?.tags?.amenity || '').toLowerCase();
+            return /^(traffic_signals|stop|give_way|street_lamp)$/.test(highway) || amenity === 'waste_basket';
+          }),
           poiKeyFromTags,
           poiNodes: normalizedSelection.poiNodes,
           startLoadPhase,
@@ -625,6 +638,7 @@ export function createWorldRoadLoader(deps = {}) {
               'bundled-building-pack',
               'building-metadata',
               (signal) => fetchBundledBuildingMetadata?.({
+                coverageRadiusDegrees: buildingPublicationCacheMeta.featureRadius,
                 locationKey: appCtx.selLoc,
                 lat: appCtx.LOC.lat,
                 lon: appCtx.LOC.lon,
@@ -637,9 +651,36 @@ export function createWorldRoadLoader(deps = {}) {
                     lat: appCtx.LOC.lat,
                     lon: appCtx.LOC.lon,
                     radius: buildingPublicationCacheMeta.featureRadius,
+                    bounds: buildingPublicationCacheMeta.bounds,
+                    visibilityRadiusWorld: buildingPublicationCacheMeta.visibleRadiusWorld,
                     signal
-                  }, (error) => recordLoadWarning('Overture building massing', error))
+                  })
                 )
+              : null,
+            fetchFallbackData: buildingLoadPolicy.shouldLoad
+              ? () => runProviderWork('openstreetmap-shortbread', 'building-detail-fallback', async (signal) => {
+                  const fallback = await fetchShortbreadBuildingData({
+                    lat: appCtx.LOC.lat,
+                    lon: appCtx.LOC.lon,
+                    radius: buildingPublicationCacheMeta.featureRadius,
+                    bounds: buildingPublicationCacheMeta.bounds,
+                    signal
+                  });
+                  if (fallback?._shortbreadTiles?.coverageComplete !== true) {
+                    throw new Error(
+                      `Shortbread building coverage incomplete: ` +
+                      `${fallback?._shortbreadTiles?.loaded || 0}/${fallback?._shortbreadTiles?.requested || 0} tiles`
+                    );
+                  }
+                  fallback._buildingProviderDecision = {
+                    selected: 'shortbread',
+                    authority: 'generalized',
+                    status: fallback._shortbreadTiles?.status || 'available',
+                    fallbackStarted: true,
+                    reason: 'overture-unavailable'
+                  };
+                  return fallback;
+                })
               : null,
             skipReason: buildingLoadPolicy.shouldLoad
               ? ''

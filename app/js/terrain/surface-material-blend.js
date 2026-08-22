@@ -10,6 +10,36 @@ export const TERRAIN_SURFACE_CLASS = Object.freeze({
 
 const MATERIAL_ATTRIBUTE_A = 'terrainSurfaceMixA';
 const MATERIAL_ATTRIBUTE_B = 'terrainSurfaceMixB';
+const NORMALIZED_BYTE_MAX = 255;
+
+function normalizedByte(value) {
+  return Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * NORMALIZED_BYTE_MAX);
+}
+
+export function createNormalizedTerrainAttribute(values, itemSize) {
+  const source = ArrayBuffer.isView(values) || Array.isArray(values) ? values : [];
+  const bytes = new Uint8Array(source.length);
+  for (let index = 0; index < source.length; index += 1) bytes[index] = normalizedByte(source[index]);
+  return new THREE.BufferAttribute(bytes, itemSize, true);
+}
+
+export function setNormalizedTerrainAttribute(attribute, index, values) {
+  if (!attribute?.array || !Array.isArray(values)) return false;
+  const offset = index * attribute.itemSize;
+  for (let component = 0; component < attribute.itemSize; component += 1) {
+    const value = values[component] ?? 0;
+    attribute.array[offset + component] = attribute.normalized
+      ? normalizedByte(value)
+      : value;
+  }
+  return true;
+}
+
+function terrainAttributeComponent(attribute, index, component) {
+  if (!attribute?.array) return 0;
+  const value = Number(attribute.array[index * attribute.itemSize + component] || 0);
+  return attribute.normalized ? value / NORMALIZED_BYTE_MAX : value;
+}
 
 export function terrainSurfaceClassForWorldCover(name = '', latitude = 0) {
   const normalized = String(name || '').toLowerCase();
@@ -56,11 +86,11 @@ export function ensureTerrainSurfaceMixAttributes(geometry) {
   let mixA = geometry.attributes[MATERIAL_ATTRIBUTE_A];
   let mixB = geometry.attributes[MATERIAL_ATTRIBUTE_B];
   if (!mixA || mixA.count !== positions.count) {
-    mixA = new THREE.Float32BufferAttribute(new Float32Array(positions.count * 4), 4);
+    mixA = new THREE.BufferAttribute(new Uint8Array(positions.count * 4), 4, true);
     geometry.setAttribute(MATERIAL_ATTRIBUTE_A, mixA);
   }
   if (!mixB || mixB.count !== positions.count) {
-    mixB = new THREE.Float32BufferAttribute(new Float32Array(positions.count * 2), 2);
+    mixB = new THREE.BufferAttribute(new Uint8Array(positions.count * 2), 2, true);
     geometry.setAttribute(MATERIAL_ATTRIBUTE_B, mixB);
   }
   return { mixA, mixB };
@@ -103,8 +133,8 @@ export function applyWorldCoverSurfaceMaterialMix(mesh, result) {
   for (let index = 0; index < uvs.count; index += 1) {
     const mix = weightedMixForWorldCover(result, uvs.getX(index), uvs.getY(index));
     if (!mix) return false;
-    attributes.mixA.setXYZW(index, ...mix.mixA);
-    attributes.mixB.setXY(index, ...mix.mixB);
+    setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);
+    setNormalizedTerrainAttribute(attributes.mixB, index, mix.mixB);
   }
   attributes.mixA.needsUpdate = true;
   attributes.mixB.needsUpdate = true;
@@ -115,8 +145,8 @@ export function applyWorldCoverSurfaceMaterialMix(mesh, result) {
 export function setTerrainSurfaceMaterialMixAt(attributes, index, mode) {
   if (!attributes?.mixA || !attributes?.mixB) return false;
   const mix = terrainSurfaceMixForClass(terrainSurfaceClassForMappedMode(mode));
-  attributes.mixA.setXYZW(index, ...mix.mixA);
-  attributes.mixB.setXY(index, ...mix.mixB);
+  setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);
+  setNormalizedTerrainAttribute(attributes.mixB, index, mix.mixB);
   return true;
 }
 
@@ -129,10 +159,10 @@ export function applyTerrainProfileSurfaceMaterialMix(mesh, mode = 'grass') {
   const mix = terrainSurfaceMixForClass(surfaceClass);
   const colors = geometry.attributes.color;
   for (let index = 0; index < positions.count; index += 1) {
-    attributes.mixA.setXYZW(index, ...mix.mixA);
-    attributes.mixB.setXY(index, ...mix.mixB);
+    setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);
+    setNormalizedTerrainAttribute(attributes.mixB, index, mix.mixB);
     if (surfaceClass === TERRAIN_SURFACE_CLASS.urban && colors) {
-      colors.setXYZ(index, 1, 1, 1);
+      setNormalizedTerrainAttribute(colors, index, [1, 1, 1]);
     }
   }
   attributes.mixA.needsUpdate = true;
@@ -165,25 +195,24 @@ export function applyTerrainReliefMaterialMix(mesh) {
     const slopeRock = slopeT * slopeT * (3 - 2 * slopeT);
     if (slopeRock <= 0.001) continue;
 
-    const urban = Math.max(0, Number(attributes.mixA.getX(index) || 0));
-    const sand = Math.max(0, Number(attributes.mixA.getY(index) || 0));
-    const snow = Math.max(0, Number(attributes.mixB.getY(index) || 0));
+    const urban = Math.max(0, terrainAttributeComponent(attributes.mixA, index, 0));
+    const sand = Math.max(0, terrainAttributeComponent(attributes.mixA, index, 1));
+    const snow = Math.max(0, terrainAttributeComponent(attributes.mixB, index, 1));
     const protectedWeight = Math.min(1, urban + sand + snow);
     const rock = Math.max(
-      Math.max(0, Number(attributes.mixB.getX(index) || 0)),
+      Math.max(0, terrainAttributeComponent(attributes.mixB, index, 0)),
       slopeRock * (1 - protectedWeight)
     );
     if (rock <= 0.001) continue;
 
     const naturalScale = Math.max(0, 1 - rock);
-    attributes.mixA.setXYZW(
-      index,
+    setNormalizedTerrainAttribute(attributes.mixA, index, [
       urban,
       sand,
-      Math.max(0, Number(attributes.mixA.getZ(index) || 0)) * naturalScale,
-      Math.max(0, Number(attributes.mixA.getW(index) || 0)) * naturalScale
-    );
-    attributes.mixB.setXY(index, rock, snow);
+      Math.max(0, terrainAttributeComponent(attributes.mixA, index, 2)) * naturalScale,
+      Math.max(0, terrainAttributeComponent(attributes.mixA, index, 3)) * naturalScale
+    ]);
+    setNormalizedTerrainAttribute(attributes.mixB, index, [rock, snow]);
     exposedRockVertices += 1;
   }
   if (exposedRockVertices > 0) {

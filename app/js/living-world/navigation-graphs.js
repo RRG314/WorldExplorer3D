@@ -1,9 +1,46 @@
+import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=2';
+import {
+  MIN_DRIVEABLE_ROAD_WIDTH_METERS,
+  minimumRoadWidthOnInterval,
+  roadSegmentIsDriveable
+} from '../world/road-cross-section-profile.js?v=1';
+
 const GRAPH_BUDGET_BY_TIER = Object.freeze({
   low: Object.freeze({ pedestrianEdges: 180, trafficEdges: 140 }),
   performance: Object.freeze({ pedestrianEdges: 320, trafficEdges: 260 }),
   balanced: Object.freeze({ pedestrianEdges: 680, trafficEdges: 520 }),
   quality: Object.freeze({ pedestrianEdges: 1100, trafficEdges: 900 })
 });
+
+const LEFT_DRIVING_COUNTRY_CODES = new Set([
+  'AG', 'AI', 'AU', 'BB', 'BD', 'BM', 'BN', 'BS', 'BT', 'BW', 'CY', 'DM',
+  'FJ', 'FK', 'GB', 'GD', 'GG', 'GY', 'HK', 'ID', 'IE', 'IM', 'IN', 'JE',
+  'JM', 'JP', 'KE', 'KI', 'KN', 'KY', 'LC', 'LK', 'LS', 'MO', 'MS', 'MT',
+  'MU', 'MV', 'MW', 'MY', 'MZ', 'NA', 'NR', 'NP', 'NZ', 'PG', 'PK', 'PN',
+  'SB', 'SC', 'SG', 'SH', 'SR', 'SZ', 'TC', 'TH', 'TK', 'TO', 'TT', 'TV',
+  'TZ', 'UG', 'VC', 'VG', 'VI', 'WS', 'ZA', 'ZM', 'ZW'
+]);
+
+export function resolveDrivingSide(selection = {}) {
+  const details = selection?.locationDetails || selection?.details || {};
+  const countryCode = String(
+    selection?.countryCode || details?.countryCode || details?.country_code || ''
+  ).trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(countryCode)) {
+    return Object.freeze({
+      driveOnLeft: LEFT_DRIVING_COUNTRY_CODES.has(countryCode),
+      source: 'country-code',
+      countryCode
+    });
+  }
+  const label = [selection?.name, details?.country].filter(Boolean).join(' ').toLowerCase();
+  const leftByLabel = /\b(?:united kingdom|england|scotland|wales|northern ireland|australia|japan|new zealand|singapore|india|ireland|south africa|hong kong|thailand|malaysia|indonesia|pakistan|bangladesh|sri lanka|kenya|tanzania|uganda|zimbabwe|zambia|botswana|namibia|mozambique|london|tokyo|sydney|melbourne|auckland|wellington|dublin|edinburgh|glasgow)\b/.test(label);
+  return Object.freeze({
+    driveOnLeft: leftByLabel,
+    source: leftByLabel ? 'location-label' : 'right-driving-fallback',
+    countryCode: null
+  });
+}
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -91,11 +128,31 @@ function segmentPriority(segment) {
   return Math.hypot(midpointX, midpointZ);
 }
 
+function pedestrianSegmentAllowed(segment) {
+  const feature = segment?.feature;
+  if (!feature) return false;
+  if (feature.walkable === false || feature?.transportGraphRef?.walkable === false) return false;
+  if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return false;
+  // Pedestrian population may consume only an explicitly mapped pedestrian
+  // path. A vehicle-road centerline is not evidence of a sidewalk or crossing,
+  // regardless of road class. Engineered transport also stays closed until a
+  // mapped pedestrian path has been associated with its own physical surface;
+  // offsetting the vehicle deck produced people beside or inside bridges,
+  // ramps, and tunnels.
+  if (featureKind(feature) !== 'footway') return false;
+  const structure = structureState(feature);
+  const ordinaryAtGradeKind = structure.structureKind === 'none' || structure.structureKind === 'at_grade';
+  return structure.terrainMode === 'at_grade' &&
+    ordinaryAtGradeKind &&
+    feature?.structureSemantics?.rampCandidate !== true;
+}
+
 export function compilePedestrianGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
-  const sourceSegments = (Array.isArray(options.traversal?.segments) ? options.traversal.segments : [])
-    .filter((segment) => segment?.p1 && segment?.p2 && segmentPriority(segment) <= 900)
+  const traversalSegments = Array.isArray(options.traversal?.segments) ? options.traversal.segments : [];
+  const sourceSegments = traversalSegments
+    .filter((segment) => segment?.p1 && segment?.p2 && pedestrianSegmentAllowed(segment) && segmentPriority(segment) <= 900)
     .sort((a, b) => segmentPriority(a) - segmentPriority(b));
   const store = makeNodeStore();
   const edges = [];
@@ -128,24 +185,13 @@ export function compilePedestrianGraph(options = {}) {
 
   for (let index = 0; index < sourceSegments.length && edges.length < networkEdgeLimit; index += 1) {
     const segment = sourceSegments[index];
-    const kind = featureKind(segment.feature);
-    const mappedPath = kind === 'footway' || kind === 'cycleway';
-    const roadHalfWidth = Math.max(2.4, finite(segment.feature?.width, finite(segment.feature?.transportRecord?.crossSection?.widthMeters, 6)) * 0.5);
-    const offsets = mappedPath ? [0] : [roadHalfWidth + 1.35, -(roadHalfWidth + 1.35)];
-    const pairs = offsets.map((offset) => edgePointPair(segment, offset, options.sampleSurface)).filter(Boolean);
-    for (let side = 0; side < pairs.length && edges.length + 1 < networkEdgeLimit; side += 1) {
-      const pair = pairs[side];
-      if (typeof options.isBlockedPoint === 'function' && (
-        options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
-      )) continue;
-      const provenance = mappedPath ? 'mapped_path' : 'inferred_sidewalk';
-      addEdge(pair, segment, `${side}:forward`, pair.p1, pair.p2, provenance);
-      addEdge(pair, segment, `${side}:reverse`, pair.p2, pair.p1, provenance);
-    }
-    if (!mappedPath && pairs.length === 2 && index % 4 === 0 && edges.length + 1 < networkEdgeLimit) {
-      addEdge(pairs[0], segment, 'crossing:forward', pairs[0].p1, pairs[1].p1, 'inferred_crossing', 'crossing');
-      addEdge(pairs[0], segment, 'crossing:reverse', pairs[1].p1, pairs[0].p1, 'inferred_crossing', 'crossing');
-    }
+    const pair = edgePointPair(segment, 0, options.sampleSurface);
+    if (!pair) continue;
+    if (typeof options.isBlockedPoint === 'function' && (
+      options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
+    )) continue;
+    addEdge(pair, segment, 'forward', pair.p1, pair.p2, 'mapped_path');
+    addEdge(pair, segment, 'reverse', pair.p2, pair.p1, 'mapped_path');
   }
 
   for (const entrance of Array.isArray(options.entrances) ? options.entrances : []) {
@@ -200,7 +246,24 @@ export function compilePedestrianGraph(options = {}) {
         entranceConnections: edges.filter((edge) => edge.role === 'entrance').length,
         additionalProviderQueries: 0
       }),
-      diagnostics: Object.freeze({ tier, sourceSegments: sourceSegments.length, edgeLimit: budget.pedestrianEdges })
+      diagnostics: Object.freeze({
+        tier,
+        sourceSegments: sourceSegments.length,
+        excludedNonPedestrianSegments: traversalSegments.filter((segment) =>
+          segment?.p1 && segment?.p2 && !pedestrianSegmentAllowed(segment)
+        ).length,
+        excludedVehicleTransportSegments: traversalSegments.filter((segment) =>
+          segment?.p1 && segment?.p2 && featureKind(segment.feature) === 'road'
+        ).length,
+        excludedEngineeredTransportSegments: traversalSegments.filter((segment) => {
+          if (!segment?.p1 || !segment?.p2) return false;
+          const structure = structureState(segment.feature);
+          const ordinaryAtGradeKind = structure.structureKind === 'none' || structure.structureKind === 'at_grade';
+          return structure.terrainMode !== 'at_grade' || !ordinaryAtGradeKind ||
+            segment?.feature?.structureSemantics?.rampCandidate === true;
+        }).length,
+        edgeLimit: budget.pedestrianEdges
+      })
     }),
     runtimeFeatureByEdge
   });
@@ -210,14 +273,24 @@ export function compileTrafficGraph(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = GRAPH_BUDGET_BY_TIER[tier] || GRAPH_BUDGET_BY_TIER.balanced;
   const sourceSegments = (Array.isArray(options.traversal?.segments) ? options.traversal.segments : [])
-    .filter((segment) => segment?.p1 && segment?.p2 && segmentPriority(segment) <= 1200)
+    .filter((segment) =>
+      segment?.p1 && segment?.p2 &&
+      segmentPriority(segment) <= 1200 &&
+      segment.feature?.driveable !== false &&
+      roadSegmentIsDriveable(
+        segment.feature,
+        segment.segIndex,
+        segment.sourceTStart,
+        segment.sourceTEnd
+      )
+    )
     .sort((a, b) => segmentPriority(a) - segmentPriority(b));
   const store = makeNodeStore();
   const edges = [];
   const runtimeFeatureByEdge = new Map();
   const driveOnLeft = options.driveOnLeft === true;
 
-  const addDirected = (segment, pair, reverse, directionName) => {
+  const addDirected = (segment, pair, reverse, directionName, roadWidth, laneOffset) => {
     if (edges.length >= budget.trafficEdges) return;
     const p1 = reverse ? pair.p2 : pair.p1;
     const p2 = reverse ? pair.p1 : pair.p2;
@@ -225,6 +298,7 @@ export function compileTrafficGraph(options = {}) {
     const to = store.upsert(p2, 'lane');
     const record = segment.feature?.transportRecord;
     const id = `traffic:${featureId(segment.feature, 'feature')}:${segment.segIndex}:${directionName}:${edges.length}`;
+    const outwardSign = laneOffset < 0 ? -1 : 1;
     edges.push(Object.freeze({
       id,
       from,
@@ -233,11 +307,21 @@ export function compileTrafficGraph(options = {}) {
       p2: Object.freeze({ ...p2 }),
       length: pair.length,
       speedLimit: Math.max(4.5, Math.min(24, finite(record?.speed?.metersPerSecond, finite(segment.feature?.speedLimit, 12.5)))),
+      roadWidth,
+      laneOffset: Math.abs(laneOffset),
+      centerlineOffset: laneOffset,
+      // This vector points from the lane center toward its actual outside curb.
+      // It is source-geometry data, so downstream parking never has to infer a
+      // side from a directed-edge yaw (which flips on reverse lanes).
+      curbNormalX: pair.normalX * outwardSign,
+      curbNormalZ: pair.normalZ * outwardSign,
       laneCount: Math.max(1, Math.round(finite(record?.crossSection?.lanes, 1))),
       roadClass: String(segment.feature?.type || segment.feature?.networkKind || record?.classification?.highway || 'road'),
       laneProvenance: record?.crossSection?.lanesSource ? 'mapped' : 'inferred',
       direction: directionName,
+      sourceDirection: String(segment.direction || 'both'),
       structure: structureState(segment.feature),
+      surfacePitch: directedSurfacePitch(p1, p2),
       provenance: record?.completeness === 'lossless' ? 'mapped_transport' : 'compiled_transport'
     }));
     runtimeFeatureByEdge.set(id, segment.feature);
@@ -246,24 +330,30 @@ export function compileTrafficGraph(options = {}) {
   for (const segment of sourceSegments) {
     if (edges.length >= budget.trafficEdges) break;
     const direction = String(segment.direction || 'both');
-    const width = Math.max(4.8, finite(segment.feature?.width, finite(segment.feature?.transportRecord?.crossSection?.widthMeters, 7)));
+    const width = minimumRoadWidthOnInterval(
+      segment.feature,
+      segment.segIndex,
+      segment.sourceTStart,
+      segment.sourceTEnd
+    );
+    if (width < MIN_DRIVEABLE_ROAD_WIDTH_METERS) continue;
     const laneOffset = Math.min(2.25, width * 0.24);
     const forwardOffset = driveOnLeft ? laneOffset : -laneOffset;
     const reverseOffset = -forwardOffset;
     if (direction !== 'reverse') {
       const pair = edgePointPair(segment, forwardOffset, options.sampleSurface);
-      if (pair) addDirected(segment, pair, false, 'forward');
+      if (pair) addDirected(segment, pair, false, 'forward', width, forwardOffset);
     }
     if (direction !== 'forward' && edges.length < budget.trafficEdges) {
       const pair = edgePointPair(segment, reverseOffset, options.sampleSurface);
-      if (pair) addDirected(segment, pair, true, 'reverse');
+      if (pair) addDirected(segment, pair, true, 'reverse', width, reverseOffset);
     }
   }
 
   return Object.freeze({
     publication: Object.freeze({
       type: 'TrafficGraph',
-      schemaVersion: 1,
+      schemaVersion: 2,
       nodes: Object.freeze(store.nodes),
       edges: Object.freeze(edges),
       provenance: Object.freeze({
@@ -273,7 +363,12 @@ export function compileTrafficGraph(options = {}) {
         driveOnLeft,
         additionalProviderQueries: 0
       }),
-      diagnostics: Object.freeze({ tier, sourceSegments: sourceSegments.length, edgeLimit: budget.trafficEdges })
+      diagnostics: Object.freeze({
+        tier,
+        sourceSegments: sourceSegments.length,
+        edgeLimit: budget.trafficEdges,
+        slopedEdges: edges.filter((edge) => Math.abs(Number(edge.surfacePitch) || 0) > 0.01).length
+      })
     }),
     runtimeFeatureByEdge
   });

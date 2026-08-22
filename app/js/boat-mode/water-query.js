@@ -5,7 +5,7 @@ import {
   resolveWaterMotionProfile,
   sampleWaterSurfaceMotion,
   sampleWaterwaySurfaceProfile
-} from "../water-dynamics.js?v=4";
+} from "../water-dynamics.js?v=9";
 import {
   BOAT_AREA_MIN_AREA,
   BOAT_AREA_MIN_SPAN,
@@ -38,7 +38,7 @@ import {
   normalizeWaterBody,
   resolveWaterBodySurfaceY,
   waterKindLabel
-} from '../world/water-body-contract.js?v=3';
+} from '../world/water-body-contract.js?v=4';
 import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
 
 let _waterRaycaster = null;

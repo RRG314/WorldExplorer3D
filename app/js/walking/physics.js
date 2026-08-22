@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -165,7 +166,13 @@ function createWalkingPhysicsHelpers({
       const hits = raycaster.intersectObject(planetarySurface, false);
       groundY = hits.length > 0 ? hits[0].point.y : -100;
     } else {
-      groundY = getWalkGroundY(x, z, -100);
+      // Overlapping interior floors require a vertical reference. Preserve the
+      // legacy outdoor query path, but choose the nearest published interior
+      // surface to the actor's feet instead of always selecting the lowest one.
+      const surfaceReferenceY = appCtx.activeInterior
+        ? finiteOr(walkerY, 0) - CFG.eyeHeight
+        : -100;
+      groundY = getWalkGroundY(x, z, surfaceReferenceY);
     }
 
     let effectiveGroundY = groundY;
@@ -253,13 +260,18 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    state.walker.vy += gravity * dt;
+    const parachuteDeployed = appCtx.isUrbanParachuteDeployed?.() === true &&
+      !isPlanetarySurface() && !state.walker.onGround && state.walker.vy < 0;
+    state.walker.vy = parachuteDeployed
+      ? integrateParachuteFall(state.walker.vy, dt, true)
+      : state.walker.vy + gravity * dt;
     state.walker.y += state.walker.vy * dt;
 
     if (state.walker.y <= effectiveGroundY + CFG.eyeHeight) {
       state.walker.y = effectiveGroundY + CFG.eyeHeight;
       state.walker.vy = 0;
       state.walker.onGround = true;
+      appCtx.onUrbanParachuteLanded?.();
     }
 
     const speedMultiplier = appCtx.onMoon ? 0.6 : appCtx.onMars ? 0.72 : 1.0;
@@ -269,6 +281,17 @@ function createWalkingPhysicsHelpers({
       liveGpsTarget.x - state.walker.x,
       liveGpsTarget.z - state.walker.z
     ) > 0.002;
+
+    if (liveGpsMoved) {
+      // GPS owns translation and heading while following. Camera look remains
+      // temporarily available, then continuously settles behind the explorer
+      // so looking aside cannot make movement direction ambiguous.
+      const headingDelta = wrapYaw(state.walker.angle - state.walker.yaw);
+      const followBlend = 1 - Math.exp(-dt * 4.8);
+      state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
+      state.walker.lookYawOffset *= Math.exp(-dt * 2.8);
+      if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+    }
 
     if (forward !== 0 || liveGpsMoved) {
       const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
@@ -352,6 +375,15 @@ function createWalkingPhysicsHelpers({
           }
         }
       }
+      if (!isPlanetarySurface() && typeof appCtx.resolveUrbanActorCollision === 'function') {
+        const urbanCollision = appCtx.resolveUrbanActorCollision(
+          { x: state.walker.x, z: state.walker.z },
+          { x: newX, z: newZ },
+          { mode: 'walk', radius: .3 }
+        );
+        newX = urbanCollision.x;
+        newZ = urbanCollision.z;
+      }
       profileAfterCollision = profileEnabled ? performance.now() : 0;
 
       state.walker.x = newX;
@@ -372,10 +404,12 @@ function createWalkingPhysicsHelpers({
           state.walker.y = targetEyeY;
           state.walker.vy = 0;
           state.walker.onGround = true;
+          appCtx.onUrbanParachuteLanded?.();
         } else if (riseToGround >= 0 && riseToGround <= snapUpDistance) {
           state.walker.y = targetEyeY;
           state.walker.vy = 0;
           state.walker.onGround = true;
+          appCtx.onUrbanParachuteLanded?.();
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;

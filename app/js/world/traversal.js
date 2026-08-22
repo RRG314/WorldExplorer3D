@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
 
 const TRAVERSAL_NODE_GRID = 2.5;
 const TRAVERSAL_MAX_ANCHOR_DISTANCE = {
@@ -37,6 +38,11 @@ function traversalFeatureKind(feature) {
 function isWalkSurface(feature) {
   if (!feature) return false;
   if (feature.walkable === false) return false;
+  // The compiled transport graph is the access authority. Ignoring this
+  // decision allowed foot=no motorways to be reintroduced as inferred
+  // sidewalks by the living-world compiler.
+  if (feature?.transportGraphRef?.walkable === false) return false;
+  if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return false;
   const kind = traversalFeatureKind(feature);
   if (!runtime.enableLinearFeatures()) return kind === 'road' || feature?.isStructureConnector === true;
   return kind === 'road' || kind === 'footway' || kind === 'cycleway' || kind === 'railway';
@@ -236,6 +242,12 @@ function buildTraversalGraph(mode = 'walk') {
         pathPoints[i].distanceAlong,
         pathPoints[i + 1].distanceAlong
       );
+      if (mode === 'drive' && !roadSegmentIsDriveable(
+        feature,
+        source.segmentIndex,
+        source.startT,
+        source.endT
+      )) continue;
 
       const weight = length * segmentPenalty;
       if (direction !== 'reverse') adjacency[fromId].push({ to: toId, weight });

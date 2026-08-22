@@ -15,8 +15,19 @@ function findGradeSeparatedRoad(roads, sampleFeatureSurfaceY, x, z) {
       if (!nearest || dist < nearest.dist) nearest = { road, dist };
       const snapDistance = road.structureSemantics?.structureKind === "bridge" ? 42 : 18;
       if (dist > snapDistance || (best && dist >= best.dist)) continue;
-      const y = sampleFeatureSurfaceY(road, x, z, { segIndex: i, t });
-      if (Number.isFinite(y)) best = { road, dist, y, x: projectedX, z: projectedZ };
+      const y = sampleFeatureSurfaceY(road, projectedX, projectedZ, { segIndex: i, t });
+      if (Number.isFinite(y)) {
+        best = {
+          road,
+          dist,
+          y,
+          x: projectedX,
+          z: projectedZ,
+          angle: Math.atan2(dx, dz),
+          segmentIndex: i,
+          segmentT: t
+        };
+      }
     }
   }
   return {

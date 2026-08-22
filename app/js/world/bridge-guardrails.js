@@ -1,12 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=49";
-import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=63";
+import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=6";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   isProtectedRoadFeature
-} from "./bridge-safety.js?v=8";
+} from "./bridge-safety.js?v=13";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];

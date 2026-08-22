@@ -174,6 +174,37 @@ function formatBounds(location, radius) {
   return `(${location.lat - radius},${location.lon - radius},${location.lat + radius},${location.lon + radius})`;
 }
 
+function formatCoverageBounds(bounds) {
+  return `(${bounds.minLat},${bounds.minLon},${bounds.maxLat},${bounds.maxLon})`;
+}
+
+export function resolveBuildingPublicationBounds(location, visibleRadiusWorld, options = {}) {
+  const lat = Number(location?.lat);
+  const lon = Number(location?.lon);
+  const radiusWorld = Math.max(0, Number(visibleRadiusWorld) || 0);
+  const worldScale = Math.max(1, Number(options.worldScale) || 100000);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || radiusWorld <= 0) return null;
+
+  // The fixed-location renderer measures building LOD in local world space.
+  // Provider coverage must use the inverse of that same projection or its
+  // advertised far-visible circle becomes an increasingly narrow rectangle at
+  // higher latitudes. Polar locations normally skip settlement loading; the
+  // floor keeps the bounds finite if mapped buildings are explicitly present.
+  const longitudeScale = Math.max(0.01, Math.abs(Math.cos(lat * Math.PI / 180)));
+  const latRadius = radiusWorld / worldScale;
+  const lonRadius = radiusWorld / (worldScale * longitudeScale);
+  return Object.freeze({
+    minLat: lat - latRadius,
+    minLon: lon - lonRadius,
+    maxLat: lat + latRadius,
+    maxLon: lon + lonRadius,
+    latRadius,
+    lonRadius,
+    visibleRadiusWorld: radiusWorld,
+    authority: 'building-far-visible-lod'
+  });
+}
+
 function overpassCacheKey(meta, query) {
   if (!meta || !query) return null;
   let hash = 2166136261;
@@ -196,20 +227,35 @@ export function buildWorldOverpassPlan({
   roadsRadius,
   featureRadiusScale,
   poiRadiusScale,
+  buildingVisibleRadiusWorld,
   overpassTimeoutMs,
   loadStartedAt,
   maxTotalLoadMs
 }) {
   const featureRadius = roadsRadius * featureRadiusScale;
-  const buildingRadius = Math.min(
+  const waterStructureRadius = Math.min(
     0.022,
     Math.max(featureRadius, 0.014, roadsRadius * 1.2)
   );
+  const buildingCoverage = resolveBuildingPublicationBounds(
+    location,
+    buildingVisibleRadiusWorld
+  );
+  const buildingRadius = buildingCoverage
+    ? Math.max(buildingCoverage.latRadius, buildingCoverage.lonRadius)
+    : waterStructureRadius;
+  const buildingCoverageBounds = buildingCoverage || {
+    minLat: location.lat - buildingRadius,
+    minLon: location.lon - buildingRadius,
+    maxLat: location.lat + buildingRadius,
+    maxLon: location.lon + buildingRadius
+  };
   const buildingMetadataRadius = Math.min(buildingRadius, Math.max(0.004, roadsRadius * 0.22));
   const poiRadius = roadsRadius * poiRadiusScale;
   const roadsBounds = formatBounds(location, roadsRadius);
   const featureBounds = formatBounds(location, featureRadius);
-  const buildingBounds = formatBounds(location, buildingRadius);
+  const buildingBounds = formatCoverageBounds(buildingCoverageBounds);
+  const waterStructureBounds = formatBounds(location, waterStructureRadius);
   const buildingMetadataBounds = formatBounds(location, buildingMetadataRadius);
   const poiBounds = formatBounds(location, poiRadius);
   const queryTimeoutSeconds = Math.max(8, Math.floor(overpassTimeoutMs / 1000));
@@ -230,6 +276,9 @@ export function buildWorldOverpassPlan({
       lon: location.lon,
       roadsRadius,
       featureRadius: buildingRadius,
+      bounds: buildingCoverageBounds,
+      visibleRadiusWorld: buildingCoverage?.visibleRadiusWorld || null,
+      authority: buildingCoverage?.authority || 'legacy-angular-building-radius',
       poiRadius,
       kind: 'buildings'
     },
@@ -245,14 +294,14 @@ export function buildWorldOverpassPlan({
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
-      featureRadius: buildingRadius,
+      featureRadius: waterStructureRadius,
       poiRadius,
       kind: 'water-structures'
     },
     waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-                way["building"="ship"]${buildingBounds};
-                way["historic"="ship"]${buildingBounds};
-                way["building"="houseboat"]${buildingBounds};
+                way["building"="ship"]${waterStructureBounds};
+                way["historic"="ship"]${waterStructureBounds};
+                way["building"="houseboat"]${waterStructureBounds};
             );out body;>;out skel qt;`,
     buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
@@ -279,9 +328,9 @@ export function buildWorldOverpassPlan({
                 node["natural"="tree"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
-                way["building"="ship"]${buildingBounds};
-                way["historic"="ship"]${buildingBounds};
-                way["building"="houseboat"]${buildingBounds};
+                way["building"="ship"]${waterStructureBounds};
+                way["historic"="ship"]${waterStructureBounds};
+                way["building"="houseboat"]${waterStructureBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
             );out body;>;out skel qt;`,

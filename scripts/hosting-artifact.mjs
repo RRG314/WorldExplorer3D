@@ -19,7 +19,8 @@ const SOURCE_ENTRIES = [
   'app',
   'assets',
   'js',
-  'legal'
+  'legal',
+  'styles'
 ];
 const GENERATED_PATHS = new Set([
   'js/firebase-project-config.js',
@@ -30,8 +31,21 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'app-shell-fragments': 'app/js/app-shell-fragments.js',
   'app-auth-shell': 'app/js/app-auth-shell.js',
   bootstrap: 'app/js/bootstrap.js',
-  'app-entry': 'app/js/app-entry.js'
+  'app-entry': 'app/js/app-entry.js',
+  'account-social': 'app/js/multiplayer/social.js',
+  'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
+  'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js'
 });
+const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
+const REQUIRED_EXTERNAL_ROOT_MODULES = Object.freeze([
+  '/js/firebase-init.js?v=55',
+  '/js/auth-ui.js?v=55'
+]);
+const INDIRECT_RUNTIME_ENTRYPOINTS = new Set([
+  'app-entry',
+  'multiplayer-rooms',
+  'multiplayer-artifacts'
+]);
 
 function normalizePath(value) {
   return value.split(path.sep).join('/');
@@ -138,6 +152,23 @@ function bundleOutputForEntry(metafile, sourceEntry) {
 }
 
 async function buildGameRuntime() {
+  const externalRootModules = new Set();
+  const rootSharedModulePlugin = {
+    name: 'one-root-shared-module-authority',
+    setup(build) {
+      build.onResolve({ filter: /^\.\.?(?:\/\.\.)*\// }, (args) => {
+        const queryIndex = args.path.indexOf('?');
+        const sourcePath = queryIndex >= 0 ? args.path.slice(0, queryIndex) : args.path;
+        const query = queryIndex >= 0 ? args.path.slice(queryIndex) : '';
+        const resolved = path.resolve(args.resolveDir, sourcePath);
+        const relative = path.relative(ROOT_SHARED_MODULE_DIR, resolved);
+        if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+        const externalPath = `/js/${normalizePath(relative)}${query}`;
+        externalRootModules.add(externalPath);
+        return { path: externalPath, external: true };
+      });
+    }
+  };
   const result = await buildJavaScript({
     absWorkingDir: ROOT,
     entryPoints: GAME_RUNTIME_ENTRYPOINTS,
@@ -152,6 +183,7 @@ async function buildGameRuntime() {
     entryNames: 'bundles/[name]-[hash]',
     chunkNames: 'bundles/chunk-[hash]',
     external: ['https://*'],
+    plugins: [rootSharedModulePlugin],
     metafile: true,
     write: true,
     logLevel: 'warning'
@@ -164,8 +196,16 @@ async function buildGameRuntime() {
       bundleOutputForEntry(result.metafile, source)
     ])
   );
+  const sharedModules = [...externalRootModules].sort();
+  for (const required of REQUIRED_EXTERNAL_ROOT_MODULES) {
+    if (!sharedModules.includes(required)) {
+      throw new Error(`Bundled runtime lost its root shared-module authority: ${required}`);
+    }
+  }
   return Object.freeze({
     strategy: 'esbuild-esm-code-splitting',
+    sharedModuleAuthority: 'one-root-hosted-esm-instance',
+    externalRootModules: Object.freeze(sharedModules),
     entries: Object.freeze(entries),
     fileCount: outputFiles.length,
     entryFileCount: Object.keys(entries).length,
@@ -192,6 +232,18 @@ async function rewriteGameHtml(runtime, groundData) {
     throw new Error('Game HTML no longer contains the expected source entry scripts.');
   }
   html = html.replace(sourceScripts, replacement);
+  await fs.writeFile(htmlPath, html, 'utf8');
+}
+
+async function rewriteAccountHtml(runtime) {
+  const htmlPath = path.join(OUTPUT_DIR, 'account', 'index.html');
+  let html = await fs.readFile(htmlPath, 'utf8');
+  const sourceImport = '../app/js/multiplayer/social.js?v=55';
+  const bundledImport = `../app/${runtime.entries['account-social']}`;
+  if (!html.includes(sourceImport)) {
+    throw new Error('Account HTML no longer contains the expected social source import.');
+  }
+  html = html.replace(sourceImport, bundledImport);
   await fs.writeFile(htmlPath, html, 'utf8');
 }
 
@@ -288,6 +340,7 @@ async function buildArtifact(environment) {
   const groundData = await copyGroundData(sourceFiles, groundReleaseId);
   const runtimePackaging = await buildGameRuntime();
   await rewriteGameHtml(runtimePackaging, groundData);
+  await rewriteAccountHtml(runtimePackaging);
   await writeGeneratedFirebaseFiles(environment, config);
 
   const files = await hashOutputFiles();
@@ -364,7 +417,7 @@ async function verifyArtifact() {
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
   for (const [relative, source] of sourceFiles) {
     if (GENERATED_PATHS.has(relative)) continue;
-    if (isGameRuntimeSource(relative) || relative === 'app/index.html') continue;
+    if (isGameRuntimeSource(relative) || relative === 'app/index.html' || relative === 'account/index.html') continue;
     const outputRelative = isGroundDataSource(relative)
       ? `location-data/ground/${sourceReleases.sha256.slice(0, 16)}/${relative.slice('app/assets/ground/'.length)}`
       : relative;
@@ -378,6 +431,10 @@ async function verifyArtifact() {
   const runtimeFiles = expectedNames.filter((relative) => relative.startsWith('app/js/bundles/'));
   if (
     runtimePackaging.strategy !== 'esbuild-esm-code-splitting' ||
+    runtimePackaging.sharedModuleAuthority !== 'one-root-hosted-esm-instance' ||
+    !REQUIRED_EXTERNAL_ROOT_MODULES.every((modulePath) =>
+      runtimePackaging.externalRootModules?.includes(modulePath)
+    ) ||
     runtimePackaging.entryFileCount !== Object.keys(GAME_RUNTIME_ENTRYPOINTS).length ||
     runtimePackaging.fileCount !== runtimeFiles.length ||
     expectedNames.some((relative) => relative.startsWith('app/js/') && !relative.startsWith('app/js/bundles/'))
@@ -398,8 +455,10 @@ async function verifyArtifact() {
     throw new Error('Hosting artifact ground data no longer matches the immutable release contract.');
   }
   const gameHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'index.html'), 'utf8');
-  for (const entry of Object.values(runtimePackaging.entries || {})) {
-    if (!gameHtml.includes(entry) && entry !== runtimePackaging.entries?.['app-entry']) {
+  const accountHtml = await fs.readFile(path.join(OUTPUT_DIR, 'account', 'index.html'), 'utf8');
+  for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
+    const referenced = name === 'account-social' ? accountHtml.includes(`../app/${entry}`) : gameHtml.includes(entry);
+    if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {
       throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
     }
   }

@@ -1,6 +1,6 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
 import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=15';
-import { normalizeWaterBody } from './water-body-contract.js?v=3';
+import { normalizeWaterBody } from './water-body-contract.js?v=4';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
@@ -293,7 +293,8 @@ export function createWorldLandusePass(options = {}) {
         waveBase: 1.0,
         area: outerArea,
         span: Math.max(maxX - minX, maxZ - minZ),
-        waterKind: waterArea?.waterKind || inferWaterRenderContext({ area: outerArea, span: Math.max(maxX - minX, maxZ - minZ) })
+        waterKind: waterArea?.waterKind || inferWaterRenderContext({ area: outerArea, span: Math.max(maxX - minX, maxZ - minZ) }),
+        depthEvidence: waterArea?.depthEvidence || null
       });
     }
 

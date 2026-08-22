@@ -14,14 +14,15 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 *A current in-game capture of the expanded New York fixed world. Every image below was captured directly from the browser runtime, not rendered as concept art.*
 
-## Version 4.3.0
+## Version 4.3.1
 
-Version 4.3.0 turns the existing fixed world into a more coherent Explorer
-experience. It adds contextual Discovery, wildlife and geology, field tools,
-progression, companions and capability-aware AR while integrating those systems
-with the existing Journal, account, admin, tutorial, multiplayer and world
-lifecycles. It also strengthens visible bridge/tunnel continuity and expands the
-performance-bounded living population without creating another world loader.
+Version 4.3.1 is the corrected Explorer and Urban Sandbox release. It combines
+contextual Discovery, wildlife and geology, field tools, progression,
+companions, capability-aware AR, street-facing building entrances, richer
+interiors and grounded world interaction inside the existing fixed-location
+experience. It also improves deterministic building height, road composition,
+vehicle contact on grades and world-memory release without creating another
+world loader or reducing distant mapped detail.
 
 Highlights:
 
@@ -124,14 +125,13 @@ Core exploration can run locally without production credentials. Account, multip
 ## Verify a Change
 
 ```bash
-npm run build:hosting -- --firebase-env staging
-npm run verify:hosting
-npm run audit:reachability
-npm run runtime:verify
-npm run release:verify
+npm run verify:source
+npm run verify:world
 ```
 
-`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor and multiplayer surfaces, planetary round trips, provider fallbacks, ocean and biome behavior, and a representative global location matrix.
+`npm run release:verify` builds an immutable production-shaped artifact and
+runs the release checks against that exact output. Security-sensitive backend
+changes are additionally exercised through the local Firebase emulator suites.
 
 ## Repository Layout
 
@@ -148,17 +148,6 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 
 ## Project Documents
 
-- [Complete system inventory and reconstruction guide](docs/SYSTEM_INVENTORY.md) — canonical whole-product inventory
-- [Architecture map](docs/ARCHITECTURE_MAP.md) — runtime, environments, world load, coordinates, surfaces, movement, maps, and lifecycle
-- [Data and provenance inventory](docs/DATA_AND_PROVENANCE.md) — providers, truth classes, generated content, caches, assets, and attribution
-- [Persistence and trust inventory](docs/PERSISTENCE_AND_TRUST.md) — browser storage, Firestore, rules, Functions, privacy, and deletion
-- [Product capability and maturity map](docs/PRODUCT_CAPABILITIES.md) — user-facing systems, subsystems, limitations, and status
-- [Test and release map](docs/TEST_AND_RELEASE_MAP.md) — verification ownership, current blockers, candidate and promotion flow
-- [Explorer platform implementation report](docs/EXPLORER_PLATFORM_IMPLEMENTATION_REPORT.md) — focused recent-build evidence
-- [World Discovery and Interaction architecture/R&D](docs/WORLD_DISCOVERY_INTERACTION_ARCHITECTURE_RND.md)
-- [World Discovery playable-build handoff](docs/WORLD_DISCOVERY_IMPLEMENTATION_HANDOFF.md)
-- [Augmented Reality platform architecture/R&D](docs/AUGMENTED_REALITY_PLATFORM_ARCHITECTURE_RND.md)
-- [Augmented Reality implementation handoff](docs/AUGMENTED_REALITY_IMPLEMENTATION_HANDOFF.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)

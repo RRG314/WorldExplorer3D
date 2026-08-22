@@ -1,33 +1,48 @@
 # Controls Reference
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-08-18
 
 Canonical control map for current runtime behavior.
 
 ## Global Controls
 
-- `F`: toggle Walk/Drive mode
-- `6`: toggle Drone mode
+- `F`: cycle character / car / plane / drone
+- `P`: enter or leave plane mode directly
+- `G`: enter or leave boat travel when available
 - `C`: cycle camera mode
 - `M`: toggle large map
 - `N`: next city
 - `B`: toggle block build mode
 - `R`: record/stop track
 - `Shift+R`: road debug mode
-- `Esc`: close map or toggle pause
+- `Esc`: close the active Backpack/Journal/map surface, then toggle pause when no surface is open
 - `F4` / `` ` `` / `~`: debug overlay
 - `F8`: performance overlay
 
+Developer overlays only respond when developer diagnostics are enabled.
+
+## Contextual World Interaction
+
+- `E` / Action: use the one visible nearby door, vehicle, person, or object
+- `I`: open/close the character Backpack
+- `J`: open/close the Journal / Field Guide
+- `1`–`6`: quick-equip a carried item (`6` selects the parachute)
+- `V`: use the equipped item
+- With the parachute equipped, press `V` while descending at least 3.25 m above the ground to deploy it. It repacks automatically on landing.
+- `T`: take an available nearby item
+- `X`: currently unassigned; it no longer opens, advances, or cancels field activities
+
+The contextual prompt is the authority. A key does not activate a hidden or
+distant target, and mobile uses the matching on-screen Action button.
+
 ## Driving Mode
 
-- `W` / `ArrowUp`: accelerate
-- `S` / `ArrowDown`: brake/reverse
-- `A` / `ArrowLeft`: steer left
-- `D` / `ArrowRight`: steer right
+- `ArrowUp` / `ArrowDown`: accelerate / reverse
+- `ArrowLeft` / `ArrowRight`: steer left / right
+- `W` / `A` / `S` / `D`: look around; chase view recenters automatically
 - `Space`: handbrake / drift trigger at speed
 - `Ctrl`: boost
-- `Shift`: off-road modifier
-- `V`: look back
+- `E`: exit the current vehicle when stopped safely, or use the visible context action
 
 Handling note:
 
@@ -35,11 +50,10 @@ Handling note:
 
 ## Walking Mode
 
-- `W` / `S`: move forward/back
-- `A` / `D`: strafe left/right
-- `ArrowLeft` / `ArrowRight`: look left/right
-- `ArrowUp` / `ArrowDown`: look up/down
-- `E`: enter/exit a supported building interior when the prompt is visible
+- `ArrowUp` / `ArrowDown`: move forward/back
+- `ArrowLeft` / `ArrowRight`: turn left/right
+- `W` / `A` / `S` / `D`: look around
+- `E`: use the visible contextual door, vehicle, person, or object
 - `Space`: jump
 - `Shift`: run
 - `Right Click + Drag` or `Middle Click + Drag`: mouse look
@@ -47,16 +61,16 @@ Handling note:
 Walking/navigation note:
 
 - Walk routing currently follows the core road-and-ground traversal network on Earth scenes.
-- Supported interiors only load when you deliberately interact; being near buildings does not auto-load indoor geometry.
+- Supported interiors initialize their doorway prompt while walking but enter
+  only after deliberate keyboard/touch interaction at the published door.
 
 ## Drone Mode
 
-- `W` / `S`: move forward/back
-- `A` / `D`: strafe left/right
+- `ArrowUp` / `ArrowDown`: fly forward/back relative to the drone
+- `ArrowLeft` / `ArrowRight`: turn the drone
+- `W` / `A` / `S` / `D`: look around independently
 - `Space`: ascend
 - `Shift` or `Ctrl`: descend
-- `ArrowUp` / `ArrowDown`: pitch
-- `ArrowLeft` / `ArrowRight`: yaw
 
 ## Rocket/Space Flight Mode
 
@@ -109,7 +123,9 @@ Walking/navigation note:
 
 Virtual controls adapt by mode:
 
-- driving profile
+- driving profile with a contextual Action/Exit button
 - walking profile (`WASD` movement on left pad, arrows-style look on right pad)
 - drone profile (`WASD` movement on left pad, arrows-style look on right pad)
 - rocket profile
+- a contextual Action button for doors, vehicles, people and objects
+- a compact Gear button and touch-selectable equipment slots

@@ -64,7 +64,7 @@ float weBoatWakeDisplacement(vec2 worldXZ) {
     .replace(
       'transformed.y += weWaveField(weWorldPos.xz);',
       `float weBoatWakeDisplace = weBoatWakeDisplacement(weWorldPos.xz);
-transformed.y += weWaveField(weWorldPos.xz) + weBoatWakeDisplace;`
+transformed.y += max(weWaveField(weWorldPos.xz) + weBoatWakeDisplace, -weWaveTroughDepth);`
     );
 
   shader.fragmentShader = shader.fragmentShader

@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=49";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=63";
+import { roadWidthAtProjection } from './road-cross-section-profile.js?v=1';
 
 function roadHeadingAtSegment(road, segmentIndex, fallbackAngle = 0) {
   const points = Array.isArray(road?.pts) ? road.pts : [];
@@ -181,7 +182,7 @@ function createWorldSpawnSurfaceApi(context) {
     if (!deps.isVehicleRoad(road)) return false;
     if (!isRoadSurfaceReachable(nearestRoad, { extraVerticalAllowance: 0.4 })) return false;
 
-    const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
+    const roadHalfWidth = roadWidthAtProjection(road, nearestRoad) * 0.5;
     const onRoadCenter = nearestRoad.dist <= Math.max(2.2, roadHalfWidth - 0.35);
     const onRoadCore = nearestRoad.dist <= Math.max(1.6, roadHalfWidth - 0.95);
     const colliderDetail = buildingCheck?.building?.colliderDetail === "bbox" ? "bbox" : "full";

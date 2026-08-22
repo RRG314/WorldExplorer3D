@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { updateNightLighting } from "./engine/night-lighting.js?v=6";
+import { updateNightLighting } from "./engine/night-lighting.js?v=7";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
-import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
+import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=3";
 import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
-import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=4";
+import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
@@ -404,7 +404,9 @@ function updateCamera(dt = 1 / 60) {
   carLook.pitch += lookPitch * cameraLookSpeed;
   if (manualCameraInput) carLook.lastInputAt = performance.now();
   const cameraIdleMs = performance.now() - (Number(carLook.lastInputAt) || 0);
-  if (!manualCameraInput && cameraIdleMs > 900 && appCtx.camMode === 0) {
+  const liveGpsVehicleFollow = appCtx.getLiveGpsSnapshot?.().travelMode === 'drive' &&
+    appCtx.liveGpsTranslationOwned?.() === true;
+  if ((!manualCameraInput && cameraIdleMs > 900 || liveGpsVehicleFollow) && appCtx.camMode === 0) {
     const returnBlend = 1 - Math.exp(-4.2 * clampValue(dt, 1 / 240, 0.05));
     carLook.yaw += (0 - carLook.yaw) * returnBlend;
     carLook.pitch += (0 - carLook.pitch) * returnBlend;
@@ -637,15 +639,25 @@ function updateHUD() {
     const activeInterior = appCtx.activeInterior || null;
 
     let walkSurface = null;
-    if (!activeInterior && !appCtx.onMoon && !appCtx.onMars && typeof appCtx.findNearestTraversalFeature === 'function') {
-      const nearest = appCtx.findNearestTraversalFeature(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z, {
-        mode: 'walk',
-        maxDistance: 18
-      });
-      if (nearest?.feature) {
-        const featureWidth = Number.isFinite(nearest.feature.width) ? nearest.feature.width : 4;
-        const edge = Math.max(WALK_ROAD_EDGE_MIN, featureWidth * WALK_ROAD_EDGE_SCALE);
-        if (nearest.dist < edge) walkSurface = nearest.feature;
+    if (!activeInterior && !appCtx.onMoon && !appCtx.onMars) {
+      const walker = appCtx.Walk.state.walker;
+      const authoritativeWalkSurface = appCtx.SurfaceQuery?.walkAt?.(
+        walker.x,
+        walker.z,
+        { currentY: Number(walker.y) - 1.7 }
+      );
+      if (authoritativeWalkSurface?.feature) {
+        walkSurface = authoritativeWalkSurface.feature;
+      } else if (typeof appCtx.findNearestTraversalFeature === 'function') {
+        const nearest = appCtx.findNearestTraversalFeature(walker.x, walker.z, {
+          mode: 'walk',
+          maxDistance: 18
+        });
+        if (nearest?.feature) {
+          const featureWidth = Number.isFinite(nearest.feature.width) ? nearest.feature.width : 4;
+          const edge = Math.max(WALK_ROAD_EDGE_MIN, featureWidth * WALK_ROAD_EDGE_SCALE);
+          if (nearest.dist < edge) walkSurface = nearest.feature;
+        }
       }
     }
 

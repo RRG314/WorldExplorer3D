@@ -10,6 +10,11 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     searchNearestSafeRoadSpawn,
     tryAutoEnterBoatAt
   } = deps;
+  const requestedArrivalMode = String(appCtx.customLoc?.arrivalMode || 'auto');
+  const preferBoatIfWater = requestedArrivalMode === 'boat' || (
+    requestedArrivalMode !== 'walk' && options.preferBoatIfWater === true
+  );
+  const arrivalOptions = { ...options, preferBoatIfWater };
   const arrival = featuredArrivalNear(appCtx.LOC);
   if (arrival) {
     const viewpoint = appCtx.geoToWorld(arrival.viewpoint.lat, arrival.viewpoint.lon);
@@ -30,12 +35,20 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
 
   const exactRoad = findGradeSeparatedRoadAt(0, 0);
   const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || 'at_grade';
+  const structureKind = exactRoad?.road?.structureSemantics?.structureKind || '';
   const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);
+  // Exact OSM and generalized vector geometry can place the same bridge
+  // centerline several metres apart. Accept a tightly bounded bridge snap so
+  // an arrival selected at the real structure does not fall underneath it
+  // merely because this provider response used the alternate alignment.
+  const bridgeArrivalDistance = structureKind === 'bridge'
+    ? Math.max(roadHalfWidth, Math.min(24, roadHalfWidth + 12))
+    : roadHalfWidth;
   // Preserve a bridge deck at the selected coordinates. A tunnel arrival is
   // redirected to a safe surface so entry happens through a mapped portal.
   const structureFeetY =
     structureMode === 'elevated' &&
-    exactRoad?.dist <= roadHalfWidth &&
+    exactRoad?.dist <= bridgeArrivalDistance &&
     Number.isFinite(exactRoad?.y)
       ? exactRoad.y
       : null;
@@ -43,11 +56,25 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     return applySpawnTarget(exactRoad.x, exactRoad.z, {
       ...options,
       mode,
+      angle: exactRoad.angle,
       feetY: structureFeetY,
       preferRoad: true,
       preserveElevatedSurface: true,
       source: options.source || 'custom_structure'
     });
+  }
+
+  // A destination that explicitly prefers water should test the exact mapped
+  // coordinate before a nearby road pulls the arrival ashore. The boat query
+  // still requires containment in a published navigable water body, so a
+  // waterfront land destination safely falls through to the road policy.
+  if (preferBoatIfWater && structureMode !== 'subgrade') {
+    const preferredBoatSpawn = tryAutoEnterBoatAt(0, 0, {
+      ...arrivalOptions,
+      mode,
+      source: options.source || 'custom_location'
+    });
+    if (preferredBoatSpawn) return preferredBoatSpawn;
   }
 
   const verifiedOcean = appCtx.worldLoadRuntimeState?.surfaceDomain?.kind === 'ocean';
@@ -61,14 +88,18 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
       : null;
     if (
       mappedWalkApproach?.valid &&
-      Math.hypot(mappedWalkApproach.x, mappedWalkApproach.z) <= 160 &&
       !isSubgradeArrival(mappedWalkApproach)
     ) {
+      // searchNearestSafeRoadSpawn already resolves the nearest valid mapped
+      // surface inside the published fixed-location world. Reapplying a
+      // smaller origin-distance cutoff here discarded that authoritative
+      // result and stranded rural arrivals on empty terrain even when a road
+      // was visible just beyond the arbitrary threshold.
       mappedWalkApproach.source = options.source || 'custom_mapped_walk_approach';
       return applyResolvedWorldSpawn(mappedWalkApproach, options);
     }
     const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
-      ...options,
+      ...arrivalOptions,
       mode,
       preferRoad: mode === 'drive',
       source: options.source || 'custom_land_approach'
@@ -79,13 +110,13 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
   }
 
   const boatSpawn = tryAutoEnterBoatAt(0, 0, {
-    ...options,
+    ...arrivalOptions,
     mode,
     source: options.source || 'custom_location'
   });
   if (boatSpawn) return boatSpawn;
   return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
-    ...options,
+    ...arrivalOptions,
     mode,
     feetY: Number.isFinite(structureFeetY) ? structureFeetY : options.feetY,
     preferRoad: mode === 'drive' || Number.isFinite(structureFeetY)

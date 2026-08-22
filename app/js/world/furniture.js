@@ -6,7 +6,8 @@ import {
 import {
   registerStreetLamp,
   resetStreetLampFixtures
-} from "../engine/night-lighting.js?v=6";
+} from "../engine/night-lighting.js?v=7";
+import { roadWidthAtSegment } from './road-cross-section-profile.js?v=1';
 
 let furnitureMaterialsReady = false;
 let furnitureGeometriesReady = false;
@@ -21,6 +22,11 @@ let matTrunk;
 let matLampHead;
 let matTrashBody;
 let matTrashLid;
+let matSignalHousing;
+let matSignalRed;
+let matSignalAmber;
+let matSignalGreen;
+let matStopSign;
 
 let geoSignPole;
 let geoSignBoard;
@@ -30,6 +36,9 @@ let geoLampPole;
 let geoLampHead;
 let geoTrashBody;
 let geoTrashLid;
+let geoSignalHousing;
+let geoSignalLens;
+let geoStopSign;
 
 function getStreetFurnitureBudget() {
   const tier = String(appCtx.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -42,7 +51,8 @@ function getStreetFurnitureBudget() {
       minLampRoadWidth: 7.5,
       maxLampsTotal: 72,
       trashEveryNthPoi: 12,
-      maxTrashTotal: 18
+      maxTrashTotal: 18,
+      maxTrafficControls: 16
     };
   }
   if (tier === 'quality') {
@@ -54,7 +64,8 @@ function getStreetFurnitureBudget() {
       minLampRoadWidth: 4.8,
       maxLampsTotal: 180,
       trashEveryNthPoi: 4,
-      maxTrashTotal: 42
+      maxTrashTotal: 42,
+      maxTrafficControls: 46
     };
   }
   return {
@@ -65,7 +76,8 @@ function getStreetFurnitureBudget() {
     minLampRoadWidth: 5.8,
     maxLampsTotal: 120,
     trashEveryNthPoi: 6,
-    maxTrashTotal: 26
+    maxTrashTotal: 26,
+    maxTrafficControls: 30
   };
 }
 
@@ -90,6 +102,11 @@ function initFurnitureMaterials() {
   appCtx.streetLampHeadMaterial = matLampHead;
   matTrashBody = new THREE.MeshStandardMaterial({ color: 0x3a5a3a, roughness: 0.9, metalness: 0.04 });
   matTrashLid = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.78, metalness: 0.08 });
+  matSignalHousing = new THREE.MeshStandardMaterial({ color: 0x20282b, roughness: .72, metalness: .22 });
+  matSignalRed = new THREE.MeshStandardMaterial({ color: 0xd62f2f, emissive: 0x8a1010, emissiveIntensity: .7, roughness: .42 });
+  matSignalAmber = new THREE.MeshStandardMaterial({ color: 0x9d7221, emissive: 0x3b2600, emissiveIntensity: .22, roughness: .48 });
+  matSignalGreen = new THREE.MeshStandardMaterial({ color: 0x286c47, emissive: 0x082d19, emissiveIntensity: .22, roughness: .48 });
+  matStopSign = new THREE.MeshStandardMaterial({ color: 0xb5242d, roughness: .7, metalness: .04 });
   furnitureMaterialsReady = true;
 }
 
@@ -131,6 +148,9 @@ function initFurnitureGeometries() {
   geoLampHead = new THREE.SphereGeometry(0.5, 8, 6);
   geoTrashBody = new THREE.CylinderGeometry(0.4, 0.35, 1.0, 8);
   geoTrashLid = new THREE.CylinderGeometry(0.45, 0.45, 0.1, 8);
+  geoSignalHousing = new THREE.BoxGeometry(.52, 1.5, .42);
+  geoSignalLens = new THREE.SphereGeometry(.16, 8, 6);
+  geoStopSign = new THREE.CylinderGeometry(.58, .58, .08, 8);
   furnitureGeometriesReady = true;
 }
 
@@ -186,6 +206,7 @@ function createStreetSign(x, z, name, roadAngle) {
   group.position.set(x, terrainHeightAt(x, z), z);
   group.rotation.y = roadAngle;
   group.userData.furniturePos = { x, z };
+  markFurniture(group, 'street_name_sign', 'road_name_inference');
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
 }
@@ -214,7 +235,21 @@ function roadLightingEligible(road, point) {
   return false;
 }
 
-function createLightPost(x, z) {
+function markFurniture(group, kind, provenance = 'inferred') {
+  group.userData.furnitureKind = kind;
+  group.userData.provenance = provenance;
+  group.userData.condition = 1;
+  group.userData.interactiveWorldObject = true;
+  const identitySeed = `${kind}:${provenance}:${group.position.x.toFixed(1)}:${group.position.z.toFixed(1)}`;
+  let hash = 2166136261;
+  for (const char of identitySeed) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  group.userData.urbanEntityId = `furniture:${kind}:${(hash >>> 0).toString(16)}`;
+}
+
+function createLightPost(x, z, provenance = 'inferred') {
   const group = new THREE.Group();
 
   const pole = new THREE.Mesh(geoLampPole, matPole);
@@ -227,12 +262,13 @@ function createLightPost(x, z) {
 
   group.position.set(x, terrainHeightAt(x, z), z);
   group.userData.furniturePos = { x, z };
+  markFurniture(group, 'street_lamp', provenance);
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
   registerStreetLamp(group, head);
 }
 
-function createTrashCan(x, z) {
+function createTrashCan(x, z, provenance = 'inferred') {
   const group = new THREE.Group();
 
   const body = new THREE.Mesh(geoTrashBody, matTrashBody);
@@ -245,16 +281,149 @@ function createTrashCan(x, z) {
 
   group.position.set(x, terrainHeightAt(x, z), z);
   group.userData.furniturePos = { x, z };
+  markFurniture(group, 'waste_basket', provenance);
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
 }
 
-export function generateStreetFurniture() {
+function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred') {
+  const group = new THREE.Group();
+  const pole = new THREE.Mesh(geoLampPole, matPole);
+  pole.scale.set(.8, .83, .8);
+  pole.position.y = 2.5;
+  group.add(pole);
+  const housing = new THREE.Mesh(geoSignalHousing, matSignalHousing);
+  housing.position.set(0, 4.85, 0);
+  group.add(housing);
+  [
+    { y: 5.32, material: matSignalRed },
+    { y: 4.85, material: matSignalAmber },
+    { y: 4.38, material: matSignalGreen }
+  ].forEach((entry) => {
+    const lens = new THREE.Mesh(geoSignalLens, entry.material);
+    lens.position.set(0, entry.y, .23);
+    lens.scale.z = .45;
+    group.add(lens);
+  });
+  group.position.set(x, terrainHeightAt(x, z), z);
+  group.rotation.y = yaw;
+  group.userData.furniturePos = { x, z };
+  markFurniture(group, 'traffic_signal', provenance);
+  appCtx.addEarthWorldObject(group);
+  appCtx.streetFurnitureMeshes.push(group);
+}
+
+function createStopSign(x, z, yaw = 0, provenance = 'inferred') {
+  const group = new THREE.Group();
+  const pole = new THREE.Mesh(geoSignPole, matPole);
+  pole.scale.set(.72, .88, .72);
+  pole.position.y = 1.55;
+  group.add(pole);
+  const sign = new THREE.Mesh(geoStopSign, matStopSign);
+  sign.position.y = 3.05;
+  sign.rotation.x = Math.PI * .5;
+  group.add(sign);
+  group.position.set(x, terrainHeightAt(x, z), z);
+  group.rotation.y = yaw;
+  group.userData.furniturePos = { x, z };
+  markFurniture(group, 'stop_sign', provenance);
+  appCtx.addEarthWorldObject(group);
+  appCtx.streetFurnitureMeshes.push(group);
+}
+
+function stableUnit(value = '') {
+  let hash = 2166136261;
+  for (const char of String(value)) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967296;
+}
+
+function nearestRoadsidePoint(point) {
+  let best = null;
+  for (const road of appCtx.roads || []) {
+    if (!Array.isArray(road?.pts) || /motorway|trunk|track/i.test(String(road.type || ''))) continue;
+    for (let index = 0; index < road.pts.length - 1; index += 1) {
+      const p1 = road.pts[index];
+      const p2 = road.pts[index + 1];
+      const dx = p2.x - p1.x;
+      const dz = p2.z - p1.z;
+      const lengthSq = dx * dx + dz * dz;
+      if (lengthSq <= .01) continue;
+      const t = Math.max(0, Math.min(1, ((point.x - p1.x) * dx + (point.z - p1.z) * dz) / lengthSq));
+      const x = p1.x + dx * t;
+      const z = p1.z + dz * t;
+      const distance = Math.hypot(point.x - x, point.z - z);
+      if (best && distance >= best.distance) continue;
+      const length = Math.sqrt(lengthSq);
+      const side = ((point.x - x) * (-dz / length) + (point.z - z) * (dx / length)) >= 0 ? 1 : -1;
+      const offset = roadWidthAtSegment(road, index, t) * .5 + 1.35;
+      best = { x: x + (-dz / length) * offset * side, z: z + (dx / length) * offset * side, distance };
+    }
+  }
+  return best && best.distance <= 42 ? best : null;
+}
+
+function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.roads || []) {
+  const exact = [];
+  const exactPositions = [];
+  for (const node of mappedFurnitureNodes) {
+    if (!Number.isFinite(node?.lat) || !Number.isFinite(node?.lon)) continue;
+    const highway = String(node.tags?.highway || '').toLowerCase();
+    const amenity = String(node.tags?.amenity || '').toLowerCase();
+    const kind = highway === 'traffic_signals' ? 'traffic_signal'
+      : highway === 'stop' || highway === 'give_way' ? 'stop_sign'
+        : highway === 'street_lamp' ? 'street_lamp'
+          : amenity === 'waste_basket' ? 'waste_basket' : '';
+    if (!kind) continue;
+    const position = appCtx.geoToWorld(node.lat, node.lon);
+    exact.push({ kind, x: position.x, z: position.z, yaw: 0, provenance: 'mapped' });
+    if (kind === 'traffic_signal' || kind === 'stop_sign') exactPositions.push(position);
+  }
+  const topology = new Map();
+  for (const road of roads) {
+    if (!road?.driveable || /motorway|trunk|track|service/i.test(String(road.type || ''))) continue;
+    for (const node of road.sourceTopologyNodes || []) {
+      const key = String(node.id || `${Math.round(node.x * 2)}:${Math.round(node.z * 2)}`);
+      const record = topology.get(key) || { x: node.x, z: node.z, roads: [] };
+      if (!record.roads.includes(road)) record.roads.push(road);
+      topology.set(key, record);
+    }
+  }
+  const inferred = [...topology.values()].filter((entry) => entry.roads.length >= 3).map((entry) => {
+    const significant = entry.roads.filter((road) => /primary|secondary|tertiary/i.test(String(road.type || ''))).length;
+    const first = entry.roads[0]?.pts || [];
+    const p1 = first[0] || entry;
+    const p2 = first[1] || entry;
+    return {
+      kind: significant >= 2 ? 'traffic_signal' : 'stop_sign',
+      x: entry.x,
+      z: entry.z,
+      yaw: Math.atan2((p2.x || 0) - (p1.x || 0), (p2.z || 0) - (p1.z || 0)),
+      provenance: 'intersection_inference'
+    };
+  }).filter((entry) => !exactPositions.some((point) => Math.hypot(point.x - entry.x, point.z - entry.z) < 12));
+  return [...exact, ...inferred];
+}
+
+export function generateStreetFurniture(options = {}) {
   initFurnitureMaterials();
   initFurnitureGeometries();
   resetStreetLampFixtures();
 
   const budget = getStreetFurnitureBudget();
+  const semanticPlacements = trafficControlPlacements(options.mappedFurnitureNodes);
+  let totalControls = 0;
+  semanticPlacements.forEach((placement) => {
+    if (placement.kind === 'street_lamp') return createLightPost(placement.x, placement.z, placement.provenance);
+    if (placement.kind === 'waste_basket') return createTrashCan(placement.x, placement.z, placement.provenance);
+    if (totalControls >= budget.maxTrafficControls) return;
+    const roadside = nearestRoadsidePoint(placement) || placement;
+    if (placement.kind === 'traffic_signal') createTrafficSignal(roadside.x, roadside.z, placement.yaw, placement.provenance);
+    else createStopSign(roadside.x, roadside.z, placement.yaw, placement.provenance);
+    totalControls += 1;
+  });
   const signSpacing = budget.signSpacing;
   const signedRoads = new Set();
   let totalSigns = 0;
@@ -282,7 +451,7 @@ export function generateStreetFurniture() {
         const len = Math.hypot(dx, dz) || 1;
         const nx = -dz / len;
         const nz = dx / len;
-        const offset = road.width / 2 + 2;
+        const offset = roadWidthAtSegment(road, i, 0) / 2 + 2;
         createStreetSign(
           p1.x + nx * offset,
           p1.z + nz * offset,
@@ -317,8 +486,14 @@ export function generateStreetFurniture() {
         const len = Math.hypot(dx, dz) || 1;
         const nx = -dz / len;
         const nz = dx / len;
-        const offset = road.width / 2 + 1.5;
-        createLightPost(p1.x + nx * offset, p1.z + nz * offset);
+        const localWidth = roadWidthAtSegment(road, i, 0);
+        if (localWidth < budget.minLampRoadWidth) continue;
+        const offset = localWidth / 2 + 1.5;
+        const lx = p1.x + nx * offset;
+        const lz = p1.z + nz * offset;
+        if (!semanticPlacements.some((placement) => placement.kind === 'street_lamp' && Math.hypot(placement.x - lx, placement.z - lz) < 18)) {
+          createLightPost(lx, lz);
+        }
         totalLamps += 1;
       }
     }
@@ -328,9 +503,13 @@ export function generateStreetFurniture() {
   appCtx.pois.forEach((poi, i) => {
     if (totalTrash >= budget.maxTrashTotal) return;
     if (i % budget.trashEveryNthPoi !== 0) return;
-    const offset = 3 + Math.random() * 2;
-    const angle = Math.random() * Math.PI * 2;
-    createTrashCan(poi.x + Math.cos(angle) * offset, poi.z + Math.sin(angle) * offset);
+    const roadside = nearestRoadsidePoint(poi);
+    const unit = stableUnit(`${poi.sourceFeatureId || poi.name}:${poi.x.toFixed(1)}:${poi.z.toFixed(1)}`);
+    const offset = 3 + unit * 2;
+    const angle = unit * Math.PI * 2;
+    const position = roadside || { x: poi.x + Math.cos(angle) * offset, z: poi.z + Math.sin(angle) * offset };
+    if (semanticPlacements.some((placement) => placement.kind === 'waste_basket' && Math.hypot(placement.x - position.x, placement.z - position.z) < 16)) return;
+    createTrashCan(position.x, position.z);
     totalTrash += 1;
   });
 }
@@ -364,6 +543,14 @@ export function scheduleWorldCoverVegetationRefresh() {
   }, 500);
 }
 
+export function flushWorldCoverVegetationRefresh() {
+  if (!worldCoverVegetationTimer) return false;
+  globalThis.clearTimeout(worldCoverVegetationTimer);
+  worldCoverVegetationTimer = null;
+  refreshWorldCoverVegetation();
+  return true;
+}
+
 export function resetWorldFurnitureCaches() {
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;
@@ -371,4 +558,7 @@ export function resetWorldFurnitureCaches() {
   signTextGeometry = null;
 }
 
-Object.assign(appCtx, { scheduleWorldCoverVegetationRefresh });
+Object.assign(appCtx, {
+  flushWorldCoverVegetationRefresh,
+  scheduleWorldCoverVegetationRefresh
+});

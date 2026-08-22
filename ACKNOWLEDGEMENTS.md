@@ -1,6 +1,6 @@
 # Acknowledgements 🙏
 
-Last reviewed: 2026-08-17 for World Explorer 3D 4.3.0.
+Last reviewed: 2026-08-22 for World Explorer 3D 4.3.1.
 
 World Explorer acknowledges and thanks the following third-party projects, services, and individuals that made this software possible.
 

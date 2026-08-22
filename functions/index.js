@@ -1,5 +1,6 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const { Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
 const { defineString } = require('firebase-functions/params');
 const Stripe = require('stripe');
 const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
@@ -19,6 +20,17 @@ const {
   isMappedCameraTags,
   normalizeDeFlockSourceId
 } = require('./deflock');
+const {
+  claimUrbanVehicleLease,
+  commitUrbanCivicEvent,
+  commitUrbanImpacts,
+  normalizePose: normalizeUrbanPose,
+  normalizeUrbanEntityId,
+  poseDistance: urbanPoseDistance,
+  resolveUrbanCivicOutcome,
+  updateUrbanVehicleLease,
+  urbanEntityDocumentId
+} = require('./urban-sandbox');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -651,7 +663,10 @@ async function verifyAuth(req, res) {
   }
 
   try {
-    return await admin.auth().verifyIdToken(token);
+    // Authentication-sensitive HTTP endpoints must reject sessions that an
+    // account owner or administrator has explicitly revoked. Signature and
+    // expiry checks alone do not consult Firebase's revocation state.
+    return await admin.auth().verifyIdToken(token, true);
   } catch (err) {
     console.error('[auth] verifyIdToken failed:', err);
     res.status(401).json({ error: 'Invalid auth token.' });
@@ -751,11 +766,63 @@ async function deleteRoomTree(roomRef) {
     return;
   }
 
-  const subcollections = ['players', 'chat', 'chatState', 'artifacts', 'blocks', 'paintClaims', 'state'];
+  // Keep the fallback exhaustive with the room collections authorized by
+  // firestore.rules. Production Admin SDKs expose recursiveDelete, but the
+  // explicit path is still used by emulators and older runtimes.
+  const subcollections = [
+    'players',
+    'chat',
+    'chatState',
+    'artifacts',
+    'activities',
+    'activityState',
+    'blocks',
+    'worldModifications',
+    'paintClaims',
+    'deflockStates',
+    'state',
+    'urbanEntities',
+    'urbanActors',
+    'urbanCivic'
+  ];
   for (const name of subcollections) {
     await deleteDocsByQuery(roomRef.collection(name));
   }
   await roomRef.delete();
+}
+
+async function deleteDiscoveryTradesForUser(uid) {
+  const tradeRefs = new Map();
+  for (const field of ['ownerUid', 'recipientUid']) {
+    const snapshot = await db.collection('discoveryTrades').where(field, '==', uid).get();
+    snapshot.docs.forEach((tradeDoc) => tradeRefs.set(tradeDoc.ref.path, tradeDoc.ref));
+  }
+
+  for (const tradeRef of tradeRefs.values()) {
+    await db.runTransaction(async (transaction) => {
+      const tradeSnap = await transaction.get(tradeRef);
+      if (!tradeSnap.exists) return;
+      const trade = tradeSnap.data() || {};
+      if (trade.status === 'pending' && trade.ownerUid) {
+        const offeredRefs = (Array.isArray(trade.offeredItemIds) ? trade.offeredItemIds : [])
+          .slice(0, 20)
+          .map((itemId) => db.collection('explorerProfiles')
+            .doc(String(trade.ownerUid))
+            .collection('items')
+            .doc(String(itemId)));
+        const offered = await Promise.all(offeredRefs.map((itemRef) => transaction.get(itemRef)));
+        offered.forEach((itemSnap) => {
+          if (itemSnap.exists && itemSnap.data()?.lockedByTradeId === tradeSnap.id) {
+            transaction.update(itemSnap.ref, {
+              lockedByTradeId: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        });
+      }
+      transaction.delete(tradeRef);
+    });
+  }
 }
 
 async function deleteUserData(uid) {
@@ -778,12 +845,15 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid), 200, 'artifacts(ownerUid)');
   await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid), 200, 'blocks(createdBy)');
   await deleteDocsByQuery(db.collectionGroup('paintClaims').where('uid', '==', uid), 200, 'paintClaims(uid)');
+  await deleteDocsByQuery(db.collectionGroup('worldModifications').where('createdBy', '==', uid), 200, 'worldModifications(createdBy)');
 
   await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid), 200, 'flowerLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid), 200, 'paintTownLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('fishingLeaderboard').where('uid', '==', uid), 200, 'fishingLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
   await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+  await deleteDiscoveryTradesForUser(uid);
 
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(userRef);
@@ -1119,11 +1189,11 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
       const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
 
       if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
-        const normalizedTrialEndsAt = admin.firestore.Timestamp.fromMillis(trialEndsAtMs);
+        const normalizedTrialEndsAt = AdminTimestamp.fromMillis(trialEndsAtMs);
         const normalizedTrialStartMs = trialStartsAtIsTimestamp
           ? existing.trialStartsAt.toMillis()
           : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
-        const normalizedTrialStartsAt = admin.firestore.Timestamp.fromMillis(normalizedTrialStartMs);
+        const normalizedTrialStartsAt = AdminTimestamp.fromMillis(normalizedTrialStartMs);
         const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
           ? existing.trialConsumedAt
           : normalizedTrialStartsAt;
@@ -1163,8 +1233,8 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
       return;
     }
 
-    const trialStartsAt = admin.firestore.Timestamp.fromMillis(nowMs);
-    const trialEndsAt = admin.firestore.Timestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
+    const trialStartsAt = AdminTimestamp.fromMillis(nowMs);
+    const trialEndsAt = AdminTimestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
     const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
     const roomCreateLimit = roomCreateLimitForPlan('trial');
     await db.collection('users').doc(auth.uid).set(
@@ -1609,6 +1679,244 @@ exports.claimDeFlockVirtualDisable = functions.region('us-central1').https.onReq
   } catch (error) {
     console.error('[claimDeFlockVirtualDisable] failed:', error);
     res.status(500).json({ error: 'Could not update shared DeFlock progress right now.' });
+  }
+});
+
+async function requireUrbanRoomContext(req, res, auth) {
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const worldSeed = sanitizeText(req.body && req.body.worldSeed, 180);
+  if (!roomCode || !worldSeed) {
+    res.status(400).json({ error: 'A valid room and world identity are required.' });
+    return null;
+  }
+  const roomRef = db.collection('rooms').doc(roomCode);
+  const [roomSnap, memberSnap] = await Promise.all([
+    roomRef.get(),
+    roomRef.collection('players').doc(auth.uid).get()
+  ]);
+  if (!roomSnap.exists) {
+    res.status(404).json({ error: 'Room not found.' });
+    return null;
+  }
+  const room = roomSnap.data() || {};
+  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+    res.status(403).json({ error: 'Join this room before using shared urban interactions.' });
+    return null;
+  }
+  if (String(room.world?.kind || 'earth').toLowerCase() !== 'earth') {
+    res.status(409).json({ error: 'Urban room interactions are only available in Earth rooms.' });
+    return null;
+  }
+  if (String(room.world?.seed || '') !== worldSeed) {
+    res.status(409).json({ error: 'The active room world does not match this interaction.' });
+    return null;
+  }
+  const playerSnap = memberSnap.exists
+    ? memberSnap
+    : await roomRef.collection('players').doc(auth.uid).get();
+  if (!playerSnap.exists) {
+    res.status(409).json({ error: 'Active room presence is required.' });
+    return null;
+  }
+  const player = playerSnap.data() || {};
+  const lastSeenMs = timestampToMillis(player.lastSeenAt);
+  const expiresAtMs = timestampToMillis(player.expiresAt);
+  const nowMs = Date.now();
+  if (!Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 120_000 || (Number.isFinite(expiresAtMs) && expiresAtMs < nowMs - 2_000)) {
+    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
+    return null;
+  }
+  return { roomCode, worldSeed, roomRef, room, player, nowMs };
+}
+
+function urbanTimestampFromMs(value) {
+  return AdminTimestamp.fromMillis(Math.floor(Number(value) || Date.now()));
+}
+
+function urbanCivicAgencyForRoom(room = {}) {
+  const label = sanitizeText(room.world?.name || room.world?.label || room.name || '', 72);
+  const normalized = label.toLowerCase();
+  if (/national park|state park|forest|preserve|wilderness/.test(normalized)) return 'Ranger service';
+  if (/campus|university|college/.test(normalized)) return 'Campus safety';
+  if (label) return `${label.replace(/,.*$/, '')} civic response`.slice(0, 80);
+  return 'Local civic response';
+}
+
+exports.claimUrbanVehicle = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const entityId = normalizeUrbanEntityId(req.body && req.body.entityId);
+    const documentId = urbanEntityDocumentId(entityId);
+    if (!entityId || !documentId) return res.status(400).json({ error: 'A valid vehicle identity is required.' });
+    const pose = normalizeUrbanPose(req.body && req.body.pose);
+    if (urbanPoseDistance(context.player.pose, pose) > 30) {
+      return res.status(422).json({ error: 'Move closer to that vehicle before entering it.' });
+    }
+    const result = await claimUrbanVehicleLease({
+      runTransaction: (callback) => db.runTransaction(callback),
+      entityRef: context.roomRef.collection('urbanEntities').doc(documentId),
+      uid: auth.uid,
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        entityId,
+        worldSeed: context.worldSeed,
+        pose,
+        label: sanitizeText(req.body && req.body.label, 80),
+        style: sanitizeText(req.body && req.body.style, 40),
+        color: req.body && req.body.color
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('[claimUrbanVehicle] failed:', error);
+    res.status(500).json({ error: 'Could not claim this room vehicle right now.' });
+  }
+});
+
+async function handleUrbanVehicleLeaseUpdate(req, res, release = false) {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const entityId = normalizeUrbanEntityId(req.body && req.body.entityId);
+    const documentId = urbanEntityDocumentId(entityId);
+    if (!entityId || !documentId) return res.status(400).json({ error: 'A valid vehicle identity is required.' });
+    const result = await updateUrbanVehicleLease({
+      runTransaction: (callback) => db.runTransaction(callback),
+      entityRef: context.roomRef.collection('urbanEntities').doc(documentId),
+      uid: auth.uid,
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      release,
+      input: { pose: normalizeUrbanPose(req.body && req.body.pose) }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(`[${release ? 'release' : 'update'}UrbanVehicle] failed:`, error);
+    res.status(500).json({ error: `Could not ${release ? 'release' : 'update'} this room vehicle right now.` });
+  }
+}
+
+exports.updateUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
+exports.releaseUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
+
+exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const rawTargets = Array.isArray(req.body && req.body.targets) ? req.body.targets.slice(0, 10) : [];
+    const targets = rawTargets.map((target) => ({
+      entityId: normalizeUrbanEntityId(target && target.entityId),
+      kind: sanitizeText(target && target.kind, 20).toLowerCase(),
+      pose: normalizeUrbanPose(target && target.pose),
+      label: sanitizeText(target && target.label, 80),
+      style: sanitizeText(target && target.style, 40),
+      color: target && target.color
+    }));
+    if (!targets.length || targets.some((target) => !target.entityId)) {
+      return res.status(400).json({ error: 'At least one valid impact target is required.' });
+    }
+    const entityRefs = new Map(targets.map((target) => [
+      target.entityId,
+      context.roomRef.collection('urbanEntities').doc(urbanEntityDocumentId(target.entityId))
+    ]));
+    const result = await commitUrbanImpacts({
+      runTransaction: (callback) => db.runTransaction(callback),
+      actorRef: context.roomRef.collection('urbanActors').doc(auth.uid),
+      entityRefs,
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        equipmentId: sanitizeText(req.body && req.body.equipmentId, 40),
+        worldSeed: context.worldSeed,
+        impactPosition: normalizeUrbanPose(req.body && req.body.impactPosition),
+        targets
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = String(error && error.message || '');
+    if (message === 'impact_out_of_range' || message.startsWith('invalid_')) {
+      return res.status(422).json({ error: 'The requested impact is not valid from the current room position.' });
+    }
+    console.error('[commitUrbanImpacts] failed:', error);
+    res.status(500).json({ error: 'Could not commit this room interaction right now.' });
+  }
+});
+
+exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const result = await commitUrbanCivicEvent({
+      runTransaction: (callback) => db.runTransaction(callback),
+      civicRef: context.roomRef.collection('urbanCivic').doc('current'),
+      actorRef: context.roomRef.collection('urbanActors').doc(auth.uid),
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        worldSeed: context.worldSeed,
+        kind: sanitizeText(req.body && req.body.kind, 40).toLowerCase(),
+        severity: req.body && req.body.severity,
+        witnessCount: req.body && req.body.witnessCount,
+        vehicleId: normalizeUrbanEntityId(req.body && req.body.vehicleId),
+        position: normalizeUrbanPose(req.body && req.body.position),
+        agency: urbanCivicAgencyForRoom(context.room)
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = String(error && error.message || '');
+    if (message.startsWith('invalid_') || message === 'civic_event_out_of_range') {
+      return res.status(422).json({ error: 'The witnessed event is not valid from the current room position.' });
+    }
+    console.error('[commitUrbanCivicEvent] failed:', error);
+    res.status(500).json({ error: 'Could not share this civic event right now.' });
+  }
+});
+
+exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const result = await resolveUrbanCivicOutcome({
+      runTransaction: (callback) => db.runTransaction(callback),
+      civicRef: context.roomRef.collection('urbanCivic').doc('current'),
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      actorVelocity: context.player.pose || {},
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('[resolveUrbanCivicOutcome] failed:', error);
+    res.status(500).json({ error: 'Could not resolve this shared civic outcome right now.' });
   }
 });
 

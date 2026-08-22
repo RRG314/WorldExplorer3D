@@ -131,6 +131,7 @@ function buildingKey(building) {
   if (!building) return '';
   return String(
     building.sourceBuildingId ||
+    building.id ||
     `${Math.round(finiteNumber(building.centerX, 0))}:${Math.round(finiteNumber(building.centerZ, 0))}`
   );
 }
@@ -320,12 +321,14 @@ function resolveSupportRecord(building, options = {}) {
     z: finiteNumber(building.centerZ, (bounds.minZ + bounds.maxZ) * 0.5)
   };
   const destination = options.destination || null;
+  const key = buildingKey(building);
+  const exteriorEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :
-    center;
+    exteriorEntrance ? { x: exteriorEntrance.x, z: exteriorEntrance.z } : center;
 
   return {
-    key: buildingKey(building),
+    key,
     label: options.label || buildingLabel(destination || building),
     enterable: true,
     synthetic: !!building.syntheticInteriorOnly,
@@ -336,6 +339,7 @@ function resolveSupportRecord(building, options = {}) {
     bounds,
     center,
     entryAnchor: buildEntryAnchor(building, originPoint),
+    exteriorEntrance,
     allowMappedData: !building.syntheticInteriorOnly,
     allowGeneratedInterior: true
   };
@@ -449,14 +453,19 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
     const support = resolveBuildingEntrySupport(building, options);
     if (!support.enterable) continue;
     const footprintHit = distanceToFootprint(x, z, support.building);
-    if (!Number.isFinite(footprintHit.dist) || footprintHit.dist > radius) continue;
-    const score = footprintHit.dist + (footprintHit.inside ? 0.35 : 0);
+    const entrance = support.exteriorEntrance;
+    const interactionDistance = entrance
+      ? Math.hypot(x - finiteNumber(entrance.approachX, entrance.x), z - finiteNumber(entrance.approachZ, entrance.z))
+      : footprintHit.dist;
+    const interactionRadius = entrance ? Math.min(radius, 3.25) : radius;
+    if (!Number.isFinite(interactionDistance) || interactionDistance > interactionRadius) continue;
+    const score = interactionDistance + (footprintHit.inside ? 0.35 : 0);
     if (!best || score < best.score) {
       best = {
         support,
         score,
-        distance: footprintHit.dist,
-        point: footprintHit.point,
+        distance: interactionDistance,
+        point: entrance ? { x: entrance.x, z: entrance.z } : footprintHit.point,
         inside: footprintHit.inside
       };
     }
@@ -467,8 +476,12 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
     destinationSupport?.enterable &&
     buildingOccupiesActorHeight(destinationSupport.building, actorBaseY, actorHeight)
   ) {
-    const destinationDist = supportDistanceToActor(x, z, destinationSupport);
-    if (Number.isFinite(destinationDist) && destinationDist <= radius + 1.5) {
+    const entrance = destinationSupport.exteriorEntrance;
+    const destinationDist = entrance
+      ? Math.hypot(x - finiteNumber(entrance.approachX, entrance.x), z - finiteNumber(entrance.approachZ, entrance.z))
+      : supportDistanceToActor(x, z, destinationSupport);
+    const destinationRadius = entrance ? Math.min(radius, 3.25) : radius + 1.5;
+    if (Number.isFinite(destinationDist) && destinationDist <= destinationRadius) {
       const destinationHit = distanceToFootprint(x, z, destinationSupport.building);
       const score = destinationDist - (destinationSupport.synthetic ? 0.1 : 0.35);
       if (!best || score < best.score) {
@@ -476,7 +489,7 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
           support: destinationSupport,
           score,
           distance: destinationDist,
-          point: destinationHit.point,
+          point: entrance ? { x: entrance.x, z: entrance.z } : destinationHit.point,
           inside: destinationHit.inside
         };
       }
