@@ -599,7 +599,15 @@ function transportStructureSnapshot() {
       typeof road?.surfaceTerrainSampler === 'function').length,
     corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
     adjustedTerrainVertices: Number(appCtx.transportTerrainCorridorStats?.adjustedVertices || 0),
-    terrainMeshes: Number(appCtx.transportTerrainCorridorStats?.terrainMeshes || 0)
+    terrainMeshes: Number(appCtx.transportTerrainCorridorStats?.terrainMeshes || 0),
+    heightSamplingAuthority:
+      String(appCtx.transportTerrainCorridorStats?.heightSamplingAuthority || '') || null,
+    terrainSeamAuthority:
+      String(appCtx.transportTerrainCorridorStats?.terrainSeams?.authority || '') || null,
+    sharedTerrainEdgeVertices:
+      Number(appCtx.transportTerrainCorridorStats?.terrainSeams?.sharedVertices || 0),
+    maximumTerrainSeamDeltaBefore:
+      Number(appCtx.transportTerrainCorridorStats?.terrainSeams?.maximumDeltaBefore || 0)
   });
   const sharedPhysicalSurfaces = [...new Map(roads.map((road) => {
     const surface = road?.transportSurfacePresentation;

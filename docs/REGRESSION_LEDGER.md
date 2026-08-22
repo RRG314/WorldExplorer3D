@@ -1887,3 +1887,47 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   order-dependent building decisions, duplicate road/building renderers,
   city-specific clearances, fake widths, detail/height reduction, test cameras,
   continuous streaming or claims that object counts prove composition.
+
+## 2026-08-22 — CPU terrain height disagreed with the rendered physical surface
+
+- Status: resolved locally as recovery checkpoint 12; not deployed. Worldwide
+  road/junction enclosure and provider-sensitive vertical topology remain
+  production blockers.
+- Symptom: final London gameplay showed terrain through or above road ribbons,
+  while the road mesh integrity/count gate passed. The same complete-frame
+  review found road-edge/junction notches in Monaco and Tokyo. This is not a
+  JFX-only or London-only acceptance problem.
+- First authoritative loss: `terrainMeshHeightAt` bilinearly interpolated four
+  terrain vertices, but the GPU rendered the cell's two triangle planes. A
+  bilinear saddle is not the rendered physical surface. Separately, water and
+  transport reapplied tiles sequentially and stitched a mesh before a neighbour
+  could be recalculated, so the later tile could overwrite a shared edge.
+- Resolution: sample the exact rendered triangle selected by the geometry
+  diagonal. After all water/transport reapplications, publish each shared tile
+  edge coordinate once across the whole terrain group and average its normals.
+  Terrain remains one renderer and one resolution; roads, buildings, mapped
+  heights, providers and detail budgets are unchanged.
+- Guard: deterministic source fixtures prove triangle-plane sampling on a
+  saddle and exact shared-edge publication for disagreeing adjacent tiles.
+  Runtime diagnostics require `rendered-triangle-barycentric` and
+  `one-shared-world-height-per-terrain-edge-coordinate` in the complete world.
+- Worldwide evidence: all seven assembled locations publish the new authority
+  and reconcile 2,814-10,728 shared vertices. Mapped-tall final visibility,
+  shared far-building height authority, traffic, collision and runtime checks
+  remain green. Four-city actor verification reports 14/14 sampled traffic
+  vehicles, zero wheel penetration, bounded suspension gaps and zero visible
+  pedestrian NPCs in each location.
+- Remaining failed evidence: the worldwide matrix reports vertical topology/
+  grade failures in Baltimore (44/11.3764 m; one grade), Golden Gate (6/5.3891
+  m; one grade), London (27/5.4286 m; five grades), Manhattan (7/5.4999 m; one
+  grade) and Tokyo (17/15.9661 m; one grade). Monaco and Iowa pass. The green
+  road-footprint gate still accepts visibly incoherent London, Monaco and Tokyo
+  road composition; final-frame enclosure is now an explicit next gate.
+- Discarded theory/experiment: loading fallback street polygons did not remove
+  the London shapes. Adaptive road tessellation and local surface lifts grew
+  geometry dramatically and still left failures, so none of that experiment is
+  shipped. Do not reintroduce it as a visual patch.
+- Never reintroduce: bilinear CPU sampling against triangulated rendered
+  terrain, per-tile final seam ownership, count-only road acceptance, paving
+  arbitrary inter-road land, city-specific terrain cuts, duplicate surfaces,
+  visual-only lifts or performance work that removes world detail.

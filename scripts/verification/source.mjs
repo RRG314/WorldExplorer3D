@@ -35,6 +35,8 @@ import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-build
 import { resolveCustomLocationArrival } from '../../app/js/world/spawn-location-arrival.js';
 import { resolveFarBuildingMassing } from '../../app/js/terrain/far-building-massing.js';
 import { appendSolidAtGradeRoadGeometry } from '../../app/js/terrain/road-surface-geometry.js';
+import { interpolateRenderedTerrainCell } from '../../app/js/terrain/height-sampling.js';
+import { stitchTerrainGroupEdges } from '../../app/js/terrain/seams.js';
 import {
   computeIntersectionCapRadius,
   shouldBuildCompactIntersectionCap
@@ -196,6 +198,64 @@ assert.equal(stackedGroundRuntime.sampleAtLatLon(0, 0).artifactId, 'fine-ground'
 assert.equal(stackedGroundRuntime.sampleAtLatLon(0.01, 0.01).artifactId, 'regional-ground');
 
 const groundAuthorityFailures = [];
+const mockAttribute = (values) => ({
+  values,
+  count: values.length,
+  needsUpdate: false,
+  getX(index) { return this.values[index].x; },
+  getY(index) { return this.values[index].y; },
+  getZ(index) { return this.values[index].z; },
+  setY(index, value) { this.values[index].y = value; },
+  setXYZ(index, x, y, z) { this.values[index] = { x, y, z }; }
+});
+const mockTerrainMesh = (tx, centerX, edgeHeight) => ({
+  position: { x: centerX, y: 0, z: 0 },
+  userData: {
+    isTerrainMesh: true,
+    pendingTerrainTile: false,
+    terrainTile: { z: 14, tx, ty: 0 }
+  },
+  geometry: {
+    attributes: {
+      position: mockAttribute([
+        { x: -0.5, y: edgeHeight, z: -0.5 },
+        { x: 0.5, y: edgeHeight, z: -0.5 },
+        { x: -0.5, y: edgeHeight, z: 0.5 },
+        { x: 0.5, y: edgeHeight, z: 0.5 }
+      ]),
+      normal: mockAttribute(Array.from({ length: 4 }, () => ({ x: 0, y: 1, z: 0 })))
+    },
+    computeVertexNormals() {}
+  }
+});
+const leftTerrainFixture = mockTerrainMesh(0, 0.5, 0);
+const rightTerrainFixture = mockTerrainMesh(1, 1.5, 2);
+const terrainSeamFixture = stitchTerrainGroupEdges({
+  TERRAIN_SEGMENTS: 1,
+  terrainGroup: { children: [leftTerrainFixture, rightTerrainFixture] }
+});
+if (terrainSeamFixture.authority !== 'one-shared-world-height-per-terrain-edge-coordinate' ||
+    terrainSeamFixture.sharedVertices !== 2 ||
+    leftTerrainFixture.geometry.attributes.position.getY(1) !== 1 ||
+    leftTerrainFixture.geometry.attributes.position.getY(3) !== 1 ||
+    rightTerrainFixture.geometry.attributes.position.getY(0) !== 1 ||
+    rightTerrainFixture.geometry.attributes.position.getY(2) !== 1) {
+  groundAuthorityFailures.push(
+    'terrain finalization did not publish one shared height for adjacent tile edge coordinates'
+  );
+}
+const renderedTerrainCellFixture = [
+  { sx: 0.25, sz: 0.25, expected: 7.5 },
+  { sx: 0.75, sz: 0.75, expected: 7.5 },
+  { sx: 0.25, sz: 0.75, expected: 17.5 }
+];
+if (renderedTerrainCellFixture.some(({ sx, sz, expected }) =>
+  Math.abs(interpolateRenderedTerrainCell(sx, sz, 0, 10, 20, 0) - expected) > 1e-9
+)) {
+  groundAuthorityFailures.push(
+    'CPU terrain height did not match the two rendered PlaneGeometry triangle planes'
+  );
+}
 let appliedRuralArrival = null;
 const ruralMappedApproach = {
   valid: true,

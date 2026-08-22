@@ -41,8 +41,15 @@ try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     const browserErrors = [];
+    const browserConsole = [];
     const localFailures = [];
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
+    page.on('console', (message) => {
+      if (!['warning', 'error'].includes(message.type())) return;
+      if (browserConsole.length < 120) {
+        browserConsole.push({ type: message.type(), text: message.text() });
+      }
+    });
     page.on('response', (response) => {
       if (response.url().startsWith(baseUrl) && response.status() >= 400) {
         localFailures.push({ kind: 'response', status: response.status(), url: response.url() });
@@ -193,7 +200,12 @@ try {
           Number(snapshot.atGradeTerrainAuthority?.corridorCount || 0) ===
             Number(snapshot.atGradeTerrainAuthority?.roadCount || -1) &&
           Number(snapshot.atGradeTerrainAuthority?.liveTerrainSamplerRoads || 0) === 0 &&
-          Number(snapshot.atGradeTerrainAuthority?.adjustedTerrainVertices || 0) > 0,
+          Number(snapshot.atGradeTerrainAuthority?.adjustedTerrainVertices || 0) > 0 &&
+          snapshot.atGradeTerrainAuthority?.heightSamplingAuthority ===
+            'rendered-triangle-barycentric' &&
+          snapshot.atGradeTerrainAuthority?.terrainSeamAuthority ===
+            'one-shared-world-height-per-terrain-edge-coordinate' &&
+          Number(snapshot.atGradeTerrainAuthority?.sharedTerrainEdgeVertices || 0) > 0,
         publishedBridgeElevationControlResolved: location.id !== 'golden-gate' || (
           snapshot.publishedVerticalControls.length === 2 &&
           snapshot.publishedVerticalControls.every((control) =>
@@ -246,9 +258,24 @@ try {
         await page.waitForTimeout(200);
       }
       if (capture) await page.screenshot({ path: path.join(evidenceDir, `${location.id}.png`) });
-      results.push({ ...location, ok: Object.values(checks).every(Boolean), checks, snapshot, browserErrors, localFailures });
+      results.push({
+        ...location,
+        ok: Object.values(checks).every(Boolean),
+        checks,
+        snapshot,
+        browserErrors,
+        browserConsole,
+        localFailures
+      });
     } catch (error) {
-      results.push({ ...location, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
+      results.push({
+        ...location,
+        ok: false,
+        error: String(error?.stack || error),
+        browserErrors,
+        browserConsole,
+        localFailures
+      });
     } finally {
       await context.close().catch(() => {});
     }

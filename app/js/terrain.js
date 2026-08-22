@@ -5,8 +5,9 @@ import {
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
 } from "./terrain/structure-visuals.js?v=57";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=13";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
+import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=20";
 import {
   groundProviderCatalogSnapshot
@@ -51,7 +52,7 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=46";
+} from "./terrain/tiles.js?v=47";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -280,11 +281,13 @@ function applyWaterTerrainMask() {
     applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
     maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
+  const terrainSeams = stitchTerrainGroupEdges(appCtx);
   clearTerrainHeightCache();
   const stats = {
     terrainMeshes: meshes.length,
     waterAreas: waterAreaCount,
-    maskedVertices
+    maskedVertices,
+    terrainSeams
   };
   appCtx.waterTerrainMaskStats = stats;
   return stats;
@@ -299,12 +302,15 @@ function applyTransportTerrainCorridors() {
     applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
     adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
   }
+  const terrainSeams = stitchTerrainGroupEdges(appCtx);
   clearTerrainHeightCache();
   const stats = Object.freeze({
     authority: 'compiled_transport_surface',
+    heightSamplingAuthority: 'rendered-triangle-barycentric',
     terrainMeshes: meshes.length,
     corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
-    adjustedVertices
+    adjustedVertices,
+    terrainSeams
   });
   appCtx.transportTerrainCorridorStats = stats;
   return stats;

@@ -1874,3 +1874,47 @@ another publication owner before editing. Then continue with mapped street-
 facing doors/glass storefronts, ownership-based memory/data work and final
 packaged release/security verification. No push, deployment, promotion,
 continuous streaming, detail reduction or user-data mutation is authorized.
+
+## Current continuation after 2026-08-22 recovery checkpoint 12
+
+Complete London pixel/raycast inspection separated two problems that the green
+`solidRoadSurfaceFootprints` check had conflated. Terrain could be the first
+visible physical hit even where road geometry existed behind it because CPU
+terrain sampling used bilinear interpolation while `THREE.PlaneGeometry`
+renders each grid cell as two triangles. On uneven/corridor-shaped cells those
+are different surfaces. In addition, sequential tile reapplication could
+overwrite an edge after that edge had already been stitched to its neighbour.
+
+The bounded repair makes the rendered triangle plane the sole terrain height
+authority and performs one final terrain-group edge publication after all water
+or transport tile reapplications. Every shared edge coordinate receives one
+world height and averaged normal. Runtime diagnostics expose both authorities
+and the number/maximum pre-repair delta of reconciled vertices. This does not
+change terrain resolution, road geometry, provider selection, mapped heights,
+building selection, far detail, scene roots, load budgets or location identity.
+The seam index is temporary publication work, not retained world state.
+
+`verify:source` passes. The seven-location complete assembled matrix confirms
+the new authority in Baltimore/JFX, Golden Gate, London, Monaco, Manhattan,
+rural Iowa and Tokyo, with 2,814-10,728 shared edge vertices reconciled. All
+mapped-tall/far-height authorities remained green. The independent Baltimore,
+London, Monaco and Tokyo actor/vehicle matrix passes with 14/14 four-wheel
+contacts, zero penetration, bounded gaps and zero visible pedestrian NPCs.
+
+The assembled matrix remains red and the release is not production-ready.
+Baltimore, Golden Gate, London, Manhattan and Tokyo currently expose vertical
+connection/grade failures; Monaco and Iowa pass. External Overpass failures and
+CORS/timeouts were captured in the artifact instead of being silently lost.
+All complete frames were opened. London still has obvious broad terrain wedges
+and jagged road/junction composition, and smaller notches remain visible in
+Monaco and Tokyo even though `solidRoadSurfaceFootprints` is green. Treat that
+as proof that the gate is incomplete.
+
+The next bounded checkpoint is worldwide road/junction enclosure in final
+gameplay, including turns and parallel/intersecting identities. First classify
+the visible pixels by mapped source identity, local width, terrain and final
+physical enclosure. Do not assume the bridge compiler, pave arbitrary land,
+add broad convex-hull fans, use a city patch, or revive the discarded adaptive
+tessellation/lift experiment. Golden Gate's inspected deck is symmetric on both
+sides. Keep vertical topology, street-facing mapped doors/glass storefronts,
+and ownership-based memory/data cleanup as separate later authorities.
