@@ -1,403 +1,468 @@
-# Roadmap
+# Current Product Roadmap
 
-This roadmap describes the work required to move World Explorer 3D from the
-current 4.3.1 release to a production-ready 5.0 release. It distinguishes
-shipping foundations from partial systems and scaffolding so that a visible UI
-or data model is never mistaken for a complete feature.
+Last audited: 2026-08-22 against World Explorer 3D 4.3.1 at release commit
+`af540b39fc80ba01998d48a2739d982fd8b913c1`.
 
-Priorities can move when provider availability, licensing, security, or measured
-hardware limits change. A workstream is complete only when its acceptance
-criteria pass in the assembled application and its user-facing limitations are
-documented.
+This is a roadmap for the current codebase. Historical release work belongs in
+[CHANGELOG.md](CHANGELOG.md); it is not repeated here as future work. A module,
+button, schema, or preview is not considered a complete product feature unless
+the normal player path works in the assembled application and the release
+pipeline verifies the outcome.
 
-## Status definitions
+## Status language
 
-- **Shipping** — available through the normal 4.3.1 product path and covered by
-  a production verification gate.
-- **Partial** — useful end-to-end behavior exists, but coverage, resilience, or
-  verification is incomplete.
-- **Scaffold** — UI, schemas, local storage, or preview behavior exists without
-  the complete production workflow.
-- **Planned** — no supported end-to-end product path is claimed yet.
+- **Released and gated** — ships in 4.3.1 and has a current production journey.
+- **Released, gate incomplete** — ships through the normal UI, but the release
+  pipeline does not yet prove the complete interaction.
+- **Partial** — part of the end-to-end behavior exists, but a required authority,
+  workflow, coverage area, or failure path is missing.
+- **Not implemented** — there is no supported product path. A label, type, or
+  editor field alone does not change this status.
+- **Intentional limit** — behavior is deliberately outside the product contract.
 
-## Product invariants
+## Product rules that every checkpoint must preserve
 
-Every roadmap item must preserve these rules:
-
-- Earth remains a fixed, bounded, selected-location experience. It will not
+- Earth is a bounded, selected-location experience. It is not and will not
   become a continuously streaming world.
-- Mapped identities, geometry, heights, and provenance remain authoritative
-  when available. Inferred values stay labeled as inference and are never
-  described as surveyed measurements.
-- Each physical surface and world layer has one publication authority. New work
-  must replace or extend that authority instead of adding a competing loader,
-  renderer, collision surface, or gameplay-only duplicate.
-- Performance work must release duplicate state, defer optional systems, batch
-  compatible work, or reduce effects before reducing mapped world detail.
-- A count-only test does not prove a visible feature. Completion requires the
-  final assembled game with terrain, water, buildings, transport, population,
-  atmosphere, HUD, collision, and player control active together.
-- Provider, license, datum, freshness, coverage, and fallback state remain
-  inspectable. Missing data fails honestly or uses a bounded labeled fallback.
+- Mapped identities, geometry, height, and provenance remain authoritative when
+  available. Inferred content is labeled and is never described as surveyed.
+- Each world layer and physical surface has one owner for data selection,
+  publication, rendering, collision, and traversal.
+- Performance work removes duplicate ownership, releases retained resources,
+  defers optional systems, batches compatible geometry, and scales effects
+  before changing mapped world detail.
+- Player and non-player actors may use only eligible published surfaces.
+  Vehicle-road centerlines cannot fabricate sidewalks or crossings, and people
+  may not be placed on vehicle-only or engineered transport surfaces.
+- New work is worldwide unless the underlying licensed data is explicitly
+  regional. No city-specific geometry or test-only camera may define success.
+- A count-only check is not visual evidence. Final frames must contain the full
+  assembled game, including terrain, water, buildings, transport, population,
+  atmosphere, HUD, collision, and player control.
+- One bounded authority change is completed, inspected, documented, and
+  checkpointed before the next begins.
 
-## Current 4.3.1 baseline
+## What the current codebase already contains
 
-The following foundations are already shipping and should be improved in place:
+| Product system | Current 4.3.1 implementation | Status |
+| --- | --- | --- |
+| Fixed-location Earth | Atomic selected-location loading, cancellation, immutable world publication, fixed regional context, and explicit teardown | Released and gated |
+| Terrain and land cover | 41 integrity-checked accepted-ground artifacts, datum/provenance contracts, WorldCover, polar surfaces, far terrain, seam authority, and labeled fallback terrain | Released; accepted-ground coverage is partial |
+| Roads and structures | One compiled transport surface for roads, junctions, bridges, ramps, elevated roads, overpasses, underpasses, and tunnels | Released and gated, with source-data limitations |
+| Buildings and facades | Overture/OSM selection, stable identity, mapped height preservation through LODs, roofs, street-facing entrances, storefront glass, and facade-integrated detail | Released and gated |
+| Interiors | Mapped indoor rooms/corridors where available plus deterministic generated multi-floor interiors with stable floor IDs, stairs, elevators, collision, entry, and exit | Released; mapped multi-level ingestion gate incomplete |
+| Traversal | Walk, car, drone, plane, boat, underwater, rover, astronaut, rocket, environment transitions, and mode-aware cameras | Released and mostly gated |
+| Living world | Mapped-path pedestrian eligibility, varied traffic, parked vehicles, entrances, collision, and bounded LOD publication | Released and gated for representative Earth locations |
+| Urban Sandbox | One six-slot Backpack model, equipment actions, ammunition, vehicle entry/exit and doors, actor collision, civic responders, custody, mapped police/hospital recovery, and room authority | Released, gate incomplete |
+| Explorer and Discovery | Contextual wildlife, geology, places/history, field equipment, Journal, Field Guide, collection, goals, progression, companions, and account-backed item/trade services | Released, gate incomplete |
+| AR | Capability-aware WebXR, camera overlay, and interactive-3D fallback for companions, specimens, and habitat-gated virtual wildlife surveys | Released, gate incomplete |
+| Water and Ocean | Published water ownership, surface boat, waves, wakes, shoreline transfer, underwater mode, bathymetry evidence, fish life, and fishing | Released; bathymetry and journey coverage are partial |
+| Live Earth and Live GPS | Observed and modeled provider registry, aircraft, satellites, earthquakes, weather, marine/water-level context, street imagery, and bounded foreground GPS following | Released; Live GPS is gated, full Live Earth is not |
+| Games and progression | DeFlock Hunt, fishing, flower challenge, Paint Town, activity discovery, Explorer progression, shared room activities, and several leaderboards | Released, gate incomplete |
+| Multiplayer | Bounded authenticated rooms, private codes, public discovery, presence, chat, artifacts, blocks, world edits, activities, social data, and two-client convergence | Released; resilience and moderation are partial |
+| Creation tools | Overlay editor, local drafts, backend submission/moderation, public overlay layer, activity creator, activity library, creator profile, editable rooms, and block builder | Mixed: overlay workflow partial; activity publishing local-only |
+| Moon, Mars, Space, and universe | Planetary traversal, surface vehicles, tracks, catalog stars, solar-system navigation, spacecraft, deep-sky destinations, encounters, and return lifecycles | Released and environment-lifecycle gated |
+| Account, admin, and security | Authentication, account management, entitlements, admin operations, analytics link, moderation surfaces, security rules, emulator tests, and immutable release builds | Released and security gated |
+| UI, mobile, and accessibility | Responsive title/game shell, touch controls, screen-layout ownership, many semantic labels/live regions, and keyboard/gamepad inputs | Released; accessibility gate incomplete |
+| Public landing and documentation | Public launch flow, current gameplay gallery, GitHub Pages, source/data/limitations documentation, and release identity | Released; gallery refresh remains planned |
 
-- One selected-location Earth loader and immutable world publication path.
-- One compiled transport surface for roads, bridges, ramps, elevated roads,
-  overpasses, underpasses, and tunnels.
-- Provenance-aware buildings, water, terrain, mapped entrances, street-facing
-  facade detail, generated interiors, and deterministic height resolution.
-- Walking, driving, drone, plane, boat, underwater, rover, astronaut, and space
-  traversal.
-- Earth, Ocean, Moon, Mars, and Space lifecycle transitions without a page
-  reload.
-- Bounded multiplayer rooms with presence, chat, artifacts, shared blocks,
-  room activities, and emulator-backed authorization tests.
-- Discovery, field activities, companions, progression, DeFlock Hunt, fishing,
-  block building, overlay editing, and activity-creation foundations.
-- Immutable hosting artifacts, source checks, assembled-world checks, lifecycle
-  checks, multiplayer convergence checks, and release verification.
+## What is genuinely missing or incomplete
 
-The accepted-ground catalog currently contains 41 reviewed fixed-location
-artifacts: 38 classified Copernicus artifacts and three USGS 3DEP artifacts.
-Outside accepted coverage, the runtime can still use the documented legacy
-terrain fallback, whose mixed vertical datum is not proven uniform. This is a
-known boundary of the current terrain system, not global bare-earth completion.
+The following findings come from the current source, not the historical roadmap:
 
-## 5.0 release workstreams
+- **Crafting is not implemented.** There is no recipe, ingredient, crafting
+  transaction, or crafted-item authority in the current product path.
+- **A unified mission and economy system is not implemented.** “Missions” exists
+  as navigation language and individual games have rewards/scores, but there is
+  no authoritative mission lifecycle, wallet, currency, pricing, or economy.
+- **Complete physical player embodiment is not implemented.** Equipment has
+  first-person/world visuals and the walking actor is visible, but there is no
+  single full-body/hand interaction contract covering every traversal mode,
+  item action, camera, collision, and multiplayer representation.
+- **Generated multi-floor interiors are implemented.** The remaining indoor gap
+  is different: mapped indoor ingestion currently selects one mapped level
+  before publication, while generated eligible buildings can publish multiple
+  floors with stairs and an elevator.
+- **Activity publishing is not production-complete.** Authored activities are
+  stored in a local browser library and the UI explicitly says backend
+  publishing comes later. Built-in and room activities are separate paths.
+- **Overlay editing is more than a mock, but still beta.** Submission,
+  moderation, admin review, and public overlay code exist; the release pipeline
+  does not yet prove the entire non-admin-to-admin-to-second-client workflow.
+- **Current feature verification is narrower than the feature set.** The release
+  pipeline proves the assembled Earth world, JFX surface ownership, representative
+  locations, actor/vehicle contact, environment ownership, Live GPS, security,
+  and two-client multiplayer. It does not yet run full Discovery, AR, interior,
+  fishing, DeFlock, creator, civic-response, or accessibility journeys.
+- **Terrain is not globally accepted bare earth.** The catalog contains 41
+  reviewed fixed-location artifacts; the documented global fallback has a mixed
+  vertical datum that is not proven uniform.
+- **Ocean depth coverage is limited.** Depth evidence and fallback labeling are
+  implemented, but the reviewed bathymetry experience is not yet globally
+  consistent.
+- **Performance has mechanisms but no public numeric budget matrix.** On-demand
+  modules, cancellation, batching, lifecycle scopes, and teardown exist; named
+  desktop/mobile hardware budgets for load time, frame time, memory, network,
+  draw calls, and teardown retention still need to be measured and enforced.
+- **Accessibility is implemented unevenly.** Many controls have labels, live
+  regions, keyboard/touch equivalents, and layout protection, but there is no
+  end-to-end keyboard, focus, contrast, reduced-motion, text-scaling, and
+  screen-reader release gate.
 
-### R5.1 — Terrain accuracy and bare-earth coverage
+## Current completion program
 
-**Status: Partial**
+### CP0 — Make release evidence match the current product
 
-What exists:
+**Status: In progress — first priority**
 
-- Integrity-checked accepted-ground artifacts with explicit source release,
-  datum, coverage, spacing, confidence, provenance, and fail-closed validation.
-- USGS 3DEP and classified Copernicus provider contracts, stacked regional and
-  detailed artifacts, exact rendered-triangle sampling, and one final seam
-  authority.
-- Worldwide fallback coverage for locations without an accepted artifact.
+Current evidence already covers source integrity, provider pinning, immutable
+artifacts, security rules, two-client multiplayer convergence, the assembled
+Earth world, JFX, worldwide representative locations, actors/vehicles, Live GPS,
+and Moon/Mars/Space/Ocean ownership.
 
-Work required:
+Required work:
 
-1. Publish a provider and licensing decision for each intended coverage tier:
-   regional ground, local high-resolution ground, Arctic, and Antarctica.
-2. Expand accepted bare-earth or corrected-ground artifacts beyond the current
-   reviewed locations without overlapping publication authorities.
-3. Record vertical-datum normalization and correction attestations in every
-   accepted artifact; do not promote a digital surface model as bare earth.
-4. Add provider-outage, polar-boundary, coastline, mountain, flat-rural, and
-   four-tile-corner fixtures to the artifact build and runtime gates.
-5. Expose accepted, fallback, unavailable, and outside-coverage terrain states
-   consistently in diagnostics and user-facing data information.
+1. Add normal-input immutable-candidate journeys for Discovery, companions, AR
+   fallback, generated multi-floor interiors, mapped interiors, fishing,
+   DeFlock, Urban Sandbox equipment, vehicle entry/exit, civic response, overlay
+   submission/moderation, and activity creation/testing.
+2. Add desktop and mobile viewport coverage for every retained primary screen.
+3. Require final screenshots only after the matching runtime checks pass; inspect
+   complete frames rather than isolated feature scenes.
+4. Remove or correct stale program-status metadata whenever a release changes
+   the actual product state.
 
-Completion evidence:
+Done when:
 
-- Every supported preset resolves to one accepted artifact stack or an
-  explicitly labeled fallback with no missing samples converted to zero.
-- Rebuilding an artifact from the same source release produces the same content
-  hash and final terrain samples.
-- The assembled Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural
-  Iowa, and Tokyo matrix passes terrain, transport, collision, building-height,
-  and final-visibility checks under primary and documented fallback providers.
-- Arctic, Antarctic, mountain, coast, desert, and flat-rural final frames are
-  inspected and their source/datum state is recorded.
+- Every public 4.3.1 feature claim maps to a current runtime journey, a security
+  contract where applicable, and a named failure report.
+- A feature without a passing journey is labeled partial or removed from public
+  claims until completed.
 
-### R5.2 — Licensed world detail and environmental data
+### CP1 — Preserve one deterministic fixed world
 
-**Status: Partial**
+**Status: Released foundation; ongoing production hardening**
 
-What exists:
+Required work:
 
-- Map-informed buildings, landmarks, facade materials, roof semantics,
-  vegetation, hydrology, land use, WorldCover classification, and distant
-  regional context.
-- Stable feature identity and mapped-versus-inferred provenance for the core
-  world publication.
+1. Keep one location identity from selection through provider bounds, snapshot,
+   scene roots, gameplay systems, multiplayer frame, and teardown.
+2. Make provider priority deterministic and independent of response order.
+3. Expand accepted-ground coverage only through reviewed artifacts with explicit
+   source release, license, correction, datum, confidence, and integrity data.
+4. Verify provider outage behavior for buildings, transport, terrain, land cover,
+   hydrology, imagery, and Live Earth without erasing unrelated world layers.
+5. Retain current mapped building heights and regional detail across every
+   quality tier.
 
-Work required:
+Done when:
 
-1. Create a source matrix for landmarks, facade attributes, roof attributes,
-   vegetation, hydrology, and land cover that records license, attribution,
-   release, coverage, freshness, identity scheme, and redistribution rules.
-2. Define one ingest and deduplication contract per layer before adding another
-   provider. Provider priority must not depend on response order.
-3. Add automated provenance-to-final-visual checks for each layer, comparable
-   to the mapped-tall-building identity check.
-4. Add outage and sparse-data behavior for every provider. A richer layer may
-   disappear when unavailable, but it may not erase the authoritative base
-   world or rewrite unrelated features.
-5. Add visual review locations for dense urban, suburban, rural, tropical,
-   arid, alpine, coastal, and polar environments.
+- Repeated loads of the same accepted snapshot publish the same identities,
+  dimensions, surfaces, and scene ownership.
+- Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo
+  pass primary and documented fallback-provider runs, followed by full-frame
+  review.
 
-Completion evidence:
+### CP2 — Finish worldwide roads, bridges, and vehicle contact
 
-- Every published object reports its source identity, release, mapped or
-  inferred status, and final scene attachment.
-- Duplicate provider features resolve deterministically to one physical object.
-- Provider failure changes only the affected optional layer and does not change
-  mapped building height, terrain, roads, or the selected world boundary.
-- Attribution and redistribution checks pass for both the source tree and the
-  immutable production artifact.
+**Status: Released and strongly gated; known data-dependent limits remain**
 
-### R5.3 — Complete-route performance and memory
+Required work:
 
-**Status: Partial**
+1. Keep source identity through selection, deduplication, topology, vertical
+   constraints, profile reconciliation, structure assembly, publication,
+   traversal, collision, and rendering.
+2. Maintain solid at-grade road footprints and complete turn/junction enclosure
+   without paving unrelated mapped ground.
+3. Retain one symmetric physical deck and support relationship for bridge
+   landmarks such as Golden Gate.
+4. Verify bridge/ramp/overpass/tunnel endpoints under primary and fallback
+   provider sequences; classify incomplete mapped connections honestly instead
+   of inventing geometry.
+5. Keep traffic wheel contact bounded on slopes and keep people off ineligible
+   road, bridge, and tunnel surfaces.
 
-What exists:
+Done when:
 
-- On-demand Earth, Ocean, and Space runtimes; explicit location cancellation;
-  lifecycle scopes; quality settings; batched world geometry; and teardown
-  diagnostics.
-- Production-shaped build, reachability, asset, source-map, and lifecycle
-  verification.
+- The worldwide matrix reports no authoritative discontinuity, infeasible grade,
+  folded road triangle, degenerate triangle, junction-coverage gap, duplicate
+  physical surface, or vehicle wheel penetration.
+- Full gameplay frames show solid road surfaces and structure transitions at the
+  same coordinates and paths used by the automated checks.
 
-Work required:
+### CP3 — Complete buildings, street facades, entrances, and interiors
 
-1. Record 4.3.1 baselines for launch, location load, first controllable frame,
-   steady-state frame time, peak browser memory, retained memory after teardown,
-   network transfer, draw calls, and triangles.
-2. Define desktop and mobile hardware tiers and publish numeric pass/fail budgets
-   in a versioned performance-budget document.
-3. Exercise complete journeys: title to Earth, repeated location replacement,
-   street-to-plane travel, Earth-to-Ocean, Earth-to-Moon/Mars/Space, multiplayer
-   join/leave, interior entry/exit, and return to title.
-4. Remove duplicate owners, unbounded caches, unreachable assets, and retained
-   listeners before changing world detail. Optional effects may scale by quality
-   tier; mapped geometry and height authority may not.
-5. Add sustained aerial-travel and repeated-transition soak tests on desktop and
-   mobile-sized viewports, including provider delays and cancellation.
+**Status: Released foundation; mapped multi-level and interaction gates partial**
 
-Completion evidence:
+Required work:
 
-- Budgets are measured from immutable candidates on named hardware/browser
-  tiers; no inferred or estimated number is presented as a measurement.
-- Ten repeated location replacements and five full environment cycles finish
-  without owner-count growth, stale publication, duplicate scene roots, or an
-  out-of-memory failure.
-- Each complete journey remains controllable and visually equivalent in mapped
-  detail to the accepted 4.3.1 baseline.
+1. Preserve mapped height, levels, roof, use, material, name, identity, and
+   provenance from provider data through footprint deduplication, budgets,
+   batching, LOD, scene attachment, collision, and final visibility.
+2. Keep street-facing entrances and storefront glass inside the owning facade
+   material; do not add a duplicate facade or building renderer.
+3. Verify contextual keyboard and touch entry from an actual street approach in
+   dense, sparse, sloped, and non-gridded cities.
+4. Extend mapped indoor ingestion to retain multiple mapped levels and explicit
+   stairs/elevators where the source supports them. Do not replace mapped rooms
+   with generated layouts.
+5. Make generated interior variety deterministic by footprint, building use,
+   size, entrances, mapped levels, and world identity.
+6. Finish indoor overlay publication so authored rooms/connectors affect the
+   same interior navigation, collision, and multiplayer anchor authorities.
 
-### R5.4 — Ocean, shoreline, boat, underwater, and fishing
+Done when:
 
-**Status: Partial**
-
-What exists:
-
-- Surface boat traversal, waves and sea-state controls, water selection,
-  shoreline transfer, underwater travel, fish life, ocean HUD, local bathymetry
-  support, and a playable fishing loop with catches and records.
-- Source-aware bathymetry evidence that distinguishes measured, modeled, and
-  fallback depth information.
-
-Work required:
-
-1. Unify inland water, coastline, ocean, boat, and underwater transitions around
-   the published navigable-water surface and one shoreline boundary contract.
-2. Expand reviewed bathymetry coverage beyond the current limited local data and
-   define honest behavior where depth data is unavailable.
-3. Validate boat hull contact, grounding, docking, wave response, chase camera,
-   and exit placement in calm, rough, shallow, river, lake, and open-ocean cases.
-4. Expand underwater environments and fish habitat rules without presenting
-   generated encounters as observed local wildlife.
-5. Add complete browser journeys for boat entry/exit, shore return, underwater
-   descent/ascent, fishing catch/loss, and teardown.
-
-Completion evidence:
-
-- No boat, player, camera, or fishing actor crosses an unpublished water surface
-  or spawns below accepted ground.
-- Coast, river, lake, harbor, island, and open-ocean fixtures pass traversal,
-  collision, provenance, lifecycle, and complete-frame review.
-- Fishing remains playable with keyboard and touch, and generated species,
-  length, weight, occurrence, and depth evidence are labeled accurately.
-
-### R5.5 — Mapped and generated interiors
-
-**Status: Partial runtime; scaffolded authoring**
-
-What exists:
-
-- Enterable eligible buildings, mapped OpenStreetMap indoor room/corridor data
-  where available, a bounded generated fallback, footprint containment, and
-  interior-aware multiplayer artifact anchors.
-- Overlay presets and fields for rooms, corridors, stairs, elevators, served
-  levels, and building references.
-
-What is not complete:
-
-- The mapped runtime selects a usable level, but a general multi-level traversal
-  graph with stairs and elevators is not yet a supported production contract.
-- Indoor editor rooms, corridors, stairs, and elevators are explicitly scaffold
-  data. Their presence in the editor does not mean authored indoor navigation
-  is complete.
-
-Work required:
-
-1. Define one indoor identity and publication schema for building, level, room,
-   corridor, entrance, stair, and elevator relationships.
-2. Build a level-aware navigation and collision graph shared by mapped data,
-   generated interiors, authored overlays, player traversal, and multiplayer.
-3. Replace generic fallback layouts with deterministic footprint-, use-, size-,
-   entrance-, and level-aware layout families while retaining mapped features.
-4. Finish the indoor authoring workflow through validation, moderation,
-   publication, rollback, and final runtime consumption.
-5. Add accessibility metadata and route checks for entrances, stairs, elevators,
-   and reachable levels without inventing accessibility facts when unmapped.
-
-Completion evidence:
-
+- Exact mapped-tall identities remain visible at authoritative height in all
+  LODs.
 - A mapped single-level building, mapped multi-level building, generated small
-  building, generated large building, and authored overlay all pass entry,
-  traversal, collision, exit, teardown, and multiplayer-anchor tests.
-- Authored connectors affect the same navigation graph used by the player; no
-  editor-only or renderer-only duplicate path remains.
-- Re-entering the same building in the same world snapshot produces the same
-  layout and identity.
+  building, generated high-rise, and moderated indoor overlay each pass door
+  approach, entry, stairs/elevator, collision, multiplayer anchoring, exit,
+  reload, and teardown journeys.
 
-### R5.6 — Multiplayer resilience, moderation, and shared activities
+### CP4 — Unify player, Backpack, Journal, progression, and controls
 
 **Status: Partial**
 
-What exists:
+The current equipment adapter and Discovery inventory both use the shared
+Backpack model, but equipment persistence, Discovery profile persistence,
+account-owned items, progression events, and UI surfaces still need one explicit
+cross-system contract.
 
-- Authenticated bounded rooms, private invite codes, public city discovery,
-  presence, movement, chat, artifacts, blocks, shared world edits, room games,
-  home bases, social data, and authorization rules.
-- A production-shaped two-client emulator gate verifies room creation/joining,
-  distinct users, presence, and shared artifact convergence without production
-  user data.
+Required work:
 
-Work required:
+1. Define one player identity and revisioned state schema for condition,
+   position, active mode, Backpack items, hotbar, equipment state, Journal,
+   Field Guide, companions, and Explorer progress.
+2. Define which fields are anonymous-local, device-local, account-backed,
+   room-authoritative, or trusted-server-owned, including migration and conflict
+   rules.
+3. Route keyboard, touch, gamepad, contextual action, pause, editor, AR, interior,
+   and multiplayer controls through one conflict policy.
+4. Prevent duplicate rewards by giving every authoritative discovery, game,
+   trade, and mission event a stable event identity.
+5. Verify account sign-in/out, offline use, reload, device migration, and account
+   deletion without losing or duplicating eligible state.
 
-1. Define authoritative reconnect behavior for presence, chat, artifacts,
-   builds, world edits, and active activities after offline, refresh, duplicate
-   tab, token refresh, owner departure, and room deletion events.
-2. Complete report, block, mute, kick/ban, content review, audit, retention, and
-   appeal paths with least-privilege backend enforcement.
-3. Add deterministic conflict resolution and schema migration for every shared
-   object type.
-4. Load-test the supported 2–32 player range and publish a recommended room size
-   for each supported device tier based on measured evidence.
-5. Extend integration coverage from two clients to reconnect, owner transfer or
-   room closure, concurrent writes, moderation actions, and shared activity
-   completion.
+Done when:
 
-Completion evidence:
+- One event creates at most one reward and every UI reads the same player state.
+- Walking, vehicle, boat, drone, plane, interior, AR, planetary, editor, and room
+  transitions preserve only the state each mode is allowed to own.
 
-- Emulator tests prove allowed and denied behavior for every room role and
-  moderation action.
-- Reconnect restores one room identity and one copy of each shared object without
-  resetting accepted activity progress or duplicating presence.
-- Measured room tests meet the published latency, write-rate, memory, and player
-  count budgets without using production accounts or data.
+### CP5 — Finish the Urban Sandbox as a coherent gameplay system
 
-### R5.7 — Creation tools, games, progression, and accessibility
+**Status: Partial**
 
-**Status: Mixed; shipping games and progression, scaffolded creator publishing**
+Current code already includes usable equipment, projectiles, impacts, actor
+collision, vehicle claims, driver-side doors, enter/exit transitions, room
+authority, responders, civic attention, custody, and mapped facilities.
 
-What exists:
+Required work:
 
-- Overlay editing with presets, validation, local drafts, submission and
-  moderation UI; an activity creator with route, zone, dock, and collectible
-  anchors; creator profiles; editable-world tools; and a 200-piece block builder.
-- Discovery journals, Field Guide records, backpack items, companions, goals,
-  Explorer points, DeFlock Hunt, fishing, Paint Town, flower challenge, and
-  room activities.
-- Touch controls and substantial labels, live regions, and keyboard/gamepad
-  input foundations.
+1. Add release journeys for every equipment verb, ammunition/quantity change,
+   collision outcome, vehicle claim, door transition, room handoff, civic level,
+   responder arrival, arrest, incapacitation, and recovery.
+2. Define and implement the retained scope of physical player embodiment. If a
+   full body/hand system is not part of the product, remove the stale program
+   promise rather than leaving a permanent spike.
+3. Make vehicle dynamics, visual doors, active actor ownership, camera, collision,
+   and multiplayer pose consume one enter/exit transition.
+4. Keep police, hospital, ranger, campus, and other facility behavior tied to
+   verified mapped facilities. Missing data must not fabricate a real place.
+5. Keep ambient pedestrian eligibility separate from explicit responder
+   gameplay, and never spawn people on vehicle-only transport surfaces.
 
-What is not complete:
+Done when:
 
-- The overlay editor is presented as a beta demo, and indoor authoring remains
-  scaffolded.
-- Activity drafts can remain local with language that publishing will happen
-  later; a complete creator-to-moderation-to-discovery production path is not
-  yet established by a release gate.
-- Accessibility markup exists, but there is no end-to-end accessibility gate or
-  published keyboard, focus, contrast, reduced-motion, caption, and screen-reader
-  acceptance matrix.
+- Each interaction works by normal player input in the complete world and
+  produces the same result locally and in a supported room.
+- No transition duplicates the car, player, responder, Backpack, condition, or
+  custody authority.
 
-Work required:
+### CP6 — Build the missing missions, crafting, economy, and engagement layer
 
-1. Choose the supported 5.0 creator scope. Remove unsupported controls or finish
-   each retained workflow through save, validation, moderation, publication,
-   discovery, versioning, rollback, and deletion.
-2. Make creator output consume existing world, indoor, activity, and multiplayer
-   authorities instead of creating preview-only geometry.
-3. Define one account-backed progression schema with deterministic offline/local
-   migration, duplicate-award prevention, and explicit privacy/retention rules.
-4. Audit every core journey for keyboard-only use, visible focus, semantic names,
-   focus trapping/restoration, contrast, scalable text, reduced motion, touch
-   target size, and screen-reader status updates.
-5. Add automated accessibility checks plus manual keyboard, screen-reader,
-   mobile, and controller checklists to release verification.
+**Status: Not implemented as a unified system**
 
-Completion evidence:
+Current games, Discovery goals, trades, scores, catches, collections, and
+leaderboards are foundations; they are not a unified mission/economy system.
 
-- A non-admin can create, validate, submit, revise, and later discover a
-  moderated activity or world overlay; an admin can review it; unauthorized
-  publication is rejected by backend rules.
-- Published content survives reload and another authenticated client sees the
-  same version; rollback removes it without mutating imported base data.
-- Progress cannot be awarded twice for the same authoritative event and merges
-  safely across local and account sessions.
-- Title, location selection, core traversal, pause/settings, games, creator,
-  multiplayer, and environment transitions pass the published accessibility
-  matrix.
+Required work:
 
-## 5.0 delivery order
+1. Decide whether crafting belongs in the product. If retained, define recipes,
+   ingredient provenance, validation, inventory transactions, persistence,
+   rollback, UI, and server authority before adding crafting buttons.
+2. Define a mission schema with eligibility, objectives, progress events,
+   completion, failure/cancellation, rewards, replay policy, location scope,
+   multiplayer behavior, and version migration.
+3. Define whether the product needs currency. If retained, add one server-owned
+   ledger, transaction idempotency, pricing rules, refunds, abuse limits, and
+   clear separation from real money.
+4. Consolidate leaderboard submission and display contracts for Flower, Paint
+   Town, Fishing, Explorer, and DeFlock while keeping game-specific scoring.
+5. Connect built-in and moderated player-created activities to the same mission
+   and progression events where appropriate.
 
-Work should proceed one bounded authority at a time in this order:
+Done when:
 
-1. **Baseline and budgets** — freeze reproducible 4.3.1 visual, data, memory,
-   performance, security, and accessibility evidence.
-2. **Data decisions** — finish terrain and environmental provider/license
-   matrices before expanding runtime ingestion.
-3. **Core world contracts** — expand accepted ground and environmental layers
-   without adding duplicate authorities.
-4. **Complete traversal systems** — finish ocean and multi-level interior paths
-   against the same published surfaces used by rendering and collision.
-5. **Complete online workflows** — harden multiplayer reconnect/moderation and
-   finish creator publication end to end.
-6. **Progression and accessibility** — consolidate persistence and close the
-   complete-product interaction matrix.
-7. **Release candidate** — run source, security, provider, assembled-world,
-   actor/vehicle, environment, lifecycle, multiplayer, performance, memory,
-   accessibility, and immutable-artifact checks against the exact candidate.
+- The chosen feature scope is explicit. Unsupported crafting/economy promises
+  are removed; retained systems work end to end and are security tested.
+- Rewards and leaderboard entries cannot be forged, duplicated, or credited to
+  the wrong player/location/version.
 
-After each verified authority change, inspect the complete final frames, update
-the regression record, and create a labeled local checkpoint before starting
-the next change.
+### CP7 — Complete Water, Ocean, fishing, and environmental evidence
 
-## 5.0 release definition
+**Status: Partial**
 
-Version 5.0 is ready only when:
+Required work:
 
-- Every R5 workstream above has satisfied its completion evidence or has been
-  explicitly removed from the 5.0 product scope and public feature claims.
-- No shipping screen describes a scaffold, local-only preview, or unsupported
-  backend path as a complete production feature.
-- Known limitations, data sources, attribution, controls, privacy, security, and
-  support documentation match the immutable release artifact.
-- The same release candidate passes the worldwide assembled matrix and complete
-  desktop/mobile journeys without reducing mapped world detail.
-- The repository commit, release tag, public site, production artifact manifest,
-  changelog, and displayed version all identify the same build.
+1. Use one published water-surface registry for visuals, boat selection,
+   collision, shoreline transfer, underwater entry, fishing, and exit placement.
+2. Expand reviewed bathymetry coverage and preserve measured, modeled, inferred,
+   and unavailable evidence labels.
+3. Validate hull contact, grounding, docking, waves, wakes, camera, shore return,
+   underwater descent/ascent, fishing catch/loss, and teardown in rivers, lakes,
+   harbors, coasts, islands, and open ocean.
+4. Ensure generated fish and catches are never presented as observed local
+   wildlife or surveyed measurements.
 
-## Future exploration after 5.0
+Done when:
 
-These items remain planned and are not part of the 5.0 completion definition:
+- Water journeys pass keyboard and touch tests worldwide without crossing an
+  unpublished water surface or spawning an actor below accepted ground.
+- Depth and wildlife claims visible to the user match their recorded evidence.
 
-- Licensed rail, bicycle, and hiking route experiences. Existing parsed route
-  geometry or editor presets do not yet constitute dedicated gameplay modes.
+### CP8 — Complete multiplayer and creator publishing
+
+**Status: Partial**
+
+Required work:
+
+1. Verify reconnect and conflict behavior for presence, chat, artifacts, blocks,
+   world edits, active activities, room deletion, owner departure, token refresh,
+   duplicate tabs, and offline recovery.
+2. Complete report, mute, block, kick/ban, review, audit, retention, and appeal
+   paths with least-privilege backend enforcement.
+3. Load-test the supported 2–32 player range on named hardware tiers and publish
+   evidence-based recommended room sizes.
+4. Verify overlay creation through local draft, validation, submission, admin
+   moderation, public publication, second-client visibility, revision, rollback,
+   and deletion.
+5. Replace local-only activity publishing language with a real moderated backend
+   workflow, or explicitly retain activity creation as device-local and remove
+   public-publishing claims.
+6. Make published creator output consume existing world, interior, activity,
+   collision, and multiplayer authorities rather than preview-only geometry.
+
+Done when:
+
+- Reconnect produces one room identity and one copy of each shared object.
+- Unauthorized publication fails, approved content appears to another client,
+  and rollback does not mutate imported base map data.
+
+### CP9 — Measure and control performance, memory, and data use
+
+**Status: Partial**
+
+Required work:
+
+1. Record immutable 4.3.1 baselines for title launch, first controllable frame,
+   location load, steady frame time, peak browser memory, retained teardown
+   memory, network transfer, provider request count, cache size, draw calls,
+   triangles, and textures.
+2. Define named desktop and mobile hardware/browser tiers with numeric budgets.
+3. Run sustained street, drone, plane, boat, interior, multiplayer, Live Earth,
+   and planetary journeys plus ten location replacements and five complete
+   environment cycles.
+4. Inventory every cache, provider result, scene root, listener, worker, timer,
+   render target, geometry, material, texture, and Firebase subscription by
+   lifecycle owner.
+5. Remove duplicate or retained owners first. Do not reduce building height,
+   mapped density, distant regional detail, or location coverage to make a
+   performance chart pass.
+6. Bound external requests and stored data; publish privacy, retention, cache,
+   offline, and deletion behavior for account and anonymous sessions.
+
+Done when:
+
+- Named hardware tiers pass numeric budgets using measured candidate data.
+- Repeated journeys show no unbounded owner, resource, request, cache, or
+  subscription growth and no lower-detail replacement of the selected world.
+
+### CP10 — Complete UI, accessibility, public presentation, and release identity
+
+**Status: Partial**
+
+Required work:
+
+1. Test title, location selection, traversal, HUD, pause/settings, Backpack,
+   Discovery, AR, interiors, games, editor, multiplayer, Live Earth, Ocean, and
+   planetary flows with keyboard only, touch, gamepad where supported, and
+   screen-reader review.
+2. Add visible focus, correct focus trapping/restoration, scalable text, contrast,
+   reduced motion, non-color status, touch-target, semantic-name, and live-region
+   acceptance criteria.
+3. Refresh the landing gallery with a small curated set of real assembled-game
+   captures showing actual plane, drone, driving/action, street, water, and world
+   variety. Do not use concept art, synthetic cameras, or test-only scenes.
+4. Keep landing, README, controls, data sources, attribution, known issues,
+   privacy, security, changelog, and roadmap claims aligned with the candidate.
+5. Require the repository commit, release tag, public site, immutable build
+   manifest, displayed version, and deployment to identify the same build.
+
+Done when:
+
+- All retained primary journeys pass the accessibility matrix on desktop and
+  mobile-sized layouts without protected UI overlap.
+- Every public image is traceable to a complete runtime capture and every public
+  feature claim has matching production evidence.
+
+## Required checkpoint order
+
+Do not work on these as one large change set. Use this sequence:
+
+1. **CP0: current feature evidence** — expose which released systems actually
+   fail before changing behavior.
+2. **CP1–CP3: world integrity** — location/provider determinism, transport, then
+   buildings/facades/interiors.
+3. **CP4: player authority** — one state/event/controls contract before adding
+   more player systems.
+4. **CP5: Urban Sandbox completion** — finish and verify current interactions.
+5. **CP6: missing gameplay layer** — decide and then implement or remove
+   crafting, missions, and economy promises.
+6. **CP7: water completion** — one water authority and worldwide journeys.
+7. **CP8: online creation** — multiplayer resilience and creator publication.
+8. **CP9: measured performance** — enforce memory, network, and hardware budgets
+   without reducing mapped detail.
+9. **CP10: professional release pass** — accessibility, landing presentation,
+   documentation, immutable candidate, and release identity.
+
+After every confirmed improvement: inspect the complete final frames, update the
+progress and regression record, and create a labeled local checkpoint before the
+next authority changes.
+
+## Definition of roadmap completion
+
+The current roadmap is complete when:
+
+- Every CP item is either **complete** with its stated evidence or explicitly
+  removed from product scope and public claims.
+- No beta, local-only, preview-only, scaffold, or unsupported backend path is
+  described as a complete production feature.
+- The same immutable candidate passes source, security, provider, world,
+  transport, building, interior, actor/vehicle, Urban Sandbox, Discovery, AR,
+  game, Ocean, Live Earth/GPS, planetary, multiplayer, creator, performance,
+  memory, accessibility, and final-frame review.
+- No completion depends on a city-specific patch, fake measurement, duplicate
+  layer owner, synthetic gameplay image, or reduced mapped detail.
+
+## Future work outside the current completion program
+
+- Dedicated licensed rail, bicycle, and hiking gameplay. Parsed geometry and
+  editor presets alone are not gameplay modes.
 - Additional scientifically grounded planetary surfaces and catalog-backed
-  space destinations.
-- Improved astronomical navigation, flight handling, encounters, and scale
-  communication. Current visual scaling remains a playable presentation, not an
-  orbital simulator.
-- Historical or reconstructed environments only where source provenance,
-  uncertainty, rights, and labeling support them.
+  destinations.
+- Deeper astronomical navigation and flight simulation. Current scale remains a
+  playable visual model, not an orbital simulator.
+- Historical or reconstructed environments only with adequate provenance,
+  uncertainty labeling, and rights.
