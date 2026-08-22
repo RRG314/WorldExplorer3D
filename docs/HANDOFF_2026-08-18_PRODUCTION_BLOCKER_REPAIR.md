@@ -2002,3 +2002,34 @@ change was added. Next checkpoint must independently run the packaged
 production/security/UI/UX gates and actor/contact verification. Do not call a
 candidate production-ready, finalize or promote it until immutable artifact
 evidence and the required human frame approval both pass.
+
+## Current continuation after 2026-08-22 recovery checkpoint 15
+
+The production release pipeline exposed a shared-service split that source
+world checks could not see. The esbuild artifact inlined `firebase-init` and
+`auth-ui` into its app-auth chunk, while lazy multiplayer modules continued to
+import the copied root `/js/` files. Those were separate ES module instances
+with separate module-local caches but the same Firebase Auth singleton. After
+the bundled copy created a user, the root copy attempted to attach the emulator
+again and Firebase rejected the active singleton with
+`auth/emulator-config-failed`.
+
+Root `/js/` modules are now external to every app bundle and resolve through a
+canonical absolute `/js/...` URL. The build manifest publishes
+`one-root-hosted-esm-instance` and its exact external-module inventory, and
+artifact verification requires `firebase-init.js?v=55` and `auth-ui.js?v=55`
+to remain external. This removes the duplicate initialization cause rather
+than catching and hiding Firebase's error.
+
+The packaged room and artifact APIs are explicit hashed entrypoints. The
+multiplayer verifier obtains those paths from the immutable build manifest;
+it no longer asks a production bundle for removed source files. A rebuilt
+artifact passes hash/source parity and two-client emulator convergence with
+distinct authenticated users, a bounded private room, two presence documents,
+a shared artifact and zero browser errors.
+
+The same pipeline also records zero dependency vulnerabilities and 79/79
+Firestore authorization/legacy-account checks passing. These results do not
+yet authorize release: the remaining artifact world, environment, GPS, UI/UX,
+memory/data and complete-frame gates still need to pass on a clean committed
+candidate. No deployment, promotion or production data mutation occurred.

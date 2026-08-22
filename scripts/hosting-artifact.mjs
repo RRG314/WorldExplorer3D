@@ -32,8 +32,20 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'app-auth-shell': 'app/js/app-auth-shell.js',
   bootstrap: 'app/js/bootstrap.js',
   'app-entry': 'app/js/app-entry.js',
-  'account-social': 'app/js/multiplayer/social.js'
+  'account-social': 'app/js/multiplayer/social.js',
+  'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
+  'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js'
 });
+const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
+const REQUIRED_EXTERNAL_ROOT_MODULES = Object.freeze([
+  '/js/firebase-init.js?v=55',
+  '/js/auth-ui.js?v=55'
+]);
+const INDIRECT_RUNTIME_ENTRYPOINTS = new Set([
+  'app-entry',
+  'multiplayer-rooms',
+  'multiplayer-artifacts'
+]);
 
 function normalizePath(value) {
   return value.split(path.sep).join('/');
@@ -140,6 +152,23 @@ function bundleOutputForEntry(metafile, sourceEntry) {
 }
 
 async function buildGameRuntime() {
+  const externalRootModules = new Set();
+  const rootSharedModulePlugin = {
+    name: 'one-root-shared-module-authority',
+    setup(build) {
+      build.onResolve({ filter: /^\.\.?(?:\/\.\.)*\// }, (args) => {
+        const queryIndex = args.path.indexOf('?');
+        const sourcePath = queryIndex >= 0 ? args.path.slice(0, queryIndex) : args.path;
+        const query = queryIndex >= 0 ? args.path.slice(queryIndex) : '';
+        const resolved = path.resolve(args.resolveDir, sourcePath);
+        const relative = path.relative(ROOT_SHARED_MODULE_DIR, resolved);
+        if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+        const externalPath = `/js/${normalizePath(relative)}${query}`;
+        externalRootModules.add(externalPath);
+        return { path: externalPath, external: true };
+      });
+    }
+  };
   const result = await buildJavaScript({
     absWorkingDir: ROOT,
     entryPoints: GAME_RUNTIME_ENTRYPOINTS,
@@ -154,6 +183,7 @@ async function buildGameRuntime() {
     entryNames: 'bundles/[name]-[hash]',
     chunkNames: 'bundles/chunk-[hash]',
     external: ['https://*'],
+    plugins: [rootSharedModulePlugin],
     metafile: true,
     write: true,
     logLevel: 'warning'
@@ -166,8 +196,16 @@ async function buildGameRuntime() {
       bundleOutputForEntry(result.metafile, source)
     ])
   );
+  const sharedModules = [...externalRootModules].sort();
+  for (const required of REQUIRED_EXTERNAL_ROOT_MODULES) {
+    if (!sharedModules.includes(required)) {
+      throw new Error(`Bundled runtime lost its root shared-module authority: ${required}`);
+    }
+  }
   return Object.freeze({
     strategy: 'esbuild-esm-code-splitting',
+    sharedModuleAuthority: 'one-root-hosted-esm-instance',
+    externalRootModules: Object.freeze(sharedModules),
     entries: Object.freeze(entries),
     fileCount: outputFiles.length,
     entryFileCount: Object.keys(entries).length,
@@ -393,6 +431,10 @@ async function verifyArtifact() {
   const runtimeFiles = expectedNames.filter((relative) => relative.startsWith('app/js/bundles/'));
   if (
     runtimePackaging.strategy !== 'esbuild-esm-code-splitting' ||
+    runtimePackaging.sharedModuleAuthority !== 'one-root-hosted-esm-instance' ||
+    !REQUIRED_EXTERNAL_ROOT_MODULES.every((modulePath) =>
+      runtimePackaging.externalRootModules?.includes(modulePath)
+    ) ||
     runtimePackaging.entryFileCount !== Object.keys(GAME_RUNTIME_ENTRYPOINTS).length ||
     runtimePackaging.fileCount !== runtimeFiles.length ||
     expectedNames.some((relative) => relative.startsWith('app/js/') && !relative.startsWith('app/js/bundles/'))
@@ -416,7 +458,7 @@ async function verifyArtifact() {
   const accountHtml = await fs.readFile(path.join(OUTPUT_DIR, 'account', 'index.html'), 'utf8');
   for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
     const referenced = name === 'account-social' ? accountHtml.includes(`../app/${entry}`) : gameHtml.includes(entry);
-    if (!referenced && name !== 'app-entry') {
+    if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {
       throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
     }
   }

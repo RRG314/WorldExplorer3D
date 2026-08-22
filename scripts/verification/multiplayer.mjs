@@ -10,6 +10,21 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4380, 4381, 4382, 4383] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'multiplayer', 'report.json');
+const sourceModuleUrls = {
+  rooms: '/app/js/multiplayer/rooms.js?v=67',
+  artifacts: '/app/js/multiplayer/artifacts.js?v=57'
+};
+const moduleUrls = requestedRoot
+  ? await fs.readFile(path.join(servedRoot, 'build-manifest.json'), 'utf8').then((text) => {
+    const entries = JSON.parse(text)?.runtimePackaging?.entries || {};
+    const rooms = String(entries['multiplayer-rooms'] || '');
+    const artifacts = String(entries['multiplayer-artifacts'] || '');
+    if (!rooms || !artifacts) {
+      throw new Error('Production artifact does not publish its multiplayer verification entries.');
+    }
+    return { rooms: `/app/${rooms}`, artifacts: `/app/${artifacts}` };
+  })
+  : sourceModuleUrls;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -67,8 +82,8 @@ let member;
 try {
   owner = await createPlayer('owner');
   member = await createPlayer('member');
-  const room = await owner.page.evaluate(async () => {
-    const rooms = await import('/app/js/multiplayer/rooms.js?v=67');
+  const room = await owner.page.evaluate(async (roomsModuleUrl) => {
+    const rooms = await import(roomsModuleUrl);
     return rooms.createRoom({
       code: 'QA42MP',
       name: 'Release multiplayer verification',
@@ -79,20 +94,20 @@ try {
       locationName: 'Baltimore',
       locationTag: { label: 'Baltimore', city: 'Baltimore', cityKey: 'baltimore', kind: 'earth' }
     });
-  });
+  }, moduleUrls.rooms);
   assert.equal(room.code, 'QA42MP');
 
-  const joined = await member.page.evaluate(async (roomCode) => {
-    const rooms = await import('/app/js/multiplayer/rooms.js?v=67');
+  const joined = await member.page.evaluate(async ({ roomCode, roomsModuleUrl }) => {
+    const rooms = await import(roomsModuleUrl);
     const joinedRoom = await rooms.joinRoomByCode(roomCode, { displayName: 'Room Member' });
     return { joinedRoom, currentRoom: rooms.getCurrentRoom() };
-  }, room.code);
+  }, { roomCode: room.code, roomsModuleUrl: moduleUrls.rooms });
   assert.equal(joined.joinedRoom.code, room.code);
   assert.equal(joined.currentRoom.code, room.code);
 
   const artifactTitle = `Shared release artifact ${runId}`;
-  await member.page.evaluate(async (roomCode) => {
-    const artifacts = await import('/app/js/multiplayer/artifacts.js?v=57');
+  await member.page.evaluate(async ({ roomCode, artifactsModuleUrl }) => {
+    const artifacts = await import(artifactsModuleUrl);
     globalThis.__WE3D_MULTIPLAYER_VERIFY__ = { rows: [], error: '' };
     globalThis.__WE3D_MULTIPLAYER_VERIFY_UNSUB__ = artifacts.listenArtifacts(roomCode, (rows) => {
       globalThis.__WE3D_MULTIPLAYER_VERIFY__.rows = rows;
@@ -101,10 +116,10 @@ try {
         globalThis.__WE3D_MULTIPLAYER_VERIFY__.error = String(error?.message || error);
       }
     });
-  }, room.code);
+  }, { roomCode: room.code, artifactsModuleUrl: moduleUrls.artifacts });
 
-  await owner.page.evaluate(async ({ roomCode, title }) => {
-    const artifacts = await import('/app/js/multiplayer/artifacts.js?v=57');
+  await owner.page.evaluate(async ({ roomCode, title, artifactsModuleUrl }) => {
+    const artifacts = await import(artifactsModuleUrl);
     await artifacts.createArtifact(roomCode, {
       type: 'pin',
       title,
@@ -112,7 +127,7 @@ try {
       visibility: 'room',
       anchor: { kind: 'earth', lat: 39.2904, lon: -76.6122, x: 0, y: 0, z: 0 }
     });
-  }, { roomCode: room.code, title: artifactTitle });
+  }, { roomCode: room.code, title: artifactTitle, artifactsModuleUrl: moduleUrls.artifacts });
 
   await member.page.waitForFunction((title) => {
     const verification = globalThis.__WE3D_MULTIPLAYER_VERIFY__;

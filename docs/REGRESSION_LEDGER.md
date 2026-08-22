@@ -2005,3 +2005,31 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   owner, tolerance-based retention of conflicting stale targets, exact floating
   comparisons at projected endpoints, city patches, fake ramps or a second
   bridge/road renderer.
+
+## 2026-08-22 — Production bundle created two Firebase service authorities
+
+- Status: resolved locally as recovery checkpoint 15; not deployed.
+- Symptom: source gameplay and Firestore rules passed, but the immutable
+  production artifact failed its first authenticated multiplayer client with
+  `auth/emulator-config-failed`. After that was exposed, the old verifier also
+  attempted to import source-only multiplayer paths absent from the artifact.
+- First authoritative loss: esbuild inlined root `firebase-init`/`auth-ui` into
+  an app chunk while lazy bundled modules retained separate root imports. The
+  two ES module instances owned separate caches over one Firebase singleton.
+  This was artifact assembly, not Auth, room logic or Firestore authorization.
+- Resolution: externalize all root `/js/` imports from app bundles to canonical
+  absolute URLs. Publish and verify `one-root-hosted-esm-instance` with the
+  exact external module inventory. Publish hashed room/artifact entrypoints and
+  have artifact verification import those manifest-owned entries.
+- Guards: artifact build fails unless canonical external `firebase-init` and
+  `auth-ui` are present; manifest verification checks the authority and entry
+  count. The real packaged two-client test requires distinct authenticated
+  users, one bounded private room, two presence records, a converged shared
+  artifact and no browser errors.
+- Security evidence: root and production Functions dependency audits report
+  zero vulnerabilities; all 79 Firestore authorization and legacy-account
+  cases pass using local emulators. No live user or production data is touched.
+- Never reintroduce: bundling a second root service module, module-local caches
+  spanning duplicated singleton wrappers, source-path imports in artifact
+  verification, suppressing Firebase initialization errors, or claiming source
+  multiplayer proves packaged multiplayer.
