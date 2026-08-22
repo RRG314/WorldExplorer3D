@@ -668,6 +668,7 @@ function transportStructureSnapshot() {
       allMappedRoadsObserved: gradeProfiles.length,
       allMappedRoadsSteepest: gradeProfiles.slice(0, 24)
     },
+    roadSurfaceIntegrity: appCtx.transportSurfacePublication?.roadSurfaceIntegrity || null,
     atGradeTerrainAuthority,
     visualMeshes: visuals.length,
     attachedVisualMeshes: visuals.filter((mesh) => !!mesh?.parent).length,

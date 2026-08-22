@@ -30,6 +30,12 @@ import { compileTransportSurfaceModel } from '../../app/js/world/compiler/transp
 import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
 import { resolveCustomLocationArrival } from '../../app/js/world/spawn-location-arrival.js';
 import { resolveFarBuildingMassing } from '../../app/js/terrain/far-building-massing.js';
+import { appendSolidAtGradeRoadGeometry } from '../../app/js/terrain/road-surface-geometry.js';
+import {
+  computeIntersectionCapRadius,
+  shouldBuildCompactIntersectionCap
+} from '../../app/js/terrain/road-junctions.js';
+import { detectRoadIntersections } from '../../app/js/terrain/intersections.js';
 import {
   OVERTURE_RELEASE_POLICY,
   overtureThemeArchiveUrl
@@ -760,6 +766,103 @@ if (centerlineConflict.action !== 'suppress_building' || centerlineConflict.reas
   buildingRoadAuthorityFailures.push('irreconcilable mapped centerline conflict was not rejected');
 }
 
+const roadSurfaceFootprintFailures = [];
+const indexedSurfaceContainsPoint = (verts, indices, point) => {
+  const sign = (p1, p2, p3) =>
+    (p1.x - p3.x) * (p2.z - p3.z) - (p2.x - p3.x) * (p1.z - p3.z);
+  for (let index = 0; index < indices.length; index += 3) {
+    const triangle = [indices[index], indices[index + 1], indices[index + 2]].map((vertexIndex) => ({
+      x: verts[vertexIndex * 3],
+      z: verts[vertexIndex * 3 + 2]
+    }));
+    const d1 = sign(point, triangle[0], triangle[1]);
+    const d2 = sign(point, triangle[1], triangle[2]);
+    const d3 = sign(point, triangle[2], triangle[0]);
+    if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return true;
+  }
+  return false;
+};
+const sharpTurnVerts = [];
+const sharpTurnIndices = [];
+const sharpTurnIntegrity = appendSolidAtGradeRoadGeometry({
+  feature: {
+    structureSemantics: { terrainMode: 'at_grade' },
+    transportRecord: { crossSection: { placement: { centerlineOffsetMeters: 0 } } }
+  },
+  points: [
+    { x: 0, z: 0 },
+    { x: 2, z: 0 },
+    { x: 0.2, z: 0.35 },
+    { x: 2.2, z: 0.7 }
+  ],
+  halfWidth: 3.5,
+  sampleTerrainY: () => 0,
+  targetVerts: sharpTurnVerts,
+  targetIndices: sharpTurnIndices
+});
+if (sharpTurnIntegrity.segmentQuads !== 3 ||
+    sharpTurnIntegrity.turnJoins < 2 ||
+    sharpTurnIntegrity.foldedTriangles !== 0 ||
+    sharpTurnIntegrity.degenerateTriangles !== 0 ||
+    sharpTurnIndices.length / 3 !== sharpTurnIntegrity.surfaceTriangles) {
+  roadSurfaceFootprintFailures.push('sharp mapped turn did not publish solid non-folding segment and join geometry');
+}
+const outerTurnVerts = [];
+const outerTurnIndices = [];
+appendSolidAtGradeRoadGeometry({
+  feature: {
+    structureSemantics: { terrainMode: 'at_grade' },
+    transportRecord: { crossSection: { placement: { centerlineOffsetMeters: 0 } } }
+  },
+  points: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }],
+  halfWidth: 2,
+  sampleTerrainY: () => 0,
+  targetVerts: outerTurnVerts,
+  targetIndices: outerTurnIndices
+});
+if (!indexedSurfaceContainsPoint(outerTurnVerts, outerTurnIndices, { x: 11, z: -1 })) {
+  roadSurfaceFootprintFailures.push('road turn join filled the already-covered inside instead of the exposed outer wedge');
+}
+const twoBranchJunction = {
+  hasGradeSeparatedRoad: false,
+  maxWidth: 9,
+  roads: [{ width: 9 }, { width: 5 }]
+};
+if (!shouldBuildCompactIntersectionCap(twoBranchJunction) ||
+    computeIntersectionCapRadius(twoBranchJunction) !== 2.5) {
+  roadSurfaceFootprintFailures.push('two-branch mapped junction did not receive narrowest-connected-half-width closure');
+}
+const sourceTopologyJunctions = detectRoadIntersections([
+  {
+    pts: [{ x: -10, z: 0 }, { x: 10, z: 0 }],
+    sourceNodeIds: ['west', 'east'],
+    sourceTopologyNodes: [
+      { id: 'west', x: -10, z: 0 },
+      { id: 'shared-t', x: 0, z: 0 },
+      { id: 'east', x: 10, z: 0 }
+    ],
+    width: 7,
+    fixedRegionalContext: true,
+    structureSemantics: { terrainMode: 'at_grade' }
+  },
+  {
+    pts: [{ x: 0, z: 0 }, { x: 0, z: 10 }],
+    sourceNodeIds: ['shared-t', 'south'],
+    sourceTopologyNodes: [
+      { id: 'shared-t', x: 0, z: 0 },
+      { id: 'south', x: 0, z: 10 }
+    ],
+    width: 5,
+    fixedRegionalContext: true,
+    structureSemantics: { terrainMode: 'at_grade' }
+  }
+]);
+if (sourceTopologyJunctions.length !== 1 ||
+    sourceTopologyJunctions[0].roads.length !== 3 ||
+    Math.hypot(sourceTopologyJunctions[0].x, sourceTopologyJunctions[0].z) > 1e-7) {
+  roadSurfaceFootprintFailures.push('fixed-regional internal source-node T junction lost one or more physical branches');
+}
+
 const missingRequiredFiles = [];
 for (const relative of requiredFiles) {
   if (!(await exists(path.join(root, relative)))) missingRequiredFiles.push(relative);
@@ -837,6 +940,7 @@ const report = {
     buildingProviderAuthorityFailures,
     farBuildingHeightAuthorityFailures,
     buildingRoadAuthorityFailures,
+    roadSurfaceFootprintFailures,
     structureFallbackAuthorityFailures,
     groundAuthorityFailures,
     staleGeneratedImages,

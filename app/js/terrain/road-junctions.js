@@ -4,12 +4,15 @@ const JUNCTION_SURFACE_LIFT = 0.006;
 const JUNCTION_CAP_SEGMENTS = 16;
 
 function computeIntersectionCapRadius(intersection) {
-  const maxWidth = Number(intersection?.maxWidth || 8);
   const roads = Array.isArray(intersection?.roads) ? intersection.roads : [];
-  const averageWidth = roads.length > 0
-    ? roads.reduce((sum, branch) => sum + Number(branch?.width || maxWidth), 0) / roads.length
-    : maxWidth;
-  return Math.max(maxWidth * 0.22, Math.min(maxWidth * 0.34, averageWidth * 0.28));
+  const fallbackWidth = Number(intersection?.maxWidth || 8);
+  const narrowestConnectedWidth = roads.length > 0
+    ? Math.min(...roads.map((branch) => Math.max(1.2, Number(branch?.width || fallbackWidth))))
+    : fallbackWidth;
+  // The connected road rectangles already own every branch corridor. A cap
+  // exactly as wide as the narrowest connected half-section closes the center
+  // without restoring the old convex hull that paved unrelated corner space.
+  return Math.max(0.6, narrowestConnectedWidth * 0.5);
 }
 
 function shouldBuildCompactIntersectionCap(intersection) {
@@ -17,7 +20,7 @@ function shouldBuildCompactIntersectionCap(intersection) {
     intersection &&
     intersection.hasGradeSeparatedRoad !== true &&
     Array.isArray(intersection.roads) &&
-    intersection.roads.length >= 3
+    intersection.roads.length >= 2
   );
 }
 

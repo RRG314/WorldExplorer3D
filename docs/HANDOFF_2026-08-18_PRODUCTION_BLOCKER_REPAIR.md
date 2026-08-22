@@ -1763,3 +1763,48 @@ intersections. Those are the next separate composition-authority blocker.
 Mapped street-facing doors/glass storefronts, ownership-based memory/data work
 and final packaged release/security verification also remain. Do not push,
 deploy, promote or mutate user data.
+
+## Current continuation after 2026-08-21 recovery checkpoint 10
+
+The London road symptom was a final footprint-publication loss. Existing miter
+ribbons could fold at sharp mapped turns; the replacement's first draft then
+filled the inside of a turn even though adjacent segment rectangles already
+overlapped there. The visible outer wedge remained open while triangle counts
+looked healthy. The shared at-grade publisher now emits independent non-folding
+segment rectangles and bounded joins on the exposed outer side. Bridges and
+tunnels keep their existing compiled ribbon/profile authority.
+
+Junction closure no longer ignores two-branch turns. A compact cap uses the
+narrowest connected road's half-width, and fixed-regional shared internal source
+nodes retain all physical branches. Do not restore the old broad convex-hull
+fans, infer arbitrary fixed-regional crossings, or fill all land between nearby
+road identities. Runtime raycasts proved the remaining long Trafalgar slivers
+are terrain outside every mapped carriageway, consistent with traffic-island
+ground rather than missing asphalt.
+
+Source verification passes. In the seven complete assembled worlds the new
+road gate observed zero folded triangles, zero degenerate triangles and zero
+undersized junction closures. JFX, Golden Gate, London, Manhattan, Iowa and
+Tokyo pass all current gates, and all seven final frames were opened. Monaco's
+surface gate passes but three independent shared-node vertical joins remain
+open: `osm:way:1428926480`/`755487888` (3.1604 m),
+`osm:way:1532181305`/`1532181306` (2.0368 m), and
+`osm:way:766874492`/`766874493` (1.7692 m). Do not hide these with road caps.
+
+Golden Gate retains one symmetric six-lane physical deck. Tokyo's final frame
+still shows the separate global-width building conflict: a local footprint can
+narrow an entire mapped road and make it run incoherently through adjacent
+buildings. The next bounded change is segment-local cross-section authority
+shared by rendering, terrain, traversal and traffic. Facade frontage,
+ownership-based memory/data cleanup and packaged release verification remain
+later checkpoints. The deployed v4.2.1 London comparison did not assemble a
+playable world, so do not revert to live. No push, deployment, promotion,
+continuous streaming or detail reduction is authorized.
+
+Actor/contact control passed London, Monaco and Tokyo with 14/14 four-wheel
+vehicles, zero penetration and zero pedestrians. Baltimore published no traffic
+in the first four-city sequence but passed immediately when rerun alone with
+14/14 contact vehicles and 11-13 visible vehicles. Since traffic graph/runtime
+publication precedes and does not consume the changed road render mesh, treat
+that sequencing/provider-sensitive absence as open release evidence, not as
+proof that a visual road patch should own traffic.

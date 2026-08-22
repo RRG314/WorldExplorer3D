@@ -1799,3 +1799,36 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Adjacent blockers: the green automated matrix still misses visible London
   road ribbons and Tokyo road/building conflicts. Mapped frontage/storefronts,
   memory/data ownership and final packaged release verification remain open.
+
+## 2026-08-21 — Turn checks passed while the final road footprint had open wedges
+
+- Status: resolved locally as recovery checkpoint 10; not deployed. Monaco
+  vertical joins and Tokyo building/road cross-sections remain separate blockers.
+- Symptom: complete London gameplay rendered broad, jagged carriageway edges
+  and triangular openings near turns even though road counts, graph continuity
+  and the initial triangle-integrity diagnostic passed.
+- First authoritative loss: the final at-grade ribbon publisher used a clamped
+  miter strip that could fold at sharp turns. The first solid-segment repair
+  placed its join fan on the inside of the turn, which was already covered by
+  overlapping segment rectangles, leaving the exposed outer wedge unfilled.
+  Two-branch junctions were also omitted, and fixed-regional T junctions only
+  retained feature endpoints rather than shared internal source-node branches.
+- Resolution: publish at-grade roads as non-folding segment rectangles with a
+  bounded fan on the outer turn side. Close every physical two-or-more-branch
+  at-grade junction at the narrowest connected half-width. Preserve shared
+  internal source-node branch identity. Keep bridge/tunnel surfaces on the
+  compiled engineered ribbon owner.
+- Guard: source fixtures prove exposed outer-wedge coverage, sharp-turn
+  non-folding geometry, width-asymmetric two-branch closure and internal-node T
+  topology. Complete-world diagnostics require positive solid geometry and
+  zero folded triangles, degenerate triangles or undersized junction caps.
+- Worldwide evidence: all seven road-surface gates pass with 79,867-254,607
+  segment quads, 11,460-53,314 turn joins and no integrity failures. Six worlds
+  pass the full assembled contract; Monaco separately reports three mapped
+  vertical discontinuities up to 3.1604 m. All seven final gameplay frames were
+  inspected; Golden Gate remains symmetric and six lanes wide.
+- Scope boundary: raycasts at the London camera prove the remaining long dark
+  slivers sit outside every road half-width and belong to mapped non-road
+  traffic-island ground. Never pave arbitrary inter-road space, restore broad
+  convex-hull fans, add city geometry, use a test-only camera, suppress mapped
+  detail, or weaken the vertical-connection gate to make this checkpoint green.

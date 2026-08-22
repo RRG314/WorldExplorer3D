@@ -225,7 +225,21 @@ export function detectRoadIntersections(roads) {
   const intersections = [];
   const spatialMap = new Map();
   const sourceNodeIntersections = new Map();
+  const sourceTopologyOccurrences = new Map();
   const roadInfos = [];
+
+  roads.forEach((road, roadIdx) => {
+    const topology = Array.isArray(road?.sourceTopologyNodes)
+      ? road.sourceTopologyNodes
+      : [];
+    topology.forEach((node, topologyIndex) => {
+      const id = String(node?.id || '');
+      if (!id || !Number.isFinite(node?.x) || !Number.isFinite(node?.z)) return;
+      const occurrences = sourceTopologyOccurrences.get(id) || [];
+      occurrences.push({ road, roadIdx, topology, topologyIndex, node });
+      sourceTopologyOccurrences.set(id, occurrences);
+    });
+  });
 
   roads.forEach((road, roadIdx) => {
     if (!Array.isArray(road?.pts) || road.pts.length < 2) return;
@@ -251,6 +265,13 @@ export function detectRoadIntersections(roads) {
       const sourceNodeId = String(
         idx === 0 ? road.sourceNodeIds?.[0] || '' : road.sourceNodeIds?.at(-1) || ''
       );
+      // Shared source topology is registered below with all incoming/outgoing
+      // branches, including a side road that terminates at an internal node of
+      // a longer road. Registering only this endpoint here would duplicate the
+      // branch and still lose the internal main-road surface.
+      if (sourceNodeId && new Set(
+        (sourceTopologyOccurrences.get(sourceNodeId) || []).map((entry) => entry.roadIdx)
+      ).size >= 2) return;
       let intersection = sourceNodeId ? sourceNodeIntersections.get(sourceNodeId) : null;
       if (!intersection) {
         const semantics = road.structureSemantics || {};
@@ -265,6 +286,55 @@ export function detectRoadIntersections(roads) {
       registerRoadIntersectionBranches(intersection, road, roadIdx, idx === 0 ? 0 : road.pts.length - 2, idx === 0 ? 0 : 1, point);
     });
   });
+
+  for (const [sourceNodeId, occurrences] of sourceTopologyOccurrences) {
+    const roadIds = new Set(occurrences.map((entry) => entry.roadIdx));
+    if (roadIds.size < 2) continue;
+    const center = occurrences.reduce((result, entry) => ({
+      x: result.x + Number(entry.node.x),
+      z: result.z + Number(entry.node.z)
+    }), { x: 0, z: 0 });
+    center.x /= occurrences.length;
+    center.z /= occurrences.length;
+    let intersection = sourceNodeIntersections.get(sourceNodeId);
+    if (!intersection) {
+      intersection = getOrCreateIntersection(
+        intersections,
+        spatialMap,
+        center.x,
+        center.z,
+        `source:${sourceNodeId}`
+      );
+      sourceNodeIntersections.set(sourceNodeId, intersection);
+    }
+    for (const occurrence of occurrences) {
+      const { road, roadIdx, topology, topologyIndex, node } = occurrence;
+      const previous = topology[topologyIndex - 1];
+      const next = topology[topologyIndex + 1];
+      if (previous) {
+        addIntersectionBranch(
+          intersection,
+          roadIdx,
+          road,
+          `${roadIdx}:source:${sourceNodeId}:previous`,
+          null,
+          Number(previous.x) - Number(node.x),
+          Number(previous.z) - Number(node.z)
+        );
+      }
+      if (next) {
+        addIntersectionBranch(
+          intersection,
+          roadIdx,
+          road,
+          `${roadIdx}:source:${sourceNodeId}:next`,
+          null,
+          Number(next.x) - Number(node.x),
+          Number(next.z) - Number(node.z)
+        );
+      }
+    }
+  }
 
   const candidatePairs = collectRoadCandidatePairs(roadInfos);
   for (let i = 0; i < candidatePairs.length; i++) {

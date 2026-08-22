@@ -80,6 +80,7 @@ try {
           worldCounts: diagnostics.worldCounts || {},
           transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
           transportGradeProfile: diagnostics.transportStructures?.gradeProfile || null,
+          roadSurfaceIntegrity: diagnostics.transportStructures?.roadSurfaceIntegrity || null,
           atGradeTerrainAuthority: diagnostics.transportStructures?.atGradeTerrainAuthority || null,
           publishedVerticalControls: diagnostics.transportStructures?.publishedVerticalControls || [],
           sharedPhysicalSurfaces: diagnostics.transportStructures?.sharedPhysicalSurfaces || [],
@@ -171,6 +172,13 @@ try {
         ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
+        solidRoadSurfaceFootprints:
+          snapshot.roadSurfaceIntegrity?.authority ===
+            'solid-at-grade-segments-and-bounded-turn-joins' &&
+          Number(snapshot.roadSurfaceIntegrity?.segmentQuads || 0) > 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.foldedTriangles || 0) === 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.degenerateTriangles || 0) === 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.junctionCoverageGaps || 0) === 0,
         oneAtGradeTransportTerrainAuthority:
           snapshot.atGradeTerrainAuthority?.authority === 'compiled_transport_surface' &&
           Number(snapshot.atGradeTerrainAuthority?.roadCount || 0) > 0 &&

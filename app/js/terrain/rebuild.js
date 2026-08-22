@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
-import { detectRoadIntersections } from "./intersections.js?v=3";
+import { detectRoadIntersections } from "./intersections.js?v=4";
 import { boundsIntersectLocal } from "./context-utils.js?v=1";
 import {
   buildFeatureRibbonEdges,
@@ -13,7 +13,8 @@ import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 import {
   computeIntersectionCapRadius,
   shouldBuildCompactIntersectionCap
-} from "./road-junctions.js?v=10";
+} from "./road-junctions.js?v=11";
+import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;
@@ -43,7 +44,7 @@ function appendCompactIntersectionCap(
     targetVerts.push(x, Number(sampleTerrain(x, z)) + ROAD_SURFACE_BIAS + 0.004, z);
   }
   for (let index = 0; index < segments; index += 1) {
-    targetIndices.push(base, base + 1 + index, base + 1 + ((index + 1) % segments));
+    targetIndices.push(base, base + 1 + ((index + 1) % segments), base + 1 + index);
   }
   return true;
 }
@@ -294,9 +295,9 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   await yieldToMainThread();
   // Do not bend road profiles into a separately fitted junction plane. Those
   // large convex envelopes were wider than the actual carriageway and caused
-  // visible polygon fans and edge bumps on slopes. Continuous road ribbons
-  // remain authoritative; only a small terrain-draped center cap closes true
-  // three-or-more-way gaps.
+  // visible polygon fans and edge bumps on slopes. Solid road footprints
+  // remain authoritative; only a compact terrain-draped center cap closes a
+  // physically connected two-or-more-branch junction.
   for (const road of baseRoads) road.junctionTransitions = [];
 
   const roadMainBatches = [];
@@ -306,6 +307,15 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadSkirtBatchIdx = [];
   const roadMarkBatchVerts = [];
   const roadMarkBatchIdx = [];
+  const roadSurfaceIntegrity = {
+    authority: 'solid-at-grade-segments-and-bounded-turn-joins',
+    segmentQuads: 0,
+    turnJoins: 0,
+    surfaceTriangles: 0,
+    foldedTriangles: 0,
+    degenerateTriangles: 0,
+    junctionCoverageGaps: 0
+  };
   const flushRoadMainBatch = () => {
     if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
       roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx });
@@ -360,13 +370,32 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const roadTerrainSampler = renderRoad?.structureSemantics?.terrainMode === "at_grade" ?
         cachedTerrainHeight :
         cachedBaseTerrainHeight;
-      const ribbonEdges = buildFeatureRibbonEdges(renderRoad, pts, hw, roadTerrainSampler, {
-        surfaceBias: Number.isFinite(renderRoad?.surfaceBias) ? renderRoad.surfaceBias : ROAD_SURFACE_BIAS
-      });
-      leftEdge.push(...ribbonEdges.leftEdge);
-      rightEdge.push(...ribbonEdges.rightEdge);
-
-      appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
+      const surfaceBias = Number.isFinite(renderRoad?.surfaceBias)
+        ? renderRoad.surfaceBias
+        : ROAD_SURFACE_BIAS;
+      if (renderRoad?.structureSemantics?.terrainMode === 'at_grade') {
+        const integrity = appendSolidAtGradeRoadGeometry({
+          feature: renderRoad,
+          points: pts,
+          halfWidth: hw,
+          sampleTerrainY: roadTerrainSampler,
+          surfaceBias,
+          targetVerts: verts,
+          targetIndices: indices
+        });
+        roadSurfaceIntegrity.segmentQuads += integrity.segmentQuads;
+        roadSurfaceIntegrity.turnJoins += integrity.turnJoins;
+        roadSurfaceIntegrity.surfaceTriangles += integrity.surfaceTriangles;
+        roadSurfaceIntegrity.foldedTriangles += integrity.foldedTriangles;
+        roadSurfaceIntegrity.degenerateTriangles += integrity.degenerateTriangles;
+      } else {
+        const ribbonEdges = buildFeatureRibbonEdges(renderRoad, pts, hw, roadTerrainSampler, {
+          surfaceBias
+        });
+        leftEdge.push(...ribbonEdges.leftEdge);
+        rightEdge.push(...ribbonEdges.rightEdge);
+        appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
+      }
       appendRoadMainGeometry(verts, indices);
       appendRoadCenterMarkings(renderRoad, pts, roadMarkBatchVerts, roadMarkBatchIdx);
 
@@ -404,6 +433,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         capIndices,
         cachedTerrainHeight
       )) {
+        const radius = computeIntersectionCapRadius(intersection);
+        const minimumHalfWidth = Math.min(...intersection.roads.map((branch) =>
+          Math.max(0.6, Number(branch?.width || intersection.maxWidth || 8) * 0.5)
+        ));
+        if (radius + 1e-7 < minimumHalfWidth) {
+          roadSurfaceIntegrity.junctionCoverageGaps += 1;
+        }
         appendRoadMainGeometry(capVerts, capIndices);
         compactJunctionCount += 1;
       }
@@ -479,6 +515,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       roadMainBatches.reduce((sum, batch) => sum + batch.indices.length / 3, 0) +
       roadSkirtBatchIdx.length / 3 +
       roadMarkBatchIdx.length / 3,
+    roadSurfaceIntegrity: Object.freeze({ ...roadSurfaceIntegrity }),
     phaseDurationsMs: Object.freeze({
       ...phaseDurationsMs,
       total: Number((now() - publicationStartedAt).toFixed(2))
