@@ -510,6 +510,22 @@ function transportStructureSnapshot() {
     record.terrainMode !== 'at_grade' || record.engineeredApproach === true);
   const gradeViolations = engineeredGradeProfiles.filter((record) =>
     record.maximumGrade > record.designMaximumGrade + 0.002);
+  const atGradeRoads = roads.filter((road) =>
+    road?.structureSemantics?.terrainMode === 'at_grade' &&
+    road?.driveable !== false);
+  const atGradeTerrainAuthority = Object.freeze({
+    authority: 'compiled_transport_surface',
+    roadCount: atGradeRoads.length,
+    compiledSurfaceRoads: atGradeRoads.filter((road) =>
+      road?.transportSurfaceModel?.authority === 'compiled_transport_surface').length,
+    compiledCenterlineFitRoads: atGradeRoads.filter((road) =>
+      road?.transportSurfaceModel?.endpointPolicy === 'compiled_centerline_terrain_fit').length,
+    liveTerrainSamplerRoads: atGradeRoads.filter((road) =>
+      typeof road?.surfaceTerrainSampler === 'function').length,
+    corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
+    adjustedTerrainVertices: Number(appCtx.transportTerrainCorridorStats?.adjustedVertices || 0),
+    terrainMeshes: Number(appCtx.transportTerrainCorridorStats?.terrainMeshes || 0)
+  });
   const sharedPhysicalSurfaces = [...new Map(roads.map((road) => {
     const surface = road?.transportSurfacePresentation;
     return surface?.status === 'compiled' ? [surface.id, surface] : null;
@@ -577,6 +593,7 @@ function transportStructureSnapshot() {
       allMappedRoadsObserved: gradeProfiles.length,
       allMappedRoadsSteepest: gradeProfiles.slice(0, 24)
     },
+    atGradeTerrainAuthority,
     visualMeshes: visuals.length,
     attachedVisualMeshes: visuals.filter((mesh) => !!mesh?.parent).length,
     visibleVisualMeshes: visuals.filter((mesh) =>

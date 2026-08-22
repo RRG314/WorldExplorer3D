@@ -569,13 +569,11 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
       sampleStep: surfaceSampleStep
     })
   );
-  // Ordinary streets follow the live rendered terrain. Compiled profiles own
-  // only grade-separated structures; forcing city streets onto an engineered
-  // chord creates floating slabs and breaks steep terrain.
-  compiledFeature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade' &&
-    compiledFeature.transportSurfaceModel?.engineeredApproach !== true
-    ? sampleTerrainY
-    : null;
+  // Every published road reads one compiled surface. The terrain publisher
+  // reconciles mapped at-grade corridors to this profile; retaining a live
+  // terrain sampler here would recreate a second, folded road authority for
+  // rendering, traversal, collision, and actors.
+  compiledFeature.surfaceTerrainSampler = null;
   return compiledFeature;
 }
 

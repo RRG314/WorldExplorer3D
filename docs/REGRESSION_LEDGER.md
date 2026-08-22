@@ -1697,3 +1697,38 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   authority, renderer-specific axle positions, per-city suspension offsets,
   visual-only road lifts, road-detail reduction or claims that a count/pitch
   diagnostic proves final contact.
+
+## 2026-08-21 — Highest lateral DEM sample lifted the whole at-grade road
+
+- Status: resolved locally as recovery checkpoint 7; not deployed. Longitudinal
+  DEM steps and exact graph joins remain separate blockers.
+- Symptom: complete Monaco gameplay showed an ordinary road raised into a false
+  ramp/wall. Counts, bridge checks and traffic checks could remain green.
+- First authoritative loss: `transport-surface-model` chose the highest of the
+  center, left and right terrain samples as the elevation of the whole planar
+  cross-section. One coarse hillside cell raised a measured runtime example by
+  46.46 m. `surfaceTerrainSampler` then became a second downstream authority,
+  so final ribbons and collision could resample incompatible lateral heights.
+- Resolution: each driveable mapped centerline sample owns the at-grade vertical fit. One
+  compiled planar transport surface owns center and edges. The terrain publisher
+  consumes those canonical road references through one spatial index and
+  reconciles only the carriageway plus a bounded shoulder blend. Rebuilds start
+  from cached base terrain, reapply the same profile once and reposition
+  terrain-dependent objects after publication.
+- Guard: a deterministic steep lateral-slope fixture requires the compiled road
+  to remain at the centerline fit rather than the high edge. Runtime diagnostics
+  require every driveable at-grade road to carry the compiled surface authority, zero live
+  terrain samplers and one terrain corridor publication.
+- Worldwide evidence: `verify:source` and the real four-city actor/vehicle gate
+  pass. Baltimore, London, Monaco and Tokyo retain traffic, four-wheel contact,
+  zero wheel penetration, correct lane direction and exactly zero pedestrian
+  NPCs. Seven complete frames were inspected; Monaco is improved while London
+  road overlap, Tokyo road/building collision and Iowa arrival remain visible.
+- Verification limitation: one exact-provider matrix exposed London and Golden
+  Gate graph/grade failures. The clean committed candidate fell back in both
+  controlled comparison attempts, but reproduced pre-change ordinary London
+  grades up to 1.6965. Those failures are not waived by fallback. Accepted-ground
+  schema staleness also remains under audit; an unproven rebuild is not a fix.
+- Never reintroduce: highest-edge road lifting, center/left/right terrain folds,
+  live post-compile surface samplers, city-specific terrain cuts, visual-only
+  ramps, detail reduction or count-only acceptance.

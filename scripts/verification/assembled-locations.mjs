@@ -80,6 +80,7 @@ try {
           worldCounts: diagnostics.worldCounts || {},
           transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
           transportGradeProfile: diagnostics.transportStructures?.gradeProfile || null,
+          atGradeTerrainAuthority: diagnostics.transportStructures?.atGradeTerrainAuthority || null,
           publishedVerticalControls: diagnostics.transportStructures?.publishedVerticalControls || [],
           sharedPhysicalSurfaces: diagnostics.transportStructures?.sharedPhysicalSurfaces || [],
           mappedLandmarks: diagnostics.mappedLandmarks || null,
@@ -152,6 +153,15 @@ try {
         ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
+        oneAtGradeTransportTerrainAuthority:
+          snapshot.atGradeTerrainAuthority?.authority === 'compiled_transport_surface' &&
+          Number(snapshot.atGradeTerrainAuthority?.roadCount || 0) > 0 &&
+          Number(snapshot.atGradeTerrainAuthority?.compiledSurfaceRoads || 0) ===
+            Number(snapshot.atGradeTerrainAuthority?.roadCount || -1) &&
+          Number(snapshot.atGradeTerrainAuthority?.corridorCount || 0) ===
+            Number(snapshot.atGradeTerrainAuthority?.roadCount || -1) &&
+          Number(snapshot.atGradeTerrainAuthority?.liveTerrainSamplerRoads || 0) === 0 &&
+          Number(snapshot.atGradeTerrainAuthority?.adjustedTerrainVertices || 0) > 0,
         publishedBridgeElevationControlResolved: location.id !== 'golden-gate' || (
           snapshot.publishedVerticalControls.length === 2 &&
           snapshot.publishedVerticalControls.every((control) =>
@@ -193,12 +203,14 @@ try {
       };
       const skipGuide = page.getByText('Skip guide', { exact: true });
       if (await skipGuide.isVisible().catch(() => false)) {
-        await skipGuide.click();
+        // The guide may auto-dismiss between the visibility read and click.
+        // That is an accepted terminal state, not a world-verification error.
+        await skipGuide.click({ timeout: 2000 }).catch(() => {});
         await page.waitForTimeout(300);
       }
       const starInfoClose = page.locator('#starInfoClose');
       if (await starInfoClose.isVisible().catch(() => false)) {
-        await starInfoClose.click();
+        await starInfoClose.click({ timeout: 2000 }).catch(() => {});
         await page.waitForTimeout(200);
       }
       if (capture) await page.screenshot({ path: path.join(evidenceDir, `${location.id}.png`) });

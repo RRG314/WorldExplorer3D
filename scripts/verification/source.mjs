@@ -26,6 +26,7 @@ import {
   sampleDistrictGroundMeters
 } from '../../app/js/world/compiler/district-ground-model.js';
 import { createGroundBuildPlan } from '../lib/ground-artifact-builder.mjs';
+import { compileTransportSurfaceModel } from '../../app/js/world/compiler/transport-surface-model.js';
 import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
 import {
   OVERTURE_RELEASE_POLICY,
@@ -182,6 +183,34 @@ assert.equal(stackedGroundRuntime.sampleAtLatLon(0, 0).artifactId, 'fine-ground'
 assert.equal(stackedGroundRuntime.sampleAtLatLon(0.01, 0.01).artifactId, 'regional-ground');
 
 const groundAuthorityFailures = [];
+const hillsideRoadFixture = {
+  id: 'verification:hillside-road',
+  width: 10,
+  pts: [{ x: 0, z: 0 }, { x: 40, z: 0 }],
+  structureSemantics: { terrainMode: 'at_grade' }
+};
+const hillsideRoadSurface = compileTransportSurfaceModel(
+  hillsideRoadFixture,
+  (x, z) => 10 + x * 0.02 + Math.max(0, z) * 4,
+  { sampleStep: 2 }
+);
+if (
+  hillsideRoadSurface.endpointPolicy !== 'compiled_centerline_terrain_fit' ||
+  Math.abs(
+    Number(hillsideRoadSurface.centerHeights[0]) -
+    (Number(hillsideRoadSurface.groundHeights[0]) + Number(hillsideRoadSurface.surfaceBias))
+  ) > 0.2 ||
+  Math.abs(
+    Number(hillsideRoadSurface.leftHeights[0]) -
+    Number(hillsideRoadSurface.rightHeights[0])
+  ) > 1e-6 ||
+  Number(hillsideRoadSurface.leftGround[0]) -
+    Number(hillsideRoadSurface.groundHeights[0]) < 15
+) {
+  groundAuthorityFailures.push(
+    'at-grade road publication no longer preserves one centerline-fitted planar surface on a steep lateral terrain cell'
+  );
+}
 const groundCatalog = JSON.parse(await fs.readFile(
   path.join(root, 'app/assets/ground/manifest-catalog.json'),
   'utf8'

@@ -238,13 +238,13 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     // alignment; sampling terrain here would make every DEM bump appear in a
     // bridge deck or tunnel floor.
     // A road is an engineered cross-section, not three independent terrain
-    // samples. Using separate center/left/right DEM profiles folds the asphalt
-    // into visible triangles on side slopes. Lift one level cross-section to
-    // the highest accepted ground sample instead; this is the minimal cut/fill
-    // surface that cannot clip into the rendered terrain.
+    // samples. Its mapped centerline is the terrain-fit reference; the final
+    // terrain publication reconciles the carriageway corridor to this one
+    // compiled profile. Lifting the road to the highest lateral DEM sample
+    // turned coarse hillside cells into false ramps tens of metres high.
     const highestCrossSectionGround = Math.max(groundY, leftY, rightY);
     const lowestCrossSectionGround = Math.min(groundY, leftY, rightY);
-    const atGradeReferenceY = highestCrossSectionGround;
+    const atGradeReferenceY = groundY;
     const referenceY =
       mode === 'at_grade'
         ? atGradeReferenceY
@@ -271,10 +271,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     centerInitial[index] = centerY;
     terrainEnvelope[index] = atGradeReferenceY + surfaceBias;
     centerLowerBounds[index] = atGrade
-      // The current renderer does not publish a matching terrain cut. Until
-      // it does, an at-grade ribbon must stay above the complete rendered
-      // cross-section or the road and its actors can be buried by terrain.
-      ? highestCrossSectionGround + surfaceBias
+      ? groundY + surfaceBias - maximumAtGradeCut
       : mode === 'elevated'
         // Crossing stations are structural minimums expressed in world
         // elevation. Smoothing may lift neighboring samples to satisfy grade,
@@ -288,10 +285,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       // own the deliberate emergence at a mapped entrance.
       ? lowestCrossSectionGround + offset + surfaceBias
       : atGrade
-      ? Math.max(
-          highestCrossSectionGround + surfaceBias,
-          lowestCrossSectionGround + surfaceBias + maximumAtGradeFill
-        )
+      ? groundY + surfaceBias + maximumAtGradeFill
       : Number.POSITIVE_INFINITY;
   }
 
@@ -441,7 +435,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     endpointPolicy: engineeredApproach
       ? 'graph_owned_integrated_approach'
       : mode === 'at_grade'
-        ? 'terrain_draped'
+        ? 'compiled_centerline_terrain_fit'
         : 'hard_transition_tie_in',
     cutFillPolicy: Object.freeze({
       signed: mode === 'at_grade',
@@ -456,6 +450,8 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     pathDistances,
     distances: sampleDistances,
     groundHeights,
+    leftGround,
+    rightGround,
     offsets,
     centerHeights,
     leftHeights,

@@ -88,20 +88,50 @@ function createTerrainHeightSamplingApi(deps = {}) {
     }
 
     let adjustedY = terrainY;
-    const candidates = appCtx.structureTerrainCuts;
+    const indexedFeatures = appCtx.structureTerrainCutIndex?.candidates?.(worldX, worldZ);
+    const candidates = Array.isArray(indexedFeatures)
+      ? indexedFeatures
+      : appCtx.structureTerrainCuts;
+    let strongestAtGradeWeight = 0;
+    let strongestAtGradeY = terrainY;
     for (let i = 0; i < candidates.length; i++) {
       const cut = candidates[i];
-      if (!cut?.feature || !cut?.bounds) continue;
-      if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
+      const feature = cut?.feature || cut;
+      if (!feature || !Array.isArray(feature.pts)) continue;
+      const bounds = cut?.bounds || feature.bounds;
+      if (cut?.feature && bounds && (
+        worldX < bounds.minX || worldX > bounds.maxX ||
+        worldZ < bounds.minZ || worldZ > bounds.maxZ
+      )) continue;
 
-      const projected = projectPointToFeature(cut.feature, worldX, worldZ);
+      const projected = projectPointToFeature(feature, worldX, worldZ);
       if (!projected) continue;
 
-      const width = Math.max(4.5, Number(cut.width) || Number(cut.feature?.width) || 6);
+      const width = Math.max(4.5, Number(cut.width) || Number(feature.width) || 6);
+      if (feature?.structureSemantics?.terrainMode === 'at_grade') {
+        const halfWidth = width * 0.5;
+        const shoulderBlend = Math.max(3.5, Math.min(8, width * 0.65));
+        const influenceRadius = halfWidth + shoulderBlend;
+        if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
+        const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
+        if (!Number.isFinite(surfaceY)) continue;
+        const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
+        const shoulderT = Math.max(0, Math.min(1,
+          (projected.dist - halfWidth) / shoulderBlend
+        ));
+        const weight = projected.dist <= halfWidth
+          ? 1
+          : 1 - (shoulderT * shoulderT * (3 - 2 * shoulderT));
+        if (weight > strongestAtGradeWeight) {
+          strongestAtGradeWeight = weight;
+          strongestAtGradeY = terrainY + (targetTerrainY - terrainY) * weight;
+        }
+        continue;
+      }
       const influenceRadius = width * 0.82 + 3.4;
       if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
 
-      const surfaceY = sampleFeatureSurfaceY(cut.feature, worldX, worldZ, projected);
+      const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
       if (!Number.isFinite(surfaceY)) continue;
 
       const clearance = Math.max(3.1, Number(cut.clearance) || 3.8);
@@ -110,8 +140,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
       const lateralT = Math.max(0, Math.min(1, projected.dist / Math.max(0.5, influenceRadius)));
       let fade = 1 - (lateralT * lateralT * (3 - 2 * lateralT));
-      const distances = cut.feature?.transportSurfaceModel?.pathDistances || cut.feature?.surfaceDistances;
-      const points = cut.feature?.pts;
+      const distances = feature?.transportSurfaceModel?.pathDistances || feature?.surfaceDistances;
+      const points = feature?.pts;
       if (distances instanceof Float32Array && Array.isArray(points) && points.length >= 2) {
         const lastIndex = distances.length - 1;
         const p1 = points[projected.segIndex];
@@ -128,6 +158,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
       }
       adjustedY = Math.min(adjustedY, adjustedY + (targetY - adjustedY) * fade);
     }
+
+    if (strongestAtGradeWeight > 0) adjustedY = strongestAtGradeY;
 
     return adjustedY;
   }

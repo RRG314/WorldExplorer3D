@@ -203,6 +203,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     getSharedRoadMaterials,
     cachedTerrainHeight,
     cachedBaseTerrainHeight,
+    applyTransportTerrainCorridors,
+    repositionBuildingsWithTerrain,
     subdivideRoadPoints,
     pointAlongPolyline,
     polylineCurvatureMetric,
@@ -246,6 +248,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     );
   } else if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
     measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
+    await yieldToMainThread();
+  }
+  if (typeof applyTransportTerrainCorridors === 'function') {
+    measure('applyTransportTerrainCorridors', () => applyTransportTerrainCorridors());
+    if (typeof repositionBuildingsWithTerrain === 'function') {
+      measure('reprojectGroundAttachedWorld', () => repositionBuildingsWithTerrain());
+    }
     await yieldToMainThread();
   }
 

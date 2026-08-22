@@ -555,6 +555,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   let minElevation = Infinity;
   let maxElevation = -Infinity;
   let waterMaskedVertices = 0;
+  let transportCorridorAdjustedVertices = 0;
   const elevations = [];
   const elevationMetersSamples = [];
   const segments = Math.max(1, Number(appCtx.TERRAIN_SEGMENTS) || 1);
@@ -661,6 +662,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
     if (!reuseBaseElevations) nextBaseElevations[i] = baseY;
     const structureY = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
+    if (Math.abs(structureY - baseY) > 1e-6) transportCorridorAdjustedVertices += 1;
     const y = typeof deps.resolveWaterTerrainY === "function"
       ? deps.resolveWaterTerrainY(wx, wz, structureY, waterTerrainContext)
       : structureY;
@@ -681,6 +683,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   mesh.userData.pendingTerrainTile = false;
   mesh.userData.baseTerrainWorldY = nextBaseElevations;
   mesh.userData.waterMaskedVertices = waterMaskedVertices;
+  mesh.userData.transportCorridorAdjustedVertices = transportCorridorAdjustedVertices;
   mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;
 

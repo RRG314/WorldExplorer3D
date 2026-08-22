@@ -58,6 +58,35 @@ function structureAwareLinearFeatures() {
   );
 }
 
+function publishAtGradeTerrainCorridors(roads = []) {
+  const indexedFeatures = [];
+  for (const feature of roads) {
+    if (
+      !feature ||
+      feature.driveable === false ||
+      feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+      !feature?.transportSurfaceModel ||
+      !Array.isArray(feature.pts) ||
+      feature.pts.length < 2
+    ) continue;
+    indexedFeatures.push(feature);
+  }
+  // Retain only references to the canonical road objects. Per-road wrapper
+  // records and a second feature map duplicated an entire metropolitan road
+  // set without adding authority or query value.
+  appCtx.structureTerrainCuts = indexedFeatures;
+  appCtx.structureTerrainCutByFeature = null;
+  appCtx.structureTerrainCutIndex = createDriveableRoadConflictIndex(indexedFeatures, {
+    cellSize: 72
+  });
+  appCtx.transportTerrainCorridorPublication = Object.freeze({
+    authority: 'compiled_transport_surface',
+    corridorCount: indexedFeatures.length,
+    index: appCtx.structureTerrainCutIndex.snapshot()
+  });
+  return appCtx.transportTerrainCorridorPublication;
+}
+
 function createFeatureBoundsIndex(features = [], cellSize = 240) {
   const buckets = new Map();
   const boundsByFeature = new Map();
@@ -622,10 +651,10 @@ function* compileStructureAwareFeatureProfileSteps() {
   yield;
   measure('refreshBridgeGuardrails', () => appCtx.refreshBridgeGuardrails?.(roadFeatures));
 
-  // Terrain remains the roof above tunnels. Road and tunnel renderers must not
-  // mutate the shared ground surface.
-  appCtx.structureTerrainCuts = [];
-  appCtx.structureTerrainCutIndex = null;
+  // Tunnels remain below the unmodified terrain roof. At-grade carriageways,
+  // however, are physical terrain corridors: publish their compiled surfaces
+  // as the one bounded cut/fill authority used by the terrain mesh.
+  publishAtGradeTerrainCorridors(roadFeatures);
   appCtx.structureProfileCompilation = Object.freeze({
     roadCount: roadFeatures.length,
     structureCount: structureFeatures.length,

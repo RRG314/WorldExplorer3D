@@ -290,6 +290,26 @@ function applyWaterTerrainMask() {
   return stats;
 }
 
+function applyTransportTerrainCorridors() {
+  const meshes = (appCtx.terrainGroup?.children || []).filter(
+    (mesh) => mesh?.userData?.isTerrainMesh
+  );
+  let adjustedVertices = 0;
+  for (const mesh of meshes) {
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
+    adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
+  }
+  clearTerrainHeightCache();
+  const stats = Object.freeze({
+    authority: 'compiled_transport_surface',
+    terrainMeshes: meshes.length,
+    corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
+    adjustedVertices
+  });
+  appCtx.transportTerrainCorridorStats = stats;
+  return stats;
+}
+
 const {
   applyStructureTerrainCuts,
   baseTerrainHeightAt,
@@ -324,6 +344,8 @@ const transportPublicationDeps = {
   getSharedRoadMaterials,
   cachedTerrainHeight,
   cachedBaseTerrainHeight,
+  applyTransportTerrainCorridors,
+  repositionBuildingsWithTerrain,
   subdivideRoadPoints,
   pointAlongPolyline,
   polylineCurvatureMetric,
@@ -509,6 +531,7 @@ function publishCompiledTransportMeshesRuntime() {
 
 Object.assign(appCtx, {
   applyTerrainVisualProfile,
+  applyTransportTerrainCorridors,
   applyHeightsToTerrainMesh,
   applyWaterTerrainMask,
   baseTerrainHeightAt: cachedBaseTerrainHeight,

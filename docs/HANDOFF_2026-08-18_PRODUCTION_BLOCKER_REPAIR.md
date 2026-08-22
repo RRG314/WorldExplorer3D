@@ -1657,3 +1657,41 @@ frames were inspected and still reject London/Monaco/Tokyo composition and Iowa
 arrival as separate release work. Next continue with that composition authority;
 do not change vehicle contact, reduce detail, weaken Golden Gate evidence, push,
 deploy, promote or mutate user data.
+
+## Current continuation after 2026-08-21 recovery checkpoint 7
+
+The next first-loss trace found a split at-grade road authority before any
+bridge or landmark renderer. The transport compiler raised an entire planar
+cross-section to the highest center/left/right DEM sample. On Monaco's Avenue
+Prince Rainier III, one lateral sample therefore lifted the compiled start from
+169.42 m ground to 215.87 m and reported 46.46 m of fill. Final ribbon and
+surface queries then bypassed that compiled result through a live terrain
+sampler, independently folding center and edges back onto the DEM.
+
+Driveable at-grade roads now compile from their mapped centerline terrain sample and
+publish one planar center/left/right surface. The live sampler is removed. The
+terrain system consumes those same canonical road references through one
+spatial index, flattens vertices inside the carriageway, and shoulder-blends
+only 3.5-8 m outside it. Terrain rebuild reapplies the corridor from cached base
+elevations after structure profiles finish, then repositions terrain-dependent
+objects once. This is one shared physical surface, not another road renderer or
+visual ramp.
+
+The source fixture, source graph check and real Baltimore/London/Monaco/Tokyo
+actor gate pass. Every sampled traffic vehicle retains four-wheel contact with
+zero penetration, lane-side/direction checks pass and pedestrian NPCs remain at
+zero. All seven complete final frames were opened. Monaco loses the false
+lateral lift; checkpoint-6 comparison frames show the broad London polygons and
+Tokyo road/building collision already existed and remain open.
+
+Do not misread this checkpoint as closure of longitudinal terrain or exact graph
+topology. A successful exact-provider matrix still exposed London and Golden
+Gate continuity/grade failures. The committed comparison candidate could only
+obtain generalized transport in two controlled attempts, but that old build
+independently reproduced ordinary London road grades up to 1.6965. London road
+width/deduplication, Tokyo building conflict, Iowa arrival, tall-building
+identity/LOD, mapped facades and memory/data ownership remain release blockers.
+Several accepted-ground artifacts are also PMF v1 while the repository compiler
+emits v2; rebuilding Monaco with the same source tile changed terrain but did
+not alone remove adjacent steps, so no unproven artifact replacement belongs in
+this checkpoint.
