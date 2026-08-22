@@ -17,6 +17,10 @@ import { filterSelectionToAcceptedGround } from '../../app/js/world/compiler/acc
 import { retainRegionalTransportOutsideCore } from '../../app/js/world/fixed-regional-context.js';
 import { mergeExactRegionalStructures } from '../../app/js/world/fixed-regional-structures.js';
 import { compileTransportNetworkModel } from '../../app/js/world/compiler/transport-network-model.js';
+import {
+  buildTransportContinuityRepairAnchors,
+  buildTransportJunctionProfileAnchors
+} from '../../app/js/world/compiler/transport-junction-profile.js';
 import { createBuildingRoadFootprintGuards } from '../../app/js/world/building-road-footprint.js';
 import {
   roadSegmentIsDriveable,
@@ -31,6 +35,7 @@ import {
 } from '../../app/js/world/compiler/district-ground-model.js';
 import { createGroundBuildPlan } from '../lib/ground-artifact-builder.mjs';
 import { compileTransportSurfaceModel } from '../../app/js/world/compiler/transport-surface-model.js';
+import { reconcileExactGraphNodeConstraints } from '../../app/js/world/compiler/transport-surface-profile.js';
 import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
 import { resolveCustomLocationArrival } from '../../app/js/world/spawn-location-arrival.js';
 import { resolveFarBuildingMassing } from '../../app/js/terrain/far-building-massing.js';
@@ -199,6 +204,43 @@ assert.equal(stackedGroundRuntime.sampleAtLatLon(0, 0).artifactId, 'fine-ground'
 assert.equal(stackedGroundRuntime.sampleAtLatLon(0.01, 0.01).artifactId, 'regional-ground');
 
 const groundAuthorityFailures = [];
+const tokyoProfileDistances = new Float64Array([
+  0,
+  4144.7264849555095,
+  4642.19534474774
+]);
+const tokyoProfileFeature = {
+  structureTransitionAnchors: [
+    {
+      distance: 4144.7264849555095,
+      targetSurfaceY: 57.59303665161133,
+      span: 500,
+      source: 'transport_graph_node'
+    },
+    {
+      // The graph endpoint is 0.000207 m beyond the canonicalized compiled
+      // profile endpoint, matching the real Tokyo elevated motorway case.
+      distance: 4642.195552237722,
+      targetSurfaceY: 27.744892614678577,
+      span: 500,
+      source: 'transport_graph_node'
+    }
+  ],
+  structureStations: []
+};
+const tokyoProfileResult = reconcileExactGraphNodeConstraints(
+  tokyoProfileFeature,
+  new Float32Array([36, 40, 28]),
+  tokyoProfileDistances,
+  new Float64Array([Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY]),
+  0.06
+);
+if (Math.abs(tokyoProfileResult[1] - 57.59303665161133) > 1e-4 ||
+    Math.abs(tokyoProfileResult[2] - 27.744892614678577) > 1e-4) {
+  groundAuthorityFailures.push(
+    'sub-millimetre graph/profile endpoint round-off discarded a design-grade-feasible elevated corridor'
+  );
+}
 const mockAttribute = (values) => ({
   values,
   count: values.length,
@@ -746,6 +788,205 @@ const generalizedMetricConnection = compileTransportNetworkModel([
 if (generalizedMetricConnection.connections.length === 0 ||
     !String(generalizedMetricConnection.connections[0].provenance?.method || '').startsWith('metric-')) {
   structureFallbackAuthorityFailures.push('generalized transport lost its bounded metric conflation fallback');
+}
+const engineeredSurfaceLeft = exactTransportFeature({
+  id: 'osm:way:engineered-surface-left',
+  points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+  nodeIds: ['osm:node:engineered-left', 'osm:node:engineered-join-left'],
+  type: 'primary_link'
+});
+const engineeredSurfaceMiddle = exactTransportFeature({
+  id: 'osm:way:engineered-surface-middle',
+  points: [{ x: 10, z: 0 }, { x: 20, z: 0 }],
+  nodeIds: ['osm:node:engineered-join-left', 'osm:node:engineered-join-right'],
+  type: 'primary_link'
+});
+const engineeredSurfaceRight = exactTransportFeature({
+  id: 'osm:way:engineered-surface-right',
+  points: [{ x: 20, z: 0 }, { x: 30, z: 0 }],
+  nodeIds: ['osm:node:engineered-join-right', 'osm:node:engineered-right'],
+  type: 'primary_link'
+});
+for (const [feature, heights] of [
+  [engineeredSurfaceLeft, [10, 10]],
+  [engineeredSurfaceMiddle, [10.1, 10.1]],
+  [engineeredSurfaceRight, [10, 10]]
+]) {
+  feature.transportGraphRef = { featureId: feature.sourceFeatureId };
+  feature.surfaceBias = 0.08;
+  feature.transportSurfaceModel = {
+    engineeredApproach: true,
+    distances: new Float64Array([0, 10]),
+    centerHeights: new Float32Array(heights)
+  };
+}
+engineeredSurfaceLeft.structureTransitionAnchors = [{
+  distance: 10,
+  targetSurfaceY: 10,
+  source: 'transport_graph_node',
+  engineeredApproach: true
+}];
+engineeredSurfaceMiddle.structureTransitionAnchors = [
+  { distance: 0, targetSurfaceY: 10, source: 'transport_graph_node', engineeredApproach: true },
+  { distance: 10, targetSurfaceY: 10, source: 'transport_graph_node', engineeredApproach: true }
+];
+engineeredSurfaceRight.structureTransitionAnchors = [{
+  distance: 0,
+  targetSurfaceY: 10,
+  source: 'transport_graph_node',
+  engineeredApproach: true
+}];
+const engineeredSurfaceNetwork = compileTransportNetworkModel([
+  engineeredSurfaceLeft,
+  engineeredSurfaceMiddle,
+  engineeredSurfaceRight
+]);
+const engineeredSurfaceRepair = buildTransportContinuityRepairAnchors(
+  [engineeredSurfaceLeft, engineeredSurfaceMiddle, engineeredSurfaceRight],
+  engineeredSurfaceNetwork,
+  (feature, _x, _z, projected) => {
+    const atEnd = Number(projected?.segmentT ?? projected?.t) >= 0.5;
+    return Number(feature.transportSurfaceModel.centerHeights[atEnd ? 1 : 0]);
+  },
+  { sampleTerrainY: () => 9.92 }
+);
+if ((engineeredSurfaceRepair.anchorsByFeature.get(engineeredSurfaceMiddle) || []).length !== 2) {
+  structureFallbackAuthorityFailures.push('sub-tolerance exact grade constraints were discarded at an all-engineered surface corridor');
+}
+const buriedInteriorThrough = exactTransportFeature({
+  id: 'osm:way:buried-interior-through',
+  points: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 20, z: 0 }],
+  nodeIds: ['osm:node:buried-left', 'osm:node:buried-join', 'osm:node:buried-right'],
+  type: 'primary'
+});
+const buriedInteriorSpur = exactTransportFeature({
+  id: 'osm:way:buried-interior-spur',
+  points: [{ x: 10, z: 0 }, { x: 10, z: 10 }],
+  nodeIds: ['osm:node:buried-join', 'osm:node:buried-spur'],
+  type: 'service'
+});
+for (const feature of [buriedInteriorThrough, buriedInteriorSpur]) {
+  feature.transportGraphRef = { featureId: feature.sourceFeatureId };
+  feature.surfaceBias = 0.08;
+  feature.transportSurfaceModel = {
+    engineeredApproach: true,
+    distances: new Float64Array(feature === buriedInteriorThrough ? [0, 10, 20] : [0, 10]),
+    centerHeights: new Float32Array(feature === buriedInteriorThrough ? [5, 5, 5] : [5, 5])
+  };
+}
+buriedInteriorThrough.structureTransitionAnchors = [{
+  distance: 10,
+  targetSurfaceY: 5,
+  source: 'transport_graph_node',
+  engineeredApproach: true
+}];
+buriedInteriorSpur.structureTransitionAnchors = [{
+  distance: 0,
+  targetSurfaceY: 5,
+  source: 'transport_graph_node',
+  engineeredApproach: true
+}];
+const buriedInteriorNetwork = compileTransportNetworkModel([
+  buriedInteriorThrough,
+  buriedInteriorSpur
+]);
+const buriedInteriorRepair = buildTransportContinuityRepairAnchors(
+  [buriedInteriorThrough, buriedInteriorSpur],
+  buriedInteriorNetwork,
+  () => 5,
+  { sampleTerrainY: () => 10 }
+);
+const buriedInteriorTargets = [
+  ...(buriedInteriorRepair.anchorsByFeature.get(buriedInteriorThrough) || []),
+  ...(buriedInteriorRepair.anchorsByFeature.get(buriedInteriorSpur) || [])
+].map((anchor) => Number(anchor.targetSurfaceY));
+if (buriedInteriorTargets.length !== 2 ||
+    buriedInteriorTargets.some((target) => Math.abs(target - 10.08) > 1e-6)) {
+  structureFallbackAuthorityFailures.push('exact endpoint-to-interior road join trusted a provisional profile below accepted ground');
+}
+buriedInteriorThrough.transportSurfaceModel.engineeredApproach = false;
+buriedInteriorSpur.transportSurfaceModel.engineeredApproach = false;
+buriedInteriorThrough.structureTransitionAnchors = [{
+  distance: 0,
+  targetSurfaceY: 5,
+  source: 'transport_graph_node',
+  engineeredApproach: true
+}];
+buriedInteriorSpur.structureTransitionAnchors = [];
+const ordinaryInteriorRepair = buildTransportContinuityRepairAnchors(
+  [buriedInteriorThrough, buriedInteriorSpur],
+  buriedInteriorNetwork,
+  () => 5,
+  { sampleTerrainY: () => 10 }
+);
+if (ordinaryInteriorRepair.anchorsByFeature.size !== 0) {
+  structureFallbackAuthorityFailures.push('ordinary exact T-junction was promoted into an engineered transport approach');
+}
+const ordinaryJunctionProfile = buildTransportJunctionProfileAnchors(
+  [buriedInteriorThrough, buriedInteriorSpur],
+  buriedInteriorNetwork,
+  () => 10,
+  () => 5
+);
+if (ordinaryJunctionProfile.anchorsByFeature.size !== 0) {
+  structureFallbackAuthorityFailures.push('pure at-grade source node entered the vertical structure junction authority');
+}
+const staleTargetSurface = exactTransportFeature({
+  id: 'osm:way:stale-target-surface',
+  points: [{ x: -20, z: 0 }, { x: 0, z: 0 }],
+  nodeIds: ['osm:node:stale-ground', 'osm:node:stale-join'],
+  type: 'tertiary'
+});
+const staleTargetBridge = exactTransportFeature({
+  id: 'osm:way:stale-target-bridge',
+  points: [{ x: 0, z: 0 }, { x: 20, z: 0 }],
+  nodeIds: ['osm:node:stale-join', 'osm:node:stale-high'],
+  terrainMode: 'elevated',
+  type: 'tertiary'
+});
+const staleTargetHighSurface = exactTransportFeature({
+  id: 'osm:way:stale-target-high-surface',
+  points: [{ x: 20, z: 0 }, { x: 40, z: 0 }],
+  nodeIds: ['osm:node:stale-high', 'osm:node:stale-return'],
+  type: 'tertiary'
+});
+for (const [feature, heights] of [
+  [staleTargetSurface, [4.3, 4.3]],
+  [staleTargetBridge, [6.7, 8.4]],
+  [staleTargetHighSurface, [8.4, 8.4]]
+]) {
+  feature.transportGraphRef = { featureId: feature.sourceFeatureId };
+  feature.surfaceBias = 0.08;
+  feature.transportSurfaceModel = {
+    engineeredApproach: feature !== staleTargetSurface,
+    distances: new Float64Array([0, 20]),
+    centerHeights: new Float32Array(heights)
+  };
+}
+staleTargetBridge.structureTransitionAnchors = [{
+  distance: 0,
+  targetSurfaceY: 4.3,
+  source: 'transport_graph_node'
+}];
+const staleTargetNetwork = compileTransportNetworkModel([
+  staleTargetSurface,
+  staleTargetBridge,
+  staleTargetHighSurface
+]);
+const staleTargetRepair = buildTransportContinuityRepairAnchors(
+  [staleTargetSurface, staleTargetBridge, staleTargetHighSurface],
+  staleTargetNetwork,
+  (feature, _x, _z, projected) => {
+    const atEnd = Number(projected?.segmentT ?? projected?.t) >= 0.5;
+    return Number(feature.transportSurfaceModel.centerHeights[atEnd ? 1 : 0]);
+  },
+  { sampleTerrainY: (x) => x < 10 ? 6.895 : 8.32 }
+);
+const repairedStaleBridgeStart = (staleTargetRepair.anchorsByFeature.get(staleTargetBridge) || [])
+  .find((anchor) => anchor.endpoint === 'start');
+if (!repairedStaleBridgeStart ||
+    Math.abs(Number(repairedStaleBridgeStart.targetSurfaceY) - 6.975) > 0.02) {
+  structureFallbackAuthorityFailures.push('feasible terrain-clearing graph target did not supersede a stale buried bridge endpoint target');
 }
 if (exactStructureAccepted.selection.roadWays.length !== 1 ||
     exactStructureAccepted.selection.roadWays[0].id !== exactBridge.id ||

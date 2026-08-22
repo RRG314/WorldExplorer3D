@@ -2,7 +2,7 @@ import { polylineDistances } from '../../structure-semantics/geometry.js?v=2';
 import {
   DEFAULT_MAX_AT_GRADE_FILL,
   sampleTransportSurfaceAtDistance
-} from './transport-surface-model.js?v=24';
+} from './transport-surface-model.js?v=25';
 
 const TRANSPORT_STRUCTURE_ASSEMBLY_SCHEMA_VERSION = 1;
 

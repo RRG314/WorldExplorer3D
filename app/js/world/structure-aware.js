@@ -18,7 +18,7 @@ import {
   buildIntegratedApproachContinuationAnchors,
   buildTransportContinuityRepairAnchors,
   buildTransportJunctionProfileAnchors
-} from "./compiler/transport-junction-profile.js?v=15";
+} from "./compiler/transport-junction-profile.js?v=21";
 import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad,

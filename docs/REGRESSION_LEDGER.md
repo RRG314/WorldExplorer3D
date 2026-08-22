@@ -1968,3 +1968,40 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   diagnostics that claim an unconsumed authority, visual road lifts, fake
   ramps, city branches, detail reduction, or a green count gate overriding a
   failed complete frame.
+
+## 2026-08-22 — Exact mapped transport nodes ended at different elevations
+
+- Status: resolved locally as recovery checkpoint 14; not deployed.
+- Symptom: bridges, ramps and overpasses could stop in mid-air or meet a road
+  with a multi-metre step in some provider sequences and locations. Repeating
+  the same location could pass, proving count-only and single-provider checks
+  were insufficient.
+- First authoritative loss: exact source identity and graph topology survived.
+  Vertical graph-node classification/publication admitted pure at-grade nodes,
+  propagated a station-specific engineered label feature-wide, trusted some
+  provisional road profiles below accepted terrain and allowed stale published
+  targets to survive a feasible continuity solve. Profile reconciliation also
+  treated micrometre projection round-off as a physically impossible grade.
+- Resolution: engineered evidence is resolved at the exact graph station; pure
+  at-grade groups cannot publish structure-junction anchors. Mixed joins and
+  locally proven all-engineered joins use accepted ground plus surface bias as
+  their renderable floor. A feasible multi-node solve replaces stale targets.
+  Exact grade feasibility allows 0.1 mm numerical epsilon without changing the
+  design-grade or 0.25 m visible-continuity limits.
+- Guards: source fixtures cover an ordinary T junction, a buried endpoint-to-
+  interior approach, an all-engineered exact surface corridor, stale graph
+  targets and Tokyo's real 4,642.195 m profile with a 0.000207 m endpoint
+  canonicalization difference. They fail if ordinary streets acquire synthetic
+  structure authority or the exact constraints are discarded.
+- Worldwide evidence: captured complete gameplay passes Baltimore/JFX, Golden
+  Gate, London, Monaco, Manhattan, rural Iowa and Tokyo with zero authoritative
+  discontinuities and zero grade violations. Maximum accepted deltas are
+  0.2264, 0, 0.2028, 0.2445, 0.2002, 0.000031 and 0.1981 m respectively.
+  Mapped-tall/far-height, solid-road, terrain, traffic, collision/runtime and
+  zero-pedestrian checks remain green. Golden Gate retains one symmetric
+  six-lane physical surface.
+- Never reintroduce: feature-wide engineered classification, structure anchors
+  at ordinary at-grade nodes, a below-terrain provisional road as mixed-node
+  owner, tolerance-based retention of conflicting stale targets, exact floating
+  comparisons at projected endpoints, city patches, fake ramps or a second
+  bridge/road renderer.

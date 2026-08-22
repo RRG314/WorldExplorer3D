@@ -395,6 +395,12 @@ function reconcileExactGraphNodeConstraints(
   }
 
   const fixedEntries = [...fixedTargets.entries()];
+  // Source-node distances and the canonicalized profile endpoint are both
+  // double-precision geometric coordinates, but they may differ by a few
+  // micrometres after projection and endpoint canonicalization. A constraint
+  // exactly on the design grade boundary remains physically feasible; reject
+  // only a material excess, not floating-point noise.
+  const feasibilityEpsilonMeters = 1e-4;
   const hasAbsoluteStructuralMinimum = Number.isFinite(Number(feature?.minimumStructureSurfaceY));
   const structureStations = Array.isArray(feature?.structureStations)
     ? feature.structureStations
@@ -407,7 +413,9 @@ function reconcileExactGraphNodeConstraints(
     for (let rightIndex = leftIndex + 1; rightIndex < fixedEntries.length; rightIndex += 1) {
       const [rightSample, rightTarget] = fixedEntries[rightIndex];
       const run = Math.abs(distances[rightSample] - distances[leftSample]);
-      if (Math.abs(rightTarget - leftTarget) > grade * run + 1e-6) return heights;
+      if (Math.abs(rightTarget - leftTarget) > grade * run + feasibilityEpsilonMeters) {
+        return heights;
+      }
     }
     for (let index = 0; index < heights.length; index += 1) {
       const structuralLowerBound = finiteNumber(lowerBounds?.[index], Number.NEGATIVE_INFINITY);
@@ -415,7 +423,7 @@ function reconcileExactGraphNodeConstraints(
       const insideMappedTransition = run <= finiteNumber(transitionSpanByIndex.get(leftSample));
       if (
         (hasAbsoluteStructuralMinimum || (!insideMappedTransition && hasHardStationAt(distances[index]))) &&
-        structuralLowerBound > leftTarget + grade * run + 1e-6
+        structuralLowerBound > leftTarget + grade * run + feasibilityEpsilonMeters
       ) {
         // A measured landmark elevation is absolute and cannot be relaxed.
         if (hasAbsoluteStructuralMinimum) return heights;

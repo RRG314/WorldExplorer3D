@@ -40,6 +40,16 @@ function maximumGradeFor(feature) {
   return 0.085;
 }
 
+function hasEngineeredGraphConstraintAt(feature, side) {
+  if (feature?.structureSemantics?.terrainMode !== 'at_grade') return false;
+  const distance = finite(side?.distanceAlong);
+  return (feature?.structureTransitionAnchors || []).some((anchor) =>
+    anchor?.source === 'transport_graph_node' &&
+    anchor?.engineeredApproach === true &&
+    Math.abs(finite(anchor?.distance) - distance) <= 0.02
+  );
+}
+
 function compiledSurfaceAtDistance(feature, distance) {
   const model = feature?.transportSurfaceModel;
   const distances = model?.distances;
@@ -141,9 +151,12 @@ export function auditTransportJunctionContinuity(
       feature?.transportRecord?.completeness === 'lossless' &&
       feature?.transportRecord?.routeState !== 'incomplete'
     );
-    const structureConnection = [leftFeature, rightFeature].some((feature) =>
+    const structureConnection = [
+      { feature: leftFeature, side: connection.left },
+      { feature: rightFeature, side: connection.right }
+    ].some(({ feature, side }) =>
       feature?.structureSemantics?.terrainMode !== 'at_grade' ||
-      feature?.transportSurfaceModel?.engineeredApproach === true
+      hasEngineeredGraphConstraintAt(feature, side)
     );
     if (!exactComplete || !structureConnection) continue;
     authoritativeConnectionCount += 1;
@@ -268,23 +281,62 @@ export function buildTransportContinuityRepairAnchors(
       feature?.structureSemantics?.terrainMode === 'subgrade');
     const atGrade = sampled.filter(({ feature }) =>
       feature?.structureSemantics?.terrainMode === 'at_grade');
-    const engineeredAtGrade = atGrade.filter(({ feature }) =>
-      feature?.transportSurfaceModel?.engineeredApproach === true);
-    const terrainFittedAtGrade = atGrade.filter(({ feature }) =>
-      feature?.transportSurfaceModel?.engineeredApproach !== true);
+    const engineeredAtGrade = atGrade.filter(({ feature, side }) =>
+      hasEngineeredGraphConstraintAt(feature, side));
+    const terrainFittedAtGrade = atGrade.filter(({ feature, side }) =>
+      !hasEngineeredGraphConstraintAt(feature, side));
     const interior = sampled.filter(({ side }) => side?.endpoint === 'interior');
     let target = NaN;
     let owner = null;
     if (atGrade.length > 0 && (elevated.length > 0 || subgrade.length > 0)) {
       // Exact mapped surface roads own the physical portal/abutment elevation.
-      // Use the highest incident terrain-fitted surface so a connected road is
-      // never cut into the rendered ground.
-      owner = [...atGrade].sort((left, right) => right.surfaceY - left.surfaceY)[0];
-      target = owner.surfaceY;
-    } else if (interior.length > 0) {
+      // A provisional at-grade profile may already have been grade-smoothed
+      // below the accepted terrain at a steep endpoint. That buried profile is
+      // not a valid surface authority. Use the highest renderable incident
+      // surface so both the structure and its approach meet on or above the
+      // final ground instead of leaving a bridge end suspended over a road the
+      // terrain pass later has to excavate.
+      const surfaceCandidates = atGrade.map((entry) => {
+        const point = entry.side?.point || entry.feature?.pts?.[0];
+        const terrainY = Number(options.sampleTerrainY?.(finite(point?.x), finite(point?.z)));
+        const surfaceBias = Number.isFinite(entry.feature?.surfaceBias)
+          ? Number(entry.feature.surfaceBias)
+          : 0.08;
+        return {
+          entry,
+          surfaceY: Math.max(
+            entry.surfaceY,
+            Number.isFinite(terrainY) ? terrainY + surfaceBias : -Infinity
+          )
+        };
+      }).filter((entry) => Number.isFinite(entry.surfaceY));
+      surfaceCandidates.sort((left, right) => right.surfaceY - left.surfaceY);
+      owner = surfaceCandidates[0]?.entry || null;
+      target = surfaceCandidates[0]?.surfaceY;
+    } else if (interior.length > 0 && engineeredAtGrade.length > 0) {
       owner = [...interior].sort((left, right) =>
         ownerScore(right.side, right.feature) - ownerScore(left.side, left.feature))[0];
       target = owner.surfaceY;
+      if (atGrade.length === sampled.length) {
+        // An endpoint-to-interior tie-in makes the through route the topology
+        // owner, not a license to publish that provisional ribbon below the
+        // accepted ground shared by both surfaces. This occurs when terrain
+        // fitting smooths a steep DEM sample before exact node reconciliation.
+        // Restrict this to a node already proven to be part of an engineered
+        // corridor; ordinary exact T-junctions must remain terrain-fitted and
+        // cannot become bridge approaches merely because they have an interior
+        // source node. Preserve the through-route owner while raising the
+        // physical node to the highest renderable at-grade surface floor.
+        const terrainFloors = atGrade.map((entry) => {
+          const point = entry.side?.point || entry.feature?.pts?.[0];
+          const terrainY = Number(options.sampleTerrainY?.(finite(point?.x), finite(point?.z)));
+          const surfaceBias = Number.isFinite(entry.feature?.surfaceBias)
+            ? Number(entry.feature.surfaceBias)
+            : 0.08;
+          return Number.isFinite(terrainY) ? terrainY + surfaceBias : NaN;
+        }).filter(Number.isFinite);
+        if (terrainFloors.length > 0) target = Math.max(target, ...terrainFloors);
+      }
     } else if (elevated.length > 0) {
       // All incident elevated ways share one mapped node, while their
       // clearance/stack heights are modeled. Reconcile downward to the lowest
@@ -307,6 +359,29 @@ export function buildTransportContinuityRepairAnchors(
       owner = [...terrainFittedAtGrade].sort((left, right) =>
         ownerScore(right.side, right.feature) - ownerScore(left.side, left.feature))[0];
       target = owner.surfaceY;
+    } else if (engineeredAtGrade.length > 0) {
+      // Once every exact surface fragment incident to a node carries an
+      // approach anchor, classification alone can no longer identify the
+      // terrain-owned side of the transition. Leaving that node unseeded lets
+      // finalization publish an unrelated endpoint target after this corridor
+      // solve, producing mutually infeasible anchors and an open-air road end.
+      // The shared mapped node is still a physical surface junction: seed its
+      // minimum renderable elevation from accepted ground, then let the grade
+      // propagation below raise it only as far as the connected engineered
+      // corridor requires.
+      const terrainCandidates = engineeredAtGrade.map((entry) => {
+        const point = entry.side?.point || entry.feature?.pts?.[0];
+        const terrainY = Number(options.sampleTerrainY?.(finite(point?.x), finite(point?.z)));
+        const surfaceBias = Number.isFinite(entry.feature?.surfaceBias)
+          ? Number(entry.feature.surfaceBias)
+          : 0.08;
+        return { entry, surfaceY: Number.isFinite(terrainY) ? terrainY + surfaceBias : NaN };
+      }).filter((entry) => Number.isFinite(entry.surfaceY));
+      if (terrainCandidates.length > 0) {
+        terrainCandidates.sort((left, right) => right.surfaceY - left.surfaceY);
+        owner = terrainCandidates[0].entry;
+        target = terrainCandidates[0].surfaceY;
+      }
     }
     if (!Number.isFinite(target)) continue;
     targetByGroup.set(group.id, target);
@@ -510,11 +585,30 @@ export function buildTransportContinuityRepairAnchors(
       const terrainY = Number(options.sampleTerrainY?.(finite(point?.x), finite(point?.z)));
       if (!Number.isFinite(terrainY)) continue;
       const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
+      const targetDelta = Math.abs(targetSurfaceY - currentSurfaceY);
+      const constrainedMembershipCount = (membershipsByFeature.get(feature) || [])
+        .filter((membership) => Number.isFinite(targetByGroup.get(membership.group.id)))
+        .length;
+      const conflictingPublishedTarget = (feature.structureTransitionAnchors || []).some((anchor) =>
+        anchor?.source === 'transport_graph_node' &&
+        Math.abs(finite(anchor?.distance) - finite(side?.distanceAlong)) <= 0.02 &&
+        Number.isFinite(Number(anchor?.targetSurfaceY)) &&
+        Math.abs(Number(anchor.targetSurfaceY) - targetSurfaceY) > 1e-5
+      );
+      // Continuity tolerance decides whether a visible node step is already
+      // acceptable. It cannot discard a smaller adjustment that made two or
+      // more graph constraints grade-feasible, or leave an older graph target
+      // in place merely because the profile compiler already clipped the
+      // rendered endpoint to the feasible grade cone. In both cases the solved
+      // graph constraint must be published; otherwise the next compile reads
+      // the stale target and restores the original metre-scale discontinuity.
+      const requiredForGradeFeasibility = constrainedMembershipCount > 1 &&
+        (targetDelta > 1e-5 || conflictingPublishedTarget);
       const reconcilingAtGrade = terrainMode === 'at_grade' &&
-        Math.abs(targetSurfaceY - currentSurfaceY) > toleranceMeters &&
+        (targetDelta > toleranceMeters || requiredForGradeFeasibility) &&
         targetSurfaceY >= terrainY + surfaceBias - 0.02;
       const reconcilingStructure = terrainMode !== 'at_grade' &&
-        Math.abs(targetSurfaceY - currentSurfaceY) > toleranceMeters;
+        (targetDelta > toleranceMeters || requiredForGradeFeasibility);
       if (!reconcilingAtGrade && !reconcilingStructure) continue;
       const gradeRun = Math.abs(targetSurfaceY - currentSurfaceY) / maximumGradeFor(feature);
       if (!anchorsByFeature.has(feature)) anchorsByFeature.set(feature, []);
@@ -670,9 +764,9 @@ export function buildExactTransportNodeFinalizationAnchors(
         { segIndex: finite(entry.side?.segmentIndex), t: finite(entry.side?.segmentT) }
       ))
     })).filter((entry) => Number.isFinite(entry.surfaceY));
-    const structural = entries.filter(({ feature }) =>
+    const structural = entries.filter(({ feature, side }) =>
       feature?.structureSemantics?.terrainMode !== 'at_grade' ||
-      feature?.transportSurfaceModel?.engineeredApproach === true
+      hasEngineeredGraphConstraintAt(feature, side)
     );
     if (entries.length < 2 || structural.length === 0) continue;
     const atGrade = entries.filter(({ feature }) =>
@@ -685,10 +779,10 @@ export function buildExactTransportNodeFinalizationAnchors(
       feature?.structureSemantics?.terrainMode !== 'at_grade');
     const structuralInterior = completedStructures.filter(({ side }) =>
       side?.endpoint === 'interior');
-    const engineeredAtGrade = atGrade.filter(({ feature }) =>
-      feature?.transportSurfaceModel?.engineeredApproach === true);
-    const terrainFittedAtGrade = atGrade.filter(({ feature }) =>
-      feature?.transportSurfaceModel?.engineeredApproach !== true);
+    const engineeredAtGrade = atGrade.filter(({ feature, side }) =>
+      hasEngineeredGraphConstraintAt(feature, side));
+    const terrainFittedAtGrade = atGrade.filter(({ feature, side }) =>
+      !hasEngineeredGraphConstraintAt(feature, side));
     // At this stage bridge/tunnel profiles have already been reconciled with
     // their clearance and containment constraints. They own a mixed
     // structure/surface join; choosing the terrain road again merely restores
@@ -892,6 +986,15 @@ export function buildTransportJunctionProfileAnchors(
     const connectedCandidates = group
       .map((side) => ({ side, feature: featureById.get(String(side.featureId || '')) }))
       .filter((entry) => entry.feature?.transportRecord?.routeState !== 'incomplete');
+    // This pass publishes vertical structure junctions. Running it on a pure
+    // at-grade graph node gives an ordinary road intersection a synthetic
+    // bridge-style anchor, after which later passes mistake that generated
+    // label for structural evidence and propagate it through the street graph.
+    // At-grade continuations are handled only after a real grade-separated
+    // member has established the corridor.
+    if (!connectedCandidates.some(({ feature }) =>
+      feature?.structureSemantics?.terrainMode !== 'at_grade'
+    )) continue;
     const bridgeCandidates = connectedCandidates.filter(({ feature }) =>
       feature?.structureSemantics?.terrainMode === 'elevated' &&
       feature?.structureSemantics?.isBridge === true &&

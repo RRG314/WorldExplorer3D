@@ -1957,3 +1957,48 @@ ownership of the remaining Monaco and worldwide vertical steps before editing;
 then return to independently proven horizontal enclosure pixels. Do not restore
 final terrain resampling, add visual ramps, or suppress the red vertical gate.
 Facades, memory/data ownership and release packaging remain separate.
+
+## Current continuation after 2026-08-22 recovery checkpoint 14
+
+The provider-sensitive bridge/ramp/overpass failures were not missing source
+topology and were not caused first by the support/landmark renderer. Exact OSM
+node identity reached the compiled transport graph. The first authoritative
+loss occurred when vertical graph-node constraints were classified, published
+and reconciled into the final surface profile.
+
+There were four interacting causes. The structure-junction pass ran for pure
+at-grade groups and generated synthetic engineered evidence. Later passes used
+a feature-wide `engineeredApproach` flag, so a legitimate anchor at one station
+could turn unrelated nodes along the same ordinary road into structure joins.
+At mixed surface/structure nodes, the selected at-grade owner could already be
+grade-smoothed below accepted terrain. Finally, a solved target could be
+discarded when the rendered endpoint was within continuity tolerance even
+though a conflicting older graph target remained published. Tokyo exposed a
+separate numerical edge: source-node and canonical endpoint distances differed
+by 0.000207 m, putting exact target feasibility only 0.000012449 m beyond the
+computed 6% boundary and causing the whole exact constraint set to be rejected.
+
+Engineered classification is now local to an exact graph station. Pure
+at-grade groups do not enter structure-junction publication. Mixed and proven
+all-engineered joins use accepted terrain plus the real surface bias as their
+minimum renderable seed. Feasible solved node targets supersede stale targets,
+including sub-visual changes needed for multi-node grade feasibility. Exact
+constraint feasibility has a 0.1 mm numerical tolerance, far below the 0.25 m
+visible continuity contract and not a relaxation of the design grade.
+
+Deterministic source regressions cover all five cases. The full captured
+assembled matrix passes Baltimore/JFX, Golden Gate, London, Monaco, Manhattan,
+rural Iowa and Tokyo with zero authoritative vertical discontinuities and zero
+design-grade violations; the largest accepted node delta is 0.2445 m. The
+generalized-core/exact-structure-overlay and full-exact provider paths both
+pass. Every complete frame was opened with terrain, water, buildings,
+transport, traffic, atmosphere, HUD, collision and player control active.
+Mapped-tall and far-building height checks remain green, pedestrians on vehicle
+transport remain zero, and Golden Gate remains one symmetric six-lane surface.
+
+No city condition, inferred measurement, visual ramp, duplicate renderer,
+provider-bound change, building/detail reduction, streaming world or population
+change was added. Next checkpoint must independently run the packaged
+production/security/UI/UX gates and actor/contact verification. Do not call a
+candidate production-ready, finalize or promote it until immutable artifact
+evidence and the required human frame approval both pass.
