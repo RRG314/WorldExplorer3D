@@ -88,9 +88,13 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
       : null;
     if (
       mappedWalkApproach?.valid &&
-      Math.hypot(mappedWalkApproach.x, mappedWalkApproach.z) <= 160 &&
       !isSubgradeArrival(mappedWalkApproach)
     ) {
+      // searchNearestSafeRoadSpawn already resolves the nearest valid mapped
+      // surface inside the published fixed-location world. Reapplying a
+      // smaller origin-distance cutoff here discarded that authoritative
+      // result and stranded rural arrivals on empty terrain even when a road
+      // was visible just beyond the arbitrary threshold.
       mappedWalkApproach.source = options.source || 'custom_mapped_walk_approach';
       return applyResolvedWorldSpawn(mappedWalkApproach, options);
     }

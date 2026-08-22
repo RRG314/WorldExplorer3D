@@ -1732,3 +1732,29 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Never reintroduce: highest-edge road lifting, center/left/right terrain folds,
   live post-compile surface samplers, city-specific terrain cuts, visual-only
   ramps, detail reduction or count-only acceptance.
+
+## 2026-08-21 — Rural mapped approach was discarded by a second distance cutoff
+
+- Status: resolved locally as recovery checkpoint 8; not deployed. Building
+  height/LOD and London exact topology remain release blockers.
+- Symptom: the real rural Iowa world showed the player alone in an empty field
+  while roads and buildings were visible only on the horizon. Count gates passed.
+- First authoritative loss: the canonical spawn search found a safe mapped walk
+  approach, but `resolveCustomLocationArrival` rejected it if its distance from
+  world origin exceeded 160 m. Runtime evidence showed 3,831 roads, 4,860
+  buildings and the nearest driveable mapped road—22nd Street—at 176.2245 m.
+- Resolution: remove the duplicate post-search cutoff and consume the generic
+  safe mapped approach already selected inside the fixed-location world. The
+  existing valid-terrain fallback remains authoritative when no route exists.
+- Guard: the source fixture supplies a valid mapped approach beyond the retired
+  cutoff and requires it to survive. The Iowa assembled gate requires the final
+  walking surface to be a mapped road with transport identity inside the
+  existing 2.7 km location traversal bound.
+- Worldwide evidence: the focused Iowa gate and source gate pass; the final
+  Iowa frame shows mapped 22nd Street at approximately `42.0782,-93.8696`.
+  The seven-location matrix preserves other arrivals, traffic and zero
+  pedestrians. London stays red on 26 exact joins up to 5.4286 m and five grade
+  violations; those independent failures were not hidden.
+- Never reintroduce: competing title/world spawns, a second origin cutoff after
+  mapped selection, city-specific coordinates, synthetic rural roads,
+  continuous-world streaming or count-only arrival proof.

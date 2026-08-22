@@ -1695,3 +1695,28 @@ Several accepted-ground artifacts are also PMF v1 while the repository compiler
 emits v2; rebuilding Monaco with the same source tile changed terrain but did
 not alone remove adjacent steps, so no unproven artifact replacement belongs in
 this checkpoint.
+
+## Current continuation after 2026-08-21 recovery checkpoint 8
+
+Rural Iowa's empty arrival was a final spawn-policy loss, not a transport or
+building provider failure. The complete world published 3,831 roads and 4,860
+buildings. The nearest driveable mapped surface was 22nd Street at 176.2245 m
+from the selected coordinate. `searchNearestSafeRoadSpawn` found a valid mapped
+walking approach, then `resolveCustomLocationArrival` applied a second 160 m
+origin cutoff and discarded it, leaving the actor at `(0,0)` on farmland.
+
+The duplicate cutoff is removed. The existing generic safe-surface search owns
+the decision and its result is consumed directly. When a fixed-location world
+has no valid mapped route, the existing valid terrain fallback still owns the
+arrival. This adds no Iowa coordinates, synthetic route, new provider, second
+spawn system or continuous world streaming.
+
+Source verification passes and the focused complete Iowa run now requires a
+mapped road walk surface with real transport identity inside the existing 2.7 km
+fixed-location traversal bound. The final frame shows the player on 22nd Street
+at approximately `42.0782,-93.8696`. A complete seven-location rerun preserved
+the other arrivals and every frame was inspected. Baltimore, Golden Gate,
+Monaco, Manhattan, Iowa and Tokyo passed. London remains red on its independent
+exact-provider result: 26 graph discontinuities up to 5.4286 m and five
+engineered-grade violations. Do not weaken those gates or call the release
+ready.

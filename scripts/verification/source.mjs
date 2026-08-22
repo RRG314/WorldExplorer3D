@@ -28,6 +28,7 @@ import {
 import { createGroundBuildPlan } from '../lib/ground-artifact-builder.mjs';
 import { compileTransportSurfaceModel } from '../../app/js/world/compiler/transport-surface-model.js';
 import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
+import { resolveCustomLocationArrival } from '../../app/js/world/spawn-location-arrival.js';
 import {
   OVERTURE_RELEASE_POLICY,
   overtureThemeArchiveUrl
@@ -183,6 +184,45 @@ assert.equal(stackedGroundRuntime.sampleAtLatLon(0, 0).artifactId, 'fine-ground'
 assert.equal(stackedGroundRuntime.sampleAtLatLon(0.01, 0.01).artifactId, 'regional-ground');
 
 const groundAuthorityFailures = [];
+let appliedRuralArrival = null;
+const ruralMappedApproach = {
+  valid: true,
+  mode: 'walk',
+  x: 0,
+  z: 176.2245,
+  road: Object.freeze({
+    id: 'verification:rural-mapped-road',
+    structureSemantics: Object.freeze({ terrainMode: 'at_grade' })
+  })
+};
+resolveCustomLocationArrival({
+  appCtx: {
+    LOC: { lat: 42.08, lon: -93.87 },
+    customLoc: { arrivalMode: 'walk' },
+    roads: [ruralMappedApproach.road],
+    Walk: { state: { walker: { angle: 0 } } },
+    worldLoadRuntimeState: { surfaceDomain: { kind: 'land' } }
+  },
+  applyResolvedWorldSpawn: (spawn) => {
+    appliedRuralArrival = spawn;
+    return spawn;
+  },
+  applySpawnTarget: () => null,
+  featuredArrivalNear: () => null,
+  findGradeSeparatedRoadAt: () => null,
+  isSubgradeArrival: (spawn) => spawn?.road?.structureSemantics?.terrainMode === 'subgrade',
+  resolveSafeWorldSpawn: () => null,
+  searchNearestSafeRoadSpawn: () => ruralMappedApproach,
+  tryAutoEnterBoatAt: () => null
+}, 'walk', { source: 'verification:rural-arrival' });
+if (
+  appliedRuralArrival !== ruralMappedApproach ||
+  appliedRuralArrival?.source !== 'verification:rural-arrival'
+) {
+  groundAuthorityFailures.push(
+    'fixed-location walk arrival discarded the nearest safe mapped approach outside the retired 160 m cutoff'
+  );
+}
 const hillsideRoadFixture = {
   id: 'verification:hillside-road',
   width: 10,

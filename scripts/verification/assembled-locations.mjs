@@ -151,6 +151,14 @@ try {
           )) &&
           Number(snapshot.surfaceChain?.surfaces?.walk?.feature?.structureVisual?.visibleMeshCount || 0) > 0
         ),
+        mappedRuralArrival: location.id !== 'iowa-rural' || (
+          snapshot.surfaceChain?.surfaces?.walk?.kind === 'road' &&
+          !!snapshot.surfaceChain?.surfaces?.walk?.feature?.transportSource?.identity &&
+          Math.hypot(
+            Number(snapshot.surfaceChain?.world?.x || 0),
+            Number(snapshot.surfaceChain?.world?.z || 0)
+          ) <= 2700
+        ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         oneAtGradeTransportTerrainAuthority:
