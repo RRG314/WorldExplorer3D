@@ -1720,3 +1720,46 @@ Monaco, Manhattan, Iowa and Tokyo passed. London remains red on its independent
 exact-provider result: 26 graph discontinuities up to 5.4286 m and five
 engineered-grade violations. Do not weaken those gates or call the release
 ready.
+
+## Current continuation after 2026-08-21 recovery checkpoint 9
+
+The detailed Baltimore skyline is no longer missing in the current source.
+Exact assembled evidence traces World Trade Center identity
+`overture:fda9f5db-1315-49ba-807a-9d41a4ad4b80` from the pinned Overture tile
+through selection, provenance and final publication. It retains mapped height
+123.5 m and owns one attached visible mid-LOD mesh whose final foundation-aware
+height is 124.1419 m. Transamerica retains its mapped 161 m identity and visible
+mid-LOD mesh. Do not patch either landmark or add a skyline renderer.
+
+The remaining building-authority defect was shared far massing. It parsed and
+inferred height separately from detailed buildings and imposed a 180 m clamp on
+all values. Far massing now uses the same `building-semantics` authority for
+explicit height, mapped levels and deterministic identity/world-seed inference.
+No building count, far-region coverage or detail budget was reduced.
+
+Observed Shortbread z14 far tiles expose grouped building rings without
+per-ring height/name metadata. The final matrix therefore reports zero mapped
+far heights and labels every far height as inference. Do not relabel those
+values as mapped or surveyed data. If a future far provider supplies height or
+levels, the shared semantics owner consumes them without the retired 180 m
+clamp.
+
+The former skyline gate was count-only. Runtime diagnostics now require every
+mapped tall provenance identity to reach an attached visible direct or batched
+scene visual, with LOD and rendered height evidence. Final worldwide results
+are Baltimore 48/48, Golden Gate 34/34, London 207/207, Monaco 14/14, Manhattan
+3,875/3,875, Iowa 0/0 and Tokyo 2/2. The exact JFX gate separately requires the
+World Trade Center mapped 123.5 m identity. Source, exact JFX and seven-location
+assembled gates pass, and every complete frame was opened.
+
+The independent actor/vehicle regression gate also passes after this change.
+Baltimore, London, Monaco and Tokyo each retain 14 sampled four-wheel-contact
+vehicles, zero wheel penetration and zero visible pedestrian NPCs in both
+runtime samples.
+
+Do not call the build production-ready from those green checks. The same frames
+still show broad/overlapping London road ribbons and Tokyo road/building
+intersections. Those are the next separate composition-authority blocker.
+Mapped street-facing doors/glass storefronts, ownership-based memory/data work
+and final packaged release/security verification also remain. Do not push,
+deploy, promote or mutate user data.

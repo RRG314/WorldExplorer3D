@@ -29,6 +29,7 @@ import { createGroundBuildPlan } from '../lib/ground-artifact-builder.mjs';
 import { compileTransportSurfaceModel } from '../../app/js/world/compiler/transport-surface-model.js';
 import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
 import { resolveCustomLocationArrival } from '../../app/js/world/spawn-location-arrival.js';
+import { resolveFarBuildingMassing } from '../../app/js/terrain/far-building-massing.js';
 import {
   OVERTURE_RELEASE_POLICY,
   overtureThemeArchiveUrl
@@ -433,6 +434,42 @@ if (ruralMetadataWithPublicationCoverage !== null) {
 }
 
 const buildingProviderAuthorityFailures = [];
+
+const farBuildingHeightAuthorityFailures = [];
+const farFootprint = [
+  { x: -10, z: -10 },
+  { x: 10, z: -10 },
+  { x: 10, z: 10 },
+  { x: -10, z: 10 }
+];
+const mappedFarTower = resolveFarBuildingMassing({
+  identity: 'mapped-tower',
+  properties: { building: 'office', height: '417', levels: '104' }
+}, farFootprint, 400, 1, { worldSeed: 123 });
+if (mappedFarTower?.heightMeters !== 417 || mappedFarTower?.heightSource !== 'explicit_height') {
+  farBuildingHeightAuthorityFailures.push('far massing clipped or inferred over an explicit mapped height');
+}
+const mappedLevelBuilding = resolveFarBuildingMassing({
+  identity: 'mapped-level-building',
+  properties: { building: 'office', levels: '40' }
+}, farFootprint, 400, 1, { worldSeed: 123 });
+if (mappedLevelBuilding?.heightMeters !== 128 || mappedLevelBuilding?.heightSource !== 'levels') {
+  farBuildingHeightAuthorityFailures.push('far massing did not resolve mapped levels through shared building semantics');
+}
+const inferredFarA = resolveFarBuildingMassing({
+  identity: 'inferred-building',
+  properties: { building: 'apartments' }
+}, farFootprint, 400, 1, { worldSeed: 456 });
+const inferredFarB = resolveFarBuildingMassing({
+  identity: 'inferred-building',
+  properties: { building: 'apartments' }
+}, farFootprint, 400, 1, { worldSeed: 456 });
+if (
+  inferredFarA?.heightSource !== 'fallback' ||
+  inferredFarA?.heightMeters !== inferredFarB?.heightMeters
+) {
+  farBuildingHeightAuthorityFailures.push('far inferred height is not deterministic under the shared identity/world seed');
+}
 const overtureReleaseDate = Date.parse(`${OVERTURE_RELEASE_POLICY.release.slice(0, 10)}T00:00:00Z`);
 const overtureReviewedDate = Date.parse(`${OVERTURE_RELEASE_POLICY.reviewedOn}T00:00:00Z`);
 const verificationDate = Date.parse('2026-08-21T00:00:00Z');
@@ -798,6 +835,7 @@ const report = {
     duplicateModuleIdentities,
     buildingMetadataCoverageFailures,
     buildingProviderAuthorityFailures,
+    farBuildingHeightAuthorityFailures,
     buildingRoadAuthorityFailures,
     structureFallbackAuthorityFailures,
     groundAuthorityFailures,

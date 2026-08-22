@@ -84,6 +84,8 @@ try {
           publishedVerticalControls: diagnostics.transportStructures?.publishedVerticalControls || [],
           sharedPhysicalSurfaces: diagnostics.transportStructures?.sharedPhysicalSurfaces || [],
           mappedLandmarks: diagnostics.mappedLandmarks || null,
+          mappedTallBuildingVisuals: diagnostics.mappedTallBuildingVisuals || null,
+          farTerrainClipmap: diagnostics.farTerrainClipmap || null,
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
           surfaceChain: diagnostics.surfaceChain || null,
@@ -144,6 +146,14 @@ try {
             Number(snapshot.worldLoad?.buildingDetail?.sourceDetails?.requestedTiles || -1) &&
           snapshot.worldLoad?.buildingProviderDecision?.selected === 'overture' &&
           snapshot.worldLoad?.buildingProviderDecision?.authority === 'authoritative',
+        mappedTallIdentitiesKeepFinalVisuals:
+          Number(snapshot.mappedTallBuildingVisuals?.missingVisualRecords || 0) === 0 &&
+          Number(snapshot.mappedTallBuildingVisuals?.hiddenVisualRecords || 0) === 0,
+        oneFarBuildingHeightAuthority:
+          snapshot.farTerrainClipmap?.farBuildingHeightAuthority === 'shared-building-semantics' &&
+          Number(snapshot.farTerrainClipmap?.farMappedHeightBuildings || 0) +
+            Number(snapshot.farTerrainClipmap?.farInferredHeightBuildings || 0) ===
+            Number(snapshot.farTerrainClipmap?.farBuildings || -1),
         mappedStructureArrivalVisible: location.expectsStructureArrival !== true || (
           snapshot.surfaceChain?.actor?.mode !== 'boat' &&
           /^(?:bridge|overpass|ramp|elevated_road)$/.test(String(

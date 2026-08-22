@@ -10,7 +10,7 @@ import {
   pointInMappedLandArea,
   pointInMappedWaterArea
 } from './far-field-mapped-context.js?v=18';
-import { resolveFarBuildingMassing } from './far-building-massing.js?v=1';
+import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
 import {
@@ -292,6 +292,8 @@ function createFarFieldTerrainApi(deps = {}) {
     const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
     const yExaggeration = Number(appCtx.TERRAIN_Y_EXAGGERATION || 1);
     let exactPublished = 0;
+    let mappedHeightBuildings = 0;
+    let inferredHeightBuildings = 0;
     const groundMetersAt = (latitude, longitude) => {
       const accepted = sampleAcceptedGroundAtLatLon(latitude, longitude);
       const acceptedMeters = Number(accepted?.groundElevationMeters);
@@ -329,8 +331,15 @@ function createFarFieldTerrainApi(deps = {}) {
           { x: center.x + widthWorld * 0.5, z: center.z + depthWorld * 0.5 },
           { x: center.x - widthWorld * 0.5, z: center.z + depthWorld * 0.5 }
         ];
-        const massing = resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter);
+        const massing = resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter, {
+          worldSeed: appCtx.rdtSeed
+        });
         if (!massing) continue;
+        if (massing.heightSource === 'explicit_height' || massing.heightSource === 'levels') {
+          mappedHeightBuildings += 1;
+        } else {
+          inferredHeightBuildings += 1;
+        }
         instances.push({
           x: center.x,
           z: center.z,
@@ -380,8 +389,15 @@ function createFarFieldTerrainApi(deps = {}) {
       const groundMeters = groundMetersAt(center.lat, center.lon);
       if (!Number.isFinite(groundMeters)) continue;
       const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
-      const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter);
+      const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter, {
+        worldSeed: appCtx.rdtSeed
+      });
       if (!massing) continue;
+      if (massing.heightSource === 'explicit_height' || massing.heightSource === 'levels') {
+        mappedHeightBuildings += 1;
+      } else {
+        inferredHeightBuildings += 1;
+      }
       const { heightMeters, color } = massing;
       const topY = baseY + heightMeters * unitsPerMeter;
       const baseIndex = positions.length / 3;
@@ -427,6 +443,9 @@ function createFarFieldTerrainApi(deps = {}) {
       instances,
       exactBuildings: exactPublished,
       instancedBuildings: instances.length,
+      mappedHeightBuildings,
+      inferredHeightBuildings,
+      heightAuthority: 'shared-building-semantics',
       buildings: exactPublished + instances.length
     };
   }
@@ -775,6 +794,9 @@ function createFarFieldTerrainApi(deps = {}) {
         : 1,
       farExactBuildings: builtBuildings?.exactBuildings || 0,
       farInstancedBuildings: builtBuildings?.instancedBuildings || 0,
+      farMappedHeightBuildings: builtBuildings?.mappedHeightBuildings || 0,
+      farInferredHeightBuildings: builtBuildings?.inferredHeightBuildings || 0,
+      farBuildingHeightAuthority: builtBuildings?.heightAuthority || null,
       geometryBuildPasses: 1,
       farBuildings: builtBuildings?.buildings || 0,
       detailedTerrainTilesExcluded: spec.detailedCoverage?.length || 0,

@@ -240,6 +240,7 @@ try {
       transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
       transportStructures: diagnostics.transportStructures || null,
       worldDetail: diagnostics.worldDetail || null,
+      mappedTallBuildingVisuals: diagnostics.mappedTallBuildingVisuals || null,
       worldCounts: diagnostics.worldCounts || null,
       worldLoad: diagnostics.worldLoad || null,
       runtimeErrors: diagnostics.runtimeErrors || [],
@@ -252,6 +253,9 @@ try {
   const sourceIsExact = structure.transportSource?.completeness === 'lossless';
   const buildingDetail = snapshot.worldDetail?.buildings || {};
   const buildingDimensions = buildingDetail.publicationDiagnostics?.buildingDimensions || {};
+  const mappedTallVisuals = snapshot.mappedTallBuildingVisuals || {};
+  const worldTradeCenter = (mappedTallVisuals.samples || []).find((sample) =>
+    String(sample?.name || '').toLowerCase() === 'world trade center');
   const checks = {
     finalVisibleActorIsDriving: snapshot.environment === 'EARTH' && snapshot.surfaceChain?.actor?.mode === 'drive',
     losslessJfxSourceLoaded: sourceIsExact,
@@ -288,6 +292,15 @@ try {
     mappedTallBuildingsPublished:
       Number(buildingDimensions.mappedTall || 0) > 0 &&
       Number(buildingDimensions.metadataMatchedTall || 0) > 0,
+    mappedTallIdentitiesReachFinalVisibleVisuals:
+      Number(mappedTallVisuals.mappedTallRecords || 0) > 0 &&
+      Number(mappedTallVisuals.missingVisualRecords || 0) === 0 &&
+      Number(mappedTallVisuals.hiddenVisualRecords || 0) === 0,
+    mappedWorldTradeCenterKeepsFinalHeight:
+      Number(worldTradeCenter?.heightMeters) === 123.5 &&
+      Number(worldTradeCenter?.attachedMeshCount || 0) > 0 &&
+      Number(worldTradeCenter?.visibleMeshCount || 0) > 0 &&
+      Number(worldTradeCenter?.renderedHeightMeters || 0) >= 123.5,
     finalBuildingMeshesVisible:
       Number(snapshot.worldCounts?.visibleBuildingMeshes || 0) > 0,
     noRuntimeErrors: snapshot.runtimeErrors.length === 0,

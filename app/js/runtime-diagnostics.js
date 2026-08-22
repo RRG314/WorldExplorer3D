@@ -169,6 +169,81 @@ function buildingSnapshot(building) {
   };
 }
 
+function mappedTallBuildingVisualSnapshot() {
+  const visualsByIdentity = new Map();
+  for (const mesh of appCtx.buildingMeshes || []) {
+    if (!mesh) continue;
+    const attached = !!mesh.parent;
+    const visible = attached && mesh.visible !== false && mesh.material?.visible !== false;
+    const direct = mesh.userData?.buildingProvenance;
+    const batch = mesh.userData?.buildingProvenanceRecords || [];
+    const records = direct ? [direct, ...batch] : batch;
+    for (const record of records) {
+      const identity = String(record?.identity?.featureId || '');
+      if (!identity) continue;
+      const current = visualsByIdentity.get(identity) || {
+        meshCount: 0,
+        attachedMeshCount: 0,
+        visibleMeshCount: 0,
+        lodTiers: new Set(),
+        renderedHeightMeters: null
+      };
+      current.meshCount += 1;
+      if (attached) current.attachedMeshCount += 1;
+      if (visible) current.visibleMeshCount += 1;
+      if (mesh.userData?.lodTier) current.lodTiers.add(String(mesh.userData.lodTier));
+      if (Number.isFinite(Number(mesh.userData?.renderedHeightMeters))) {
+        current.renderedHeightMeters = Number(mesh.userData.renderedHeightMeters);
+      }
+      visualsByIdentity.set(identity, current);
+    }
+  }
+
+  const records = (appCtx.buildingProvenanceRecords || []).map((record) => {
+    const heightField = record?.fields?.heightMeters;
+    const levelsField = record?.fields?.levels;
+    const heightMeters = Number(heightField?.value);
+    const mappedHeightAuthority = heightField?.status === 'mapped' || (
+      heightField?.status === 'inferred' &&
+      heightField?.method === 'levels' &&
+      levelsField?.status === 'mapped'
+    );
+    if (!mappedHeightAuthority || !(heightMeters >= 60)) return null;
+    const identity = String(record?.identity?.featureId || '');
+    const visual = visualsByIdentity.get(identity) || null;
+    return {
+      identity,
+      name: String(record?.fields?.name?.value || ''),
+      heightMeters,
+      heightAuthority: heightField?.status === 'mapped' ? 'explicit_height' : 'mapped_levels',
+      heightSourceFeatureId: String(
+        heightField?.status === 'mapped'
+          ? heightField?.sourceFeatureId || ''
+          : levelsField?.sourceFeatureId || ''
+      ),
+      geometryAuthority: String(record?.identity?.geometryAuthority || ''),
+      meshCount: Number(visual?.meshCount || 0),
+      attachedMeshCount: Number(visual?.attachedMeshCount || 0),
+      visibleMeshCount: Number(visual?.visibleMeshCount || 0),
+      lodTiers: visual ? [...visual.lodTiers].sort() : [],
+      renderedHeightMeters: numberOrNull(visual?.renderedHeightMeters)
+    };
+  }).filter(Boolean).sort((left, right) =>
+    right.heightMeters - left.heightMeters || left.identity.localeCompare(right.identity)
+  );
+  const attached = records.filter((record) => record.attachedMeshCount > 0).length;
+  const visible = records.filter((record) => record.visibleMeshCount > 0).length;
+  return {
+    authority: 'mapped-building-identity-to-final-scene-visual',
+    mappedTallRecords: records.length,
+    attachedMappedTallRecords: attached,
+    visibleMappedTallRecords: visible,
+    missingVisualRecords: records.length - attached,
+    hiddenVisualRecords: records.length - visible,
+    samples: records.slice(0, 32)
+  };
+}
+
 function buildingOccupancySnapshot(x, z, feetY, actorHeight) {
   const nearby = safeCall(() => appCtx.getNearbyBuildings?.(x, z, 12), []);
   if (!Array.isArray(nearby)) return null;
@@ -632,6 +707,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     worldLoad: appCtx.worldLoadRuntimeState || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
+    mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),
     modes: {
       boat: !!appCtx.boatMode?.active,
       drone: !!appCtx.droneMode,

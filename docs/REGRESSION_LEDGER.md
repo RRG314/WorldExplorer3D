@@ -1758,3 +1758,44 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
 - Never reintroduce: competing title/world spawns, a second origin cutoff after
   mapped selection, city-specific coordinates, synthetic rural roads,
   continuous-world streaming or count-only arrival proof.
+
+## 2026-08-21 — Count-only skyline checks hid a second far-height authority
+
+- Status: resolved locally as recovery checkpoint 9; not deployed. London and
+  Tokyo composition remain visible release blockers.
+- Symptom: Baltimore could report mapped tall buildings while the expected
+  skyline appeared absent or short. The supposed downtown screenshot did not
+  prove the World Trade Center camera path, and the assertion required only a
+  positive mapped-tall count.
+- Trace result: the current pinned detailed provider retains World Trade Center
+  identity `overture:fda9f5db-1315-49ba-807a-9d41a4ad4b80`, mapped height
+  123.5 m, attached visible mid-LOD mesh and matching collision. Transamerica
+  likewise retains mapped 161 m. The remaining first code divergence was
+  `far-building-massing`, which independently parsed/inferred height and clamped
+  even mapped values to 180 m.
+- Resolution: detailed and far publication now share `building-semantics` for
+  explicit height, mapped levels and deterministic identity/world-seed
+  inference. Remove the blanket mapped-height clamp. Preserve building count,
+  far coverage, batching and LOD budgets.
+- Data limitation: observed Shortbread far tiles group rings without per-ring
+  height/name metadata. Final far results are therefore correctly labeled
+  inferred, not mapped or surveyed. No fabricated height or city metadata was
+  introduced.
+- Guard: source fixtures require a mapped 417 m far tower to remain 417 m,
+  mapped 40 levels to resolve to 128 m and inference to remain deterministic.
+  Runtime diagnostics join mapped tall identities to final direct/batched
+  visuals. JFX requires the exact World Trade Center identity and height.
+- Worldwide evidence: source, exact JFX and seven-location assembled gates
+  pass. Attached/visible mapped-tall coverage is 48/48 Baltimore, 34/34 Golden
+  Gate, 207/207 London, 14/14 Monaco, 3,875/3,875 Manhattan, 0/0 Iowa and 2/2
+  Tokyo. All complete frames were inspected. The independent actor/vehicle
+  gate remains green in Baltimore, London, Monaco and Tokyo with 14/14 sampled
+  four-wheel-contact vehicles, zero wheel penetration and zero visible
+  pedestrian NPCs in both samples.
+- Never reintroduce: count-only skyline acceptance, mislabeled camera evidence,
+  an independent LOD height parser, blanket clipping of mapped towers, random
+  reload-dependent inference, fake skyline geometry, city-specific heights or
+  performance work that removes building/ground/far detail.
+- Adjacent blockers: the green automated matrix still misses visible London
+  road ribbons and Tokyo road/building conflicts. Mapped frontage/storefronts,
+  memory/data ownership and final packaged release verification remain open.
