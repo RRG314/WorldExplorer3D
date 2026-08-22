@@ -1,5 +1,7 @@
 # World Explorer 3D 4.3.0
 
+> This release has been superseded by 4.3.1, the corrected 4.3 release.
+
 World Explorer 3D 4.3.0 is the Explorer Experience release. It integrates
 contextual discovery, field interaction, wildlife, geology, companions and AR
 into the existing fixed-location world rather than presenting them as separate

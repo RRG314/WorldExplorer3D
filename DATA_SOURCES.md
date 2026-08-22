@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-08-17 for version 4.3.0.
+Last reviewed: 2026-08-22 for version 4.3.1.
 
 World Explorer keeps source identity and truth type in its runtime contracts. Observations, forecasts/models, predictions, mapped features, and visual fallbacks are not interchangeable.
 

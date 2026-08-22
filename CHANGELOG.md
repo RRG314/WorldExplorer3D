@@ -2,7 +2,48 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.3.1] - 2026-08-22
+
+### Added
+
+- Street-oriented building entrances and storefront presentation integrated
+  into the owning facade material, with contextual keyboard and touch entry.
+- Multi-floor generated interiors with stable floor identity, walkable stairs
+  and a proximity elevator for eligible buildings.
+- A six-slot character equipment loop, contextual world actions, richer
+  pedestrian roles, vehicle families and bounded civic-response gameplay.
+- More expressive water, wake, sky and evidence-labeled bathymetry presentation.
+
+### Changed
+
+- Preserved mapped building height through selection, batching and every
+  published LOD so distant presentation cannot silently shorten authoritative
+  skyline metadata.
+- Unified final terrain, at-grade roads, junction footprints, building
+  clearance and vehicle wheel contact around the same published surface.
+- Reconciled bridge, ramp, overpass, elevated-road and tunnel endpoint profiles
+  inside the shared transport compiler instead of adding city-specific geometry.
+- Kept Earth as one bounded selected-location world. No actor-centered or
+  continuous-world streaming system was added.
+- Released location-owned terrain, provider state and scene resources during
+  teardown, and kept one shared Firebase/module authority in packaged output.
+
+### Fixed
+
+- Restored Baltimore and Manhattan tall-building visibility without reducing
+  distant mapped detail or changing authoritative building heights by quality.
+- Closed false cross-layer transport joins, duplicate structure ownership,
+  jagged at-grade junction wedges and conflicting road/terrain cross-sections.
+- Aligned non-player vehicles to four-wheel road contact on grades and kept
+  pedestrians off vehicle-only transport surfaces.
+- Preserved the nearest valid mapped arrival instead of relocating the player
+  to a different road solely to satisfy a test.
+- Removed obsolete hosted assets and internal audit, handoff and R&D records
+  from the public release tip.
+
 ## [4.3.0] - 2026-08-17
+
+Superseded by 4.3.1, the corrected 4.3 release.
 
 ### Production-candidate repair — 2026-08-19
 
