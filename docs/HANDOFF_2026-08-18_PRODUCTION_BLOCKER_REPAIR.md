@@ -1918,3 +1918,42 @@ add broad convex-hull fans, use a city patch, or revive the discarded adaptive
 tessellation/lift experiment. Golden Gate's inspected deck is symmetric on both
 sides. Keep vertical topology, street-facing mapped doors/glass storefronts,
 and ownership-based memory/data cleanup as separate later authorities.
+
+## Current continuation after 2026-08-22 recovery checkpoint 13
+
+The road renderer was still a hidden second height owner. Complete London
+raycasts found terrain first at coordinates inside mapped Trafalgar Square
+carriageway widths, with an at-grade road batch behind it. The corridor pass,
+vehicles, traversal and collision consumed the compiled transport profile, but
+`appendSolidAtGradeRoadGeometry` received `cachedTerrainHeight` and regenerated
+its final vertex heights from downstream terrain. Diagnostics called those
+roads compiled even though presentation no longer used that authority.
+
+At-grade presentation now receives `sampleFeatureSurfaceY` from the compiled
+feature/shared surface. A fallback to terrain exists only as a guarded failure
+path; source and complete assembled gates require zero fallback calls. Source
+fixtures prove a sloped compiled profile wins over a contradictory terrain
+fallback. The change adds no geometry, requests, provider, renderer, width,
+mapped identity or city rule and changes no building/far detail budget.
+
+The same full London player-camera frame is materially improved: the broad
+interior terrain wedges disappear while 191,946 segment quads and 31,644 turn
+joins remain, with zero folded/degenerate triangles or fallbacks. Some jagged
+edge notches and inter-road ground remain. Do not call checkpoint 13 complete
+worldwide road enclosure from its green mesh gate.
+
+The full seven-location run preserves mapped-tall visibility, far-height
+authority, terrain detail, traffic, collision, Golden Gate's one symmetric
+shared deck and rural arrival. The existing provider-sensitive joins/grades
+remain red in Baltimore, Golden Gate, London, Manhattan and Tokyo. A later
+focused Monaco response exposed three vertical joins up to 3.1604 m, and the
+compiled-surface frame truthfully shows the associated step instead of hiding
+it with terrain draping. The four-city actor run passes 14/14 wheel contacts,
+zero penetration, bounded gaps and zero visible pedestrians in every location.
+
+A conservative terrain-cell padding experiment did not materially close London
+or Monaco and was completely removed. Next trace the exact source-node/provider
+ownership of the remaining Monaco and worldwide vertical steps before editing;
+then return to independently proven horizontal enclosure pixels. Do not restore
+final terrain resampling, add visual ramps, or suppress the red vertical gate.
+Facades, memory/data ownership and release packaging remain separate.

@@ -42,6 +42,7 @@ import {
   shouldBuildCompactIntersectionCap
 } from '../../app/js/terrain/road-junctions.js';
 import { detectRoadIntersections } from '../../app/js/terrain/intersections.js';
+import { createCompiledRoadSurfaceSampler } from '../../app/js/terrain/rebuild.js';
 import { compileTrafficGraph } from '../../app/js/living-world/navigation-graphs.js';
 import {
   OVERTURE_RELEASE_POLICY,
@@ -920,6 +921,24 @@ if (crossSectionTraffic.publication.diagnostics.sourceSegments !== 1 ||
 }
 
 const roadSurfaceFootprintFailures = [];
+const compiledAtGradeSurfaceFixture = {
+  pts: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+  surfaceDistances: new Float32Array([0, 10]),
+  surfaceHeights: new Float32Array([2, 6]),
+  structureSemantics: { terrainMode: 'at_grade' }
+};
+const compiledAtGradeSurfaceDiagnostics = { compiledSurfaceFallbacks: 0 };
+const compiledAtGradeSurfaceSampler = createCompiledRoadSurfaceSampler(
+  compiledAtGradeSurfaceFixture,
+  () => 99,
+  compiledAtGradeSurfaceDiagnostics
+);
+if (compiledAtGradeSurfaceSampler(5, 0) !== 4 ||
+    compiledAtGradeSurfaceDiagnostics.compiledSurfaceFallbacks !== 0) {
+  roadSurfaceFootprintFailures.push(
+    'final at-grade road vertices did not consume the compiled transport surface profile'
+  );
+}
 const indexedSurfaceContainsPoint = (verts, indices, point) => {
   const sign = (p1, p2, p3) =>
     (p1.x - p3.x) * (p2.z - p3.z) - (p2.x - p3.x) * (p1.z - p3.z);

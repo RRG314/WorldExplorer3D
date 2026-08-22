@@ -188,10 +188,13 @@ try {
         solidRoadSurfaceFootprints:
           snapshot.roadSurfaceIntegrity?.authority ===
             'solid-at-grade-segments-and-bounded-turn-joins' &&
+          snapshot.roadSurfaceIntegrity?.surfaceHeightAuthority ===
+            'compiled_transport_surface_profile' &&
           Number(snapshot.roadSurfaceIntegrity?.segmentQuads || 0) > 0 &&
           Number(snapshot.roadSurfaceIntegrity?.foldedTriangles || 0) === 0 &&
           Number(snapshot.roadSurfaceIntegrity?.degenerateTriangles || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.junctionCoverageGaps || 0) === 0,
+          Number(snapshot.roadSurfaceIntegrity?.junctionCoverageGaps || 0) === 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.compiledSurfaceFallbacks || 0) === 0,
         oneAtGradeTransportTerrainAuthority:
           snapshot.atGradeTerrainAuthority?.authority === 'compiled_transport_surface' &&
           Number(snapshot.atGradeTerrainAuthority?.roadCount || 0) > 0 &&

@@ -57,12 +57,12 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=45";
+} from "./terrain/rebuild.js?v=46";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=14";
+} from "./terrain/debug-tools.js?v=15";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=71";

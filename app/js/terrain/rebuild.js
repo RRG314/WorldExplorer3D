@@ -205,6 +205,18 @@ export function resolveRoadRibbonSubdivisionStep(road) {
   return baseDetail;
 }
 
+export function createCompiledRoadSurfaceSampler(feature, fallbackSampler, diagnostics = null) {
+  return (x, z) => {
+    const compiledY = sampleFeatureSurfaceY(feature, x, z);
+    if (Number.isFinite(compiledY)) return compiledY;
+    if (diagnostics && typeof diagnostics === 'object') {
+      diagnostics.compiledSurfaceFallbacks =
+        Number(diagnostics.compiledSurfaceFallbacks || 0) + 1;
+    }
+    return typeof fallbackSampler === 'function' ? fallbackSampler(x, z) : NaN;
+  };
+}
+
 function mapPublishedPointsToCrossSectionWidths(feature, publishedPoints) {
   const sourcePoints = feature?.pts;
   if (!Array.isArray(sourcePoints) || sourcePoints.length < 2 || !Array.isArray(publishedPoints)) {
@@ -347,12 +359,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadMarkBatchIdx = [];
   const roadSurfaceIntegrity = {
     authority: 'solid-at-grade-segments-and-bounded-turn-joins',
+    surfaceHeightAuthority: 'compiled_transport_surface_profile',
     segmentQuads: 0,
     turnJoins: 0,
     surfaceTriangles: 0,
     foldedTriangles: 0,
     degenerateTriangles: 0,
-    junctionCoverageGaps: 0
+    junctionCoverageGaps: 0,
+    compiledSurfaceFallbacks: 0
   };
   const flushRoadMainBatch = () => {
     if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
@@ -408,6 +422,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const roadTerrainSampler = renderRoad?.structureSemantics?.terrainMode === "at_grade" ?
         cachedTerrainHeight :
         cachedBaseTerrainHeight;
+      const compiledRoadSurfaceSampler = createCompiledRoadSurfaceSampler(
+        renderRoad,
+        roadTerrainSampler,
+        roadSurfaceIntegrity
+      );
       const surfaceBias = Number.isFinite(renderRoad?.surfaceBias)
         ? renderRoad.surfaceBias
         : ROAD_SURFACE_BIAS;
@@ -421,7 +440,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           points: pts,
           halfWidth: hw,
           widthSamplesMeters,
-          sampleTerrainY: roadTerrainSampler,
+          sampleTerrainY: compiledRoadSurfaceSampler,
           surfaceBias,
           targetVerts: verts,
           targetIndices: indices

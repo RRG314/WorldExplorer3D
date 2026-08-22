@@ -1931,3 +1931,40 @@ A code-only pass is not enough for terrain, water, sky, or transitions. Before r
   terrain, per-tile final seam ownership, count-only road acceptance, paving
   arbitrary inter-road land, city-specific terrain cuts, duplicate surfaces,
   visual-only lifts or performance work that removes world detail.
+
+## 2026-08-22 — Final at-grade renderer discarded the compiled road height
+
+- Status: resolved locally as recovery checkpoint 13; not deployed. Remaining
+  horizontal edge enclosure and provider-sensitive vertical joins are open.
+- Symptom: complete London gameplay showed terrain through broad parts of a
+  mapped carriageway. Camera raycasts found terrain first at points inside the
+  mapped 7.9 m width and found road geometry farther down the same ray. Counts,
+  triangle integrity and the claimed compiled authority were all green.
+- First authoritative loss: the compiled transport surface already owned
+  terrain shaping, traversal, collision and traffic, but final at-grade road
+  geometry sampled `cachedTerrainHeight` for every vertex. Presentation was
+  therefore derived from downstream terrain while diagnostics mislabeled it as
+  compiled.
+- Resolution: final at-grade geometry samples `sampleFeatureSurfaceY` from the
+  existing compiled feature/shared surface. Any non-finite profile fallback is
+  counted; assembled checks require `compiled_transport_surface_profile` and
+  zero fallback calls.
+- Guard: a deterministic sloped-profile fixture returns compiled height 4 m
+  while its contradictory fallback returns 99 m; the fallback count must remain
+  zero. Worldwide runtime checks enforce the same result in complete gameplay.
+- Evidence: the same London frame loses its broad interior wedges while keeping
+  191,946 segment quads, 31,644 joins and zero folded/degenerate triangles or
+  fallbacks. Seven-location evidence retains mapped buildings/heights, far
+  detail, traffic, terrain, collision and Golden Gate symmetry. Four-city actor
+  verification retains 14/14 four-wheel contacts, zero penetration, bounded
+  gap and zero visible pedestrian NPCs per location.
+- Remaining evidence: smaller London edge notches remain. Baltimore, Golden
+  Gate, London, Manhattan and Tokyo still expose provider-sensitive vertical
+  failures; a focused Monaco response exposed three mapped joins up to 3.1604
+  m and a corresponding visible step. Do not hide those with terrain draping.
+- Discarded experiment: expanding the terrain corridor by each cell's half-
+  diagonal did not materially close London or Monaco and was removed in full.
+- Never reintroduce: final road heights sampled from rendered terrain,
+  diagnostics that claim an unconsumed authority, visual road lifts, fake
+  ramps, city branches, detail reduction, or a green count gate overriding a
+  failed complete frame.
