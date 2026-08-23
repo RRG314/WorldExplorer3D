@@ -615,25 +615,6 @@ body.deflock-active .floatBtn::after {
   #gameMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
   #gameMenu .floatItemSection:first-of-type { padding-top: 0; }
   #gameMenu .floatItem { min-height: 48px; }
-  #mobileTouchControls.show { display: block; }
-  .mobilePad { width: 136px; height: 136px; top: auto; transform: none; gap: 3px; }
-  #mobileMovePad { left: 16px; right: auto; bottom: 104px; border: 1px solid rgba(255,255,255,0.45); border-radius: 50%; background: rgba(3,9,14,0.34); }
-  #mobileLookPad { left: auto; right: 16px; top: auto; bottom: 238px; width: 112px; height: 112px; }
-  .mobileNavBtn { border: 1px solid rgba(255,255,255,0.42); border-radius: 50%; background: rgba(6, 13, 19, 0.68); box-shadow: none; }
-  .mobilePadLabel { border-radius: 50%; color: var(--wx-text); background: rgba(255,255,255,0.18); }
-  #mobileActionStack { left: auto; right: 16px; top: auto; bottom: 104px; width: 112px; transform: none; }
-  .mobileActionBtn { min-width: 112px; min-height: 52px; border: 1px solid rgba(255,255,255,0.48); border-radius: 26px; background: rgba(6, 13, 19, 0.72); box-shadow: none; }
-  #mobileTouchControls.mode-driving #mobileMoveLeft,
-  #mobileTouchControls.mode-driving #mobileMoveRight,
-  #mobileTouchControls.mode-driving #mobileLookUp,
-  #mobileTouchControls.mode-driving #mobileLookDown { display: flex; }
-  #mobileTouchControls.mode-driving #mobileMoveLabel,
-  #mobileTouchControls.mode-driving #mobileLookLabel { display: flex; }
-  #mobileTouchControls.mode-driving #mobileActionStack,
-  #mobileTouchControls.mode-rocket #mobileActionStack { left: auto; right: 16px; top: auto; bottom: 104px; width: 112px; transform: none; }
-  #mobileTouchControls.mode-driving .mobileActionBtn,
-  #mobileTouchControls.mode-rocket .mobileActionBtn { min-width: 112px; }
-  #mobileTouchControls.mode-rocket #mobileLookPad { left: auto; right: 16px; top: auto; bottom: 238px; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }
   body.deflock-active .floatBtn { height: 58px; padding: 5px 2px 3px; }
@@ -645,10 +626,6 @@ body.deflock-active .floatBtn::after {
 @media (max-width: 390px) {
   .tab-content { bottom: 108px; }
   .loc-grid { grid-template-columns: 1fr; }
-  #mobileMovePad { width: 122px; height: 122px; left: 10px; }
-  #mobileLookPad { right: 10px; width: 100px; height: 100px; }
-  #mobileActionStack { right: 10px; width: 104px; }
-  .mobileActionBtn { min-width: 104px; }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
@@ -656,8 +633,5 @@ body.deflock-active .floatBtn::after {
   #coords { top: auto; bottom: 170px; width: 148px; }
   .hud-box { width: 100%; max-width: none; padding-bottom: 8px; }
   #controlsTab { top: 66px; right: 12px; }
-  #mobileMovePad { bottom: 86px; width: 112px; height: 112px; }
-  #mobileLookPad { right: 138px; bottom: 86px; width: 96px; height: 96px; }
-  #mobileActionStack { bottom: 88px; }
 }
 }

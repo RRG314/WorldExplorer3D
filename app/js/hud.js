@@ -374,7 +374,7 @@ function updateCamera(dt = 1 / 60) {
     // Order: YXZ (yaw, pitch, roll)
     appCtx.camera.rotation.order = 'YXZ';
     appCtx.camera.rotation.y = dronePose.yaw + (Number(dronePose.cameraYawOffset) || 0);
-    appCtx.camera.rotation.x = dronePose.pitch;
+    appCtx.camera.rotation.x = dronePose.pitch + (Number(dronePose.cameraPitchOffset) || 0);
     appCtx.camera.rotation.z = dronePose.roll;
 
     updateCameraLinkedEffects();

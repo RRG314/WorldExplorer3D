@@ -750,6 +750,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
     worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
     fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
+    mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     activeActor,

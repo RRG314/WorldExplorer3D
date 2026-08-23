@@ -116,7 +116,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=5";
+} from "./world/navigation.js?v=6";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,

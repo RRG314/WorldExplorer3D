@@ -20,38 +20,6 @@
 #ctrlContent.hidden{display:none}
 #controlsTab.compact{width:max-content;max-width:max-content;overflow:visible}
 #controlsTab.compact #ctrlHeader{white-space:nowrap;padding:10px 14px}
-#mobileTouchControls{position:fixed;inset:0;display:none;pointer-events:none;z-index:106}
-#mobileTouchControls.show{display:block}
-.mobilePad{position:absolute;top:58%;transform:translateY(-50%);width:126px;height:126px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:4px;pointer-events:none}
-#mobileMovePad{right:10px}
-#mobileLookPad{left:10px}
-.mobileNavBtn{border:none;border-radius:10px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;box-shadow:0 6px 16px rgba(0,0,0,0.24)}
-.mobileNavBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
-.mobileNavBtn.up{grid-column:2;grid-row:1}
-.mobileNavBtn.left{grid-column:1;grid-row:2}
-.mobileNavBtn.right{grid-column:3;grid-row:2}
-.mobileNavBtn.down{grid-column:2;grid-row:3}
-.mobilePadLabel{grid-column:2;grid-row:2;border-radius:10px;background:rgba(255,255,255,0.85);color:#334155;font-size:9px;font-weight:700;letter-spacing:0.7px;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
-#mobileActionStack{position:absolute;left:10px;top:73%;transform:none;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:126px}
-.mobileActionBtn{min-width:88px;padding:10px 14px;border:none;border-radius:12px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.3px;pointer-events:auto;touch-action:none;box-shadow:0 8px 18px rgba(0,0,0,0.24)}
-.mobileActionBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
-.mobilePad.hidden,.mobileActionBtn.hidden{display:none}
-#mobileTouchControls.mode-driving #mobileMoveLeft,
-#mobileTouchControls.mode-driving #mobileMoveRight,
-#mobileTouchControls.mode-driving #mobileLookUp,
-#mobileTouchControls.mode-driving #mobileLookDown{display:none}
-#mobileTouchControls.mode-driving #mobileMoveLabel,
-#mobileTouchControls.mode-driving #mobileLookLabel{display:none}
-#mobileTouchControls.mode-driving #mobileActionStack{left:10px;top:58%;transform:translateY(-50%);width:126px}
-#mobileTouchControls.mode-driving .mobileActionBtn{min-width:126px}
-#mobileTouchControls.mode-driving #mobileActionSecondary{display:none!important}
-#mobileTouchControls.mode-rocket #mobileMovePad{display:none}
-#mobileTouchControls.mode-rocket #mobileLookPad{left:auto;right:10px;top:58%}
-#mobileTouchControls.mode-rocket #mobileActionStack{left:10px;top:50%;transform:translateY(-50%);width:126px}
-#mobileTouchControls.mode-rocket .mobileActionBtn{min-width:126px}
-@media (hover:hover) and (pointer:fine){
-  #mobileTouchControls{display:none!important}
-}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:103;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}

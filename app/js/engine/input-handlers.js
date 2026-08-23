@@ -28,6 +28,11 @@ export function setupEngineInputHandlers(appCtx) {
 
   inputScope.listen(globalThis, 'keydown', (e) => {
     if (isFormControl(e.target)) return;
+    if (appCtx.showLargeMap && gameplayKeys.has(e.code)) {
+      e.preventDefault();
+      appCtx.keys[e.code] = false;
+      return;
+    }
     if (appCtx.gameStarted && gameplayKeys.has(e.code)) {
       e.preventDefault();
     }
@@ -111,8 +116,7 @@ export function setupEngineInputHandlers(appCtx) {
     const sensitivity = 0.005;
     if (appCtx.droneMode) {
       appCtx.drone.cameraYawOffset = wrapYaw((Number(appCtx.drone.cameraYawOffset) || 0) - deltaX * sensitivity);
-      appCtx.drone.pitch += deltaY * sensitivity;
-      appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
+      appCtx.drone.cameraPitchOffset = Math.max(-1.2, Math.min(1.2, (Number(appCtx.drone.cameraPitchOffset) || 0) + deltaY * sensitivity));
     } else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
       appCtx.Walk.state.walker.lookYawOffset = wrapYaw((Number(appCtx.Walk.state.walker.lookYawOffset) || 0) - deltaX * sensitivity);
       appCtx.Walk.state.walker.pitch += deltaY * sensitivity;

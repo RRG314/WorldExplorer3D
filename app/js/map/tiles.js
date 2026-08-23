@@ -129,7 +129,11 @@ function resolveMapView(w, h, isLarge) {
   const actorRef = getMapReferencePosition();
   const zoom = isLarge ? appCtx.largeMapZoom : appCtx.minimapZoom;
   const actorLatLon = worldToLatLon(actorRef.x, actorRef.z);
-  const centerLatLon = isLarge ? actorLatLon : resolveMinimapCenter(actorRef, zoom);
+  const largeMapCenter = appCtx.largeMapCenterWorld;
+  const hasLargeMapCenter = isLarge && Number.isFinite(largeMapCenter?.x) && Number.isFinite(largeMapCenter?.z);
+  const centerLatLon = isLarge
+    ? (hasLargeMapCenter ? worldToLatLon(largeMapCenter.x, largeMapCenter.z) : actorLatLon)
+    : resolveMinimapCenter(actorRef, zoom);
   const centerTile = tileCoordinates(centerLatLon.lat, centerLatLon.lon, zoom);
   const xtileFloat = centerTile.x;
   const ytileFloat = centerTile.y;
@@ -141,6 +145,7 @@ function resolveMapView(w, h, isLarge) {
   const my = h / 2;
   const view = {
     ref: actorRef,
+    browsing: hasLargeMapCenter,
     centerLatLon,
     zoom,
     centerTileX,

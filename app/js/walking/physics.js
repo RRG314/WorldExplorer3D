@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=1";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 
 function wrapYaw(angle = 0) {
@@ -205,6 +206,7 @@ function createWalkingPhysicsHelpers({
     const startX = finiteOr(state.walker.x, 0);
     const startZ = finiteOr(state.walker.z, 0);
     const actions = appCtx.readControlActions?.('walk') || {};
+    const mobileTouch = actions.mobileTouch === true;
     const liveGpsOwnsTranslation = appCtx.liveGpsTranslationOwned?.() === true;
     const liveGpsTarget = liveGpsOwnsTranslation
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
@@ -220,11 +222,12 @@ function createWalkingPhysicsHelpers({
     state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, state.walker.pitch));
     if (liveGpsOwnsTranslation && Number.isFinite(liveGpsTarget?.headingDegrees)) {
       state.walker.angle = Math.PI - liveGpsTarget.headingDegrees * Math.PI / 180;
-    } else if (!liveGpsOwnsTranslation) {
+    } else if (!liveGpsOwnsTranslation && !mobileTouch) {
       state.walker.angle = state.walker.yaw;
     }
 
     const forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
+    const strafe = liveGpsOwnsTranslation ? 0 : Number(actions.strafe) || 0;
     const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
@@ -291,11 +294,33 @@ function createWalkingPhysicsHelpers({
       state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
       state.walker.lookYawOffset *= Math.exp(-dt * 2.8);
       if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+    } else if (mobileTouch && actions.mobileSettings?.cameraRecenter !== false && actions.mobileLookActive !== true) {
+      const idleFor = performance.now() - (Number(actions.mobileLastLookInputAt) || 0);
+      const recenter = resolveMobileCameraRecenter({
+        actorYaw: state.walker.angle,
+        cameraYaw: state.walker.yaw + state.walker.lookYawOffset,
+        dt,
+        idleMs: idleFor,
+        lookActive: actions.mobileLookActive,
+        settings: actions.mobileSettings
+      });
+      if (recenter.active) {
+        state.walker.yaw = recenter.yaw;
+        state.walker.lookYawOffset = 0;
+      }
     }
 
-    if (forward !== 0 || liveGpsMoved) {
-      const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+    if (forward !== 0 || strafe !== 0 || liveGpsMoved) {
+      const cameraYaw = wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
+      const moveX = mobileTouch && !liveGpsMoved
+        ? (Math.sin(cameraYaw) * forward + Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
+        : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
+      const moveZ = mobileTouch && !liveGpsMoved
+        ? (Math.cos(cameraYaw) * forward - Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
+        : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+      if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
+        state.walker.angle = Math.atan2(moveX, moveZ);
+      }
 
       let newX = liveGpsMoved ? liveGpsTarget.x : state.walker.x + moveX;
       let newZ = liveGpsMoved ? liveGpsTarget.z : state.walker.z + moveZ;

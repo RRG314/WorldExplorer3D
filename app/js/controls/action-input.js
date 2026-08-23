@@ -1,4 +1,9 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import {
+  loadMobileTouchSettings,
+  resolveMobileSemanticActions,
+  saveMobileTouchSettings
+} from './mobile-touch-authority.js?v=1';
 
 const DEAD_ZONE = 0.16;
 const inputState = {
@@ -7,6 +12,13 @@ const inputState = {
   updatedAt: 0,
   lastPlaneTurnTapAt: { ArrowLeft: -Infinity, ArrowRight: -Infinity },
   pendingPlaneBarrelRoll: 0
+};
+const mobileTouchState = {
+  enabled: false,
+  move: { x: 0, y: 0, active: false },
+  look: { x: 0, y: 0, active: false },
+  lastLookInputAt: 0,
+  settings: loadMobileTouchSettings()
 };
 const PLANE_DOUBLE_TAP_WINDOW_MS = 340;
 const HELD_CONTROL_CODES = Object.freeze([
@@ -153,9 +165,71 @@ function mergeGamepad(actions, gamepad) {
   return actions;
 }
 
+function mergeMobileTouch(actions) {
+  if (!mobileTouchState.enabled) return actions;
+  const mobile = resolveMobileSemanticActions(actions.mode, mobileTouchState);
+  actions.move = Math.abs(mobile.move) > Math.abs(actions.move) ? mobile.move : actions.move;
+  actions.turn = Math.abs(mobile.turn) > Math.abs(actions.turn) ? mobile.turn : actions.turn;
+  actions.steer = actions.turn;
+  actions.strafe = Math.abs(mobile.strafe) > Math.abs(actions.strafe) ? mobile.strafe : actions.strafe;
+  actions.lookYaw = Math.abs(mobile.lookYaw) > Math.abs(actions.lookYaw) ? mobile.lookYaw : actions.lookYaw;
+  actions.lookPitch = Math.abs(mobile.lookPitch) > Math.abs(actions.lookPitch) ? mobile.lookPitch : actions.lookPitch;
+  actions.mobileTouch = true;
+  actions.mobileMoveActive = mobile.moveActive;
+  actions.mobileLookActive = mobile.lookActive;
+  actions.mobileLastLookInputAt = mobileTouchState.lastLookInputAt;
+  actions.mobileSettings = mobile.settings;
+  if (actions.mode === 'plane') {
+    actions.pitch = -actions.move;
+    actions.roll = actions.turn;
+  } else {
+    actions.throttle = Math.max(actions.throttle, Math.max(0, actions.move));
+    actions.reverse = Math.max(actions.reverse, Math.max(0, -actions.move));
+  }
+  return actions;
+}
+
 function readControlActions(mode = 'drive') {
   const normalizedMode = normalizeMode(mode);
-  return mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad());
+  return mergeMobileTouch(mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad()));
+}
+
+function setMobileTouchEnabled(enabled) {
+  mobileTouchState.enabled = enabled === true;
+  if (!mobileTouchState.enabled) clearMobileTouchInput('disabled');
+  return mobileTouchState.enabled;
+}
+
+function setMobileTouchPad(pad, x = 0, y = 0, active = true, now = performance.now()) {
+  const target = pad === 'look' ? mobileTouchState.look : mobileTouchState.move;
+  target.x = clamp(x);
+  target.y = clamp(y);
+  target.active = active === true;
+  if (pad === 'look') {
+    mobileTouchState.lastLookInputAt = Number(now) || performance.now();
+  }
+  return getMobileTouchInputSnapshot();
+}
+
+function clearMobileTouchInput(reason = 'runtime') {
+  Object.assign(mobileTouchState.move, { x: 0, y: 0, active: false });
+  Object.assign(mobileTouchState.look, { x: 0, y: 0, active: false });
+  return String(reason || 'runtime');
+}
+
+function updateMobileTouchSettings(patch = {}) {
+  mobileTouchState.settings = saveMobileTouchSettings({ ...mobileTouchState.settings, ...patch });
+  return mobileTouchState.settings;
+}
+
+function getMobileTouchInputSnapshot() {
+  return {
+    enabled: mobileTouchState.enabled,
+    move: { ...mobileTouchState.move },
+    look: { ...mobileTouchState.look },
+    lastLookInputAt: mobileTouchState.lastLookInputAt,
+    settings: { ...mobileTouchState.settings }
+  };
 }
 
 function buttonRising(gamepad, index) {
@@ -188,6 +262,7 @@ function clearControlInputState(reason = 'runtime') {
   inputState.lastPlaneTurnTapAt.ArrowLeft = -Infinity;
   inputState.lastPlaneTurnTapAt.ArrowRight = -Infinity;
   inputState.pendingPlaneBarrelRoll = 0;
+  clearMobileTouchInput(reason);
   inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return String(reason || 'runtime');
 }
@@ -202,21 +277,30 @@ function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'driv
 }
 
 Object.assign(appCtx, {
+  clearMobileTouchInput,
   getControlInputSnapshot,
+  getMobileTouchInputSnapshot,
   clearControlInputState,
   consumePlaneBarrelRollTrigger,
   readControlActions,
   registerPlaneTurnTap,
+  setMobileTouchEnabled,
+  setMobileTouchPad,
+  updateMobileTouchSettings,
   updateControlInput
 });
 
 export {
   PLANE_DOUBLE_TAP_WINDOW_MS,
+  clearMobileTouchInput,
   clearControlInputState,
   consumePlaneBarrelRollTrigger,
   getControlInputSnapshot,
   keyboardControlActions,
   readControlActions,
   registerPlaneTurnTap,
-  updateControlInput
+  setMobileTouchEnabled,
+  setMobileTouchPad,
+  updateControlInput,
+  updateMobileTouchSettings
 };

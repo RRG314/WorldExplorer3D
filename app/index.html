@@ -21,16 +21,18 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=91">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=100">
+<link rel="stylesheet" href="styles/title-shell.css?v=92">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=101">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=4">
-<link rel="stylesheet" href="styles/interface-v4.css?v=17">
+<link rel="stylesheet" href="styles/interface-v4.css?v=18">
 <link rel="stylesheet" href="styles/start-hub.css?v=15">
 <link rel="stylesheet" href="styles/discovery.css?v=5">
-<link rel="stylesheet" href="styles/tutorial.css?v=1">
+<link rel="stylesheet" href="styles/tutorial.css?v=2">
 <link rel="stylesheet" href="styles/ar.css?v=1">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=1">
+<link rel="stylesheet" href="styles/map-explorer.css?v=2">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -768,7 +770,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div id="urbanBackpackContents" class="urbanBackpackContents"></div>
   <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
 </aside>
-<button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden>PACK</button>
+<button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.8C8 3.7 9.7 2 11.8 2h.4C14.3 2 16 3.7 16 5.8V7M6.5 8h11A2.5 2.5 0 0 1 20 10.5v8A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-8A2.5 2.5 0 0 1 6.5 8ZM4 13h16M8 16h8"/></svg><span>PACK</span></button>
 <aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
   <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
   <div class="urbanCivicStatusCopy">
@@ -816,8 +818,13 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
 </div>
 <div id="largeMap">
+<header id="mapExplorerHeader">
+  <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
+  <button id="mapRecenter" type="button">◎ My position</button>
+</header>
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
-<button id="mapClose">Close Map (M)</button>
+<div id="mapExplorerHint">Drag to explore · use +/− to zoom · tap a marker for details</div>
+<button id="mapClose" type="button" aria-label="Close world map">Close</button>
 <button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">📋 Legend</button>
 <div id="legendPanel" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
@@ -1047,14 +1054,14 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div id="mapInfoContent" style="font-size:11px;line-height:1.6"></div>
 </div>
 
-<div style="position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:10px">
-<button id="mapSatelliteToggle" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛰️</button>
-<button id="mapRoadsToggle" class="active" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛣️</button>
+<div id="mapControlDock">
+<button id="mapSatelliteToggle" type="button" aria-label="Toggle satellite map" title="Satellite">🛰️</button>
+<button id="mapRoadsToggle" class="active" type="button" aria-label="Toggle road overlay" title="Roads">🛣️</button>
 <button id="mapPathsToggle" hidden style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
-<div style="border-top:2px solid #0fc;margin:5px 0"></div>
-<button id="mapZoomIn" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">+</button>
-<button id="mapZoomOut" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">−</button>
-<div style="background:rgba(0,0,0,0.8);border:1px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:5px 10px;border-radius:6px;text-align:center" id="zoomLevel">Z: 14</div>
+<span aria-hidden="true"></span>
+<button id="mapZoomIn" type="button" aria-label="Zoom map in">+</button>
+<button id="mapZoomOut" type="button" aria-label="Zoom map out">−</button>
+<div id="zoomLevel" aria-live="polite">Z 14</div>
 </div>
 </div>
 <div id="explorationModeMsg" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:3px solid #667eea;border-radius:16px;padding:24px 48px;color:#ffffff;font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;z-index:1000;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center;letter-spacing:1px;cursor:pointer;pointer-events:auto">
@@ -1670,6 +1677,18 @@ Explore the area
   <div id="blockBuilderStatus" role="status" aria-live="polite"></div>
 </aside>
 <div id="controlsTab"><div id="ctrlHeader">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden">
+<section id="mobileControlSettings" aria-label="Mobile control settings">
+<div class="mobileControlSettingsHead"><strong>Mobile Controls</strong><button id="mobileControlsReset" type="button">Reset</button></div>
+<label><span>Layout</span><select id="mobileControlsHandedness"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
+<label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>
+<label><span>Camera sensitivity</span><input id="mobileLookSensitivity" type="range" min="35" max="150" step="5" value="80"><output id="mobileLookSensitivityValue">80%</output></label>
+<label class="mobileControlToggle"><input id="mobileCameraRecenter" type="checkbox" checked><span>Return camera behind player</span></label>
+<p id="mobileControlSettingsStatus">Left thumb moves. Right thumb looks and uses actions.</p>
+<div id="mobileControlModeSummary" aria-live="polite">
+<strong id="mobileControlModeName">Walking</strong>
+<div><span><b>LEFT</b><i id="mobileControlLeftSummary">Move</i></span><span><b>RIGHT</b><i id="mobileControlRightSummary">Look</i></span><span><b>ACTIONS</b><i id="mobileControlActionSummary">Jump · Run</i></span></div>
+</div>
+</section>
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
 • Arrow Up/Down - Drive forward / reverse<br>
@@ -1781,5 +1800,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=488"></script>
+<script type="module" src="js/bootstrap.js?v=489"></script>
 </body></html>

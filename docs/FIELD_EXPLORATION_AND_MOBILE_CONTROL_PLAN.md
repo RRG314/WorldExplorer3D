@@ -53,11 +53,32 @@ The first Phase A4 shoreline slice is also implemented and tested:
   Harbor bank, opens the shore game, casts, receives a bite, sets the hook, and
   reaches the fight state with zero browser errors or failed local resources.
 
+The first mobile semantic-control and map-navigation slice is implemented and
+browser tested:
+
+- standard right-handed play uses a left analog movement/vehicle stick and a
+  right camera/action zone; a saved Southpaw option actually swaps sides;
+- the analog reader owns movement/look semantics instead of relying only on
+  visible buttons that claim to be configurable, and walking uses independent
+  camera-relative movement;
+- walk, drive, and plane cameras accept independent look input and then return
+  behind the controlled actor after the saved idle delay;
+- Backpack is integrated into the walking action dock and removed from vehicle
+  modes instead of floating over mode controls;
+- the expanded map now has separate follow/browse state, drag pan, zoom,
+  recenter, and close behavior that restores the correct gameplay controls;
+- one canonical mobile stylesheet owns the touch layout. The older conflicting
+  left/right declarations were removed from the legacy style layers;
+- a deterministic 390×844 installed-Chrome journey proves handedness, saved
+  settings, real analog movement, free look/recenter for walk/drive/plane,
+  Backpack layout ownership, map pan/zoom/recenter/return, zero browser errors,
+  and zero failed local resources.
+
 These are local checkpoints, not a production deployment. The regional ecology
 pack, regional/seasonal fish authority, retained recurring programs, backend
 receipt validation, physical-device evidence, complete catch/land verification,
-and configurable semantic controls remain open and must satisfy the gates later
-in this plan.
+and the full per-action control editor remain open and must satisfy the gates
+later in this plan.
 
 ## Product direction
 
@@ -111,9 +132,9 @@ Non-negotiable rules:
 - Fishing has a real cast/fight/catch loop, equipment state, catch records, and
   a 14-species catalog.
 - A shared Backpack model, a partial screen-layout service, desktop input
-  handlers, and hard-coded touch profiles already exist. The touch layer writes
-  directly into Earth/Space key-state channels; one cross-device semantic input
-  authority does not yet exist.
+  handlers, and mode touch profiles exist. A first semantic mobile authority now
+  owns analog movement/look state and persisted handedness/sensitivity/recenter
+  settings while legacy digital action bindings remain behind the adapter.
 - The normal 390×844 production entry now exposes and verifies Live GPS from the
   first screen, and the in-game mobile Games menu exposes the same mode.
 
@@ -146,16 +167,17 @@ Non-negotiable rules:
   temperature, salinity, current, depth, bait, or gear ecology.
 - Underwater schools, the fishing catalog, and catch records do not share one
   authoritative fish identity/population model.
-- Touch controls are fixed key-emulation profiles. There is no user action map,
-  remapping, resize/reposition, handedness, opacity, sensitivity, haptics,
-  conflict validation, recovery profile, or proof that settings change gameplay.
+- Touch now has real analog input, saved Standard/Southpaw handedness, movement
+  and camera sensitivity, camera recenter, and reset behavior with browser proof
+  that settings change gameplay. Per-action remapping, resize/reposition,
+  opacity, haptics, conflicts, named profiles, and recovery gestures remain open.
 - The screen-layout service stores one activity and one panel ID, but it does
   not yet own every modal/focus/back path. The current mobile composition is
   accepted; this remains regression-hardening work, not a reason to redesign the
   menu while configurable controls are unfinished.
-- Multiple style layers reposition the same touch controls at overlapping
-  breakpoints. They must not be expanded with more per-mode exceptions while
-  the semantic, user-configurable control authority is being introduced.
+- The conflicting legacy touch-layout declarations have been removed. New mode
+  UI must stay within the canonical mobile-control layer and semantic action
+  profiles rather than reintroducing breakpoint-specific ownership.
 
 ## Location-game comparison and adaptation
 
@@ -697,6 +719,11 @@ law without a maintained official source.
 
 ### User configuration that must be real
 
+Current first slice: saved Standard/Southpaw layout, movement sensitivity,
+camera sensitivity, automatic camera return, mode-specific control guidance,
+and reset are wired to the real analog reader. This is a verified foundation,
+not completion of the editor described below.
+
 Users can remap actions, drag controls within safe zones, resize, change
 opacity, select handedness, tune camera sensitivity/dead zones, choose
 hold/toggle behavior, enable/disable haptics, save named profiles, restore the
@@ -1017,6 +1044,16 @@ Biodiversity and mobile standards:
 - [Android accessibility: touch target size](https://developer.android.com/guide/topics/ui/accessibility/apps#touch-targets)
 - [Apple Human Interface Guidelines: Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
 - [MDN: Geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API)
+
+Mobile control R&D references:
+
+- [Roblox input](https://create.roblox.com/docs/input)
+- [Roblox UI positioning and thumb zones](https://create.roblox.com/docs/ui/position-and-size)
+- [Roblox camera modes](https://create.roblox.com/docs/workspace/camera)
+- [Fortnite mobile HUD layout tool](https://www.epicgames.com/help/c-202300000001636/c-202300000001721/hud-a202300000016543)
+- [Infinite Flight touch and tilt controls](https://infiniteflight.com/guide/getting-started-guide/pilot-user-interface/flight-controls)
+- [Infinite Flight sensitivity and dead-zone settings](https://infiniteflight.com/guide/getting-started-guide/home-user-interface/settings)
+- [Asphalt control modes](https://www.gameloft.com/blog/players/asphalt-9-legends-in-one-minute)
 
 Any additional commercial dataset, especially a non-commercially licensed fish
 catalog, requires explicit license review before it enters the provider registry.

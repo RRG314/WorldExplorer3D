@@ -123,6 +123,8 @@ function syncDronePositionFromReference(options = {}) {
   appCtx.drone.z = ref.z;
   appCtx.drone.yaw = Number.isFinite(ref?.yaw) ? ref.yaw : Number.isFinite(ref?.angle) ? ref.angle : Number(appCtx.car?.angle) || 0;
   appCtx.drone.cameraYawOffset = 0;
+  appCtx.drone.cameraPitchOffset = 0;
+  appCtx.drone.cameraLookTimer = 0;
   appCtx.drone.roll = 0;
   const safeLaunchY = sampleDroneSpawnHeight(ref.x, ref.z);
   appCtx.drone.y = options.preserveAltitude && Number.isFinite(ref?.y) ? Math.max(safeLaunchY, ref.y) : safeLaunchY;
@@ -160,6 +162,8 @@ function clearControllerLocalState(targetMode) {
   if (targetMode !== 'drone' && appCtx.drone) {
     appCtx.drone.roll = 0;
     appCtx.drone.cameraYawOffset = 0;
+    appCtx.drone.cameraPitchOffset = 0;
+    appCtx.drone.cameraLookTimer = 0;
   }
 }
 

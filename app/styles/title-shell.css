@@ -395,17 +395,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #flowerChallengeHud{top:74px;left:50%;transform:translateX(-50%);padding:8px 10px}
   #flowerChallengeHudStatus{font-size:11px}
   #flowerChallengeHudTimer{font-size:11px;min-width:54px}
-  #mobileTouchControls{inset:0}
-  .mobilePad{width:114px;height:114px;top:58%}
-  #mobileMovePad{right:8px}
-  #mobileLookPad{left:8px}
-  #mobileActionStack{left:8px;top:72%;width:114px}
-  #mobileTouchControls.mode-rocket #mobileLookPad{left:auto;right:8px;top:58%}
-  #mobileTouchControls.mode-rocket #mobileActionStack{left:8px;top:50%;width:114px;transform:translateY(-50%)}
-  #mobileTouchControls.mode-rocket .mobileActionBtn{min-width:114px}
-  #mobileTouchControls.mode-driving #mobileActionStack{left:8px;top:58%;width:114px;transform:translateY(-50%)}
-  #mobileTouchControls.mode-driving .mobileActionBtn{min-width:114px}
-  .mobileActionBtn{min-width:82px;padding:9px 12px;font-size:11px}
   .title-share-btn{width:42px;height:42px}
   #buildModeIndicator{left:10px;bottom:66px;font-size:10px;padding:8px 10px;max-width:220px}
 
@@ -469,18 +458,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #flowerChallengeHud{top:68px;padding:7px 9px}
   #flowerChallengeHudStatus{font-size:10px}
   #flowerChallengeHudTimer{font-size:10px;min-width:48px}
-  #mobileTouchControls{inset:0}
-  .mobilePad{width:104px;height:104px;top:60%}
-  #mobileMovePad{right:6px}
-  #mobileLookPad{left:6px}
-  #mobileActionStack{left:6px;top:74%;width:104px}
-  #mobileTouchControls.mode-rocket #mobileLookPad{left:auto;right:6px;top:60%}
-  #mobileTouchControls.mode-rocket #mobileActionStack{left:6px;top:50%;width:104px;transform:translateY(-50%)}
-  #mobileTouchControls.mode-rocket .mobileActionBtn{min-width:104px}
-  #mobileTouchControls.mode-driving #mobileActionStack{left:6px;top:60%;width:104px;transform:translateY(-50%)}
-  #mobileTouchControls.mode-driving .mobileActionBtn{min-width:104px}
-  .mobileNavBtn{font-size:16px}
-  .mobileActionBtn{min-width:76px;padding:8px 10px;font-size:10px}
   .title-share-btn{width:38px;height:38px}
   .title-share-btn svg{width:18px;height:18px}
   #buildModeIndicator{left:5px;bottom:60px;font-size:9px;padding:7px 9px;max-width:190px}

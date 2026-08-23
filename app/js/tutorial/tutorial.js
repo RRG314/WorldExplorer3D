@@ -189,9 +189,12 @@ function presentCurrentStage() {
     return;
   }
   if (runtime.state.stage === STAGES.MOVE) {
+    const touchControls = appCtx.getMobileTouchInputSnapshot?.().enabled === true;
     showPrompt(STAGES.MOVE, {
       title: 'Take your first steps',
-      body: 'Move about 12 metres and look around. Use W/S to move, A/D to turn, and Shift to run.',
+      body: touchControls
+        ? 'Move about 12 metres. Left thumb moves; right thumb looks. Hold Run to sprint, and the camera returns behind you after looking around.'
+        : 'Move about 12 metres and look around. Arrow keys move and turn; WASD looks around; Shift runs.',
       progress: 33
     });
   } else if (runtime.state.stage === STAGES.EXPLORE) {

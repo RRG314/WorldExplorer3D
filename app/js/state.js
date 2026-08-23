@@ -111,6 +111,7 @@ let boatMode = {
   waveDirectionZ: 1,
   cameraYawOffset: 0,
   cameraPitch: 0,
+  cameraLookTimer: 0,
   currentWater: null,
   lastEntryMode: 'walk',
   previousCameraMode: null,
@@ -159,7 +160,7 @@ let customTrack = [],isRecording = false;
 let lastTime = 0;
 // Drone camera variables
 let droneMode = false;
-const drone = { x: 0, y: 50, z: 0, pitch: 0, yaw: 0, roll: 0, speed: 30 };
+const drone = { x: 0, y: 50, z: 0, pitch: 0, yaw: 0, roll: 0, speed: 30, cameraYawOffset: 0, cameraPitchOffset: 0, cameraLookTimer: 0 };
 // Walking module - will be initialized after THREE is loaded
 let Walk = null;
 

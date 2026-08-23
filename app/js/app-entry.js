@@ -7,12 +7,12 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=42';
-import './state.js?v=61';
+import './runtime-diagnostics.js?v=43';
+import './state.js?v=62';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=5';
-import './controls/action-input.js?v=6';
+import './controls/action-input.js?v=7';
 import './interaction/context-router.js?v=4';
 import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
@@ -22,15 +22,15 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=92';
-import './physics.js?v=110';
-import './walking.js?v=76';
-import './travel-mode.js?v=20';
-import { initBoatMode } from './boat-mode.js?v=41';
+import { init, tryEnablePostProcessing } from './engine.js?v=94';
+import './physics.js?v=111';
+import './walking.js?v=77';
+import './travel-mode.js?v=21';
+import { initBoatMode } from './boat-mode.js?v=42';
 import './sky.js?v=86';
 import './weather.js?v=10';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=108';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=109';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
@@ -41,12 +41,12 @@ import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=1';
 import './game.js?v=62';
-import './input.js?v=66';
-import './hud.js?v=94';
-import './map.js?v=59';
+import './input.js?v=67';
+import './hud.js?v=95';
+import './map.js?v=60';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=126';
+import { setupUI } from './ui.js?v=127';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -284,7 +284,7 @@ function scheduleTutorialInit() {
     _tutorialInitPromise = new Promise((resolve) => {
         scheduleAfterFirstPlay('tutorial-runtime', async () => {
             try {
-                const mod = await import('./tutorial/tutorial.js?v=3');
+                const mod = await import('./tutorial/tutorial.js?v=4');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);

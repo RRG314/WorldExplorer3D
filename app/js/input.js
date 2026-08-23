@@ -14,8 +14,12 @@ function isPerfToggleKey(code) {
 }
 
 function toggleLargeMap() {
-  appCtx.showLargeMap = !appCtx.showLargeMap;
-  document.getElementById('largeMap').classList.toggle('show', appCtx.showLargeMap);
+  if (appCtx.showLargeMap) appCtx.closeLargeMap?.();
+  else appCtx.openLargeMap?.();
+  if (typeof appCtx.openLargeMap !== 'function') {
+    appCtx.showLargeMap = !appCtx.showLargeMap;
+    document.getElementById('largeMap').classList.toggle('show', appCtx.showLargeMap);
+  }
 }
 
 function onKey(code, event) {
@@ -220,15 +224,17 @@ function onKey(code, event) {
     toggleLargeMap();
   }
   if (appCtx.showLargeMap && (code === 'Equal' || code === 'NumpadAdd')) {
-    if (appCtx.largeMapZoom < 18) {
+    if (typeof appCtx.adjustLargeMapZoom === 'function') appCtx.adjustLargeMapZoom(1);
+    else if (appCtx.largeMapZoom < 18) {
       appCtx.largeMapZoom++;
-      document.getElementById('zoomLevel').textContent = 'Z: ' + appCtx.largeMapZoom;
+      document.getElementById('zoomLevel').textContent = 'Z ' + appCtx.largeMapZoom;
     }
   }
   if (appCtx.showLargeMap && (code === 'Minus' || code === 'NumpadSubtract')) {
-    if (appCtx.largeMapZoom > 10) {
+    if (typeof appCtx.adjustLargeMapZoom === 'function') appCtx.adjustLargeMapZoom(-1);
+    else if (appCtx.largeMapZoom > 10) {
       appCtx.largeMapZoom--;
-      document.getElementById('zoomLevel').textContent = 'Z: ' + appCtx.largeMapZoom;
+      document.getElementById('zoomLevel').textContent = 'Z ' + appCtx.largeMapZoom;
     }
   }
   if (code === 'Escape' && !document.getElementById('resultScreen').classList.contains('show') && !document.getElementById('caughtScreen').classList.contains('show')) {
@@ -245,8 +251,11 @@ function onKey(code, event) {
       return;
     }
     if (appCtx.showLargeMap) {
-      appCtx.showLargeMap = false;
-      document.getElementById('largeMap').classList.remove('show');
+      if (typeof appCtx.closeLargeMap === 'function') appCtx.closeLargeMap();
+      else {
+        appCtx.showLargeMap = false;
+        document.getElementById('largeMap').classList.remove('show');
+      }
     } else {
       const paused = appCtx.togglePauseReason?.('manual_pause') ?? appCtx.paused;
       document.getElementById('pauseScreen').classList.toggle('show', paused);

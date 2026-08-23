@@ -33,7 +33,7 @@ function installOnDemandEarth(appCtx) {
 
   async function ensureEarthRuntimeReady() {
     if (!modulePromise) {
-      modulePromise = import('./earth-runtime.js?v=111').catch((error) => {
+      modulePromise = import('./earth-runtime.js?v=112').catch((error) => {
         modulePromise = null;
         throw error;
       });

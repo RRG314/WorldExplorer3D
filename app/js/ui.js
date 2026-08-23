@@ -3,8 +3,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
-import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=68";
+import { initMapInteractions } from "./ui/map-interactions.js?v=60";
+import { initMobileControls } from "./ui/mobile-controls.js?v=69";
 import { initShareUi } from "./ui/share-links.js?v=63";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
