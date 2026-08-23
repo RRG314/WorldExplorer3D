@@ -358,6 +358,22 @@ h1 {
 .feature-list li { padding: 14px 0 14px 22px; border-top: 1px solid var(--line); color: #c8d1cd; }
 .feature-list li::before { position: absolute; margin: 7px 0 0 -21px; width: 7px; height: 7px; border: 1px solid var(--world); content: ''; transform: rotate(45deg); }
 
+.flight-showcase { margin-top: 88px; }
+.flight-showcase-heading {
+  display: grid;
+  grid-template-columns: 0.7fr 1.15fr 1fr;
+  gap: 28px;
+  align-items: start;
+  margin-bottom: 26px;
+}
+.flight-showcase-heading h3 { margin: 0; font: 600 clamp(23px, 2.6vw, 34px)/1.15 'Orbitron', sans-serif; letter-spacing: -0.025em; }
+.flight-showcase-heading p { margin: 0; color: var(--muted); font-size: 15px; }
+.flight-reel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.flight-reel figure { overflow: hidden; margin: 0; border: 1px solid var(--line); background: var(--surface); }
+.flight-reel video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #030607; object-fit: cover; }
+.flight-reel figcaption { display: flex; justify-content: space-between; gap: 16px; padding: 14px 16px; color: var(--muted); font-size: 12px; }
+.flight-reel figcaption strong { color: var(--ink); font-size: 13px; }
+
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -451,6 +467,8 @@ footer a:hover { color: var(--ink); }
   .journey-card:nth-child(n+3) { border-top: 1px solid var(--line); }
   .story, .story:nth-child(even) { grid-template-columns: 1fr; gap: 34px; }
   .story:nth-child(even) .story-media { order: 0; }
+  .flight-showcase-heading { grid-template-columns: 1fr 1.4fr; }
+  .flight-showcase-heading p { grid-column: 2; }
   .features { grid-template-columns: 1fr; }
   .feature, .feature:nth-child(3n) { min-height: auto; border-right: 0; }
   .feature:nth-child(n+2) { border-top: 1px solid var(--line); }
@@ -497,6 +515,11 @@ footer a:hover { color: var(--ink); }
   .journey-card:nth-child(n+2) { border-top: 1px solid var(--line); }
   .journey-card h3 { margin-top: 36px; }
   .story-stack { gap: 78px; }
+  .flight-showcase { margin-top: 64px; }
+  .flight-showcase-heading, .flight-reel { grid-template-columns: 1fr; }
+  .flight-showcase-heading { gap: 14px; }
+  .flight-showcase-heading p { grid-column: auto; }
+  .flight-reel figcaption { align-items: flex-start; }
   .gallery { grid-template-columns: 1fr; }
   .gallery figure:nth-child(n) { grid-column: auto; width: 100%; min-height: 0; }
   .gallery img { min-height: 0; }
