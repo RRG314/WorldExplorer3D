@@ -183,7 +183,7 @@ function ensureInteriorsReady() {
 
 function ensureFishingReady() {
     if (!_fishingModulePromise) {
-        _fishingModulePromise = import('./fishing-game.js?v=4').then((fishing) => {
+        _fishingModulePromise = import('./fishing-game.js?v=5').then((fishing) => {
             fishing.setupFishingGame?.();
             return fishing;
         }).catch((error) => {
@@ -205,6 +205,7 @@ function registerLazyFishingEntrypoints() {
     appCtx.updateFishingGame = () => false;
     const dockButton = document.getElementById('fishingDockBtn');
     const menuButton = document.getElementById('fFishing');
+    if (menuButton) menuButton.style.display = '';
     const activate = async (event) => {
         event?.preventDefault?.();
         dockButton?.removeEventListener('click', activate);

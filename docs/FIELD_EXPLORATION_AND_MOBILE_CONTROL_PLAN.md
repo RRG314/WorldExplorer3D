@@ -35,10 +35,29 @@ Phase A2 now has a tested vertical slice rather than scaffolding:
   active GPS watch, accuracy hold, vehicle-speed hold, zero browser errors, and
   zero failed local resources.
 
-This is a local checkpoint candidate, not a production deployment. Phase A3
-regional ecology, shore fishing, retained recurring programs, backend receipt
-validation, physical-device evidence, and configurable semantic controls remain
-open and must satisfy the gates later in this plan.
+The first Phase A4 shoreline slice is also implemented and tested:
+
+- walking players can open the existing fishing game from Games without first
+  entering Boat Mode;
+- one shoreline authority reuses the mapped water geometry, rejects synthetic
+  transition water, requires an unobstructed bank-to-water cast corridor, and
+  distinguishes explicit fishing access, mapped restrictions, and unknown
+  access rather than inventing permission from missing OSM tags;
+- unknown access is clearly labeled and allows virtual practice without a
+  location reward, while explicit mapped access can be reward eligible;
+- Live GPS accuracy/speed/foreground holds also hold shore fishing;
+- shore catches feed the existing fishing record and ExplorerEvent/Journal/
+  Field Guide spine, use stable claim IDs, and store only generalized GPS
+  coordinates;
+- a 390×844 installed-Chrome journey walks from a dry point to a mapped Inner
+  Harbor bank, opens the shore game, casts, receives a bite, sets the hook, and
+  reaches the fight state with zero browser errors or failed local resources.
+
+These are local checkpoints, not a production deployment. The regional ecology
+pack, regional/seasonal fish authority, retained recurring programs, backend
+receipt validation, physical-device evidence, complete catch/land verification,
+and configurable semantic controls remain open and must satisfy the gates later
+in this plan.
 
 ## Product direction
 
@@ -100,9 +119,10 @@ Non-negotiable rules:
 
 ### What is still scaffolding or too narrow
 
-- A manual avatar can reach the same discovery targets as a GPS player; there
-  is no authoritative walking-session ledger connecting eligible movement to a
-  proximity reward.
+- Manual free roam remains available, but a Live GPS field activity now requires
+  eligible foreground walking evidence from the field-session authority; avatar
+  movement cannot spoof that GPS-tagged proximity reward. Server-side receipt
+  validation and an accommodation evidence class remain open.
 - The 25-cell discovery grid is a local activity generator, not a regional
   population, migration, season, or live-operations system.
 - Ambient wildlife is effectively a few generic archetypes: rock pigeon,
@@ -119,10 +139,11 @@ Non-negotiable rules:
 - The local Explorer event is richer than the server receipt: the backend does
   not own the complete Journal, Field Guide, rank/specialty projection, or an
   account/device reconciliation contract.
-- Fishing is boat-only. Its 14 fish use broad water-kind and latitude filters;
-  it has no shore eligibility, waterbody identity, watershed/region checklist,
-  season, time, weather, temperature, salinity, current, depth, bait, or gear
-  ecology.
+- Shore fishing now has a mapped-water/bank eligibility authority, waterbody
+  identity, explicit restriction handling, an access-unknown practice state,
+  and the existing cast/fight path. Its 14 fish still use broad water-kind and
+  latitude filters; it has no watershed/region checklist, season, time, weather,
+  temperature, salinity, current, depth, bait, or gear ecology.
 - Underwater schools, the fishing catalog, and catch records do not share one
   authoritative fish identity/population model.
 - Touch controls are fixed key-emulation profiles. There is no user action map,

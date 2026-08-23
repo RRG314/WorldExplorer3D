@@ -122,14 +122,15 @@ function ensureSceneVisual(fish, appCtx) {
 }
 
 function updateFishingScene(state, appCtx, dt) {
-  if (!state?.fish || !['bite', 'fighting', 'landed'].includes(state.stage) || !appCtx.boatMode?.active) {
+  const shoreActor = state?.accessMode === 'shore' ? appCtx.Walk?.state?.walker : null;
+  if (!state?.fish || !['bite', 'fighting', 'landed'].includes(state.stage) || (!appCtx.boatMode?.active && !shoreActor)) {
     if (sceneVisual) disposeVisual();
     return;
   }
   const visual = ensureSceneVisual(state.fish, appCtx);
   if (!visual) return;
   visual.phase += dt * (state.stage === 'fighting' ? 3.2 + state.currentBurst * 5 : 1.1);
-  const boat = appCtx.boat || { x: 0, y: 0, z: 0, angle: 0 };
+  const boat = shoreActor || appCtx.boat || { x: 0, y: 0, z: 0, angle: 0 };
   const direction = Number(state.fishDirection || 1);
   const outboard = state.stage === 'landed' ? 2.4 : 8 + (1 - state.reelProgress) * 15;
   const foreAft = 4 + direction * (2.4 + Math.sin(visual.phase * 0.7) * 2.8);

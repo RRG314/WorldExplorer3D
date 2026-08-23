@@ -19,6 +19,7 @@
     "verify:assembled-locations": "node scripts/verification/assembled-locations.mjs",
     "verify:actors-vehicles": "node scripts/verification/actors-vehicles.mjs",
     "verify:live-gps": "node scripts/verification/live-gps.mjs",
+    "verify:shore-fishing": "node scripts/verification/shore-fishing.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",

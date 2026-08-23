@@ -749,6 +749,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.worldDiscoveryRuntime = null;
   appCtx.toggleWorldDiscoveryJournal = null;
   appCtx.handleWorldDiscoveryQuickAction = null;
+  if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   return true;
 }
 
@@ -879,6 +880,38 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       return RELEASED_EXPLORER_ACTIVITIES.has(slot.activityId) && (!toolId || entitlements.canUseTool(toolId).allowed);
     }
   });
+  state.recordFishingExplorerCatch = async (catchRecord = {}) => {
+    if (!catchRecord.id || !catchRecord.speciesId) return false;
+    const position = playerPosition(appCtx);
+    const result = await profileStore.recordObservation({
+      instanceId: `fish-catch:${catchRecord.id}`,
+      claimId: `claim:fishing:${catchRecord.id}`,
+      catalogId: catchRecord.speciesId,
+      name: catchRecord.species || catchRecord.speciesId,
+      description: 'Virtual fishing catch recorded through the shared Explorer Journal.',
+      family: 'fish',
+      rarityBand: catchRecord.rarity || 'common',
+      qualityBand: 'virtual-catch',
+      discipline: 'nature',
+      activityId: 'fish',
+      toolId: 'fishing-rod',
+      regionId: worldIdentity.id,
+      regionLabel,
+      locationKey: state.locationKey,
+      worldIdentity: worldIdentity.id,
+      environment: appCtx.getEnv?.() || 'EARTH',
+      localPosition: position,
+      evidenceClass: 'procedural-game-encounter',
+      supportingEvidence: [catchRecord.occurrenceTruth || 'simulated-gameplay-event', catchRecord.accessTruth || 'unknown-access'],
+      sourceRefs: [],
+      collectedAt: Date.now()
+    }, { collection: true });
+    if (!result.recorded && !result.collected) return false;
+    await state.refreshToolProgress?.();
+    await state.ui?.refreshData?.();
+    return true;
+  };
+  appCtx.recordFishingExplorerCatch = state.recordFishingExplorerCatch;
   state.presentation = createFieldEquipmentPresentation(appCtx);
   state.companionRuntime = await createCompanionRuntime(appCtx, {
     profileStore,
