@@ -11,7 +11,9 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const origin = new URL(baseUrl).origin;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({
-  viewport: { width: 1440, height: 900 },
+  viewport: { width: 390, height: 844 },
+  hasTouch: true,
+  isMobile: true,
   geolocation: { latitude: 39.2904, longitude: -76.6122, accuracy: 6 },
   permissions: ['geolocation']
 });
@@ -34,11 +36,14 @@ const distance2d = (left, right) => Math.hypot(
 );
 
 try {
-  const url = `${baseUrl}/app/?loc=custom&lat=39.290400&lon=-76.612200&lname=Live%20GPS%20Baltimore&gm=livegps`;
+  const url = `${baseUrl}/app/`;
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
-  await page.getByRole('button', { name: 'Explore', exact: true }).click();
+  const liveGpsEntry = page.locator('#globeSelectorLiveGpsBtn');
+  await liveGpsEntry.waitFor({ state: 'visible', timeout: 30_000 });
+  assert.equal(await liveGpsEntry.isEnabled(), true, 'Live GPS entry must be enabled in the mobile start hub.');
+  await liveGpsEntry.click();
   await page.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
   await page.locator('#liveGpsPermissionContinue').click();
   await page.waitForFunction(() => {
@@ -84,6 +89,7 @@ try {
   const driving = await snapshot();
 
   const checks = {
+    mobileEntryVisible: true,
     gpsActive: walking.liveGps?.active === true && walking.liveGps?.following === true,
     walkingMovedFromGps: distance2d(initial.activeActor?.position, walking.activeActor?.position) > 0.2,
     walkingCameraReturnsBehind:

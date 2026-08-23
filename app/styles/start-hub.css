@@ -231,6 +231,19 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   font: 700 12px/1 Inter, sans-serif;
   text-transform: uppercase;
 }
+.globe-selector-live-gps-btn {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #22d3ee !important;
+  border-radius: 2px !important;
+  background: linear-gradient(135deg,#0e7490,#155e75) !important;
+  color: #fff !important;
+  font: 800 12px/1 Inter, sans-serif !important;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  box-shadow: 0 7px 18px rgba(8,145,178,.22);
+}
 .globe-selector-mode-tabs { margin-top: 0; }
 .globe-selector-mode-panel { min-height: 0; }
 .globe-selector-locate-btn { min-height: 36px; }
