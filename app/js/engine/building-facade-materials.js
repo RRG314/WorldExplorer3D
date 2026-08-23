@@ -321,21 +321,22 @@ function facadeEntranceAtlas(appCtx) {
   return texture;
 }
 
-function glslColor(hex) {
-  const color = new THREE.Color(hex);
-  return `vec3(${color.r.toFixed(5)}, ${color.g.toFixed(5)}, ${color.b.toFixed(5)})`;
-}
-
 function applyWallOnlyFacadeMap(material, roof, entranceAtlas) {
-  const roofA = glslColor(roof.colorA);
-  const roofB = glslColor(roof.colorB);
-  const grainScale = Number(roof.grainScale || 0.6).toFixed(4);
-  const facadeRepeatX = Number(material.map?.repeat?.x || 0.08).toFixed(6);
-  const facadeRepeatY = Number(material.map?.repeat?.y || (1 / 16)).toFixed(6);
-  const facadeOffsetX = Number(material.map?.offset?.x || 0).toFixed(6);
-  const facadeOffsetY = Number(material.map?.offset?.y || 0).toFixed(6);
+  const facadeProjection = new THREE.Vector4(
+    Number(material.map?.repeat?.x || 0.08),
+    Number(material.map?.repeat?.y || (1 / 16)),
+    Number(material.map?.offset?.x || 0),
+    Number(material.map?.offset?.y || 0)
+  );
+  const roofA = new THREE.Color(roof.colorA);
+  const roofB = new THREE.Color(roof.colorB);
+  const grainScale = Number(roof.grainScale || 0.6);
   material.onBeforeCompile = (shader) => {
     shader.uniforms.facadeEntranceAtlas = { value: entranceAtlas };
+    shader.uniforms.facadeProjection = { value: facadeProjection };
+    shader.uniforms.facadeRoofA = { value: roofA };
+    shader.uniforms.facadeRoofB = { value: roofB };
+    shader.uniforms.facadeRoofGrainScale = { value: grainScale };
     shader.vertexShader = `attribute vec4 facadeEntrance;\nvarying float vFacadeWallMask;\nvarying vec2 vFacadeRoofPosition;\nvarying vec2 vFacadeWallPosition;\nvarying vec4 vFacadeEntrance;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace(
       '#include <beginnormal_vertex>',
@@ -354,6 +355,10 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas) {
       'varying vec2 vFacadeWallPosition;',
       'varying vec4 vFacadeEntrance;',
       'uniform sampler2D facadeEntranceAtlas;',
+      'uniform vec4 facadeProjection;',
+      'uniform vec3 facadeRoofA;',
+      'uniform vec3 facadeRoofB;',
+      'uniform float facadeRoofGrainScale;',
       'float facadeRoofHash(vec2 p) {',
       '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);',
       '}',
@@ -377,10 +382,10 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas) {
         '#include <map_fragment>',
         [
         '#ifdef USE_MAP',
-        `  vec2 facadeUv = vec2(vFacadeWallPosition.x * ${facadeRepeatX} + ${facadeOffsetX}, vFacadeWallPosition.y * ${facadeRepeatY} + ${facadeOffsetY});`,
+        '  vec2 facadeUv = vFacadeWallPosition * facadeProjection.xy + facadeProjection.zw;',
         '  vec4 facadeTexel = mapTexelToLinear(texture2D(map, facadeUv));',
-        `  float roofGrain = facadeRoofNoise(vFacadeRoofPosition * ${grainScale});`,
-        `  vec3 roofSurface = mix(${roofA}, ${roofB}, 0.18 + roofGrain * 0.64);`,
+        '  float roofGrain = facadeRoofNoise(vFacadeRoofPosition * facadeRoofGrainScale);',
+        '  vec3 roofSurface = mix(facadeRoofA, facadeRoofB, 0.18 + roofGrain * 0.64);',
         '  diffuseColor.rgb = mix(roofSurface, diffuseColor.rgb * facadeTexel.rgb, vFacadeWallMask);',
         '  diffuseColor.a *= facadeTexel.a;',
         '  float entranceActive = step(0.5, vFacadeEntrance.y) * vFacadeWallMask;',
@@ -409,7 +414,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas) {
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => `building-facade-world-projection-v4-integrated-entrances:${roof.key}:${facadeRepeatX}:${facadeRepeatY}:${facadeOffsetX}`;
+  material.customProgramCacheKey = () => 'building-facade-world-projection-v5-integrated-entrances-uniform-parameters';
 }
 
 export function getBuildingMaterial(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
@@ -471,6 +476,9 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
     colorSource: mappedColor ? 'building:colour' : 'material-profile',
     roofSurfaceOwner: 'engine/building-facade-materials',
     roofSurfaceStyle: roof.key,
+    roofSurfaceColorA: roof.colorA,
+    roofSurfaceColorB: roof.colorB,
+    roofSurfaceGrainScale: roof.grainScale,
     roofMaterialClaim: options.roofMaterial ? 'mapped' : 'type-inferred-fallback',
     roofMaterialSource: options.roofMaterial ? 'roof:material' : 'building-type',
     roofColorClaim: roof.colorMapped ? 'mapped' : 'profile-default',

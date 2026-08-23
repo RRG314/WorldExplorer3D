@@ -644,7 +644,13 @@ function updateHUD() {
       const authoritativeWalkSurface = appCtx.SurfaceQuery?.walkAt?.(
         walker.x,
         walker.z,
-        { currentY: Number(walker.y) - 1.7 }
+        {
+          currentY: Number(walker.y) - 1.7,
+          // The HUD needs mapped identity and speed-limit metadata, not a
+          // second rendered-geometry height sample. Walking physics already
+          // owns contact resolution through this same SurfaceQuery authority.
+          sampleRenderedMesh: false
+        }
       );
       if (authoritativeWalkSurface?.feature) {
         walkSurface = authoritativeWalkSurface.feature;

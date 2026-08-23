@@ -8,7 +8,7 @@ import {
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=20";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=21";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";

@@ -150,6 +150,8 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
+- [System inventory](docs/SYSTEM_INVENTORY.md)
+- [Architecture map](docs/ARCHITECTURE_MAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
 - [DeFlock Hunt](docs/DEFLOCK_MODE.md)
 - [Data sources and attribution](DATA_SOURCES.md)

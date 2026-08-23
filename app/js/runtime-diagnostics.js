@@ -186,14 +186,34 @@ function mappedTallBuildingVisualSnapshot() {
         attachedMeshCount: 0,
         visibleMeshCount: 0,
         lodTiers: new Set(),
-        renderedHeightMeters: null
+        renderedTopOffsetMeters: null
       };
       current.meshCount += 1;
       if (attached) current.attachedMeshCount += 1;
       if (visible) current.visibleMeshCount += 1;
       if (mesh.userData?.lodTier) current.lodTiers.add(String(mesh.userData.lodTier));
-      if (Number.isFinite(Number(mesh.userData?.renderedHeightMeters))) {
-        current.renderedHeightMeters = Number(mesh.userData.renderedHeightMeters);
+      if (direct && mesh.geometry) {
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        const groundBaseY = Number(direct?.foundation?.groundBaseY);
+        if (mesh.geometry.boundingBox && Number.isFinite(groundBaseY)) {
+          mesh.updateMatrixWorld(true);
+          const bounds = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+          const foundationRise = Math.max(0, Number(mesh.userData?.terrainFoundationRise) || 0);
+          const topOffset = bounds.max.y - groundBaseY - foundationRise;
+          if (Number.isFinite(topOffset)) {
+            current.renderedTopOffsetMeters = Math.max(
+              topOffset,
+              Number(current.renderedTopOffsetMeters) || -Infinity
+            );
+          }
+        }
+      }
+      const batchedTopOffset = Number(mesh.userData?.buildingVisualTopOffsetsByFeatureId?.[identity]);
+      if (Number.isFinite(batchedTopOffset)) {
+        current.renderedTopOffsetMeters = Math.max(
+          batchedTopOffset,
+          Number(current.renderedTopOffsetMeters) || -Infinity
+        );
       }
       visualsByIdentity.set(identity, current);
     }
@@ -211,6 +231,18 @@ function mappedTallBuildingVisualSnapshot() {
     if (!mappedHeightAuthority || !(heightMeters >= 60)) return null;
     const identity = String(record?.identity?.featureId || '');
     const visual = visualsByIdentity.get(identity) || null;
+    const structureBaseOffsetMeters = Number(record?.foundation?.structureBaseOffsetMeters) || 0;
+    // A mapped `height` is the feature top above ground. A height inferred
+    // from mapped levels is the rendered body thickness, so an elevated part
+    // must add its mapped base offset before comparing final geometry.
+    const expectedTopOffsetMeters = heightField?.status === 'mapped'
+      ? heightMeters
+      : structureBaseOffsetMeters + heightMeters;
+    const renderedTopOffsetMeters = numberOrNull(visual?.renderedTopOffsetMeters);
+    const heightDeltaMeters = renderedTopOffsetMeters == null
+      ? null
+      : renderedTopOffsetMeters - expectedTopOffsetMeters;
+    const heightToleranceMeters = Math.max(3, expectedTopOffsetMeters * 0.05);
     return {
       identity,
       name: String(record?.fields?.name?.value || ''),
@@ -226,13 +258,23 @@ function mappedTallBuildingVisualSnapshot() {
       attachedMeshCount: Number(visual?.attachedMeshCount || 0),
       visibleMeshCount: Number(visual?.visibleMeshCount || 0),
       lodTiers: visual ? [...visual.lodTiers].sort() : [],
-      renderedHeightMeters: numberOrNull(visual?.renderedHeightMeters)
+      buildingRole: String(record?.identity?.role || ''),
+      structureBaseOffsetMeters,
+      mappedMinimumHeight: record?.fields?.minHeightMeters || null,
+      foundation: record?.foundation || null,
+      expectedTopOffsetMeters,
+      renderedTopOffsetMeters,
+      heightDeltaMeters: numberOrNull(heightDeltaMeters),
+      heightToleranceMeters,
+      heightMatchesMappedSource: heightDeltaMeters != null && Math.abs(heightDeltaMeters) <= heightToleranceMeters
     };
   }).filter(Boolean).sort((left, right) =>
     right.heightMeters - left.heightMeters || left.identity.localeCompare(right.identity)
   );
   const attached = records.filter((record) => record.attachedMeshCount > 0).length;
   const visible = records.filter((record) => record.visibleMeshCount > 0).length;
+  const missingRenderedHeight = records.filter((record) => record.renderedTopOffsetMeters == null).length;
+  const heightMismatches = records.filter((record) => record.heightMatchesMappedSource !== true).length;
   return {
     authority: 'mapped-building-identity-to-final-scene-visual',
     mappedTallRecords: records.length,
@@ -240,6 +282,8 @@ function mappedTallBuildingVisualSnapshot() {
     visibleMappedTallRecords: visible,
     missingVisualRecords: records.length - attached,
     hiddenVisualRecords: records.length - visible,
+    missingRenderedHeightRecords: missingRenderedHeight,
+    heightMismatchRecords: heightMismatches,
     samples: records.slice(0, 32)
   };
 }

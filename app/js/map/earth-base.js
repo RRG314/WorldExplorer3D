@@ -3,6 +3,102 @@ import { getOverlayPreset } from "../editor/preset-registry.js?v=1";
 import { geometryPolygonRings } from "../editor/schema.js?v=1";
 import { loadTile } from "./tiles.js?v=4";
 
+const ROAD_MAP_INDEX_CELL_SIZE = 256;
+let roadMapIndex = null;
+
+function roadMapIndexIsCurrent(roads) {
+  return roadMapIndex?.source === roads &&
+    roadMapIndex.length === roads.length &&
+    roadMapIndex.first === roads[0] &&
+    roadMapIndex.last === roads[roads.length - 1];
+}
+
+function rebuildRoadMapIndex(roads) {
+  const cells = new Map();
+  const boundsByRoad = new WeakMap();
+  for (const road of roads) {
+    const points = Array.isArray(road?.pts) ? road.pts : [];
+    if (points.length < 2) continue;
+    let minX = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxZ = -Infinity;
+    for (const point of points) {
+      if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) continue;
+      minX = Math.min(minX, point.x);
+      minZ = Math.min(minZ, point.z);
+      maxX = Math.max(maxX, point.x);
+      maxZ = Math.max(maxZ, point.z);
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minZ) ||
+        !Number.isFinite(maxX) || !Number.isFinite(maxZ)) continue;
+    const bounds = { minX, minZ, maxX, maxZ };
+    boundsByRoad.set(road, bounds);
+    const minCellX = Math.floor(minX / ROAD_MAP_INDEX_CELL_SIZE);
+    const minCellZ = Math.floor(minZ / ROAD_MAP_INDEX_CELL_SIZE);
+    const maxCellX = Math.floor(maxX / ROAD_MAP_INDEX_CELL_SIZE);
+    const maxCellZ = Math.floor(maxZ / ROAD_MAP_INDEX_CELL_SIZE);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+        const key = `${cellX}:${cellZ}`;
+        const cell = cells.get(key) || [];
+        cell.push(road);
+        cells.set(key, cell);
+      }
+    }
+  }
+  roadMapIndex = {
+    source: roads,
+    length: roads.length,
+    first: roads[0],
+    last: roads[roads.length - 1],
+    cells,
+    boundsByRoad
+  };
+  return roadMapIndex;
+}
+
+function visibleRoadMapCandidates(roads, view, w, h) {
+  const index = roadMapIndexIsCurrent(roads) ? roadMapIndex : rebuildRoadMapIndex(roads);
+  const refX = Number(view?.ref?.x);
+  const refZ = Number(view?.ref?.z);
+  if (!Number.isFinite(refX) || !Number.isFinite(refZ)) return roads;
+
+  const origin = view.worldToScreen(refX, refZ);
+  const sampleDistance = 100;
+  const sampleX = view.worldToScreen(refX + sampleDistance, refZ);
+  const sampleZ = view.worldToScreen(refX, refZ + sampleDistance);
+  const pixelsPerWorldX = Math.abs(sampleX.x - origin.x) / sampleDistance;
+  const pixelsPerWorldZ = Math.abs(sampleZ.y - origin.y) / sampleDistance;
+  if (!(pixelsPerWorldX > 0) || !(pixelsPerWorldZ > 0)) return roads;
+
+  // Query twice the visible half-extent. The padding preserves roads whose
+  // wide strokes or crossing segments enter the canvas from outside its edge.
+  const halfWorldX = w / pixelsPerWorldX;
+  const halfWorldZ = h / pixelsPerWorldZ;
+  const minX = refX - halfWorldX;
+  const maxX = refX + halfWorldX;
+  const minZ = refZ - halfWorldZ;
+  const maxZ = refZ + halfWorldZ;
+  const minCellX = Math.floor(minX / ROAD_MAP_INDEX_CELL_SIZE);
+  const minCellZ = Math.floor(minZ / ROAD_MAP_INDEX_CELL_SIZE);
+  const maxCellX = Math.floor(maxX / ROAD_MAP_INDEX_CELL_SIZE);
+  const maxCellZ = Math.floor(maxZ / ROAD_MAP_INDEX_CELL_SIZE);
+  const candidates = new Set();
+  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+    for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+      for (const road of index.cells.get(`${cellX}:${cellZ}`) || []) {
+        const bounds = index.boundsByRoad.get(road);
+        if (bounds && bounds.maxX >= minX && bounds.minX <= maxX &&
+            bounds.maxZ >= minZ && bounds.minZ <= maxZ) {
+          candidates.add(road);
+        }
+      }
+    }
+  }
+  return [...candidates];
+}
+
 function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
   const {
     zoom,
@@ -39,7 +135,7 @@ function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
 
   drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
-  drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
+  drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen);
   drawInteriorLayer(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawContributionOverlayLayer(ctx, w, h, isLarge, latLonToScreen, mx, my);
 }
@@ -155,10 +251,10 @@ function drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
   ctx.restore();
 }
 
-function drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
+function drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen) {
   if (!(appCtx.showRoads && appCtx.roads.length > 0)) return;
 
-  appCtx.roads.forEach((road) => {
+  visibleRoadMapCandidates(appCtx.roads, view, w, h).forEach((road) => {
     if (!road.pts || road.pts.length < 2) return;
 
     let roadColor;
@@ -192,10 +288,8 @@ function drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
     ctx.beginPath();
     road.pts.forEach((pt, i) => {
       const pos = worldToScreen(pt.x, pt.z);
-      if (Math.abs(pos.x - mx) < w && Math.abs(pos.y - my) < h) {
-        if (i === 0) ctx.moveTo(pos.x, pos.y);
-        else ctx.lineTo(pos.x, pos.y);
-      }
+      if (i === 0) ctx.moveTo(pos.x, pos.y);
+      else ctx.lineTo(pos.x, pos.y);
     });
     ctx.stroke();
 
@@ -204,10 +298,8 @@ function drawRoadLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
     ctx.beginPath();
     road.pts.forEach((pt, i) => {
       const pos = worldToScreen(pt.x, pt.z);
-      if (Math.abs(pos.x - mx) < w && Math.abs(pos.y - my) < h) {
-        if (i === 0) ctx.moveTo(pos.x, pos.y);
-        else ctx.lineTo(pos.x, pos.y);
-      }
+      if (i === 0) ctx.moveTo(pos.x, pos.y);
+      else ctx.lineTo(pos.x, pos.y);
     });
     ctx.stroke();
     ctx.globalAlpha = 1.0;

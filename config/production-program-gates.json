@@ -1,21 +1,30 @@
 {
-  "schemaVersion": 1,
-  "programId": "character-explorer-sandbox-unification-2026-08-18",
+  "schemaVersion": 2,
+  "programId": "current-product-completion-2026-08-22",
+  "productBaseline": {
+    "version": "4.3.1",
+    "releaseCommit": "af540b39fc80ba01998d48a2739d982fd8b913c1"
+  },
+  "roadmap": "ROADMAP.md",
   "productionRequired": true,
+  "statusDefinitions": [
+    "complete",
+    "in-progress",
+    "partial",
+    "not-implemented"
+  ],
   "workstreams": {
-    "productionBlockerRepair": "implemented-awaiting-final-release-evidence",
-    "waterSkyRealism": "implemented-awaiting-final-release-evidence",
-    "phase0EvidenceAndContainment": "in-progress",
-    "phase1PlayerDomainContracts": "in-progress",
-    "phase2BackpackJournalControls": "in-progress",
-    "phase3ItemUtilityCraftingTrade": "in-progress",
-    "phase4PhysicalEmbodimentSpike": "not-started",
-    "phase5VehicleActorPhysics": "in-progress",
-    "phase6CivicResponseCustody": "in-progress",
-    "phase7VerifiedFacilities": "in-progress",
-    "phase8MissionsEconomyContinuity": "not-started",
-    "phase9EngagementLeaderboards": "not-started",
-    "phase10DoorsTransportWorldwideRelease": "not-started"
+    "CP0CurrentFeatureEvidence": "in-progress",
+    "CP1DeterministicFixedWorld": "in-progress",
+    "CP2WorldwideTransport": "in-progress",
+    "CP3BuildingsFacadesInteriors": "in-progress",
+    "CP4PlayerBackpackJournalControls": "partial",
+    "CP5UrbanSandboxCompletion": "partial",
+    "CP6MissionsCraftingEconomyEngagement": "not-implemented",
+    "CP7WaterOceanFishingEvidence": "partial",
+    "CP8MultiplayerCreatorPublishing": "partial",
+    "CP9PerformanceMemoryDataUse": "partial",
+    "CP10UiAccessibilityPresentationRelease": "partial"
   },
   "requiredCompleteStatus": "complete"
 }

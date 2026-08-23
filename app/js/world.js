@@ -101,12 +101,12 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=53";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=54";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=14";
+} from "./world/render-support.js?v=15";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -142,7 +142,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=30";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=31";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=17";

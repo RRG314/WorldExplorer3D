@@ -6,7 +6,7 @@ import {
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
 import { createMidLodBuildingMesh } from "./load-geometry.js?v=27";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=5";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
@@ -15,7 +15,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=10";
+} from "./building-batching.js?v=12";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=8';
@@ -652,6 +652,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       mappedRoofMesh.userData.geometrySource = way.tags._geometrySource || 'osm';
       mappedRoofMesh.userData.buildingProvenance = buildingProvenance;
       mappedRoofMesh.userData.lodTier = lodTier;
+      mappedRoofMesh.userData.terrainFoundationRise = terrainFoundationRise;
       appCtx.addEarthWorldObject(mappedRoofMesh);
       appCtx.buildingMeshes.push(mappedRoofMesh);
     }
