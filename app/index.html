@@ -21,13 +21,13 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=90">
+<link rel="stylesheet" href="styles/title-shell.css?v=91">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=100">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=3">
 <link rel="stylesheet" href="styles/interface-v4.css?v=17">
-<link rel="stylesheet" href="styles/start-hub.css?v=14">
+<link rel="stylesheet" href="styles/start-hub.css?v=15">
 <link rel="stylesheet" href="styles/discovery.css?v=5">
 <link rel="stylesheet" href="styles/tutorial.css?v=1">
 <link rel="stylesheet" href="styles/ar.css?v=1">
@@ -107,6 +107,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
 </div>
 <div class="title-location-actions">
+<button id="titleLiveGpsBtn" class="title-live-gps-btn" type="button">📍 Start Live GPS Explore</button>
 <button id="titleUseMyLocationBtn" class="title-use-location-btn" type="button">Use My Location</button>
 <div id="titleUseMyLocationStatus" class="title-location-status" aria-live="polite"></div>
 </div>
@@ -493,6 +494,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
   <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
+<button id="globeSelectorLiveGpsBtn" class="globe-selector-action-btn globe-selector-live-gps-btn" type="button">📍 Start Live GPS Explore</button>
 <div class="globe-selector-stat">
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>

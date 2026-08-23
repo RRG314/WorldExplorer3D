@@ -22,6 +22,8 @@ function initTitleScreenUi({
 }) {
   const customPanel = document.getElementById('customPanel');
   const titleUseMyLocationBtn = document.getElementById('titleUseMyLocationBtn');
+  const titleLiveGpsBtn = document.getElementById('titleLiveGpsBtn');
+  const globeLiveGpsBtn = document.getElementById('globeSelectorLiveGpsBtn');
   const titleUseMyLocationStatus = document.getElementById('titleUseMyLocationStatus');
   const earthLaunchToggle = document.getElementById('earthLaunchToggle');
   const moonLaunchToggle = document.getElementById('moonLaunchToggle');
@@ -40,6 +42,7 @@ function initTitleScreenUi({
   let globeSelector = null;
   let skipGlobeGateOnce = false;
   let geolocationBusy = false;
+  let liveGpsLaunchBusy = false;
   let oceanEntryHadEarthWorld = false;
   let multiplayerWarmupPromise = null;
   let requestTitleStart = () => Promise.resolve(false);
@@ -297,6 +300,45 @@ function initTitleScreenUi({
     }
   };
 
+  const selectLiveGpsMode = () => {
+    document.querySelectorAll('.mode').forEach((element) => element.classList.remove('sel'));
+    document.querySelector('.mode[data-mode="livegps"]')?.classList.add('sel');
+    appCtx.gameMode = 'livegps';
+    setLaunchMode('earth');
+  };
+  const setLiveGpsLaunchBusy = (isBusy) => {
+    liveGpsLaunchBusy = !!isBusy;
+    [titleLiveGpsBtn, globeLiveGpsBtn].forEach((button) => {
+      if (!button) return;
+      button.disabled = liveGpsLaunchBusy;
+      button.setAttribute('aria-busy', liveGpsLaunchBusy ? 'true' : 'false');
+      button.textContent = liveGpsLaunchBusy ? 'Starting Live GPS…' : '📍 Start Live GPS Explore';
+    });
+  };
+  const runLiveGpsExplore = async () => {
+    if (liveGpsLaunchBusy) return false;
+    selectLiveGpsMode();
+    setLiveGpsLaunchBusy(true);
+    setTitleUseMyLocationStatus('Live GPS will ask for location access, then open the world at your position.', '#0e7490');
+    globeSelector?.setSearchStatus?.('Live GPS will ask for location access, then open the world at your position.', '#0e7490');
+    try {
+      const launched = await requestTitleStart();
+      if (launched === false && !document.getElementById('liveGpsPermissionPanel')?.classList.contains('show')) {
+        setTitleUseMyLocationStatus('Live GPS start canceled. Tap Start Live GPS Explore to retry.', '#b45309');
+        globeSelector?.setSearchStatus?.('Live GPS start canceled. Tap Start Live GPS Explore to retry.', '#b45309');
+      }
+      return launched;
+    } catch (error) {
+      const message = error?.message || 'Live GPS could not start. Check location access and try again.';
+      setTitleUseMyLocationStatus(message, '#dc2626');
+      globeSelector?.setSearchStatus?.(message, '#dc2626');
+      console.error('[live-gps] Title launch failed.', error);
+      return false;
+    } finally {
+      setLiveGpsLaunchBusy(false);
+    }
+  };
+
   appCtx.triggerTitleStart = (options = {}) => {
     if (options?.bypassCustomGate) {
       skipGlobeGateOnce = true;
@@ -313,6 +355,8 @@ function initTitleScreenUi({
     if (button.dataset.tab === 'multiplayer') primeMultiplayerUi();
   }));
   titleUseMyLocationBtn?.addEventListener('click', () => runUseMyLocation('menu'));
+  titleLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
+  globeLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
 
   globeSelector = createGlobeSelector({
     onOpen: () => emitTutorialEvent('opened_globe_selector'),
