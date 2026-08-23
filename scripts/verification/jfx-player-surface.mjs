@@ -300,7 +300,7 @@ try {
       Number(worldTradeCenter?.heightMeters) === 123.5 &&
       Number(worldTradeCenter?.attachedMeshCount || 0) > 0 &&
       Number(worldTradeCenter?.visibleMeshCount || 0) > 0 &&
-      Number(worldTradeCenter?.renderedHeightMeters || 0) >= 123.5,
+      Math.abs(Number(worldTradeCenter?.renderedTopOffsetMeters || 0) - 123.5) <= 0.01,
     finalBuildingMeshesVisible:
       Number(snapshot.worldCounts?.visibleBuildingMeshes || 0) > 0,
     noRuntimeErrors: snapshot.runtimeErrors.length === 0,
