@@ -162,7 +162,9 @@ try {
           snapshot.worldLoad?.buildingProviderDecision?.authority === 'authoritative',
         mappedTallIdentitiesKeepFinalVisuals:
           Number(snapshot.mappedTallBuildingVisuals?.missingVisualRecords || 0) === 0 &&
-          Number(snapshot.mappedTallBuildingVisuals?.hiddenVisualRecords || 0) === 0,
+          Number(snapshot.mappedTallBuildingVisuals?.hiddenVisualRecords || 0) === 0 &&
+          Number(snapshot.mappedTallBuildingVisuals?.missingRenderedHeightRecords || 0) === 0 &&
+          Number(snapshot.mappedTallBuildingVisuals?.heightMismatchRecords || 0) === 0,
         oneFarBuildingHeightAuthority:
           snapshot.farTerrainClipmap?.farBuildingHeightAuthority === 'shared-building-semantics' &&
           Number(snapshot.farTerrainClipmap?.farMappedHeightBuildings || 0) +

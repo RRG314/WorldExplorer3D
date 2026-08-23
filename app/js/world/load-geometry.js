@@ -3,7 +3,7 @@ import {
   classifyWaterSurfaceProfile,
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=18";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=5";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
