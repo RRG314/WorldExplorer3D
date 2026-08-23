@@ -52,6 +52,8 @@ function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
       'varying vec4 vBuildingFacadeParams;',
       'varying vec4 vBuildingRoofAParams;',
       'varying vec4 vBuildingRoofColorB;',
+      'varying float vBuildingWallMask;',
+      'varying vec2 vBuildingRoofPosition;',
       'varying vec2 vBuildingFacadeWorldPosition;',
       shader.vertexShader
     ].join('\n');
@@ -62,6 +64,8 @@ function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
         'vBuildingFacadeParams = buildingFacadeParams;',
         'vBuildingRoofAParams = buildingRoofAParams;',
         'vBuildingRoofColorB = buildingRoofColorB;',
+        'vBuildingWallMask = smoothstep(0.18, 0.72, 1.0 - abs(objectNormal.y));',
+        'vBuildingRoofPosition = position.xz;',
         'float buildingFacadeHorizontal = abs(objectNormal.x) > abs(objectNormal.z) ? position.z : position.x;',
         'vBuildingFacadeWorldPosition = vec2(buildingFacadeHorizontal, position.y);'
       ].join('\n')
@@ -70,9 +74,21 @@ function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
       'varying vec4 vBuildingFacadeParams;',
       'varying vec4 vBuildingRoofAParams;',
       'varying vec4 vBuildingRoofColorB;',
+      'varying float vBuildingWallMask;',
+      'varying vec2 vBuildingRoofPosition;',
       'varying vec2 vBuildingFacadeWorldPosition;',
       'float buildingMidRoofHash(vec2 p) {',
-      '  return fract(sin(dot(floor(p), vec2(127.1, 311.7))) * 43758.5453123);',
+      '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);',
+      '}',
+      'float buildingMidRoofNoise(vec2 p) {',
+      '  vec2 cell = floor(p);',
+      '  vec2 fraction = fract(p);',
+      '  vec2 blend = fraction * fraction * (3.0 - 2.0 * fraction);',
+      '  float a = buildingMidRoofHash(cell);',
+      '  float b = buildingMidRoofHash(cell + vec2(1.0, 0.0));',
+      '  float c = buildingMidRoofHash(cell + vec2(0.0, 1.0));',
+      '  float d = buildingMidRoofHash(cell + vec2(1.0, 1.0));',
+      '  return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);',
       '}',
       shader.fragmentShader
     ].join('\n');
@@ -82,15 +98,15 @@ function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
         '#ifdef USE_MAP',
         '  vec2 buildingFacadeUv = vBuildingFacadeWorldPosition * vBuildingFacadeParams.xy + vBuildingFacadeParams.zw;',
         '  vec4 buildingFacadeTexel = mapTexelToLinear(texture2D(map, buildingFacadeUv));',
-        '  float buildingRoofGrain = buildingMidRoofHash(vBuildingFacadeWorldPosition * vBuildingRoofAParams.w);',
+        '  float buildingRoofGrain = buildingMidRoofNoise(vBuildingRoofPosition * vBuildingRoofAParams.w);',
         '  vec3 buildingRoofSurface = mix(vBuildingRoofAParams.rgb, vBuildingRoofColorB.rgb, 0.18 + buildingRoofGrain * 0.64);',
-        '  diffuseColor.rgb = mix(buildingRoofSurface, diffuseColor.rgb * buildingFacadeTexel.rgb, vBuildingRoofColorB.w);',
-        '  diffuseColor.a *= mix(1.0, buildingFacadeTexel.a, vBuildingRoofColorB.w);',
+        '  diffuseColor.rgb = mix(buildingRoofSurface, diffuseColor.rgb * buildingFacadeTexel.rgb, vBuildingWallMask);',
+        '  diffuseColor.a *= mix(1.0, buildingFacadeTexel.a, vBuildingWallMask);',
         '#endif'
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v2-per-vertex-presentation';
+  material.customProgramCacheKey = () => 'building-mid-facade-batch-v3-production-shader-parity';
   material.userData = {
     ...(material.userData || {}),
     buildingMidFacadeBatch: true,

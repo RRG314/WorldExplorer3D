@@ -15,7 +15,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=11";
+} from "./building-batching.js?v=12";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=8';
