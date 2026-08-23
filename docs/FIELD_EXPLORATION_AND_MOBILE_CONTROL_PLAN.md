@@ -51,14 +51,21 @@ Non-negotiable rules:
   mode, and enforces bounded-world warning/recenter/hard-pause radii.
 - Discovery compiles deterministic local cells from published roads,
   buildings, land use, and water. It has nearby activities, tool requirements,
-  interaction radii, hold-to-observe behavior, Journal and Field Guide records,
-  a Backpack projection, companions, goals, and Explorer points.
+  interaction radii, hold-to-observe behavior, a Today-like Activities surface,
+  Current Goal, Recent Journal, Field Guide records, regional summaries, a
+  Backpack projection, companions, and Explorer points.
+- Explorer records already use stable claim/event IDs in a chronological
+  IndexedDB event store. Four ranks, three specialties, new-identification and
+  new-region credit, and released tool unlocks at 0/8/20 points are real
+  foundations that must be migrated, not silently replaced.
 - Wildlife already has deterministic ambient slots, basic approach/flee
   behavior, a capped visible population, and several interaction paths.
 - Fishing has a real cast/fight/catch loop, equipment state, catch records, and
   a 14-species catalog.
-- A shared Backpack model, screen-layout service, semantic input actions,
-  desktop controls, and hard-coded touch profiles already exist.
+- A shared Backpack model, a partial screen-layout service, desktop input
+  handlers, and hard-coded touch profiles already exist. The touch layer writes
+  directly into Earth/Space key-state channels; one cross-device semantic input
+  authority does not yet exist.
 - The normal 390×844 production entry now exposes and verifies Live GPS from the
   first screen, and the in-game mobile Games menu exposes the same mode.
 
@@ -72,14 +79,17 @@ Non-negotiable rules:
 - Ambient wildlife is effectively a few generic archetypes: rock pigeon,
   mallard, a generic small mammal, and several domestic companion variants.
   There is no production insect catalog or credible worldwide species model.
-- Field records contain only a handful of wildlife/plant entries. Four Explorer
-  ranks, simple points, one goal chain, and shallow unlock thresholds cannot
-  sustain extended play.
+- Field records contain only a handful of wildlife/plant entries. The existing
+  first-use/regional/rank goal sequence and shallow unlock thresholds teach the
+  foundation but cannot sustain recurring or seasonal play.
 - There are no daily field notes, weekly expeditions, routes, habitat mastery,
   seasonal surveys, collection challenges, distance rewards, research chains,
   meaningful repeat observations, or community field events.
 - Normal discovery claims receive a server receipt, but the server does not
   independently validate location, movement, proximity, or session eligibility.
+- The local Explorer event is richer than the server receipt: the backend does
+  not own the complete Journal, Field Guide, rank/specialty projection, or an
+  account/device reconciliation contract.
 - Fishing is boat-only. Its 14 fish use broad water-kind and latitude filters;
   it has no shore eligibility, waterbody identity, watershed/region checklist,
   season, time, weather, temperature, salinity, current, depth, bait, or gear
@@ -106,16 +116,75 @@ capture mechanics.
 | Proven location-game system | World Explorer today | World Explorer adaptation |
 | --- | --- | --- |
 | Nearby map objects require physical proximity | Nearby generated activities exist, but GPS is not reward authority | Signals reveal at distance; approach and interaction rings require an eligible field session and accuracy-aware proximity |
-| Field, special, timed, and level-up research | One shallow goal chain and activity records | Daily Field Notes, authored Expeditions, timed Community Surveys, and rank/specialty Research Chapters |
+| Field, special, timed, and level-up research | Current Goal, regional summaries, Journal events, ranks, specialties, and tool unlocks exist locally | Preserve the Explorer event pipeline; add Daily Field Notes, authored Expeditions, timed Community Surveys, and rank/specialty Research Chapters through one lifecycle |
 | Background/weekly walking progress | Foreground GPS only; no distance progression | Foreground field-session distance first; background distance only after a separate privacy, platform, battery, and abuse review |
 | Routes with rewards and badges | Navigation exists; no field-route lifecycle | Curated and moderated survey routes, safe start/end, route objectives, habitat diversity, badges, and rollback-able publication |
 | Buddy relationship and daily capped actions | Companion ownership/adoption exists | Separate virtual Companion Bond with walk, care, photograph, assist, mood, capped daily bond, and explorer perks |
 | Rotating seasons, weather, events, and regional pools | Month/hemisphere metadata exists but barely affects species | Versioned seasonal ecology and event manifests with hemisphere, local time, weather, habitat, migration, and regional constraints |
 | Collection challenges and medals | Field Guide and four ranks | Life-list challenges, observation-quality goals, habitat/region medals, specialist mastery, and seasonal atlas completion |
-| Scheduled cooperative location encounters | Room activities exist separately | Community survey windows, bioblitzes, cleanup/education events, and shared route objectives; no claims about live animal presence |
+| Stops/resource hubs and first-visit discovery | Mapped places and activity anchors exist, but there is no moderated field-service node | Field Stations at eligible public mapped places provide research boards, supplies, first-visit stamps, route starts, and community context without inventing access |
+| Player-activated encounter boosts | No equivalent | Optional Personal Survey Windows and shared Research Beacons increase virtual signal variety for a bounded time; they never claim to attract real wildlife or require payment |
+| Scheduled cooperative location encounters, raids, and gyms | Room activities exist separately; no complete field-cooperation loop | Community survey windows, bioblitzes, restoration/education challenges, and shared route objectives; no wildlife combat, capture, or territorial ownership |
 | Local showcases and party challenges | Leaderboards and rooms are fragmented | Optional local photo/record showcases and 2–4 player Field Parties with shared, non-exclusive objectives |
+| Friends, gifts, postcards, and trading | Friends, rooms, trades, and region-bearing Journal records exist in separate systems | Consent-based Expedition Postcards and field-report exchange with coarse location controls, child-account rules, moderation, and no automatic route disclosure |
 | Delayed distance rewards | No equivalent | Virtual specimen incubation/research processing where thematically suitable; never eggs or removal of real wildlife |
-| A Today view communicating current reasons to play | Status is spread across panels | One Field Today surface: nearby signals, current expedition, daily note, weekly distance, season, event, companion, and safety state |
+| Daily bonuses and streaks | Current Goal is persistent but not time-rotated | A first Field Note and weekly completion bonus with grace/catch-up; missing a day never destroys progress |
+| A Today view communicating current reasons to play | Activities already shows Current Goal, nearby leads, rank, result, and Recent Journal | Evolve this existing surface into Field Today with current expedition, daily note, weekly distance, season/event, companion, pack/download, and safety state |
+| Camera/AR snapshots | AR and virtual wildlife photography exist, but do not form a complete durable observation-quality system | Optional camera/audio evidence improves record quality; a no-camera identification path remains complete and media requires explicit consent and privacy handling |
+| Inventory, replenishment, and monetized convenience | Backpack/tools/trades exist, but no field-supply economy is defined | Define bounded research supplies, gear capability, rewards, and caps before adding scarcity; no pay-to-win proximity, hard energy wall, loot-box species, or paid safety advantage |
+
+## Second-pass omissions and corrections
+
+The first version established the major authorities but missed the following
+product contracts. They are now required scope, not optional polish:
+
+1. **Preserve the existing Explorer spine.** `ExplorerEvent` v1, local claim
+   idempotency, Recent Journal, Field Guide, Current Goal, ranks, specialties,
+   regional progress, Backpack projection, and tool unlocks need explicit
+   adapters and migrations. A new Expedition system cannot create a second
+   Journal, rank, or reward projection.
+2. **Decide the web-platform boundary.** The current browser product reliably
+   supports foreground geolocation. Background distance, push alerts, durable
+   offline jobs, health-platform steps, and native sensor integrations require
+   a documented PWA/native feasibility and privacy decision before they appear
+   in schedules or public claims.
+3. **Create useful geographic service nodes.** Pokémon GO's stops are not just
+   encounter markers; they replenish inventory, distribute research, provide
+   route anchors, and create shared local context. World Explorer needs Field
+   Stations derived from eligible public mapped places, plus a rural fallback
+   that does not make dense cities the only viable progression path.
+4. **Specify the actual skill mechanics.** “Observe” cannot remain one hold
+   timer with different labels. Photography, track/sign analysis, audio survey,
+   macro insect inspection, habitat assessment, identification, geology,
+   shoreline fishing, and community work each need a distinct input, evidence,
+   success/failure, accessibility, safety, and mastery contract.
+5. **Define rewards and supplies before balancing retention.** Explorer points,
+   specialty mastery, gear capabilities, cosmetics, research supplies,
+   companion bond, badges, catches, and tradeable virtual finds need one source/
+   sink and cap policy. Undefined currency, bait durability, energy, premium
+   boosts, or inventory pressure cannot be added ad hoc.
+6. **Design for spatial equity.** Signal density, Field Stations, route access,
+   fishable shores, events, and rewards need urban/suburban/rural/remote,
+   wheelchair-accessible, low-connectivity, and data-sparse acceptance. Density
+   normalization cannot fabricate POIs or award city players more progression
+   simply because mapping is denser.
+7. **Build content operations, not only runtime selectors.** Taxonomy/media
+   review, pack compilation, licenses, localization, safety exclusions, event
+   scheduling, staged rollout, experiments, incident disable, migration,
+   rollback, and audit history need operator tooling and least-privilege roles.
+8. **Treat player media and routes as user-generated content.** Photos, audio,
+   captions, route names/descriptions, postcards, and showcases require metadata
+   stripping, consent, retention/deletion/export, reporting, moderation, rights,
+   child-account controls, and safe public-location generalization.
+9. **Handle international time and language.** Local-day boundaries, time zones,
+   daylight-saving changes, the date line, hemisphere seasons, localized common
+   names, scientific names, units, scripts, and right-to-left layouts need
+   versioned behavior and tests.
+10. **Separate plausibility from abundance.** Occurrence records are unevenly
+    sampled and do not establish absence, current presence, catch probability,
+    or population size. Native/introduced/stocked/migratory status, coordinate
+    uncertainty, record age, sampling bias, and coverage confidence must remain
+    explicit through ecology and fishing selection.
 
 ## The complete player loop
 
@@ -155,6 +224,35 @@ Repeat observations must have value without becoming a grind. They can improve
 photo/audio quality, add a new region/season/behavior/life stage, advance
 specialty mastery, validate a community survey, or contribute to a capped daily
 research objective. Exact same-region repeats do not endlessly mint currency.
+
+## Platform and bounded-world contract
+
+World Explorer is a browser game whose Earth authority loads one bounded fixed
+location. The field game must respect that architecture:
+
+- Phase A is foreground-only and requires a secure context, visible permission
+  state, fresh fix, active screen, and explicit session controls. Permission
+  denied, unavailable, timed out, poor accuracy, offline, and restored-permission
+  journeys have complete explanations and manual-play fallbacks.
+- An Expedition can offer only objectives whose complete approach geometry lies
+  within the current published world and safety margin. The director must not
+  create an objective that requires invisible streaming or crossing the existing
+  recenter/hard-pause boundary.
+- Recenter closes the current spatial segment and opens a new segment under the
+  same user-visible field session. Aggregate eligible distance can continue;
+  proximity proofs and objectives migrate only when their versioned policy
+  explicitly permits it. No reward can be claimed against a disposed snapshot.
+- A route must fit one published snapshot, or be deliberately split into safe,
+  resumable legs. Route detail shows distance, estimated time, elevation/access
+  evidence, start distance, reversibility, download state, and known limitations.
+- Background steps, push notifications, native health data, and geofenced alerts
+  stay **not implemented** until a platform decision records browser/PWA/native
+  behavior, permission and store policies, battery cost, abuse controls, data
+  retention, account consent, and an equivalent no-background progression path.
+- Ecology/content packs are downloadable by bounded region and release version.
+  Core session state, selected objectives, catalog references, and pending
+  records tolerate network loss; authoritative rewards reconcile idempotently
+  after reconnect.
 
 ## Authority architecture
 
@@ -237,12 +335,31 @@ habitats, confidence, observation recency/quality summaries, sensitivity
 generalization, and provider provenance. The client does not query global
 occurrence APIs per frame or disclose sensitive exact records.
 
+### `FieldStationAuthority`
+
+Selects service nodes from stable mapped place identity plus verified public/
+safe approach evidence. A Field Station can issue research, provide bounded
+virtual supplies, anchor a route, record a first visit, host an approved event,
+or show an educational place card. It cannot infer public access from a name or
+place category alone. Nodes have cooldown, retirement, correction, density,
+moderation, accessibility, and provenance state.
+
+Where eligible mapped places are sparse, the system offers a portable Personal
+Field Desk and broader habitat objectives with equivalent progression ceilings.
+It does not fabricate a landmark or require a player to drive to a city.
+
 ### `EncounterDirector`
 
 Selects procedural opportunities from the ecology pack using habitat, season,
 local time, weather, novelty, recent encounters, player specialty, session
 budget, density, accessibility, cooldowns, and event manifest. It emits a stable
 encounter ID and evidence class but cannot directly grant rewards.
+
+The director also owns spatial-equity policy: per-cell opportunity floors and
+ceilings, data-confidence fallbacks, recent-action diversity, cooldowns, and a
+no-objective result when access or ecological evidence is insufficient. It
+never resolves sparse data by inventing a named species, public place, or safe
+route.
 
 ### `ExpeditionAuthority`
 
@@ -251,12 +368,22 @@ event types, progress, completion, cancellation, expiry, reward policy,
 multiplayer contribution, migration, and version. Daily, weekly, seasonal, and
 special research use the same event contract instead of separate counters.
 
+It consumes existing `ExplorerEvent` records through a versioned adapter. Old
+events remain readable, and migrated progress is reproducible from immutable
+events plus versioned projections rather than copied into parallel counters.
+
 ### `RewardLedger`
 
 Validates idempotent event IDs, field-session class, plausible distance/speed,
 proximity proof, objective version, caps, and prior claims. It owns points,
 items, badge progress, challenge credit, and any future currency. The client can
 show a pending result but cannot mint final progression.
+
+The ledger defines reward classes and caps before launch: Explorer rank credit,
+specialty/mastery, badges, research supplies, gear capability, cosmetics,
+companion bond, catches, and explicitly tradeable virtual finds. It does not
+introduce premium proximity, paid accuracy, pay-to-win species odds, hard field
+energy, or loot-box biodiversity.
 
 ### `FieldGuideAuthority`
 
@@ -265,6 +392,25 @@ season, behavior/life stage, media quality, first/last date, and mastery. It
 clearly separates a real-world observation record, a habitat-plausible
 procedural encounter, and a virtual specimen or companion.
 
+### `FieldMediaAuthority`
+
+Owns optional photo/audio capture consent, local draft state, file limits,
+metadata stripping, media quality signals, upload state, rights/attribution,
+content safety, retention/export/deletion, visibility, moderation, and coarse
+place disclosure. Camera or microphone refusal never blocks the base
+identification/Journal loop. Automated quality checks can score framing or
+signal clarity but cannot certify species identity without a separately reviewed
+identification policy.
+
+### `ContentReleaseAuthority`
+
+Owns signed/versioned ecology, Expedition, Field Station, reward, season, event,
+localization, safety-exclusion, and feature manifests. It provides staged
+rollout, region/device targeting without discriminatory rewards, preview,
+approval, activation/expiry, audit history, emergency disable, rollback, client
+compatibility, and migration. Runtime modules consume this publication; they do
+not embed one-off event dates or species overrides.
+
 ### `WaterAndFishPopulationAuthority`
 
 Consumes the existing published water registry and owns waterbody identity,
@@ -272,6 +418,57 @@ fresh/marine/estuary class, shoreline eligibility, depth/salinity/current where
 available, regional fish candidates, season/time/weather modifiers, bait/gear
 compatibility, catch evidence, and boat/shore access. The boat game, shore
 fishing, underwater schools, Field Guide, and catch record share it.
+
+## Distinct field mechanics
+
+Every released activity needs a real verb and observable consequence. Shared
+session plumbing is desirable; identical play with renamed text is not.
+
+| Activity | Required interaction | Evidence/result | Failure and accessibility path |
+| --- | --- | --- | --- |
+| Wildlife observation | Respectful-distance tracking using bearing, movement/sign clues, binocular zoom, and a stable observation window | Species/habitat-plausible record with behavior, time, region, and evidence class | Target leaves, signal quality drops, or access becomes unsafe; audio/text/haptic clue equivalents |
+| Photography | Player frames a virtual subject or habitat and chooses a shutter moment | Optional local image plus computed framing/visibility quality; never proof of real species | Camera denied uses an in-game viewfinder without device capture; no mandatory upload |
+| Audio survey | Direction/interval recognition for a virtual or licensed call with explicit audio provenance | Soundscape/call record and listening-quality score | Muted/deaf path uses synchronized visual/haptic rhythm and equivalent credit |
+| Insect/microfauna study | Locate a habitat clue, then use a macro inspection view with scale/behavior details | Life-stage, morphology, habitat, and season record | No forced device camera; reduced-motion and magnified static inspection alternatives |
+| Track/sign analysis | Compare prints, scat/feather/shed or feeding signs against bounded candidate clues | Evidence-based identification with confidence; no assertion the animal is currently present | Wrong identification gives explanation and another attempt, not a punitive loss |
+| Habitat survey | Sample several distinct mapped/derived habitat facts inside a safe small route | Habitat-quality field note with source truth labels | Incomplete data yields an honest partial record; no invented environmental measurement |
+| Geology/fossil work | Select a virtual outcrop/specimen, use the correct tool motion, expose diagnostic features, and identify | Virtual specimen or observation depending on activity policy | Real collecting/excavation is never instructed; accessible timed/untimed alternatives |
+| Fishing | Select shore/boat position, tackle and cast target; manage hook, tension, direction, stamina, landing/release | Virtual catch/loss event linked to waterbody, regional pool, gear, and Field Guide | Unsafe/ineligible bank, incompatible tackle, broken line, escaped fish, cancel, and assisted controls |
+| Community survey | Contribute one independently valid observation/task to a shared bounded objective | Personal record plus exact-once aggregate contribution | A failed group target never removes individual earned progress; asynchronous contribution allowed |
+
+An encounter publishes a lifecycle: `signaled`, `selected`, `approaching`,
+`interactable`, `active`, `resolved|failed|expired|canceled`, and `cooldown`.
+Every transition records its allowed movement/evidence classes, timeout, safe
+cancel behavior, resume policy, animation/audio ownership, and reward event.
+
+## Progression, supplies, and return design
+
+The current four ranks and tool unlocks remain the migration baseline. New
+progression must define curves and reward purpose rather than adding counters:
+
+- Explorer rank reflects broad account experience; specialties reflect Nature,
+  Earth, Places, fishing, photography/audio, and future reviewed disciplines.
+- Species mastery values first identification, new region/season/behavior/life
+  stage, improved media/evidence quality, and capped research contribution.
+- Habitat and regional atlases combine breadth across taxa and activities; a
+  single farmable species or action cannot complete them.
+- Field Stations and Daily Field Notes can provide bounded virtual research
+  supplies. Supplies support choice and preparation, not an energy timer that
+  prevents ordinary exploration.
+- Gear progression unlocks capabilities, alternate techniques, cosmetics, and
+  convenience within fair ceilings. Better gear cannot falsify evidence or make
+  unsafe GPS accurate.
+- Bait/lures affect the virtual fishing/encounter model only. A Research Beacon
+  advertises a temporary game event to nearby players; it never says real
+  animals were attracted.
+- Companion bond has daily capped care/walk/assist actions and permanent levels
+  that do not decay. Real wildlife cannot be fed, adopted, battled, traded, or
+  treated as owned.
+- First-of-day and weekly completion bonuses have grace and catch-up. No broken
+  streak wipes progress, no notification shame, and no midnight exploit across
+  time zones.
+- Any future currency, premium item, inventory capacity, trading expansion, or
+  marketplace requires a separate economy/security/consumer-protection review.
 
 ## Biodiversity truth and data pipeline
 
@@ -282,6 +479,14 @@ Recommended provider strategy:
   licensing, dataset rights, and sensitive-species generalization.
 - OBIS for marine species occurrence and checklist evidence, with dataset-level
   provenance and policy compliance.
+- HydroBASINS/HydroATLAS as a candidate global watershed and hydro-environment
+  frame for freshwater pack compilation, subject to pinned-version, attribution,
+  redistribution, and derived-data review. Watershed geometry is context, not a
+  fish-presence claim.
+- Reviewed national/regional authorities where they materially improve a pack,
+  such as USGS native-range and nonindigenous aquatic datasets in the United
+  States. Regional additions use provider adapters and may not become hidden
+  city conditionals.
 - eBird regional/summary data only where its access and product terms permit the
   intended use; never scrape the public site.
 - Existing OSM, land cover, water, terrain, weather, and time authorities for
@@ -289,6 +494,30 @@ Recommended provider strategy:
 - A curated licensed media pipeline. Do not scrape images, audio, or 3D models.
 - Taxonomy versions are pinned. Synonyms migrate to stable internal IDs without
   rewriting a player’s historical record.
+
+The offline build pipeline is explicit:
+
+1. ingest only approved dataset releases and record dataset/license/attribution;
+2. normalize taxonomy and preserve provider record IDs plus accepted synonyms;
+3. reject or down-weight invalid coordinates, excessive uncertainty, fossils,
+   captive/cultivated records where inappropriate, implausible dates, duplicate
+   records, and unsupported occurrence bases;
+4. generalize sensitive records and compute age, coverage, sample-density, and
+   provider-diversity diagnostics;
+5. join habitat, water class, watershed/coastal region, season/time traits, and
+   native/introduced/stocked/migratory status without converting correlation
+   into presence or abundance;
+6. run automated anomaly checks and expert review on the candidate regional pack;
+7. publish a signed immutable pack plus coverage card, known gaps, attribution,
+   compatibility range, and rollback pointer;
+8. compare the deployed pack with later corrections through a migration that
+   preserves historical Journal truth.
+
+Each release region needs a coverage card by major taxonomic group and habitat:
+candidate count, reviewed count, recent/high-confidence evidence fraction,
+unknown/sensitive fraction, media quality tier, supported seasons, localization
+coverage, and known sampling bias. A minimum total count cannot hide zero useful
+insects, freshwater fish, marine fish, nocturnal species, or rural content.
 
 Every displayed opportunity carries one truth class:
 
@@ -302,6 +531,9 @@ Every displayed opportunity carries one truth class:
 The product must never say “this animal is here now” unless it is describing the
 player’s own current observation. Sensitive species use coarser geography,
 delayed timing, or omission according to provider and conservation policy.
+Absence of records means `data_insufficient`, not species absence. Common names
+are localized display data; pinned scientific name and stable internal taxon ID
+remain the cross-language identity.
 
 ## Creature, animal, insect, and fish quality
 
@@ -358,6 +590,12 @@ Shore fishing eligibility requires:
 6. a regional fish pool with evidence/confidence and a non-empty compatible
    tackle path.
 
+Every waterbody receives one explainable result: `shore_eligible`,
+`boat_only`, `access_unknown`, `no_safe_bank`, `private_or_excluded`,
+`seasonally_dry_or_ice`, `protected_or_closed`, `insufficient_ecology`, or
+`not_supported`. The game must not turn missing access/regulation data into
+permission, and closures can disable rewards without deleting the mapped water.
+
 Boat and shore players use the same cast, bite, fight, catch/loss, Field Guide,
 population, and reward events. Access method changes depth, distance, species,
 gear, and risk; it does not fork the fishing game.
@@ -367,6 +605,23 @@ fresh/marine/estuary class, season, local time, weather, temperature where
 available, salinity/current/depth evidence, habitat, bait, lure, gear, prior
 pressure/cooldown, rarity, and event manifest. Missing evidence widens the pool
 and lowers confidence instead of fabricating precision.
+
+The fish record distinguishes native range, introduced/established, stocked,
+migratory/seasonal, vagrant, and unknown where supported. These labels affect
+education and pack confidence, not moralized score. Occurrence history never
+becomes modeled abundance or a promise that a fish will bite.
+
+The existing 60-entry local catch history and 14-species IDs require a migration
+adapter into `ExplorerEvent`, Field Guide, account sync, and the unified fish
+catalog. Old virtual catches remain visible with their original
+`simulated-estimate` measurement truth; catalog upgrades do not rewrite species,
+size, place, or date.
+
+Tackle has explicit rod/reel/line/hook/lure/bait capabilities, legal/safety
+disclaimers, compatible habitat/depth ranges, durability decision, acquisition,
+repair/reset, inventory cap, and accessibility controls. Until those rules are
+approved, the starter fishing rod remains functional and no consumable bait or
+premium tackle is introduced.
 
 Catches are virtual game outcomes. The UI should support catch-and-release
 education and local regulation links where dependable, but it must not present
@@ -403,6 +658,29 @@ safety actions, validates duplicate exclusive bindings, and always exposes a
 hardware/browser-independent recovery gesture. Saving is not accepted until a
 test action changes the actual gameplay action state.
 
+The control schema records:
+
+- stable action ID, context (`global`, `walk`, `drive`, `boat`, `plane`,
+  `drone`, `ocean`, `space`, `Live GPS`, `panel`, or `activity`), input type,
+  label/help, required/optional status, and exclusivity group;
+- digital press/release, analog vector/axis, pointer region, gesture, hold,
+  toggle, repeat, chord, sensitivity curve, inversion, dead zone, and haptic
+  feedback without converting them into synthetic keyboard events;
+- visual control ID, normalized safe-zone position, size, opacity, handedness,
+  z-order, portrait/landscape variant, and per-mode visibility;
+- profile ID/version, device class, created/updated time, local/account sync
+  scope, base-default version, migration result, and last-known-good recovery;
+- conflict and precedence policy. Global Back/Cancel, Stop GPS, pause, and reset
+  cannot be shadowed; contextual Interact resolves one visible action owner;
+  panels suspend gameplay actions; releasing focus/visibility clears all held
+  digital and analog state.
+
+The first migration wraps the existing keyboard/gamepad handlers and fixed
+mobile profiles behind the new action reader while preserving their default
+feel. Only after parity tests pass does the touch editor write custom profiles.
+Removing the direct `appCtx.keys`/Space-key coupling is a measured migration,
+not a one-file rewrite.
+
 ### Screen and navigation rules
 
 - Only one full-screen panel/activity may own interaction at once.
@@ -438,6 +716,13 @@ instrumented prototypes and observed results.
 The default is the best-performing direct-control profile that preserves the
 current game feel. Alternatives are opt-in saved profiles, not untested toggles.
 
+Observed R&D records task completion, error/mis-touch rate, time to recover,
+camera overshoot, simultaneous-input success, one-hand reach, comfort/fatigue,
+motion sickness, eyes-on-screen time during GPS play, preference, battery, FPS,
+and accessibility barriers. A default is accepted only after representative
+players complete walk, look, interact, mode switch, Backpack, GPS stop/recenter,
+and one fishing fight without facilitator correction.
+
 ### Required devices and journeys
 
 Test at minimum: a small iPhone-class viewport, standard and large iPhone,
@@ -469,6 +754,13 @@ driving the rendered control, and observing the intended gameplay action/result.
 - Do not place objectives across unsafe barriers, in water without the matching
   activity, on private/excluded land where known, or where no eligible approach
   surface exists.
+- Weather/emergency alerts, darkness, seasonal closure, construction, tide/ice,
+  wildfire/flood, and access data can suppress or warn where a maintained source
+  exists. Missing live safety data is never presented as proof that a route or
+  shoreline is safe.
+- No objective instructs players to touch, feed, pursue, corner, handle, capture,
+  disturb, collect from, or approach real wildlife. Observation distances and
+  prompts become more conservative for sensitive/large/dangerous taxa.
 - Provide awareness reminders at session start and context changes, then keep
   the ordinary walking HUD glanceable instead of repeatedly demanding attention.
 - Store raw location only in bounded session memory by default. Persistent
@@ -478,8 +770,17 @@ driving the rendered control, and observing the intended gameplay action/result.
   idempotent, replay-resistant, speed/accuracy checked, and rate limited.
 - Spoof suspicion withholds competitive/reward credit; it does not erase a
   user’s local Field Guide without an explainable appeal/recovery path.
-- Child accounts, social discovery, shared routes, and location visibility need
-  separate guardian/privacy review before release.
+- Player photos/audio strip EXIF and precise coordinates before any upload.
+  Visibility defaults private; public media, captions, postcards, showcases,
+  and routes require report/block/moderation, rights confirmation, retention,
+  export/deletion, and appeal paths.
+- Child accounts, social discovery, gifts/postcards, shared routes, public media,
+  nearby parties, notifications, and location visibility remain disabled until
+  separate guardian/privacy/age-assurance and abuse reviews pass.
+- Accessibility objectives provide equivalent challenge/reward ceilings for
+  mobility, visual, hearing, dexterity, cognitive, and energy limitations. The
+  accommodation policy is server-declared and private; it does not publicly
+  label or rank players by disability.
 
 ## Performance and telemetry
 
@@ -508,28 +809,94 @@ use punitive streaks.
 
 ## Delivery sequence and acceptance gates
 
-### Phase A — Authorities and Baltimore vertical slice
+### Phase 0 — Contracts, migrations, and feasibility
+
+- Freeze current `ExplorerEvent`, Journal/Guide/Backpack, catch-history, control,
+  GPS, waterbody, and account snapshots as migration fixtures.
+- Write versioned schemas for input actions/profiles, field sessions, proximity
+  proofs, Expeditions/objectives, rewards, taxa, ecology packs, Field Stations,
+  water/fish populations, media, content releases, and localized display data.
+- Decide foreground web/PWA/native capability boundaries and keep unsupported
+  background/health/push features out of release claims.
+- Define reward/supply policy, spatial-equity metrics, location/media retention,
+  child/social gates, Field Station selection, route safety, operator roles,
+  incident disable, and rollback before UI production work.
+- Record the current Firebase production performance/artifact baseline and a
+  seven-region ecology/access/data-coverage baseline.
+
+Exit: schemas validate fixtures, migration round-trips lose no current Journal,
+Guide, Backpack, companion, rank, tool-unlock, or catch data, and every authority
+has one owner, trust boundary, persistence class, failure state, and release gate.
+
+### Phase A1 — Configurable control foundation
 
 - Implement semantic input profiles first; preserve the accepted mobile
   navigation and harden screen/modal ownership only where regression evidence
   requires it.
-- Implement field session, proximity state, reward-event IDs, Field Today, and
-  one expedition lifecycle.
-- Build one reviewed Baltimore ecology pack and 60-taxon content slice.
-- Unify one shoreline and boat fishing journey through the water/fish authority.
-- Prove the complete 390×844 physical-phone journey and desktop direct controls.
+- Wrap existing keyboard, gamepad, Earth/Space key-state, contextual action, and
+  touch profiles behind semantic actions with parity tests before removing any
+  legacy coupling.
+- Add edit/preview/save/reload/conflict/default/reset and last-known-good recovery
+  for walk and Live GPS first, then every traversal/activity profile.
+- Run observed one-hand/accessibility/control R&D and choose versioned defaults
+  based on task evidence.
 
-Exit: a player can start GPS, walk to three varied objectives, record credible
-evidence, improve progress, fish from an eligible shore, close every screen,
-customize a real control, reload it, and return to the default—without manual
-database edits, test URLs, fake GPS in production, or duplicate rewards.
+Exit: current defaults feel and perform no worse, a saved touch change alters the
+intended gameplay action after reload, every mode clears held input correctly,
+and reset/recovery always returns to the shipped direct-control profile.
+
+### Phase A2 — Trusted field-session vertical slice
+
+- Implement field session, proximity state, safe bounded-world targeting,
+  reward-event IDs, server reconciliation, and one Expedition lifecycle.
+- Adapt the existing Activities/Current Goal/Recent Journal surface into Field
+  Today; preserve existing events, ranks, specialties, regional progress, and
+  tool unlocks.
+- Add Field Station selection plus Personal Field Desk fallback and prove
+  equivalent urban/rural opportunity ceilings.
+- Deliver consent allow/deny/retry, poor accuracy, unsafe speed, recenter,
+  background/foreground, offline/reconnect, and accessibility-assist journeys.
+
+Exit: a player can start GPS, walk to three safe varied objectives, record them
+through the existing Explorer spine, receive each eligible reward exactly once,
+and understand every held/ineligible/pending state without test URLs or manual
+database edits.
+
+### Phase A3 — Reviewed Baltimore ecology and mechanics slice
+
+- Build one reviewed Baltimore ecology pack and 60-taxon content slice with
+  coverage cards, insects/microfauna, freshwater/marine fish, media rights,
+  sensitive-species policy, localization seed, and pack rollback.
+- Ship distinct observation, photography, track/sign, insect macro, habitat,
+  geology, and community-survey mechanics with their accessible alternatives.
+- Prove encounter lifecycle, density/diversity/cooldown policy, creature quality
+  tiers, media-private default, and no-live-presence language.
+
+Exit: the slice is useful across urban, park, shoreline, freshwater, and rural
+test cells; each mechanic plays differently, evidence labels are correct, weak
+data produces honest fallback, and every visual/media asset passes quality,
+rights, attribution, mobile, and teardown gates.
+
+### Phase A4 — Unified shore and boat fishing
+
+- Introduce one fish catalog/population authority and migrate all existing catch
+  records without changing their historical truth.
+- Evaluate every published pilot waterbody and implement one eligible shoreline
+  plus boat journey using the same cast/fight/catch/loss/record/reward events.
+- Add tackle capability, waterbody outcome explanations, regional pool evidence,
+  seasonal/access/closure state, Field Guide integration, and assisted controls.
+
+Exit: eligible shores work, ineligible shores explain why, boat and shore catches
+share identity/progression, and a 390×844 physical-phone player can customize a
+control, fish, exit, reload, and restore the default without stuck input.
 
 ### Phase B — Seven-region beta and durable progression
 
 - Expand to the representative release matrix and at least 300 reviewed taxa.
 - Add daily/weekly/seasonal research, routes, companion bond, specialties,
-  collection challenges, social field parties, offline pack handling, and
-  moderation/rollback for authored routes/events.
+  collection challenges, Field Stations, Research Beacons, social field parties,
+  postcards/showcases only after their privacy gates, offline pack handling, and
+  moderation/rollback for authored routes/events/media.
 - Add real-device accessibility, battery, privacy, abuse, and performance gates.
 
 Exit: every region has useful habitat/season variety and fishing where eligible;
@@ -539,8 +906,9 @@ remain valuable; rewards reconcile exactly once; no region uses a city patch.
 ### Phase C — Worldwide pack pipeline and live operations
 
 - Scale the reviewed catalog/packs toward the worldwide targets.
-- Add versioned season/event manifests, migrations, rollback, content review,
-  sensitive-species policy, provider outage behavior, and operational dashboards.
+- Add versioned season/event/localization/safety manifests, migrations, rollback,
+  content review, sensitive-species policy, provider outage behavior, coverage
+  cards, operational dashboards, incident disable, and audit history.
 - Consider background distance only after explicit platform/privacy/battery and
   abuse acceptance; foreground play remains complete without it.
 
