@@ -614,6 +614,11 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
       <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
       <section class="discoveryPane active" data-discovery-pane="today">
         <div class="discoveryModeNote"><b>EXPLORE THIS PLACE</b><span>Choose one nearby lead, then minimize this journal. Your tool and the world will guide the active field action.</span></div>
+        <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
+        <div class="discoveryFieldExpedition">
+          <div class="discoverySectionHead"><span>FIELD TODAY</span><small>THREE GPS WALKING STOPS</small></div>
+          <div id="discoveryExpeditionList" class="discoveryExpeditionList"></div>
+        </div>
         <div id="discoveryRankSummary" class="discoveryRankSummary"><span>FIELD RANK</span><strong>Trailhead</strong><small>Build records to reveal follow-up opportunities.</small></div>
         <div id="discoveryGoal" class="discoveryGoal" aria-live="polite"></div>
         <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
@@ -795,8 +800,9 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <section id="liveGpsHud" aria-label="Live GPS status">
   <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
   <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
-  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span></div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span><span id="liveGpsFieldDistance">Walk 0 m</span></div>
   <div class="liveGpsActions">
+    <button id="liveGpsFieldBtn" type="button">Field Today</button>
     <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
     <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
     <button id="liveGpsLowPowerBtn" type="button">Low Power</button>

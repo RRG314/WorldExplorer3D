@@ -1,8 +1,9 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
 import { createCompanionRuntime } from './companion-runtime.js?v=2';
-import { createDetectorSession } from './detector-session.js?v=1';
+import { createDetectorSession } from './detector-session.js?v=2';
 import { compileEnvironmentContext } from './environment-context.js?v=1';
-import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=1';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
+import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
 import { explorerProgressSnapshot } from './explorer-events.js?v=1';
 import {
@@ -20,7 +21,7 @@ import {
   resolveContextActions
 } from './model.js?v=1';
 import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=1';
-import { fieldProgress } from './pacing.js?v=1';
+import { fieldProgress } from './pacing.js?v=2';
 import { emitDiscoveryTelemetry } from './telemetry.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
@@ -210,7 +211,8 @@ function createDiscoveryUi(state) {
     tutorialSteps: byId('discoveryTutorialSteps'), tutorialDone: byId('discoveryTutorialDoneBtn'),
     sectionTutorial: byId('discoverySectionTutorial'), sectionTutorialTitle: byId('discoverySectionTutorialTitle'),
     sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
-    inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal')
+    inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal'),
+    fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList')
   };
   const listeners = [];
   let activeTab = 'today';
@@ -218,6 +220,7 @@ function createDiscoveryUi(state) {
   let actionSignature = '';
   let guideRecords = [];
   let journalRecords = [];
+  let expeditionSignature = '';
 
   function listen(element, type, handler) {
     if (!element) return;
@@ -450,6 +453,10 @@ function createDiscoveryUi(state) {
     const button = event.target?.closest?.('[data-discovery-action]');
     if (button) void state.selectActivity(button.dataset.discoveryAction);
   });
+  listen(elements.expedition, 'click', (event) => {
+    const button = event.target?.closest?.('[data-field-objective]');
+    if (button) void state.startFieldObjective?.(button.dataset.fieldObjective);
+  });
   listen(elements.companions, 'click', (event) => {
     const button = event.target?.closest?.('[data-companion-action]');
     if (button) void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog);
@@ -478,6 +485,31 @@ function createDiscoveryUi(state) {
   listen(elements.arChallenge, 'click', () => void state.handleArChallenge());
 
   function render(actions, snapshot, activityId = 'metal-detect') {
+    const liveGps = state.appCtx.getLiveGpsSnapshot?.() || { active: false };
+    const expedition = state.fieldExpedition?.snapshot?.(
+      playerPosition(state.appCtx),
+      liveGps.active ? (target) => state.evaluateFieldTarget?.(target) : null
+    );
+    if (elements.fieldSession) {
+      elements.fieldSession.hidden = !liveGps.active;
+      if (liveGps.active) {
+        const field = liveGps.fieldSession || {};
+        const status = field.pauseReason ? displayDiscoveryLabel(field.pauseReason, 'Held') : 'Eligible walking session';
+        elements.fieldSession.innerHTML = `<div><span>LIVE GPS WALK</span><strong>${escapeHtml(status)}</strong><small>${Math.round(Number(field.trustedDistanceMeters || 0))} m trusted walking · raw route not saved</small></div><b>${expedition?.completedCount || 0}/${expedition?.objectiveCount || 0}</b>`;
+        elements.fieldSession.dataset.state = field.pauseReason ? 'held' : 'eligible';
+      }
+    }
+    if (elements.expedition) {
+      const rows = expedition?.objectives || [];
+      const nextSignature = rows.map((row) => `${row.slotId}:${row.complete}:${Math.round(Number(row.distanceMeters || 0) / 5)}:${row.proximityState}:${row.pauseReason || ''}`).join('|');
+      if (nextSignature !== expeditionSignature) {
+        expeditionSignature = nextSignature;
+        elements.expedition.innerHTML = rows.length ? rows.map((row) => {
+          const stateLabel = row.complete ? 'Saved' : row.pauseReason ? displayDiscoveryLabel(row.pauseReason, 'Held') : row.distanceMeters == null ? 'Waiting for GPS' : `${Math.ceil(row.distanceMeters)} m · ${displayDiscoveryLabel(row.proximityState, 'Follow bearing')}`;
+          return `<button class="discoveryExpeditionStop${row.complete ? ' complete' : ''}" data-field-objective="${escapeHtml(row.slotId)}" type="button" ${row.complete ? 'disabled' : ''}><span>${row.complete ? '✓' : row.index + 1}</span><div><strong>${escapeHtml(row.targetLabel)}</strong><small>${escapeHtml(stateLabel)}</small></div></button>`;
+        }).join('') : '<div class="discoveryEmpty">Walk into another survey area to prepare three available field stops.</div>';
+      }
+    }
     const detectorAvailable = actions.some((action) => action.id === 'metal-detect');
     const operationActive = !!snapshot?.active && !['complete', 'collected', 'recorded', 'left'].includes(snapshot?.phase);
     elements.quick?.classList.toggle('show', state.active && !open && operationActive && (detectorAvailable || activityId !== 'metal-detect'));
@@ -832,6 +864,21 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     tutorials: { ...(discoveryProfile.tutorials || {}) }, companionEncounters: new Map(), detectorSnapshot: session.snapshot(playerPosition(appCtx)),
     lastSnapshot: session.snapshot(playerPosition(appCtx))
   };
+  state.evaluateFieldTarget = (target) => {
+    const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
+    return liveGps.active ? appCtx.getLiveGpsFieldEligibility?.(target) || null : null;
+  };
+  state.fieldExpedition = createFieldExpedition({
+    plan: fieldActivities,
+    claimedIds,
+    observedCatalogIds,
+    progress,
+    position: playerPosition(appCtx),
+    isSlotAvailable: (slot) => {
+      const toolId = ACTIVITY_TOOL[slot.activityId];
+      return RELEASED_EXPLORER_ACTIVITIES.has(slot.activityId) && (!toolId || entitlements.canUseTool(toolId).allowed);
+    }
+  });
   state.presentation = createFieldEquipmentPresentation(appCtx);
   state.companionRuntime = await createCompanionRuntime(appCtx, {
     profileStore,
@@ -1121,6 +1168,29 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     void state.showActivityTutorial(false);
     return true;
   };
+  state.startFieldObjective = async (slotId) => {
+    const objective = state.fieldExpedition.snapshot(playerPosition(appCtx), state.evaluateFieldTarget)
+      .objectives.find((entry) => entry.slotId === slotId && !entry.complete);
+    if (!objective) return false;
+    const activityId = objective.activityId;
+    const toolId = ACTIVITY_TOOL[activityId];
+    if (toolId && !state.entitlements.canUseTool(toolId).allowed) {
+      appCtx.showToast?.(`${displayDiscoveryLabel(toolId)} unlocks at a later Explorer rank.`);
+      return false;
+    }
+    if (toolId) await state.equipTool(toolId, { silent: true });
+    state.activeActivityId = activityId;
+    state.session.reset();
+    state.detectorSnapshot = state.session.snapshot(playerPosition(appCtx));
+    state.fieldSession.reset();
+    const began = state.fieldSession.beginSlot(slotId, playerPosition(appCtx), { evaluateFieldTarget: state.evaluateFieldTarget });
+    state.lastSnapshot = state.fieldSession.snapshot(playerPosition(appCtx));
+    state.ui.showResult(null);
+    state.ui.setTab('today');
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    if (began) state.ui.setOpen(false);
+    return began;
+  };
   state.handlePrimary = async () => {
     resumeDiscoveryAudio(state);
     const position = playerPosition(appCtx);
@@ -1128,16 +1198,22 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       const fieldPhase = state.fieldSession.snapshot().phase;
       if (['idle', 'complete', 'recorded', 'left'].includes(fieldPhase)) {
         state.fieldSession.reset();
-        const began = state.fieldSession.begin(state.activeActivityId, environment, position);
+        const began = state.fieldSession.begin(state.activeActivityId, environment, position, {
+          evaluateFieldTarget: state.evaluateFieldTarget,
+          preferNearby: (appCtx.getLiveGpsSnapshot?.() || {}).active === true
+        });
         if (began) state.ui.setOpen(false);
       } else if (fieldPhase === 'revealed') {
+        const completedSlot = fieldActivities.slots.find((entry) => entry.id === state.fieldSession.snapshot(position).targetId);
         const recorded = await state.fieldSession.record(profileStore, {
           toolId: ACTIVITY_TOOL[state.activeActivityId] || '',
           regionLabel,
           locationKey: state.locationKey,
           environment: appCtx.getEnv?.() || 'EARTH',
-          localPosition: position
+          localPosition: position,
+          evaluateFieldTarget: state.evaluateFieldTarget
         });
+        if (recorded && completedSlot) state.fieldExpedition.markComplete(completedSlot.claimId);
         if (recorded) await state.refreshToolProgress();
         await state.ui.refreshData();
         const outcome = state.fieldSession.snapshot().collectionResult;
@@ -1289,7 +1365,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       if (state.activeActivityId === 'metal-detect') {
         state.lastSnapshot = state.detectorSnapshot;
       } else {
-        state.lastSnapshot = state.fieldSession.update(frame.dt, position);
+        state.lastSnapshot = state.fieldSession.update(frame.dt, position, { evaluateFieldTarget: state.evaluateFieldTarget });
         if (state.lastSnapshot.phase !== state.fieldFeedbackPhase) {
           if (state.lastSnapshot.phase === 'observing') {
             discoveryHaptic(14);
@@ -1332,6 +1408,7 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
     equippedToolId: state.equippedToolId,
     entitlement: state.entitlements.snapshot(),
     interaction: state.lastSnapshot,
+    fieldExpedition: state.fieldExpedition?.snapshot?.(playerPosition(appCtx), state.evaluateFieldTarget) || null,
     logicalEncounterSlots: state.publication.encounters.slots.length,
     logicalFieldActivitySlots: state.publication.fieldActivities?.slots.length || 0,
     presentation: state.presentation.diagnostics,

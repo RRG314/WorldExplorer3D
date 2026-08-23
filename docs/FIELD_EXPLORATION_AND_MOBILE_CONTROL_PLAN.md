@@ -11,6 +11,35 @@ quality, performance, and release evidence. It is intentionally more specific
 than a feature list. Nothing described here is complete because a button,
 catalog entry, mock screen, or isolated demo exists.
 
+## Implementation status — isolated Live GPS branch
+
+As of 2026-08-23, `steven/live-gps-walking-game` starts from exact deployed
+commit `8ce4dcbbf0f9dadd6ab99bc335653ce0cf2092c3`. The paused hardening program is
+preserved at `steven/hardening-return-db9ffc1` and has not been mixed into this
+walking-game branch.
+
+Phase A2 now has a tested vertical slice rather than scaffolding:
+
+- one foreground field-session authority owns GPS trust, accuracy, speed,
+  pause reason, movement evidence, and privacy-safe trusted distance;
+- reward proximity comes from the filtered GPS fix projected into the fixed
+  world, not from a manually moved avatar;
+- poor accuracy, unsafe speed, hidden-screen, signal-loss, paused-follow, and
+  hard-boundary conditions visibly hold interaction and recording;
+- Activities contains a stable three-stop `FIELD TODAY` expedition selected
+  from generated, unlocked field opportunities;
+- all three stops run through the existing tool, ExplorerEvent, Journal, Field
+  Guide, rank, and one-time claim spine; no second reward owner was added;
+- a deterministic 390×844 Chrome journey completes all three stops, records
+  3/3, advances the shared field record count, and verifies camera follow,
+  active GPS watch, accuracy hold, vehicle-speed hold, zero browser errors, and
+  zero failed local resources.
+
+This is a local checkpoint candidate, not a production deployment. Phase A3
+regional ecology, shore fishing, retained recurring programs, backend receipt
+validation, physical-device evidence, and configurable semantic controls remain
+open and must satisfy the gates later in this plan.
+
 ## Product direction
 
 World Explorer should use the strongest location-game ideas—walking into range,

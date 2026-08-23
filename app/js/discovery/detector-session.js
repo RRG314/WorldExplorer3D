@@ -1,5 +1,5 @@
 import { FIND_CATALOG } from './catalog.js?v=1';
-import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=1';
+import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
 import { resolveExcavationTool } from './tools.js?v=1';
 
 function clamp(value, minimum, maximum) {

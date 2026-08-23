@@ -7,6 +7,12 @@ import {
   normalizeBrowserPosition,
   resetLiveGpsAtOrigin
 } from './model.js?v=1';
+import {
+  createLiveGpsFieldSession,
+  evaluateLiveGpsFieldProximity,
+  ingestLiveGpsFieldFix,
+  liveGpsFieldSessionSnapshot
+} from './field-session-authority.js?v=1';
 
 const LIVE_GPS_WATCH_OPTIONS = Object.freeze({
   enableHighAccuracy: true,
@@ -155,7 +161,9 @@ function ingestSessionPosition(session, position, source = 'watch') {
   if (result.accepted) {
     session.signalLost = false;
     session.lastAcceptedAt = Date.now();
+    session.notice = 'GPS connected. Keep this screen open while exploring.';
     const speedMps = Number(result.speedMps || 0);
+    ingestLiveGpsFieldFix(session.fieldSession, result.fix, { speedMps });
     if (speedMps >= 4.8) {
       session.fastFixCount += 1;
       session.slowFixCount = 0;
@@ -260,10 +268,12 @@ function startLiveGpsMode() {
     longitude: Number(appCtx.LOC?.lon)
   };
   const model = createLiveGpsModel({ origin });
+  const startedAt = Date.now();
   activeSession = {
     active: true,
     source: prepared?.source || 'unknown',
     model,
+    fieldSession: createLiveGpsFieldSession({ startedAt }),
     following: true,
     visibilityPaused: document.visibilityState === 'hidden',
     permissionDenied: false,
@@ -330,6 +340,7 @@ function updateLiveGpsHud(force = false) {
   const status = document.getElementById('liveGpsStatus');
   const accuracy = document.getElementById('liveGpsAccuracy');
   const distance = document.getElementById('liveGpsDistance');
+  const fieldDistance = document.getElementById('liveGpsFieldDistance');
   const motion = document.getElementById('liveGpsMotion');
   const pauseButton = document.getElementById('liveGpsPauseBtn');
   const recenterButton = document.getElementById('liveGpsRecenterBtn');
@@ -338,6 +349,7 @@ function updateLiveGpsHud(force = false) {
   if (status) status.textContent = activeBoundaryMessage(session, snapshot);
   if (accuracy) accuracy.textContent = snapshot.accuracyMeters === null ? 'Accuracy —' : `Accuracy ±${Math.round(snapshot.accuracyMeters)} m`;
   if (distance) distance.textContent = `From center ${(snapshot.boundaryDistanceMeters / 1000).toFixed(2)} km`;
+  if (fieldDistance) fieldDistance.textContent = `Walk ${Math.round(session.fieldSession.trustedDistanceMeters)} m`;
   if (motion) motion.textContent = `${snapshot.movementClass} · ${snapshot.speedMps.toFixed(1)} m/s`;
   if (pauseButton) {
     pauseButton.textContent = session.following ? 'Pause GPS' : 'Resume GPS';
@@ -538,7 +550,10 @@ function getLiveGpsSnapshot() {
   const session = activeSession;
   if (!session) return { active: false };
   const model = liveGpsModelSnapshot(session.model);
-  return {
+  const fieldWorld = session.model.filtered && typeof appCtx.geoToWorld === 'function'
+    ? appCtx.geoToWorld(session.model.filtered.latitude, session.model.filtered.longitude)
+    : null;
+  const runtime = {
     active: true,
     following: session.following,
     visibilityPaused: session.visibilityPaused,
@@ -553,6 +568,10 @@ function getLiveGpsSnapshot() {
       x: Number(session.targetWorld.x.toFixed(2)),
       z: Number(session.targetWorld.z.toFixed(2))
     } : null,
+    fieldWorld: Number.isFinite(fieldWorld?.x) && Number.isFinite(fieldWorld?.z) ? {
+      x: Number(fieldWorld.x.toFixed(2)),
+      z: Number(fieldWorld.z.toFixed(2))
+    } : null,
     snap: session.snap ? {
       kind: session.snap.kind,
       distanceMeters: Number(session.snap.distanceMeters.toFixed(1))
@@ -560,6 +579,24 @@ function getLiveGpsSnapshot() {
     lastFixResult: session.lastFixResult,
     lastSource: session.lastSource
   };
+  return {
+    ...runtime,
+    fieldSession: liveGpsFieldSessionSnapshot(session.fieldSession, runtime)
+  };
+}
+
+function getLiveGpsFieldEligibility(targetWorld = null) {
+  const session = activeSession;
+  if (!session) return evaluateLiveGpsFieldProximity(null, Infinity, { active: false });
+  const runtime = getLiveGpsSnapshot();
+  const gpsWorld = runtime.fieldWorld;
+  const targetX = Number(targetWorld?.x);
+  const targetZ = Number(targetWorld?.z);
+  const distanceWorld = gpsWorld && Number.isFinite(targetX) && Number.isFinite(targetZ)
+    ? Math.hypot(targetX - gpsWorld.x, targetZ - gpsWorld.z)
+    : Infinity;
+  const distanceMeters = distanceWorld * Number(appCtx.METERS_PER_WORLD_UNIT || 1);
+  return evaluateLiveGpsFieldProximity(session.fieldSession, distanceMeters, runtime);
 }
 
 async function startLiveGpsFromWorld() {
@@ -578,6 +615,10 @@ function ensureUiBound() {
   document.getElementById('liveGpsPauseBtn')?.addEventListener('click', pauseOrResumeLiveGps);
   document.getElementById('liveGpsRecenterBtn')?.addEventListener('click', () => void recenterLiveGpsWorld());
   document.getElementById('liveGpsLowPowerBtn')?.addEventListener('click', toggleLiveGpsLowPower);
+  document.getElementById('liveGpsFieldBtn')?.addEventListener('click', () => {
+    appCtx.toggleWorldDiscoveryJournal?.(true);
+    appCtx.worldDiscoveryRuntime?.ui?.setTab?.('today');
+  });
   document.getElementById('liveGpsStopBtn')?.addEventListener('click', () => {
     if (appCtx.getGameplayRegistrySnapshot?.().activeId === 'livegps') {
       appCtx.stopGameplayPlugin?.('live-gps-user-stop');
@@ -588,6 +629,7 @@ function ensureUiBound() {
 }
 
 Object.assign(appCtx, {
+  getLiveGpsFieldEligibility,
   getLiveGpsSnapshot,
   liveGpsTranslationOwned,
   prepareLiveGpsStart,
@@ -601,6 +643,7 @@ Object.assign(appCtx, {
 export {
   LIVE_GPS_LOW_POWER_WATCH_OPTIONS,
   LIVE_GPS_WATCH_OPTIONS,
+  getLiveGpsFieldEligibility,
   getLiveGpsSnapshot,
   liveGpsTranslationOwned,
   pauseOrResumeLiveGps,

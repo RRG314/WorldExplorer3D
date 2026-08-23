@@ -1,6 +1,6 @@
 import { ACTIVITY_CATALOG, FIELD_DISCOVERY_CATALOG } from './catalog.js?v=1';
 import { deterministicUnit, findCell, resolveDiscoverySlotPosition } from './model.js?v=1';
-import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=1';
+import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
 
 const NON_FIELD_ACTIVITIES = new Set(['metal-detect', 'fish']);
 const FIELD_OBSERVATION_RADIUS = 24;
@@ -75,44 +75,73 @@ function createFieldActivitySession(options = {}) {
   const claimedIds = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const observedCatalogIds = options.observedCatalogIds instanceof Set ? options.observedCatalogIds : new Set(options.observedCatalogIds || []);
   let progress = options.progress || fieldProgress({ collectionCount: options.collectionCount || 0 });
-  let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null };
+  let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null };
 
   const distanceToSlot = (position, slot) => slot ? Math.hypot(Number(position?.x || 0) - slot.position.x, Number(position?.z || 0) - slot.position.z) : null;
   const bearingToSlot = (position, slot) => slot ? (Math.atan2(slot.position.x - Number(position?.x || 0), slot.position.z - Number(position?.z || 0)) * 180 / Math.PI + 360) % 360 : null;
 
-  function begin(activityId, environment, position) {
+  function authorityFor(slot, context = {}) {
+    if (!slot || typeof context.evaluateFieldTarget !== 'function') return null;
+    return context.evaluateFieldTarget(slot.position);
+  }
+
+  function beginWithSlot(activityId, slot, position, context = {}) {
+    if (!slot) return false;
+    const authority = authorityFor(slot, context);
+    const distance = authority?.distanceMeters ?? distanceToSlot(position, slot);
+    const phase = authority ? authority.eligible ? 'observing' : 'seeking' : distance <= FIELD_OBSERVATION_RADIUS ? 'observing' : 'seeking';
+    const message = authority?.message || (phase === 'observing'
+      ? `Hold position while ${slot.activityLabel.toLowerCase()} examines this virtual survey point…`
+      : `A plausible survey point is ${Math.ceil(distance)} m away. Follow the bearing while the panel is minimized.`);
+    state = { phase, activityId, slot, elapsed: 0, message, error: '', result: null, authority };
+    return true;
+  }
+
+  function begin(activityId, environment, position, context = {}) {
     const cell = findCell(environment, position);
-    const localSlots = plan.slots.filter((entry) => entry.activityId === activityId && entry.cellId === cell?.cellId);
+    let localSlots = plan.slots.filter((entry) => entry.activityId === activityId && entry.cellId === cell?.cellId);
+    if (context.preferNearby === true) {
+      localSlots = plan.slots.filter((entry) => entry.activityId === activityId)
+        .sort((left, right) => distanceToSlot(position, left) - distanceToSlot(position, right));
+    }
     const slot = prioritizeProgressiveSlots(
       localSlots,
       { claimedIds, observedCatalogIds, progress }
     )[0];
     if (!slot) {
       const rankLocked = localSlots.some((entry) => !claimedIds.has(entry.claimId));
-      state = { phase: 'complete', activityId, slot: null, elapsed: 0, message: rankLocked ? `This cell has a follow-up opportunity at a higher field rank. Explore another cell or build ${progress.rankLabel.toLowerCase()} records.` : 'This survey cell is documented for this activity. Walk into another cell to continue.', error: '', result: null };
+      state = { phase: 'complete', activityId, slot: null, elapsed: 0, message: rankLocked ? `This cell has a follow-up opportunity at a higher field rank. Explore another cell or build ${progress.rankLabel.toLowerCase()} records.` : 'This survey cell is documented for this activity. Walk into another cell to continue.', error: '', result: null, authority: null };
       return false;
     }
-    const distance = distanceToSlot(position, slot);
-    const phase = distance <= FIELD_OBSERVATION_RADIUS ? 'observing' : 'seeking';
-    state = { phase, activityId, slot, elapsed: 0, message: phase === 'observing' ? `Hold position while ${slot.activityLabel.toLowerCase()} examines this virtual survey point…` : `A plausible survey point is ${Math.ceil(distance)} m away. Follow the bearing while the panel is minimized.`, error: '', result: null };
-    return true;
+    return beginWithSlot(activityId, slot, position, context);
   }
 
-  function update(dt, position = {}) {
+  function beginSlot(slotId, position, context = {}) {
+    const slot = plan.slots.find((entry) => entry.id === slotId);
+    if (!slot || claimedIds.has(slot.claimId)) return false;
+    const available = prioritizeProgressiveSlots([slot], { claimedIds, observedCatalogIds, progress })[0];
+    return beginWithSlot(slot.activityId, available, position, context);
+  }
+
+  function update(dt, position = {}, context = {}) {
     if (!['seeking', 'observing'].includes(state.phase)) return snapshot(position);
-    const distance = distanceToSlot(position, state.slot);
+    const authority = authorityFor(state.slot, context);
+    const distance = authority?.distanceMeters ?? distanceToSlot(position, state.slot);
+    state.authority = authority;
     if (state.phase === 'seeking') {
-      if (distance <= FIELD_OBSERVATION_RADIUS) {
+      if (authority ? authority.eligible : distance <= FIELD_OBSERVATION_RADIUS) {
         state.phase = 'observing';
         state.elapsed = 0;
         state.message = `Survey point reached. Hold position while ${state.slot.activityLabel.toLowerCase()} completes the observation…`;
+      } else if (authority?.message) {
+        state.message = authority.message;
       }
       return snapshot(position);
     }
-    if (distance > FIELD_OBSERVATION_BREAK_RADIUS) {
+    if (authority ? !authority.eligible : distance > FIELD_OBSERVATION_BREAK_RADIUS) {
       state.phase = 'seeking';
       state.elapsed = 0;
-      state.message = 'The survey point moved outside observation range. Follow the bearing to resume.';
+      state.message = authority?.message || 'The survey point moved outside observation range. Follow the bearing to resume.';
       return snapshot(position);
     }
     state.elapsed += Math.max(0, Number(dt) || 0);
@@ -126,6 +155,13 @@ function createFieldActivitySession(options = {}) {
 
   async function record(profileStore, context = {}) {
     if (state.phase !== 'revealed' || !state.slot) return false;
+    const authority = authorityFor(state.slot, context);
+    if (authority && !authority.eligible) {
+      state.authority = authority;
+      state.error = authority.message || 'Return to the field stop with an eligible Live GPS fix before recording.';
+      return false;
+    }
+    state.error = '';
     const discovery = FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === state.slot.catalogId);
     const record = {
       instanceId: `item:${state.slot.id}`,
@@ -175,12 +211,12 @@ function createFieldActivitySession(options = {}) {
   }
 
   function reset() {
-    state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null };
+    state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null };
   }
 
   function snapshot(position = {}) {
     const discovery = state.slot ? FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === state.slot.catalogId) : null;
-    const distance = distanceToSlot(position, state.slot);
+    const distance = state.authority?.distanceMeters ?? distanceToSlot(position, state.slot);
     const bearing = bearingToSlot(position, state.slot);
     return Object.freeze({
       active: state.phase !== 'idle', phase: state.phase, activityId: state.activityId,
@@ -193,6 +229,10 @@ function createFieldActivitySession(options = {}) {
       distanceMeters: Number.isFinite(distance) ? Number(distance.toFixed(1)) : null,
       bearingDegrees: Number.isFinite(bearing) ? Number(bearing.toFixed(1)) : null,
       claimState: state.slot ? claimedIds.has(state.slot.claimId) ? 'claimed' : 'unclaimed' : null,
+      movementAuthority: state.authority?.authority || 'manual-direct',
+      proximityState: state.authority?.state || null,
+      interactionEligible: state.authority ? state.authority.eligible === true : Number.isFinite(distance) && distance <= FIELD_OBSERVATION_RADIUS,
+      pauseReason: state.authority?.pauseReason || null,
       collectionResult: state.result ? {
         recorded: state.result.recorded !== false,
         collected: state.result.collected === true,
@@ -205,7 +245,7 @@ function createFieldActivitySession(options = {}) {
     });
   }
 
-  return Object.freeze({ begin, leave, record, reset, snapshot, update });
+  return Object.freeze({ begin, beginSlot, leave, record, reset, snapshot, update });
 }
 
 export { FIELD_OBSERVATION_RADIUS, compileFieldActivityPlan, createFieldActivitySession };

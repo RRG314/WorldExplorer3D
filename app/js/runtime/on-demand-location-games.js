@@ -24,7 +24,7 @@ function ensureDeFlockModule() {
 function ensureLiveGpsModule() {
   if (liveGpsModule) return Promise.resolve(liveGpsModule);
   if (!liveGpsModulePromise) {
-    liveGpsModulePromise = import('../live-gps/runtime.js?v=2').then((module) => {
+    liveGpsModulePromise = import('../live-gps/runtime.js?v=3').then((module) => {
       liveGpsModule = module;
       return module;
     }).catch((error) => {

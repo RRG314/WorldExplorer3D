@@ -748,6 +748,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
     augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
     livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
+    worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     activeActor,
