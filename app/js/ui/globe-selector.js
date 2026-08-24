@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=16';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=17';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
@@ -29,7 +29,7 @@ import {
 
 function createGlobeSelector(options = {}) {
   const {
-    root, stage, canvas, latLonReadout, placeReadout, searchInput, mobileSearchInput,
+    root, stage, canvas, zoomInBtn, zoomOutBtn, scaleReadout, latLonReadout, placeReadout, searchInput, mobileSearchInput,
     mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
     spaceBtn, oceanBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
@@ -64,6 +64,9 @@ function createGlobeSelector(options = {}) {
     appCtx,
     canvas,
     stage,
+    zoomInBtn,
+    zoomOutBtn,
+    scaleReadout,
     placeReadout,
     getActiveCityTab: () => activeCityTab,
     getPanelMode: () => panelMode,
@@ -110,8 +113,8 @@ function createGlobeSelector(options = {}) {
     document.querySelector('.globe-selector-hint')?.replaceChildren(
       document.createTextNode(
         panelMode === 'live-earth' ?
-          'Drag to rotate · Scroll to zoom · Tap markers to inspect Live Earth layers' :
-          'Drag to rotate · Scroll to zoom · Tap/Click to pick'
+          `${globalThis.matchMedia?.('(pointer: coarse)')?.matches ? 'Drag to rotate · Pinch to zoom · Tap' : 'Drag to rotate · Scroll to zoom · Click'} markers to inspect Live Earth systems` :
+          `${globalThis.matchMedia?.('(pointer: coarse)')?.matches ? 'Drag to rotate · Pinch to zoom · Tap' : 'Drag to rotate · Scroll to zoom · Click'} to pick`
       )
     );
     if (appCtx.liveEarth && typeof appCtx.liveEarth.setPanelMode === 'function') {
@@ -544,6 +547,8 @@ function createGlobeSelector(options = {}) {
       localPointToLatLon,
       getCameraDistance: globeScene.getCameraDistance,
       getPointHitThresholdWorld: globeScene.getPointHitThresholdWorld,
+      getRenderStats: globeScene.getRenderStats,
+      getZoomState: globeScene.getZoomState,
       projectLatLonToClient: globeScene.projectLatLonToClient,
       setCameraDistance: globeScene.setCameraDistance,
       setSelection,

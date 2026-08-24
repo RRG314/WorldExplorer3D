@@ -20,7 +20,7 @@ import {
   updateEarthquakeReplay as animateEarthquakeReplay,
   updateLocalEventContext as syncLocalEventContext
 } from "./local-events.js?v=2";
-import { renderGlobeLayers } from "./render-globe.js?v=10";
+import { renderGlobeLayers } from "./render-globe.js?v=11";
 import {
   bindSelectorUi,
   handleGlobePick,
@@ -30,7 +30,7 @@ import {
   setActiveLayer,
   setPanelMode,
   updateSelectorFrame
-} from "./controller-ui.js?v=15";
+} from "./controller-ui.js?v=16";
 
 const SATELLITE_POSITION_REFRESH_MS = 15000;
 const EARTHQUAKE_UI_REFRESH_MS = 5 * 60 * 1000;
@@ -765,7 +765,7 @@ function initLiveEarth() {
     getSummary() {
       const selectedCamera = state.selectedDeFlockCamera || null;
       const selectedProjection = selectedCamera
-        ? state.selector.api?.projectLatLonToClient?.(selectedCamera.lat, selectedCamera.lon, 1.023) || null
+        ? state.selector.api?.projectLatLonToClient?.(selectedCamera.lat, selectedCamera.lon, 1.00004) || null
         : null;
       return {
         activeLayerId: state.activeLayerId,
@@ -796,6 +796,8 @@ function initLiveEarth() {
           indexedLon: Number(selectedCamera.indexedLon ?? selectedCamera.lon)
         } : null,
         selectedDeFlockProjection: selectedProjection,
+        selectorZoom: state.selector.api?.getZoomState?.() || null,
+        selectorRender: state.selector.api?.getRenderStats?.() || null,
         streetImageryProviderId: state.streetImageryProviderId || 'panoramax'
       };
     },

@@ -21,13 +21,13 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=92">
+<link rel="stylesheet" href="styles/title-shell.css?v=94">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=102">
 <link rel="stylesheet" href="styles/block-builder.css?v=3">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=4">
 <link rel="stylesheet" href="styles/interface-v4.css?v=18">
-<link rel="stylesheet" href="styles/start-hub.css?v=15">
+<link rel="stylesheet" href="styles/start-hub.css?v=16">
 <link rel="stylesheet" href="styles/discovery.css?v=8">
 <link rel="stylesheet" href="styles/tutorial.css?v=2">
 <link rel="stylesheet" href="styles/ar.css?v=1">
@@ -607,6 +607,11 @@ Graphics changes apply to the current session.
 </div>
 <div class="globe-selector-stage">
 <canvas id="globeSelectorCanvas"></canvas>
+<div class="globe-selector-zoom-controls" role="group" aria-label="Globe zoom controls">
+  <button id="globeSelectorZoomInBtn" type="button" aria-label="Zoom in">+</button>
+  <button id="globeSelectorZoomOutBtn" type="button" aria-label="Zoom out">−</button>
+  <output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
+</div>
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 <div class="globe-destination-bar" aria-label="World destinations">
@@ -1864,5 +1869,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=490"></script>
+<script type="module" src="js/bootstrap.js?v=491"></script>
 </body></html>

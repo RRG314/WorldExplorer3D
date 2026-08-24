@@ -11,7 +11,7 @@ import {
   renderSatelliteGlobe,
   renderTransportGlobe,
   renderWeatherGlobe
-} from "./render-globe.js?v=10";
+} from "./render-globe.js?v=11";
 
 function selectedLayerCount(ctx, state, layerId) {
   if (layerId === 'overview') return 7;
@@ -203,7 +203,7 @@ export function renderLiveEarthDetails(ctx, state) {
         ${state.deFlockError ? `<div class="globe-selector-live-detail-meta deflock-live-warning">${ctx.escapeHtml(state.deFlockError)}</div>` : ''}
         ${state.deFlockIndexWarning ? `<div class="globe-selector-live-detail-meta deflock-live-warning">${ctx.escapeHtml(state.deFlockIndexWarning)}</div>` : ''}
         ${state.deFlockDetailError ? `<div class="globe-selector-live-detail-meta deflock-live-warning">${ctx.escapeHtml(state.deFlockDetailError)}</div>` : ''}
-        ${directions.length ? '<div class="globe-selector-live-detail-meta">View distance is schematic because the mapped camera data does not publish lens reach. Bearing and any mapped angular span remain data-driven.</div>' : ''}
+        ${directions.length ? '<div class="globe-selector-live-detail-meta">The direction indicator extends 46 m from the mapped camera for legibility; it does not claim lens reach. Bearing and any mapped angular span remain data-driven.</div>' : ''}
         <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(coverageLabel)} Exact selected-camera detail comes from OpenStreetMap.</div>
         <div class="globe-selector-live-detail-actions">
           ${!camera ? `<button class="globe-selector-live-action-btn" type="button" data-live-earth-action="select-nearest-deflock"${nearestCamera ? '' : ' disabled'}>${ctx.escapeHtml(nearestCamera && Number.isFinite(nearestDistanceKm) ? `Select Nearest Camera · ${nearestDistanceKm < 1 ? `${Math.max(1, Math.round(nearestDistanceKm * 1000))} m` : `${nearestDistanceKm.toFixed(1)} km`}` : 'No Camera Near Selection')}</button>` : ''}
@@ -417,9 +417,12 @@ export function setPanelMode(state, mode = 'explore') {
   if (ui?.explorePanel) ui.explorePanel.hidden = state.panelMode !== 'explore';
   if (ui?.liveEarthPanel) ui.liveEarthPanel.hidden = state.panelMode !== 'live-earth';
   if (ui?.hint) {
+    const gesture = globalThis.matchMedia?.('(pointer: coarse)')?.matches
+      ? 'Drag to rotate · Pinch to zoom · Tap'
+      : 'Drag to rotate · Scroll to zoom · Click';
     ui.hint.textContent = state.panelMode === 'live-earth'
-      ? 'Drag to rotate · Scroll to zoom · Tap markers to inspect live Earth systems'
-      : 'Drag to rotate · Scroll to zoom · Tap/Click to pick';
+      ? `${gesture} markers to inspect live Earth systems`
+      : `${gesture} to pick`;
   }
 }
 
@@ -567,7 +570,7 @@ export async function handleUiAction(ctx, state, action, value) {
     const camera = ctx.selectedDeFlockCamera(state);
     if (camera) {
       state.selector.api?.setSelection?.(camera.lat, camera.lon, { name: camera.name || 'Mapped DeFlock camera', focus: true });
-      state.selector.api?.setCameraDistance?.(1.15);
+      state.selector.api?.setCameraDistance?.(1.00018);
     }
     return;
   }
@@ -680,7 +683,7 @@ export function handleGlobePick(ctx, state, raycaster) {
   const meshes = state.selector.markerRecords.map((entry) => entry.mesh).filter(Boolean);
   if (!meshes.length && state.activeLayerId !== 'deflock-cameras') return false;
   if (state.activeLayerId === 'deflock-cameras' && raycaster.params?.Points) {
-    raycaster.params.Points.threshold = state.selector.api?.getPointHitThresholdWorld?.(7, 1.017) || 0.006;
+    raycaster.params.Points.threshold = state.selector.api?.getPointHitThresholdWorld?.(7, 1.000025) || 0.006;
   }
   const hits = raycaster.intersectObjects(meshes, false);
   const hit = hits && hits.length ? hits[0] : null;
@@ -719,7 +722,12 @@ export function handleGlobePick(ctx, state, raycaster) {
       // Keep the invisible fallback close to the rendered point. A broad
       // geographic snap makes a successful click look inaccurate because the
       // selected target can appear several pixels away from the pointer.
-      const radiusDegrees = distance >= 2 ? 1.2 : distance >= 1.45 ? 0.3 : 0.06;
+      const zoom = state.selector.api.getZoomState?.();
+      const radiusDegrees = distance >= 2
+        ? 1.2
+        : distance >= 1.45
+          ? 0.3
+          : Math.max(0.00005, Math.min(0.06, (Number(zoom?.verticalSpanMeters) || 6670) / 111320 * 0.025));
       const camera = location ? ctx.nearestDeFlockCamera(state, location.lat, location.lon, radiusDegrees) : null;
       if (camera) {
         void handleUiAction(ctx, state, 'select-deflock', camera.id);
@@ -758,6 +766,13 @@ export function onSelectorSelectionChanged(ctx, state) {
 
 export function updateSelectorFrame(ctx, state) {
   if (!state.selector.api?.isOpen?.() || state.panelMode !== 'live-earth') return;
+  if (state.activeLayerId === 'deflock-cameras' && state.selector.deFlockSelectionGroup) {
+    const worldPerPixel = (state.selector.api.getPointHitThresholdWorld?.(7, 1.00004) || 0.006) / 7;
+    state.selector.deFlockSelectionGroup.traverse((object) => {
+      const pixels = Number(object?.userData?.fixedScreenRadiusPx);
+      if (Number.isFinite(pixels) && pixels > 0) object.scale.setScalar(worldPerPixel * pixels);
+    });
+  }
   if (state.activeLayerId === 'overview') {
     if ((Date.now() - state.selectorSatelliteTickAt) < 1500) return;
     state.selectorSatelliteTickAt = Date.now();

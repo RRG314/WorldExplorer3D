@@ -1,3 +1,9 @@
+const DEFLOCK_POINT_RADIUS = 1.000025;
+const DEFLOCK_SELECTION_RADIUS = 1.00004;
+const DEFLOCK_COVERAGE_RADIUS = 1.000045;
+const DEFLOCK_ORIENTATION_LENGTH_METERS = 45.72;
+const METERS_PER_LATITUDE_DEGREE = 111320;
+
 function ensureSelectorGroups(state) {
   const selector = state.selector;
   const api = selector.api;
@@ -23,7 +29,7 @@ function ensureSelectorGroups(state) {
   api.globeRoot.add(selector.group);
 }
 
-function cameraDirectionEndpoint(camera, bearingDegrees, distanceDegrees = 0.45) {
+function cameraDirectionEndpoint(camera, bearingDegrees, distanceDegrees = DEFLOCK_ORIENTATION_LENGTH_METERS / METERS_PER_LATITUDE_DEGREE) {
   const bearing = Number(bearingDegrees) * Math.PI / 180;
   const lat = Number(camera.lat) + Math.cos(bearing) * distanceDegrees;
   const lonScale = Math.max(0.2, Math.cos(Number(camera.lat) * Math.PI / 180));
@@ -34,22 +40,24 @@ function cameraDirectionEndpoint(camera, bearingDegrees, distanceDegrees = 0.45)
 function renderDeFlockSelectionDirections(ctx, state, group) {
   const selected = ctx.selectedDeFlockCamera(state);
   if (!selected) return;
-  const center = state.selector.api.latLonToLocalPoint(selected.lat, selected.lon, 1.023);
+  const center = state.selector.api.latLonToLocalPoint(selected.lat, selected.lon, DEFLOCK_SELECTION_RADIUS);
   const marker = new THREE.Mesh(
-    new THREE.RingGeometry(0.00072, 0.00155, 24),
+    new THREE.RingGeometry(0.48, 1, 24),
     new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false })
   );
   marker.position.set(center.x, center.y, center.z);
   marker.lookAt(0, 0, 0);
   marker.renderOrder = 8;
+  marker.userData.fixedScreenRadiusPx = 9;
   group.add(marker);
   const centerDot = new THREE.Mesh(
-    new THREE.CircleGeometry(0.00036, 16),
+    new THREE.CircleGeometry(1, 16),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false })
   );
   centerDot.position.set(center.x, center.y, center.z);
   centerDot.lookAt(0, 0, 0);
   centerDot.renderOrder = 9;
+  centerDot.userData.fixedScreenRadiusPx = 3;
   group.add(centerDot);
   const sectors = Array.isArray(selected.directionSectors) ? selected.directionSectors : [];
   if (!state.deFlockCoverageVisible || !sectors.length) return;
@@ -62,8 +70,8 @@ function renderDeFlockSelectionDirections(ctx, state, group) {
     for (let index = 0; index < segments; index += 1) {
       const aGeo = cameraDirectionEndpoint(selected, startBearing + fieldOfView * index / segments);
       const bGeo = cameraDirectionEndpoint(selected, startBearing + fieldOfView * (index + 1) / segments);
-      const a = state.selector.api.latLonToLocalPoint(aGeo.lat, aGeo.lon, 1.024);
-      const b = state.selector.api.latLonToLocalPoint(bGeo.lat, bGeo.lon, 1.024);
+      const a = state.selector.api.latLonToLocalPoint(aGeo.lat, aGeo.lon, DEFLOCK_COVERAGE_RADIUS);
+      const b = state.selector.api.latLonToLocalPoint(bGeo.lat, bGeo.lon, DEFLOCK_COVERAGE_RADIUS);
       triangles.push(center.x, center.y, center.z, a.x, a.y, a.z, b.x, b.y, b.z);
     }
     const coverageGeometry = new THREE.BufferGeometry();
@@ -84,7 +92,7 @@ function renderDeFlockSelectionDirections(ctx, state, group) {
     const outlinePoints = [];
     for (let index = 0; index <= segments; index += 1) {
       const edgeGeo = cameraDirectionEndpoint(selected, startBearing + fieldOfView * index / segments);
-      const edge = state.selector.api.latLonToLocalPoint(edgeGeo.lat, edgeGeo.lon, 1.025);
+      const edge = state.selector.api.latLonToLocalPoint(edgeGeo.lat, edgeGeo.lon, DEFLOCK_COVERAGE_RADIUS);
       outlinePoints.push(new THREE.Vector3(edge.x, edge.y, edge.z));
     }
     const outline = new THREE.Line(
@@ -98,7 +106,7 @@ function renderDeFlockSelectionDirections(ctx, state, group) {
     outline.renderOrder = 7;
     group.add(outline);
     const endGeo = cameraDirectionEndpoint(selected, sector.bearingDegrees);
-    const end = state.selector.api.latLonToLocalPoint(endGeo.lat, endGeo.lon, 1.026);
+    const end = state.selector.api.latLonToLocalPoint(endGeo.lat, endGeo.lon, DEFLOCK_COVERAGE_RADIUS);
     const line = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(center.x, center.y, center.z),
@@ -130,7 +138,7 @@ export function renderDeFlockGlobe(ctx, state) {
     let offset = 0;
     for (const index of snapshot.indexes) {
       for (let itemIndex = 0; itemIndex < index.count; itemIndex += 1) {
-        const point = selector.api.latLonToLocalPoint(index.latitudes[itemIndex] / 1e6, index.longitudes[itemIndex] / 1e6, 1.017);
+        const point = selector.api.latLonToLocalPoint(index.latitudes[itemIndex] / 1e6, index.longitudes[itemIndex] / 1e6, DEFLOCK_POINT_RADIUS);
         positions[offset * 3] = point.x;
         positions[offset * 3 + 1] = point.y;
         positions[offset * 3 + 2] = point.z;

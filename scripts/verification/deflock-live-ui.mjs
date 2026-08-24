@@ -33,6 +33,37 @@ async function dragGlobe(page, context, start, deltaX, touchInput) {
   await session.detach();
 }
 
+async function pinchGlobe(page, context, center, startSeparation, endSeparation) {
+  const session = await context.newCDPSession(page);
+  const points = (separation) => ([
+    { x: center.x - separation * 0.5, y: center.y, radiusX: 5, radiusY: 5, force: 1, id: 1 },
+    { x: center.x + separation * 0.5, y: center.y, radiusX: 5, radiusY: 5, force: 1, id: 2 }
+  ]);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(startSeparation) });
+  for (let step = 1; step <= 8; step += 1) {
+    const separation = startSeparation + (endSeparation - startSeparation) * step / 8;
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(separation) });
+  }
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await session.detach();
+}
+
+async function sampleAnimationFps(page, durationMs = 1200) {
+  return page.evaluate((sampleDuration) => new Promise((resolve) => {
+    let frames = 0;
+    const startedAt = performance.now();
+    const tick = (now) => {
+      frames += 1;
+      if (now - startedAt >= sampleDuration) {
+        resolve({ frames, durationMs: now - startedAt, fps: frames * 1000 / (now - startedAt) });
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), durationMs);
+}
+
 async function openDeFlock(context, screenshotName, touchInput = false) {
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
@@ -93,6 +124,16 @@ async function openDeFlock(context, screenshotName, touchInput = false) {
     return projection?.visible === true;
   }, null, { timeout: 10_000 });
   const focusedState = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth);
+  assert.equal(focusedState.selectorZoom?.level, 'camera', 'Focus Camera must enter an individual-camera scale.');
+  assert.ok(
+    focusedState.selectorZoom?.verticalSpanMeters >= 400 && focusedState.selectorZoom?.verticalSpanMeters <= 1200,
+    `Focus Camera must frame a walkable local area, not a region (${JSON.stringify(focusedState.selectorZoom)}).`
+  );
+  assert.match(await page.locator('#globeSelectorScaleReadout').textContent(), /m$/, 'The globe must expose a visible local-scale readout.');
+  const renderPerformance = await sampleAnimationFps(page);
+  assert.ok(renderPerformance.fps >= 30, `The complete close-scale DeFlock globe must sustain at least 30 FPS (${renderPerformance.fps.toFixed(1)}).`);
+  assert.ok(focusedState.selectorRender?.triangles > 60_000 && focusedState.selectorRender?.triangles < 100_000, `The close-scale globe triangle budget must remain bounded (${JSON.stringify(focusedState.selectorRender)}).`);
+  assert.equal(focusedState.selectorRender?.points, mappedCount, 'Every indexed DeFlock point must remain in the single GPU point draw.');
   const focusedProjection = focusedState.selectedDeFlockProjection;
   const canvasBox = await canvas.boundingBox();
   assert.ok(canvasBox, 'The DeFlock globe canvas must have a measurable hit region.');
@@ -100,6 +141,26 @@ async function openDeFlock(context, screenshotName, touchInput = false) {
     x: canvasBox.x + canvasBox.width * 0.5,
     y: canvasBox.y + canvasBox.height * 0.5
   };
+  let zoomInteraction;
+  if (touchInput) {
+    const beforeSpan = focusedState.selectorZoom.verticalSpanMeters;
+    await pinchGlobe(page, context, dragStart, 100, 48);
+    await page.waitForFunction((span) => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom?.verticalSpanMeters > span * 1.5, beforeSpan);
+    const zoomedOut = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom.verticalSpanMeters);
+    await pinchGlobe(page, context, dragStart, 48, 140);
+    await page.waitForFunction((span) => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom?.verticalSpanMeters < span * 0.7, zoomedOut);
+    const zoomedIn = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom.verticalSpanMeters);
+    zoomInteraction = { input: 'pinch', beforeSpan, zoomedOut, zoomedIn };
+  } else {
+    const beforeSpan = focusedState.selectorZoom.verticalSpanMeters;
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await page.waitForFunction((span) => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom?.verticalSpanMeters > span * 1.25, beforeSpan);
+    const zoomedOut = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom.verticalSpanMeters);
+    await page.getByRole('button', { name: 'Zoom in' }).click();
+    await page.waitForFunction((span) => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom?.verticalSpanMeters < span * 0.85, zoomedOut);
+    const zoomedIn = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorZoom.verticalSpanMeters);
+    zoomInteraction = { input: 'buttons', beforeSpan, zoomedOut, zoomedIn };
+  }
   await dragGlobe(page, context, dragStart, 48, touchInput);
   await page.waitForTimeout(250);
   const movedProjection = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectedDeFlockProjection);
@@ -145,6 +206,13 @@ async function openDeFlock(context, screenshotName, touchInput = false) {
       navigationDistancePx: Number(navigationDistance.toFixed(1)),
       pointerErrorPx: Number(pointerErrorPx.toFixed(1))
     },
+    zoomInteraction,
+    renderPerformance: {
+      fps: Number(renderPerformance.fps.toFixed(1)),
+      triangles: focusedState.selectorRender.triangles,
+      points: focusedState.selectorRender.points,
+      calls: focusedState.selectorRender.calls
+    },
     selectedText: (await page.locator('.deflock-live-detail').textContent())?.replace(/\s+/g, ' ').trim() || ''
   };
 }
@@ -159,7 +227,7 @@ try {
   await mobile.close();
   const report = {
     ok: pageErrors.length === 0,
-    contract: 'deflock-live-globe-and-actions-v3',
+    contract: 'deflock-live-globe-close-scale-v4',
     desktop: desktopResult,
     mobile: mobileResult,
     pageErrors
