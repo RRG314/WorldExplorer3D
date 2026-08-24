@@ -25,6 +25,26 @@ async function waitForWorld(page) {
   }, null, { timeout: 240_000 });
 }
 
+async function inspectDirectPromptPlacement(page) {
+  return page.evaluate(() => {
+    const prompt = document.getElementById('urbanVehiclePrompt');
+    if (!prompt?.classList.contains('show') || getComputedStyle(prompt).display === 'none') {
+      return { visible: false, clearsMobileControls: true };
+    }
+    const overlaps = (left, right) => !!left && !!right &&
+      left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+    const promptBox = prompt.getBoundingClientRect();
+    const controls = ['exploreBtn', 'mobileMovePad', 'mobileLookPad']
+      .map((id) => document.getElementById(id)?.getBoundingClientRect())
+      .filter(Boolean);
+    return {
+      visible: true,
+      label: document.getElementById('urbanVehiclePromptTitle')?.textContent || '',
+      clearsMobileControls: controls.every((box) => !overlaps(promptBox, box))
+    };
+  });
+}
+
 async function waitForLead(page, expectedMode, movePastDirectInteraction) {
   await page.waitForFunction((mode) => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
@@ -54,6 +74,11 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
   return page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const prompt = document.getElementById('discoveryContextPrompt');
+    const overlaps = (left, right) => !!left && !!right &&
+      left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+    const promptBox = prompt?.getBoundingClientRect();
+    const moveBox = document.getElementById('mobileMovePad')?.getBoundingClientRect();
+    const lookBox = document.getElementById('mobileLookPad')?.getBoundingClientRect();
     const visiblePromptLayers = [...document.querySelectorAll('body *')].filter((element) => {
       const text = String(element.textContent || '').trim();
       if (!/(Building|Equitable|Track Lead|Resume Photograph)/i.test(text)) return false;
@@ -76,6 +101,7 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
       promptText: document.getElementById('discoveryContextText')?.textContent || '',
       promptButton: document.getElementById('discoveryContextOpenBtn')?.textContent || '',
       promptMode: prompt?.dataset.mode || '',
+      promptClearsMobileControls: !overlaps(promptBox, moveBox) && !overlaps(promptBox, lookBox),
       wildlife: state.worldDiscovery.wildlife,
       visiblePromptLayers
     };
@@ -92,10 +118,17 @@ async function acceptLead(page, lead) {
   return page.evaluate(() => {
     const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
     const quick = document.getElementById('discoveryQuickToolBtn');
+    const overlaps = (left, right) => !!left && !!right &&
+      left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+    const quickBox = quick?.getBoundingClientRect();
+    const controls = ['exploreBtn', 'mobileMovePad', 'mobileLookPad', 'urbanEquipmentToggle']
+      .map((id) => document.getElementById(id)?.getBoundingClientRect())
+      .filter(Boolean);
     return {
       activeActivityId: discovery.activeActivityId,
       interaction: discovery.interaction,
       quickVisible: !!quick && getComputedStyle(quick).display !== 'none',
+      quickClearsMobileControls: controls.every((box) => !overlaps(quickBox, box)),
       journalOpen: document.getElementById('discoveryPanel')?.classList.contains('show') || false
     };
   });
@@ -112,6 +145,7 @@ try {
   await freePage.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await freePage.locator('#globeSelectorStartBtn').click();
   await waitForWorld(freePage);
+  const freeDirectPromptPlacement = await inspectDirectPromptPlacement(freePage);
   await freePage.locator('#exploreBtn').click();
   await freePage.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
   await freePage.locator('#fWalk').click();
@@ -147,6 +181,7 @@ try {
   await gpsPage.locator('#liveGpsPermissionContinue').click();
   await waitForWorld(gpsPage);
   await gpsPage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.active === true, null, { timeout: 60_000 });
+  const gpsDirectPromptPlacement = await inspectDirectPromptPlacement(gpsPage);
   const gpsLead = await waitForLead(gpsPage, 'live-gps', async () => {
     await gpsContext.setGeolocation({ latitude: 39.2907, longitude: -76.6122, accuracy: 6 });
   });
@@ -156,21 +191,27 @@ try {
   await gpsContext.close();
 
   const checks = {
-    freeRoamLeadVisible: freeLead.lead.available && freeLead.promptMode === 'free-roam' && /nearby/i.test(freeLead.promptText),
+    freeRoamLeadVisible: freeLead.lead.available && freeLead.promptMode === 'free-roam' && freeLead.promptText.includes(freeLead.lead.leadLabel) && /procedural encounter/i.test(freeLead.promptText),
+    freeRoamLeadClearsControls: freeLead.promptClearsMobileControls === true,
     freeRoamStartsExistingFieldSession: freeAccepted.activeActivityId === freeLead.lead.activityId && freeAccepted.interaction.targetId === freeLead.lead.slotId,
     freeRoamKeepsJournalOutOfTheWay: freeAccepted.quickVisible === true && freeAccepted.journalOpen === false,
-    liveGpsLeadVisible: gpsLead.lead.available && gpsLead.promptMode === 'live-gps' && /nearby/i.test(gpsLead.promptText),
+    freeRoamTrackingClearsControls: freeAccepted.quickClearsMobileControls === true,
+    liveGpsLeadVisible: gpsLead.lead.available && gpsLead.promptMode === 'live-gps' && gpsLead.promptText.includes(gpsLead.lead.leadLabel) && /procedural encounter/i.test(gpsLead.promptText),
+    liveGpsLeadClearsControls: gpsLead.promptClearsMobileControls === true,
     liveGpsUsesSameEncounterContract: gpsAccepted.activeActivityId === gpsLead.lead.activityId && gpsAccepted.interaction.targetId === gpsLead.lead.slotId,
     liveGpsKeepsJournalOutOfTheWay: gpsAccepted.quickVisible === true && gpsAccepted.journalOpen === false,
+    liveGpsTrackingClearsControls: gpsAccepted.quickClearsMobileControls === true,
     directInteractionDefersBroadLead: [freeLead, gpsLead]
       .filter((entry) => entry.directInteraction)
       .every((entry) => entry.directInteraction.leadCorrectlyDeferred === true),
+    directPromptsClearMobileControls: [freeDirectPromptPlacement, gpsDirectPromptPlacement]
+      .every((entry) => entry.clearsMobileControls === true),
     freeRoamHasVisibleWildlife: Number(freeLead.wildlife?.active || 0) >= 1,
     liveGpsHasVisibleWildlife: Number(gpsLead.wildlife?.active || 0) >= 1,
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'walking-encounters-v1', checks, freeLead, freeAccepted, gpsLead, gpsAccepted, browserErrors, localFailures };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'walking-encounters-v1', checks, freeDirectPromptPlacement, freeLead, freeAccepted, gpsDirectPromptPlacement, gpsLead, gpsAccepted, browserErrors, localFailures };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Walking encounter journey failed.');
 } finally {

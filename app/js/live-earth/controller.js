@@ -294,7 +294,7 @@ async function resolveDeFlockCamera(state, indexedCamera) {
   } catch (error) {
     if (token !== state.deFlockResolveToken) return state.selectedDeFlockCamera;
     state.selectedDeFlockCamera = { ...indexedCamera, resolving: false, detailUnavailable: true };
-    state.deFlockDetailError = `Exact OSM camera detail is temporarily unavailable: ${error?.message || error}`;
+    state.deFlockDetailError = 'Exact camera direction and metadata are temporarily unavailable. The indexed position and DeFlock launch remain usable.';
   }
   return state.selectedDeFlockCamera;
 }

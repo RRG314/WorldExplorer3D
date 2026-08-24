@@ -34,6 +34,7 @@ test('a rich nearby encounter is promoted without opening the Journal first', ()
   assert.equal(lead.available, true);
   assert.equal(lead.slotId, 'wildlife');
   assert.equal(lead.kind, 'wildlife');
+  assert.equal(lead.leadLabel, 'Rock Pigeon Record');
   assert.equal(lead.mode, 'free-roam');
 });
 

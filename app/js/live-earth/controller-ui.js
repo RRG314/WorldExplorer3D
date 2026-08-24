@@ -169,6 +169,13 @@ export function renderLiveEarthDetails(ctx, state) {
 
   if (layer.id === 'deflock-cameras') {
     const camera = ctx.selectedDeFlockCamera(state);
+    const selection = ctx.selectorSelection(state);
+    const nearestCamera = !camera && selection
+      ? ctx.nearestDeFlockCamera(state, selection.lat, selection.lon, 5)
+      : null;
+    const nearestDistanceKm = nearestCamera && selection
+      ? ctx.haversineKm(selection.lat, selection.lon, nearestCamera.lat, nearestCamera.lon)
+      : null;
     const directions = Array.isArray(camera?.directionSectors) ? camera.directionSectors : [];
     const directionLabel = directions.length
       ? directions.map((sector) => sector.kind === 'range'
@@ -177,7 +184,7 @@ export function renderLiveEarthDetails(ctx, state) {
       : 'Direction is not mapped for this camera.';
     const cameraHeading = camera?.resolving ? 'Resolving exact OpenStreetMap camera…' :
       camera?.sourceId ? (camera.name || camera.brand || camera.cameraType || 'Mapped camera') :
-      camera ? (camera.brand && camera.brand !== 'Unknown' ? camera.brand : 'Indexed camera') : 'Tap a camera point';
+      camera ? (camera.brand && camera.brand !== 'Unknown' ? camera.brand : 'Indexed camera') : 'Choose a camera';
     const sourceMeta = camera?.sourceId
       ? `${camera.sourceId} • ${camera.sourceTimestamp ? `OSM edit ${new Date(camera.sourceTimestamp).toLocaleDateString()}` : 'current bounded OSM lookup'}`
       : camera ? `${camera.sourceDataset || 'DeFlock hourly camera index'} • build ${camera.indexBuild || 'current'}` : '';
@@ -188,7 +195,7 @@ export function renderLiveEarthDetails(ctx, state) {
     ctx.setDetailsHtml(state, `
       <div class="globe-selector-live-detail-card deflock-live-detail">
         <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(cameraHeading)}</div>
-        <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(camera ? `${Number(camera.lat).toFixed(6)}, ${Number(camera.lon).toFixed(6)}` : 'Every point is an indexed camera. Tap one to resolve its exact mapped metadata and launch DeFlock Hunt there.')}</div>
+        <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(camera ? `${Number(camera.lat).toFixed(6)}, ${Number(camera.lon).toFixed(6)}` : 'Camera points are visible on the globe. Tap a point, or select the closest indexed camera to the current location.')}</div>
         ${camera ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(directionLabel)}</div>` : ''}
         ${camera?.operator ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Operator: ${camera.operator}`)}</div>` : ''}
         ${camera?.cameraMount || camera?.cameraType ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${camera.cameraType || 'camera'}${camera.cameraMount ? ` • ${camera.cameraMount} mount` : ''}`)}</div>` : ''}
@@ -199,9 +206,10 @@ export function renderLiveEarthDetails(ctx, state) {
         ${directions.length ? '<div class="globe-selector-live-detail-meta">View distance is schematic because the mapped camera data does not publish lens reach. Bearing and any mapped angular span remain data-driven.</div>' : ''}
         <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(coverageLabel)} Exact selected-camera detail comes from OpenStreetMap.</div>
         <div class="globe-selector-live-detail-actions">
-          <button class="globe-selector-live-action-btn" type="button" data-live-earth-action="travel-deflock"${camera && !camera.resolving ? '' : ' disabled'}>Start DeFlock Here</button>
-          <button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="focus-deflock"${camera ? '' : ' disabled'}>Focus Camera</button>
-          <button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="toggle-deflock-coverage"${directions.length ? '' : ' disabled'}>${state.deFlockCoverageVisible ? 'Hide View Coverage' : 'Show View Coverage'}</button>
+          ${!camera ? `<button class="globe-selector-live-action-btn" type="button" data-live-earth-action="select-nearest-deflock"${nearestCamera ? '' : ' disabled'}>${ctx.escapeHtml(nearestCamera && Number.isFinite(nearestDistanceKm) ? `Select Nearest Camera · ${nearestDistanceKm < 1 ? `${Math.max(1, Math.round(nearestDistanceKm * 1000))} m` : `${nearestDistanceKm.toFixed(1)} km`}` : 'No Camera Near Selection')}</button>` : ''}
+          ${camera ? `<button class="globe-selector-live-action-btn" type="button" data-live-earth-action="travel-deflock"${camera.resolving ? ' disabled' : ''}>Start DeFlock Here</button>
+          <button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="focus-deflock">Focus Camera</button>
+          ${directions.length ? `<button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="toggle-deflock-coverage">${state.deFlockCoverageVisible ? 'Hide View Coverage' : 'Show View Coverage'}</button>` : ''}` : ''}
         </div>
       </div>
     `);
@@ -534,9 +542,24 @@ export async function handleUiAction(ctx, state, action, value) {
     state.selector.api?.setCameraDistance?.(1.2);
     renderDeFlockGlobe(ctx, state);
     renderLiveEarthUi(ctx, state);
-    await ctx.resolveDeFlockCamera(state, camera);
+    const detailRequest = ctx.resolveDeFlockCamera(state, camera);
+    renderLiveEarthUi(ctx, state);
+    await detailRequest;
     renderDeFlockGlobe(ctx, state);
     renderLiveEarthUi(ctx, state);
+    return;
+  }
+  if (action === 'select-nearest-deflock') {
+    const selection = ctx.selectorSelection(state);
+    const camera = selection
+      ? ctx.nearestDeFlockCamera(state, selection.lat, selection.lon, 5)
+      : null;
+    if (!camera) {
+      state.deFlockDetailError = 'No indexed DeFlock camera is within the supported United States and Canada search radius of this selection.';
+      renderLiveEarthUi(ctx, state);
+      return;
+    }
+    await handleUiAction(ctx, state, 'select-deflock', camera.id);
     return;
   }
   if (action === 'focus-deflock') {

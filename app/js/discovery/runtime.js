@@ -178,6 +178,11 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
   return spaced.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function compactCompassDirection(value) {
+  const bearing = ((Number(value) % 360) + 360) % 360;
+  return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(bearing / 45) % 8];
+}
+
 function discoveryCatalogEntry(catalogId) {
   return [...BUILTIN_DISCOVERY_CATALOGS.finds, ...BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries]
     .find((entry) => entry.id === catalogId);
@@ -530,7 +535,7 @@ function createDiscoveryUi(state) {
       elements.prompt.dataset.mode = encounterLead?.mode || 'free-roam';
     }
     if (elements.promptText) elements.promptText.textContent = showEncounterLead
-      ? `${encounterLead.leadLabel} nearby · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m · ${Math.round(Number(encounterLead.bearingDegrees || 0))}°`
+      ? `${encounterLead.leadLabel} · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m ${compactCompassDirection(encounterLead.bearingDegrees)} · procedural encounter`
       : actions.length
         ? `${actions.slice(0, 3).map((action) => action.label).join(' · ')} available here`
         : 'Inspect the current area.';
@@ -1419,9 +1424,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     priority: 81,
     evaluate: () => {
       if (state.disposed || state.ui?.open || appCtx.Walk?.state?.mode !== 'walk' || appCtx.getEnv?.() !== 'EARTH') return null;
-      const nearby = state.wildlifeRuntime?.nearest?.(playerPosition(appCtx), 5.2);
+      const nearby = state.wildlifeRuntime?.nearest?.(playerPosition(appCtx), 12);
       if (!nearby) return null;
       const actor = nearby.actor;
+      if (actor.companionPolicy === 'trust-sequence-required' && nearby.distance > 5.2) return null;
       const companionCatalogId = actor.companionPolicy === 'trust-sequence-required'
         ? actor.speciesId
         : WILDLIFE_COMPANION_CATALOG[actor.speciesId];

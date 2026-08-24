@@ -20,11 +20,12 @@ function bearingTo(position = {}, target = {}) {
 function leadPresentation(slot = {}) {
   const discovery = FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === slot.catalogId);
   const family = String(discovery?.family || 'field-record');
-  if (/wildlife|animal|bird/.test(family)) return { kind: 'wildlife', label: 'Wildlife sign', tone: 'nature' };
-  if (/botany|plant|fung/.test(family)) return { kind: 'botany', label: 'Plant life', tone: 'nature' };
-  if (/rock|mineral|sediment|fossil|gem|ore|metal/.test(family)) return { kind: 'earth-science', label: 'Earth science trace', tone: 'earth' };
-  if (/beach|shore|ocean|water/.test(family)) return { kind: 'shoreline', label: 'Shoreline lead', tone: 'water' };
-  if (/place|urban|history/.test(family)) return { kind: 'place', label: 'Place clue', tone: 'place' };
+  const name = String(discovery?.names?.common || '').trim();
+  if (/wildlife|animal|bird/.test(family)) return { kind: 'wildlife', label: name || 'Wildlife sign', tone: 'nature' };
+  if (/botany|plant|fung/.test(family)) return { kind: 'botany', label: name || 'Plant life', tone: 'nature' };
+  if (/rock|mineral|sediment|fossil|gem|ore|metal/.test(family)) return { kind: 'earth-science', label: name || 'Earth science trace', tone: 'earth' };
+  if (/beach|shore|ocean|water/.test(family)) return { kind: 'shoreline', label: name || 'Shoreline lead', tone: 'water' };
+  if (/place|urban|history/.test(family)) return { kind: 'place', label: name || 'Place clue', tone: 'place' };
   return { kind: 'field', label: slot.activityLabel || 'Field lead', tone: 'field' };
 }
 

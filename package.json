@@ -25,6 +25,8 @@
     "verify:retention-ui": "node scripts/verification/retention-ui.mjs",
     "verify:performance-retention": "node scripts/verification/performance-retention.mjs",
     "verify:deflock": "node --test tests/deflock-data-contract.test.mjs",
+    "verify:deflock-live-ui": "node scripts/verification/deflock-live-ui.mjs",
+    "verify:walking-encounters": "node scripts/verification/walking-encounters.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",

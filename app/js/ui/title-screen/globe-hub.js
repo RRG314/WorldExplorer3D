@@ -182,15 +182,12 @@ function setupGlobeHub({
       return true;
     }
     if (destination === 'live-earth' && liveEarthPanel && overlay && panelHost) {
-      panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
-      panelHost.appendChild(liveEarthPanel);
-      liveEarthPanel.hidden = false;
-      liveEarthPanel.classList.add('hub-center-panel', 'active');
-      overlay.hidden = false;
-      overlay.setAttribute('aria-hidden', 'false');
-      if (overlayTitle) overlayTitle.textContent = 'Live Data';
-      setActiveDestination(destination);
+      // Live Earth controls must stay beside the globe they operate. Moving
+      // this panel into the full workspace overlay made its globe markers
+      // unreachable while instructing players to tap one.
+      closePanel();
       document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
+      setActiveDestination(destination);
       return true;
     }
     const target = HUB_PANELS[destination];
