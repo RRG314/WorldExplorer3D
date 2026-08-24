@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=1";
+import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=2";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 
 function wrapYaw(angle = 0) {

@@ -52,10 +52,15 @@ function cameraFollowSnapshot(activeActor) {
   const dot = Math.max(-1, Math.min(1,
     normalizedCameraX * actorForwardX + normalizedCameraZ * actorForwardZ
   ));
+  const signedHeadingOffset = Math.atan2(
+    actorForwardZ * normalizedCameraX - actorForwardX * normalizedCameraZ,
+    dot
+  );
   const cameraOffsetX = Number(camera.position?.x) - actorX;
   const cameraOffsetZ = Number(camera.position?.z) - actorZ;
   return {
     headingAlignmentDegrees: Number((Math.acos(dot) * 180 / Math.PI).toFixed(2)),
+    signedHeadingOffsetDegrees: Number((signedHeadingOffset * 180 / Math.PI).toFixed(2)),
     trailingDistance: Number((-(cameraOffsetX * actorForwardX + cameraOffsetZ * actorForwardZ)).toFixed(2)),
     horizontalDistance: Number(Math.hypot(cameraOffsetX, cameraOffsetZ).toFixed(2))
   };

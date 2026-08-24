@@ -13,6 +13,11 @@
 #urbanCivicStatus{position:fixed;top:74px;right:18px;z-index:137;display:none;align-items:center;gap:10px;max-width:min(320px,calc(100vw - 30px));padding:9px 12px;color:#f5f7f8;background:rgba(8,15,20,.9);border:1px solid rgba(190,202,210,.34);box-shadow:0 10px 28px rgba(0,0,0,.36);backdrop-filter:blur(12px);font:600 11px/1.25 Inter,sans-serif;pointer-events:none}
 #urbanCivicStatus.show{display:flex}#urbanCivicStatusMeter{color:#f0b45b;letter-spacing:3px;font-size:10px;white-space:nowrap}#urbanCivicStatus[data-level="2"] #urbanCivicStatusMeter{color:#ee8f55}#urbanCivicStatus[data-level="3"] #urbanCivicStatusMeter{color:#ef695f}.urbanCivicStatusCopy{min-width:0}#urbanCivicStatusTitle{color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#urbanCivicStatusDetail{margin-top:2px;color:#9ba8b0;font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:760px),(hover:none) and (pointer:coarse){#urbanVehiclePrompt{bottom:max(18px,env(safe-area-inset-bottom));width:min(390px,calc(100vw - 20px));box-sizing:border-box;flex-wrap:wrap}#urbanVehiclePrompt kbd{display:none}#urbanVehiclePrompt button{display:inline-flex;align-items:center;justify-content:center;margin-left:auto;min-height:36px;padding:0 11px;color:#fff;background:#2d7dff;border:1px solid #65a1ff;border-radius:2px;font:700 10px Orbitron,sans-serif}#urbanEquipment{top:max(8px,env(safe-area-inset-top));width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:14px}.urbanEquipmentHead small{display:none}.urbanEquipmentHead>span{font-size:16px}.urbanEquipmentSlots{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.urbanBackpackContents{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.urbanEquipmentSlot,.urbanBackpackItem{min-height:108px;padding:8px 5px}.urbanItemVisual{width:52px;height:52px;margin-bottom:6px}.urbanItemVisual svg{width:43px;height:43px}.urbanItemName{font-size:8px}.urbanItemCount{font-size:8px}.urbanItemSlot{top:6px;left:6px;width:20px;height:20px;font-size:9px}.urbanEquipmentStatus{font-size:9px}#urbanEquipmentToggle:not([hidden]){display:block}}
+@media(max-width:760px),(hover:none) and (pointer:coarse){
+#urbanEquipment{z-index:10030}
+.urbanEquipmentHead{position:sticky;top:-14px;z-index:2;margin:-14px -14px 12px;padding:14px;border-bottom:1px solid rgba(133,151,163,.3);background:rgba(5,12,18,.985)}
+#urbanEquipmentCloseBtn{width:44px;height:44px;border-radius:50%;touch-action:manipulation}
+}
 @media(max-width:600px){#urbanCivicStatus{top:max(58px,calc(env(safe-area-inset-top) + 46px));right:10px;max-width:calc(100vw - 20px)}}
 #controlsTab.show{display:block}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
@@ -63,6 +68,7 @@ body.game-panel-layer-open #appSignInBtn,
 body.game-panel-layer-open #authFloatPanel,
 body.game-panel-layer-open #proAccessPanel,
 body.panel-backpack-open #urbanEquipmentToggle,
+body.panel-backpack-open #mainMenuBtn,
 body.game-activity-layer-open .tutorial-card,
 body.game-activity-layer-open #appSignInBtn,
 body.game-activity-layer-open #authFloatPanel,

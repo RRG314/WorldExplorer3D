@@ -28,7 +28,7 @@ test('walking uses a left movement stick and independent right camera stick', ()
   assert.ok(actions.move > 0);
   assert.ok(actions.strafe > 0);
   assert.equal(actions.turn, 0);
-  assert.ok(actions.lookYaw < 0);
+  assert.ok(actions.lookYaw > 0, 'dragging right must look right');
   assert.ok(actions.lookPitch > 0);
 });
 

@@ -89,6 +89,27 @@ try {
       position: pack ? getComputedStyle(pack).position : ''
     };
   });
+  await page.locator('#urbanEquipmentToggle').click();
+  await page.waitForSelector('#urbanEquipment.show', { timeout: 10_000 });
+  const openPackUi = await page.evaluate(() => {
+    const pack = document.getElementById('urbanEquipment');
+    const close = document.getElementById('urbanEquipmentCloseBtn');
+    const menu = document.getElementById('mainMenuBtn');
+    const closeRect = close?.getBoundingClientRect();
+    const closeHit = closeRect
+      ? document.elementFromPoint(closeRect.left + closeRect.width / 2, closeRect.top + closeRect.height / 2)
+      : null;
+    return {
+      panelVisible: !!pack && getComputedStyle(pack).display !== 'none',
+      menuVisible: !!menu && getComputedStyle(menu).display !== 'none',
+      closeWidth: closeRect?.width || 0,
+      closeHeight: closeRect?.height || 0,
+      closeHitId: closeHit?.closest?.('#urbanEquipmentCloseBtn')?.id || closeHit?.id || ''
+    };
+  });
+  await page.screenshot({ path: 'output/verification/mobile-controls/backpack-mobile.png', fullPage: true });
+  await page.locator('#urbanEquipmentCloseBtn').click();
+  await page.waitForFunction(() => !document.getElementById('urbanEquipment')?.classList.contains('show'), null, { timeout: 10_000 });
   await page.locator('#minimap').click();
   await page.waitForSelector('#largeMap.show', { timeout: 10_000 });
   const mapActorBefore = await diagnostics();
@@ -170,6 +191,8 @@ try {
     onboardingClearOfLookControl: onboardingLayout.lookHit === 'mobileLookPad',
     walkingPackClearOfLookControl: !onboardingLayout.pack || onboardingLayout.pack.x + onboardingLayout.pack.width < onboardingLayout.look.x,
     packIsIntegratedWithActionDock: packUi.parent === 'mobileActionStack' && packUi.integrated && packUi.position === 'static',
+    backpackOwnsMobileFocus: openPackUi.panelVisible === true && openPackUi.menuVisible === false,
+    backpackCloseIsTouchable: openPackUi.closeWidth >= 44 && openPackUi.closeHeight >= 44 && openPackUi.closeHitId === 'urbanEquipmentCloseBtn',
     vehiclePackHidden: drivePackVisible === false,
     mobileSettingsAreModeSpecific: /walking/i.test(settingsLayout.summary) && /jump/i.test(settingsLayout.summary) && settingsLayout.desktopInstructionsVisible === false,
     expandedMapStartsFollowingPlayer: mapFollowState.browsing === false && /following/i.test(mapFollowState.status),
@@ -180,13 +203,13 @@ try {
     expandedMapRecenters: mapRecentered === true,
     closingMapRestoresGameplayControls: mapReturnedToPlay === true,
     walkAnalogMoves: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position) > 2,
-    walkFreeLookWorks: Number(walkLooked.cameraFollow?.headingAlignmentDegrees) > 8,
+    walkRightLookTurnsRight: Number(walkLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     walkCameraRecenters: Number(walkRecentered.cameraFollow?.headingAlignmentDegrees) < 5 && Number(walkRecentered.cameraFollow?.trailingDistance) > 1,
     driveAnalogMoves: distance(driveBefore.activeActor?.position, driveMoved.activeActor?.position) > 0.4,
-    driveFreeLookWorks: Number(driveLooked.cameraFollow?.headingAlignmentDegrees) > 8,
+    driveRightLookTurnsRight: Number(driveLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     driveCameraRecenters: Number(driveRecentered.cameraFollow?.headingAlignmentDegrees) < 6 && Number(driveRecentered.cameraFollow?.trailingDistance) > 2,
     planeAnalogChangesAttitude: Math.abs(Number(planeControlled.activeActor?.orientation?.pitch) - Number(planeBefore.activeActor?.orientation?.pitch)) > 0.05 || Math.abs(Number(planeControlled.activeActor?.orientation?.roll) - Number(planeBefore.activeActor?.orientation?.roll)) > 0.05,
-    planeFreeLookWorks: Number(planeLooked.cameraFollow?.headingAlignmentDegrees) > 8,
+    planeRightLookTurnsRight: Number(planeLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     planeCameraRecenters: Number(planeRecentered.cameraFollow?.headingAlignmentDegrees) < 7 && Number(planeRecentered.cameraFollow?.trailingDistance) > 2,
     savedSettingsPresent: await page.evaluate(() => !!localStorage.getItem('world-explorer-mobile-controls-v1')),
     noBrowserErrors: browserErrors.length === 0,
@@ -194,7 +217,7 @@ try {
   };
   const report = {
     ok: Object.values(checks).every(Boolean), contract: 'semantic-mobile-controls-v1', checks,
-    layouts: { standardLayout, southpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi },
+    layouts: { standardLayout, southpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi, openPackUi },
     map: { mapFollowState, mapBrowseState, mapZoomed, mapRecentered, mapReturnedToPlay, blockedMovementDistance: distance(mapActorBefore.activeActor?.position, mapActorAfterBlockedInput.activeActor?.position) },
     camera: {
       walk: { looked: walkLooked.cameraFollow, recentered: walkRecentered.cameraFollow },
