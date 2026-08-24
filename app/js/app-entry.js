@@ -284,7 +284,7 @@ function scheduleTutorialInit() {
     _tutorialInitPromise = new Promise((resolve) => {
         scheduleAfterFirstPlay('tutorial-runtime', async () => {
             try {
-                const mod = await import('./tutorial/tutorial.js?v=4');
+                const mod = await import('./tutorial/tutorial.js?v=5');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);

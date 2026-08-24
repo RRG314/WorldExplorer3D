@@ -48,7 +48,10 @@ function compileAmbientWildlifePlan(environment, options = {}) {
   for (const cell of candidateCells) {
     if (actors.length >= maxActors || !cell.contexts.some((context) => WILDLIFE_CONTEXTS.has(context))) continue;
     const seed = `${environment.worldIdentity.id}|ambient-wildlife-v1|${cell.cellId}`;
-    if (deterministicUnit(`${seed}:presence`) < 0.16) continue;
+    // Always retain the nearest compatible cell so a walking session has one
+    // visible nature presence. More distant cells keep deterministic thinning
+    // for performance and variety.
+    if (actors.length > 0 && deterministicUnit(`${seed}:presence`) < 0.16) continue;
     const margin = 0.22;
     let home = null;
     for (let attempt = 0; attempt < 8; attempt += 1) {

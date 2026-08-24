@@ -74,8 +74,29 @@ browser tested:
   Backpack layout ownership, map pan/zoom/recenter/return, zero browser errors,
   and zero failed local resources.
 
-These are local checkpoints, not a production deployment. The regional ecology
-pack, regional/seasonal fish authority, retained recurring programs, backend
+The first shared walking-encounter slice is also implemented and browser tested:
+
+- one deterministic encounter director consumes the existing generated field
+  slots, stable claim IDs, tool entitlements, cooldowns, and claimed-record set;
+  it does not create a second reward, inventory, or progression authority;
+- manual free-roam walking and Live GPS publish the same encounter contract and
+  stable target. Only the movement authority and eligibility evidence differ;
+- short, non-spoiler Nature/Earth/Water leads appear after real walking or a
+  bounded fallback delay, favor varied nearby activities, and cannot immediately
+  repeat an accepted or claimed slot;
+- close world actions such as observing visible wildlife or entering a building
+  take priority over the broader lead. Once tracking begins, the compact field
+  tool owns the lower mobile UI and the Journal remains minimized;
+- the nearest compatible discovery cell retains one modeled nature presence
+  while the existing mobile actor cap and deterministic thinning still govern
+  the wider wildlife set;
+- a 390×844 installed-Chrome journey proves direct-interaction priority, about
+  20 m of real analog walking, visible wildlife, lead selection, existing field
+  session start, shared free-roam/Live-GPS identity, clean mobile screen
+  ownership, zero browser errors, and zero failed local resources.
+
+These are bounded vertical slices, not completion of the field-game program.
+The regional ecology pack, regional/seasonal fish authority, retained recurring programs, backend
 receipt validation, physical-device evidence, complete catch/land verification,
 and the full per-action control editor remain open and must satisfy the gates
 later in this plan.

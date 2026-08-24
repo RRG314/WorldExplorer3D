@@ -61,16 +61,16 @@ progression, and configurable controls is the
 | Traversal | Walk, car, drone, plane, boat, underwater, rover, astronaut, rocket, environment transitions, and mode-aware cameras | Released and mostly gated |
 | Living world | Mapped-path pedestrian eligibility, varied traffic, parked vehicles, entrances, collision, and bounded LOD publication | Released and gated for representative Earth locations |
 | Urban Sandbox | One six-slot Backpack model, equipment actions, ammunition, vehicle entry/exit and doors, actor collision, civic responders, custody, mapped police/hospital recovery, and room authority | Released, gate incomplete |
-| Explorer and Discovery | Deterministic local activities, a small wildlife/catalog foundation, field equipment, Journal, Field Guide, collection, goals, progression, companions, and account-backed item/trade services | Released foundation; complete field-game loop and ecology are not implemented |
+| Explorer and Discovery | Deterministic local activities, shared free-roam/Live-GPS walking leads, a small wildlife/catalog foundation, field equipment, Journal, Field Guide, collection, goals, progression, companions, and account-backed item/trade services | Walking vertical slice implemented; regional ecology and durable field-game program remain incomplete |
 | AR | Capability-aware WebXR, camera overlay, and interactive-3D fallback for companions, specimens, and habitat-gated virtual wildlife surveys | Released, gate incomplete |
-| Water and Ocean | Published water ownership, surface boat, waves, wakes, shoreline transfer, underwater mode, bathymetry evidence, generic fish life, and boat-only fishing with 14 catalog species | Released foundation; bathymetry, regional fish ecology, shore fishing, and journey coverage are partial |
-| Live Earth and Live GPS | Observed and modeled provider registry, aircraft, satellites, earthquakes, weather, marine/water-level context, street imagery, and bounded foreground GPS following | Released; Live GPS movement is gated, but proximity-backed field progression is not implemented |
+| Water and Ocean | Published water ownership, surface boat, waves, wakes, shoreline transfer, underwater mode, bathymetry evidence, generic fish life, boat fishing, and a mapped-bank shore-fishing slice with 14 catalog species | Shore mechanics slice implemented; bathymetry and regional fish ecology remain partial |
+| Live Earth and Live GPS | Observed and modeled provider registry, aircraft, satellites, earthquakes, weather, marine/water-level context, street imagery, bounded foreground GPS following, trusted client field sessions, three-stop Expeditions, and shared walking leads | Mechanics journeys gated; backend reward proof, regional ecology, retention, and real-device program remain incomplete |
 | Games and progression | DeFlock Hunt, fishing, flower challenge, Paint Town, activity discovery, Explorer progression, shared room activities, and several leaderboards | Released, gate incomplete |
 | Multiplayer | Bounded authenticated rooms, private codes, public discovery, presence, chat, artifacts, blocks, world edits, activities, social data, and two-client convergence | Released; resilience and moderation are partial |
 | Creation tools | Overlay editor, local drafts, backend submission/moderation, public overlay layer, activity creator, activity library, creator profile, editable rooms, and block builder | Mixed: overlay workflow partial; activity publishing local-only |
 | Moon, Mars, Space, and universe | Planetary traversal, surface vehicles, tracks, catalog stars, solar-system navigation, spacecraft, deep-sky destinations, encounters, and return lifecycles | Released and environment-lifecycle gated |
 | Account, admin, and security | Authentication, account management, entitlements, admin operations, analytics link, moderation surfaces, security rules, emulator tests, and immutable release builds | Released and security gated |
-| UI, mobile, and accessibility | Responsive title/game shell, working mobile Live GPS access under Games, hard-coded touch profiles, partial screen-layout ownership, semantic labels/live regions, and keyboard/gamepad inputs | Released; configurable control and accessibility gates are incomplete |
+| UI, mobile, and accessibility | Responsive title/game shell, working mobile Live GPS access under Games, semantic analog touch authority, Standard/Southpaw layouts, camera return, navigable expanded map, partial screen-layout ownership, semantic labels/live regions, and keyboard/gamepad inputs | Bounded phone-control slice implemented; full remapping/editor, accessibility, and physical-device gates remain incomplete |
 | Public landing and documentation | Public launch flow, current gameplay gallery, GitHub Pages, source/data/limitations documentation, and release identity | Released; gallery refresh remains planned |
 
 ## What is genuinely missing or incomplete
@@ -82,23 +82,25 @@ The following findings come from the current source, not the historical roadmap:
 - **A unified mission and economy system is not implemented.** “Missions” exists
   as navigation language and individual games have rewards/scores, but there is
   no authoritative mission lifecycle, wallet, currency, pricing, or economy.
-- **Live GPS is not yet a complete field game.** It follows a foreground device
-  through the bounded Earth world, but there is no trusted field-session ledger,
-  accuracy-aware proximity reward authority, route lifecycle, daily/weekly field
-  work, seasonal encounter operation, or server validation of walking evidence.
+- **Live GPS is not yet a complete field game.** It now has a client field-session
+  authority, accuracy/speed/foreground holds, proximity-backed three-stop work,
+  and shared walking leads through the existing Explorer claim spine. It still
+  lacks a server-owned reward ledger, route lifecycle, daily/weekly field work,
+  seasonal encounter operation, reviewed regional ecology, and independent
+  validation of walking evidence.
 - **Regional biodiversity is not production-complete.** Discovery uses a small
   local deterministic grid and a few generic wildlife archetypes; it does not
   have one licensed, versioned catalog and regional population pipeline for
   animals, insects, plants, fish, seasons, habitats, provenance, or sensitive
   species.
-- **Fishing is boat-only and ecologically broad.** The 14-species catalog uses
-  water-kind and latitude filters. Shoreline access, waterbody identity,
-  regional/seasonal fish pools, and a shared boat/shore/underwater population
-  authority are missing.
-- **Mobile controls are not configurable.** Existing touch profiles emulate
-  fixed keys; users cannot remap semantic actions, move/resize controls, choose
-  handedness, save profiles, validate conflicts, or prove that a saved setting
-  changes the underlying gameplay action.
+- **Fishing remains ecologically broad.** A mapped-bank shore path now reuses the
+  existing cast/fight game and preserves access uncertainty, but the 14-species
+  catalog still relies mainly on water-kind and latitude. Regional/seasonal fish
+  pools and one shared boat/shore/underwater population authority are missing.
+- **Mobile controls are only partly configurable.** The semantic touch authority
+  now saves Standard/Southpaw handedness, sensitivity, and camera-return settings
+  that alter real play. Users still cannot remap every action, move/resize zones,
+  validate conflicts, or maintain revisioned per-mode profiles.
 - **Complete physical player embodiment is not implemented.** Equipment has
   first-person/world visuals and the walking actor is visible, but there is no
   single full-body/hand interaction contract covering every traversal mode,
@@ -352,13 +354,23 @@ Done when:
 
 ### CP7 — Complete Live GPS Field Expeditions and regional ecology
 
-**Status: Foundations released; complete system not implemented**
+**Status: Walking/Expedition vertical slices implemented; regional system incomplete**
 
 The source of truth for this checkpoint is the
 [Field Exploration and Mobile Control Plan](docs/FIELD_EXPLORATION_AND_MOBILE_CONTROL_PLAN.md).
 The current GPS follower, deterministic Discovery cells, Journal, Field Guide,
 companions, and small wildlife catalog are inputs to this program; none alone is
 evidence of the complete real-world field game.
+
+Current bounded proof on `steven/live-gps-walking-game` includes one trusted
+foreground field-session authority, a three-stop GPS Expedition through the
+existing ExplorerEvent/Journal/Field Guide claim spine, mapped-bank shore
+fishing, and one shared passive walking-encounter director for manual free roam
+and Live GPS. The encounter director reuses generated field slots and existing
+tools/rewards, defers to directly reachable world actions, suppresses repeats,
+and keeps the Journal out of phone gameplay. This is a mechanics vertical slice,
+not the reviewed regional ecology, long-term retention, backend receipt, or
+worldwide-content completion described below.
 
 Required work:
 

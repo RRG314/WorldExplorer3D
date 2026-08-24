@@ -1,6 +1,7 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
 import { createCompanionRuntime } from './companion-runtime.js?v=2';
 import { createDetectorSession } from './detector-session.js?v=2';
+import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
 import { compileEnvironmentContext } from './environment-context.js?v=1';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
 import { createFieldExpedition } from './field-expedition.js?v=1';
@@ -424,7 +425,10 @@ function createDiscoveryUi(state) {
     setTab('today');
     setOpen(true);
   });
-  listen(elements.promptOpen, 'click', () => setOpen(true));
+  listen(elements.promptOpen, 'click', () => {
+    if (state.encounterLead?.available) void state.startEncounterLead?.();
+    else setOpen(true);
+  });
   listen(elements.close, 'click', () => setOpen(false));
   listen(elements.help, 'click', () => {
     if (activeTab === 'guide' && elements.guideHelp) {
@@ -513,10 +517,24 @@ function createDiscoveryUi(state) {
     const detectorAvailable = actions.some((action) => action.id === 'metal-detect');
     const operationActive = !!snapshot?.active && !['complete', 'collected', 'recorded', 'left'].includes(snapshot?.phase);
     elements.quick?.classList.toggle('show', state.active && !open && operationActive && (detectorAvailable || activityId !== 'metal-detect'));
-    elements.prompt?.classList.remove('show');
-    if (elements.promptText) elements.promptText.textContent = actions.length
-      ? `${actions.slice(0, 3).map((action) => action.label).join(' · ')} available here`
-      : 'Inspect the current area.';
+    const encounterLead = state.encounterLead || null;
+    // A world-space action within reach (observe wildlife, enter a vehicle,
+    // inspect an object) is more urgent than a broader walking lead. The lead
+    // remains available and returns as soon as the direct interaction clears.
+    const directInteraction = state.appCtx.resolvePrimaryContextInteraction?.() || null;
+    const interiorInteraction = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
+    const showEncounterLead = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
+    elements.prompt?.classList.toggle('show', showEncounterLead);
+    if (elements.prompt) {
+      elements.prompt.dataset.tone = encounterLead?.tone || 'field';
+      elements.prompt.dataset.mode = encounterLead?.mode || 'free-roam';
+    }
+    if (elements.promptText) elements.promptText.textContent = showEncounterLead
+      ? `${encounterLead.leadLabel} nearby · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m · ${Math.round(Number(encounterLead.bearingDegrees || 0))}°`
+      : actions.length
+        ? `${actions.slice(0, 3).map((action) => action.label).join(' · ')} available here`
+        : 'Inspect the current area.';
+    if (elements.promptOpen) elements.promptOpen.textContent = showEncounterLead ? 'Track Lead' : 'Explore';
     const nextSignature = `${activityId}|${actions.map((action) => action.id).join('|')}`;
     if (elements.actions && nextSignature !== actionSignature) {
       actionSignature = nextSignature;
@@ -880,6 +898,15 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       return RELEASED_EXPLORER_ACTIVITIES.has(slot.activityId) && (!toolId || entitlements.canUseTool(toolId).allowed);
     }
   });
+  state.encounterDirector = createWalkingEncounterDirector({
+    plan: fieldActivities,
+    claimedIds,
+    canUseSlot: (slot) => {
+      const toolId = ACTIVITY_TOOL[slot.activityId];
+      return RELEASED_EXPLORER_ACTIVITIES.has(slot.activityId) && (!toolId || state.entitlements.canUseTool(toolId).allowed);
+    }
+  });
+  state.encounterLead = state.encounterDirector.snapshot(playerPosition(appCtx), false);
   state.recordFishingExplorerCatch = async (catchRecord = {}) => {
     if (!catchRecord.id || !catchRecord.speciesId) return false;
     const position = playerPosition(appCtx);
@@ -1224,6 +1251,49 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (began) state.ui.setOpen(false);
     return began;
   };
+  state.startEncounterLead = async () => {
+    const position = playerPosition(appCtx);
+    const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
+    const lead = state.encounterDirector.snapshot(position, liveGps.active === true);
+    if (!lead.available || !lead.slotId || !lead.activityId) return false;
+    const toolId = ACTIVITY_TOOL[lead.activityId];
+    if (toolId && !state.entitlements.canUseTool(toolId).allowed) {
+      state.encounterDirector.reject(lead.slotId);
+      appCtx.showToast?.(`${displayDiscoveryLabel(toolId)} unlocks at a later Explorer rank.`);
+      return false;
+    }
+    if (toolId) await state.equipTool(toolId, { silent: true });
+    state.activeActivityId = lead.activityId;
+    state.session.reset();
+    state.detectorSnapshot = state.session.snapshot(position);
+    state.fieldSession.reset();
+    const began = state.fieldSession.beginSlot(lead.slotId, position, { evaluateFieldTarget: state.evaluateFieldTarget });
+    if (!began) {
+      state.encounterDirector.reject(lead.slotId);
+      state.encounterLead = state.encounterDirector.snapshot(position, liveGps.active === true);
+      appCtx.showToast?.('That lead is no longer available. Keep walking for another encounter.');
+      return false;
+    }
+    state.encounterDirector.accept(position, liveGps.active === true);
+    state.encounterLead = state.encounterDirector.snapshot(position, liveGps.active === true);
+    state.lastSnapshot = state.fieldSession.snapshot(position);
+    state.ui.showResult(null);
+    state.ui.setTab('today');
+    state.ui.setOpen(false);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    discoveryHaptic([12, 24, 12]);
+    appCtx.showToast?.(`${lead.leadLabel} tracked · follow the field bearing.`);
+    // Use the canonical field-activity event so onboarding, analytics, and all
+    // activity entry points observe the same lifecycle.
+    emitDiscoveryTelemetry('activity_started', {
+      activityId: lead.activityId,
+      discipline: lead.tone === 'nature' ? 'nature' : lead.tone === 'earth' ? 'earth-science' : 'exploration',
+      contextBands: telemetryContextBands(),
+      liveGps: liveGps.active === true,
+      result: 'walking-encounter'
+    });
+    return true;
+  };
   state.handlePrimary = async () => {
     resumeDiscoveryAudio(state);
     const position = playerPosition(appCtx);
@@ -1419,6 +1489,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       const travelMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car';
       state.companionRuntime?.update?.(position, frame.dt, travelMode, appCtx.getEnv?.() || 'EARTH');
       state.wildlifeRuntime?.update?.(position, frame.dt, appCtx.getEnv?.() || 'EARTH');
+      const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
+      const operationActive = !!state.lastSnapshot?.active && !['complete', 'collected', 'recorded', 'left'].includes(state.lastSnapshot?.phase);
+      state.encounterLead = state.encounterDirector.update({
+        dt: frame.dt,
+        position,
+        walking: appCtx.Walk?.state?.mode === 'walk',
+        earth: appCtx.getEnv?.() === 'EARTH',
+        liveGpsActive: liveGps.active === true,
+        operationActive,
+        blocked: state.ui?.open || appCtx.paused || appCtx.showLargeMap || appCtx.getFishingSnapshot?.().open === true
+      });
       state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
       if (state.activeActivityId === 'metal-detect') playDetectorTone(state, state.detectorSnapshot, frame.dt);
     }
@@ -1447,6 +1528,7 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
     presentation: state.presentation.diagnostics,
     companions: state.companionRuntime?.snapshot?.() || { owned: 0, activeInstanceId: null },
     wildlife: state.wildlifeRuntime?.snapshot?.() || { active: 0, logical: state.publication.wildlife?.actors?.length || 0 },
+    encounterLead: state.encounterLead || null,
     generatedWithAdditionalProviderQueries: false,
     error: state.lastSnapshot?.error || ''
   });

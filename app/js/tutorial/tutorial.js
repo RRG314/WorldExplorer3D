@@ -299,6 +299,10 @@ function onDiscoveryTelemetry(event) {
   const type = String(event?.detail?.type || '');
   if (type === 'activity_started' && runtime.state.stage === STAGES.EXPLORE) {
     setStage(STAGES.DISCOVER, 'activity_started');
+    // A walking encounter immediately returns the player to the world-space
+    // bearing. Advance the first-expedition journey, then clear its card so it
+    // cannot cover the tracking controls or target.
+    if (event?.detail?.result === 'walking-encounter') dismissCurrentPrompt('encounter_tracking');
   } else if (type === 'discovery_recorded') {
     completeTutorial('discovery_recorded');
   }

@@ -139,10 +139,10 @@ or surveyed height.
 | Living world | Pedestrian eligibility, navigation, population, entrances, traffic and parked vehicles | `app/js/living-world/` | Rebuilt from each published world | Released and representative-location gated |
 | Urban Sandbox | Backpack, equipment, ammunition, vehicle leases, impacts, civic responders, custody and recovery | `app/js/urban-sandbox/` | Firestore room state plus authorized urban functions | Released, gate incomplete |
 | Interiors | Building entry/exit, mapped indoor geometry, generated floors, stairs, elevator and collision | `app/js/interiors/`, `app/js/building-entry.js` | Session-local interior scope | Released; mapped ingestion currently selects one mapped level |
-| Discovery | Deterministic local activities, a small wildlife/geology/history catalog, specimens, tools, Journal/Field Guide, goals, progression, companions, and trades | `app/js/discovery/` | Local IndexedDB profiles plus `explorerProfiles`, item subcollections, and discovery functions | Released foundation; field-session rewards, regional ecology, durable Expeditions, and broad species content are incomplete |
+| Discovery | Deterministic local activities, shared free-roam/Live-GPS walking leads, visible wildlife, specimens, tools, Journal/Field Guide, goals, progression, companions, and trades | `app/js/discovery/` | Local IndexedDB profiles plus `explorerProfiles`, item subcollections, and discovery functions | Walking/three-stop vertical slices implemented; regional ecology, backend proof, recurring Expeditions, and broad species content are incomplete |
 | AR | Capability detection, eligibility, WebXR/camera-overlay/3D presentation, virtual wildlife survey | `app/js/ar/` | Device permission plus local/session state | Released, gate incomplete |
 | DeFlock Hunt | Virtual objectives from publicly mapped OSM surveillance nodes | `app/js/deflock/`, `functions/deflock.js`, `functions/geospatial.js` | Immutable room state and authorized claim function | Released; provider fallback is explicitly labeled |
-| Fishing | Boat-only cast/fight/catch loop with equipment and 14 broadly filtered species; underwater schools are separate | `app/js/fishing-game.js`, `app/js/fishing/`, `app/js/ocean/fish-life.js` | Local catch/equipment state plus leaderboard/backend where enabled | Released foundation; shore access and one regional water/fish population authority are absent |
+| Fishing | Shared boat/shore cast-fight-catch loop with equipment, mapped-bank eligibility, and 14 broadly filtered species; underwater schools are separate | `app/js/fishing-game.js`, `app/js/fishing/`, `app/js/ocean/fish-life.js` | Local catch/equipment state plus Explorer records and leaderboard/backend where enabled | Shore mechanics slice implemented; one regional water/fish population authority is absent |
 | Paint Town | Shared paint claims and leaderboard | `app/js/game/paint-town*.js`, `tests/painttown.integration.test.mjs` | Firestore room claims | Released and integration-tested |
 | Flower challenge | Local challenge lifecycle and score path | `app/js/flower-challenge/` | Leaderboard where enabled | Released, gate incomplete |
 | Block builder | 200-piece construction catalog and shared room blocks | `app/js/block-builder/`, `app/js/multiplayer/` | Firestore room blocks | Released and multiplayer-convergence tested |
@@ -160,7 +160,7 @@ are not hidden subsystems; they are unimplemented product work tracked in the
 | System | Role | Authority and truth boundary | Status |
 | --- | --- | --- | --- |
 | Live Earth | Registers satellites, earthquakes, aircraft, weather, marine/water-level context, street imagery, and reference layers | `app/js/live-earth/`, `app/js/geospatial/`; each provider records observation/model/prediction/reference class | Released, full journey gate incomplete |
-| Live GPS Explore | Starts from the mobile launch path or the in-game Games menu and follows foreground device location inside one already bounded Earth world | `app/js/live-gps/`, `app/js/runtime/on-demand-location-games.js` | Browser permission and session-local fixes; does not create continuous-world streaming or trusted proximity rewards | Released movement path and journey gate; complete field-game authority is absent |
+| Live GPS Explore | Starts from mobile launch or Games, follows foreground device location inside one bounded Earth world, and supplies filtered movement evidence to three-stop field work and shared walking leads | `app/js/live-gps/`, `app/js/runtime/on-demand-location-games.js`, `app/js/discovery/` | Browser permission and session-local fixes; no raw route by default and no continuous-world streaming; independent server reward proof remains absent | Movement/field mechanics journeys pass; regional ecology, retained programs, and server ledger are incomplete |
 | Geospatial server adapters | Protect provider boundaries and normalize DeFlock, street imagery, and aircraft queries | `functions/geospatial.js` | Same-origin HTTPS functions, bounded caches/timeouts/fallbacks | Released |
 | Data provenance | Documents public sources, licenses, fallbacks, and truth classes | `DATA_SOURCES.md`, `ATTRIBUTION.md`, asset attribution files | Documentation plus runtime provenance fields | Released; maintain with provider changes |
 
@@ -235,7 +235,7 @@ the test contract.
 | `npm run verify:environments` | Earth/Moon/Mars/Ocean/Space transition ownership and teardown |
 | `npm run verify:assembled-locations` | Baltimore/JFX, Golden Gate, London, Monaco, Manhattan, rural Iowa, and Tokyo |
 | `npm run verify:actors-vehicles` | Actor and vehicle contact/interaction contracts |
-| `npm run verify:live-gps` | Visible 390×844 Live GPS entry, real emulated geolocation, walk/drive switching, camera return, and bounded lifecycle; field rewards/ecology are not yet covered |
+| `npm run verify:live-gps` | Visible 390×844 Live GPS entry, real emulated geolocation, walk/drive switching, camera return, three generated stops, exact-once records, accuracy/speed holds, and bounded lifecycle |
 | `npm run verify:artifact-runtime` | Runtime against the immutable built candidate |
 | `npm run build:hosting` | Fresh production-shaped `dist/` with content hashes |
 | `npm run audit:reachability` | Rejects hosted code/styles that are not reachable from declared entries |
@@ -271,13 +271,14 @@ frames and real input journeys remain required for visual acceptance.
 9. The product intentionally does not stream an unbounded continuous Earth.
    Changes that assume cross-location continuity conflict with the product
    architecture.
-10. Live GPS movement, Discovery rewards, regional species selection, and
-    fishing do not share a trusted field-session/proximity/ecology authority.
-    The client can currently claim Discovery rewards without independent server
-    validation of location, movement, or proximity.
-11. Touch controls are fixed key-emulation profiles. There is no revisioned
-    semantic action map, saved remapping/layout, conflict validation, mode-aware
-    user profile, or automated proof that a setting changes gameplay.
+10. Live GPS movement and Discovery field work now share one client
+    field-session/proximity authority, but regional species selection and fish
+    ecology are not unified and reward evidence still lacks independent server
+    validation.
+11. Touch controls now share a semantic action authority with saved handedness,
+    sensitivity, camera return, and browser proof across walk/drive/plane. There
+    is no full revisioned remapping/layout editor, conflict validation, or
+    complete per-mode user profile.
 
 See [ROADMAP.md](../ROADMAP.md) for the ordered completion program and
 [KNOWN_ISSUES.md](../KNOWN_ISSUES.md) for player-facing limitations. The
