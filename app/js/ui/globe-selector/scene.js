@@ -177,6 +177,33 @@ export function createGlobeSelectorScene(options = {}) {
     return cameraDistance;
   }
 
+  function getPointHitThresholdWorld(targetPixels = 7, surfaceRadius = 1.017) {
+    if (!camera || !canvas) return 0.006;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.height) return 0.006;
+    const depth = Math.max(0.02, cameraDistance - Number(surfaceRadius || 1.017));
+    const verticalWorldSpan = 2 * depth * Math.tan((camera.fov * Math.PI / 180) * 0.5);
+    return Math.max(0.0012, Math.min(0.018, verticalWorldSpan * Math.max(3, Number(targetPixels) || 7) / rect.height));
+  }
+
+  function projectLatLonToClient(lat, lon, radius = 1.023) {
+    if (!camera || !globeRoot || !canvas || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    globeRoot.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    const local = latLonToLocalPoint(Number(lat), Number(lon), Number(radius) || 1.023);
+    const projected = new THREE.Vector3(local.x, local.y, local.z)
+      .applyMatrix4(globeRoot.matrixWorld)
+      .project(camera);
+    return {
+      x: rect.left + (projected.x + 1) * 0.5 * rect.width,
+      y: rect.top + (1 - projected.y) * 0.5 * rect.height,
+      depth: projected.z,
+      visible: projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1
+    };
+  }
+
   function handlePick(clientX, clientY, activate = false) {
     if (!renderer || !camera || !raycaster || !earthMesh) return;
     const rect = canvas.getBoundingClientRect();
@@ -371,7 +398,9 @@ export function createGlobeSelectorScene(options = {}) {
     focusOnSelection,
     getBridgeRefs: () => ({ globeRoot, earthMesh }),
     getCameraDistance,
+    getPointHitThresholdWorld,
     init,
+    projectLatLonToClient,
     renderFavoriteMarkers,
     renderFrame,
     setCameraDistance,

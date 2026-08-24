@@ -10,7 +10,30 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const pageErrors = [];
 
-async function openDeFlock(context, screenshotName) {
+async function dragGlobe(page, context, start, deltaX, touchInput) {
+  if (!touchInput) {
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + deltaX, start.y, { steps: 8 });
+    await page.mouse.up();
+    return;
+  }
+  const session = await context.newCDPSession(page);
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: start.x, y: start.y, radiusX: 5, radiusY: 5, force: 1, id: 1 }]
+  });
+  for (let step = 1; step <= 8; step += 1) {
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: start.x + deltaX * step / 8, y: start.y, radiusX: 5, radiusY: 5, force: 1, id: 1 }]
+    });
+  }
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await session.detach();
+}
+
+async function openDeFlock(context, screenshotName, touchInput = false) {
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
@@ -61,6 +84,49 @@ async function openDeFlock(context, screenshotName) {
   assert.equal(await start.isEnabled(), true);
   assert.equal(await focus.isEnabled(), true);
   await focus.click();
+
+  const canvas = page.locator('#globeSelectorCanvas');
+  await canvas.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(100);
+  await page.waitForFunction(() => {
+    const projection = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.liveEarth?.selectedDeFlockProjection;
+    return projection?.visible === true;
+  }, null, { timeout: 10_000 });
+  const focusedState = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth);
+  const focusedProjection = focusedState.selectedDeFlockProjection;
+  const canvasBox = await canvas.boundingBox();
+  assert.ok(canvasBox, 'The DeFlock globe canvas must have a measurable hit region.');
+  const dragStart = {
+    x: canvasBox.x + canvasBox.width * 0.5,
+    y: canvasBox.y + canvasBox.height * 0.5
+  };
+  await dragGlobe(page, context, dragStart, 48, touchInput);
+  await page.waitForTimeout(250);
+  const movedProjection = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectedDeFlockProjection);
+  assert.equal(movedProjection?.visible, true, 'The selected camera must remain visible after navigating the globe.');
+  const navigationDistance = Math.hypot(movedProjection.x - focusedProjection.x, movedProjection.y - focusedProjection.y);
+  assert.ok(navigationDistance >= 10, `The globe drag must move the selected point enough to exercise picking (moved ${navigationDistance.toFixed(1)} px).`);
+  assert.ok(
+    movedProjection.x >= canvasBox.x && movedProjection.x <= canvasBox.x + canvasBox.width &&
+      movedProjection.y >= canvasBox.y && movedProjection.y <= canvasBox.y + canvasBox.height,
+    'The moved selected camera must remain inside the globe canvas.'
+  );
+
+  const clickPoint = { x: movedProjection.x, y: movedProjection.y };
+  await page.screenshot({ path: `output/verification/deflock-live-ui/${screenshotName.replace('camera-selected', 'picking-before-click')}`, fullPage: false });
+  if (touchInput) await page.touchscreen.tap(clickPoint.x, clickPoint.y);
+  else await page.mouse.click(clickPoint.x, clickPoint.y);
+  await page.waitForFunction(() => {
+    const details = document.querySelector('.deflock-live-detail')?.textContent || '';
+    const button = [...document.querySelectorAll('[data-live-earth-action="travel-deflock"]')][0];
+    const detailResolved = /osm:(?:node|way):\d+|Exact camera direction and metadata are temporarily unavailable/i.test(details);
+    return detailResolved && button instanceof HTMLButtonElement && button.disabled === false;
+  }, null, { timeout: 90_000 });
+  const clickedState = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth);
+  const clickedProjection = clickedState.selectedDeFlockProjection;
+  const pointerErrorPx = Math.hypot(clickedProjection.x - clickPoint.x, clickedProjection.y - clickPoint.y);
+  assert.ok(pointerErrorPx <= 8, `The selected DeFlock target must stay under the pointer (error ${pointerErrorPx.toFixed(1)} px; ${JSON.stringify({ focusedState, movedProjection, clickedState })}).`);
+
   const coverage = page.getByRole('button', { name: 'Show View Coverage' });
   let coverageToggle = 'not-mapped';
   if (await coverage.count()) {
@@ -70,7 +136,17 @@ async function openDeFlock(context, screenshotName) {
     assert.equal(coverageToggle, 'working');
   }
   await page.screenshot({ path: `output/verification/deflock-live-ui/${screenshotName}`, fullPage: true });
-  return { mappedCount, stage, entry, coverageToggle, selectedText: (await page.locator('.deflock-live-detail').textContent())?.replace(/\s+/g, ' ').trim() || '' };
+  return {
+    mappedCount,
+    stage,
+    entry,
+    coverageToggle,
+    picking: {
+      navigationDistancePx: Number(navigationDistance.toFixed(1)),
+      pointerErrorPx: Number(pointerErrorPx.toFixed(1))
+    },
+    selectedText: (await page.locator('.deflock-live-detail').textContent())?.replace(/\s+/g, ' ').trim() || ''
+  };
 }
 
 try {
@@ -79,11 +155,11 @@ try {
   const desktopResult = await openDeFlock(desktop, 'desktop-camera-selected.png');
   await desktop.close();
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  const mobileResult = await openDeFlock(mobile, 'mobile-camera-selected.png');
+  const mobileResult = await openDeFlock(mobile, 'mobile-camera-selected.png', true);
   await mobile.close();
   const report = {
     ok: pageErrors.length === 0,
-    contract: 'deflock-live-globe-and-actions-v2',
+    contract: 'deflock-live-globe-and-actions-v3',
     desktop: desktopResult,
     mobile: mobileResult,
     pageErrors

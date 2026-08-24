@@ -20,7 +20,7 @@ import {
   updateEarthquakeReplay as animateEarthquakeReplay,
   updateLocalEventContext as syncLocalEventContext
 } from "./local-events.js?v=2";
-import { renderGlobeLayers } from "./render-globe.js?v=9";
+import { renderGlobeLayers } from "./render-globe.js?v=10";
 import {
   bindSelectorUi,
   handleGlobePick,
@@ -30,7 +30,7 @@ import {
   setActiveLayer,
   setPanelMode,
   updateSelectorFrame
-} from "./controller-ui.js?v=14";
+} from "./controller-ui.js?v=15";
 
 const SATELLITE_POSITION_REFRESH_MS = 15000;
 const EARTHQUAKE_UI_REFRESH_MS = 5 * 60 * 1000;
@@ -763,6 +763,10 @@ function initLiveEarth() {
       void setActiveLayer(buildLiveEarthModuleContext(), state, layerId, false);
     },
     getSummary() {
+      const selectedCamera = state.selectedDeFlockCamera || null;
+      const selectedProjection = selectedCamera
+        ? state.selector.api?.projectLatLonToClient?.(selectedCamera.lat, selectedCamera.lon, 1.023) || null
+        : null;
       return {
         activeLayerId: state.activeLayerId,
         activeCategoryId: state.activeCategoryId,
@@ -783,7 +787,15 @@ function initLiveEarth() {
           id: entry.id, lat: entry.lat, lon: entry.lon, altitude: entry.altitude, dataSource: entry.dataSource
         })),
         selectedStreetImageId: state.selectedStreetImageId || '',
-        selectedDeFlockCameraId: state.selectedDeFlockCamera?.sourceId || state.selectedDeFlockCamera?.id || '',
+        selectedDeFlockCameraId: selectedCamera?.sourceId || selectedCamera?.id || '',
+        selectedDeFlockCamera: selectedCamera ? {
+          id: selectedCamera.sourceId || selectedCamera.id || '',
+          lat: Number(selectedCamera.lat),
+          lon: Number(selectedCamera.lon),
+          indexedLat: Number(selectedCamera.indexedLat ?? selectedCamera.lat),
+          indexedLon: Number(selectedCamera.indexedLon ?? selectedCamera.lon)
+        } : null,
+        selectedDeFlockProjection: selectedProjection,
         streetImageryProviderId: state.streetImageryProviderId || 'panoramax'
       };
     },

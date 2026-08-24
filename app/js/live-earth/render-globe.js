@@ -36,13 +36,21 @@ function renderDeFlockSelectionDirections(ctx, state, group) {
   if (!selected) return;
   const center = state.selector.api.latLonToLocalPoint(selected.lat, selected.lon, 1.023);
   const marker = new THREE.Mesh(
-    new THREE.RingGeometry(0.00065, 0.0012, 20),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.96, side: THREE.DoubleSide, depthTest: false })
+    new THREE.RingGeometry(0.00072, 0.00155, 24),
+    new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false })
   );
   marker.position.set(center.x, center.y, center.z);
   marker.lookAt(0, 0, 0);
   marker.renderOrder = 8;
   group.add(marker);
+  const centerDot = new THREE.Mesh(
+    new THREE.CircleGeometry(0.00036, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false })
+  );
+  centerDot.position.set(center.x, center.y, center.z);
+  centerDot.lookAt(0, 0, 0);
+  centerDot.renderOrder = 9;
+  group.add(centerDot);
   const sectors = Array.isArray(selected.directionSectors) ? selected.directionSectors : [];
   if (!state.deFlockCoverageVisible || !sectors.length) return;
   sectors.forEach((sector) => {

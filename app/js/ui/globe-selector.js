@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=15';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=16';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
@@ -543,6 +543,8 @@ function createGlobeSelector(options = {}) {
       latLonToLocalPoint,
       localPointToLatLon,
       getCameraDistance: globeScene.getCameraDistance,
+      getPointHitThresholdWorld: globeScene.getPointHitThresholdWorld,
+      projectLatLonToClient: globeScene.projectLatLonToClient,
       setCameraDistance: globeScene.setCameraDistance,
       setSelection,
       applySelectionAndResolve,

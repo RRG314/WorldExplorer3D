@@ -11,7 +11,7 @@ import {
   renderSatelliteGlobe,
   renderTransportGlobe,
   renderWeatherGlobe
-} from "./render-globe.js?v=9";
+} from "./render-globe.js?v=10";
 
 function selectedLayerCount(ctx, state, layerId) {
   if (layerId === 'overview') return 7;
@@ -538,8 +538,9 @@ export async function handleUiAction(ctx, state, action, value) {
       : ctx.cameraFromDeFlockInstance(state, Number(value));
     if (!camera) return;
     state.selectedDeFlockCamera = camera;
-    state.selector.api?.setSelection?.(camera.lat, camera.lon, { name: 'Mapped DeFlock camera', focus: true });
-    state.selector.api?.setCameraDistance?.(1.2);
+    // A direct point pick must leave the selected marker at the pointer. Camera
+    // movement is an explicit action owned by the separate Focus Camera button.
+    state.selector.api?.setSelection?.(camera.lat, camera.lon, { name: 'Mapped DeFlock camera' });
     renderDeFlockGlobe(ctx, state);
     renderLiveEarthUi(ctx, state);
     const detailRequest = ctx.resolveDeFlockCamera(state, camera);
@@ -679,7 +680,7 @@ export function handleGlobePick(ctx, state, raycaster) {
   const meshes = state.selector.markerRecords.map((entry) => entry.mesh).filter(Boolean);
   if (!meshes.length && state.activeLayerId !== 'deflock-cameras') return false;
   if (state.activeLayerId === 'deflock-cameras' && raycaster.params?.Points) {
-    raycaster.params.Points.threshold = 0.018;
+    raycaster.params.Points.threshold = state.selector.api?.getPointHitThresholdWorld?.(7, 1.017) || 0.006;
   }
   const hits = raycaster.intersectObjects(meshes, false);
   const hit = hits && hits.length ? hits[0] : null;
@@ -715,7 +716,10 @@ export function handleGlobePick(ctx, state, raycaster) {
       state.selector.api.earthMesh.worldToLocal(local);
       const location = state.selector.api.localPointToLatLon?.(local);
       const distance = Number(state.selector.api.getCameraDistance?.()) || 2.15;
-      const radiusDegrees = distance >= 2 ? 2.5 : distance >= 1.45 ? 0.6 : 0.09;
+      // Keep the invisible fallback close to the rendered point. A broad
+      // geographic snap makes a successful click look inaccurate because the
+      // selected target can appear several pixels away from the pointer.
+      const radiusDegrees = distance >= 2 ? 1.2 : distance >= 1.45 ? 0.3 : 0.06;
       const camera = location ? ctx.nearestDeFlockCamera(state, location.lat, location.lon, radiusDegrees) : null;
       if (camera) {
         void handleUiAction(ctx, state, 'select-deflock', camera.id);
