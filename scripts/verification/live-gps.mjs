@@ -41,6 +41,8 @@ try {
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  const consent = page.locator('#analyticsConsentDenyBtn');
+  if (await consent.isVisible()) await consent.click();
   const liveGpsEntry = page.locator('#globeSelectorLiveGpsBtn');
   await liveGpsEntry.waitFor({ state: 'visible', timeout: 30_000 });
   assert.equal(await liveGpsEntry.isEnabled(), true, 'Live GPS entry must be enabled in the mobile start hub.');

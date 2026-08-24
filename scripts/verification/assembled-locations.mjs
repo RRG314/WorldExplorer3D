@@ -68,6 +68,8 @@ try {
       });
       await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
       await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
+      const consent = page.locator('#analyticsConsentDenyBtn');
+      if (await consent.isVisible()) await consent.click();
       await page.getByRole('button', { name: 'Explore', exact: true }).click();
       await page.waitForFunction(() => {
         const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
