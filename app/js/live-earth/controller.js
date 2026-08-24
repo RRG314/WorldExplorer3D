@@ -796,6 +796,7 @@ function initLiveEarth() {
           indexedLon: Number(selectedCamera.indexedLon ?? selectedCamera.lon)
         } : null,
         selectedDeFlockProjection: selectedProjection,
+        selectorBasemap: state.selector.api?.getBasemapState?.() || null,
         selectorZoom: state.selector.api?.getZoomState?.() || null,
         selectorRender: state.selector.api?.getRenderStats?.() || null,
         streetImageryProviderId: state.streetImageryProviderId || 'panoramax'

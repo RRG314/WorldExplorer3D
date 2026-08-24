@@ -29,7 +29,7 @@ function installOnDemandLiveEarth(appCtx) {
 
   async function ensureLiveEarthReady() {
     if (!modulePromise) {
-      modulePromise = import('../live-earth/controller.js?v=28').then((controller) => {
+      modulePromise = import('../live-earth/controller.js?v=29').then((controller) => {
         const liveEarth = controller.initLiveEarth();
         if (selectorApi) liveEarth.bindGlobeSelector(selectorApi);
         liveEarth.setPanelMode(requestedPanelMode);

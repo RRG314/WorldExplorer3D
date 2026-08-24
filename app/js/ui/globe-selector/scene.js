@@ -4,6 +4,7 @@ import {
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
 import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=9';
+import { createGlobeBasemapTiles } from './basemap-tiles.js?v=1';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
@@ -13,6 +14,9 @@ export function createGlobeSelectorScene(options = {}) {
     zoomInBtn,
     zoomOutBtn,
     scaleReadout,
+    mapBasemapBtn,
+    satelliteBasemapBtn,
+    basemapAttribution,
     placeReadout,
     getActiveCityTab,
     getPanelMode,
@@ -37,6 +41,7 @@ export function createGlobeSelectorScene(options = {}) {
   let menuFavoriteMaterial = null;
   let savedFavoriteMaterial = null;
   let favoriteMarkerNodes = [];
+  let basemapTiles = null;
   let cameraDistance = 2.8;
   let targetCameraDistance = 2.8;
   let pointerActive = false;
@@ -116,11 +121,19 @@ export function createGlobeSelectorScene(options = {}) {
     camera.updateProjectionMatrix();
     applyMarkerScales();
     updateZoomUi();
+    basemapTiles?.update?.(true);
+  }
+
+  function getViewCenter() {
+    if (!globeRoot || typeof THREE === 'undefined') return { lat: 0, lon: 0 };
+    const inverseRotation = globeRoot.quaternion.clone().invert();
+    return localPointToLatLon(new THREE.Vector3(0, 0, 1).applyQuaternion(inverseRotation));
   }
 
   function renderFrame() {
     if (!getOpenState()) return;
     appCtx.liveEarth?.updateSelectorFrame?.();
+    basemapTiles?.update?.();
     applyMarkerScales();
     if (renderer && scene && camera) renderer.render(scene, camera);
   }
@@ -243,6 +256,14 @@ export function createGlobeSelectorScene(options = {}) {
       points: Number(render.points) || 0,
       lines: Number(render.lines) || 0
     } : null;
+  }
+
+  function getBasemapState() {
+    return basemapTiles?.getState?.() || null;
+  }
+
+  function setBasemap(mode) {
+    basemapTiles?.setMode?.(mode);
   }
 
   function getPointHitThresholdWorld(targetPixels = 7, surfaceRadius = 1.000025) {
@@ -437,6 +458,18 @@ export function createGlobeSelectorScene(options = {}) {
     });
     earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 256, 128), earthMaterial);
     globeRoot.add(earthMesh);
+    basemapTiles = createGlobeBasemapTiles({
+      THREE,
+      globeRoot,
+      renderer,
+      canvas,
+      mapButton: mapBasemapBtn,
+      satelliteButton: satelliteBasemapBtn,
+      attributionElement: basemapAttribution,
+      getZoomState,
+      getViewCenter,
+      requestRender: renderFrame
+    });
     markerMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.018, 14, 12),
       new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false })
@@ -481,6 +514,8 @@ export function createGlobeSelectorScene(options = {}) {
     activePointers.clear();
     favoriteMarkerNodes = [];
     sceneReady = false;
+    basemapTiles?.destroy?.();
+    basemapTiles = null;
     if (scene) disposeThreeObjectTree(scene);
     renderer = disposeThreeRenderer(renderer);
     if (canvas) {
@@ -505,6 +540,7 @@ export function createGlobeSelectorScene(options = {}) {
     focusOnSelection,
     getBridgeRefs: () => ({ globeRoot, earthMesh }),
     getCameraDistance,
+    getBasemapState,
     getPointHitThresholdWorld,
     getRenderStats,
     getZoomState,
@@ -513,6 +549,7 @@ export function createGlobeSelectorScene(options = {}) {
     renderFavoriteMarkers,
     renderFrame,
     setCameraDistance,
+    setBasemap,
     setFavoriteMarkersVisible,
     setSelectionMarker,
     startRenderLoop,

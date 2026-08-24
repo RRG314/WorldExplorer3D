@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=17';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=18';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
-import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
+import { getGlobeSelectorElements } from './globe-selector/dom.js?v=3';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
 import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
 import {
@@ -29,7 +29,8 @@ import {
 
 function createGlobeSelector(options = {}) {
   const {
-    root, stage, canvas, zoomInBtn, zoomOutBtn, scaleReadout, latLonReadout, placeReadout, searchInput, mobileSearchInput,
+    root, stage, canvas, mapBasemapBtn, satelliteBasemapBtn, basemapAttribution,
+    zoomInBtn, zoomOutBtn, scaleReadout, latLonReadout, placeReadout, searchInput, mobileSearchInput,
     mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
     spaceBtn, oceanBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
@@ -67,6 +68,9 @@ function createGlobeSelector(options = {}) {
     zoomInBtn,
     zoomOutBtn,
     scaleReadout,
+    mapBasemapBtn,
+    satelliteBasemapBtn,
+    basemapAttribution,
     placeReadout,
     getActiveCityTab: () => activeCityTab,
     getPanelMode: () => panelMode,
@@ -546,6 +550,7 @@ function createGlobeSelector(options = {}) {
       latLonToLocalPoint,
       localPointToLatLon,
       getCameraDistance: globeScene.getCameraDistance,
+      getBasemapState: globeScene.getBasemapState,
       getPointHitThresholdWorld: globeScene.getPointHitThresholdWorld,
       getRenderStats: globeScene.getRenderStats,
       getZoomState: globeScene.getZoomState,
@@ -750,11 +755,13 @@ function createGlobeSelector(options = {}) {
   return {
     close,
     getSelection() { return selected ? { ...selected } : null; },
+    getBasemapState: globeScene.getBasemapState,
     isOpen() { return openState; },
     open,
     startHere: triggerStartHere,
     applySelectionAndResolve,
     setPanelMode,
+    setBasemap: globeScene.setBasemap,
     setSelection,
     setLocateButtonBusy,
     setSearchStatus(message, color = null) {

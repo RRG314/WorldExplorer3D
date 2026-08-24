@@ -197,6 +197,8 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   background: rgba(0, 6, 11, 0.76);
 }
 #globeSelectorCanvas { position: relative; z-index: 1; }
+.globe-selector-basemap-controls,
+.globe-selector-basemap-attribution { z-index: 3; }
 .globe-selector-zoom-controls { z-index: 3; }
 .globe-selector-hint { z-index: 2; }
 
