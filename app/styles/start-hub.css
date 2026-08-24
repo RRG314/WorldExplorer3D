@@ -78,6 +78,11 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-app-rail,
 .globe-destination-bar { background: var(--hub-bar); }
 .globe-selector-side { background: var(--hub-panel); }
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) #globeSelectorLiveGpsBtn,
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-stat,
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-actions {
+  display: none;
+}
 .globe-selector-stat,
 .globe-selector-live-details,
 .globe-selector-live-layer,

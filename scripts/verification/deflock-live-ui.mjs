@@ -24,6 +24,22 @@ async function openDeFlock(context, screenshotName) {
   assert.equal(await page.locator('.globe-selector-side > #globeSelectorLiveEarthPanel.active').count(), 1, 'Live Data controls must remain beside the globe.');
   const stage = await page.locator('.globe-selector-stage').boundingBox();
   assert.ok(stage && stage.width >= 300 && stage.height >= 200, 'The DeFlock globe must remain visible and navigable.');
+  const entry = await page.evaluate(() => {
+    const panel = document.getElementById('globeSelectorLiveEarthPanel')?.getBoundingClientRect();
+    const heading = document.querySelector('.globe-selector-live-header')?.getBoundingClientRect();
+    const rail = document.querySelector('[data-globe-destination="live-earth"]');
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      panel: panel ? { top: panel.top, bottom: panel.bottom, width: panel.width } : null,
+      heading: heading ? { top: heading.top, bottom: heading.bottom } : null,
+      railActive: rail?.classList.contains('active') || false
+    };
+  });
+  const maximumEntryTop = entry.viewport.width <= 900 ? entry.viewport.height * 0.76 : 220;
+  assert.equal(entry.railActive, true, 'The Live Data destination must visibly activate on the first click.');
+  assert.ok(entry.panel && entry.panel.top <= maximumEntryTop, 'The Live Data workspace must enter the visible viewport on the first click.');
+  assert.ok(entry.heading && entry.heading.bottom < entry.viewport.height - 68, 'The Live Data heading must be visible above the navigation dock.');
+  await page.screenshot({ path: `output/verification/deflock-live-ui/${screenshotName.replace('camera-selected', 'live-data-open')}`, fullPage: false });
 
   await page.getByRole('button', { name: 'DeFlock', exact: true }).click();
   await page.waitForFunction(() => /[1-9][\d,]+ mapped/.test(document.querySelector('.globe-selector-live-layer-status')?.textContent || ''), null, { timeout: 60_000 });
@@ -54,12 +70,12 @@ async function openDeFlock(context, screenshotName) {
     assert.equal(coverageToggle, 'working');
   }
   await page.screenshot({ path: `output/verification/deflock-live-ui/${screenshotName}`, fullPage: true });
-  return { mappedCount, stage, coverageToggle, selectedText: (await page.locator('.deflock-live-detail').textContent())?.replace(/\s+/g, ' ').trim() || '' };
+  return { mappedCount, stage, entry, coverageToggle, selectedText: (await page.locator('.deflock-live-detail').textContent())?.replace(/\s+/g, ' ').trim() || '' };
 }
 
 try {
   await mkdir('output/verification/deflock-live-ui', { recursive: true });
-  const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const desktop = await browser.newContext({ viewport: { width: 1200, height: 500 } });
   const desktopResult = await openDeFlock(desktop, 'desktop-camera-selected.png');
   await desktop.close();
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

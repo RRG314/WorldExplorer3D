@@ -188,6 +188,16 @@ function setupGlobeHub({
       closePanel();
       document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
       setActiveDestination(destination);
+      // On desktop the selector side is its own scroll container. Reset it so
+      // opening Live Data reveals the workspace instead of only changing a tab
+      // below the current fold. Mobile keeps the globe/panel document flow.
+      requestAnimationFrame(() => {
+        if (!liveEarthPanel.classList.contains('active')) return;
+        const side = liveEarthPanel.closest('.globe-selector-side');
+        if (side instanceof HTMLElement && matchMedia('(min-width: 901px)').matches) {
+          side.scrollTop = 0;
+        }
+      });
       return true;
     }
     const target = HUB_PANELS[destination];
