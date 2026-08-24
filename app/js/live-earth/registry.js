@@ -24,6 +24,12 @@ const LIVE_EARTH_CATEGORIES = [
     layers: ['street-imagery']
   },
   {
+    id: 'surveillance',
+    label: 'DeFlock',
+    summary: 'Frequently refreshed mapped ALPR camera positions with exact local OSM detail on selection.',
+    layers: ['deflock-cameras']
+  },
+  {
     id: 'atmosphere',
     label: 'Atmosphere & Oceans',
     summary: 'Weather, storms, and ocean-state context.',
@@ -80,6 +86,17 @@ const LIVE_EARTH_LAYERS = {
     summary: 'Panoramax and KartaView imagery near the selected point with capture date, contributor, and license.',
     localSummary: 'Imagery is inspected separately and is not silently converted into building textures.',
     sourceIds: ['panoramax', 'kartaview']
+  },
+  'deflock-cameras': {
+    id: 'deflock-cameras',
+    categoryId: 'surveillance',
+    label: 'DeFlock Cameras',
+    shortLabel: 'DeFlock',
+    status: 'observed',
+    globeMode: 'markers',
+    summary: 'Hourly OpenStreetMap ALPR camera index across its published United States and Canada coverage.',
+    localSummary: 'Selecting a point resolves the precise nearby OSM node and its mapped camera direction before launch.',
+    sourceIds: ['deflock-hourly-osm-index', 'openstreetmap-overpass']
   },
   weather: {
     id: 'weather',

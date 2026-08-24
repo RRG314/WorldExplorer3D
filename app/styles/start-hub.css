@@ -284,6 +284,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-live-detail-copy,
 .globe-selector-live-detail-meta { color: var(--hub-muted); }
 .globe-selector-live-detail-heading { color: var(--hub-text); }
+.deflock-live-detail .deflock-live-warning { color: #f0b24a; }
 .globe-selector-live-layer-status.observed { color: #35d39a; }
 .globe-selector-live-layer-status.current { color: #35d39a; }
 .globe-selector-live-layer-status.derived { color: #f0b24a; }
@@ -574,6 +575,14 @@ body.start-hub-open #flowerChallengePanel {
 }
 
 @media (max-width: 900px) {
+  .deflock-live-detail .globe-selector-live-detail-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 8px 0 calc(4px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(7, 16, 24, 0), var(--hub-panel-2) 24%);
+  }
+  .deflock-live-detail .globe-selector-live-action-btn { min-height: 42px; flex: 1 1 130px; }
   .globe-selector-street-list { grid-template-columns: 1fr; }
   body.start-hub-open #appSignInBtn { top: 12px; right: 190px; height: 36px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #globeSelectorScreen .globe-selector-shell {

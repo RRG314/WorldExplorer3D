@@ -144,13 +144,20 @@ function isDeFlockCameraElement(element) {
 }
 
 function bundledDeFlockFallback(query) {
-  const center = DEFLOCK_BALTIMORE_SNAPSHOT.center || {};
-  if (Math.abs(query.lat - Number(center.lat)) > 0.001 || Math.abs(query.lon - Number(center.lon)) > 0.001) return null;
   const south = query.lat - query.radiusDegrees;
   const north = query.lat + query.radiusDegrees;
   const west = query.lon - query.radiusDegrees;
   const east = query.lon + query.radiusDegrees;
-  const elements = (DEFLOCK_BALTIMORE_SNAPSHOT.elements || []).filter((element) => (
+  const snapshotElements = (DEFLOCK_BALTIMORE_SNAPSHOT.elements || []).filter(isDeFlockCameraElement);
+  if (!snapshotElements.length) return null;
+  const coverage = snapshotElements.reduce((bounds, element) => ({
+    south: Math.min(bounds.south, Number(element.lat)),
+    north: Math.max(bounds.north, Number(element.lat)),
+    west: Math.min(bounds.west, Number(element.lon)),
+    east: Math.max(bounds.east, Number(element.lon))
+  }), { south: Infinity, north: -Infinity, west: Infinity, east: -Infinity });
+  if (north < coverage.south || south > coverage.north || east < coverage.west || west > coverage.east) return null;
+  const elements = snapshotElements.filter((element) => (
     isDeFlockCameraElement(element) &&
     Number(element.lat) >= south && Number(element.lat) <= north &&
     Number(element.lon) >= west && Number(element.lon) <= east
@@ -237,7 +244,15 @@ async function queryDeFlockCameras(input = {}, options = {}) {
       return { ...cached.value, cache: 'stale-memory', cacheAgeMs: now - cached.savedAt };
     }
     const bundled = bundledDeFlockFallback(query);
-    if (bundled) return bundled;
+    if (bundled) {
+      DEFLOCK_CACHE.set(key, {
+        value: bundled,
+        savedAt: now,
+        expiresAt: now + DEFLOCK_CACHE_TTL_MS,
+        staleUntil: now + DEFLOCK_STALE_TTL_MS
+      });
+      return bundled;
+    }
     const upstreamError = new Error('Mapped camera providers are temporarily unavailable.');
     upstreamError.statusCode = 502;
     upstreamError.cause = error;

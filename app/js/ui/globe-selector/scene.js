@@ -173,6 +173,10 @@ export function createGlobeSelectorScene(options = {}) {
     }
   }
 
+  function getCameraDistance() {
+    return cameraDistance;
+  }
+
   function handlePick(clientX, clientY, activate = false) {
     if (!renderer || !camera || !raycaster || !earthMesh) return;
     const rect = canvas.getBoundingClientRect();
@@ -366,6 +370,7 @@ export function createGlobeSelectorScene(options = {}) {
     ensureSize,
     focusOnSelection,
     getBridgeRefs: () => ({ globeRoot, earthMesh }),
+    getCameraDistance,
     init,
     renderFavoriteMarkers,
     renderFrame,

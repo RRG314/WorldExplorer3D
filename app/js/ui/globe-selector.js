@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=14';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=15';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
@@ -15,6 +15,7 @@ import {
   getFavoriteCityGroups as getFavoriteCityGroupsFromData,
   getMenuFavoriteCities as getMenuFavoriteCitiesFromLocs,
   latLonToLocalPoint,
+  localPointToLatLon,
   loadSavedFavoriteCities as loadSavedFavoriteCitiesFromStorage,
   loadRecentPlaces,
   normalizeCityRecord,
@@ -540,6 +541,8 @@ function createGlobeSelector(options = {}) {
         return openState;
       },
       latLonToLocalPoint,
+      localPointToLatLon,
+      getCameraDistance: globeScene.getCameraDistance,
       setCameraDistance: globeScene.setCameraDistance,
       setSelection,
       applySelectionAndResolve,

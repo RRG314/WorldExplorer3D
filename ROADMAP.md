@@ -120,6 +120,13 @@ The following findings come from the current source, not the historical roadmap:
   locations, actor/vehicle contact, environment ownership, Live GPS, security,
   and two-client multiplayer. It does not yet run full Discovery, AR, interior,
   fishing, DeFlock, creator, civic-response, or accessibility journeys.
+- **DeFlock's local and globe paths need one continuing data program.** The
+  isolated DeFlock hardening branch adds a selectable hourly camera index,
+  precise bounded OSM detail resolution, exact-camera world launch, and
+  multi-direction parsing. Production completion still requires a maintained
+  owned index for regions outside the current published United States/Canada
+  coverage, provider-age monitoring, and a mobile/desktop release journey that
+  measures index load, selection, launch, direction, and teardown.
 - **Terrain is not globally accepted bare earth.** The catalog contains 41
   reviewed fixed-location artifacts; the documented global fallback has a mixed
   vertical datum that is not proven uniform.

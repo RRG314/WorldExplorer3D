@@ -5,8 +5,10 @@ import { getWeatherSampleSnapshots } from "./weather-samples.js?v=2";
 import { aircraftService } from "../geospatial/aircraft.js?v=1";
 import { marineService } from "../geospatial/marine.js?v=2";
 import { streetImageryService } from "../geospatial/street-imagery.js?v=1";
+import { cameraAt, loadDeFlockGlobeIndex, nearestCamera } from "../deflock/globe-index.js?v=1";
+import { loadSurveillanceFeatures } from "../deflock/source.js?v=5";
 import { createMarineState, ensureSelectedMarineData } from "./marine-state.js?v=1";
-import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=10";
+import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=11";
 import { getSatelliteLookAngles, getSatelliteSnapshot, getSatelliteTrack, refreshSatelliteCatalog } from "./satellites.js?v=6";
 import { buildEarthquakeReplayProfile, refreshEarthquakes } from "./earthquakes.js?v=2";
 import { buildAircraftTrafficSnapshot, buildShipTrafficSnapshot } from "./transport.js?v=3";
@@ -18,7 +20,7 @@ import {
   updateEarthquakeReplay as animateEarthquakeReplay,
   updateLocalEventContext as syncLocalEventContext
 } from "./local-events.js?v=2";
-import { renderGlobeLayers } from "./render-globe.js?v=5";
+import { renderGlobeLayers } from "./render-globe.js?v=9";
 import {
   bindSelectorUi,
   handleGlobePick,
@@ -28,7 +30,7 @@ import {
   setActiveLayer,
   setPanelMode,
   updateSelectorFrame
-} from "./controller-ui.js?v=11";
+} from "./controller-ui.js?v=14";
 
 const SATELLITE_POSITION_REFRESH_MS = 15000;
 const EARTHQUAKE_UI_REFRESH_MS = 5 * 60 * 1000;
@@ -125,6 +127,15 @@ function buildLiveEarthState() {
     streetImageryExternalUrl: '',
     streetImageryRadiusM: 350,
     selectedStreetImageId: '',
+    deFlockIndex: null,
+    deFlockLoadedAt: 0,
+    deFlockLoading: false,
+    deFlockError: '',
+    deFlockIndexWarning: '',
+    deFlockDetailError: '',
+    deFlockResolveToken: 0,
+    deFlockCoverageVisible: false,
+    selectedDeFlockCamera: null,
     streetImageryRequestToken: 0,
     selectorSatelliteTickAt: 0,
     localEvent: null,
@@ -149,6 +160,10 @@ function buildLiveEarthState() {
       satelliteGroup: null,
       earthquakeGroup: null,
       weatherGroup: null,
+      deFlockGroup: null,
+      deFlockPointGroup: null,
+      deFlockSelectionGroup: null,
+      deFlockBuildKey: '',
       trackLine: null,
       markerRecords: [],
       detailsScrollTopByLayer: {}
@@ -166,6 +181,8 @@ function buildLiveEarthModuleContext() {
     colorForStormSeverity,
     colorForWeatherCategory,
     ensureAircraftTrafficData,
+    ensureDeFlockIndex,
+    resolveDeFlockCamera,
     ensureEarthquakeData,
     ensureMarineData,
     ensureSelectionWeather,
@@ -186,6 +203,9 @@ function buildLiveEarthModuleContext() {
     resolveObservedEarthLocation,
     rememberDetailsScroll,
     selectedAircraft,
+    selectedDeFlockCamera,
+    cameraFromDeFlockInstance,
+    nearestDeFlockCamera,
     selectedEarthquake,
     selectedSatelliteEntry,
     selectedSatellitePosition,
@@ -196,10 +216,107 @@ function buildLiveEarthModuleContext() {
     stateWaveIntensity,
     stormSamples,
     travelToEvent,
+    travelToDeFlockCamera,
     travelToSatellite,
     warmImplementedLayers,
     buildEarthquakeReplayProfile
   };
+}
+
+function cameraFromDeFlockInstance(state, globalIndex) {
+  let remaining = Number(globalIndex);
+  if (!Number.isInteger(remaining) || remaining < 0) return null;
+  for (const index of state.deFlockIndex?.indexes || []) {
+    if (remaining < index.count) return cameraAt(index, remaining);
+    remaining -= index.count;
+  }
+  return null;
+}
+
+function nearestDeFlockCamera(state, lat, lon, radiusDegrees) {
+  return nearestCamera(state.deFlockIndex, lat, lon, { radiusDegrees });
+}
+
+async function ensureDeFlockIndex(state, force = false) {
+  if (!force && state.deFlockIndex?.count) return state.deFlockIndex;
+  if (state.deFlockLoading && state.deFlockLoadPromise) return state.deFlockLoadPromise;
+  state.deFlockLoading = true;
+  state.deFlockError = '';
+  state.deFlockIndexWarning = '';
+  const load = loadDeFlockGlobeIndex({ force }).then((snapshot) => {
+    state.deFlockIndex = snapshot;
+    state.deFlockLoadedAt = snapshot.loadedAt || Date.now();
+    state.deFlockIndexWarning = snapshot.warnings?.length
+      ? `Partial DeFlock index: ${snapshot.warnings.join(' ')}`
+      : '';
+    return snapshot;
+  }).catch((error) => {
+    state.deFlockError = error?.message || 'The DeFlock camera index is unavailable.';
+    throw error;
+  }).finally(() => {
+    if (state.deFlockLoadPromise === load) state.deFlockLoadPromise = null;
+    state.deFlockLoading = false;
+  });
+  state.deFlockLoadPromise = load;
+  return load;
+}
+
+function selectedDeFlockCamera(state) {
+  return state.selectedDeFlockCamera || null;
+}
+
+function distanceSquaredDegrees(a, b) {
+  const latScale = Math.max(0.2, Math.cos(Number(a?.lat || 0) * Math.PI / 180));
+  return (Number(a?.lat) - Number(b?.lat)) ** 2 + ((Number(a?.lon) - Number(b?.lon)) * latScale) ** 2;
+}
+
+async function resolveDeFlockCamera(state, indexedCamera) {
+  if (!indexedCamera) return null;
+  const token = ++state.deFlockResolveToken;
+  state.selectedDeFlockCamera = { ...indexedCamera, resolving: true };
+  state.deFlockCoverageVisible = false;
+  state.deFlockDetailError = '';
+  try {
+    const loaded = await loadSurveillanceFeatures(indexedCamera, { radiusDegrees: 0.002, maxCameras: 100 });
+    if (token !== state.deFlockResolveToken) return state.selectedDeFlockCamera;
+    const alpr = loaded.features.filter((feature) => /(?:^|[;,\s])(?:alpr|anpr)(?:$|[;,\s])/i.test(feature.surveillanceType));
+    const candidates = alpr.length ? alpr : loaded.features;
+    const matched = candidates.sort((a, b) => distanceSquaredDegrees(a, indexedCamera) - distanceSquaredDegrees(b, indexedCamera))[0] || null;
+    const withinTolerance = matched && distanceSquaredDegrees(matched, indexedCamera) <= 0.002 ** 2;
+    state.selectedDeFlockCamera = withinTolerance ? {
+      ...indexedCamera,
+      ...matched,
+      indexedLat: indexedCamera.lat,
+      indexedLon: indexedCamera.lon,
+      resolving: false,
+      detailSource: loaded.cacheSource || 'OpenStreetMap'
+    } : { ...indexedCamera, resolving: false, detailUnavailable: true };
+  } catch (error) {
+    if (token !== state.deFlockResolveToken) return state.selectedDeFlockCamera;
+    state.selectedDeFlockCamera = { ...indexedCamera, resolving: false, detailUnavailable: true };
+    state.deFlockDetailError = `Exact OSM camera detail is temporarily unavailable: ${error?.message || error}`;
+  }
+  return state.selectedDeFlockCamera;
+}
+
+async function travelToDeFlockCamera(state) {
+  const camera = state.selectedDeFlockCamera;
+  if (!camera || typeof state.selector.api?.setSelection !== 'function') return false;
+  state.selector.api.setSelection(camera.lat, camera.lon, {
+    name: camera.name || `${camera.brand && camera.brand !== 'Unknown' ? `${camera.brand} ` : ''}DeFlock camera`,
+    focus: true,
+    arrivalMode: 'walk'
+  });
+  appCtx.gameMode = 'deflock';
+  document.querySelectorAll('.mode').forEach((element) => element.classList.toggle('sel', element.dataset.mode === 'deflock'));
+  appCtx.pendingDeFlockTarget = {
+    sourceId: camera.sourceId || null,
+    lat: camera.lat,
+    lon: camera.lon,
+    directionSectors: camera.directionSectors || [],
+    indexId: camera.id || null
+  };
+  return state.selector.api.startHere?.();
 }
 
 function selectorSelection(state) {
@@ -579,6 +696,23 @@ function bindGlobeSelector(state, api) {
   renderLiveEarthUi(buildLiveEarthModuleContext(), state);
 }
 
+function resetSelectorVisuals(state) {
+  Object.assign(state.selector, {
+    group: null,
+    satelliteGroup: null,
+    earthquakeGroup: null,
+    weatherGroup: null,
+    deFlockGroup: null,
+    deFlockPointGroup: null,
+    deFlockSelectionGroup: null,
+    deFlockBuildKey: '',
+    transportRouteGroup: null,
+    transportMarkerGroup: null,
+    trackLine: null,
+    markerRecords: []
+  });
+}
+
 function initLiveEarth() {
   if (appCtx.liveEarth?.ready) return appCtx.liveEarth;
   const state = buildLiveEarthState();
@@ -597,7 +731,10 @@ function initLiveEarth() {
     onSelectorOpen() {
       refreshForOpenSelector(buildLiveEarthModuleContext(), state);
     },
-    onSelectorClose() {},
+    onSelectorClose() {
+      state.deFlockResolveToken += 1;
+      resetSelectorVisuals(state);
+    },
     onSelectorSelectionChanged() {
       onSelectorSelectionChanged(buildLiveEarthModuleContext(), state);
     },
@@ -636,6 +773,7 @@ function initLiveEarth() {
         aircraft: state.aircraftItems.length,
         aircraftSourceMode: state.aircraftSourceMode,
         streetImagery: state.streetImageryItems.length,
+        deFlockCameras: state.deFlockIndex?.count || 0,
         localEventId: state.localEvent?.id || '',
         selectedSatelliteId: state.selectedSatelliteId || '',
         selectedEarthquakeId: state.selectedEarthquakeId || '',
@@ -645,6 +783,7 @@ function initLiveEarth() {
           id: entry.id, lat: entry.lat, lon: entry.lon, altitude: entry.altitude, dataSource: entry.dataSource
         })),
         selectedStreetImageId: state.selectedStreetImageId || '',
+        selectedDeFlockCameraId: state.selectedDeFlockCamera?.sourceId || state.selectedDeFlockCamera?.id || '',
         streetImageryProviderId: state.streetImageryProviderId || 'panoramax'
       };
     },

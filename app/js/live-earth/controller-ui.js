@@ -1,4 +1,4 @@
-import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=10";
+import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=11";
 import { CURATED_SATELLITES } from "./satellites.js?v=6";
 import { nearestRouteContext } from "./transport.js?v=3";
 import { startEarthquakeReplay as startLocalEarthquakeReplay } from "./local-events.js?v=2";
@@ -7,13 +7,14 @@ import { renderMarineDetails } from "./marine-ui.js?v=1";
 import { collectLiveEarthProviderHealth } from "./provider-health.js?v=1";
 import {
   renderGlobeLayers,
+  renderDeFlockGlobe,
   renderSatelliteGlobe,
   renderTransportGlobe,
   renderWeatherGlobe
-} from "./render-globe.js?v=5";
+} from "./render-globe.js?v=9";
 
 function selectedLayerCount(ctx, state, layerId) {
-  if (layerId === 'overview') return 6;
+  if (layerId === 'overview') return 7;
   if (layerId === 'satellites') return ctx.filteredSatelliteItems(state).length;
   if (layerId === 'earthquakes') return state.earthquakeItems.length;
   if (layerId === 'weather') return state.weatherSamples.length;
@@ -25,6 +26,7 @@ function selectedLayerCount(ctx, state, layerId) {
   if (layerId === 'ships') return state.shipItems.length;
   if (layerId === 'aircraft') return state.aircraftItems.length;
   if (layerId === 'street-imagery') return state.streetImageryItems.length;
+  if (layerId === 'deflock-cameras') return state.deFlockIndex?.count || 0;
   return 0;
 }
 
@@ -34,6 +36,7 @@ function layerCountLabel(ctx, state, layer) {
   if (layer.id === 'aircraft') return `${count} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`;
   if (layer.id === 'ships') return `${count} reference`;
   if (layer.id === 'ocean-state') return state.marineLoading ? 'loading' : `${count} ${count === 1 ? 'source' : 'sources'}`;
+  if (layer.id === 'deflock-cameras') return state.deFlockLoading ? 'loading' : `${count.toLocaleString()} mapped`;
   if (layer.id === 'storms') return `${count} derived`;
   if (layer.id === 'satellites') {
     const observed = state.satelliteItems.filter((entry) => entry.dataSource === 'live').length;
@@ -124,6 +127,7 @@ function renderOverviewDetails(ctx, state) {
     { id: 'earthquakes', label: 'Earthquakes', value: `${state.earthquakeItems.length} observed`, source: 'USGS GeoJSON feed', health: health.earthquakes.label },
     { id: 'weather', label: 'Weather', value: `${state.weatherSamples.length} current`, source: 'Open-Meteo current conditions', health: health.weather.label },
     { id: 'street-imagery', label: 'Street imagery', value: 'selected location', source: 'Panoramax and KartaView community observations', health: health.streetImagery.label },
+    { id: 'deflock-cameras', label: 'DeFlock cameras', value: `${(state.deFlockIndex?.count || 0).toLocaleString()} indexed`, source: 'Hourly OpenStreetMap ALPR position index', health: state.deFlockError || state.deFlockIndexWarning || (state.deFlockIndex ? 'Index ready · exact detail resolved on selection' : 'Open layer to load') },
     { id: 'aircraft', label: 'Aircraft', value: `${state.aircraftItems.length} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`, source: state.aircraftSourceMode === 'observed' ? 'Current live ADS-B state vectors' : 'Modeled route fallback', health: state.aircraftSourceMode === 'observed' ? health.aircraft.label : 'Fallback active · Live ADS-B unavailable' },
     { id: 'ships', label: 'Marine traffic', value: `${state.shipItems.length} reference`, source: 'Major corridor context, not live AIS', health: 'Reference only · AIS provider not configured' }
   ];
@@ -160,6 +164,47 @@ export function renderLiveEarthDetails(ctx, state) {
 
   if (layer.id === 'street-imagery') {
     renderStreetImageryDetails(ctx, state);
+    return;
+  }
+
+  if (layer.id === 'deflock-cameras') {
+    const camera = ctx.selectedDeFlockCamera(state);
+    const directions = Array.isArray(camera?.directionSectors) ? camera.directionSectors : [];
+    const directionLabel = directions.length
+      ? directions.map((sector) => sector.kind === 'range'
+        ? `${Number(sector.bearingDegrees).toFixed(1)}° center / ${Number(sector.fieldOfViewDegrees).toFixed(1)}° mapped view span`
+        : sector.kind === 'panoramic' ? '360° mapped panoramic view' : `${Number(sector.bearingDegrees).toFixed(1)}° mapped direction / 70° schematic view cone`).join(' • ')
+      : 'Direction is not mapped for this camera.';
+    const cameraHeading = camera?.resolving ? 'Resolving exact OpenStreetMap camera…' :
+      camera?.sourceId ? (camera.name || camera.brand || camera.cameraType || 'Mapped camera') :
+      camera ? (camera.brand && camera.brand !== 'Unknown' ? camera.brand : 'Indexed camera') : 'Tap a camera point';
+    const sourceMeta = camera?.sourceId
+      ? `${camera.sourceId} • ${camera.sourceTimestamp ? `OSM edit ${new Date(camera.sourceTimestamp).toLocaleDateString()}` : 'current bounded OSM lookup'}`
+      : camera ? `${camera.sourceDataset || 'DeFlock hourly camera index'} • build ${camera.indexBuild || 'current'}` : '';
+    const loadedCoverage = (state.deFlockIndex?.indexes || []).map((index) => index.sourceLabel).join(' and ');
+    const coverageLabel = state.deFlockIndexWarning
+      ? `Currently loaded hourly DeFlock coverage: ${loadedCoverage || 'no country index'}.`
+      : 'Coverage shown is the complete published hourly DeFlock index for the United States and Canada.';
+    ctx.setDetailsHtml(state, `
+      <div class="globe-selector-live-detail-card deflock-live-detail">
+        <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(cameraHeading)}</div>
+        <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(camera ? `${Number(camera.lat).toFixed(6)}, ${Number(camera.lon).toFixed(6)}` : 'Every point is an indexed camera. Tap one to resolve its exact mapped metadata and launch DeFlock Hunt there.')}</div>
+        ${camera ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(directionLabel)}</div>` : ''}
+        ${camera?.operator ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Operator: ${camera.operator}`)}</div>` : ''}
+        ${camera?.cameraMount || camera?.cameraType ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${camera.cameraType || 'camera'}${camera.cameraMount ? ` • ${camera.cameraMount} mount` : ''}`)}</div>` : ''}
+        ${sourceMeta ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(sourceMeta)}</div>` : ''}
+        ${state.deFlockError ? `<div class="globe-selector-live-detail-meta deflock-live-warning">${ctx.escapeHtml(state.deFlockError)}</div>` : ''}
+        ${state.deFlockIndexWarning ? `<div class="globe-selector-live-detail-meta deflock-live-warning">${ctx.escapeHtml(state.deFlockIndexWarning)}</div>` : ''}
+        ${state.deFlockDetailError ? `<div class="globe-selector-live-detail-meta deflock-live-warning">${ctx.escapeHtml(state.deFlockDetailError)}</div>` : ''}
+        ${directions.length ? '<div class="globe-selector-live-detail-meta">View distance is schematic because the mapped camera data does not publish lens reach. Bearing and any mapped angular span remain data-driven.</div>' : ''}
+        <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(coverageLabel)} Exact selected-camera detail comes from OpenStreetMap.</div>
+        <div class="globe-selector-live-detail-actions">
+          <button class="globe-selector-live-action-btn" type="button" data-live-earth-action="travel-deflock"${camera && !camera.resolving ? '' : ' disabled'}>Start DeFlock Here</button>
+          <button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="focus-deflock"${camera ? '' : ' disabled'}>Focus Camera</button>
+          <button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="toggle-deflock-coverage"${directions.length ? '' : ' disabled'}>${state.deFlockCoverageVisible ? 'Hide View Coverage' : 'Show View Coverage'}</button>
+        </div>
+      </div>
+    `);
     return;
   }
 
@@ -301,6 +346,7 @@ export function renderLiveEarthStatus(ctx, state) {
     layer?.id === 'ships' ? state.shipsLoadedAt :
     layer?.id === 'aircraft' ? state.aircraftLoadedAt :
     layer?.id === 'street-imagery' ? state.streetImageryLoadedAt :
+    layer?.id === 'deflock-cameras' ? state.deFlockLoadedAt :
     layer?.id === 'ocean-state' ? Math.max(state.weatherSamplesLoadedAt, state.marineLoadedAt) :
     ['weather', 'storms'].includes(layer?.id) ? state.weatherSamplesLoadedAt :
     0;
@@ -388,6 +434,8 @@ export async function refreshActiveLayer(ctx, state, force = false) {
       const pending = ctx.ensureStreetImagery(state, force);
       renderLiveEarthUi(ctx, state);
       await pending;
+    } else if (layerId === 'deflock-cameras') {
+      await ctx.ensureDeFlockIndex(state, force);
     } else if (layerId === 'ocean-state') {
       const pending = ctx.ensureMarineData(state, force);
       renderLiveEarthUi(ctx, state);
@@ -420,6 +468,7 @@ export async function setActiveLayer(ctx, state, layerId, force = false) {
     state.selectedAircraftId = state.aircraftItems[0]?.id || '';
   }
   if (layer.id === 'aircraft') state.selector.api?.setCameraDistance?.(1.18);
+  if (layer.id === 'deflock-cameras') state.selector.api?.setCameraDistance?.(2.15);
   await refreshActiveLayer(ctx, state, force);
 }
 
@@ -469,6 +518,44 @@ export async function handleUiAction(ctx, state, action, value) {
     state.selectedAircraftId = value;
     renderGlobeLayers(ctx, state);
     renderLiveEarthUi(ctx, state);
+    return;
+  }
+  if (action === 'select-deflock') {
+    const camera = String(value).includes(':')
+      ? (() => {
+          const [sourceId, item] = String(value).split(':');
+          const index = state.deFlockIndex?.indexes?.find((entry) => entry.sourceId === sourceId);
+          return index ? ctx.cameraFromDeFlockInstance(state, state.deFlockIndex.indexes.slice(0, state.deFlockIndex.indexes.indexOf(index)).reduce((sum, entry) => sum + entry.count, 0) + Number(item)) : null;
+        })()
+      : ctx.cameraFromDeFlockInstance(state, Number(value));
+    if (!camera) return;
+    state.selectedDeFlockCamera = camera;
+    state.selector.api?.setSelection?.(camera.lat, camera.lon, { name: 'Mapped DeFlock camera', focus: true });
+    state.selector.api?.setCameraDistance?.(1.2);
+    renderDeFlockGlobe(ctx, state);
+    renderLiveEarthUi(ctx, state);
+    await ctx.resolveDeFlockCamera(state, camera);
+    renderDeFlockGlobe(ctx, state);
+    renderLiveEarthUi(ctx, state);
+    return;
+  }
+  if (action === 'focus-deflock') {
+    const camera = ctx.selectedDeFlockCamera(state);
+    if (camera) {
+      state.selector.api?.setSelection?.(camera.lat, camera.lon, { name: camera.name || 'Mapped DeFlock camera', focus: true });
+      state.selector.api?.setCameraDistance?.(1.15);
+    }
+    return;
+  }
+  if (action === 'toggle-deflock-coverage') {
+    if (!ctx.selectedDeFlockCamera(state)?.directionSectors?.length) return;
+    state.deFlockCoverageVisible = !state.deFlockCoverageVisible;
+    renderDeFlockGlobe(ctx, state);
+    renderLiveEarthUi(ctx, state);
+    return;
+  }
+  if (action === 'travel-deflock') {
+    await ctx.travelToDeFlockCamera(state);
     return;
   }
   if (action === 'street-provider') {
@@ -567,30 +654,51 @@ export function bindSelectorUi(ctx, state) {
 export function handleGlobePick(ctx, state, raycaster) {
   if (state.panelMode !== 'live-earth') return false;
   const meshes = state.selector.markerRecords.map((entry) => entry.mesh).filter(Boolean);
-  if (!meshes.length) return false;
+  if (!meshes.length && state.activeLayerId !== 'deflock-cameras') return false;
+  if (state.activeLayerId === 'deflock-cameras' && raycaster.params?.Points) {
+    raycaster.params.Points.threshold = 0.018;
+  }
   const hits = raycaster.intersectObjects(meshes, false);
   const hit = hits && hits.length ? hits[0] : null;
   const meta = hit?.object?.userData?.liveEarth || null;
-  if (!meta) return false;
-  if (meta.type === 'satellite') {
+  if (meta?.type === 'deflock' && Number.isInteger(hit.index)) {
+    void handleUiAction(ctx, state, 'select-deflock', String(hit.index));
+    return true;
+  }
+  if (meta?.type === 'satellite') {
     void handleUiAction(ctx, state, 'select-satellite', meta.id);
     return true;
   }
-  if (meta.type === 'earthquake') {
+  if (meta?.type === 'earthquake') {
     void handleUiAction(ctx, state, 'select-earthquake', meta.id);
     return true;
   }
-  if (meta.type === 'weather') {
+  if (meta?.type === 'weather') {
     void handleUiAction(ctx, state, 'select-weather', meta.id);
     return true;
   }
-  if (meta.type === 'ship') {
+  if (meta?.type === 'ship') {
     void handleUiAction(ctx, state, 'select-ship', meta.id);
     return true;
   }
-  if (meta.type === 'aircraft') {
+  if (meta?.type === 'aircraft') {
     void handleUiAction(ctx, state, 'select-aircraft', meta.id);
     return true;
+  }
+  if (state.activeLayerId === 'deflock-cameras' && state.selector.api?.earthMesh) {
+    const earthHit = raycaster.intersectObject(state.selector.api.earthMesh, false)?.[0] || null;
+    if (earthHit) {
+      const local = earthHit.point.clone();
+      state.selector.api.earthMesh.worldToLocal(local);
+      const location = state.selector.api.localPointToLatLon?.(local);
+      const distance = Number(state.selector.api.getCameraDistance?.()) || 2.15;
+      const radiusDegrees = distance >= 2 ? 2.5 : distance >= 1.45 ? 0.6 : 0.09;
+      const camera = location ? ctx.nearestDeFlockCamera(state, location.lat, location.lon, radiusDegrees) : null;
+      if (camera) {
+        void handleUiAction(ctx, state, 'select-deflock', camera.id);
+        return true;
+      }
+    }
   }
   return false;
 }
