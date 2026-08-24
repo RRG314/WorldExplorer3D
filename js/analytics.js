@@ -1,5 +1,6 @@
 import { observeAuth } from './auth-ui.js?v=55';
 import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=55';
+import { readAnalyticsConsent } from './analytics-consent.js?v=1';
 
 const ANALYTICS_EVENT_WORLD_START = 'we3d_world_session_start';
 const ANALYTICS_EVENT_WORLD_END = 'we3d_world_session_end';
@@ -18,12 +19,24 @@ let authUnsubscribe = null;
 let productEventsBound = false;
 let discoveryEventListener = null;
 let tutorialEventListener = null;
+let productEventListener = null;
+let consentEventListener = null;
+let lastAuthUser = null;
 
 const ALLOWED_PRODUCT_EVENTS = new Set([
   'tutorial_begin',
   'tutorial_complete',
   'we3d_tutorial_step',
-  'we3d_discovery_action'
+  'we3d_discovery_action',
+  'leaderboard_view',
+  'leaderboard_refresh',
+  'score_submit',
+  'room_create',
+  'room_join',
+  'room_leave',
+  'room_artifact_share',
+  'friend_add',
+  'explorer_progress'
 ]);
 
 const state = {
@@ -146,6 +159,7 @@ async function ensureAnalyticsTools() {
 }
 
 async function logAnalyticsEvent(eventName, params = {}) {
+  if (readAnalyticsConsent() !== 'granted') return false;
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics || typeof tools.logEvent !== 'function') return false;
   try {
@@ -199,13 +213,22 @@ function bindProductEvents() {
     const detail = event?.detail || {};
     void trackProductEvent(detail.name, detail.params || {});
   };
+  productEventListener = (event) => {
+    const detail = event?.detail || {};
+    void trackProductEvent(detail.name, detail.params || {});
+  };
   globalThis.addEventListener('we3d:discovery-telemetry', discoveryEventListener);
   globalThis.addEventListener('we3d:tutorial-telemetry', tutorialEventListener);
+  globalThis.addEventListener('we3d:product-telemetry', productEventListener);
   globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ = true;
   const queuedTutorialEvents = Array.isArray(globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__)
     ? globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__.splice(0)
     : [];
   queuedTutorialEvents.forEach((detail) => tutorialEventListener({ detail }));
+  const queuedProductEvents = Array.isArray(globalThis.__WE3D_PRODUCT_TELEMETRY_QUEUE__)
+    ? globalThis.__WE3D_PRODUCT_TELEMETRY_QUEUE__.splice(0)
+    : [];
+  queuedProductEvents.forEach((detail) => productEventListener({ detail }));
 }
 
 function unbindProductEvents() {
@@ -214,11 +237,17 @@ function unbindProductEvents() {
   globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ = false;
   if (discoveryEventListener) globalThis.removeEventListener('we3d:discovery-telemetry', discoveryEventListener);
   if (tutorialEventListener) globalThis.removeEventListener('we3d:tutorial-telemetry', tutorialEventListener);
+  if (productEventListener) globalThis.removeEventListener('we3d:product-telemetry', productEventListener);
   discoveryEventListener = null;
   tutorialEventListener = null;
+  productEventListener = null;
 }
 
 async function syncAnalyticsUser(user = null) {
+  if (readAnalyticsConsent() !== 'granted') {
+    state.currentUserId = '';
+    return;
+  }
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics) return;
   try {
@@ -339,11 +368,31 @@ function startAnalyticsTracking(appCtx) {
   state.runtimeStartedAt = Date.now();
   state.measurementId = String(readFirebaseConfig()?.measurementId || '').trim();
 
+  consentEventListener = async (event) => {
+    const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js').catch(() => null);
+    const granted = event?.detail?.value === 'granted';
+    analyticsMod?.setConsent?.({
+      analytics_storage: granted ? 'granted' : 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied'
+    });
+    if (granted) {
+      void syncAnalyticsUser(lastAuthUser);
+    } else {
+      state.currentUserId = '';
+      const tools = await ensureAnalyticsTools();
+      tools?.setUserId?.(tools.analytics, null);
+    }
+  };
+  globalThis.addEventListener?.('we3d:analytics-consent', consentEventListener, { passive: true });
+
   void ensureAnalyticsTools();
   bindLifecycle(appCtx);
   bindProductEvents();
 
   authUnsubscribe = observeAuth((user) => {
+    lastAuthUser = user || null;
     void syncAnalyticsUser(user || null);
   });
 
@@ -366,6 +415,11 @@ function stopAnalyticsTracking() {
     authUnsubscribe();
     authUnsubscribe = null;
   }
+  if (consentEventListener) {
+    globalThis.removeEventListener?.('we3d:analytics-consent', consentEventListener);
+    consentEventListener = null;
+  }
+  lastAuthUser = null;
   unbindProductEvents();
 }
 
@@ -376,6 +430,7 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     enabled: !!state.enabled,
     ready: !!state.ready,
     measurementId: state.measurementId || '',
+    consent: readAnalyticsConsent(),
     currentUserId: state.currentUserId || '',
     trackingStarted,
     runtimeAgeSec: clampDurationSec((now - (state.runtimeStartedAt || now)) / 1000),

@@ -1,7 +1,21 @@
 Character Assets
+
 - File: `soldier.glb`
-- Source: Existing project asset pack
-- Notes: Loaded as the primary rigged character model in runtime.
+- Asset lineage: Three.js `Soldier.glb` example model, locally optimized for the web runtime.
+- Upstream: https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/Soldier.glb
+- Character and animations: Adobe Mixamo.
+- Terms: Adobe permits royalty-free use of Mixamo characters and animations in commercial video games. The raw asset must not be offered as a standalone asset product or download.
+- Adobe FAQ: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html
+- Additional terms: https://wwwimages2.adobe.com/content/dam/cc/en/legal/servicetou/Mixamo-Addl-Terms-en_US-20210623.pdf
+- Notes: Loaded as the primary rigged character model in runtime and distributed only as an embedded game asset.
+
+- File: `Astronaut.glb`
+- Title/creator: Astronaut by Poly.
+- License: Creative Commons Attribution 2.0 (CC BY 2.0).
+- Upstream: https://github.com/google/model-viewer/blob/master/packages/shared-assets/models/Astronaut.glb
+- Attribution record: https://github.com/google/model-viewer/blob/master/packages/modelviewer.dev/ATTRIBUTIONS.md
+- License: https://creativecommons.org/licenses/by/2.0/
+- Notes: Used as the fallback walking character.
 
 Mars Exploration Rover
 - File: `mars-exploration-rover.glb`

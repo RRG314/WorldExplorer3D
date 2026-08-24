@@ -1,3 +1,5 @@
+import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
+
 export function createUiRoomRoomActionsApi({
   appCtx,
   refs,
@@ -113,6 +115,12 @@ export function createUiRoomRoomActionsApi({
       }
       await activateRoom(room, "joined room");
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      emitProductTelemetry('room_join', {
+        source: 'code',
+        visibility: room.visibility || 'private',
+        world_kind: room.world?.kind || 'earth',
+        max_players: Number(room.maxPlayers || 0)
+      });
       await refreshFeaturedRooms(true);
       if (!suppressStatus) setStatus(`Joined room ${room.code}.`);
       closeRoomPanel();
@@ -213,6 +221,11 @@ export function createUiRoomRoomActionsApi({
 
       await activateRoom(room, "created room");
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      emitProductTelemetry('room_create', {
+        visibility: room.visibility || visibility,
+        world_kind: room.world?.kind || world.kind,
+        max_players: Number(room.maxPlayers || cap)
+      });
       await refreshFeaturedRooms(true);
       const inviteLink = buildInviteLink(room.code);
       if (inviteLink) {
@@ -274,6 +287,12 @@ export function createUiRoomRoomActionsApi({
     async function finalizeJoin(room, originLabel) {
       await activateRoom(room, originLabel);
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      emitProductTelemetry('room_join', {
+        source: 'weekly_city',
+        visibility: room.visibility || 'public',
+        world_kind: room.world?.kind || 'earth',
+        max_players: Number(room.maxPlayers || 0)
+      });
       await refreshFeaturedRooms(true);
       renderFeaturedRooms();
       closeRoomPanel();
@@ -335,6 +354,7 @@ export function createUiRoomRoomActionsApi({
     try {
       const prevCode = state.currentRoom.code;
       await deactivateRoom(false);
+      emitProductTelemetry('room_leave', { source: 'room_controls' });
       const url = new URL(window.location.href);
       url.searchParams.delete("room");
       window.history.replaceState({}, "", url.toString());

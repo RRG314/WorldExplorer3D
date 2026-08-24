@@ -255,9 +255,9 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <li class="mpRoomEmpty">No incoming invites.</li>
 </ul>
 
-<div class="mp-subtitle">Top Explorers</div>
+<div class="mp-subtitle">Explorer League · Global · All time</div>
 <ul id="mpLeaderboardList" class="mpFeedList">
-<li class="mpRoomEmpty">Leaderboard updates as explorers participate.</li>
+<li class="mpRoomEmpty">Loading public Explorer League results…</li>
 </ul>
 </details>
 </div>
@@ -414,11 +414,12 @@ Graphics changes apply to the current session.
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Game Leaderboards</div>
-<div class="flowerChallengeBadge">All Games</div>
+<div class="flowerChallengeTitle">Leaderboards</div>
+<div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
 <div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest red-flower runs. Signed-in scores publish to the shared board.</div>
+<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
 <div class="flowerLeaderboardTabs">
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
@@ -432,7 +433,7 @@ Graphics changes apply to the current session.
 <button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Find Flower</button>
 <button id="titleFlowerRefreshBtn" class="flowerChallengeBtn refresh" type="button">Refresh</button>
 </div>
-<div id="flowerChallengeStatus" class="flowerChallengeStatus"></div>
+<div id="flowerChallengeStatus" class="flowerChallengeStatus" role="status" aria-live="polite"></div>
 <ol id="flowerLeaderboardList" class="flowerLeaderboard">
 <li class="flowerLeaderboardEmpty">Loading leaderboard...</li>
 </ol>
@@ -462,10 +463,67 @@ Graphics changes apply to the current session.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · Ground artifacts produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30. · Global ocean-floor elevations from the GEBCO_2024 Grid, GEBCO Compilation Group · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+<a class="title-map-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors • ODbL</a>
+<span aria-hidden="true">•</span>
+<button id="dataLicensesBtn" class="title-legal-link" type="button" data-open-data-licenses>Data &amp; Licenses</button>
+<span aria-hidden="true">•</span>
+<a href="../about/" target="_blank" rel="noopener">About</a>
+<a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
+<a href="../legal/privacy" target="_blank" rel="noopener">Privacy</a>
+<span>© 2026 Steven Reid</span>
 </div>
 </div>
 </div>
+<dialog id="dataLicensesDialog" class="data-licenses-dialog" aria-labelledby="dataLicensesTitle">
+  <div class="data-licenses-head">
+    <div>
+      <span class="data-licenses-kicker">World Explorer 3D</span>
+      <h2 id="dataLicensesTitle">Data, licenses &amp; credits</h2>
+    </div>
+    <button id="dataLicensesCloseBtn" type="button" aria-label="Close data and licenses">Close</button>
+  </div>
+  <p class="data-licenses-intro">World Explorer combines first-party game systems with attributed open data, public scientific sources, licensed software, and optional provider services. Provider coverage and availability vary.</p>
+  <div class="data-licenses-grid">
+    <section>
+      <h3>Maps &amp; Earth</h3>
+      <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a> — ODbL 1.0. Includes mapped roads, buildings, water, places, and surveillance nodes.</p>
+      <p>ESA WorldCover 2021 / modified Copernicus Sentinel data — CC BY 4.0. GEBCO bathymetry — CC BY 4.0. Copernicus and USGS terrain artifacts retain source-specific notices.</p>
+    </section>
+    <section>
+      <h3>Live &amp; community feeds</h3>
+      <p>OpenSky Network and ADSB.lol aircraft observations; USGS earthquakes; CelesTrak orbital elements; Open-Meteo weather and marine models; NOAA CO-OPS observations and tide predictions.</p>
+      <p>Panoramax and KartaView street imagery is provided by their contributors under CC BY-SA 4.0.</p>
+    </section>
+    <section>
+      <h3>Software, fonts &amp; assets</h3>
+      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License.</p>
+      <p>NASA, ESA, JPL-Caltech, USGS Astrogeology, LROC, Wikimedia contributors, ambientCG, and Poly Haven assets retain the credits and terms documented in the attribution index.</p>
+    </section>
+    <section>
+      <h3>Project terms</h3>
+      <p>World Explorer 3D is source-available under its project license. Third-party components and data remain under their original terms.</p>
+      <nav class="data-licenses-links" aria-label="Detailed legal and attribution documents">
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">Attribution index</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/DATA_SOURCES.md" target="_blank" rel="noopener noreferrer">Data sources</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ACKNOWLEDGEMENTS.md" target="_blank" rel="noopener noreferrer">Acknowledgements</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Project license</a>
+      </nav>
+      <button id="analyticsConsentManageBtn" class="analytics-consent-manage" type="button">Analytics preference</button>
+    </section>
+  </div>
+  <p class="data-licenses-note">Detailed asset-level credits are retained with the bundled model and texture records. This summary is informational and is not legal advice.</p>
+</dialog>
+<aside id="analyticsConsentBanner" class="analytics-consent-banner" hidden aria-hidden="true" aria-labelledby="analyticsConsentTitle">
+  <div>
+    <strong id="analyticsConsentTitle">Help improve World Explorer</strong>
+    <p>Optional Firebase Analytics measures sessions, mission outcomes, room use, and onboarding. It does not receive exact GPS coordinates, room codes, messages, or other free-form text.</p>
+    <a href="../legal/privacy" target="_blank" rel="noopener">Privacy details</a>
+  </div>
+  <div class="analytics-consent-actions">
+    <button id="analyticsConsentDenyBtn" class="secondary" type="button">Essential only</button>
+    <button id="analyticsConsentAllowBtn" type="button">Allow analytics</button>
+  </div>
+</aside>
 <div id="globeSelectorScreen" aria-hidden="true">
 <div class="globe-selector-shell">
 <div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
@@ -540,6 +598,12 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div class="globe-selector-live-loading">Loading working Live Earth layers...</div>
 </div>
 </div>
+<nav class="globe-legal-strip" aria-label="Data and legal information">
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors · ODbL</a>
+  <button type="button" data-open-data-licenses>Data &amp; Licenses</button>
+  <a href="../legal/privacy" target="_blank" rel="noopener">Privacy</a>
+  <a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
+</nav>
 </div>
 <div class="globe-selector-stage">
 <canvas id="globeSelectorCanvas"></canvas>

@@ -1,6 +1,7 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
+import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=1';
 import './rdt.js?v=55';
 import './config.js?v=61';
 import { ctx as appCtx } from './shared-context.js?v=55';
@@ -8,6 +9,7 @@ import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
 import './runtime-diagnostics.js?v=44';
+import './ui/legal-attribution.js?v=1';
 import './state.js?v=62';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
@@ -63,6 +65,7 @@ const platformServices = createPlatformServiceRegistry({
         globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
     }
 });
+setupAnalyticsConsentUi();
 
 function scheduleIdleTask(task, timeout = 1200) {
     if (typeof task !== 'function') return;

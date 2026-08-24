@@ -1,6 +1,6 @@
 # Acknowledgements 🙏
 
-Last reviewed: 2026-08-22 for World Explorer 3D 4.3.1.
+Last reviewed: 2026-08-23 for World Explorer 3D 4.3.1.
 
 World Explorer acknowledges and thanks the following third-party projects, services, and individuals that made this software possible.
 
@@ -215,6 +215,44 @@ All fonts used under the SIL Open Font License (OFL), Version 1.1
 
 **Font Service**: Google Fonts  
 **Website**: https://fonts.google.com/
+
+### Barlow and Chakra Petch
+
+**License**: SIL Open Font License 1.1
+**Source**: Google Fonts
+**Barlow**: https://fonts.google.com/specimen/Barlow
+**Chakra Petch**: https://fonts.google.com/specimen/Chakra+Petch
+
+**What We Use Them For**:
+- Account and administration interfaces
+- Operational headings and readouts
+
+---
+
+## Character and Vehicle Models
+
+### Soldier character
+
+- Upstream example: Three.js `Soldier.glb`
+- Character and animations: Adobe Mixamo
+- Use: Embedded primary walking character
+- Terms: Adobe permits royalty-free use in commercial video games; the raw character and animation files are not offered as a separate asset product.
+- Adobe FAQ: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html
+- Full record: `app/assets/models/ATTRIBUTION.md`
+
+### Astronaut character
+
+- Creator: Poly
+- License: Creative Commons Attribution 2.0
+- Upstream: Google `<model-viewer>` shared assets
+- Use: Fallback walking character
+- Full record: `app/assets/models/ATTRIBUTION.md`
+
+### Mars Exploration Rover
+
+- Source: NASA Mars Exploration Rover 3D model
+- NASA media usage guidelines apply
+- Full record: `app/assets/models/ATTRIBUTION.md`
 
 ---
 

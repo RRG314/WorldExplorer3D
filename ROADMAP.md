@@ -352,6 +352,14 @@ Required work:
 5. Connect built-in and moderated player-created activities to the same mission
    and progression events where appropriate.
 
+Release hardening now uses the shared board catalog, merged cloud/device
+results, public signed-out reads, bounded score schemas, outcome telemetry, and
+the documented retention contract in
+[Leaderboards, Retention, and Analytics](docs/LEADERBOARDS_RETENTION_AND_ANALYTICS.md).
+These controls make the current community boards usable and honest; trusted
+server result receipts, recurring seasons, friend/room scopes, and reward-grade
+anti-cheat remain required before competitive rewards.
+
 Done when:
 
 - The chosen feature scope is explicit. Unsupported crafting/economy promises
