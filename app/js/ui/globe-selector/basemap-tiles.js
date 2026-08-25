@@ -1,8 +1,14 @@
 const WEB_MERCATOR_LIMIT = 85.05112878;
-const GLOBAL_TILE_ZOOM = 2;
+// Zoom 2 loses most political context on the selector's large global globe.
+// Zoom 3 retains worldwide coverage while keeping the complete 64-tile set
+// inside the existing bounded cache; closer views continue through zoom 18.
+const GLOBAL_TILE_ZOOM = 3;
 const LOCAL_DETAIL_THRESHOLD_METERS = 4_000_000;
 const TILE_CACHE_LIMIT = 112;
-const MAP_MODE_STORAGE_KEY = 'worldExplorer3D.globeSelector.basemap';
+// v2 intentionally resets the first-use preference to Satellite. The v1
+// release defaulted to Map, so reusing that key would keep existing players on
+// the wrong startup view after the default changed.
+const MAP_MODE_STORAGE_KEY = 'worldExplorer3D.globeSelector.basemap.v2';
 
 const BASEMAPS = Object.freeze({
   map: Object.freeze({
@@ -26,14 +32,15 @@ function clamp(value, min, max) {
 }
 
 function normalizeMode(value) {
-  return value === 'satellite' ? 'satellite' : 'map';
+  if (value === 'map') return 'map';
+  return 'satellite';
 }
 
 function readStoredMode() {
   try {
     return normalizeMode(localStorage.getItem(MAP_MODE_STORAGE_KEY));
   } catch {
-    return 'map';
+    return 'satellite';
   }
 }
 
@@ -47,6 +54,11 @@ function storeMode(mode) {
 
 function tileYToLatitude(y, zoom) {
   const n = 2 ** zoom;
+  // Web Mercator imagery ends at ±85.051°. Extend only the outermost texture
+  // edge to the pole so the tiled globe is a complete visual surface and does
+  // not need a second Earth sphere behind it to fill polar holes.
+  if (y <= 0) return 90;
+  if (y >= n) return -90;
   return Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
 }
 
@@ -198,6 +210,7 @@ export function createGlobeBasemapTiles(options = {}) {
       touchCache(cacheKey, cached);
       material.map = cached.texture;
       material.opacity = 1;
+      material.transparent = false;
       material.needsUpdate = true;
       return;
     }
@@ -206,6 +219,7 @@ export function createGlobeBasemapTiles(options = {}) {
         if (!material.userData.disposed && texture) {
           material.map = texture;
           material.opacity = 1;
+          material.transparent = false;
           material.needsUpdate = true;
           requestRender?.();
         }
@@ -242,6 +256,7 @@ export function createGlobeBasemapTiles(options = {}) {
       if (!material.userData.disposed && texture) {
         material.map = texture;
         material.opacity = 1;
+        material.transparent = false;
         material.needsUpdate = true;
         requestRender?.();
       }
@@ -282,11 +297,13 @@ export function createGlobeBasemapTiles(options = {}) {
         color: 0xffffff,
         transparent: true,
         opacity: 0,
-        depthTest: true,
+        // The original globe is a loading fallback only. The completed tile
+        // shell renders over it by order rather than competing at nearly the
+        // same depth, which prevents the circular z-fighting holes that exposed
+        // the fallback through the active basemap.
+        depthTest: false,
         depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1
+        polygonOffset: false
       });
       const mesh = new THREE.Mesh(createTileGeometry(THREE, tile.zoom, tile.x, tile.y), material);
       mesh.name = `BasemapTile:${mode}:${key}`;

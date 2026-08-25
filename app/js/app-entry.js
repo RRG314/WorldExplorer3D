@@ -48,7 +48,7 @@ import './hud.js?v=95';
 import './map.js?v=60';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=129';
+import { setupUI } from './ui.js?v=132';
 
 let _booted = false;
 let _lastObservedAuthUser = null;

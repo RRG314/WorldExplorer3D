@@ -4,7 +4,7 @@ import {
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
 import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=9';
-import { createGlobeBasemapTiles } from './basemap-tiles.js?v=1';
+import { createGlobeBasemapTiles } from './basemap-tiles.js?v=4';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
