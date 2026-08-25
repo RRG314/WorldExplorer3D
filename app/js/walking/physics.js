@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=2";
+import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=3";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 
 function wrapYaw(angle = 0) {
@@ -226,8 +226,23 @@ function createWalkingPhysicsHelpers({
       state.walker.angle = state.walker.yaw;
     }
 
-    const forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
-    const strafe = liveGpsOwnsTranslation ? 0 : Number(actions.strafe) || 0;
+    let forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
+    let strafe = liveGpsOwnsTranslation ? 0 : Number(actions.strafe) || 0;
+    if (mobileTouch && !liveGpsOwnsTranslation) {
+      const dampingRate = actions.mobileMoveActive === true ? 14 : 22;
+      const inputBlend = 1 - Math.exp(-Math.max(0, Math.min(0.1, dt)) * dampingRate);
+      state.walker.mobileForward = finiteOr(state.walker.mobileForward, 0) +
+        (forward - finiteOr(state.walker.mobileForward, 0)) * inputBlend;
+      state.walker.mobileStrafe = finiteOr(state.walker.mobileStrafe, 0) +
+        (strafe - finiteOr(state.walker.mobileStrafe, 0)) * inputBlend;
+      if (Math.abs(state.walker.mobileForward) < 0.002) state.walker.mobileForward = 0;
+      if (Math.abs(state.walker.mobileStrafe) < 0.002) state.walker.mobileStrafe = 0;
+      forward = state.walker.mobileForward;
+      strafe = state.walker.mobileStrafe;
+    } else {
+      state.walker.mobileForward = 0;
+      state.walker.mobileStrafe = 0;
+    }
     const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
@@ -294,8 +309,12 @@ function createWalkingPhysicsHelpers({
       state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
       state.walker.lookYawOffset *= Math.exp(-dt * 2.8);
       if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
-    } else if (mobileTouch && actions.mobileSettings?.cameraRecenter !== false && actions.mobileLookActive !== true) {
-      const idleFor = performance.now() - (Number(actions.mobileLastLookInputAt) || 0);
+    } else if (mobileTouch && actions.mobileSettings?.cameraRecenter !== false && actions.mobileLookActive !== true && actions.mobileMoveActive !== true) {
+      const lastMobileInputAt = Math.max(
+        Number(actions.mobileLastLookInputAt) || 0,
+        Number(actions.mobileLastMoveInputAt) || 0
+      );
+      const idleFor = performance.now() - lastMobileInputAt;
       const recenter = resolveMobileCameraRecenter({
         actorYaw: state.walker.angle,
         cameraYaw: state.walker.yaw + state.walker.lookYawOffset,

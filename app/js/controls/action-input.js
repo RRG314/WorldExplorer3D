@@ -3,7 +3,7 @@ import {
   loadMobileTouchSettings,
   resolveMobileSemanticActions,
   saveMobileTouchSettings
-} from './mobile-touch-authority.js?v=2';
+} from './mobile-touch-authority.js?v=3';
 
 const DEAD_ZONE = 0.16;
 const inputState = {
@@ -17,6 +17,7 @@ const mobileTouchState = {
   enabled: false,
   move: { x: 0, y: 0, active: false },
   look: { x: 0, y: 0, active: false },
+  lastMoveInputAt: 0,
   lastLookInputAt: 0,
   settings: loadMobileTouchSettings()
 };
@@ -177,6 +178,7 @@ function mergeMobileTouch(actions) {
   actions.mobileTouch = true;
   actions.mobileMoveActive = mobile.moveActive;
   actions.mobileLookActive = mobile.lookActive;
+  actions.mobileLastMoveInputAt = mobileTouchState.lastMoveInputAt;
   actions.mobileLastLookInputAt = mobileTouchState.lastLookInputAt;
   actions.mobileSettings = mobile.settings;
   if (actions.mode === 'plane') {
@@ -207,6 +209,8 @@ function setMobileTouchPad(pad, x = 0, y = 0, active = true, now = performance.n
   target.active = active === true;
   if (pad === 'look') {
     mobileTouchState.lastLookInputAt = Number(now) || performance.now();
+  } else {
+    mobileTouchState.lastMoveInputAt = Number(now) || performance.now();
   }
   return getMobileTouchInputSnapshot();
 }
@@ -227,6 +231,7 @@ function getMobileTouchInputSnapshot() {
     enabled: mobileTouchState.enabled,
     move: { ...mobileTouchState.move },
     look: { ...mobileTouchState.look },
+    lastMoveInputAt: mobileTouchState.lastMoveInputAt,
     lastLookInputAt: mobileTouchState.lastLookInputAt,
     settings: { ...mobileTouchState.settings }
   };

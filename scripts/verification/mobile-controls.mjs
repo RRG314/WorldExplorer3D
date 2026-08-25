@@ -18,6 +18,14 @@ page.on('response', (response) => {
 
 const diagnostics = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
 const distance = (a, b) => Math.hypot(Number(a?.x) - Number(b?.x), Number(a?.z) - Number(b?.z));
+const pathTurnDegrees = (a, b, c) => {
+  const first = { x: Number(b?.x) - Number(a?.x), z: Number(b?.z) - Number(a?.z) };
+  const second = { x: Number(c?.x) - Number(b?.x), z: Number(c?.z) - Number(b?.z) };
+  const denominator = Math.hypot(first.x, first.z) * Math.hypot(second.x, second.z);
+  if (!(denominator > 0.0001)) return 180;
+  const cosine = Math.max(-1, Math.min(1, (first.x * second.x + first.z * second.z) / denominator));
+  return Math.acos(cosine) * 180 / Math.PI;
+};
 
 async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
   const box = await page.locator(selector).boundingBox();
@@ -31,6 +39,52 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
   await page.waitForTimeout(holdMs);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(90);
+}
+
+async function touchPrecisionProbe(selector) {
+  const box = await page.locator(selector).boundingBox();
+  assert.ok(box, `${selector} must be visible.`);
+  const start = { x: box.x + box.width / 2 + 24, y: box.y + box.height / 2 + 9 };
+  const end = { x: start.x, y: start.y - 18 };
+  const point = (position) => ({ x: position.x, y: position.y, id: 0, radiusX: 5, radiusY: 5, force: 1 });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
+  await page.waitForTimeout(140);
+  const touchdown = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().mobileControls?.move || null);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
+  await page.waitForTimeout(240);
+  const gentleDrag = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().mobileControls?.move || null);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(150);
+  return { touchdown, gentleDrag };
+}
+
+async function touchStraightnessProbe(selector) {
+  const box = await page.locator(selector).boundingBox();
+  assert.ok(box, `${selector} must be visible.`);
+  const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const end = { x: start.x + 24, y: start.y - 36 };
+  const point = (position) => ({ x: position.x, y: position.y, id: 0, radiusX: 5, radiusY: 5, force: 1 });
+  const before = await diagnostics();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
+  await page.waitForTimeout(80);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
+  await page.waitForTimeout(450);
+  const middle = await diagnostics();
+  await page.waitForTimeout(650);
+  const after = await diagnostics();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(150);
+  const positions = {
+    before: before.activeActor?.position,
+    middle: middle.activeActor?.position,
+    after: after.activeActor?.position
+  };
+  return {
+    ...positions,
+    firstDistance: distance(positions.before, positions.middle),
+    secondDistance: distance(positions.middle, positions.after),
+    turnDegrees: pathTurnDegrees(positions.before, positions.middle, positions.after)
+  };
 }
 
 async function mode(mode, selector) {
@@ -137,6 +191,8 @@ try {
   await page.waitForFunction(() => !document.getElementById('largeMap')?.classList.contains('show'), null, { timeout: 10_000 });
   await page.waitForSelector('#mobileTouchControls.show.mode-walking', { timeout: 10_000 });
   const mapReturnedToPlay = await page.locator('#mobileTouchControls.show.mode-walking').isVisible();
+  const walkPrecision = await touchPrecisionProbe('#mobileMovePad');
+  const walkStraightness = await touchStraightnessProbe('#mobileMovePad');
   const walkBefore = await diagnostics();
   await touchDrag('#mobileMovePad', 28, -46, 1_250);
   const walkMoved = await diagnostics();
@@ -202,6 +258,9 @@ try {
     expandedMapCanZoom: mapZoomed !== mapFollowState.zoom,
     expandedMapRecenters: mapRecentered === true,
     closingMapRestoresGameplayControls: mapReturnedToPlay === true,
+    offCenterTouchdownIsNeutral: Math.hypot(Number(walkPrecision.touchdown?.x), Number(walkPrecision.touchdown?.y)) < 0.01,
+    shortWalkDragStaysPrecise: Math.abs(Number(walkPrecision.gentleDrag?.x)) < 0.01 && Number(walkPrecision.gentleDrag?.y) < -0.25 && Number(walkPrecision.gentleDrag?.y) > -0.4,
+    heldDiagonalWalkStaysStraight: walkStraightness.firstDistance > 0.4 && walkStraightness.secondDistance > 0.4 && walkStraightness.turnDegrees < 5,
     walkAnalogMoves: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position) > 2,
     walkRightLookTurnsRight: Number(walkLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     walkCameraRecenters: Number(walkRecentered.cameraFollow?.headingAlignmentDegrees) < 5 && Number(walkRecentered.cameraFollow?.trailingDistance) > 1,
@@ -225,6 +284,8 @@ try {
       plane: { looked: planeLooked.cameraFollow, recentered: planeRecentered.cameraFollow }
     },
     movement: {
+      walkPrecision,
+      walkStraightness,
       walk: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position),
       drive: distance(driveBefore.activeActor?.position, driveMoved.activeActor?.position),
       planeBefore: planeBefore.activeActor?.orientation,

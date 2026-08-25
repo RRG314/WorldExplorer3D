@@ -38,15 +38,30 @@ function normalizeMobileStick(x = 0, y = 0, deadZone = 0.1) {
   });
 }
 
+function shapeMobileStick(stick, exponent = 1) {
+  const magnitude = clamp(stick?.magnitude, 0, 1);
+  if (!(magnitude > 0)) return Object.freeze({ x: 0, y: 0, magnitude: 0 });
+  const shapedMagnitude = Math.pow(magnitude, Math.max(1, Number(exponent) || 1));
+  const scale = shapedMagnitude / magnitude;
+  return Object.freeze({
+    x: clamp(stick.x * scale),
+    y: clamp(stick.y * scale),
+    magnitude: shapedMagnitude
+  });
+}
+
 function resolveMobileSemanticActions(mode = 'walk', state = {}) {
   const settings = normalizeMobileTouchSettings(state.settings);
-  const move = normalizeMobileStick(state.move?.x, state.move?.y);
+  const walking = mode === 'walk';
+  const normalizedMove = normalizeMobileStick(state.move?.x, state.move?.y, walking ? 0.14 : 0.1);
+  // Preserve full walking speed while giving short thumb motions a larger
+  // precision range. Vehicle modes retain their established response.
+  const move = walking ? shapeMobileStick(normalizedMove, 1.45) : normalizedMove;
   const look = normalizeMobileStick(state.look?.x, state.look?.y, 0.045);
   const moveX = clamp(move.x * settings.moveSensitivity);
   const moveY = clamp(move.y * settings.moveSensitivity);
   const lookX = clamp(look.x * settings.lookSensitivity);
   const lookY = clamp(look.y * settings.lookSensitivity);
-  const walking = mode === 'walk';
   return Object.freeze({
     move: -moveY,
     turn: walking ? 0 : -moveX,
@@ -98,6 +113,7 @@ export {
   MOBILE_TOUCH_SETTINGS_KEY,
   loadMobileTouchSettings,
   normalizeMobileStick,
+  shapeMobileStick,
   normalizeMobileTouchSettings,
   resolveMobileCameraRecenter,
   resolveMobileSemanticActions,

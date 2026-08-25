@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createWalkingCharacterHelpers } from "./walking/character.js?v=2";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
-import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=14";
+import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=15";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=3";
 import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=3";
 
@@ -26,7 +26,7 @@ function createWalkingModule(opts) {
     enabled: true,
     mode: "drive",
     view: "third",
-    walker: { x: 0, z: 0, y: 0, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, speedMph: 0, vy: 0, onGround: true, wallJumpTimer: 0, onBuilding: false },
+    walker: { x: 0, z: 0, y: 0, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, speedMph: 0, vy: 0, mobileForward: 0, mobileStrafe: 0, onGround: true, wallJumpTimer: 0, onBuilding: false },
     characterMesh: null
   };
 

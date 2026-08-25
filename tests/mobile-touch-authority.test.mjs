@@ -1,10 +1,12 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
+
 import {
   normalizeMobileStick,
   normalizeMobileTouchSettings,
   resolveMobileCameraRecenter,
-  resolveMobileSemanticActions
+  resolveMobileSemanticActions,
+  shapeMobileStick
 } from '../app/js/controls/mobile-touch-authority.js';
 
 test('standard right-handed layout is the safe default', () => {
@@ -51,4 +53,41 @@ test('camera waits for look release, then converges behind the actor', () => {
   const recentering = resolveMobileCameraRecenter({ actorYaw: 0, cameraYaw: 1.2, dt: 1 / 60, idleMs: 1000, lookActive: false });
   assert.equal(recentering.active, true);
   assert.ok(Math.abs(recentering.yaw) < 1.2);
+});
+
+test('walking stick has a stable center and a progressive precision range', () => {
+  const centered = resolveMobileSemanticActions('walk', {
+    enabled: true,
+    move: { x: 0.1, y: 0, active: true }
+  });
+  assert.ok(Math.abs(centered.move) === 0);
+  assert.ok(Math.abs(centered.strafe) === 0);
+
+  const partial = resolveMobileSemanticActions('walk', {
+    enabled: true,
+    move: { x: 0, y: -0.4, active: true }
+  });
+  assert.ok(partial.move > 0.12 && partial.move < 0.25, `expected precise partial motion, got ${partial.move}`);
+
+  const full = resolveMobileSemanticActions('walk', {
+    enabled: true,
+    move: { x: 0, y: -1, active: true }
+  });
+  assert.equal(full.move, 1);
+});
+
+test('walking response curve preserves direction and lowers only partial magnitude', () => {
+  const normalized = normalizeMobileStick(0.5, -0.5, 0.14);
+  const shaped = shapeMobileStick(normalized, 1.45);
+  assert.ok(shaped.magnitude < normalized.magnitude);
+  assert.ok(Math.abs(shaped.x / shaped.y - normalized.x / normalized.y) < 1e-9);
+  assert.ok(Math.abs(shapeMobileStick(normalizeMobileStick(0, -1, 0.14), 1.45).magnitude - 1) < 1e-9);
+});
+
+test('vehicle response remains linear and separate from walking tuning', () => {
+  const vehicle = resolveMobileSemanticActions('drive', {
+    enabled: true,
+    move: { x: 0, y: -0.4, active: true }
+  });
+  assert.ok(vehicle.move > 0.32 && vehicle.move < 0.34);
 });

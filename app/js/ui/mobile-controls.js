@@ -260,11 +260,11 @@ function initMobileControls() {
     if (!pad || typeof PointerEvent === 'undefined') return;
     const update = (event) => {
       const activePointer = analogPadPointers.get(kind);
-      if (activePointer !== event.pointerId) return;
+      if (activePointer?.pointerId !== event.pointerId) return;
       const bounds = pad.getBoundingClientRect();
-      const radius = Math.max(28, Math.min(bounds.width, bounds.height) * 0.43);
-      const rawX = (event.clientX - (bounds.left + bounds.width * 0.5)) / radius;
-      const rawY = (event.clientY - (bounds.top + bounds.height * 0.5)) / radius;
+      const radius = Math.max(32, Math.min(bounds.width, bounds.height) * 0.48);
+      const rawX = (event.clientX - activePointer.originX) / radius;
+      const rawY = (event.clientY - activePointer.originY) / radius;
       const length = Math.hypot(rawX, rawY) || 1;
       const scale = length > 1 ? 1 / length : 1;
       const x = rawX * scale;
@@ -277,18 +277,24 @@ function initMobileControls() {
       if (analogPadPointers.has(kind)) return;
       event.preventDefault();
       event.stopPropagation();
-      analogPadPointers.set(kind, event.pointerId);
+      // Thumb-down is neutral. Landing off-center must not immediately command
+      // a turn or sprint before the player deliberately drags.
+      analogPadPointers.set(kind, {
+        pointerId: event.pointerId,
+        originX: event.clientX,
+        originY: event.clientY
+      });
       try { pad.setPointerCapture?.(event.pointerId); } catch (_) {}
       pad.classList.add('active');
       update(event);
     };
     const move = (event) => {
-      if (analogPadPointers.get(kind) !== event.pointerId) return;
+      if (analogPadPointers.get(kind)?.pointerId !== event.pointerId) return;
       event.preventDefault();
       update(event);
     };
     const end = (event) => {
-      if (analogPadPointers.get(kind) !== event.pointerId) return;
+      if (analogPadPointers.get(kind)?.pointerId !== event.pointerId) return;
       event.preventDefault();
       analogPadPointers.delete(kind);
       appCtx.setMobileTouchPad?.(kind, 0, 0, false, performance.now());
