@@ -44,7 +44,7 @@
       "name": "Player, Backpack, Journal, progression, and controls",
       "status": "complete",
       "minimumDecision": "Ship one Explorer event and profile authority across the Backpack, Journal, Field Guide, fieldwork, games, making, travel, community, and companions; retain tested touch profiles with reset and reload recovery. Full cross-device Journal sync and per-action remapping remain staged and are not 5.1 claims.",
-      "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui", "verify:explorer-coherence", "verify:explorer-coherence-browser"],
+      "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui", "verify:explorer-coherence", "verify:discovery-receipts", "verify:explorer-coherence-browser"],
       "openItems": []
     },
     "CP5": {
