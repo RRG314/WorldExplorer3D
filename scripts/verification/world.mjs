@@ -10,6 +10,10 @@ const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const captureRequested = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
+const configuredWorldReadyTimeoutMs = Number(process.env.WE3D_WORLD_READY_TIMEOUT_MS);
+const worldReadyTimeoutMs = Number.isFinite(configuredWorldReadyTimeoutMs) && configuredWorldReadyTimeoutMs > 0
+  ? configuredWorldReadyTimeoutMs
+  : process.env.CI ? 480_000 : 240_000;
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
 const captureManifest = JSON.parse(await fs.readFile(path.join(root, 'config', 'public-capture-manifest.json'), 'utf8'));
 const captureByFile = new Map(captureManifest.captures.map((capture) => [capture.file, capture]));
@@ -147,6 +151,79 @@ async function publicSnapshot() {
   });
 }
 
+async function worldReadinessSnapshot() {
+  return page.evaluate(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    const worldLoad = diagnostics.worldLoad || {};
+    return {
+      runtimeReady: globalThis.__WE3D_RUNTIME_READY__ === true,
+      gameStarted: state.gameStarted === true,
+      worldLoading: state.worldLoading,
+      worldLoad: {
+        status: worldLoad.status || null,
+        retryPass: worldLoad.retryPass ?? null,
+        lastCompletedPhase: worldLoad.lastCompletedPhase || null,
+        activePhases: Array.isArray(worldLoad.activePhases) ? worldLoad.activePhases : [],
+        sessionState: worldLoad.session?.state || null,
+        outstandingProviderWork: worldLoad.session?.outstandingProviderWork ?? null,
+        providers: worldLoad.session?.providers || {}
+      },
+      terrain: diagnostics.surfaceChain?.surfaces?.terrain || null,
+      roads: Number(diagnostics.worldCounts?.roads || 0),
+      buildingMeshes: Number(diagnostics.worldCounts?.buildingMeshes || 0),
+      publishedBodies: Number(diagnostics.transportStructures?.publishedBodies || 0),
+      waterSurfaces: Number(diagnostics.visualOwners?.water?.surfaceCount || 0),
+      livingWorldActive: diagnostics.livingWorld?.active === true,
+      urbanSandboxActive: diagnostics.urbanSandbox?.active === true,
+      worldDiscoveryActive: diagnostics.worldDiscovery?.active === true,
+      runtimeErrors: Array.isArray(diagnostics.runtimeErrors) ? diagnostics.runtimeErrors.slice(-5) : []
+    };
+  });
+}
+
+async function waitForCompleteWorld() {
+  const startedAt = Date.now();
+  const deadline = startedAt + worldReadyTimeoutMs;
+  let latest = null;
+  while (Date.now() < deadline) {
+    const intervalTimeout = Math.max(1, Math.min(60_000, deadline - Date.now()));
+    try {
+      await page.waitForFunction(() => {
+        const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+        return state.gameStarted === true && state.worldLoading === false &&
+          diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
+          Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
+          Number(diagnostics.worldCounts?.roads || 0) > 0 &&
+          Number(diagnostics.worldCounts?.buildingMeshes || 0) > 0 &&
+          Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
+          Number(diagnostics.visualOwners?.water?.surfaceCount || 0) > 0 &&
+          diagnostics.livingWorld?.active === true &&
+          diagnostics.urbanSandbox?.active === true &&
+          diagnostics.worldDiscovery?.active === true;
+      }, null, { timeout: intervalTimeout });
+      return;
+    } catch (error) {
+      latest = await worldReadinessSnapshot().catch(() => null);
+      console.log(JSON.stringify({
+        event: 'complete-world-readiness',
+        elapsedMs: Date.now() - startedAt,
+        timeoutMs: worldReadyTimeoutMs,
+        latest,
+        browserErrors,
+        localFailures
+      }, null, 2));
+      if (error?.name !== 'TimeoutError') throw error;
+    }
+  }
+  throw new Error(`Complete world did not become ready within ${worldReadyTimeoutMs}ms: ${JSON.stringify({
+    latest,
+    browserErrors,
+    localFailures
+  })}`);
+}
+
 let report = null;
 try {
   const platformSurfaces = await verifyPlatformSurfaces();
@@ -193,20 +270,7 @@ try {
   await page.locator('#globeCityList').getByText('Baltimore', { exact: true }).click();
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
 
-  await page.waitForFunction(() => {
-    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-    return state.gameStarted === true && state.worldLoading === false &&
-      diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
-      Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
-      Number(diagnostics.worldCounts?.roads || 0) > 0 &&
-      Number(diagnostics.worldCounts?.buildingMeshes || 0) > 0 &&
-      Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
-      Number(diagnostics.visualOwners?.water?.surfaceCount || 0) > 0 &&
-      diagnostics.livingWorld?.active === true &&
-      diagnostics.urbanSandbox?.active === true &&
-      diagnostics.worldDiscovery?.active === true;
-  }, null, { timeout: 240000 });
+  await waitForCompleteWorld();
   await page.waitForTimeout(4500);
 
   const beforeInput = await publicSnapshot();
