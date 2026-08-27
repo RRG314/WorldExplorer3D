@@ -2,8 +2,8 @@
 
 Last updated: 2026-08-26.
 
-Production remains on version 4.3.1. Version 5.0 is in staging preparation and
-will not replace production until desktop and mobile testing is approved.
+Version 5.0 is the current approved release. The roadmap below separates its
+shipped regional scope from later expansion work.
 
 ## Version 5.0
 
@@ -12,30 +12,28 @@ regional field-exploration and progression loop.
 
 | Area | Current 5.0 status | Remaining release work |
 | --- | --- | --- |
-| World loading and traversal | Implemented | Final staging regression review |
+| World loading and traversal | Released in 5.0 | Continue reviewed location coverage |
 | Roads, bridges, tunnels, terrain, and buildings | Implemented for the supported bounded-world model | Continue expanding reviewed location coverage after 5.0 |
 | Interiors | Mapped detail where available plus generated multi-floor fallback | More mapped connector and accessibility coverage later |
-| Mobile controls and camera | Reported direction, follow-camera, loading, selector, prompt, and speed issues corrected | Hands-on testing on the new staging link |
-| Backpack and player state | Shared schema, v1→v2 migration, backup, and rollback implemented | Confirm migration with representative existing player data |
-| Field exploration | Shared walking/Live GPS activities, Journal, Field Guide, life lists, specialties, companions, and recurring programs implemented | Physical-device Live GPS review |
+| Mobile controls and camera | Reported direction, follow-camera, loading, selector, prompt, and speed issues corrected and approved | Broaden physical-device coverage |
+| Backpack and player state | Shared schema, v1→v2 migration, backup, and rollback released | Continue representative migration monitoring |
+| Field exploration | Shared walking/Live GPS activities, Journal, Field Guide, life lists, specialties, companions, and recurring programs released | Broaden physical-device Live GPS coverage |
 | Baltimore ecology | Versioned 60-taxon regional pack implemented | Independent scientific review and later regional expansion |
 | Fishing | Shore, boat, and underwater records use one authority | Expand reviewed fish and waterbody coverage later |
-| Multiplayer | Bounded rooms, presence, chat, activities, Blocks, overlays, and persistent vehicles implemented | Fresh two-client staging review and larger-room testing later |
+| Multiplayer | Bounded rooms, presence, chat, activities, Blocks, overlays, and persistent vehicles released | Larger-room testing later |
 | World Editor and Blocks | Integrated into one editor with local/room persistence | Hybrid terrain/building material editing remains later work |
 | Accessibility | Keyboard, focus, zoom, touch targets, text, contrast, motion, and live-status baseline implemented | Broader assistive-technology and physical-device review |
-| Public presentation | Player-facing landing copy, release notes, system inventory, and architecture updated | Final screenshot and release-page review |
+| Public presentation | Player-facing landing copy, release notes, system inventory, architecture, and screenshots updated | Maintain with each release |
 
-The planned 5.0 feature implementation is complete. Production remains on 4.3.1
-until the 5.0 staging build has been reviewed on desktop and mobile and approved
-for release.
+The planned 5.0 feature implementation and owner acceptance are complete.
 
-## 5.0 release gate
+## 5.0 release boundary
 
-Before production:
+Completed for 5.0:
 
-1. Publish the final 5.0 staging build.
-2. Complete desktop and mobile gameplay review.
-3. Release the exact approved build as `v5.0.0`.
+1. Published the final 5.0 staging build.
+2. Completed desktop and mobile gameplay review.
+3. Approved the exact candidate for `v5.0.0` release.
 
 ## Phase B: regional expansion
 

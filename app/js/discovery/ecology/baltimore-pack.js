@@ -249,7 +249,7 @@ const BALTIMORE_ECOLOGY_PACK = deepFreeze({
   },
   contentRelease: {
     releaseId: `${BALTIMORE_ECOLOGY_PACK_ID}@${BALTIMORE_ECOLOGY_PACK_VERSION}`,
-    compatibleClient: '>=4.3.1',
+    compatibleClient: '>=5.0.0',
     migration: { fromVersions: [], stableIdPolicy: 'preserve-historical-records' },
     rollback: { previousVersion: null, action: 'disable-pack-and-use-global-procedural-catalog' },
     emergencyDisableSupported: true

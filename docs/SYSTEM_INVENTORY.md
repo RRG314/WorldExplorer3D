@@ -1,7 +1,6 @@
 # World Explorer 3D System Inventory
 
-Last updated: 2026-08-26 for the 5.0 development line. Production remains on
-4.3.1 until the 5.0 staging build is approved.
+Last updated: 2026-08-26 for the approved 5.0 release.
 
 This inventory describes the systems present in the current source tree and
 their honest product boundaries. See [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md)
@@ -105,6 +104,6 @@ committed.
   not every taxon has a promoted animated model.
 - Live GPS remains foreground-only and depends on browser permission, signal
   quality, and secure hosting.
-- Physical phones still need final hands-on battery, thermal, accessibility,
-  and gameplay review before production approval.
+- Broader physical-phone battery, thermal, accessibility, and gameplay coverage
+  remains continuing release work.
 - Backend-dependent features require the matching authorized environment.
