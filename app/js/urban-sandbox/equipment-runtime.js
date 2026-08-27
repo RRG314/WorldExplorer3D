@@ -2,12 +2,15 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
+import { beginNpcDefense, npcFireDecision } from './npc-combat-policy.js?v=1';
 
 const ITEM_ICON_PATHS = Object.freeze({
   hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
   flashlight: '<path d="M16 10h32l-5 15v27a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V25L16 10Zm8 9h16l2-6H22l2 6Zm3 9v23h10V28H27Z"/>',
   baton: '<path d="m19 49 7 7 30-38-10-10-8 10 4 4-23 27Zm-7 7 7 0-7-7v7Z"/>',
   'pulse-sidearm': '<path d="M9 22h37l9 8-9 9H31l-3 17H16l5-17H9V22Zm35 6H16v5h30l3-3-5-2Z"/>',
+  'compact-sidearm': '<path d="M10 24h34l8 7-8 8H31l-3 16H17l4-16H10V24Zm7 6v4h26l3-3-3-1H17Z"/>',
+  'responder-sidearm': '<path d="M8 21h39l9 8-9 10H32l-4 18H16l5-18H8V21Zm10 7v5h28l3-4-4-1H18Zm18-12h9v5h-9v-5Z"/>',
   'laser-gun': '<path d="M7 23h39l11 8-11 8H31l-4 18H15l6-18H7V23Zm10 6v4h28l4-2-4-2H17Zm20-12h8v5h-8v-5Z"/>',
   'paintball-gun': '<path d="M8 25h38l10 7-10 8H31l-4 17H16l5-17H8V25Zm12-14h19l5 12H16l4-12Zm4 5-2 4h15l-2-4H24Z"/>',
   'concussion-charge': '<path d="M25 6h14v8h5l9 13-5 27H16l-5-27 9-13h5V6Zm6 6h2V8h-2v4Zm-9 9-5 8 3 19h24l3-19-5-8H22Z"/><path d="M29 26h6v16h-6zM24 31h16v6H24z"/>',
@@ -41,6 +44,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   const promoteNpc = options.promoteNpc;
   const promoteVehicle = options.promoteVehicle;
   const reportCivicEvent = options.reportCivicEvent;
+  const onNpcShot = options.onNpcShot;
   const setStatus = options.setStatus;
   const clock = options.now || (() => performance.now());
   const effects = [];
@@ -68,12 +72,14 @@ function createUrbanEquipmentRuntime(options = {}) {
       'field-discovery': 'Found while exploring',
       'fishing-catch': 'Caught while fishing',
       'world-creation': 'Made in the world',
+      'recovered-equipment': 'Recovered equipment',
       'Backpack item': 'Backpack item'
     };
     const source = sourceLabels[item.provenance] || 'Found while exploring';
     const acquired = item.acquiredAt ? new Date(item.acquiredAt).toLocaleDateString() : '';
     const actions = [];
     if (item.verbs?.includes('equip')) actions.push(`<button data-backpack-action="equip" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Equip</button>`);
+    if (item.hotbarSlot != null) actions.push(`<button data-backpack-action="clear-slot" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Remove from slot ${item.hotbarSlot}</button>`);
     if (item.verbs?.includes('use-context')) actions.push(`<button data-backpack-action="field" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Use for fieldwork</button>`);
     if (item.verbs?.includes('inspect')) actions.push(`<button data-backpack-action="inspect" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Inspect</button>`);
     const slots = item.verbs?.includes('equip')
@@ -94,8 +100,11 @@ function createUrbanEquipmentRuntime(options = {}) {
     ui.filters?.querySelectorAll?.('[data-backpack-filter]').forEach((button) => {
       button.classList.toggle('active', button.dataset.backpackFilter === (state.backpackFilter || 'all'));
     });
-    const hotbarItems = inventory.items.filter((item) => item.hotbarSlot != null);
-    ui.slots.innerHTML = hotbarItems.map((item) => {
+    const hotbarItems = new Map(inventory.items.filter((item) => item.hotbarSlot != null).map((item) => [item.hotbarSlot, item]));
+    ui.slots.innerHTML = Array.from({ length: 6 }, (_, index) => {
+      const slot = index + 1;
+      const item = hotbarItems.get(slot);
+      if (!item) return `<button class="urbanEquipmentSlot empty" type="button" disabled aria-label="Quick slot ${slot} is empty"><b class="urbanItemSlot">${slot}</b><span class="urbanItemVisual">+</span><strong class="urbanItemName">Empty slot</strong><span class="urbanItemCount">Choose an item below</span></button>`;
       const count = item.magazine !== null ? `${item.magazine}/${item.reserve}` : Number(item.quantity || 0) > 1 ? `×${item.quantity}` : '';
       const selected = item.instanceId === state.backpackSelectedId;
       return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}${selected ? ' selected' : ''}" type="button" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}"${selected ? ' aria-current="true"' : ''} title="${escapeHtml(`${item.hotbarSlot}. ${item.label} · ${count}`)}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong><span class="urbanItemCount">${escapeHtml(count)}</span></button>`;
@@ -112,6 +121,14 @@ function createUrbanEquipmentRuntime(options = {}) {
     }
     renderDetail(inventory);
     const equipped = inventory.items.find((item) => item.equipped);
+    const reticleVisible = !!(
+      equipped?.projectileKind &&
+      appCtx.Walk?.state?.mode === 'walk' &&
+      !state.equipmentOpen &&
+      isActive()
+    );
+    ui.reticle?.classList.toggle('show', reticleVisible);
+    if (ui.reticle) ui.reticle.dataset.kind = String(equipped?.projectileKind || '');
     state.equipmentVisual?.setEquipped?.(equipped?.id || 'hands');
     const parachuteState = equipped?.id === 'parachute'
       ? state.parachute?.deployed ? ' · canopy deployed' : ' · deploy after jumping'
@@ -145,6 +162,12 @@ function createUrbanEquipmentRuntime(options = {}) {
   function handleBackpackAction(action, instanceId, slot = null) {
     const item = state.equipment.snapshot().items.find((entry) => entry.instanceId === String(instanceId));
     if (!item) return false;
+    if (action === 'clear-slot' && item.hotbarSlot != null) {
+      const changed = state.equipment.assignHotbar(item.hotbarSlot, null);
+      if (changed) setStatus(`${item.label} removed from quick access.`, 1400);
+      render();
+      return changed;
+    }
     if (slot != null) {
       const changed = state.equipment.assignHotbar(Number(slot), item.instanceId);
       if (changed) setStatus(`${item.label} assigned to slot ${slot}.`, 1400);
@@ -229,6 +252,15 @@ function createUrbanEquipmentRuntime(options = {}) {
     return target;
   }
 
+  function prepareNpcDefense(npc, destroyed) {
+    const response = beginNpcDefense(npc, clock(), destroyed);
+    if (!response) return false;
+    Object.assign(npc, response);
+    npc.reactionUntil = response.hostileUntil;
+    npc.visual.setReaction('defending');
+    return true;
+  }
+
   function applyImpact(target, force) {
     const detailed = detailedTarget(target);
     if (!detailed) return null;
@@ -239,6 +271,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       npc.reaction = result.destroyed ? 'downed' : 'hit';
       npc.reactionUntil = result.destroyed ? Infinity : clock() + 1300;
       npc.visual.setReaction(npc.reaction);
+      prepareNpcDefense(npc, result.destroyed);
       return { kind: 'npc', id: npc.id, ...result };
     }
     if (detailed.kind === 'vehicle') {
@@ -285,6 +318,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       npc.reaction = destroyed ? 'downed' : 'hit';
       npc.reactionUntil = destroyed ? Infinity : clock() + 1300;
       npc.visual.setReaction(npc.reaction);
+      prepareNpcDefense(npc, destroyed);
       return { kind: 'npc', id: npc.id, before: result.before, after, destroyed };
     }
     if (detailed.kind === 'vehicle') {
@@ -593,6 +627,36 @@ function createUrbanEquipmentRuntime(options = {}) {
     }
   }
 
+  function updateArmedNpcResponse() {
+    const actor = appCtx.Walk?.state?.walker;
+    if (!actor) return;
+    const current = clock();
+    state.npcs.forEach((npc) => {
+      const pose = npcPose(npc);
+      const decision = npcFireDecision({ ...npc, x: pose.x, z: pose.z }, actor, current, {
+        multiplayer: !!appCtx.getCurrentMultiplayerRoom?.(),
+        walking: appCtx.Walk?.state?.mode === 'walk'
+      });
+      if (!decision) return;
+      npc.reaction = 'defending';
+      npc.reactionUntil = npc.hostileUntil;
+      npc.visual.setReaction('defending');
+      npc.visual.root.rotation.y = decision.yaw;
+      if (!decision.ready) return;
+      const fired = fireNpcProjectile({
+        sourceId: npc.id,
+        equipmentId: npc.heldEquipment,
+        ...decision.profile,
+        origin: { x: pose.x, y: pose.y + 1.34, z: pose.z },
+        target: { x: Number(actor.x), y: Number(actor.y) - .5, z: Number(actor.z) },
+        onPlayerImpact: onNpcShot
+      });
+      if (!fired) return;
+      npc.shotsFired = Number(npc.shotsFired || 0) + 1;
+      npc.nextShotAt = decision.nextShotAt;
+    });
+  }
+
   function use() {
     if (!isActive() || appCtx.Walk?.state?.mode !== 'walk') return false;
     const currentEquipment = state.equipment.equipped();
@@ -705,6 +769,7 @@ function createUrbanEquipmentRuntime(options = {}) {
 
   function update(dt) {
     updateProjectiles(dt);
+    updateArmedNpcResponse();
     const actor = appCtx.Walk?.state?.walker;
     if (actor && state.flashlight.visible) {
       const direction = new THREE.Vector3();
@@ -735,6 +800,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function dispose() {
+    state.equipmentUi?.reticle?.classList.remove('show');
     projectiles.slice().forEach(disposeProjectile);
     projectiles.length = 0;
     effects.forEach((effect) => {
@@ -754,7 +820,13 @@ function createUrbanEquipmentRuntime(options = {}) {
     inspectItem,
     render,
     setFilter,
-    snapshot: () => Object.freeze({ activeProjectiles: projectiles.length, lastProjectileAction: state.lastProjectileAction || null }),
+    snapshot: () => Object.freeze({
+      activeProjectiles: projectiles.length,
+      lastProjectileAction: state.lastProjectileAction || null,
+      reticleVisible: state.equipmentUi?.reticle?.classList.contains('show') === true,
+      armedNpcCount: state.npcs.filter((npc) => npc.heldEquipment && Number(npc.condition ?? 1) > .05).length,
+      defendingNpcCount: state.npcs.filter((npc) => Number(npc.hostileUntil || 0) > clock() && Number(npc.condition ?? 1) > .05).length
+    }),
     toggle,
     update,
     use

@@ -3,13 +3,13 @@ import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=2';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=5';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=9';
+import { createEquipmentInventory } from './equipment-model.js?v=6';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=10';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=5';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=10';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=11';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 
@@ -312,7 +312,9 @@ function promotePedestrian(state, source) {
     id: promotedId,
     sourceAgentId: promoted.id,
     source: 'living-world-promoted-interaction',
-    heldEquipment: possessionSeed % 17 === 0 ? 'laser-gun' : possessionSeed % 11 === 0 ? 'paintball-gun' : ''
+    heldEquipment: possessionSeed % 13 === 0
+      ? 'compact-sidearm'
+      : possessionSeed % 17 === 0 ? 'laser-gun' : possessionSeed % 11 === 0 ? 'paintball-gun' : ''
   };
   const visual = createUrbanNpcVisual(THREE, definition);
   const npc = {
@@ -323,7 +325,10 @@ function promotePedestrian(state, source) {
     resistance: 100,
     possessionAvailable: possessionSeed % 5 !== 0,
     lootClaimed: false,
-    lootRounds: definition.heldEquipment ? 12 + possessionSeed % 25 : 0
+    lootRounds: definition.heldEquipment ? 12 + possessionSeed % 25 : 0,
+    hostileUntil: 0,
+    nextShotAt: 0,
+    shotsFired: 0
   };
   visual.root.position.set(promoted.x, promoted.y, promoted.z);
   visual.root.rotation.set(0, promoted.yaw, 0);
@@ -817,6 +822,19 @@ function applyOfficerImpact(state, impact = {}) {
   return true;
 }
 
+function applyArmedNpcImpact(state, impact = {}) {
+  if (!activeWorldMatches(state) || state.custody?.active) return false;
+  const force = Math.max(0, Number(impact.force) || 0);
+  state.playerCondition = Math.max(0, Number(state.playerCondition ?? 1) - force / 100);
+  setStatus(state, `Incoming fire · ${Math.round(state.playerCondition * 100)}% condition`, 1500);
+  renderEquipment(state);
+  if (state.playerCondition <= .05 && !placePlayerInMedicalRecovery(state, 'incapacitated')) {
+    state.playerCondition = .2;
+    renderEquipment(state);
+  }
+  return true;
+}
+
 function civicSnapshot(state) {
   const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
   if (authorityMode !== 'local') return state.roomAuthorityRuntime?.civicSnapshot?.() || null;
@@ -960,6 +978,7 @@ function updateCivicResponse(state, dt) {
     ? 'reporting'
     : currentCivic?.phase === 'searching' ? 'watching' : '';
   state.npcs.forEach((npc) => {
+    if (Number(npc.condition ?? 1) > .05 && Number(npc.hostileUntil || 0) > now()) return;
     if (npc.reaction === witnessReaction) return;
     npc.reaction = witnessReaction;
     npc.visual.setReaction(witnessReaction);
@@ -1122,8 +1141,19 @@ function performResponderLoot(state, candidate) {
     setStatus(state, 'No equipment or ammunition remains.');
     return true;
   }
+  if (!state.equipment.has(loot.weaponId)) {
+    state.equipment.upsertItem({
+      instanceId: `recovered:responder:${candidate?.data?.officerId}:${loot.weaponId}`,
+      catalogId: loot.weaponId,
+      quantity: 1,
+      authority: 'anonymous-local',
+      provenance: 'recovered-equipment',
+      sourceEventId: `downed:${candidate?.data?.officerId}`,
+      acquiredAt: Date.now()
+    });
+  }
   const rounds = state.equipment.grantAmmo(loot.weaponId, loot.rounds);
-  setStatus(state, `Pulse sidearm ammunition recovered · ${rounds} rounds added`, 2400);
+  setStatus(state, `Response sidearm recovered · ${rounds} rounds added`, 2400);
   renderEquipment(state);
   return true;
 }
@@ -1343,6 +1373,9 @@ function snapshot(state) {
       archetype: npc.archetype,
       reaction: npc.reaction,
       condition: Number(Number(npc.condition ?? 1).toFixed(3)),
+      heldEquipment: String(npc.heldEquipment || ''),
+      defending: Number(npc.hostileUntil || 0) > now() && Number(npc.condition ?? 1) > .05,
+      shotsFired: Number(npc.shotsFired || 0),
       possessionAvailable: npc.possessionAvailable === true,
       x: Number(npc.x.toFixed(2)),
       y: Number(npc.y.toFixed(2)),
@@ -1526,7 +1559,8 @@ function startUrbanSandboxRuntime(options = {}) {
     conditionText: document.getElementById('urbanPlayerConditionText'),
     conditionFill: document.getElementById('urbanPlayerConditionFill'),
     toggle: document.getElementById('urbanEquipmentToggle'),
-    close: document.getElementById('urbanEquipmentCloseBtn')
+    close: document.getElementById('urbanEquipmentCloseBtn'),
+    reticle: document.getElementById('urbanWeaponReticle')
   };
   const backpackStore = appCtx.playerBackpackStore || createLocalBackpackStore();
   appCtx.playerBackpackStore = backpackStore;
@@ -1661,6 +1695,7 @@ function startUrbanSandboxRuntime(options = {}) {
     promoteNpc: (source) => promotePedestrian(state, source),
     promoteVehicle: (agentId) => promoteTrafficVehicle(state, agentId),
     reportCivicEvent: (event) => reportCivicEvent(state, event),
+    onNpcShot: (impact) => applyArmedNpcImpact(state, impact),
     setStatus: (message, duration) => setStatus(state, message, duration),
     now
   });
@@ -1701,14 +1736,7 @@ function startUrbanSandboxRuntime(options = {}) {
   state.onEquipmentSlotClick = (event) => {
     const button = event.target?.closest?.('[data-equipment-id]');
     if (!button || !state.equipmentUi.root.contains(button)) return;
-    if (button.dataset.backpackInspect === 'true') {
-      state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
-      return;
-    }
-    if (state.equipment.equip(button.dataset.equipmentId)) {
-      setStatus(state, `${state.equipment.equipped().label} equipped.`, 1200);
-      renderEquipment(state);
-    }
+    state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
   };
   state.onBackpackFilterClick = (event) => {
     const button = event.target?.closest?.('[data-backpack-filter]');

@@ -10,7 +10,9 @@ const EQUIPMENT_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'concussion-charge', label: 'Concussion charge', category: 'explosive', slot: 5, range: 19, force: 78, blastRadius: 7.5, cooldownMs: 1100, quantity: 4, projectileKind: 'thrown-charge', projectileSpeed: 15, fuseSeconds: 1.15, actionLabel: 'Throw', icon: 'CHARGE', verbs: ['equip', 'use'] }),
   Object.freeze({ id: 'parachute', label: 'Explorer parachute', category: 'mobility', slot: 6, range: 0, force: 0, cooldownMs: 500, actionLabel: 'Deploy', icon: 'CHUTE', verbs: ['equip', 'use'] }),
   Object.freeze({ id: 'laser-gun', label: 'Laser gun', category: 'sidearm', slot: null, range: 58, force: 42, cooldownMs: 230, magazineSize: 20, reserve: 80, projectileKind: 'laser', projectileSpeed: 92, actionLabel: 'Fire', icon: 'LASER', verbs: ['equip', 'use'] }),
-  Object.freeze({ id: 'paintball-gun', label: 'Paintball gun', category: 'sidearm', slot: null, range: 34, force: 9, cooldownMs: 145, magazineSize: 30, reserve: 120, projectileKind: 'paintball', projectileSpeed: 38, projectileGravity: 4.8, actionLabel: 'Fire', icon: 'PAINT', verbs: ['equip', 'use'] })
+  Object.freeze({ id: 'paintball-gun', label: 'Paintball gun', category: 'sidearm', slot: null, range: 34, force: 9, cooldownMs: 145, magazineSize: 30, reserve: 120, projectileKind: 'paintball', projectileSpeed: 38, projectileGravity: 4.8, actionLabel: 'Fire', icon: 'PAINT', verbs: ['equip', 'use'] }),
+  Object.freeze({ id: 'compact-sidearm', label: 'Compact sidearm', category: 'sidearm', slot: null, starter: false, range: 38, force: 27, cooldownMs: 360, magazineSize: 10, reserve: 0, projectileKind: 'pulse', projectileSpeed: 55, actionLabel: 'Fire', icon: 'COMPACT', verbs: ['equip', 'use'] }),
+  Object.freeze({ id: 'responder-sidearm', label: 'Response sidearm', category: 'sidearm', slot: null, starter: false, range: 44, force: 32, cooldownMs: 280, magazineSize: 15, reserve: 0, projectileKind: 'pulse', projectileSpeed: 66, actionLabel: 'Fire', icon: 'RESPONSE', verbs: ['equip', 'use'] })
 ]);
 
 function definitionFor(id, backpack = null) {
@@ -30,7 +32,7 @@ function starterItem(definition) {
 function createEquipmentInventory(options = {}) {
   const acquired = new Set(Array.isArray(options.acquired)
     ? options.acquired.filter((id) => definitionFor(id))
-    : EQUIPMENT_DEFINITIONS.map((definition) => definition.id));
+    : EQUIPMENT_DEFINITIONS.filter((definition) => definition.starter !== false).map((definition) => definition.id));
   acquired.add('hands');
   const persisted = options.persistedState && typeof options.persistedState === 'object' ? options.persistedState : null;
   const backpack = options.backpack || createBackpackModel({

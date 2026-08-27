@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=2';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=5';
 import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=2';
 import { vehicleDoorPosition } from './vehicle-model.js?v=6';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -502,7 +502,7 @@ function createUrbanResponderRuntime(options = {}) {
     const officer = responders.map((responder) => responder.officer).find((entry) => entry?.id === String(officerId || ''));
     if (!officer || Number(officer.condition ?? 1) > .05 || officer.lootClaimed) return null;
     officer.lootClaimed = true;
-    return Object.freeze({ weaponId: 'pulse-sidearm', rounds: 24 });
+    return Object.freeze({ weaponId: 'responder-sidearm', rounds: 24 });
   }
 
   function dispose() {
