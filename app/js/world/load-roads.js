@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=60";
+} from "./load-runtime-session.js?v=63";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -391,6 +391,8 @@ export function createWorldRoadLoader(deps = {}) {
           buildingPublicationQuery,
           civicFacilityCacheMeta,
           civicFacilityQuery,
+          commercePlaceCacheMeta,
+          commercePlaceQuery,
           waterStructureCacheMeta,
           waterStructureQuery,
           featureRadius,
@@ -407,6 +409,20 @@ export function createWorldRoadLoader(deps = {}) {
         const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
         startLoadPhase('fetchFixedRegionalContext');
         const regionalRequest = beginFixedRegionalTransportLoad({ fetchWorldData: fetchShortbreadWorldData, location: appCtx.LOC, runProviderWork });
+        const mappedPoiRequest = runProviderWork(
+          'openstreetmap-shortbread',
+          'mapped-pois',
+          (signal) => fetchShortbreadWorldData({
+            lat: appCtx.LOC.lat,
+            lon: appCtx.LOC.lon,
+            radius: Math.min(0.02, Math.max(0.006, featureRadius)),
+            zoom: 14,
+            includeBuildings: false,
+            layerNames: ['pois'],
+            signal
+          })
+        ).then((poiData) => ({ poiData, error: null }))
+          .catch((error) => ({ poiData: null, error }));
         startLoadPhase('fetchFixedRegionalStructures');
         const regionalStructureRequest = beginFixedRegionalStructureLoad({
           deadlineMs: loadDeadline,
@@ -427,6 +443,18 @@ export function createWorldRoadLoader(deps = {}) {
           )
         ).then((facilityData) => ({ facilityData, error: null }))
           .catch((error) => ({ facilityData: null, error }));
+        const commercePlaceRequest = runProviderWork(
+          'osm-overpass',
+          'commerce-places',
+          (signal) => fetchOverpassJSON(
+            commercePlaceQuery,
+            Math.min(12000, overpassTimeoutMs),
+            loadDeadline,
+            commercePlaceCacheMeta,
+            { signal }
+          )
+        ).then((placeData) => ({ placeData, error: null }))
+          .catch((error) => ({ placeData: null, error }));
         startLoadPhase('fetchOverpass');
         let data;
         let exactTransportLoaded = false;
@@ -499,6 +527,22 @@ export function createWorldRoadLoader(deps = {}) {
         } finally {
           endLoadPhase('fetchFixedRegionalStructures');
         }
+        const mappedPoiResult = await mappedPoiRequest;
+        if (mappedPoiResult.poiData?.elements?.length) {
+          const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
+          mappedPoiResult.poiData.elements.forEach((element) => merged.set(`${element.type}:${element.id}`, element));
+          data = { ...data, elements: [...merged.values()] };
+          loadMetrics.mappedPois = {
+            provider: 'openstreetmap-shortbread',
+            mapped: mappedPoiResult.poiData.elements.length,
+            status: 'loaded',
+            zoom: 14
+          };
+        } else {
+          loadMetrics.mappedPois = { provider: 'openstreetmap-shortbread', mapped: 0, status: 'unavailable', zoom: 14 };
+          if (mappedPoiResult.error) recordLoadWarning('mapped Shortbread places', mappedPoiResult.error);
+        }
+        runtimeState.mappedPois = loadMetrics.mappedPois;
         const civicFacilityResult = await civicFacilityRequest;
         if (civicFacilityResult.facilityData?.elements?.length) {
           const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
@@ -513,6 +557,34 @@ export function createWorldRoadLoader(deps = {}) {
           loadMetrics.civicFacilities = { provider: 'osm-overpass', mapped: 0, status: 'unavailable' };
           if (civicFacilityResult.error) recordLoadWarning('mapped civic facilities', civicFacilityResult.error);
         }
+        const commercePlaceResult = await commercePlaceRequest;
+        if (commercePlaceResult.placeData?.elements?.length) {
+          const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
+          commercePlaceResult.placeData.elements.forEach((element) => merged.set(`${element.type}:${element.id}`, element));
+          data = { ...data, elements: [...merged.values()] };
+        } else if (commercePlaceResult.error) {
+          recordLoadWarning('exact mapped convenience-store supplement', commercePlaceResult.error);
+        }
+        const mappedConvenienceCount = (data?.elements || []).filter((element) =>
+          element?.tags?.shop === 'convenience' &&
+          Number.isFinite(Number(element.lat ?? element.center?.lat)) &&
+          Number.isFinite(Number(element.lon ?? element.center?.lon))
+        ).length;
+        const shortbreadConvenienceCount = (data?.elements || []).filter((element) =>
+          element?.tags?.shop === 'convenience' &&
+          String(element?.tags?._sourceFeatureId || '').startsWith('shortbread:pois:')
+        ).length;
+        loadMetrics.commercePlaces = {
+          provider: commercePlaceResult.placeData?.elements?.length
+            ? shortbreadConvenienceCount > 0 ? 'openstreetmap-shortbread+osm-overpass' : 'osm-overpass'
+            : 'openstreetmap-shortbread',
+          mapped: mappedConvenienceCount,
+          status: mappedConvenienceCount > 0 ? 'loaded' : 'authoritative-empty',
+          shortbreadMapped: shortbreadConvenienceCount,
+          exactSupplementAvailable: Boolean(commercePlaceResult.placeData?.elements?.length),
+          inventoryAuthority: 'world-explorer-gameplay'
+        };
+        runtimeState.commercePlaces = loadMetrics.commercePlaces;
         const reviewedCivicFacilities = reviewedCivicFacilitiesForLocation(appCtx.LOC);
         if (reviewedCivicFacilities.length) {
           const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));

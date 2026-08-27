@@ -1,7 +1,7 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=17";
+} from "../world/shortbread-source.js?v=18";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=4';

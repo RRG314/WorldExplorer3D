@@ -3,7 +3,7 @@ import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=6';
+import { createEquipmentInventory } from './equipment-model.js?v=7';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=10';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=6';
@@ -14,6 +14,7 @@ import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
+import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-model.js?v=1';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -36,10 +37,17 @@ const NPC_DETAIL_PRELOAD_DISTANCE = 140;
 const NPC_DETAIL_RELEASE_DISTANCE = 174;
 const VEHICLE_DETAIL_PRELOAD_DISTANCE = 120;
 const VEHICLE_DETAIL_RELEASE_DISTANCE = 180;
+const STORE_INTERACTION_DISTANCE = 4.8;
 let activeRuntime = null;
 
 function now() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  })[char]);
 }
 
 function isTouchClient() {
@@ -575,6 +583,152 @@ function nearestResponderLootCandidate(state, radius = 3.2) {
   return state.responders?.nearestDownedOfficer?.(appCtx.Walk?.state?.walker, radius) || null;
 }
 
+function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
+  if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk' || state.storeOpen) return null;
+  const walker = appCtx.Walk?.state?.walker;
+  if (!walker) return null;
+  return state.stores.map((store) => ({
+    store,
+    distance: Math.hypot(store.interactionX - walker.x, store.interactionZ - walker.z)
+  })).filter((entry) => entry.distance <= radius)
+    .sort((left, right) => left.distance - right.distance)[0] || null;
+}
+
+function activeStore(state) {
+  return state.stores.find((store) => store.id === state.activeStoreId) || null;
+}
+
+function resolveStoreApproach(store) {
+  const candidates = [{ x: store.x, z: store.z }];
+  [3, 5, 7, 9, 12].forEach((radius) => {
+    for (let index = 0; index < 12; index += 1) {
+      const angle = index / 12 * Math.PI * 2;
+      candidates.push({ x: store.x + Math.cos(angle) * radius, z: store.z + Math.sin(angle) * radius });
+    }
+  });
+  for (const candidate of candidates) {
+    const groundY = Number(appCtx.elevationWorldYAtWorldXZ?.(candidate.x, candidate.z) || 0);
+    if (appCtx.checkBuildingCollision?.(candidate.x, candidate.z, .35, { actorBaseY: groundY, actorHeight: 1.8 })?.collision) continue;
+    if (appCtx.isInsideWaterArea?.(candidate.x, candidate.z) === true) continue;
+    const resolved = appCtx.resolveSafeWorldSpawn?.(candidate.x, candidate.z, {
+      mode: 'walk',
+      feetY: groundY,
+      source: 'mapped_convenience_store_approach',
+      maxGroundRadius: 2
+    });
+    if (resolved?.valid === false) continue;
+    return Object.freeze({ ...store, interactionX: Number(resolved?.x ?? candidate.x), interactionZ: Number(resolved?.z ?? candidate.z) });
+  }
+  return Object.freeze({ ...store, interactionX: store.x, interactionZ: store.z });
+}
+
+function moveNearStoreForSupport(state, storeId) {
+  if (!appCtx.developerDiagnosticsEnabled || appCtx.Walk?.state?.mode !== 'walk') return null;
+  const store = state.stores.find((entry) => entry.id === String(storeId || ''));
+  if (!store) return null;
+  const resolved = appCtx.resolveSafeWorldSpawn?.(store.interactionX, store.interactionZ, {
+    mode: 'walk',
+    feetY: appCtx.elevationWorldYAtWorldXZ?.(store.interactionX, store.interactionZ),
+    source: 'store_verification_setup',
+    maxGroundRadius: 2
+  });
+  if (!resolved || resolved.valid === false) return null;
+  appCtx.applyResolvedWorldSpawn?.(resolved, { mode: 'walk', syncCar: false, syncWalker: true });
+  return Object.freeze({ storeId: store.id, x: resolved.x, z: resolved.z });
+}
+
+function commerceFailureMessage(reason) {
+  return {
+    not_in_today_stock: 'That item is not in today’s stock.',
+    sold_out: 'That item is sold out here today.',
+    not_enough_credits: 'Not enough Explorer Credits.',
+    not_sellable: 'That Backpack item cannot be sold here.',
+    already_traded_today: 'This store’s rare trade is complete for today.',
+    missing_trade_items: 'The Backpack does not have the requested trade items.',
+    inventory_unavailable: 'The Backpack could not complete that exchange.'
+  }[String(reason || '')] || 'That exchange could not be completed.';
+}
+
+function renderStore(state) {
+  const ui = state.storeUi;
+  const store = activeStore(state);
+  const visible = state.storeOpen && !!store && activeWorldMatches(state);
+  ui?.root?.classList.toggle('show', visible);
+  ui?.root?.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  if (!visible) return;
+  const view = state.commerce.snapshot(store);
+  ui.name.textContent = store.name;
+  ui.source.textContent = `${store.attribution} · ${store.license}`;
+  ui.credits.textContent = `${view.credits} Explorer Credits`;
+  ui.stock.innerHTML = view.standard.map((item) => `
+    <article class="urbanStoreCard">
+      <strong>${escapeHtml(item.label)}</strong>
+      <small>${escapeHtml(item.description)} · ${item.remaining} left today</small>
+      <button type="button" data-store-action="buy" data-store-item="${escapeHtml(item.id)}"${item.remaining <= 0 || view.credits < item.buyPrice ? ' disabled' : ''}>Buy · ${item.buyPrice} credits</button>
+    </article>`).join('');
+  ui.sell.innerHTML = view.sellable.length ? view.sellable.map((item) => `
+    <article class="urbanStoreCard">
+      <strong>${escapeHtml(item.label)}</strong>
+      <small>${item.quantity} in Backpack</small>
+      <button type="button" data-store-action="sell" data-store-item="${escapeHtml(item.instanceId)}">Sell one · ${item.sellPrice} credits</button>
+    </article>`).join('') : '<div class="urbanBackpackEmpty">No store goods available to sell</div>';
+  const rare = view.rare;
+  ui.rare.innerHTML = `<article class="urbanStoreCard rare">
+    <strong>${escapeHtml(rare.item.label)}</strong>
+    <small>One trade per store today · ${rare.requirementQuantity} ${escapeHtml(rare.requirement.label)} + ${rare.credits} credits · carrying ${rare.requirementCarried}</small>
+    <button type="button" data-store-action="trade"${rare.available ? '' : ' disabled'}>${rare.claimed ? 'Trade complete today' : 'Make rare trade'}</button>
+  </article>`;
+  ui.status.textContent = state.storeStatus;
+}
+
+function openStore(state, storeId) {
+  const store = state.stores.find((entry) => entry.id === String(storeId || ''));
+  if (!store || appCtx.Walk?.state?.mode !== 'walk') return false;
+  state.equipmentRuntime?.toggle?.(false);
+  state.activeStoreId = store.id;
+  state.storeOpen = true;
+  state.storeStatus = '';
+  appCtx.screenLayout?.setPanelLayer?.('store', true);
+  appCtx.setPauseReason?.('urban_store', true);
+  renderStore(state);
+  return true;
+}
+
+function closeStore(state) {
+  if (!state.storeOpen) return false;
+  state.storeOpen = false;
+  state.activeStoreId = '';
+  state.storeStatus = '';
+  state.storeUi?.root?.classList.remove('show');
+  state.storeUi?.root?.setAttribute('aria-hidden', 'true');
+  appCtx.screenLayout?.setPanelLayer?.('store', false);
+  appCtx.setPauseReason?.('urban_store', false);
+  return true;
+}
+
+function handleStoreAction(state, event) {
+  const button = event.target?.closest?.('[data-store-action]');
+  const store = activeStore(state);
+  if (!button || !store) return false;
+  const action = button.dataset.storeAction;
+  const result = action === 'buy'
+    ? state.commerce.buy(store, button.dataset.storeItem)
+    : action === 'sell'
+      ? state.commerce.sell(store, button.dataset.storeItem)
+      : action === 'trade' ? state.commerce.trade(store) : null;
+  if (!result) return false;
+  state.storeStatus = result.ok
+    ? action === 'sell'
+      ? `${result.item.label} sold · ${result.credits} credits available`
+      : action === 'trade'
+        ? `${result.item.label} added to Backpack · rare trade complete`
+        : `${result.item.label} added to Backpack · ${result.credits} credits available`
+    : commerceFailureMessage(result.reason);
+  renderStore(state);
+  renderEquipment(state);
+  return true;
+}
+
 function releasePromotedNpc(state, npc) {
   const index = state.npcs.indexOf(npc);
   if (index < 0) return false;
@@ -802,7 +956,7 @@ function resolveExitSpawn(vehicle) {
 }
 
 function interactionCandidate(state) {
-  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior) return null;
+  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
   if (state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk') {
     const speed = Math.abs(Number(appCtx.car?.speed || 0));
     return {
@@ -818,11 +972,13 @@ function interactionCandidate(state) {
   const nearestNpc = nearestNpcCandidate(state);
   const nearestFurniture = nearestFurnitureCandidate(state);
   const nearestResponderLoot = nearestResponderLootCandidate(state);
-  if (!nearestVehicle && !nearestNpc && !nearestFurniture && !nearestResponderLoot) return null;
+  const nearestStore = nearestStoreCandidate(state);
+  if (!nearestVehicle && !nearestNpc && !nearestFurniture && !nearestResponderLoot && !nearestStore) return null;
   const nearestOtherDistance = Math.min(
     nearestVehicle?.distance ?? Infinity,
     nearestNpc?.distance ?? Infinity,
-    nearestFurniture?.distance ?? Infinity
+    nearestFurniture?.distance ?? Infinity,
+    nearestStore?.distance ?? Infinity
   );
   if (nearestResponderLoot && nearestResponderLoot.distance <= nearestOtherDistance) {
     return {
@@ -833,6 +989,20 @@ function interactionCandidate(state) {
       distance: nearestResponderLoot.distance,
       takeLabel: 'Collect gear',
       data: { officerId: nearestResponderLoot.officer.id }
+    };
+  }
+  if (nearestStore && nearestStore.distance <= Math.min(
+    nearestVehicle?.distance ?? Infinity,
+    nearestNpc?.distance ?? Infinity,
+    nearestFurniture?.distance ?? Infinity
+  )) {
+    return {
+      available: true,
+      action: 'visit_store',
+      label: 'Visit store',
+      detail: `${nearestStore.store.name} · today’s game stock`,
+      distance: nearestStore.distance,
+      data: { storeId: nearestStore.store.id }
     };
   }
   if (nearestFurniture && (!nearestVehicle || nearestFurniture.distance < nearestVehicle.distance) && (!nearestNpc || nearestFurniture.distance < nearestNpc.distance)) {
@@ -1517,6 +1687,7 @@ function performInteraction(state, candidate) {
   if (candidate?.action === 'talk_npc') return performNpcTalk(state, candidate);
   if (candidate?.action === 'loot_npc') return performNpcTake(state, candidate);
   if (candidate?.action === 'loot_responder') return performResponderLoot(state, candidate);
+  if (candidate?.action === 'visit_store') return openStore(state, candidate?.data?.storeId);
   if (candidate?.action === 'inspect_object') {
     const object = (appCtx.streetFurnitureMeshes || []).find((entry) => entry.uuid === candidate?.data?.objectUuid);
     if (!object) return false;
@@ -1584,6 +1755,7 @@ function updatePrompt(state) {
   if (candidate?.action === 'loot_npc') prompt.button.textContent = 'Search';
   if (candidate?.action === 'loot_responder') prompt.button.textContent = 'Collect gear';
   if (candidate?.action === 'inspect_object') prompt.button.textContent = 'Inspect';
+  if (candidate?.action === 'visit_store') prompt.button.textContent = 'Visit';
   prompt.button.disabled = !candidate?.available;
   prompt.button.hidden = !!transientStatus;
   const showSecondary = !transientStatus && !!candidate?.secondaryLabel && appCtx.Walk?.state?.mode === 'walk';
@@ -1719,6 +1891,16 @@ function snapshot(state) {
     authority: state.roomAuthorityRuntime?.snapshot?.() || Object.freeze({ mode: 'local' }),
     equipment: state.equipment?.snapshot?.() || null,
     backpackMigration: state.backpackStore?.migrationSnapshot?.() || null,
+    commerce: Object.freeze({
+      mappedStoreCount: state.stores.length,
+      stores: Object.freeze(state.stores.map((store) => Object.freeze({ ...store }))),
+      open: state.storeOpen === true,
+      activeStoreId: state.activeStoreId,
+      current: activeStore(state) ? state.commerce.snapshot(activeStore(state)) : null,
+      placeAuthority: 'loaded-map-poi',
+      inventoryAuthority: 'world-explorer-gameplay',
+      plainFuelStationsAreStores: false
+    }),
     parachute: Object.freeze({
       deployed: state.parachute?.deployed === true,
       deployedAt: Number(state.parachute?.deployedAt || 0),
@@ -1759,6 +1941,8 @@ function disposeRuntime(state, reason = 'disposed') {
   if (!state || state.disposed) return false;
   state.roomAuthorityRuntime?.dispose?.();
   state.disposed = true;
+  closeStore(state);
+  state.unregisterStoreInteraction?.();
   state.unregisterInteraction?.();
   appCtx.unregisterRuntimeOwner?.(state.owner);
   state.prompt?.button?.removeEventListener('click', state.onPromptClick);
@@ -1770,6 +1954,9 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentUi?.contents?.removeEventListener('click', state.onEquipmentSlotClick);
   state.equipmentUi?.filters?.removeEventListener('click', state.onBackpackFilterClick);
   state.equipmentUi?.detail?.removeEventListener('click', state.onBackpackDetailClick);
+  state.storeUi?.close?.removeEventListener('click', state.onStoreClose);
+  state.storeUi?.root?.removeEventListener('click', state.onStoreAction);
+  document.removeEventListener('keydown', state.onStoreKeyDown);
   document.getElementById('caughtBtn')?.removeEventListener('click', state.onCustodyContinue);
   if (appCtx.handleUrbanCustodyContinue === state.onCustodyContinue) delete appCtx.handleUrbanCustodyContinue;
   const caughtMessage = document.getElementById('caughtScreen')?.querySelector?.('.caughtText');
@@ -1803,6 +1990,9 @@ function disposeRuntime(state, reason = 'disposed') {
   if (appCtx.onUrbanParachuteLanded === state.onParachuteLanded) delete appCtx.onUrbanParachuteLanded;
   if (globalThis.__WE3D_URBAN_CRASH_SUPPORT__ === state.crashSupportHook) {
     delete globalThis.__WE3D_URBAN_CRASH_SUPPORT__;
+  }
+  if (globalThis.__WE3D_STORE_SUPPORT__ === state.storeSupportHook) {
+    delete globalThis.__WE3D_STORE_SUPPORT__;
   }
   state.reason = String(reason || 'disposed');
   if (activeRuntime === state) activeRuntime = null;
@@ -1884,6 +2074,20 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.playerBackpackStore = backpackStore;
   const equipment = appCtx.playerBackpackInventory || createEquipmentInventory({ persistedState: backpackStore.load() });
   appCtx.playerBackpackInventory = equipment;
+  const stores = mappedConvenienceStores(appCtx.pois).map(resolveStoreApproach);
+  const commerce = appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  appCtx.localConvenienceStoreCommerce = commerce;
+  const storeUi = {
+    root: document.getElementById('urbanStore'),
+    name: document.getElementById('urbanStoreName'),
+    source: document.getElementById('urbanStoreSource'),
+    credits: document.getElementById('urbanStoreCredits'),
+    stock: document.getElementById('urbanStoreStock'),
+    sell: document.getElementById('urbanStoreSell'),
+    rare: document.getElementById('urbanStoreRare'),
+    status: document.getElementById('urbanStoreStatus'),
+    close: document.getElementById('urbanStoreCloseBtn')
+  };
   const civicUi = {
     root: document.getElementById('urbanCivicStatus'),
     title: document.getElementById('urbanCivicStatusTitle'),
@@ -1905,6 +2109,7 @@ function startUrbanSandboxRuntime(options = {}) {
     npcs: [],
     prompt,
     equipmentUi,
+    storeUi,
     civicUi,
     budget,
     vehicleDetailBudget,
@@ -1930,6 +2135,7 @@ function startUrbanSandboxRuntime(options = {}) {
     defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'classic-utility-d'),
     defaultCarCondition: Math.max(0, Math.min(1, Number(appCtx.car?.condition ?? 1))),
     crashSupportHook: null,
+    storeSupportHook: null,
     lastAction: null,
     lastCivicAction: null,
     lastCivicOutcome: null,
@@ -1951,6 +2157,11 @@ function startUrbanSandboxRuntime(options = {}) {
     responders: null,
     equipment,
     backpackStore,
+    stores,
+    commerce,
+    storeOpen: false,
+    activeStoreId: '',
+    storeStatus: '',
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
@@ -2033,10 +2244,22 @@ function startUrbanSandboxRuntime(options = {}) {
     beginExit: () => beginExit(state)
   });
   state.reportCivicEvent = (event) => reportCivicEvent(state, event);
+  state.unregisterStoreInteraction = appCtx.registerContextInteraction?.({
+    id: 'urban_store',
+    priority: 90,
+    evaluate: () => {
+      const candidate = interactionCandidate(state);
+      return candidate?.action === 'visit_store' ? candidate : null;
+    },
+    perform: (candidate) => performInteraction(state, candidate)
+  });
   state.unregisterInteraction = appCtx.registerContextInteraction?.({
     id: 'urban_vehicle',
     priority: 80,
-    evaluate: () => interactionCandidate(state),
+    evaluate: () => {
+      const candidate = interactionCandidate(state);
+      return candidate?.action === 'visit_store' ? null : candidate;
+    },
     perform: (candidate) => performInteraction(state, candidate)
   });
   state.onPromptClick = () => {
@@ -2075,6 +2298,14 @@ function startUrbanSandboxRuntime(options = {}) {
       button.dataset.backpackSlot || null
     );
   };
+  state.onStoreClose = () => closeStore(state);
+  state.onStoreAction = (event) => handleStoreAction(state, event);
+  state.onStoreKeyDown = (event) => {
+    if (event.key === 'Escape' && state.storeOpen) {
+      event.preventDefault();
+      closeStore(state);
+    }
+  };
   prompt.button?.addEventListener('click', state.onPromptClick);
   prompt.secondaryButton?.addEventListener('click', state.onSecondaryClick);
   prompt.takeButton?.addEventListener('click', state.onTakeClick);
@@ -2085,6 +2316,9 @@ function startUrbanSandboxRuntime(options = {}) {
   equipmentUi.contents?.addEventListener('click', state.onEquipmentSlotClick);
   equipmentUi.filters?.addEventListener('click', state.onBackpackFilterClick);
   equipmentUi.detail?.addEventListener('click', state.onBackpackDetailClick);
+  storeUi.close?.addEventListener('click', state.onStoreClose);
+  storeUi.root?.addEventListener('click', state.onStoreAction);
+  document.addEventListener('keydown', state.onStoreKeyDown);
   state.unsubscribeBackpack = state.equipment.subscribe(() => {
     backpackStore.save(state.equipment.exportState());
     if (activeWorldMatches(state)) renderEquipment(state);
@@ -2137,6 +2371,12 @@ function startUrbanSandboxRuntime(options = {}) {
       snapshot: () => snapshot(state)
     });
     globalThis.__WE3D_URBAN_CRASH_SUPPORT__ = state.crashSupportHook;
+    state.storeSupportHook = Object.freeze({
+      context: () => appCtx.contextInteractionSnapshot?.() || null,
+      moveNear: (storeId) => moveNearStoreForSupport(state, storeId),
+      snapshot: () => snapshot(state)
+    });
+    globalThis.__WE3D_STORE_SUPPORT__ = state.storeSupportHook;
   }
   state.isParachuteDeployed = () => activeWorldMatches(state) && state.parachute.deployed === true;
   state.onParachuteLanded = () => {

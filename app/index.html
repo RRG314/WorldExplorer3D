@@ -22,7 +22,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=94">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=109">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=110">
 <link rel="stylesheet" href="styles/block-builder.css?v=7">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=5">
@@ -852,6 +852,15 @@ Graphics changes apply to the current session.
   <div id="urbanBackpackDetail" class="urbanBackpackDetail" aria-live="polite"><span>Select an item to see its story and available actions.</span></div>
   <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
   <details class="urbanConditionDetails"><summary>Character condition <span id="urbanPlayerConditionText">100%</span></summary><div id="urbanPlayerCondition" class="urbanPlayerCondition" role="status" aria-label="Character health"><i aria-hidden="true"><b id="urbanPlayerConditionFill"></b></i></div></details>
+</aside>
+<aside id="urbanStore" role="dialog" aria-modal="true" aria-labelledby="urbanStoreName" aria-hidden="true">
+  <div class="urbanStoreHead"><div><small>MAPPED LOCAL STORE</small><strong id="urbanStoreName">Convenience store</strong></div><button id="urbanStoreCloseBtn" type="button" aria-label="Close store">×</button></div>
+  <div class="urbanStoreMeta"><span id="urbanStoreSource">OpenStreetMap place</span><strong id="urbanStoreCredits">120 Explorer Credits</strong></div>
+  <p class="urbanStoreAuthority">The place comes from the loaded map. Today’s stock, prices, and trades are World Explorer gameplay.</p>
+  <section><h3>Today’s stock</h3><div id="urbanStoreStock" class="urbanStoreGrid"></div></section>
+  <section><h3>Sell from Backpack</h3><div id="urbanStoreSell" class="urbanStoreGrid"></div></section>
+  <section><h3>Rare counter find</h3><div id="urbanStoreRare"></div></section>
+  <div id="urbanStoreStatus" role="status" aria-live="polite"></div>
 </aside>
 <button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.8C8 3.7 9.7 2 11.8 2h.4C14.3 2 16 3.7 16 5.8V7M6.5 8h11A2.5 2.5 0 0 1 20 10.5v8A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-8A2.5 2.5 0 0 1 6.5 8ZM4 13h16M8 16h8"/></svg><span>PACK</span></button>
 <div id="urbanWeaponReticle" aria-hidden="true"><i></i><b></b><span></span><em></em></div>

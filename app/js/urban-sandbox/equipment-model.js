@@ -1,4 +1,4 @@
-import { createBackpackModel } from '../player/backpack-model.js?v=3';
+import { createBackpackModel } from '../player/backpack-model.js?v=4';
 
 const EQUIPMENT_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'hands', label: 'Hands', category: 'unarmed', slot: 1, range: 2.4, force: 12, cooldownMs: 520, actionLabel: 'Shove', icon: 'HAND', verbs: ['equip', 'use'] }),
@@ -110,6 +110,7 @@ function createEquipmentInventory(options = {}) {
     equip(id) { return backpack.equip(id); },
     equipSlot(slot) { return backpack.equipSlot(slot); },
     assignHotbar(slot, id) { return backpack.assignHotbar(slot, id); },
+    consumeItem(id, quantity = 1) { return backpack.consume(id, quantity); },
     cycle(direction = 1) {
       const state = backpack.snapshot();
       const available = state.hotbar.filter(Boolean);

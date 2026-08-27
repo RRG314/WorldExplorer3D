@@ -59,6 +59,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
       generated: 0
     },
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
+    commercePlaces: { provider: 'osm-overpass', mapped: 0, status: 'pending', inventoryAuthority: 'world-explorer-gameplay' },
     phases: {}
   };
   const traceWorldLoad = typeof globalThis.location?.search === 'string' &&
@@ -419,7 +420,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       snapshot: publication,
       request: worldSession?.request
     });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=41');
+    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=44');
     const urbanSandbox = startUrbanSandboxRuntime({
       snapshot: publication,
       request: worldSession?.request,

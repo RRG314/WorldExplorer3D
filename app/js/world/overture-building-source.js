@@ -1,4 +1,4 @@
-import { vectorTileRangeForBounds } from "./shortbread-source.js?v=17";
+import { vectorTileRangeForBounds } from "./shortbread-source.js?v=18";
 import {
   OVERTURE_RELEASE,
   OVERTURE_RELEASE_POLICY,
