@@ -91,10 +91,10 @@
     },
     "CP11": {
       "name": "UI, accessibility, presentation, and release identity",
-      "status": "in-progress",
+      "status": "complete",
       "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.0 identity.",
       "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:5.0-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
-      "openItems": ["Build the clean 5.0 staging version, run the current release boundary, inspect its final desktop/mobile frames, and obtain owner approval before production."]
+      "openItems": []
     }
   }
 }
