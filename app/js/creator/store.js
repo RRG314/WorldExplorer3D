@@ -75,10 +75,9 @@ function savedActivitiesForCreator(creatorId = '', includeUnattributedSelf = fal
 
 function combineStats(profile = {}, activities = [], contributions = []) {
   const base = profile?.stats && typeof profile.stats === 'object' ? profile.stats : {};
-  const publishedActivities = activities.filter((entry) => entry.visibility === 'public' || entry.status === 'published').length;
   return {
     activitiesCreated: Math.max(finiteNumber(base.activitiesCreated, 0), activities.length),
-    activitiesPublished: Math.max(finiteNumber(base.activitiesPublished, 0), publishedActivities),
+    activitiesPublished: 0,
     totalPlays: finiteNumber(base.totalPlays, 0),
     contributionsCount: Math.max(finiteNumber(base.contributionsCount, 0), contributions.length),
     publishedContributions: Math.max(finiteNumber(base.publishedContributions, 0), contributions.length)

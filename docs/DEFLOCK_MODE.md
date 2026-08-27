@@ -47,11 +47,58 @@ surveillance infrastructure in OpenStreetMap. World Explorer 3D is not
 affiliated with or endorsed by DeFlock and does not use DeFlock application
 code or a DeFlock-owned data feed.
 
+## Live globe index and launch authority
+
+The globe selector's **Live Data → DeFlock** layer uses the maintained DeFlock
+hourly camera position indexes published at `tiles.dontgetflocked.com`. The
+current published coverage is the United States and Canada. Every record in
+those country indexes is drawn as one fixed-pixel GPU point sized to the other
+Live Earth data points; the UI reports the exact indexed
+record count and build identities rather than substituting samples or invented
+locations. The compact columnar indexes are roughly nine bytes per camera plus
+their headers, so the complete point set remains practical on mobile.
+
+The globe index is a discovery index, not a second camera-detail authority.
+Selecting one point performs a bounded OSM surveillance lookup around that
+coordinate and chooses the nearest ALPR/ANPR node. The resolved node provides
+the launch coordinate, OSM identity, timestamp, type, mount, operator, and
+direction metadata. If the detail lookup is temporarily unavailable, the
+indexed coordinate remains visible but is explicitly identified as index-only.
+The game never expands a selection into a planet-scale public Overpass query.
+
+When the selected OSM node includes one or more mapped bearings, **Show View
+Coverage** adds a toggleable direction cone. Mapped angular ranges retain their
+published span; a bearing without a mapped span uses the hunt's documented
+70-degree gameplay cone. The cone's map distance is deliberately schematic
+because OSM does not publish lens reach for these nodes. The selector states
+that limitation instead of presenting the display footprint as measured camera
+range. Cameras without mapped direction do not receive an invented cone.
+
+Starting from a selected point sets DeFlock Hunt as the active game, sends one
+pending target identity through the normal Earth loading boundary, and launches
+the ordinary world/runtime path. The loaded OSM feature with that identity (or
+the nearest precise feature when an hourly index and OSM edit are between
+refreshes) becomes the first highlighted objective. There is no separate globe
+world or DeFlock-only coordinate system.
+
+Public Overpass instances are intentionally limited to bounded foreground
+queries. Their published operating guidance warns against stitching global
+bounding boxes or using public instances as a general production backend. Any
+future expansion beyond the published country indexes therefore requires an
+owned planet-extract/replication pipeline or another licensed, versioned global
+index—not more browser queries.
+
 ## Game representation
 
 Each source node is transformed with the canonical Earth geographic-to-world
 authority and placed on the shared terrain surface. Mapped direction controls
-the virtual camera and direction-zone orientation. Poles, state-colored camera
+the virtual camera and direction-zone orientation. Both `direction=*` and
+`camera:direction=*` are accepted. Numeric bearings are clockwise from true
+north; cardinal directions are normalized to bearings; semicolon/comma-separated
+directions remain separate camera views; and mapped ranges such as `300-60`
+retain their wraparound midpoint and 120-degree span. Raw direction text and
+the source key remain attached to the camera record. Unknown direction remains
+unknown and does not fabricate a detection cone. Poles, state-colored camera
 bodies, lenses, interaction targets, and optional direction zones are rendered
 as shared instanced meshes. A state-colored ground ring, short vertical beam,
 and elevated beacon make each mapped objective legible against dense buildings

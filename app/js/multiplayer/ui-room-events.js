@@ -68,6 +68,19 @@ function createUiRoomEventsApi(context) {
   }
 
   function wireEvents() {
+    globalThis.addEventListener('offline', () => {
+      if (!state.currentRoom) return;
+      appCtx.setSharedBuildConnectionState?.(false);
+      setStatus('Room connection is offline. Shared changes may be stale until connection returns.', true);
+      appCtx.showToast?.('Room offline · shared changes may be stale');
+    });
+    globalThis.addEventListener('online', () => {
+      if (!state.currentRoom) return;
+      appCtx.setSharedBuildConnectionState?.(true);
+      setStatus('Room connection restored. Syncing shared changes…');
+      appCtx.showToast?.('Room connection restored · syncing');
+    });
+
     refs.titleCreateBtn?.addEventListener('click', handleCreateRoom);
     refs.roomPanelCreateBtn?.addEventListener('click', handleCreateRoom);
 

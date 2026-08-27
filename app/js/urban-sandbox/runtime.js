@@ -1,19 +1,25 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createLocalBackpackStore } from '../player/backpack-store.js?v=1';
-import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
+import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
+import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=2';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=4';
+import { createEquipmentInventory } from './equipment-model.js?v=5';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=6';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
-import { nearestMappedFacility } from './facility-model.js?v=1';
+import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=8';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=10';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 
 const ENTER_DISTANCE = 3.4;
+// Room clients can assemble slightly different collision envelopes when a live
+// map-provider request succeeds for one player and falls back for another. A
+// released authoritative vehicle keeps its shared pose, but the receiving
+// player needs a bounded vicinity handoff so a fallback wall cannot make that
+// vehicle permanently unclaimable. Local vehicles retain the normal range.
+const ROOM_RECONCILIATION_ENTER_DISTANCE = 6.5;
 const EXIT_SPEED_LIMIT = 4;
 const TRANSITION_DURATION = 0.56;
 const NPC_INTERACTION_DISTANCE = 3.2;
@@ -98,7 +104,10 @@ function nearestEnterableVehicle(state) {
     if (vehicle.ambientTraffic === true && Number(vehicle.speed || 0) > 2.5) continue;
     const door = vehicleDoorPosition(vehicle);
     const distance = Math.hypot(door.x - walker.x, door.z - walker.z);
-    if (distance > ENTER_DISTANCE || nearest && distance >= nearest.distance) continue;
+    const enterDistance = state.authority && state.remoteEntities?.has(vehicle.id)
+      ? ROOM_RECONCILIATION_ENTER_DISTANCE
+      : ENTER_DISTANCE;
+    if (distance > enterDistance || nearest && distance >= nearest.distance) continue;
     nearest = { vehicle, door, distance };
   }
   const traffic = state.population?.nearbyVehicles?.(walker, ENTER_DISTANCE + 2) || [];
@@ -1254,6 +1263,22 @@ function updatePrompt(state) {
 function snapshot(state) {
   if (!state) return Object.freeze({ active: false });
   const candidate = interactionCandidate(state);
+  const actor = civicActorPosition(state);
+  const ambientPedestrians = (state.population?.pedestrianSnapshots?.() || [])
+    .filter((pedestrian) => pedestrian?.visible && !pedestrian.promoted)
+    .map((pedestrian) => Object.freeze({
+      id: String(pedestrian.id || ''),
+      x: Number(Number(pedestrian.x || 0).toFixed(2)),
+      y: Number(Number(pedestrian.y || 0).toFixed(2)),
+      z: Number(Number(pedestrian.z || 0).toFixed(2)),
+      yaw: Number(Number(pedestrian.yaw || 0).toFixed(4)),
+      distance: Number(Math.hypot(
+        Number(pedestrian.x || 0) - Number(actor?.x || 0),
+        Number(pedestrian.z || 0) - Number(actor?.z || 0)
+      ).toFixed(2))
+    }))
+    .sort((left, right) => left.distance - right.distance)
+    .slice(0, 24);
   return Object.freeze({
     active: activeWorldMatches(state),
     requestId: state.requestId,
@@ -1265,6 +1290,8 @@ function snapshot(state) {
     interaction: candidate ? Object.freeze({ action: candidate.action, label: candidate.label, distance: candidate.distance }) : null,
     vehicles: Object.freeze(state.vehicles.map((vehicle) => {
       const pose = vehiclePose(vehicle);
+      const door = vehicleDoorPosition(vehicle);
+      const visualDoor = doorForVehicle(vehicle);
       return Object.freeze({
         id: vehicle.id,
         label: vehicle.variant.label,
@@ -1286,6 +1313,14 @@ function snapshot(state) {
         ambientTraffic: vehicle.ambientTraffic === true,
         occupied: vehicle.occupied,
         attachedToPlayer: vehicle.attachedToPlayer,
+        roomOccupiedByOther: vehicle.roomOccupiedByOther === true,
+        roomLeaseOwnerUid: String(vehicle.roomLeaseOwnerUid || ''),
+        driverSide: Number(vehicle.driverSide || -1),
+        driverDoor: Object.freeze({
+          x: Number(door.x.toFixed(2)),
+          z: Number(door.z.toFixed(2)),
+          openRadians: Number(Number(visualDoor?.rotation?.y || 0).toFixed(4))
+        }),
         dimensionsMeters: vehicle.visual?.root?.userData?.vehicleDimensionsMeters || null,
         visualEnvelopeMeters: vehicle.visual?.root?.userData?.vehicleVisualEnvelopeMeters || null,
         parking: vehicle.source === 'deterministic-parked-vehicle' ? Object.freeze({
@@ -1315,6 +1350,7 @@ function snapshot(state) {
         return count;
       })()
     }))),
+    ambientPedestrians: Object.freeze(ambientPedestrians),
     lastAction: state.lastAction,
     lastCivicAction: state.lastCivicAction,
     lastCivicOutcome: state.lastCivicOutcome,
@@ -1324,11 +1360,13 @@ function snapshot(state) {
     playerCondition: Number(Number(state.playerCondition ?? 1).toFixed(3)),
     custody: state.custody ? Object.freeze({
       active: state.custody.active === true,
+      type: String(state.custody.type || ''),
       reason: state.custody.reason,
       facility: state.custody.facility
     }) : null,
     authority: state.roomAuthorityRuntime?.snapshot?.() || Object.freeze({ mode: 'local' }),
     equipment: state.equipment?.snapshot?.() || null,
+    backpackMigration: state.backpackStore?.migrationSnapshot?.() || null,
     parachute: Object.freeze({
       deployed: state.parachute?.deployed === true,
       deployedAt: Number(state.parachute?.deployedAt || 0),
@@ -1544,6 +1582,7 @@ function startUrbanSandboxRuntime(options = {}) {
     civic: null,
     responders: null,
     equipment,
+    backpackStore,
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
@@ -1582,8 +1621,11 @@ function startUrbanSandboxRuntime(options = {}) {
       const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
       if (authorityMode === 'local') {
         state.lastCivicOutcome = Object.freeze({ ...outcome, at: now() });
-        state.civic.clear();
-        setStatus(state, `${outcome.label}. Civic attention is clearing.`, 3200);
+        const placedInCustody = outcome.type === 'arrest' && placePlayerInCustody(state, 'responder_contact');
+        if (!placedInCustody) {
+          state.civic.clear();
+          setStatus(state, `${outcome.label}. Civic attention is clearing.`, 3200);
+        }
         return;
       }
       if (state.civicResolutionPending) return;
@@ -1592,7 +1634,8 @@ function startUrbanSandboxRuntime(options = {}) {
         if (!activeWorldMatches(state)) return;
         if (result?.accepted) {
           state.lastCivicOutcome = Object.freeze({ ...result.outcome, authority: 'room', at: now() });
-          setStatus(state, `${result.outcome.label}. Shared civic attention is clearing.`, 3200);
+          const placedInCustody = result.outcome?.type === 'arrest' && placePlayerInCustody(state, 'shared_responder_contact');
+          if (!placedInCustody) setStatus(state, `${result.outcome.label}. Shared civic attention is clearing.`, 3200);
         }
       }).catch(() => {
         if (activeWorldMatches(state)) setStatus(state, 'Shared civic outcome is reconnecting.', 2200);

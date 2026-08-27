@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=82";
-import { readSharedExperienceParams } from "./share-links.js?v=63";
+import { createGlobeSelector } from "./globe-selector.js?v=89";
+import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
   geolocationErrorMessage,
@@ -535,6 +535,7 @@ function initTitleScreenUi({
       refX: sharedExperienceParams.refX,
       refY: sharedExperienceParams.refY,
       refZ: sharedExperienceParams.refZ,
+      refRoadId: sharedExperienceParams.refRoadId,
       yaw: sharedExperienceParams.yaw,
       pitch: sharedExperienceParams.pitch
     };
@@ -575,6 +576,24 @@ function initTitleScreenUi({
 
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ? appCtx.consumePendingFlowerChallengeStart() : false;
     appCtx.loadingScreenMode = requestedLaunchMode;
+    const selectedLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
+    const launchLoadingText = requestedLaunchMode === 'earth'
+      ? `Loading ${String(selectedLocation?.name || 'the selected location')}...`
+      : requestedLaunchMode === 'ocean'
+        ? 'Diving Into Ocean Mode...'
+        : requestedLaunchMode === 'moon'
+          ? 'Approaching The Moon...'
+          : requestedLaunchMode === 'mars'
+            ? 'Approaching Olympus Mons...'
+            : 'Preparing Space Flight...';
+    // Publish the opaque loading cover before hiding the title shell or
+    // exposing any gameplay HUD. The world and actor must never become the
+    // transition background while their scene is still being assembled.
+    appCtx.showLoad?.(launchLoadingText, {
+      mode: requestedLaunchMode,
+      bold: true,
+      overlay: 0.24
+    });
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('hud')?.classList.add('show');
     document.getElementById('minimap')?.classList.add('show');
@@ -582,19 +601,22 @@ function initTitleScreenUi({
     document.getElementById('floatMenuContainer')?.classList.add('show');
     document.getElementById('mainMenuBtn')?.classList.add('show');
     document.getElementById('controlsTab')?.classList.add('show');
+    const accessibilitySettings = document.getElementById('accessibilitySettings');
+    const mobileControlSettings = document.getElementById('mobileControlSettings');
+    if (accessibilitySettings && mobileControlSettings?.parentElement) mobileControlSettings.after(accessibilitySettings);
     document.getElementById('coords')?.classList.add('show');
     document.getElementById('historicBtn')?.classList.add('show');
     document.getElementById('memoryFlowerFloatBtn')?.classList.add('show');
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
+    appCtx.kickOptionalRuntimeBoot?.('boot');
     if (requestedLaunchMode !== 'ocean') void appCtx.ensureStarCatalogLoaded?.();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
     if (requestedLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
-      if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 1100);
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
       const selectedOceanLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
       const oceanStarted = appCtx.startOceanMode({
@@ -609,6 +631,8 @@ function initTitleScreenUi({
       });
       if (oceanStarted === false) throw new Error('Ocean mode did not accept the selected coordinates.');
       updateControlsModeUI?.();
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      appCtx.hideLoad?.();
       appCtx.loadingScreenMode = 'earth';
       return true;
     }
@@ -695,9 +719,14 @@ function initTitleScreenUi({
   requestTitleStart = () => {
     if (titleStartPromise) return titleStartPromise;
     const pending = runTitleStart();
-    const tracked = pending.finally(() => {
-      if (titleStartPromise === tracked) titleStartPromise = null;
-    });
+    const tracked = pending
+      .catch((error) => {
+        appCtx.hideLoad?.();
+        throw error;
+      })
+      .finally(() => {
+        if (titleStartPromise === tracked) titleStartPromise = null;
+      });
     titleStartPromise = tracked;
     return titleStartPromise;
   };

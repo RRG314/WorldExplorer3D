@@ -820,22 +820,22 @@
                 <span id="creatorTierBadge" class="creator-badge">New Creator</span>
                 <span class="creator-badge">Visible in World</span>
               </div>
-              <p id="creatorBioPreview" class="creator-bio">Add a short bio so people know who built these activities and world edits.</p>
+              <p id="creatorBioPreview" class="creator-bio">Add a short bio for room-scoped activities, attribution, and published world overlays.</p>
             </div>
           </div>
           <div id="creatorStats" class="creator-stats">
-            <div class="creator-stat"><span class="label">Activities</span><p class="value">0</p></div>
-            <div class="creator-stat"><span class="label">Published</span><p class="value">0</p></div>
+            <div class="creator-stat"><span class="label">Device Drafts</span><p class="value">0</p></div>
+            <div class="creator-stat"><span class="label">Public Activities</span><p class="value">0</p></div>
             <div class="creator-stat"><span class="label">Plays</span><p class="value">0</p></div>
             <div class="creator-stat"><span class="label">World Edits</span><p class="value">0</p></div>
           </div>
-          <div id="creatorSummary" class="creator-summary">Creator recognition is lightweight here: activities, published overlays, and attribution all point back to this profile.</div>
+          <div id="creatorSummary" class="creator-summary">Published overlays and room attribution point to this profile. Creator Library activity drafts remain on their browser.</div>
         </article>
         <article class="creator-card">
           <div class="creator-form-head">
             <div>
               <span class="label">Public Creator Details</span>
-              <p class="hint">This is the public identity shown from activities, creator attribution, and published world edits.</p>
+              <p class="hint">This public identity is used for room activities, attribution, and moderated published world overlays. Device activity drafts are not public.</p>
             </div>
             <div id="creatorBioCount" class="creator-count">0 / 320</div>
           </div>
@@ -855,7 +855,7 @@
           </div>
           <ul class="creator-help-list">
             <li>Keep the bio short and world-focused so players know what you build.</li>
-            <li>Your username and creator card appear on activities and published contributions.</li>
+            <li>Your username and creator card can appear on room activities and published contributions; device drafts stay private to that browser.</li>
             <li>This stays separate from billing and other private account details.</li>
           </ul>
         </article>
@@ -1351,7 +1351,7 @@
       creatorJoinDate.textContent = joinDate ? `Public profile active since ${joinDate}.` : 'Public creator profile not loaded yet.';
       creatorPublicState.textContent = profile ? 'Public Profile Live' : 'Preview Only';
       creatorTierBadge.textContent = creatorTierLabel(stats);
-      creatorBioPreview.textContent = String(profile?.bio || 'Add a short bio so people know who built these activities and world edits.');
+      creatorBioPreview.textContent = String(profile?.bio || 'Add a short bio for room-scoped activities, attribution, and published world overlays.');
       if (document.activeElement !== creatorBioInput) {
         creatorBioInput.value = String(profile?.bio || '');
       }
@@ -1360,14 +1360,14 @@
         creatorAvatarInput.value = hasAvatarOption ? avatar : '🌍';
       }
       creatorStats.innerHTML = `
-        <div class="creator-stat"><span class="label">Activities</span><p class="value">${Number(stats.activitiesCreated || 0)}</p></div>
-        <div class="creator-stat"><span class="label">Published</span><p class="value">${Number(stats.activitiesPublished || 0)}</p></div>
+        <div class="creator-stat"><span class="label">Device Drafts</span><p class="value">${Number(stats.activitiesCreated || 0)}</p></div>
+        <div class="creator-stat"><span class="label">Public Activities</span><p class="value">0</p></div>
         <div class="creator-stat"><span class="label">Plays</span><p class="value">${Number(stats.totalPlays || 0)}</p></div>
         <div class="creator-stat"><span class="label">World Edits</span><p class="value">${Number(stats.publishedContributions || stats.contributionsCount || 0)}</p></div>
       `;
       creatorSummary.textContent = profile
-        ? 'Attribution across activities and world contributions now points to this public creator profile.'
-        : 'Creator recognition is lightweight here: activities, published overlays, and attribution all point back to this profile.';
+        ? 'Published overlays and room attribution point to this public creator profile. Creator Library drafts remain on their browser.'
+        : 'Public activity publishing is unavailable; moderated overlays and room attribution can point to this profile.';
       updateCreatorBioCount();
     }
 

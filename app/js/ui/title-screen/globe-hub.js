@@ -8,7 +8,7 @@ import {
 } from '../globe-selector/helpers.js?v=9';
 
 const HUB_PANELS = {
-  games: { tab: 'games', title: 'Missions & Games' },
+  games: { tab: 'games', title: 'Activities & Games' },
   multiplayer: { tab: 'multiplayer', title: 'Multiplayer' },
   settings: { tab: 'settings', title: 'Settings' },
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
@@ -182,20 +182,31 @@ function setupGlobeHub({
       return true;
     }
     if (destination === 'live-earth' && liveEarthPanel && overlay && panelHost) {
-      panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
-      panelHost.appendChild(liveEarthPanel);
-      liveEarthPanel.hidden = false;
-      liveEarthPanel.classList.add('hub-center-panel', 'active');
-      overlay.hidden = false;
-      overlay.setAttribute('aria-hidden', 'false');
-      if (overlayTitle) overlayTitle.textContent = 'Live Data';
-      setActiveDestination(destination);
+      // Live Earth controls must stay beside the globe they operate. Moving
+      // this panel into the full workspace overlay made its globe markers
+      // unreachable while instructing players to tap one.
+      closePanel();
       document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
+      setActiveDestination(destination);
+      // On desktop the selector side is its own scroll container. Reset it so
+      // opening Live Data reveals the workspace instead of only changing a tab
+      // below the current fold. Mobile keeps the globe/panel document flow.
+      requestAnimationFrame(() => {
+        if (!liveEarthPanel.classList.contains('active')) return;
+        const side = liveEarthPanel.closest('.globe-selector-side');
+        if (side instanceof HTMLElement && matchMedia('(min-width: 901px)').matches) {
+          side.scrollTop = 0;
+        }
+      });
       return true;
     }
     const target = HUB_PANELS[destination];
     const panel = target ? document.getElementById(`tab-${target.tab}`) : null;
     if (!target || !panel || !overlay || !panelHost) return false;
+    if (destination === 'controls') {
+      const accessibilitySettings = document.getElementById('accessibilitySettings');
+      if (accessibilitySettings && accessibilitySettings.parentElement !== panel) panel.prepend(accessibilitySettings);
+    }
     panelHost.querySelectorAll('.tab-content').forEach((node) => node.classList.remove('active'));
     panel.classList.add('active');
     overlay.hidden = false;
@@ -248,6 +259,12 @@ function setupGlobeHub({
   const titleFooter = document.querySelector('.title-footer');
   if (titleFooter && footerHost) footerHost.appendChild(titleFooter);
   document.getElementById('globeHubOverlayCloseBtn')?.addEventListener('click', closePanel);
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || overlay?.hidden !== false) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closePanel();
+  }, true);
   document.getElementById('globeHubFullscreenBtn')?.addEventListener('click', () => {
     if (document.fullscreenElement) void document.exitFullscreen?.();
     else void document.documentElement.requestFullscreen?.();

@@ -1,8 +1,8 @@
 import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
 import { describeArCapability, detectArCapabilities } from './capabilities.js?v=1';
-import { evaluateArEligibility, getArEligibilityRegistrySnapshot } from './eligibility.js?v=1';
-import { compileWaterfowlChallenge, createWaterfowlChallengeSession } from './field-challenge.js?v=1';
-import { createArPresentation } from './presentation.js?v=1';
+import { evaluateArEligibility, getArEligibilityRegistrySnapshot } from './eligibility.js?v=2';
+import { compileWaterfowlChallenge, createWaterfowlChallengeSession } from './field-challenge.js?v=2';
+import { createArPresentation } from './presentation.js?v=4';
 
 let activePlatform = null;
 
@@ -148,7 +148,30 @@ function createArPlatform(appCtx, options = {}) {
 
   async function startCamera() {
     const mediaDevices = (options.navigatorObject || navigator).mediaDevices;
-    state.stream = await mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const request = Promise.resolve().then(() => mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    }));
+    let timeoutId = null;
+    let timedOut = false;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = globalThis.setTimeout(() => {
+        timedOut = true;
+        const error = new Error('Camera permission did not finish. Continue in interactive 3D instead.');
+        error.name = 'CameraStartTimeoutError';
+        reject(error);
+      }, 8_000);
+    });
+    try {
+      state.stream = await Promise.race([request, timeout]);
+    } catch (error) {
+      if (timedOut) {
+        void request.then((lateStream) => lateStream?.getTracks?.().forEach((track) => track.stop())).catch(() => {});
+      }
+      throw error;
+    } finally {
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    }
     if (ui.video) {
       ui.video.srcObject = state.stream;
       await ui.video.play();
@@ -226,7 +249,11 @@ function createArPlatform(appCtx, options = {}) {
       state.presentation = null;
       state.challengeSession = null;
       state.hitTestAvailable = false;
-      state.error = error?.name === 'NotAllowedError' ? 'Camera access was not allowed. You can continue in interactive 3D without a camera.' : String(error?.message || error || 'AR could not start.');
+      state.error = error?.name === 'NotAllowedError'
+        ? 'Camera access was not allowed. You can continue in interactive 3D without a camera.'
+        : error?.name === 'CameraStartTimeoutError'
+          ? 'Camera permission did not finish. You can continue in interactive 3D without a camera.'
+          : String(error?.message || error || 'AR could not start.');
       state.capability = { ...(state.capability || {}), level: 'interactive-3d', camera: false, immersiveAr: false };
       state.phase = 'error';
       renderUi();

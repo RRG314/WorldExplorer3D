@@ -10,8 +10,15 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4394, 4395, 4396, 4397] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const evidenceDir = path.join(root, 'output', 'release-evidence', 'current');
-const reportPath = path.join(root, 'output', 'verification', 'assembled-locations', 'report.json');
 const capture = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
+const forceTransportFallback = process.env.WE3D_FORCE_TRANSPORT_FALLBACK === '1';
+const reportPath = path.join(
+  root,
+  'output',
+  'verification',
+  'assembled-locations',
+  forceTransportFallback ? 'report-fallback.json' : 'report.json'
+);
 
 // These are product-owned catalog/audit anchors, selected by current release
 // requirements rather than inherited legacy screenshots.
@@ -60,14 +67,20 @@ try {
         localFailures.push({ kind: 'request', reason: request.failure()?.errorText || 'failed', url: request.url() });
       }
     });
+    if (forceTransportFallback) {
+      await page.route(/https:\/\/[^/]*overpass[^/]*\/api\/interpreter/i, (route) =>
+        route.abort('failed'));
+    }
 
     try {
       const params = new URLSearchParams({
         loc: 'custom', lat: String(location.lat), lon: String(location.lon), lname: location.name,
-        launch: 'earth', gm: 'free', mode: 'walk'
+        launch: 'earth', gm: 'free', mode: 'walking'
       });
       await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
       await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
+      const consent = page.locator('#analyticsConsentDenyBtn');
+      if (await consent.isVisible()) await consent.click();
       await page.getByRole('button', { name: 'Explore', exact: true }).click();
       await page.waitForFunction(() => {
         const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -99,6 +112,10 @@ try {
           surfaceChain: diagnostics.surfaceChain || null,
           worldLoad: {
             providers: diagnostics.worldLoad?.session?.providers || {},
+            regionalStructures: diagnostics.worldLoad?.regionalStructures || null,
+            regionalTransportSelection: diagnostics.worldLoad?.regionalTransportSelection || null,
+            reviewedStructureSelection: diagnostics.worldLoad?.reviewedStructureSelection || null,
+            transportProviderDecision: diagnostics.worldLoad?.transportProviderDecision || null,
             transportSource: diagnostics.worldLoad?.layerProducts?.transport?.source || null,
             buildingSource: diagnostics.worldLoad?.layerProducts?.buildings?.source || null,
             buildingProviderDecision: diagnostics.worldLoad?.buildingProviderDecision || null,
@@ -114,6 +131,17 @@ try {
           }).length
         };
       });
+      const directAtGradeContactAligned =
+        snapshot.surfaceChain?.actor?.contact?.kind === 'road' &&
+        snapshot.surfaceChain?.surfaces?.walk?.kind === 'road' &&
+        snapshot.surfaceChain?.surfaces?.walk?.feature?.structureKind === 'at_grade' &&
+        Number.isFinite(Number(snapshot.surfaceChain?.deltas?.feetMinusRenderedTerrain)) &&
+        Math.abs(Number(snapshot.surfaceChain?.deltas?.feetMinusRenderedTerrain)) <= 0.35 &&
+        Number.isFinite(Number(snapshot.surfaceChain?.deltas?.renderedMinusSourceWorld)) &&
+        Math.abs(Number(snapshot.surfaceChain?.deltas?.renderedMinusSourceWorld)) <= 0.1;
+      const atGradeTerrainOutcomeObserved =
+        Number(snapshot.atGradeTerrainAuthority?.adjustedTerrainVertices || 0) > 0 ||
+        directAtGradeContactAligned;
       const checks = {
         earthOwnsRuntime: snapshot.environment === 'EARTH',
         terrainAndRoadsPublished:
@@ -131,7 +159,6 @@ try {
         noPedestriansOnVehicleTransport:
           Number(snapshot.livingWorld?.pedestrianGraph?.vehicleTransportEdges || 0) === 0 &&
           Number(snapshot.livingWorld?.pedestrianGraph?.engineeredTransportEdges || 0) === 0 &&
-          Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredSidewalks || 0) === 0 &&
           Number(snapshot.livingWorld?.pedestrianGraph?.provenance?.inferredCrossings || 0) === 0,
         oneAtGradeBuildingRoadAuthority:
           snapshot.worldLoad?.buildingRoadAuthority !== null &&
@@ -205,7 +232,12 @@ try {
           Number(snapshot.atGradeTerrainAuthority?.corridorCount || 0) ===
             Number(snapshot.atGradeTerrainAuthority?.roadCount || -1) &&
           Number(snapshot.atGradeTerrainAuthority?.liveTerrainSamplerRoads || 0) === 0 &&
-          Number(snapshot.atGradeTerrainAuthority?.adjustedTerrainVertices || 0) > 0 &&
+          // A changed-vertex count is not itself a player outcome. A corridor
+          // that already matches the rendered terrain can correctly need zero
+          // edits, especially with a sparse fallback road set. Require either
+          // a real terrain edit or direct at-grade player contact aligned to
+          // both the rendered and source ground authorities.
+          atGradeTerrainOutcomeObserved &&
           snapshot.atGradeTerrainAuthority?.heightSamplingAuthority ===
             'rendered-triangle-barycentric' &&
           snapshot.atGradeTerrainAuthority?.terrainSeamAuthority ===
@@ -250,6 +282,35 @@ try {
         noBrowserErrors: browserErrors.length === 0,
         noFailedLocalResources: localFailures.length === 0
       };
+      checks.transportProviderModeResolved = forceTransportFallback
+        ? (
+            snapshot.worldLoad?.transportProviderDecision?.primaryProvider === 'shortbread-vector' &&
+            snapshot.worldLoad?.transportProviderDecision?.optionalExactProvider === 'osm-overpass' &&
+            snapshot.worldLoad?.transportProviderDecision?.optionalExactUnavailable === true &&
+            snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === false &&
+            snapshot.worldLoad?.transportProviderDecision?.selected === 'shortbread-vector' &&
+            Number(snapshot.worldLoad?.providers?.['openstreetmap-shortbread']?.completed || 0) > 0 &&
+            Number(snapshot.worldLoad?.providers?.['osm-overpass']?.failed || 0) > 0
+          )
+        : (
+            snapshot.worldLoad?.transportProviderDecision?.primaryProvider === 'shortbread-vector' &&
+            snapshot.worldLoad?.transportProviderDecision?.optionalExactProvider === 'osm-overpass' &&
+            Number(snapshot.worldLoad?.providers?.['openstreetmap-shortbread']?.completed || 0) > 0 &&
+            (
+              (
+                snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === true &&
+                snapshot.worldLoad?.transportProviderDecision?.optionalExactActive === true &&
+                snapshot.worldLoad?.transportProviderDecision?.selected ===
+                  'shortbread-vector+osm-overpass-exact' &&
+                Number(snapshot.worldLoad?.providers?.['osm-overpass']?.completed || 0) > 0
+              ) || (
+                snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === false &&
+                snapshot.worldLoad?.transportProviderDecision?.optionalExactUnavailable === true &&
+                snapshot.worldLoad?.transportProviderDecision?.selected === 'shortbread-vector' &&
+                Number(snapshot.worldLoad?.providers?.['osm-overpass']?.failed || 0) > 0
+              )
+            )
+          );
       const skipGuide = page.getByText('Skip guide', { exact: true });
       if (await skipGuide.isVisible().catch(() => false)) {
         // The guide may auto-dismiss between the visibility read and click.
@@ -262,11 +323,18 @@ try {
         await starInfoClose.click({ timeout: 2000 }).catch(() => {});
         await page.waitForTimeout(200);
       }
-      if (capture) await page.screenshot({ path: path.join(evidenceDir, `${location.id}.png`) });
+      if (capture) {
+        const suffix = forceTransportFallback ? '-transport-fallback' : '';
+        await page.screenshot({ path: path.join(evidenceDir, `${location.id}${suffix}.png`) });
+      }
       results.push({
         ...location,
         ok: Object.values(checks).every(Boolean),
         checks,
+        verifierEvidence: {
+          directAtGradeContactAligned,
+          atGradeTerrainOutcomeObserved
+        },
         snapshot,
         browserErrors,
         browserConsole,
@@ -295,6 +363,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   contract: 'complete-assembled-gameplay-representative-location-matrix',
   captureEnabled: capture,
+  forceTransportFallback,
   results
 };
 await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -306,6 +375,9 @@ console.log(JSON.stringify({
     id: result.id,
     ok: result.ok,
     checks: result.checks || null,
+    transportProvider: result.snapshot?.worldLoad?.transportSource?.provider || null,
+    transportProviderDecision: result.snapshot?.worldLoad?.transportProviderDecision || null,
+    overpassFailures: Number(result.snapshot?.worldLoad?.providers?.['osm-overpass']?.failed || 0),
     discontinuities: Number(result.snapshot?.transportContinuity?.discontinuityCount || 0),
     maximumVerticalDeltaMeters: Number(result.snapshot?.transportContinuity?.maximumVerticalDeltaMeters || 0),
     gradeViolations: Number(result.snapshot?.transportGradeProfile?.violationCount || 0),

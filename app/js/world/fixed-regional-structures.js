@@ -1,4 +1,5 @@
 import { fixedRegionalContextBounds } from './fixed-regional-context.js?v=8';
+import { fetchBundledLandmarkData } from './landmark-source.js?v=3';
 
 const DRIVEABLE_HIGHWAYS =
   'motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service';
@@ -115,6 +116,7 @@ function buildExactStructureSpatialIndex(exactWays, exactNodes, originLatitude) 
     const family = structureFamily(way.tags);
     if (!family) continue;
     for (const segment of projectedStructureSegments(way, exactNodes, originLatitude)) {
+      segment.structureName = normalizedStructureName(way.tags);
       const minCellX = Math.floor((Math.min(segment.a.x, segment.b.x) - padding) / STRUCTURE_DUPLICATE_GRID_METERS);
       const maxCellX = Math.floor((Math.max(segment.a.x, segment.b.x) + padding) / STRUCTURE_DUPLICATE_GRID_METERS);
       const minCellY = Math.floor((Math.min(segment.a.y, segment.b.y) - padding) / STRUCTURE_DUPLICATE_GRID_METERS);
@@ -134,6 +136,9 @@ function buildExactStructureSpatialIndex(exactWays, exactNodes, originLatitude) 
 function generalizedStructureDuplicatesExact(way, worldNodes, originLatitude, exactSpatialIndex) {
   const family = structureFamily(way?.tags);
   if (!family) return false;
+  const structureName = String(
+    way.tags?._reviewedStructureName || normalizedStructureName(way.tags)
+  );
   const generalizedSegments = projectedStructureSegments(way, worldNodes, originLatitude);
   if (generalizedSegments.length === 0) return false;
   let totalLength = 0;
@@ -142,6 +147,7 @@ function generalizedStructureDuplicatesExact(way, worldNodes, originLatitude, ex
     totalLength += segment.length;
     const candidates = exactSpatialIndex.get(structureGridKey(family, segment.midX, segment.midY)) || [];
     const matched = candidates.some((exactSegment) => {
+      if (structureName && exactSegment.structureName !== structureName) return false;
       const directionDot = Math.abs(segment.dx * exactSegment.dx + segment.dy * exactSegment.dy);
       if (directionDot < STRUCTURE_DUPLICATE_MIN_DIRECTION_DOT) return false;
       return pointToStructureSegmentDistance(segment.midX, segment.midY, exactSegment) <=
@@ -149,12 +155,41 @@ function generalizedStructureDuplicatesExact(way, worldNodes, originLatitude, ex
     });
     if (matched) matchedLength += segment.length;
   }
-  // Names and refs frequently change at a bridge anchorage, tunnel bore, or
-  // jurisdiction boundary. A substantial same-family, same-direction spatial
-  // overlap is the durable identity contract between generalized and exact
-  // sources. Requiring length coverage prevents a nearby crossing structure
-  // from deleting an unrelated way at one point.
+  // An explicitly named generalized corridor must only be retired by the same
+  // accepted named corridor. Spatial overlap alone remains sufficient for
+  // unnamed structures. Requiring length coverage prevents a nearby crossing
+  // structure from deleting an unrelated way at one point.
   return matchedLength >= Math.min(18, totalLength) && matchedLength / totalLength >= 0.35;
+}
+
+function reviewedStructureNameForGeneralized(way, worldNodes, originLatitude, reviewedSpatialIndex) {
+  const family = structureFamily(way?.tags);
+  if (!family) return '';
+  const generalizedSegments = projectedStructureSegments(way, worldNodes, originLatitude);
+  if (generalizedSegments.length === 0) return '';
+  const matchedLengthByName = new Map();
+  const totalLength = generalizedSegments.reduce((total, segment) => total + segment.length, 0);
+  for (const segment of generalizedSegments) {
+    const names = new Set();
+    const candidates = reviewedSpatialIndex.get(structureGridKey(family, segment.midX, segment.midY)) || [];
+    for (const exactSegment of candidates) {
+      const name = String(exactSegment.structureName || '');
+      if (!name) continue;
+      const directionDot = Math.abs(segment.dx * exactSegment.dx + segment.dy * exactSegment.dy);
+      if (directionDot < STRUCTURE_DUPLICATE_MIN_DIRECTION_DOT) continue;
+      if (pointToStructureSegmentDistance(segment.midX, segment.midY, exactSegment) >
+          STRUCTURE_DUPLICATE_DISTANCE_METERS) continue;
+      names.add(name);
+    }
+    for (const name of names) {
+      matchedLengthByName.set(name, (matchedLengthByName.get(name) || 0) + segment.length);
+    }
+  }
+  return [...matchedLengthByName.entries()]
+    .filter(([, matchedLength]) =>
+      matchedLength >= Math.min(18, totalLength) && matchedLength / totalLength >= 0.35
+    )
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] || '';
 }
 
 function isDriveableStructureWay(element) {
@@ -313,6 +348,11 @@ export function mergeExactRegionalStructures(worldData, structureData) {
   const worldElements = Array.isArray(worldData?.elements) ? worldData.elements : [];
   const exact = retainExactRegionalStructures(structureData);
   const exactWays = exact.elements.filter((element) => element.type === 'way');
+  const exactNodesById = new Map(
+    exact.elements
+      .filter((element) => element.type === 'node')
+      .map((node) => [node.id, node])
+  );
   const exactWaysById = new Map(exactWays.map((way) => [way.id, way]));
   const existingExactWayIds = new Set(
     worldElements
@@ -321,7 +361,12 @@ export function mergeExactRegionalStructures(worldData, structureData) {
   );
   const additions = exactWays.filter((way) => !existingExactWayIds.has(way.id));
   let upgradedExistingWays = 0;
+  let upgradedExistingNodes = 0;
   const retainedWorldElements = worldElements.map((element) => {
+    if (element?.type === 'node' && exactNodesById.has(element.id)) {
+      upgradedExistingNodes += 1;
+      return { ...element, ...exactNodesById.get(element.id) };
+    }
     if (element?.type !== 'way') return element;
     const exactWay = exactWaysById.get(element.id);
     if (!exactWay || Number(element.id) <= 0) return element;
@@ -353,7 +398,10 @@ export function mergeExactRegionalStructures(worldData, structureData) {
       .filter((element) => element?.type === 'node')
       .map((node) => node.id)
   );
-  const additionNodeIds = new Set(additions.flatMap((way) => way.nodes));
+  // An existing live way can be upgraded to the reviewed way's complete node
+  // sequence. Its newly referenced nodes are just as required as the nodes for
+  // a wholly new way; omitting them causes selection to discard the upgrade.
+  const additionNodeIds = new Set(exactWays.flatMap((way) => way.nodes));
   const additionNodes = exact.elements.filter(
     (element) => element?.type === 'node' &&
       additionNodeIds.has(element.id) &&
@@ -370,9 +418,84 @@ export function mergeExactRegionalStructures(worldData, structureData) {
       ...exact._fixedRegionalStructures,
       addedWays: additions.length,
       upgradedExistingWays,
+      upgradedExistingNodes,
       deferredGeneralizedWays,
       replacedGeneralizedWays: 0
     }
+  };
+}
+
+function removeLiveStructuresSupersededByReviewedPack(worldData, reviewedData) {
+  const reviewed = retainExactRegionalStructures(reviewedData);
+  const reviewedWays = reviewed.elements.filter((element) => element?.type === 'way');
+  const reviewedIds = new Set(reviewedWays.map((way) => Number(way.id)));
+  const reviewedNames = new Set(
+    reviewedWays
+      .filter(isDriveableStructureWay)
+      .map((way) => normalizedStructureName(way.tags))
+      .filter(Boolean)
+  );
+  let supersededLiveWays = 0;
+  const elements = (worldData?.elements || []).filter((element) => {
+    if (element?.type !== 'way' || !isDriveableStructureWay(element)) return true;
+    if (Number(element.id) <= 0 ||
+        String(element.tags?._sourceCompleteness || '') === 'generalized') return true;
+    if (reviewedIds.has(Number(element.id))) return true;
+    const name = normalizedStructureName(element.tags);
+    if (!name || !reviewedNames.has(name)) return true;
+    supersededLiveWays += 1;
+    return false;
+  });
+  return {
+    ...worldData,
+    elements,
+    _reviewedStructureSupersession: {
+      reviewedWayCount: reviewedWays.length,
+      reviewedNamedCorridors: reviewedNames.size,
+      supersededLiveWays
+    }
+  };
+}
+
+function markReviewedGeneralizedStructureFallbacks(worldData, reviewedData) {
+  const reviewed = retainExactRegionalStructures(reviewedData);
+  const reviewedIds = new Set(
+    reviewed.elements
+      .filter((element) => element?.type === 'way' && isDriveableStructureWay(element))
+      .map((way) => Number(way.id))
+  );
+  const elements = Array.isArray(worldData?.elements) ? worldData.elements : [];
+  const nodes = structureNodeMap(elements);
+  const reviewedWays = elements.filter((element) =>
+    element?.type === 'way' && reviewedIds.has(Number(element.id))
+  );
+  const originLatitude = structureProjectionOriginLatitude(nodes);
+  const reviewedSpatialIndex = buildExactStructureSpatialIndex(reviewedWays, nodes, originLatitude);
+  let markedWays = 0;
+  const markedElements = elements.map((element) => {
+    if (!isDriveableStructureWay(element) ||
+        String(element.tags?._sourceCompleteness || '') !== 'generalized') return element;
+    const reviewedName = reviewedStructureNameForGeneralized(
+      element,
+      nodes,
+      originLatitude,
+      reviewedSpatialIndex
+    );
+    if (!reviewedName) return element;
+    markedWays += 1;
+    return {
+      ...element,
+      tags: {
+        ...element.tags,
+        _reviewedStructureFallback: 'reviewed-spatial-match',
+        _reviewedStructureName: reviewedName
+      }
+    };
+  });
+  return {
+    ...worldData,
+    elements: markedElements,
+    _reviewedGeneralizedStructureFallbacks: markedWays
   };
 }
 
@@ -452,9 +575,43 @@ export function beginFixedRegionalStructureLoad(options = {}) {
 export async function completeFixedRegionalStructureLoad(options = {}) {
   const { data, loadMetrics, request } = options;
   const outcome = await request?.outcome;
-  if (outcome?.error) throw outcome.error;
-  if (!outcome?.value) throw new Error('Fixed regional structures returned no source data.');
-  const merged = mergeExactRegionalStructures(data, outcome.value);
+  const reviewedLandmarkData = await fetchBundledLandmarkData({
+    lat: request?.location?.lat,
+    lon: request?.location?.lon
+  }).catch(() => null);
+  const reviewedExact = reviewedLandmarkData
+    ? retainExactRegionalStructures(reviewedLandmarkData)
+    : null;
+  const reviewedExactWays = Number(reviewedExact?._fixedRegionalStructures?.exactWays || 0);
+  if (!outcome?.value && reviewedExactWays === 0) {
+    if (outcome?.error) throw outcome.error;
+    throw new Error('Fixed regional structures returned no source data.');
+  }
+  let merged = outcome?.value
+    ? mergeExactRegionalStructures(data, outcome.value)
+    : data;
+  if (reviewedExactWays > 0) {
+    // The bundled landmark pack is the reviewed, versioned structure snapshot.
+    // Live OSM may split the same named deck into new overlapping way ids. If
+    // those enter compilation first, geometric deduplication can discard the
+    // reviewed carriageways and their published surface controls. Retire only
+    // same-named live engineered ways that are not part of the reviewed pack;
+    // unrelated live roads and the reviewed ids remain intact.
+    merged = removeLiveStructuresSupersededByReviewedPack(merged, reviewedLandmarkData);
+    merged = mergeExactRegionalStructures(merged, reviewedLandmarkData);
+    merged = markReviewedGeneralizedStructureFallbacks(merged, reviewedLandmarkData);
+  }
+  merged._fixedRegionalStructures.source = reviewedExactWays > 0
+    ? outcome?.value
+      ? 'live-plus-bundled-reviewed-openstreetmap-landmark-pack'
+      : 'bundled-reviewed-openstreetmap-landmark-pack'
+    : 'live-openstreetmap';
+  merged._fixedRegionalStructures.reviewedLandmarkExactWays = reviewedExactWays;
+  merged._fixedRegionalStructures.supersededLiveReviewedCorridorWays =
+    Number(merged._reviewedStructureSupersession?.supersededLiveWays || 0);
+  merged._fixedRegionalStructures.reviewedGeneralizedFallbackWays =
+    Number(merged._reviewedGeneralizedStructureFallbacks || 0);
+  merged._fixedRegionalStructures.liveProviderError = outcome?.error?.message || '';
   if (loadMetrics) loadMetrics.regionalStructures = merged._fixedRegionalStructures;
   return merged;
 }

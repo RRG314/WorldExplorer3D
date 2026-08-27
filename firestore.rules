@@ -1672,6 +1672,142 @@ service cloud.firestore {
         request.resource.data.score <= resource.data.score + 20;
     }
 
+    function validLeaderboardBase(challenge, allowedKeys) {
+      return request.resource.data.keys().hasAll([
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly(allowedKeys) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.challenge == challenge &&
+        request.resource.data.player is string &&
+        request.resource.data.player.size() > 0 &&
+        request.resource.data.player.size() <= 24 &&
+        request.resource.data.location is string &&
+        request.resource.data.location.size() > 0 &&
+        request.resource.data.location.size() <= 80 &&
+        request.resource.data.lat is number &&
+        request.resource.data.lat >= -90 &&
+        request.resource.data.lat <= 90 &&
+        request.resource.data.lon is number &&
+        request.resource.data.lon >= -180 &&
+        request.resource.data.lon <= 180 &&
+        request.resource.data.mode is string &&
+        request.resource.data.mode.size() > 0 &&
+        request.resource.data.mode.size() <= 24 &&
+        request.resource.data.createdAtIso is string &&
+        request.resource.data.createdAtIso.size() >= 20 &&
+        request.resource.data.createdAtIso.size() <= 40 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    function validFlowerLeaderboardEntry() {
+      return validLeaderboardBase('flower', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 21600000 &&
+        request.resource.data.paintedPct == null &&
+        request.resource.data.paintedBuildings == 0 &&
+        request.resource.data.totalBuildings == 0;
+    }
+
+    function validPaintTownLeaderboardEntry() {
+      return validLeaderboardBase('painttown', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 600000 &&
+        request.resource.data.paintedPct is number &&
+        request.resource.data.paintedPct >= 0 &&
+        request.resource.data.paintedPct <= 100 &&
+        request.resource.data.paintedBuildings is int &&
+        request.resource.data.paintedBuildings >= 0 &&
+        request.resource.data.paintedBuildings <= 100000 &&
+        request.resource.data.totalBuildings is int &&
+        request.resource.data.totalBuildings >= request.resource.data.paintedBuildings &&
+        request.resource.data.totalBuildings <= 100000;
+    }
+
+    function validFishingLeaderboardEntry() {
+      return validLeaderboardBase('fishing', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt', 'species', 'speciesId',
+          'score', 'weightKg', 'lengthCm', 'strength', 'rarity', 'behavior',
+          'fightTimeMs', 'lineIntegrityPct', 'maxTensionPct', 'waterKind'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 86400000 &&
+        request.resource.data.paintedPct == null &&
+        request.resource.data.paintedBuildings == 0 &&
+        request.resource.data.totalBuildings == 0 &&
+        request.resource.data.species is string &&
+        request.resource.data.species.size() > 0 &&
+        request.resource.data.species.size() <= 80 &&
+        request.resource.data.speciesId is string &&
+        request.resource.data.speciesId.size() <= 48 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 1000000 &&
+        request.resource.data.weightKg is number &&
+        request.resource.data.weightKg > 0 &&
+        request.resource.data.weightKg <= 5000 &&
+        request.resource.data.lengthCm is number &&
+        request.resource.data.lengthCm > 0 &&
+        request.resource.data.lengthCm <= 3000 &&
+        (request.resource.data.strength == null || request.resource.data.strength is number) &&
+        request.resource.data.rarity is string &&
+        request.resource.data.rarity.size() <= 24 &&
+        request.resource.data.behavior is string &&
+        request.resource.data.behavior.size() <= 32 &&
+        (request.resource.data.fightTimeMs == null || request.resource.data.fightTimeMs is number) &&
+        (request.resource.data.lineIntegrityPct == null ||
+          (request.resource.data.lineIntegrityPct is number && request.resource.data.lineIntegrityPct >= 0 && request.resource.data.lineIntegrityPct <= 100)) &&
+        (request.resource.data.maxTensionPct == null ||
+          (request.resource.data.maxTensionPct is number && request.resource.data.maxTensionPct >= 0 && request.resource.data.maxTensionPct <= 100)) &&
+        request.resource.data.waterKind is string &&
+        request.resource.data.waterKind.size() > 0 &&
+        request.resource.data.waterKind.size() <= 24;
+    }
+
+    function validDeFlockLeaderboardEntry() {
+      return validLeaderboardBase('deflock', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt', 'score', 'disabledCameras',
+          'totalCameras', 'detections', 'distance'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 86400000 &&
+        (request.resource.data.paintedPct == null || request.resource.data.paintedPct == 0) &&
+        request.resource.data.paintedBuildings == 0 &&
+        request.resource.data.totalBuildings == 0 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 100000 &&
+        request.resource.data.disabledCameras is int &&
+        request.resource.data.disabledCameras > 0 &&
+        request.resource.data.disabledCameras <= 750 &&
+        request.resource.data.totalCameras is int &&
+        request.resource.data.totalCameras == request.resource.data.disabledCameras &&
+        request.resource.data.detections is int &&
+        request.resource.data.detections >= 0 &&
+        request.resource.data.detections <= 100000 &&
+        request.resource.data.distance is number &&
+        request.resource.data.distance >= 0;
+    }
+
     match /users/{userId} {
       allow read: if isSelf(userId);
       allow create: if isSelf(userId) && validUserSelfCreate(userId);
@@ -1807,70 +1943,25 @@ service cloud.firestore {
 
     match /flowerLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && validFlowerLeaderboardEntry();
       allow update, delete: if false;
     }
 
     match /paintTownLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && validPaintTownLeaderboardEntry();
       allow update, delete: if false;
     }
 
     match /deflockLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn() &&
-        request.resource.data.keys().hasOnly([
-          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
-          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
-          'mode', 'createdAtIso', 'createdAt', 'score', 'disabledCameras',
-          'totalCameras', 'detections', 'distance'
-        ]) &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.challenge == 'deflock' &&
-        request.resource.data.player is string &&
-        request.resource.data.player.size() > 0 &&
-        request.resource.data.player.size() <= 24 &&
-        request.resource.data.location is string &&
-        request.resource.data.location.size() <= 80 &&
-        request.resource.data.timeMs is number &&
-        request.resource.data.timeMs > 0 &&
-        request.resource.data.timeMs <= 86400000 &&
-        request.resource.data.score is int &&
-        request.resource.data.score >= 0 &&
-        request.resource.data.score <= 100000 &&
-        request.resource.data.disabledCameras is int &&
-        request.resource.data.disabledCameras > 0 &&
-        request.resource.data.disabledCameras <= 750 &&
-        request.resource.data.totalCameras is int &&
-        request.resource.data.totalCameras == request.resource.data.disabledCameras &&
-        request.resource.data.detections is int &&
-        request.resource.data.detections >= 0 &&
-        request.resource.data.detections <= 100000 &&
-        request.resource.data.distance is number &&
-        request.resource.data.distance >= 0;
+      allow create: if isSignedIn() && validDeFlockLeaderboardEntry();
       allow update, delete: if false;
     }
 
     match /fishingLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn() &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.challenge == 'fishing' &&
-        request.resource.data.player is string &&
-        request.resource.data.player.size() > 0 &&
-        request.resource.data.player.size() <= 24 &&
-        request.resource.data.species is string &&
-        request.resource.data.species.size() > 0 &&
-        request.resource.data.species.size() <= 80 &&
-        request.resource.data.score is int &&
-        request.resource.data.score >= 0 &&
-        request.resource.data.weightKg is number &&
-        request.resource.data.weightKg > 0 &&
-        request.resource.data.lengthCm is number &&
-        request.resource.data.lengthCm > 0 &&
-        request.resource.data.location is string &&
-        request.resource.data.location.size() <= 80;
+      allow create: if isSignedIn() && validFishingLeaderboardEntry();
       allow update, delete: if false;
     }
 

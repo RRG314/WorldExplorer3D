@@ -202,7 +202,7 @@ function compileEncounterPlan(environment, eligibility, catalogs = BUILTIN_DISCO
         position,
         depthBand: depth,
         signalClass: find.signalClass,
-        evidenceClass: 'procedural-game-encounter',
+        evidenceClass: 'guided-exploration-lead',
         supportingEvidence: ['habitat-plausible'],
         sourceRefs: find.sourceRefs
       });

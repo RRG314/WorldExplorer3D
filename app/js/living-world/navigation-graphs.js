@@ -128,23 +128,39 @@ function segmentPriority(segment) {
   return Math.hypot(midpointX, midpointZ);
 }
 
-function pedestrianSegmentAllowed(segment) {
+function roadHighwayClass(feature) {
+  return String(
+    feature?.transportRecord?.sourceTags?.highway ||
+    feature?.transportRecord?.rawTags?.highway ||
+    feature?.type ||
+    ''
+  ).trim().toLowerCase();
+}
+
+function pedestrianSegmentMode(segment) {
   const feature = segment?.feature;
-  if (!feature) return false;
-  if (feature.walkable === false || feature?.transportGraphRef?.walkable === false) return false;
-  if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return false;
-  // Pedestrian population may consume only an explicitly mapped pedestrian
-  // path. A vehicle-road centerline is not evidence of a sidewalk or crossing,
-  // regardless of road class. Engineered transport also stays closed until a
-  // mapped pedestrian path has been associated with its own physical surface;
-  // offsetting the vehicle deck produced people beside or inside bridges,
-  // ramps, and tunnels.
-  if (featureKind(feature) !== 'footway') return false;
+  if (!feature) return '';
+  if (feature.walkable === false || feature?.transportGraphRef?.walkable === false) return '';
+  if (feature?.transportRecord?.access?.pedestrian === 'prohibited') return '';
   const structure = structureState(feature);
   const ordinaryAtGradeKind = structure.structureKind === 'none' || structure.structureKind === 'at_grade';
-  return structure.terrainMode === 'at_grade' &&
-    ordinaryAtGradeKind &&
-    feature?.structureSemantics?.rampCandidate !== true;
+  if (structure.terrainMode !== 'at_grade' || !ordinaryAtGradeKind ||
+    feature?.structureSemantics?.rampCandidate === true) return '';
+  if (featureKind(feature) === 'footway') return 'mapped_path';
+  if (featureKind(feature) !== 'road') return '';
+  const tags = feature?.transportRecord?.sourceTags || feature?.transportRecord?.rawTags || {};
+  const sidewalk = String(tags.sidewalk || '').trim().toLowerCase();
+  if (['no', 'none', 'separate'].includes(sidewalk)) return '';
+  const highway = roadHighwayClass(feature);
+  if (/^(?:motorway|motorway_link|trunk|trunk_link|raceway|construction|proposed)$/.test(highway)) return '';
+  if (/^(?:primary|primary_link)$/.test(highway) && !['yes', 'both', 'left', 'right'].includes(sidewalk)) return '';
+  return /^(?:secondary|secondary_link|tertiary|tertiary_link|residential|living_street|service|unclassified|road|pedestrian)$/.test(highway)
+    ? 'inferred_sidewalk'
+    : '';
+}
+
+function pedestrianSegmentAllowed(segment) {
+  return pedestrianSegmentMode(segment) !== '';
 }
 
 export function compilePedestrianGraph(options = {}) {
@@ -185,13 +201,35 @@ export function compilePedestrianGraph(options = {}) {
 
   for (let index = 0; index < sourceSegments.length && edges.length < networkEdgeLimit; index += 1) {
     const segment = sourceSegments[index];
-    const pair = edgePointPair(segment, 0, options.sampleSurface);
-    if (!pair) continue;
-    if (typeof options.isBlockedPoint === 'function' && (
-      options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
-    )) continue;
-    addEdge(pair, segment, 'forward', pair.p1, pair.p2, 'mapped_path');
-    addEdge(pair, segment, 'reverse', pair.p2, pair.p1, 'mapped_path');
+    const mode = pedestrianSegmentMode(segment);
+    const offsets = mode === 'mapped_path' ? [0] : (() => {
+      const width = minimumRoadWidthOnInterval(
+        segment.feature,
+        segment.segIndex,
+        segment.sourceTStart,
+        segment.sourceTEnd
+      );
+      const sidewalkOffset = Math.min(8, Math.max(2.4, width * .5 + 1.2));
+      const tags = segment.feature?.transportRecord?.sourceTags || segment.feature?.transportRecord?.rawTags || {};
+      const sidewalk = String(tags.sidewalk || '').trim().toLowerCase();
+      // OSM roadway geometry is the source authority. Where no separately
+      // mapped footway exists, publish a clearly attributed inferred sidewalk
+      // outside the road cross-section; never claim provider-mapped geometry.
+      if (sidewalk === 'left') return [sidewalkOffset];
+      if (sidewalk === 'right') return [-sidewalkOffset];
+      return [-sidewalkOffset, sidewalkOffset];
+    })();
+    for (const offset of offsets) {
+      if (edges.length >= networkEdgeLimit) break;
+      const pair = edgePointPair(segment, offset, options.sampleSurface);
+      if (!pair) continue;
+      if (typeof options.isBlockedPoint === 'function' && (
+        options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
+      )) continue;
+      const side = offset < 0 ? 'right' : offset > 0 ? 'left' : 'mapped';
+      addEdge(pair, segment, `${side}:forward`, pair.p1, pair.p2, mode);
+      addEdge(pair, segment, `${side}:reverse`, pair.p2, pair.p1, mode);
+    }
   }
 
   for (const entrance of Array.isArray(options.entrances) ? options.entrances : []) {

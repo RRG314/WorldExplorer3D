@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html><head>
+<html lang="en"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -21,18 +21,23 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=91">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=100">
-<link rel="stylesheet" href="styles/block-builder.css?v=3">
+<link rel="stylesheet" href="styles/title-shell.css?v=94">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=105">
+<link rel="stylesheet" href="styles/block-builder.css?v=7">
 <link rel="stylesheet" href="styles/universe.css?v=5">
-<link rel="stylesheet" href="styles/fishing-game.css?v=3">
-<link rel="stylesheet" href="styles/interface-v4.css?v=17">
-<link rel="stylesheet" href="styles/start-hub.css?v=15">
-<link rel="stylesheet" href="styles/discovery.css?v=5">
-<link rel="stylesheet" href="styles/tutorial.css?v=1">
+<link rel="stylesheet" href="styles/fishing-game.css?v=4">
+<link rel="stylesheet" href="styles/interface-v4.css?v=18">
+<link rel="stylesheet" href="styles/start-hub.css?v=16">
+<link rel="stylesheet" href="styles/discovery.css?v=10">
+<link rel="stylesheet" href="styles/tutorial.css?v=3">
 <link rel="stylesheet" href="styles/ar.css?v=1">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=1">
+<link rel="stylesheet" href="styles/map-explorer.css?v=2">
+<link rel="stylesheet" href="styles/accessibility.css?v=1">
 </head>
 <body>
+<a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
+<div id="accessibilityAnnouncements" class="we3d-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
 <button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <aside id="authFloatPanel" class="auth-float-panel" hidden>
@@ -253,9 +258,9 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <li class="mpRoomEmpty">No incoming invites.</li>
 </ul>
 
-<div class="mp-subtitle">Top Explorers</div>
+<div class="mp-subtitle">Explorer League · Global · All time</div>
 <ul id="mpLeaderboardList" class="mpFeedList">
-<li class="mpRoomEmpty">Leaderboard updates as explorers participate.</li>
+<li class="mpRoomEmpty">Loading public Explorer League results…</li>
 </ul>
 </details>
 </div>
@@ -412,11 +417,12 @@ Graphics changes apply to the current session.
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Game Leaderboards</div>
-<div class="flowerChallengeBadge">All Games</div>
+<div class="flowerChallengeTitle">Leaderboards</div>
+<div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
 <div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest red-flower runs. Signed-in scores publish to the shared board.</div>
+<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
 <div class="flowerLeaderboardTabs">
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
@@ -430,7 +436,7 @@ Graphics changes apply to the current session.
 <button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Find Flower</button>
 <button id="titleFlowerRefreshBtn" class="flowerChallengeBtn refresh" type="button">Refresh</button>
 </div>
-<div id="flowerChallengeStatus" class="flowerChallengeStatus"></div>
+<div id="flowerChallengeStatus" class="flowerChallengeStatus" role="status" aria-live="polite"></div>
 <ol id="flowerLeaderboardList" class="flowerLeaderboard">
 <li class="flowerLeaderboardEmpty">Loading leaderboard...</li>
 </ol>
@@ -460,16 +466,74 @@ Graphics changes apply to the current session.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · Ground artifacts produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30. · Global ocean-floor elevations from the GEBCO_2024 Grid, GEBCO Compilation Group · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+<a class="title-map-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors • ODbL</a>
+<span aria-hidden="true">•</span>
+<button id="dataLicensesBtn" class="title-legal-link" type="button" data-open-data-licenses>Data &amp; Licenses</button>
+<span aria-hidden="true">•</span>
+<a href="../about/" target="_blank" rel="noopener">About</a>
+<a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
+<a href="../legal/privacy" target="_blank" rel="noopener">Privacy</a>
+<span>© 2026 Steven Reid</span>
 </div>
 </div>
 </div>
+<dialog id="dataLicensesDialog" class="data-licenses-dialog" aria-labelledby="dataLicensesTitle">
+  <div class="data-licenses-head">
+    <div>
+      <span class="data-licenses-kicker">World Explorer 3D</span>
+      <h2 id="dataLicensesTitle">Data, licenses &amp; credits</h2>
+    </div>
+    <button id="dataLicensesCloseBtn" type="button" aria-label="Close data and licenses">Close</button>
+  </div>
+  <p class="data-licenses-intro">World Explorer combines first-party game systems with attributed open data, public scientific sources, licensed software, and optional provider services. Provider coverage and availability vary.</p>
+  <div class="data-licenses-grid">
+    <section>
+      <h3>Maps &amp; Earth</h3>
+      <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a> — ODbL 1.0. Includes mapped roads, buildings, water, places, and surveillance nodes.</p>
+      <p><a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Esri World Imagery</a> — interactive satellite basemap imagery with provider attribution shown in the globe selector.</p>
+      <p>ESA WorldCover 2021 / modified Copernicus Sentinel data — CC BY 4.0. GEBCO bathymetry — CC BY 4.0. Copernicus and USGS terrain artifacts retain source-specific notices.</p>
+    </section>
+    <section>
+      <h3>Live &amp; community feeds</h3>
+      <p>OpenSky Network and ADSB.lol aircraft observations; USGS earthquakes; CelesTrak orbital elements; Open-Meteo weather and marine models; NOAA CO-OPS observations and tide predictions.</p>
+      <p>Panoramax and KartaView street imagery is provided by their contributors under CC BY-SA 4.0.</p>
+    </section>
+    <section>
+      <h3>Software, fonts &amp; assets</h3>
+      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License.</p>
+      <p>NASA, ESA, JPL-Caltech, USGS Astrogeology, LROC, Wikimedia contributors, ambientCG, and Poly Haven assets retain the credits and terms documented in the attribution index.</p>
+    </section>
+    <section>
+      <h3>Project terms</h3>
+      <p>World Explorer 3D is source-available under its project license. Third-party components and data remain under their original terms.</p>
+      <nav class="data-licenses-links" aria-label="Detailed legal and attribution documents">
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">Attribution index</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/DATA_SOURCES.md" target="_blank" rel="noopener noreferrer">Data sources</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ACKNOWLEDGEMENTS.md" target="_blank" rel="noopener noreferrer">Acknowledgements</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Project license</a>
+      </nav>
+      <button id="analyticsConsentManageBtn" class="analytics-consent-manage" type="button">Analytics preference</button>
+    </section>
+  </div>
+  <p class="data-licenses-note">Detailed asset-level credits are retained with the bundled model and texture records. This summary is informational and is not legal advice.</p>
+</dialog>
+<aside id="analyticsConsentBanner" class="analytics-consent-banner" hidden aria-hidden="true" aria-labelledby="analyticsConsentTitle">
+  <div>
+    <strong id="analyticsConsentTitle">Help improve World Explorer</strong>
+    <p>Optional Firebase Analytics measures sessions, game and activity outcomes, room use, and onboarding. It does not receive exact GPS coordinates, room codes, messages, or other free-form text.</p>
+    <a href="../legal/privacy" target="_blank" rel="noopener">Privacy details</a>
+  </div>
+  <div class="analytics-consent-actions">
+    <button id="analyticsConsentDenyBtn" class="secondary" type="button">Essential only</button>
+    <button id="analyticsConsentAllowBtn" type="button">Allow analytics</button>
+  </div>
+</aside>
 <div id="globeSelectorScreen" aria-hidden="true">
 <div class="globe-selector-shell">
 <div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
 <nav class="globe-app-rail" aria-label="Main sections">
   <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
-  <button type="button" data-globe-destination="games"><span>⌖</span>Missions</button>
+  <button type="button" data-globe-destination="games"><span>⌖</span>Activities</button>
   <button type="button" data-globe-destination="multiplayer"><span>♙</span>Multiplayer</button>
   <button type="button" data-globe-destination="live-earth"><span>⌁</span>Live Data</button>
   <button type="button" data-globe-destination="library"><span>▥</span>My Places</button>
@@ -538,9 +602,25 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div class="globe-selector-live-loading">Loading working Live Earth layers...</div>
 </div>
 </div>
+<nav class="globe-legal-strip" aria-label="Data and legal information">
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors · ODbL</a>
+  <button type="button" data-open-data-licenses>Data &amp; Licenses</button>
+  <a href="../legal/privacy" target="_blank" rel="noopener">Privacy</a>
+  <a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
+</nav>
 </div>
 <div class="globe-selector-stage">
 <canvas id="globeSelectorCanvas"></canvas>
+<div class="globe-selector-basemap-controls" role="group" aria-label="Globe map style">
+  <button id="globeSelectorMapBasemapBtn" type="button" aria-pressed="false">Map</button>
+  <button id="globeSelectorSatelliteBasemapBtn" class="active" type="button" aria-pressed="true">Satellite</button>
+</div>
+<div class="globe-selector-zoom-controls" role="group" aria-label="Globe zoom controls">
+  <button id="globeSelectorZoomInBtn" type="button" aria-label="Zoom in">+</button>
+  <button id="globeSelectorZoomOutBtn" type="button" aria-label="Zoom out">−</button>
+  <output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
+</div>
+<a id="globeSelectorBasemapAttribution" class="globe-selector-basemap-attribution" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Imagery © Esri and contributors</a>
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 <div class="globe-destination-bar" aria-label="World destinations">
@@ -550,7 +630,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
   <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
 </div>
-<section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
+<section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="globeHubOverlayTitle" tabindex="-1">
   <header class="globe-hub-overlay-header">
     <div>
       <span>World Explorer 3D</span>
@@ -614,8 +694,14 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
       <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
       <section class="discoveryPane active" data-discovery-pane="today">
         <div class="discoveryModeNote"><b>EXPLORE THIS PLACE</b><span>Choose one nearby lead, then minimize this journal. Your tool and the world will guide the active field action.</span></div>
+        <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
+        <div class="discoveryFieldExpedition">
+          <div class="discoverySectionHead"><span>FIELD TODAY</span><small>THREE GPS WALKING STOPS</small></div>
+          <div id="discoveryExpeditionList" class="discoveryExpeditionList"></div>
+        </div>
         <div id="discoveryRankSummary" class="discoveryRankSummary"><span>FIELD RANK</span><strong>Trailhead</strong><small>Build records to reveal follow-up opportunities.</small></div>
         <div id="discoveryGoal" class="discoveryGoal" aria-live="polite"></div>
+        <div class="discoverySubsection discoveryRetentionSection"><h3>Field Rhythm</h3><p>Daily, weekly, and seasonal goals build on your permanent Journal. Missed days never remove progress.</p><div id="discoveryRetentionDashboard" class="discoveryRetentionDashboard"></div></div>
         <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
         <div class="discoverySectionHead"><span>NEARBY LEADS</span><small>ONE RECOMMENDED / TWO ALTERNATIVES</small></div>
         <div id="discoveryActionList" class="discoveryActionList" aria-label="Available activities"></div>
@@ -635,8 +721,9 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
       <section class="discoveryPane" data-discovery-pane="guide">
         <div class="discoverySectionHead"><span>FIELD GUIDE</span><small>WHAT EXISTS / WHAT YOU IDENTIFIED</small></div>
         <div class="discoveryGuideControls"><input id="discoveryGuideSearch" type="search" placeholder="Search your Field Guide" aria-label="Search your Field Guide"><select id="discoveryGuideCategory" aria-label="Filter Field Guide category"><option value="all">All categories</option><option value="wildlife">Wildlife</option><option value="plants">Plants &amp; Fungi</option><option value="geology">Geology</option><option value="fossils">Fossils</option><option value="places">Places &amp; History</option><option value="ocean">Ocean</option></select><button id="discoveryGuideHelpBtn" type="button">How This Works</button></div>
-        <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Procedural</dt><dd>A virtual gameplay encounter generated from broad world context, not a live occurrence claim.</dd></div><div><dt>Backpack</dt><dd>A virtual specimen, find, catch trophy, or created artifact enters your Backpack only when you actually acquire it.</dd></div><div><dt>Rarity</dt><dd>Gameplay opportunity frequency, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
+        <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Field lead</dt><dd>A game-generated field lead based on broad world context, not a live occurrence claim.</dd></div><div><dt>Backpack</dt><dd>A virtual specimen, find, catch trophy, or created artifact enters your Backpack only when you actually acquire it.</dd></div><div><dt>Rarity</dt><dd>Gameplay opportunity frequency, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
         <div id="discoveryGuideOverview" class="discoveryGuideOverview"></div>
+        <div id="discoveryLifeList" class="discoveryLifeList"></div>
         <div id="discoveryFieldGuideList" class="discoveryList"></div>
       </section>
       <section class="discoveryPane" data-discovery-pane="collection"><div class="discoverySectionHead"><span>PLACES &amp; CONTACTS</span><small>WHERE YOUR EXPLORER STORY HAPPENED</small></div><div class="discoveryModeNote"><b>KNOWLEDGE, NOT STORAGE</b><span>Review regions connected to your Journal records. Acquired objects and tools live only in your Backpack.</span></div><div id="discoveryCollectionList" class="discoveryList"></div></section>
@@ -763,7 +850,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div id="urbanBackpackContents" class="urbanBackpackContents"></div>
   <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
 </aside>
-<button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden>PACK</button>
+<button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.8C8 3.7 9.7 2 11.8 2h.4C14.3 2 16 3.7 16 5.8V7M6.5 8h11A2.5 2.5 0 0 1 20 10.5v8A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-8A2.5 2.5 0 0 1 6.5 8ZM4 13h16M8 16h8"/></svg><span>PACK</span></button>
 <aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
   <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
   <div class="urbanCivicStatusCopy">
@@ -778,13 +865,14 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <p>Direction cones and detection range are gameplay approximations, not claims about real camera capabilities. No plates, vehicle photos, live results, or driver data are collected.</p>
   <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors • ODbL</a>
 </aside>
-<div id="liveGpsPermissionPanel" role="dialog" aria-modal="true" aria-labelledby="liveGpsPermissionTitle">
+<div id="liveGpsPermissionPanel" role="dialog" aria-modal="true" aria-labelledby="liveGpsPermissionTitle" tabindex="-1">
   <div class="liveGpsPermissionCard">
     <div class="liveGpsPermissionIcon">📍</div>
     <h2 id="liveGpsPermissionTitle">Start Live GPS Explore?</h2>
     <p>Your location moves the in-world walker while World Explorer remains open and visible. Locking the screen or switching apps may pause movement.</p>
     <p class="liveGpsSafety"><strong>Stay aware of traffic, terrain, private property, and local rules. Do not use the game while driving.</strong></p>
-    <p>Location samples stay in memory for this session and are not saved as a route.</p>
+    <p>Only bounded current-processing fixes and aggregate distance/quality counters stay in session memory. World Explorer does not retain a raw fix history or save a raw route.</p>
+    <p>Field stops create personal virtual records only. They do not prove physical access, a real animal nearby, or eligibility for a competitive location reward.</p>
     <div id="liveGpsPermissionStatus" aria-live="polite"></div>
     <div class="liveGpsPermissionActions">
       <button id="liveGpsPermissionCancel" type="button">Cancel</button>
@@ -795,8 +883,9 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <section id="liveGpsHud" aria-label="Live GPS status">
   <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
   <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
-  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span></div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span><span id="liveGpsFieldDistance">Walk 0 m</span></div>
   <div class="liveGpsActions">
+    <button id="liveGpsFieldBtn" type="button">Field Today</button>
     <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
     <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
     <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
@@ -810,8 +899,13 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
 </div>
 <div id="largeMap">
+<header id="mapExplorerHeader">
+  <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
+  <button id="mapRecenter" type="button">◎ My position</button>
+</header>
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
-<button id="mapClose">Close Map (M)</button>
+<div id="mapExplorerHint">Drag to explore · use +/− to zoom · tap a marker for details</div>
+<button id="mapClose" type="button" aria-label="Close world map">Close</button>
 <button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">📋 Legend</button>
 <div id="legendPanel" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
@@ -1041,14 +1135,14 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <div id="mapInfoContent" style="font-size:11px;line-height:1.6"></div>
 </div>
 
-<div style="position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:10px">
-<button id="mapSatelliteToggle" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛰️</button>
-<button id="mapRoadsToggle" class="active" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛣️</button>
+<div id="mapControlDock">
+<button id="mapSatelliteToggle" type="button" aria-label="Toggle satellite map" title="Satellite">🛰️</button>
+<button id="mapRoadsToggle" class="active" type="button" aria-label="Toggle road overlay" title="Roads">🛣️</button>
 <button id="mapPathsToggle" hidden style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
-<div style="border-top:2px solid #0fc;margin:5px 0"></div>
-<button id="mapZoomIn" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">+</button>
-<button id="mapZoomOut" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">−</button>
-<div style="background:rgba(0,0,0,0.8);border:1px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:5px 10px;border-radius:6px;text-align:center" id="zoomLevel">Z: 14</div>
+<span aria-hidden="true"></span>
+<button id="mapZoomIn" type="button" aria-label="Zoom map in">+</button>
+<button id="mapZoomOut" type="button" aria-label="Zoom map out">−</button>
+<div id="zoomLevel" aria-live="polite">Z 14</div>
 </div>
 </div>
 <div id="explorationModeMsg" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:3px solid #667eea;border-radius:16px;padding:24px 48px;color:#ffffff;font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;z-index:1000;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center;letter-spacing:1px;cursor:pointer;pointer-events:auto">
@@ -1189,8 +1283,8 @@ Explore the area
 <section id="editorPanel" aria-label="Overlay editor panel">
   <div class="editorPanelHeader">
     <div class="editorPanelTitleWrap">
-      <div id="editorPanelTitle">Overlay Editor Beta</div>
-      <div id="editorPanelSubline">Beta demo editor for World Explorer overlays. This does not submit to OpenStreetMap and does not edit the imported base world data.</div>
+      <div id="editorPanelTitle">World Editor Beta</div>
+      <div id="editorPanelSubline">Create reviewed World Explorer overlays or switch to persistent block building. Neither workflow changes OpenStreetMap, Overture, or imported provider data.</div>
       <div id="editorAuthBadge">Preview only • Sign in to save drafts</div>
     </div>
     <div class="editorHeaderActions">
@@ -1219,6 +1313,7 @@ Explore the area
   <div class="editorTabRow">
     <button id="editorTabWorkspace" class="editorTabBtn active" type="button">Workspace</button>
     <button id="editorTabMine" class="editorTabBtn" type="button">My Features</button>
+    <button id="editorTabBlocks" class="editorTabBtn" type="button">Blocks</button>
     <button id="editorTabModeration" class="editorTabBtn" type="button" hidden>Moderation</button>
   </div>
   <div class="editorPanelBody">
@@ -1421,7 +1516,7 @@ Explore the area
 
 <div id="editorTutorialModal" aria-hidden="true">
   <div class="editorTutorialCard">
-    <div class="editorTutorialTitle">Overlay Editor Beta Demo</div>
+    <div class="editorTutorialTitle">World Editor Beta</div>
     <div class="editorTutorialText">This workflow previews World Explorer overlay editing on top of the imported world. It is not connected to OpenStreetMap contribution and it does not edit base ingest data.</div>
     <div class="editorTutorialList">
       <div>1. Select a base feature to patch, or choose a preset and draw a point, line, or polygon directly in the 3D world.</div>
@@ -1491,7 +1586,7 @@ Explore the area
           <option value="library">Creator Library</option>
         </select>
       </label>
-      <div id="activityCreatorAudienceHelp" class="activityCreatorHelpCard">Saved activities stay in your creator library on this browser until you publish them later.</div>
+      <div id="activityCreatorAudienceHelp" class="activityCreatorHelpCard">Creator Library activities stay only on this browser. Public activity publishing is not available in minimum 5.0.</div>
       <div class="activityCreatorFieldGrid">
         <label class="activityCreatorField">
           <span>Placement Offset</span>
@@ -1574,7 +1669,7 @@ Explore the area
     <div class="creatorProfileTopBar">
       <div class="creatorProfileTitleWrap">
         <div id="creatorProfileTitle">Creator Profile</div>
-        <div id="creatorProfileSubline">Recognition, authored activities, and published world work.</div>
+        <div id="creatorProfileSubline">Room activity credit, device drafts, and published world overlays.</div>
       </div>
       <button id="creatorProfileCloseBtn" type="button">Close</button>
     </div>
@@ -1629,10 +1724,13 @@ Explore the area
 </div>
 <aside id="blockBuilderPanel" aria-label="Build with Blocks" aria-hidden="true">
   <header class="blockBuilderHeader">
-    <strong>Edit This World</strong>
-    <button id="blockBuilderClose" type="button" aria-label="Close builder" title="Close builder">×</button>
+    <strong>World Editor · Blocks</strong>
+    <div class="blockBuilderHeaderActions">
+      <button id="blockBuilderBack" type="button">Overlays</button>
+      <button id="blockBuilderClose" type="button" aria-label="Close World Editor" title="Close World Editor">×</button>
+    </div>
   </header>
-  <p class="blockBuilderTruthNote">Creates a virtual alternate version on this device or in this room. It never changes OpenStreetMap, Overture, or real-world data.</p>
+  <p class="blockBuilderTruthNote">Blocks persist in this virtual location on this device or in the current shared room. They never change OpenStreetMap, Overture, or real-world data.</p>
   <section class="editableWorldBuildingTools" aria-label="Mapped building tools">
     <strong>Mapped building</strong>
     <div class="blockBuilderActions">
@@ -1664,6 +1762,25 @@ Explore the area
   <div id="blockBuilderStatus" role="status" aria-live="polite"></div>
 </aside>
 <div id="controlsTab"><div id="ctrlHeader">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden">
+<section id="mobileControlSettings" aria-label="Mobile control settings">
+<div class="mobileControlSettingsHead"><strong>Mobile Controls</strong><button id="mobileControlsReset" type="button">Reset</button></div>
+<label><span>Layout</span><select id="mobileControlsHandedness"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
+<label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>
+<label><span>Camera sensitivity</span><input id="mobileLookSensitivity" type="range" min="35" max="150" step="5" value="80"><output id="mobileLookSensitivityValue">80%</output></label>
+<label class="mobileControlToggle"><input id="mobileCameraRecenter" type="checkbox" checked><span>Return camera behind player</span></label>
+<p id="mobileControlSettingsStatus">Left thumb moves. Right thumb looks and uses actions.</p>
+<div id="mobileControlModeSummary" aria-live="polite">
+<strong id="mobileControlModeName">Walking</strong>
+<div><span><b>LEFT</b><i id="mobileControlLeftSummary">Move</i></span><span><b>RIGHT</b><i id="mobileControlRightSummary">Look</i></span><span><b>ACTIONS</b><i id="mobileControlActionSummary">Jump · Run</i></span></div>
+</div>
+</section>
+<section id="accessibilitySettings" aria-label="Accessibility settings">
+<strong>Accessibility</strong>
+<label><span>Text size</span><select id="accessibilityTextScale"><option value="100">Standard</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option></select></label>
+<label><input id="accessibilityReducedMotion" type="checkbox"><span>Reduce interface motion</span></label>
+<label><input id="accessibilityHighContrast" type="checkbox"><span>Increase interface contrast</span></label>
+<p id="accessibilitySettingsStatus" role="status" aria-live="polite">100% text · system motion · standard contrast</p>
+</section>
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
 • Arrow Up/Down - Drive forward / reverse<br>
@@ -1774,6 +1891,6 @@ Explore the area
 
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
-<script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=488"></script>
+<script type="module" src="js/app-auth-shell.js?v=87"></script>
+<script type="module" src="js/bootstrap.js?v=516"></script>
 </body></html>

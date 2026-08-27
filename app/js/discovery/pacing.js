@@ -11,7 +11,11 @@ function fieldRankForCount(recordCount = 0) {
 }
 
 function fieldProgress(profile = {}) {
-  const records = Math.max(0, Number(profile.collectionCount) || 0);
+  const records = Math.max(
+    0,
+    Number(profile.collectionCount) || 0,
+    Number(profile.explorerProgress?.totalRecords) || 0
+  );
   const rank = fieldRankForCount(records);
   const rankIndex = FIELD_RANKS.indexOf(rank);
   const next = FIELD_RANKS[rankIndex + 1] || null;

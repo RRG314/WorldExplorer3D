@@ -45,6 +45,8 @@ async function verifyDestination(destination) {
     await page.locator('#landingPrimaryCta').click();
     await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
     await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60000 });
+    const consent = page.locator('#analyticsConsentDenyBtn');
+    if (await consent.isVisible()) await consent.click();
     await page.locator(destination.selector).click();
     await page.waitForFunction((expected) => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};

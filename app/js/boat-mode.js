@@ -37,7 +37,7 @@ import {
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=2";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=8";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=9";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=2";
 
@@ -244,6 +244,7 @@ function syncBoatPromptState(force = false) {
     return null;
   }
   const candidate = findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
+    requireContainment: false,
     referenceY: ref.y,
     structureTerrainMode: ref.structureTerrainMode
   });
@@ -313,6 +314,7 @@ function startBoatMode(options = {}) {
     appCtx.boatMode?.candidate ||
     findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
       allowSynthetic: options.allowSynthetic === true,
+      requireContainment: false,
       waterKind: options.waterKind || 'open_ocean',
       referenceY: ref.y,
       structureTerrainMode: ref.structureTerrainMode

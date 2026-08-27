@@ -14,16 +14,19 @@ function setStatus(message) {
   if (status) status.textContent = String(message || '');
 }
 
+function deferTutorialPrompt() {
+  const card = document.getElementById('tutorialHintCard');
+  if (!card || card.hidden) return;
+  const later = card.querySelector('.tutorial-icon-btn');
+  if (later instanceof HTMLButtonElement) later.click();
+  else card.hidden = true;
+}
+
 function syncBlockBuilderUi(snapshot = {}) {
   if (!panel) return;
   const enabled = snapshot.enabled === true;
   panel.classList.toggle('show', enabled);
   panel.setAttribute('aria-hidden', enabled ? 'false' : 'true');
-  const menuItem = document.getElementById('fEditorMode');
-  if (menuItem) {
-    menuItem.classList.toggle('on', enabled);
-    menuItem.textContent = enabled ? '🏗️ Edit This World: ON' : '🏗️ Edit This World';
-  }
 
   panel.querySelectorAll('[data-block-tool]').forEach((button) => {
     const active = button.dataset.blockTool === snapshot.tool;
@@ -54,8 +57,16 @@ function syncBlockBuilderUi(snapshot = {}) {
 
 function openBlockBuilder() {
   if (!appCtx.gameStarted || typeof appCtx.toggleBlockBuildMode !== 'function') return false;
+  deferTutorialPrompt();
   const enabled = appCtx.toggleBlockBuildMode(true);
-  if (enabled) setStatus('Choose a piece and color, or select a nearby mapped building to edit this virtual world.');
+  if (enabled) {
+    const snapshot = appCtx.getBlockBuilderSnapshot?.() || {};
+    const persistence = appCtx.getBuildPersistenceStatus?.() || {};
+    const recoveryNotice = snapshot.shared !== true && persistence.notice && persistence.notice !== 'none'
+      ? String(persistence.detail || '')
+      : '';
+    setStatus(recoveryNotice || 'Choose a piece and color, or select a nearby mapped building to edit this virtual world.');
+  }
   return enabled;
 }
 
@@ -103,6 +114,10 @@ function initBlockBuilderUi() {
   panel.addEventListener('pointerdown', stopBuildPointer);
   panel.addEventListener('click', stopBuildPointer);
   document.getElementById('blockBuilderClose')?.addEventListener('click', closeBlockBuilder);
+  document.getElementById('blockBuilderBack')?.addEventListener('click', async () => {
+    closeBlockBuilder();
+    await appCtx.openEditorSession?.({ initialTab: 'workspace', skipTutorial: true });
+  });
   panel.querySelectorAll('[data-block-tool]').forEach((button) => {
     button.addEventListener('click', () => appCtx.setBlockBuildTool?.(button.dataset.blockTool));
   });
@@ -164,8 +179,13 @@ function initBlockBuilderUi() {
   });
   document.getElementById('blockBuilderClear')?.addEventListener('click', () => {
     if (!globalThis.confirm('Clear your blocks at this location?')) return;
-    appCtx.clearAllBuildBlocks?.();
-    setStatus('Blocks cleared for this location.');
+    const shared = appCtx.getBlockBuilderSnapshot?.()?.shared === true;
+    const cleared = appCtx.clearAllBuildBlocks?.();
+    if (cleared === false) {
+      setStatus('Could not save that clear. Your blocks were kept.');
+    } else {
+      setStatus(shared ? 'Removing your saved room blocks…' : 'Blocks cleared for this location.');
+    }
     syncBlockBuilderUi(appCtx.getBlockBuilderSnapshot?.() || {});
   });
   refreshButton?.addEventListener('click', refreshMapData);

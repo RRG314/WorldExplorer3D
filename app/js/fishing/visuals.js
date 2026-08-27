@@ -122,14 +122,15 @@ function ensureSceneVisual(fish, appCtx) {
 }
 
 function updateFishingScene(state, appCtx, dt) {
-  if (!state?.fish || !['bite', 'fighting', 'landed'].includes(state.stage) || !appCtx.boatMode?.active) {
+  const shoreActor = state?.accessMode === 'shore' ? appCtx.Walk?.state?.walker : null;
+  if (!state?.fish || !['bite', 'fighting', 'landed'].includes(state.stage) || (!appCtx.boatMode?.active && !shoreActor)) {
     if (sceneVisual) disposeVisual();
     return;
   }
   const visual = ensureSceneVisual(state.fish, appCtx);
   if (!visual) return;
   visual.phase += dt * (state.stage === 'fighting' ? 3.2 + state.currentBurst * 5 : 1.1);
-  const boat = appCtx.boat || { x: 0, y: 0, z: 0, angle: 0 };
+  const boat = shoreActor || appCtx.boat || { x: 0, y: 0, z: 0, angle: 0 };
   const direction = Number(state.fishDirection || 1);
   const outboard = state.stage === 'landed' ? 2.4 : 8 + (1 - state.reelProgress) * 15;
   const foreAft = 4 + direction * (2.4 + Math.sin(visual.phase * 0.7) * 2.8);
@@ -137,12 +138,27 @@ function updateFishingScene(state, appCtx, dt) {
   const forwardZ = Math.cos(boat.angle);
   const rightX = Math.cos(boat.angle);
   const rightZ = -Math.sin(boat.angle);
-  const fishX = boat.x + forwardX * foreAft + rightX * outboard;
-  const fishZ = boat.z + forwardZ * foreAft + rightZ * outboard;
+  let fishX = boat.x + forwardX * foreAft + rightX * outboard;
+  let fishZ = boat.z + forwardZ * foreAft + rightZ * outboard;
+  if (shoreActor) {
+    const castTarget = state.accessContext?.castTarget;
+    const targetX = Number(castTarget?.x);
+    const targetZ = Number(castTarget?.z);
+    if (Number.isFinite(targetX) && Number.isFinite(targetZ)) {
+      const toWaterX = targetX - Number(shoreActor.x || 0);
+      const toWaterZ = targetZ - Number(shoreActor.z || 0);
+      const toWaterLength = Math.hypot(toWaterX, toWaterZ) || 1;
+      const tangentX = -toWaterZ / toWaterLength;
+      const tangentZ = toWaterX / toWaterLength;
+      const swimOffset = state.stage === 'landed' ? 0 : direction * (1.2 + (1 - state.reelProgress) * 4.2);
+      fishX = targetX + tangentX * swimOffset;
+      fishZ = targetZ + tangentZ * swimOffset;
+    }
+  }
   const surfaceY = Number(appCtx.waterSurfaceYAt?.(fishX, fishZ));
   const waterY = Number.isFinite(surfaceY) ? surfaceY : Number(boat.y) || 0;
   const fishY = state.stage === 'landed'
-    ? waterY + 1.4
+    ? waterY + (shoreActor ? 0.55 : 1.4)
     : waterY - 0.7 - state.currentBurst * 1.1 + Math.sin(visual.phase) * 0.22;
 
   visual.fishMesh.visible = true;

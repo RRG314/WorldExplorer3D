@@ -1,6 +1,6 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
-const { Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
+const { FieldValue, Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
 const { defineString } = require('firebase-functions/params');
 const Stripe = require('stripe');
 const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
@@ -422,7 +422,7 @@ async function logAdminActivity(entry = {}) {
     targetId,
     title: sanitizeText(entry.title || '', 140),
     summary: sanitizeMultilineText(entry.summary || '', 320),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     createdAtMs: Date.now()
   });
 }
@@ -815,7 +815,7 @@ async function deleteDiscoveryTradesForUser(uid) {
           if (itemSnap.exists && itemSnap.data()?.lockedByTradeId === tradeSnap.id) {
             transaction.update(itemSnap.ref, {
               lockedByTradeId: null,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+              updatedAt: FieldValue.serverTimestamp()
             });
           }
         });
@@ -932,7 +932,7 @@ async function ensureUserDoc(uid, email, displayName) {
         displayName: normalizedDisplayName || existing.displayName || 'Explorer',
         roomCreateCount,
         roomCreateLimit,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp()
       },
       { merge: true }
     );
@@ -957,8 +957,8 @@ async function ensureUserDoc(uid, email, displayName) {
     entitlements: planEntitlements(plan),
     roomCreateCount: 0,
     roomCreateLimit: roomCreateLimitForPlan(plan),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
   };
 
   await ref.set(created, { merge: true });
@@ -1016,7 +1016,7 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
       entitlements: planEntitlements(plan),
       roomCreateCount,
       roomCreateLimit,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     },
     { merge: true }
   );
@@ -1074,7 +1074,7 @@ exports.createCheckoutSession = functions.region('us-central1').https.onRequest(
       await db.collection('users').doc(auth.uid).set(
         {
           stripeCustomerId: customerId,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp()
         },
         { merge: true }
       );
@@ -1212,7 +1212,7 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
             entitlements: planEntitlements('trial'),
             roomCreateCount,
             roomCreateLimit,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            updatedAt: FieldValue.serverTimestamp()
           },
           { merge: true }
         );
@@ -1250,7 +1250,7 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
         entitlements: planEntitlements('trial'),
         roomCreateCount,
         roomCreateLimit,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp()
       },
       { merge: true }
     );
@@ -1315,7 +1315,7 @@ exports.enableAdminTester = functions.region('us-central1').https.onRequest(asyn
         entitlements: planEntitlements('pro'),
         roomCreateCount,
         roomCreateLimit,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp()
       },
       { merge: true }
     );
@@ -1519,7 +1519,7 @@ exports.updateAccountProfile = functions.region('us-central1').https.onRequest(a
     await admin.auth().updateUser(auth.uid, { displayName });
     await db.collection('users').doc(auth.uid).set({
       displayName,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     const creatorProfile = await mergeCreatorProfile(db, auth.uid, {
       username: sanitizeUsername(displayName, 'Explorer'),
@@ -1664,7 +1664,7 @@ exports.claimDeFlockVirtualDisable = functions.region('us-central1').https.onReq
       action: 'virtually_disabled',
       uid: auth.uid,
       displayName: sanitizeText(authUser.displayName || authUser.email || 'Explorer', 48) || 'Explorer',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     };
     const result = await claimImmutableDeFlockState({
       cameraRef,
@@ -1963,7 +1963,7 @@ exports.submitContribution = functions.region('us-central1').https.onRequest(asy
       return;
     }
 
-    const createdAt = admin.firestore.FieldValue.serverTimestamp();
+    const createdAt = FieldValue.serverTimestamp();
     const ref = await db.collection('editorSubmissions').add({
       editType,
       status: 'pending',
@@ -2137,11 +2137,11 @@ exports.moderateContributionSubmission = functions.region('us-central1').https.o
 
     await ref.set({
       status,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       moderation: {
         moderatedBy: moderator.auth.uid,
         moderatedByName: moderator.displayName,
-        moderatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        moderatedAt: FieldValue.serverTimestamp(),
         decisionNote
       }
     }, { merge: true });

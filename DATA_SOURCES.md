@@ -1,8 +1,10 @@
 # Data Sources
 
-Last reviewed: 2026-08-22 for version 4.3.1.
+Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
 
-World Explorer keeps source identity and truth type in its runtime contracts. Observations, forecasts/models, predictions, mapped features, and visual fallbacks are not interchangeable.
+World Explorer keeps source identity and truth type with its data. Observations,
+forecasts and models, predictions, mapped features, and visual fallbacks are not
+interchangeable.
 
 ## Earth Geometry And Surfaces
 
@@ -14,12 +16,29 @@ World Explorer keeps source identity and truth type in its runtime contracts. Ob
 | Nominatim | Forward and reverse place lookup | Community-mapped service | OSMF Nominatim policy |
 | Overture Maps Foundation | Bounded building-massing fallback when selected-location OSM building coverage is unavailable | Compiled mapped data | Overture source licenses and attribution |
 | ESA WorldCover 2021 | Global semantic surface classification and land-cover fallback | Remote-sensing classification | CC BY 4.0; contains modified Copernicus Sentinel data |
-| USGS 3DEP accepted-ground artifact | Baltimore bare-earth terrain height and collision | Government elevation model normalized to EGM2008 | Public USGS data |
-| Copernicus DEM GLO-30 classified-ground artifacts | Accepted terrain for the documented worldwide release fixtures | Public DEM-derived, correction-attested ground normalized to EGM2008 | Public free use with required attribution |
+| USGS 3DEP accepted-ground data | Baltimore bare-earth terrain height and collision | Government elevation model normalized to EGM2008 | Public USGS data |
+| Copernicus DEM GLO-30 classified-ground data | Accepted terrain for documented locations | Public DEM-derived, correction-attested ground normalized to EGM2008 | Public free use with required attribution |
 | Mapzen Terrarium elevation tiles | Legacy visual fallback only; never accepted-ground authority | Elevation model | Provider/source terms |
 | GEBCO 2020 via OpenTopodata | Bundled Great Barrier Reef bathymetry seed | Bathymetric model | CC BY 4.0 |
 
 Required map attribution: `© OpenStreetMap contributors`.
+
+## Regional Ecology
+
+The Baltimore–Chesapeake ecology pack uses the GBIF Backbone Taxonomy for
+stable taxon identity and Maryland Department of Natural Resources and
+Chesapeake Bay Program references for regional plausibility review. It does not
+include occurrence points or abundance estimates and does not claim that a real
+organism is present at a player location.
+
+| Source | Runtime use | Data class | License / terms |
+| --- | --- | --- | --- |
+| GBIF Backbone Taxonomy (2023 pinned compatibility taxonomy) | Stable taxonomy identity for the 60-taxon regional pack | Taxonomic reference | CC BY 4.0; GBIF Secretariat DOI 10.15468/39omei |
+| Maryland Department of Natural Resources wildlife and native-plant lists | Factual regional plausibility review | Government reference | Reference only; no copied prose or media |
+| Chesapeake Bay Program Field Guide | Factual estuary and fish plausibility review | Government-program reference | Reference only; photography excluded unless separately permitted |
+
+OpenStreetMap and ESA WorldCover can provide mapped habitat or land-cover
+context. Neither is used to infer species presence or abundance.
 
 ## Surveillance Mapping
 

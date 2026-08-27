@@ -99,7 +99,7 @@ function civicSearchDurationMs(level) {
 
 function civicOutcomeForLevel(level) {
   if (level >= 3) return Object.freeze({ type: 'recovery', label: 'Vehicle recovery required' });
-  if (level >= 2) return Object.freeze({ type: 'citation', label: 'Citation issued' });
+  if (level >= 2) return Object.freeze({ type: 'arrest', label: 'Taken into custody' });
   return Object.freeze({ type: 'warning', label: 'Warning issued' });
 }
 

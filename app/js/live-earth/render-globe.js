@@ -1,3 +1,9 @@
+const DEFLOCK_POINT_RADIUS = 1.000025;
+const DEFLOCK_SELECTION_RADIUS = 1.00004;
+const DEFLOCK_COVERAGE_RADIUS = 1.000045;
+const DEFLOCK_ORIENTATION_LENGTH_METERS = 45.72;
+const METERS_PER_LATITUDE_DEGREE = 111320;
+
 function ensureSelectorGroups(state) {
   const selector = state.selector;
   const api = selector.api;
@@ -7,14 +13,158 @@ function ensureSelectorGroups(state) {
   selector.satelliteGroup = new THREE.Group();
   selector.earthquakeGroup = new THREE.Group();
   selector.weatherGroup = new THREE.Group();
+  selector.deFlockGroup = new THREE.Group();
+  selector.deFlockPointGroup = new THREE.Group();
+  selector.deFlockSelectionGroup = new THREE.Group();
   selector.transportRouteGroup = new THREE.Group();
   selector.transportMarkerGroup = new THREE.Group();
   selector.group.add(selector.satelliteGroup);
   selector.group.add(selector.earthquakeGroup);
   selector.group.add(selector.weatherGroup);
+  selector.group.add(selector.deFlockGroup);
+  selector.deFlockGroup.add(selector.deFlockPointGroup);
+  selector.deFlockGroup.add(selector.deFlockSelectionGroup);
   selector.group.add(selector.transportRouteGroup);
   selector.group.add(selector.transportMarkerGroup);
   api.globeRoot.add(selector.group);
+}
+
+function cameraDirectionEndpoint(camera, bearingDegrees, distanceDegrees = DEFLOCK_ORIENTATION_LENGTH_METERS / METERS_PER_LATITUDE_DEGREE) {
+  const bearing = Number(bearingDegrees) * Math.PI / 180;
+  const lat = Number(camera.lat) + Math.cos(bearing) * distanceDegrees;
+  const lonScale = Math.max(0.2, Math.cos(Number(camera.lat) * Math.PI / 180));
+  const lon = Number(camera.lon) + Math.sin(bearing) * distanceDegrees / lonScale;
+  return { lat: Math.max(-89.999, Math.min(89.999, lat)), lon: ((lon + 540) % 360) - 180 };
+}
+
+function renderDeFlockSelectionDirections(ctx, state, group) {
+  const selected = ctx.selectedDeFlockCamera(state);
+  if (!selected) return;
+  const center = state.selector.api.latLonToLocalPoint(selected.lat, selected.lon, DEFLOCK_SELECTION_RADIUS);
+  const marker = new THREE.Mesh(
+    new THREE.RingGeometry(0.48, 1, 24),
+    new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false })
+  );
+  marker.position.set(center.x, center.y, center.z);
+  marker.lookAt(0, 0, 0);
+  marker.renderOrder = 8;
+  marker.userData.fixedScreenRadiusPx = 9;
+  group.add(marker);
+  const centerDot = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false })
+  );
+  centerDot.position.set(center.x, center.y, center.z);
+  centerDot.lookAt(0, 0, 0);
+  centerDot.renderOrder = 9;
+  centerDot.userData.fixedScreenRadiusPx = 3;
+  group.add(centerDot);
+  const sectors = Array.isArray(selected.directionSectors) ? selected.directionSectors : [];
+  if (!state.deFlockCoverageVisible || !sectors.length) return;
+  sectors.forEach((sector) => {
+    const mappedFov = Number(sector.fieldOfViewDegrees);
+    const fieldOfView = sector.kind === 'panoramic' ? 360 : Number.isFinite(mappedFov) ? Math.max(8, Math.min(350, mappedFov)) : 70;
+    const segments = fieldOfView >= 359 ? 32 : Math.max(6, Math.ceil(fieldOfView / 10));
+    const startBearing = Number(sector.bearingDegrees) - fieldOfView * 0.5;
+    const triangles = [];
+    for (let index = 0; index < segments; index += 1) {
+      const aGeo = cameraDirectionEndpoint(selected, startBearing + fieldOfView * index / segments);
+      const bGeo = cameraDirectionEndpoint(selected, startBearing + fieldOfView * (index + 1) / segments);
+      const a = state.selector.api.latLonToLocalPoint(aGeo.lat, aGeo.lon, DEFLOCK_COVERAGE_RADIUS);
+      const b = state.selector.api.latLonToLocalPoint(bGeo.lat, bGeo.lon, DEFLOCK_COVERAGE_RADIUS);
+      triangles.push(center.x, center.y, center.z, a.x, a.y, a.z, b.x, b.y, b.z);
+    }
+    const coverageGeometry = new THREE.BufferGeometry();
+    coverageGeometry.setAttribute('position', new THREE.Float32BufferAttribute(triangles, 3));
+    const coverage = new THREE.Mesh(
+      coverageGeometry,
+      new THREE.MeshBasicMaterial({
+        color: 0x67e8f9,
+        transparent: true,
+        opacity: 0.34,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false
+      })
+    );
+    coverage.renderOrder = 6;
+    group.add(coverage);
+    const outlinePoints = [];
+    for (let index = 0; index <= segments; index += 1) {
+      const edgeGeo = cameraDirectionEndpoint(selected, startBearing + fieldOfView * index / segments);
+      const edge = state.selector.api.latLonToLocalPoint(edgeGeo.lat, edgeGeo.lon, DEFLOCK_COVERAGE_RADIUS);
+      outlinePoints.push(new THREE.Vector3(edge.x, edge.y, edge.z));
+    }
+    const outline = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(center.x, center.y, center.z),
+        ...outlinePoints,
+        new THREE.Vector3(center.x, center.y, center.z)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xb9f7ff, transparent: true, opacity: 0.95, depthTest: false })
+    );
+    outline.renderOrder = 7;
+    group.add(outline);
+    const endGeo = cameraDirectionEndpoint(selected, sector.bearingDegrees);
+    const end = state.selector.api.latLonToLocalPoint(endGeo.lat, endGeo.lon, DEFLOCK_COVERAGE_RADIUS);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(center.x, center.y, center.z),
+        new THREE.Vector3(end.x, end.y, end.z)
+      ]),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.98, depthTest: false })
+    );
+    line.renderOrder = 7;
+    group.add(line);
+  });
+}
+
+export function renderDeFlockGlobe(ctx, state) {
+  ensureSelectorGroups(state);
+  const selector = state.selector;
+  removeChildren(selector.deFlockSelectionGroup);
+  if (state.panelMode !== 'live-earth' || state.activeLayerId !== 'deflock-cameras') {
+    selector.deFlockGroup.visible = false;
+    return;
+  }
+  selector.deFlockGroup.visible = true;
+  const snapshot = state.deFlockIndex;
+  if (!snapshot?.count) return;
+  const buildKey = JSON.stringify(snapshot.builds);
+  if (selector.deFlockBuildKey !== buildKey || !selector.deFlockPointGroup?.children.length) {
+    removeChildren(selector.deFlockPointGroup);
+    selector.markerRecords = selector.markerRecords.filter((entry) => entry.type !== 'deflock');
+    const positions = new Float32Array(snapshot.count * 3);
+    let offset = 0;
+    for (const index of snapshot.indexes) {
+      for (let itemIndex = 0; itemIndex < index.count; itemIndex += 1) {
+        const point = selector.api.latLonToLocalPoint(index.latitudes[itemIndex] / 1e6, index.longitudes[itemIndex] / 1e6, DEFLOCK_POINT_RADIUS);
+        positions[offset * 3] = point.x;
+        positions[offset * 3 + 1] = point.y;
+        positions[offset * 3 + 2] = point.z;
+        offset += 1;
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const points = new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({
+        color: 0xff4f67,
+        size: 1.45,
+        sizeAttenuation: false,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false
+      })
+    );
+    points.renderOrder = 5;
+    points.userData.liveEarth = { type: 'deflock' };
+    selector.deFlockPointGroup.add(points);
+    selector.markerRecords.push({ type: 'deflock', id: 'camera-index', mesh: points });
+    selector.deFlockBuildKey = buildKey;
+  }
+  renderDeFlockSelectionDirections(ctx, state, selector.deFlockSelectionGroup);
 }
 
 function removeChildren(group) {
@@ -297,6 +447,7 @@ export function renderGlobeLayers(ctx, state) {
   renderSatelliteGlobe(ctx, state);
   renderEarthquakeGlobe(ctx, state);
   renderWeatherGlobe(ctx, state);
+  renderDeFlockGlobe(ctx, state);
   renderTransportGlobe(ctx, state);
 }
 

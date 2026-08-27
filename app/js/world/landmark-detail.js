@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=3";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=20";
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=21";
 import { renderCuratedLandmarkModels } from './landmark-models.js?v=13';
 
 const MAX_PYRAMIDS = 48;

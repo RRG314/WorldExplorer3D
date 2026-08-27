@@ -1,3 +1,5 @@
+import { createUnderwaterSchoolPlan } from '../fishing/population-authority.js?v=2';
+
 export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
   const _tmpVecA = new THREE.Vector3();
   const _tmpVecB = new THREE.Vector3();
@@ -136,6 +138,8 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
     }
     oceanMode.fishEntities = [];
     oceanMode.fishSchools = [];
+    oceanMode.underwaterSchoolPlan = null;
+    oceanMode.fishPopulationContext = null;
 
     if (oceanMode.sharkEntity && oceanMode.sharkEntity.mesh) {
       if (oceanMode.sharkEntity.mesh.parent === scene) scene.remove(oceanMode.sharkEntity.mesh);
@@ -144,23 +148,29 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
     oceanMode.sharkEntity = null;
   }
 
-  function initFishLife(scene) {
+  function initFishLife(scene, populationContext = null) {
     clearFishLife(scene);
+    const schoolPlan = createUnderwaterSchoolPlan(populationContext, { maximumSchools: 5 });
+    oceanMode.fishPopulationContext = populationContext;
+    oceanMode.underwaterSchoolPlan = schoolPlan;
+    if (!schoolPlan.playable) return;
 
-    const templates = [
-      createFishTemplate({ bodyColor: 0xffc18c, finColor: 0xff9d78 }),
-      createFishTemplate({ bodyColor: 0x8cdfff, finColor: 0x67c7ea }),
-      createFishTemplate({ bodyColor: 0xff94bf, finColor: 0xff7da8 }),
-      createFishTemplate({ bodyColor: 0xb9f7a8, finColor: 0x96e08a })
+    const anchors = [
+      [34, -16, 124], [-30, -20, 88], [96, -28, 42], [-105, -45, 28], [22, -58, -88]
     ];
-
-    const schoolDefs = [
-      { anchor: new THREE.Vector3(34, -16, 124), radius: 16, speed: 0.6, verticalAmp: 2.0, count: 24, scaleMin: 1.0, scaleMax: 1.8 },
-      { anchor: new THREE.Vector3(-30, -20, 88), radius: 24, speed: 0.48, verticalAmp: 2.8, count: 20, scaleMin: 1.1, scaleMax: 2.1 },
-      { anchor: new THREE.Vector3(96, -28, 42), radius: 32, speed: 0.4, verticalAmp: 3.4, count: 16, scaleMin: 1.4, scaleMax: 2.7 },
-      { anchor: new THREE.Vector3(-105, -45, 28), radius: 40, speed: 0.32, verticalAmp: 4.2, count: 14, scaleMin: 1.8, scaleMax: 3.3 },
-      { anchor: new THREE.Vector3(22, -58, -88), radius: 62, speed: 0.24, verticalAmp: 5.2, count: 10, scaleMin: 2.2, scaleMax: 4.5 }
-    ];
+    const schoolDefs = schoolPlan.schools.map((school, index) => ({
+      ...school,
+      anchor: new THREE.Vector3(...anchors[index]),
+      radius: 16 + index * 10,
+      speed: Math.max(0.24, 0.6 - index * 0.09),
+      verticalAmp: 2 + index * 0.8,
+      scaleMin: 1 + index * 0.3,
+      scaleMax: 1.8 + index * 0.55
+    }));
+    const templates = schoolDefs.map((school) => createFishTemplate({
+      bodyColor: school.visual?.body || 0x8cdfff,
+      finColor: school.visual?.fin || school.visual?.body || 0x67c7ea
+    }));
 
     oceanMode.fishSchools = schoolDefs.map((def, idx) => ({
       ...def,
@@ -174,7 +184,7 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
 
     oceanMode.fishSchools.forEach((school, schoolIndex) => {
       for (let i = 0; i < school.count; i++) {
-        const template = templates[(Math.random() * templates.length) | 0];
+        const template = templates[schoolIndex];
         const fish = template.clone(true);
         const fishScale = school.scaleMin + Math.random() * (school.scaleMax - school.scaleMin);
         fish.scale.setScalar(fishScale);
@@ -190,6 +200,9 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
           mesh: fish,
           tail: fish.getObjectByName("fishTail") || null,
           schoolIndex,
+          speciesId: school.speciesId,
+          populationContextId: populationContext.contextId,
+          livePresenceClaim: false,
           phase: Math.random() * Math.PI * 2,
           orbitScale: 0.58 + Math.random() * 0.9,
           drift: (Math.random() - 0.5) * 2.6,
@@ -199,19 +212,6 @@ export function createOceanFishLifeApi({ oceanMode, disposeObject3D }) {
         });
       }
     });
-
-    const sharkMesh = createSharkModel();
-    scene.add(sharkMesh);
-    oceanMode.sharkEntity = {
-      mesh: sharkMesh,
-      tailHub: sharkMesh.getObjectByName("sharkTailHub") || null,
-      center: new THREE.Vector3(64, -24, 118),
-      radiusX: 80,
-      radiusZ: 52,
-      speed: 0.16,
-      verticalAmp: 4,
-      phase: Math.random() * Math.PI * 2
-    };
 
     templates.forEach((template) => disposeObject3D(template));
   }

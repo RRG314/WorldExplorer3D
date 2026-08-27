@@ -53,14 +53,14 @@ function creatorHeroSummary(profile = {}, data = {}) {
     return 'Curated routes, featured world experiences, and system-authored activities all point back to this creator record.';
   }
   if (data.isSelf) {
-    return 'This is the public creator card other players see from your activities, published overlays, and attribution surfaces in the world.';
+    return 'Published overlays and attribution use this public creator card. Your Creator Library activity drafts remain on this browser and are visible only to you.';
   }
   const activityCount = Array.isArray(data.activities) ? data.activities.length : 0;
   const worldEditCount = Array.isArray(data.contributions) ? data.contributions.length : 0;
   if (activityCount || worldEditCount) {
     return `${profile.username} currently has ${activityCount} visible activit${activityCount === 1 ? 'y' : 'ies'} and ${worldEditCount} published world edit${worldEditCount === 1 ? '' : 's'} surfaced here.`;
   }
-  return `${profile.username} is credited here, but no public activities or published world edits are visible in this area yet.`;
+  return `${profile.username} is credited here, but no shared room activities or published world edits are visible in this area yet.`;
 }
 
 function refs() {
@@ -86,9 +86,7 @@ function renderHeroBadges(profile = {}, data = {}) {
     profile.userId === 'system_worldexplorer' ? 'System creator' : 'Public creator',
     creatorTierLabel(stats)
   ];
-  const publishedActivities = finiteNumber(stats.activitiesPublished, 0);
   const publishedEdits = finiteNumber(stats.publishedContributions, finiteNumber(stats.contributionsCount, 0));
-  if (publishedActivities > 0) badges.push(`${publishedActivities} published`);
   if (publishedEdits > 0) badges.push(`${publishedEdits} world edits`);
   if (profile.spaces?.primaryRoomCode) badges.push(`Room ${profile.spaces.primaryRoomCode}`);
   return badges.map((badge) => `<span class="creatorProfileBadge">${escapeHtml(badge)}</span>`).join('');
@@ -96,8 +94,8 @@ function renderHeroBadges(profile = {}, data = {}) {
 
 function renderStats(stats = {}) {
   const items = [
-    ['Activities', stats.activitiesCreated || 0],
-    ['Published', stats.activitiesPublished || 0],
+    ['Device Drafts', stats.activitiesCreated || 0],
+    ['Public Activities', 0],
     ['Plays', stats.totalPlays || 0],
     ['World Edits', stats.publishedContributions || 0]
   ];
@@ -113,8 +111,8 @@ function renderActivities(items = [], data = {}) {
   if (!items.length) {
     return `<div class="creatorProfileEmpty">${
       data.isSelf
-        ? 'No creator activities are saved yet. Build one in Activity Creator and it will show up here with your public attribution.'
-        : 'No public creator activities are visible here yet.'
+        ? 'No device-only activity drafts are saved yet. Activity Creator saves them on this browser.'
+        : 'No room-scoped activities are visible here. Device drafts are never shown to other players.'
     }</div>`;
   }
   return items.map((activity) => `
@@ -125,7 +123,7 @@ function renderActivities(items = [], data = {}) {
       </div>
       <div class="creatorProfileListMeta">${escapeHtml(activity.locationLabel || 'Current world')}</div>
       <div class="creatorProfileMetaRow">
-        <span class="creatorProfileMetaBadge">${escapeHtml(activity.visibility)}</span>
+        <span class="creatorProfileMetaBadge">${escapeHtml(activity.visibility === 'room' ? 'room only' : 'this device')}</span>
         ${activity.templateId ? `<span class="creatorProfileMetaBadge">${escapeHtml(activity.templateId.replace(/_/g, ' '))}</span>` : ''}
         ${activity.sourceType ? `<span class="creatorProfileMetaBadge">${escapeHtml(activity.sourceType)}</span>` : ''}
       </div>

@@ -1,4 +1,4 @@
-import { fetchOverpassJSON } from "../world/osm-loader.js?v=19";
+import { fetchOverpassJSON } from "../world/osm-loader.js?v=21";
 
 const DEFLOCK_SOURCE_VERSION = "osm-surveillance-v1";
 const DEFLOCK_RADIUS_DEGREES = 0.022;
@@ -12,13 +12,7 @@ function finite(value, fallback = null) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function normalizeDirection(value) {
-  const text = String(value ?? "").trim().toUpperCase().split(/[;,]/)[0].trim();
-  if (!text) return null;
-  const numericText = text.replace(/[^0-9.+-]/g, "");
-  const numeric = numericText ? Number(numericText) : Number.NaN;
-  if (Number.isFinite(numeric)) return ((numeric % 360) + 360) % 360;
-  const compass = {
+const COMPASS_BEARINGS = Object.freeze({
     N: 0,
     NNE: 22.5,
     NE: 45,
@@ -35,8 +29,50 @@ function normalizeDirection(value) {
     WNW: 292.5,
     NW: 315,
     NNW: 337.5
-  };
-  return compass[text] ?? null;
+});
+
+function normalizeBearing(value) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (!text) return null;
+  if (Object.hasOwn(COMPASS_BEARINGS, text)) return COMPASS_BEARINGS[text];
+  if (!/^[+-]?\d+(?:\.\d+)?(?:\s*°)?$/.test(text)) return null;
+  const numeric = Number(text.replace(/\s*°$/, ""));
+  return Number.isFinite(numeric) ? ((numeric % 360) + 360) % 360 : null;
+}
+
+function normalizeDirectionSectors(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+  const sectors = [];
+  for (const token of raw.split(/[;,]/).map((entry) => entry.trim()).filter(Boolean)) {
+    const range = token.match(/^([+-]?\d+(?:\.\d+)?)\s*(?:-|–|—|\.\.)\s*([+-]?\d+(?:\.\d+)?)$/);
+    if (range) {
+      const start = normalizeBearing(range[1]);
+      const end = normalizeBearing(range[2]);
+      if (start == null || end == null) continue;
+      const sweep = ((end - start) + 360) % 360 || 360;
+      sectors.push({
+        bearingDegrees: (start + sweep * 0.5) % 360,
+        fieldOfViewDegrees: sweep,
+        kind: sweep >= 359.5 ? "panoramic" : "range",
+        raw: token
+      });
+      continue;
+    }
+    const bearing = normalizeBearing(token);
+    if (bearing == null) continue;
+    sectors.push({
+      bearingDegrees: bearing,
+      fieldOfViewDegrees: null,
+      kind: "bearing",
+      raw: token
+    });
+  }
+  return sectors;
+}
+
+function normalizeDirection(value) {
+  return normalizeDirectionSectors(value)[0]?.bearingDegrees ?? null;
 }
 
 function normalizeText(value, maxLength = 120) {
@@ -79,6 +115,10 @@ function parseSurveillanceElements(payload = {}, options = {}) {
     if (sourceId.endsWith(":" ) || seen.has(sourceId)) continue;
     seen.add(sourceId);
     const tags = element.tags || {};
+    const directionSource = tags.direction != null && String(tags.direction).trim() ? "direction" :
+      tags["camera:direction"] != null && String(tags["camera:direction"]).trim() ? "camera:direction" : null;
+    const directionRaw = directionSource ? normalizeText(tags[directionSource], 120) : null;
+    const directionSectors = normalizeDirectionSectors(directionRaw);
     rows.push({
       sourceId,
       sourceDataset: "OpenStreetMap",
@@ -91,7 +131,11 @@ function parseSurveillanceElements(payload = {}, options = {}) {
       cameraHeightMeters: normalizeHeightMeters(tags["camera:height"] ?? tags.height),
       surveillanceType: normalizeText(tags["surveillance:type"], 48) || "unknown",
       surveillanceZone: normalizeText(tags["surveillance:zone"], 48),
-      direction: normalizeDirection(tags.direction ?? tags["camera:direction"]),
+      direction: directionSectors[0]?.bearingDegrees ?? null,
+      directions: directionSectors.map((sector) => sector.bearingDegrees),
+      directionSectors,
+      directionRaw,
+      directionSource,
       operator: normalizeText(tags.operator, 80),
       manufacturer: normalizeText(tags.manufacturer ?? tags.brand, 80),
       name: normalizeText(tags.name, 80),
@@ -211,6 +255,7 @@ export {
   fetchSurveillanceProxyJSON,
   loadSurveillanceFeatures,
   normalizeDirection,
+  normalizeDirectionSectors,
   normalizeHeightMeters,
   parseSurveillanceElements
 };

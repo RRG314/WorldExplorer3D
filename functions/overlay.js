@@ -1,5 +1,6 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const { FieldValue } = require('firebase-admin/firestore');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -386,7 +387,7 @@ function featureRevisionDoc(feature = {}, revisionId, action, actor = {}) {
     reviewState: feature.reviewState,
     createdBy: sanitizeSmallText(actor.uid || feature.updatedBy || '', 160),
     createdByName: sanitizeSmallText(actor.displayName || feature.updatedByName || '', 80),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     createdAtMs: timestampMillisNow(),
     snapshot: feature,
     diffSummary: sanitizeSmallText(`${action}:${feature.summary}`, 240)
@@ -400,7 +401,7 @@ function moderationEventDoc(feature = {}, action, actor = {}, note = '', fromSta
     note: sanitizeLongText(note || '', 320),
     actorUid: sanitizeSmallText(actor.uid || '', 160),
     actorName: sanitizeSmallText(actor.displayName || '', 80),
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
     createdAtMs: timestampMillisNow(),
     fromState: sanitizeSmallText(fromState || '', 40),
     toState: sanitizeSmallText(toState || '', 40)
@@ -433,6 +434,13 @@ async function ensureOwnerCanEdit(ref, auth) {
     throw new Error('This overlay feature is no longer editable as a draft.');
   }
   return { exists: true, data };
+}
+
+function overlayRequestErrorStatus(error) {
+  const message = String(error?.message || '');
+  if (message.includes('Only the feature owner')) return 403;
+  if (message.includes('no longer editable')) return 409;
+  return 500;
 }
 
 function buildOverlayExports(helpers = {}) {
@@ -494,8 +502,8 @@ function buildOverlayExports(helpers = {}) {
 
         const payload = {
           ...normalized,
-          createdAt: existing?.data?.createdAt || admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          createdAt: existing?.data?.createdAt || FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
         };
 
         await ref.set(payload, { merge: true });
@@ -507,8 +515,9 @@ function buildOverlayExports(helpers = {}) {
 
         res.status(200).json({ item: normalized });
       } catch (error) {
-        console.error('[saveOverlayFeatureDraft] failed:', error);
-        res.status(500).json({ error: error?.message || 'Could not save this overlay draft right now.' });
+        const status = overlayRequestErrorStatus(error);
+        if (status === 500) console.error('[saveOverlayFeatureDraft] failed:', error);
+        res.status(status).json({ error: error?.message || 'Could not save this overlay draft right now.' });
       }
     }),
 
@@ -536,9 +545,9 @@ function buildOverlayExports(helpers = {}) {
         const updated = {
           ...data,
           reviewState: 'submitted',
-          submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+          submittedAt: FieldValue.serverTimestamp(),
           submittedAtMs: timestampMillisNow(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
           updatedAtMs: timestampMillisNow()
         };
         const revisionRef = ref.collection(OVERLAY_REVISIONS_SUBCOLLECTION).doc();
@@ -550,8 +559,9 @@ function buildOverlayExports(helpers = {}) {
         }));
         res.status(200).json({ item: updated });
       } catch (error) {
-        console.error('[submitOverlayFeature] failed:', error);
-        res.status(500).json({ error: error?.message || 'Could not submit this overlay feature right now.' });
+        const status = overlayRequestErrorStatus(error);
+        if (status === 500) console.error('[submitOverlayFeature] failed:', error);
+        res.status(status).json({ error: error?.message || 'Could not submit this overlay feature right now.' });
       }
     }),
 
@@ -579,8 +589,9 @@ function buildOverlayExports(helpers = {}) {
         await syncCreatorContributionStats(mergeCreatorProfile, existing?.data?.createdBy || auth.uid);
         res.status(200).json({ ok: true, featureId });
       } catch (error) {
-        console.error('[deleteOverlayFeatureDraft] failed:', error);
-        res.status(500).json({ error: error?.message || 'Could not delete this overlay draft right now.' });
+        const status = overlayRequestErrorStatus(error);
+        if (status === 500) console.error('[deleteOverlayFeatureDraft] failed:', error);
+        res.status(status).json({ error: error?.message || 'Could not delete this overlay draft right now.' });
       }
     }),
 
@@ -628,15 +639,15 @@ function buildOverlayExports(helpers = {}) {
           ...data,
           reviewState: nextReviewState,
           publicationState: nextPublicationState,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
           updatedAtMs: nowMs,
-          approvedAt: action === 'approve' ? admin.firestore.FieldValue.serverTimestamp() : data.approvedAt || null,
+          approvedAt: action === 'approve' ? FieldValue.serverTimestamp() : data.approvedAt || null,
           approvedAtMs: action === 'approve' ? nowMs : finiteNumber(data.approvedAtMs, 0),
-          publishedAt: action === 'approve' ? admin.firestore.FieldValue.serverTimestamp() : data.publishedAt || null,
+          publishedAt: action === 'approve' ? FieldValue.serverTimestamp() : data.publishedAt || null,
           publishedAtMs: action === 'approve' ? nowMs : finiteNumber(data.publishedAtMs, 0),
-          needsChangesAt: action === 'needs_changes' ? admin.firestore.FieldValue.serverTimestamp() : data.needsChangesAt || null,
+          needsChangesAt: action === 'needs_changes' ? FieldValue.serverTimestamp() : data.needsChangesAt || null,
           needsChangesAtMs: action === 'needs_changes' ? nowMs : finiteNumber(data.needsChangesAtMs, 0),
-          rejectedAt: action === 'reject' ? admin.firestore.FieldValue.serverTimestamp() : data.rejectedAt || null,
+          rejectedAt: action === 'reject' ? FieldValue.serverTimestamp() : data.rejectedAt || null,
           rejectedAtMs: action === 'reject' ? nowMs : finiteNumber(data.rejectedAtMs, 0),
           moderation: {
             note,
@@ -676,7 +687,7 @@ function buildOverlayExports(helpers = {}) {
                 reviewState: 'superseded',
                 publicationState: 'rolled_back',
                 supersededBy: featureId,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
                 updatedAtMs: nowMs
               }, { merge: true });
               await db.collection(OVERLAY_PUBLISHED_COLLECTION).doc(updated.supersedes).delete().catch(() => {});

@@ -24,13 +24,13 @@ import {
   constrainPointToFootprint,
   findInteriorAnchor,
   prepareInteriorFeaturePlan
-} from "./planner.js?v=5";
+} from "./planner.js?v=6";
 import {
   deriveInteriorFloorPlan,
   interiorFloorIdentity,
   loadedInteriorLevels,
   nextElevatorLevel
-} from "./floor-model.js?v=2";
+} from "./floor-model.js?v=3";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -525,6 +525,19 @@ function connectorLayout(footprint, center) {
   return null;
 }
 
+export function canPublishInteriorConnector(support) {
+  const building = support?.building || support?.destination;
+  const footprint = buildingFootprintPoints(building);
+  if (!building || footprint.length < 3) return false;
+  const floorPlan = deriveInteriorFloorPlan({
+    key: support?.key,
+    support,
+    building
+  }, footprintBounds(footprint));
+  return floorPlan.connectorEligible &&
+    connectorLayout(footprint, polygonCentroid(footprint) || { x: 0, z: 0 }) != null;
+}
+
 function addElevatorVisual(group, layout, floorY, level) {
   const cabin = new THREE.Group();
   cabin.name = `interior-elevator:floor:${level}`;
@@ -680,14 +693,24 @@ function addStairVisual(group, layout, fromLevel, floorBaseY, storyHeight) {
 }
 
 function floorDefinition(definition, level) {
-  const mappedLevel = finiteNumber(definition.selectedLevel, 0);
-  const mapped = Math.abs(mappedLevel - level) < 0.01;
+  const mappedLevel = Array.isArray(definition.mappedLevels)
+    ? definition.mappedLevels.find((entry) =>
+      Math.abs(finiteNumber(entry?.level, NaN) - level) < 0.01
+    )
+    : null;
+  const legacyMapped = definition.mode === 'mapped' &&
+    Math.abs(finiteNumber(definition.selectedLevel, 0) - level) < 0.01;
+  const mapped = mappedLevel != null || legacyMapped;
   return {
     ...definition,
     selectedLevel: level,
     mode: mapped ? definition.mode : 'generated',
-    features: mapped ? definition.features : [],
-    entrances: level === 0 ? definition.entrances : []
+    features: mapped
+      ? (mappedLevel?.features || definition.features || [])
+      : [],
+    entrances: mapped
+      ? (mappedLevel?.entrances || (level === 0 ? definition.entrances : []) || [])
+      : []
   };
 }
 

@@ -266,7 +266,26 @@ const ordinaryRoadPedestrianGraph = compilePedestrianGraph({
     }]
   }
 }).publication;
-assert.equal(ordinaryRoadPedestrianGraph.edges.length, 0, 'Vehicle roads must never fabricate pedestrian sidewalks or crossings.');
+assert.equal(ordinaryRoadPedestrianGraph.edges.length, 4, 'Eligible at-grade residential roads must publish two-way inferred sidewalks on both sides.');
+assert.equal(ordinaryRoadPedestrianGraph.provenance.inferredSidewalks, 4, 'Inferred road-offset paths must remain explicitly labeled as inferred sidewalks.');
+assert.equal(ordinaryRoadPedestrianGraph.edges.every((edge) => Math.abs(Number(edge.p1.z || 0)) >= 2.4), true, 'Inferred sidewalks must be offset outside the road centerline.');
+
+const sidewalkProhibitedGraph = compilePedestrianGraph({
+  traversal: {
+    authority: 'actor-vehicle-verification',
+    segments: [{
+      p1: { x: -50, y: 0, z: 0 },
+      p2: { x: 50, y: 0, z: 0 },
+      segIndex: 0,
+      direction: 'both',
+      feature: {
+        id: 'no-sidewalk-road', kind: 'road', type: 'residential', walkable: true,
+        transportRecord: { sourceTags: { highway: 'residential', sidewalk: 'no' } }
+      }
+    }]
+  }
+}).publication;
+assert.equal(sidewalkProhibitedGraph.edges.length, 0, 'Explicit OSM sidewalk=no must prohibit sidewalk inference.');
 
 const narrowTrafficGraph = compileTrafficGraph({
   traversal: {
@@ -497,7 +516,7 @@ try {
     try {
       const params = new URLSearchParams({
         loc: 'custom', lat: String(location.lat), lon: String(location.lon), lname: location.name,
-        launch: 'earth', gm: 'free', mode: 'walk'
+        launch: 'earth', gm: 'free', mode: 'driving'
       });
       await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
       await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
@@ -515,7 +534,10 @@ try {
         await page.waitForTimeout(1000);
       }
       const first = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
-      await page.waitForTimeout(4000);
+      await page.keyboard.down('ArrowUp');
+      await page.waitForTimeout(1250);
+      await page.keyboard.up('ArrowUp');
+      await page.waitForTimeout(2750);
       const second = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       const vehicles = second?.urbanSandbox?.vehicles || [];
       const envelopes = vehicles.map((vehicle) => ({
@@ -532,12 +554,28 @@ try {
       const secondVisibleVehicles = Number(second?.livingWorld?.activePopulation?.vehicles || 0) + Number(second?.livingWorld?.activePopulation?.promotedVehicles || 0);
       const firstVisiblePeople = Number(first?.livingWorld?.activePopulation?.pedestrians || 0) + Number(first?.livingWorld?.activePopulation?.promotedPedestrians || 0);
       const secondVisiblePeople = Number(second?.livingWorld?.activePopulation?.pedestrians || 0) + Number(second?.livingWorld?.activePopulation?.promotedPedestrians || 0);
+      const playerDriveMeters = Math.hypot(
+        Number(second?.surfaceChain?.world?.x || 0) - Number(first?.surfaceChain?.world?.x || 0),
+        Number(second?.surfaceChain?.world?.z || 0) - Number(first?.surfaceChain?.world?.z || 0)
+      );
       const checks = {
+        normalPlayerDriveInputMovesVehicle:
+          first?.surfaceChain?.actor?.mode === 'drive' &&
+          second?.surfaceChain?.actor?.mode === 'drive' &&
+          playerDriveMeters >= 0.25,
+        playerVehicleRetainsPublishedSurfaceContact:
+          first?.surfaceChain?.surfaces?.drive?.kind === 'road' &&
+          ['road', 'terrain'].includes(String(second?.surfaceChain?.surfaces?.drive?.kind || '')) &&
+          Number(second?.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
+          Number(second?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
+          Number.isFinite(Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance)) &&
+          Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
+          Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
         canonicalFarNpc: Number(population.pedestrians || 0) === 0 ||
           population.pedestrianRepresentation === 'articulated-instanced-character-v2' && population.pedestrianLegacyBlockFallback === false,
         articulatedFarNpc: Number(population.pedestrians || 0) === 0 || Number(population.pedestrianRenderedParts || 0) >= 17,
-        pedestrianPopulationRequiresMappedPaths:
-          Number(pedestrianGraph.provenance?.mappedPaths || 0) > 0
+        pedestrianPopulationRequiresSafePaths:
+          Number(pedestrianGraph.provenance?.mappedPaths || 0) + Number(pedestrianGraph.provenance?.inferredSidewalks || 0) > 0
             ? firstVisiblePeople > 0 && secondVisiblePeople > 0
             : Number(population.pedestrians || 0) === 0 && firstVisiblePeople === 0 && secondVisiblePeople === 0,
         trafficRemainsPublished: firstVisibleVehicles > 0 && secondVisibleVehicles > 0,
@@ -572,7 +610,6 @@ try {
         noPedestriansOnVehicleTransport:
           Number(pedestrianGraph.vehicleTransportEdges || 0) === 0 &&
           Number(pedestrianGraph.engineeredTransportEdges || 0) === 0 &&
-          Number(pedestrianGraph.provenance?.inferredSidewalks || 0) === 0 &&
           Number(pedestrianGraph.provenance?.inferredCrossings || 0) === 0,
         vehicleHeightFitsCatalog: envelopes.filter((entry) => entry.envelope && entry.dimensions).every((entry) => entry.envelope.height <= entry.dimensions.height + .08 && entry.envelope.roofOverflow <= .08),
         vehicleWidthFitsCatalog: envelopes.filter((entry) => entry.envelope && entry.dimensions).every((entry) => entry.envelope.width <= entry.dimensions.width + .12),
@@ -598,6 +635,13 @@ try {
         maximumWheelPenetration: Number(activePopulation.maximumWheelPenetration || 0),
         maximumWheelGap: Number(activePopulation.maximumWheelGap || 0),
         previousMaximumWheelPenetration: Number(activePopulation.previousMaximumWheelPenetration || 0),
+        playerDriveMeters,
+        playerStartSurfaceKind: first?.surfaceChain?.surfaces?.drive?.kind || null,
+        playerStartSurfaceId: first?.surfaceChain?.surfaces?.drive?.feature?.id || null,
+        playerEndSurfaceKind: second?.surfaceChain?.surfaces?.drive?.kind || null,
+        playerDriveSurfaceId: second?.surfaceChain?.surfaces?.drive?.feature?.id || null,
+        playerFeetMinusDriveSurface: Number(second?.surfaceChain?.deltas?.feetMinusDriveSurface),
+        playerVehicleContact: second?.surfaceChain?.actor?.vehicleContact || null,
         envelopes,
         browserErrors,
         localFailures

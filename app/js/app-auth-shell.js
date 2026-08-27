@@ -36,6 +36,8 @@ const authEmailSubmitBtn = document.getElementById('authEmailSubmitBtn');
 const authGoogleBtn = document.getElementById('authGoogleBtn');
 const authForgotBtn = document.getElementById('authForgotBtn');
 const authPanelStatus = document.getElementById('authPanelStatus');
+const editorMineMenuItem = document.getElementById('fEditorMine');
+const moderationMenuItem = document.getElementById('fModerationPanel');
 
 let unsubscribeEntitlements = null;
 let currentState = getFreeEntitlementsState();
@@ -127,6 +129,8 @@ function renderState(state, user) {
   appSignInBtn.textContent = signedIn ? 'Account' : 'Sign In / Sign Up';
   authFormBlock.hidden = signedIn;
   authSignedInBlock.hidden = !signedIn;
+  if (editorMineMenuItem) editorMineMenuItem.hidden = !signedIn;
+  if (moderationMenuItem) moderationMenuItem.hidden = !signedIn || !adminMode;
   if (signedIn) {
     const summaryName = user.displayName || user.email || 'Signed In';
     authUserSummary.textContent = `${summaryName} • ${(currentState.planLabel || 'Free')}`;

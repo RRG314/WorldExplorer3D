@@ -6,8 +6,8 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=9';
-import { createLivingWorldPopulation } from './population.js?v=12';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=10';
+import { createLivingWorldPopulation } from './population.js?v=13';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -228,8 +228,8 @@ export function livingWorldRuntimeSnapshot(appCtx) {
   }).length;
   const pedestrianVehicleTransportEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
     const feature = state.pedestrianCompilation.runtimeFeatureByEdge.get(edge.id);
-    return String(feature?.networkKind || feature?.kind || '').toLowerCase() === 'road' ||
-      edge.provenance === 'inferred_sidewalk' || edge.provenance === 'inferred_crossing';
+    return String(feature?.networkKind || feature?.kind || '').toLowerCase() === 'road' &&
+      edge.provenance !== 'inferred_sidewalk' && edge.provenance !== 'inferred_crossing';
   }).length;
   const pedestrianEngineeredTransportEdges = state.publication.pedestrianGraph.edges.filter((edge) => {
     const structure = edge?.structure || {};

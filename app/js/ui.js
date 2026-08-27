@@ -3,12 +3,12 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
-import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=68";
-import { initShareUi } from "./ui/share-links.js?v=63";
+import { initMapInteractions } from "./ui/map-interactions.js?v=60";
+import { initMobileControls } from "./ui/mobile-controls.js?v=70";
+import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=101";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=109";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -269,7 +269,10 @@ function setupUI() {
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
   document.getElementById('fEditorMode')?.addEventListener('click', () => {
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.openBlockBuilder === 'function') appCtx.openBlockBuilder();
+    if (typeof appCtx.closeBlockBuilder === 'function') appCtx.closeBlockBuilder();
+    if (typeof appCtx.openEditorSession === 'function') {
+      void appCtx.openEditorSession({ initialTab: 'workspace' });
+    }
     closeAllFloatMenus();
   });
   document.getElementById('fEditorMine')?.addEventListener('click', () => {
@@ -575,12 +578,26 @@ function setupUI() {
   }
   const controlsBarBtn = document.getElementById('controlsBarBtn');
   if (controlsBarBtn && ctrlContent) {
-    controlsBarBtn.addEventListener('click', (e) => {
+    let lastTouchToggleAt = 0;
+    const toggleControlsPanel = (e) => {
       e.stopPropagation();
       document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
       ctrlContent.classList.toggle('hidden');
       controlsTab?.classList.toggle('bar-open', !ctrlContent.classList.contains('hidden'));
       updateControlsModeUI();
+    };
+    controlsBarBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      lastTouchToggleAt = performance.now();
+      toggleControlsPanel(e);
+    }, { passive: false });
+    controlsBarBtn.addEventListener('click', (e) => {
+      if (performance.now() - lastTouchToggleAt < 700) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      toggleControlsPanel(e);
     });
   }
 

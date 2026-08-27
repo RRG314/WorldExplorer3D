@@ -240,7 +240,7 @@ function mapScreenToWorld(screenX, screenY, options = {}) {
   const mapCenterX = Number.isFinite(options.centerX) ? Number(options.centerX) : 0;
   const mapCenterY = Number.isFinite(options.centerY) ? Number(options.centerY) : 0;
   const zoom = Number.isFinite(options.zoom) ? Number(options.zoom) : 15;
-  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  const ref = options.ref || appCtx.getMapReferencePosition?.() || (appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z });
   const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
   const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
@@ -281,7 +281,10 @@ export function largeMapScreenToWorld(screenX, screenY) {
   return mapScreenToWorld(screenX, screenY, {
     centerX: 400,
     centerY: 400,
-    zoom: appCtx.largeMapZoom
+    zoom: appCtx.largeMapZoom,
+    ref: Number.isFinite(appCtx.largeMapCenterWorld?.x) && Number.isFinite(appCtx.largeMapCenterWorld?.z)
+      ? appCtx.largeMapCenterWorld
+      : null
   });
 }
 

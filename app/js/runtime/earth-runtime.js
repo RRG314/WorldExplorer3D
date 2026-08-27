@@ -5,7 +5,7 @@
 // initialization contract that previously lived in app-entry.js.
 import '../ground.js?v=90';
 import '../terrain.js?v=272';
-import '../world.js?v=388';
+import '../world.js?v=408';
 import '../building-entry.js?v=7';
 
 export const EARTH_RUNTIME_READY = true;

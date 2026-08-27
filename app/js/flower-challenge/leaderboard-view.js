@@ -1,6 +1,9 @@
+import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=1';
+
 export function createFlowerLeaderboardView(deps = {}) {
   const {
     challengeState,
+    getSignedInUser,
     getLeaderboardStorageKey,
     getSortLeaderboardEntries,
     leaderboardLimit,
@@ -44,6 +47,8 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   const totalCameras = Number(raw.totalCameras);
   const detections = Number(raw.detections);
   const distance = Number(raw.distance);
+  const source = raw.source === 'cloud' ? 'cloud' : 'device';
+  const uid = String(raw.uid || '').slice(0, 128);
 
   if (challenge === 'flower') {
     if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
@@ -57,6 +62,8 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
 
   return {
     id: String(raw.id || raw.docId || `entry_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
+    uid,
+    source,
     challenge,
     player,
     timeMs: Number.isFinite(timeMs) && timeMs > 0 ? timeMs : null,
@@ -122,16 +129,11 @@ function writeLocalLeaderboard(challengeType, entries) {
 function renderLeaderboard(entries) {
   if (!ui.titleList) return;
   const challengeType = normalizeChallengeType(challengeState.leaderboardView);
+  const definition = getLeaderboardDefinition(challengeType);
+  const signedInUid = String(getSignedInUser?.()?.uid || '');
 
   if (!entries || entries.length === 0) {
-    const empty = {
-      flower: 'No flower runs yet. Be the first.',
-      painttown: 'No paint runs yet. Reach rooftops to paint and post a score.',
-      fishing: 'No catches yet. Launch a boat, stop in open water, and cast.',
-      explorer: 'Explorer scores appear as people join rooms, share artifacts, and make connections.',
-      deflock: 'No completed DeFlock hunts yet.'
-    }[challengeType];
-    ui.titleList.innerHTML = `<li class="flowerLeaderboardEmpty">${safeText(empty)}</li>`;
+    ui.titleList.innerHTML = `<li class="flowerLeaderboardEmpty"><strong>No results yet</strong><span>${safeText(definition.empty)}</span></li>`;
     return;
   }
 
@@ -151,11 +153,13 @@ function renderLeaderboard(entries) {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
       locationLine = `${entry.disabledCameras || 0}/${entry.totalCameras || 0} virtual cameras | ${((Number(entry.timeMs) || 0) / 1000).toFixed(1)}s | ${safeText(entry.location)}`;
     }
-    return `<li class="flowerLeaderboardItem">
+    const isCurrentPlayer = !!signedInUid && entry.uid === signedInUid;
+    const sourceLabel = entry.source === 'device' ? '<span class="flowerLeaderboardSource">This device</span>' : '';
+    return `<li class="flowerLeaderboardItem${isCurrentPlayer ? ' current-player' : ''}">
       <span class="flowerLeaderboardRank">#${idx + 1}</span>
-      <span class="flowerLeaderboardPlayer">${safeText(entry.player)}</span>
+      <span class="flowerLeaderboardPlayer">${safeText(entry.player)}${isCurrentPlayer ? ' <em>You</em>' : ''}</span>
       <span class="flowerLeaderboardTime">${safeText(metric)}</span>
-      <span class="flowerLeaderboardLoc">${locationLine}</span>
+      <span class="flowerLeaderboardLoc">${locationLine}${sourceLabel}</span>
     </li>`;
   }).join('');
 }

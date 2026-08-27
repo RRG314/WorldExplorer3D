@@ -36,8 +36,17 @@ export function createBoatRuntimeDynamics(deps = {}) {
     const brake = fishingLocked || Number(actions.brake) > 0.05;
 
     const cameraLookSpeed = 2.2 * dt;
-    appCtx.boatMode.cameraYawOffset += (Number(actions.lookYaw) || 0) * cameraLookSpeed;
-    appCtx.boatMode.cameraPitch += (Number(actions.lookPitch) || 0) * cameraLookSpeed * 0.55;
+    const lookYaw = Number(actions.lookYaw) || 0;
+    const lookPitch = Number(actions.lookPitch) || 0;
+    const manualCameraInput = Math.abs(lookYaw) > 0.05 || Math.abs(lookPitch) > 0.05;
+    appCtx.boatMode.cameraLookTimer = manualCameraInput ? 1.15 : Math.max(0, Number(appCtx.boatMode.cameraLookTimer || 0) - dt);
+    appCtx.boatMode.cameraYawOffset += lookYaw * cameraLookSpeed;
+    appCtx.boatMode.cameraPitch += lookPitch * cameraLookSpeed * 0.55;
+    if (!manualCameraInput && appCtx.boatMode.cameraLookTimer <= 0 && appCtx.camMode === 0) {
+      const recenterBlend = 1 - Math.exp(-dt * 3.4);
+      appCtx.boatMode.cameraYawOffset += (0 - appCtx.boatMode.cameraYawOffset) * recenterBlend;
+      appCtx.boatMode.cameraPitch += (0 - appCtx.boatMode.cameraPitch) * recenterBlend;
+    }
     appCtx.boatMode.cameraYawOffset = normalizeAngle(appCtx.boatMode.cameraYawOffset);
     appCtx.boatMode.cameraPitch = clamp(appCtx.boatMode.cameraPitch, -0.62, 0.62);
 

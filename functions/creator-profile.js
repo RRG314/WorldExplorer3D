@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { FieldValue } = require('firebase-admin/firestore');
 
 const CREATOR_PROFILES_COLLECTION = 'creatorProfiles';
 const CREATOR_SYSTEM_USER_ID = 'system_worldexplorer';
@@ -77,7 +78,7 @@ async function mergeCreatorProfile(db, userId, patch = {}) {
   const snap = await ref.get();
   const existing = snap.exists ? snap.data() || {} : {};
   const normalized = normalizeCreatorProfileInput(patch, existing, cleanUserId);
-  const now = admin.firestore.FieldValue.serverTimestamp();
+  const now = FieldValue.serverTimestamp();
   await ref.set(
     {
       userId: cleanUserId,

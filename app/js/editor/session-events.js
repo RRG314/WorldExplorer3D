@@ -66,6 +66,19 @@ export function bindRefEvents(ctx) {
     ctx.state.tab = 'mine';
     ctx.renderUi();
   });
+  refs.blocksTabBtn?.addEventListener('click', async () => {
+    ctx.closeEditorSession();
+    try {
+      const opened = await ctx.appCtx.openBlockBuilder?.();
+      if (!opened) {
+        ctx.openEditorSession({ initialTab: 'workspace', skipTutorial: true });
+        ctx.setStatus('Persistent block building is unavailable in this world mode.', 'warning');
+      }
+    } catch (error) {
+      ctx.openEditorSession({ initialTab: 'workspace', skipTutorial: true });
+      ctx.setStatus(error?.message || 'Could not open persistent block building.', 'error');
+    }
+  });
   refs.moderationTabBtn?.addEventListener('click', () => {
     if (ctx.state.userIsAdmin) {
       ctx.state.tab = 'moderation';
@@ -297,6 +310,7 @@ export function bindRefEvents(ctx) {
       ctx.addWorkspaceFeature(feature);
       ctx.pushHistory();
       ctx.state.tab = 'workspace';
+      ctx.renderUi();
       ctx.setStatus('Saved overlay draft loaded into the workspace.', 'ok');
     } else if (action === 'focus') {
       ctx.focusFeatureInWorld(feature);

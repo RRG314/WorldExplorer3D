@@ -18,6 +18,7 @@ import {
   getWeeklyEventMessage,
   getWeeklyFeaturedCity
 } from './featured-city-model.js?v=1';
+import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 
 const ACTIVITY_FEED_COLLECTION = 'activityFeed';
 const LEADERBOARD_COLLECTION = 'explorerLeaderboard';
@@ -114,36 +115,53 @@ function listenActivityFeed(callback) {
 
 async function bumpExplorerLeaderboard(delta = {}) {
   const user = getCurrentUser();
-  if (!user || !user.uid) return;
+  if (!user || !user.uid) return false;
   const roomsJoinedInc = Math.max(0, Math.min(1, Math.floor(Number(delta.roomsJoined || 0))));
   const artifactsSharedInc = Math.max(0, Math.min(2, Math.floor(Number(delta.artifactsShared || 0))));
   const friendsAddedInc = Math.max(0, Math.min(1, Math.floor(Number(delta.friendsAdded || 0))));
-  if (!roomsJoinedInc && !artifactsSharedInc && !friendsAddedInc) return;
+  if (!roomsJoinedInc && !artifactsSharedInc && !friendsAddedInc) return false;
 
   const scoreInc = Math.min(20, roomsJoinedInc * 4 + artifactsSharedInc * 6 + friendsAddedInc * 3);
-  const { db } = getServices();
-  const ref = doc(db, LEADERBOARD_COLLECTION, user.uid);
+  try {
+    const { db } = getServices();
+    const ref = doc(db, LEADERBOARD_COLLECTION, user.uid);
 
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    const data = snap.exists() ? snap.data() || {} : {};
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const data = snap.exists() ? snap.data() || {} : {};
 
-    const roomsJoined = Math.max(0, Number(data.roomsJoined || 0)) + roomsJoinedInc;
-    const artifactsShared = Math.max(0, Number(data.artifactsShared || 0)) + artifactsSharedInc;
-    const friendsAdded = Math.max(0, Number(data.friendsAdded || 0)) + friendsAddedInc;
-    const score = Math.max(0, Number(data.score || 0)) + scoreInc;
+      const roomsJoined = Math.max(0, Number(data.roomsJoined || 0)) + roomsJoinedInc;
+      const artifactsShared = Math.max(0, Number(data.artifactsShared || 0)) + artifactsSharedInc;
+      const friendsAdded = Math.max(0, Number(data.friendsAdded || 0)) + friendsAddedInc;
+      const score = Math.max(0, Number(data.score || 0)) + scoreInc;
 
-    tx.set(ref, {
-      uid: user.uid,
-      displayName: sanitizeText(user.displayName || data.displayName || 'Explorer', 48),
-      roomsJoined,
-      artifactsShared,
-      friendsAdded,
-      score,
-      lastActiveAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-  });
+      tx.set(ref, {
+        uid: user.uid,
+        displayName: sanitizeText(user.displayName || data.displayName || 'Explorer', 48),
+        roomsJoined,
+        artifactsShared,
+        friendsAdded,
+        score,
+        lastActiveAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    });
+    emitProductTelemetry('explorer_progress', {
+      outcome: 'recorded',
+      progress_type: roomsJoinedInc ? 'room' : artifactsSharedInc ? 'artifact' : 'friend',
+      points: scoreInc
+    });
+    return true;
+  } catch (error) {
+    // Participation scoring is secondary. A throttled or unavailable leaderboard
+    // must never turn a successful room/social action into a false failure.
+    console.warn('[multiplayer][loop] Explorer progress was not recorded.', error);
+    emitProductTelemetry('explorer_progress', {
+      outcome: 'deferred',
+      progress_type: roomsJoinedInc ? 'room' : artifactsSharedInc ? 'artifact' : 'friend'
+    });
+    return false;
+  }
 }
 
 function listenExplorerLeaderboard(callback) {

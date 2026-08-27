@@ -298,11 +298,22 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'water-structures'
     },
+    civicFacilityCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'civic-facilities'
+    },
     waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"="ship"]${waterStructureBounds};
                 way["historic"="ship"]${waterStructureBounds};
                 way["building"="houseboat"]${waterStructureBounds};
             );out body;>;out skel qt;`,
+    civicFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];
+            nwr["amenity"~"^(police|hospital)$"]${poiBounds};
+            out body center qt;`,
     buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
             );out tags center qt;`,

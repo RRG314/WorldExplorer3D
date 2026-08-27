@@ -74,14 +74,22 @@ function edgeSpawnWeight(edge, kind) {
   return 1;
 }
 
-function selectSpawnEdgeIndex(graph, random, kind) {
-  const weights = graph.edges.map((edge) => edgeSpawnWeight(edge, kind));
+function selectSpawnEdgeIndex(graph, random, kind, reference = null) {
+  const allIndexes = graph.edges.map((_, index) => index);
+  const localIndexes = reference ? allIndexes.filter((index) => {
+    const edge = graph.edges[index];
+    const x = (Number(edge?.p1?.x || 0) + Number(edge?.p2?.x || 0)) * .5;
+    const z = (Number(edge?.p1?.z || 0) + Number(edge?.p2?.z || 0)) * .5;
+    return Math.hypot(x - Number(reference.x || 0), z - Number(reference.z || 0)) <= 720;
+  }) : [];
+  const indexes = localIndexes.length ? localIndexes : allIndexes;
+  const weights = indexes.map((index) => edgeSpawnWeight(graph.edges[index], kind));
   let target = random() * weights.reduce((sum, weight) => sum + weight, 0);
   for (let index = 0; index < weights.length; index += 1) {
     target -= weights[index];
-    if (target <= 0) return index;
+    if (target <= 0) return indexes[index];
   }
-  return 0;
+  return indexes[0] || 0;
 }
 
 function paletteColor(palette, random) {
@@ -93,11 +101,11 @@ function vehicleColor(variant, random) {
   return new THREE.Color(serviceColors[variant?.id] || VEHICLE_PALETTE[Math.floor(random() * VEHICLE_PALETTE.length) % VEHICLE_PALETTE.length]);
 }
 
-function createAgents(count, graph, random, kind) {
+function createAgents(count, graph, random, kind, reference = null) {
   if (!graph?.edges?.length) return [];
   const agents = [];
   for (let index = 0; index < count; index += 1) {
-    const edgeIndex = selectSpawnEdgeIndex(graph, random, kind);
+    const edgeIndex = selectSpawnEdgeIndex(graph, random, kind, reference);
     const edge = graph.edges[edgeIndex];
     const variant = kind === 'vehicle'
       ? selectVehicleVariant(random, { majorRoad: /motorway|trunk|primary|secondary/i.test(edge.roadClass || '') })
@@ -440,8 +448,9 @@ export function createLivingWorldPopulation(options = {}) {
   const trafficGraph = options.trafficGraph;
   const random = typeof options.random === 'function' ? options.random : Math.random;
   const sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
-  const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian');
-  const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle');
+  const initialReference = options.getReferencePosition?.() || null;
+  const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian', initialReference);
+  const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle', initialReference);
   const group = new THREE.Group();
   group.name = 'Living World Population';
 

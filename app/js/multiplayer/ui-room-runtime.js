@@ -80,6 +80,14 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.unsubLeaderboard = null;
   }
 
+  function ensureLeaderboardSubscription() {
+    if (state.unsubLeaderboard) return;
+    state.unsubLeaderboard = listenExplorerLeaderboard((rows) => {
+      state.leaderboard = rows;
+      renderLeaderboard();
+    });
+  }
+
   function roomWorldSignature(room) {
     if (!room || !room.world) return "";
     const world = room.world || {};
@@ -385,12 +393,11 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       state.recentPlayers = [];
       state.invites = [];
       state.ownedRooms = [];
-      state.leaderboard = [];
       renderFriends();
       renderRecentPlayers();
       renderInvites();
       renderOwnedRooms();
-      renderLeaderboard();
+      ensureLeaderboardSubscription();
       renderFeaturedRooms();
       return;
     }
@@ -419,12 +426,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
         renderOwnedRooms();
       });
     }
-    if (!state.unsubLeaderboard) {
-      state.unsubLeaderboard = listenExplorerLeaderboard((rows) => {
-        state.leaderboard = rows;
-        renderLeaderboard();
-      });
-    }
+    ensureLeaderboardSubscription();
   }
 
   function currentRoomName() {

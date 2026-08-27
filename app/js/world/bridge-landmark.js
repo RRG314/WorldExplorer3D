@@ -406,6 +406,15 @@ export function renderSuspensionBridgeLandmark(data) {
       structuralMembers: 0,
       controlledRoads: surfaceControl.appliedRoads,
       surfaceControlAuthority: surfaceControl.authority,
+      surfaceControlCandidates: Object.freeze((appCtx.roads || [])
+        .filter((road) => /golden gate bridge/i.test(String(road?.name || '')))
+        .map((road) => Object.freeze({
+          sourceFeatureId: String(road?.sourceFeatureId || ''),
+          name: String(road?.name || ''),
+          terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+          sourceCompleteness: String(road?.sourceCompleteness || road?.tags?._sourceCompleteness || ''),
+          pointCount: Number(road?.pts?.length || 0)
+        }))),
       synchronizedRoads: 0,
       transportSurfaceOwner: 'compiled_transport_surface',
       spanMeters: Number(metrics.total.toFixed(1))

@@ -1,5 +1,6 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const { FieldValue } = require('firebase-admin/firestore');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -862,7 +863,7 @@ function buildAdminDashboardExports(helpers = {}) {
         const featured = req.body && 'featured' in req.body ? req.body.featured === true : snap.data()?.featured === true;
         await ref.set({
           featured,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
         await logAdminActivity({
           actorUid: moderator.auth.uid,
@@ -930,7 +931,7 @@ function buildAdminDashboardExports(helpers = {}) {
         await db.collection(SITE_CONTENT_COLLECTION).doc(entryId).set({
           entryId,
           draft: content,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
           updatedBy: moderator.auth.uid,
           updatedByName: moderator.displayName
         }, { merge: true });
@@ -971,12 +972,12 @@ function buildAdminDashboardExports(helpers = {}) {
         await db.collection(SITE_CONTENT_PUBLISHED_COLLECTION).doc(entryId).set({
           entryId,
           content,
-          publishedAt: admin.firestore.FieldValue.serverTimestamp(),
+          publishedAt: FieldValue.serverTimestamp(),
           publishedBy: moderator.auth.uid,
           publishedByName: moderator.displayName
         }, { merge: true });
         await draftRef.set({
-          publishedAt: admin.firestore.FieldValue.serverTimestamp(),
+          publishedAt: FieldValue.serverTimestamp(),
           publishedBy: moderator.auth.uid,
           publishedByName: moderator.displayName
         }, { merge: true });

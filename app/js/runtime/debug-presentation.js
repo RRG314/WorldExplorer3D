@@ -1,4 +1,26 @@
-import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
+import {
+  carSpeedToMph,
+  worldUnitsPerSecondToMph
+} from '../physics/vehicle-speed-units.js?v=2';
+
+function measuredSpeedMph(appCtx, actor) {
+  if (actor.mode === 'walk') return Math.abs(appCtx.Walk?.state?.walker?.speedMph || 0);
+  if (actor.mode === 'drive') return Math.abs(carSpeedToMph(appCtx.car?.speed || 0));
+
+  let worldUnitsPerSecond = 0;
+  if (actor.mode === 'plane') {
+    worldUnitsPerSecond = Math.abs(appCtx.planeMode?.speed || 0);
+  } else if (actor.mode === 'boat') {
+    worldUnitsPerSecond = Math.abs(appCtx.boat?.forwardSpeed ?? appCtx.boat?.speed ?? 0);
+  } else if (actor.mode === 'drone') {
+    worldUnitsPerSecond = Math.hypot(
+      Number(appCtx.drone?.vx) || 0,
+      Number(appCtx.drone?.vy) || 0,
+      Number(appCtx.drone?.vz) || 0
+    );
+  }
+  return Math.abs(worldUnitsPerSecondToMph(worldUnitsPerSecond, appCtx.METERS_PER_WORLD_UNIT));
+}
 
 function createDebugPresentationSystem(appCtx) {
   function actorDebugState() {
@@ -9,11 +31,7 @@ function createDebugPresentationSystem(appCtx) {
       x: actor.position.x,
       y: actor.position.y,
       z: actor.position.z,
-      speed: actor.mode === 'plane' ? Math.round(Math.abs((appCtx.planeMode?.speed || 0) * 2.237)) :
-        actor.mode === 'drone' ? Math.round(Math.abs((appCtx.drone?.speed || 0) * 1.8)) :
-        actor.mode === 'boat' ? Math.round(Math.abs((appCtx.boat?.speed || 0) * 0.43)) :
-        actor.mode === 'walk' ? Math.round(Math.abs(appCtx.Walk?.state?.walker?.speedMph || 0)) :
-        Math.round(Math.abs(carSpeedToMph(appCtx.car?.speed || 0)))
+      speed: Math.round(measuredSpeedMph(appCtx, actor))
     };
   }
 

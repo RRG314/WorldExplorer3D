@@ -1,4 +1,4 @@
-import { createBackpackModel } from '../player/backpack-model.js?v=2';
+import { createBackpackModel } from '../player/backpack-model.js?v=3';
 
 const EQUIPMENT_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'hands', label: 'Hands', category: 'unarmed', slot: 1, range: 2.4, force: 12, cooldownMs: 520, actionLabel: 'Shove', icon: 'HAND', verbs: ['equip', 'use'] }),

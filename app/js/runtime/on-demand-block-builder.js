@@ -1,6 +1,7 @@
 let modulePromise = null;
 let pendingSharedConfig = null;
 let pendingSharedEntries = null;
+let pendingSharedConnected = true;
 
 function emptySnapshot() {
   return {
@@ -21,16 +22,17 @@ function emptyPersistenceStatus() {
     ready: false,
     totalCount: 0,
     currentLocationCount: 0,
-    shared: { enabled: false, totalCount: 0 }
+    shared: { enabled: false, totalCount: 0, connected: pendingSharedConnected, pendingCount: 0 }
   };
 }
 
 function installOnDemandBlockBuilder(appCtx) {
   async function ensureBlockBuilderReady() {
     if (!modulePromise) {
-      modulePromise = import('../blocks.js?v=61').then(async (blocks) => {
-        const ui = await import('../block-builder/ui.js?v=2');
+      modulePromise = import('../blocks.js?v=67').then(async (blocks) => {
+        const ui = await import('../block-builder/ui.js?v=6');
         if (pendingSharedConfig) blocks.configureSharedBuildSync?.(pendingSharedConfig);
+        blocks.setSharedBuildConnectionState?.(pendingSharedConnected);
         if (pendingSharedEntries) blocks.setSharedBuildEntries?.(pendingSharedEntries);
         pendingSharedConfig = null;
         pendingSharedEntries = null;
@@ -75,10 +77,15 @@ function installOnDemandBlockBuilder(appCtx) {
       void ensureBlockBuilderReady().then(({ blocks }) => blocks.setSharedBuildEntries?.(pendingSharedEntries || entries));
       return false;
     },
+    setSharedBuildConnectionState: (connected) => {
+      pendingSharedConnected = connected !== false;
+      if (modulePromise) void modulePromise.then(({ blocks }) => blocks.setSharedBuildConnectionState?.(pendingSharedConnected));
+      return pendingSharedConnected;
+    },
     getBlockBuilderSnapshot: emptySnapshot,
     getBuildPersistenceStatus: emptyPersistenceStatus,
     getBuildLimits: () => ({ maxPerLocation: 200, maxTotal: 5000, currentLocationCount: 0, totalCount: 0 }),
-    getSharedBuildSyncStatus: () => ({ enabled: false, totalCount: 0 }),
+    getSharedBuildSyncStatus: () => ({ enabled: false, totalCount: 0, connected: pendingSharedConnected, pendingCount: 0 }),
     getBuildCollisionAtWorldXZ: () => null,
     getBuildTopSurfaceAtWorldXZ: () => null,
     getBuildVehicleContact: () => null,

@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
+  buildingKey,
   buildingLabel,
   distanceToFootprint,
   listEnterableBuildingSupportsNear,
@@ -103,6 +104,7 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
 }
 
 function applyInteriorSceneState(active, sceneState) {
+  active.mode = sceneState.mode;
   active.group = sceneState.group;
   active.walkSurfaces = sceneState.walkSurfaces;
   active.placementTargets = sceneState.placementTargets;
@@ -200,12 +202,36 @@ export function listSupportedInteriorsNear(x, z, radius = 220, limit = 8, deps) 
     const cached = support?.key ? deps.interiorCache.get(support.key) : null;
     const mappedState = cached?.mode === "mapped" ? "mapped" : cached?.mode === "generated" ? "generated" : "unknown";
     const badge = summarizeSupportType(support, mappedState);
+    const building = support.building || support.destination || {};
+    const exteriorEntrance = support.exteriorEntrance || null;
     return {
       key: support.key,
       label: support.label || buildingLabel(support.building || support.destination),
       x: deps.finiteNumber(support.center?.x, deps.finiteNumber(support.entryAnchor?.x, 0)),
       z: deps.finiteNumber(support.center?.z, deps.finiteNumber(support.entryAnchor?.z, 0)),
       distance: deps.finiteNumber(support.distance, 0),
+      sourceBuildingId: String(building.sourceBuildingId || building.id || ''),
+      sourceLevels: Number.isFinite(Number(building.levels)) ? Number(building.levels) : null,
+      sourceHeight: Number.isFinite(Number(building.height)) ? Number(building.height) : null,
+      bounds: {
+        minX: deps.finiteNumber(building.minX, 0),
+        maxX: deps.finiteNumber(building.maxX, 0),
+        minZ: deps.finiteNumber(building.minZ, 0),
+        maxZ: deps.finiteNumber(building.maxZ, 0)
+      },
+      entryAnchor: support.entryAnchor ? {
+        x: deps.finiteNumber(support.entryAnchor.x, 0),
+        z: deps.finiteNumber(support.entryAnchor.z, 0)
+      } : null,
+      approachTarget: exteriorEntrance ? {
+        x: deps.finiteNumber(exteriorEntrance.approachX, exteriorEntrance.x),
+        z: deps.finiteNumber(exteriorEntrance.approachZ, exteriorEntrance.z)
+      } : support.entryAnchor ? {
+        x: deps.finiteNumber(support.entryAnchor.x, 0),
+        z: deps.finiteNumber(support.entryAnchor.z, 0)
+      } : null,
+      mappedEntrance: exteriorEntrance != null,
+      connectorEligible: deps.canPublishInteriorConnector?.(support) === true,
       supportType: badge,
       mode: cached?.mode || null,
       destinationKind: support.destinationKind || "",
@@ -555,6 +581,8 @@ export function updateInteriorInteraction(deps) {
     const label = support.label || buildingLabel(support.building || support.destination);
     appCtx.interiorHint = {
       state: "enterable",
+      key: support.key || '',
+      sourceBuildingId: buildingKey(support.building || support.destination),
       label,
       type,
       distance: candidate.distance

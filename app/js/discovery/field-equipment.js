@@ -5,6 +5,8 @@ import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 const ACTIVITY_TOOL = Object.freeze({
   'metal-detect': 'metal-detector', 'geology-inspect': 'rock-hammer', 'pan-sediment': 'sediment-pan',
   photograph: 'field-camera', 'fossil-document': 'specimen-brush', forage: 'field-lens',
+  'nature-observe': 'field-binoculars', 'insect-macro': 'field-camera',
+  'habitat-survey': 'field-lens', 'community-survey': 'field-lens',
   'wildlife-track': 'field-binoculars', 'trail-camera-survey': 'field-camera', survey: 'field-lens',
   inspect: 'field-lens', beachcomb: 'hand-trowel', 'virtual-archaeology': 'hand-trowel',
   'treasure-hunt': 'field-shovel', 'forest-survey': 'field-lens', 'weather-observe': 'field-lens'

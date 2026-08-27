@@ -1,4 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=4";
+import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 
 function wrapYaw(angle = 0) {
@@ -205,6 +207,7 @@ function createWalkingPhysicsHelpers({
     const startX = finiteOr(state.walker.x, 0);
     const startZ = finiteOr(state.walker.z, 0);
     const actions = appCtx.readControlActions?.('walk') || {};
+    const mobileTouch = actions.mobileTouch === true;
     const liveGpsOwnsTranslation = appCtx.liveGpsTranslationOwned?.() === true;
     const liveGpsTarget = liveGpsOwnsTranslation
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
@@ -220,11 +223,41 @@ function createWalkingPhysicsHelpers({
     state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, state.walker.pitch));
     if (liveGpsOwnsTranslation && Number.isFinite(liveGpsTarget?.headingDegrees)) {
       state.walker.angle = Math.PI - liveGpsTarget.headingDegrees * Math.PI / 180;
-    } else if (!liveGpsOwnsTranslation) {
+    } else if (!liveGpsOwnsTranslation && !mobileTouch) {
       state.walker.angle = state.walker.yaw;
     }
 
-    const forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
+    let forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
+    let strafe = liveGpsOwnsTranslation ? 0 : Number(actions.strafe) || 0;
+    if (mobileTouch && !liveGpsOwnsTranslation) {
+      const mobileMoveActive = actions.mobileMoveActive === true;
+      if (mobileMoveActive && state.walker.mobileMoveWasActive !== true) {
+        // Lock this gesture to the camera direction that was visible when the
+        // thumb went down. The chase camera may then move behind the explorer
+        // without feeding its own rotation back into a held left/right input
+        // and curling the player into a tight circle.
+        state.walker.mobileMoveBasisYaw = wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
+      }
+      state.walker.mobileMoveWasActive = mobileMoveActive;
+      const dampingRate = actions.mobileMoveActive === true ? 14 : 22;
+      const inputBlend = 1 - Math.exp(-Math.max(0, Math.min(0.1, dt)) * dampingRate);
+      state.walker.mobileForward = finiteOr(state.walker.mobileForward, 0) +
+        (forward - finiteOr(state.walker.mobileForward, 0)) * inputBlend;
+      state.walker.mobileStrafe = finiteOr(state.walker.mobileStrafe, 0) +
+        (strafe - finiteOr(state.walker.mobileStrafe, 0)) * inputBlend;
+      if (Math.abs(state.walker.mobileForward) < 0.002) state.walker.mobileForward = 0;
+      if (Math.abs(state.walker.mobileStrafe) < 0.002) state.walker.mobileStrafe = 0;
+      if (!mobileMoveActive && state.walker.mobileForward === 0 && state.walker.mobileStrafe === 0) {
+        state.walker.mobileMoveBasisYaw = null;
+      }
+      forward = state.walker.mobileForward;
+      strafe = state.walker.mobileStrafe;
+    } else {
+      state.walker.mobileForward = 0;
+      state.walker.mobileStrafe = 0;
+      state.walker.mobileMoveBasisYaw = null;
+      state.walker.mobileMoveWasActive = false;
+    }
     const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
@@ -291,11 +324,42 @@ function createWalkingPhysicsHelpers({
       state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
       state.walker.lookYawOffset *= Math.exp(-dt * 2.8);
       if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+    } else if (mobileTouch && actions.mobileSettings?.cameraRecenter !== false && actions.mobileLookActive !== true) {
+      // Movement is not a reason to suspend the chase camera. While the move
+      // stick is held, keep settling behind the explorer so screen direction
+      // and travel direction remain readable. Only active look input owns the
+      // camera; after it is released the normal idle delay applies.
+      const idleFor = actions.mobileMoveActive === true
+        ? Number.POSITIVE_INFINITY
+        : performance.now() - (Number(actions.mobileLastLookInputAt) || 0);
+      const recenter = resolveMobileCameraRecenter({
+        actorYaw: state.walker.angle,
+        cameraYaw: state.walker.yaw + state.walker.lookYawOffset,
+        dt,
+        followRate: actions.mobileMoveActive === true ? 7.2 : 4.2,
+        idleMs: idleFor,
+        lookActive: actions.mobileLookActive,
+        settings: actions.mobileSettings
+      });
+      if (recenter.active) {
+        state.walker.yaw = recenter.yaw;
+        state.walker.lookYawOffset = 0;
+      }
     }
 
-    if (forward !== 0 || liveGpsMoved) {
-      const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+    if (forward !== 0 || strafe !== 0 || liveGpsMoved) {
+      const cameraYaw = mobileTouch && Number.isFinite(state.walker.mobileMoveBasisYaw)
+        ? state.walker.mobileMoveBasisYaw
+        : wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
+      const moveX = mobileTouch && !liveGpsMoved
+        ? (Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
+        : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
+      const moveZ = mobileTouch && !liveGpsMoved
+        ? (Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
+        : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+      if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
+        state.walker.angle = Math.atan2(moveX, moveZ);
+      }
 
       let newX = liveGpsMoved ? liveGpsTarget.x : state.walker.x + moveX;
       let newZ = liveGpsMoved ? liveGpsTarget.z : state.walker.z + moveZ;
@@ -413,10 +477,10 @@ function createWalkingPhysicsHelpers({
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;
-      state.walker.speedMph = liveGpsMoved
-        ? Math.hypot(state.walker.x - startX, state.walker.z - startZ) /
-          Math.max(0.001, dt) * Number(appCtx.METERS_PER_WORLD_UNIT || 1) * 2.236936
-        : adjustedSpeed * 0.68;
+      state.walker.speedMph = worldUnitsPerSecondToMph(
+        Math.hypot(state.walker.x - startX, state.walker.z - startZ) / Math.max(0.001, dt),
+        appCtx.METERS_PER_WORLD_UNIT
+      );
     } else {
       state.walker.speedMph = 0;
     }

@@ -396,12 +396,27 @@ const validFishingScore = {
   uid: OWNER_UID,
   challenge: 'fishing',
   player: 'Owner',
+  timeMs: 42_000,
+  paintedPct: null,
+  paintedBuildings: 0,
+  totalBuildings: 0,
   species: 'Striped Bass',
   speciesId: 'striped-bass',
   score: 1380,
   weightKg: 8.4,
   lengthCm: 86.2,
+  strength: 72,
+  rarity: 'uncommon',
+  behavior: 'runner',
+  fightTimeMs: 42_000,
+  lineIntegrityPct: 64,
+  maxTensionPct: 88,
+  waterKind: 'estuary',
   location: 'Chesapeake Bay',
+  lat: 39.2904,
+  lon: -76.6122,
+  mode: 'boat',
+  createdAtIso: new Date().toISOString(),
   createdAt: serverTimestamp()
 };
 
@@ -417,6 +432,54 @@ await runCheck('anonymous player cannot publish a fishing score', async () => {
   await assertFails(setDoc(doc(anonDb, 'fishingLeaderboard', 'anon_catch'), {
     ...validFishingScore,
     uid: 'anonymous'
+  }));
+});
+
+const validFlowerScore = {
+  uid: OWNER_UID,
+  challenge: 'flower',
+  player: 'Owner',
+  timeMs: 31_250,
+  paintedPct: null,
+  paintedBuildings: 0,
+  totalBuildings: 0,
+  location: 'Baltimore',
+  lat: 39.2904,
+  lon: -76.6122,
+  mode: 'walking',
+  createdAtIso: new Date().toISOString(),
+  createdAt: serverTimestamp()
+};
+
+await runCheck('signed-in player can publish a bounded Flower Sprint score', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'flowerLeaderboard', 'owner_flower'), validFlowerScore));
+});
+
+await runCheck('Flower Sprint rejects forged ownership and impossible duration', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'flowerLeaderboard', 'forged_flower'), validFlowerScore));
+  await assertFails(setDoc(doc(ownerDb, 'flowerLeaderboard', 'impossible_flower'), {
+    ...validFlowerScore,
+    timeMs: 99_999_999
+  }));
+});
+
+const validPaintTownScore = {
+  ...validFlowerScore,
+  challenge: 'painttown',
+  timeMs: 120_000,
+  paintedPct: 62.5,
+  paintedBuildings: 25,
+  totalBuildings: 40
+};
+
+await runCheck('signed-in player can publish a bounded Paint Town score', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'paintTownLeaderboard', 'owner_paint'), validPaintTownScore));
+});
+
+await runCheck('Paint Town rejects counts larger than the available building set', async () => {
+  await assertFails(setDoc(doc(ownerDb, 'paintTownLeaderboard', 'impossible_paint'), {
+    ...validPaintTownScore,
+    paintedBuildings: 41
   }));
 });
 

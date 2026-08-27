@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-22 for World Explorer 3D 4.3.1.
+Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
 
 ## Location and map coverage
 
@@ -37,6 +37,9 @@ Last reviewed: 2026-08-22 for World Explorer 3D 4.3.1.
   source.
 - WebXR, camera-overlay AR, geolocation and some graphics features depend on
   browser support, device hardware and explicit user permission.
+- Performance varies by browser, graphics hardware, and device. Final staging
+  review covers desktop and a 390×844 mobile layout, but does not guarantee a
+  particular battery, thermal, or frame-rate result on every physical phone.
 
 ## External services
 

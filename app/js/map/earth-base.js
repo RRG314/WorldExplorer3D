@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getOverlayPreset } from "../editor/preset-registry.js?v=1";
 import { geometryPolygonRings } from "../editor/schema.js?v=1";
-import { loadTile } from "./tiles.js?v=4";
+import { loadTile } from "./tiles.js?v=5";
 
 const ROAD_MAP_INDEX_CELL_SIZE = 256;
 let roadMapIndex = null;

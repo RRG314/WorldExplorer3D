@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { FieldValue } = require('firebase-admin/firestore');
 
 const TRADEABLE_CATALOG_IDS = new Set([
   'brass-transit-token', 'iron-trade-buckle', 'copper-keepsake',
@@ -48,7 +49,7 @@ function normalizeTradeInput(input = {}) {
 
 function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
   const region = functions.region('us-central1');
-  const serverTimestamp = () => admin.firestore.FieldValue.serverTimestamp();
+  const serverTimestamp = () => FieldValue.serverTimestamp();
 
   const claimExplorerDiscovery = region.https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;

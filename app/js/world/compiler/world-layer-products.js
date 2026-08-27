@@ -87,7 +87,8 @@ export function compileWorldLayerProducts(options = {}) {
   const transportPublication = artifacts.transportSurfacePublication || {};
   const waterPublication = artifacts.waterSurfaceRegistrySnapshot || {};
   const buildingPublication = artifacts.buildingProvenanceModel || {};
-  const transportProvider = loadMetrics.overpassSource || runtimeState.districtSource || 'selected-location-transport';
+  const transportProvider = runtimeState.transportProviderDecision?.selected ||
+    loadMetrics.overpassSource || runtimeState.districtSource || 'selected-location-transport';
   const buildingProvider = runtimeState?.publicationSources?.buildings || 'selected-location-buildings';
 
   return immutableValue({
