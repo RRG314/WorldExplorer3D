@@ -1,17 +1,19 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
-import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
-import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=2';
+import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=6';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=10';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=5';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=6';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=11';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=12';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
+import { applyConditionImpact } from './impact-model.js?v=1';
+import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -174,12 +176,272 @@ function urbanCollisionTargets(state, reference, radius = 5) {
         ...vehicle
       }))
   ];
-  const responders = state.responders?.snapshot?.()?.responders || [];
-  responders.forEach((responder) => {
-    targets.push({ kind: 'responder_vehicle', ref: responder, radius: 1.02, ...responder });
-    if (responder.officer) targets.push({ kind: 'responder_officer', ref: responder.officer, radius: .44, ...responder.officer });
+  (state.responders?.targets?.() || []).forEach((target) => {
+    targets.push({ ...target, radius: target.kind === 'responder_vehicle' ? 1.02 : .44 });
   });
   return targets;
+}
+
+function materializeCrashTarget(state, target) {
+  if (target?.kind === 'ambient_npc') {
+    const npc = promotePedestrian(state, target.ref);
+    return npc ? { kind: 'npc', ref: npc, radius: .42, ...npcPose(npc) } : target;
+  }
+  if (target?.kind === 'ambient_vehicle') {
+    const vehicle = promoteTrafficVehicle(state, target.ref?.id);
+    return vehicle ? {
+      kind: 'vehicle', ref: vehicle,
+      radius: Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5),
+      ...vehiclePose(vehicle)
+    } : target;
+  }
+  return target;
+}
+
+function crashTargetMass(target) {
+  if (String(target?.kind || '').includes('npc') || target?.kind === 'responder_officer') return 82;
+  return vehicleMassKg(target?.ref?.variant || 'sedan');
+}
+
+function crashTargetVelocity(target, metersPerWorldUnit) {
+  const motion = target?.ref?.crashMotion;
+  if (motion) return { x: Number(motion.velocityX || 0), z: Number(motion.velocityZ || 0) };
+  const speedWorld = Number(target?.ref?.speed || 0);
+  const yaw = Number(target?.yaw ?? target?.ref?.yaw ?? 0);
+  return {
+    x: Math.sin(yaw) * speedWorld * metersPerWorldUnit,
+    z: Math.cos(yaw) * speedWorld * metersPerWorldUnit
+  };
+}
+
+function applyPlayerCrashResponse(state, response, metersPerWorldUnit) {
+  const angle = Number(appCtx.car?.angle || 0);
+  const forwardX = Math.sin(angle);
+  const forwardZ = Math.cos(angle);
+  const lateralX = Math.cos(angle);
+  const lateralZ = -Math.sin(angle);
+  const forwardMps = response.moverVelocity.x * forwardX + response.moverVelocity.z * forwardZ;
+  const lateralMps = response.moverVelocity.x * lateralX + response.moverVelocity.z * lateralZ;
+  const toSimulationSpeed = (mps) => mphToCarSpeed(mps * 2.2369362921);
+  appCtx.car.speed = toSimulationSpeed(forwardMps);
+  appCtx.car.vFwd = appCtx.car.speed;
+  appCtx.car.vLat = toSimulationSpeed(lateralMps);
+  appCtx.car.vx = response.moverVelocity.x / metersPerWorldUnit;
+  appCtx.car.vz = response.moverVelocity.z / metersPerWorldUnit;
+  appCtx.car.yawRate = Number(appCtx.car.yawRate || 0) + response.moverYawImpulse;
+  appCtx.car.rearSlip = Number(appCtx.car.rearSlip || 0) + response.moverYawImpulse * .48;
+  if (response.moverDamageForce > 0) {
+    const target = state.activeVehicle || { condition: appCtx.car.condition ?? 1, resistance: 175 };
+    const result = applyConditionImpact(target, response.moverDamageForce);
+    appCtx.car.condition = result.after;
+    if (state.activeVehicle) {
+      state.activeVehicle.condition = result.after;
+      state.activeVehicle.visual?.setCondition?.(result.after);
+    }
+  }
+}
+
+function applyCrashTargetMotion(target, response, at) {
+  if (!target?.ref || response.severity === 'contact') return;
+  target.ref.crashMotion = {
+    velocityX: response.targetVelocity.x,
+    velocityZ: response.targetVelocity.z,
+    angularVelocity: response.targetYawImpulse,
+    startedAt: at,
+    severity: response.severity
+  };
+  if (target.kind === 'npc' || target.kind === 'responder_officer') {
+    const downed = Number(target.ref.condition ?? 1) <= .05;
+    target.ref.knockdownUntil = downed ? Infinity : at + response.knockdownSeconds * 1000;
+    target.ref.reaction = downed ? 'downed' : 'knocked-down';
+    target.ref.reactionUntil = target.ref.knockdownUntil;
+    target.ref.visual?.setReaction?.(target.ref.reaction);
+  } else if ('speed' in target.ref) {
+    target.ref.speed = 0;
+  }
+}
+
+function showCrashFeedback(state, severity) {
+  const root = state.crashFeedback;
+  if (!root) return;
+  root.classList.remove('show');
+  void root.offsetWidth;
+  root.dataset.severity = String(severity || 'minor');
+  root.classList.add('show');
+  state.crashFeedbackUntil = now() + 360;
+}
+
+function updateCrashBodies(state, dt) {
+  const step = Math.max(0, Math.min(.1, Number(dt) || 0));
+  const metersPerWorldUnit = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+  const at = now();
+  if (state.activeVehicle?.attachedToPlayer) {
+    state.activeVehicle.condition = Math.max(0, Math.min(1, Number(appCtx.car?.condition ?? state.activeVehicle.condition ?? 1)));
+    state.activeVehicle.visual?.setCondition?.(state.activeVehicle.condition);
+  }
+  if (state.crashFeedbackUntil > 0 && state.crashFeedbackUntil <= at) {
+    state.crashFeedback?.classList.remove('show');
+    state.crashFeedbackUntil = 0;
+  }
+  state.vehicles.forEach((vehicle) => {
+    if (!vehicle.crashMotion || vehicle.attachedToPlayer) return;
+    const motion = dampCrashMotion(vehicle.crashMotion, step, { kind: 'vehicle' });
+    const nextX = vehicle.x + motion.velocityX / metersPerWorldUnit * step;
+    const nextZ = vehicle.z + motion.velocityZ / metersPerWorldUnit * step;
+    const secondaryTarget = [
+      ...state.vehicles.filter((entry) => entry !== vehicle && !entry.attachedToPlayer && Number(entry.condition ?? 1) > .05).map((entry) => ({
+        kind: 'vehicle', ref: entry, x: entry.x, z: entry.z,
+        radius: Math.max(.78, Number(entry.variant?.width || 1.8) * .5)
+      })),
+      ...state.npcs.filter((entry) => Number(entry.condition ?? 1) > .05).map((entry) => ({
+        kind: 'npc', ref: entry, x: entry.x, z: entry.z, radius: .42
+      }))
+    ].find((target) => Math.hypot(Number(target.x) - nextX, Number(target.z) - nextZ) < target.radius + Math.max(.78, Number(vehicle.variant?.width || 1.8) * .5));
+    const secondaryKey = secondaryTarget ? `${vehicle.id}:${secondaryTarget.kind}:${secondaryTarget.ref.id}` : '';
+    const lastSecondary = Number(state.secondaryCrashCooldowns.get(secondaryKey) || 0);
+    if (secondaryTarget && at - lastSecondary > 700) {
+      const response = resolveCrashImpact({
+        moverMassKg: vehicleMassKg(vehicle.variant),
+        targetMassKg: crashTargetMass(secondaryTarget),
+        moverVelocity: { x: motion.velocityX, z: motion.velocityZ },
+        targetVelocity: crashTargetVelocity(secondaryTarget, metersPerWorldUnit),
+        normal: { x: Number(secondaryTarget.x) - vehicle.x, z: Number(secondaryTarget.z) - vehicle.z },
+        targetKind: secondaryTarget.kind
+      });
+      if (response.applied && response.severity !== 'contact') {
+        state.secondaryCrashCooldowns.set(secondaryKey, at);
+        vehicle.crashMotion = {
+          ...vehicle.crashMotion,
+          velocityX: response.moverVelocity.x,
+          velocityZ: response.moverVelocity.z,
+          angularVelocity: response.moverYawImpulse,
+          severity: response.severity
+        };
+        const damage = applyConditionImpact(vehicle, response.moverDamageForce);
+        vehicle.condition = damage.after;
+        vehicle.visual?.setCondition?.(damage.after);
+        state.equipmentRuntime?.applyCollisionImpact?.(secondaryTarget, response.targetDamageForce);
+        applyCrashTargetMotion(secondaryTarget, response, at);
+        state.lastCrashAction = Object.freeze({
+          targetId: String(secondaryTarget.ref.id || ''), targetKind: secondaryTarget.kind,
+          severity: response.severity, closingMph: Number(response.closingMph.toFixed(1)),
+          energyJoules: Math.round(response.energyJoules), secondary: true, at
+        });
+        showCrashFeedback(state, response.severity);
+        return;
+      }
+    }
+    const collision = appCtx.checkBuildingCollision?.(nextX, nextZ, Math.max(.72, Number(vehicle.variant?.width || 1.8) * .46), {
+      actorBaseY: Number(vehicle.y || 0) - VEHICLE_ROOT_TO_GROUND_METERS,
+      actorHeight: Number(vehicle.variant?.height || 1.5)
+    });
+    if (collision?.collision) {
+      vehicle.crashMotion = {
+        ...motion,
+        velocityX: -motion.velocityX * .18,
+        velocityZ: -motion.velocityZ * .18,
+        angularVelocity: motion.angularVelocity * .35
+      };
+      const damage = applyConditionImpact(vehicle, Math.min(42, Math.hypot(motion.velocityX, motion.velocityZ) * 3.1));
+      vehicle.condition = damage.after;
+      vehicle.visual?.setCondition?.(damage.after);
+    } else {
+      vehicle.crashMotion = { ...vehicle.crashMotion, ...motion };
+      vehicle.x = nextX;
+      vehicle.z = nextZ;
+      vehicle.yaw += motion.angularVelocity * step;
+      syncVehiclePose(vehicle, vehicle);
+    }
+    if (Math.hypot(motion.velocityX, motion.velocityZ) < .12 && Math.abs(motion.angularVelocity) < .04) {
+      vehicle.crashMotion = null;
+    }
+  });
+  state.npcs.forEach((npc) => {
+    if (!npc.crashMotion) {
+      if (npc.reaction === 'knocked-down' && Number(npc.condition ?? 1) > .05 && Number(npc.knockdownUntil || 0) <= at) {
+        npc.reaction = '';
+        npc.reactionUntil = 0;
+        npc.visual.setReaction('');
+      }
+      return;
+    }
+    const motion = dampCrashMotion(npc.crashMotion, step, { kind: 'npc' });
+    npc.crashMotion = { ...npc.crashMotion, ...motion };
+    npc.x += motion.velocityX / metersPerWorldUnit * step;
+    npc.z += motion.velocityZ / metersPerWorldUnit * step;
+    npc.y = Number(appCtx.SurfaceQuery?.walkAt?.(npc.x, npc.z)?.position?.y ?? npc.y);
+    npc.yaw += motion.angularVelocity * step;
+    npc.visual.root.position.set(npc.x, npc.y, npc.z);
+    npc.visual.root.rotation.y = npc.yaw;
+    const stopped = Math.hypot(motion.velocityX, motion.velocityZ) < .1 && Math.abs(motion.angularVelocity) < .04;
+    if (!stopped) return;
+    npc.crashMotion = null;
+    if (Number(npc.condition ?? 1) > .05 && Number(npc.knockdownUntil || 0) <= at) {
+      npc.reaction = '';
+      npc.reactionUntil = 0;
+      npc.visual.setReaction('');
+    }
+  });
+}
+
+function prepareCrashScenarioForSupport(state, targetKind = 'vehicle', speedMph = 30, lateralOffset = 0) {
+  if (!appCtx.developerDiagnosticsEnabled || !state.activeVehicle || appCtx.Walk?.state?.mode !== 'drive') return null;
+  state.actorCollisionCooldowns.clear();
+  state.secondaryCrashCooldowns.clear();
+  state.vehicles.forEach((vehicle) => {
+    if (!vehicle.attachedToPlayer) vehicle.crashMotion = null;
+  });
+  const angle = Number(appCtx.car.angle || 0);
+  const forward = { x: Math.sin(angle), z: Math.cos(angle) };
+  const side = { x: Math.cos(angle), z: -Math.sin(angle) };
+  const speedMps = Math.max(0, Math.min(80, Number(speedMph) || 0)) * .44704;
+  const units = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+  let target;
+  if (targetKind === 'npc') {
+    state.vehicles.filter((vehicle) => !vehicle.attachedToPlayer).forEach((vehicle, index) => {
+      vehicle.x = appCtx.car.x - forward.x * 18 + side.x * (8 + index * 4);
+      vehicle.z = appCtx.car.z - forward.z * 18 + side.z * (8 + index * 4);
+      syncVehiclePose(vehicle, vehicle);
+    });
+    let npc = state.npcs.find((entry) => Number(entry.condition ?? 1) > .05);
+    if (!npc) {
+      const nearby = state.population?.nearbyPedestrians?.(appCtx.car, 80) || [];
+      npc = nearby.length ? promotePedestrian(state, nearby[0]) : null;
+    }
+    if (!npc) return null;
+    npc.x = appCtx.car.x + forward.x * 3 + side.x * Number(lateralOffset || 0);
+    npc.z = appCtx.car.z + forward.z * 3 + side.z * Number(lateralOffset || 0);
+    npc.y = Number(appCtx.SurfaceQuery?.walkAt?.(npc.x, npc.z)?.position?.y ?? npc.y);
+    npc.condition = 1;
+    npc.crashMotion = null;
+    npc.reaction = '';
+    npc.visual.root.position.set(npc.x, npc.y, npc.z);
+    npc.visual.setReaction('');
+    target = { id: npc.id, kind: 'npc', x: npc.x, z: npc.z };
+  } else {
+    const vehicle = state.vehicles.find((entry) => entry !== state.activeVehicle && !entry.attachedToPlayer);
+    if (!vehicle) return null;
+    state.vehicles.filter((entry) => entry !== state.activeVehicle && entry !== vehicle && !entry.attachedToPlayer).forEach((entry, index) => {
+      entry.x = appCtx.car.x - forward.x * 18 + side.x * (8 + index * 4);
+      entry.z = appCtx.car.z - forward.z * 18 + side.z * (8 + index * 4);
+      syncVehiclePose(entry, entry);
+    });
+    vehicle.condition = 1;
+    vehicle.crashMotion = null;
+    vehicle.x = appCtx.car.x + forward.x * 4.1 + side.x * Number(lateralOffset || 0);
+    vehicle.z = appCtx.car.z + forward.z * 4.1 + side.z * Number(lateralOffset || 0);
+    vehicle.yaw = angle;
+    vehicle.visual.setCondition?.(1);
+    syncVehiclePose(vehicle, vehicle);
+    target = { id: vehicle.id, kind: 'vehicle', x: vehicle.x, z: vehicle.z };
+  }
+  appCtx.car.speed = mphToCarSpeed(speedMph);
+  appCtx.car.vFwd = appCtx.car.speed;
+  appCtx.car.vLat = 0;
+  appCtx.car.vx = forward.x * speedMps / units;
+  appCtx.car.vz = forward.z * speedMps / units;
+  appCtx.car.yawRate = 0;
+  return Object.freeze({ ...target, speedMph: Number(speedMph), lateralOffset: Number(lateralOffset || 0) });
 }
 
 function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
@@ -226,26 +488,59 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
     const speedMph = Math.abs(Number(options.speedMph || 0));
     const collisionKey = `${direct.target.kind}:${direct.target.ref?.id || ''}`;
     const lastImpact = Number(state.actorCollisionCooldowns.get(collisionKey) || 0);
-    if (speedMph >= 7 && now() - lastImpact > 900 && !direct.target.kind.startsWith('responder_')) {
+    if (speedMph >= 3 && now() - lastImpact > 650) {
       state.actorCollisionCooldowns.set(collisionKey, now());
-      const force = Math.min(120, 14 + speedMph * 1.7);
-      state.equipmentRuntime?.applyCollisionImpact?.(direct.target, force);
-      reportCivicEvent(state, {
-        kind: 'vehicle_collision',
-        severity: speedMph >= 25 ? 2 : 1,
-        radius: 38,
-        audibleRadius: 24,
-        maximumWitnesses: 3,
-        forceWitness: true
+      const target = materializeCrashTarget(state, direct.target);
+      const metersPerWorldUnit = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+      const normal = {
+        x: Number(target.x || 0) - (source.x + (destination.x - source.x) * direct.t),
+        z: Number(target.z || 0) - (source.z + (destination.z - source.z) * direct.t)
+      };
+      const response = resolveCrashImpact({
+        moverMassKg: Number(appCtx.car?.handlingProfile?.massKg || 1520),
+        targetMassKg: crashTargetMass(target),
+        moverVelocity: {
+          x: Number(options.velocityX || 0) * metersPerWorldUnit,
+          z: Number(options.velocityZ || 0) * metersPerWorldUnit
+        },
+        targetVelocity: crashTargetVelocity(target, metersPerWorldUnit),
+        normal,
+        targetKind: target.kind
       });
+      if (response.applied && response.severity !== 'contact') {
+        applyPlayerCrashResponse(state, response, metersPerWorldUnit);
+        state.equipmentRuntime?.applyCollisionImpact?.(target, response.targetDamageForce);
+        applyCrashTargetMotion(target, response, now());
+        state.lastCrashAction = Object.freeze({
+          targetId: String(target.ref?.id || ''), targetKind: target.kind,
+          severity: response.severity,
+          closingMph: Number(response.closingMph.toFixed(1)),
+          energyJoules: Math.round(response.energyJoules),
+          at: now()
+        });
+        showCrashFeedback(state, response.severity);
+        setStatus(state, `${response.severity === 'minor' ? 'Impact' : 'Crash'} · ${Math.round(response.closingMph)} mph closing speed`, 1800);
+        reportCivicEvent(state, {
+          kind: 'vehicle_collision',
+          severity: response.severity === 'severe' ? 3 : response.severity === 'major' ? 2 : 1,
+          radius: 38,
+          audibleRadius: 24,
+          maximumWitnesses: 3,
+          forceWitness: true
+        });
+      }
+      direct.crashResponse = response;
+    } else if (speedMph >= 3 && lastImpact > 0) {
+      direct.responseSuppressed = true;
     }
   }
 
   const slideX = blockerAlong(source, { x: destination.x, z: source.z });
   const slideZ = blockerAlong(source, { x: source.x, z: destination.z });
-  if (!slideX) return Object.freeze({ x: destination.x, z: source.z, collision: true, targetKind: direct.target.kind });
-  if (!slideZ) return Object.freeze({ x: source.x, z: destination.z, collision: true, targetKind: direct.target.kind });
-  return Object.freeze({ x: source.x, z: source.z, collision: true, targetKind: direct.target.kind });
+  const responseApplied = direct.responseSuppressed === true || direct.crashResponse?.applied === true && direct.crashResponse?.severity !== 'contact';
+  if (!slideX) return Object.freeze({ x: destination.x, z: source.z, collision: true, responseApplied, targetKind: direct.target.kind });
+  if (!slideZ) return Object.freeze({ x: source.x, z: destination.z, collision: true, responseApplied, targetKind: direct.target.kind });
+  return Object.freeze({ x: source.x, z: source.z, collision: true, responseApplied, targetKind: direct.target.kind });
 }
 
 function nearestNpcCandidate(state, radius = NPC_INTERACTION_DISTANCE) {
@@ -605,6 +900,7 @@ function resetPlayerVehicleVisual(state) {
   }
   appCtx.car.vehicleVariantId = 'sedan';
   appCtx.car.vehicleServiceType = '';
+  appCtx.car.condition = state.defaultCarCondition;
 }
 
 function mountVehicleForDriving(state, vehicle) {
@@ -622,6 +918,7 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.carMesh.userData.vehicleStyle = `urban-${vehicle.variant.bodyStyle}`;
   appCtx.car.vehicleVariantId = vehicle.variant.id;
   appCtx.car.vehicleServiceType = vehicle.serviceType || '';
+  appCtx.car.condition = Math.max(0, Math.min(1, Number(vehicle.condition ?? 1)));
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;
@@ -861,6 +1158,9 @@ function promoteCivicWitness(state, witness) {
   if (!witness?.id) return null;
   const npc = promotePedestrian(state, witness);
   if (!npc) return null;
+  if (Number(npc.condition ?? 1) <= .05 || Number(npc.knockdownUntil || 0) > now() || npc.reaction === 'knocked-down') {
+    return npc;
+  }
   npc.reaction = witness.reaction;
   npc.visual.setReaction(witness.reaction);
   return npc;
@@ -880,7 +1180,7 @@ function reportCivicEvent(state, event = {}) {
   state.npcs.map((npc) => {
     const pose = npcPose(npc);
     return { npc, pose, distance: Math.hypot(pose.x - position.x, pose.z - position.z) };
-  }).filter((entry) => entry.npc.condition > 0 && entry.distance <= Math.max(0, Number(event.radius) || 0))
+  }).filter((entry) => entry.npc.condition > .05 && Number(entry.npc.knockdownUntil || 0) <= now() && entry.distance <= Math.max(0, Number(event.radius) || 0))
     .sort((a, b) => a.distance - b.distance)
     .forEach((entry) => {
       if (witnesses.length >= maximumWitnesses || knownWitnessIds.has(entry.npc.sourceAgentId)) return;
@@ -978,6 +1278,7 @@ function updateCivicResponse(state, dt) {
     ? 'reporting'
     : currentCivic?.phase === 'searching' ? 'watching' : '';
   state.npcs.forEach((npc) => {
+    if (Number(npc.condition ?? 1) <= .05 || Number(npc.knockdownUntil || 0) > now() || npc.reaction === 'knocked-down') return;
     if (Number(npc.condition ?? 1) > .05 && Number(npc.hostileUntil || 0) > now()) return;
     if (npc.reaction === witnessReaction) return;
     npc.reaction = witnessReaction;
@@ -1320,6 +1621,12 @@ function snapshot(state) {
     phase: state.transition?.kind || (state.activeVehicle ? 'driving' : 'walking'),
     vehicleCount: state.vehicles.length,
     activeVehicleId: state.activeVehicle?.id || '',
+    playerVehicle: state.activeVehicle ? Object.freeze({
+      id: state.activeVehicle.id,
+      speedMph: Number(Math.abs(carSpeedToMph(Number(appCtx.car?.speed || 0))).toFixed(1)),
+      condition: Number(Number(state.activeVehicle.condition ?? appCtx.car?.condition ?? 1).toFixed(3)),
+      worldVelocityMps: Number((Math.hypot(Number(appCtx.car?.vx || 0), Number(appCtx.car?.vz || 0)) * Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11))).toFixed(2))
+    }) : null,
     nearbyVehicleId: candidate?.data?.vehicleId || '',
     interaction: candidate ? Object.freeze({ action: candidate.action, label: candidate.label, distance: candidate.distance }) : null,
     vehicles: Object.freeze(state.vehicles.map((vehicle) => {
@@ -1347,6 +1654,11 @@ function snapshot(state) {
         ambientTraffic: vehicle.ambientTraffic === true,
         occupied: vehicle.occupied,
         attachedToPlayer: vehicle.attachedToPlayer,
+        crashMotion: vehicle.crashMotion ? Object.freeze({
+          velocityMps: Number(Math.hypot(vehicle.crashMotion.velocityX, vehicle.crashMotion.velocityZ).toFixed(2)),
+          angularVelocity: Number(Number(vehicle.crashMotion.angularVelocity || 0).toFixed(3)),
+          severity: String(vehicle.crashMotion.severity || '')
+        }) : null,
         roomOccupiedByOther: vehicle.roomOccupiedByOther === true,
         roomLeaseOwnerUid: String(vehicle.roomLeaseOwnerUid || ''),
         driverSide: Number(vehicle.driverSide || -1),
@@ -1376,6 +1688,8 @@ function snapshot(state) {
       heldEquipment: String(npc.heldEquipment || ''),
       defending: Number(npc.hostileUntil || 0) > now() && Number(npc.condition ?? 1) > .05,
       shotsFired: Number(npc.shotsFired || 0),
+      knockedDown: npc.reaction === 'knocked-down',
+      crashVelocityMps: Number(Math.hypot(Number(npc.crashMotion?.velocityX || 0), Number(npc.crashMotion?.velocityZ || 0)).toFixed(2)),
       possessionAvailable: npc.possessionAvailable === true,
       x: Number(npc.x.toFixed(2)),
       y: Number(npc.y.toFixed(2)),
@@ -1393,6 +1707,7 @@ function snapshot(state) {
     lastCivicOutcome: state.lastCivicOutcome,
     lastNpcAction: state.lastNpcAction,
     lastImpactAction: state.lastImpactAction,
+    lastCrashAction: state.lastCrashAction,
     projectileRuntime: state.equipmentRuntime?.snapshot?.() || Object.freeze({ activeProjectiles: 0, lastProjectileAction: null }),
     playerCondition: Number(Number(state.playerCondition ?? 1).toFixed(3)),
     custody: state.custody ? Object.freeze({
@@ -1486,6 +1801,9 @@ function disposeRuntime(state, reason = 'disposed') {
   state.civic?.clear?.();
   if (appCtx.isUrbanParachuteDeployed === state.isParachuteDeployed) delete appCtx.isUrbanParachuteDeployed;
   if (appCtx.onUrbanParachuteLanded === state.onParachuteLanded) delete appCtx.onUrbanParachuteLanded;
+  if (globalThis.__WE3D_URBAN_CRASH_SUPPORT__ === state.crashSupportHook) {
+    delete globalThis.__WE3D_URBAN_CRASH_SUPPORT__;
+  }
   state.reason = String(reason || 'disposed');
   if (activeRuntime === state) activeRuntime = null;
   if (appCtx.urbanSandboxRuntime === state) appCtx.urbanSandboxRuntime = null;
@@ -1591,6 +1909,7 @@ function startUrbanSandboxRuntime(options = {}) {
     budget,
     vehicleDetailBudget,
     actorCollisionCooldowns: new Map(),
+    secondaryCrashCooldowns: new Map(),
     // Keep every close/conversational pedestrian on the detailed character
     // path. Four slots allowed a fifth person in a normal sidewalk cluster to
     // remain an instanced silhouette until interaction, which is the visible
@@ -1609,11 +1928,16 @@ function startUrbanSandboxRuntime(options = {}) {
     backpackSelectedId: '',
     defaultWheelMeshes: [...(appCtx.wheelMeshes || [])],
     defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'classic-utility-d'),
+    defaultCarCondition: Math.max(0, Math.min(1, Number(appCtx.car?.condition ?? 1))),
+    crashSupportHook: null,
     lastAction: null,
     lastCivicAction: null,
     lastCivicOutcome: null,
     lastNpcAction: null,
     lastImpactAction: null,
+    lastCrashAction: null,
+    crashFeedback: document.getElementById('urbanCrashFeedback'),
+    crashFeedbackUntil: 0,
     statusMessage: '',
     statusUntil: 0,
     promptElapsed: 0,
@@ -1778,6 +2102,7 @@ function startUrbanSandboxRuntime(options = {}) {
       updateTransition(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);
+      updateCrashBodies(state, frame.dt);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {
         state.npcPromotionElapsed = 0;
@@ -1805,6 +2130,14 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
+  if (appCtx.developerDiagnosticsEnabled) {
+    state.crashSupportHook = Object.freeze({
+      enterVehicle: (vehicleId) => enterVehicleAfterClaim(state, state.vehicles.find((vehicle) => vehicle.id === String(vehicleId || ''))),
+      prepare: (targetKind, speedMph, lateralOffset) => prepareCrashScenarioForSupport(state, targetKind, speedMph, lateralOffset),
+      snapshot: () => snapshot(state)
+    });
+    globalThis.__WE3D_URBAN_CRASH_SUPPORT__ = state.crashSupportHook;
+  }
   state.isParachuteDeployed = () => activeWorldMatches(state) && state.parachute.deployed === true;
   state.onParachuteLanded = () => {
     if (!state.parachute.deployed) return false;

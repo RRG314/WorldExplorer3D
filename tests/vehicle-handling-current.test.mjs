@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   PARKED_VEHICLE_CATALOG,
+  vehicleConditionDynamics,
   vehicleHandlingProfile
 } from '../app/js/engine/vehicle-catalog.js';
 import { ROAD_CAR_CONFIG } from '../app/js/physics/vehicle-config.js';
@@ -12,6 +13,18 @@ test('the normal road-car ceiling is the advertised 120 mph', () => {
   assert.equal(carSpeedToMph(ROAD_CAR_CONFIG.maxSpd), 120);
   assert.equal(carSpeedToMph(ROAD_CAR_CONFIG.boostMax), 120);
   assert.ok(ROAD_CAR_CONFIG.boostAccel > ROAD_CAR_CONFIG.accel, 'boost should change acceleration, not top speed');
+});
+
+test('crash damage degrades the same vehicle handling contract and totaled cars cannot accelerate', () => {
+  const healthy = vehicleConditionDynamics(1);
+  const damaged = vehicleConditionDynamics(.35);
+  const totaled = vehicleConditionDynamics(.05);
+
+  assert.equal(healthy.topSpeedScale, 1);
+  assert.ok(damaged.topSpeedScale < healthy.topSpeedScale);
+  assert.ok(damaged.accelerationScale < healthy.accelerationScale);
+  assert.ok(damaged.steeringScale < healthy.steeringScale);
+  assert.equal(totaled.operable, false);
 });
 
 test('enterable vehicle families resolve genuinely different handling', () => {

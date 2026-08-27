@@ -8,7 +8,7 @@ import {
   updateVehicleSurface
 } from "./physics/vehicle-surface.js?v=6";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
-import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=6";
+import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=7";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 import {
@@ -21,7 +21,7 @@ import {
   carSpeedToWorldUnitsPerSecond,
   mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=2";
-import { vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=3";
+import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=5";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -202,6 +202,7 @@ function update(dt) {
   const vehicleHandling = vehicleHandlingProfile(appCtx.car.vehicleVariantId || 'sedan', {
     serviceType: appCtx.car.vehicleServiceType || ''
   });
+  const vehicleCondition = vehicleConditionDynamics(appCtx.car.condition ?? 1);
   appCtx.car.handlingProfile = vehicleHandling;
   let maxSpd, friction, accel;
   let planetaryNormalMaxSpd = appCtx.onMars ? 18 : 24;
@@ -257,14 +258,19 @@ function update(dt) {
   maxSpd *= surfaceDynamics.topSpeed;
   friction *= surfaceDynamics.rolling;
   accel *= surfaceDynamics.accel;
+  if (!isPlanetarySurface()) {
+    maxSpd *= vehicleCondition.topSpeedScale;
+    accel *= vehicleCondition.accelerationScale;
+  }
 
   const spd = Math.abs(appCtx.car.speed);
-  const canAccelerate = !appCtx.car.isAirborne;
+  const hasGroundControl = !appCtx.car.isAirborne;
+  const canAccelerate = hasGroundControl && (isPlanetarySurface() || vehicleCondition.operable);
   const driftBrakeSpeed = 10;
   const earthDriftBrakeIntent = !isPlanetarySurface() && braking && (left || right) && spd > driftBrakeSpeed;
 
-  if (driveCommand.serviceBrake && canAccelerate) {
-    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) * (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale);
+  if (driveCommand.serviceBrake && hasGroundControl) {
+    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) * (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale);
     const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
     appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
     if (nextMagnitude < 0.5) appCtx.car.speed = 0;
@@ -279,7 +285,7 @@ function update(dt) {
     appCtx.car.speed += throttleAccel * driveCommand.forward * (1 - spd / maxSpd * 0.7) * dt;
   }
 
-  if (braking && spd > 0.5 && canAccelerate) {
+  if (braking && spd > 0.5 && hasGroundControl) {
     if (earthDriftBrakeIntent) {
       // Handbrake-like brake response: keep momentum so brake+steer can initiate drift.
       const driftBrakeRate = 0.72;
@@ -349,7 +355,7 @@ function update(dt) {
   const earthSteering = earthDrivingSteeringProfile(carSpeedToMph(spdAbs));
   const maxSteer = isPlanetarySurface()
     ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90))
-    : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale;
+    : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale * vehicleCondition.steeringScale;
 
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
@@ -386,7 +392,7 @@ function update(dt) {
   const isDrifting = driftStartIntent || !!appCtx.car.isDrifting && driftCanSustain;
 
   // Surface grip baseline using existing runtime config values.
-  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip * (isPlanetarySurface() ? 1 : vehicleHandling.gripScale);
+  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip * (isPlanetarySurface() ? 1 : vehicleHandling.gripScale * vehicleCondition.gripScale);
 
   // Moon handling remains unchanged by drift tuning.
   if (isPlanetarySurface()) gripBase = 1.0;
@@ -456,7 +462,7 @@ function update(dt) {
   } else if (!isDrifting) {
     appCtx.car.yawRate *= Math.exp(-dt * yawDamp * 0.08);
   }
-  if (canAccelerate) {
+  if (hasGroundControl) {
     appCtx.car.angle += appCtx.car.yawRate * dt;
   } else {
     appCtx.car.yawRate *= Math.exp(-dt * 2.0);
@@ -582,11 +588,17 @@ function update(dt) {
       const actorCollision = appCtx.resolveUrbanActorCollision(
         { x: appCtx.car.x, z: appCtx.car.z },
         { x: nx, z: nz },
-        { mode: 'drive', radius: .92, speedMph: carSpeedToMph(appCtx.car.speed) }
+        {
+          mode: 'drive',
+          radius: .92,
+          speedMph: carSpeedToMph(appCtx.car.speed),
+          velocityX: appCtx.car.vx,
+          velocityZ: appCtx.car.vz
+        }
       );
       nx = actorCollision.x;
       nz = actorCollision.z;
-      if (actorCollision.collision) {
+      if (actorCollision.collision && !actorCollision.responseApplied) {
         appCtx.car.speed *= .18;
         appCtx.car.vFwd *= .18;
         appCtx.car.vLat *= .12;

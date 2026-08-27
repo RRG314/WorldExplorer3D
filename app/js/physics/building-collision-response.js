@@ -1,3 +1,6 @@
+import { mphToCarSpeed } from './vehicle-speed-units.js?v=2';
+import { resolveCrashImpact } from '../urban-sandbox/crash-physics.js?v=1';
+
 function stopVehicle(car) {
   car.speed = 0;
   car.vFwd = 0;
@@ -12,6 +15,46 @@ function slowVehicle(car, factor) {
   car.vLat *= factor;
   car.vx *= factor;
   car.vz *= factor;
+}
+
+function applyWallCrashResponse(appCtx, buildingCheck) {
+  const units = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+  const angle = Number(appCtx.car.angle || 0);
+  const response = resolveCrashImpact({
+    moverMassKg: Number(appCtx.car?.handlingProfile?.massKg || 1520),
+    targetMassKg: 1e9,
+    moverVelocity: {
+      x: Number(appCtx.car.vx || 0) * units,
+      z: Number(appCtx.car.vz || 0) * units
+    },
+    targetVelocity: { x: 0, z: 0 },
+    normal: { x: -Number(buildingCheck.pushX || 0), z: -Number(buildingCheck.pushZ || 0) },
+    targetKind: 'world'
+  });
+  if (!response.applied || response.severity === 'contact') {
+    slowVehicle(appCtx.car, .55);
+    return response;
+  }
+  const forwardX = Math.sin(angle);
+  const forwardZ = Math.cos(angle);
+  const lateralX = Math.cos(angle);
+  const lateralZ = -Math.sin(angle);
+  const forwardMps = response.moverVelocity.x * forwardX + response.moverVelocity.z * forwardZ;
+  const lateralMps = response.moverVelocity.x * lateralX + response.moverVelocity.z * lateralZ;
+  appCtx.car.speed = mphToCarSpeed(forwardMps * 2.2369362921);
+  appCtx.car.vFwd = appCtx.car.speed;
+  appCtx.car.vLat = mphToCarSpeed(lateralMps * 2.2369362921);
+  appCtx.car.vx = response.moverVelocity.x / units;
+  appCtx.car.vz = response.moverVelocity.z / units;
+  appCtx.car.yawRate = Number(appCtx.car.yawRate || 0) + response.moverYawImpulse;
+  appCtx.car.rearSlip = Number(appCtx.car.rearSlip || 0) + response.moverYawImpulse * .42;
+  appCtx.car.condition = Math.max(0, Number(appCtx.car.condition ?? 1) - response.moverDamageForce / 175);
+  appCtx.car.lastWorldImpact = Object.freeze({
+    severity: response.severity,
+    closingMph: Number(response.closingMph.toFixed(1)),
+    energyJoules: Math.round(response.energyJoules)
+  });
+  return response;
 }
 
 // The rendered car body is 1.8 m wide and 3.5 m long. Model it as a capsule
@@ -198,17 +241,10 @@ export function resolveVehicleBuildingCollision(
   const pushDistance = buildingCheck.penetration + 1;
   const pushedX = sweptCollision.x + buildingCheck.pushX * pushDistance;
   const pushedZ = sweptCollision.z + buildingCheck.pushZ * pushDistance;
-  const hitAngle = Math.atan2(appCtx.car.vz, appCtx.car.vx);
-  const wallAngle = Math.atan2(buildingCheck.pushZ, buildingCheck.pushX);
-  let angleDifference = Math.abs(hitAngle - wallAngle);
-  if (angleDifference > Math.PI) {
-    angleDifference = 2 * Math.PI - angleDifference;
-  }
-  const headOnFactor = Math.abs(Math.cos(angleDifference));
-  slowVehicle(appCtx.car, 0.1 + (1 - headOnFactor) * 0.3);
+  const impact = applyWallCrashResponse(appCtx, buildingCheck);
   const pushedPastSafePoint =
     Math.hypot(pushedX - sweptCollision.lastSafeX, pushedZ - sweptCollision.lastSafeZ) > 3.5;
   return pushedPastSafePoint
-    ? { x: sweptCollision.lastSafeX, z: sweptCollision.lastSafeZ }
-    : { x: pushedX, z: pushedZ };
+    ? { x: sweptCollision.lastSafeX, z: sweptCollision.lastSafeZ, impact }
+    : { x: pushedX, z: pushedZ, impact };
 }

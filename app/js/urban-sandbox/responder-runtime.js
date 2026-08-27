@@ -2,11 +2,12 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=2';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=5';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=6';
 import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=2';
 import { vehicleDoorPosition } from './vehicle-model.js?v=6';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import { dampCrashMotion } from './crash-physics.js?v=1';
 
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
@@ -212,6 +213,24 @@ function createUrbanResponderRuntime(options = {}) {
       officer.visual.setReaction('downed');
       return;
     }
+    const current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (officer.crashMotion) {
+      const motion = dampCrashMotion(officer.crashMotion, dt, { kind: 'npc' });
+      const units = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+      officer.crashMotion = { ...officer.crashMotion, ...motion };
+      officer.x += motion.velocityX / units * dt;
+      officer.z += motion.velocityZ / units * dt;
+      officer.yaw += motion.angularVelocity * dt;
+      officer.y = surfaceY(officer.x, officer.z, officer.y);
+      officer.visual.root.position.set(officer.x, officer.y, officer.z);
+      officer.visual.root.rotation.y = officer.yaw;
+      officer.visual.setReaction('knocked-down');
+      if (Math.hypot(motion.velocityX, motion.velocityZ) < .1 && Math.abs(motion.angularVelocity) < .04) officer.crashMotion = null;
+    }
+    if (Number(officer.knockdownUntil || 0) > current) {
+      officer.visual.setReaction('knocked-down');
+      return;
+    }
     officer.activeElapsed += dt;
     officer.fireCooldown = Math.max(0, officer.fireCooldown - dt);
     const dx = finite(actor?.x) - officer.x;
@@ -264,6 +283,26 @@ function createUrbanResponderRuntime(options = {}) {
   }
 
   function updateMotion(responder, dt, civic, actor, returning, actorWithinSearch) {
+    if (responder.crashMotion) {
+      const motion = dampCrashMotion(responder.crashMotion, dt, { kind: 'vehicle' });
+      const units = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+      responder.crashMotion = { ...responder.crashMotion, ...motion };
+      responder.x += motion.velocityX / units * dt;
+      responder.z += motion.velocityZ / units * dt;
+      responder.yaw += motion.angularVelocity * dt;
+      responder.y = surfaceY(responder.x, responder.z, responder.y - RESPONDER_BASE_Y) + RESPONDER_BASE_Y;
+      responder.speed = Math.hypot(motion.velocityX, motion.velocityZ) / units;
+      responder.visual.root.position.set(responder.x, responder.y, responder.z);
+      responder.visual.root.rotation.y = responder.yaw;
+      responder.visual.wheels.forEach((wheel) => { wheel.rotation.x += responder.speed * dt / .38; });
+      responder.visual.setServiceLights(elapsed, true);
+      if (responder.speed < .12 && Math.abs(motion.angularVelocity) < .04) {
+        responder.crashMotion = null;
+        responder.speed = 0;
+        responder.navigationTarget = null;
+      }
+      return;
+    }
     responder.navigationElapsed += dt;
     responder.surfaceElapsed += dt;
     if (!responder.navigationTarget || responder.navigationElapsed >= .28) {

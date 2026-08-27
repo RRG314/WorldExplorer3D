@@ -35,8 +35,39 @@ function vehicleHandlingProfile(variantOrId = 'sedan', options = {}) {
     steeringScale: Math.max(.35, Number(variant.steeringScale) || 1) * (responder ? 1.1 : 1),
     gripScale: Math.max(.55, Number(variant.gripScale) || 1) * (responder ? 1.06 : 1),
     brakeScale: Math.max(.45, Number(variant.brakeScale) || 1) * (responder ? 1.08 : 1),
+    massKg: vehicleMassKg(variant) + (responder ? 140 : 0),
     wheelBase: Math.max(1.9, Math.min(4.8, Number(variant.length || 4.45) * .58)),
     turningRadius: Math.max(3.8, Number(variant.turningRadius) || 5.2)
+  });
+}
+
+function vehicleMassKg(variantOrId = 'sedan') {
+  const variant = typeof variantOrId === 'string'
+    ? vehicleDefinitionById(variantOrId)
+    : variantOrId || vehicleDefinitionById('sedan');
+  const style = String(variant.bodyStyle || variant.id || 'sedan');
+  const masses = {
+    compact: 1240,
+    sedan: 1520,
+    suv: 1980,
+    pickup: 2240,
+    van: 2350,
+    taxi: 1640,
+    'box-truck': 5200,
+    bus: 11800
+  };
+  return masses[style] || (style.includes('van') ? 2480 : 1520);
+}
+
+function vehicleConditionDynamics(condition = 1) {
+  const normalized = Math.max(0, Math.min(1, Number(condition) || 0));
+  return Object.freeze({
+    operable: normalized > .05,
+    topSpeedScale: .5 + normalized * .5,
+    accelerationScale: .3 + normalized * .7,
+    steeringScale: .72 + normalized * .28,
+    gripScale: .78 + normalized * .22,
+    brakeScale: .65 + normalized * .35
   });
 }
 
@@ -74,6 +105,8 @@ export {
   VEHICLE_ROOT_TO_GROUND_METERS,
   selectVehicleVariant,
   vehicleDefinitionById,
+  vehicleConditionDynamics,
   vehicleHandlingProfile,
+  vehicleMassKg,
   vehicleWheelContactLayout
 };
