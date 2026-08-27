@@ -244,6 +244,7 @@ function syncBoatPromptState(force = false) {
     return null;
   }
   const candidate = findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
+    requireContainment: false,
     referenceY: ref.y,
     structureTerrainMode: ref.structureTerrainMode
   });
@@ -313,6 +314,7 @@ function startBoatMode(options = {}) {
     appCtx.boatMode?.candidate ||
     findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
       allowSynthetic: options.allowSynthetic === true,
+      requireContainment: false,
       waterKind: options.waterKind || 'open_ocean',
       referenceY: ref.y,
       structureTerrainMode: ref.structureTerrainMode

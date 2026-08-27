@@ -20,7 +20,7 @@ import {
   carSpeedToMph,
   carSpeedToWorldUnitsPerSecond,
   mphToCarSpeed
-} from "./physics/vehicle-speed-units.js?v=1";
+} from "./physics/vehicle-speed-units.js?v=2";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -638,6 +638,7 @@ function update(dt) {
       preferRoad: !!appCtx.car.onRoad,
       nearestRoad: appCtx.car.onRoad ? nr : null
     }, dt, Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined);
+    appCtx.car.groundContact = groundContact;
     let surfaceY = stabilizeEarthVehicleSurfaceY(
       groundContact?.supportY,
       appCtx.car._lastSurfaceY,

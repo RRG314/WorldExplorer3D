@@ -61,7 +61,7 @@
         </div>
 
         <div class="hero-media">
-          <div class="hero-coordinate">Baltimore Inner Harbor · rendered gameplay</div>
+          <div class="hero-coordinate">Baltimore Inner Harbor · in-game view</div>
           <figure class="hero-frame">
             <img src="./assets/landing/current/baltimore-harbor-hero.webp" width="1280" height="720" alt="Baltimore skyline and tall downtown buildings viewed across the rendered Inner Harbor water" fetchpriority="high">
             <figcaption class="hero-caption">
@@ -118,23 +118,23 @@
           <span class="section-kicker">Current gameplay</span>
           <h2>One world, seen from where you stand.</h2>
         </div>
-        <p>These are automated captures from the bundled release candidate, reached through the normal location selector and player launch—not a separate marketing renderer.</p>
+        <p>Begin at the globe, arrive at street level, and change how you travel without leaving your expedition.</p>
       </div>
 
       <div class="story-stack">
         <article class="story">
           <figure class="story-media">
-            <span class="media-label">World entry · bundled release candidate</span>
-            <img src="./assets/landing/current/world-entry-2026-08-19.png" width="1280" height="720" loading="lazy" alt="World Explorer location selector rendered from the bundled release candidate">
+            <span class="media-label">Choose your destination</span>
+            <img src="./assets/landing/current/world-entry-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 location selector with Baltimore selected on the interactive globe">
           </figure>
           <div class="feature-copy">
-            <span class="eyebrow">Enter through the actual player flow</span>
+            <span class="eyebrow">Start anywhere</span>
             <h2>Choose a real location, then arrive in the rendered world.</h2>
-            <p>The release check opens this exact bundled selector, enters coordinates, uses the visible Explore button, and waits for the playable world to finish loading.</p>
+            <p>Search for a place, enter coordinates, or pick a featured destination. World Explorer brings you into the same connected experience for walking, driving, field work, building, and flight.</p>
             <ul class="feature-list">
-              <li>The capture is produced from the deployable artifact.</li>
-              <li>The public landing page and game are tested from the same server root.</li>
-              <li>Older promotional captures are not presented as current gameplay.</li>
+              <li>Move between ground, water, air, and planetary exploration.</li>
+              <li>Record discoveries and continue building your Explorer story.</li>
+              <li>Return to saved places, persistent builds, and shared rooms.</li>
             </ul>
           </div>
         </article>
@@ -142,19 +142,27 @@
 
       <div class="gallery" aria-label="Current World Explorer gameplay">
         <figure>
-          <img src="./assets/landing/current/explorer-progress.webp" width="1440" height="900" loading="lazy" alt="Explorer Journal progress and discoveries open over the live Baltimore world">
-          <figcaption><strong>Explorer Journal</strong><span>Progress, discoveries, and field guidance</span></figcaption>
+          <img src="./assets/landing/current/street-walk-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 walking character on an assembled Baltimore street">
+          <figcaption><strong>Walk the street</strong><span>Explore Baltimore on foot</span></figcaption>
         </figure>
         <figure>
-          <img src="./assets/landing/current/companion-ar.webp" width="1440" height="900" loading="lazy" alt="World Explorer animal companion in the augmented reality viewer">
-          <figcaption><strong>AR Companion</strong><span>Bring a discovered companion into your space</span></figcaption>
+          <img src="./assets/landing/current/driving-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 vehicle driving on an assembled Baltimore road">
+          <figcaption><strong>Drive the city</strong><span>Follow mapped streets and find a new route</span></figcaption>
         </figure>
         <figure>
-          <img src="./assets/landing/current/field-tools-mobile-current.webp" width="390" height="844" loading="lazy" alt="Current mobile Explorer Journal and field tools interface">
-          <figcaption><strong>Mobile field tools</strong><span>The same expedition from a phone</span></figcaption>
+          <img src="./assets/landing/current/drone-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 drone view above assembled Baltimore buildings">
+          <figcaption><strong>Survey by drone</strong><span>See the city from above</span></figcaption>
         </figure>
         <figure>
-          <img src="./assets/landing/current/world-entry-2026-08-19.png" width="1280" height="720" loading="lazy" alt="Current rendered World Explorer location selector with Baltimore selected">
+          <img src="./assets/landing/current/plane-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 plane flying between assembled Baltimore buildings">
+          <figcaption><strong>Take flight</strong><span>Launch from the city and travel farther</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/ocean-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 submarine traveling across a rendered ocean floor">
+          <figcaption><strong>Explore the Ocean</strong><span>Descend beneath the surface by submarine</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/world-entry-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer 5.0 globe selector with Baltimore coordinates and Explore action visible">
           <figcaption><strong>Choose the destination</strong><span>Search Earth or begin with a featured city</span></figcaption>
         </figure>
       </div>
@@ -226,7 +234,7 @@
         <article class="qa"><h3>Does it use real locations?</h3><p>Yes. World Explorer builds its world from geographic data and open real-world feeds, then adds playable systems and generated detail where the source data does not provide it.</p></article>
         <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. Mobile includes touch controls and field activities. A desktop browser is currently recommended for the highest rendering quality and the largest city scenes.</p></article>
         <article class="qa"><h3>Do I need an account?</h3><p>No account is required for core exploration. Sign in when you want multiplayer and persistent account-linked progress.</p></article>
-        <article class="qa"><h3>Can I contribute?</h3><p>Yes. You can submit staged place, building, interior, and photo updates for review. Contributions never overwrite the live shared world without review.</p></article>
+        <article class="qa"><h3>Can I contribute?</h3><p>Yes. Signed-in explorers can create staged World Explorer overlay drafts for places, buildings, and interiors, then submit them for moderator review. Approved overlays are published without overwriting provider data or OpenStreetMap.</p></article>
       </div>
     </section>
 
@@ -244,6 +252,7 @@
 
   <footer>
     <span>World Explorer 3D</span>
+    <span id="landingBuildIdentity">Version 5.0.0</span>
     <a href="./about/">About</a>
     <a href="./legal/privacy">Privacy</a>
     <a href="./legal/terms">Terms</a>
@@ -257,6 +266,17 @@
     import { ensureSignedIn } from './js/auth-ui.js?v=55';
     import { redirectToCheckout } from './js/billing.js?v=58';
     import { hydrateLandingPageFromPublishedContent } from './js/site-content.js?v=1';
+
+    fetch('./build-manifest.json', { cache: 'no-store' }).then(async (response) => {
+      if (!response.ok) return;
+      const manifest = await response.json();
+      if (!manifest?.buildId || manifest.buildId !== manifest.candidateId) return;
+      const identity = document.getElementById('landingBuildIdentity');
+      if (!identity) return;
+      identity.textContent = `Version ${manifest.version} · ${String(manifest.commit || '').slice(0, 7)}`;
+      identity.title = manifest.buildId;
+      identity.dataset.buildId = manifest.buildId;
+    }).catch(() => {});
 
     const openMultiplayerBtn = document.getElementById('landingSecondaryCta');
     const donateSupporterBtn = document.getElementById('donateSupporterBtn');

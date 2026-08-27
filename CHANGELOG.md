@@ -2,6 +2,50 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.0.0] - 2026-08-26
+
+### Added
+
+- Field Today activities, daily and weekly Expeditions, seasonal surveys, life
+  lists, specialties, companions, and non-punitive return progression connected
+  to the Backpack, Journal, and Field Guide.
+- A Baltimore–Chesapeake ecology pack covering 60 plants, mammals, birds,
+  insects and arachnids, freshwater fish, and marine fish, with distinct
+  observation, photography, track/sign, macro, habitat, geology, and community
+  survey activities.
+- Shore, boat, and underwater fishing connected to the same Journal and Field
+  Guide records, including catch, loss, retry, and recovery outcomes.
+- Persistent local and multiplayer Blocks inside the World Editor, plus shared
+  room building, activities, and vehicles.
+- Browser zoom, visible focus, keyboard navigation, live status announcements,
+  reduced motion, larger text, increased contrast, and larger touch targets.
+
+### Changed
+
+- Player-facing wildlife opportunities use game language such as field leads;
+  they never claim a generated opportunity proves a real animal is present.
+- Live GPS and free-roam walking share field activity and progression authority.
+- Mobile walking, driving, drone, plane, map, Backpack, settings, reload, reset,
+  and recovery remain on the stabilized control implementation.
+- The former standalone Block Builder entry is replaced by the integrated World
+  Editor Blocks workspace. Supported local and room builds are preserved.
+- Existing Backpack data upgrades automatically with a local recovery backup.
+
+### Fixed
+
+- Returning to the title screen or changing locations more reliably clears the
+  previous world and its browser memory.
+- Released multiplayer vehicles remain reclaimable after reconnecting or when
+  local terrain and collision detail differ.
+- Walking routes avoid vehicle-only and engineered transport surfaces while
+  retaining safe attributed sidewalk fallbacks.
+- Kept the loading image above the game until the selected world is ready.
+- Kept globe selection markers attached to the chosen location while zooming.
+- Corrected mobile walking left/right direction and kept the camera behind the
+  character during movement.
+- Removed contextual field and interaction prompts while a bottom menu is open.
+- Unified walking, driving, boat, plane, drone, and underwater speed units.
+
 ## [4.3.1] - 2026-08-22
 
 ### Added

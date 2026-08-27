@@ -1,4 +1,4 @@
-const BACKPACK_SCHEMA_VERSION = 1;
+const BACKPACK_SCHEMA_VERSION = 2;
 const HOTBAR_SLOT_COUNT = 6;
 
 function text(value, fallback = '') {
@@ -51,10 +51,12 @@ function normalizeItem(item = {}, definition = null) {
 function createBackpackModel(options = {}) {
   const definitions = new Map();
   const items = new Map();
+  const aliases = new Map();
   const hotbar = Array.from({ length: HOTBAR_SLOT_COUNT }, () => null);
   const listeners = new Set();
   let equippedInstanceId = null;
   let revision = 0;
+  let duplicateEventMerges = 0;
 
   function registerDefinitions(next = []) {
     for (const entry of next) {
@@ -68,6 +70,7 @@ function createBackpackModel(options = {}) {
     const id = text(identity);
     if (!id) return null;
     if (items.has(id)) return items.get(id);
+    if (aliases.has(id) && items.has(aliases.get(id))) return items.get(aliases.get(id));
     return [...items.values()].find((item) => item.catalogId === id) || null;
   }
 
@@ -93,12 +96,27 @@ function createBackpackModel(options = {}) {
     if (candidateDefinition) registerDefinitions([candidateDefinition]);
     const definition = definitions.get(text(next?.catalogId || next?.id || candidateDefinition?.catalogId || candidateDefinition?.id));
     const item = normalizeItem(next, definition);
-    const existing = items.get(item.instanceId);
-    items.set(item.instanceId, existing ? { ...existing, ...item, metadata: { ...existing.metadata, ...item.metadata } } : item);
-    if (settings.hotbarSlot != null) assignHotbar(settings.hotbarSlot, item.instanceId, { silent: true });
-    if (settings.equip === true || !equippedInstanceId) equippedInstanceId = item.instanceId;
-    if (!settings.silent) notify(existing ? 'item-updated' : 'item-added', { instanceId: item.instanceId, catalogId: item.catalogId });
-    return item.instanceId;
+    const sameInstance = items.get(item.instanceId);
+    const sameEvent = item.sourceEventId ? [...items.values()].find((entry) =>
+      entry.sourceEventId === item.sourceEventId && entry.catalogId === item.catalogId
+    ) : null;
+    const existing = sameInstance || sameEvent;
+    const canonicalInstanceId = existing?.instanceId || item.instanceId;
+    if (sameEvent && sameEvent.instanceId !== item.instanceId) {
+      aliases.set(item.instanceId, sameEvent.instanceId);
+      duplicateEventMerges += 1;
+    }
+    const canonicalItem = { ...item, instanceId: canonicalInstanceId };
+    items.set(canonicalInstanceId, existing
+      ? { ...existing, ...canonicalItem, metadata: { ...existing.metadata, ...canonicalItem.metadata } }
+      : canonicalItem);
+    if (settings.hotbarSlot != null) assignHotbar(settings.hotbarSlot, canonicalInstanceId, { silent: true });
+    if (settings.equip === true || !equippedInstanceId) equippedInstanceId = canonicalInstanceId;
+    if (!settings.silent) notify(
+      sameEvent && !sameInstance ? 'duplicate-event-merged' : existing ? 'item-updated' : 'item-added',
+      { instanceId: canonicalInstanceId, catalogId: item.catalogId, sourceEventId: item.sourceEventId }
+    );
+    return canonicalInstanceId;
   }
 
   function assignHotbar(slot, identity, settings = {}) {
@@ -150,6 +168,7 @@ function createBackpackModel(options = {}) {
       type: 'BackpackSnapshot',
       schemaVersion: BACKPACK_SCHEMA_VERSION,
       revision,
+      duplicateEventMerges,
       equippedInstanceId,
       equippedCatalogId: resolveItem(equippedInstanceId)?.catalogId || null,
       hotbar: Object.freeze(hotbar.slice()),

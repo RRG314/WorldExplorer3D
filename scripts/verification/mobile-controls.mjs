@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
-const server = await startStaticServer({ rootDir: process.cwd(), ports: [4391, 4392, 4393] });
+const root = process.cwd();
+const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
+const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
+const server = await startStaticServer({ rootDir: servedRoot, ports: [4391, 4392, 4393] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -95,7 +99,22 @@ async function mode(mode, selector) {
   await page.waitForTimeout(250);
   const visibility = await page.evaluate(() => {
     const element = document.getElementById('mobileTouchControls');
-    return { display: element ? getComputedStyle(element).display : 'missing', bodyClasses: document.body.className, controlsExpanded: !document.getElementById('ctrlContent')?.classList.contains('hidden') };
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return {
+      display: element ? getComputedStyle(element).display : 'missing',
+      bodyClasses: document.body.className,
+      controlsExpanded: !document.getElementById('ctrlContent')?.classList.contains('hidden'),
+      gameStarted: state.gameStarted,
+      paused: state.paused,
+      worldLoading: state.worldLoading,
+      titleVisible: state.titleVisible,
+      largeMapVisible: document.getElementById('largeMap')?.classList.contains('show') === true,
+      maxTouchPoints: navigator.maxTouchPoints,
+      coarsePointer: matchMedia('(hover: none) and (pointer: coarse)').matches,
+      mobileInputEnabled: state.mobileControls?.enabled,
+      controlsClasses: element?.className || '',
+      mobileLifecycle: state.sessionLifecycle?.lifecycle?.scopes?.find((scope) => scope.owner === 'mobile-controls') || null
+    };
   });
   if (visibility.display === 'none') console.log(JSON.stringify({ mobileControlsHiddenAfterMode: mode, ...visibility }));
   await page.waitForSelector(`#mobileTouchControls.show.mode-${mode === 'walk' ? 'walking' : mode === 'drive' ? 'driving' : mode}`, { timeout: 10_000 });
@@ -110,6 +129,21 @@ async function layoutSnapshot() {
   return { move, look, primary, width: page.viewportSize().width };
 }
 
+async function waitForInteractiveWorld() {
+  await page.waitForFunction(() => {
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+    const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
+    const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');
+    const ready = state?.gameStarted === true && state.worldLoading === false && !loadingVisible && !titleVisible;
+    if (!ready) {
+      globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ = 0;
+      return false;
+    }
+    globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ ||= performance.now();
+    return performance.now() - globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ >= 2_500;
+  }, null, { timeout: 300_000 });
+}
+
 try {
   await mkdir('output/verification/mobile-controls', { recursive: true });
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
@@ -118,10 +152,7 @@ try {
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForSelector('#loading.show', { timeout: 30_000 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 240_000 });
-  await page.waitForFunction(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return state?.gameStarted === true && state.worldLoading === false;
-  }, null, { timeout: 240_000 });
+  await waitForInteractiveWorld();
 
   await mode('walk', '#fWalk');
   const standardLayout = await layoutSnapshot();
@@ -205,10 +236,6 @@ try {
   await page.locator('#controlsBarBtn').click();
   await page.waitForSelector('#controlsTab.bar-open #mobileControlSettings', { timeout: 10_000 });
   await page.locator('#mobileControlsHandedness').selectOption('southpaw');
-  await page.locator('#controlsBarBtn').click();
-  const southpawLayout = await layoutSnapshot();
-  await page.locator('#controlsBarBtn').click();
-  await page.locator('#mobileControlsReset').click();
   const settingsLayout = await page.evaluate(() => ({
     summary: document.getElementById('mobileControlModeSummary')?.innerText || '',
     desktopInstructionsVisible: ['drivingControls', 'boatControls', 'walkingControls', 'droneControls', 'planeControls', 'rocketControls', 'oceanControls']
@@ -216,7 +243,8 @@ try {
   }));
   await page.screenshot({ path: 'output/verification/mobile-controls/settings-mobile.png', fullPage: true });
   await page.locator('#controlsBarBtn').click();
-  const resetLayout = await layoutSnapshot();
+  const southpawLayout = await layoutSnapshot();
+  const savedSouthpawSettings = await page.evaluate(() => JSON.parse(localStorage.getItem('world-explorer-mobile-controls-v1') || 'null'));
 
   await mode('drive', '#fDriving');
   const drivePackVisible = await page.locator('#urbanEquipmentToggle').isVisible();
@@ -229,6 +257,12 @@ try {
   const driveRecentered = await diagnostics();
   await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: true });
 
+  await mode('drone', '#fDrone');
+  const droneBefore = await diagnostics();
+  await touchDrag('#mobileMovePad', 30, -46, 1_250);
+  const droneControlled = await diagnostics();
+  await page.screenshot({ path: 'output/verification/mobile-controls/drone-southpaw-mobile.png', fullPage: true });
+
   await mode('plane', '#fPlane');
   const planeBefore = await diagnostics();
   await touchDrag('#mobileMovePad', 34, -42, 1_250);
@@ -239,10 +273,28 @@ try {
   const planeRecentered = await diagnostics();
   await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: true });
 
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await page.reload({ waitUntil: 'load', timeout: 120_000 });
+  await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  await page.waitForFunction(() => navigator.maxTouchPoints > 0 && matchMedia('(hover: none) and (pointer: coarse)').matches, null, { timeout: 10_000 });
+  await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  await page.locator('#globeSelectorStartBtn').click();
+  await waitForInteractiveWorld();
+  await mode('walk', '#fWalk');
+  const reloadedSouthpawLayout = await layoutSnapshot();
+  const reloadedWalkState = await diagnostics();
+  await page.locator('#controlsBarBtn').click();
+  await page.locator('#mobileControlsReset').click();
+  await page.locator('#controlsBarBtn').click();
+  const resetLayout = await layoutSnapshot();
+  const resetWalkState = await diagnostics();
+
   const checks = {
     standardMoveLeft: standardLayout.move.x + standardLayout.move.width / 2 < standardLayout.width / 2,
     standardLookAndActionRight: standardLayout.look.x > standardLayout.width / 2 && standardLayout.primary.x > standardLayout.width / 2,
     southpawActuallySwaps: southpawLayout.move.x > southpawLayout.width / 2 && southpawLayout.look.x < southpawLayout.width / 2,
+    southpawSurvivesReload: savedSouthpawSettings?.handedness === 'southpaw' &&
+      reloadedSouthpawLayout.move.x > reloadedSouthpawLayout.width / 2 && reloadedSouthpawLayout.look.x < reloadedSouthpawLayout.width / 2,
     resetRestoresStandard: resetLayout.move.x < resetLayout.width / 2 && resetLayout.look.x > resetLayout.width / 2,
     onboardingClearOfLookControl: onboardingLayout.lookHit === 'mobileLookPad',
     walkingPackClearOfLookControl: !onboardingLayout.pack || onboardingLayout.pack.x + onboardingLayout.pack.width < onboardingLayout.look.x,
@@ -267,16 +319,21 @@ try {
     driveAnalogMoves: distance(driveBefore.activeActor?.position, driveMoved.activeActor?.position) > 0.4,
     driveRightLookTurnsRight: Number(driveLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     driveCameraRecenters: Number(driveRecentered.cameraFollow?.headingAlignmentDegrees) < 6 && Number(driveRecentered.cameraFollow?.trailingDistance) > 2,
+    droneTransitionAndAnalogControl: droneBefore.activeActor?.mode === 'drone' && droneControlled.activeActor?.mode === 'drone' &&
+      distance(droneBefore.activeActor?.position, droneControlled.activeActor?.position) > 0.4,
     planeAnalogChangesAttitude: Math.abs(Number(planeControlled.activeActor?.orientation?.pitch) - Number(planeBefore.activeActor?.orientation?.pitch)) > 0.05 || Math.abs(Number(planeControlled.activeActor?.orientation?.roll) - Number(planeBefore.activeActor?.orientation?.roll)) > 0.05,
     planeRightLookTurnsRight: Number(planeLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     planeCameraRecenters: Number(planeRecentered.cameraFollow?.headingAlignmentDegrees) < 7 && Number(planeRecentered.cameraFollow?.trailingDistance) > 2,
+    returnToWalkClearsInput: reloadedWalkState.activeActor?.mode === 'walk' &&
+      reloadedWalkState.mobileControls?.move?.active !== true && reloadedWalkState.mobileControls?.look?.active !== true &&
+      resetWalkState.activeActor?.mode === 'walk',
     savedSettingsPresent: await page.evaluate(() => !!localStorage.getItem('world-explorer-mobile-controls-v1')),
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
     ok: Object.values(checks).every(Boolean), contract: 'semantic-mobile-controls-v1', checks,
-    layouts: { standardLayout, southpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi, openPackUi },
+    layouts: { standardLayout, southpawLayout, reloadedSouthpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi, openPackUi },
     map: { mapFollowState, mapBrowseState, mapZoomed, mapRecentered, mapReturnedToPlay, blockedMovementDistance: distance(mapActorBefore.activeActor?.position, mapActorAfterBlockedInput.activeActor?.position) },
     camera: {
       walk: { looked: walkLooked.cameraFollow, recentered: walkRecentered.cameraFollow },
@@ -288,6 +345,7 @@ try {
       walkStraightness,
       walk: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position),
       drive: distance(driveBefore.activeActor?.position, driveMoved.activeActor?.position),
+      drone: distance(droneBefore.activeActor?.position, droneControlled.activeActor?.position),
       planeBefore: planeBefore.activeActor?.orientation,
       planeAfter: planeControlled.activeActor?.orientation
     },

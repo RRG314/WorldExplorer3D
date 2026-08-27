@@ -12,7 +12,7 @@ import {
   evaluateLiveGpsFieldProximity,
   ingestLiveGpsFieldFix,
   liveGpsFieldSessionSnapshot
-} from './field-session-authority.js?v=1';
+} from './field-session-authority.js?v=2';
 
 const LIVE_GPS_WATCH_OPTIONS = Object.freeze({
   enableHighAccuracy: true,
@@ -123,7 +123,16 @@ async function prepareLiveGpsStart(options = {}) {
     if (!(fix.accuracy <= LIVE_GPS_POLICY.poorAccuracyMeters)) {
       throw new Error(`GPS accuracy is currently about ${Math.round(fix.accuracy)} m. Move near a window or outdoors and retry.`);
     }
-    preparedStart = { fix, source, setWorldLocation, preparedAt: Date.now() };
+    const preparedAt = Date.now();
+    preparedStart = {
+      fix,
+      source,
+      setWorldLocation,
+      preparedAt,
+      consented: true,
+      consentedAt: preparedAt,
+      secureContext: secureContextAvailable()
+    };
     if (setWorldLocation) {
       appCtx.setCustomLocation?.({
         lat: fix.latitude,
@@ -273,7 +282,13 @@ function startLiveGpsMode() {
     active: true,
     source: prepared?.source || 'unknown',
     model,
-    fieldSession: createLiveGpsFieldSession({ startedAt }),
+    fieldSession: createLiveGpsFieldSession({
+      startedAt,
+      consentGranted: prepared?.consented === true,
+      consentedAt: prepared?.consentedAt,
+      consentSource: prepared?.source,
+      secureContext: prepared?.secureContext === true
+    }),
     following: true,
     visibilityPaused: document.visibilityState === 'hidden',
     permissionDenied: false,
@@ -585,9 +600,9 @@ function getLiveGpsSnapshot() {
   };
 }
 
-function getLiveGpsFieldEligibility(targetWorld = null) {
+function getLiveGpsFieldEligibility(targetWorld = null, targetEvidence = null) {
   const session = activeSession;
-  if (!session) return evaluateLiveGpsFieldProximity(null, Infinity, { active: false });
+  if (!session) return evaluateLiveGpsFieldProximity(null, Infinity, { active: false }, targetEvidence || {});
   const runtime = getLiveGpsSnapshot();
   const gpsWorld = runtime.fieldWorld;
   const targetX = Number(targetWorld?.x);
@@ -596,7 +611,7 @@ function getLiveGpsFieldEligibility(targetWorld = null) {
     ? Math.hypot(targetX - gpsWorld.x, targetZ - gpsWorld.z)
     : Infinity;
   const distanceMeters = distanceWorld * Number(appCtx.METERS_PER_WORLD_UNIT || 1);
-  return evaluateLiveGpsFieldProximity(session.fieldSession, distanceMeters, runtime);
+  return evaluateLiveGpsFieldProximity(session.fieldSession, distanceMeters, runtime, targetEvidence || {});
 }
 
 async function startLiveGpsFromWorld() {

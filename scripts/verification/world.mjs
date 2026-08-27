@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -10,6 +11,16 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const captureRequested = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
+const captureManifest = JSON.parse(await fs.readFile(path.join(root, 'config', 'public-capture-manifest.json'), 'utf8'));
+const captureByFile = new Map(captureManifest.captures.map((capture) => [capture.file, capture]));
+const requiredGalleryFiles = new Set([
+  'assets/landing/current/world-entry-5.0.png',
+  'assets/landing/current/street-walk-5.0.png',
+  'assets/landing/current/driving-5.0.png',
+  'assets/landing/current/drone-5.0.png',
+  'assets/landing/current/plane-5.0.png',
+  'assets/landing/current/ocean-5.0.png'
+]);
 const reportPath = path.join(root, 'output', 'verification', 'world', 'report.json');
 const evidenceDir = path.join(root, policy.visualEvidence.outputDirectory);
 const server = externalUrl ? null : await startStaticServer({
@@ -149,13 +160,31 @@ try {
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight
   })));
+  const landingGalleryEvidence = await Promise.all(landingGallery.map(async (entry) => {
+    const manifestEntry = captureByFile.get(entry.src) || null;
+    const bytes = await fs.readFile(path.join(root, entry.src)).catch(() => null);
+    const sha256 = bytes ? createHash('sha256').update(bytes).digest('hex') : '';
+    return {
+      file: entry.src,
+      manifestEntry,
+      sha256,
+      valid:
+        captureManifest.release === '5.0.0' &&
+        manifestEntry?.sha256 === sha256 &&
+        manifestEntry?.width === entry.naturalWidth &&
+        manifestEntry?.height === entry.naturalHeight &&
+        /normal-input browser runtime capture/i.test(manifestEntry?.provenance || '') &&
+        /no synthetic camera or test-only scene/i.test(manifestEntry?.provenance || '')
+    };
+  }));
   assert.ok(await page.locator('#landingPrimaryCta').isVisible(), 'public landing CTA is not visible');
   const landingUsesApprovedAsset = !policy.blockedLandingAssets.includes(landingHero);
-  const landingGalleryUsesCurrentGameplay = landingGallery.length >= 4 && landingGallery.every((entry) =>
+  const landingGalleryUsesCurrentGameplay = landingGallery.length === requiredGalleryFiles.size && landingGallery.every((entry) =>
     entry.src.startsWith('assets/landing/current/') &&
     !policy.blockedLandingAssets.includes(entry.src) &&
     entry.complete && entry.naturalWidth > 0 && entry.naturalHeight > 0
-  );
+  ) && landingGalleryEvidence.every((entry) => entry.valid) &&
+    [...requiredGalleryFiles].every((file) => landingGallery.some((entry) => entry.src === file));
 
   await page.locator('#landingPrimaryCta').click();
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
@@ -175,7 +204,8 @@ try {
       Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
       Number(diagnostics.visualOwners?.water?.surfaceCount || 0) > 0 &&
       diagnostics.livingWorld?.active === true &&
-      diagnostics.urbanSandbox?.active === true;
+      diagnostics.urbanSandbox?.active === true &&
+      diagnostics.worldDiscovery?.active === true;
   }, null, { timeout: 240000 });
   await page.waitForTimeout(4500);
 
@@ -210,8 +240,8 @@ try {
       Number(livingWorld.facades?.published || 0) > 0 &&
       Number(livingWorld.facades?.addedDrawCalls || 0) === 0 &&
       livingWorld.facades?.facadeIntegration === 'shader-integrated-wall-face',
-    pedestrianPopulationRequiresMappedPaths:
-      Number(pedestrianGraph.provenance?.mappedPaths || 0) > 0
+    pedestrianPopulationRequiresSafePaths:
+      Number(pedestrianGraph.provenance?.mappedPaths || 0) + Number(pedestrianGraph.provenance?.inferredSidewalks || 0) > 0
         ? Number(population.pedestrians || 0) > 0 &&
           Number(population.pedestrianRenderedParts || 0) >= 17 &&
           population.pedestrianRepresentation === 'articulated-instanced-character-v2' &&
@@ -220,8 +250,11 @@ try {
           activePedestrianCount === 0 &&
           Number(pedestrianGraph.vehicleTransportEdges || 0) === 0 &&
           Number(pedestrianGraph.engineeredTransportEdges || 0) === 0 &&
-          Number(pedestrianGraph.provenance?.inferredSidewalks || 0) === 0 &&
           Number(pedestrianGraph.provenance?.inferredCrossings || 0) === 0,
+    noPedestriansOnVehicleTransport:
+      Number(pedestrianGraph.vehicleTransportEdges || 0) === 0 &&
+      Number(pedestrianGraph.engineeredTransportEdges || 0) === 0 &&
+      Number(pedestrianGraph.provenance?.inferredCrossings || 0) === 0,
     npcDetailLoadsBeforeInteraction:
       Number(urbanSandbox.lodPolicy?.npcPreloadDistance || 0) >= 120 &&
       Number(urbanSandbox.lodPolicy?.npcPreloadDistance || 0) >
@@ -246,6 +279,10 @@ try {
       urbanSandbox.equipment?.type === 'BackpackSnapshot' &&
       equipmentItems.some((item) => item.id === 'laser-gun' && Number(item.reserve) >= 0) &&
       equipmentItems.some((item) => item.id === 'paintball-gun' && Number(item.reserve) >= 0),
+    discoveryAndBackpackReadyTogether:
+      beforeInput.diagnostics.worldDiscovery?.active === true &&
+      equipmentItems.some((item) => item.id === 'field-lens' && item.instanceId === 'field-tool:field-lens') &&
+      equipmentItems.some((item) => item.id === 'field-camera' && item.instanceId === 'field-tool:field-camera'),
     peopleAndVehiclesHaveCollisionAuthority:
       urbanSandbox.collisionPolicy?.actorResolver === 'urban-actor-swept-collision' &&
       urbanSandbox.collisionPolicy?.segmentContinuous === true &&
@@ -297,6 +334,13 @@ try {
     screenshotsWritten: [],
     landingHero,
     landingGallery,
+    landingGalleryEvidence,
+    captureManifest: {
+      release: captureManifest.release,
+      generatedAt: captureManifest.generatedAt,
+      captureCommand: captureManifest.captureCommand,
+      writesProduction: captureManifest.writesProduction
+    },
     platformSurfaces,
     checks,
     continuity,

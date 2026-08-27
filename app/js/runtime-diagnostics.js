@@ -429,7 +429,21 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
       centerY: numberOrNull(actor.position?.y),
       feetY: numberOrNull(feetY),
       grounded: actor.contact?.grounded ?? null,
-      contactKind: String(actor.contact?.kind || "")
+      contactKind: String(actor.contact?.kind || ""),
+      vehicleContact: actor.mode === 'drive' && appCtx.car?.groundContact
+        ? {
+            centerY: numberOrNull(appCtx.car.groundContact.centerY),
+            supportY: numberOrNull(appCtx.car.groundContact.supportY),
+            chassisClearance: Number.isFinite(feetY) && Number.isFinite(Number(appCtx.car.groundContact.supportY))
+              ? feetY - Number(appCtx.car.groundContact.supportY)
+              : null,
+            pitch: numberOrNull(appCtx.car.groundContact.pitch),
+            roll: numberOrNull(appCtx.car.groundContact.roll),
+            sampleCount: Number(appCtx.car.groundContact.sampleCount || 0),
+            supportSampleCount: Number(appCtx.car.groundContact.supportSampleCount || 0),
+            roadCentered: appCtx.car.groundContact.roadCentered === true
+          }
+        : null
     },
     sourceElevationMeters: numberOrNull(sourceElevationMeters),
     terrainSourceSample:
@@ -495,7 +509,9 @@ function rendererSnapshot() {
     height: numberOrNull(renderer.domElement?.height),
     calls: numberOrNull(renderer.info?.render?.calls),
     triangles: numberOrNull(renderer.info?.render?.triangles),
-    programs: Array.isArray(renderer.info?.programs) ? renderer.info.programs.length : null
+    programs: Array.isArray(renderer.info?.programs) ? renderer.info.programs.length : null,
+    geometries: numberOrNull(renderer.info?.memory?.geometries),
+    textures: numberOrNull(renderer.info?.memory?.textures)
   };
 }
 
@@ -737,6 +753,28 @@ function transportStructureSnapshot() {
 
 function getWorldExplorerRuntimeDiagnostics() {
   const activeActor = appCtx.activeTransportActor?.() || null;
+  const interiorCandidates = !appCtx.activeInterior && activeActor?.position &&
+      typeof appCtx.listSupportedInteriorsNear === 'function'
+    ? appCtx.listSupportedInteriorsNear(
+      Number(activeActor.position.x),
+      Number(activeActor.position.z),
+      650,
+      80
+    )
+    : [];
+  const activeInterior = appCtx.activeInterior;
+  const interiorWallColliders = (appCtx.dynamicBuildingColliders || [])
+    .filter((collider) => collider?.isInteriorCollider && collider?.buildingType === 'interior_wall')
+    .slice(0, 48)
+    .map((collider) => ({
+      minX: Number(collider.minX),
+      maxX: Number(collider.maxX),
+      minZ: Number(collider.minZ),
+      maxZ: Number(collider.maxZ),
+      centerX: Number(collider.centerX),
+      centerZ: Number(collider.centerZ),
+      floorLevel: Number(collider.floorLevel || 0)
+    }));
   return {
     developerDiagnostics: {
       enabled: developerDiagnosticsEnabled,
@@ -749,13 +787,63 @@ function getWorldExplorerRuntimeDiagnostics() {
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    blockBuilder: {
+      ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
+      persistence: appCtx.getBuildPersistenceStatus?.() || null
+    },
     deflock: appCtx.getDeFlockSnapshot?.() || { active: false },
     liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
     liveEarth: appCtx.inspectLiveEarthState?.() || null,
     augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
     livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
     worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
+    publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
+      activeAreaSignature: '',
+      publishedCount: 0,
+      featureIds: [],
+      renderedObjectCount: 0,
+      groupAttached: false
+    },
     fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
+    interior: activeInterior ? {
+      active: true,
+      key: String(activeInterior.key || ''),
+      mode: String(activeInterior.mode || 'generated'),
+      floorId: String(activeInterior.floorId || ''),
+      floorLabel: String(activeInterior.floorLabel || 'Lobby'),
+      activeLevel: Number(activeInterior.activeLevel || 0),
+      floorCount: Number(activeInterior.floorPlan?.floorCount || 1),
+      floorBaseY: Number(activeInterior.floorBaseY || 0),
+      storyHeight: Number(activeInterior.floorPlan?.storyHeight || 0),
+      loadedLevels: Array.isArray(activeInterior.loadedLevels) ? [...activeInterior.loadedLevels] : [],
+      connectorsAvailable: activeInterior.connector != null,
+      walkSurfaceCount: Array.isArray(activeInterior.walkSurfaces) ? activeInterior.walkSurfaces.length : 0,
+      colliderCount: Number(appCtx.dynamicBuildingColliders?.length || 0),
+      buildingCollisionDisabled: activeInterior.building?.collisionDisabled === true,
+      groupAttached: activeInterior.group?.parent != null,
+      stairs: (activeInterior.stairs || []).map((stair) => ({
+        start: { x: Number(stair.start?.x), z: Number(stair.start?.z) },
+        end: { x: Number(stair.end?.x), z: Number(stair.end?.z) },
+        floorLevel: Number(stair.floorLevel || 0),
+        targetLevel: Number(stair.targetLevel || 0)
+      })),
+      interactions: (activeInterior.interactions || []).map((interaction) => ({
+        kind: String(interaction.kind || ''),
+        label: String(interaction.label || ''),
+        level: Number(interaction.level || 0),
+        targetLevel: Number.isFinite(Number(interaction.targetLevel)) ? Number(interaction.targetLevel) : null,
+        x: Number(interaction.x),
+        z: Number(interaction.z),
+        radius: Number(interaction.radius || 0)
+      })),
+      wallColliders: interiorWallColliders
+    } : {
+      active: false,
+      candidates: interiorCandidates,
+      promptTargetKey: String(appCtx.interiorHint?.key || ''),
+      promptSourceBuildingId: String(appCtx.interiorHint?.sourceBuildingId || ''),
+      colliderCount: Number(appCtx.dynamicBuildingColliders?.length || 0)
+    },
     mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
@@ -825,6 +913,8 @@ function getWorldExplorerRuntimeDiagnostics() {
         }
       : null,
     renderer: rendererSnapshot(),
+    accessibility: globalThis.getWorldExplorerAccessibilitySnapshot?.() || null,
+    lastEarthWorldRelease: appCtx.lastEarthWorldRelease || null,
     composer: composerSnapshot(),
     worldComposition: worldCompositionSnapshot(),
     visualOwners: {
@@ -913,6 +1003,10 @@ globalThis.render_game_to_text = () => JSON.stringify({
   livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
   urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
   fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false, stage: 'idle' },
+  blockBuilder: {
+    ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
+    persistence: appCtx.getBuildPersistenceStatus?.() || null
+  },
   interior: appCtx.activeInterior ? {
     active: true,
     key: String(appCtx.activeInterior.key || ''),
@@ -925,6 +1019,12 @@ globalThis.render_game_to_text = () => JSON.stringify({
   } : { active: false },
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
+  publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
+    publishedCount: 0,
+    featureIds: [],
+    renderedObjectCount: 0,
+    groupAttached: false
+  },
   transportStructures: transportStructureSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,

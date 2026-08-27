@@ -15,6 +15,10 @@ export function closeHelpDrawer(ctx) {
 }
 
 export function collapseRuntimeUiForEditor(ctx) {
+  // World-selection cards sit above normal gameplay UI and can intercept the
+  // editor before a tool-specific entry point gets a chance to clear them.
+  // Editor entry owns this boundary, so clear the selection up front.
+  ctx.appCtx.clearStarSelection?.();
   document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
   ctx.appCtx.showLargeMap = false;
   document.getElementById('largeMap')?.classList.remove('show');

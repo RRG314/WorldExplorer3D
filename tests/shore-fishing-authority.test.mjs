@@ -20,6 +20,7 @@ function context(tags = {}, overrides = {}) {
     }),
     checkBuildingCollision: () => ({ collision: false }),
     sampleSurfaceY: () => 0,
+    worldToLatLon: () => ({ lat: 39.283, lon: -76.613 }),
     getLiveGpsSnapshot: () => ({ active: false })
   };
 }
@@ -32,6 +33,13 @@ test('explicit mapped fishing access enables reward-eligible shore fishing', () 
   assert.equal(result.playable, true);
   assert.equal(result.rewardEligible, true);
   assert.equal(result.waterbodyId, 'water:test-harbor');
+  assert.equal(result.populationContext.waterbody.id, result.waterbodyId);
+  assert.equal(result.populationContext.access.mode, 'shore');
+  assert.equal(result.populationContext.evidence.livePresenceClaim, false);
+  assert.equal(result.bankEvidence.stableStandingSurface, true);
+  assert.equal(result.bankEvidence.castCorridorClear, true);
+  assert.equal(result.bankEvidence.recoverableExit, true);
+  assert.equal(result.bankEvidence.accessibilityClaim, false);
 });
 
 test('unknown access permits labeled virtual practice but no location reward', () => {
@@ -48,6 +56,11 @@ test('mapped restrictions and blocked corridors refuse shore fishing', () => {
   const blocked = context({ fishing: 'yes' });
   blocked.checkBuildingCollision = () => ({ collision: true });
   assert.equal(evaluateShoreFishing(blocked, walker).outcome, 'no_safe_bank');
+  const steep = context({ fishing: 'yes' });
+  steep.sampleSurfaceY = (x) => x > 0 ? 3 : 0;
+  const steepResult = evaluateShoreFishing(steep, walker);
+  assert.equal(steepResult.outcome, 'no_safe_bank');
+  assert.equal(steepResult.bankEvidence.reason, 'modeled-bank-too-steep');
 });
 
 test('Live GPS field holds also hold shore fishing', () => {

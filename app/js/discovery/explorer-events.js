@@ -158,7 +158,13 @@ function createExplorerEvent(record = {}, options = {}) {
     family: boundedText(record.family || 'discovery', 80),
     specialtyId: specialtyForDiscovery(record),
     resolution,
-    evidenceClass: boundedText(record.evidenceClass || 'procedural-game-encounter', 80),
+    evidenceClass: boundedText(record.evidenceClass || 'virtual-field-record', 80),
+    evidenceContractId: boundedText(record.evidenceContractId, 80),
+    evidencePayload: Object.freeze({ ...(record.evidencePayload || {}) }),
+    regionalPackId: boundedText(record.regionalPackId, 120),
+    regionalPackVersion: boundedText(record.regionalPackVersion, 80),
+    stableTaxonId: boundedText(record.stableTaxonId, 160),
+    taxonGroup: boundedText(record.taxonGroup, 80),
     regionId,
     regionLabel,
     locationKey: boundedText(record.locationKey || options.locationKey, 120),
@@ -169,7 +175,7 @@ function createExplorerEvent(record = {}, options = {}) {
       y: finiteOrNull(record.localPosition?.y ?? options.localPosition?.y),
       z: finiteOrNull(record.localPosition?.z ?? options.localPosition?.z)
     }),
-    projections: Object.freeze({ journal: true, fieldGuide: true, collection }),
+    projections: Object.freeze({ journal: true, fieldGuide: true, collection, missionProgress: true }),
     progress: Object.freeze({
       points: Math.max(0, Number(options.progress?.points) || 0),
       reason: boundedText(options.progress?.reason || 'pending', 64)

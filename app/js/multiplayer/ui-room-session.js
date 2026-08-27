@@ -5,7 +5,7 @@ import {
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
-} from "./blocks.js?v=63";
+} from "./blocks.js?v=67";
 import { listenChat } from "./chat.js?v=56";
 import { listenPlayers, startPresence } from "./presence.js?v=62";
 import {
@@ -81,6 +81,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       appCtx.configureSharedBuildSync({
         enabled: true,
         roomId: room.id,
+        connected: globalThis.navigator?.onLine !== false,
         upsert: (entry) => upsertSharedBlock(room.id, entry),
         remove: (entry) => removeSharedBlock(room.id, entry),
         clearMine: () => clearMySharedBlocks(room.id)

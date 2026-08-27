@@ -90,7 +90,8 @@ function resolveMobileCameraRecenter(options = {}) {
   }
   const dt = Math.max(0, Math.min(0.1, Number(options.dt) || 0));
   const delta = wrapAngle((Number(options.actorYaw) || 0) - currentYaw);
-  return Object.freeze({ active: true, yaw: wrapAngle(currentYaw + delta * (1 - Math.exp(-dt * 4.2))) });
+  const followRate = Math.max(0.5, Math.min(14, Number(options.followRate) || 4.2));
+  return Object.freeze({ active: true, yaw: wrapAngle(currentYaw + delta * (1 - Math.exp(-dt * followRate))) });
 }
 
 function loadMobileTouchSettings(storage = globalThis.localStorage) {

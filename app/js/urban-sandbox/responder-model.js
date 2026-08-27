@@ -23,7 +23,7 @@ function responderCountForLevel(level, mobile = false) {
 
 function outcomeForLevel(level) {
   if (Number(level) >= 3) return Object.freeze({ type: 'recovery', label: 'Vehicle recovery required' });
-  if (Number(level) >= 2) return Object.freeze({ type: 'citation', label: 'Citation issued' });
+  if (Number(level) >= 2) return Object.freeze({ type: 'arrest', label: 'Taken into custody' });
   return Object.freeze({ type: 'warning', label: 'Warning issued' });
 }
 

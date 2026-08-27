@@ -64,6 +64,7 @@ const requiredFiles = [
   'app/js/app-shell-fragments.js',
   'app/js/app-auth-shell.js',
   'app/js/runtime-diagnostics.js',
+  'scripts/verification/urban-equipment.mjs',
   'scripts/hosting-artifact.mjs',
   'config/verification-policy.json'
 ];
@@ -1326,9 +1327,13 @@ const duplicateModuleIdentities = [...identitiesByTarget.entries()]
 const diagnosticsSource = await fs.readFile(path.join(root, 'app', 'js', 'runtime-diagnostics.js'), 'utf8');
 const productionDebugDefaultOff = diagnosticsSource.includes("diagnosticsParams.get('diagnostics') === '1'");
 const outputFiles = await filesUnder(path.join(root, 'output')).catch(() => []);
+// Gameplay journeys create their candidate evidence before the closing source
+// gate. Those captures are expected verification output, not stale source-tree
+// artwork; continue rejecting generated images in every other output location.
 const staleGeneratedImages = outputFiles
   .map((filePath) => path.relative(root, filePath).split(path.sep).join('/'))
   .filter((relative) => /\.(?:png|jpe?g|webp)$/i.test(relative) &&
+    !relative.startsWith('output/verification/') &&
     !relative.startsWith('output/release-evidence/current/'));
 
 const report = {

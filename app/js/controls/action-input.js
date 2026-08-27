@@ -3,7 +3,7 @@ import {
   loadMobileTouchSettings,
   resolveMobileSemanticActions,
   saveMobileTouchSettings
-} from './mobile-touch-authority.js?v=3';
+} from './mobile-touch-authority.js?v=4';
 
 const DEAD_ZONE = 0.16;
 const inputState = {

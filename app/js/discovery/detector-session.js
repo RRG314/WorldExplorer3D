@@ -26,7 +26,7 @@ function createDetectorSession(options = {}) {
   let target = null;
   let elapsed = 0;
   let signalStrength = 0;
-  let message = 'Sweep a suitable area to search for a procedural virtual find.';
+  let message = 'Sweep a suitable area to search for a virtual field find.';
   let error = '';
   let collectionResult = null;
   let activeToolId = 'metal-detector';
@@ -167,7 +167,7 @@ function createDetectorSession(options = {}) {
     error = '';
     collectionResult = null;
     activeToolId = 'metal-detector';
-    message = 'Sweep a suitable area to search for a procedural virtual find.';
+    message = 'Sweep a suitable area to search for a virtual field find.';
   }
 
   function setAvailableToolIds(toolIds = []) {

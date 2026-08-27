@@ -12,7 +12,7 @@ const SPECIAL_STEPS = Object.freeze({
   'field-binoculars': Object.freeze([
     'Look for tracks and other habitat-plausible clues.',
     'Follow the clue without implying an animal is at a real coordinate.',
-    'Record the procedural encounter in your Journal and Field Guide.'
+    'Record the field lead in your Journal and Field Guide.'
   ]),
   'sediment-pan': Object.freeze([
     'Use this only where the world classifies a river or stream edge.',

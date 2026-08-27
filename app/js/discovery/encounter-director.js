@@ -21,10 +21,11 @@ function leadPresentation(slot = {}) {
   const discovery = FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === slot.catalogId);
   const family = String(discovery?.family || 'field-record');
   const name = String(discovery?.names?.common || '').trim();
-  if (/wildlife|animal|bird/.test(family)) return { kind: 'wildlife', label: name || 'Wildlife sign', tone: 'nature' };
+  if (/wildlife|animal|bird|mammal/.test(family)) return { kind: 'wildlife', label: name || 'Wildlife sign', tone: 'nature' };
+  if (/insect|arachnid|microfauna/.test(family)) return { kind: 'microfauna', label: name || 'Microfauna clue', tone: 'nature' };
   if (/botany|plant|fung/.test(family)) return { kind: 'botany', label: name || 'Plant life', tone: 'nature' };
   if (/rock|mineral|sediment|fossil|gem|ore|metal/.test(family)) return { kind: 'earth-science', label: name || 'Earth science trace', tone: 'earth' };
-  if (/beach|shore|ocean|water/.test(family)) return { kind: 'shoreline', label: name || 'Shoreline lead', tone: 'water' };
+  if (/beach|shore|ocean|water|fish/.test(family)) return { kind: 'shoreline', label: name || 'Shoreline lead', tone: 'water' };
   if (/place|urban|history/.test(family)) return { kind: 'place', label: name || 'Place clue', tone: 'place' };
   return { kind: 'field', label: slot.activityLabel || 'Field lead', tone: 'field' };
 }
@@ -32,7 +33,7 @@ function leadPresentation(slot = {}) {
 function slotRichnessPenalty(slot = {}) {
   const discovery = FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === slot.catalogId);
   const family = String(discovery?.family || '');
-  if (/wildlife|animal|bird|botany|plant|fung|rock|mineral|sediment|fossil|beach/.test(family)) return 0;
+  if (/wildlife|animal|bird|mammal|insect|arachnid|botany|plant|fung|rock|mineral|sediment|fossil|beach|fish/.test(family)) return 0;
   if (slot.catalogId === 'area-survey-note') return 90;
   return 32;
 }

@@ -1,5 +1,5 @@
 import { deterministicUnit } from '../discovery/model.js?v=1';
-import { cellAtPosition, evaluateArEligibility } from './eligibility.js?v=1';
+import { cellAtPosition, evaluateArEligibility } from './eligibility.js?v=2';
 
 const FIELD_CHALLENGE_VERSION = 'waterfowl-photo-v1';
 
@@ -14,7 +14,7 @@ function compileWaterfowlChallenge(options = {}) {
     liveGpsSnapshot: options.liveGpsSnapshot,
     travelMode: options.travelMode || 'walk'
   });
-  const cell = cellAtPosition(environment, position);
+  const cell = environment.cells.find((entry) => entry.cellId === eligibility.cellId) || cellAtPosition(environment, position);
   const seed = `${environment.worldIdentity.id}|${cell?.cellId || 'none'}|${FIELD_CHALLENGE_VERSION}`;
   const actors = eligibility.allowed ? Array.from({ length: 4 }, (_, index) => {
     const actorSeed = `${seed}|mallard:${index}`;
@@ -27,7 +27,7 @@ function compileWaterfowlChallenge(options = {}) {
       height: 0.05 + deterministicUnit(`${actorSeed}:height`) * 0.45,
       speed: 0.16 + deterministicUnit(`${actorSeed}:speed`) * 0.09,
       direction: deterministicUnit(`${actorSeed}:direction`) > 0.5 ? 1 : -1,
-      evidenceClass: 'procedural-game-encounter'
+      evidenceClass: 'guided-field-encounter'
     });
   }) : [];
   return Object.freeze({
@@ -39,6 +39,7 @@ function compileWaterfowlChallenge(options = {}) {
     worldIdentity: environment.worldIdentity,
     cellId: cell?.cellId || null,
     habitat: eligibility.habitat || null,
+    habitatDistanceMeters: eligibility.habitatDistanceMeters,
     contexts: Object.freeze([...(cell?.contexts || [])]),
     eligible: eligibility.allowed,
     reason: eligibility.reason,

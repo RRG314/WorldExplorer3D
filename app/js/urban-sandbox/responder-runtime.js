@@ -1,15 +1,16 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=1';
+import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=2';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
-import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=1';
+import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=2';
 import { vehicleDoorPosition } from './vehicle-model.js?v=6';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
+const OFFICER_CONTACT_DISTANCE = 3.2;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -217,8 +218,8 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = finite(actor?.z) - officer.z;
     const distance = Math.hypot(dx, dz);
     officer.yaw = Math.atan2(dx, dz);
-    if (!returning && distance > 4.2 && distance < 34) {
-      const speed = Math.min(3.2, Math.max(0, distance - 4) * .9);
+    if (!returning && distance > OFFICER_CONTACT_DISTANCE && distance < 34) {
+      const speed = Math.min(3.2, Math.max(0, distance - OFFICER_CONTACT_DISTANCE + .35) * .9);
       officer.x += Math.sin(officer.yaw) * speed * dt;
       officer.z += Math.cos(officer.yaw) * speed * dt;
       officer.y = surfaceY(officer.x, officer.z, officer.y);
@@ -247,7 +248,7 @@ function createUrbanResponderRuntime(options = {}) {
         officer.fireCooldown = 1.35;
       }
     }
-    if (!returning && Number(civic?.level || 0) >= 2 && appCtx.Walk?.state?.mode === 'walk' && distance <= 2.2 && officer.activeElapsed >= 1.2) {
+    if (!returning && Number(civic?.level || 0) >= 2 && appCtx.Walk?.state?.mode === 'walk' && distance <= OFFICER_CONTACT_DISTANCE && officer.activeElapsed >= 1.2) {
       options.onArrest?.({ officerId: officer.id, responderId: responder.id });
     }
   }

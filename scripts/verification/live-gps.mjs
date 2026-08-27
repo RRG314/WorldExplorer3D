@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
+const root = process.cwd();
+const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
+const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
 const server = externalUrl ? null : await startStaticServer({
-  rootDir: process.cwd(),
+  rootDir: servedRoot,
   ports: [4370, 4371, 4372]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
@@ -46,6 +50,13 @@ try {
   const liveGpsEntry = page.locator('#globeSelectorLiveGpsBtn');
   await liveGpsEntry.waitFor({ state: 'visible', timeout: 30_000 });
   assert.equal(await liveGpsEntry.isEnabled(), true, 'Live GPS entry must be enabled in the mobile start hub.');
+  await liveGpsEntry.click();
+  await page.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
+  const consentCopy = await page.locator('#liveGpsPermissionPanel').textContent();
+  await page.locator('#liveGpsPermissionCancel').click();
+  await page.waitForFunction(() => !document.getElementById('liveGpsPermissionPanel')?.classList.contains('show'), null, { timeout: 10_000 });
+  const deniedSnapshot = await snapshot();
+  assert.notEqual(deniedSnapshot.liveGps?.active, true, 'Cancelling consent must not begin Live GPS.');
   await liveGpsEntry.click();
   await page.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
   await page.locator('#liveGpsPermissionContinue').click();
@@ -211,7 +222,26 @@ try {
 
   const checks = {
     mobileEntryVisible: true,
+    consentCancelHoldsStart: deniedSnapshot.liveGps?.active !== true,
+    consentCopyStatesPrivacyAndRewardBoundary:
+      /does not retain a raw fix history/i.test(consentCopy || '') &&
+      /save a raw route/i.test(consentCopy || '') &&
+      /personal virtual records only/i.test(consentCopy || '') &&
+      /do not prove physical access/i.test(consentCopy || ''),
     gpsActive: walking.liveGps?.active === true && walking.liveGps?.following === true,
+    secureConsentedFieldSession:
+      walking.liveGps?.fieldSession?.schemaVersion === 2 &&
+      walking.liveGps?.fieldSession?.consent?.granted === true &&
+      walking.liveGps?.fieldSession?.pauseReason === null,
+    rawRouteNotStored:
+      walking.liveGps?.fieldSession?.privacy?.rawRouteStored === false &&
+      walking.liveGps?.fieldSession?.privacy?.rawFixHistoryStored === false &&
+      walking.liveGps?.rawFixHistoryStored === false &&
+      walking.liveGps?.retainedRawSamples === 0,
+    rewardBoundaryIsPersonalOnly:
+      walking.liveGps?.fieldSession?.rewardPolicy?.personalVirtualRecord === true &&
+      walking.liveGps?.fieldSession?.rewardPolicy?.competitive === false &&
+      walking.liveGps?.fieldSession?.rewardPolicy?.locationReward === false,
     walkingMovedFromGps: distance2d(initial.activeActor?.position, walking.activeActor?.position) > 0.2,
     walkingCameraReturnsBehind:
       Number(walking.cameraFollow?.headingAlignmentDegrees) <= 12 &&
@@ -220,9 +250,17 @@ try {
     fieldTodayHasThreeStops: fieldToday.objectiveText.length === 3 && fieldToday.objectiveText.every((entry) => /\d+ m|Waiting for GPS/.test(entry)),
     firstStopRecordsOnce: firstStopRecorded.worldDiscovery?.fieldExpedition?.completedCount === 1 &&
       firstStopRecorded.worldDiscovery?.interaction?.claimState === 'claimed',
+    firstStopHasHonestApproachEvidence:
+      firstStopRecorded.worldDiscovery?.interaction?.approachEvidence?.stableSurface === true &&
+      firstStopRecorded.worldDiscovery?.interaction?.approachEvidence?.buildingClear === true &&
+      firstStopRecorded.worldDiscovery?.interaction?.approachEvidence?.accessEvidence === 'unknown' &&
+      firstStopRecorded.worldDiscovery?.interaction?.approachEvidence?.accessClaim === false,
+    firstStopHasNoLocationReward:
+      firstStopRecorded.worldDiscovery?.interaction?.rewardEligibility?.competitive === false &&
+      firstStopRecorded.worldDiscovery?.interaction?.rewardEligibility?.locationReward === false,
     expeditionCompletesThreeStops: expeditionComplete.worldDiscovery?.fieldExpedition?.completedCount === 3 &&
       expeditionComplete.worldDiscovery?.fieldExpedition?.complete === true,
-    poorAccuracyHoldsFieldRewards: accuracyHeld.liveGps?.fieldSession?.eligible === false && accuracyHeld.liveGps?.fieldSession?.pauseReason === 'accuracy-hold',
+    poorAccuracyHoldsFieldProgress: accuracyHeld.liveGps?.fieldSession?.eligible === false && accuracyHeld.liveGps?.fieldSession?.pauseReason === 'accuracy-hold',
     vehicleSpeedDetected:
       driving.liveGps?.travelMode === 'drive' && driving.liveGps?.movementClass === 'fast',
     vehicleActorSelected: driving.activeActor?.mode === 'drive',
@@ -230,13 +268,15 @@ try {
       Number(driving.cameraFollow?.headingAlignmentDegrees) <= 12 &&
       Number(driving.cameraFollow?.trailingDistance) > 0,
     gpsWatchRemainsActive: driving.liveGps?.watchActive === true,
+    noInternalEncounterLanguage: !/procedural encounter/i.test(await page.locator('body').innerText()),
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
     ok: Object.values(checks).every(Boolean),
-    contract: 'visible-live-gps-walk-drive-camera-follow',
+    contract: 'live-gps-field-v2-visible-three-stop-journey',
     checks,
+    deniedSnapshot: { gps: deniedSnapshot.liveGps },
     initial: { actor: initial.activeActor, gps: initial.liveGps, cameraFollow: initial.cameraFollow },
     walking: { actor: walking.activeActor, gps: walking.liveGps, cameraFollow: walking.cameraFollow },
     fieldToday,

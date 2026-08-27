@@ -506,8 +506,8 @@ export function renderUi(ctx) {
       <div>${ctx.escapeHtml(summary.description)}</div>
       <div>${template.help.map((entry) => ctx.escapeHtml(entry)).join('<br>')}</div>
       <div>${ctx.escapeHtml(ctx.state.audience === 'room' && roomContext.available
-        ? 'Room games publish into the current multiplayer room so everyone in that room can start or join them together.'
-        : 'Saved activities stay in your creator library on this browser until you publish them through a later backend workflow.')}</div>
+        ? 'Room games are shared only with the current multiplayer room so its members can start or join them together.'
+        : 'Creator Library activities stay only on this browser. Public activity publishing is not available in minimum 5.0.')}</div>
     `;
   }
   if (refs.summary) {
@@ -531,8 +531,8 @@ export function renderUi(ctx) {
     refs.audienceHelp.innerHTML = ctx.state.audience === 'room' && roomContext.available
       ? `Save this as a shared multiplayer game for <strong>${ctx.escapeHtml(roomContext.room?.name || roomContext.room?.code || 'your current room')}</strong>. Everyone in that room can join once the host starts it.`
       : roomContext.room
-        ? `You are in room <strong>${ctx.escapeHtml(roomContext.room.name || roomContext.room.code || 'room')}</strong>. Switch Save To if you want to publish this draft as a shared room game.`
-        : `Save to <strong>${ctx.escapeHtml(saveTargetLabel)}</strong> to keep a private creator draft on this device. Join and manage a multiplayer room if you want to publish a shared room game.`;
+        ? `You are in room <strong>${ctx.escapeHtml(roomContext.room.name || roomContext.room.code || 'room')}</strong>. Switch Save To if you want to share this draft only with that room.`
+        : `Save to <strong>${ctx.escapeHtml(saveTargetLabel)}</strong> to keep a private creator draft on this device. Join a multiplayer room to share a room-scoped game; this does not publish it publicly.`;
   }
   if (refs.checklist) {
     refs.checklist.innerHTML = checklist.map((entry) => `

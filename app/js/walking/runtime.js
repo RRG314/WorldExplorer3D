@@ -28,6 +28,8 @@ function createWalkingRuntimeHelpers({
     state.mode = "walk";
     state.walker._resolvedGroundState = null;
     state.walker.lookYawOffset = 0;
+    state.walker.mobileMoveBasisYaw = null;
+    state.walker.mobileMoveWasActive = false;
     let appliedSafeWalkSpawn = options.preserveResolvedSpawn === true;
     if (!appliedSafeWalkSpawn && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
       const safeWalkSpawn = appCtx.resolveSafeWorldSpawn(

@@ -205,6 +205,7 @@ try {
   params.set('rx', Number(exactStructureSample.x).toFixed(3));
   params.set('ry', (Number(exactStructureSample.surfaceY) + 1.2).toFixed(3));
   params.set('rz', Number(exactStructureSample.z).toFixed(3));
+  params.set('rid', 'osm:way:12115981');
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
@@ -233,6 +234,20 @@ try {
   });
   await page.waitForTimeout(1500);
 
+  const preDrive = await page.evaluate(() => {
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return {
+      actorMode: diagnostics.surfaceChain?.actor?.mode || null,
+      worldX: Number(diagnostics.surfaceChain?.world?.x || 0),
+      worldZ: Number(diagnostics.surfaceChain?.world?.z || 0),
+      driveSurfaceId: diagnostics.surfaceChain?.surfaces?.drive?.feature?.id || null
+    };
+  });
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(1250);
+  await page.keyboard.up('ArrowUp');
+  await page.waitForTimeout(500);
+
   const snapshot = await page.evaluate(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return {
@@ -256,8 +271,15 @@ try {
   const mappedTallVisuals = snapshot.mappedTallBuildingVisuals || {};
   const worldTradeCenter = (mappedTallVisuals.samples || []).find((sample) =>
     String(sample?.name || '').toLowerCase() === 'world trade center');
+  const playerDriveMeters = Math.hypot(
+    Number(snapshot.surfaceChain?.world?.x || 0) - preDrive.worldX,
+    Number(snapshot.surfaceChain?.world?.z || 0) - preDrive.worldZ
+  );
   const checks = {
     finalVisibleActorIsDriving: snapshot.environment === 'EARTH' && snapshot.surfaceChain?.actor?.mode === 'drive',
+    normalDriveInputMovesVehicle:
+      preDrive.actorMode === 'drive' &&
+      playerDriveMeters >= 0.25,
     losslessJfxSourceLoaded: sourceIsExact,
     canonicalJfxSurfaceOwnsDrivingSurface: structure.id === 'osm:way:12115981' ||
       /jones falls expressway/i.test(String(structure.name || '')),
@@ -274,10 +296,14 @@ try {
     noConnectedEndpointAbutmentWall:
       Number(structure.structureAssembly?.connectedEndpointAbutmentCount || 0) === 0,
     // The driving actor includes a 1 cm chassis clearance plus the existing
-    // multi-wheel suspension stabilizer. Keep contact inside that physical
-    // envelope rather than applying the walker's zero-offset tolerance.
+    // multi-wheel suspension stabilizer. Measure against the selected wheel
+    // support, not the road centerline under a curved or banked vehicle body.
     vehicleContactWithinSuspensionEnvelope:
-      Math.abs(Number(snapshot.surfaceChain?.deltas?.feetMinusDriveSurface)) <= 0.2,
+      snapshot.surfaceChain?.actor?.vehicleContact?.roadCentered === true &&
+      Number(snapshot.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
+      Number(snapshot.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
+      Number(snapshot.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
+      Number(snapshot.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
     deckIsAboveRenderedTerrain: Number(snapshot.surfaceChain?.deltas?.feetMinusRenderedTerrain) >= 3,
     exactNetworkContinuity: !sourceIsExact || (
       Number(snapshot.transportContinuity?.authoritativeConnectionCount || 0) >= 1 &&
@@ -315,6 +341,13 @@ try {
     checks,
     evidence: snapshot,
     vehiclePlacement,
+    normalDriveInput: {
+      key: 'ArrowUp',
+      heldMilliseconds: 1250,
+      distanceMeters: playerDriveMeters,
+      startSurfaceId: preDrive.driveSurfaceId,
+      endSurfaceId: drive?.feature?.id || null
+    },
     overpassProxyResults,
     browserErrors,
     localFailures

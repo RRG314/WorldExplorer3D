@@ -14,6 +14,36 @@ function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function projectFieldGuideEntry(existingGuide, record, now, regionId) {
+  const existingRegions = Array.isArray(existingGuide?.regions) ? existingGuide.regions : [];
+  const evidenceContractIds = [...new Set([
+    ...(existingGuide?.evidenceContractIds || []),
+    record.evidenceContractId
+  ].filter(Boolean))];
+  return {
+    catalogId: record.catalogId,
+    name: record.name || record.catalogId,
+    family: record.family || 'discovery',
+    firstObservedAt: Number(existingGuide?.firstObservedAt) || now,
+    lastObservedAt: now,
+    observations: Number(existingGuide?.observations || 0) + 1,
+    evidenceClass: record.evidenceClass || 'virtual-field-record',
+    evidenceContractIds,
+    regionalPackId: record.regionalPackId || existingGuide?.regionalPackId || null,
+    regionalPackVersion: record.regionalPackVersion || existingGuide?.regionalPackVersion || null,
+    stableTaxonId: record.stableTaxonId || existingGuide?.stableTaxonId || null,
+    taxonGroup: record.taxonGroup || existingGuide?.taxonGroup || null,
+    fishingAuthorityVersion: record.evidencePayload?.fishingAuthorityVersion || existingGuide?.fishingAuthorityVersion || null,
+    populationEvidence: record.evidencePayload?.populationEvidence || existingGuide?.populationEvidence || null,
+    livePresenceClaim: typeof record.evidencePayload?.livePresenceClaim === 'boolean'
+      ? record.evidencePayload.livePresenceClaim
+      : existingGuide?.livePresenceClaim === true,
+    sourceRefs: clone(record.sourceRefs || existingGuide?.sourceRefs || []),
+    regions: [...new Set([...existingRegions, regionId])],
+    regionLabels: [...new Set([...(existingGuide?.regionLabels || []), String(record.regionLabel || 'Current region')])]
+  };
+}
+
 function createDefaultProfile() {
   return {
     id: PROFILE_ID,
@@ -188,18 +218,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
       if (item) items.put(item);
       events.put(event);
       claims.put({ claimId: record.claimId, claimedAt: now, item, event });
-      fieldGuide.put({
-        catalogId: record.catalogId,
-        name: record.name || record.catalogId,
-        family: record.family || 'discovery',
-        firstObservedAt: Number(existingGuide?.firstObservedAt) || now,
-        lastObservedAt: now,
-        observations: Number(existingGuide?.observations || 0) + 1,
-        evidenceClass: record.evidenceClass || 'procedural-game-encounter',
-        sourceRefs: clone(record.sourceRefs || []),
-        regions: [...new Set([...existingRegions, regionId])],
-        regionLabels: [...new Set([...(existingGuide?.regionLabels || []), String(record.regionLabel || 'Current region')])]
-      });
+      fieldGuide.put(projectFieldGuideEntry(existingGuide, record, now, regionId));
       profiles.put(profile);
       await transactionPromise(transaction);
       return {
@@ -392,18 +411,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     if (item) items.set(item.instanceId, item);
     events.set(event.eventId, event);
     claims.set(record.claimId, { claimId: record.claimId, item, event });
-    guide.set(record.catalogId, {
-      catalogId: record.catalogId,
-      name: record.name || record.catalogId,
-      family: record.family || 'discovery',
-      firstObservedAt: existingGuide?.firstObservedAt || record.collectedAt || Date.now(),
-      lastObservedAt: record.collectedAt || Date.now(),
-      observations: Number(existingGuide?.observations || 0) + 1,
-      evidenceClass: record.evidenceClass || 'procedural-game-encounter',
-      sourceRefs: clone(record.sourceRefs || []),
-      regions: [...new Set([...regions, regionId])],
-      regionLabels: [...new Set([...(existingGuide?.regionLabels || []), String(record.regionLabel || 'Current region')])]
-    });
+    guide.set(record.catalogId, projectFieldGuideEntry(existingGuide, record, record.collectedAt || Date.now(), regionId));
     const discipline = String(record.discipline || 'exploration');
     const legacy = { ...(profile.disciplineProgress[discipline] || { discoveries: 0, regions: [] }) };
     legacy.discoveries = Number(legacy.discoveries || 0) + 1;

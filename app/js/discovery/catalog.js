@@ -1,9 +1,15 @@
-const DISCOVERY_CATALOG_VERSION = '2026.08.17.1';
+import {
+  BALTIMORE_TAXON_DISCOVERIES,
+  ECOLOGY_SOURCE_MANIFEST
+} from './ecology/baltimore-pack.js?v=1';
+
+const DISCOVERY_CATALOG_VERSION = '2026.08.24.2';
 
 const SOURCE_MANIFEST = Object.freeze({
+  ...ECOLOGY_SOURCE_MANIFEST,
   'we3d-original': Object.freeze({
     id: 'we3d-original',
-    label: 'World Explorer 3D original procedural content',
+    label: 'World Explorer 3D original game content',
     license: 'WE3D-ORIGINAL',
     attribution: 'World Explorer 3D',
     allowsProductUse: true,
@@ -39,7 +45,7 @@ const sourceRef = (providerId, recordId) => Object.freeze({
 const TOOL_CATALOG = Object.freeze([
   {
     id: 'field-lens', label: 'Field Lens', discipline: 'exploration',
-    capabilities: ['inspect', 'classify'], depthBands: ['surface'],
+    capabilities: ['inspect', 'classify', 'survey-habitat', 'community-survey'], depthBands: ['surface'],
     tutorialId: 'field-lens-v1', sourceRefs: [sourceRef('we3d-original', 'tool:field-lens')]
   },
   {
@@ -64,7 +70,7 @@ const TOOL_CATALOG = Object.freeze([
   },
   {
     id: 'field-camera', label: 'Field Camera', discipline: 'nature',
-    capabilities: ['photograph', 'record'], depthBands: ['surface'],
+    capabilities: ['photograph', 'macro-photograph', 'record'], depthBands: ['surface'],
     tutorialId: 'field-camera-v1', sourceRefs: [sourceRef('we3d-original', 'tool:field-camera')]
   },
   {
@@ -148,6 +154,26 @@ const ACTIVITY_CATALOG = Object.freeze([
     id: 'photograph', label: 'Photograph', discipline: 'nature', toolCapability: 'photograph',
     contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'beach', 'mountain', 'desert', 'urban'], exclusions: [],
     sourceRefs: [sourceRef('we3d-original', 'activity:photograph')]
+  },
+  {
+    id: 'nature-observe', label: 'Observe Wildlife', discipline: 'nature', toolCapability: 'observe-wildlife',
+    contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], exclusions: ['sensitive'],
+    sourceRefs: [sourceRef('we3d-original', 'activity:nature-observe')]
+  },
+  {
+    id: 'insect-macro', label: 'Insect Macro', discipline: 'nature', toolCapability: 'macro-photograph',
+    contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'urban'], exclusions: ['sensitive'],
+    sourceRefs: [sourceRef('we3d-original', 'activity:insect-macro')]
+  },
+  {
+    id: 'habitat-survey', label: 'Survey Habitat', discipline: 'nature', toolCapability: 'survey-habitat',
+    contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], exclusions: ['sensitive'],
+    sourceRefs: [sourceRef('we3d-original', 'activity:habitat-survey')]
+  },
+  {
+    id: 'community-survey', label: 'Community Survey', discipline: 'nature', toolCapability: 'community-survey',
+    contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], exclusions: ['sensitive'],
+    sourceRefs: [sourceRef('we3d-original', 'activity:community-survey')]
   },
   {
     id: 'fish', label: 'Fish', discipline: 'nature', toolCapability: 'fish',
@@ -242,19 +268,19 @@ const FIND_CATALOG = Object.freeze([
   {
     id: 'iron-trade-buckle', names: { common: 'Iron Trade Buckle' }, family: 'fictional-find',
     material: 'iron', signalClass: 'ferrous', depthBands: ['shallow', 'moderate'],
-    contexts: ['field', 'trail', 'forest', 'park'], rarityBand: 'uncommon', description: 'A historically informed but procedural iron buckle.',
+    contexts: ['field', 'trail', 'forest', 'park'], rarityBand: 'uncommon', description: 'A historically inspired virtual iron buckle.',
     tradePolicy: 'collectible', sourceRefs: [sourceRef('we3d-original', 'find:iron-trade-buckle')]
   },
   {
     id: 'copper-keepsake', names: { common: 'Copper Keepsake' }, family: 'fictional-find',
     material: 'copper', signalClass: 'high-conductor', depthBands: ['shallow', 'moderate'],
-    contexts: ['urban', 'park', 'field', 'beach'], rarityBand: 'rare', description: 'A small procedural keepsake with weathered engraved lines.',
+    contexts: ['urban', 'park', 'field', 'beach'], rarityBand: 'rare', description: 'A small virtual keepsake with weathered engraved lines.',
     tradePolicy: 'collectible', sourceRefs: [sourceRef('we3d-original', 'find:copper-keepsake')]
   },
   {
     id: 'aluminum-trail-tag', names: { common: 'Aluminum Trail Tag' }, family: 'fictional-find',
     material: 'aluminum', signalClass: 'mid-conductor', depthBands: ['surface', 'shallow'],
-    contexts: ['trail', 'forest', 'mountain', 'park'], rarityBand: 'common', description: 'A procedural trail marker fragment, recorded as virtual gameplay.',
+    contexts: ['trail', 'forest', 'mountain', 'park'], rarityBand: 'common', description: 'A trail marker fragment created for virtual gameplay.',
     tradePolicy: 'collectible', sourceRefs: [sourceRef('we3d-original', 'find:aluminum-trail-tag')]
   },
   {
@@ -266,30 +292,33 @@ const FIND_CATALOG = Object.freeze([
   {
     id: 'sea-smoothed-disc', names: { common: 'Sea-smoothed Metal Disc' }, family: 'fictional-find',
     material: 'mixed-metal', signalClass: 'mixed', depthBands: ['surface', 'shallow'],
-    contexts: ['beach'], rarityBand: 'uncommon', description: 'A procedural disc shaped by a fictional shoreline history.',
+    contexts: ['beach'], rarityBand: 'uncommon', description: 'A virtual disc shaped by a fictional shoreline history.',
     tradePolicy: 'collectible', sourceRefs: [sourceRef('we3d-original', 'find:sea-smoothed-disc')]
   }
 ].map(Object.freeze));
 
 const FIELD_DISCOVERY_CATALOG = Object.freeze([
   { id: 'area-survey-note', names: { common: 'Area Survey Note' }, family: 'exploration-record', activityIds: ['inspect', 'survey'], contexts: ['any'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual note describing the current compiled environment context.', sourceRefs: [sourceRef('we3d-original', 'field:area-survey')] },
-  { id: 'granite-field-sample', names: { common: 'Granite Field Sample', scientific: 'Coarse-grained intrusive igneous rock' }, visualId: 'granite', family: 'rock', activityIds: ['geology-inspect'], contexts: ['mountain', 'outcrop'], rarityBand: 'common', qualityBand: 'field', tradePolicy: 'specimen', description: 'A procedural virtual specimen representing coarse-grained igneous rock. The photograph is an identification reference, not a location claim.', sourceRefs: [sourceRef('we3d-original', 'field:granite')] },
+  { id: 'granite-field-sample', names: { common: 'Granite Field Sample', scientific: 'Coarse-grained intrusive igneous rock' }, visualId: 'granite', family: 'rock', activityIds: ['geology-inspect'], contexts: ['mountain', 'outcrop'], rarityBand: 'common', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual specimen representing coarse-grained igneous rock. The photograph is an identification reference, not a location claim.', sourceRefs: [sourceRef('we3d-original', 'field:granite')] },
   { id: 'quartz-vein-sample', names: { common: 'Quartz Vein Sample', scientific: 'SiO₂' }, visualId: 'quartz', family: 'mineral', activityIds: ['geology-inspect', 'pan-sediment'], contexts: ['outcrop', 'mountain', 'riverbank'], rarityBand: 'uncommon', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual quartz-bearing sample generated for Earth-science gameplay. The photograph is an identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:quartz')] },
-  { id: 'river-heavy-sand', names: { common: 'Heavy River Sand' }, family: 'sediment', activityIds: ['pan-sediment'], contexts: ['riverbank', 'stream'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'specimen', description: 'A procedural concentrate from virtual sediment panning.', sourceRefs: [sourceRef('we3d-original', 'field:river-sand')] },
+  { id: 'river-heavy-sand', names: { common: 'Heavy River Sand' }, family: 'sediment', activityIds: ['pan-sediment'], contexts: ['riverbank', 'stream'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'specimen', description: 'A concentrate from virtual sediment panning.', sourceRefs: [sourceRef('we3d-original', 'field:river-sand')] },
   { id: 'shell-impression-cast', names: { common: 'Shell Impression Cast', scientific: 'Molluscan fossil material' }, visualId: 'fossil-shells', family: 'fossil-representation', activityIds: ['fossil-document'], contexts: ['fossil-formation'], rarityBand: 'uncommon', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual cast, not a claim of a fossil at this exact location. The photograph is a museum reference.', sourceRefs: [sourceRef('we3d-original', 'field:shell-impression')] },
-  { id: 'sea-glass-fragment', names: { common: 'Sea Glass Fragment' }, family: 'beach-find', activityIds: ['beachcomb'], contexts: ['beach'], rarityBand: 'common', qualityBand: 'weathered', tradePolicy: 'collectible', description: 'A procedural shoreline find.', sourceRefs: [sourceRef('we3d-original', 'field:sea-glass')] },
-  { id: 'woodland-track-clue', names: { common: 'White-tailed Deer Sign', scientific: 'Odocoileus virginianus' }, visualId: 'white-tailed-deer', family: 'wildlife-clue', activityIds: ['wildlife-track', 'trail-camera-survey', 'photograph'], contexts: ['forest', 'field', 'park'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A procedural wildlife encounter using a real species reference. It does not assert that an animal is present at the selected location.', sourceRefs: [sourceRef('we3d-original', 'field:woodland-track')] },
-  { id: 'wetland-waterbird-clue', names: { common: 'Mallard Observation', scientific: 'Anas platyrhynchos' }, visualId: 'mallard', family: 'wildlife-clue', activityIds: ['wildlife-track', 'trail-camera-survey', 'photograph'], contexts: ['wetland', 'riverbank', 'coast'], rarityBand: 'uncommon', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A procedural waterbird encounter paired with a real identification reference. It is not a live occurrence claim.', sourceRefs: [sourceRef('we3d-original', 'field:waterbird-clue')] },
-  { id: 'urban-nature-photo', names: { common: 'Rock Pigeon Record', scientific: 'Columba livia' }, visualId: 'rock-pigeon', family: 'wildlife-record', activityIds: ['photograph'], contexts: ['urban', 'urban-core', 'park'], rarityBand: 'common', qualityBand: 'photographic', tradePolicy: 'not-tradeable', description: 'A procedural urban-nature objective paired with a real identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:urban-nature-photo')] },
+  { id: 'sea-glass-fragment', names: { common: 'Sea Glass Fragment' }, family: 'beach-find', activityIds: ['beachcomb'], contexts: ['beach'], rarityBand: 'common', qualityBand: 'weathered', tradePolicy: 'collectible', description: 'A virtual shoreline find.', sourceRefs: [sourceRef('we3d-original', 'field:sea-glass')] },
+  { id: 'woodland-track-clue', names: { common: 'White-tailed Deer Sign', scientific: 'Odocoileus virginianus' }, visualId: 'white-tailed-deer', family: 'wildlife-clue', activityIds: ['wildlife-track', 'trail-camera-survey', 'photograph'], contexts: ['forest', 'field', 'park'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual field lead using a real species reference. It does not assert that an animal is present at the selected location.', sourceRefs: [sourceRef('we3d-original', 'field:woodland-track')] },
+  { id: 'wetland-waterbird-clue', names: { common: 'Mallard Observation', scientific: 'Anas platyrhynchos' }, visualId: 'mallard', family: 'wildlife-clue', activityIds: ['wildlife-track', 'trail-camera-survey', 'photograph'], contexts: ['wetland', 'riverbank', 'coast'], rarityBand: 'uncommon', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual waterbird field lead paired with a real identification reference. It is not a live occurrence claim.', sourceRefs: [sourceRef('we3d-original', 'field:waterbird-clue')] },
+  { id: 'urban-nature-photo', names: { common: 'Rock Pigeon Record', scientific: 'Columba livia' }, visualId: 'rock-pigeon', family: 'wildlife-record', activityIds: ['photograph'], contexts: ['urban', 'urban-core', 'park'], rarityBand: 'common', qualityBand: 'photographic', tradePolicy: 'not-tradeable', description: 'A virtual urban-nature field lead paired with a real identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:urban-nature-photo')] },
   { id: 'common-plant-record', names: { common: 'Common Dandelion Record', scientific: 'Taraxacum officinale' }, visualId: 'dandelion', family: 'botany-record', activityIds: ['forage'], contexts: ['forest', 'field', 'park'], rarityBand: 'common', qualityBand: 'photographic', tradePolicy: 'not-tradeable', description: 'A virtual botany record paired with a real identification reference. Never use the game to decide whether any real plant is safe to touch or eat.', sourceRefs: [sourceRef('we3d-original', 'field:common-plant-record')] },
-  { id: 'sonar-depth-profile', names: { common: 'Sonar Depth Profile' }, family: 'water-survey', activityIds: ['sonar-survey'], contexts: ['fresh-water', 'coast', 'open-ocean'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A procedural virtual sonar profile.', sourceRefs: [sourceRef('we3d-original', 'field:sonar')] },
-  { id: 'reef-photo-record', names: { common: 'Underwater Habitat Record' }, family: 'water-survey', activityIds: ['dive-survey'], contexts: ['coast', 'open-ocean'], rarityBand: 'uncommon', qualityBand: 'photographic', tradePolicy: 'not-tradeable', description: 'A procedural virtual dive observation.', sourceRefs: [sourceRef('we3d-original', 'field:dive')] },
-  { id: 'expedition-clue-page', names: { common: 'Expedition Clue Page' }, family: 'fictional-history', activityIds: ['treasure-hunt', 'virtual-archaeology'], contexts: ['urban', 'park', 'field', 'trail', 'beach', 'desert', 'outcrop'], rarityBand: 'uncommon', qualityBand: 'documented', tradePolicy: 'collectible', description: 'A clearly fictional clue for a procedural historical expedition.', sourceRefs: [sourceRef('we3d-original', 'field:clue')] },
+  { id: 'sonar-depth-profile', names: { common: 'Sonar Depth Profile' }, family: 'water-survey', activityIds: ['sonar-survey'], contexts: ['fresh-water', 'coast', 'open-ocean'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A virtual sonar profile.', sourceRefs: [sourceRef('we3d-original', 'field:sonar')] },
+  { id: 'reef-photo-record', names: { common: 'Underwater Habitat Record' }, family: 'water-survey', activityIds: ['dive-survey'], contexts: ['coast', 'open-ocean'], rarityBand: 'uncommon', qualityBand: 'photographic', tradePolicy: 'not-tradeable', description: 'A virtual dive observation.', sourceRefs: [sourceRef('we3d-original', 'field:dive')] },
+  { id: 'expedition-clue-page', names: { common: 'Expedition Clue Page' }, family: 'fictional-history', activityIds: ['treasure-hunt', 'virtual-archaeology'], contexts: ['urban', 'park', 'field', 'trail', 'beach', 'desert', 'outcrop'], rarityBand: 'uncommon', qualityBand: 'documented', tradePolicy: 'collectible', description: 'A clearly fictional clue for a virtual historical expedition.', sourceRefs: [sourceRef('we3d-original', 'field:clue')] },
   { id: 'land-stewardship-plan', names: { common: 'Land Stewardship Plan' }, family: 'creation-record', activityIds: ['farm-plot', 'forest-survey', 'camp-expedition'], contexts: ['field', 'forest', 'mountain', 'desert'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A virtual planning record that does not change or authorize use of real land.', sourceRefs: [sourceRef('we3d-original', 'field:stewardship')] },
-  { id: 'aerial-survey-frame', names: { common: 'Aerial Survey Frame' }, family: 'service-record', activityIds: ['drone-survey', 'search-rescue'], contexts: ['urban', 'field', 'forest', 'mountain', 'desert', 'coast'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A procedural virtual survey result.', sourceRefs: [sourceRef('we3d-original', 'field:aerial-survey')] },
+  { id: 'aerial-survey-frame', names: { common: 'Aerial Survey Frame' }, family: 'service-record', activityIds: ['drone-survey', 'search-rescue'], contexts: ['urban', 'field', 'forest', 'mountain', 'desert', 'coast'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A virtual survey result.', sourceRefs: [sourceRef('we3d-original', 'field:aerial-survey')] },
   { id: 'weather-observation', names: { common: 'Weather Observation' }, family: 'weather-record', activityIds: ['weather-observe'], contexts: ['any'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A game record based on the current modeled weather state.', sourceRefs: [sourceRef('we3d-original', 'field:weather')] },
   { id: 'night-sky-log', names: { common: 'Night Sky Log' }, family: 'astronomy-record', activityIds: ['astronomy-observe'], contexts: ['field', 'mountain', 'desert', 'beach'], rarityBand: 'uncommon', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual observing log tied to game time and sky conditions.', sourceRefs: [sourceRef('we3d-original', 'field:sky-log')] },
-  { id: 'urban-place-note', names: { common: 'Urban Place Note' }, family: 'urban-record', activityIds: ['urban-survey', 'transport-job'], contexts: ['urban', 'urban-core'], rarityBand: 'common', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual survey or service record without asserting access to private property.', sourceRefs: [sourceRef('we3d-original', 'field:urban-note')] }
+  { id: 'urban-place-note', names: { common: 'Urban Place Note' }, family: 'urban-record', activityIds: ['urban-survey', 'transport-job'], contexts: ['urban', 'urban-core'], rarityBand: 'common', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual survey or service record without asserting access to private property.', sourceRefs: [sourceRef('we3d-original', 'field:urban-note')] },
+  { id: 'modeled-habitat-transect', names: { common: 'Modeled Habitat Transect' }, family: 'habitat-record', activityIds: ['habitat-survey'], contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A modeled habitat-context record. It does not confirm field conditions, access, or species presence.', sourceRefs: [sourceRef('we3d-original', 'field:modeled-habitat-transect')] },
+  { id: 'local-game-checklist', names: { common: 'Local Game Checklist' }, family: 'community-survey-record', activityIds: ['community-survey'], contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A local checklist kept inside the game; it is not submitted to a community-science provider.', sourceRefs: [sourceRef('we3d-original', 'field:local-game-checklist')] },
+  ...BALTIMORE_TAXON_DISCOVERIES
 ].map(Object.freeze));
 
 const COMPANION_CATALOG = Object.freeze([

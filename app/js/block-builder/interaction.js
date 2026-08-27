@@ -67,7 +67,7 @@ export function createBlockBuilderInteraction(options) {
       '#titleScreen, #largeMap, #propertyPanel, #propertyModal, #historicPanel, #memoryComposer, ' +
       '#memoryInfoPanel, #floatMenuContainer, #controlsTab, #pauseScreen, #resultScreen, #caughtScreen, ' +
       '#legendPanel, #mapInfoPanel, #mainMenuBtn, #realEstateBtn, #historicBtn, #memoryFlowerFloatBtn, ' +
-      '#starInfo, #solarSystemInfoPanel, #blockBuilderPanel'
+      '#starInfo, #solarSystemInfoPanel, #editorPanel, #blockBuilderPanel'
     );
   }
 

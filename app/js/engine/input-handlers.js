@@ -133,6 +133,11 @@ export function setupEngineInputHandlers(appCtx) {
   inputScope.listen(globalThis, 'click', (e) => {
     if (!appCtx.gameStarted) return;
 
+    // Moon/star picking is a world-canvas action. Letting bubbled UI clicks
+    // reach these pickers can create a selection card above the panel that was
+    // just opened, including the World Editor itself.
+    if (e.target !== appCtx.renderer?.domElement) return;
+
     if (typeof appCtx.handleBlockBuilderClick === 'function' && appCtx.handleBlockBuilderClick(e)) {
       return;
     }

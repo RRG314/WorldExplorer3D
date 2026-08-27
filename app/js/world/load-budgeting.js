@@ -366,10 +366,26 @@ export function prepareWorldFeatureSelections(options = {}) {
     coreRatio: 0.5
   });
 
-  const allPoiNodes = data.elements.filter((element) =>
-    element.type === 'node' &&
-    !!poiKeyFromTags(element.tags)
-  );
+  const allPoiNodes = data.elements.map((element) => {
+    if (!poiKeyFromTags(element.tags)) return null;
+    if (element.type === 'node' && Number.isFinite(Number(element.lat)) && Number.isFinite(Number(element.lon))) return element;
+    const lat = Number(element.center?.lat);
+    const lon = Number(element.center?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return {
+      type: 'node',
+      id: `${element.type}:${element.id}`,
+      lat,
+      lon,
+      tags: {
+        ...element.tags,
+        _sourceElementType: element.type,
+        _sourceElementId: String(element.id)
+      },
+      sourceElementType: element.type,
+      sourceElementId: element.id
+    };
+  }).filter(Boolean);
   const poiNodes = limitNodesByTileBudget(allPoiNodes, {
     globalCap: maxPoiNodes,
     basePerTile: tileBudgetCfg.poiPerTile,

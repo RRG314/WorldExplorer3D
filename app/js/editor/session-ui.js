@@ -451,8 +451,8 @@ export function renderUi(ctx) {
   refs.panel.dataset.sidebarView = sidebarView;
   document.body.classList.toggle('editor-workspace-open', ctx.state.active);
   document.body.classList.toggle('editor-workspace-peek', ctx.state.active && ctx.state.peekWorld === true);
-  if (refs.title) refs.title.textContent = 'Overlay Editor Beta';
-  if (refs.subline) refs.subline.textContent = 'Beta demo for World Explorer overlays. Use presets first. This does not submit to OpenStreetMap.';
+  if (refs.title) refs.title.textContent = 'World Editor Beta';
+  if (refs.subline) refs.subline.textContent = 'Create reviewed overlays or switch to persistent Blocks. Neither workflow changes OpenStreetMap, Overture, or imported provider data.';
   if (refs.authBadge) {
     refs.authBadge.textContent = ctx.state.authUser?.uid
       ? `${ctx.sanitizeText(ctx.state.authUser.displayName || ctx.state.authUser.email || 'Explorer', 60)}${ctx.state.userIsAdmin ? ' • Admin' : ''}`

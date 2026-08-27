@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  getDocsFromServer,
   limit,
   onSnapshot,
   query,
@@ -187,7 +188,7 @@ function listenSharedBlocks(roomId, callback, options = {}) {
     limit(resultLimit)
   );
 
-  return onSnapshot(blocksQuery, (snap) => {
+  const rowsFromSnapshot = (snap) => {
     const rows = [];
     snap.forEach((blockSnap) => {
       const block = toSharedBlockObject(blockSnap);
@@ -199,11 +200,43 @@ function listenSharedBlocks(roomId, callback, options = {}) {
       if (a.gz !== b.gz) return a.gz - b.gz;
       return a.gy - b.gy;
     });
+    return rows;
+  };
+  let closed = false;
+  let listenerDeliveries = 0;
+  let lastListenerSize = null;
+  const unsubscribe = onSnapshot(blocksQuery, (snap) => {
+    const rows = rowsFromSnapshot(snap);
+    listenerDeliveries += 1;
+    lastListenerSize = rows.length;
     callback(rows);
   }, (err) => {
     console.warn('[multiplayer][blocks] listenSharedBlocks failed:', err);
     if (typeof options.onError === 'function') options.onError(err);
   });
+
+  // A newly joined client can receive an empty local-cache snapshot while the
+  // realtime stream is still establishing its server view. Confirm the initial
+  // room state directly so an existing build does not remain invisible. Never
+  // apply this read after the listener has delivered a non-empty or subsequent
+  // state, which prevents an older response from reviving a removed block.
+  void getDocsFromServer(blocksQuery).then((snap) => {
+    if (closed) return;
+    const rows = rowsFromSnapshot(snap);
+    const listenerOnlyDeliveredEmptyCache = listenerDeliveries === 1 && lastListenerSize === 0;
+    if (listenerDeliveries === 0 || (listenerOnlyDeliveredEmptyCache && rows.length > 0)) {
+      callback(rows);
+    }
+  }).catch((err) => {
+    if (closed || listenerDeliveries > 0) return;
+    console.warn('[multiplayer][blocks] initial server read failed:', err);
+    if (typeof options.onError === 'function') options.onError(err);
+  });
+
+  return () => {
+    closed = true;
+    unsubscribe();
+  };
 }
 
 export {

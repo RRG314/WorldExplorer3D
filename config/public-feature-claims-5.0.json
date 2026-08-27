@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "targetVersion": "5.0.0",
+  "publicFiles": ["index.html", "about/index.html", "README.md", "github-pages/index.html", "app/index.html"],
+  "allowedStatuses": ["review-required", "source-verified", "candidate-verified", "excluded"],
+  "forbiddenPublicPatterns": [
+    { "pattern": "test:multiplayer-integration", "reason": "stale verification command" },
+    { "pattern": ">\\s*Missions\\s*<", "reason": "implies a unified mission system that minimum 5.0 does not claim" },
+    { "pattern": "Missions & Games", "reason": "implies a unified mission system that minimum 5.0 does not claim" },
+    { "pattern": "procedural encounter", "reason": "internal evidence wording is not player-facing game language" },
+    { "pattern": "\\b(unified economy|crafting system|earn currency|spend currency)\\b", "reason": "minimum 5.0 excludes these positive system claims" }
+  ],
+  "claims": [
+    {
+      "id": "fixed-location-earth",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Choose a\\s+place on the globe" },
+      "evidenceCommands": ["verify:world", "verify:assembled-locations", "verify:artifact-runtime"]
+    },
+    {
+      "id": "earth-traversal",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Walking, driving, drone, plane, boat, underwater, rover, astronaut, and\\s+spacecraft traversal" },
+      "evidenceCommands": ["verify:actors-vehicles", "verify:environments"]
+    },
+    {
+      "id": "live-earth",
+      "status": "candidate-verified",
+      "source": { "file": "github-pages/index.html", "pattern": "Live Earth separates observed aircraft" },
+      "evidenceCommands": ["verify:world", "verify:provider-release"]
+    },
+    {
+      "id": "buildings-and-interiors",
+      "status": "candidate-verified",
+      "source": { "file": "app/index.html", "pattern": "ENTERABLE BUILDINGS" },
+      "evidenceCommands": ["verify:interiors"]
+    },
+    {
+      "id": "urban-sandbox",
+      "status": "candidate-verified",
+      "source": { "file": "app/index.html", "pattern": "Character Backpack" },
+      "evidenceCommands": ["verify:urban-equipment", "verify:actors-vehicles"]
+    },
+    {
+      "id": "multiplayer-rooms",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Multiplayer uses bounded rooms" },
+      "evidenceCommands": ["verify:multiplayer"]
+    },
+    {
+      "id": "reviewed-world-contributions",
+      "status": "candidate-verified",
+      "source": { "file": "index.html", "pattern": "create staged World Explorer overlay drafts for places, buildings, and interiors" },
+      "evidenceCommands": ["verify:creator-flow"]
+    },
+    {
+      "id": "fishing",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Shore, boat, and underwater fishing" },
+      "evidenceCommands": ["verify:shore-fishing", "verify:unified-fishing", "verify:fishing-loss-recovery"]
+    },
+    {
+      "id": "deflock-hunt",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "DeFlock Hunt" },
+      "evidenceCommands": ["verify:deflock-live-ui"]
+    },
+    {
+      "id": "live-gps",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "optional Live GPS play" },
+      "evidenceCommands": ["verify:live-gps", "verify:walking-encounters", "verify:shore-fishing"]
+    },
+    {
+      "id": "field-discovery",
+      "status": "candidate-verified",
+      "source": { "file": "index.html", "pattern": "field journal and activity-specific tools" },
+      "evidenceCommands": ["verify:walking-encounters", "verify:mission-lifecycle", "verify:field-retention-ui", "verify:regional-ecology"]
+    },
+    {
+      "id": "contextual-ar",
+      "status": "candidate-verified",
+      "source": { "file": "app/index.html", "pattern": "CONTEXTUAL WORLD VIEW" },
+      "evidenceCommands": ["verify:ar"]
+    },
+    {
+      "id": "mobile-touch-controls",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Keyboard, touch, browser-zoom" },
+      "evidenceCommands": ["verify:mobile-controls"]
+    },
+    {
+      "id": "minimum-accessibility-boundary",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Keyboard, touch, browser-zoom, focus, contrast, larger-text, and reduced-motion" },
+      "evidenceCommands": ["verify:accessibility-release", "verify:mobile-controls"]
+    },
+    {
+      "id": "planetary-and-space-travel",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Ocean, Moon, Mars, solar-system, and deep-space environments" },
+      "evidenceCommands": ["verify:environments"]
+    }
+  ]
+}

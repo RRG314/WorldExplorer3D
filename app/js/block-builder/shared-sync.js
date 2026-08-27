@@ -14,6 +14,9 @@ export function createSharedBlockSync(options = {}) {
   let upsertFn = null;
   let removeFn = null;
   let clearMineFn = null;
+  let connected = true;
+  let operationSequence = 0;
+  const pendingOperations = new Map();
 
   function isActive() {
     return enabled && !!roomId;
@@ -65,23 +68,53 @@ export function createSharedBlockSync(options = {}) {
     upsertFn = enabled && typeof config.upsert === 'function' ? config.upsert : null;
     removeFn = enabled && typeof config.remove === 'function' ? config.remove : null;
     clearMineFn = enabled && typeof config.clearMine === 'function' ? config.clearMine : null;
+    connected = enabled ? config.connected !== false : true;
+    if (roomChanged) pendingOperations.clear();
     if (!enabled || roomChanged) replaceEntries([]);
     onRefresh?.();
+  }
+
+  function rollbackOperation(operation, error) {
+    if (!operation) return;
+    if (operation.previous) entryMap.set(operation.key, operation.previous);
+    else entryMap.delete(operation.key);
+    entries = Array.from(entryMap.values());
+    operation.onFailure?.(error, operation.previous || operation.entry);
+  }
+
+  function setConnected(nextConnected) {
+    const next = nextConnected !== false;
+    if (connected === next) return connected;
+    connected = next;
+    if (!connected && pendingOperations.size > 0) {
+      const error = new Error('Room connection is offline. The shared block was not committed.');
+      const pending = Array.from(pendingOperations.values());
+      pendingOperations.clear();
+      pending.forEach((operation) => rollbackOperation(operation, error));
+      onRefresh?.();
+    }
+    return connected;
   }
 
   function upsert(raw, onFailure) {
     const entry = normalizeEntry(raw);
     if (!entry) return null;
+    if (!connected) return null;
     const key = keyFor(entry);
+    if (pendingOperations.has(key)) return null;
     const previous = entryMap.get(key) || null;
     entryMap.set(key, entry);
     entries = Array.from(entryMap.values());
     if (upsertFn) {
-      Promise.resolve(upsertFn(entry)).catch((error) => {
-        if (previous) entryMap.set(key, previous);
-        else entryMap.delete(key);
-        entries = Array.from(entryMap.values());
-        onFailure?.(error, entry);
+      const operationId = ++operationSequence;
+      const operation = { operationId, key, entry, previous, onFailure };
+      pendingOperations.set(key, operation);
+      Promise.resolve(upsertFn(entry)).then(() => {
+        if (pendingOperations.get(key)?.operationId === operationId) pendingOperations.delete(key);
+      }).catch((error) => {
+        if (pendingOperations.get(key)?.operationId !== operationId) return;
+        pendingOperations.delete(key);
+        rollbackOperation(operation, error);
       });
     }
     return entry;
@@ -90,21 +123,29 @@ export function createSharedBlockSync(options = {}) {
   function remove(raw, onFailure) {
     const entry = normalizeEntry(raw);
     if (!entry) return null;
+    if (!connected) return null;
     const key = keyFor(entry);
+    if (pendingOperations.has(key)) return null;
     const previous = entryMap.get(key) || null;
     entryMap.delete(key);
     entries = Array.from(entryMap.values());
     if (removeFn) {
-      Promise.resolve(removeFn(entry)).catch((error) => {
-        if (previous) entryMap.set(key, previous);
-        entries = Array.from(entryMap.values());
-        onFailure?.(error, previous || entry);
+      const operationId = ++operationSequence;
+      const operation = { operationId, key, entry, previous, onFailure };
+      pendingOperations.set(key, operation);
+      Promise.resolve(removeFn(entry)).then(() => {
+        if (pendingOperations.get(key)?.operationId === operationId) pendingOperations.delete(key);
+      }).catch((error) => {
+        if (pendingOperations.get(key)?.operationId !== operationId) return;
+        pendingOperations.delete(key);
+        rollbackOperation(operation, error);
       });
     }
     return entry;
   }
 
   function clearMine() {
+    if (!connected) return Promise.reject(new Error('Room connection is offline. Shared blocks were kept.'));
     return clearMineFn ? Promise.resolve(clearMineFn()) : null;
   }
 
@@ -113,7 +154,14 @@ export function createSharedBlockSync(options = {}) {
   }
 
   function getStatus() {
-    return { enabled: isActive(), roomId, totalCount: entries.length };
+    return {
+      enabled: isActive(),
+      roomId,
+      totalCount: entries.length,
+      connected,
+      pendingCount: pendingOperations.size,
+      detail: connected ? '' : 'Room connection is offline. Reconnect and try again.'
+    };
   }
 
   return {
@@ -124,6 +172,7 @@ export function createSharedBlockSync(options = {}) {
     isActive,
     normalizeEntry,
     remove,
+    setConnected,
     setEntries,
     upsert
   };

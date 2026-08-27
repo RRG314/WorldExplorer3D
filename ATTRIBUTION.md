@@ -1,6 +1,6 @@
 # Attribution
 
-Last reviewed: 2026-08-22 for version 4.3.1.
+Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
 
 This is the concise public attribution index. Asset-level details are in `app/assets/models/ATTRIBUTION.md` and `app/assets/textures/ATTRIBUTION.md`.
 
@@ -34,6 +34,15 @@ This is the concise public attribution index. Asset-level details are in `app/as
 - Open-Meteo weather and marine APIs, subject to provider terms. <https://open-meteo.com/>
 - NOAA Center for Operational Oceanographic Products and Services water-level observations and tide predictions. <https://tidesandcurrents.noaa.gov/>
 - Panoramax and KartaView community street imagery, CC BY-SA 4.0. <https://panoramax.openstreetmap.fr/> and <https://kartaview.org/>
+
+## Regional Ecology References
+
+- GBIF Backbone Taxonomy, GBIF Secretariat, CC BY 4.0, DOI
+  [10.15468/39omei](https://doi.org/10.15468/39omei).
+- [Maryland Department of Natural Resources wildlife and native-plant lists](https://dnr.maryland.gov/wildlife/Pages/plants_wildlife/mdwllists.aspx),
+  used for factual regional review without copied prose or media.
+- [Chesapeake Bay Program Field Guide](https://www.chesapeakebay.net/discover/field-guide),
+  used for factual estuary review without bundled photography.
 
 ## Astronomy And Planetary Assets
 

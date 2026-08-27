@@ -2,7 +2,11 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { updateNightLighting } from "./engine/night-lighting.js?v=7";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=3";
-import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
+import {
+  carSpeedToMph,
+  worldUnitsPerSecondToKnots,
+  worldUnitsPerSecondToMph
+} from "./physics/vehicle-speed-units.js?v=2";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
@@ -550,7 +554,10 @@ function updateHUD() {
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
 
   if (appCtx.boatMode?.active) {
-    const knots = Math.max(0, Math.round(Math.abs(appCtx.boat.speed) * 0.43));
+    const knots = Math.max(0, Math.round(Math.abs(worldUnitsPerSecondToKnots(
+      appCtx.boat.forwardSpeed ?? appCtx.boat.speed,
+      appCtx.METERS_PER_WORLD_UNIT
+    ))));
     const seaLabel = typeof appCtx.boatHudLabel === 'function' ? appCtx.boatHudLabel() : 'Boat Travel';
     const shorelineKnown = appCtx.boatMode.currentWater?.shorelineDistanceKnown !== false;
     const shoreline = shorelineKnown && Number.isFinite(appCtx.boatMode.shorelineDistance) ?
@@ -576,7 +583,7 @@ function updateHUD() {
     const plane = appCtx.planeMode;
     const groundY = appCtx.SurfaceQuery?.terrainAt?.(plane.x, plane.z)?.position?.y ?? 0;
     const altitude = Math.max(0, Math.round(plane.y - groundY));
-    const mph = Math.max(0, Math.round(plane.speed * 2.237));
+    const mph = Math.max(0, Math.round(worldUnitsPerSecondToMph(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
     setHudUnitLabels('MPH', 'ALT');
     document.getElementById('speed').textContent = `${mph}`;
     document.getElementById('speed').classList.toggle('fast', mph > 105);
@@ -611,13 +618,16 @@ function updateHUD() {
     }
 
     const altitudeMeters = Math.max(0, Math.round(appCtx.drone.y - groundY));
-    const altitudeCap = appCtx.onMoon || appCtx.onMars ? 2000 : 400;
-
-    // Drone mode HUD (everyday wording; avoid aviation jargon like AGL).
-    setHudUnitLabels('HEIGHT', 'CEILING');
-    document.getElementById('speed').textContent = `${altitudeMeters}`;
+    const droneSpeedMph = Math.max(0, Math.round(worldUnitsPerSecondToMph(
+      Math.hypot(Number(appCtx.drone.vx) || 0, Number(appCtx.drone.vy) || 0, Number(appCtx.drone.vz) || 0),
+      appCtx.METERS_PER_WORLD_UNIT
+    )));
+    // Keep the primary readout semantically consistent across traversal modes:
+    // speed stays speed, while the secondary value carries height.
+    setHudUnitLabels('MPH', 'HEIGHT');
+    document.getElementById('speed').textContent = `${droneSpeedMph}`;
     document.getElementById('speed').classList.remove('fast');
-    document.getElementById('limit').textContent = `${altitudeCap}`;
+    document.getElementById('limit').textContent = `${altitudeMeters}m`;
     setStreetAndLocation('Drone View', locationName());
     const bf = document.getElementById('boostFill');
     bf.style.width = '0%';

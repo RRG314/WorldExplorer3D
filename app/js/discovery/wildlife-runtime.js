@@ -75,10 +75,10 @@ function compileAmbientWildlifePlan(environment, options = {}) {
       speciesId,
       label: archetype === 'domestic-wanderer'
         ? WILDLIFE_LABELS[speciesId]
-        : `Procedural ${WILDLIFE_LABELS[speciesId].toLowerCase()} encounter`,
+        : `${WILDLIFE_LABELS[speciesId]} field lead`,
       home: Object.freeze(home),
       phase: deterministicUnit(`${seed}:phase`) * Math.PI * 2,
-      evidenceClass: 'procedural-game-encounter',
+      evidenceClass: 'guided-wildlife-encounter',
       supportingEvidence: Object.freeze(['habitat-plausible']),
       companionPolicy: archetype === 'domestic-wanderer' ? 'trust-sequence-required' : 'observe-only'
     }));

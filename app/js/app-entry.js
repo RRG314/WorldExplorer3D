@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=45';
+import './runtime-diagnostics.js?v=52';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=62';
 import './camera-mode.js?v=1';
@@ -24,16 +24,16 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=94';
-import './physics.js?v=111';
-import './walking.js?v=78';
+import { init, tryEnablePostProcessing } from './engine.js?v=95';
+import './physics.js?v=112';
+import './walking.js?v=80';
 import './travel-mode.js?v=21';
 import { initBoatMode } from './boat-mode.js?v=42';
 import './sky.js?v=86';
 import './weather.js?v=10';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=109';
-import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=128';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=8';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=3';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
@@ -48,7 +48,8 @@ import './hud.js?v=95';
 import './map.js?v=60';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=133';
+import { setupUI } from './ui.js?v=136';
+import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -102,7 +103,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'editor', category: 'authoring',
         load: async () => {
-            const mod = await import('./editor/session.js?v=5');
+            const mod = await import('./editor/session.js?v=10');
             mod.initEditorSession?.();
             return mod;
         }
@@ -145,7 +146,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'editor-overlay', category: 'world-content',
         load: async () => {
-            const mod = await import('./editor/public-layer.js?v=5');
+            const mod = await import('./editor/public-layer.js?v=6');
             mod.initEditorPublicLayer?.();
             return mod;
         }
@@ -153,7 +154,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=77');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=83');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
@@ -162,7 +163,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'augmented-reality', category: 'presentation',
         load: async () => {
-            const mod = await import('./ar/session-service.js?v=1');
+            const mod = await import('./ar/session-service.js?v=6');
             mod.initArPlatform?.(appCtx);
             return mod;
         }
@@ -176,7 +177,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=14').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=15').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -326,7 +327,8 @@ function registerLazySubsystemEntrypoints() {
             !_interiorsModulePromise &&
             appCtx.gameStarted === true &&
             walking &&
-            Number(appCtx.buildingEntranceByBuilding?.size || 0) > 0
+            Array.isArray(appCtx.buildings) &&
+            appCtx.buildings.length > 0
         ) {
             void ensureInteriorsReady().then((interiors) => interiors.updateInteriorInteraction?.()).catch((error) => {
                 console.warn('[interior] Proximity runtime failed to initialize:', error);
@@ -590,6 +592,7 @@ function bootApp() {
         return { tryEnablePostProcessing };
     }
     runBootStep('registerLazySubsystemEntrypoints', () => registerLazySubsystemEntrypoints());
+    runBootStep('initAccessibility', () => { appCtx.accessibility = initAccessibility(); });
     runBootStep('setupUI', () => setupUI());
     runBootStep('initBoatMode', () => initBoatMode());
     runBootStep('registerLazyFishingEntrypoints', () => registerLazyFishingEntrypoints());

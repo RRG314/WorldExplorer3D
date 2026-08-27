@@ -40,6 +40,10 @@ const steps = [
     command: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify']
   },
   {
+    name: 'Verify one 5.0 version, commit, artifact, and displayed identity',
+    command: [process.execPath, 'scripts/verification/release-identity.mjs']
+  },
+  {
     name: 'Verify reachable hosting sources',
     command: [process.execPath, 'scripts/audit-hosting-reachability.mjs', '--strict']
   },
@@ -50,6 +54,11 @@ const steps = [
   {
     name: 'Run the complete player journey against the artifact',
     command: [process.execPath, 'scripts/verification/world.mjs'],
+    environment: { WE3D_VERIFY_ROOT: 'dist' }
+  },
+  {
+    name: 'Verify the shared Backpack and equipment through normal player input',
+    command: [process.execPath, 'scripts/verification/urban-equipment.mjs'],
     environment: { WE3D_VERIFY_ROOT: 'dist' }
   },
   {

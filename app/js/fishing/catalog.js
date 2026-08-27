@@ -106,18 +106,21 @@ function weightedPick(entries, random = Math.random) {
   return entries[entries.length - 1]?.species || FISH_SPECIES[0];
 }
 
-function selectSpecies({ waterKind = 'coastal', latitude = 0, random = Math.random } = {}) {
+function selectSpecies({ waterKind = 'coastal', latitude = 0, allowedSpeciesIds = null, random = Math.random } = {}) {
   const normalizedWater = String(waterKind || 'coastal').toLowerCase();
   const lat = Number.isFinite(Number(latitude)) ? Number(latitude) : 0;
-  let candidates = FISH_SPECIES.filter((species) => (
+  const allowed = Array.isArray(allowedSpeciesIds) ? new Set(allowedSpeciesIds.map(String)) : null;
+  const eligible = FISH_SPECIES.filter((species) => !allowed || allowed.has(species.id));
+  let candidates = eligible.filter((species) => (
     species.waterKinds.includes(normalizedWater) &&
     lat >= species.latitude[0] &&
     lat <= species.latitude[1]
   ));
   if (!candidates.length) {
-    candidates = FISH_SPECIES.filter((species) => species.waterKinds.includes(normalizedWater));
+    candidates = eligible.filter((species) => species.waterKinds.includes(normalizedWater));
   }
-  if (!candidates.length) candidates = FISH_SPECIES.slice();
+  if (!candidates.length && !allowed) candidates = FISH_SPECIES.slice();
+  if (!candidates.length) return null;
   return weightedPick(candidates.map((species) => ({
     species,
     weight: RARITY[species.rarity].weight * (0.82 + random() * 0.36)
@@ -127,6 +130,7 @@ function selectSpecies({ waterKind = 'coastal', latitude = 0, random = Math.rand
 function generateFish(options = {}) {
   const random = typeof options.random === 'function' ? options.random : Math.random;
   const species = selectSpecies({ ...options, random });
+  if (!species) return null;
   const sizeRoll = Math.pow(random(), 1.65);
   const lengthCm = species.length[0] + (species.length[1] - species.length[0]) * sizeRoll;
   const conditionRoll = 0.88 + random() * 0.24;

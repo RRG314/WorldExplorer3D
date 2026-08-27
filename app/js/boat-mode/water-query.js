@@ -298,11 +298,14 @@ function getReferencePosition() {
     };
   }
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) {
+    const walker = appCtx.Walk.state.walker;
+    const resolvedSurfaceY = Number(walker._resolvedGroundState?.effectiveGroundY);
     return {
-      x: appCtx.Walk.state.walker.x,
-      y: appCtx.Walk.state.walker.y,
-      z: appCtx.Walk.state.walker.z,
-      angle: Number.isFinite(appCtx.Walk.state.walker.angle) ? appCtx.Walk.state.walker.angle : appCtx.Walk.state.walker.yaw || 0,
+      x: walker.x,
+      // Water reachability compares surfaces, not the walker's eye/body origin.
+      y: Number.isFinite(resolvedSurfaceY) ? resolvedSurfaceY : Number(walker.y) - 1.7,
+      z: walker.z,
+      angle: Number.isFinite(walker.angle) ? walker.angle : walker.yaw || 0,
       mode: 'walk'
     };
   }

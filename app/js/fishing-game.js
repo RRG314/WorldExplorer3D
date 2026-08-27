@@ -1,9 +1,10 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { fishMetricText, generateFish } from './fishing/catalog.js?v=2';
+import { fishMetricText } from './fishing/catalog.js?v=2';
 import { normalizeDepthEvidence } from './geospatial/bathymetry-evidence.js?v=1';
-import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=4';
+import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=5';
 import { getScreenLayoutService } from './ui/screen-layout.js?v=1';
-import { evaluateShoreFishing } from './fishing/shore-authority.js?v=1';
+import { evaluateShoreFishing } from './fishing/shore-authority.js?v=2';
+import { createFishPopulationContext, selectFishFromPopulation } from './fishing/population-authority.js?v=2';
 
 const CATCH_STORAGE_KEY = 'worldExplorer3D.fishing.catches.v1';
 const MAX_SAVED_CATCHES = 60;
@@ -37,7 +38,11 @@ const state = {
   pointerStartY: 0,
   accessMode: null,
   accessContext: null,
-  accessCheckTimer: 0
+  populationContext: null,
+  accessCheckTimer: 0,
+  attemptSequence: 0,
+  attempt: null,
+  lastOutcome: null
 };
 
 const refs = {};
@@ -95,6 +100,36 @@ function currentBathymetryEvidence() {
   return normalizeDepthEvidence(location?.surfaceEvidence?.bathymetry);
 }
 
+function boatPopulationContext() {
+  const candidate = appCtx.boatMode?.currentWater || appCtx.boatMode?.candidate || {};
+  const source = candidate.source || candidate;
+  const synthetic = candidate.synthetic === true || source.synthetic === true;
+  const geo = currentGeo();
+  const bathymetry = currentBathymetryEvidence();
+  const waterKind = String(candidate.waterKind || appCtx.boatMode?.waterKind || 'water');
+  const sourceDataset = String(
+    source.provenance?.dataset || source.registryProvenance?.geometrySource || source.geometrySource ||
+    (synthetic ? 'synthetic-transition' : 'published-water-registry')
+  );
+  const locationKey = String(appCtx.selLoc || 'custom-water');
+  const waterbodyId = String(
+    source.registryId || source.sourceFeatureId || source.id ||
+    `${synthetic ? 'synthetic' : 'mapped'}:${locationKey}:${waterKind}`
+  );
+  return createFishPopulationContext({
+    accessMode: 'boat',
+    waterbodyId,
+    waterKind,
+    waterLabel: candidate.label || source.name || waterKind,
+    sourceDataset,
+    sourceTruth: synthetic ? 'synthetic-transition' : 'published-water-surface',
+    latitude: geo.lat,
+    longitude: geo.lon,
+    depthTruth: bathymetry.truthType,
+    depthMeters: bathymetry.depthMeters
+  });
+}
+
 function boatSpeed() {
   if (state.accessMode === 'shore') return 0;
   return Math.abs(Number(appCtx.boat?.forwardSpeed ?? appCtx.boat?.speed) || 0);
@@ -117,6 +152,7 @@ function stageGestureLabel() {
   if (state.stage === 'waiting') return 'WATCH THE LINE';
   if (state.stage === 'fighting') return 'DRAG TO STEER · HOLD TO REEL';
   if (state.stage === 'landed') return 'CATCH LANDED';
+  if (state.stage === 'lost') return 'TRY ANOTHER CAST';
   return 'TAP WATER TO CAST';
 }
 
@@ -131,6 +167,46 @@ function setStage(stage, message, duration = 0) {
   state.lastUiAt = 0;
 }
 
+function beginFishingAttempt() {
+  state.attemptSequence += 1;
+  const startedAt = new Date().toISOString();
+  state.attempt = Object.freeze({
+    attemptId: `fishing-attempt:${Date.now().toString(36)}:${state.attemptSequence}`,
+    startedAt,
+    accessMode: state.accessMode || 'unknown',
+    fishingAuthorityVersion: state.populationContext?.authorityVersion || null,
+    populationContextId: state.populationContext?.contextId || null,
+    waterbodyId: state.populationContext?.waterbody?.id || state.accessContext?.waterbodyId || null
+  });
+  return state.attempt;
+}
+
+function publishFishingOutcome(status, reason, fish = state.fish) {
+  const attempt = state.attempt;
+  const outcome = Object.freeze({
+    type: 'FishingOutcome',
+    schemaVersion: 1,
+    outcomeId: `${attempt?.attemptId || `fishing-attempt:${Date.now().toString(36)}:untracked`}:${status}`,
+    attemptId: attempt?.attemptId || null,
+    status: String(status || 'cancelled'),
+    reason: String(reason || ''),
+    startedAt: attempt?.startedAt || null,
+    completedAt: new Date().toISOString(),
+    accessMode: attempt?.accessMode || state.accessMode || 'unknown',
+    fishingAuthorityVersion: attempt?.fishingAuthorityVersion || state.populationContext?.authorityVersion || null,
+    populationContextId: attempt?.populationContextId || state.populationContext?.contextId || null,
+    waterbodyId: attempt?.waterbodyId || state.populationContext?.waterbody?.id || state.accessContext?.waterbodyId || null,
+    fishSpeciesId: fish?.speciesId || null,
+    recordedCatch: status === 'landed',
+    rewardEligible: status === 'landed' && state.accessContext?.rewardEligible !== false,
+    livePresenceClaim: false
+  });
+  state.lastOutcome = outcome;
+  state.attempt = null;
+  globalThis.dispatchEvent?.(new CustomEvent('we3d-fishing-outcome', { detail: outcome }));
+  return outcome;
+}
+
 function stopFight(reason = 'Fishing ended.') {
   state.active = false;
   state.reeling = false;
@@ -139,6 +215,33 @@ function stopFight(reason = 'Fishing ended.') {
   state.currentBurst = 0;
   state.burstTimer = 0;
   if (['casting', 'waiting', 'bite', 'fighting'].includes(state.stage)) setStage('lost', reason);
+  clearFishingScene();
+}
+
+function cancelFishingAttempt(reason = 'Fishing session ended.') {
+  if (state.attempt) publishFishingOutcome('cancelled', reason);
+  stopFight(reason);
+}
+
+function resetFishingInteraction() {
+  state.active = false;
+  state.stage = 'idle';
+  state.stageTimer = 0;
+  state.fish = null;
+  state.fishStamina = 1;
+  state.lineTension = 0;
+  state.lineIntegrity = 1;
+  state.reelProgress = 0;
+  state.reeling = false;
+  state.givingLine = false;
+  state.rodDirection = 0;
+  state.currentBurst = 0;
+  state.burstTimer = 0;
+  state.nextBurstAt = 0;
+  state.slackTimer = 0;
+  state.fightElapsed = 0;
+  state.maxTension = 0;
+  state.attempt = null;
   clearFishingScene();
 }
 
@@ -166,6 +269,7 @@ function startCast() {
   state.slackTimer = 0;
   state.maxTension = 0;
   state.rodDirection = 0;
+  beginFishingAttempt();
   setStage('casting', 'CASTING', 0.9);
   return true;
 }
@@ -173,14 +277,19 @@ function startCast() {
 function prepareBite() {
   const geo = currentGeo();
   const bathymetry = currentBathymetryEvidence();
+  const generated = selectFishFromPopulation(state.populationContext, {
+    recentCatches: state.catches,
+    random: Math.random
+  });
+  if (!generated) {
+    cancelFishingAttempt('NO SUPPORTED VIRTUAL CATCH POOL');
+    return false;
+  }
   state.fish = {
-    ...generateFish({
-    waterKind: state.accessContext?.waterKind || appCtx.boatMode?.waterKind || 'coastal',
-    latitude: geo.lat
-    }),
+    ...generated,
     occurrenceTruth: 'simulated-gameplay-event',
     habitatBasis: {
-      model: 'water-kind-latitude-v1',
+      model: state.populationContext?.evidence?.candidatePoolBasis || 'we3d-game-catalog-water-kind-latitude-access-v2',
       waterKind: String(state.accessContext?.waterKind || appCtx.boatMode?.waterKind || 'water'),
       latitude: Number(geo.lat.toFixed(6)),
       bathymetryTruth: bathymetry.truthType,
@@ -221,6 +330,7 @@ function beginBurst() {
 
 function loseFish(reason) {
   state.lineIntegrity = clamp(state.lineIntegrity);
+  publishFishingOutcome('lost', reason);
   stopFight(reason);
 }
 
@@ -238,14 +348,18 @@ function catchFish() {
     lineIntegrityPct: Math.round(state.lineIntegrity * 100),
     maxTensionPct: Math.round(state.maxTension * 100),
     waterKind: String(state.accessContext?.waterKind || appCtx.boatMode?.waterKind || 'water'),
+    waterClass: state.populationContext?.waterbody?.waterClass || 'unresolved',
     accessMode: state.accessMode || 'boat',
-    waterbodyId: state.accessContext?.waterbodyId || null,
+    waterbodyId: state.populationContext?.waterbody?.id || state.accessContext?.waterbodyId || null,
+    waterSourceTruth: state.populationContext?.waterbody?.sourceTruth || 'unresolved',
+    depthTruth: state.populationContext?.environment?.depthTruth || 'unavailable',
     accessTruth: state.accessContext?.accessTruth || (state.accessMode === 'boat' ? 'boat-water-authority' : 'unknown'),
+    bankEvidence: state.accessMode === 'shore' ? state.accessContext?.bankEvidence || null : null,
     locationRewardEligible: state.accessContext?.rewardEligible !== false,
     location: currentLocationLabel(),
-    lat: Number(geo.lat.toFixed(state.accessMode === 'shore' ? 3 : 6)),
-    lon: Number(geo.lon.toFixed(state.accessMode === 'shore' ? 3 : 6)),
-    locationPrecision: state.accessMode === 'shore' ? 'generalized-100m' : 'legacy-boat-point',
+    lat: Number(geo.lat.toFixed(3)),
+    lon: Number(geo.lon.toFixed(3)),
+    locationPrecision: 'generalized-100m',
     caughtAt: new Date().toISOString()
   };
   state.fish = entry;
@@ -255,6 +369,7 @@ function catchFish() {
   state.active = false;
   state.reeling = false;
   state.givingLine = false;
+  publishFishingOutcome('landed', 'LANDED', entry);
   setStage('landed', 'LANDED');
   void appCtx.submitFishingScore?.(entry);
   globalThis.dispatchEvent?.(new CustomEvent('we3d-fishing-catch', { detail: entry }));
@@ -429,7 +544,10 @@ function renderUi(force = false) {
   }
   if (refs.gestureLabel) refs.gestureLabel.textContent = stageGestureLabel();
   if (refs.fishName) refs.fishName.textContent = state.fish?.species || (state.stage === 'waiting' ? 'Line in water' : 'Open water');
-  if (refs.fishMeta) refs.fishMeta.textContent = state.fish && ['landed', 'lost'].includes(state.stage) ? `${state.fish.rarityLabel} · ${fishMetricText(state.fish)}` : '';
+  if (refs.fishMeta) refs.fishMeta.textContent = state.fish
+    ? `${state.stage === 'landed' ? 'Virtual catch' : 'Virtual fish'} · ${state.fish.rarityLabel}` +
+      `${state.stage === 'landed' ? ` · ${fishMetricText(state.fish)}` : state.stage === 'lost' ? ' · Not recorded' : ''}`
+    : '';
   meter(refs.tensionFill, state.lineTension, state.lineTension > 0.84 || state.lineTension < 0.14 && state.stage === 'fighting');
   meter(refs.staminaFill, 1 - state.fishStamina);
   meter(refs.integrityFill, state.lineIntegrity, state.lineIntegrity < 0.35);
@@ -465,8 +583,23 @@ function renderUi(force = false) {
 
 function openFishingGame() {
   if (appCtx.boatMode?.active) {
+    const populationContext = boatPopulationContext();
+    if (!populationContext.playable) {
+      appCtx.showToast?.('This water does not yet have a supported virtual catch pool.');
+      state.accessMode = null;
+      state.accessContext = null;
+      state.populationContext = populationContext;
+      return false;
+    }
     state.accessMode = 'boat';
-    state.accessContext = Object.freeze({ waterKind: appCtx.boatMode?.waterKind || 'water', rewardEligible: true, accessTruth: 'boat-water-authority' });
+    state.populationContext = populationContext;
+    state.accessContext = Object.freeze({
+      waterKind: populationContext.waterbody.waterKind,
+      waterbodyId: populationContext.waterbody.id,
+      sourceDataset: populationContext.waterbody.sourceDataset,
+      rewardEligible: populationContext.waterbody.sourceTruth !== 'synthetic-transition',
+      accessTruth: populationContext.waterbody.sourceTruth
+    });
   } else {
     const walker = appCtx.Walk?.state?.mode === 'walk' ? appCtx.Walk.state.walker : null;
     const shore = evaluateShoreFishing(appCtx, walker);
@@ -478,6 +611,7 @@ function openFishingGame() {
     }
     state.accessMode = 'shore';
     state.accessContext = shore;
+    state.populationContext = shore.populationContext;
   }
   appCtx.toggleWorldDiscoveryJournal?.(false);
   appCtx.toggleUrbanEquipment?.(false);
@@ -494,12 +628,14 @@ function openFishingGame() {
 }
 
 function closeFishingGame() {
-  if (['casting', 'waiting', 'bite', 'fighting'].includes(state.stage)) stopFight('Fishing session ended.');
+  if (['casting', 'waiting', 'bite', 'fighting'].includes(state.stage)) cancelFishingAttempt('Fishing session ended.');
   state.open = false;
   if (Number.isFinite(state.cameraModeBeforeOpen)) appCtx.setCameraMode?.(state.cameraModeBeforeOpen);
   state.cameraModeBeforeOpen = null;
   state.accessMode = null;
   state.accessContext = null;
+  state.populationContext = null;
+  resetFishingInteraction();
   appCtx.screenLayout ||= getScreenLayoutService();
   appCtx.screenLayout.setActivityLayer('fishing', false);
   renderUi(true);
@@ -510,7 +646,7 @@ function updateFishingGame(dt) {
   const delta = clamp(dt, 0, 0.1);
   if (!appCtx.boatMode?.active && state.accessMode !== 'shore' && (state.open || state.active)) {
     state.open = false;
-    stopFight('Fishing requires an eligible shore or surface boat.');
+    cancelFishingAttempt('Fishing requires an eligible shore or surface boat.');
   }
   if (state.accessMode === 'shore' && state.open) {
     state.accessCheckTimer -= delta;
@@ -518,8 +654,9 @@ function updateFishingGame(dt) {
       state.accessCheckTimer = 1;
       const shore = evaluateShoreFishing(appCtx, appCtx.Walk?.state?.walker);
       state.accessContext = shore;
+      state.populationContext = shore.populationContext || null;
       if (!shore.playable) {
-        stopFight(shore.message);
+        cancelFishingAttempt(shore.message);
         state.open = false;
         appCtx.screenLayout?.setActivityLayer?.('fishing', false);
         appCtx.showToast?.(shore.message);
@@ -687,6 +824,16 @@ function getFishingSnapshot() {
       behavior: state.fish.behavior,
       measurementTruth: state.fish.measurementTruth,
       occurrenceTruth: state.fish.occurrenceTruth,
+      fishingAuthorityVersion: state.fish.fishingAuthorityVersion,
+      populationContextId: state.fish.populationContextId,
+      populationEvidence: state.fish.populationEvidence,
+      livePresenceClaim: state.fish.livePresenceClaim,
+      waterClass: state.fish.waterClass,
+      waterSourceTruth: state.fish.waterSourceTruth,
+      depthTruth: state.fish.depthTruth,
+      locationPrecision: state.fish.locationPrecision,
+      lat: state.fish.lat,
+      lon: state.fish.lon,
       habitatBasis: state.fish.habitatBasis,
       score: state.fish.score || state.fish.baseScore
     } : null,
@@ -703,6 +850,9 @@ function getFishingSnapshot() {
     boatSpeed: boatSpeed(),
     accessMode: state.accessMode,
     accessContext: state.accessContext,
+    populationContext: state.populationContext,
+    attempt: state.attempt,
+    lastOutcome: state.lastOutcome,
     visualMode: state.accessMode === 'shore' ? 'shore-screen-and-world' : 'in-world-boat',
     controls: state.stage === 'fighting' ? 'drag horizontally to steer; hold/drag up to reel; drag down to give line' : 'tap water or E to cast/set hook'
   };

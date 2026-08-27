@@ -1,30 +1,100 @@
 {
-  "schemaVersion": 2,
-  "programId": "current-product-completion-2026-08-22",
-  "productBaseline": {
+  "schemaVersion": 3,
+  "programId": "world-explorer-5.0-minimum-2026-08-25",
+  "targetVersion": "5.0.0",
+  "productionBaseline": {
     "version": "4.3.1",
-    "releaseCommit": "af540b39fc80ba01998d48a2739d982fd8b913c1"
+    "releaseCommit": "1611d666f8c469c573ad184128b019a7f1e3f961"
   },
   "roadmap": "ROADMAP.md",
-  "productionRequired": true,
-  "statusDefinitions": [
-    "complete",
-    "in-progress",
-    "partial",
-    "not-implemented"
-  ],
-  "workstreams": {
-    "CP0CurrentFeatureEvidence": "in-progress",
-    "CP1DeterministicFixedWorld": "in-progress",
-    "CP2WorldwideTransport": "in-progress",
-    "CP3BuildingsFacadesInteriors": "in-progress",
-    "CP4PlayerBackpackJournalControls": "partial",
-    "CP5UrbanSandboxCompletion": "partial",
-    "CP6MissionsCraftingEconomyEngagement": "not-implemented",
-    "CP7WaterOceanFishingEvidence": "partial",
-    "CP8MultiplayerCreatorPublishing": "partial",
-    "CP9PerformanceMemoryDataUse": "partial",
-    "CP10UiAccessibilityPresentationRelease": "partial"
-  },
-  "requiredCompleteStatus": "complete"
+  "acceptanceContract": "RELEASE_NOTES_5.0.0.md",
+  "deploymentRequiresExplicitUserApproval": true,
+  "requiredCompleteStatus": "complete",
+  "statusDefinitions": ["complete", "in-progress", "partial", "not-implemented"],
+  "checkpoints": {
+    "CP0": {
+      "name": "Current feature evidence",
+      "status": "complete",
+      "minimumDecision": "Retain only public feature claims backed by a fresh normal-input journey on the immutable 5.0 candidate.",
+      "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:5.0-claims"],
+      "openItems": []
+    },
+    "CP1": {
+      "name": "Deterministic fixed world",
+      "status": "complete",
+      "minimumDecision": "Retain the production fixed-location Earth authority with deterministic Shortbread transport, optional exact Overpass gap-fill, and explicit forced-outage evidence at the representative release locations.",
+      "requiredCommands": ["verify:world", "verify:assembled-locations", "verify:assembled-locations-fallback", "verify:provider-release"],
+      "openItems": []
+    },
+    "CP2": {
+      "name": "Worldwide transport and vehicle contact",
+      "status": "complete",
+      "minimumDecision": "Retain the compiled road/bridge/tunnel authority, reviewed bridge spans over mapped water, mapped share-link road identity, and measured four-wheel vehicle contact without claiming geometry beyond published provider data.",
+      "requiredCommands": ["verify:assembled-locations", "verify:actors-vehicles", "verify:jfx-player-surface"],
+      "openItems": []
+    },
+    "CP3": {
+      "name": "Buildings, facades, entrances, and interiors",
+      "status": "complete",
+      "minimumDecision": "Ship mapped indoor geometry on each available source level and generated fallback floors with working stairs, elevator, collision, keyboard/touch entry, exit recovery, and reload teardown. Explicit mapped connector semantics and moderated indoor overlay publication remain staged beyond the minimum 5.0 and are not public claims.",
+      "requiredCommands": ["verify:world", "verify:assembled-locations", "verify:interiors"],
+      "openItems": []
+    },
+    "CP4": {
+      "name": "Player, Backpack, Journal, progression, and controls",
+      "status": "complete",
+      "minimumDecision": "Ship one versioned local/account reconciliation contract for Backpack rewards, Journal, Field Guide, and progression; retain the tested Standard/Southpaw touch profiles with reset and reload recovery. Full per-action remapping, gamepad profiles, and editor/AR-specific bindings remain staged and are not minimum-5.0 claims.",
+      "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui"],
+      "openItems": []
+    },
+    "CP5": {
+      "name": "Urban Sandbox",
+      "status": "complete",
+      "minimumDecision": "Ship the retained equipment, vehicle, responder, custody, mapped-facility, and room-authority journeys proven by normal input. Universal full-body embodiment and broader sandbox simulation remain staged and are not minimum-5.0 claims.",
+      "requiredCommands": ["verify:urban-sandbox", "verify:urban-equipment", "verify:actors-vehicles", "verify:multiplayer"],
+      "openItems": []
+    },
+    "CP6": {
+      "name": "Missions, engagement, crafting, and economy",
+      "status": "complete",
+      "minimumDecision": "The minimum 5.0 retains Field Today, daily/weekly Expeditions, seasonal surveys, progression, and existing games. Crafting, currency, and a reward-grade unified economy are excluded and must not be publicly claimed.",
+      "requiredCommands": ["verify:mission-lifecycle", "verify:retention-release", "verify:field-retention-ui", "audit:5.0-claims"],
+      "openItems": []
+    },
+    "CP7": {
+      "name": "Live GPS Field Expeditions and regional ecology",
+      "status": "complete",
+      "minimumDecision": "Ship the reviewed Baltimore 60-taxon regional slice and honest virtual field leads; make no worldwide ecology or live-animal-presence claim.",
+      "requiredCommands": ["verify:live-gps-authority", "verify:live-gps", "verify:walking-encounters", "verify:regional-ecology", "verify:field-evidence", "verify:game-language", "verify:field-retention-ui", "verify:creature-quality"],
+      "openItems": []
+    },
+    "CP8": {
+      "name": "Water, Ocean, fishing, and environmental evidence",
+      "status": "complete",
+      "minimumDecision": "Ship one honest shore/boat virtual fishing authority; connect underwater schools before describing water fish as unified.",
+      "requiredCommands": ["verify:fish-population", "verify:shore-fishing", "verify:unified-fishing", "verify:fishing-loss-recovery", "verify:underwater-fish", "verify:environments"],
+      "openItems": []
+    },
+    "CP9": {
+      "name": "Multiplayer and creator publishing",
+      "status": "complete",
+      "minimumDecision": "Retain authenticated rooms, one public World Editor containing reviewed semantic overlays and persistent local/room Blocks, and explicitly device-local activity creation. Do not expose Blocks as a competing top-level editor or claim public activity publishing.",
+      "requiredCommands": ["verify:multiplayer", "verify:creator-flow", "verify:block-local-store", "verify:block-shared-sync", "verify:world-editor-blocks-desktop", "verify:world-editor-blocks-mobile", "verify:world-editor-blocks-vehicle", "verify:world-editor-blocks-room"],
+      "openItems": []
+    },
+    "CP10": {
+      "name": "Performance, memory, and data use",
+      "status": "complete",
+      "minimumDecision": "Enforce numeric budgets on the physical Apple M1/8 GB desktop and a clearly labeled 390x844 Chrome touch-regression tier; do not claim physical-phone battery, thermal, or sustained FPS evidence until a phone is measured.",
+      "requiredCommands": ["verify:performance-retention", "verify:assembled-locations", "verify:environments"],
+      "openItems": []
+    },
+    "CP11": {
+      "name": "UI, accessibility, presentation, and release identity",
+      "status": "in-progress",
+      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.0 identity.",
+      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:5.0-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
+      "openItems": ["Build the clean 5.0 staging version, run the current release boundary, inspect its final desktop/mobile frames, and obtain owner approval before production."]
+    }
+  }
 }

@@ -1,7 +1,11 @@
+import { createFishPopulationContext } from './population-authority.js?v=2';
+
 const SHORE_FISHING_POLICY = Object.freeze({
   maximumBankDistanceMeters: 42,
   maximumCastCorridorMeters: 48,
-  corridorSamples: 7
+  corridorSamples: 7,
+  standingSampleRadiusMeters: 1.5,
+  maximumModeledSlopeRatio: 0.6
 });
 
 function sourceTags(candidate) {
@@ -22,13 +26,24 @@ function explicitFishingAccess(tags = {}) {
   return ['yes', 'designated', 'catch_and_release', 'permit'].includes(fishing) || leisure === 'fishing';
 }
 
+function sampleModeledSurfaceY(appCtx, x, z, fallback = NaN) {
+  const direct = Number(appCtx?.sampleSurfaceY?.(x, z));
+  if (Number.isFinite(direct)) return direct;
+  const walk = Number(appCtx?.SurfaceQuery?.walkAt?.(x, z, { currentY: fallback })?.position?.y);
+  if (Number.isFinite(walk)) return walk;
+  const terrain = Number(appCtx?.terrainMeshHeightAt?.(x, z));
+  if (Number.isFinite(terrain)) return terrain;
+  const elevation = Number(appCtx?.elevationWorldYAtWorldXZ?.(x, z));
+  return Number.isFinite(elevation) ? elevation : Number(fallback);
+}
+
 function corridorBlocked(appCtx, position, target) {
   if (typeof appCtx?.checkBuildingCollision !== 'function') return false;
   for (let index = 1; index < SHORE_FISHING_POLICY.corridorSamples; index += 1) {
     const amount = index / SHORE_FISHING_POLICY.corridorSamples;
     const x = position.x + (target.x - position.x) * amount;
     const z = position.z + (target.z - position.z) * amount;
-    const surfaceY = appCtx.sampleSurfaceY?.(x, z) ?? position.y ?? 0;
+    const surfaceY = sampleModeledSurfaceY(appCtx, x, z, position.y ?? 0);
     const result = appCtx.checkBuildingCollision(x, z, 0.75, {
       actorBaseY: Number(surfaceY) || 0,
       actorHeight: 2.1
@@ -36,6 +51,51 @@ function corridorBlocked(appCtx, position, target) {
     if (result?.collision === true) return true;
   }
   return false;
+}
+
+function evaluateModeledBank(appCtx, position, target) {
+  if (typeof appCtx?.sampleSurfaceY !== 'function' &&
+      typeof appCtx?.SurfaceQuery?.walkAt !== 'function' &&
+      typeof appCtx?.terrainMeshHeightAt !== 'function' &&
+      typeof appCtx?.elevationWorldYAtWorldXZ !== 'function') {
+    return Object.freeze({
+      stableStandingSurface: false,
+      modeledSlopeRatio: null,
+      castCorridorClear: false,
+      recoverableExit: false,
+      accessibilityClaim: false,
+      reason: 'surface-sampler-unavailable'
+    });
+  }
+  const radius = SHORE_FISHING_POLICY.standingSampleRadiusMeters;
+  const centerY = sampleModeledSurfaceY(appCtx, position.x, position.z, position.y);
+  const samples = [
+    [position.x + radius, position.z], [position.x - radius, position.z],
+    [position.x, position.z + radius], [position.x, position.z - radius]
+  ].map(([x, z]) => sampleModeledSurfaceY(appCtx, x, z, centerY));
+  const stableStandingSurface = Number.isFinite(centerY) && samples.every(Number.isFinite);
+  const modeledSlopeRatio = stableStandingSurface
+    ? Math.max(...samples.map((height) => Math.abs(height - centerY))) / radius
+    : null;
+  const castCorridorClear = Number.isFinite(target?.x) && Number.isFinite(target?.z) && !corridorBlocked(appCtx, position, target);
+  const awayX = Number.isFinite(target?.x) ? position.x + (position.x - target.x) * 0.12 : position.x;
+  const awayZ = Number.isFinite(target?.z) ? position.z + (position.z - target.z) * 0.12 : position.z;
+  const exitY = sampleModeledSurfaceY(appCtx, awayX, awayZ, centerY);
+  const recoverableExit = stableStandingSurface && Number.isFinite(exitY) &&
+    Math.abs(exitY - centerY) <= radius * SHORE_FISHING_POLICY.maximumModeledSlopeRatio &&
+    !corridorBlocked(appCtx, position, { x: awayX, z: awayZ });
+  return Object.freeze({
+    stableStandingSurface,
+    modeledSlopeRatio: Number.isFinite(modeledSlopeRatio) ? Number(modeledSlopeRatio.toFixed(3)) : null,
+    castCorridorClear,
+    recoverableExit,
+    accessibilityClaim: false,
+    realWorldSafetyClaim: false,
+    reason: !stableStandingSurface ? 'unstable-or-unavailable-modeled-surface'
+      : modeledSlopeRatio > SHORE_FISHING_POLICY.maximumModeledSlopeRatio ? 'modeled-bank-too-steep'
+        : !castCorridorClear ? 'cast-corridor-blocked'
+          : !recoverableExit ? 'modeled-exit-unavailable' : 'modeled-bank-evidence-eligible'
+  });
 }
 
 function messageForOutcome(outcome, distanceMeters = null) {
@@ -82,8 +142,14 @@ function evaluateShoreFishing(appCtx, position = {}, options = {}) {
     });
   }
   const target = candidate.entryPoint || { x: candidate.spawnX, z: candidate.spawnZ };
-  if (!Number.isFinite(target?.x) || !Number.isFinite(target?.z) || corridorBlocked(appCtx, effectivePosition, target)) {
-    return Object.freeze({ outcome: 'no_safe_bank', playable: false, rewardEligible: false, distanceMeters, message: 'A mapped structure blocks the cast corridor from this bank.' });
+  const bankEvidence = evaluateModeledBank(appCtx, effectivePosition, target);
+  if (!bankEvidence.stableStandingSurface ||
+      Number(bankEvidence.modeledSlopeRatio) > SHORE_FISHING_POLICY.maximumModeledSlopeRatio ||
+      !bankEvidence.castCorridorClear || !bankEvidence.recoverableExit) {
+    return Object.freeze({
+      outcome: 'no_safe_bank', playable: false, rewardEligible: false, distanceMeters, bankEvidence,
+      message: 'This position does not have a complete modeled standing, cast-corridor, and return-path contract. Choose another bank.'
+    });
   }
   const tags = sourceTags(candidate);
   const restriction = restrictedOutcome(tags);
@@ -97,17 +163,41 @@ function evaluateShoreFishing(appCtx, position = {}, options = {}) {
     });
   }
   const outcome = explicitFishingAccess(tags) ? 'shore_eligible' : 'access_unknown';
+  const waterbodyId = String(candidate.source?.registryId || candidate.source?.sourceFeatureId || candidate.source?.id || 'mapped-water');
+  const waterKind = String(candidate.waterKind || 'water');
+  const sourceDataset = String(candidate.source?.provenance?.dataset || candidate.source?.registryProvenance?.geometrySource || 'mapped-water');
+  const geo = appCtx.worldToLatLon?.(effectivePosition.x, effectivePosition.z) || {};
+  const populationContext = createFishPopulationContext({
+    accessMode: 'shore',
+    waterbodyId,
+    waterKind,
+    waterLabel: String(candidate.label || candidate.waterKind || 'Mapped water'),
+    sourceDataset,
+    sourceTruth: 'published-water-surface',
+    latitude: geo.lat ?? appCtx.LOC?.lat,
+    longitude: geo.lon ?? appCtx.LOC?.lon,
+    depthTruth: 'bank-cast-depth-unavailable'
+  });
+  if (!populationContext.playable) {
+    return Object.freeze({
+      outcome: 'no_fish_pool', playable: false, rewardEligible: false, distanceMeters,
+      waterbodyId, waterKind, sourceDataset,
+      message: 'This mapped water does not yet have a supported virtual catch pool.'
+    });
+  }
   return Object.freeze({
     type: 'ShoreFishingEligibility', schemaVersion: 1, outcome,
     playable: true,
     rewardEligible: outcome === 'shore_eligible',
     accessTruth: outcome === 'shore_eligible' ? 'mapped-explicit' : 'data-insufficient',
-    waterbodyId: String(candidate.source?.registryId || candidate.source?.sourceFeatureId || candidate.source?.id || 'mapped-water'),
-    waterKind: String(candidate.waterKind || 'water'),
+    waterbodyId,
+    waterKind,
     waterLabel: String(candidate.label || candidate.waterKind || 'Mapped water'),
     distanceMeters: Number(distanceMeters.toFixed(1)),
     castTarget: Object.freeze({ x: Number(target.x), z: Number(target.z) }),
-    sourceDataset: String(candidate.source?.provenance?.dataset || candidate.source?.registryProvenance?.geometrySource || 'mapped-water'),
+    sourceDataset,
+    populationContext,
+    bankEvidence,
     message: messageForOutcome(outcome, distanceMeters)
   });
 }

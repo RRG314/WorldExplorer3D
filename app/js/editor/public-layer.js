@@ -26,6 +26,46 @@ function finiteNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function hashIdentityTokens(tokens = []) {
+  let hash = 2166136261;
+  tokens.slice().sort().forEach((token) => {
+    const value = String(token || '');
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+  });
+  return hash.toString(16).padStart(8, '0');
+}
+
+function providerRecordToken(record = {}, kind = '') {
+  const points = Array.isArray(record.pts) ? record.pts : [];
+  const first = points[0] || {};
+  const last = points[points.length - 1] || {};
+  const identity = record.sourceFeatureId || record.sourceBuildingId || record.id || '';
+  return [
+    kind,
+    identity,
+    record.type || record.buildingType || '',
+    points.length,
+    finiteNumber(first.x, 0).toFixed(2),
+    finiteNumber(first.z, 0).toFixed(2),
+    finiteNumber(last.x, 0).toFixed(2),
+    finiteNumber(last.z, 0).toFixed(2)
+  ].join(':');
+}
+
+function providerBaseIdentity() {
+  const roads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
+  const buildings = Array.isArray(appCtx.buildings) ? appCtx.buildings : [];
+  return {
+    roadCount: roads.length,
+    buildingCount: buildings.length,
+    roadIdentityHash: hashIdentityTokens(roads.map((entry) => providerRecordToken(entry, 'road'))),
+    buildingIdentityHash: hashIdentityTokens(buildings.map((entry) => providerRecordToken(entry, 'building')))
+  };
+}
+
 function shouldShowOverlayRuntime() {
   return appCtx.gameStarted === true && overlayBackendReady() && !appCtx.onMoon;
 }
@@ -310,6 +350,12 @@ function getApprovedEditorContributionSnapshot() {
     runtimeLinearCount: Array.isArray(appCtx.overlayRuntimeLinearFeatures) ? appCtx.overlayRuntimeLinearFeatures.length : 0,
     runtimePoiCount: Array.isArray(appCtx.overlayRuntimePois) ? appCtx.overlayRuntimePois.length : 0,
     runtimeBuildingCount: Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders.length : 0,
+    featureIds: (Array.isArray(appCtx.overlayPublishedFeatures) ? appCtx.overlayPublishedFeatures : [])
+      .map((feature) => String(feature?.featureId || ''))
+      .filter(Boolean),
+    renderedObjectCount: state.group?.children?.length || 0,
+    groupAttached: state.group?.parent === appCtx.scene,
+    providerBaseIdentity: providerBaseIdentity(),
     visible: syncApprovedEditorContributionVisibility()
   };
 }

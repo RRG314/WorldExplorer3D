@@ -7,7 +7,7 @@ function facilityType(poi = {}) {
   const type = String(poi.type || '').toLowerCase();
   const category = String(poi.category || '').toLowerCase();
   if (type === 'amenity=police' || type === 'police' || category === 'police') return 'police';
-  if (type === 'amenity=hospital' || type === 'hospital' || category === 'healthcare') return 'hospital';
+  if (type === 'amenity=hospital' || type === 'hospital' || category === 'hospital') return 'hospital';
   return '';
 }
 
@@ -29,6 +29,14 @@ function nearestMappedFacility(pois = [], origin = {}, requestedType = 'police')
     z: finite(selected.poi.z),
     distance: selected.distance,
     sourceFeatureId: String(selected.poi.sourceFeatureId || ''),
+    sourceElementType: String(selected.poi.sourceElementType || ''),
+    sourceElementId: String(selected.poi.sourceElementId || ''),
+    provider: String(selected.poi.provider || 'OpenStreetMap'),
+    license: String(selected.poi.license || 'ODbL-1.0'),
+    attribution: String(selected.poi.attribution || '© OpenStreetMap contributors'),
+    retrievedAt: String(selected.poi.retrievedAt || ''),
+    regionalPackId: String(selected.poi.regionalPackId || ''),
+    regionalPackVersion: String(selected.poi.regionalPackVersion || ''),
     provenance: 'loaded-map-poi'
   });
 }

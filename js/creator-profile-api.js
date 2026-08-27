@@ -198,7 +198,7 @@ function creatorStatsFromActivities(items = []) {
   const list = Array.isArray(items) ? items : [];
   return {
     activitiesCreated: list.length,
-    activitiesPublished: list.filter((entry) => sanitizeText(entry?.visibility || '', 24).toLowerCase() === 'public').length,
+    activitiesPublished: 0,
     totalPlays: 0
   };
 }

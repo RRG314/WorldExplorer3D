@@ -8,8 +8,7 @@ const LIVE_GPS_POLICY = Object.freeze({
   warningRadiusMeters: 9_000,
   recenterRadiusMeters: 10_000,
   hardPauseRadiusMeters: 11_000,
-  signalLostAfterMs: 10_000,
-  rawSampleLimit: 60
+  signalLostAfterMs: 10_000
 });
 
 const EARTH_RADIUS_METERS = 6_371_000;
@@ -105,7 +104,6 @@ function createLiveGpsModel(options = {}) {
     lastAccepted: null,
     filtered: null,
     pendingJump: null,
-    rawSamples: [],
     lastReceivedAt: 0,
     speedMps: 0,
     headingDegrees: null,
@@ -157,19 +155,11 @@ function resetLiveGpsAtOrigin(model, point) {
   return true;
 }
 
-function rememberRawSample(model, fix) {
-  model.rawSamples.push(fix);
-  if (model.rawSamples.length > LIVE_GPS_POLICY.rawSampleLimit) {
-    model.rawSamples.splice(0, model.rawSamples.length - LIVE_GPS_POLICY.rawSampleLimit);
-  }
-}
-
 function ingestLiveGpsFix(model, position, now = Date.now()) {
   if (!model) throw new TypeError('Live GPS model is required.');
   const fix = normalizeBrowserPosition(position, now);
   model.counters.received += 1;
   model.lastReceivedAt = fix.receivedAt;
-  rememberRawSample(model, fix);
 
   if (!validGeographicPoint(fix)) {
     model.counters.invalid += 1;
@@ -276,7 +266,8 @@ function liveGpsModelSnapshot(model, now = Date.now()) {
     boundaryDistanceMeters: Number(finiteNumber(model?.boundaryDistanceMeters, 0).toFixed(1)),
     boundaryState: model?.boundaryState || 'inside',
     counters: { ...(model?.counters || {}) },
-    retainedRawSamples: model?.rawSamples?.length || 0
+    retainedRawSamples: 0,
+    rawFixHistoryStored: false
   };
 }
 

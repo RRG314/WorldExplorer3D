@@ -132,20 +132,24 @@ async function openDeFlock(context, screenshotName, touchInput = false) {
   assert.match(await page.locator('#globeSelectorScaleReadout').textContent(), /m$/, 'The globe must expose a visible local-scale readout.');
   await page.waitForFunction(() => {
     const basemap = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.liveEarth?.selectorBasemap;
-    return basemap?.mode === 'map' && basemap.tileZoom >= 14 && basemap.loadedTiles > 0;
+    return basemap?.mode === 'satellite' && basemap.tileZoom >= 14 && basemap.loadedTiles > 0;
   }, null, { timeout: 30_000 });
-  const mapBasemap = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorBasemap);
-  assert.match(mapBasemap.attribution, /OpenStreetMap/, 'Map mode must expose its provider attribution.');
-  await page.getByRole('button', { name: 'Satellite', exact: true }).click();
-  await page.waitForFunction((priorLoadedTiles) => {
-    const basemap = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.liveEarth?.selectorBasemap;
-    return basemap?.mode === 'satellite' && basemap.tileZoom >= 14 && basemap.loadedTiles > priorLoadedTiles;
-  }, mapBasemap.loadedTiles, { timeout: 30_000 });
   const satelliteBasemap = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorBasemap);
   assert.match(satelliteBasemap.attribution, /Esri/, 'Satellite mode must expose its provider attribution.');
   assert.equal(await page.getByRole('button', { name: 'Satellite', exact: true }).getAttribute('aria-pressed'), 'true');
   await page.getByRole('button', { name: 'Map', exact: true }).click();
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.()?.liveEarth?.selectorBasemap?.mode === 'map');
+  await page.waitForFunction((priorLoadedTiles) => {
+    const basemap = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.liveEarth?.selectorBasemap;
+    return basemap?.mode === 'map' && basemap.tileZoom >= 14 && basemap.loadedTiles > priorLoadedTiles;
+  }, satelliteBasemap.loadedTiles, { timeout: 30_000 });
+  const mapBasemap = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics().liveEarth.selectorBasemap);
+  assert.match(mapBasemap.attribution, /OpenStreetMap/, 'Map mode must expose its provider attribution.');
+  assert.equal(await page.getByRole('button', { name: 'Map', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.getByRole('button', { name: 'Satellite', exact: true }).click();
+  await page.waitForFunction(() => {
+    const basemap = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.liveEarth?.selectorBasemap;
+    return basemap?.mode === 'satellite' && basemap.visibleTiles > 0;
+  });
   const renderPerformance = await sampleAnimationFps(page);
   assert.ok(renderPerformance.fps >= 30, `The complete close-scale DeFlock globe must sustain at least 30 FPS (${renderPerformance.fps.toFixed(1)}).`);
   assert.ok(focusedState.selectorRender?.triangles > 60_000 && focusedState.selectorRender?.triangles < 100_000, `The close-scale globe triangle budget must remain bounded (${JSON.stringify(focusedState.selectorRender)}).`);

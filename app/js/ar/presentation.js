@@ -101,6 +101,8 @@ function createArPresentation(options = {}) {
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+  const diagnosticBounds = new THREE.Box3();
+  const diagnosticCenter = new THREE.Vector3();
   let elapsed = 0;
   let placed = false;
   let disposed = false;
@@ -127,11 +129,13 @@ function createArPresentation(options = {}) {
     if (dt > .034) slowFrames++; else slowFrames = Math.max(0, slowFrames - 2);
     if (!reduced && slowFrames > 90) { reduced = true; resize(); }
     if (request.type === 'field-challenge' && plan) {
+      // Keep every survey target inside the usable horizontal field of view.
+      // Portrait phones have far less horizontal room than desktop AR canvases.
+      const travelSpan = Math.min(2.8, Math.max(.62, camera.aspect * 1.55));
       content.animated.forEach((model, index) => {
         const actor = plan.actors[index];
-        const span = 2.8;
         const travel = ((elapsed * actor.speed * actor.direction + actor.phase / Math.PI) % 2 + 2) % 2;
-        model.position.x = (travel - 1) * span;
+        model.position.x = (travel - 1) * travelSpan;
         model.position.y = .28 + actor.height + Math.sin(elapsed * 1.8 + actor.phase) * .12;
         model.position.z = -.35 - index * .2;
         model.rotation.y = actor.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -217,7 +221,34 @@ function createArPresentation(options = {}) {
     update,
     updateXr,
     setChallengeComplete(complete = true) { if (content.retriever) content.retriever.visible = complete === true; },
-    snapshot: () => Object.freeze({ placed, spatialMode, reticleVisible: reticle.visible, reduced, captured: captured.size, actorCount: plan?.actors?.length || 0, retrieverAvailable: !!content.retriever, retrieverVisible: content.retriever?.visible === true }),
+    snapshot: () => {
+      const rect = canvas.getBoundingClientRect();
+      const targetHitPoints = request.type === 'field-challenge'
+        ? Object.freeze(content.animated.map((model, index) => {
+          diagnosticBounds.setFromObject(model).getCenter(diagnosticCenter);
+          diagnosticCenter.project(camera);
+          const visible = model.visible === true && Math.abs(diagnosticCenter.x) <= 1 && Math.abs(diagnosticCenter.y) <= 1 && diagnosticCenter.z >= -1 && diagnosticCenter.z <= 1;
+          return Object.freeze({
+            actorId: plan?.actors?.[index]?.id || null,
+            captured: captured.has(plan?.actors?.[index]?.id),
+            visible,
+            clientX: rect.left + (diagnosticCenter.x + 1) * rect.width * .5,
+            clientY: rect.top + (1 - diagnosticCenter.y) * rect.height * .5
+          });
+        }))
+        : Object.freeze([]);
+      return Object.freeze({
+        placed,
+        spatialMode,
+        reticleVisible: reticle.visible,
+        reduced,
+        captured: captured.size,
+        actorCount: plan?.actors?.length || 0,
+        targetHitPoints,
+        retrieverAvailable: !!content.retriever,
+        retrieverVisible: content.retriever?.visible === true
+      });
+    },
     dispose() {
       if (disposed) return;
       disposed = true;

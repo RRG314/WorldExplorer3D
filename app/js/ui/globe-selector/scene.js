@@ -35,6 +35,7 @@ export function createGlobeSelectorScene(options = {}) {
   let globeRoot = null;
   let earthMesh = null;
   let markerMesh = null;
+  let selectionMarkerCoordinates = null;
   let raycaster = null;
   let favoriteMarkerGroup = null;
   let favoriteMarkerGeometry = null;
@@ -104,10 +105,27 @@ export function createGlobeSelectorScene(options = {}) {
 
   function applyMarkerScales() {
     const zoomScale = getMarkerScale();
-    if (markerMesh) markerMesh.scale.setScalar(zoomScale);
+    if (markerMesh) {
+      markerMesh.scale.setScalar(zoomScale);
+      if (selectionMarkerCoordinates) {
+        const position = latLonToLocalPoint(
+          selectionMarkerCoordinates.lat,
+          selectionMarkerCoordinates.lon,
+          1 + 0.018 * zoomScale * 1.08
+        );
+        markerMesh.position.set(position.x, position.y, position.z);
+      }
+    }
     favoriteMarkerNodes.forEach((entry) => {
       const selectedScale = cityMatchesSelection(entry.city) ? 1.26 : 1;
-      entry.mesh.scale.setScalar(selectedScale * zoomScale);
+      const markerScale = selectedScale * zoomScale;
+      entry.mesh.scale.setScalar(markerScale);
+      const position = latLonToLocalPoint(
+        entry.city.lat,
+        entry.city.lon,
+        1 + 0.009 * markerScale * 1.08
+      );
+      entry.mesh.position.set(position.x, position.y, position.z);
     });
   }
 
@@ -199,7 +217,7 @@ export function createGlobeSelectorScene(options = {}) {
         favoriteMarkerGeometry,
         city.source === 'saved' ? savedFavoriteMaterial : menuFavoriteMaterial
       );
-      const position = latLonToLocalPoint(city.lat, city.lon, 1.018);
+      const position = latLonToLocalPoint(city.lat, city.lon, 1.009);
       marker.position.set(position.x, position.y, position.z);
       marker.userData.favoriteCity = city;
       favoriteMarkerGroup.add(marker);
@@ -221,11 +239,11 @@ export function createGlobeSelectorScene(options = {}) {
   function setSelectionMarker(selected) {
     if (!markerMesh) return;
     if (!selected) {
+      selectionMarkerCoordinates = null;
       markerMesh.visible = false;
       return;
     }
-    const point = latLonToLocalPoint(selected.lat, selected.lon, 1.02);
-    markerMesh.position.set(point.x, point.y, point.z);
+    selectionMarkerCoordinates = { lat: Number(selected.lat), lon: Number(selected.lon) };
     markerMesh.visible = getPanelMode() !== 'live-earth';
     applyMarkerScales();
     renderFrame();
@@ -527,6 +545,7 @@ export function createGlobeSelectorScene(options = {}) {
     globeRoot = null;
     earthMesh = null;
     markerMesh = null;
+    selectionMarkerCoordinates = null;
     raycaster = null;
     favoriteMarkerGroup = null;
     favoriteMarkerGeometry = null;

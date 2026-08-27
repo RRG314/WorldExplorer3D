@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=40";
+} from "./world/spawn.js?v=41";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=19";
+} from "./world/osm-loader.js?v=21";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -58,7 +58,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=34";
+} from "./world/load-support.js?v=36";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -66,7 +66,7 @@ import {
 } from "./world/load-reset.js?v=17";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=11";
+} from "./world/load-budgeting.js?v=13";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=142";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=165";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
@@ -170,8 +170,8 @@ import {
 } from "./world/shortbread-source.js?v=17";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=13";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
-import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=35";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=49";
+import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=59";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -347,7 +347,21 @@ function releaseEarthWorldForTitle() {
     releasedAt: performance.now(),
     reason: 'title_screen_release'
   });
-  return Object.freeze({ released: true, before });
+  const after = Object.freeze({
+    roads: Number(appCtx.roads?.length || 0),
+    buildings: Number(appCtx.buildings?.length || 0),
+    terrainTiles: Number(appCtx.terrainTileCache?.size || 0),
+    rendererGeometries: Number(appCtx.renderer?.info?.memory?.geometries || 0),
+    rendererTextures: Number(appCtx.renderer?.info?.memory?.textures || 0)
+  });
+  appCtx.lastEarthWorldRelease = Object.freeze({
+    released: true,
+    reason: 'title_screen_release',
+    before,
+    after,
+    releasedAt: performance.now()
+  });
+  return appCtx.lastEarthWorldRelease;
 }
 
 initWorldSpawning({

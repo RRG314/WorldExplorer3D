@@ -435,6 +435,14 @@ export function buildPoiGeometryPass(options = {}) {
         type: poiKey,
         name: tags.name || poiData.category,
         lodTier: poiTier,
+        sourceElementType: tags._sourceElementType || node.sourceElementType || node.type,
+        sourceElementId: tags._sourceElementId || node.sourceElementId || node.id,
+        provider: tags._we3dProvider || node.provider || 'OpenStreetMap',
+        license: tags._we3dLicense || node.license || 'ODbL-1.0',
+        attribution: tags._we3dAttribution || node.attribution || '© OpenStreetMap contributors',
+        retrievedAt: tags._we3dRetrievedAt || node.retrievedAt || '',
+        regionalPackId: tags._we3dRegionalPackId || node.regionalPackId || '',
+        regionalPackVersion: tags._we3dRegionalPackVersion || node.regionalPackVersion || '',
         ...poiData
       });
 

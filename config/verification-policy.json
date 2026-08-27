@@ -19,6 +19,10 @@
       "reason": "proves the public landing, selector, full live Baltimore world, input, UI ownership and transport continuity together",
       "command": "npm run verify:world"
     },
+    "urbanEquipmentJourney": {
+      "reason": "proves the shared Backpack waits for Discovery and Urban Sandbox ownership, then preserves unique item identity through normal equip and use input",
+      "command": "npm run verify:urban-equipment"
+    },
     "immutableArtifactRuntime": {
       "reason": "repeats the same complete-world journey against the exact dist artifact intended for deployment",
       "command": "npm run verify:artifact-runtime"

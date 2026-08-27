@@ -8,7 +8,7 @@ import {
 } from '../globe-selector/helpers.js?v=9';
 
 const HUB_PANELS = {
-  games: { tab: 'games', title: 'Missions & Games' },
+  games: { tab: 'games', title: 'Activities & Games' },
   multiplayer: { tab: 'multiplayer', title: 'Multiplayer' },
   settings: { tab: 'settings', title: 'Settings' },
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
@@ -203,6 +203,10 @@ function setupGlobeHub({
     const target = HUB_PANELS[destination];
     const panel = target ? document.getElementById(`tab-${target.tab}`) : null;
     if (!target || !panel || !overlay || !panelHost) return false;
+    if (destination === 'controls') {
+      const accessibilitySettings = document.getElementById('accessibilitySettings');
+      if (accessibilitySettings && accessibilitySettings.parentElement !== panel) panel.prepend(accessibilitySettings);
+    }
     panelHost.querySelectorAll('.tab-content').forEach((node) => node.classList.remove('active'));
     panel.classList.add('active');
     overlay.hidden = false;
@@ -255,6 +259,12 @@ function setupGlobeHub({
   const titleFooter = document.querySelector('.title-footer');
   if (titleFooter && footerHost) footerHost.appendChild(titleFooter);
   document.getElementById('globeHubOverlayCloseBtn')?.addEventListener('click', closePanel);
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || overlay?.hidden !== false) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closePanel();
+  }, true);
   document.getElementById('globeHubFullscreenBtn')?.addEventListener('click', () => {
     if (document.fullscreenElement) void document.exitFullscreen?.();
     else void document.documentElement.requestFullscreen?.();

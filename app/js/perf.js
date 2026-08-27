@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { createPerfPanelApi } from "./perf-panel.js?v=1";
 import { createPerfRendererInfoApi } from "./perf-renderer.js?v=1";
 import { createPerfSettingsApi } from "./perf-settings.js?v=1";
-import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
+import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=2";
 // perf.js - Runtime performance mode + benchmark telemetry for RDT comparisons
 // ============================================================================
 
