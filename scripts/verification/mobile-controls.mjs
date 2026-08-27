@@ -22,6 +22,10 @@ page.on('response', (response) => {
 
 const diagnostics = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
 const distance = (a, b) => Math.hypot(Number(a?.x) - Number(b?.x), Number(a?.z) - Number(b?.z));
+// Walking is calibrated near a normal human pace. These journeys must prove
+// sustained directional movement without assuming vehicle-like displacement.
+const MIN_WALK_DISTANCE_1250_MS = 1;
+const MIN_STRAIGHT_SEGMENT_DISTANCE = 0.25;
 const pathTurnDegrees = (a, b, c) => {
   const first = { x: Number(b?.x) - Number(a?.x), z: Number(b?.z) - Number(a?.z) };
   const second = { x: Number(c?.x) - Number(b?.x), z: Number(c?.z) - Number(b?.z) };
@@ -312,8 +316,12 @@ try {
     closingMapRestoresGameplayControls: mapReturnedToPlay === true,
     offCenterTouchdownIsNeutral: Math.hypot(Number(walkPrecision.touchdown?.x), Number(walkPrecision.touchdown?.y)) < 0.01,
     shortWalkDragStaysPrecise: Math.abs(Number(walkPrecision.gentleDrag?.x)) < 0.01 && Number(walkPrecision.gentleDrag?.y) < -0.25 && Number(walkPrecision.gentleDrag?.y) > -0.4,
-    heldDiagonalWalkStaysStraight: walkStraightness.firstDistance > 0.4 && walkStraightness.secondDistance > 0.4 && walkStraightness.turnDegrees < 5,
-    walkAnalogMoves: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position) > 2,
+    heldDiagonalWalkStaysStraight:
+      walkStraightness.firstDistance > MIN_STRAIGHT_SEGMENT_DISTANCE &&
+      walkStraightness.secondDistance > MIN_STRAIGHT_SEGMENT_DISTANCE &&
+      walkStraightness.firstDistance + walkStraightness.secondDistance > 0.9 &&
+      walkStraightness.turnDegrees < 5,
+    walkAnalogMoves: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position) > MIN_WALK_DISTANCE_1250_MS,
     walkRightLookTurnsRight: Number(walkLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
     walkCameraRecenters: Number(walkRecentered.cameraFollow?.headingAlignmentDegrees) < 5 && Number(walkRecentered.cameraFollow?.trailingDistance) > 1,
     driveAnalogMoves: distance(driveBefore.activeActor?.position, driveMoved.activeActor?.position) > 0.4,
@@ -332,7 +340,7 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
-    ok: Object.values(checks).every(Boolean), contract: 'semantic-mobile-controls-v1', checks,
+    ok: Object.values(checks).every(Boolean), contract: 'semantic-mobile-controls-v2', checks,
     layouts: { standardLayout, southpawLayout, reloadedSouthpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi, openPackUi },
     map: { mapFollowState, mapBrowseState, mapZoomed, mapRecentered, mapReturnedToPlay, blockedMovementDistance: distance(mapActorBefore.activeActor?.position, mapActorAfterBlockedInput.activeActor?.position) },
     camera: {

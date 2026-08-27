@@ -130,15 +130,14 @@ try {
   assert.match(guide || '', /Mammals/);
   assert.match(guide || '', /Birds/);
   assert.match(guide || '', /Insects & Arachnids/);
-  assert.match(guide || '', /EVIDENCE SPECIALTIES/);
-  assert.match(guide || '', /60 reference fallbacks/);
-  assert.match(guide || '', /not a live-presence count/i);
+  assert.match(guide || '', /WAYS YOU EXPLORE/);
+  assert.match(guide || '', /not a live wildlife count/i);
   await page.locator('#discoveryLifeList').scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'output/release-evidence/current/baltimore-life-list-mobile.png', fullPage: true });
 
   const report = {
     ok: browserErrors.length === 0 && localFailures.length === 0,
-    contract: 'field-retention-v1',
+    contract: 'field-retention-v2',
     servedRoot,
     checks: {
       fieldToday: /Field Today/i.test(today || ''),
@@ -146,9 +145,8 @@ try {
       seasonalSurvey: /Regional Survey/i.test(today || ''),
       noStreakLoss: /NO STREAK LOSS/.test(today || ''),
       lifeList: /3\/60/.test(guide || ''),
-      evidenceSpecialties: /EVIDENCE SPECIALTIES/.test(guide || ''),
-      creatureQualityFallback: /60 reference fallbacks/.test(guide || ''),
-      honestPresenceLanguage: /not a live-presence count/i.test(guide || ''),
+      explorationMethods: /WAYS YOU EXPLORE/.test(guide || ''),
+      honestPresenceLanguage: /not a live wildlife count/i.test(guide || ''),
       noInternalEncounterCopy: !/procedural encounter/i.test(`${today} ${guide}`)
     },
     browserErrors,

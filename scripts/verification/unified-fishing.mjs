@@ -158,6 +158,7 @@ try {
   }
   const journalText = await page.locator('#discoveryJournalList').innerText();
   await page.locator('[data-discovery-tab="guide"]').click();
+  await page.locator('#discoveryGuideScope').selectOption('world');
   await page.waitForFunction((species) => document.querySelector('#discoveryFieldGuideList')?.innerText?.includes(species), fishing.fish.species, { timeout: 10_000 });
   if (await page.locator('#discoverySectionTutorial:not([hidden])').isVisible().catch(() => false)) {
     await page.locator('#discoverySectionTutorialDoneBtn').click();
