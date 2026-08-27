@@ -75,10 +75,12 @@ test('server receipt vocabulary accepts current field and fishing evidence witho
   assert.equal(normalizeDiscoveryClaim({ ...base, evidenceClass: 'anything-goes' }), null);
 });
 
-test('Explorer surfaces use player language and do not expose pipeline status', async () => {
-  const [html, runtime] = await Promise.all([
+test('Explorer surfaces use player language and keep Backpack viewing distinct from equipped state', async () => {
+  const [html, runtime, equipmentRuntime, shellStyles] = await Promise.all([
     readFile(new URL('../app/index.html', import.meta.url), 'utf8'),
-    readFile(new URL('../app/js/discovery/runtime.js', import.meta.url), 'utf8')
+    readFile(new URL('../app/js/discovery/runtime.js', import.meta.url), 'utf8'),
+    readFile(new URL('../app/js/urban-sandbox/equipment-runtime.js', import.meta.url), 'utf8'),
+    readFile(new URL('../app/styles/runtime-shell.css', import.meta.url), 'utf8')
   ]);
   assert.doesNotMatch(html, /game-generated field lead/i);
   assert.doesNotMatch(html, /Places &amp; Contacts/i);
@@ -88,4 +90,8 @@ test('Explorer surfaces use player language and do not expose pipeline status', 
   assert.match(html, /data-discovery-tab="journal"/);
   assert.match(html, /All paths/);
   assert.match(html, /Journal backup and account status/);
+  assert.match(equipmentRuntime, /selected \? ' aria-current="true"'/);
+  assert.match(equipmentRuntime, /item\.equipped \? ' equipped'/);
+  assert.match(shellStyles, /urbanBackpackItem\.selected/);
+  assert.match(shellStyles, /content:'VIEWING'/);
 });

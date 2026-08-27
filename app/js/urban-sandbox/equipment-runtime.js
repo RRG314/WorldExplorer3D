@@ -97,7 +97,8 @@ function createUrbanEquipmentRuntime(options = {}) {
     const hotbarItems = inventory.items.filter((item) => item.hotbarSlot != null);
     ui.slots.innerHTML = hotbarItems.map((item) => {
       const count = item.magazine !== null ? `${item.magazine}/${item.reserve}` : Number(item.quantity || 0) > 1 ? `×${item.quantity}` : '';
-      return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}" title="${escapeHtml(`${item.hotbarSlot}. ${item.label} · ${count}`)}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong><span class="urbanItemCount">${escapeHtml(count)}</span></button>`;
+      const selected = item.instanceId === state.backpackSelectedId;
+      return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}${selected ? ' selected' : ''}" type="button" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}"${selected ? ' aria-current="true"' : ''} title="${escapeHtml(`${item.hotbarSlot}. ${item.label} · ${count}`)}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong><span class="urbanItemCount">${escapeHtml(count)}</span></button>`;
     }).join('');
     if (ui.contents) {
       const carried = inventory.items.filter((item) => item.hotbarSlot == null && (
@@ -105,7 +106,8 @@ function createUrbanEquipmentRuntime(options = {}) {
       ));
       ui.contents.innerHTML = carried.length ? carried.map((item) => {
         const verbs = item.verbs?.length ? item.verbs.join(' · ') : 'No available action';
-        return `<button class="urbanBackpackItem${item.equipped ? ' equipped' : ''}" type="button" data-backpack-inspect="true" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}" title="${escapeHtml(`${item.label} · ${verbs}`)}"><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong>${Number(item.quantity || 0) > 1 ? `<b class="urbanItemQuantity">${Number(item.quantity)}</b>` : ''}</button>`;
+        const selected = item.instanceId === state.backpackSelectedId;
+        return `<button class="urbanBackpackItem${item.equipped ? ' equipped' : ''}${selected ? ' selected' : ''}" type="button" data-backpack-inspect="true" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}"${selected ? ' aria-current="true"' : ''} title="${escapeHtml(`${item.label} · ${verbs}`)}"><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong>${Number(item.quantity || 0) > 1 ? `<b class="urbanItemQuantity">${Number(item.quantity)}</b>` : ''}</button>`;
       }).join('') : '<div class="urbanBackpackEmpty">No items in this category</div>';
     }
     renderDetail(inventory);
