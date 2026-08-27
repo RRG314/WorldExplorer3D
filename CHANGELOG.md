@@ -2,6 +2,41 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.1.0] - 2026-08-27
+
+### Added
+
+- Ten source-bounded regional Field Guide packs for built-in destinations in
+  addition to Baltimore, bringing the attainable guide to 180 entries across
+  eleven regional packs.
+- A dedicated Journal with Fieldwork, Games, Making, Travel, Community, and
+  Companion paths.
+- Journal backup and restore, current-region and World Guide scopes, grouped
+  unidentified entries, and regional life-list progress.
+- Backpack categories, item history, inspection, equip and use actions, hotbar
+  assignment, and Field Kit synchronization.
+
+### Changed
+
+- Games, creation, Blocks, place visits, room joins, companion care, fieldwork,
+  and fishing now contribute to the same Explorer profile and Journal.
+- Every built-in Earth destination now selects a bounded regional field pack;
+  expansion entries remain reference fallbacks unless reviewed media or models
+  are available.
+- The Explorer panel separates permanent Journal progress from recurring Field
+  Today, Expedition, and seasonal opportunities.
+
+### Fixed
+
+- Regional Guide totals now count entries the player can actually reach with
+  released activities.
+- Fishing only credits a regional Guide entry when the caught species matches
+  that entry.
+- Backpack tools and the Explorer Field Kit remain synchronized across game
+  modes.
+- Player-facing Guide and Journal language no longer exposes implementation
+  labels or repeats generic unknown-entry names.
+
 ## [5.0.0] - 2026-08-26
 
 ### Added

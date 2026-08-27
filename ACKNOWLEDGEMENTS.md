@@ -1,6 +1,6 @@
 # Acknowledgements
 
-Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
+Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
 
 World Explorer 3D is made possible by open web technology, public geographic
 and scientific data, licensed creative assets, and the communities that
@@ -29,10 +29,12 @@ maintain them.
 ## Field and ecology references
 
 - GBIF Secretariat provides the pinned GBIF Backbone Taxonomy used for stable
-  identity in the Baltimore–Chesapeake ecology pack under CC BY 4.0.
-- Maryland Department of Natural Resources and the Chesapeake Bay Program
-  provide regional wildlife, plant, habitat, and fish references. Their prose
-  and photography are not redistributed as part of the ecology pack.
+  identity across the regional ecology registry under CC BY 4.0.
+- Government and public-agency references for the Chesapeake, United States,
+  western Europe, Mediterranean, Kanto, and Arabian Gulf packs support factual
+  regional review. Their prose and photography are not redistributed as part
+  of the packs. Exact sources and use boundaries are listed in
+  [ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## Space, models, and materials
 

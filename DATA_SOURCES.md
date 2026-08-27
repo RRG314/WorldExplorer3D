@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-08-27 for World Explorer 3D 5.0.0 and the 5.1 candidate.
+Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
 
 World Explorer keeps source identity and truth type with its data. Observations,
 forecasts and models, predictions, mapped features, and visual fallbacks are not

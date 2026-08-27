@@ -40,7 +40,7 @@ const steps = [
     command: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify']
   },
   {
-    name: 'Verify one 5.0 version, commit, artifact, and displayed identity',
+    name: 'Verify one release version, commit, artifact, and displayed identity',
     command: [process.execPath, 'scripts/verification/release-identity.mjs']
   },
   {

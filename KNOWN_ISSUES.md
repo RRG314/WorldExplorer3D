@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
+Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
 
 ## Location and map coverage
 
@@ -59,6 +59,19 @@ Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
   observations.
 - Solar-system distance and body-size presentation uses documented visual
   scaling so destinations remain playable; it is not an orbital simulator.
+
+## Field Guide and Journal
+
+- The eleven regional packs are bounded identification and activity slices for
+  built-in destinations, not a complete worldwide species catalog. Their field
+  leads use broad habitat and seasonal context; they do not report abundance or
+  confirm that an organism is present at the selected point.
+- Expansion-pack entries currently use reference presentation unless separately
+  reviewed media or creature models are available. Missing media does not block
+  identification, Journal, life-list, or activity progress.
+- The complete Journal, Guide, companion history, and local Backpack history are
+  stored in the current browser. Backup and restore are available, but full
+  cross-device Journal sync is not yet provided.
 
 ## Online features
 

@@ -35,21 +35,27 @@ allows, and keeps mapped, observed, modeled, reference, and game-generated
 content distinct. It is an exploration game—not a navigation, wildlife-presence,
 surveying, or safety tool.
 
-## Version 5.0
+## Version 5.1
 
-World Explorer 3D 5.0 brings the game’s exploration, field activities,
-progression, multiplayer building, and creator tools into a more consistent
-player experience.
+World Explorer 3D 5.1 makes the Explorer, Journal, Field Guide, and Backpack one
+connected record of what you do across the sandbox. It also expands regional
+field play beyond Baltimore while keeping every lead honest about what the game
+does and does not know.
 
 Highlights include:
 
 - Walking, driving, drone, plane, boat, underwater, rover, astronaut, and
   spacecraft traversal.
 - A unified World Editor with persistent local and multiplayer Blocks.
-- A shared Backpack, Field Today activities, Expeditions, Journal, Field Guide,
-  life lists, specialties, companions, and seasonal surveys.
-- A Baltimore ecology pack covering 60 plants, animals, birds,
-  insects/arachnids, freshwater fish, and marine fish.
+- A dedicated Journal for Fieldwork, Games, Making, Travel, Community, and
+  Companions, connected to one Explorer profile.
+- A shared Backpack, Field Today activities, Expeditions, Field Guide, life
+  lists, specialties, companions, and seasonal surveys.
+- Eleven regional Field Guide packs covering 180 attainable entries across
+  plants, animals, birds, insects and arachnids, freshwater fish, and marine
+  fish. Every built-in Earth destination resolves to an appropriate pack.
+- Searchable current-region and World Guide views, grouped unidentified
+  entries, and downloadable Journal backup and restore.
 - Field leads shared by normal walking and optional Live GPS play. Field leads
   are game opportunities and do not claim a real animal is physically present.
 - Shore, boat, and underwater fishing connected to the same Journal and Field
@@ -59,7 +65,7 @@ Highlights include:
 - Keyboard, touch, browser-zoom, focus, contrast, larger-text, and reduced-motion
   support.
 
-Version 5.0 does not claim complete worldwide ecology, universal detailed
+Version 5.1 does not claim complete worldwide ecology, universal detailed
 interiors, survey-grade terrain, or identical data quality at every location.
 See [Known Issues](KNOWN_ISSUES.md) for current limits.
 
@@ -124,7 +130,7 @@ authorized environment. Secrets are not included in the repository.
 
 ## Project documents
 
-- [Release notes](RELEASE_NOTES_5.0.0.md)
+- [Release notes](RELEASE_NOTES_5.1.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [System inventory](docs/SYSTEM_INVENTORY.md)
