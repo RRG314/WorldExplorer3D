@@ -419,13 +419,13 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       snapshot: publication,
       request: worldSession?.request
     });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=38');
+    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=40');
     const urbanSandbox = startUrbanSandboxRuntime({
       snapshot: publication,
       request: worldSession?.request,
       livingWorld
     });
-    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=11');
+    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=13');
     const worldDiscovery = await startWorldDiscoveryRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request

@@ -1,4 +1,4 @@
-import { FIND_CATALOG } from './catalog.js?v=1';
+import { FIND_CATALOG } from './catalog.js?v=2';
 import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
 import { resolveExcavationTool } from './tools.js?v=1';
 
@@ -128,6 +128,7 @@ function createDetectorSession(options = {}) {
       regionId: plan.worldIdentity.id,
       regionLabel: context.regionLabel || 'Current region',
       locationKey: context.locationKey || '',
+      locationSnapshot: context.locationSnapshot || null,
       worldIdentity: plan.worldIdentity.id,
       environment: context.environment || 'EARTH',
       localPosition: context.localPosition || target.position,

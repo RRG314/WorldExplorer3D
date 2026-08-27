@@ -7,6 +7,7 @@ const ACTIVITY_TOOL = Object.freeze({
   photograph: 'field-camera', 'fossil-document': 'specimen-brush', forage: 'field-lens',
   'nature-observe': 'field-binoculars', 'insect-macro': 'field-camera',
   'habitat-survey': 'field-lens', 'community-survey': 'field-lens',
+  'sonar-survey': 'portable-sonar',
   'wildlife-track': 'field-binoculars', 'trail-camera-survey': 'field-camera', survey: 'field-lens',
   inspect: 'field-lens', beachcomb: 'hand-trowel', 'virtual-archaeology': 'hand-trowel',
   'treasure-hunt': 'field-shovel', 'forest-survey': 'field-lens', 'weather-observe': 'field-lens'
@@ -122,6 +123,12 @@ function createFieldEquipmentPresentation(appCtx) {
     const tool = toolGroup('sediment-pan');
     mesh(tool, new THREE.CylinderGeometry(.28, .18, .10, 20, 1, true), materials.dark, 'Sediment pan', [.36, .72, .43], [0, 0, .16]);
     mesh(tool, new THREE.TorusGeometry(.28, .025, 8, 24), materials.blue, 'Sediment pan rim', [.36, .77, .43], [Math.PI / 2, 0, 0]);
+  }
+  {
+    const tool = toolGroup('portable-sonar');
+    mesh(tool, new THREE.BoxGeometry(.32, .22, .14), materials.dark, 'Portable sonar body', [.36, 1.02, .36]);
+    mesh(tool, new THREE.BoxGeometry(.23, .13, .018), materials.screen, 'Portable sonar display', [.36, 1.04, .44]);
+    mesh(tool, new THREE.CylinderGeometry(.045, .045, .18, 10), materials.blue, 'Portable sonar transducer', [.53, .88, .38], [Math.PI / 2, 0, 0]);
   }
 
   holder.userData.worldDiscoveryEquipment = true;

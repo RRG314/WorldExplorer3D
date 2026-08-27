@@ -1,5 +1,5 @@
-import { ACTIVITY_CATALOG, FIELD_DISCOVERY_CATALOG } from './catalog.js?v=1';
-import { resolveRegionalEcologyPack, selectRegionalTaxa } from './ecology/regional-packs.js?v=1';
+import { ACTIVITY_CATALOG, FIELD_DISCOVERY_CATALOG } from './catalog.js?v=2';
+import { resolveRegionalEcologyPack, selectRegionalTaxa } from './ecology/regional-packs.js?v=2';
 import { buildFieldEvidencePayload, resolveFieldEvidenceContract } from './evidence-contracts.js?v=2';
 import { deterministicUnit, findCell, resolveDiscoverySlotPosition } from './model.js?v=1';
 import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
@@ -241,6 +241,7 @@ function createFieldActivitySession(options = {}) {
       regionId: plan.worldIdentity.id,
       regionLabel: context.regionLabel || 'Current region',
       locationKey: context.locationKey || '',
+      locationSnapshot: context.locationSnapshot || null,
       worldIdentity: plan.worldIdentity.id,
       environment: context.environment || 'EARTH',
       localPosition: context.localPosition || state.slot.position,

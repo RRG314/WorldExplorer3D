@@ -4,7 +4,7 @@ import {
   ECOLOGY_SOURCE_MANIFEST,
   REGIONAL_ECOLOGY_SCHEMA_VERSION,
   selectRegionalTaxa
-} from './baltimore-pack.js?v=1';
+} from './baltimore-pack.js?v=2';
 
 const PACK_RELEASE_VERSION = '2026.08.27-b1.0';
 const ALL_MONTHS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);

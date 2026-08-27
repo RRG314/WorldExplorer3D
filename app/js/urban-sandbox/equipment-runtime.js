@@ -26,6 +26,12 @@ function itemIconMarkup(item) {
   return `<svg viewBox="0 0 64 64" focusable="false" aria-hidden="true">${path}</svg>`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  })[char]);
+}
+
 function createUrbanEquipmentRuntime(options = {}) {
   const state = options.state;
   const THREE = options.THREE;
@@ -40,26 +46,69 @@ function createUrbanEquipmentRuntime(options = {}) {
   const effects = [];
   const projectiles = [];
 
+  function backpackCategory(item) {
+    if (item.category === 'field-tool') return 'field-tool';
+    if (item.category === 'specimen') return 'specimen';
+    return 'gear';
+  }
+
+  function renderDetail(inventory) {
+    const ui = state.equipmentUi;
+    if (!ui?.detail) return;
+    const item = inventory.items.find((entry) => entry.instanceId === state.backpackSelectedId) || null;
+    if (!item) {
+      ui.detail.innerHTML = '<span>Select an item to see its story and available actions.</span>';
+      return;
+    }
+    const sourceLabels = {
+      'starter-loadout': 'Starter gear',
+      'starter-field-kit': 'Starter field kit',
+      'starter-grant': 'Starter gear',
+      'explorer-progression': 'Explorer field kit',
+      'field-discovery': 'Found while exploring',
+      'fishing-catch': 'Caught while fishing',
+      'world-creation': 'Made in the world',
+      'Backpack item': 'Backpack item'
+    };
+    const source = sourceLabels[item.provenance] || 'Found while exploring';
+    const acquired = item.acquiredAt ? new Date(item.acquiredAt).toLocaleDateString() : '';
+    const actions = [];
+    if (item.verbs?.includes('equip')) actions.push(`<button data-backpack-action="equip" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Equip</button>`);
+    if (item.verbs?.includes('use-context')) actions.push(`<button data-backpack-action="field" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Use for fieldwork</button>`);
+    if (item.verbs?.includes('inspect')) actions.push(`<button data-backpack-action="inspect" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Inspect</button>`);
+    const slots = item.verbs?.includes('equip')
+      ? Array.from({ length: 6 }, (_, index) => `<button data-backpack-slot="${index + 1}" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Slot ${index + 1}</button>`).join('')
+      : '';
+    const description = item.metadata?.description || `${source}${acquired ? ` · added ${acquired}` : ''}`;
+    ui.detail.innerHTML = `<strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(description)}</small>${item.metadata?.regionLabel ? `<small>${escapeHtml(item.metadata.regionLabel)}</small>` : ''}<div class="urbanBackpackDetailActions">${actions.join('')}${slots}</div>`;
+  }
+
   function render() {
     const ui = state.equipmentUi;
     if (!ui?.root) return;
     const inventory = state.equipment.snapshot();
-    const visible = state.equipmentOpen && appCtx.Walk?.state?.mode === 'walk';
+    const visible = state.equipmentOpen && isActive();
     ui.root.classList.toggle('show', visible);
     ui.root.setAttribute('aria-hidden', visible ? 'false' : 'true');
-    ui.toggle.hidden = !(state.mobile && appCtx.Walk?.state?.mode === 'walk');
+    ui.toggle.hidden = !state.mobile;
+    ui.filters?.querySelectorAll?.('[data-backpack-filter]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.backpackFilter === (state.backpackFilter || 'all'));
+    });
     const hotbarItems = inventory.items.filter((item) => item.hotbarSlot != null);
     ui.slots.innerHTML = hotbarItems.map((item) => {
       const count = item.magazine !== null ? `${item.magazine}/${item.reserve}` : Number(item.quantity || 0) > 1 ? `×${item.quantity}` : '';
-      return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${item.instanceId}" aria-pressed="${item.equipped}" title="${item.hotbarSlot}. ${item.label} · ${count}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${item.label}</strong><span class="urbanItemCount">${count}</span></button>`;
+      return `<button class="urbanEquipmentSlot${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}" title="${escapeHtml(`${item.hotbarSlot}. ${item.label} · ${count}`)}"><b class="urbanItemSlot">${item.hotbarSlot}</b><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong><span class="urbanItemCount">${escapeHtml(count)}</span></button>`;
     }).join('');
     if (ui.contents) {
-      const carried = inventory.items.filter((item) => item.hotbarSlot == null);
+      const carried = inventory.items.filter((item) => item.hotbarSlot == null && (
+        (state.backpackFilter || 'all') === 'all' || backpackCategory(item) === state.backpackFilter
+      ));
       ui.contents.innerHTML = carried.length ? carried.map((item) => {
         const verbs = item.verbs?.length ? item.verbs.join(' · ') : 'No available action';
-        return `<button class="urbanBackpackItem${item.equipped ? ' equipped' : ''}" type="button" data-equipment-id="${item.instanceId}" aria-pressed="${item.equipped}" title="${item.label} · ${verbs}" ${item.verbs?.includes('equip') ? '' : 'disabled'}><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${item.label}</strong>${Number(item.quantity || 0) > 1 ? `<b class="urbanItemQuantity">${item.quantity}</b>` : ''}</button>`;
-      }).join('') : '<div class="urbanBackpackEmpty">No loose items</div>';
+        return `<button class="urbanBackpackItem${item.equipped ? ' equipped' : ''}" type="button" data-backpack-inspect="true" data-equipment-id="${escapeHtml(item.instanceId)}" aria-pressed="${item.equipped}" title="${escapeHtml(`${item.label} · ${verbs}`)}"><span class="urbanItemVisual">${itemIconMarkup(item)}</span><strong class="urbanItemName">${escapeHtml(item.label)}</strong>${Number(item.quantity || 0) > 1 ? `<b class="urbanItemQuantity">${Number(item.quantity)}</b>` : ''}</button>`;
+      }).join('') : '<div class="urbanBackpackEmpty">No items in this category</div>';
     }
+    renderDetail(inventory);
     const equipped = inventory.items.find((item) => item.equipped);
     state.equipmentVisual?.setEquipped?.(equipped?.id || 'hands');
     const parachuteState = equipped?.id === 'parachute'
@@ -69,12 +118,54 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function toggle(force) {
-    if (!isActive() || appCtx.Walk?.state?.mode !== 'walk') return false;
+    if (!isActive()) return false;
     state.equipmentOpen = typeof force === 'boolean' ? force : !state.equipmentOpen;
     appCtx.screenLayout ||= getScreenLayoutService();
     appCtx.screenLayout.setPanelLayer('backpack', state.equipmentOpen);
     render();
     return true;
+  }
+
+  function inspectItem(instanceId) {
+    const item = state.equipment.snapshot().items.find((entry) => entry.instanceId === String(instanceId));
+    if (!item) return false;
+    state.backpackSelectedId = item.instanceId;
+    render();
+    return true;
+  }
+
+  function setFilter(filter = 'all') {
+    state.backpackFilter = ['all', 'field-tool', 'specimen', 'gear'].includes(filter) ? filter : 'all';
+    render();
+    return true;
+  }
+
+  function handleBackpackAction(action, instanceId, slot = null) {
+    const item = state.equipment.snapshot().items.find((entry) => entry.instanceId === String(instanceId));
+    if (!item) return false;
+    if (slot != null) {
+      const changed = state.equipment.assignHotbar(Number(slot), item.instanceId);
+      if (changed) setStatus(`${item.label} assigned to slot ${slot}.`, 1400);
+      render();
+      return changed;
+    }
+    if (action === 'equip') {
+      const changed = state.equipment.equip(item.instanceId);
+      if (changed) setStatus(`${item.label} equipped.`, 1200);
+      render();
+      return changed;
+    }
+    if (action === 'field') {
+      const result = appCtx.worldDiscoveryRuntime?.equipTool?.(item.catalogId);
+      Promise.resolve(result).then(() => appCtx.toggleWorldDiscoveryJournal?.(true));
+      toggle(false);
+      return true;
+    }
+    if (action === 'inspect') {
+      setStatus(`${item.label} · ready in your Backpack`, 2200);
+      return inspectItem(item.instanceId);
+    }
+    return false;
   }
 
   function equipSlot(slot) {
@@ -252,26 +343,26 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (roomActive && selected.length) {
       const shared = selected.map((entry) => sharedTarget(entry.detailed));
       if (shared.some((entry) => !entry)) {
-        setStatus('That object does not have a stable room identity.', 2200);
+        setStatus('That target is not available in this room.', 2200);
         return;
       }
       state.authorityImpactPending = true;
-      setStatus('Verifying shared impact…', 2600);
+      setStatus('Checking room action…', 2600);
       state.authority.commitImpacts(equipment, impactPosition, shared).then((response) => {
         if (!isActive()) return;
         state.authorityImpactPending = false;
         if (!response?.accepted) {
-          setStatus(response?.reason === 'cooldown' ? 'Shared equipment is not ready yet.' : 'The room rejected that impact.', 2200);
+          setStatus(response?.reason === 'cooldown' ? 'That room action is not ready yet.' : 'That action could not be used in this room.', 2200);
           return;
         }
         const byId = new Map((response.results || []).map((entry) => [entry.entityId, entry]));
         results = selected.map((entry) => applyAuthoritativeImpact(entry.detailed, byId.get(sharedTarget(entry.detailed)?.entityId))).filter(Boolean);
         state.lastImpactAction = Object.freeze({ equipmentId: equipment.id, resultCount: results.length, authority: 'room', at: clock() });
-        if (results.length) setStatus(`${equipment.label} affected ${results.length} shared target${results.length === 1 ? '' : 's'}.`);
+        if (results.length) setStatus(`${equipment.label} affected ${results.length} room target${results.length === 1 ? '' : 's'}.`);
       }).catch((error) => {
         if (!isActive()) return;
         state.authorityImpactPending = false;
-        setStatus(String(error?.message || 'Shared impact authority is unavailable.'), 2800);
+        setStatus('That room action is unavailable right now.', 2800);
       });
       return;
     }
@@ -546,11 +637,11 @@ function createUrbanEquipmentRuntime(options = {}) {
       return true;
     }
     if (roomActive && currentEquipment?.category !== 'utility' && currentEquipment?.category !== 'mobility' && !state.authority) {
-      setStatus('Shared impact authority is connecting. Room damage remains locked.', 2600);
+      setStatus('Room actions are still connecting. Damage stays disabled.', 2600);
       return true;
     }
     if (roomActive && state.authorityImpactPending && currentEquipment?.category !== 'utility' && currentEquipment?.category !== 'mobility') {
-      setStatus('The previous room interaction is still being verified.', 1800);
+      setStatus('The previous room action is still being saved.', 1800);
       return true;
     }
     const prepared = state.equipment.prepareUse(Date.now());
@@ -657,7 +748,10 @@ function createUrbanEquipmentRuntime(options = {}) {
     dispose,
     equipSlot,
     fireNpcProjectile,
+    handleBackpackAction,
+    inspectItem,
     render,
+    setFilter,
     snapshot: () => Object.freeze({ activeProjectiles: projectiles.length, lastProjectileAction: state.lastProjectileAction || null }),
     toggle,
     update,

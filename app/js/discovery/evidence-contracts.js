@@ -41,6 +41,11 @@ const FIELD_EVIDENCE_CONTRACTS = deepFreeze({
     id: 'community', recordKind: 'local-game-checklist', holdSeconds: 4,
     activityIds: ['community-survey'], requiredFields: ['checklistScope', 'submissionState', 'presenceClaim'],
     actionPhrase: 'complete a local game checklist'
+  },
+  'water-scan': {
+    id: 'water-scan', recordKind: 'virtual-water-scan', holdSeconds: 3.4,
+    activityIds: ['sonar-survey'], requiredFields: ['waterContexts', 'scanClass', 'presenceClaim'],
+    actionPhrase: 'scan a modeled water habitat'
   }
 });
 
@@ -89,7 +94,8 @@ function buildFieldEvidencePayload(contract, input = {}) {
     'insect-macro': { captureMode: 'virtual-non-contact', scaleClass: 'macro-reference', handlingPolicy: 'do-not-handle-real-organisms' },
     habitat: { habitatContexts: contexts, transectClass: 'modeled-game-cell', accessClaim: false },
     geology: { substrateContext: contexts, samplePolicy: 'virtual-only', locationClaim: 'context-plausible-not-field-confirmed' },
-    community: { checklistScope: 'current-game-cell', submissionState: 'local-game-record-only', presenceClaim: false }
+    community: { checklistScope: 'current-game-cell', submissionState: 'local-game-record-only', presenceClaim: false },
+    'water-scan': { waterContexts: contexts, scanClass: 'modeled-water-habitat', presenceClaim: false }
   };
   return deepFreeze({ ...base, ...(byContract[contract.id] || {}) });
 }

@@ -1,7 +1,7 @@
 import { deterministicUnit } from './model.js?v=1';
 import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
-import { COMPANION_CATALOG } from './catalog.js?v=1';
+import { COMPANION_CATALOG } from './catalog.js?v=2';
 
 const WILDLIFE_CONTEXTS = new Set(['urban', 'urban-core', 'park', 'field', 'forest', 'wetland', 'riverbank', 'fresh-water', 'coast', 'mountain', 'desert']);
 

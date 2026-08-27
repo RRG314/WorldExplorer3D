@@ -32,7 +32,7 @@ import { initBoatMode } from './boat-mode.js?v=42';
 import './sky.js?v=86';
 import './weather.js?v=10';
 import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=128';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=129';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=8';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=3';
@@ -119,7 +119,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=6');
+            const mod = await import('./activity-discovery/session.js?v=7');
             mod.initActivityDiscovery?.();
             return mod;
         }

@@ -1,10 +1,12 @@
 import {
   createExplorerEvent,
+  createExplorerStoryEvent,
   defaultExplorerProgress,
   normalizeExplorerProgress,
   progressCreditForDiscovery,
-  projectExplorerProgress
-} from './explorer-events.js?v=1';
+  projectExplorerProgress,
+  projectExplorerStoryProgress
+} from './explorer-events.js?v=2';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
 const DISCOVERY_DB_VERSION = 2;
@@ -234,6 +236,31 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function recordExplorerEvent(record) {
+    const event = createExplorerStoryEvent(record);
+    const db = await open();
+    try {
+      const transaction = db.transaction(['profiles', 'events'], 'readwrite');
+      const profiles = transaction.objectStore('profiles');
+      const events = transaction.objectStore('events');
+      const existing = await requestPromise(events.get(event.eventId));
+      if (existing) {
+        await transactionPromise(transaction);
+        return { recorded: false, reason: 'already-recorded', event: clone(existing) };
+      }
+      const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      const profile = event.projections.profile
+        ? normalizeProfile({ ...current, explorerProgress: projectExplorerStoryProgress(current.explorerProgress, event) })
+        : current;
+      events.put(event);
+      profiles.put(profile);
+      await transactionPromise(transaction);
+      return { recorded: true, event: clone(event), profile: clone(profile) };
+    } finally {
+      db.close();
+    }
+  }
+
   async function collect(record) {
     return recordDiscovery(record, { collection: true });
   }
@@ -361,6 +388,40 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     return { schemaVersion: DISCOVERY_DB_VERSION, exportedAt: Date.now(), profile, items, fieldGuide, companions, events };
   }
 
+  async function importData(data = {}) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.events) || !Array.isArray(data.fieldGuide)) {
+      throw new TypeError('This is not a World Explorer Journal backup.');
+    }
+    const db = await open();
+    try {
+      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'companions', 'events'], 'readwrite');
+      const profiles = transaction.objectStore('profiles');
+      const itemsStore = transaction.objectStore('items');
+      const claims = transaction.objectStore('claims');
+      const guideStore = transaction.objectStore('fieldGuide');
+      const companionsStore = transaction.objectStore('companions');
+      const eventsStore = transaction.objectStore('events');
+      [profiles, itemsStore, claims, guideStore, companionsStore, eventsStore].forEach((store) => store.clear());
+      profiles.put(normalizeProfile(data.profile));
+      const items = Array.isArray(data.items) ? data.items : [];
+      const companions = Array.isArray(data.companions) ? data.companions : [];
+      items.filter((item) => item?.instanceId && item?.catalogId).forEach((item) => itemsStore.put(clone(item)));
+      data.fieldGuide.filter((entry) => entry?.catalogId).forEach((entry) => guideStore.put(clone(entry)));
+      companions.filter((entry) => entry?.instanceId && entry?.catalogId).forEach((entry) => companionsStore.put(clone(entry)));
+      data.events.filter((event) => event?.eventId).forEach((event) => {
+        eventsStore.put(clone(event));
+        if (event.claimId) {
+          const item = items.find((candidate) => candidate.claimId === event.claimId) || null;
+          claims.put({ claimId: event.claimId, claimedAt: event.occurredAt || Date.now(), item, event });
+        }
+      });
+      await transactionPromise(transaction);
+      return { imported: true, events: data.events.length, guide: data.fieldGuide.length, items: items.length, companions: companions.length };
+    } finally {
+      db.close();
+    }
+  }
+
   return Object.freeze({
     type: 'IndexedDbDiscoveryProfileStore',
     applyTrustedReceipt,
@@ -372,7 +433,9 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     listEvents,
     listFieldGuide,
     listItems,
+    importData,
     recordDiscovery,
+    recordExplorerEvent,
     recordObservation,
     saveCompanion,
     saveProfile,
@@ -433,6 +496,17 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     };
   }
 
+
+  async function recordExplorerEvent(record) {
+    const event = createExplorerStoryEvent(record);
+    if (events.has(event.eventId)) return { recorded: false, reason: 'already-recorded', event: clone(events.get(event.eventId)) };
+    events.set(event.eventId, event);
+    if (event.projections.profile) {
+      profile = normalizeProfile({ ...profile, explorerProgress: projectExplorerStoryProgress(profile.explorerProgress, event) });
+    }
+    return { recorded: true, event: clone(event), profile: clone(profile) };
+  }
+
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
     async getProfile() { return clone(profile); },
@@ -459,6 +533,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     collect(record) { return recordDiscovery(record, { collection: true }); },
     recordDiscovery,
+    recordExplorerEvent,
     recordObservation(record, policy = {}) { return recordDiscovery(record, { ...policy, collection: policy.collection === true }); },
     async exportData() {
       return {
@@ -469,6 +544,19 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
         companions: [...companions.values()].map(clone),
         events: [...events.values()].map(clone)
       };
+    },
+    async importData(data = {}) {
+      if (!data || typeof data !== 'object' || !Array.isArray(data.events) || !Array.isArray(data.fieldGuide)) throw new TypeError('This is not a World Explorer Journal backup.');
+      profile = normalizeProfile(data.profile);
+      items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();
+      (data.items || []).filter((item) => item?.instanceId && item?.catalogId).forEach((item) => items.set(item.instanceId, clone(item)));
+      data.fieldGuide.filter((entry) => entry?.catalogId).forEach((entry) => guide.set(entry.catalogId, clone(entry)));
+      (data.companions || []).filter((entry) => entry?.instanceId && entry?.catalogId).forEach((entry) => companions.set(entry.instanceId, clone(entry)));
+      data.events.filter((event) => event?.eventId).forEach((event) => {
+        events.set(event.eventId, clone(event));
+        if (event.claimId) claims.set(event.claimId, { claimId: event.claimId, event: clone(event), item: [...items.values()].find((item) => item.claimId === event.claimId) || null });
+      });
+      return { imported: true, events: events.size, guide: guide.size, items: items.size, companions: companions.size };
     }
   });
 }

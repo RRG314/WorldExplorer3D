@@ -220,7 +220,7 @@ const BALTIMORE_ECOLOGY_PACK = deepFreeze({
   version: BALTIMORE_ECOLOGY_PACK_VERSION,
   status: 'candidate-source-reviewed-domain-review-pending',
   region: {
-    label: 'Baltimore–Chesapeake pilot',
+    label: 'Baltimore–Chesapeake',
     countryCode: 'US',
     bounds: { south: 38.4, west: -77.6, north: 40.1, east: -75.7 },
     spatialPrecision: 'regional-pack-only-no-occurrence-points'
@@ -289,7 +289,7 @@ const BALTIMORE_TAXON_DISCOVERIES = deepFreeze(BALTIMORE_TAXA.map((entry) => ({
   regionalReviewBand: entry.sensitiveSpecies ? 'sensitive-generalized' : 'regional',
   qualityBand: entry.presentation.tier,
   tradePolicy: 'not-tradeable',
-  description: `${entry.localizedNames['en-US']} is a habitat-plausible Baltimore–Chesapeake catalog taxon. Generated opportunities are virtual and do not claim a real organism is present at this location.`,
+  description: `${entry.localizedNames['en-US']} is part of the Baltimore–Chesapeake Field Guide. Field leads do not claim a real organism is present at this location.`,
   evidenceClass: entry.regionalEvidenceClass,
   sensitiveLocationPolicy: entry.sensitiveLocationPolicy,
   activeMonths: entry.activeMonths,

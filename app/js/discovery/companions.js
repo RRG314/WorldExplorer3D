@@ -1,4 +1,4 @@
-import { COMPANION_CATALOG } from './catalog.js?v=1';
+import { COMPANION_CATALOG } from './catalog.js?v=2';
 import { deterministicUnit } from './model.js?v=1';
 
 function createCompanionInstance(catalogId, options = {}) {

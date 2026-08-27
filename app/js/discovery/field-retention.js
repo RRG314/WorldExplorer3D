@@ -105,9 +105,9 @@ function createFieldRetentionSnapshot(options = {}) {
     label: 'Field Today',
     resetPolicy: 'new-day-new-focus-no-streak-loss',
     objectives: [
-      objective('daily-record', 'Save one field record', todayEvents.length, 1, 'Any honest typed field record counts.', todayEvents.map((event) => event.eventId), ['discovery-recorded', 'specimen-collected']),
+      objective('daily-record', 'Save one field record', todayEvents.length, 1, 'Any completed field activity counts.', todayEvents.map((event) => event.eventId), ['discovery-recorded', 'specimen-collected']),
       objective('daily-methods', 'Use two evidence methods', todayMethods.size, 2, 'Try a second way of documenting the place.', todayEvents.map((event) => event.eventId), ['evidence-method-recorded']),
-      objective('daily-life-list', 'Add one regional life-list entry', todayNewTaxa, 1, 'Identify one new reviewed regional taxon.', todayEvents.filter((event) => event.firstIdentification).map((event) => event.eventId), ['first-identification'])
+      objective('daily-life-list', 'Add one regional life-list entry', todayNewTaxa, 1, 'Identify one new regional Guide entry.', todayEvents.filter((event) => event.firstIdentification).map((event) => event.eventId), ['first-identification'])
     ],
     eligibility: { eligible: true, acceptedMovementSources: ['manual_direct', 'gps_walk', 'accessibility_assist'] },
     replayPolicy: { mode: 'daily-rollover' },
@@ -148,7 +148,7 @@ function createFieldRetentionSnapshot(options = {}) {
     label: `${season.label} Regional Survey`,
     resetPolicy: 'new-season-new-survey-no-permanent-life-list-loss',
     objectives: [objective('seasonal-life-list', `Identify ${seasonalTarget} season-compatible taxa`, seasonalIdentified, seasonalTarget,
-      'Seasonality narrows the reviewed catalog; it does not assert live presence.',
+      'Season changes which Guide entries are in focus; it does not report live wildlife nearby.',
       regionalEvents.filter((event) => activeIds.has(event.catalogId)).map((event) => event.eventId), ['season-compatible-identification'])],
     eligibility: {
       eligible: !!regionalPack,

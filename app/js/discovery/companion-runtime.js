@@ -1,4 +1,4 @@
-import { COMPANION_CATALOG } from './catalog.js?v=1';
+import { COMPANION_CATALOG } from './catalog.js?v=2';
 import { createCompanionInstance, feedCompanion, resolveCompanionTravelPolicy, trainCompanion } from './companions.js?v=1';
 import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';

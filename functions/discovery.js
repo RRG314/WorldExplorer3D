@@ -7,6 +7,17 @@ const TRADEABLE_CATALOG_IDS = new Set([
   'expedition-clue-page'
 ]);
 
+const ACCEPTED_DISCOVERY_EVIDENCE_CLASSES = new Set([
+  'procedural-game-encounter',
+  'guided-field-lead',
+  'guided-exploration-lead',
+  'guided-field-encounter',
+  'guided-wildlife-encounter',
+  'virtual-field-record',
+  'virtual-fishing-catch',
+  'virtual-wildlife-record'
+]);
+
 function stableId(value, max = 220) {
   const text = String(value || '').trim().slice(0, max);
   return /^[A-Za-z0-9][A-Za-z0-9:._%-]*$/.test(text) ? text : '';
@@ -26,7 +37,7 @@ function normalizeDiscoveryClaim(input = {}) {
   const worldIdentity = stableId(input.worldIdentity);
   const activityId = stableId(input.activityId || 'inspect', 100);
   const evidenceClass = shortText(input.evidenceClass, 60);
-  if (!claimId || !catalogId || !worldIdentity || evidenceClass !== 'procedural-game-encounter') return null;
+  if (!claimId || !catalogId || !worldIdentity || !ACCEPTED_DISCOVERY_EVIDENCE_CLASSES.has(evidenceClass)) return null;
   return Object.freeze({
     claimId, catalogId, worldIdentity, activityId,
     name: shortText(input.name || catalogId, 100),
@@ -247,6 +258,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
 }
 
 module.exports = {
+  ACCEPTED_DISCOVERY_EVIDENCE_CLASSES,
   TRADEABLE_CATALOG_IDS,
   buildDiscoveryExports,
   itemDocumentId,

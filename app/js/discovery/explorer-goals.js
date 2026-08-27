@@ -1,9 +1,9 @@
-import { explorerProgressSnapshot } from './explorer-events.js?v=1';
+import { explorerProgressSnapshot } from './explorer-events.js?v=2';
 
 const RELEASED_EXPLORER_TOOLS = Object.freeze([
   'field-lens', 'field-camera', 'metal-detector', 'hand-trowel', 'fishing-rod',
   'field-binoculars', 'rock-hammer', 'sediment-pan',
-  'fossil-brush', 'specimen-brush', 'field-shovel'
+  'fossil-brush', 'specimen-brush', 'field-shovel', 'portable-sonar'
 ]);
 
 const EXPLORER_TOOL_UNLOCKS = Object.freeze({
@@ -17,7 +17,8 @@ const EXPLORER_TOOL_UNLOCKS = Object.freeze({
   'sediment-pan': Object.freeze({ points: 8, label: 'Reach Pathfinder' }),
   'fossil-brush': Object.freeze({ points: 20, label: 'Reach Field Explorer' }),
   'specimen-brush': Object.freeze({ points: 20, label: 'Reach Field Explorer' }),
-  'field-shovel': Object.freeze({ points: 20, label: 'Reach Field Explorer' })
+  'field-shovel': Object.freeze({ points: 20, label: 'Reach Field Explorer' }),
+  'portable-sonar': Object.freeze({ points: 20, label: 'Reach Field Explorer' })
 });
 
 function explorerToolProgress(profile = {}) {
@@ -49,8 +50,9 @@ function guideIdentificationsInRegion(guide = [], regionId = '') {
 function explorerGoalSnapshot({ profile = {}, guide = [], items = [], events = [], regionId = '', regionLabel = 'Current region' } = {}) {
   const progress = explorerProgressSnapshot(profile.explorerProgress);
   const regionalIdentifications = guideIdentificationsInRegion(guide, regionId);
+  const fieldEvents = events.filter((event) => ['discovery-recorded', 'specimen-collected'].includes(event.eventType));
   let goal;
-  if (!events.length) {
+  if (!fieldEvents.length) {
     goal = { id: 'first-discovery', label: 'Make your first discovery', detail: 'Choose a nearby lead and record what you find.', current: 0, target: 1, reward: 'Start your Journal and Field Guide' };
   } else if (!items.length) {
     goal = { id: 'first-collection', label: 'Collect your first specimen', detail: 'Use a collecting activity such as metal detecting in a suitable place.', current: 0, target: 1, reward: 'Learn Discover versus Collect' };
@@ -61,13 +63,24 @@ function explorerGoalSnapshot({ profile = {}, guide = [], items = [], events = [
   } else if (regionalIdentifications < 6) {
     goal = { id: 'regional-pathfinder', label: `Deepen your ${regionLabel} survey`, detail: 'Build a broader wildlife, Earth, and places record here.', current: regionalIdentifications, target: 6, reward: 'Regional Pathfinder recognition' };
   } else if (progress.points < 20) {
-    goal = { id: 'reach-field-explorer', label: 'Reach Field Explorer', detail: 'Explore new regions and build more than one specialty.', current: progress.points, target: 20, reward: 'Unlock Fossil Brushes and the Field Shovel' };
+    goal = { id: 'reach-field-explorer', label: 'Reach Field Explorer', detail: 'Explore new regions and build more than one specialty.', current: progress.points, target: 20, reward: 'Unlock advanced field tools and Portable Sonar' };
   } else {
+    const paths = progress.paths || {};
+    if ((paths.activity?.firsts || 0) < 1) {
+      goal = { id: 'first-game', label: 'Complete a world activity', detail: 'Choose a game from Games & Activities and finish its route.', current: 0, target: 1, reward: 'Begin your Games path' };
+    } else if ((paths.creation?.firsts || 0) < 1) {
+      goal = { id: 'first-creation', label: 'Leave your mark on the world', detail: 'Save an Editor feature or reach your first Blocks milestone.', current: 0, target: 1, reward: 'Earn the World Maker badge' };
+    } else if ((paths.travel?.records || 0) < 3) {
+      goal = { id: 'three-places', label: 'Explore three places', detail: 'Visit two more destinations and build a wider Journal.', current: paths.travel?.records || 0, target: 3, reward: 'Grow your Travel path' };
+    } else if (progress.points < 45) {
+      goal = { id: 'reach-expeditioner', label: 'Reach Expeditioner', detail: 'Fieldwork, games, making, travel, companions, and community firsts all count.', current: progress.points, target: 45, reward: 'Expeditioner rank' };
+    } else {
     const nature = Number(progress.specialties?.nature?.uniqueDiscoveries) || 0;
     const earth = Number(progress.specialties?.earth?.uniqueDiscoveries) || 0;
     const places = Number(progress.specialties?.places?.uniqueDiscoveries) || 0;
     const balanced = Math.min(nature, earth, places);
     goal = { id: 'balanced-explorer', label: 'Build all three Explorer specialties', detail: 'Identify Nature, Earth, and Places discoveries across your travels.', current: Math.min(3, balanced), target: 3, reward: 'Balanced Explorer recognition' };
+    }
   }
   return Object.freeze({ ...goal, regionId, regionLabel, complete: goal.current >= goal.target, progressPercent: Math.min(100, Math.round(goal.current / Math.max(1, goal.target) * 100)) });
 }

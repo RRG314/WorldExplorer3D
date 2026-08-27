@@ -1,7 +1,7 @@
 import {
   ALL_REGIONAL_SOURCE_MANIFEST,
   REGIONAL_TAXON_DISCOVERIES
-} from './ecology/regional-packs.js?v=1';
+} from './ecology/regional-packs.js?v=2';
 
 const DISCOVERY_CATALOG_VERSION = '2026.08.27.1';
 
@@ -300,7 +300,7 @@ const FIND_CATALOG = Object.freeze([
 const FIELD_DISCOVERY_CATALOG = Object.freeze([
   { id: 'area-survey-note', names: { common: 'Area Survey Note' }, family: 'exploration-record', activityIds: ['inspect', 'survey'], contexts: ['any'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual note describing the current compiled environment context.', sourceRefs: [sourceRef('we3d-original', 'field:area-survey')] },
   { id: 'granite-field-sample', names: { common: 'Granite Field Sample', scientific: 'Coarse-grained intrusive igneous rock' }, visualId: 'granite', family: 'rock', activityIds: ['geology-inspect'], contexts: ['mountain', 'outcrop'], rarityBand: 'common', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual specimen representing coarse-grained igneous rock. The photograph is an identification reference, not a location claim.', sourceRefs: [sourceRef('we3d-original', 'field:granite')] },
-  { id: 'quartz-vein-sample', names: { common: 'Quartz Vein Sample', scientific: 'SiO₂' }, visualId: 'quartz', family: 'mineral', activityIds: ['geology-inspect', 'pan-sediment'], contexts: ['outcrop', 'mountain', 'riverbank'], rarityBand: 'uncommon', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual quartz-bearing sample generated for Earth-science gameplay. The photograph is an identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:quartz')] },
+  { id: 'quartz-vein-sample', names: { common: 'Quartz Vein Sample', scientific: 'SiO₂' }, visualId: 'quartz', family: 'mineral', activityIds: ['geology-inspect', 'pan-sediment'], contexts: ['outcrop', 'mountain', 'riverbank'], rarityBand: 'uncommon', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual quartz-bearing sample for Earth-science play. The photograph is an identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:quartz')] },
   { id: 'river-heavy-sand', names: { common: 'Heavy River Sand' }, family: 'sediment', activityIds: ['pan-sediment'], contexts: ['riverbank', 'stream'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'specimen', description: 'A concentrate from virtual sediment panning.', sourceRefs: [sourceRef('we3d-original', 'field:river-sand')] },
   { id: 'shell-impression-cast', names: { common: 'Shell Impression Cast', scientific: 'Molluscan fossil material' }, visualId: 'fossil-shells', family: 'fossil-representation', activityIds: ['fossil-document'], contexts: ['fossil-formation'], rarityBand: 'uncommon', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual cast, not a claim of a fossil at this exact location. The photograph is a museum reference.', sourceRefs: [sourceRef('we3d-original', 'field:shell-impression')] },
   { id: 'sea-glass-fragment', names: { common: 'Sea Glass Fragment' }, family: 'beach-find', activityIds: ['beachcomb'], contexts: ['beach'], rarityBand: 'common', qualityBand: 'weathered', tradePolicy: 'collectible', description: 'A virtual shoreline find.', sourceRefs: [sourceRef('we3d-original', 'field:sea-glass')] },

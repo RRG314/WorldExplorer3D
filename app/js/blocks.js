@@ -192,6 +192,13 @@ function rememberBuildAction(action) {
   if (buildActionHistory.length > BUILD_HISTORY_LIMIT) buildActionHistory.shift();
   showBuildTransientMessage('');
   syncBlockBuilderUi();
+  const snapshot = getBlockBuilderSnapshot();
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:block-builder-change', { detail: {
+    action: action.kind,
+    worldId: getCurrentLocationKey() || 'current-world',
+    count: snapshot.count,
+    shared: snapshot.shared === true
+  } }));
 }
 
 function discardNewestBuildAction(kind, entry) {

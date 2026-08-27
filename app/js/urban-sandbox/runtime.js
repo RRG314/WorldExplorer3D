@@ -4,7 +4,7 @@ import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=2';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=5';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=6';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=8';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -1416,6 +1416,8 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentUi?.close?.removeEventListener('click', state.onEquipmentClose);
   state.equipmentUi?.slots?.removeEventListener('click', state.onEquipmentSlotClick);
   state.equipmentUi?.contents?.removeEventListener('click', state.onEquipmentSlotClick);
+  state.equipmentUi?.filters?.removeEventListener('click', state.onBackpackFilterClick);
+  state.equipmentUi?.detail?.removeEventListener('click', state.onBackpackDetailClick);
   document.getElementById('caughtBtn')?.removeEventListener('click', state.onCustodyContinue);
   if (appCtx.handleUrbanCustodyContinue === state.onCustodyContinue) delete appCtx.handleUrbanCustodyContinue;
   const caughtMessage = document.getElementById('caughtScreen')?.querySelector?.('.caughtText');
@@ -1514,6 +1516,8 @@ function startUrbanSandboxRuntime(options = {}) {
     root: document.getElementById('urbanEquipment'),
     slots: document.getElementById('urbanEquipmentSlots'),
     contents: document.getElementById('urbanBackpackContents'),
+    filters: document.getElementById('urbanBackpackFilters'),
+    detail: document.getElementById('urbanBackpackDetail'),
     status: document.getElementById('urbanEquipmentStatus'),
     conditionText: document.getElementById('urbanPlayerConditionText'),
     conditionFill: document.getElementById('urbanPlayerConditionFill'),
@@ -1563,6 +1567,8 @@ function startUrbanSandboxRuntime(options = {}) {
     disposed: false,
     reason: '',
     defaultCarChildren: [...(appCtx.carMesh?.children || [])],
+    backpackFilter: 'all',
+    backpackSelectedId: '',
     defaultWheelMeshes: [...(appCtx.wheelMeshes || [])],
     defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'classic-utility-d'),
     lastAction: null,
@@ -1691,10 +1697,27 @@ function startUrbanSandboxRuntime(options = {}) {
   state.onEquipmentSlotClick = (event) => {
     const button = event.target?.closest?.('[data-equipment-id]');
     if (!button || !state.equipmentUi.root.contains(button)) return;
+    if (button.dataset.backpackInspect === 'true') {
+      state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
+      return;
+    }
     if (state.equipment.equip(button.dataset.equipmentId)) {
       setStatus(state, `${state.equipment.equipped().label} equipped.`, 1200);
       renderEquipment(state);
     }
+  };
+  state.onBackpackFilterClick = (event) => {
+    const button = event.target?.closest?.('[data-backpack-filter]');
+    if (button) state.equipmentRuntime?.setFilter?.(button.dataset.backpackFilter);
+  };
+  state.onBackpackDetailClick = (event) => {
+    const button = event.target?.closest?.('[data-equipment-id]');
+    if (!button) return;
+    state.equipmentRuntime?.handleBackpackAction?.(
+      button.dataset.backpackAction || '',
+      button.dataset.equipmentId,
+      button.dataset.backpackSlot || null
+    );
   };
   prompt.button?.addEventListener('click', state.onPromptClick);
   prompt.secondaryButton?.addEventListener('click', state.onSecondaryClick);
@@ -1704,6 +1727,8 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.handleUrbanCustodyContinue = state.onCustodyContinue;
   equipmentUi.slots?.addEventListener('click', state.onEquipmentSlotClick);
   equipmentUi.contents?.addEventListener('click', state.onEquipmentSlotClick);
+  equipmentUi.filters?.addEventListener('click', state.onBackpackFilterClick);
+  equipmentUi.detail?.addEventListener('click', state.onBackpackDetailClick);
   state.unsubscribeBackpack = state.equipment.subscribe(() => {
     backpackStore.save(state.equipment.exportState());
     if (activeWorldMatches(state)) renderEquipment(state);

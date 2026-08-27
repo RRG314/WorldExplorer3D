@@ -1,15 +1,15 @@
-import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=2';
 import { createCompanionRuntime } from './companion-runtime.js?v=2';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=2';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
-import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=1';
+import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
 import { compileEnvironmentContext } from './environment-context.js?v=1';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
-import { explorerProgressSnapshot } from './explorer-events.js?v=1';
+import { explorerProgressSnapshot } from './explorer-events.js?v=2';
 import {
   RELEASED_EXPLORER_TOOLS,
   explorerGoalSnapshot,
@@ -24,7 +24,7 @@ import {
   createDiscoveryPublicationStore,
   resolveContextActions
 } from './model.js?v=1';
-import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=1';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=2';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
 import { emitDiscoveryTelemetry } from './telemetry.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
@@ -39,7 +39,7 @@ import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
   'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
   'fossil-document', 'forage', 'wildlife-track', 'beachcomb', 'fish',
-  'nature-observe', 'insect-macro', 'habitat-survey', 'community-survey'
+  'nature-observe', 'insect-macro', 'habitat-survey', 'community-survey', 'sonar-survey'
 ]);
 
 const WILDLIFE_OBSERVATION_CATALOG = Object.freeze({
@@ -76,7 +76,10 @@ function discoveryItemBackpackRecord(item) {
       label: item.name || item.catalogId,
       category: 'specimen',
       icon: 'FIND',
-      verbs: ['inspect', 'trade', 'quest']
+      verbs: ['inspect'],
+      description: item.description || `${item.name || item.catalogId} was added through ${displayDiscoveryLabel(item.activityId, 'an Explorer activity')}.`,
+      regionLabel: item.regionLabel || '',
+      evidenceClass: item.evidenceClass || ''
     }
   };
 }
@@ -94,7 +97,8 @@ function projectDiscoveryItemsToBackpack(appCtx, items = []) {
         label: record.metadata.label,
         category: record.metadata.category,
         icon: record.metadata.icon,
-        verbs: record.metadata.verbs
+        verbs: record.metadata.verbs,
+        description: record.metadata.description
       },
       silent: true
     });
@@ -120,23 +124,29 @@ const TOOL_FIELD_USE = Object.freeze({
   'sediment-pan': 'Survey virtual sediment along suitable streams and riverbanks.',
   'fossil-brush': 'Clean and document virtual fossil evidence.',
   'specimen-brush': 'Reveal delicate virtual fossil and specimen details.',
-  'field-shovel': 'Excavate moderate-depth detector finds after classification.'
+  'field-shovel': 'Excavate moderate-depth detector finds after classification.',
+  'portable-sonar': 'Scan a modeled water habitat and add regional fish references to your Guide without claiming a live fish is present.'
 });
 
 const EXPLORER_SECTION_TUTORIALS = Object.freeze({
   workspace: Object.freeze({ id: 'explorer-workspace-v1', title: 'Your Explorer loop', steps: Object.freeze([
     'Choose one nearby lead. The first option is the best fit for this place; the next two are alternatives.',
     'Begin, then minimize this Journal so the equipped tool and world-space signal can guide you.',
-    'Record the result. Every completed action enters the Journal and Field Guide; only acquired virtual objects enter your Backpack.',
+    'Record the result. Everything you finish enters the Journal. Field identifications also update the Guide; acquired virtual objects enter your Backpack.',
     'Current Goal and Progress show what to pursue next without forcing every system at once.'
   ]) }),
+  journal: Object.freeze({ id: 'explorer-journal-v1', title: 'Journal', steps: Object.freeze([
+    'The Journal is the shared story of your fieldwork, games, creations, travel, rooms, and companions.',
+    'Filter by Explorer path or place when you want to find a particular memory.',
+    'A saved location can return you to that place. Guide entries and Backpack items stay in their own sections.'
+  ]) }),
   guide: Object.freeze({ id: 'explorer-guide-v1', title: 'Field Guide', steps: Object.freeze([
-    'The Field Guide answers what exists and what you have identified; it is not an inventory.',
-    'Unknown silhouettes are future identification targets. Search and category filters narrow the catalog.',
+    'The Field Guide shows regional reference groups and what you have identified; it is not an inventory.',
+    'Unidentified groups show how much is left and which field methods can help. Search and category filters narrow the Guide.',
     'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
   ]) }),
-  collection: Object.freeze({ id: 'explorer-places-v2', title: 'Places & Contacts', steps: Object.freeze([
-    'Places collects the regions and contacts connected to your Journal records.',
+  collection: Object.freeze({ id: 'explorer-places-v3', title: 'Places', steps: Object.freeze([
+    'Places collects the regions connected to your Journal records.',
     'It is a guide to where things happened. Acquired objects live only in the Backpack.'
   ]) }),
   gear: Object.freeze({ id: 'explorer-field-kit-v2', title: 'Field Kit Guide', steps: Object.freeze([
@@ -148,7 +158,7 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
   progress: Object.freeze({ id: 'explorer-progress-v1', title: 'Explorer Progress', steps: Object.freeze([
     'New identifications earn the strongest rank credit; documenting known evidence in a new region also counts.',
     'Regional goals mix Nature, Earth, Places, and field activities so one repeated action cannot complete everything.',
-    'Specialties describe your Explorer story while rank unlocks additional ways to play.'
+    'Fieldwork, Games, Making, Travel, Community, and Companion paths describe your Explorer story while rank unlocks additional ways to play.'
   ]) })
 });
 
@@ -178,7 +188,17 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'exploration-record': 'Field note',
     'creation-record': 'Stewardship record',
     'service-record': 'Survey record',
-    'not-tradeable': 'Personal record'
+    'not-tradeable': 'Personal record',
+    'place-visited': 'Place visit',
+    'activity-completed': 'Game completed',
+    'world-edited': 'World edit',
+    'building-milestone': 'Blocks milestone',
+    'creation-saved': 'Creation saved',
+    'creation-submitted': 'Creation shared',
+    'room-joined': 'Room joined',
+    'companion-activate': 'Companion selected',
+    'companion-feed': 'Companion care',
+    'companion-train': 'Companion training'
   };
   if (labels[key]) return labels[key];
   const spaced = key.replaceAll('-', ' ').replaceAll('_', ' ').replace(/\s+/g, ' ').trim();
@@ -217,7 +237,7 @@ function createDiscoveryUi(state) {
     message: byId('discoveryMessage'), primary: byId('discoveryPrimaryBtn'), secondary: byId('discoverySecondaryBtn'),
     journal: byId('discoveryJournalList'), journalCategory: byId('discoveryJournalCategory'), journalRegion: byId('discoveryJournalRegion'), result: byId('discoveryResultCard'),
     fieldGuide: byId('discoveryFieldGuideList'), collection: byId('discoveryCollectionList'),
-    guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'),
+    guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'), guideScope: byId('discoveryGuideScope'),
     lifeList: byId('discoveryLifeList'), retention: byId('discoveryRetentionDashboard'),
     guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
     companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
@@ -227,7 +247,8 @@ function createDiscoveryUi(state) {
     sectionTutorial: byId('discoverySectionTutorial'), sectionTutorialTitle: byId('discoverySectionTutorialTitle'),
     sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
     inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal'),
-    fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList')
+    fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList'), expeditionMode: byId('discoveryExpeditionMode'),
+    exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
   };
   const listeners = [];
   let activeTab = 'today';
@@ -261,47 +282,87 @@ function createDiscoveryUi(state) {
     if (!elements.fieldGuide) return;
     const search = String(elements.guideSearch?.value || '').trim().toLowerCase();
     const category = String(elements.guideCategory?.value || 'all');
-    const knownIds = new Set(guideRecords.map((entry) => entry.catalogId));
-    const known = guideRecords.filter((entry) => {
+    const requestedScope = String(elements.guideScope?.value || 'current');
+    const regionalPack = resolveRegionalEcologyPack(state.publication.worldIdentity?.location);
+    const currentRegionIds = new Set(regionalPack?.taxa?.map((entry) => entry.id) || []);
+    const worldCatalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.filter((entry) =>
+      entry.activityIds?.some((activityId) => RELEASED_EXPLORER_ACTIVITIES.has(activityId))
+    );
+    const scopedCatalog = requestedScope === 'current' && regionalPack
+      ? worldCatalog.filter((entry) => currentRegionIds.has(entry.id))
+      : worldCatalog;
+    const scopedGuide = requestedScope === 'current' && regionalPack
+      ? guideRecords.filter((entry) => currentRegionIds.has(entry.catalogId) && entry.regions?.includes(state.worldIdentityId))
+      : guideRecords;
+    const knownIds = new Set(scopedGuide.map((entry) => entry.catalogId));
+    const known = scopedGuide.filter((entry) => {
       const catalog = discoveryCatalogEntry(entry.catalogId);
       if (category !== 'all' && guideCategoryFor(entry) !== category) return false;
       const haystack = `${entry.name || ''} ${entry.family || ''} ${catalog?.names?.scientific || ''}`.toLowerCase();
       return !search || haystack.includes(search);
     });
-    const unknown = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.filter((entry) => {
+    const unknown = scopedCatalog.filter((entry) => {
       if (knownIds.has(entry.id)) return false;
       if (category !== 'all' && guideCategoryFor(entry) !== category) return false;
       const haystack = `${entry.names?.common || ''} ${entry.family || ''} ${entry.names?.scientific || ''}`.toLowerCase();
       return !search || haystack.includes(search);
-    }).slice(0, 6);
+    });
     const knownMarkup = known.map((entry) => {
       const catalog = discoveryCatalogEntry(entry.catalogId);
       const regions = Array.isArray(entry.regionLabels) ? entry.regionLabels.filter(Boolean) : [];
       return visualCard(entry, `${displayDiscoveryLabel(entry.family || catalog?.family)} · ${entry.observations || 1} observation${entry.observations === 1 ? '' : 's'} · ${regions.length || 1} region${regions.length === 1 ? '' : 's'} · ${displayDiscoveryLabel(entry.evidenceClass, 'Field record')}`, 'field-guide');
     }).join('');
-    const unknownMarkup = unknown.map((entry) => `<article class="discoveryItem discoveryUnknown"><span class="discoveryUnknownMark" aria-hidden="true">?</span><div><strong>Unknown ${escapeHtml(displayDiscoveryLabel(entry.family, 'discovery'))}</strong><small>Explore a compatible place and use the right field tool to identify this entry.</small></div></article>`).join('');
+    const familyLabels = {
+      'mammal-taxon': 'mammals',
+      'bird-taxon': 'birds',
+      'insect-arachnid-taxon': 'insects and arachnids',
+      'plant-taxon': 'plants',
+      'freshwater-fish-taxon': 'freshwater fish',
+      'marine-fish-taxon': 'marine fish'
+    };
+    const unknownGroups = new Map();
+    unknown.forEach((entry) => {
+      const key = String(entry.family || 'discoveries');
+      const group = unknownGroups.get(key) || { entries: [], activityIds: new Set() };
+      group.entries.push(entry);
+      entry.activityIds?.filter((id) => RELEASED_EXPLORER_ACTIVITIES.has(id)).forEach((id) => group.activityIds.add(id));
+      unknownGroups.set(key, group);
+    });
+    const unknownMarkup = [...unknownGroups.entries()].map(([family, group]) => {
+      const label = familyLabels[family] || displayDiscoveryLabel(family, 'discoveries').replace(/ taxon$/i, '').toLowerCase();
+      const methods = [...group.activityIds].slice(0, 3).map((id) => displayDiscoveryLabel(id)).join(', ');
+      return `<article class="discoveryItem discoveryUnknown"><span class="discoveryUnknownMark" aria-hidden="true">?</span><div><strong>${group.entries.length} ${escapeHtml(label)} left to identify</strong><small>${methods ? `Try ${escapeHtml(methods)} in a suitable place.` : 'Explore a suitable place to begin.'}</small></div></article>`;
+    }).join('');
     elements.fieldGuide.innerHTML = knownMarkup || unknownMarkup
       ? `${knownMarkup}${unknownMarkup}`
       : '<div class="discoveryEmpty">No Guide entries match this search.</div>';
     if (elements.guideOverview) {
-      const total = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.length;
-      elements.guideOverview.innerHTML = `<article><strong>${guideRecords.length}</strong><span>identified</span></article><article><strong>${Math.max(0, total - guideRecords.length)}</strong><span>unknown in this catalog</span></article><article><strong>${new Set(guideRecords.flatMap((entry) => entry.regionLabels || [])).size}</strong><span>named regions</span></article>`;
+      const total = new Set([...scopedCatalog.map((entry) => entry.id), ...knownIds]).size;
+      const scopeLabel = requestedScope === 'current' && regionalPack ? `${state.regionLabel} area` : 'World';
+      elements.guideOverview.innerHTML = `<article><strong>${knownIds.size}</strong><span>identified here</span></article><article><strong>${Math.max(0, total - knownIds.size)}</strong><span>left to discover</span></article><article><strong>${escapeHtml(scopeLabel)}</strong><span>Guide scope</span></article>`;
     }
   }
 
   function renderJournal() {
     if (!elements.journal) return;
-    const specialty = String(elements.journalCategory?.value || 'all');
+    const path = String(elements.journalCategory?.value || 'all');
     const regionId = String(elements.journalRegion?.value || 'all');
     const filtered = journalRecords.filter((event) =>
-      (specialty === 'all' || event.specialtyId === specialty) &&
+      (path === 'all' || (event.pathId || 'field') === path) &&
       (regionId === 'all' || event.regionId === regionId)
     );
+    const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
     elements.journal.innerHTML = filtered.length ? filtered.slice(0, 16).map((event) => {
       const when = new Date(Number(event.occurredAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      const destination = event.projections?.collection ? 'Guide + Backpack item' : 'Guide record';
-      const returnButton = event.locationKey ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${displayDiscoveryLabel(event.activityId, 'Field work')} · ${destination}`)}</small><span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Documented · no repeat rank credit'}</span>${returnButton}</article>`;
+      const connections = [
+        event.projections?.fieldGuide ? 'also in Field Guide' : '',
+        event.projections?.collection ? 'also in Backpack' : ''
+      ].filter(Boolean).join(' + ');
+      const canReturn = event.locationKey || (Number.isFinite(event.locationSnapshot?.lat) && Number.isFinite(event.locationSnapshot?.lon));
+      const returnButton = canReturn ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
+      const activity = displayDiscoveryLabel(event.activityId || event.eventType || event.pathId, 'Explorer memory');
+      const eventPath = event.pathId || 'field';
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${returnButton}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
   }
 
@@ -322,7 +383,7 @@ function createDiscoveryUi(state) {
       elements.journalRegion.value = regions.some(([id]) => id === selectedRegion) ? selectedRegion : 'all';
     }
     const rank = explorerProgressSnapshot(profile.explorerProgress);
-    if (elements.rank) elements.rank.innerHTML = `<span>EXPLORER RANK</span><strong>${escapeHtml(rank.rankLabel)}</strong><small>${rank.next ? `${rank.next.pointsRemaining} points to ${escapeHtml(rank.next.label)} · new identifications and new-region evidence count` : 'Highest current rank · keep building your regional story'}</small>`;
+    if (elements.rank) elements.rank.innerHTML = `<span>EXPLORER RANK</span><strong>${escapeHtml(rank.rankLabel)}</strong><small>${rank.next ? `${rank.next.pointsRemaining} points to ${escapeHtml(rank.next.label)} · find something new or explore a new place` : 'Highest current rank · keep exploring and building your story'}</small>`;
     const goal = explorerGoalSnapshot({ profile, guide, items, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
     if (elements.goal) elements.goal.innerHTML = `<div class="discoveryGoalCopy"><span>CURRENT GOAL</span><strong>${escapeHtml(goal.label)}</strong><small>${escapeHtml(goal.detail)}</small></div><div class="discoveryGoalMeter" aria-label="${escapeHtml(`${goal.current} of ${goal.target}`)}"><i style="width:${goal.progressPercent}%"></i></div><div class="discoveryGoalFoot"><b>${goal.current}/${goal.target}</b><span>${escapeHtml(goal.reward)}</span></div>`;
     const regionalPack = resolveRegionalEcologyPack(state.publication.worldIdentity?.location);
@@ -337,7 +398,7 @@ function createDiscoveryUi(state) {
       const rhythm = [retention.daily, retention.weekly, retention.seasonal].map((period) => {
         const objectives = period.objectives || [period.objective];
         const programNote = period.phase === 'ineligible'
-          ? 'A reviewed regional survey is not available for this location yet.'
+          ? 'Seasonal surveys are not available in this place yet.'
           : 'Personal field progress · missed days never remove permanent records';
         return `<article class="discoveryRetentionCard" data-mission-phase="${escapeHtml(period.phase)}"><span>${escapeHtml(period.label)}</span>${objectives.map((entry) => `<div class="discoveryRetentionObjective${entry.complete ? ' complete' : ''}"><div><strong>${entry.complete ? '✓ ' : ''}${escapeHtml(entry.label)}</strong><small>${escapeHtml(entry.detail)}</small></div><b>${Math.min(entry.current, entry.target)}/${entry.target}</b><i><em style="width:${entry.progressPercent}%"></em></i></div>`).join('')}<small>${escapeHtml(programNote)}</small></article>`;
       }).join('');
@@ -348,8 +409,8 @@ function createDiscoveryUi(state) {
       const groups = retention.lifeList.groups.filter((entry) => entry.target > 0);
       const methods = retention.evidenceSpecialties.filter((entry) => entry.records > 0);
       elements.lifeList.innerHTML = regionalPack
-        ? `<div class="discoveryLifeListHead"><div><span>REGIONAL LIFE LIST</span><strong>${retention.lifeList.identified}/${retention.lifeList.target}</strong></div><small>Reviewed catalog progress · not a live-presence count</small></div><div class="discoveryLifeListGrid">${groups.map((entry) => `<article><span>${escapeHtml(entry.label)}</span><b>${entry.current}/${entry.target}</b><i><em style="width:${Math.min(100, Math.round(entry.current / Math.max(1, entry.target) * 100))}%"></em></i></article>`).join('')}</div><div class="discoveryEvidenceSpecialties"><span>EVIDENCE SPECIALTIES</span><small>${methods.length ? methods.map((entry) => `${displayDiscoveryLabel(entry.id)} ${entry.records}`).join(' · ') : 'Complete a typed field record to begin.'}</small></div><div class="discoveryEvidenceSpecialties"><span>CREATURE QUALITY</span><small>${state.creatureQualityAudit.tiers['reference-fallback'] || 0} reference fallbacks · ${state.creatureQualityAudit.promotionReadyCount} reviewed media/model promotions</small></div>`
-        : '<div class="discoveryEmpty">Regional life lists appear where a reviewed ecology pack is available.</div>';
+        ? `<div class="discoveryLifeListHead"><div><span>REGIONAL LIFE LIST</span><strong>${retention.lifeList.identified}/${retention.lifeList.target}</strong></div><small>Guide progress · not a live wildlife count</small></div><div class="discoveryLifeListGrid">${groups.map((entry) => `<article><span>${escapeHtml(entry.label)}</span><b>${entry.current}/${entry.target}</b><i><em style="width:${Math.min(100, Math.round(entry.current / Math.max(1, entry.target) * 100))}%"></em></i></article>`).join('')}</div><div class="discoveryEvidenceSpecialties"><span>WAYS YOU EXPLORE</span><small>${methods.length ? methods.map((entry) => `${displayDiscoveryLabel(entry.id)} ${entry.records}`).join(' · ') : 'Complete a field record to begin.'}</small></div>`
+        : '<div class="discoveryEmpty">Regional life lists appear in places with a dedicated Field Guide.</div>';
     }
     renderJournal();
     if (elements.collection) {
@@ -359,16 +420,17 @@ function createDiscoveryUi(state) {
         count: events.filter((candidate) => candidate.regionId === event.regionId).length,
         lastAt: Math.max(...events.filter((candidate) => candidate.regionId === event.regionId).map((candidate) => Number(candidate.occurredAt) || 0))
       }])).values()].sort((left, right) => right.lastAt - left.lastAt);
-      elements.collection.innerHTML = places.length ? places.map((place) =>
-        `<article class="discoveryItem"><strong>${escapeHtml(place.label)}</strong><small>${place.count} Journal record${place.count === 1 ? '' : 's'} · saved Explorer region</small></article>`
-      ).join('') : '<div class="discoveryEmpty">Complete an activity or observation to add its region to Places.</div>';
+      elements.collection.innerHTML = places.length ? places.map((place) => {
+        const latest = events.find((event) => event.regionId === place.id && (event.locationKey || (Number.isFinite(event.locationSnapshot?.lat) && Number.isFinite(event.locationSnapshot?.lon))));
+        return `<article class="discoveryItem"><strong>${escapeHtml(place.label)}</strong><small>${place.count} Journal record${place.count === 1 ? '' : 's'} · saved Explorer place</small>${latest ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(latest.eventId)}" type="button">Return to place</button>` : ''}</article>`;
+      }).join('') : '<div class="discoveryEmpty">Complete an activity or observation to add its region to Places.</div>';
     }
     if (elements.tools) {
       const equippedToolId = String(state.equippedToolId || 'field-lens');
       const available = state.entitlements.listAvailableTools();
       const lockedProgress = new Map((state.toolProgress?.lockedTools || []).map((entry) => [entry.toolId, entry]));
       const availableMarkup = available.map((tool) =>
-        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Active activity tool' : ' · In Backpack'}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
+        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Ready for fieldwork' : ' · In Backpack'}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
       ).join('');
       const lockedMarkup = state.entitlements.listLockedTools().map((tool) => {
         const unlock = lockedProgress.get(tool.id);
@@ -404,6 +466,9 @@ function createDiscoveryUi(state) {
       const progress = rank;
       const regional = regionalProgressSnapshot({ guide, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
       const specialties = Object.entries(progress.specialties || {});
+      const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
+      const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
+      const badges = progress.badgeAwards || [];
       const regionEvents = new Map();
       events.forEach((event) => {
         const key = event.regionId || event.worldIdentity || 'local-region';
@@ -412,7 +477,10 @@ function createDiscoveryUi(state) {
         if (event.catalogId) row.catalogs.add(event.catalogId);
         regionEvents.set(key, row);
       });
-      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.uniqueDiscoveries || 0} unique identifications · ${progress.regions?.length || 0} regions</small></article><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.catalogs.size}</strong>${escapeHtml(region.label)}<small>${region.records} Journal record${region.records === 1 ? '' : 's'} · ${region.catalogs.size} identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first completed field record will start regional progress.</div>'}`;
+      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.totalRecords || 0} Journal memories · ${progress.regions?.length || 0} places</small></article><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')}${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} field records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.records}</strong>${escapeHtml(region.label)}<small>${region.catalogs.size} Guide identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first Explorer memory will start this story.</div>'}`;
+      if (badges.length) {
+        elements.progress.insertAdjacentHTML('beforeend', badges.map((badge) => `<article class="discoveryProgressCard"><strong>◆</strong>${escapeHtml(badge.label)}<small>Explorer badge</small></article>`).join(''));
+      }
     }
   }
 
@@ -431,8 +499,8 @@ function createDiscoveryUi(state) {
 
   function setTab(tab) {
     activeTab = tab;
-    const tabTitles = { today: 'Activities', guide: 'Field Guide', collection: 'Places & Contacts', gear: 'Field Kit Guide', progress: 'Explorer Progress' };
-    if (tab !== 'today' && elements.title) elements.title.textContent = tabTitles[tab] || 'Explorer Journal';
+    const tabTitles = { today: 'Explorer', journal: 'Journal', guide: 'Field Guide', collection: 'Places', gear: 'Field Kit', progress: 'Explorer Progress' };
+    if (elements.title) elements.title.textContent = tabTitles[tab] || 'Explorer';
     document.querySelectorAll('.discoveryTab').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === tab));
     document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === tab));
     const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${tab}"]`);
@@ -452,7 +520,7 @@ function createDiscoveryUi(state) {
     const collection = event.projections?.collection === true;
     const points = Number(event.progress?.points) || 0;
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · New Field Guide evidence · Item added to Backpack' : 'Journal updated · New Field Guide evidence · No owned item created')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation documented · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation saved · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }
@@ -481,6 +549,7 @@ function createDiscoveryUi(state) {
     elements.guideHelpButton.setAttribute('aria-expanded', elements.guideHelp.hidden ? 'false' : 'true');
   });
   listen(elements.guideSearch, 'input', renderGuide);
+  listen(elements.guideScope, 'change', renderGuide);
   listen(elements.guideCategory, 'change', renderGuide);
   listen(elements.journalCategory, 'change', renderJournal);
   listen(elements.journalRegion, 'change', renderJournal);
@@ -512,6 +581,37 @@ function createDiscoveryUi(state) {
     setOpen(false);
     state.appCtx.toggleUrbanEquipment?.(true);
   });
+  listen(elements.exportData, 'click', async () => {
+    try {
+      const data = await state.profileStore.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `world-explorer-journal-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      if (elements.backupStatus) elements.backupStatus.textContent = 'Journal backup downloaded.';
+    } catch (error) {
+      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The backup could not be created.';
+    }
+  });
+  listen(elements.importData, 'click', () => elements.importFile?.click());
+  listen(elements.importFile, 'change', async () => {
+    const file = elements.importFile?.files?.[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!globalThis.confirm?.('Restore this Journal backup? Current local Explorer records in this browser will be replaced.')) return;
+      const result = await state.profileStore.importData(data);
+      await refreshData();
+      if (elements.backupStatus) elements.backupStatus.textContent = `Restored ${result.events} Journal memories and ${result.guide} Guide entries.`;
+    } catch (error) {
+      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'This backup could not be restored.';
+    } finally {
+      if (elements.importFile) elements.importFile.value = '';
+    }
+  });
   listen(elements.result, 'click', (event) => {
     if (event.target?.closest?.('[data-open-backpack]')) {
       setOpen(false);
@@ -522,6 +622,11 @@ function createDiscoveryUi(state) {
     if (button) setTab(button.dataset.resultTab || 'today');
   });
   [elements.fieldGuide, elements.collection].forEach((container) => listen(container, 'click', (event) => {
+    const returnButton = event.target?.closest?.('[data-journal-return]');
+    if (returnButton) {
+      void state.returnToJournalEvent?.(returnButton.dataset.journalReturn);
+      return;
+    }
     const button = event.target?.closest?.('[data-ar-record]');
     if (button) void state.handleArRecord(button.dataset.arRecord, button.dataset.arSource);
   }));
@@ -529,6 +634,9 @@ function createDiscoveryUi(state) {
 
   function render(actions, snapshot, activityId = 'metal-detect') {
     const liveGps = state.appCtx.getLiveGpsSnapshot?.() || { active: false };
+    if (elements.expeditionMode) elements.expeditionMode.textContent = liveGps.active
+      ? 'THREE GPS WALKING STOPS'
+      : 'THREE NEARBY FIELD STOPS';
     const expedition = state.fieldExpedition?.snapshot?.(
       playerPosition(state.appCtx),
       liveGps.active ? (target) => state.evaluateFieldTarget?.(target) : null
@@ -584,7 +692,7 @@ function createDiscoveryUi(state) {
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
-    if (elements.title && activeTab === 'today') elements.title.textContent = activeAction?.label || (activityId === 'metal-detect' ? 'Metal Detector' : 'Today');
+    if (elements.title && activeTab === 'today') elements.title.textContent = 'Explorer';
     if (elements.quickLabel) elements.quickLabel.textContent = `Resume ${activeAction?.label || 'Field Activity'}`;
     if (!snapshot) return;
     if (elements.inspection) {
@@ -800,6 +908,8 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   state.companionRuntime?.dispose?.();
   state.wildlifeRuntime?.dispose?.();
   state.unregisterWildlifeInteraction?.();
+  state.unsubscribeBackpackToolSync?.();
+  state.unregisterExplorerListeners?.forEach?.((remove) => remove());
   state.audioContext?.close?.().catch?.(() => {});
   appCtx.worldDiscoveryPublicationStore?.clear?.();
   appCtx.worldDiscoveryPublication = null;
@@ -807,6 +917,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.toggleWorldDiscoveryJournal = null;
   appCtx.handleWorldDiscoveryQuickAction = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
+  if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
   return true;
 }
 
@@ -947,6 +1058,109 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     retentionSnapshot: null,
     creatureQualityAudit: auditRegionalCreatureQuality(resolveRegionalEcologyPack(worldIdentity.location))
   };
+  state.recordExplorerEvent = async (record = {}) => {
+    const position = playerPosition(appCtx);
+    const result = await profileStore.recordExplorerEvent?.({
+      regionId: state.worldIdentityId,
+      regionLabel: state.regionLabel,
+      worldIdentity: state.worldIdentityId,
+      locationKey: state.locationKey,
+      locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
+      environment: appCtx.getEnv?.() || 'EARTH',
+      localPosition: position,
+      ...record
+    });
+    if (result?.recorded) {
+      await state.refreshToolProgress?.();
+      await state.ui?.refreshData?.();
+    }
+    return result || { recorded: false, reason: 'event-store-unavailable' };
+  };
+  appCtx.recordExplorerEvent = state.recordExplorerEvent;
+  state.unregisterExplorerListeners = [];
+  const listenForExplorerEvent = (type, handler) => {
+    globalThis.addEventListener?.(type, handler);
+    state.unregisterExplorerListeners.push(() => globalThis.removeEventListener?.(type, handler));
+  };
+  listenForExplorerEvent('we3d:editable-world-change', (event) => {
+    const detail = event.detail || {};
+    if (!detail.worldId || !detail.action || detail.action === 'reset_world') return;
+    void state.recordExplorerEvent({
+      eventId: `event:creation:${detail.worldId}:${detail.revision || Date.now()}`,
+      eventType: 'world-edited',
+      sourceSystem: 'world-editor',
+      sourceId: `${detail.worldId}:${detail.revision || ''}`,
+      pathId: 'creation',
+      name: 'World edit saved',
+      detail: 'A change to this place was saved in the World Editor.',
+      points: 0,
+      progressReason: 'creative-history'
+    });
+  });
+  listenForExplorerEvent('we3d:block-builder-change', (event) => {
+    const detail = event.detail || {};
+    const count = Math.max(0, Number(detail.count) || 0);
+    const milestone = [1, 10, 25, 50, 100].find((target) => count === target);
+    if (!milestone || detail.action !== 'place') return;
+    void state.recordExplorerEvent({
+      eventId: `event:block-milestone:${detail.worldId}:${milestone}`,
+      eventType: 'building-milestone',
+      sourceSystem: 'blocks',
+      sourceId: `${detail.worldId}:${milestone}`,
+      pathId: 'creation',
+      name: milestone === 1 ? 'Placed the first block here' : `Built with ${milestone} blocks here`,
+      detail: detail.shared ? 'A shared-world building milestone.' : 'A building milestone saved at this place.',
+      firstCompletion: true,
+      points: milestone === 1 ? 2 : milestone >= 25 ? 3 : 2,
+      progressReason: 'building-milestone'
+    });
+  });
+  listenForExplorerEvent('we3d:editor-feature-saved', (event) => {
+    const detail = event.detail || {};
+    if (!detail.featureId) return;
+    const submitted = detail.reviewState === 'submitted';
+    void state.recordExplorerEvent({
+      eventId: `event:editor-feature:${detail.featureId}:${submitted ? 'submitted' : 'saved'}`,
+      eventType: submitted ? 'creation-submitted' : 'creation-saved',
+      sourceSystem: 'world-editor',
+      sourceId: detail.featureId,
+      pathId: 'creation',
+      name: `${detail.label || 'World feature'} ${submitted ? 'submitted' : 'saved'}`,
+      detail: submitted ? 'Submitted for community review.' : detail.storageMode === 'local' ? 'Saved on this device.' : 'Saved to your account.',
+      firstCompletion: true,
+      points: submitted ? 2 : 1,
+      progressReason: submitted ? 'creation-submitted' : 'creation-saved'
+    });
+  });
+  listenForExplorerEvent('we3d-room-changed', (event) => {
+    const room = event.detail?.room;
+    const roomId = String(room?.code || room?.id || '').trim();
+    if (!roomId) return;
+    void state.recordExplorerEvent({
+      eventId: `event:room-joined:${roomId}`,
+      eventType: 'room-joined',
+      sourceSystem: 'multiplayer',
+      sourceId: roomId,
+      pathId: 'community',
+      name: `Joined ${room.name || 'a shared room'}`,
+      detail: 'A shared-world visit was added to your Explorer story.',
+      firstCompletion: true,
+      points: 1,
+      progressReason: 'new-community-experience'
+    });
+  });
+  void state.recordExplorerEvent({
+    eventId: `event:place-visited:${state.worldIdentityId}`,
+    eventType: 'place-visited',
+    sourceSystem: 'world-travel',
+    sourceId: state.worldIdentityId,
+    pathId: 'travel',
+    name: `Explored ${state.regionLabel}`,
+    detail: 'This place is now part of your Explorer story.',
+    firstCompletion: true,
+    points: 1,
+    progressReason: 'new-place-visited'
+  });
   state.evaluateFieldTarget = (target, evidence = null) => {
     const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
     return liveGps.active ? appCtx.getLiveGpsFieldEligibility?.(target, evidence || approachEvidenceAt(target)) || null : null;
@@ -976,10 +1190,15 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.recordFishingExplorerCatch = async (catchRecord = {}) => {
     if (!catchRecord.id || !catchRecord.speciesId) return false;
     const position = playerPosition(appCtx);
+    const regionalPack = resolveRegionalEcologyPack(worldIdentity.location);
+    const regionalTaxon = regionalPack?.taxa?.find((entry) =>
+      entry.group.endsWith('-fish') &&
+      String(entry.localizedNames?.['en-US'] || '').toLowerCase() === String(catchRecord.species || '').toLowerCase()
+    ) || null;
     const result = await profileStore.recordObservation({
       instanceId: `fish-catch:${catchRecord.id}`,
       claimId: `claim:fishing:${catchRecord.id}`,
-      catalogId: catchRecord.speciesId,
+      catalogId: regionalTaxon?.id || catchRecord.speciesId,
       name: catchRecord.species || catchRecord.speciesId,
       description: 'Virtual fishing catch recorded through the shared Explorer Journal.',
       family: 'fish',
@@ -991,6 +1210,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       regionId: worldIdentity.id,
       regionLabel,
       locationKey: state.locationKey,
+      locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
       worldIdentity: worldIdentity.id,
       environment: appCtx.getEnv?.() || 'EARTH',
       localPosition: position,
@@ -1012,14 +1232,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         livePresenceClaim: false,
         locationRewardEligible: catchRecord.locationRewardEligible === true
       },
-      stableTaxonId: `we3d-game-fish:${catchRecord.speciesId}`,
-      taxonGroup: 'fish',
+      regionalPackId: regionalTaxon ? regionalPack.id : null,
+      regionalPackVersion: regionalTaxon ? regionalPack.version : null,
+      stableTaxonId: regionalTaxon?.stableTaxonId || `we3d-game-fish:${catchRecord.speciesId}`,
+      taxonGroup: regionalTaxon?.group || 'fish',
       supportingEvidence: [
         catchRecord.occurrenceTruth || 'simulated-gameplay-event',
         catchRecord.populationEvidence || 'gameplay-model-only',
         catchRecord.accessTruth || 'unknown-access'
       ],
-      sourceRefs: [],
+      sourceRefs: regionalTaxon?.sourceRefs || [],
       collectedAt: Date.now()
     }, { collection: true });
     if (!result.recorded && !result.collected) return false;
@@ -1104,6 +1326,14 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     await state.ui?.refreshData?.();
     return true;
   };
+  state.unsubscribeBackpackToolSync = appCtx.playerBackpackInventory?.subscribe?.((change) => {
+    if (change?.reason !== 'equipped-changed') return;
+    const equippedId = appCtx.playerBackpackInventory?.snapshot?.().equippedCatalogId;
+    if (!equippedId || state.entitlements.canUseTool(equippedId).allowed !== true || equippedId === state.equippedToolId) return;
+    state.equippedToolId = equippedId;
+    void profileStore.getProfile().then((profile) => profileStore.saveProfile({ ...profile, equippedToolId: equippedId }));
+    void state.ui?.refreshData?.();
+  });
   state.showToolHelp = async (toolId) => {
     const tool = state.entitlements.listAvailableTools().find((entry) => entry.id === String(toolId));
     if (!tool) return false;
@@ -1124,21 +1354,22 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     const events = await profileStore.listEvents?.(500) || [];
     const event = events.find((entry) => entry.eventId === String(eventId));
     const locationKey = String(event?.locationKey || '');
-    if (!event || !locationKey) return false;
-    if (!appCtx.LOCS?.[locationKey] || typeof appCtx.selectPresetLocation !== 'function') {
-      appCtx.showToast?.('This saved location can be reviewed here, but it is not a reusable preset.');
-      return false;
-    }
+    if (!event) return false;
+    const savedLocation = event.locationSnapshot || {};
+    const isPreset = !!(locationKey && appCtx.LOCS?.[locationKey] && typeof appCtx.selectPresetLocation === 'function');
+    const isCoordinate = Number.isFinite(savedLocation.lat) && Number.isFinite(savedLocation.lon) && typeof appCtx.setCustomLocation === 'function';
+    if (!isPreset && !isCoordinate) return false;
     state.ui?.setOpen(false);
-    if (String(appCtx.selLoc) === locationKey) {
+    if (isPreset && String(appCtx.selLoc) === locationKey) {
       appCtx.showToast?.(`Already exploring ${event.regionLabel || 'this location'}`);
       return true;
     }
-    appCtx.selectPresetLocation(locationKey);
+    if (isPreset) appCtx.selectPresetLocation(locationKey);
+    else appCtx.setCustomLocation({ lat: savedLocation.lat, lon: savedLocation.lon, name: savedLocation.name || event.regionLabel || 'Saved place' }, { transient: false });
     if (appCtx.ENV?.EARTH && appCtx.getEnv?.() !== appCtx.ENV.EARTH) appCtx.switchEnv?.(appCtx.ENV.EARTH);
     await appCtx.loadRoads?.();
     appCtx.spawnOnRoad?.();
-    appCtx.showToast?.(`Returned to ${event.regionLabel || appCtx.LOCS[locationKey].name}`);
+    appCtx.showToast?.(`Returned to ${event.regionLabel || appCtx.LOCS?.[locationKey]?.name || savedLocation.name || 'saved place'}`);
     return true;
   };
   const telemetryContextBands = () => environment.cells.find((cell) => cell.cellId === state.currentCellId)?.contexts || [];
@@ -1197,6 +1428,23 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
     else if (action === 'feed') await state.companionRuntime.feed(instanceId);
     else if (action === 'train') await state.companionRuntime.train(instanceId, 'find');
+    const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
+    if (companion && ['activate', 'feed', 'train'].includes(action)) {
+      const day = new Date().toISOString().slice(0, 10);
+      const eventSuffix = action === 'train' ? `find-${companion.training?.find || 0}` : action === 'feed' ? day : 'active';
+      void state.recordExplorerEvent({
+        eventId: `event:companion:${action}:${companion.instanceId}:${eventSuffix}`,
+        eventType: `companion-${action}`,
+        sourceSystem: 'companions',
+        sourceId: companion.instanceId,
+        pathId: 'companion',
+        name: action === 'activate' ? `${companion.name} joined the journey` : action === 'feed' ? `Cared for ${companion.name}` : `${companion.name} practiced finding`,
+        detail: action === 'train' ? `Find training ${companion.training?.find || 0}/5.` : 'A companion memory was added to your Journal.',
+        firstCompletion: action === 'train' && companion.training?.find === 5,
+        points: action === 'train' && companion.training?.find === 5 ? 2 : 0,
+        progressReason: action === 'train' && companion.training?.find === 5 ? 'companion-skill-mastered' : 'companion-memory'
+      });
+    }
     emitDiscoveryTelemetry(
       action === 'activate' ? 'companion_activated' : 'companion_cared_for',
       { result: action, contextBands: telemetryContextBands() }
@@ -1253,6 +1501,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       regionLabel: state.regionLabel,
       worldIdentity: state.worldIdentityId,
       locationKey: state.locationKey,
+      locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
       environment: appCtx.getEnv?.() || 'EARTH',
       localPosition: position,
       collectedAt: Date.now()
@@ -1401,6 +1650,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           toolId: ACTIVITY_TOOL[state.activeActivityId] || '',
           regionLabel,
           locationKey: state.locationKey,
+          locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
           environment: appCtx.getEnv?.() || 'EARTH',
           localPosition: position,
           evaluateFieldTarget: state.evaluateFieldTarget
@@ -1446,6 +1696,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         toolId: 'metal-detector',
         regionLabel,
         locationKey: state.locationKey,
+        locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
         environment: appCtx.getEnv?.() || 'EARTH',
         localPosition: position
       });
@@ -1653,4 +1904,4 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
   });
 }
 
-export { disposeWorldDiscoveryRuntime, startWorldDiscoveryRuntime, worldDiscoveryRuntimeSnapshot };
+export { RELEASED_EXPLORER_ACTIVITIES, disposeWorldDiscoveryRuntime, startWorldDiscoveryRuntime, worldDiscoveryRuntimeSnapshot };

@@ -1,4 +1,4 @@
-import { TOOL_CATALOG } from './catalog.js?v=1';
+import { TOOL_CATALOG } from './catalog.js?v=2';
 
 const DEPTH_BANDS = Object.freeze(['surface', 'shallow', 'moderate', 'deep', 'heavy']);
 
