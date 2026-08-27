@@ -598,6 +598,8 @@ function resetPlayerVehicleVisual(state) {
     delete appCtx.carMesh.userData.activeUrbanVehicleId;
     appCtx.carMesh.userData.vehicleStyle = state.defaultVehicleStyle;
   }
+  appCtx.car.vehicleVariantId = 'sedan';
+  appCtx.car.vehicleServiceType = '';
 }
 
 function mountVehicleForDriving(state, vehicle) {
@@ -613,6 +615,8 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.wheelMeshes = vehicle.visual.wheels;
   appCtx.carMesh.userData.activeUrbanVehicleId = vehicle.id;
   appCtx.carMesh.userData.vehicleStyle = `urban-${vehicle.variant.bodyStyle}`;
+  appCtx.car.vehicleVariantId = vehicle.variant.id;
+  appCtx.car.vehicleServiceType = vehicle.serviceType || '';
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;

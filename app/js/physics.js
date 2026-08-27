@@ -21,6 +21,7 @@ import {
   carSpeedToWorldUnitsPerSecond,
   mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=2";
+import { vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=3";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -198,6 +199,10 @@ function update(dt) {
     boostDecayFactor = Math.max(0, appCtx.car.boostDecayTime / 1.5);
   }
 
+  const vehicleHandling = vehicleHandlingProfile(appCtx.car.vehicleVariantId || 'sedan', {
+    serviceType: appCtx.car.vehicleServiceType || ''
+  });
+  appCtx.car.handlingProfile = vehicleHandling;
   let maxSpd, friction, accel;
   let planetaryNormalMaxSpd = appCtx.onMars ? 18 : 24;
 
@@ -242,9 +247,10 @@ function update(dt) {
       if (appCtx.car._roadContinuityTimer <= 0) appCtx.car.road = null;
     }
 
-    maxSpd = appCtx.car.boost ? appCtx.CFG.boostMax : appCtx.CFG.maxSpd;
+    const vehicleMaxSpd = mphToCarSpeed(vehicleHandling.topSpeedMph);
+    maxSpd = Math.min(vehicleMaxSpd, appCtx.car.boost ? appCtx.CFG.boostMax : appCtx.CFG.maxSpd);
     friction = appCtx.CFG.friction;
-    accel = appCtx.car.boost ? appCtx.CFG.boostAccel : appCtx.CFG.accel;
+    accel = (appCtx.car.boost ? appCtx.CFG.boostAccel : appCtx.CFG.accel) * vehicleHandling.accelerationScale;
   }
 
   const surfaceDynamics = updateVehicleSurface(appCtx, dt);
@@ -258,7 +264,7 @@ function update(dt) {
   const earthDriftBrakeIntent = !isPlanetarySurface() && braking && (left || right) && spd > driftBrakeSpeed;
 
   if (driveCommand.serviceBrake && canAccelerate) {
-    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18);
+    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) * (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale);
     const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
     appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
     if (nextMagnitude < 0.5) appCtx.car.speed = 0;
@@ -298,7 +304,9 @@ function update(dt) {
   appCtx.car.speed = Math.max(-maxSpd * 0.3, Math.min(maxSpd, appCtx.car.speed));
 
   if (boostDecayFactor > 0 && !appCtx.car.boost) {
-    const normalMaxSpd = isPlanetarySurface() ? planetaryNormalMaxSpd : appCtx.CFG.maxSpd;
+    const normalMaxSpd = isPlanetarySurface()
+      ? planetaryNormalMaxSpd
+      : Math.min(appCtx.CFG.maxSpd, mphToCarSpeed(vehicleHandling.topSpeedMph));
     if (Math.abs(appCtx.car.speed) > normalMaxSpd) {
       const targetSpeed = normalMaxSpd + (Math.abs(appCtx.car.speed) - normalMaxSpd) * boostDecayFactor;
       const sign = appCtx.car.speed >= 0 ? 1 : -1;
@@ -341,7 +349,7 @@ function update(dt) {
   const earthSteering = earthDrivingSteeringProfile(carSpeedToMph(spdAbs));
   const maxSteer = isPlanetarySurface()
     ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90))
-    : earthSteering.maxSteeringAngle;
+    : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale;
 
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
@@ -378,7 +386,7 @@ function update(dt) {
   const isDrifting = driftStartIntent || !!appCtx.car.isDrifting && driftCanSustain;
 
   // Surface grip baseline using existing runtime config values.
-  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip;
+  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip * (isPlanetarySurface() ? 1 : vehicleHandling.gripScale);
 
   // Moon handling remains unchanged by drift tuning.
   if (isPlanetarySurface()) gripBase = 1.0;
@@ -418,7 +426,7 @@ function update(dt) {
     }
   }
 
-  const wheelBase = 2.6;
+  const wheelBase = isPlanetarySurface() ? 2.6 : vehicleHandling.wheelBase;
   const v = isPlanetarySurface()
     ? appCtx.car.speed
     : carSpeedToWorldUnitsPerSecond(appCtx.car.speed, appCtx.METERS_PER_WORLD_UNIT);
@@ -429,7 +437,10 @@ function update(dt) {
   if (!isPlanetarySurface() && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= 1.22;
   }
-  const maxYawRate = isPlanetarySurface() ? Infinity : earthSteering.maxYawRate;
+  const radiusAuthority = Math.max(.76, Math.min(1.22, 5.2 / vehicleHandling.turningRadius));
+  const maxYawRate = isPlanetarySurface()
+    ? Infinity
+    : earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority;
   const yawRateTarget = arcadeSteeringYawTarget(
     v,
     steerAngle * steerAuthority,
