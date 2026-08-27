@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
+Last reviewed: 2026-08-27 for World Explorer 3D 5.0.0 and the 5.1 candidate.
 
 World Explorer keeps source identity and truth type with its data. Observations,
 forecasts and models, predictions, mapped features, and visual fallbacks are not
@@ -25,17 +25,20 @@ Required map attribution: `© OpenStreetMap contributors`.
 
 ## Regional Ecology
 
-The Baltimore–Chesapeake ecology pack uses the GBIF Backbone Taxonomy for
-stable taxon identity and Maryland Department of Natural Resources and
-Chesapeake Bay Program references for regional plausibility review. It does not
-include occurrence points or abundance estimates and does not claim that a real
-organism is present at a player location.
+The regional ecology registry uses the GBIF Backbone Taxonomy for stable taxon
+identity. Government and public-agency references support regional
+plausibility review. The packs do not include occurrence points or abundance
+estimates and do not claim that a real organism is present at a player
+location.
 
 | Source | Runtime use | Data class | License / terms |
 | --- | --- | --- | --- |
-| GBIF Backbone Taxonomy (2023 pinned compatibility taxonomy) | Stable taxonomy identity for the 60-taxon regional pack | Taxonomic reference | CC BY 4.0; GBIF Secretariat DOI 10.15468/39omei |
+| GBIF Backbone Taxonomy (2023 pinned compatibility taxonomy) | Stable taxonomy identity for regional packs | Taxonomic reference | CC BY 4.0; GBIF Secretariat DOI 10.15468/39omei |
 | Maryland Department of Natural Resources wildlife and native-plant lists | Factual regional plausibility review | Government reference | Reference only; no copied prose or media |
 | Chesapeake Bay Program Field Guide | Factual estuary and fish plausibility review | Government-program reference | Reference only; photography excluded unless separately permitted |
+| New York DEC, Illinois DNR, Florida FWC, California CDFW, Washington WDFW, and Clark County Desert Conservation Program | Factual state or county ecology review for candidate United States packs | Government reference | Reference only; copied prose, media, occurrence points, and abundance claims excluded |
+| European Environment Agency EUNIS and Monaco Direction de l’Environnement | Factual habitat and regional review for candidate European and Mediterranean packs | Public-agency reference | EEA material used under CC BY 4.0; Monaco material reference only |
+| Biodiversity Center of Japan and Dubai Municipality Protected Areas | Factual regional review for candidate Tokyo–Kanto and Dubai packs | Government reference | Reference only; copied prose, media, occurrence points, and abundance claims excluded |
 
 OpenStreetMap and ESA WorldCover can provide mapped habitat or land-cover
 context. Neither is used to infer species presence or abundance.

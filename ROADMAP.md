@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-08-26.
+Last updated: 2026-08-27.
 
 Version 5.0 is the current approved release. The roadmap below separates its
 shipped regional scope from later expansion work.
@@ -37,11 +37,24 @@ Completed for 5.0:
 
 ## Phase B: regional expansion
 
-After 5.0:
+In the 5.1 candidate:
 
-- Add independently reviewed ecology packs for more regions.
+- A single regional-pack registry now covers all 15 built-in Earth
+  destinations with 11 packs and 180 total taxa. The 120 newly added taxa are
+  integrated with walking, Live GPS, field activities, the Journal, Field
+  Guide, life lists, and recurring progression.
+- Each new pack retains taxonomy, habitat, season, regional-source, licensing,
+  attribution, localization, sensitive-species, version, migration, and
+  rollback metadata.
+- The expansion remains a reviewed regional field-guide slice. Independent
+  domain review is still required before the new packs are promoted from
+  candidate status.
+
+After the 5.1 candidate:
+
 - Promote more creatures from reference presentation to higher-quality,
   correctly scaled animated models with mobile LODs.
+- Add independently reviewed packs beyond the built-in destination regions.
 - Expand reviewed terrain, bathymetry, fish, interiors, and water access.
 - Broaden Live GPS device, accessibility, privacy, battery, and thermal review.
 - Add larger multiplayer capacity tests and fuller moderation workflows.

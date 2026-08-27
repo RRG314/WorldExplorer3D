@@ -1,5 +1,5 @@
 import { ACTIVITY_CATALOG, FIELD_DISCOVERY_CATALOG } from './catalog.js?v=1';
-import { resolveRegionalEcologyPack, selectRegionalTaxa } from './ecology/baltimore-pack.js?v=1';
+import { resolveRegionalEcologyPack, selectRegionalTaxa } from './ecology/regional-packs.js?v=1';
 import { buildFieldEvidencePayload, resolveFieldEvidenceContract } from './evidence-contracts.js?v=2';
 import { deterministicUnit, findCell, resolveDiscoverySlotPosition } from './model.js?v=1';
 import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
@@ -80,6 +80,8 @@ function compileFieldActivityPlan(environment, eligibility, options = {}) {
           cellId,
           slotIndex,
           catalogId: discovery.id,
+          regionalPackId: eligibleRegionalIds.has(discovery.id) ? regionalPack?.id || null : null,
+          regionalPackVersion: eligibleRegionalIds.has(discovery.id) ? regionalPack?.version || null : null,
           rarityBand: discovery.rarityBand || 'common',
           position,
           evidenceClass: 'guided-field-lead',
@@ -108,7 +110,7 @@ function compileFieldActivityPlan(environment, eligibility, options = {}) {
 }
 
 function entryEvidence(discovery, temporal = {}, regionalPack = null) {
-  if (!discovery?.regionalPackId || discovery.regionalPackId !== regionalPack?.id) return ['habitat-plausible'];
+  if (!regionalPack || discovery?.regionalPackId !== regionalPack.id) return ['habitat-plausible'];
   return [
     'habitat-plausible',
     `regional-pack:${regionalPack.id}@${regionalPack.version}`,
@@ -227,10 +229,10 @@ function createFieldActivitySession(options = {}) {
       name: discovery?.names?.common || state.slot.catalogId,
       description: discovery?.description || '',
       family: discovery?.family || 'field-record',
-      regionalPackId: discovery?.regionalPackId || null,
-      regionalPackVersion: discovery?.regionalPackVersion || null,
+      regionalPackId: state.slot.regionalPackId || null,
+      regionalPackVersion: state.slot.regionalPackVersion || null,
       stableTaxonId: discovery?.stableTaxonId || null,
-      taxonGroup: discovery?.regionalPackId ? String(discovery.family || '').replace(/-taxon$/, '') : null,
+      taxonGroup: state.slot.regionalPackId ? String(discovery?.family || '').replace(/-taxon$/, '') : null,
       rarityBand: discovery?.rarityBand || 'common',
       qualityBand: discovery?.qualityBand || 'observed',
       discipline: state.slot.discipline,

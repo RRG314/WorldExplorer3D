@@ -101,12 +101,12 @@ test('regional taxa join the shared walking field plan with honest evidence and 
   });
 });
 
-test('the same shared planner excludes the Baltimore pack outside its coordinate bounds', () => {
+test('the shared planner excludes Baltimore taxa outside its bounds while allowing another reviewed region', () => {
   const environment = environmentAt({ lat: 40.758, lon: -73.9855 });
   const plan = compileFieldActivityPlan(environment, eligibilityFor(environment), { slotsPerCell: 3 });
   const regionalIds = new Set(BALTIMORE_TAXON_DISCOVERIES.map((entry) => entry.id));
-  assert.equal(plan.diagnostics.regionalEcologyPackId, null);
-  assert.equal(plan.diagnostics.regionalTaxonCount, 0);
+  assert.equal(plan.diagnostics.regionalEcologyPackId, 'us-nyc-northeast-urban');
+  assert.equal(plan.diagnostics.regionalTaxonCount, 12);
   assert.equal(plan.slots.some((entry) => regionalIds.has(entry.catalogId)), false);
 });
 

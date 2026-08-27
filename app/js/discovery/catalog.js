@@ -1,12 +1,12 @@
 import {
-  BALTIMORE_TAXON_DISCOVERIES,
-  ECOLOGY_SOURCE_MANIFEST
-} from './ecology/baltimore-pack.js?v=1';
+  ALL_REGIONAL_SOURCE_MANIFEST,
+  REGIONAL_TAXON_DISCOVERIES
+} from './ecology/regional-packs.js?v=1';
 
-const DISCOVERY_CATALOG_VERSION = '2026.08.24.2';
+const DISCOVERY_CATALOG_VERSION = '2026.08.27.1';
 
 const SOURCE_MANIFEST = Object.freeze({
-  ...ECOLOGY_SOURCE_MANIFEST,
+  ...ALL_REGIONAL_SOURCE_MANIFEST,
   'we3d-original': Object.freeze({
     id: 'we3d-original',
     label: 'World Explorer 3D original game content',
@@ -318,7 +318,7 @@ const FIELD_DISCOVERY_CATALOG = Object.freeze([
   { id: 'urban-place-note', names: { common: 'Urban Place Note' }, family: 'urban-record', activityIds: ['urban-survey', 'transport-job'], contexts: ['urban', 'urban-core'], rarityBand: 'common', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual survey or service record without asserting access to private property.', sourceRefs: [sourceRef('we3d-original', 'field:urban-note')] },
   { id: 'modeled-habitat-transect', names: { common: 'Modeled Habitat Transect' }, family: 'habitat-record', activityIds: ['habitat-survey'], contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A modeled habitat-context record. It does not confirm field conditions, access, or species presence.', sourceRefs: [sourceRef('we3d-original', 'field:modeled-habitat-transect')] },
   { id: 'local-game-checklist', names: { common: 'Local Game Checklist' }, family: 'community-survey-record', activityIds: ['community-survey'], contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A local checklist kept inside the game; it is not submitted to a community-science provider.', sourceRefs: [sourceRef('we3d-original', 'field:local-game-checklist')] },
-  ...BALTIMORE_TAXON_DISCOVERIES
+  ...REGIONAL_TAXON_DISCOVERIES
 ].map(Object.freeze));
 
 const COMPANION_CATALOG = Object.freeze([

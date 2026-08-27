@@ -82,9 +82,16 @@ Normal walking and Live GPS use the same field-activity and player-state
 authority. Live GPS may supply trusted physical-movement context, but generated
 field leads remain game opportunities rather than live-occurrence claims.
 
-The Baltimore ecology pack is versioned separately from runtime logic. Taxon
-records carry category, habitat, seasonality, region, source, license,
-attribution, localization seed, and sensitive-species policy.
+Regional ecology packs are versioned separately from runtime logic and resolved
+through one registry. The released Baltimore–Chesapeake pack and 5.1 candidate
+packs share the same field-activity authority. Taxon records carry category,
+habitat, seasonality, region, source, license, attribution, localization seed,
+sensitive-species policy, migration, and rollback metadata.
+
+The registry covers the regions around all built-in Earth destinations. It does
+not infer species from OpenStreetMap, store occurrence points, estimate
+abundance, or claim a real organism is present. Locations outside reviewed pack
+bounds continue to use the global field catalog.
 
 ## World Editor and persistent Blocks
 

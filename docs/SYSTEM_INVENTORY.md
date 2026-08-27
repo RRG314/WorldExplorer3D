@@ -1,6 +1,6 @@
 # World Explorer 3D System Inventory
 
-Last updated: 2026-08-26 for the approved 5.0 release.
+Last updated: 2026-08-27 for the approved 5.0 release and 5.1 candidate source.
 
 This inventory describes the systems present in the current source tree and
 their honest product boundaries. See [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md)
@@ -25,7 +25,7 @@ with explicit entry and exit lifecycles.
 | Other environments | Underwater, Moon, Mars, solar system, and deep space | Environment detail is intentionally different from Earth |
 | Mobile play | Analog movement/look controls, mode actions, handedness, sensitivity, camera follow, map, Backpack, and recovery | Physical-device battery and thermal performance still require device testing |
 | Field exploration | Field leads, Journal, Field Guide, typed activities, life lists, specialties, companions, Field Today, Expeditions, and seasonal surveys | Game opportunities do not assert live real-world animal presence |
-| Regional ecology | Versioned Baltimore pack with 60 taxa, habitat and season fields, source and license metadata, sensitive-species handling, and localization seeds | Worldwide expansion and independent scientific review remain future work |
+| Regional ecology | One versioned registry with 11 packs and 180 taxa covers all 15 built-in Earth destinations; packs retain habitat, season, source, license, attribution, sensitive-species, localization, migration, and rollback metadata | The 10 expansion packs are 5.1 candidates pending independent domain review; this is not worldwide completeness |
 | Fishing | Shared shore, boat, and underwater records with catch, loss, retry, and recovery | Fish availability depends on the current water and regional data boundary |
 | Live GPS | Optional foreground location following, privacy/consent controls, three-stop Expeditions, and shared field activities | No continuous world streaming; background tracking is not part of the product |
 | Multiplayer | Bounded public/private rooms, presence, chat, shared Blocks, activities, published overlays, and persistent room vehicles | Large-room capacity and moderation continue to evolve |
@@ -99,7 +99,10 @@ committed.
 - Detailed accepted ground is available only for reviewed locations; other
   areas use labeled fallback terrain.
 - Building and interior detail depends on mapped metadata and local coverage.
-- The Baltimore ecology pack is a regional slice, not worldwide completeness.
+- The ecology registry covers built-in destination regions, not the whole
+  world. Locations outside reviewed pack bounds use the global field catalog.
+- The 10 expansion packs remain source-reviewed candidates pending independent
+  domain review.
 - Creature presentation still includes quality tiers and reference fallbacks;
   not every taxon has a promoted animated model.
 - Live GPS remains foreground-only and depends on browser permission, signal
