@@ -1,11 +1,34 @@
-// Immutable astronomical catalog and visual scale configuration.
+import {
+  getAstronomicalBody,
+  METERS_PER_AU,
+  SOLAR_SYSTEM_PLANET_IDS
+} from '../astronomy/body-catalog.js?v=1';
+
+// Immutable solar-system rendering/orbit projection. Canonical body facts live
+// in astronomy/body-catalog.js; this module owns orbit approximation and visual
+// scale only.
+function projectPhysicalBody(id) {
+  const body = getAstronomicalBody(id);
+  if (!body) throw new Error(`Unknown solar-system body projection: ${id}`);
+  return {
+    bodyId: body.id,
+    name: body.name,
+    massKg: body.physical.massKg,
+    physicalRadiusKm: body.physical.meanRadiusM / 1000,
+    meanDistanceAU: body.physical.meanSolarDistanceM / METERS_PER_AU,
+    meanDistanceKM: body.physical.meanSolarDistanceM / 1000,
+    texture: body.presentation.globalTexturePath,
+    landingMode: body.exploration.landingMode,
+    bodyCatalogVersion: body.catalogVersion
+  };
+}
+
 export const SOLAR_SYSTEM_PLANETS = [
 {
-  name: 'Mercury', type: 'Terrestrial', color: 0xffffff, emissive: 0x181512,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[0]),
+  type: 'Terrestrial', color: 0xffffff, emissive: 0x181512,
   glowColor: 0xb0a090,
-  texture: '/app/assets/textures/mercury_messenger.jpg',
-  massKg: 3.3011e23, physicalRadiusKm: 2439.7,
-  radiusScaled: 22, meanDistanceAU: 0.387, meanDistanceKM: 57910000,
+  radiusScaled: 22,
   description: 'Smallest planet, closest to the Sun. Extreme temperature swings.',
   a0: 0.38710, aRate: 0.00000,
   e0: 0.20563, eRate: 0.00002,
@@ -15,11 +38,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 48.331, LNRate: -0.125
 },
 {
-  name: 'Venus', type: 'Terrestrial', color: 0xffffff, emissive: 0x2a1908,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[1]),
+  type: 'Terrestrial', color: 0xffffff, emissive: 0x2a1908,
   glowColor: 0xe8c080,
-  texture: '/app/assets/textures/venus_magellan.jpg',
-  massKg: 4.8675e24, physicalRadiusKm: 6051.8,
-  radiusScaled: 35, meanDistanceAU: 0.723, meanDistanceKM: 108200000,
+  radiusScaled: 35,
   description: 'Hottest planet due to runaway greenhouse effect. Thick toxic atmosphere.',
   a0: 0.72333, aRate: 0.00001,
   e0: 0.00677, eRate: -0.00005,
@@ -29,11 +51,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 76.680, LNRate: -0.278
 },
 {
-  name: 'Earth', type: 'Terrestrial', color: 0x2255bb, emissive: 0x142a5e,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[2]),
+  type: 'Terrestrial', color: 0x2255bb, emissive: 0x142a5e,
   glowColor: 0x88ccff,
-  texture: '/app/assets/textures/earth_atmos_2048.jpg',
-  massKg: 5.97237e24, physicalRadiusKm: 6371,
-  radiusScaled: 36, meanDistanceAU: 1.000, meanDistanceKM: 149600000,
+  radiusScaled: 36,
   description: 'Our home planet. The only known world with liquid surface water and life.',
   a0: 1.00000, aRate: -0.00001,
   e0: 0.01671, eRate: -0.00004,
@@ -43,11 +64,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 0.0, LNRate: 0.0
 },
 {
-  name: 'Mars', type: 'Terrestrial', color: 0xffffff, emissive: 0x1c0904,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[3]),
+  type: 'Terrestrial', color: 0xffffff, emissive: 0x1c0904,
   glowColor: 0xcc4422,
-  texture: '/app/assets/textures/mars_viking_4096.jpg',
-  massKg: 6.4171e23, physicalRadiusKm: 3389.5,
-  radiusScaled: 28, meanDistanceAU: 1.524, meanDistanceKM: 227900000,
+  radiusScaled: 28,
   description: 'The Red Planet. Has the tallest volcano and deepest canyon in the solar system.',
   a0: 1.52368, aRate: 0.00001,
   e0: 0.09340, eRate: 0.00008,
@@ -57,11 +77,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 49.558, LNRate: -0.297
 },
 {
-  name: 'Jupiter', type: 'Gas Giant', color: 0xffffff, emissive: 0x23180e,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[4]),
+  type: 'Gas Giant', color: 0xffffff, emissive: 0x23180e,
   glowColor: 0xd4a060,
-  texture: '/app/assets/textures/jupiter_voyager.jpg',
-  massKg: 1.8982e27, physicalRadiusKm: 69911,
-  radiusScaled: 90, meanDistanceAU: 5.203, meanDistanceKM: 778500000,
+  radiusScaled: 90,
   description: 'Largest planet. Its Great Red Spot is a storm larger than Earth.',
   a0: 5.20260, aRate: -0.00036,
   e0: 0.04849, eRate: 0.00018,
@@ -71,11 +90,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 100.464, LNRate: 0.176
 },
 {
-  name: 'Saturn', type: 'Gas Giant', color: 0xffffff, emissive: 0x211d12,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[5]),
+  type: 'Gas Giant', color: 0xffffff, emissive: 0x211d12,
   glowColor: 0xe8d090,
-  texture: '/app/assets/textures/saturn_jpl.jpg',
-  massKg: 5.6834e26, physicalRadiusKm: 58232,
-  radiusScaled: 78, meanDistanceAU: 9.537, meanDistanceKM: 1427000000,
+  radiusScaled: 78,
   description: 'Famous for its spectacular ring system. Least dense planet.',
   a0: 9.55491, aRate: -0.00121,
   e0: 0.05551, eRate: -0.00035,
@@ -85,11 +103,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 113.665, LNRate: -0.268
 },
 {
-  name: 'Uranus', type: 'Ice Giant', color: 0xffffff, emissive: 0x10262b,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[6]),
+  type: 'Ice Giant', color: 0xffffff, emissive: 0x10262b,
   glowColor: 0x88ccdd,
-  texture: '/app/assets/textures/uranus_jpl.jpg',
-  massKg: 8.6810e25, physicalRadiusKm: 25362,
-  radiusScaled: 55, meanDistanceAU: 19.189, meanDistanceKM: 2871000000,
+  radiusScaled: 55,
   description: 'Tilted on its side. Has faint rings and 27 known moons.',
   a0: 19.21845, aRate: -0.00152,
   e0: 0.04630, eRate: -0.00003,
@@ -99,11 +116,10 @@ export const SOLAR_SYSTEM_PLANETS = [
   LN0: 74.006, LNRate: 0.074
 },
 {
-  name: 'Neptune', type: 'Ice Giant', color: 0xffffff, emissive: 0x0d1730,
+  ...projectPhysicalBody(SOLAR_SYSTEM_PLANET_IDS[7]),
+  type: 'Ice Giant', color: 0xffffff, emissive: 0x0d1730,
   glowColor: 0x4466dd,
-  texture: '/app/assets/textures/neptune_jpl.jpg',
-  massKg: 1.02413e26, physicalRadiusKm: 24622,
-  radiusScaled: 52, meanDistanceAU: 30.070, meanDistanceKM: 4498000000,
+  radiusScaled: 52,
   description: 'Farthest planet. Has the strongest winds in the solar system.',
   a0: 30.11039, aRate: 0.00030,
   e0: 0.00899, eRate: 0.00001,

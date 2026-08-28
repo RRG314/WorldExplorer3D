@@ -1,31 +1,28 @@
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=1';
+
+function projectPlanetaryBody(id) {
+  const body = getAstronomicalBody(id);
+  if (!body) throw new Error(`Unknown planetary body projection: ${id}`);
+  return Object.freeze({
+    id: body.id,
+    name: body.name,
+    environment: body.presentation.environmentId,
+    gravity: body.physical.surfaceGravityMps2,
+    texture: body.presentation.globalTexturePath,
+    radiusKm: body.physical.meanRadiusM / 1000,
+    surfaceLabel: body.presentation.surfaceLabel,
+    landingMode: body.exploration.landingMode,
+    bodyCatalogVersion: body.catalogVersion
+  });
+}
+
+// Compatibility projection for current Earth, Moon, and Mars consumers. The
+// canonical facts live in astronomy/body-catalog.js; this object is read-only
+// and must not grow into another body authority.
 const PLANETARY_BODIES = Object.freeze({
-  earth: Object.freeze({
-    id: 'earth',
-    name: 'Earth',
-    environment: 'EARTH',
-    gravity: 9.80665,
-    texture: '/app/assets/textures/earth_atmos_2048.jpg',
-    radiusKm: 6371,
-    surfaceLabel: 'Earth'
-  }),
-  moon: Object.freeze({
-    id: 'moon',
-    name: 'Moon',
-    environment: 'MOON',
-    gravity: 1.62,
-    texture: '/app/assets/textures/moon_lroc_2048.jpg',
-    radiusKm: 1737.4,
-    surfaceLabel: 'Mare Tranquillitatis'
-  }),
-  mars: Object.freeze({
-    id: 'mars',
-    name: 'Mars',
-    environment: 'MARS',
-    gravity: 3.71,
-    texture: '/app/assets/textures/mars_viking_4096.jpg',
-    radiusKm: 3389.5,
-    surfaceLabel: 'Olympus Mons, Tharsis'
-  })
+  earth: projectPlanetaryBody('earth'),
+  moon: projectPlanetaryBody('moon'),
+  mars: projectPlanetaryBody('mars')
 });
 
 function normalizeBodyId(value) {

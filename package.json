@@ -65,6 +65,7 @@
     "verify:explorer-coherence-browser": "node scripts/verification/explorer-coherence.mjs",
     "verify:regional-guide-new-york": "node scripts/verification/regional-guide-new-york.mjs",
     "verify:creature-quality": "node --test tests/creature-quality.test.mjs",
+    "verify:astronomy-catalog": "node --test tests/astronomy-body-catalog-current.test.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",
