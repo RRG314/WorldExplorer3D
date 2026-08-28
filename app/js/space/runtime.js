@@ -5,6 +5,7 @@ import {
   normalizeAstronomicalBodyId
 } from '../astronomy/body-catalog.js?v=2';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
+import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 
 let injectedThree = null;
 let math = null;
@@ -389,6 +390,11 @@ export function updateSpaceFlightPhysics() {
   const keys = appCtx.spaceFlight.keys;
   const launchAssist = getLaunchAssistState(rocket);
   const frameScale = appCtx.spaceFlight._frameScale || 1;
+  const characterFlight = spacecraftOperationTuning(appCtx.resolveCharacterCapability?.('spacecraft', {
+    vehicleAvailable: true,
+    environment: 'SPACE_FLIGHT'
+  }));
+  appCtx.spaceFlight.characterHandling = characterFlight;
 
   // Read the axes the player is looking through before applying either turn.
   // These remain continuous with the chase view and have no world-axis pole.
@@ -402,13 +408,13 @@ export function updateSpaceFlightPhysics() {
 
   if (keys['arrowleft'] || keys['arrowright']) {
     const yawDir = keys['arrowleft'] ? -1 : 1;
-    _sfTempQuat.setFromAxisAngle(_sfControlYawAxis, SPACE_CONSTANTS.TURN_SPEED * yawDir * frameScale);
+    _sfTempQuat.setFromAxisAngle(_sfControlYawAxis, SPACE_CONSTANTS.TURN_SPEED * characterFlight.manualTurnScale * yawDir * frameScale);
     rocket.quaternion.premultiply(_sfTempQuat);
   }
 
   if (keys['arrowup'] || keys['arrowdown']) {
     const pitchDir = keys['arrowup'] ? 1 : -1;
-    _sfTempQuat.setFromAxisAngle(_sfControlPitchAxis, SPACE_CONSTANTS.PITCH_SPEED * pitchDir * frameScale);
+    _sfTempQuat.setFromAxisAngle(_sfControlPitchAxis, SPACE_CONSTANTS.PITCH_SPEED * characterFlight.manualTurnScale * pitchDir * frameScale);
     rocket.quaternion.premultiply(_sfTempQuat);
   }
 

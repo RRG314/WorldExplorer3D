@@ -6,6 +6,7 @@ import {
   computeBodyRelativeNavigation,
   evaluateLandingEligibility
 } from './spacecraft-authority.js?v=1';
+import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
 
@@ -53,6 +54,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
       <span style="font-size:24px;">🚀</span> SPACE FLIGHT
     </div>
     <div id="sfFlightStatus" style="margin-bottom:9px;color:#a5b4fc;font-size:11px;letter-spacing:0.04em;">Preparing flight</div>
+    <div id="sfFlightRead" style="margin:-4px 0 9px;color:#cbd5e1;font-size:10px;">Basic flight guidance</div>
     <div style="margin-bottom:6px;">Nearest: <span id="sfDestination" style="color:#10b981;font-weight:600;">---</span></div>
     <div style="margin-bottom:6px;"><span id="sfAltitudeLabel">Altitude</span>: <span id="sfAltitude">0</span> <span id="sfAltitudeUnit">km</span></div>
     <div style="margin-bottom:6px;"><span id="sfSpeedLabel">Velocity</span>: <span id="sfSpeed">0</span> <span id="sfSpeedUnit">km/s</span></div>
@@ -225,6 +227,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const zoneLabel = document.getElementById('sfZoneLabel');
   const flightStatus = document.getElementById('sfFlightStatus');
   const assistBtn = document.getElementById('sfAssistBtn');
+  const flightRead = document.getElementById('sfFlightRead');
   const environmentText = document.getElementById('sfEnvironment');
   const destinationName = appCtx.spaceJourneyEphemeris?.destination?.bodyId || appCtx.spaceFlight.destination || 'destination';
   const departureName = appCtx.spaceJourneyEphemeris?.source?.bodyId || appCtx.spaceJourney?.sourceBodyId || 'departure point';
@@ -249,6 +252,12 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   if (flightStatus) {
     const copy = phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';
     flightStatus.textContent = copy;
+  }
+  if (flightRead) {
+    const characterFlight = appCtx.spaceFlight.characterHandling || spacecraftOperationTuning(
+      appCtx.resolveCharacterCapability?.('spacecraft', { vehicleAvailable: true, environment: 'SPACE_FLIGHT' })
+    );
+    flightRead.textContent = `${characterFlight.guidanceLabel} · ${Math.round(characterFlight.manualTurnScale * 100)}% manual response`;
   }
   if (assistBtn) {
     const assist = appCtx.spaceJourneyAssistState;

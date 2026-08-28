@@ -10,6 +10,7 @@ import {
 import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../app/js/character/wildlife-assistance.js';
 import { constructionTuning } from '../app/js/character/construction-assistance.js';
+import { spacecraftOperationTuning } from '../app/js/character/spacecraft-assistance.js';
 import { createCharacter, createDefaultCharacterState, validateCreationAttributes } from '../app/js/character/model.js';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../app/js/character/progression.js';
 import { createDetectorSession } from '../app/js/discovery/detector-session.js';
@@ -178,6 +179,24 @@ test('Engineering improves the existing construction controls within bounded aut
   assert.equal(engineer.mappedSelectionRadiusMeters > general.mappedSelectionRadiusMeters, true);
   assert.equal(engineer.placementRangeScale <= 1.1, true);
   assert.equal(engineer.mappedSelectionRadiusMeters <= 48, true);
+});
+
+test('Space experience improves manual response without changing flight authority', () => {
+  const general = spacecraftOperationTuning(resolveCharacterCapability(
+    createCharacter({ backgroundId: 'general-explorer', now: 1 }),
+    'spacecraft',
+    { vehicleAvailable: true }
+  ));
+  const planetary = spacecraftOperationTuning(resolveCharacterCapability(
+    createCharacter({ backgroundId: 'planetary-explorer', traits: ['equipment-minded'], now: 1 }),
+    'spacecraft',
+    { vehicleAvailable: true }
+  ));
+  assert.equal(planetary.manualTurnScale > general.manualTurnScale, true);
+  assert.equal(planetary.manualTurnScale <= 1.12, true);
+  assert.deepEqual(Object.keys(planetary).sort(), [
+    'guidanceLabel', 'informationTier', 'manualTurnScale', 'type'
+  ]);
 });
 
 test('advanced requirements explain equipment and qualification while basic play remains open', () => {
