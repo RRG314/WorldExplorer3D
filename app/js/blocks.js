@@ -11,7 +11,7 @@ import {
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
 import { createBlockLocalStore } from './block-builder/local-store.js?v=3';
 import { createSharedBlockSync } from './block-builder/shared-sync.js?v=3';
-import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=2';
+import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=3';
 import {
   activePlanetaryBodyId,
   planetarySurfaceYAtRenderXZ

@@ -1,4 +1,4 @@
-import { selectVehicleVariant, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=2';
+import { selectVehicleVariant, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=5';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
 

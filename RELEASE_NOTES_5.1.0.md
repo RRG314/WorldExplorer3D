@@ -19,6 +19,31 @@ play extends to every built-in Earth destination.
 - Download a Journal backup and restore it in the browser when needed.
 - Carry Explorer progress through field activities, fishing, games, travel,
   World Editor work, Blocks, multiplayer rooms, and companion care.
+- Configure six Backpack quick slots for weapons, field tools, and equipment.
+- Drive vehicle families with distinct handling, enter responder vehicles, and
+  use their lights and siren after claiming them.
+- Find recoverable weapons and ammunition in the world, use clearer ranged
+  aiming, and trade at eligible mapped convenience stores.
+- Raise individual domestic, bird, and livestock companions through care,
+  trust, and levels; companions travel aboard compatible vehicles.
+- Fly spacecraft manually or with assistance, travel to selectable planets,
+  moons, and small bodies, traverse accepted planetary surfaces, and return to
+  Earth.
+- Reach playable Earth and Live GPS sessions faster on mobile while retaining
+  the near-player district and regional recovery context.
+
+## Traversal and sandbox play
+
+Cars now share one tuned controller with distinct family handling and a 120 MPH
+road-vehicle ceiling. Walking pace, follow camera, roof landing and traversal,
+elevators, parachute use, reticles, collision damage, NPC response, mapped-store
+exchange, and recoverable equipment have been brought into the same Character
+and Backpack flow.
+
+Space travel now supports manual control, assisted journeys, collision with
+rendered celestial bodies, solid-world landing and traversal, atmospheric
+destinations, and explicit return journeys. Open-water transfer keeps terrestrial
+terrain and vegetation out of the boat scene.
 
 ## Regional field play
 

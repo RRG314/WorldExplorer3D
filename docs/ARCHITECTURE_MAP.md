@@ -14,6 +14,7 @@ flowchart LR
     Earth --> World[Terrain, water, roads, buildings, and places]
     Earth --> Actors[Player, traffic, pedestrians, and wildlife]
     Earth --> Field[Field activities and progression]
+    Earth --> Sandbox[Vehicles, companions, commerce, combat, and civic response]
     Earth --> Editor[World Editor and Blocks]
     Earth --> Rooms[Multiplayer rooms]
     Field --> PlayerState[Backpack, Journal, Guide, and goals]
@@ -66,6 +67,31 @@ camera direction visible when it began, while the chase camera follows behind
 the character. This avoids inverted left/right input and prevents the camera
 from feeding its own rotation back into a held direction.
 
+Road vehicles share one physical controller and vehicle-state contract. Family
+profiles change acceleration, steering response, braking, grip, mass, and
+damage response without creating separate vehicle loops. Responder vehicles,
+traffic, claimed vehicles, cameras, HUD units, crash state, and companions all
+consume that same contract.
+
+## Character, companions, and urban play
+
+The Character Backpack is the item authority for equipment, ammunition,
+recovered loot, purchases, and six player-assigned quick slots. Skills modify
+the existing traversal, fieldwork, construction, companion, and spacecraft
+owners; they do not replace those systems with parallel implementations.
+
+The living-world population owns ambient pedestrians and traffic. The focused
+urban runtime temporarily promotes nearby actors for interaction, vehicles,
+civic response, defensive behavior, and collision, then returns them to the
+population owner. Downed-actor items become bounded world pickups before the
+Backpack can receive them. Mapped stores use exact eligible place records and a
+stable per-store exchange model.
+
+Companions retain individual identity, care, trust, experience, level, and
+travel state. Domestic animals, birds, and eligible livestock use one companion
+authority. Vehicle travel records an aboard state instead of leaving the
+companion to trail through the scene.
+
 ## Field exploration and progression
 
 ```mermaid
@@ -92,6 +118,19 @@ The registry covers the regions around all built-in Earth destinations. It does
 not infer species from OpenStreetMap, store occurrence points, estimate
 abundance, or claim a real organism is present. Locations outside reviewed pack
 bounds continue to use the global field catalog.
+
+## Planetary and space environments
+
+Planetary play resolves bodies through one catalog and world-address model.
+Solid worlds publish an accepted traversable surface with collision and a
+separate non-colliding horizon presentation. Atmospheric giants use an explicit
+atmospheric journey rather than pretending they have a solid landing surface.
+
+Spacecraft state uses SI units for mass, velocity, thrust, propellant, gravity,
+collision, and landing checks. The rendered solar system uses declared
+presentation scales so it remains playable. Manual input cancels assisted travel,
+and swept body collision prevents a fast frame from passing through a planet or
+the Sun.
 
 ## World Editor and persistent Blocks
 
@@ -140,5 +179,8 @@ the selected Firebase environment configuration. Backend deployment is a
 separate operation from hosting deployment.
 
 Production promotion is intentionally separate from staging preview creation.
-The 5.0 build must be tested on desktop and mobile before production hosting is
-changed.
+The 5.1 candidate is built once, preserved with its manifest and content hash,
+and exercised on desktop and mobile. Backend authorization, multiplayer, and
+creator checks run against local Firebase emulators. Production hosting and
+backend services are not changed until that exact candidate is reviewed and
+explicitly approved.

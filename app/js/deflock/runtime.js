@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=5";
+import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=6";
 import { computeCameraPlacement } from "./placement.js?v=2";
 import {
   applySharedDisabled,

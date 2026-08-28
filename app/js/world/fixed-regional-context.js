@@ -252,13 +252,16 @@ export async function waitForFixedRegionalGround(
   appCtx,
   loadMetrics,
   startLoadPhase = () => {},
-  endLoadPhase = () => {}
+  endLoadPhase = () => {},
+  options = {}
 ) {
   if (!(appCtx.fixedRegionalContextRadiusWorld > 0) ||
       typeof appCtx.waitForFarTerrainClipmap !== 'function') return false;
   startLoadPhase('waitForFixedRegionalGround');
   try {
-    loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(35000);
+    const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 35000);
+    loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(timeoutMs);
+    loadMetrics.regionalGroundWaitTimeoutMs = timeoutMs;
     return loadMetrics.regionalGroundReady;
   } finally {
     endLoadPhase('waitForFixedRegionalGround');

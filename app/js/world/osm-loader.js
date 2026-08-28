@@ -398,6 +398,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const staggerIntervalMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
     ? Number(options.staggerMs)
     : OVERPASS_STAGGER_MS);
+  // `timeoutMs` is the budget for the optional provider as a whole, not a
+  // separate allowance for every hedged endpoint. Otherwise a 3.5 second
+  // mobile probe can take nine seconds after endpoint staggering.
+  const requestedTimeoutMs = Math.max(1000, Number(timeoutMs) || OVERPASS_MIN_TIMEOUT_MS);
+  const requestDeadlineMs = Math.min(
+    Number.isFinite(deadlineMs) ? deadlineMs : Infinity,
+    performance.now() + requestedTimeoutMs
+  );
   const requestController = new AbortController();
   const abortRequest = () => requestController.abort(externalAbortError(externalSignal));
   externalSignal?.addEventListener?.('abort', abortRequest, { once: true });
@@ -410,15 +418,18 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
 
     const now = performance.now();
-    if (now >= deadlineMs - 300) {
+    if (now >= requestDeadlineMs - 300) {
       throw new Error(`[${endpoint}] skipped: load budget exhausted`);
     }
 
-    const timeLeftMs = deadlineMs - now;
+    const timeLeftMs = requestDeadlineMs - now;
     const timeoutForEndpointMs = Math.max(
-      3500,
+      500,
       Math.min(
-        Math.max(OVERPASS_MIN_TIMEOUT_MS, timeoutMs - idx * 1200),
+        Math.max(
+          Math.min(OVERPASS_MIN_TIMEOUT_MS, requestedTimeoutMs),
+          requestedTimeoutMs - idx * 1200
+        ),
         timeLeftMs - 250
       )
     );

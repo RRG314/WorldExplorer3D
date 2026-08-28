@@ -1,5 +1,5 @@
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=2';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=5';
 
 function createUrbanVehicleVisual(THREE, definition = {}) {
   const variant = definition.variant || {};

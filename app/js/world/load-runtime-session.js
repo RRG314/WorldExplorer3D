@@ -250,7 +250,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
   const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
-  const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow, dynamicBudgetState.budgetScale);
+  const loadProfile = getAdaptiveLoadProfile(
+    rdtLoadComplexity,
+    perfModeNow,
+    dynamicBudgetState.budgetScale,
+    dynamicBudgetState.deviceClass
+  );
   const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
   const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
@@ -273,8 +278,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
     maxPoiNodes: loadProfile.maxPoiNodes,
     tileBudgetCfg: loadProfile.tileBudgetCfg,
     overpassTimeoutMs: loadProfile.overpassTimeoutMs,
+    optionalProviderTimeoutMs: loadProfile.optionalProviderTimeoutMs,
+    fixedRegionalGroundTimeoutMs: loadProfile.fixedRegionalGroundTimeoutMs,
+    regionalContextRadiusMeters: loadProfile.regionalContextRadiusMeters,
     maxTotalLoadMs: loadProfile.maxTotalLoadMs
   };
+  runtimeState.loadProfile = { ...loadMetrics.loadProfile };
   loadMetrics.dynamicBudget = {
     auto: !!dynamicBudgetState.auto,
     tier: dynamicBudgetState.tier || 'balanced',

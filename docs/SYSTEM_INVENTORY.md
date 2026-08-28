@@ -1,6 +1,6 @@
 # World Explorer 3D System Inventory
 
-Last updated: 2026-08-27 for the approved 5.0 release and 5.1 candidate source.
+Last updated: 2026-08-28 for the 5.1 release candidate.
 
 This inventory describes the systems present in the current source tree and
 their honest product boundaries. See [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md)
@@ -22,8 +22,12 @@ with explicit entry and exit lifecycles.
 | --- | --- | --- |
 | World selection | Interactive globe, search, presets, coordinates, geolocation, favorites, and recent places | Provider and imagery availability vary |
 | Earth traversal | Walk, drive, drone, plane, and boat with shared location handoff | One bounded location per session |
-| Other environments | Underwater, Moon, Mars, solar system, and deep space | Environment detail is intentionally different from Earth |
+| Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, and deep space | Distances use explicit game scales; planetary detail is intentionally different from Earth |
 | Mobile play | Analog movement/look controls, mode actions, handedness, sensitivity, camera follow, map, Backpack, and recovery | Physical-device battery and thermal performance still require device testing |
+| Character and equipment | One persistent character profile, attributes, skills, condition, six assignable quick slots, ammunition, field tools, and usable equipment | Complete cross-device character sync is not yet available |
+| Vehicles and collisions | Distinct road-vehicle families plus boats, aircraft, rovers, and spacecraft; enter/exit, condition, collision, and recovery | Collisions are game physics, not an engineering or accident simulator |
+| Urban play | Pedestrian behavior, bounded defensive combat, civic response, recoverable world loot, mapped convenience-store trade, and responder vehicles | Shared-room combat and loot remain restricted where server authority is unavailable |
+| Companions | Individual domestic animals, birds, livestock, trust, care, level progression, travel state, and vehicle boarding | Availability follows the game catalog and regional rules, not live occurrence reports |
 | Field exploration | Field leads, Journal, Field Guide, typed activities, life lists, specialties, companions, Field Today, Expeditions, and seasonal surveys | Game opportunities do not assert live real-world animal presence |
 | Regional ecology | One versioned registry with 11 packs and 180 taxa covers all 15 built-in Earth destinations; packs retain habitat, season, source, license, attribution, sensitive-species, localization, migration, and rollback metadata | The 10 expansion packs are 5.1 candidates pending independent domain review; this is not worldwide completeness |
 | Fishing | Shared shore, boat, and underwater records with catch, loss, retry, and recovery | Fish availability depends on the current water and regional data boundary |
@@ -44,9 +48,12 @@ with explicit entry and exit lifecycles.
 | Water | `app/js/world/water-*`, `app/js/boat-mode/`, `app/js/ocean/` | Surface water, shore transfer, boats, underwater play, and fish life |
 | Living world | `app/js/living-world/`, `app/js/urban-sandbox/` | Pedestrians, traffic, wildlife, vehicles, and civic-response play |
 | Field and progression | `app/js/discovery/`, `app/js/player/` | Ecology, activities, Backpack, Journal, progression, and retention programs |
+| Character and companions | `app/js/character/`, `app/js/discovery/companions/` | Attributes, skills, equipment integration, individual companions, care, trust, levels, and travel state |
+| Commerce and combat | `app/js/urban-sandbox/`, `app/js/player/` | Mapped-store exchange, weapons, ammunition, defensive NPC behavior, condition, world loot, and Backpack delivery |
 | Input and cameras | `app/js/controls/`, `app/js/ui/mobile-controls.js`, `app/js/hud.js`, `app/js/walking/` | Keyboard, touch, gamepad, movement, follow cameras, and HUD units |
 | Editor and Blocks | `app/js/editor/`, `app/js/block-builder/`, `app/js/blocks.js` | Integrated editing, persistence, undo, sharing, moderation, and rollback |
 | Multiplayer | `app/js/multiplayer/`, `firestore.rules`, `functions/` | Room state, authorization, presence, chat, shared content, and activities |
+| Planetary and space | `app/js/planetary/`, `app/js/space/`, `app/js/universe/` | Body catalog, physical environments, accepted surfaces, spacecraft state, journeys, collision, landing, and return |
 
 ## Data and truth boundaries
 
@@ -69,7 +76,7 @@ The browser keeps device-local preferences and supported offline player data.
 Authenticated accounts, room state, published overlays, moderation, and
 server-authorized rewards use Firebase services.
 
-The 5.0 Backpack uses schema version 2. Existing schema-version-1 data is
+The current Backpack uses schema version 2. Existing schema-version-1 data is
 migrated with a local backup and rollback path. Block storage also preserves
 supported legacy location records while moving entry into the integrated World
 Editor.
@@ -107,6 +114,11 @@ committed.
   not every taxon has a promoted animated model.
 - Live GPS remains foreground-only and depends on browser permission, signal
   quality, and secure hosting.
+- The solar system uses explicit presentation scales so long journeys remain
+  playable in a browser; it is not an astronomical visualization at one uniform
+  real-world scale.
+- Vehicle and character collision responses are designed for readable gameplay,
+  not forensic accident reconstruction.
 - Broader physical-phone battery, thermal, accessibility, and gameplay coverage
   remains continuing release work.
 - Backend-dependent features require the matching authorized environment.

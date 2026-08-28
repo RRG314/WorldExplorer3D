@@ -46,6 +46,14 @@ Highlights include:
 
 - Walking, driving, drone, plane, boat, underwater, rover, astronaut, and
   spacecraft traversal.
+- Distinct road-vehicle handling, a 120 MPH car ceiling, enterable responder
+  vehicles, readable collision damage, and lights and siren controls.
+- Configurable quick slots, ranged-weapon aiming, recoverable weapons and
+  ammunition, mapped convenience-store exchange, and bounded NPC response.
+- Individual companion care, trust, levels, vehicle travel, and eligible
+  domestic, bird, and livestock companions.
+- Manual solar-system flight, assisted journeys, solid-world traversal,
+  atmospheric destinations, body collision, landing, and Earth return.
 - A unified World Editor with persistent local and multiplayer Blocks.
 - A dedicated Journal for Fieldwork, Games, Making, Travel, Community, and
   Companions, connected to one Explorer profile.
@@ -64,6 +72,8 @@ Highlights include:
   and persistent vehicle ownership.
 - Keyboard, touch, browser-zoom, focus, contrast, larger-text, and reduced-motion
   support.
+- Faster mobile Earth and Live GPS entry with a bounded regional world budget
+  that keeps the playable district and GPS recovery boundary intact.
 
 Version 5.1 does not claim complete worldwide ecology, universal detailed
 interiors, survey-grade terrain, or identical data quality at every location.

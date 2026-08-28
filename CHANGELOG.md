@@ -15,6 +15,14 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   unidentified entries, and regional life-list progress.
 - Backpack categories, item history, inspection, equip and use actions, hotbar
   assignment, and Field Kit synchronization.
+- Distinct road-vehicle handling, responder vehicle entry and equipment,
+  recoverable world loot, mapped convenience-store exchange, defensive NPC
+  behavior, and configurable quick-slot equipment.
+- Individual companion trust and level progression for eligible domestic
+  animals, birds, and livestock, including vehicle travel state.
+- Manual and assisted solar-system journeys, accepted planetary surfaces,
+  celestial collision, solid-world landing, atmospheric destinations, and
+  Earth return.
 
 ### Changed
 
@@ -25,6 +33,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   are available.
 - The Explorer panel separates permanent Journal progress from recurring Field
   Today, Expedition, and seasonal opportunities.
+- Mobile Earth compilation keeps the near-player district and a bounded regional
+  context while shortening optional provider waits and repeated feature scans.
 
 ### Fixed
 
@@ -36,6 +46,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   modes.
 - Player-facing Guide and Journal language no longer exposes implementation
   labels or repeats generic unknown-entry names.
+- Corrected manual space control, planetary underside visibility, roof and
+  interior collision, elevator floor choice, weapon reticles, open-water layer
+  ownership, mobile walking direction, follow camera, loading coverage, globe
+  selection, prompt overlap, and mode-specific speed units.
 
 ## [5.0.0] - 2026-08-26
 

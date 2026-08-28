@@ -15,7 +15,7 @@ import {
   wayWorldPoints,
   worldToGeo,
   isClosedWay
-} from "./core.js?v=3";
+} from "./core.js?v=4";
 
 export async function fetchMappedInteriorDefinition(support, interiorCache) {
   if (!support?.enterable || !support.allowMappedData || typeof appCtx.fetchOverpassJSON !== 'function') return null;

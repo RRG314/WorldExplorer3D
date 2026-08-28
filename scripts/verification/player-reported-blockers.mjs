@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
-const outputDir = path.join(root, 'output/verification/player-reported-blockers');
+const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'player-reported-blockers');
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4411, 4412, 4413] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -26,6 +26,8 @@ function observe(page) {
 async function waitForRuntime(page) {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  const consentButton = page.locator('#analyticsConsentDenyBtn');
+  if (await consentButton.isVisible()) await consentButton.click();
 }
 
 async function selectBaltimore(page) {
@@ -54,9 +56,14 @@ async function waitForInteractiveWorld(page) {
 }
 
 async function switchToWalking(page) {
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
-  await page.locator('#fWalk').click();
+  const alreadyWalking = await page.evaluate(() =>
+    globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk'
+  );
+  if (!alreadyWalking) {
+    await page.locator('#exploreBtn').click();
+    await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+    await page.locator('#fWalk').click();
+  }
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
   await page.waitForSelector('#mobileTouchControls.show.mode-walking', { timeout: 10_000 });
   await page.waitForTimeout(450);
@@ -154,9 +161,8 @@ try {
   desktopContext = null;
 
   mobileContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    hasTouch: true,
-    isMobile: true
+    ...devices['iPhone 13'],
+    viewport: { width: 390, height: 844 }
   });
   const mobile = await mobileContext.newPage();
   const cdp = await mobileContext.newCDPSession(mobile);
@@ -239,9 +245,8 @@ try {
 
   await mobileContext.close();
   mobileContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    hasTouch: true,
-    isMobile: true
+    ...devices['iPhone 13'],
+    viewport: { width: 390, height: 844 }
   });
   const oceanMobile = await mobileContext.newPage();
   const oceanCdp = await mobileContext.newCDPSession(oceanMobile);

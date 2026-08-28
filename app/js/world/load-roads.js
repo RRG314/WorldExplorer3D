@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=70";
+} from "./load-runtime-session.js?v=71";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -27,7 +27,7 @@ import {
   fixedRegionalRoadGeometryGuards,
   sampleFixedRegionalGround,
   waitForFixedRegionalGround
-} from "./fixed-regional-context.js?v=8";
+} from "./fixed-regional-context.js?v=9";
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
@@ -237,6 +237,9 @@ export function createWorldRoadLoader(deps = {}) {
     const lodNearDist = lodThresholds.near;
     const lodMidDist = lodThresholds.mid;
     const overpassTimeoutMs = loadProfile.overpassTimeoutMs;
+    const optionalProviderTimeoutMs = loadProfile.optionalProviderTimeoutMs || 9000;
+    const fixedRegionalGroundTimeoutMs = loadProfile.fixedRegionalGroundTimeoutMs || 35000;
+    const regionalContextRadiusMeters = loadProfile.regionalContextRadiusMeters || 14000;
     const maxTotalLoadMs = loadProfile.maxTotalLoadMs;
     const loadStartedAt = performance.now();
     const recordLoadWarning = (label, err) => recordWorldLoadWarning(loadMetrics, label, err);
@@ -408,7 +411,12 @@ export function createWorldRoadLoader(deps = {}) {
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
         startLoadPhase('fetchFixedRegionalContext');
-        const regionalRequest = beginFixedRegionalTransportLoad({ fetchWorldData: fetchShortbreadWorldData, location: appCtx.LOC, runProviderWork });
+        const regionalRequest = beginFixedRegionalTransportLoad({
+          fetchWorldData: fetchShortbreadWorldData,
+          location: appCtx.LOC,
+          radiusMeters: regionalContextRadiusMeters,
+          runProviderWork
+        });
         const mappedPoiRequest = runProviderWork(
           'openstreetmap-shortbread',
           'mapped-pois',
@@ -429,14 +437,14 @@ export function createWorldRoadLoader(deps = {}) {
           fetchOverpassJSON,
           location: appCtx.LOC,
           runProviderWork,
-          timeoutMs: Math.min(22000, overpassTimeoutMs)
+          timeoutMs: Math.min(optionalProviderTimeoutMs, overpassTimeoutMs)
         });
         const civicFacilityRequest = runProviderWork(
           'osm-overpass',
           'civic-facilities',
           (signal) => fetchOverpassJSON(
             civicFacilityQuery,
-            Math.min(12000, overpassTimeoutMs),
+            Math.min(optionalProviderTimeoutMs, overpassTimeoutMs),
             loadDeadline,
             civicFacilityCacheMeta,
             { signal }
@@ -448,7 +456,7 @@ export function createWorldRoadLoader(deps = {}) {
           'commerce-places',
           (signal) => fetchOverpassJSON(
             commercePlaceQuery,
-            Math.min(12000, overpassTimeoutMs),
+            Math.min(optionalProviderTimeoutMs, overpassTimeoutMs),
             loadDeadline,
             commercePlaceCacheMeta,
             { signal }
@@ -464,7 +472,7 @@ export function createWorldRoadLoader(deps = {}) {
             // Do not hold an empty world behind the full publication timeout.
             // Dense responses normally win quickly; after this bounded probe,
             // the global vector source supplies deterministic sparse coverage.
-            const primaryTransportTimeoutMs = Math.min(overpassTimeoutMs, 9000);
+            const primaryTransportTimeoutMs = Math.min(overpassTimeoutMs, optionalProviderTimeoutMs);
             data = await runProviderWork(
               'osm-overpass',
               'transport-and-surface',
@@ -605,7 +613,13 @@ export function createWorldRoadLoader(deps = {}) {
           hideEarthSceneMeshes();
           return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-provider-fetch');
         }
-        await waitForFixedRegionalGround(appCtx, loadMetrics, startLoadPhase, endLoadPhase);
+        await waitForFixedRegionalGround(
+          appCtx,
+          loadMetrics,
+          startLoadPhase,
+          endLoadPhase,
+          { timeoutMs: fixedRegionalGroundTimeoutMs }
+        );
         const nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         const baselineFullWorld = perfModeNow === 'baseline';
@@ -778,7 +792,7 @@ export function createWorldRoadLoader(deps = {}) {
             buildingGeometryGuards,
             buildBuildingGeometryPass,
             cacheMeta: buildingPublicationCacheMeta,
-            deadlineMs: performance.now() + Math.max(12000, overpassTimeoutMs + 2500),
+            deadlineMs: performance.now() + Math.max(5000, optionalProviderTimeoutMs + 1000),
             endLoadPhase,
             fetchOverpassJSON: (...args) => runProviderWork(
               'osm-overpass', 'building-detail', (signal) => fetchOverpassJSON(...args, { signal })
@@ -845,7 +859,7 @@ export function createWorldRoadLoader(deps = {}) {
             metadataCacheMeta: buildingMetadataCacheMeta,
             metadataDeadlineMs: Infinity,
             metadataQuery: buildingMetadataQuery,
-            metadataTimeoutMs: 9000,
+            metadataTimeoutMs: optionalProviderTimeoutMs,
             pickBuildingBaseColor,
             query: buildingPublicationQuery,
             rdtLoadComplexity,
@@ -859,7 +873,7 @@ export function createWorldRoadLoader(deps = {}) {
             waterStructureCacheMeta,
             waterStructureDeadlineMs: Infinity,
             waterStructureQuery,
-            waterStructureTimeoutMs: 9000,
+            waterStructureTimeoutMs: optionalProviderTimeoutMs,
             useRdtBudgeting
           });
           appCtx.showLoad('Loading buildings and preparing the world...');

@@ -48,7 +48,7 @@ export function getRuntimeDynamicBudget(mode = runtime.getPerfModeValue()) {
       clampNumber(source.lodScale, 0.72, 1.00, 1) :
       clampNumber(source.lodScale, 0.72, 1.14, 1);
   const budgetScale = mobileLike
-    ? Math.min(requestedBudgetScale, mode === 'baseline' ? 0.32 : 0.52)
+    ? Math.min(requestedBudgetScale, mode === 'baseline' ? 0.32 : 0.36)
     : requestedBudgetScale;
   const lodScale = mobileLike
     ? Math.min(requestedLodScale, mode === 'baseline' ? 0.68 : 0.78)
@@ -307,9 +307,15 @@ export function getWorldLodThresholds(loadDepth, mode = runtime.getPerfModeValue
   return { near, mid, farVisible: mid + 450 };
 }
 
-export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValue(), budgetScale = 1) {
+export function getAdaptiveLoadProfile(
+  loadDepth,
+  mode = runtime.getPerfModeValue(),
+  budgetScale = 1,
+  deviceClass = 'desktop'
+) {
   const depth = Math.max(0, loadDepth | 0);
   const scale = clampNumber(budgetScale, 0.30, 1.35, 1);
+  const mobileLike = String(deviceClass || '').toLowerCase() === 'mobile';
   const radiusScale = clampNumber(Math.sqrt(scale), 0.58, 1.08, 1);
   const scaledRadii = (radii) => radii.map((r) => Number((r * radiusScale).toFixed(5)));
 
@@ -334,6 +340,9 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
         poiMinPerTile: scaledInt(90, scale, 20)
       },
       overpassTimeoutMs: 30000,
+      optionalProviderTimeoutMs: mobileLike ? 3500 : 9000,
+      fixedRegionalGroundTimeoutMs: mobileLike ? 16000 : 35000,
+      regionalContextRadiusMeters: mobileLike ? 12000 : 14000,
       maxTotalLoadMs: 62000
     };
   }
@@ -435,6 +444,9 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       poiMinPerTile: scaledInt(profileByDepth.poiMinPerTile, scale, 3)
     },
     overpassTimeoutMs: profileByDepth.overpassTimeoutMs,
+    optionalProviderTimeoutMs: mobileLike ? 3500 : 9000,
+    fixedRegionalGroundTimeoutMs: mobileLike ? 16000 : 35000,
+    regionalContextRadiusMeters: mobileLike ? 12000 : 14000,
     maxTotalLoadMs: profileByDepth.maxTotalLoadMs
   };
 }

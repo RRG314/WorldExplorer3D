@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-08-27.
+Last updated: 2026-08-28.
 
 Version 5.0 is the current approved release. The roadmap below separates its
 shipped regional scope from later expansion work.
@@ -49,6 +49,20 @@ In the 5.1 candidate:
 - The expansion remains a reviewed regional field-guide slice. Independent
   domain review is still required before the new packs are promoted from
   candidate status.
+- The Character, Backpack, quick slots, companions, vehicles, combat, recoverable
+  loot, mapped-store exchange, and civic response now use connected owners rather
+  than parallel feature paths.
+- Space and planetary play now share a catalog, world addresses, spacecraft
+  state, journeys, collision, accepted surfaces, landing, and return authority.
+- Mobile Earth and Live GPS entry use bounded provider and compilation budgets
+  while retaining the playable district and regional recovery boundary.
+
+Before 5.1 production:
+
+- Pass the current System Inventory and Architecture release matrix against one
+  immutable staging artifact.
+- Complete owner testing on desktop and a physical phone.
+- Promote only the exact approved artifact; do not rebuild during promotion.
 
 After the 5.1 candidate:
 

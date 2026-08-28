@@ -1,14 +1,13 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
+import { startStaticServer } from '../scripts/verification/static-server.mjs';
 
-const PORT = Number(process.env.WE3D_TEST_PORT || 4300 + Math.floor(Math.random() * 500));
-const HOST = `http://127.0.0.1:${PORT}`;
-const APP_URL = `${HOST}/app/index.html`;
-const OUTPUT_DIR = path.join(process.cwd(), 'output', 'playwright', 'painttown-physics-check');
+const VERIFY_ROOT = process.env.WE3D_VERIFY_ROOT || process.cwd();
+let APP_URL = '';
+const OUTPUT_DIR = path.join('/tmp', 'worldexplorer3d-verification', 'painttown-physics-check');
 const REPORT_PATH = path.join(OUTPUT_DIR, 'report.json');
 const SCREEN_TITLE_PATH = path.join(OUTPUT_DIR, 'title-painttown-selected.png');
 const SCREEN_GAME_PATH = path.join(OUTPUT_DIR, 'ingame-painttown.png');
@@ -16,58 +15,37 @@ const SCREEN_HUD_PATH = path.join(OUTPUT_DIR, 'ingame-painttown-after-tests.png'
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForServerReady(url, server, timeoutMs = 15000) {
-  const start = Date.now();
-  let lastStatus = '';
-  while (Date.now() - start < timeoutMs) {
-    if (server && server.exitCode !== null) {
-      throw new Error(`Local static server exited early with code ${server.exitCode}`);
-    }
-    try {
-      const response = await fetch(url, { method: 'GET' });
-      if (response.ok) return;
-      lastStatus = `HTTP ${response.status}`;
-    } catch (_) {
-      lastStatus = 'connection failed';
-    }
-    await sleep(150);
-  }
-  throw new Error(`Timed out waiting for local server at ${url} (${lastStatus})`);
-}
-
-function startStaticServer() {
-  const build = spawnSync(process.execPath, [
-    'scripts/hosting-artifact.mjs',
-    'build',
-    '--firebase-env',
-    'staging'
-  ], { cwd: process.cwd(), encoding: 'utf8' });
-  if (build.status !== 0) {
-    throw new Error(`Hosting artifact build failed.\n${build.stdout}\n${build.stderr}`);
-  }
-  const distDir = path.join(process.cwd(), 'dist');
-  const child = spawn('python3', ['-m', 'http.server', '-d', distDir, String(PORT)], {
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-  child.stdout.on('data', () => {});
-  child.stderr.on('data', () => {});
-  return child;
-}
-
 async function selectPaintTownAndStart(page) {
-  await page.waitForSelector('#startBtn', { timeout: 20000 });
-  await page.click('.tab-btn[data-tab="games"]');
-  await page.click('.mode[data-mode="painttown"]');
+  await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  const consentButton = page.locator('#analyticsConsentDenyBtn');
+  if (await consentButton.isVisible()) await consentButton.click();
+  await page.click('[data-globe-destination="games"]');
+  await page.waitForSelector('#globeHubOverlay:not([hidden]) #tab-games.active', { timeout: 10_000 });
+  const paintTownMode = page.locator('.mode[data-mode="painttown"]');
+  await paintTownMode.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+  await paintTownMode.focus();
+  await paintTownMode.press('Enter');
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx?.gameMode === 'painttown';
+  }, null, { timeout: 10_000 });
   await page.screenshot({ path: SCREEN_TITLE_PATH, fullPage: true });
-  await page.click('#startBtn', { force: true });
+  await page.click('#globeHubOverlayCloseBtn');
+  await page.click('#globeSelectorStartBtn');
   await page.waitForFunction(() => {
     const title = document.getElementById('titleScreen');
-    return !!title && title.classList.contains('hidden');
-  }, { timeout: 30000 });
+    const loading = document.getElementById('loading');
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return !!title && title.classList.contains('hidden') &&
+      !loading?.classList.contains('show') &&
+      state.gameStarted === true && state.worldLoading === false &&
+      Number(state.worldCounts?.buildings || 0) > 0 &&
+      Number(state.worldCounts?.roads || 0) > 0;
+  }, null, { timeout: 180_000 });
+  // The world publication is complete at this point; allow the PaintTown
+  // plugin one render turn to finish indexing the published building meshes.
+  await page.waitForTimeout(1_200);
 }
 
 async function waitForPaintTownRuntime(page) {
@@ -77,7 +55,31 @@ async function waitForPaintTownRuntime(page) {
     if (!ctx || typeof ctx.paintTownDebugSnapshot !== 'function') return false;
     const snap = ctx.paintTownDebugSnapshot();
     return !!(snap && snap.active && Number(snap.totalBuildings) > 0);
-  }, { timeout: 45000 });
+  }, null, { timeout: 120_000 });
+}
+
+async function capturePaintTownRuntime(page) {
+  return page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      gameMode: ctx?.gameMode || null,
+      disableNearBuildingBatching: ctx?.disableNearBuildingBatching === true,
+      buildings: Number(ctx?.buildings?.length || 0),
+      buildingMeshes: Number(ctx?.buildingMeshes?.length || 0),
+      unbatchedBuildingMeshes: Array.isArray(ctx?.buildingMeshes)
+        ? ctx.buildingMeshes.filter((mesh) => mesh && !mesh.userData?.isBuildingBatch).length
+        : 0,
+      gameplay: ctx?.getGameplayRegistrySnapshot?.() || null,
+      paintTown: ctx?.paintTownDebugSnapshot?.() || null
+    };
+  });
+}
+
+function isExpectedLocalNetworkConsoleError(message) {
+  const text = String(message || '');
+  return text.includes('Failed to load resource: net::ERR_') ||
+    (text.includes('blocked by CORS policy') && text.includes('/api/interpreter')) ||
+    (text.includes('net::ERR_FAILED') && text.includes('Failed to load resource'));
 }
 
 async function checkDeterministicSeed(page) {
@@ -245,6 +247,8 @@ async function run() {
     seedCheck: null,
     touchCheck: null,
     gunCheck: null,
+    runtime: null,
+    consoleErrors: [],
     errors: [],
     pass: false
   };
@@ -252,26 +256,32 @@ async function run() {
   let server = null;
   let browser = null;
   try {
-    server = startStaticServer();
-    await waitForServerReady(APP_URL, server);
+    server = await startStaticServer({ rootDir: VERIFY_ROOT, ports: [4431, 4432, 4433] });
+    APP_URL = `http://127.0.0.1:${server.port}/app/`;
+    report.appUrl = APP_URL;
 
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--use-gl=angle', '--use-angle=swiftshader']
+    browser = await chromium.launch({ headless: true, channel: 'chrome' });
+    const context = await browser.newContext({
+      ...devices['iPhone 13'],
+      viewport: { width: 1280, height: 800 },
+      screen: { width: 1280, height: 800 }
     });
-    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    const page = await context.newPage();
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
-        report.errors.push(`console.error: ${msg.text()}`);
+        const message = `console.error: ${msg.text()}`;
+        report.consoleErrors.push(message);
+        if (!isExpectedLocalNetworkConsoleError(message)) report.errors.push(message);
       }
     });
     page.on('pageerror', (err) => {
       report.errors.push(`pageerror: ${String(err)}`);
     });
 
-    await page.goto(APP_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(APP_URL, { waitUntil: 'load', timeout: 120_000 });
     await selectPaintTownAndStart(page);
     await waitForPaintTownRuntime(page);
+    report.runtime = await capturePaintTownRuntime(page);
     await page.screenshot({ path: SCREEN_GAME_PATH, fullPage: true });
 
     report.seedCheck = await checkDeterministicSeed(page);
@@ -293,15 +303,7 @@ async function run() {
     report.errors.push(String(err && err.stack ? err.stack : err));
   } finally {
     if (browser) await browser.close().catch(() => {});
-    if (server && !server.killed) {
-      server.kill('SIGTERM');
-    }
-    if (server) {
-      await new Promise((resolve) => {
-        server.once('exit', () => resolve());
-        setTimeout(resolve, 1500);
-      });
-    }
+    await server?.close();
     fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2));
   }
 

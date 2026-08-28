@@ -1,4 +1,4 @@
-import { FIELD_DISCOVERY_CATALOG } from './catalog.js?v=2';
+import { FIELD_DISCOVERY_CATALOG } from './catalog.js?v=4';
 import { prioritizeProgressiveSlots } from './pacing.js?v=2';
 
 function distanceTo(position, slot) {

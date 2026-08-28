@@ -1,4 +1,4 @@
-import { FIND_CATALOG } from './catalog.js?v=2';
+import { FIND_CATALOG } from './catalog.js?v=4';
 import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
 import { resolveExcavationTool } from './tools.js?v=1';
 

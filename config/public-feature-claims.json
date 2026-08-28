@@ -43,6 +43,24 @@
       "evidenceCommands": ["verify:urban-equipment", "verify:actors-vehicles"]
     },
     {
+      "id": "vehicle-handling-and-response",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Distinct road-vehicle handling" },
+      "evidenceCommands": ["verify:current-contracts", "verify:actors-vehicles", "verify:player-reported-blockers"]
+    },
+    {
+      "id": "character-quick-slots-and-urban-equipment",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Configurable quick slots" },
+      "evidenceCommands": ["verify:current-contracts", "verify:urban-equipment"]
+    },
+    {
+      "id": "companion-progression-and-travel",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Individual companion care" },
+      "evidenceCommands": ["verify:current-contracts", "verify:explorer-coherence-browser"]
+    },
+    {
       "id": "multiplayer-rooms",
       "status": "candidate-verified",
       "source": { "file": "README.md", "pattern": "Multiplayer uses bounded rooms" },
@@ -118,7 +136,7 @@
       "id": "planetary-and-space-travel",
       "status": "candidate-verified",
       "source": { "file": "README.md", "pattern": "Ocean, Moon, Mars, solar-system, and deep-space environments" },
-      "evidenceCommands": ["verify:environments"]
+      "evidenceCommands": ["verify:current-contracts", "verify:environments"]
     }
   ]
 }

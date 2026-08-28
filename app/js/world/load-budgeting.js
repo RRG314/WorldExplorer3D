@@ -123,18 +123,81 @@ export function prepareWorldFeatureSelections(options = {}) {
   const poiKeyFromTags = options.poiKeyFromTags;
   const roadTypePriority = options.roadTypePriority;
 
-  const allRoadWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    isDriveableHighwayTag(element.tags?.highway)
-  );
+  const allRoadWays = [];
+  const allBuildingWays = [];
+  const allLanduseWays = [];
+  const allWaterwayWays = [];
+  const allRailwayWays = [];
+  const allFootwayWays = [];
+  const allCyclewayWays = [];
+  const allStructureConnectorWays = [];
+  const allTreeNodes = [];
+  const allTreeRowWays = [];
+  const allPoiNodes = [];
+  // Provider payloads can contain hundreds of thousands of elements. Index
+  // every feature family in one pass; the prior implementation rescanned the
+  // full payload for roads, land, water, each path type, vegetation, and POIs.
+  for (const element of Array.isArray(data.elements) ? data.elements : []) {
+    const tags = element?.tags || {};
+    if (element?.type === 'node') {
+      if (tags.natural === 'tree') allTreeNodes.push(element);
+    } else if (element?.type === 'way') {
+      if (isDriveableHighwayTag(tags.highway)) allRoadWays.push(element);
+      if (tags.building || tags['building:part']) allBuildingWays.push(element);
+      if (isLanduseCandidate(tags)) allLanduseWays.push(element);
+      if (tags.waterway) allWaterwayWays.push(element);
+      if (tags.natural === 'tree_row') allTreeRowWays.push(element);
+      if (enableLinearFeatures) {
+        const classification = classifyLinearFeatureTags(tags);
+        if (classification?.kind === 'railway') allRailwayWays.push(element);
+        if (classification?.kind === 'footway') allFootwayWays.push(element);
+        if (classification?.kind === 'cycleway') allCyclewayWays.push(element);
+        const forcedClassification = classifyLinearFeatureTags(tags, { force: true });
+        if (forcedClassification?.kind === 'footway') {
+          const semantics = classifyStructureSemantics(tags, {
+            featureKind: forcedClassification.kind,
+            subtype: forcedClassification.subtype
+          });
+          if (semantics.gradeSeparated || semantics.skywalk) {
+            allStructureConnectorWays.push(element);
+          }
+        }
+      }
+    }
+    if (!poiKeyFromTags(tags)) continue;
+    if (element.type === 'node' && Number.isFinite(Number(element.lat)) && Number.isFinite(Number(element.lon))) {
+      allPoiNodes.push(element);
+      continue;
+    }
+    const lat = Number(element.center?.lat);
+    const lon = Number(element.center?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    allPoiNodes.push({
+      type: 'node',
+      id: `${element.type}:${element.id}`,
+      lat,
+      lon,
+      tags: {
+        ...tags,
+        _sourceElementType: element.type,
+        _sourceElementId: String(element.id)
+      },
+      sourceElementType: element.type,
+      sourceElementId: element.id
+    });
+  }
   const coreRoadWays = allRoadWays.filter(
     (way) => way.tags?._regionalContext !== 'fixed-location'
   );
   const regionalRoadWays = allRoadWays.filter(
     (way) => way.tags?._regionalContext === 'fixed-location'
   );
+  const mobileLike = typeof appCtx.isLikelyMobileDevice === 'function' &&
+    appCtx.isLikelyMobileDevice();
   const regionalRoadCap = regionalRoadWays.length > 0
-    ? Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
+    ? mobileLike
+      ? Math.min(1600, Math.max(1400, Math.floor(maxRoadWays * 0.6)))
+      : Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
     : 0;
   const regionalPartition = partitionFixedRegionalRoads(regionalRoadWays);
   const exactRegionalEngineered = regionalPartition.engineered.filter((way) =>
@@ -227,9 +290,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       selectedRegionalConnectors.length + selectedRegionalRoadWays.length
   };
 
-  const allBuildingWays = data.elements.filter((element) =>
-    element.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
-  );
   const buildingWays = limitWaysByTileBudget(allBuildingWays, nodes, {
     globalCap: maxBuildingWays,
     basePerTile: tileBudgetCfg.buildingsPerTile,
@@ -240,11 +300,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     coreRatio: useRdtBudgeting ? 0.35 : 0.45
   });
 
-  const allLanduseWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    element.tags &&
-    isLanduseCandidate(element.tags)
-  );
   const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
     globalCap: maxLanduseWays,
     basePerTile: tileBudgetCfg.landusePerTile,
@@ -253,11 +308,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting
   });
 
-  const allWaterwayWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    element.tags &&
-    !!element.tags.waterway
-  );
   const waterwayWays = limitWaysByTileBudget(allWaterwayWays, nodes, {
     globalCap: Math.max(120, Math.floor(maxLanduseWays * 0.8)),
     basePerTile: Math.max(12, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
@@ -266,10 +316,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting
   });
 
-  const allRailwayWays = enableLinearFeatures ? data.elements.filter((element) =>
-    element.type === 'way' &&
-    classifyLinearFeatureTags(element.tags)?.kind === 'railway'
-  ) : [];
   const railwayWays = enableLinearFeatures ? limitWaysByTileBudget(allRailwayWays, nodes, {
     globalCap: Math.max(80, Math.floor(maxRoadWays * 0.22)),
     basePerTile: Math.max(6, Math.floor(tileBudgetCfg.roadsPerTile * 0.22)),
@@ -281,10 +327,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('railway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allFootwayWays = enableLinearFeatures ? data.elements.filter((element) =>
-    element.type === 'way' &&
-    classifyLinearFeatureTags(element.tags)?.kind === 'footway'
-  ) : [];
   const footwayWays = enableLinearFeatures ? limitWaysByTileBudget(allFootwayWays, nodes, {
     globalCap: Math.max(150, Math.floor(maxLanduseWays * 0.65)),
     basePerTile: Math.max(10, Math.floor(tileBudgetCfg.landusePerTile * 0.55)),
@@ -298,10 +340,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('footway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allCyclewayWays = enableLinearFeatures ? data.elements.filter((element) =>
-    element.type === 'way' &&
-    classifyLinearFeatureTags(element.tags)?.kind === 'cycleway'
-  ) : [];
   const cyclewayWays = enableLinearFeatures ? limitWaysByTileBudget(allCyclewayWays, nodes, {
     globalCap: Math.max(110, Math.floor(maxLanduseWays * 0.45)),
     basePerTile: Math.max(8, Math.floor(tileBudgetCfg.landusePerTile * 0.36)),
@@ -315,16 +353,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allStructureConnectorWays = enableLinearFeatures ? data.elements.filter((element) => {
-    if (element.type !== 'way') return false;
-    const classification = classifyLinearFeatureTags(element.tags, { force: true });
-    if (!classification || classification.kind !== 'footway') return false;
-    const semantics = classifyStructureSemantics(element.tags || {}, {
-      featureKind: classification.kind,
-      subtype: classification.subtype
-    });
-    return semantics.gradeSeparated || semantics.skywalk;
-  }) : [];
   const structureConnectorWays = enableLinearFeatures ? limitWaysByTileBudget(allStructureConnectorWays, nodes, {
     globalCap: Math.max(36, Math.floor(tileBudgetCfg.landusePerTile * 1.4)),
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
@@ -340,10 +368,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     }
   }) : [];
 
-  const allTreeNodes = data.elements.filter((element) =>
-    element.type === 'node' &&
-    element.tags?.natural === 'tree'
-  );
   const treeNodes = limitNodesByTileBudget(allTreeNodes, {
     globalCap: maxTreeNodes,
     basePerTile: Math.max(6, Math.floor(tileBudgetCfg.landusePerTile * 0.22)),
@@ -352,10 +376,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting
   });
 
-  const allTreeRowWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    element.tags?.natural === 'tree_row'
-  );
   const treeRowWays = limitWaysByTileBudget(allTreeRowWays, nodes, {
     globalCap: maxTreeRowWays,
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.14)),
@@ -366,26 +386,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     coreRatio: 0.5
   });
 
-  const allPoiNodes = data.elements.map((element) => {
-    if (!poiKeyFromTags(element.tags)) return null;
-    if (element.type === 'node' && Number.isFinite(Number(element.lat)) && Number.isFinite(Number(element.lon))) return element;
-    const lat = Number(element.center?.lat);
-    const lon = Number(element.center?.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    return {
-      type: 'node',
-      id: `${element.type}:${element.id}`,
-      lat,
-      lon,
-      tags: {
-        ...element.tags,
-        _sourceElementType: element.type,
-        _sourceElementId: String(element.id)
-      },
-      sourceElementType: element.type,
-      sourceElementId: element.id
-    };
-  }).filter(Boolean);
   const poiNodes = limitNodesByTileBudget(allPoiNodes, {
     globalCap: maxPoiNodes,
     basePerTile: tileBudgetCfg.poiPerTile,

@@ -1,4 +1,4 @@
-import { FIELD_DISCOVERY_CATALOG } from './catalog.js?v=2';
+import { FIELD_DISCOVERY_CATALOG } from './catalog.js?v=4';
 
 const WALKING_ENCOUNTER_SCHEMA_VERSION = 1;
 

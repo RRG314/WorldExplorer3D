@@ -11,6 +11,8 @@ const authHost = String(process.env.FIREBASE_AUTH_EMULATOR_HOST || '').trim();
 const firestoreHost = String(process.env.FIRESTORE_EMULATOR_HOST || '').trim();
 const scope = String(process.env.WE3D_BLOCKS_SCOPE || '').trim().toLowerCase();
 const requireImmutableSource = process.env.WE3D_REQUIRE_IMMUTABLE === '1';
+const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
+const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 
 const sourceRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 const relevantWorktreeChanges = execFileSync(
@@ -35,7 +37,7 @@ const firestorePort = Number(firestoreHost.split(':').at(-1));
 assert.ok(Number.isInteger(authPort) && authPort > 0, `Invalid Auth emulator host: ${authHost}`);
 assert.ok(Number.isInteger(firestorePort) && firestorePort > 0, `Invalid Firestore emulator host: ${firestoreHost}`);
 
-const server = await startStaticServer({ rootDir: root, ports: [4395, 4396, 4397] });
+const server = await startStaticServer({ rootDir: servedRoot, ports: [4395, 4396, 4397] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const password = 'WorldEditor-Blocks-Emulator-Only-2026';

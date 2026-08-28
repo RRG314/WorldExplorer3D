@@ -29,7 +29,7 @@
     "browser": "Installed Google Chrome with touch/mobile emulation",
     "measurementAuthority": "software regression proxy; not physical-phone battery or thermal evidence",
     "budgets": {
-      "firstPlayableMs": 150000,
+      "firstPlayableMs": 60000,
       "minimumAverageFps": 30,
       "maximumP95FrameMs": 50,
       "maximumP99FrameMs": 100,
