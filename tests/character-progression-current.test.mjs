@@ -10,6 +10,7 @@ import {
 import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
 import { createCharacter, createDefaultCharacterState, validateCreationAttributes } from '../app/js/character/model.js';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../app/js/character/progression.js';
+import { createDetectorSession } from '../app/js/discovery/detector-session.js';
 import { createMemoryDiscoveryProfileStore } from '../app/js/discovery/profile-store.js';
 
 function event(overrides = {}) {
@@ -109,6 +110,34 @@ test('different starting characters receive perceptibly different assistance wit
   assert.equal(marineDive.allowed, true);
   assert.equal(prospectorDig.assistance.control > marineDig.assistance.control, true);
   assert.equal(marineDive.assistance.control > prospectorDive.assistance.control, true);
+});
+
+test('starting geology experience affects detector play before the first rank threshold', () => {
+  const general = createCharacter({ backgroundId: 'general-explorer', now: 1 });
+  const prospector = createCharacter({ backgroundId: 'field-prospector', now: 1 });
+  const equipmentIds = ['metal-detector', 'hand-trowel'];
+  const generalRead = resolveCharacterCapability(general, 'detector', { equipmentIds });
+  const prospectorRead = resolveCharacterCapability(prospector, 'detector', { equipmentIds });
+  assert.equal(generalRead.contributions.specialty.rank, 0);
+  assert.equal(prospectorRead.contributions.specialty.rank, 0);
+  assert.equal(prospectorRead.assistance.control > generalRead.assistance.control, true);
+
+  const plan = {
+    type: 'EncounterPlan',
+    worldIdentity: { id: 'world:test-geology' },
+    slots: [{
+      id: 'detector:test:1', claimId: 'claim:detector:test:1', catalogId: 'brass-transit-token',
+      position: { x: 17, z: 0 }, slotIndex: 0, rarityBand: 'common',
+      signalClass: 'high-conductor', depthBand: 'shallow'
+    }]
+  };
+  const generalSession = createDetectorSession({ plan, availableToolIds: equipmentIds, characterCapability: generalRead });
+  const prospectorSession = createDetectorSession({ plan, availableToolIds: equipmentIds, characterCapability: prospectorRead });
+  generalSession.sweep({ x: 0, z: 0 });
+  prospectorSession.sweep({ x: 0, z: 0 });
+  assert.equal(generalSession.update({ x: 0, z: 0 }).phase, 'sweeping');
+  assert.equal(prospectorSession.update({ x: 0, z: 0 }).phase, 'signal');
+  assert.equal(prospectorSession.snapshot().characterAssistance.focusRadiusMeters > generalSession.snapshot().characterAssistance.focusRadiusMeters, true);
 });
 
 test('advanced requirements explain equipment and qualification while basic play remains open', () => {

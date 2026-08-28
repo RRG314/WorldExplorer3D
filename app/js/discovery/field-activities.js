@@ -8,6 +8,20 @@ const NON_FIELD_ACTIVITIES = new Set(['metal-detect', 'fish']);
 const FIELD_OBSERVATION_RADIUS = 24;
 const FIELD_OBSERVATION_BREAK_RADIUS = 31;
 
+function fieldActivityTuning(capability = null) {
+  if (capability?.type !== 'CharacterCapability' || capability.allowed !== true) return null;
+  const control = Math.max(0, Math.min(100, Number(capability.assistance?.control) || 0));
+  const interpretation = Math.max(0, Math.min(100, Number(capability.assistance?.interpretation) || 0));
+  return Object.freeze({
+    label: capability.label || 'Field read',
+    informationTier: capability.assistance?.informationTier || 'basic',
+    observationRadius: Number((FIELD_OBSERVATION_RADIUS + Math.max(0, interpretation - 25) * 0.08).toFixed(1)),
+    breakRadius: Number((FIELD_OBSERVATION_BREAK_RADIUS + Math.max(0, control - 25) * 0.06).toFixed(1)),
+    specialtyRank: Number(capability.contributions?.specialty?.rank) || 0,
+    proficiencyRank: Number(capability.contributions?.proficiency?.rank) || 0
+  });
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   Object.values(value).forEach(deepFreeze);
@@ -125,7 +139,7 @@ function createFieldActivitySession(options = {}) {
   const claimedIds = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const observedCatalogIds = options.observedCatalogIds instanceof Set ? options.observedCatalogIds : new Set(options.observedCatalogIds || []);
   let progress = options.progress || fieldProgress({ collectionCount: options.collectionCount || 0 });
-  let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null };
+  let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null, characterTuning: null };
 
   const distanceToSlot = (position, slot) => slot ? Math.hypot(Number(position?.x || 0) - slot.position.x, Number(position?.z || 0) - slot.position.z) : null;
   const bearingToSlot = (position, slot) => slot ? (Math.atan2(slot.position.x - Number(position?.x || 0), slot.position.z - Number(position?.z || 0)) * 180 / Math.PI + 360) % 360 : null;
@@ -137,14 +151,16 @@ function createFieldActivitySession(options = {}) {
 
   function beginWithSlot(activityId, slot, position, context = {}) {
     if (!slot) return false;
+    const characterTuning = fieldActivityTuning(context.characterCapability);
     const authority = authorityFor(slot, context);
     const distance = authority?.distanceMeters ?? distanceToSlot(position, slot);
-    const phase = authority ? authority.eligible ? 'observing' : 'seeking' : distance <= FIELD_OBSERVATION_RADIUS ? 'observing' : 'seeking';
+    const observationRadius = characterTuning?.observationRadius || FIELD_OBSERVATION_RADIUS;
+    const phase = authority ? authority.eligible ? 'observing' : 'seeking' : distance <= observationRadius ? 'observing' : 'seeking';
     const actionPhrase = slot.evidenceContract?.actionPhrase || `${slot.activityLabel.toLowerCase()} examines this virtual survey point`;
     const message = authority?.message || (phase === 'observing'
       ? `Hold position to ${actionPhrase}…`
       : `A plausible survey point is ${Math.ceil(distance)} m away. Follow the bearing while the panel is minimized.`);
-    state = { phase, activityId, slot, elapsed: 0, message, error: '', result: null, authority };
+    state = { phase, activityId, slot, elapsed: 0, message, error: '', result: null, authority, characterTuning };
     return true;
   }
 
@@ -178,9 +194,11 @@ function createFieldActivitySession(options = {}) {
     if (!['seeking', 'observing'].includes(state.phase)) return snapshot(position);
     const authority = authorityFor(state.slot, context);
     const distance = authority?.distanceMeters ?? distanceToSlot(position, state.slot);
+    const observationRadius = state.characterTuning?.observationRadius || FIELD_OBSERVATION_RADIUS;
+    const breakRadius = state.characterTuning?.breakRadius || FIELD_OBSERVATION_BREAK_RADIUS;
     state.authority = authority;
     if (state.phase === 'seeking') {
-      if (authority ? authority.eligible : distance <= FIELD_OBSERVATION_RADIUS) {
+      if (authority ? authority.eligible : distance <= observationRadius) {
         state.phase = 'observing';
         state.elapsed = 0;
         state.message = `Survey point reached. Hold position to ${state.slot.evidenceContract?.actionPhrase || state.slot.activityLabel.toLowerCase()}…`;
@@ -189,7 +207,7 @@ function createFieldActivitySession(options = {}) {
       }
       return snapshot(position);
     }
-    if (authority ? !authority.eligible : distance > FIELD_OBSERVATION_BREAK_RADIUS) {
+    if (authority ? !authority.eligible : distance > breakRadius) {
       state.phase = 'seeking';
       state.elapsed = 0;
       state.message = authority?.message || 'The survey point moved outside observation range. Follow the bearing to resume.';
@@ -277,7 +295,7 @@ function createFieldActivitySession(options = {}) {
   }
 
   function reset() {
-    state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null };
+    state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null, characterTuning: null };
   }
 
   function snapshot(position = {}) {
@@ -303,10 +321,19 @@ function createFieldActivitySession(options = {}) {
       claimState: state.slot ? claimedIds.has(state.slot.claimId) ? 'claimed' : 'unclaimed' : null,
       movementAuthority: state.authority?.authority || 'manual-direct',
       proximityState: state.authority?.state || null,
-      interactionEligible: state.authority ? state.authority.eligible === true : Number.isFinite(distance) && distance <= FIELD_OBSERVATION_RADIUS,
+      interactionEligible: state.authority ? state.authority.eligible === true : Number.isFinite(distance) && distance <= (state.characterTuning?.observationRadius || FIELD_OBSERVATION_RADIUS),
       pauseReason: state.authority?.pauseReason || null,
       approachEvidence: state.slot?.approachEvidence || null,
       rewardEligibility: state.authority?.rewardEligibility || null,
+      characterAssistance: state.characterTuning ? Object.freeze({
+        type: 'FieldCharacterAssistance',
+        label: state.characterTuning.label,
+        informationTier: state.characterTuning.informationTier,
+        observationRadiusMeters: state.characterTuning.observationRadius,
+        steadyRangeMeters: state.characterTuning.breakRadius,
+        specialtyRank: state.characterTuning.specialtyRank,
+        proficiencyRank: state.characterTuning.proficiencyRank
+      }) : null,
       collectionResult: state.result ? {
         recorded: state.result.recorded !== false,
         collected: state.result.collected === true,
@@ -323,4 +350,4 @@ function createFieldActivitySession(options = {}) {
   return Object.freeze({ begin, beginSlot, leave, record, reset, snapshot, update });
 }
 
-export { FIELD_OBSERVATION_RADIUS, compileFieldActivityPlan, createFieldActivitySession };
+export { FIELD_OBSERVATION_RADIUS, compileFieldActivityPlan, createFieldActivitySession, fieldActivityTuning };

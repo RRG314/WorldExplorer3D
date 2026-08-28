@@ -1,12 +1,12 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
 import { createCompanionRuntime } from './companion-runtime.js?v=5';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
-import { createDetectorSession } from './detector-session.js?v=2';
+import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
 import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
 import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
-import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=3';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
@@ -36,12 +36,28 @@ import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 import { SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
+import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
   'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
   'fossil-document', 'forage', 'wildlife-track', 'beachcomb', 'fish',
   'nature-observe', 'insect-macro', 'habitat-survey', 'community-survey', 'sonar-survey'
 ]);
+
+const CHARACTER_CAPABILITY_BY_ACTIVITY = Object.freeze({
+  'metal-detect': 'detector',
+  'geology-inspect': 'geology-inspection',
+  'pan-sediment': 'geology-inspection',
+  'fossil-document': 'excavation'
+});
+
+function backpackEquipmentIds(appCtx, fallbackIds = []) {
+  const itemIds = appCtx.playerBackpackInventory?.snapshot?.().items
+    ?.filter((item) => Number(item.quantity || 1) > 0)
+    .map((item) => String(item.catalogId || ''))
+    .filter(Boolean) || [];
+  return [...new Set([...fallbackIds.map(String), ...itemIds])];
+}
 
 const WILDLIFE_OBSERVATION_CATALOG = Object.freeze({
   'rock-pigeon': 'urban-nature-photo',
@@ -241,7 +257,7 @@ function createDiscoveryUi(state) {
     quickSignal: byId('discoveryQuickSignal'), prompt: byId('discoveryContextPrompt'), promptText: byId('discoveryContextText'),
     promptOpen: byId('discoveryContextOpenBtn'), phase: byId('discoveryPhase'), bearing: byId('discoveryBearing'),
     fill: byId('discoverySignalFill'), distance: byId('discoveryDistance'), classification: byId('discoveryClassification'),
-    message: byId('discoveryMessage'), primary: byId('discoveryPrimaryBtn'), secondary: byId('discoverySecondaryBtn'),
+    message: byId('discoveryMessage'), characterAssist: byId('discoveryCharacterAssist'), primary: byId('discoveryPrimaryBtn'), secondary: byId('discoverySecondaryBtn'),
     journal: byId('discoveryJournalList'), journalCategory: byId('discoveryJournalCategory'), journalRegion: byId('discoveryJournalRegion'), result: byId('discoveryResultCard'),
     fieldGuide: byId('discoveryFieldGuideList'), collection: byId('discoveryCollectionList'),
     guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'), guideScope: byId('discoveryGuideScope'),
@@ -759,6 +775,16 @@ function createDiscoveryUi(state) {
       elements.message.textContent = snapshot.error || snapshot.message;
       elements.message.classList.toggle('error', !!snapshot.error);
     }
+    if (elements.characterAssist) {
+      const assistance = snapshot.characterAssistance;
+      elements.characterAssist.hidden = !assistance;
+      if (assistance) {
+        const detail = assistance.type === 'DetectorCharacterAssistance'
+          ? `${assistance.informationTier} cues · focus ${Math.round(assistance.focusRadiusMeters)} m · reveal ${Number(assistance.excavationSeconds).toFixed(1)} s`
+          : `${assistance.informationTier} cues · observation range ${Math.round(assistance.observationRadiusMeters)} m · steady range ${Math.round(assistance.steadyRangeMeters)} m`;
+        elements.characterAssist.innerHTML = `<strong>${escapeHtml(assistance.label)}</strong><span>${escapeHtml(detail)}</span>`;
+      }
+    }
     if (elements.quickSignal) elements.quickSignal.textContent = isDetector && snapshot.signalStrength > 0.7 ? 'Strong' : isDetector && snapshot.signalStrength > 0.25 ? 'Signal' : isDetector ? 'Sweeping' : snapshot.phase === 'seeking' && snapshot.distanceMeters != null ? `${Math.ceil(snapshot.distanceMeters)} m · ${Math.round(snapshot.bearingDegrees)}°` : snapshot.phase === 'revealed' ? 'Result ready' : 'Observing';
     const detectorControls = {
       idle: ['Start Sweep', 'Close'], complete: ['Search Again', 'Close'], sweeping: ['Refine Signal', 'Close'],
@@ -963,6 +989,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.handleWorldDiscoveryQuickAction = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
+  if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
   return true;
 }
 
@@ -1084,15 +1111,24 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   appCtx.playerBackpackStore?.save?.(backpackInventory?.exportState?.());
   const backpackEquipped = backpackInventory?.snapshot?.().equippedCatalogId;
   const initialEquippedToolId = entitlements.canUseTool(backpackEquipped).allowed ? backpackEquipped : legacyEquippedToolId;
+  const capabilityResolver = createCapabilityResolver();
+  const initialEquipmentIds = backpackEquipmentIds(appCtx, entitlements.listAvailableTools().map((tool) => tool.id));
+  const initialDetectorCapability = capabilityResolver.resolve(discoveryProfile.characterState, 'detector', {
+    difficulty: 'basic',
+    equipmentIds: initialEquipmentIds,
+    environment: appCtx.getEnv?.() || 'EARTH'
+  });
   const session = createDetectorSession({
     plan: encounters, claimedIds,
     observedCatalogIds, progress,
-    availableToolIds: entitlements.listAvailableTools().map((tool) => tool.id)
+    availableToolIds: entitlements.listAvailableTools().map((tool) => tool.id),
+    characterCapability: initialDetectorCapability
   });
   const fieldSession = createFieldActivitySession({ plan: fieldActivities, claimedIds, observedCatalogIds, progress });
   const owner = `world-discovery:${snapshot.sequence}`;
   const state = {
     type: 'WorldDiscoveryRuntime', owner, appCtx, publication, environment, profileStore, entitlements, session, fieldSession,
+    capabilityResolver, characterState: discoveryProfile.characterState, activeCharacterCapability: initialDetectorCapability,
     actions: [], currentCellId: null, presentation: null, ui: null,
     disposed: false, reason: null, actionTimer: 0, toneTimer: 0, audioContext: null, fieldFeedbackPhase: 'idle',
     active: true, activeActivityId: 'metal-detect', equippedToolId: initialEquippedToolId,
@@ -1108,6 +1144,34 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     retentionSnapshot: null,
     creatureQualityAudit: auditRegionalCreatureQuality(resolveRegionalEcologyPack(worldIdentity.location))
   };
+  state.resolveCharacterCapability = (capabilityId, context = {}) => state.capabilityResolver.resolve(
+    state.characterState,
+    capabilityId,
+    {
+      difficulty: 'basic',
+      environment: appCtx.getEnv?.() || 'EARTH',
+      equipmentIds: backpackEquipmentIds(appCtx, state.entitlements.listAvailableTools().map((tool) => tool.id)),
+      ...context
+    }
+  );
+  state.characterCapabilityForActivity = (activityId) => {
+    const capabilityId = CHARACTER_CAPABILITY_BY_ACTIVITY[String(activityId || '')];
+    return capabilityId ? state.resolveCharacterCapability(capabilityId) : null;
+  };
+  state.applyCharacterCapability = (activityId = state.activeActivityId) => {
+    const capability = state.characterCapabilityForActivity(activityId);
+    state.activeCharacterCapability = capability;
+    if (activityId === 'metal-detect') state.session.setCharacterCapability?.(capability);
+    return capability;
+  };
+  state.syncCharacterState = (profile) => {
+    if (!profile?.characterState) return state.characterState;
+    state.characterState = profile.characterState;
+    state.capabilityResolver.clear();
+    state.applyCharacterCapability();
+    return state.characterState;
+  };
+  appCtx.resolveCharacterCapability = state.resolveCharacterCapability;
   state.recordExplorerEvent = async (record = {}) => {
     const position = playerPosition(appCtx);
     const result = await profileStore.recordExplorerEvent?.({
@@ -1396,6 +1460,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.wildlifeRuntime = createAmbientWildlifeRuntime(appCtx, wildlife);
   state.refreshToolProgress = async () => {
     const profile = await profileStore.getProfile();
+    state.syncCharacterState(profile);
     const previous = new Set(state.toolProgress?.unlockedToolIds || []);
     state.toolProgress = explorerToolProgress(profile);
     state.entitlements = createExplorationEntitlementService({
@@ -1414,6 +1479,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     appCtx.playerBackpackStore?.save?.(appCtx.playerBackpackInventory?.exportState?.());
     state.session.setAvailableToolIds?.(state.entitlements.listAvailableTools().map((tool) => tool.id));
+    state.applyCharacterCapability();
     const unlocked = state.toolProgress.unlockedToolIds.filter((toolId) => !previous.has(toolId));
     if (unlocked.length) {
       const labels = state.entitlements.listAvailableTools().filter((tool) => unlocked.includes(tool.id)).map((tool) => tool.label);
@@ -1459,6 +1525,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (appCtx.playerBackpackInventory?.equip?.(id) !== true) return false;
     appCtx.playerBackpackStore?.save?.(appCtx.playerBackpackInventory.exportState?.());
     state.equippedToolId = id;
+    state.applyCharacterCapability();
     if (!options.silent) appCtx.showToast?.(`${tool.label} equipped`);
     await state.ui?.refreshData?.();
     return true;
@@ -1468,6 +1535,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     const equippedId = appCtx.playerBackpackInventory?.snapshot?.().equippedCatalogId;
     if (!equippedId || state.entitlements.canUseTool(equippedId).allowed !== true || equippedId === state.equippedToolId) return;
     state.equippedToolId = equippedId;
+    state.applyCharacterCapability();
     void profileStore.getProfile().then((profile) => profileStore.saveProfile({ ...profile, equippedToolId: equippedId }));
     void state.ui?.refreshData?.();
   });
@@ -1766,6 +1834,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     }
     if (activityToolId) await state.equipTool(activityToolId, { silent: true });
     state.activeActivityId = id;
+    state.applyCharacterCapability(id);
     if (id === 'metal-detect') {
       state.fieldSession.reset();
       state.lastSnapshot = state.detectorSnapshot;
@@ -1796,10 +1865,14 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     }
     if (toolId) await state.equipTool(toolId, { silent: true });
     state.activeActivityId = activityId;
+    const characterCapability = state.applyCharacterCapability(activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(playerPosition(appCtx));
     state.fieldSession.reset();
-    const began = state.fieldSession.beginSlot(slotId, playerPosition(appCtx), { evaluateFieldTarget: state.evaluateFieldTarget });
+    const began = state.fieldSession.beginSlot(slotId, playerPosition(appCtx), {
+      evaluateFieldTarget: state.evaluateFieldTarget,
+      characterCapability
+    });
     state.lastSnapshot = state.fieldSession.snapshot(playerPosition(appCtx));
     state.ui.showResult(null);
     state.ui.setTab('today');
@@ -1820,10 +1893,14 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     }
     if (toolId) await state.equipTool(toolId, { silent: true });
     state.activeActivityId = lead.activityId;
+    const characterCapability = state.applyCharacterCapability(lead.activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(position);
     state.fieldSession.reset();
-    const began = state.fieldSession.beginSlot(lead.slotId, position, { evaluateFieldTarget: state.evaluateFieldTarget });
+    const began = state.fieldSession.beginSlot(lead.slotId, position, {
+      evaluateFieldTarget: state.evaluateFieldTarget,
+      characterCapability
+    });
     if (!began) {
       state.encounterDirector.reject(lead.slotId);
       state.encounterLead = state.encounterDirector.snapshot(position, liveGps.active === true);
@@ -1859,7 +1936,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         state.fieldSession.reset();
         const began = state.fieldSession.begin(state.activeActivityId, environment, position, {
           evaluateFieldTarget: state.evaluateFieldTarget,
-          preferNearby: (appCtx.getLiveGpsSnapshot?.() || {}).active === true
+          preferNearby: (appCtx.getLiveGpsSnapshot?.() || {}).active === true,
+          characterCapability: state.applyCharacterCapability(state.activeActivityId)
         });
         if (began) state.ui.setOpen(false);
       } else if (fieldPhase === 'revealed') {

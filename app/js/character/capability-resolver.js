@@ -1,4 +1,5 @@
 import { normalizeCharacterState } from './model.js?v=1';
+import { PROFICIENCY_RANKS, SPECIALTY_RANKS } from './catalog.js?v=1';
 
 const DIFFICULTY_ORDER = Object.freeze({ basic: 0, intermediate: 1, advanced: 2, expert: 3 });
 
@@ -7,8 +8,12 @@ const CAPABILITY_DEFINITIONS = Object.freeze({
     label: 'Field inspection', attributes: Object.freeze({ awareness: 0.45, fieldKnowledge: 0.4, precision: 0.15 }),
     specialtyId: 'surveying', proficiencyId: 'survey-equipment', equipmentAny: Object.freeze([]), qualificationId: null
   }),
+  'geology-inspection': Object.freeze({
+    label: 'Geology field read', attributes: Object.freeze({ fieldKnowledge: 0.45, awareness: 0.35, precision: 0.2 }),
+    specialtyId: 'geology', proficiencyId: 'survey-equipment', equipmentAny: Object.freeze(['field-lens', 'rock-hammer']), qualificationId: null
+  }),
   detector: Object.freeze({
-    label: 'Detector interpretation', attributes: Object.freeze({ awareness: 0.55, precision: 0.3, fieldKnowledge: 0.15 }),
+    label: 'Detector field read', attributes: Object.freeze({ awareness: 0.55, precision: 0.3, fieldKnowledge: 0.15 }),
     specialtyId: 'geology', proficiencyId: 'detector', equipmentAny: Object.freeze(['metal-detector']), qualificationId: null
   }),
   excavation: Object.freeze({
@@ -76,10 +81,15 @@ function normalizedDifficulty(value = 'basic') {
 }
 
 function informationTier(score) {
-  if (score >= 82) return 'detailed';
-  if (score >= 65) return 'guided';
-  if (score >= 48) return 'standard';
+  if (score >= 75) return 'detailed';
+  if (score >= 58) return 'guided';
+  if (score >= 38) return 'standard';
   return 'basic';
+}
+
+function experienceScore(entry, ranks) {
+  const maximumXp = Number(ranks.at(-1)?.minimumXp) || 1;
+  return Math.min(100, Math.sqrt(Math.max(0, Number(entry?.xp) || 0) / maximumXp) * 100);
 }
 
 function traitAssistance(character, capabilityId) {
@@ -142,8 +152,8 @@ function resolveCharacterCapability(input, capabilityId, context = {}) {
   const attributeScore = attributeParts.reduce((sum, entry) => sum + boundedRating(entry.rating) * entry.weight, 0) / 7 * 100;
   const specialty = character.specialties[definition.specialtyId] || { rank: 0 };
   const proficiency = definition.proficiencyId ? character.proficiencies[definition.proficiencyId] || { rank: 0 } : { rank: 0 };
-  const specialtyScore = Number(specialty.rank || 0) / 5 * 100;
-  const proficiencyScore = definition.proficiencyId ? Number(proficiency.rank || 0) / 4 * 100 : specialtyScore;
+  const specialtyScore = experienceScore(specialty, SPECIALTY_RANKS);
+  const proficiencyScore = definition.proficiencyId ? experienceScore(proficiency, PROFICIENCY_RANKS) : specialtyScore;
   const trait = traitAssistance(character, capabilityId);
   const baseScore = Math.max(0, Math.min(100, attributeScore * 0.55 + specialtyScore * 0.27 + proficiencyScore * 0.18));
   const control = Math.max(0, Math.min(100, Math.round(baseScore + trait.control)));

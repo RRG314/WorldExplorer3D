@@ -5,7 +5,7 @@ import { compileFieldActivityPlan, createFieldActivitySession } from '../app/js/
 
 const ACTIVITY_IDS = [
   'nature-observe', 'photograph', 'wildlife-track', 'insect-macro',
-  'habitat-survey', 'geology-inspect', 'community-survey'
+  'habitat-survey', 'geology-inspect', 'community-survey', 'sonar-survey'
 ];
 
 function publications() {
@@ -29,12 +29,12 @@ function publications() {
   return { environment, eligibility };
 }
 
-test('seven A3 evidence contracts have distinct record kinds and bounded requirements', () => {
+test('released field evidence contracts have distinct record kinds and bounded requirements', () => {
   assert.deepEqual(Object.keys(FIELD_EVIDENCE_CONTRACTS).sort(), [
-    'community', 'geology', 'habitat', 'insect-macro', 'observation', 'photography', 'track-sign'
+    'community', 'geology', 'habitat', 'insect-macro', 'observation', 'photography', 'track-sign', 'water-scan'
   ]);
   const contracts = Object.values(FIELD_EVIDENCE_CONTRACTS);
-  assert.equal(new Set(contracts.map((entry) => entry.recordKind)).size, 7);
+  assert.equal(new Set(contracts.map((entry) => entry.recordKind)).size, contracts.length);
   contracts.forEach((contract) => {
     assert.ok(contract.holdSeconds >= 1.8 && contract.holdSeconds <= 4);
     assert.equal(contract.requiredFields.length, 3);
@@ -53,7 +53,7 @@ test('seven A3 evidence contracts have distinct record kinds and bounded require
   });
 });
 
-test('the shared Baltimore field plan publishes all seven mechanic contracts', () => {
+test('the shared Baltimore field plan publishes every released mechanic contract', () => {
   const { environment, eligibility } = publications();
   const plan = compileFieldActivityPlan(environment, eligibility, { slotsPerCell: 3 });
   const contracts = new Map(plan.slots.map((slot) => [slot.activityId, slot.evidenceContract?.id]));
@@ -64,7 +64,8 @@ test('the shared Baltimore field plan publishes all seven mechanic contracts', (
     'insect-macro': 'insect-macro',
     'habitat-survey': 'habitat',
     'geology-inspect': 'geology',
-    'community-survey': 'community'
+    'community-survey': 'community',
+    'sonar-survey': 'water-scan'
   });
   assert.equal(plan.slots.every((slot) => slot.evidenceClass === 'guided-field-lead'), true);
   assert.equal(plan.slots.every((slot) => slot.approachEvidence.accessEvidence === 'unknown' && slot.approachEvidence.accessClaim === false), true);
