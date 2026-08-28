@@ -147,7 +147,9 @@ function createAssistedAscentPlan(state, sourceBody, options = {}) {
   const tangent = normalized({ x: -radialOut.y, y: radialOut.x, z: radialOut.z }, { x: 0, y: 1, z: 0 });
   const endPositionM = add(sourceBody.positionM, scale(radialOut, sourceBody.radiusM + 110_000));
   const circularSpeedMps = Math.sqrt(6.67430e-11 * sourceBody.massKg / (sourceBody.radiusM + 110_000));
-  const endVelocityMps = add(sourceBody.velocityMps, scale(tangent, circularSpeedMps));
+  const endVelocityMps = options.endVelocityMps
+    ? vector(options.endVelocityMps)
+    : add(sourceBody.velocityMps, scale(tangent, circularSpeedMps));
   return Object.freeze({
     accepted: true,
     kind: 'ascent',

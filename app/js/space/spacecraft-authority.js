@@ -325,8 +325,12 @@ function computeBodyRelativeNavigation(stateInput, bodyState) {
 function evaluateLandingEligibility(stateInput, bodyState, options = {}) {
   const state = stateRecord(stateInput);
   const body = getAstronomicalBody(bodyState?.bodyId);
-  if (!body || !body.exploration.surfaceRegionEligible) {
+  if (!body) {
     return Object.freeze({ eligible: false, reason: 'solid-surface-landing-unavailable' });
+  }
+  const navigation = computeBodyRelativeNavigation(state, bodyState);
+  if (!body.exploration.surfaceRegionEligible) {
+    return Object.freeze({ eligible: false, reason: 'solid-surface-landing-unavailable', navigation });
   }
   if (state.targetBodyId && state.targetBodyId !== body.id) {
     return Object.freeze({ eligible: false, reason: 'landing-target-mismatch' });
@@ -336,7 +340,6 @@ function evaluateLandingEligibility(stateInput, bodyState, options = {}) {
       return Object.freeze({ eligible: false, reason: `${subsystem}-system-failed` });
     }
   }
-  const navigation = computeBodyRelativeNavigation(state, bodyState);
   const maxAltitudeM = Math.max(1, finite(options.maxAltitudeM ?? 25_000, 'Landing corridor altitude'));
   const maxRelativeSpeedMps = Math.max(0, finite(options.maxRelativeSpeedMps ?? 120, 'Landing speed limit'));
   const maxHorizontalSpeedMps = Math.max(0, finite(options.maxHorizontalSpeedMps ?? 80, 'Landing horizontal speed limit'));

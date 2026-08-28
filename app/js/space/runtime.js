@@ -1,5 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=1';
+import {
+  getAstronomicalBody,
+  LANDING_MODE,
+  normalizeAstronomicalBodyId
+} from '../astronomy/body-catalog.js?v=1';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 
 let injectedThree = null;
@@ -56,7 +60,7 @@ export function findLandableBodyByName(target) {
   if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') return null;
 
   if (typeof appCtx.getAllSpaceBodies === 'function') {
-    const body = appCtx.getAllSpaceBodies().find((b) => b.landable && String(b.name).toLowerCase() === normalized.toLowerCase());
+    const body = appCtx.getAllSpaceBodies().find((b) => String(b.name).toLowerCase() === normalized.toLowerCase());
     if (body) return body;
   }
 
@@ -413,19 +417,31 @@ export function updateSpaceFlightPhysics() {
   const siRuntimeActive = appCtx.updateRenderedSpaceJourney?.({
     realDtS: frameScale / 60,
     throttle: keys[' '] ? 1 : 0,
-    braking: !!keys['shift'],
+    braking: !!keys['shift'] || appCtx.spaceFlight._atmosphericClimbRequested === true,
     thrustDirection: { x: _sfForward.x, y: _sfForward.y, z: _sfForward.z },
     timeScale: appCtx.spaceFlight.timeScale || 1
   }) === true;
   if (siRuntimeActive) {
     const environment = appCtx.spaceFlightEnvironment;
     const atmosphericFlight = environment?.pressurePa > 0.5 &&
-      ['approach', 'descent', 'home_approach', 'home_descent'].includes(appCtx.spaceJourney?.phase);
+      ['approach', 'atmospheric_exploration', 'descent', 'home_approach', 'home_descent'].includes(appCtx.spaceJourney?.phase);
     if (atmosphericFlight && appCtx.spaceFlight.scene) {
-      const fogColors = { earth: 0x6f9fc4, mars: 0xb06a4e, venus: 0xc89155 };
+      const fogColors = {
+        earth: 0x6f9fc4,
+        mars: 0xb06a4e,
+        venus: 0xc89155,
+        jupiter: 0xc48a5a,
+        saturn: 0xd0b57a,
+        uranus: 0x7cc8d2,
+        neptune: 0x315fa8
+      };
       const fogColor = fogColors[environment.bodyId] || 0x8799aa;
+      const giantAtmosphere = ['jupiter', 'saturn', 'uranus', 'neptune'].includes(environment.bodyId);
       const pressureRatio = Math.max(0, Math.min(1, environment.pressurePa / (
-        environment.bodyId === 'mars' ? 610 : environment.bodyId === 'venus' ? 9_200_000 : 101_325
+        environment.bodyId === 'mars' ? 610
+          : environment.bodyId === 'venus' ? 9_200_000
+            : giantAtmosphere ? 600_000
+              : 101_325
       )));
       if (!appCtx.spaceFlight._journeyFogActive) {
         appCtx.spaceFlight.scene.fog = new THREE.FogExp2(fogColor, 0.0004);
@@ -635,11 +651,34 @@ export function animateSpaceFlight(deps = {}) {
 }
 
 export function attemptLanding(deps = {}) {
+  if (
+    appCtx.spaceJourney?.phase === 'atmospheric_exploration' &&
+    typeof appCtx.requestRenderedAtmosphericDeparture === 'function'
+  ) {
+    const result = appCtx.requestRenderedAtmosphericDeparture();
+    deps.showFlightMessage?.(
+      result.accepted ? 'RETURN FLIGHT ENGAGED' : String(result.reason || 'RETURN FLIGHT NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
+      result.accepted ? '#10b981' : '#f59e0b'
+    );
+    return result.accepted;
+  }
   if (appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
     const targetName = normalizeLandingTargetName(
       appCtx.spaceFlight._manualLandingTarget || appCtx.spaceFlight.destination
     );
     if (!targetName) return false;
+    const targetBody = getAstronomicalBody(targetName);
+    if (
+      targetBody?.exploration?.landingMode === LANDING_MODE.ATMOSPHERIC_DESCENT &&
+      typeof appCtx.requestRenderedAtmosphericEntry === 'function'
+    ) {
+      const result = appCtx.requestRenderedAtmosphericEntry(targetName);
+      deps.showFlightMessage?.(
+        result.accepted ? 'ATMOSPHERIC FLIGHT ENGAGED' : String(result.reason || 'ATMOSPHERIC ENTRY NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
+        result.accepted ? '#10b981' : '#f59e0b'
+      );
+      return result.accepted;
+    }
     const result = appCtx.requestRenderedJourneyLanding(targetName);
     deps.showFlightMessage?.(
       result.accepted ? 'DESCENT GUIDANCE ENGAGED' : String(result.reason || 'LANDING NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),

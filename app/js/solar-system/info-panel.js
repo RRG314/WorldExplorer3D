@@ -203,6 +203,13 @@ function handleSpaceReturnAction(ctx) {
       ctx.appCtx.returnToEarthFromUniverse?.();
       return;
     }
+    if (
+      ctx.appCtx.spaceJourney?.phase === 'atmospheric_exploration' &&
+      typeof ctx.appCtx.requestRenderedAtmosphericDeparture === 'function'
+    ) {
+      const departure = ctx.appCtx.requestRenderedAtmosphericDeparture();
+      if (departure?.accepted) return;
+    }
     if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
       const forced = ctx.appCtx.forceSpaceFlightLanding('Earth');
       if (forced) return;

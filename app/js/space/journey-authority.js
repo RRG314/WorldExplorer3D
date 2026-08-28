@@ -1,7 +1,7 @@
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=1';
 import { createBodyEphemerisState } from './spacecraft-authority.js?v=1';
 
-const SPACE_JOURNEY_SCHEMA_VERSION = 1;
+const SPACE_JOURNEY_SCHEMA_VERSION = 2;
 const EARTH_MOON_MEAN_DISTANCE_M = 384_400_000;
 
 const JOURNEY_MODE = Object.freeze({
@@ -16,6 +16,7 @@ const JOURNEY_PHASE = Object.freeze({
   PARKING_ORBIT: 'parking_orbit',
   TRANSFER: 'transfer',
   APPROACH: 'approach',
+  ATMOSPHERIC_EXPLORATION: 'atmospheric_exploration',
   DESCENT: 'descent',
   SURFACE: 'surface',
   ASCENT: 'ascent',
@@ -191,6 +192,16 @@ function transitionSpaceJourney(journeyInput, eventInput, evidence = {}) {
       return landing?.eligible === true && landing.navigation?.bodyId === journey.destinationBodyId
         ? acceptedTransition(journey, event, JOURNEY_PHASE.DESCENT, atMs)
         : rejectedTransition(journey, landing?.reason || 'destination-descent-not-authorized');
+    case `${JOURNEY_PHASE.APPROACH}:atmospheric_entry_authorized`:
+      return evidence.atmosphericEntry?.authorized === true &&
+        evidence.atmosphericEntry?.navigation?.bodyId === journey.destinationBodyId &&
+        evidence.atmosphericEntry?.noSolidSurface === true
+        ? acceptedTransition(journey, event, JOURNEY_PHASE.ATMOSPHERIC_EXPLORATION, atMs)
+        : rejectedTransition(journey, evidence.atmosphericEntry?.reason || 'atmospheric-entry-not-authorized');
+    case `${JOURNEY_PHASE.ATMOSPHERIC_EXPLORATION}:atmospheric_departure`:
+      return evidence.spacecraftReady === true
+        ? acceptedTransition(journey, event, JOURNEY_PHASE.ASCENT, atMs)
+        : rejectedTransition(journey, 'spacecraft-not-ready-for-atmospheric-departure');
     case `${JOURNEY_PHASE.DESCENT}:touchdown`:
       return landing?.eligible === true && landing.navigation?.altitudeM <= 20 && landing.navigation?.relativeSpeedMps <= 15
         ? acceptedTransition(journey, event, JOURNEY_PHASE.SURFACE, atMs)

@@ -1,5 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=1';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
+import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=1';
 import {
   computeBodyRelativeNavigation,
   evaluateLandingEligibility
@@ -94,6 +96,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfAssistBtn'), 'click', () => {
+    if (appCtx.spaceJourney?.phase === 'atmospheric_exploration') return;
     const result = appCtx.toggleRenderedJourneyAssist?.();
     if (!result?.accepted) {
       showFlightMessage('FLIGHT ASSIST IS NOT AVAILABLE HERE', '#f59e0b');
@@ -103,6 +106,16 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
       showFlightMessage('FLIGHT ASSIST ENGAGED', '#10b981');
     }
   });
+  const climbButton = document.getElementById('sfAssistBtn');
+  const setAtmosphericClimb = (active, event) => {
+    if (appCtx.spaceJourney?.phase !== 'atmospheric_exploration') return;
+    event?.preventDefault?.();
+    appCtx.spaceFlight._atmosphericClimbRequested = active;
+  };
+  listen(climbButton, 'pointerdown', (event) => setAtmosphericClimb(true, event));
+  listen(climbButton, 'pointerup', (event) => setAtmosphericClimb(false, event));
+  listen(climbButton, 'pointercancel', (event) => setAtmosphericClimb(false, event));
+  listen(climbButton, 'pointerleave', (event) => setAtmosphericClimb(false, event));
 
   listen(document, 'keydown', (e) => {
     if (appCtx.spaceFlight.active) {
@@ -227,30 +240,39 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const environmentText = document.getElementById('sfEnvironment');
   const destinationName = appCtx.spaceJourneyEphemeris?.destination?.bodyId || appCtx.spaceFlight.destination || 'destination';
   const departureName = appCtx.spaceJourneyEphemeris?.source?.bodyId || appCtx.spaceJourney?.sourceBodyId || 'departure point';
+  const destinationLabel = getAstronomicalBody(destinationName)?.name || destinationName;
+  const departureLabel = getAstronomicalBody(departureName)?.name || departureName;
+  const sourceLabel = getAstronomicalBody(appCtx.spaceJourney?.sourceBodyId)?.name || appCtx.spaceJourney?.sourceBodyId || 'Earth';
   const phaseCopy = {
     preparing: 'Preparing flight',
     launch: 'Leaving the surface',
-    parking_orbit: `${appCtx.spaceJourney?.sourceBodyId || 'Earth'} orbit`,
-    transfer: `Cruising to ${destinationName}`,
-    approach: `${destinationName} approach`,
-    descent: `Landing on ${destinationName}`,
-    surface: `On ${destinationName}`,
-    ascent: `Leaving ${departureName}`,
-    return_transfer: `Returning to ${destinationName}`,
-    home_approach: `${destinationName} approach`,
-    home_descent: `Landing on ${destinationName}`,
+    parking_orbit: `${sourceLabel} orbit`,
+    transfer: `Cruising to ${destinationLabel}`,
+    approach: `${destinationLabel} approach`,
+    atmospheric_exploration: `Exploring ${destinationLabel}'s atmosphere`,
+    descent: `Landing on ${destinationLabel}`,
+    surface: `On ${destinationLabel}`,
+    ascent: `Leaving ${departureLabel}`,
+    return_transfer: `Returning to ${destinationLabel}`,
+    home_approach: `${destinationLabel} approach`,
+    home_descent: `Landing on ${destinationLabel}`,
     complete: 'Journey complete'
   };
   if (flightStatus) {
     const copy = phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';
-    flightStatus.textContent = copy.replace(/\b\w/g, (letter) => letter.toUpperCase());
+    flightStatus.textContent = copy;
   }
   if (assistBtn) {
     const assist = appCtx.spaceJourneyAssistState;
-    assistBtn.style.display = assist?.available === false ? 'none' : '';
-    assistBtn.disabled = !assist?.available || !['parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
+    const atmosphericClimb = appCtx.spaceJourney?.phase === 'atmospheric_exploration';
+    assistBtn.style.display = assist?.available === false && !atmosphericClimb ? 'none' : '';
+    assistBtn.disabled = atmosphericClimb
+      ? false
+      : !assist?.available || !['parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
     assistBtn.style.opacity = assistBtn.disabled ? '0.55' : '1';
-    assistBtn.textContent = assist?.holding
+    assistBtn.textContent = atmosphericClimb
+      ? 'HOLD TO CLIMB'
+      : assist?.holding
       ? 'APPROACH HOLD · PRESS SPACE FOR MANUAL'
       : assist?.active
       ? assist.kind === 'ascent'
@@ -311,7 +333,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       'sfAltitudeUnit',
       'Altitude',
       physicalNavigation
-        ? Math.max(0, Math.round(physicalNavigation.altitudeM / 1000)).toLocaleString()
+        ? Math.round(physicalNavigation.altitudeM / 1000).toLocaleString()
         : sceneToKm ? Math.round(altitude * sceneToKm).toLocaleString() : Math.floor(altitude).toLocaleString(),
       physicalNavigation || sceneToKm ? 'km' : 'display u'
     );
@@ -339,6 +361,14 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const physicalLanding = appCtx.spacecraftState && appCtx.spaceJourneyEphemeris?.destination
     ? evaluateLandingEligibility(appCtx.spacecraftState, appCtx.spaceJourneyEphemeris.destination)
     : null;
+  const targetBody = getAstronomicalBody(String(activeHudBody.name || '').toLowerCase());
+  const atmosphericTarget = targetBody?.exploration?.landingMode === LANDING_MODE.ATMOSPHERIC_DESCENT;
+  const atmosphericExploration = appCtx.spaceJourney?.phase === 'atmospheric_exploration'
+    ? appCtx.spaceAtmosphereExploration
+    : null;
+  const atmosphericEntry = atmosphericTarget && physicalLanding?.navigation
+    ? evaluateAtmosphericEntry(targetBody.id, physicalLanding.navigation)
+    : null;
   const canLand = physicalLanding
     ? physicalLanding.eligible && ['approach', 'home_approach'].includes(appCtx.spaceJourney?.phase)
     : activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
@@ -359,6 +389,39 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       landBtn.style.opacity = '0.7';
       landBtn.style.background = '#315d9d';
       landBtn.textContent = 'EXPLORING ' + activeHudBody.name.toUpperCase();
+    }
+  } else if (atmosphericExploration) {
+    const pressurePa = Number(atmosphericExploration.environment?.pressurePa) || 0;
+    const pressureRatio = Math.max(0, Math.min(1, pressurePa / atmosphericExploration.pressureLimitPa));
+    const depthLimit = atmosphericExploration.phase === 'depth_limit';
+    if (zoneLabel) zoneLabel.textContent = 'FLIGHT ENVELOPE';
+    if (landingBar) {
+      landingBar.style.width = `${pressureRatio * 100}%`;
+      landingBar.style.background = 'linear-gradient(90deg,#38bdf8,#f59e0b)';
+    }
+    if (landingText) {
+      landingText.textContent = depthLimit
+        ? 'Safe depth limit reached · no solid surface'
+        : 'Descending through the atmosphere · hold Climb to rise';
+    }
+    if (landBtn) {
+      landBtn.disabled = false;
+      landBtn.style.opacity = '1';
+      landBtn.style.background = '#2563eb';
+      landBtn.textContent = 'EXIT ATMOSPHERE AND RETURN';
+    }
+  } else if (atmosphericEntry?.authorized && appCtx.spaceJourney?.phase === 'approach') {
+    if (zoneLabel) zoneLabel.textContent = 'ATMOSPHERIC ENTRY';
+    if (landingBar) {
+      landingBar.style.width = '100%';
+      landingBar.style.background = 'linear-gradient(90deg,#38bdf8,#2563eb)';
+    }
+    if (landingText) landingText.textContent = 'Entry corridor ready · this world has no solid surface';
+    if (landBtn) {
+      landBtn.disabled = false;
+      landBtn.style.opacity = '1';
+      landBtn.style.background = '#2563eb';
+      landBtn.textContent = 'ENTER ' + activeHudBody.name.toUpperCase() + ' ATMOSPHERE';
     }
   } else if (canLand && activeHudBody.landable) {
     if (landingText) landingText.textContent = 'IN RANGE - Ready to land!';
