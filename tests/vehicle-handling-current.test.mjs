@@ -8,6 +8,9 @@ import {
 } from '../app/js/engine/vehicle-catalog.js';
 import { ROAD_CAR_CONFIG } from '../app/js/physics/vehicle-config.js';
 import { carSpeedToMph } from '../app/js/physics/vehicle-speed-units.js';
+import { createCharacter } from '../app/js/character/model.js';
+import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
+import { groundVehicleTuning } from '../app/js/character/vehicle-assistance.js';
 
 test('the normal road-car ceiling is the advertised 120 mph', () => {
   assert.equal(carSpeedToMph(ROAD_CAR_CONFIG.maxSpd), 120);
@@ -56,4 +59,27 @@ test('road vehicles never exceed 120 mph and police vehicles get response tuning
   assert.ok(police.accelerationScale > civilian.accelerationScale);
   assert.ok(police.steeringScale > civilian.steeringScale);
   assert.ok(police.brakeScale > civilian.brakeScale);
+});
+
+test('Piloting assists the existing vehicle identity without changing its speed ceiling', () => {
+  const general = groundVehicleTuning(resolveCharacterCapability(
+    createCharacter({ backgroundId: 'general-explorer', now: 1 }),
+    'ground-vehicle',
+    { vehicleAvailable: true }
+  ));
+  const pilot = groundVehicleTuning(resolveCharacterCapability(
+    createCharacter({ backgroundId: 'expedition-pilot', traits: ['sure-footed'], now: 1 }),
+    'ground-vehicle',
+    { vehicleAvailable: true }
+  ));
+  assert.ok(pilot.accelerationScale > general.accelerationScale);
+  assert.ok(pilot.steeringResponseScale > general.steeringResponseScale);
+  assert.ok(pilot.recoveryScale > general.recoveryScale);
+  assert.ok(pilot.accelerationScale <= 1.12);
+  assert.ok(pilot.steeringAngleScale <= 1.08);
+  assert.equal(vehicleHandlingProfile('compact').topSpeedMph, 120);
+  assert.ok(
+    vehicleHandlingProfile('compact').steeringScale * pilot.steeringAngleScale >
+    vehicleHandlingProfile('pickup').steeringScale * pilot.steeringAngleScale
+  );
 });

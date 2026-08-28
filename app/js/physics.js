@@ -23,6 +23,7 @@ import {
 } from "./physics/vehicle-speed-units.js?v=2";
 import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=5";
 import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=2';
+import { groundVehicleTuning } from './character/vehicle-assistance.js?v=1';
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -207,7 +208,12 @@ function update(dt) {
     serviceType: appCtx.car.vehicleServiceType || ''
   });
   const vehicleCondition = vehicleConditionDynamics(appCtx.car.condition ?? 1);
+  const characterVehicle = groundVehicleTuning(appCtx.resolveCharacterCapability?.('ground-vehicle', {
+    vehicleAvailable: true,
+    environment: appCtx.getEnv?.() || (isPlanetarySurface() ? 'PLANETARY' : 'EARTH')
+  }));
   appCtx.car.handlingProfile = vehicleHandling;
+  appCtx.car.characterHandling = characterVehicle;
   let maxSpd, friction, accel;
   const planetaryBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
   const planetaryDriveProfile = {
@@ -279,6 +285,7 @@ function update(dt) {
     maxSpd *= vehicleCondition.topSpeedScale;
     accel *= vehicleCondition.accelerationScale;
   }
+  accel *= characterVehicle.accelerationScale;
 
   const spd = Math.abs(appCtx.car.speed);
   const hasGroundControl = !appCtx.car.isAirborne;
@@ -287,7 +294,9 @@ function update(dt) {
   const earthDriftBrakeIntent = !isPlanetarySurface() && braking && (left || right) && spd > driftBrakeSpeed;
 
   if (driveCommand.serviceBrake && hasGroundControl) {
-    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) * (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale);
+    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) *
+      (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) *
+      characterVehicle.brakingScale;
     const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
     appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
     if (nextMagnitude < 0.5) appCtx.car.speed = 0;
@@ -344,7 +353,7 @@ function update(dt) {
   const steerInput = steerControl;
   const throttleInput = gas && !reverse ? throttleControl : 0;
 
-  const steerSmooth = 1 - Math.exp(-dt * 14);
+  const steerSmooth = 1 - Math.exp(-dt * 14 * characterVehicle.steeringResponseScale);
   const throttleSmooth = 1 - Math.exp(-dt * 6);
   if (Math.abs(steerInput) > 0.05 && steerInput * appCtx.car.steerSm < 0) {
     // A deliberate steering reversal must not spend visible frames applying
@@ -372,7 +381,7 @@ function update(dt) {
   const earthSteering = earthDrivingSteeringProfile(carSpeedToMph(spdAbs));
   const maxSteer = isPlanetarySurface()
     ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90))
-    : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale * vehicleCondition.steeringScale;
+    : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale * vehicleCondition.steeringScale * characterVehicle.steeringAngleScale;
 
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
@@ -449,6 +458,11 @@ function update(dt) {
     }
   }
 
+  if (!isDrifting) {
+    latDamp *= characterVehicle.recoveryScale;
+    yawResponse *= characterVehicle.steeringResponseScale;
+  }
+
   const wheelBase = isPlanetarySurface() ? 2.6 : vehicleHandling.wheelBase;
   const v = isPlanetarySurface()
     ? appCtx.car.speed
@@ -463,7 +477,7 @@ function update(dt) {
   const radiusAuthority = Math.max(.76, Math.min(1.22, 5.2 / vehicleHandling.turningRadius));
   const maxYawRate = isPlanetarySurface()
     ? Infinity
-    : earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority;
+    : earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority * characterVehicle.steeringAngleScale;
   const yawRateTarget = arcadeSteeringYawTarget(
     v,
     steerAngle * steerAuthority,
