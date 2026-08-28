@@ -178,6 +178,11 @@ test('presentation mapping preserves readable body radii without mutating physic
   assert.ok(Math.abs(destinationSurface.x - (920 - sceneAxis.x * 13.5)) < 1e-9);
   assert.ok(Math.abs(destinationSurface.y - (20 - sceneAxis.y * 13.5)) < 1e-9);
   assert.equal(map.physicalDistanceM, EARTH_MOON_MEAN_DISTANCE_M);
+  const physicalProbe = { x: 22_000_000, y: 310_000, z: -125_000 };
+  const physicalRoundTrip = map.sceneToPhysical(map.physicalToScene(physicalProbe));
+  assert.ok(Math.abs(physicalRoundTrip.x - physicalProbe.x) < 1e-6);
+  assert.ok(Math.abs(physicalRoundTrip.y - physicalProbe.y) < 1e-6);
+  assert.ok(Math.abs(physicalRoundTrip.z - physicalProbe.z) < 1e-6);
 });
 
 test('planned burns apply exact delta-v and rocket-equation propellant accounting', () => {
@@ -288,6 +293,44 @@ test('rendered journey controller makes the mesh a presentation of fuel-accounte
     appContext.spacecraftState.velocityMps.y,
     appContext.spacecraftState.velocityMps.z
   ));
+  assert.ok(Math.hypot(
+    appContext.spaceFlight.rocket.position.x - initialMesh.x,
+    appContext.spaceFlight.rocket.position.y - initialMesh.y,
+    appContext.spaceFlight.rocket.position.z - initialMesh.z
+  ) > 0.1, 'manual flight must be visibly meaningful in one input interval');
+  assert.equal(appContext.spaceFlight.manualFlightRate, 100);
+});
+
+test('manual flight input immediately takes control from an active assisted transfer', () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const appContext = {
+    spaceFlight: {
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying'
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  runtime.beginRenderedSpaceJourney({ sourceBodyId: 'earth', destinationBodyId: 'moon', mode: JOURNEY_MODE.ASSISTED });
+  assert.equal(runtime.engageRenderedJourneyAssist().accepted, true);
+  assert.equal(appContext.spaceJourneyAssistState.active, true);
+  const propellantBefore = appContext.spacecraftState.propellantKg;
+
+  runtime.updateRenderedSpaceJourney({
+    realDtS: 0.1,
+    throttle: 1,
+    manualControl: true,
+    thrustDirection: { x: 0, y: 0, z: 1 },
+    manualFlightRate: 100
+  });
+
+  assert.equal(appContext.spaceJourneyAssistState.active, false);
+  assert.equal(appContext.spaceJourneyAssistState.manual, true);
+  assert.ok(appContext.spacecraftState.propellantKg < propellantBefore);
+  assert.equal(appContext.spacecraftState.timeScale, 100);
 });
 
 test('rendered landing request fails closed before verified destination approach', () => {

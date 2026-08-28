@@ -20,6 +20,10 @@ export function isWalkModeActive() {
     !appCtx.paused &&
     !appCtx.onMoon &&
     !appCtx.droneMode &&
+    !appCtx.planeMode?.active &&
+    !appCtx.boatMode?.active &&
+    !appCtx.oceanMode?.active &&
+    !appCtx.spaceFlight?.active &&
     appCtx.Walk &&
     appCtx.Walk.state?.mode === 'walk' &&
     appCtx.Walk.state.walker

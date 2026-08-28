@@ -425,7 +425,16 @@ export function updateSpaceFlightPhysics() {
     throttle: keys[' '] ? 1 : 0,
     braking: !!keys['shift'] || appCtx.spaceFlight._atmosphericClimbRequested === true,
     thrustDirection: { x: _sfForward.x, y: _sfForward.y, z: _sfForward.z },
-    timeScale: appCtx.spaceFlight.timeScale || 1
+    angular: {
+      x: keys['arrowup'] ? 1 : keys['arrowdown'] ? -1 : 0,
+      y: keys['arrowright'] ? 1 : keys['arrowleft'] ? -1 : 0,
+      z: 0
+    },
+    manualControl: !!(
+      keys[' '] || keys['shift'] ||
+      keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright']
+    ),
+    manualFlightRate: 100
   }) === true;
   if (siRuntimeActive) {
     const environment = appCtx.spaceFlightEnvironment;

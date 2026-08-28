@@ -14,11 +14,13 @@ export function createBoatOceanTransferApi(options = {}) {
     showBoatPrompt,
     startBoatMode,
     updateBoatMenuUi,
-    updateWaterWaveVisuals
+    updateWaterWaveVisuals,
+    restoreEarthSurfaceLayers
   } = options;
 
 function suspendBoatModeForOceanTransfer() {
   appCtx.boatMode.active = false;
+  restoreEarthSurfaceLayers?.();
   appCtx.boatMode.available = false;
   appCtx.boatMode.candidate = null;
   appCtx.boatMode.currentWater = null;
@@ -99,9 +101,10 @@ async function transferSubmarineToBoat(options = {}) {
     if (typeof appCtx.showTransitionLoad === 'function') {
       await appCtx.showTransitionLoad('earth', 700);
     }
-    if (typeof appCtx.loadRoads === 'function') {
-      await appCtx.loadRoads();
-    }
+    // A submarine surfaces into the modeled open-ocean patch, not a terrestrial
+    // OSM scene. Waiting for a complete road/building/vegetation reload here
+    // both delays control and can place land cover over the boat. The explicit
+    // synthetic-water handoff below is the authority for this transition.
     if (typeof appCtx.applyCustomLocationSpawn === 'function') {
       appCtx.applyCustomLocationSpawn('walk', {
         source: 'submarine_transfer_spawn',

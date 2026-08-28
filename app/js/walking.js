@@ -1,9 +1,11 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createWalkingCharacterHelpers } from "./walking/character.js?v=2";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
-import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=18";
+import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=19";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=3";
 import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=4";
+
+const DEFAULT_WALKING_SPEEDS = Object.freeze({ walk: 2.8, run: 5.6 });
 
 function createWalkingModule(opts) {
   const {
@@ -31,11 +33,10 @@ function createWalkingModule(opts) {
   };
 
   const CFG = {
-    // World units are geospatially scaled (~1.11 m each). These targets are
-    // therefore a brisk 4.1 mph walk and an 8.2 mph run, not the former
-    // 15/30 mph motion hidden behind an arbitrary HUD multiplier.
-    walkSpeed: 1.65,
-    runSpeed: 3.3,
+    // Exploration uses a responsive game pace while the HUD still reports the
+    // resulting measured world speed. Live GPS translation remains provider-owned.
+    walkSpeed: DEFAULT_WALKING_SPEEDS.walk,
+    runSpeed: DEFAULT_WALKING_SPEEDS.run,
     turnSpeed: 2.6,
     eyeHeight: 1.7,
     thirdPersonDist: 4.5,
@@ -116,4 +117,4 @@ function createWalkingModule(opts) {
 
 Object.assign(appCtx, { createWalkingModule });
 
-export { createWalkingModule };
+export { createWalkingModule, DEFAULT_WALKING_SPEEDS };

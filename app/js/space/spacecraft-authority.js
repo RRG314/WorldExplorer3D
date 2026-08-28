@@ -227,6 +227,7 @@ function applyAngularCommand(state, command, dtS) {
 function resolveTimeScale(requested, options = {}) {
   const numeric = Number(requested);
   const selected = TIME_SCALES.includes(numeric) ? numeric : 1;
+  if (options.manualFlightRate === true) return selected;
   if (Number(options.throttle) > 0 || options.maneuvering === true) return 1;
   if (Number.isFinite(options.altitudeM) && options.altitudeM < 1_000_000) return 1;
   if (Number.isFinite(options.timeToEncounterS) && options.timeToEncounterS < 1800) return Math.min(selected, 10);
@@ -245,7 +246,8 @@ function propagateSpacecraft(stateInput, command = {}, bodies = [], realDtS = 0)
     throttle,
     maneuvering: magnitude(command.angular || {}) > 0,
     altitudeM: command.altitudeM,
-    timeToEncounterS: command.timeToEncounterS
+    timeToEncounterS: command.timeToEncounterS,
+    manualFlightRate: command.manualFlightRate === true
   });
   const dtS = realDt * timeScale;
   const massFlowKgps = throttle > 0

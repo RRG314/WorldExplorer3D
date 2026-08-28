@@ -1,5 +1,5 @@
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
-import { createBodyEphemerisState } from './spacecraft-authority.js?v=1';
+import { createBodyEphemerisState } from './spacecraft-authority.js?v=2';
 
 const SPACE_JOURNEY_SCHEMA_VERSION = 2;
 const EARTH_MOON_MEAN_DISTANCE_M = 384_400_000;
@@ -62,6 +62,14 @@ function dot(a, b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+function cross(a, b) {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x
+  };
+}
+
 function normalized(a) {
   const length = magnitude(a);
   if (length <= 1e-12) throw new RangeError('Journey axis cannot be zero.');
@@ -70,6 +78,23 @@ function normalized(a) {
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
+}
+
+function rotateBetweenAxes(vector, fromAxis, toAxis) {
+  const cosine = Math.max(-1, Math.min(1, dot(fromAxis, toAxis)));
+  const axisCross = cross(fromAxis, toAxis);
+  const sine = magnitude(axisCross);
+  if (sine <= 1e-12) {
+    if (cosine > 0) return { ...vector };
+    const helper = Math.abs(fromAxis.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 };
+    const halfTurnAxis = normalized(cross(fromAxis, helper));
+    return subtract(scale(halfTurnAxis, 2 * dot(halfTurnAxis, vector)), vector);
+  }
+  const rotationAxis = scale(axisCross, 1 / sine);
+  return add(
+    add(scale(vector, cosine), scale(cross(rotationAxis, vector), sine)),
+    scale(rotationAxis, dot(rotationAxis, vector) * (1 - cosine))
+  );
 }
 
 function journeyRecord(input = {}) {
@@ -295,32 +320,94 @@ function createJourneyPresentationMap(options = {}) {
   const destinationSceneRadius = Math.max(0.001, finite(options.destinationSceneRadius, 'Destination scene radius'));
   const physicalSpan = Math.max(1, physicalDistanceM - sourcePhysicalRadiusM - destinationPhysicalRadiusM);
   const sceneSpan = Math.max(0.001, sceneDistance - sourceSceneRadius - destinationSceneRadius);
+  const sourceInteractionPhysicalSpanM = Math.min(
+    physicalSpan * 0.2,
+    Math.max(1, finite(options.sourceInteractionPhysicalSpanM ?? 5_000_000, 'Source interaction span'))
+  );
+  const destinationInteractionPhysicalSpanM = Math.min(
+    physicalSpan * 0.2,
+    Math.max(1, finite(options.destinationInteractionPhysicalSpanM ?? 5_000_000, 'Destination interaction span'))
+  );
+  const interactionSceneSpan = Math.min(10, sceneSpan * 0.24);
+  const sourceInteractionSceneSpan = interactionSceneSpan;
+  const destinationInteractionSceneSpan = interactionSceneSpan;
+  const middlePhysicalSpan = Math.max(
+    1,
+    physicalSpan - sourceInteractionPhysicalSpanM - destinationInteractionPhysicalSpanM
+  );
+  const middleSceneSpan = Math.max(
+    0.001,
+    sceneSpan - sourceInteractionSceneSpan - destinationInteractionSceneSpan
+  );
 
   const physicalToScene = (physicalPosition) => {
     const relative = subtract(vec(physicalPosition, 'Physical presentation position'), physicalSource);
     const alongM = dot(relative, physicalAxis);
     const lateralM = subtract(relative, scale(physicalAxis, alongM));
+    const sceneLateralDirection = rotateBetweenAxes(lateralM, physicalAxis, sceneAxis);
     let alongScene;
     if (alongM <= sourcePhysicalRadiusM) {
       alongScene = alongM / sourcePhysicalRadiusM * sourceSceneRadius;
+    } else if (alongM <= sourcePhysicalRadiusM + sourceInteractionPhysicalSpanM) {
+      alongScene = sourceSceneRadius +
+        (alongM - sourcePhysicalRadiusM) / sourceInteractionPhysicalSpanM * sourceInteractionSceneSpan;
     } else if (alongM >= physicalDistanceM - destinationPhysicalRadiusM) {
       alongScene = sceneDistance - (physicalDistanceM - alongM) / destinationPhysicalRadiusM * destinationSceneRadius;
+    } else if (alongM >= physicalDistanceM - destinationPhysicalRadiusM - destinationInteractionPhysicalSpanM) {
+      const distanceBeforeDestinationSurface = physicalDistanceM - destinationPhysicalRadiusM - alongM;
+      alongScene = sceneDistance - destinationSceneRadius -
+        distanceBeforeDestinationSurface / destinationInteractionPhysicalSpanM * destinationInteractionSceneSpan;
     } else {
-      alongScene = sourceSceneRadius + (alongM - sourcePhysicalRadiusM) / physicalSpan * sceneSpan;
+      alongScene = sourceSceneRadius + sourceInteractionSceneSpan +
+        (alongM - sourcePhysicalRadiusM - sourceInteractionPhysicalSpanM) / middlePhysicalSpan * middleSceneSpan;
     }
     const progress = clamp01(alongM / physicalDistanceM);
     const metersPerSceneUnit = sourcePhysicalRadiusM / sourceSceneRadius * (1 - progress) +
       destinationPhysicalRadiusM / destinationSceneRadius * progress;
     return Object.freeze(add(
       add(sceneSource, scale(sceneAxis, alongScene)),
-      scale(lateralM, 1 / metersPerSceneUnit)
+      scale(sceneLateralDirection, 1 / metersPerSceneUnit)
+    ));
+  };
+
+  const sceneToPhysical = (scenePosition) => {
+    const relative = subtract(vec(scenePosition, 'Scene presentation position'), sceneSource);
+    const alongScene = dot(relative, sceneAxis);
+    const lateralScene = subtract(relative, scale(sceneAxis, alongScene));
+    let alongM;
+    if (alongScene <= sourceSceneRadius) {
+      alongM = alongScene / sourceSceneRadius * sourcePhysicalRadiusM;
+    } else if (alongScene <= sourceSceneRadius + sourceInteractionSceneSpan) {
+      alongM = sourcePhysicalRadiusM +
+        (alongScene - sourceSceneRadius) / sourceInteractionSceneSpan * sourceInteractionPhysicalSpanM;
+    } else if (alongScene >= sceneDistance - destinationSceneRadius) {
+      alongM = physicalDistanceM -
+        (sceneDistance - alongScene) / destinationSceneRadius * destinationPhysicalRadiusM;
+    } else if (alongScene >= sceneDistance - destinationSceneRadius - destinationInteractionSceneSpan) {
+      const sceneDistanceBeforeDestinationSurface = sceneDistance - destinationSceneRadius - alongScene;
+      alongM = physicalDistanceM - destinationPhysicalRadiusM -
+        sceneDistanceBeforeDestinationSurface / destinationInteractionSceneSpan * destinationInteractionPhysicalSpanM;
+    } else {
+      alongM = sourcePhysicalRadiusM + sourceInteractionPhysicalSpanM +
+        (alongScene - sourceSceneRadius - sourceInteractionSceneSpan) / middleSceneSpan * middlePhysicalSpan;
+    }
+    const progress = clamp01(alongM / physicalDistanceM);
+    const metersPerSceneUnit = sourcePhysicalRadiusM / sourceSceneRadius * (1 - progress) +
+      destinationPhysicalRadiusM / destinationSceneRadius * progress;
+    const physicalLateralDirection = rotateBetweenAxes(lateralScene, sceneAxis, physicalAxis);
+    return Object.freeze(add(
+      add(physicalSource, scale(physicalAxis, alongM)),
+      scale(physicalLateralDirection, metersPerSceneUnit)
     ));
   };
 
   return Object.freeze({
     physicalDistanceM,
     sceneDistance,
-    physicalToScene
+    sourceInteractionPhysicalSpanM,
+    sourceInteractionSceneSpan,
+    physicalToScene,
+    sceneToPhysical
   });
 }
 

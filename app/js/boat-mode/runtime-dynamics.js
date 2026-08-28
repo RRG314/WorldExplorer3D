@@ -15,7 +15,8 @@ export function createBoatRuntimeDynamics(deps = {}) {
     updateBoatFoamFx,
     updateBoatLodBias,
     updateBoatMesh,
-    updateBoatWaterPatch
+    updateBoatWaterPatch,
+    syncOpenOceanSurfaceLayers
   } = deps;
 
   return function updateBoatMode(dt) {
@@ -160,6 +161,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
 
     updateBoatLodBias();
     updateBoatWaterPatch(appCtx.boatMode.currentWater || null);
+    syncOpenOceanSurfaceLayers?.();
     updateBoatMesh();
     updateBoatFoamFx(dt, profile);
 

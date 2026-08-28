@@ -346,6 +346,66 @@ function addGeneratedSurfaceDetail(pack, world) {
   appCtx.scene.add(rocks);
 }
 
+function visualHorizonRegions(manifest, outerExtent = 45_000) {
+  const bounds = manifest.localBounds;
+  const extent = Math.max(
+    Number(outerExtent) || 0,
+    Math.abs(bounds.minX), Math.abs(bounds.maxX), Math.abs(bounds.minZ), Math.abs(bounds.maxZ)
+  );
+  const overlap = 24;
+  return Object.freeze([
+    Object.freeze({ id: 'north', minX: -extent, maxX: extent, minZ: -extent, maxZ: bounds.minZ + overlap }),
+    Object.freeze({ id: 'south', minX: -extent, maxX: extent, minZ: bounds.maxZ - overlap, maxZ: extent }),
+    Object.freeze({ id: 'west', minX: -extent, maxX: bounds.minX + overlap, minZ: bounds.minZ, maxZ: bounds.maxZ }),
+    Object.freeze({ id: 'east', minX: bounds.maxX - overlap, maxX: extent, minZ: bounds.minZ, maxZ: bounds.maxZ })
+  ]);
+}
+
+function addVisualSurfaceHorizon(pack, world) {
+  const regions = visualHorizonRegions(pack.manifest);
+  regions.forEach((region) => {
+    const width = region.maxX - region.minX;
+    const depth = region.maxZ - region.minZ;
+    const centerX = (region.minX + region.maxX) * 0.5;
+    const centerZ = (region.minZ + region.maxZ) * 0.5;
+    const geometry = new THREE.PlaneGeometry(
+      width,
+      depth,
+      Math.max(2, Math.min(96, Math.ceil(width / 1_200))),
+      Math.max(2, Math.min(64, Math.ceil(depth / 1_200)))
+    );
+    geometry.rotateX(-Math.PI / 2);
+    const positions = geometry.attributes.position;
+    for (let index = 0; index < positions.count; index++) {
+      positions.setY(
+        index,
+        sampleModeledRelief(pack, positions.getX(index) + centerX, positions.getZ(index) + centerZ) - 1.2
+      );
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    const material = world.surface.material.clone();
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = 1;
+    material.polygonOffsetUnits = 1;
+    const horizon = new THREE.Mesh(geometry, material);
+    horizon.name = `${pack.bodyId} modeled horizon ${region.id}`;
+    horizon.position.set(
+      pack.manifest.renderPlacement.x + centerX,
+      pack.manifest.renderPlacement.y,
+      pack.manifest.renderPlacement.z + centerZ
+    );
+    horizon.receiveShadow = true;
+    horizon.frustumCulled = false;
+    horizon.userData.planetaryBody = pack.bodyId;
+    horizon.userData.truthClass = 'generated_game_detail';
+    horizon.userData.collisionAuthority = false;
+    horizon.userData.description = 'Modeled visual continuation outside the accepted traversable surface region.';
+    world.objects.push(horizon);
+    appCtx.scene.add(horizon);
+  });
+}
+
 async function createSolidWorld(pack) {
   const cached = worldCache.get(pack.bodyId);
   const authority = ensurePlanetarySurfaceAuthority(appCtx);
@@ -407,6 +467,7 @@ async function createSolidWorld(pack) {
   const world = { pack, surface, objects: [] };
   worldCache.set(pack.bodyId, world);
   appCtx.scene.add(surface);
+  addVisualSurfaceHorizon(pack, world);
   addGeneratedSurfaceDetail(pack, world);
   await addParentBodyView(pack, world);
   return world;
@@ -628,5 +689,6 @@ Object.assign(appCtx, {
 export {
   arriveAtSolidWorld,
   sampleActiveSolidWorldHeight,
-  SOLID_WORLD_PACKS
+  SOLID_WORLD_PACKS,
+  visualHorizonRegions
 };

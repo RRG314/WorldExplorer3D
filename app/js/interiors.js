@@ -11,7 +11,7 @@ import {
   isWalkModeActive,
   pointInPolygonSafe,
   sampleSurfaceY
-} from "./interiors/core.js?v=3";
+} from "./interiors/core.js?v=4";
 import {
   resolveInteriorDefinitionForEntry,
   warmMappedInteriorDefinition
@@ -24,7 +24,7 @@ import {
   sampleInteriorWalkSurface as sampleInteriorWalkSurfaceRuntime,
   scanNearbyInteriorSupport as scanNearbyInteriorSupportRuntime,
   updateInteriorInteraction as updateInteriorInteractionRuntime
-} from "./interiors/runtime.js?v=10";
+} from "./interiors/runtime.js?v=11";
 
 const interiorCache = new Map();
 const mappedInteriorWarmPromises = new Map();

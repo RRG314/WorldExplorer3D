@@ -25,19 +25,19 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
-import './physics.js?v=115';
-import './walking.js?v=81';
+import './physics.js?v=116';
+import './walking.js?v=82';
 import './travel-mode.js?v=22';
-import { initBoatMode } from './boat-mode.js?v=42';
+import { initBoatMode } from './boat-mode.js?v=44';
 import './sky.js?v=87';
 import './weather.js?v=10';
-import './runtime/on-demand-modes.js?v=9';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=137';
+import './runtime/on-demand-modes.js?v=10';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=139';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=4';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=6';
+import './planetary/solid-world-runtime.js?v=7';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=2';
 import './planetary/sky-orientation.js?v=13';
@@ -46,11 +46,11 @@ import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=8';
 import './game.js?v=62';
 import './input.js?v=67';
-import './hud.js?v=97';
+import './hud.js?v=98';
 import './map.js?v=60';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=136';
+import { setupUI } from './ui.js?v=138';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -179,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=15').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=16').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

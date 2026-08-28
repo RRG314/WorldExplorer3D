@@ -5,7 +5,7 @@ import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=1
 import {
   computeBodyRelativeNavigation,
   evaluateLandingEligibility
-} from './spacecraft-authority.js?v=1';
+} from './spacecraft-authority.js?v=2';
 import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
@@ -257,7 +257,10 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     const characterFlight = appCtx.spaceFlight.characterHandling || spacecraftOperationTuning(
       appCtx.resolveCharacterCapability?.('spacecraft', { vehicleAvailable: true, environment: 'SPACE_FLIGHT' })
     );
-    flightRead.textContent = `${characterFlight.guidanceLabel} · ${Math.round(characterFlight.manualTurnScale * 100)}% manual response`;
+    const flightRate = Number(appCtx.spaceFlight.manualFlightRate) || 1;
+    flightRead.textContent = flightRate > 1
+      ? `${characterFlight.guidanceLabel} · manual flight ×${flightRate}`
+      : characterFlight.guidanceLabel;
   }
   if (assistBtn) {
     const assist = appCtx.spaceJourneyAssistState;

@@ -2,16 +2,17 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=14";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=15";
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=23";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=5";
+import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=6";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=1';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=2';
+import { resolveCompletedLandingTarget } from './space/landing-target.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -60,6 +61,7 @@ function beginSpaceFlightSession() {
   spaceSessionScope = createLifecycleScope('space-flight-session');
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
   appCtx.spaceFlight.overviewMode = false;
+  appCtx.spaceFlight._landingTarget = null;
   return appCtx.spaceFlight._sessionId;
 }
 
@@ -286,7 +288,7 @@ function attemptLanding() {
 
 function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
   if (!isCurrentSpaceFlightSession(sessionId)) return;
-  const targetName = appCtx.spaceFlight._landingTarget || appCtx.spaceFlight.destination;
+  const targetName = resolveCompletedLandingTarget(appCtx.spaceFlight, appCtx.spaceJourney);
   console.log("Landing complete! Target:", targetName);
 
   showFlightMessage('LANDING SUCCESSFUL!', '#10b981');

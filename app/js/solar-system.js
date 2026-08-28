@@ -350,6 +350,9 @@ function resetSolarSystemRuntime() {
   if (appCtx.spaceFlight?.canvas) {
     appCtx.spaceFlight.canvas.removeEventListener('click', onSolarSystemClick);
   }
+  ['solarSystemInfo', 'ssToggleContainer', 'solarSystemScale', 'ssProximity'].forEach((id) => {
+    document.getElementById(id)?.remove();
+  });
   Object.assign(solarSystem, {
     group: null,
     sunMesh: null,

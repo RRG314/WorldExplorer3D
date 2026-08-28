@@ -8,8 +8,10 @@ import {
   summarizeSupportType
 } from "../building-entry.js?v=7";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=3";
+import { elevatorFloorChoices } from './elevator-authority.js?v=1';
 
 let nearbyInteriorScanPromise = null;
+let elevatorFloorPicker = null;
 const {
   clearPrompt,
   collectInteriorWorldSuppressionStates,
@@ -164,9 +166,16 @@ function nearestInteriorInteraction(active, walker) {
     .sort((a, b) => a.distance - b.distance)[0] || null;
 }
 
-function travelByElevator(active, interaction, deps) {
-  if (!interaction || interaction.kind !== 'elevator') return false;
-  if (!replaceActiveInteriorFloor(active, interaction.targetLevel, deps)) return false;
+function closeElevatorFloorPicker(active = appCtx.activeInterior) {
+  elevatorFloorPicker?.remove?.();
+  elevatorFloorPicker = null;
+  if (active) active.elevatorPickerOpen = false;
+}
+
+function travelByElevator(active, targetLevel, deps) {
+  if (!Number.isFinite(Number(targetLevel))) return false;
+  closeElevatorFloorPicker(active);
+  if (!replaceActiveInteriorFloor(active, Number(targetLevel), deps)) return false;
   const walker = appCtx.Walk?.state?.walker;
   if (!walker || !active.connector) return false;
   const eyeHeight = appCtx.Walk?.CFG?.eyeHeight || 1.7;
@@ -182,7 +191,28 @@ function travelByElevator(active, interaction, deps) {
     yaw: deps.finiteNumber(walker.yaw || walker.angle, 0),
     angle: deps.finiteNumber(walker.angle, 0)
   };
-  setTransientHint(`${active.floorLabel} • stairs and elevator are ready.`, 1500, deps);
+  setTransientHint(`${active.floorLabel} · doors opening.`, 1500, deps);
+  return true;
+}
+
+function openElevatorFloorPicker(active, deps) {
+  if (!active?.floorPlan || active.floorPlan.floorCount <= 1 || typeof document === 'undefined') return false;
+  closeElevatorFloorPicker(active);
+  const choices = elevatorFloorChoices(active.floorPlan, active.activeLevel);
+  const picker = document.createElement('section');
+  picker.id = 'interiorElevatorFloorPicker';
+  picker.setAttribute('role', 'dialog');
+  picker.setAttribute('aria-label', 'Choose an elevator floor');
+  picker.style.cssText = 'position:fixed;left:50%;bottom:max(92px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10020;width:min(360px,calc(100vw - 24px));max-height:min(56vh,430px);overflow:auto;padding:14px;border:1px solid rgba(148,197,255,.65);border-radius:12px;background:rgba(8,18,28,.96);box-shadow:0 18px 50px rgba(0,0,0,.45);color:#f8fafc;font:500 13px Inter,sans-serif;';
+  picker.innerHTML = `<div style="display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:10px;"><div><strong style="display:block;font:700 16px Orbitron,sans-serif;">Elevator</strong><span style="display:block;margin-top:3px;color:#b8c7d9;">Choose a floor</span></div><button type="button" data-elevator-close aria-label="Close elevator controls" style="border:0;background:transparent;color:#fff;font-size:22px;line-height:1;cursor:pointer;">×</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">${choices.map((choice) => `<button type="button" data-elevator-level="${choice.level}" ${choice.current ? 'disabled aria-current="true"' : ''} style="min-height:46px;padding:9px 10px;border:1px solid ${choice.current ? '#64748b' : '#60a5fa'};border-radius:8px;background:${choice.current ? 'rgba(71,85,105,.55)' : 'rgba(30,64,175,.5)'};color:#fff;font:700 12px Inter,sans-serif;cursor:${choice.current ? 'default' : 'pointer'};">${choice.direction === 'up' ? '↑ ' : choice.direction === 'down' ? '↓ ' : '• '}${choice.label}${choice.current ? ' · Here' : ''}</button>`).join('')}</div>`;
+  picker.querySelector('[data-elevator-close]')?.addEventListener('click', () => closeElevatorFloorPicker(active));
+  picker.querySelectorAll('[data-elevator-level]').forEach((button) => {
+    button.addEventListener('click', () => travelByElevator(active, Number(button.dataset.elevatorLevel), deps));
+  });
+  document.body.appendChild(picker);
+  elevatorFloorPicker = picker;
+  active.elevatorPickerOpen = true;
+  picker.querySelector('[data-elevator-level]:not([disabled])')?.focus?.();
   return true;
 }
 
@@ -394,10 +424,13 @@ export async function enterInteriorForSupport(support, deps) {
 export function clearActiveInterior(options = {}, deps) {
   const active = appCtx.activeInterior;
   if (!active) {
+    closeElevatorFloorPicker(null);
     appCtx.replaceWorldCollection('dynamicBuildingColliders');
     if (!options.preservePrompt) clearPrompt();
     return false;
   }
+
+  closeElevatorFloorPicker(active);
 
   if (options.restorePlayer !== false && deps.isWalkModeActive() && active.outsideState) {
     const walker = appCtx.Walk.state.walker;
@@ -530,7 +563,7 @@ export async function handleInteriorAction(deps) {
       clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
       return true;
     }
-    if (interaction?.kind === 'elevator') return travelByElevator(active, interaction, deps);
+    if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps);
     return false;
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);
@@ -543,6 +576,7 @@ export function updateInteriorInteraction(deps) {
   const now = performance.now();
 
   if (!deps.isWalkModeActive()) {
+    closeElevatorFloorPicker(appCtx.activeInterior);
     appCtx.interiorHint = null;
     resetInteriorInteractionCache();
     const transientHint = getTransientHint();
@@ -569,7 +603,10 @@ export function updateInteriorInteraction(deps) {
       loadedLevels: active.loadedLevels || []
     };
     resetInteriorInteractionCache();
-    if (interaction) setPrompt(`E ${interaction.label}`, interaction.kind === 'elevator' ? 'supported' : 'active');
+    if (interaction) setPrompt(
+      interaction.kind === 'elevator' ? 'E Choose elevator floor' : `E ${interaction.label}`,
+      interaction.kind === 'elevator' ? 'supported' : 'active'
+    );
     else clearPrompt();
     return;
   }

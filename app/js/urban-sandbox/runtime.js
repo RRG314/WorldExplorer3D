@@ -4,7 +4,7 @@ import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=11';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=12';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -2008,6 +2008,15 @@ function performInteraction(state, candidate) {
 function updatePrompt(state) {
   const prompt = state.prompt;
   if (!prompt?.root) return;
+  if (appCtx.getEnv?.() !== 'EARTH' || appCtx.oceanMode?.active || appCtx.spaceFlight?.active || appCtx.activePlanetaryBodyId) {
+    prompt.secondaryKey.hidden = true;
+    prompt.secondaryButton.hidden = true;
+    prompt.takeKey.hidden = true;
+    prompt.takeButton.hidden = true;
+    prompt.root.classList.remove('show');
+    prompt.root.setAttribute('aria-hidden', 'true');
+    return;
+  }
   const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
 import { updateDrone } from "./physics/drone-flight.js?v=9";
-import { updatePlane } from "./plane-mode.js?v=18";
+import { updatePlane } from "./plane-mode.js?v=19";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
@@ -10,7 +10,7 @@ import {
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=7";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
-import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=2";
+import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=3";
 import {
   arcadeSteeringYawTarget,
   earthDrivingSteeringProfile,

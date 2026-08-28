@@ -38,8 +38,9 @@ import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=2";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=9";
-import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
+import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=2";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=2";
+import { createSurfaceLayerSuppression } from './boat-mode/surface-layer-visibility.js?v=1';
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -56,6 +57,24 @@ const BOAT_EDGE_BUFFER_MIN = 1.2;
 
 let _boatMeshReady = false;
 let _boatPromptSignature = '';
+
+const openOceanSurfaceSuppression = createSurfaceLayerSuppression(() => [
+  appCtx.terrainGroup,
+  appCtx.urbanSandboxRuntime?.group,
+  ...(appCtx.roadMeshes || []),
+  ...(appCtx.buildingMeshes || []),
+  ...(appCtx.landuseMeshes || []),
+  ...(appCtx.vegetationMeshes || []),
+  ...(appCtx.streetFurnitureMeshes || []),
+  ...(appCtx.structureVisualMeshes || []),
+  ...(appCtx.poiMeshes || [])
+]);
+
+function syncOpenOceanSurfaceLayers(forceInactive = false) {
+  const openOcean = !forceInactive && appCtx.boatMode?.active && String(appCtx.boatMode?.waterKind || '').toLowerCase() === 'open_ocean';
+  openOceanSurfaceSuppression.setActive(openOcean);
+  appCtx.boatMode.openOceanSurfaceSuppression = openOceanSurfaceSuppression.snapshot();
+}
 
 function resetBoatDynamics() {
   appCtx.boat.speed = 0;
@@ -294,7 +313,8 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
   showBoatPrompt,
   startBoatMode: (options) => startBoatMode(options),
   updateBoatMenuUi,
-  updateWaterWaveVisuals
+  updateWaterWaveVisuals,
+  restoreEarthSurfaceLayers: () => syncOpenOceanSurfaceLayers(true)
 });
 const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat } = boatOceanTransferApi;
 
@@ -365,6 +385,7 @@ function startBoatMode(options = {}) {
   setBoatActorPose(spawnPoint.x, spawnPoint.z, startAngle, activeCandidate, { forceSnap: true });
   createBoatMesh();
   updateBoatWaterPatch(activeCandidate);
+  syncOpenOceanSurfaceLayers();
   updateBoatMesh();
   snapBoatChaseCamera();
   if (appCtx.carMesh) appCtx.carMesh.visible = false;
@@ -407,6 +428,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     resetBoatFoamFx();
     setBoatActorPose(spawnPoint.x, spawnPoint.z, yaw, activeCandidate, { forceSnap: true });
     updateBoatWaterPatch(activeCandidate);
+    syncOpenOceanSurfaceLayers();
     snapBoatChaseCamera();
     updateBoatLodBias();
     updateBoatMesh();
@@ -486,6 +508,7 @@ function stopBoatMode(options = {}) {
   }
 
   appCtx.boatMode.active = false;
+  syncOpenOceanSurfaceLayers(true);
   appCtx.boatMode.available = false;
   appCtx.boatMode.candidate = null;
   appCtx.boatMode.currentWater = null;
@@ -601,7 +624,8 @@ const updateBoatMode = createBoatRuntimeDynamics({
   updateBoatFoamFx,
   updateBoatLodBias,
   updateBoatMesh,
-  updateBoatWaterPatch
+  updateBoatWaterPatch,
+  syncOpenOceanSurfaceLayers
 });
 
 function initBoatMode() {

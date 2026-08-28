@@ -1,7 +1,7 @@
 import {
   createSpacecraftState,
   executePlannedBurn
-} from './spacecraft-authority.js?v=1';
+} from './spacecraft-authority.js?v=2';
 
 const ASSISTED_TRANSFER_PRESENTATION_SECONDS = Object.freeze({
   'earth:moon': 12,

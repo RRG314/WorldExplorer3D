@@ -485,11 +485,13 @@ function updateCamera(dt = 1 / 60) {
           targetX, targetY, targetZ,
           dt
         );
-    if (!planetaryChase && !insideTunnel) {
+    if (!insideTunnel) {
       const terrainTarget = resolveChaseCameraTerrainCollision(
         { x: lookX, y: lookY, z: lookZ },
         collisionTarget,
-        (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+        planetaryChase
+          ? (x, z) => planetarySurfaceYAtRenderXZ(appCtx, x, z)
+          : (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
       );
       collisionTarget = {
         ...terrainTarget,

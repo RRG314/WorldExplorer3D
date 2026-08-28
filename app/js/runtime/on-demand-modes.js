@@ -31,8 +31,8 @@ export function ensureSpaceRuntime() {
     modeLoads.space = (async () => {
       // Solar-system and universe code is intentionally outside the Earth
       // startup graph. It is evaluated only after a space action.
-      await import('../solar-system.js?v=80');
-      return import('../space.js?v=99');
+      await import('../solar-system.js?v=81');
+      return import('../space.js?v=100');
     })().catch((error) => {
       modeLoads.space = null;
       throw error;
@@ -43,7 +43,7 @@ export function ensureSpaceRuntime() {
 
 export function ensureOceanRuntime() {
   if (!modeLoads.ocean) {
-    modeLoads.ocean = import('../ocean.js?v=9').catch((error) => {
+    modeLoads.ocean = import('../ocean.js?v=10').catch((error) => {
       modeLoads.ocean = null;
       throw error;
     });

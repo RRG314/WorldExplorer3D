@@ -3,6 +3,7 @@ import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
+import { reticlePresentation } from './weapon-reticle-authority.js?v=1';
 
 const ITEM_ICON_PATHS = Object.freeze({
   hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
@@ -50,6 +51,23 @@ function createUrbanEquipmentRuntime(options = {}) {
   const clock = options.now || (() => performance.now());
   const effects = [];
   const projectiles = [];
+  const reticleFeedback = { firedAt: -Infinity, hitAt: -Infinity };
+
+  function updateReticlePresentation(equipped = state.equipment?.equipped?.()) {
+    const reticle = state.equipmentUi?.reticle;
+    if (!reticle || !equipped?.projectileKind) return;
+    const current = clock();
+    const presentation = reticlePresentation({
+      kind: equipped.projectileKind,
+      speedMph: appCtx.Walk?.state?.walker?.speedMph || 0,
+      firedAgoMs: current - reticleFeedback.firedAt,
+      hitAgoMs: current - reticleFeedback.hitAt
+    });
+    reticle.style.setProperty('--reticle-gap', `${presentation.gapPx}px`);
+    reticle.dataset.kind = presentation.profile;
+    reticle.dataset.recoil = presentation.recoilActive ? 'true' : 'false';
+    reticle.dataset.hit = presentation.hitConfirmed ? 'true' : 'false';
+  }
 
   function backpackCategory(item) {
     if (item.category === 'field-tool') return 'field-tool';
@@ -129,7 +147,10 @@ function createUrbanEquipmentRuntime(options = {}) {
       isActive()
     );
     ui.reticle?.classList.toggle('show', reticleVisible);
-    if (ui.reticle) ui.reticle.dataset.kind = String(equipped?.projectileKind || '');
+    if (ui.reticle) {
+      ui.reticle.dataset.kind = String(equipped?.projectileKind || '');
+      if (reticleVisible) updateReticlePresentation(equipped);
+    }
     state.equipmentVisual?.setEquipped?.(equipped?.id || 'hands');
     const parachuteState = equipped?.id === 'parachute'
       ? state.parachute?.deployed ? ' · canopy deployed' : ' · deploy after jumping'
@@ -476,6 +497,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       });
     }
     commitImpacts(equipment, position, selected, projectile.roomActive);
+    if (directTarget && projectile.owner !== 'npc') reticleFeedback.hitAt = clock();
     state.lastProjectileAction = Object.freeze({
       equipmentId: equipment.id,
       phase: 'impact',
@@ -514,6 +536,7 @@ function createUrbanEquipmentRuntime(options = {}) {
         : Math.min(.95, Number(equipment.range || 30) / speed + .12)
     };
     projectiles.push(projectile);
+    reticleFeedback.firedAt = clock();
     state.lastProjectileAction = Object.freeze({ equipmentId: equipment.id, phase: 'travel', targetKind: '', at: clock() });
     if (equipment.category === 'sidearm') {
       reportCivicEvent({
@@ -773,6 +796,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   function update(dt) {
     updateProjectiles(dt);
     updateArmedNpcResponse();
+    updateReticlePresentation();
     const actor = appCtx.Walk?.state?.walker;
     if (actor && state.flashlight.visible) {
       const direction = new THREE.Vector3();

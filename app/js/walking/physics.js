@@ -4,6 +4,7 @@ import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2"
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
+import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -301,6 +302,20 @@ function createWalkingPhysicsHelpers({
       ? integrateParachuteFall(state.walker.vy, dt, true)
       : state.walker.vy + gravity * dt;
     state.walker.y += state.walker.vy * dt;
+
+    if (appCtx.activeInterior) {
+      const ceiling = resolveInteriorCeiling({
+        activeInterior: appCtx.activeInterior,
+        x: state.walker.x,
+        z: state.walker.z,
+        eyeY: state.walker.y,
+        verticalVelocity: state.walker.vy
+      });
+      if (ceiling.collided) {
+        state.walker.y = ceiling.eyeY;
+        state.walker.vy = ceiling.verticalVelocity;
+      }
+    }
 
     if (state.walker.y <= effectiveGroundY + CFG.eyeHeight) {
       state.walker.y = effectiveGroundY + CFG.eyeHeight;

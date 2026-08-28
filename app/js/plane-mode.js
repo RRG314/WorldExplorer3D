@@ -1,6 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 import { createExpeditionPlaneMesh } from './plane/expedition-plane-mesh.js?v=1';
+import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=1';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -174,6 +175,12 @@ function groundSurfaceAt(x, z, options = {}) {
   return roof && roof.y > surface.y ? roof : surface;
 }
 
+function aircraftGroundSurfaceAt(x, z, options = {}) {
+  return aircraftGearSamplePoints(x, z, state.yaw)
+    .map((point) => groundSurfaceAt(point.x, point.z, options))
+    .sort((left, right) => right.y - left.y)[0];
+}
+
 function samplePlaneSurface(dt = 0, force = false) {
   surfaceSample.age += Math.max(0, Number(dt) || 0);
   const moved = surfaceSample.valid ? Math.hypot(state.x - surfaceSample.x, state.z - surfaceSample.z) : Infinity;
@@ -185,7 +192,7 @@ function samplePlaneSurface(dt = 0, force = false) {
     return surfaceSample.y;
   }
   const includeRoad = !state.airborne || clearance < 12;
-  const sampled = groundSurfaceAt(state.x, state.z, { includeRoad });
+  const sampled = aircraftGroundSurfaceAt(state.x, state.z, { includeRoad });
   surfaceSample.y = sampled.y;
   surfaceSample.kind = sampled.kind;
   surfaceSample.building = sampled.building;

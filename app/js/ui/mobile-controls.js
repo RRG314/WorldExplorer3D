@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createLifecycleScope } from "../runtime/lifecycle-scope.js?v=2";
+import { canUseEquippedItemOnMobile } from './equipment-action-policy.js?v=1';
 
 const MOBILE_CONTROL_PROFILES = {
   driving: {
@@ -164,6 +165,7 @@ function initMobileControls() {
   const mobileLookLabel = document.getElementById('mobileLookLabel');
   const mobileActionPrimary = document.getElementById('mobileActionPrimary');
   const mobileActionSecondary = document.getElementById('mobileActionSecondary');
+  const mobileEquipmentUse = document.getElementById('mobileEquipmentUse');
   const mobileActionStack = document.getElementById('mobileActionStack');
   const urbanEquipmentToggle = document.getElementById('urbanEquipmentToggle');
   const mobileControlsHandedness = document.getElementById('mobileControlsHandedness');
@@ -510,6 +512,16 @@ function initMobileControls() {
     applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
     applyActionProfile(actions);
     const showPackAction = mode === 'walking' && urbanEquipmentToggle && !urbanEquipmentToggle.hidden;
+    const equipped = appCtx.playerBackpackInventory?.equipped?.() || null;
+    const showEquipmentUse = mode === 'walking' &&
+      canUseEquippedItemOnMobile(equipped) &&
+      typeof appCtx.handleUrbanEquipmentUse === 'function';
+    if (mobileEquipmentUse) {
+      mobileEquipmentUse.textContent = equipped?.actionLabel || 'Use';
+      mobileEquipmentUse.setAttribute('aria-label', `${equipped?.actionLabel || 'Use'} ${equipped?.label || 'equipped item'}`);
+      mobileEquipmentUse.classList.toggle('hidden', !showEquipmentUse);
+      mobileEquipmentUse.disabled = !showEquipmentUse;
+    }
     urbanEquipmentToggle?.classList.toggle('mobile-mode-hidden', !showPackAction);
     mobileActionStack?.classList.toggle('has-pack-action', !!showPackAction);
     mobileTouchControls.classList.add('show');
@@ -598,6 +610,11 @@ function initMobileControls() {
     bindAnalogPad(mobileMovePad, 'move');
     bindAnalogPad(mobileLookPad, 'look');
     mobileHoldButtons.forEach((btn) => bindMobileHoldButton(btn));
+    mobileControlScope.listen(mobileEquipmentUse, 'click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      appCtx.handleUrbanEquipmentUse?.();
+    });
     syncMobileControlSettingsUi();
     mobileControlScope.listen(mobileControlsHandedness, 'change', () => updateMobileSettings({ handedness: mobileControlsHandedness.value }));
     mobileControlScope.listen(mobileMoveSensitivity, 'input', () => updateMobileSettings({ moveSensitivity: Number(mobileMoveSensitivity.value) / 100 }));
