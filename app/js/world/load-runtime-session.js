@@ -429,7 +429,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       snapshot: publication,
       request: worldSession?.request
     });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=47');
+    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=48');
     const urbanSandbox = startUrbanSandboxRuntime({
       snapshot: publication,
       request: worldSession?.request,

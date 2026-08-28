@@ -158,6 +158,8 @@ function createUrbanResponderRuntime(options = {}) {
       navigationElapsed: 1,
       surfaceElapsed: 1,
       returnElapsed: 0,
+      avoidanceSide: 0,
+      avoidanceRemaining: 0,
       condition: 1,
       resistance: 190,
       officer: null
@@ -314,25 +316,58 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = target.z - responder.z;
     const distance = Math.hypot(dx, dz);
     const targetYaw = Math.atan2(dx, dz);
-    responder.yaw += angleDelta(targetYaw, responder.yaw) * Math.min(1, dt * 2.8);
+    responder.avoidanceRemaining = Math.max(0, finite(responder.avoidanceRemaining) - dt);
+    const steeringTargetYaw = targetYaw + (responder.avoidanceRemaining > 0 ? responder.avoidanceSide * .68 : 0);
+    responder.yaw += angleDelta(steeringTargetYaw, responder.yaw) * Math.min(1, dt * 2.8);
     const civicLevel = Math.max(1, Number(civic.level) || 1);
     const stopDistance = returning ? 4 : actorWithinSearch ? 9 : 15;
     const targetSpeed = distance <= stopDistance ? 0 : Math.min(22 + civicLevel * 2, 7 + distance * .24);
     const acceleration = targetSpeed > responder.speed ? 7.5 : 11;
     responder.speed += Math.sign(targetSpeed - responder.speed) * Math.min(Math.abs(targetSpeed - responder.speed), acceleration * dt);
-    let nextX = responder.x + Math.sin(responder.yaw) * responder.speed * dt;
-    let nextZ = responder.z + Math.cos(responder.yaw) * responder.speed * dt;
     const vehicleBlockers = [
       ...responders.filter((entry) => entry !== responder),
       ...(options.getVehicles?.() || []).filter((entry) => !entry.attachedToPlayer)
     ];
-    const blockedByVehicle = vehicleBlockers.some((entry) =>
-      Math.hypot(finite(entry.x) - nextX, finite(entry.z) - nextZ) < Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9)
-    );
+    const travelSpeed = responder.avoidanceRemaining > 0 ? Math.min(responder.speed, 5.5) : responder.speed;
+    let nextX = responder.x + Math.sin(responder.yaw) * travelSpeed * dt;
+    let nextZ = responder.z + Math.cos(responder.yaw) * travelSpeed * dt;
+    const nearestBlocker = vehicleBlockers.map((entry) => ({
+      entry,
+      currentDistance: Math.hypot(finite(entry.x) - responder.x, finite(entry.z) - responder.z),
+      nextDistance: Math.hypot(finite(entry.x) - nextX, finite(entry.z) - nextZ),
+      clearance: Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9)
+    })).filter((candidate) => candidate.nextDistance < candidate.clearance)
+      .sort((left, right) => left.nextDistance - right.nextDistance)[0] || null;
+    const blockedByVehicle = !!nearestBlocker && nearestBlocker.nextDistance < nearestBlocker.currentDistance - .015;
     if (blockedByVehicle) {
-      responder.speed = 0;
-      nextX = responder.x;
-      nextZ = responder.z;
+      const blockerYaw = Math.atan2(
+        finite(nearestBlocker.entry.x) - responder.x,
+        finite(nearestBlocker.entry.z) - responder.z
+      );
+      if (responder.avoidanceRemaining <= 0) {
+        responder.avoidanceSide = angleDelta(blockerYaw, responder.yaw) >= 0 ? -1 : 1;
+      }
+      responder.avoidanceRemaining = 1.25;
+      const bypassTargetYaw = targetYaw + responder.avoidanceSide * .82;
+      responder.yaw += angleDelta(bypassTargetYaw, responder.yaw) * Math.min(1, dt * 5.5);
+      const bypassSpeed = Math.min(Math.max(responder.speed, 2.2), 4.8);
+      const bypassX = responder.x + Math.sin(responder.yaw) * bypassSpeed * dt;
+      const bypassZ = responder.z + Math.cos(responder.yaw) * bypassSpeed * dt;
+      const bypassClears = vehicleBlockers.every((entry) => {
+        const currentDistance = Math.hypot(finite(entry.x) - responder.x, finite(entry.z) - responder.z);
+        const bypassDistance = Math.hypot(finite(entry.x) - bypassX, finite(entry.z) - bypassZ);
+        const clearance = Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9);
+        return bypassDistance >= clearance || bypassDistance >= currentDistance - .015;
+      });
+      if (bypassClears) {
+        nextX = bypassX;
+        nextZ = bypassZ;
+        responder.speed = bypassSpeed;
+      } else {
+        responder.speed = 0;
+        nextX = responder.x;
+        nextZ = responder.z;
+      }
     }
     const road = roadAnchorNear(nextX, nextZ, responder.y - RESPONDER_BASE_Y, responder.road);
     if (road && road.distance <= 14) {

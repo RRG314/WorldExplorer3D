@@ -6,10 +6,14 @@ import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
+const requestedScope = String(process.env.WE3D_URBAN_SCOPE || 'all').trim().toLowerCase();
+assert.ok(['all', 'arrest', 'medical', 'vehicle'].includes(requestedScope),
+  `Unsupported WE3D_URBAN_SCOPE: ${requestedScope}`);
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4410, 4411, 4412] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const reportPath = path.join(root, 'output', 'verification', 'urban-sandbox', 'report.json');
+const reportPath = path.join(root, 'output', 'verification', 'urban-sandbox',
+  requestedScope === 'all' ? 'report.json' : `report-${requestedScope}.json`);
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const browserErrors = [];
 const localFailures = [];
@@ -52,6 +56,7 @@ async function actorState(page, target = null) {
       x: Number(position.x),
       z: Number(position.z),
       yaw: Number(actor.orientation?.yaw),
+      cameraYaw: Number(actor.orientation?.yaw) + Number(state.cameraFollow?.signedHeadingOffsetDegrees || 0) * Math.PI / 180,
       mode: actor.mode,
       distance: point ? Math.hypot(Number(point.x) - Number(position.x), Number(point.z) - Number(position.z)) : 0,
       interaction: state.urbanSandbox?.interaction || null,
@@ -68,7 +73,22 @@ async function turnToward(page, target, tolerance = 0.11, maxSteps = 160) {
     if (Math.abs(delta) <= tolerance) return state;
     await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', 55);
   }
-  throw new Error(`Could not face target ${JSON.stringify(target)} with normal walking input.`);
+  const final = await actorState(page, target);
+  const desired = Math.atan2(Number(target.x) - final.x, Number(target.z) - final.z);
+  throw new Error(`Could not face target ${JSON.stringify(target)} with normal walking input: ${JSON.stringify({ final, desired, delta: wrapYaw(desired - final.yaw) })}`);
+}
+
+async function turnCameraToward(page, target, tolerance = 0.11, maxSteps = 160) {
+  for (let step = 0; step < maxSteps; step += 1) {
+    const state = await actorState(page, target);
+    const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
+    const delta = wrapYaw(desired - state.cameraYaw);
+    if (Math.abs(delta) <= tolerance) return state;
+    await inputStep(page, delta > 0 ? 'KeyA' : 'KeyD', 55);
+  }
+  const final = await actorState(page, target);
+  const desired = Math.atan2(Number(target.x) - final.x, Number(target.z) - final.z);
+  throw new Error(`Could not aim the camera reticle at ${JSON.stringify(target)} with normal look input: ${JSON.stringify({ final, desired, delta: wrapYaw(desired - final.cameraYaw) })}`);
 }
 
 async function walkTo(page, target, options = {}) {
@@ -78,6 +98,7 @@ async function walkTo(page, target, options = {}) {
   let previousDistance = Infinity;
   let stagnant = 0;
   let start = null;
+  let detourCount = 0;
   for (let step = 0; step < maxSteps; step += 1) {
     const state = await actorState(page, target);
     start ||= state;
@@ -99,6 +120,26 @@ async function walkTo(page, target, options = {}) {
     }
     stagnant = state.distance >= previousDistance - 0.008 ? stagnant + 1 : 0;
     previousDistance = state.distance;
+    if (stagnant > Number(options.stagnantLimit ?? 85) && options.detour === true && detourCount < 8) {
+      const side = detourCount % 2 === 0 ? 1 : -1;
+      detourCount += 1;
+      const tangent = {
+        x: state.x + Math.sin(desired + side * Math.PI / 2) * 9,
+        z: state.z + Math.cos(desired + side * Math.PI / 2) * 9
+      };
+      const turned = await turnToward(page, tangent, .16, 160).then(() => true, () => false);
+      if (!turned) {
+        stagnant = 0;
+        previousDistance = Infinity;
+        continue;
+      }
+      if (state.distance > 20) await page.keyboard.down('ShiftLeft');
+      await inputStep(page, 'ArrowUp', Math.max(900, Math.min(5_200, state.distance * 125)));
+      if (state.distance > 20) await page.keyboard.up('ShiftLeft');
+      stagnant = 0;
+      previousDistance = Infinity;
+      continue;
+    }
     if (stagnant > Number(options.stagnantLimit ?? 85)) {
       return { reached: false, blocked: true, start, final: state, steps: step };
     }
@@ -149,6 +190,11 @@ async function equip(page, id) {
   await page.keyboard.press('KeyI');
   await page.waitForSelector('#urbanEquipment.show', { timeout: 5_000 });
   await page.locator(`#urbanEquipment [data-equipment-id="${item.instanceId}"]`).first().click();
+  const equipAction = page.locator(
+    `#urbanBackpackDetail [data-backpack-action="equip"][data-equipment-id="${item.instanceId}"]`
+  );
+  await equipAction.waitFor({ state: 'visible', timeout: 5_000 });
+  await equipAction.click();
   await page.waitForFunction((catalogId) => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.equipment?.equippedId === catalogId, id, { timeout: 5_000 });
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.getElementById('urbanEquipment')?.classList.contains('show'), null, { timeout: 5_000 });
@@ -183,47 +229,78 @@ async function walkNearAmbientWitness(page, stopDistance = 5) {
     }, null, 2));
     throw error;
   }
-  const selectWitness = (preferredId = '') => page.evaluate((targetId) => {
+  const selectWitness = (preferredId = '', excludedIds = []) => page.evaluate(({ targetId, excluded }) => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
-    const ambient = state.urbanSandbox?.ambientPedestrians || [];
+    const ambient = (state.urbanSandbox?.ambientPedestrians || []).map((entry) => ({
+      ...entry,
+      detailed: false
+    }));
     const promoted = (state.urbanSandbox?.interactiveNpcs || []).map((entry) => ({
       id: entry.sourceAgentId || entry.id,
       x: entry.x,
       y: entry.y,
       z: entry.z,
       yaw: entry.yaw,
-      distance: Math.hypot(Number(entry.x) - Number(actor.x), Number(entry.z) - Number(actor.z))
+      distance: Math.hypot(Number(entry.x) - Number(actor.x), Number(entry.z) - Number(actor.z)),
+      detailed: true
     }));
     const candidates = [...ambient, ...promoted]
-      .filter((entry) => Number.isFinite(entry.x) && Number.isFinite(entry.z))
-      .sort((left, right) => Number(left.distance || Infinity) - Number(right.distance || Infinity));
+      .filter((entry) => Number.isFinite(entry.x) && Number.isFinite(entry.z) && !excluded.includes(String(entry.id)))
+      .sort((left, right) => Number(right.detailed) - Number(left.detailed) ||
+        Number(left.distance ?? Infinity) - Number(right.distance ?? Infinity));
     return targetId
       ? candidates.find((entry) => String(entry.id) === String(targetId)) || null
       : candidates[0] || null;
-  }, preferredId);
+  }, { targetId: preferredId, excluded: excludedIds });
   let witness = await selectWitness();
   assert.ok(witness, 'The loaded Baltimore world did not publish a simulated pedestrian witness.');
-  const witnessId = String(witness.id || '');
-  const deadline = Date.now() + 40_000;
+  let witnessId = String(witness.id || '');
+  const excludedWitnessIds = new Set();
+  const deadline = Date.now() + 70_000;
   let approach = null;
+  const trace = [];
   while (Date.now() < deadline) {
     witness = await selectWitness(witnessId);
-    assert.ok(witness, 'The selected simulated pedestrian disappeared from both LOD representations.');
+    if (!witness) {
+      excludedWitnessIds.add(witnessId);
+      witness = await selectWitness('', [...excludedWitnessIds]);
+      assert.ok(witness, 'Every published simulated pedestrian disappeared before interaction.');
+      witnessId = String(witness.id || '');
+    }
     const actor = await actorState(page, witness);
     if (actor.distance <= stopDistance) return { witness, approach: { ...approach, reached: true, final: actor } };
-    approach = await walkTo(page, witness, { stopDistance, maxSteps: 35, stagnantLimit: 24 });
+    approach = await walkTo(page, witness, {
+      stopDistance,
+      maxSteps: 90,
+      stagnantLimit: 18,
+      detour: true
+    });
     if (approach.reached) return { witness: await selectWitness(witnessId), approach };
+    trace.push({ witnessId, detailed: witness.detailed, actor, approach });
+    if (!approach.blocked) continue;
+    excludedWitnessIds.add(witnessId);
+    const replacement = await selectWitness('', [...excludedWitnessIds]);
+    if (replacement) {
+      witness = replacement;
+      witnessId = String(replacement.id || '');
+    }
   }
-  assert.fail('Normal walking input could not follow a simulated pedestrian witness.');
+  assert.fail(`Normal walking input could not reach a simulated pedestrian witness: ${JSON.stringify(trace.slice(-4))}`);
 }
 
 async function triggerWitnessedWeaponResponse(page) {
-  const witnessApproach = await walkNearAmbientWitness(page);
+  // A sidearm discharge is audible within 34 m. This journey verifies that
+  // witness rule; unlike melee, it must not require face-to-face contact.
+  const witnessApproach = await walkNearAmbientWitness(page, 24);
   await equip(page, 'pulse-sidearm');
-  await turnToward(page, {
-    x: witnessApproach.witness.x + Math.sin(Number(witnessApproach.witness.yaw || 0)) * 20,
-    z: witnessApproach.witness.z + Math.cos(Number(witnessApproach.witness.yaw || 0)) * 20
+  const actor = await actorState(page);
+  const awayX = actor.x - Number(witnessApproach.witness.x);
+  const awayZ = actor.z - Number(witnessApproach.witness.z);
+  const awayLength = Math.max(.001, Math.hypot(awayX, awayZ));
+  await turnCameraToward(page, {
+    x: actor.x + awayX / awayLength * 20,
+    z: actor.z + awayZ / awayLength * 20
   });
   const projectile = await useProjectile(page, 'pulse-sidearm');
   await page.waitForFunction(() => {
@@ -264,7 +341,7 @@ async function chaseOfficerUntilCustody(page, timeoutMs = 35_000) {
     const actor = state.activeActor?.position || {};
     const officer = officers.sort((a, b) =>
       Math.hypot(a.x - actor.x, a.z - actor.z) - Math.hypot(b.x - actor.x, b.z - actor.z))[0];
-    await walkTo(page, officer, { stopDistance: 1.35, maxSteps: 30, stagnantLimit: 20 });
+    await walkTo(page, officer, { stopDistance: 1.35, maxSteps: 60, stagnantLimit: 16, detour: true });
     await page.waitForTimeout(120);
   }
   return diagnostics(page);
@@ -283,7 +360,7 @@ async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
       await page.waitForTimeout(200);
       continue;
     }
-    await walkTo(page, responder, { stopDistance: 9, maxSteps: 35, stagnantLimit: 20 });
+    await walkTo(page, responder, { stopDistance: 9, maxSteps: 60, stagnantLimit: 16, detour: true });
     await page.waitForTimeout(120);
   }
   return diagnostics(page);
@@ -291,7 +368,7 @@ async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
 
 async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
   const deadline = Date.now() + timeoutMs;
-  let orbitDirection = 1;
+  const trace = [];
   while (Date.now() < deadline) {
     const state = await diagnostics(page);
     const custodyType = state.urbanSandbox?.custody?.type || '';
@@ -309,14 +386,35 @@ async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
     const dz = Number(actor.z) - Number(officer.z);
     const distance = Math.hypot(dx, dz);
     const radialYaw = Math.atan2(dx, dz);
-    const movementYaw = distance < 7 ? radialYaw : distance > 25 ? radialYaw + Math.PI : radialYaw + orbitDirection * Math.PI * .5;
-    const target = { x: Number(actor.x) + Math.sin(movementYaw) * 12, z: Number(actor.z) + Math.cos(movementYaw) * 12 };
-    await turnToward(page, target, .18, 35);
-    await inputStep(page, 'ArrowUp', 85);
-    await page.waitForTimeout(70);
-    if (distance < 5 || distance > 29) orbitDirection *= -1;
+    trace.push({
+      distance: Number(distance.toFixed(2)),
+      shotsFired: Number(officer.shotsFired || 0),
+      playerCondition: Number(state.urbanSandbox?.playerCondition ?? 1)
+    });
+    if (distance < 9) {
+      const retreat = {
+        x: Number(actor.x) + Math.sin(radialYaw) * 14,
+        z: Number(actor.z) + Math.cos(radialYaw) * 14
+      };
+      await turnToward(page, retreat, .18, 45);
+      await inputStep(page, 'ArrowUp', 520);
+    } else if (distance > 20) {
+      const approach = {
+        x: Number(actor.x) - Math.sin(radialYaw) * 14,
+        z: Number(actor.z) - Math.cos(radialYaw) * 14
+      };
+      await turnToward(page, approach, .18, 45);
+      await inputStep(page, 'ArrowUp', 260);
+    } else {
+      // Hold briefly in the officer's real firing lane so the projectile path
+      // can resolve, then retreat before contact can become an arrest.
+      await page.evaluate(() => globalThis.advanceTime?.(420));
+    }
+    await page.waitForTimeout(45);
   }
-  return diagnostics(page);
+  const final = await diagnostics(page);
+  final.__medicalTrace = trace.slice(-16);
+  return final;
 }
 
 async function continueFromCustody(page) {
@@ -487,6 +585,17 @@ async function runMedicalRecoveryJourney() {
     const before = await meetResponderUntilOfficer(page, 50_000);
     assert.ok(before.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer), 'Normal walking input could not meet the medical recovery responder.');
     const custody = await evadeOfficerUntilHospital(page);
+    if (custody.urbanSandbox?.custody?.type !== 'hospital') {
+      console.error('CP5 medical contact evidence', JSON.stringify({
+        activeActor: custody.activeActor,
+        civicResponse: custody.urbanSandbox?.civicResponse,
+        responders: custody.urbanSandbox?.responders,
+        custody: custody.urbanSandbox?.custody,
+        playerCondition: custody.urbanSandbox?.playerCondition,
+        projectileRuntime: custody.urbanSandbox?.projectileRuntime,
+        trace: custody.__medicalTrace
+      }, null, 2));
+    }
     assert.equal(custody.urbanSandbox?.custody?.type, 'hospital', 'Normal movement and responder impacts did not resolve to mapped hospital recovery.');
     const recovered = await continueFromCustody(page);
     return { witnessedResponse, before, custody, recovered };
@@ -497,9 +606,76 @@ async function runMedicalRecoveryJourney() {
 
 let report;
 try {
+  if (requestedScope === 'arrest') {
+    console.log('[urban-sandbox] START arrest recovery');
+    const arrest = await runArrestRecoveryJourney();
+    const facility = arrest.custody.urbanSandbox.custody?.facility || {};
+    const checks = {
+      responderArrivesFromWitnessedCivicLevel:
+        Number(arrest.witnessedResponse.state.urbanSandbox.civicResponse?.level || 0) >= 2 &&
+        Number(arrest.responderArrived.urbanSandbox.responders?.activeCount || 0) > 0,
+      arrestUsesMappedPoliceFacility:
+        arrest.custody.urbanSandbox.custody?.type === 'police' && facility.provenance === 'loaded-map-poi',
+      recoveryRestoresWalking:
+        !arrest.recovered.urbanSandbox.custody && arrest.recovered.activeActor?.mode === 'walk' &&
+        arrest.recovered.urbanSandbox.playerCondition === 1,
+      noBrowserErrors: browserErrors.length === 0,
+      noFailedLocalResources: localFailures.length === 0
+    };
+    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-arrest-scope-v1', servedRoot, checks, browserErrors, localFailures };
+    console.log('[urban-sandbox] PASS arrest recovery');
+  } else if (requestedScope === 'medical') {
+    console.log('[urban-sandbox] START medical recovery');
+    const medical = await runMedicalRecoveryJourney();
+    const facility = medical.custody.urbanSandbox.custody?.facility || {};
+    const civic = medical.witnessedResponse.state.urbanSandbox.civicResponse || {};
+    const checks = {
+      reticleDirectedDischargeIsWitnessed: Number(civic.level || 0) >= 2 && Number(civic.lastEvent?.witnessCount || 0) > 0,
+      responderReachesPlayer: medical.before.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer) === true,
+      incapacitationUsesMappedHospital:
+        medical.custody.urbanSandbox.custody?.type === 'hospital' && facility.provenance === 'loaded-map-poi',
+      recoveryRestoresWalking:
+        !medical.recovered.urbanSandbox.custody && medical.recovered.activeActor?.mode === 'walk' &&
+        medical.recovered.urbanSandbox.playerCondition === 1,
+      noBrowserErrors: browserErrors.length === 0,
+      noFailedLocalResources: localFailures.length === 0
+    };
+    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-medical-scope-v1', servedRoot, checks, browserErrors, localFailures };
+    console.log('[urban-sandbox] PASS medical recovery');
+  } else if (requestedScope === 'vehicle') {
+    console.log('[urban-sandbox] START vehicle and equipment');
+    const primary = await runVehicleEquipmentJourney();
+    const vehicleAfterExit = primary.exited.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id);
+    const checks = {
+      oneVehicleIdentityAcrossDoorDriveExit:
+        primary.entered.urbanSandbox.activeVehicleId === primary.vehicle.id &&
+        primary.entered.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id).length === 1 &&
+        vehicleAfterExit.length === 1 && vehicleAfterExit[0].attachedToPlayer === false,
+      realDrivingMovesClaimedVehicle: primary.drivenMeters > 1,
+      segmentCollisionContainsPlayer: primary.collisionProbe.reached === false,
+      handsAndStaffAffectSameVehicle:
+        primary.equipmentResults.hands.after < primary.equipmentResults.hands.before &&
+        primary.equipmentResults.baton.after < primary.equipmentResults.baton.before,
+      ammunitionAndQuantitiesChangeExactlyOnce:
+        ['pulse-sidearm', 'laser-gun', 'paintball-gun'].every((id) => {
+          const result = primary.equipmentResults[id];
+          return Number(result.after?.magazine) === Number(result.before?.magazine) - 1 && Number(result.after?.reserve) === Number(result.before?.reserve);
+        }) && Number(primary.equipmentResults['concussion-charge'].after?.quantity) === Number(primary.equipmentResults['concussion-charge'].before?.quantity) - 1,
+      noBrowserErrors: browserErrors.length === 0,
+      noFailedLocalResources: localFailures.length === 0
+    };
+    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, browserErrors, localFailures };
+    console.log('[urban-sandbox] PASS vehicle and equipment');
+  } else {
+  console.log('[urban-sandbox] START arrest recovery');
   const arrest = await runArrestRecoveryJourney();
+  console.log('[urban-sandbox] PASS arrest recovery');
+  console.log('[urban-sandbox] START medical recovery');
   const medical = await runMedicalRecoveryJourney();
+  console.log('[urban-sandbox] PASS medical recovery');
+  console.log('[urban-sandbox] START vehicle and equipment');
   const primary = await runVehicleEquipmentJourney();
+  console.log('[urban-sandbox] PASS vehicle and equipment');
   const vehicleAfterExit = primary.exited.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id);
   const custodyFacility = arrest.custody.urbanSandbox.custody?.facility || {};
   const medicalFacility = medical.custody.urbanSandbox.custody?.facility || {};
@@ -560,10 +736,11 @@ try {
     browserErrors,
     localFailures
   };
+  }
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
-  assert.equal(report.ok, true, 'Urban Sandbox normal-input journey failed.');
+  assert.equal(report.ok, true, `Urban Sandbox ${requestedScope} normal-input journey failed.`);
 } finally {
   await browser.close();
   await server.close();

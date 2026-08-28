@@ -25,7 +25,7 @@ const INDOOR_OVERLAY_PRESETS = Object.freeze([
       description: 'Use for room shells inside a building when you need indoor-ready geometry and semantics.',
       whenToUse: [
         'You are preparing multi-level indoor geometry for a building shell.',
-        'The room footprint matters for future interior navigation or rendering.'
+        'The room footprint matters for indoor navigation or rendering.'
       ],
       doNotUse: [
         'Outdoor building footprints.',
@@ -35,7 +35,7 @@ const INDOOR_OVERLAY_PRESETS = Object.freeze([
         'Skipping the level or building reference.',
         'Using the room preset for whole-floor circulation.'
       ],
-      moderationNotes: 'Indoor room work is still scaffolded. Keep geometry disciplined and level-aware.',
+      moderationNotes: 'Keep room geometry clean, level-aware, and linked to its building.',
       relatedPresetIds: ['corridor', 'stairs', 'elevator', 'building']
     }
   },
@@ -60,9 +60,9 @@ const INDOOR_OVERLAY_PRESETS = Object.freeze([
     validationRules: ['feature.levelRequired'],
     search: ['corridor', 'hall', 'hallway', 'indoor'],
     help: {
-      description: 'Use for indoor circulation paths while the dedicated interior editor is still scaffolded.',
+      description: 'Use for hallways, concourses, and other indoor circulation paths.',
       whenToUse: [
-        'You need a circulation centerline for indoor traversal scaffolding.',
+        'You need a circulation centerline for indoor navigation.',
         'A hallway or concourse path should be represented without room polygons.'
       ],
       doNotUse: [
@@ -98,10 +98,10 @@ const INDOOR_OVERLAY_PRESETS = Object.freeze([
     validationRules: ['feature.levelRequired', 'feature.connectorLevelsRecommended'],
     search: ['stairs', 'steps', 'staircase', 'indoor'],
     help: {
-      description: 'Use for level-connecting stair geometry as indoor connector scaffold data.',
+      description: 'Use for stairs that connect levels inside a building.',
       whenToUse: [
         'You need to indicate how levels connect inside a building.',
-        'A future indoor route should know where stairs are.'
+        'An indoor route should know where the stairs begin and end.'
       ],
       doNotUse: [
         'Generic entrances.',
@@ -111,7 +111,7 @@ const INDOOR_OVERLAY_PRESETS = Object.freeze([
         'Not listing served levels when they are known.',
         'Leaving the connector unrelated to a building shell.'
       ],
-      moderationNotes: 'Indoor connectors are scaffold data in this pass. Served levels make review much easier.',
+      moderationNotes: 'List every served level and keep the stairs linked to their building.',
       relatedPresetIds: ['elevator', 'corridor']
     }
   },
@@ -136,10 +136,10 @@ const INDOOR_OVERLAY_PRESETS = Object.freeze([
     validationRules: ['feature.levelRequired', 'feature.connectorLevelsRecommended'],
     search: ['elevator', 'lift', 'indoor'],
     help: {
-      description: 'Use for indoor elevator anchors and served-level scaffolding.',
+      description: 'Use for elevator locations and the levels they serve.',
       whenToUse: [
-        'You need a level connector point for accessibility or future indoor traversal.',
-        'An elevator location should be recorded before the full interior editor ships.'
+        'You need an accessible connection between building levels.',
+        'An elevator location and its served floors should be recorded.'
       ],
       doNotUse: [
         'Outdoor markers with no building context.',
