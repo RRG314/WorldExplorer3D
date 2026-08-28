@@ -672,6 +672,10 @@ try {
         primary.entered.urbanSandbox.activeVehicleId === primary.vehicle.id &&
         primary.entered.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id).length === 1 &&
         vehicleAfterExit.length === 1 && vehicleAfterExit[0].attachedToPlayer === false,
+      visualDoorAndActorTransition:
+        Math.abs(primary.entering.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
+        Math.abs(primary.exiting.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
+        primary.entered.activeActor?.mode === 'drive' && primary.exited.activeActor?.mode === 'walk',
       realDrivingMovesClaimedVehicle: primary.drivenMeters > 1,
       segmentCollisionContainsPlayer: primary.collisionProbe.reached === false,
       handsAndStaffAffectSameVehicle:
@@ -682,6 +686,11 @@ try {
           const result = primary.equipmentResults[id];
           return Number(result.after?.magazine) === Number(result.before?.magazine) - 1 && Number(result.after?.reserve) === Number(result.before?.reserve);
         }) && Number(primary.equipmentResults['concussion-charge'].after?.quantity) === Number(primary.equipmentResults['concussion-charge'].before?.quantity) - 1,
+      flashlightUsesSharedBackpack: primary.equipmentResults.flashlight && primary.parachuteBefore.deployed === false,
+      projectilesResolveThroughOneRuntime:
+        ['pulse-sidearm', 'laser-gun', 'paintball-gun'].every((id) => primary.equipmentResults[id].state.urbanSandbox.projectileRuntime?.lastProjectileAction?.equipmentId === id),
+      groundParachuteFailsSafely:
+        primary.parachuteBefore.deployed === false && primary.parachuteGroundRecovery.deployed === false,
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
