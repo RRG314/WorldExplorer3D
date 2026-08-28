@@ -37,6 +37,7 @@ import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 import { SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
 import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
+import { companionHandlingTuning, wildlifeObservationTuning } from '../character/wildlife-assistance.js?v=1';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
   'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
@@ -1732,8 +1733,9 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           startedAt: performance.now(), startPosition: { x: startPosition.x, z: startPosition.z }, completing: false
         };
         state.wildlifeRuntime?.interact?.(actorId, 'wait');
-        appCtx.showToast?.('Stay still for a moment.');
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const handling = companionHandlingTuning(state.resolveCharacterCapability('companion-handling'));
+        appCtx.showToast?.('Stay still and let it choose the distance.');
+        await new Promise((resolve) => setTimeout(resolve, handling.calmWaitMs));
         state.companionExercise = null;
         if (state.disposed) return false;
         await state.saveCompanionEncounter({
@@ -2082,10 +2084,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     priority: 81,
     evaluate: () => {
       if (state.disposed || state.ui?.open || appCtx.Walk?.state?.mode !== 'walk' || appCtx.getEnv?.() !== 'EARTH') return null;
-      const nearby = state.wildlifeRuntime?.nearest?.(playerPosition(appCtx), 12);
+      const observation = wildlifeObservationTuning(state.resolveCharacterCapability('wildlife-observation'));
+      const handling = companionHandlingTuning(state.resolveCharacterCapability('companion-handling'));
+      const nearby = state.wildlifeRuntime?.nearest?.(playerPosition(appCtx), observation.observationRadiusMeters);
       if (!nearby) return null;
       const actor = nearby.actor;
-      if (actor.companionPolicy === 'trust-sequence-required' && nearby.distance > 5.2) return null;
+      if (actor.companionPolicy === 'trust-sequence-required' && nearby.distance > handling.trustRadiusMeters) return null;
       const companionCatalogId = actor.companionPolicy === 'trust-sequence-required'
         ? actor.speciesId
         : WILDLIFE_COMPANION_CATALOG[actor.speciesId];
@@ -2102,8 +2106,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         action: actor.companionPolicy === 'trust-sequence-required' ? 'build_animal_trust' : 'observe_wildlife',
         label,
         detail: actor.companionPolicy === 'trust-sequence-required'
-          ? `${actor.label} · ${encounter.trustState || 'Wary'}`
-          : `${actor.label} · game encounter`,
+          ? `${actor.label} · ${encounter.trustState || 'Wary'} · ${handling.cueLabel}`
+          : `${actor.label} · ${observation.cueLabel}`,
         distance: nearby.distance,
         data: {
           actorId: actor.id,

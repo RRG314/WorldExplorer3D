@@ -8,6 +8,7 @@ import {
   rankForXp
 } from '../app/js/character/catalog.js';
 import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
+import { companionHandlingTuning, wildlifeObservationTuning } from '../app/js/character/wildlife-assistance.js';
 import { createCharacter, createDefaultCharacterState, validateCreationAttributes } from '../app/js/character/model.js';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../app/js/character/progression.js';
 import { createDetectorSession } from '../app/js/discovery/detector-session.js';
@@ -138,6 +139,29 @@ test('starting geology experience affects detector play before the first rank th
   assert.equal(generalSession.update({ x: 0, z: 0 }).phase, 'sweeping');
   assert.equal(prospectorSession.update({ x: 0, z: 0 }).phase, 'signal');
   assert.equal(prospectorSession.snapshot().characterAssistance.focusRadiusMeters > generalSession.snapshot().characterAssistance.focusRadiusMeters, true);
+});
+
+test('wildlife and companion experience improve cues without skipping the trust sequence', () => {
+  const general = createCharacter({ backgroundId: 'general-explorer', now: 1 });
+  const naturalist = createCharacter({ backgroundId: 'field-naturalist', traits: ['patient-observer'], now: 1 });
+  const generalObservation = wildlifeObservationTuning(resolveCharacterCapability(general, 'wildlife-observation'));
+  const naturalistObservation = wildlifeObservationTuning(resolveCharacterCapability(naturalist, 'wildlife-observation'));
+  assert.equal(naturalistObservation.observationRadiusMeters > generalObservation.observationRadiusMeters, true);
+
+  const practiced = projectCharacterProgress(general, event({
+    eventId: 'event:companion:befriended',
+    eventType: 'companion-befriended',
+    activityId: 'companion-befriended',
+    catalogId: 'trail-hound',
+    family: 'companion'
+  })).character;
+  const startingHandling = companionHandlingTuning(resolveCharacterCapability(general, 'companion-handling'));
+  const practicedHandling = companionHandlingTuning(resolveCharacterCapability(practiced, 'companion-handling'));
+  assert.equal(practicedHandling.trustRadiusMeters > startingHandling.trustRadiusMeters, true);
+  assert.equal(practicedHandling.calmWaitMs < startingHandling.calmWaitMs, true);
+  assert.equal(practicedHandling.trustRadiusMeters <= 6.5, true);
+  assert.equal(practicedHandling.calmWaitMs >= 2400, true);
+  assert.doesNotMatch(`${practicedHandling.cueLabel} ${naturalistObservation.cueLabel}`, /procedural|encounter/i);
 });
 
 test('advanced requirements explain equipment and qualification while basic play remains open', () => {
