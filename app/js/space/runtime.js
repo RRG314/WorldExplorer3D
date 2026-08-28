@@ -420,6 +420,25 @@ export function updateSpaceFlightPhysics() {
     timeScale: appCtx.spaceFlight.timeScale || 1
   }) === true;
   if (siRuntimeActive) {
+    const environment = appCtx.spaceFlightEnvironment;
+    const atmosphericFlight = environment?.pressurePa > 0.5 &&
+      ['approach', 'descent', 'home_approach', 'home_descent'].includes(appCtx.spaceJourney?.phase);
+    if (atmosphericFlight && appCtx.spaceFlight.scene) {
+      const fogColors = { earth: 0x6f9fc4, mars: 0xb06a4e, venus: 0xc89155 };
+      const fogColor = fogColors[environment.bodyId] || 0x8799aa;
+      const pressureRatio = Math.max(0, Math.min(1, environment.pressurePa / (
+        environment.bodyId === 'mars' ? 610 : environment.bodyId === 'venus' ? 9_200_000 : 101_325
+      )));
+      if (!appCtx.spaceFlight._journeyFogActive) {
+        appCtx.spaceFlight.scene.fog = new THREE.FogExp2(fogColor, 0.0004);
+        appCtx.spaceFlight._journeyFogActive = true;
+      }
+      appCtx.spaceFlight.scene.fog.color.setHex(fogColor);
+      appCtx.spaceFlight.scene.fog.density = 0.00035 + pressureRatio * 0.0024;
+    } else if (appCtx.spaceFlight._journeyFogActive && appCtx.spaceFlight.scene) {
+      appCtx.spaceFlight.scene.fog = null;
+      appCtx.spaceFlight._journeyFogActive = false;
+    }
     const glow = rocket.getObjectByName('engineGlow');
     const exhaust = rocket.getObjectByName('exhaust');
     const thrustLevel = appCtx.spaceFlight._isThrusting ? 1 : 0.16;

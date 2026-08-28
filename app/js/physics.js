@@ -22,6 +22,7 @@ import {
   mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=2";
 import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=5";
+import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=1';
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -53,9 +54,11 @@ function getPlanetarySurfaceMesh() {
 }
 
 function getPlanetaryGravity() {
-  if (appCtx.onMars) return -3.71;
-  if (appCtx.onMoon) return -1.62;
-  return -9.80665;
+  const bodyId = appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : 'earth';
+  return -samplePhysicalEnvironment(bodyId, {
+    heightM: 0,
+    timestampS: Number(appCtx.astronomicalSkyState?.timestampMs || Date.now()) / 1000
+  }).gravityMagnitudeMps2;
 }
 function _getPhysRaycaster() {
   if (!_physRaycaster && typeof THREE !== 'undefined') {

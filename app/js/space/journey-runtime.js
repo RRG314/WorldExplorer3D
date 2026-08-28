@@ -22,6 +22,7 @@ import {
   createAssistedDescentPlan,
   createAssistedTransferPlan
 } from './assisted-guidance.js?v=1';
+import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=1';
 
 const FAST_TRAVEL_DELTA_V_MPS = Object.freeze({
   'earth:moon': 3_200,
@@ -315,6 +316,31 @@ function installSpaceJourneyRuntime(appContext) {
     return engageRenderedJourneyAssist();
   };
 
+  const retargetRenderedSpaceJourney = (destinationInput) => {
+    if (!rendered || rendered.journey.phase !== JOURNEY_PHASE.PARKING_ORBIT || rendered.assistedPlan) {
+      return Object.freeze({ accepted: false, reason: 'destination-change-requires-parking-orbit' });
+    }
+    const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
+    if (!destinationBodyId || destinationBodyId === rendered.ephemeris.source.bodyId) {
+      return Object.freeze({ accepted: false, reason: 'invalid-space-destination' });
+    }
+    const sourceBodyId = rendered.ephemeris.source.bodyId;
+    const mode = rendered.journey.mode;
+    if (!beginRenderedSpaceJourney({ sourceBodyId, destinationBodyId, mode })) {
+      return Object.freeze({ accepted: false, reason: 'destination-scene-unavailable' });
+    }
+    const body = getAstronomicalBody(destinationBodyId);
+    appContext.spaceFlight.destination = destinationBodyId;
+    appContext.spaceFlight.mode = 'flying';
+    appContext.spaceFlight._lastFrameMs = 0;
+    appContext.spaceFlight._manualLandingTarget = body?.name || destinationBodyId;
+    const destinationElement = globalThis.document?.getElementById?.('sfDestination');
+    const landingButton = globalThis.document?.getElementById?.('sfLandBtn');
+    if (destinationElement) destinationElement.textContent = body?.name || destinationBodyId;
+    if (landingButton) landingButton.textContent = `LAND ON ${(body?.name || destinationBodyId).toUpperCase()}`;
+    return Object.freeze({ accepted: true, reason: null, destinationBodyId });
+  };
+
   const updateRenderedJourneyPhase = (atMs) => {
     if (!rendered) return;
     const sourceNavigation = computeBodyRelativeNavigation(rendered.spacecraft, rendered.ephemeris.source);
@@ -338,6 +364,23 @@ function installSpaceJourneyRuntime(appContext) {
         navigation: destinationNavigation
       });
     }
+  };
+
+  const publishRenderedEnvironment = () => {
+    if (!rendered) return;
+    const samples = [rendered.ephemeris.source, rendered.ephemeris.destination].map((bodyState) => ({
+      bodyState,
+      navigation: computeBodyRelativeNavigation(rendered.spacecraft, bodyState)
+    })).sort((a, b) => a.navigation.altitudeM - b.navigation.altitudeM);
+    const nearest = samples[0];
+    if (!nearest || nearest.navigation.altitudeM > 500_000) {
+      appContext.spaceFlightEnvironment = null;
+      return;
+    }
+    appContext.spaceFlightEnvironment = samplePhysicalEnvironment(nearest.bodyState.bodyId, {
+      heightM: Math.max(0, nearest.navigation.altitudeM),
+      timestampS: rendered.spacecraft.epochMs / 1000
+    });
   };
 
   const updateDescentGuidance = () => {
@@ -488,6 +531,7 @@ function installSpaceJourneyRuntime(appContext) {
     );
     appContext.spacecraftState = rendered.spacecraft;
     appContext.spaceJourney = rendered.journey;
+    publishRenderedEnvironment();
     appContext.spaceFlight._isThrusting = Number(options.throttle) > 0 || braking;
     if (rendered.assistedPlan) publishAssistState();
     return true;
@@ -524,6 +568,7 @@ function installSpaceJourneyRuntime(appContext) {
 
   const clearRenderedSpaceJourney = () => {
     rendered = null;
+    appContext.spaceFlightEnvironment = null;
     publishAssistState();
   };
 
@@ -567,6 +612,7 @@ function installSpaceJourneyRuntime(appContext) {
     clearRenderedSpaceJourney,
     completeFastTravelEvidence,
     engageRenderedJourneyAssist,
+    retargetRenderedSpaceJourney,
     requestRenderedJourneyLanding,
     startFastTravelJourney,
     toggleRenderedJourneyAssist,
@@ -577,6 +623,7 @@ function installSpaceJourneyRuntime(appContext) {
     cancelSpaceJourneyOperation,
     clearRenderedSpaceJourney,
     engageRenderedJourneyAssist,
+    retargetRenderedSpaceJourney,
     requestRenderedJourneyLanding,
     startFastTravelJourney,
     toggleRenderedJourneyAssist,

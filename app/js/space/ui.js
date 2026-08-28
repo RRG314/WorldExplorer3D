@@ -67,6 +67,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
     <div style="margin-bottom:6px;"><span id="sfAltitudeLabel">Altitude</span>: <span id="sfAltitude">0</span> <span id="sfAltitudeUnit">km</span></div>
     <div style="margin-bottom:6px;"><span id="sfSpeedLabel">Velocity</span>: <span id="sfSpeed">0</span> <span id="sfSpeedUnit">km/s</span></div>
     <div style="margin-bottom:12px;"><span id="sfDistanceLabel">Distance</span>: <span id="sfDistance" style="color:#fbbf24;">---</span> <span id="sfDistanceUnit">km</span></div>
+    <div id="sfEnvironment" style="margin:-4px 0 12px;color:#cbd5e1;font-size:10px;line-height:1.45;">Deep space</div>
     <div style="background:rgba(102,126,234,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
       <div id="sfZoneLabel" style="font-size:11px;opacity:0.8;margin-bottom:6px;">LANDING ZONE</div>
       <div style="height:8px;background:rgba(0,0,0,0.3);border-radius:4px;overflow:hidden;">
@@ -223,6 +224,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const zoneLabel = document.getElementById('sfZoneLabel');
   const flightStatus = document.getElementById('sfFlightStatus');
   const assistBtn = document.getElementById('sfAssistBtn');
+  const environmentText = document.getElementById('sfEnvironment');
   const destinationName = appCtx.spaceJourneyEphemeris?.destination?.bodyId || appCtx.spaceFlight.destination || 'destination';
   const departureName = appCtx.spaceJourneyEphemeris?.source?.bodyId || appCtx.spaceJourney?.sourceBodyId || 'departure point';
   const phaseCopy = {
@@ -255,6 +257,19 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
         ? `ASSISTED TAKEOFF · ${Math.round((assist.progress || 0) * 100)}%`
         : `TAKE MANUAL CONTROL · ${Math.round((assist.progress || 0) * 100)}%`
       : `FLY TO ${String(destinationName).toUpperCase()} WITH ASSIST`;
+  }
+  if (environmentText) {
+    const environment = appCtx.spaceFlightEnvironment;
+    if (!environment) {
+      environmentText.textContent = 'Deep space';
+    } else if (environment.pressurePa > 0.5) {
+      const pressure = environment.pressurePa >= 1000
+        ? `${(environment.pressurePa / 1000).toFixed(1)} kPa`
+        : `${Math.round(environment.pressurePa)} Pa`;
+      environmentText.textContent = `${environment.bodyId[0].toUpperCase()}${environment.bodyId.slice(1)} atmosphere · ${pressure} · ${Math.round(environment.temperatureK - 273.15)}°C`;
+    } else {
+      environmentText.textContent = `${environment.bodyId[0].toUpperCase()}${environment.bodyId.slice(1)} vacuum · ${environment.gravityMagnitudeMps2.toFixed(2)} m/s²`;
+    }
   }
 
   if (universeTarget?.navigation) {

@@ -157,6 +157,8 @@ function startSpaceFlightToMoon() {
 function startSpaceFlightToEarth() {
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'earth';
   console.log("Starting space flight to Earth...");
+  const sourceBodyId = appCtx.onMars ? 'mars' : 'moon';
+  const sourceLabel = sourceBodyId === 'mars' ? 'Mars' : 'Moon';
   const sessionId = beginSpaceFlightSession();
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_earth' });
 
@@ -168,7 +170,7 @@ function startSpaceFlightToEarth() {
   appCtx.spaceFlight.destination = 'earth';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
-  appCtx.spaceFlight._launchSource = 'Moon';
+  appCtx.spaceFlight._launchSource = sourceLabel;
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
   if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
@@ -184,13 +186,15 @@ function startSpaceFlightToEarth() {
 
   hideGameUI();
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) {
-    createSpaceFlightScene({ includeExtendedSpace: false });
+    createSpaceFlightScene({ includeExtendedSpace: sourceBodyId === 'mars' });
   }
+  if (sourceBodyId === 'mars') ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
+  appCtx.spaceFlight._launchSource = sourceLabel;
   appCtx.beginRenderedSpaceJourney?.({
-    sourceBodyId: 'moon',
+    sourceBodyId,
     destinationBodyId: 'earth',
     mode: 'assisted',
     resumeJourney: true

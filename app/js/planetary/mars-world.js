@@ -342,6 +342,13 @@ async function arriveAtMars(expectedSessionId = null) {
 
 async function directTravelToMars() {
   if (appCtx.onMars) return true;
+  if (typeof appCtx.startFastTravelJourney === 'function') {
+    return appCtx.startFastTravelJourney('mars', {
+      sourceBodyId: 'earth',
+      arrive: arriveAtMars,
+      transitionDurationMs: 900
+    });
+  }
   const sessionId = ++marsTransitionSessionId;
   appCtx.prepareEarthDepartureForMars?.();
   await appCtx.showTransitionLoad?.('mars', 900);
@@ -351,6 +358,11 @@ async function directTravelToMars() {
 
 async function returnFromMars() {
   if (!appCtx.onMars || appCtx.travelingToMoon) return;
+  if (typeof appCtx.startSpaceFlightToEarth === 'function') {
+    const button = document.getElementById('marsReturnEarthBtn');
+    if (button) button.style.display = 'none';
+    return appCtx.startSpaceFlightToEarth();
+  }
   const sessionId = ++marsTransitionSessionId;
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);

@@ -213,6 +213,10 @@ function handleSpaceReturnAction(ctx) {
 
 function handleMoonLandingAction(ctx) {
   if (ctx.appCtx.spaceFlight && ctx.appCtx.spaceFlight.active) {
+    if (ctx.appCtx.spaceJourney?.phase === 'parking_orbit') {
+      const retargeted = ctx.appCtx.retargetRenderedSpaceJourney?.('moon');
+      if (retargeted?.accepted) return;
+    }
     if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
       const forced = ctx.appCtx.forceSpaceFlightLanding('Moon');
       if (forced) return;
@@ -237,6 +241,10 @@ function handleMoonLandingAction(ctx) {
 function handleMarsLandingAction(ctx) {
   if (ctx.appCtx.onMars) return;
   if (ctx.appCtx.spaceFlight?.active) {
+    if (ctx.appCtx.spaceJourney?.phase === 'parking_orbit') {
+      const retargeted = ctx.appCtx.retargetRenderedSpaceJourney?.('mars');
+      if (retargeted?.accepted) return;
+    }
     if (ctx.appCtx.forceSpaceFlightLanding?.('Mars')) return;
     if (ctx.appCtx.setSpaceFlightLandingTarget?.('Mars', { force: true, autoLand: true })) return;
     ctx.appCtx.spaceFlight.destination = 'mars';
