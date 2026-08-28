@@ -440,3 +440,67 @@ test('Mars second slice uses the same journey, atmospheric authority, surface, a
   assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.COMPLETE);
   assert.equal(appContext.spaceJourney.journeyId, journeyId);
 });
+
+test('featured nested moons and small bodies use resolved scene positions and complete a return journey', async () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+
+  for (const destination of [
+    { id: 'europa', name: 'Europa', local: position(2, 0, 0), world: position(310, 46, -34), radius: 11 },
+    { id: 'vesta', name: 'Vesta', local: position(-3, 1, 0), world: position(245, -28, 62), radius: 6 }
+  ]) {
+    let landingCompletions = 0;
+    const destinationMesh = { position: destination.local };
+    const appContext = {
+      completeSpaceFlightJourneyLanding() { landingCompletions += 1; },
+      getAllSpaceBodies() {
+        return [{
+          name: destination.name,
+          mesh: destinationMesh,
+          position: destination.world,
+          radius: destination.radius,
+          landable: true
+        }];
+      },
+      spaceFlight: {
+        earth: { position: position(0, 0, 0) },
+        moon: { position: position(120, 20, 0) },
+        rocket: { position: position(58, 0, 0) },
+        velocity: position(0, 0, 0),
+        speed: 0,
+        mode: 'flying'
+      }
+    };
+    const runtime = installSpaceJourneyRuntime(appContext);
+    assert.equal(runtime.beginRenderedSpaceJourney({
+      sourceBodyId: 'earth', destinationBodyId: destination.id, mode: JOURNEY_MODE.ASSISTED
+    }), true);
+    const magnitude = Math.hypot(destination.world.x, destination.world.y, destination.world.z);
+    assert.ok(Math.abs(appContext.spaceJourneyEphemeris.destination.positionM.x / appContext.spaceJourneyEphemeris.separationM - destination.world.x / magnitude) < 1e-12);
+    assert.notEqual(appContext.spaceJourneyEphemeris.destination.positionM.x / appContext.spaceJourneyEphemeris.separationM, 1);
+
+    assert.equal(runtime.engageRenderedJourneyAssist().accepted, true);
+    for (let frame = 0; frame < 181; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+    assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.APPROACH);
+    assert.equal(runtime.requestRenderedJourneyLanding(destination.id).accepted, true);
+    for (let frame = 0; frame < 71; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.SURFACE);
+    const journeyId = appContext.spaceJourney.journeyId;
+
+    runtime.clearRenderedSpaceJourney();
+    assert.equal(runtime.beginRenderedSpaceJourney({
+      sourceBodyId: destination.id,
+      destinationBodyId: 'earth',
+      mode: JOURNEY_MODE.ASSISTED,
+      resumeJourney: true
+    }), true);
+    for (let frame = 0; frame < 261; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+    assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.HOME_APPROACH);
+    assert.equal(runtime.requestRenderedJourneyLanding('earth').accepted, true);
+    for (let frame = 0; frame < 71; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.COMPLETE);
+    assert.equal(appContext.spaceJourney.journeyId, journeyId);
+    assert.equal(landingCompletions, 2);
+  }
+});

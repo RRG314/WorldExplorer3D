@@ -2,7 +2,7 @@ import {
   getAstronomicalBody,
   METERS_PER_AU,
   SOLAR_SYSTEM_PLANET_IDS
-} from '../astronomy/body-catalog.js?v=1';
+} from '../astronomy/body-catalog.js?v=2';
 
 // Immutable solar-system rendering/orbit projection. Canonical body facts live
 // in astronomy/body-catalog.js; this module owns orbit approximation and visual
@@ -168,6 +168,7 @@ export const PLANET_MOONS = {
 
   Saturn: [
   { name: 'Titan', radiusScaled: 5.5, orbitRadius: 145, orbitDays: 15.95, color: 0xd8b97f },
+  { name: 'Enceladus', radiusScaled: 2.6, orbitRadius: 92, orbitDays: 1.37, color: 0xe7edf2 },
   { name: 'Rhea', radiusScaled: 3, orbitRadius: 115, orbitDays: 4.52, color: 0xc3c3c3 }],
 
   Uranus: [
@@ -241,6 +242,13 @@ export const NAMED_ASTEROIDS = [
   description: 'Fourth-largest asteroid. Nearly spherical, potentially a dwarf planet.',
   a0: 3.1421, e0: 0.1146, I0: 3.84, L0: 225.0, LP0: 312.3, LN0: 283.2,
   meanDistanceAU: 3.142, meanDistanceKM: 470000000
+},
+{
+  name: 'Pluto', type: 'Dwarf Planet', region: 'Kuiper Belt', radiusScaled: 14,
+  color: 0xc4a58f, emissive: 0x4b352b, glowColor: 0xd7b9a2,
+  description: 'A complex Kuiper Belt dwarf planet visited by New Horizons in 2015.',
+  a0: 39.482, e0: 0.2488, I0: 17.16, L0: 238.93, LP0: 224.07, LN0: 110.30,
+  meanDistanceAU: 39.482, meanDistanceKM: 5906400000
 }];
 
 

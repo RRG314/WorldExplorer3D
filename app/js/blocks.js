@@ -11,11 +11,11 @@ import {
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
 import { createBlockLocalStore } from './block-builder/local-store.js?v=3';
 import { createSharedBlockSync } from './block-builder/shared-sync.js?v=3';
-import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=1';
+import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=2';
 import {
   activePlanetaryBodyId,
   planetarySurfaceYAtRenderXZ
-} from './planetary/runtime/surface-query.js?v=1';
+} from './planetary/runtime/surface-query.js?v=2';
 import {
   planetaryBlockRenderCoordinates,
   planetaryBlockStorageCoordinates
@@ -454,7 +454,7 @@ function getSurfaceYAt(x, z) {
     const interiorY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
     if (Number.isFinite(interiorY)) return interiorY;
   }
-  if (appCtx.onMoon || appCtx.onMars) {
+  if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) {
     const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
     if (Number.isFinite(surfaceY)) return surfaceY;
     return Number.NaN;

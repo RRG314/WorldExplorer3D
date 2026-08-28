@@ -634,7 +634,6 @@ body.deflock-active .floatBtn::after {
     max-width: none !important;
   }
   body.solid-world-active #solidWorldReturnBtn {
-    top: 218px !important;
     right: 12px !important;
     min-height: 44px;
   }

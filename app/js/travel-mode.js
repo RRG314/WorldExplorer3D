@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
-import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=1';
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';

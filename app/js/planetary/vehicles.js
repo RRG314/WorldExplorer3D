@@ -114,6 +114,56 @@ function createVenusPressureCrawler() {
   return crawler;
 }
 
+const PLANETARY_ROVER_STYLES = Object.freeze({
+  io: Object.freeze({ name: 'Io Radiation Survey Rover', body: 0xd0a34c, accent: 0x4b4337 }),
+  europa: Object.freeze({ name: 'Europa Ice Survey Rover', body: 0xd9e2e8, accent: 0x315d78 }),
+  titan: Object.freeze({ name: 'Titan Haze Survey Rover', body: 0xc28443, accent: 0x49372b, sealed: true }),
+  enceladus: Object.freeze({ name: 'Enceladus Ice Survey Rover', body: 0xe2e8ec, accent: 0x596d7a }),
+  triton: Object.freeze({ name: 'Triton Cryogenic Survey Rover', body: 0xb7b1ad, accent: 0x4d6473 }),
+  ceres: Object.freeze({ name: 'Ceres Mineral Survey Rover', body: 0xa4a29b, accent: 0x5d5146 }),
+  vesta: Object.freeze({ name: 'Vesta Basin Survey Rover', body: 0x978b7d, accent: 0x443d38 }),
+  pluto: Object.freeze({ name: 'Pluto Ice Survey Rover', body: 0xc8b29e, accent: 0x506274 })
+});
+
+function createPlanetarySurveyRover(kind) {
+  const style = PLANETARY_ROVER_STYLES[kind];
+  const rover = new THREE.Group();
+  rover.name = style.name;
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.42, 2.25), material(style.body, 0.52, 0.52));
+  chassis.position.y = 1.12;
+  rover.add(chassis);
+  const instrumentDeck = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.18, 1.65), material(style.accent, 0.48, 0.5));
+  instrumentDeck.position.y = 1.56;
+  rover.add(instrumentDeck);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.25, 10), material(0xc7c9c7, 0.65, 0.4));
+  mast.position.set(0.68, 2.2, -0.25);
+  rover.add(mast);
+  const sensor = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.34, 0.38), material(0x242a32, 0.52, 0.38));
+  sensor.position.set(0.68, 2.84, -0.25);
+  rover.add(sensor);
+  if (style.sealed) {
+    const cabin = new THREE.Mesh(
+      new THREE.SphereGeometry(0.82, 18, 12),
+      new THREE.MeshPhysicalMaterial({ color: 0x60442f, metalness: 0.3, roughness: 0.25, transparent: true, opacity: 0.78 })
+    );
+    cabin.scale.set(1.2, 0.78, 0.9);
+    cabin.position.set(-0.45, 2.05, 0.15);
+    rover.add(cabin);
+    rover.userData.protectedSurfaceCapability = true;
+  }
+  [-1.48, 0, 1.48].forEach((z) => {
+    [-1, 1].forEach((side) => {
+      const wheel = createWheel(0.5, 0.3, 0x34383b);
+      wheel.position.set(side * 1.62, 0.56, z * 0.58);
+      rover.add(wheel);
+    });
+  });
+  rover.rotation.y = Math.PI;
+  rover.userData.vehicleKind = kind;
+  rover.userData.capabilityClass = 'fictional_planetary_survey_vehicle';
+  return rover;
+}
+
 function createLunarRovingVehicle() {
   const lrv = new THREE.Group();
   lrv.name = 'Apollo Lunar Roving Vehicle';
@@ -257,7 +307,7 @@ async function setPlanetaryVehicle(kind) {
   if (activeVehicle?.parent) activeVehicle.parent.remove(activeVehicle);
   activeVehicle = null;
 
-  if (!['moon', 'mars', 'mercury', 'venus'].includes(kind)) {
+  if (!['moon', 'mars', 'mercury', 'venus', ...Object.keys(PLANETARY_ROVER_STYLES)].includes(kind)) {
     earthChildVisibility?.forEach((visible, child) => { child.visible = visible; });
     earthChildVisibility = null;
     return null;
@@ -267,7 +317,8 @@ async function setPlanetaryVehicle(kind) {
   const vehicle = kind === 'moon' ? createLunarRovingVehicle() :
     kind === 'mars' ? createMarsRoverFallback() :
       kind === 'mercury' ? createMercurySurveyRover() :
-        createVenusPressureCrawler();
+        kind === 'venus' ? createVenusPressureCrawler() :
+          createPlanetarySurveyRover(kind);
   activeVehicle = alignVehicleToSurface(vehicle);
   appCtx.carMesh.add(activeVehicle);
 

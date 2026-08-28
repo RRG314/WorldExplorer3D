@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
 import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=15';
 import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
 
@@ -31,8 +32,26 @@ const OBSERVERS = Object.freeze({
 
 function bodyOrientation(body, date = new Date()) {
   const observer = OBSERVERS[body];
-  if (!observer) return null;
   const days = (date.getTime() - J2000_MS) / DAY_MS;
+  if (!observer) {
+    const canonical = getAstronomicalBody(body);
+    if (!canonical || canonical.exploration.landingMode !== LANDING_MODE.SOLID_SURFACE) return null;
+    const address = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active?.bodyId === canonical.id
+      ? appCtx.activeSolidWorldSurface?.userData?.worldAddress
+      : null;
+    const rotationDays = canonical.physical.rotationPeriodS / 86400;
+    return {
+      body: canonical.id,
+      latitudeDeg: Number(address?.latitudeDeg) || 0,
+      longitudeDeg: Number(address?.longitudeDegPositiveEast) || 0,
+      poleRaDeg: 0,
+      poleDecDeg: 90 - canonical.physical.axialTiltRad * 180 / Math.PI,
+      primeMeridianDeg: ((days / rotationDays) * 360) % 360,
+      starOpacity: canonical.atmosphere.class === 'dense' ? 0.08 : canonical.atmosphere.class === 'thin' ? 0.72 : 0.94,
+      computedAtIso: date.toISOString(),
+      truthClass: 'gameplay_abstraction'
+    };
+  }
   const centuries = days / 36525;
   return {
     body,
@@ -42,7 +61,8 @@ function bodyOrientation(body, date = new Date()) {
     poleDecDeg: observer.poleDecAtJ2000 + observer.poleDecPerCentury * centuries,
     primeMeridianDeg: (observer.primeAtJ2000 + observer.rotationPerDay * days) % 360,
     starOpacity: observer.starOpacity,
-    computedAtIso: date.toISOString()
+    computedAtIso: date.toISOString(),
+    truthClass: 'modeled_physics'
   };
 }
 
@@ -79,7 +99,7 @@ function clearPlanetarySky() {
 function updatePlanetarySky() {
   const env = appCtx.getEnv?.();
   if (!appCtx.starField || !appCtx.camera) return;
-  if (env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS) {
+  if (env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS || env === appCtx.ENV?.PLANETARY) {
     appCtx.starField.position.copy(appCtx.camera.position);
   }
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');

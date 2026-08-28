@@ -13,7 +13,10 @@ const close = (actual, expected, tolerance, message) => {
 
 test('one immutable profile covers every currently cataloged world environment', () => {
   assert.deepEqual(Object.keys(PHYSICAL_ENVIRONMENT_PROFILES), [
-    'mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'
+    'mercury', 'venus', 'earth', 'moon', 'mars',
+    'phobos', 'deimos', 'io', 'europa', 'ganymede', 'callisto',
+    'titan', 'enceladus', 'triton', 'ceres', 'vesta', 'pluto',
+    'jupiter', 'saturn', 'uranus', 'neptune'
   ]);
   assert.ok(Object.isFrozen(PHYSICAL_ENVIRONMENT_PROFILES));
   Object.values(PHYSICAL_ENVIRONMENT_PROFILES).forEach((profile) => {
@@ -24,7 +27,7 @@ test('one immutable profile covers every currently cataloged world environment',
 });
 
 test('airless bodies have no fake weather pressure density or wind', () => {
-  for (const bodyId of ['mercury', 'moon']) {
+  for (const bodyId of ['mercury', 'moon', 'io', 'europa', 'enceladus', 'ceres', 'vesta']) {
     const sample = samplePhysicalEnvironment(bodyId, { latitudeDeg: 10, longitudeDegPositiveEast: 25, heightM: 0, timestampS: 1000 });
     assert.equal(sample.pressurePa, 0);
     assert.equal(sample.atmosphericDensityKgM3, 0);
@@ -34,6 +37,18 @@ test('airless bodies have no fake weather pressure density or wind', () => {
     });
     assert.equal(sample.solidSurfaceAvailable, true);
   }
+});
+
+test('Titan, Triton, and Pluto keep physically distinct atmosphere classes', () => {
+  const titan = samplePhysicalEnvironment('titan', { heightM: 0, timestampS: 100 });
+  const triton = samplePhysicalEnvironment('triton', { heightM: 0, timestampS: 100 });
+  const pluto = samplePhysicalEnvironment('pluto', { heightM: 0, timestampS: 100 });
+  assert.ok(titan.pressurePa > 100_000);
+  assert.ok(titan.atmosphericDensityKgM3 > 1);
+  assert.equal(titan.weatherModelId, 'titan_nitrogen_methane_haze');
+  assert.ok(triton.pressurePa > 0 && triton.pressurePa < 10);
+  assert.ok(pluto.pressurePa > 0 && pluto.pressurePa < 10);
+  assert.notEqual(triton.weatherModelId, pluto.weatherModelId);
 });
 
 test('gravity decreases with altitude from the canonical body radius', () => {

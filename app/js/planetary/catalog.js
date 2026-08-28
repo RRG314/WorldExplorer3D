@@ -1,4 +1,4 @@
-import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=1';
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=2';
 
 function projectPlanetaryBody(id) {
   const body = getAstronomicalBody(id);

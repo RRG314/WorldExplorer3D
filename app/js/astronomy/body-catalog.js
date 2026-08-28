@@ -4,7 +4,7 @@ const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 86_400;
 const DEG_TO_RAD = Math.PI / 180;
 
-const BODY_CATALOG_VERSION = '1.0.0';
+const BODY_CATALOG_VERSION = '1.1.0';
 
 const TRUTH_CLASS = Object.freeze({
   OBSERVED_OR_MEASURED: 'observed_or_measured',
@@ -60,6 +60,27 @@ const SOURCE_CATALOG = Object.freeze({
     id: 'nasa-moon-facts',
     title: 'NASA Science — Moon Facts',
     url: 'https://science.nasa.gov/moon/facts/',
+    authority: 'NASA',
+    reviewedAt: '2026-08-27'
+  }),
+  nasaMoonSystems: Object.freeze({
+    id: 'nasa-moon-systems',
+    title: 'NASA Science — Moons of the Solar System',
+    url: 'https://science.nasa.gov/solar-system/moons/',
+    authority: 'NASA',
+    reviewedAt: '2026-08-27'
+  }),
+  nasaDawnBodies: Object.freeze({
+    id: 'nasa-dawn-bodies',
+    title: 'NASA Science — Dawn at Ceres and Vesta',
+    url: 'https://science.nasa.gov/mission/dawn/',
+    authority: 'NASA/JPL-Caltech',
+    reviewedAt: '2026-08-27'
+  }),
+  nasaPlutoFacts: Object.freeze({
+    id: 'nasa-pluto-facts',
+    title: 'NASA Science — Pluto Facts',
+    url: 'https://science.nasa.gov/dwarf-planets/pluto/facts/',
     authority: 'NASA',
     reviewedAt: '2026-08-27'
   }),
@@ -144,6 +165,18 @@ function makeBody({
 const sharedPlanetSources = Object.freeze([
   SOURCE_CATALOG.nasaPlanetCompare.id,
   SOURCE_CATALOG.nasaPlanetFacts.id,
+  SOURCE_CATALOG.naifFrames.id,
+  SOURCE_CATALOG.usgsNomenclature.id
+]);
+
+const sharedMoonSources = Object.freeze([
+  SOURCE_CATALOG.nasaMoonSystems.id,
+  SOURCE_CATALOG.naifFrames.id,
+  SOURCE_CATALOG.usgsNomenclature.id
+]);
+
+const sharedSmallBodySources = Object.freeze([
+  SOURCE_CATALOG.nasaDawnBodies.id,
   SOURCE_CATALOG.naifFrames.id,
   SOURCE_CATALOG.usgsNomenclature.id
 ]);
@@ -238,11 +271,125 @@ const bodyRows = [
     frames: { inertial: 'J2000', bodyFixed: 'IAU_NEPTUNE' },
     presentation: { environmentId: 'NEPTUNE', globalTexturePath: '/app/assets/textures/neptune_jpl.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
+  }),
+  makeBody({
+    id: 'phobos', name: 'Phobos', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'mars',
+    physical: makePhysical({ massKg: 1.0659e16, meanRadiusKm: 11.2667, surfaceGravityMps2: 0.0057, escapeVelocityKmS: 0.0114, rotationHours: 7.6538, orbitalPeriodDays: 0.31891, axialTiltDeg: 0, meanSolarDistanceAU: 1.52368 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.NONE, referencePressurePa: 0, composition: [] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'phobos', experienceTier: 'regional' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_PHOBOS' },
+    presentation: { environmentId: 'PHOBOS', globalTexturePath: '/app/assets/textures/phobos-viking.jpg', surfaceLabel: 'Stickney crater region' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'deimos', name: 'Deimos', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'mars',
+    physical: makePhysical({ massKg: 1.4762e15, meanRadiusKm: 6.2, surfaceGravityMps2: 0.003, escapeVelocityKmS: 0.0056, rotationHours: 30.2986, orbitalPeriodDays: 1.26244, axialTiltDeg: 0, meanSolarDistanceAU: 1.52368 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.NONE, referencePressurePa: 0, composition: [] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'deimos', experienceTier: 'regional' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_DEIMOS' },
+    presentation: { environmentId: 'DEIMOS', globalTexturePath: '/app/assets/textures/deimos-viking.jpg', surfaceLabel: 'Voltaire crater region' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'io', name: 'Io', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'jupiter',
+    physical: makePhysical({ massKg: 8.9319e22, meanRadiusKm: 1821.6, surfaceGravityMps2: 1.796, escapeVelocityKmS: 2.558, rotationHours: 42.459, orbitalPeriodDays: 1.76914, axialTiltDeg: 0.04, meanSolarDistanceAU: 5.20260 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['sulfur_dioxide'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'io', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_IO' },
+    presentation: { environmentId: 'IO', globalTexturePath: '/app/assets/textures/io-voyager-galileo.jpg', surfaceLabel: 'Tvashtar volcanic region' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'europa', name: 'Europa', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'jupiter',
+    physical: makePhysical({ massKg: 4.7998e22, meanRadiusKm: 1560.8, surfaceGravityMps2: 1.315, escapeVelocityKmS: 2.025, rotationHours: 85.228, orbitalPeriodDays: 3.55118, axialTiltDeg: 0.1, meanSolarDistanceAU: 5.20260 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['oxygen'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'europa', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_EUROPA' },
+    presentation: { environmentId: 'EUROPA', globalTexturePath: '/app/assets/textures/europa-voyager-galileo.jpg', surfaceLabel: 'Conamara Chaos region' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'ganymede', name: 'Ganymede', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'jupiter',
+    physical: makePhysical({ massKg: 1.4819e23, meanRadiusKm: 2634.1, surfaceGravityMps2: 1.428, escapeVelocityKmS: 2.741, rotationHours: 171.709, orbitalPeriodDays: 7.15455, axialTiltDeg: 0.33, meanSolarDistanceAU: 5.20260 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['oxygen'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'ganymede', experienceTier: 'regional' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_GANYMEDE' },
+    presentation: { environmentId: 'GANYMEDE', globalTexturePath: '/app/assets/textures/ganymede-voyager-galileo.jpg', surfaceLabel: 'Galileo Regio' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'callisto', name: 'Callisto', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'jupiter',
+    physical: makePhysical({ massKg: 1.0759e23, meanRadiusKm: 2410.3, surfaceGravityMps2: 1.235, escapeVelocityKmS: 2.440, rotationHours: 400.536, orbitalPeriodDays: 16.689, axialTiltDeg: 0.19, meanSolarDistanceAU: 5.20260 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['carbon_dioxide', 'oxygen'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'callisto', experienceTier: 'regional' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_CALLISTO' },
+    presentation: { environmentId: 'CALLISTO', globalTexturePath: '/app/assets/textures/callisto-voyager-galileo.jpg', surfaceLabel: 'Valhalla basin' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'titan', name: 'Titan', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'saturn',
+    physical: makePhysical({ massKg: 1.3452e23, meanRadiusKm: 2574.73, surfaceGravityMps2: 1.352, escapeVelocityKmS: 2.639, rotationHours: 382.68, orbitalPeriodDays: 15.945, axialTiltDeg: 0.33, meanSolarDistanceAU: 9.55491 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.DENSE, referencePressurePa: 146_700, composition: ['nitrogen', 'methane', 'hydrogen'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'titan', experienceTier: 'featured', requiresProtectedSurfaceCapability: true },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_TITAN' },
+    presentation: { environmentId: 'TITAN', globalTexturePath: '/app/assets/textures/titan-cassini-iss.jpg', surfaceLabel: 'Shangri-La dunes' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'enceladus', name: 'Enceladus', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'saturn',
+    physical: makePhysical({ massKg: 1.08022e20, meanRadiusKm: 252.1, surfaceGravityMps2: 0.113, escapeVelocityKmS: 0.239, rotationHours: 32.885, orbitalPeriodDays: 1.37022, axialTiltDeg: 0, meanSolarDistanceAU: 9.55491 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['water_vapor', 'carbon_dioxide'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'enceladus', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_ENCELADUS' },
+    presentation: { environmentId: 'ENCELADUS', globalTexturePath: '/app/assets/textures/enceladus-cassini.jpg', surfaceLabel: 'South polar terrain' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'triton', name: 'Triton', bodyClass: BODY_CLASS.NATURAL_SATELLITE, parentId: 'neptune',
+    physical: makePhysical({ massKg: 2.14e22, meanRadiusKm: 1353.4, surfaceGravityMps2: 0.779, escapeVelocityKmS: 1.455, rotationHours: -141.05, orbitalPeriodDays: -5.87685, axialTiltDeg: 156.8, meanSolarDistanceAU: 30.11039 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.THIN, referencePressurePa: 1.4, composition: ['nitrogen', 'methane'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'triton', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_TRITON' },
+    presentation: { environmentId: 'TRITON', globalTexturePath: '/app/assets/textures/triton-voyager.jpg', surfaceLabel: 'Voyager imaged hemisphere' },
+    provenanceSources: sharedMoonSources
+  }),
+  makeBody({
+    id: 'ceres', name: 'Ceres', bodyClass: BODY_CLASS.DWARF_PLANET, parentId: 'sun',
+    physical: makePhysical({ massKg: 9.3835e20, meanRadiusKm: 469.7, surfaceGravityMps2: 0.27, escapeVelocityKmS: 0.51, rotationHours: 9.074, orbitalPeriodDays: 1681.63, axialTiltDeg: 4, meanSolarDistanceAU: 2.7675 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['water_vapor'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'ceres', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_CERES' },
+    presentation: { environmentId: 'CERES', globalTexturePath: '/app/assets/textures/ceres-dawn-enhanced.jpg', surfaceLabel: 'Occator crater region' },
+    provenanceSources: sharedSmallBodySources
+  }),
+  makeBody({
+    id: 'vesta', name: 'Vesta', bodyClass: BODY_CLASS.SMALL_BODY, parentId: 'sun',
+    physical: makePhysical({ massKg: 2.59076e20, meanRadiusKm: 262.7, surfaceGravityMps2: 0.25, escapeVelocityKmS: 0.36, rotationHours: 5.342, orbitalPeriodDays: 1325.75, axialTiltDeg: 27.5, meanSolarDistanceAU: 2.3615 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.NONE, referencePressurePa: 0, composition: [] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'vesta', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_VESTA' },
+    presentation: { environmentId: 'VESTA', globalTexturePath: '/app/assets/textures/vesta-dawn.jpg', surfaceLabel: 'Rheasilvia basin' },
+    provenanceSources: sharedSmallBodySources
+  }),
+  makeBody({
+    id: 'pluto', name: 'Pluto', bodyClass: BODY_CLASS.DWARF_PLANET, parentId: 'sun',
+    physical: makePhysical({ massKg: 1.303e22, meanRadiusKm: 1188.3, surfaceGravityMps2: 0.62, escapeVelocityKmS: 1.212, rotationHours: -153.293, orbitalPeriodDays: 90560, axialTiltDeg: 122.53, meanSolarDistanceAU: 39.482 }),
+    atmosphere: { class: ATMOSPHERE_CLASS.THIN, referencePressurePa: 1, composition: ['nitrogen', 'methane', 'carbon_monoxide'] },
+    exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'pluto', experienceTier: 'featured' },
+    frames: { inertial: 'J2000', bodyFixed: 'IAU_PLUTO' },
+    presentation: { environmentId: 'PLUTO', globalTexturePath: '/app/assets/textures/pluto-new-horizons.jpg', surfaceLabel: 'Sputnik Planitia' },
+    provenanceSources: [SOURCE_CATALOG.nasaPlutoFacts.id, SOURCE_CATALOG.naifFrames.id, SOURCE_CATALOG.usgsNomenclature.id]
   })
 ];
 
 const ASTRONOMICAL_BODIES = deepFreeze(Object.fromEntries(bodyRows.map((body) => [body.id, body])));
 const SOLAR_SYSTEM_PLANET_IDS = Object.freeze(['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune']);
+const SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS = Object.freeze([
+  'moon', 'mercury', 'venus', 'mars',
+  'jupiter', 'io', 'europa',
+  'saturn', 'titan', 'enceladus', 'uranus', 'neptune', 'triton',
+  'ceres', 'vesta', 'pluto'
+]);
 
 const aliases = new Map();
 bodyRows.forEach((body) => {
@@ -285,6 +432,7 @@ export {
   listAstronomicalBodies,
   METERS_PER_AU,
   normalizeAstronomicalBodyId,
+  SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS,
   SOLAR_SYSTEM_PLANET_IDS,
   SOURCE_CATALOG,
   TRUTH_CLASS

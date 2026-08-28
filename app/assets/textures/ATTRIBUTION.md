@@ -13,6 +13,14 @@
 - `saturn_jpl.jpg`: NASA/JPL-Caltech synthesized Saturn map for NASA 3D resources. It is documented by NASA as fictional rather than measured global imagery. Source: https://science.nasa.gov/3d-resources/saturn/
 - `uranus_jpl.jpg`: JPL/Caltech Uranus map. JPL documents it as a synthesized solid atmospheric color because available global detail is limited. Source: https://space.jpl.nasa.gov/tmaps/uranus.html
 - `neptune_jpl.jpg`: Don Davis/JPL-Caltech synthesized Neptune cloud map for NASA 3D resources. It is documented by NASA as fictional. Source: https://science.nasa.gov/3d-resources/neptune/
+- `io-voyager-galileo.jpg`: NASA/JPL/USGS Voyager and Galileo global Io color mosaic (PIA09257), resized locally for interactive use. Source: https://science.nasa.gov/resource/io-the-volcanic-moon/
+- `europa-voyager-galileo.jpg`: NASA/JPL-Caltech/SETI Institute Voyager and Galileo global Europa views (PIA01295), resized locally for interactive use. Source: https://science.nasa.gov/resource/europa-in-true-color/
+- `titan-cassini-iss.jpg`: NASA/JPL-Caltech/Space Science Institute Cassini Imaging Science Subsystem global Titan map (PIA19658), observed at 938 nm and resized locally. Source: https://science.nasa.gov/resource/titan-global-map-june-2015/
+- `enceladus-cassini.jpg`: NASA/JPL-Caltech/University of Arizona/LPG-CNRS/University of Nantes/Space Science Institute Cassini VIMS and ISS Enceladus mosaic (PIA24027), resized locally. Its colors combine infrared and visible observations. Source: https://science.nasa.gov/resource/enceladus-global-color-mosaic/
+- `triton-voyager.jpg`: NASA/JPL-Caltech/Lunar & Planetary Institute Voyager 2 enhanced-color Triton map (PIA18668), resized locally. Source: https://science.nasa.gov/resource/global-color-map-of-triton/
+- `ceres-dawn-enhanced.jpg`: NASA/JPL-Caltech/UCLA/MPS/DLR/IDA Dawn enhanced-color Ceres map (PIA20351), resized locally. Its colors emphasize compositional differences rather than human-eye appearance. Source: https://science.nasa.gov/resource/colorful-ceres/
+- `vesta-dawn-false-color.jpg`: NASA/JPL-Caltech/UCLA/MPS/DLR/IDA Dawn false-color view of Vesta's southern hemisphere (PIA15141), resized by NASA's image service; the runtime selects a clean observed-image window for terrain context. Source: https://photojournal.jpl.nasa.gov/catalog/PIA15141
+- `pluto-new-horizons.jpg`: NASA/JHUAPL/SwRI New Horizons enhanced-color Pluto map (PIA11707), resized locally. Coverage and resolution vary across the mapped surface. Source: https://science.nasa.gov/resource/pluto-global-color-map/
 
 ## Destination UI Thumbnails
 

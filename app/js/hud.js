@@ -10,7 +10,7 @@ import {
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
-import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=1';
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -423,7 +423,7 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
+  const planetaryChase = !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 
   // Get car's actual Y position (follows terrain)
   const carGroundY = Number(presentationCar?.y ?? appCtx.carMesh.position.y) - CAR_BODY_HEIGHT_FROM_GROUND;
@@ -445,10 +445,10 @@ function updateCamera(dt = 1 / 60) {
   const insideTunnel = tunnelCameraState.inside;
   const d = insideTunnel
     ? tunnelCameraEnvelope.chaseDistance
-    : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
+    : planetaryChase ? 12 : CHASE_CAMERA_DISTANCE;
   const h = insideTunnel
     ? tunnelCameraEnvelope.cameraHeight
-    : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
+    : planetaryChase ? 6.5 : CHASE_CAMERA_HEIGHT;
   const viewAngle = carAngle + carLook.yaw + (lb ? Math.PI : 0);
 
   // Show car mesh for non-first-person modes

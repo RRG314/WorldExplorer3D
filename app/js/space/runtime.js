@@ -3,7 +3,7 @@ import {
   getAstronomicalBody,
   LANDING_MODE,
   normalizeAstronomicalBodyId
-} from '../astronomy/body-catalog.js?v=1';
+} from '../astronomy/body-catalog.js?v=2';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 
 let injectedThree = null;

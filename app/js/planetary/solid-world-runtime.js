@@ -1,4 +1,4 @@
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=1';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ENV, getEnv } from '../env.js?v=58';
 import {
@@ -7,45 +7,162 @@ import {
 } from '../session-coordinator.js?v=2';
 import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 import { configureColorTexture } from './catalog.js?v=1';
-import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=1';
+import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import {
   CALORIS_PLANITIA_SURFACE_REGION,
+  CERES_OCCATOR_SURFACE_REGION,
+  ENCELADUS_SOUTH_POLAR_SURFACE_REGION,
   ensurePlanetarySurfaceAuthority,
-  MAXWELL_MONTES_SURFACE_REGION
-} from './runtime/surface-authority.js?v=1';
+  EUROPA_CONAMARA_SURFACE_REGION,
+  IO_TVASHTAR_SURFACE_REGION,
+  MAXWELL_MONTES_SURFACE_REGION,
+  PLUTO_SPUTNIK_SURFACE_REGION,
+  TITAN_SHANGRI_LA_SURFACE_REGION,
+  TRITON_CANTALOUPE_SURFACE_REGION,
+  VESTA_RHEASILVIA_SURFACE_REGION
+} from './runtime/surface-authority.js?v=3';
 
-const SOLID_WORLD_PACKS = Object.freeze({
-  mercury: Object.freeze({
-    bodyId: 'mercury',
-    manifest: CALORIS_PLANITIA_SURFACE_REGION,
-    spawn: Object.freeze({ x: 1_150, z: -620, angle: 0.7 }),
+const WALK_AND_DRIVE = Object.freeze({ drive: true, walk: true, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
+const PROTECTED_DRIVE = Object.freeze({ drive: true, walk: false, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
+
+function worldPack(input) {
+  return Object.freeze({
     terrainSize: 16_000,
     segments: 192,
+    fogColor: null,
+    fogDensity: 0,
+    exposure: 1.04,
+    fillIntensity: 0.2,
+    rockCount: 520,
+    rockScale: 4,
+    capabilities: WALK_AND_DRIVE,
+    ...input,
+    spawn: Object.freeze(input.spawn),
+    material: Object.freeze(input.material),
+    textureWindow: input.textureWindow ? Object.freeze(input.textureWindow) : null
+  });
+}
+
+const SOLID_WORLD_PACKS = Object.freeze({
+  mercury: worldPack({
+    bodyId: 'mercury',
+    manifest: CALORIS_PLANITIA_SURFACE_REGION,
+    reliefKind: 'cratered',
+    detailSeed: 17,
+    rockColor: 0x8d857d,
+    spawn: Object.freeze({ x: 1_150, z: -620, angle: 0.7 }),
     material: Object.freeze({ color: 0xa69a8c, roughness: 0.96, bumpScale: 4 }),
     skyColor: 0x000000,
-    fogColor: null,
     sunColor: 0xfff4df,
     sunIntensity: 4.4,
     ambientIntensity: 0.12,
+    exposure: 1.18,
+    fillIntensity: 0.2,
     title: 'Caloris Planitia, Mercury',
     context: 'Airless terrain · intense sunlight · 0.38g',
     representation: 'MESSENGER enhanced-color map · locally shaped terrain'
   }),
-  venus: Object.freeze({
+  venus: worldPack({
     bodyId: 'venus',
     manifest: MAXWELL_MONTES_SURFACE_REGION,
+    reliefKind: 'mountain-ridges',
+    detailSeed: 29,
+    rockColor: 0x7f3e25,
+    rockScale: 6,
     spawn: Object.freeze({ x: -900, z: 1_050, angle: -1.1 }),
-    terrainSize: 16_000,
-    segments: 192,
     material: Object.freeze({ color: 0xc57b45, roughness: 0.88, bumpScale: 9 }),
     skyColor: 0x9a5a2e,
     fogColor: 0xb46d38,
+    fogDensity: 0.00042,
     sunColor: 0xffc27a,
     sunIntensity: 0.8,
     ambientIntensity: 0.58,
+    fillIntensity: 0.4,
+    capabilities: PROTECTED_DRIVE,
     title: 'Maxwell Montes, Venus',
     context: 'Protected vehicle · dense CO₂ atmosphere · 0.90g',
     representation: 'Magellan radar context · modeled local relief'
+  }),
+  io: worldPack({
+    bodyId: 'io', manifest: IO_TVASHTAR_SURFACE_REGION, reliefKind: 'volcanic', detailSeed: 47,
+    rockColor: 0x6d5734, rockScale: 5, spawn: { x: 780, z: -1_020, angle: 0.35 },
+    material: { color: 0xd7aa55, roughness: 0.92, bumpScale: 7 },
+    skyColor: 0x000000, sunColor: 0xfff7e9, sunIntensity: 0.18, ambientIntensity: 0.1,
+    parentBodyId: 'jupiter', parentVisualDiameter: 620,
+    title: 'Tvashtar Paterae, Io',
+    context: 'Protected survey · sulfurous volcanic terrain · 0.18g',
+    representation: 'Voyager/Galileo color context · modeled volcanic relief'
+  }),
+  europa: worldPack({
+    bodyId: 'europa', manifest: EUROPA_CONAMARA_SURFACE_REGION, reliefKind: 'ice-lineae', detailSeed: 53,
+    rockColor: 0xa9b4ba, rockScale: 2.6, spawn: { x: -640, z: 980, angle: -0.6 },
+    material: { color: 0xd9d3c6, roughness: 0.78, bumpScale: 3 },
+    skyColor: 0x000000, sunColor: 0xfff8ec, sunIntensity: 0.17, ambientIntensity: 0.11,
+    parentBodyId: 'jupiter', parentVisualDiameter: 420,
+    title: 'Conamara Chaos, Europa',
+    context: 'Protected survey · fractured water-ice surface · 0.13g',
+    representation: 'Voyager/Galileo image context · modeled local ice relief'
+  }),
+  titan: worldPack({
+    bodyId: 'titan', manifest: TITAN_SHANGRI_LA_SURFACE_REGION, reliefKind: 'titan-dunes', detailSeed: 61,
+    rockColor: 0x493526, rockScale: 3.5, spawn: { x: 520, z: 1_080, angle: 1.25 },
+    material: { color: 0x8d6038, roughness: 0.98, bumpScale: 5 },
+    skyColor: 0x7a4b22, fogColor: 0xb87532, fogDensity: 0.00055,
+    sunColor: 0xffd29c, sunIntensity: 0.07, ambientIntensity: 0.5, fillIntensity: 0.32,
+    parentBodyId: 'saturn', parentVisualDiameter: 180,
+    title: 'Shangri-La, Titan',
+    context: 'Sealed suit · nitrogen-methane haze · 0.14g',
+    representation: 'Cassini near-infrared context · modeled dune relief'
+  }),
+  enceladus: worldPack({
+    bodyId: 'enceladus', manifest: ENCELADUS_SOUTH_POLAR_SURFACE_REGION, reliefKind: 'ice-fractures', detailSeed: 67,
+    rockColor: 0xbcc8d0, rockScale: 2.1, spawn: { x: -720, z: -840, angle: 0.85 },
+    material: { color: 0xe7eef2, roughness: 0.74, bumpScale: 4 },
+    skyColor: 0x000000, sunColor: 0xfff6e4, sunIntensity: 0.06, ambientIntensity: 0.12,
+    parentBodyId: 'saturn', parentVisualDiameter: 760,
+    title: 'South Polar Terrain, Enceladus',
+    context: 'Airless ice terrain · plume-source fractures · 0.012g',
+    representation: 'Cassini image context · modeled local fracture relief'
+  }),
+  triton: worldPack({
+    bodyId: 'triton', manifest: TRITON_CANTALOUPE_SURFACE_REGION, reliefKind: 'cantaloupe', detailSeed: 73,
+    rockColor: 0xa4a6a0, rockScale: 3.2, spawn: { x: 860, z: 720, angle: -0.25 },
+    material: { color: 0xc4b7aa, roughness: 0.9, bumpScale: 5 },
+    skyColor: 0x030508, fogColor: 0x66727d, fogDensity: 0.000012,
+    sunColor: 0xe7efff, sunIntensity: 0.002, ambientIntensity: 0.09,
+    parentBodyId: 'neptune', parentVisualDiameter: 330,
+    title: 'Voyager Hemisphere, Triton',
+    context: 'Near-vacuum · nitrogen-ice terrain · 0.08g',
+    representation: 'Voyager enhanced-color context · modeled cellular relief'
+  }),
+  ceres: worldPack({
+    bodyId: 'ceres', manifest: CERES_OCCATOR_SURFACE_REGION, reliefKind: 'ceres-craters', detailSeed: 79,
+    rockColor: 0x72716d, rockScale: 4.2, spawn: { x: -960, z: 480, angle: -1.35 },
+    material: { color: 0x8b8b85, roughness: 0.97, bumpScale: 6 },
+    skyColor: 0x000000, sunColor: 0xfff5df, sunIntensity: 0.14, ambientIntensity: 0.09,
+    title: 'Occator Crater, Ceres',
+    context: 'Airless dwarf planet · bright salt deposits · 0.028g',
+    representation: 'Dawn enhanced-color context · modeled crater relief'
+  }),
+  vesta: worldPack({
+    bodyId: 'vesta', manifest: VESTA_RHEASILVIA_SURFACE_REGION, reliefKind: 'vesta-basin', detailSeed: 83,
+    rockColor: 0x615b54, rockScale: 4.8, spawn: { x: 940, z: -460, angle: 0.5 },
+    material: { color: 0x837b70, roughness: 0.97, bumpScale: 7 },
+    textureWindow: { u: 0.59, v: 0.31, width: 0.28, height: 0.39 },
+    skyColor: 0x000000, sunColor: 0xfff6e3, sunIntensity: 0.18, ambientIntensity: 0.08,
+    title: 'Rheasilvia Basin, Vesta',
+    context: 'Irregular small world · giant impact basin · 0.025g',
+    representation: 'Dawn image context · modeled basin relief'
+  }),
+  pluto: worldPack({
+    bodyId: 'pluto', manifest: PLUTO_SPUTNIK_SURFACE_REGION, reliefKind: 'nitrogen-ice', detailSeed: 89,
+    rockColor: 0x9a8d80, rockScale: 3.8, spawn: { x: -680, z: -1_060, angle: 1.05 },
+    material: { color: 0xc1aa96, roughness: 0.88, bumpScale: 5 },
+    skyColor: 0x020305, fogColor: 0x6b7280, fogDensity: 0.000008,
+    sunColor: 0xddeaff, sunIntensity: 0.0012, ambientIntensity: 0.08,
+    title: 'Sputnik Planitia, Pluto',
+    context: 'Near-vacuum · nitrogen-ice plain · 0.063g',
+    representation: 'New Horizons color context · modeled local ice relief'
   })
 });
 
@@ -71,16 +188,64 @@ function craterRelief(x, z, centerX, centerZ, radius, depth) {
 }
 
 function sampleModeledRelief(pack, x, z) {
-  if (pack.bodyId === 'mercury') {
-    return deterministicNoise(x, z, 17) * 13 +
+  const noise = deterministicNoise(x, z, pack.detailSeed);
+  if (pack.reliefKind === 'cratered') {
+    return noise * 13 +
       craterRelief(x, z, -1_900, 1_250, 1_050, 145) +
       craterRelief(x, z, 2_300, -2_100, 720, 105) +
       craterRelief(x, z, 850, 2_850, 430, 62) +
       Math.max(0, Math.sin((x - z) * 0.0017)) * 19;
   }
-  const broadRise = 390 * Math.exp(-((x + 1_500) ** 2 + (z - 900) ** 2) / 8_500_000);
-  const ridges = Math.abs(Math.sin(x * 0.0014 + Math.sin(z * 0.0011))) * 72;
-  return broadRise + ridges + deterministicNoise(x, z, 29) * 22;
+  if (pack.reliefKind === 'mountain-ridges') {
+    const broadRise = 390 * Math.exp(-((x + 1_500) ** 2 + (z - 900) ** 2) / 8_500_000);
+    const ridges = Math.abs(Math.sin(x * 0.0014 + Math.sin(z * 0.0011))) * 72;
+    return broadRise + ridges + noise * 22;
+  }
+  if (pack.reliefKind === 'volcanic') {
+    const shield = 230 * Math.exp(-((x + 900) ** 2 + (z - 650) ** 2) / 3_800_000);
+    const caldera = craterRelief(x, z, -900, 650, 520, 105);
+    const flows = Math.max(0, Math.sin((x * 0.0019) + Math.sin(z * 0.0007) * 2.5)) * 36;
+    return shield + caldera + flows + noise * 17;
+  }
+  if (pack.reliefKind === 'ice-lineae') {
+    const lineae = Math.abs(Math.sin(x * 0.0021 + z * 0.0007)) * 18 +
+      Math.abs(Math.sin(z * 0.0017 - x * 0.0005)) * 12;
+    const chaos = Math.max(0, noise) * 22 * Math.exp(-((x - 650) ** 2 + (z + 400) ** 2) / 4_200_000);
+    return lineae + chaos + noise * 5;
+  }
+  if (pack.reliefKind === 'titan-dunes') {
+    const dunes = Math.sin(x * 0.007 + Math.sin(z * 0.00045) * 1.6) * 18;
+    const broadTerrain = 55 * Math.sin((x + z) * 0.00035) + 34 * Math.sin(z * 0.00062);
+    return dunes + broadTerrain + noise * 8;
+  }
+  if (pack.reliefKind === 'ice-fractures') {
+    const tigerStripes = Math.abs(Math.sin((x + z * 0.35) * 0.0028)) ** 8 * 48;
+    const crossFractures = Math.abs(Math.sin((z - x * 0.18) * 0.0011)) ** 10 * 24;
+    return tigerStripes + crossFractures + noise * 7;
+  }
+  if (pack.reliefKind === 'cantaloupe') {
+    const cells = Math.sin(x * 0.0016) * Math.sin(z * 0.0016) * 34;
+    const dimples = -Math.abs(Math.sin(x * 0.0024) * Math.cos(z * 0.0021)) * 22;
+    return cells + dimples + noise * 9;
+  }
+  if (pack.reliefKind === 'ceres-craters') {
+    return noise * 16 +
+      craterRelief(x, z, -1_050, 820, 1_150, 190) +
+      craterRelief(x, z, 1_900, -1_250, 560, 92) +
+      craterRelief(x, z, 380, 2_300, 390, 65);
+  }
+  if (pack.reliefKind === 'vesta-basin') {
+    const basin = craterRelief(x, z, 0, 0, 3_300, 360);
+    const centralPeak = 250 * Math.exp(-(x ** 2 + z ** 2) / 1_200_000);
+    const scarps = Math.max(0, Math.sin((x - z) * 0.0012)) * 54;
+    return basin + centralPeak + scarps + noise * 18;
+  }
+  if (pack.reliefKind === 'nitrogen-ice') {
+    const cells = (Math.sin(x * 0.0017) + Math.sin(z * 0.0015) + Math.sin((x + z) * 0.0011)) * 13;
+    const mountains = 190 * Math.max(0, noise - 0.55) ** 2;
+    return cells + mountains;
+  }
+  return noise * 12;
 }
 
 function loadSurfaceTexture(pack) {
@@ -88,24 +253,74 @@ function loadSurfaceTexture(pack) {
   return new Promise((resolve, reject) => {
     new THREE.TextureLoader().load(
       asset.url,
-      (texture) => resolve(configureColorTexture(texture, appCtx.renderer)),
+      (texture) => {
+        const configured = configureColorTexture(texture, appCtx.renderer);
+        if (pack.textureWindow) {
+          configured.offset.set(pack.textureWindow.u, pack.textureWindow.v);
+          configured.repeat.set(pack.textureWindow.width, pack.textureWindow.height);
+          configured.needsUpdate = true;
+        }
+        resolve(configured);
+      },
       undefined,
       () => reject(new Error(`Unable to load ${pack.bodyId} surface context: ${asset.url}`))
     );
   });
 }
 
+function loadColorTexture(url) {
+  return new Promise((resolve) => {
+    new THREE.TextureLoader().load(
+      url,
+      (texture) => resolve(configureColorTexture(texture, appCtx.renderer)),
+      undefined,
+      () => resolve(null)
+    );
+  });
+}
+
+async function addParentBodyView(pack, world) {
+  if (!pack.parentBodyId || !pack.parentVisualDiameter) return;
+  const parent = getAstronomicalBody(pack.parentBodyId);
+  if (!parent?.presentation?.globalTexturePath) return;
+  const texture = await loadColorTexture(parent.presentation.globalTexturePath);
+  const radius = pack.parentVisualDiameter / 2;
+  const group = new THREE.Group();
+  group.name = `${parent.name} body-fixed sky context`;
+  group.position.set(-2_900, 1_850, -4_900);
+  const globe = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 48, 32),
+    new THREE.MeshBasicMaterial({ map: texture, color: 0xffffff })
+  );
+  globe.rotation.y = 0.55;
+  group.add(globe);
+  if (parent.id === 'saturn') {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(radius * 1.18, radius * 2.15, 96),
+      new THREE.MeshBasicMaterial({ color: 0xd8c7a4, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false })
+    );
+    ring.rotation.x = 1.18;
+    ring.rotation.z = -0.18;
+    group.add(ring);
+  }
+  group.userData.truthClass = 'visual_scale_adjustment';
+  group.userData.parentBodyId = parent.id;
+  group.userData.description = 'Body-fixed parent-planet sky context; apparent size is adjusted for gameplay readability.';
+  world.objects.push(group);
+  appCtx.scene.add(group);
+}
+
 function addGeneratedSurfaceDetail(pack, world) {
-  const count = 520;
+  const count = pack.rockCount;
   const geometry = new THREE.DodecahedronGeometry(1, 0);
   const material = new THREE.MeshStandardMaterial({
-    color: pack.bodyId === 'mercury' ? 0x8d857d : 0x7f3e25,
+    color: pack.rockColor,
     roughness: 1,
     metalness: 0
   });
   const rocks = new THREE.InstancedMesh(geometry, material, count);
   const transform = new THREE.Object3D();
-  let seed = pack.bodyId === 'mercury' ? 0x4d455243 : 0x56454e55;
+  let seed = pack.detailSeed * 0x01010101;
   const random = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
@@ -115,7 +330,7 @@ function addGeneratedSurfaceDetail(pack, world) {
     const theta = random() * Math.PI * 2;
     const x = pack.spawn.x + Math.cos(theta) * radius;
     const z = pack.spawn.z + Math.sin(theta) * radius;
-    const scale = 0.45 + Math.pow(random(), 2.5) * (pack.bodyId === 'venus' ? 6 : 4);
+    const scale = 0.45 + Math.pow(random(), 2.5) * pack.rockScale;
     transform.position.set(x, pack.manifest.renderPlacement.y + sampleModeledRelief(pack, x, z) + scale * 0.35, z);
     transform.rotation.set(random(), random() * Math.PI * 2, random());
     transform.scale.set(scale * 1.3, scale * (0.45 + random() * 0.5), scale);
@@ -193,6 +408,7 @@ async function createSolidWorld(pack) {
   worldCache.set(pack.bodyId, world);
   appCtx.scene.add(surface);
   addGeneratedSurfaceDetail(pack, world);
+  await addParentBodyView(pack, world);
   return world;
 }
 
@@ -229,11 +445,16 @@ function showWorldPanel(pack, environment) {
     panel.style.cssText = 'position:fixed;top:76px;left:18px;z-index:999;background:rgba(10,12,18,.88);border:1px solid rgba(255,255,255,.22);border-radius:10px;padding:12px 14px;color:#fff;font:12px Inter,sans-serif;max-width:260px;line-height:1.45;';
     document.body.appendChild(panel);
   }
+  const compact = globalThis.innerWidth <= 600;
+  panel.style.left = compact ? '10px' : '18px';
+  panel.style.right = compact ? '10px' : 'auto';
+  panel.style.maxWidth = compact ? 'none' : '260px';
   const temperatureC = Math.round(environment.temperatureK - 273.15);
   const pressure = environment.pressurePa >= 1000
     ? `${(environment.pressurePa / 1000).toFixed(1)} kPa`
     : `${Math.round(environment.pressurePa)} Pa`;
-  panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C</span><br><small style="opacity:.72;">${pack.representation}</small>`;
+  panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C</span><br><small style="opacity:.72;">${pack.representation}</small><canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:220px;max-width:100%;height:105px;margin-top:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:5px;color:#a7f3d0;">Follow the field beacons · use E or Explore nearby</small><button id="planetaryJournalBtn" type="button" style="display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid rgba(167,243,208,.5);border-radius:6px;color:#eafff6;background:rgba(16,82,65,.66);font:700 10px Inter,sans-serif;cursor:pointer;">Open Journal &amp; Field Guide</button>`;
+  panel.querySelector('#planetaryJournalBtn')?.addEventListener('click', () => appCtx.openPlanetaryJournal?.('journal'));
   panel.style.display = 'block';
 }
 
@@ -248,6 +469,11 @@ function showReturnButton(pack) {
     document.body.appendChild(button);
   }
   button.textContent = `Leave ${getAstronomicalBody(pack.bodyId).name}`;
+  const compact = globalThis.innerWidth <= 600;
+  const panelBottom = document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
+  const compactTop = Number.isFinite(panelBottom) ? Math.ceil(panelBottom + 10) : 330;
+  button.style.setProperty('top', compact ? `${compactTop}px` : '82px', compact ? 'important' : '');
+  button.style.right = compact ? '10px' : '20px';
   button.style.display = 'block';
 }
 
@@ -260,6 +486,9 @@ function setSolidWorldInterfaceActive(active) {
 }
 
 function hideActiveWorld() {
+  appCtx.clearBlockBuilderForWorldReload?.();
+  appCtx.clearPlanetaryFieldActivities?.();
+  appCtx.clearPlanetarySky?.();
   if (activePack) {
     const world = worldCache.get(activePack.bodyId);
     if (world) {
@@ -286,6 +515,20 @@ function hideActiveWorld() {
       appCtx.camera.far = priorWorldPresentation.cameraFar;
       appCtx.camera.updateProjectionMatrix?.();
     }
+    if (appCtx.scene) {
+      appCtx.scene.background = priorWorldPresentation.background;
+      appCtx.scene.fog = priorWorldPresentation.fog;
+    }
+    if (appCtx.sun) {
+      if (priorWorldPresentation.sunColor != null) appCtx.sun.color?.setHex?.(priorWorldPresentation.sunColor);
+      if (Number.isFinite(priorWorldPresentation.sunIntensity)) appCtx.sun.intensity = priorWorldPresentation.sunIntensity;
+    }
+    if (appCtx.ambientLight && Number.isFinite(priorWorldPresentation.ambientIntensity)) {
+      appCtx.ambientLight.intensity = priorWorldPresentation.ambientIntensity;
+    }
+    if (appCtx.fillLight && Number.isFinite(priorWorldPresentation.fillIntensity)) {
+      appCtx.fillLight.intensity = priorWorldPresentation.fillIntensity;
+    }
     priorWorldPresentation = null;
   }
   activePack = null;
@@ -296,6 +539,14 @@ async function arriveAtSolidWorld(bodyInput) {
   const pack = SOLID_WORLD_PACKS[bodyId];
   if (!pack) return false;
   const requestId = ++transitionId;
+  const body = getAstronomicalBody(bodyId);
+  appCtx.showLoad?.(`Preparing ${body.name} surface...`, {
+    background: body.presentation.globalTexturePath,
+    mode: 'space',
+    overlay: 0.38,
+    bold: true
+  });
+  try {
   suspendEarthModesForPlanetaryEntry(ENV.PLANETARY);
   appCtx.setPauseReason?.('planetary_transition', true);
   const world = await createSolidWorld(pack);
@@ -305,18 +556,23 @@ async function arriveAtSolidWorld(bodyInput) {
   appCtx.activeSolidWorldSurface = world.surface;
   const environment = samplePhysicalEnvironment(bodyId, { heightM: 0, timestampS: Date.now() / 1000 });
   appCtx.activePlanetaryEnvironment = environment;
-  appCtx.planetaryTravelCapabilities = bodyId === 'venus'
-    ? Object.freeze({ drive: true, walk: false, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false })
-    : Object.freeze({ drive: true, walk: true, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
-  appCtx.scene.background = new THREE.Color(pack.skyColor);
-  appCtx.scene.fog = pack.fogColor == null ? null : new THREE.FogExp2(pack.fogColor, bodyId === 'venus' ? 0.00042 : 0);
+  appCtx.planetaryTravelCapabilities = pack.capabilities;
+  appCtx.activatePlanetaryFieldActivities?.(pack, world, (x, z) => sampleModeledRelief(pack, x, z));
   if (!priorWorldPresentation) {
     priorWorldPresentation = {
       exposure: Number(appCtx.renderer?.toneMappingExposure),
-      cameraFar: Number(appCtx.camera?.far)
+      cameraFar: Number(appCtx.camera?.far),
+      background: appCtx.scene?.background || null,
+      fog: appCtx.scene?.fog || null,
+      sunColor: appCtx.sun?.color?.getHex?.(),
+      sunIntensity: Number(appCtx.sun?.intensity),
+      ambientIntensity: Number(appCtx.ambientLight?.intensity),
+      fillIntensity: Number(appCtx.fillLight?.intensity)
     };
   }
-  if (appCtx.renderer) appCtx.renderer.toneMappingExposure = bodyId === 'mercury' ? 1.18 : 1.04;
+  appCtx.scene.background = new THREE.Color(pack.skyColor);
+  appCtx.scene.fog = pack.fogColor == null ? null : new THREE.FogExp2(pack.fogColor, pack.fogDensity);
+  if (appCtx.renderer) appCtx.renderer.toneMappingExposure = pack.exposure;
   if (appCtx.camera) {
     appCtx.camera.far = Math.max(30_000, appCtx.camera.far);
     appCtx.camera.updateProjectionMatrix?.();
@@ -326,21 +582,28 @@ async function arriveAtSolidWorld(bodyInput) {
     appCtx.sun.intensity = pack.sunIntensity;
     appCtx.sun.position.set(-160, 220, 70);
   }
-  if (appCtx.ambientLight) appCtx.ambientLight.intensity = bodyId === 'mercury' ? 0.38 : pack.ambientIntensity;
-  if (appCtx.fillLight) appCtx.fillLight.intensity = bodyId === 'venus' ? 0.4 : 0.2;
-  positionPlayer(pack);
+  if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity;
+  if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity;
   appCtx.setTravelMode?.('drive', { source: `${bodyId}_arrival`, emitTutorial: false });
+  positionPlayer(pack);
   await appCtx.setPlanetaryVehicle?.(bodyId);
   if (requestId !== transitionId) return false;
   appCtx.setPlanetaryCharacter?.(bodyId);
   appCtx.setPlanetarySky?.(bodyId);
   if (!commitEnvironment(ENV.PLANETARY, { source: `${bodyId}_arrival` })) return false;
+  appCtx.refreshBlockBuilderForCurrentLocation?.();
   showWorldPanel(pack, environment);
   showReturnButton(pack);
   setSolidWorldInterfaceActive(true);
   appCtx.syncTravelModeButtons?.();
-  appCtx.setPauseReason?.('planetary_transition', false);
+  appCtx.updateControlsModeUI?.();
   return true;
+  } finally {
+    if (requestId === transitionId) {
+      appCtx.hideLoad?.();
+      appCtx.setPauseReason?.('planetary_transition', false);
+    }
+  }
 }
 
 function sampleActiveSolidWorldHeight(x, z) {

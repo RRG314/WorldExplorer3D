@@ -1,4 +1,4 @@
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 
 export function updatePlanetaryVehicleHeight(appCtx, dt, options = {}) {
   const { planetarySurface, getPlanetaryGravity } = options;

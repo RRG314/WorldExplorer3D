@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=1';
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=1';
 import {
@@ -8,18 +8,6 @@ import {
 } from './spacecraft-authority.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
-const BODY_RADIUS_KM = Object.freeze({
-  sun: 695700,
-  mercury: 2439.7,
-  venus: 6051.8,
-  earth: 6371,
-  moon: 1737.4,
-  mars: 3389.5,
-  jupiter: 69911,
-  saturn: 58232,
-  uranus: 25362,
-  neptune: 24622
-});
 
 function setMetric(labelId, valueId, unitId, label, value, unit) {
   const labelElement = document.getElementById(labelId);
@@ -320,7 +308,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     const physicalNavigation = appCtx.spacecraftState && missionBody
       ? computeBodyRelativeNavigation(appCtx.spacecraftState, missionBody)
       : null;
-    const physicalRadius = BODY_RADIUS_KM[physicalBodyId];
+    const physicalRadius = getAstronomicalBody(physicalBodyId)?.physical?.meanRadiusM / 1000;
     const sceneToKm = physicalRadius && activeHudBody.radius > 0
       ? physicalRadius / activeHudBody.radius
       : null;

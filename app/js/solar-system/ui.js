@@ -4,10 +4,15 @@ import {
   hidePlanetInfo,
   showAsteroidInfo,
   showGalaxyInfo,
+  showMoonInfo,
   showPlanetInfo,
   showSpacecraftInfo,
   showSunInfo
-} from "./info-panel.js?v=2";
+} from "./info-panel.js?v=3";
+import {
+  getAstronomicalBody,
+  SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
+} from '../astronomy/body-catalog.js?v=2';
 
 function formatKilometers(km) {
   if (km >= 1e9) return (km / 1e9).toFixed(1) + 'B';
@@ -27,6 +32,7 @@ export function onSolarSystemClick(ctx, event) {
   ctx.solarSystem.planetMeshes.forEach((entry) => {
     clickables.push(entry.mesh, entry.hitbox);
   });
+  ctx.solarSystem.moonMeshes.forEach((entry) => clickables.push(entry.mesh, entry.hitbox));
   ctx.solarSystem.asteroidMeshes.forEach((entry) => {
     clickables.push(entry.mesh, entry.hitbox);
   });
@@ -53,6 +59,7 @@ export function onSolarSystemClick(ctx, event) {
   while (
     target &&
     !target.userData.isPlanet &&
+    !target.userData.isMoon &&
     !target.userData.isAsteroid &&
     !target.userData.isSpacecraft &&
     !target.userData.isGalaxy &&
@@ -67,6 +74,9 @@ export function onSolarSystemClick(ctx, event) {
     const idx = target.userData.planetIndex;
     const entry = ctx.solarSystem.planetMeshes.find((item) => item.planet === ctx.SOLAR_SYSTEM_PLANETS[idx]);
     if (entry) showPlanetInfo(ctx, entry);
+  } else if (target && target.userData.isMoon) {
+    const entry = ctx.solarSystem.moonMeshes[target.userData.moonIndex];
+    if (entry) showMoonInfo(ctx, entry);
   } else if (target && target.userData.isAsteroid) {
     const idx = target.userData.asteroidIndex;
     const entry = ctx.solarSystem.asteroidMeshes.find((item) => item.asteroid === ctx.NAMED_ASTEROIDS[idx]);
@@ -132,7 +142,7 @@ export function createInfoPanel(ctx) {
   ctx.solarSystem.infoPanel = panel;
   document.getElementById('ssInfoClose').addEventListener('click', () => hidePlanetInfo(ctx));
   document.getElementById('ssInfoSetCourse').addEventListener('click', () => {
-    const bodyId = ctx.solarSystem.selectedPlanet?.planet?.bodyId;
+    const bodyId = ctx.solarSystem.selectedBodyId;
     const result = ctx.appCtx.retargetRenderedSpaceJourney?.(bodyId);
     if (result?.accepted) hidePlanetInfo(ctx);
   });
@@ -188,9 +198,10 @@ export function createToggleButton(ctx) {
   `;
   destinationSelect.innerHTML = `
     <option value="">SET COURSE...</option>
-    ${ctx.SOLAR_SYSTEM_PLANETS
-      .filter((planet) => planet.bodyId !== 'earth')
-      .map((planet) => `<option value="${planet.bodyId}">${planet.name.toUpperCase()}</option>`)
+    ${SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
+      .map((bodyId) => getAstronomicalBody(bodyId))
+      .filter(Boolean)
+      .map((body) => `<option value="${body.id}">${body.name.toUpperCase()}</option>`)
       .join('')}
   `;
   destinationSelect.addEventListener('change', () => {

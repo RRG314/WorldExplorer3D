@@ -490,6 +490,12 @@ function initMobileControls() {
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     let actions = profile.actions;
+    if (appCtx.activePlanetaryBodyId && (mode === 'walking' || mode === 'driving')) {
+      actions = [
+        ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
+        { label: 'Explore', binding: { channel: 'earth', key: 'KeyE' } }
+      ];
+    }
     if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {
       actions = Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : [];
       actions.push({ label: 'DeFlock', binding: { channel: 'earth', key: 'KeyE' } });

@@ -10,13 +10,14 @@ import {
   LANDING_MODE,
   listAstronomicalBodies,
   normalizeAstronomicalBodyId,
+  SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS,
   SOLAR_SYSTEM_PLANET_IDS
 } from '../app/js/astronomy/body-catalog.js';
 import { PLANETARY_BODIES } from '../app/js/planetary/catalog.js';
 import { SOLAR_SYSTEM_PLANETS } from '../app/js/solar-system/catalog.js';
 
 test('catalog publishes one immutable record for all eight planets', () => {
-  assert.equal(BODY_CATALOG_VERSION, '1.0.0');
+  assert.equal(BODY_CATALOG_VERSION, '1.1.0');
   assert.deepEqual(SOLAR_SYSTEM_PLANET_IDS, [
     'mercury', 'venus', 'earth', 'mars',
     'jupiter', 'saturn', 'uranus', 'neptune'
@@ -36,6 +37,33 @@ test('catalog publishes one immutable record for all eight planets', () => {
     assert.ok(body.physical.orbitalPeriodS > 0);
     assert.ok(body.frames.inertial);
     assert.ok(body.frames.bodyFixed);
+  }
+});
+
+test('the public solar-system route list contains only implemented reviewed destinations', () => {
+  assert.deepEqual(SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS, [
+    'moon', 'mercury', 'venus', 'mars',
+    'jupiter', 'io', 'europa',
+    'saturn', 'titan', 'enceladus', 'uranus', 'neptune', 'triton',
+    'ceres', 'vesta', 'pluto'
+  ]);
+  assert.equal(new Set(SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS).size, SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.length);
+  for (const id of SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS) {
+    const body = getAstronomicalBody(id);
+    assert.ok(body, `${id} must resolve through the canonical catalog`);
+    assert.notEqual(body.exploration.landingMode, LANDING_MODE.NOT_EXPLORABLE);
+  }
+});
+
+test('cataloged regional moons remain hidden until they own distinctive surface packs', () => {
+  for (const id of ['phobos', 'deimos', 'ganymede', 'callisto']) {
+    const body = getAstronomicalBody(id);
+    assert.equal(body.exploration.experienceTier, 'regional');
+    assert.equal(SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.includes(id), false);
+  }
+  for (const id of ['io', 'europa', 'titan', 'enceladus', 'triton', 'ceres', 'vesta', 'pluto']) {
+    assert.equal(getAstronomicalBody(id).exploration.experienceTier, 'featured');
+    assert.equal(SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.includes(id), true);
   }
 });
 

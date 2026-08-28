@@ -18,7 +18,7 @@ import {
   showStarInfo,
   ensureStarCatalogLoaded
 } from "./sky/starfield-ui.js?v=15";
-import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
+import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=3";
 import {
   activateMoonSurface,
   createMoonSurface as createMoonSurfaceRuntime

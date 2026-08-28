@@ -1,4 +1,4 @@
-import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=1';
+import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=2';
 import {
   createWorldAddress,
   worldAddressKey
@@ -276,11 +276,258 @@ const MAXWELL_MONTES_SURFACE_REGION = createSurfaceRegionManifest({
   rollbackId: 'venus-maxwell-modeled-runtime-v1'
 });
 
+function createModeledMissionSurface({
+  regionId,
+  bodyId,
+  displayName,
+  latitudeDeg,
+  longitudeDegPositiveEast,
+  coordinateSystem,
+  verticalDatum,
+  source,
+  asset,
+  rollbackId
+}) {
+  return createSurfaceRegionManifest({
+    regionId,
+    bodyId,
+    displayName,
+    truthClass: SURFACE_TRUTH_CLASS.MODELED,
+    address: {
+      latitudeDeg,
+      longitudeDegPositiveEast,
+      heightM: 0,
+      scopeType: 'world',
+      scopeId: 'public'
+    },
+    coordinateSystem,
+    verticalDatum,
+    metersPerUnit: 1,
+    localBounds: { minX: -8000, maxX: 8000, minZ: -8000, maxZ: 8000 },
+    renderPlacement: { x: 0, y: -80, z: 0 },
+    source,
+    assets: [asset],
+    rollbackId
+  });
+}
+
+const IO_TVASHTAR_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'io-tvashtar-paterae',
+  bodyId: 'io',
+  displayName: 'Tvashtar Paterae',
+  latitudeDeg: 62.3,
+  longitudeDegPositiveEast: 123.5,
+  coordinateSystem: 'IAU Io planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Voyager and Galileo morphology; not local elevation data',
+  source: {
+    title: 'Io global color mosaic from Voyager and Galileo imagery',
+    url: 'https://science.nasa.gov/resource/io-the-volcanic-moon/',
+    provider: 'NASA/JPL/USGS',
+    attribution: 'NASA/JPL/USGS',
+    rights: 'NASA and USGS source imagery is used with mission credit retained.',
+    processing: 'Observed global color context is projected onto modeled local volcanic terrain; active eruptions are not claimed at the player location.'
+  },
+  asset: {
+    id: 'io-voyager-galileo-context',
+    role: 'albedo',
+    url: '/app/assets/textures/io-voyager-galileo.jpg',
+    sourceProduct: 'Voyager/Galileo Io global color mosaic PIA09257'
+  },
+  rollbackId: 'io-tvashtar-modeled-runtime-v1'
+});
+
+const EUROPA_CONAMARA_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'europa-conamara-chaos',
+  bodyId: 'europa',
+  displayName: 'Conamara Chaos',
+  latitudeDeg: 8.6,
+  longitudeDegPositiveEast: 274.7,
+  coordinateSystem: 'IAU Europa planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Voyager and Galileo imaging; not local elevation data',
+  source: {
+    title: 'Europa global views from Voyager and Galileo imagery',
+    url: 'https://science.nasa.gov/resource/europa-in-true-color/',
+    provider: 'NASA/JPL-Caltech/SETI Institute',
+    attribution: 'NASA/JPL-Caltech/SETI Institute',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'Observed color and lineae context is projected onto modeled local ice relief; subsurface structure is not depicted as observed.'
+  },
+  asset: {
+    id: 'europa-voyager-galileo-context',
+    role: 'albedo',
+    url: '/app/assets/textures/europa-voyager-galileo.jpg',
+    sourceProduct: 'Voyager/Galileo Europa global views PIA01295'
+  },
+  rollbackId: 'europa-conamara-modeled-runtime-v1'
+});
+
+const TITAN_SHANGRI_LA_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'titan-shangri-la',
+  bodyId: 'titan',
+  displayName: 'Shangri-La Dunes',
+  latitudeDeg: -10,
+  longitudeDegPositiveEast: 165,
+  coordinateSystem: 'IAU Titan planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled dune relief informed by Cassini radar and global imaging; not local elevation data',
+  source: {
+    title: 'Cassini Imaging Science Subsystem global Titan map',
+    url: 'https://science.nasa.gov/resource/titan-global-map-june-2015/',
+    provider: 'NASA/JPL-Caltech/Space Science Institute',
+    attribution: 'NASA/JPL-Caltech/Space Science Institute',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'Near-infrared observed context is projected onto modeled dune terrain; surface visibility is intentionally limited by Titan haze.'
+  },
+  asset: {
+    id: 'titan-cassini-iss-context',
+    role: 'near-infrared-albedo',
+    url: '/app/assets/textures/titan-cassini-iss.jpg',
+    resolutionM: 4000,
+    sourceProduct: 'Cassini ISS Titan global map PIA19658'
+  },
+  rollbackId: 'titan-shangri-la-modeled-runtime-v1'
+});
+
+const ENCELADUS_SOUTH_POLAR_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'enceladus-south-polar-terrain',
+  bodyId: 'enceladus',
+  displayName: 'South Polar Terrain',
+  latitudeDeg: -82,
+  longitudeDegPositiveEast: 30,
+  coordinateSystem: 'IAU Enceladus planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Cassini imaging; not local elevation data',
+  source: {
+    title: 'Cassini global infrared and visible Enceladus mosaic',
+    url: 'https://science.nasa.gov/resource/enceladus-global-color-mosaic/',
+    provider: 'NASA/JPL-Caltech/University of Arizona/LPG-CNRS-University of Nantes/Space Science Institute',
+    attribution: 'NASA/JPL-Caltech/University of Arizona/LPG-CNRS/University of Nantes/Space Science Institute',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'Observed infrared/visible context is projected onto modeled fracture terrain; plume activity is presented as scientific context, not a guaranteed event.'
+  },
+  asset: {
+    id: 'enceladus-cassini-context',
+    role: 'enhanced-color-albedo',
+    url: '/app/assets/textures/enceladus-cassini.jpg',
+    resolutionM: 200,
+    sourceProduct: 'Cassini VIMS/ISS Enceladus mosaic PIA24027'
+  },
+  rollbackId: 'enceladus-south-polar-modeled-runtime-v1'
+});
+
+const TRITON_CANTALOUPE_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'triton-voyager-hemisphere',
+  bodyId: 'triton',
+  displayName: 'Voyager Imaged Hemisphere',
+  latitudeDeg: -20,
+  longitudeDegPositiveEast: 315,
+  coordinateSystem: 'IAU Triton planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Voyager 2 imagery; coverage is limited to the observed hemisphere',
+  source: {
+    title: 'Voyager 2 enhanced-color global Triton map',
+    url: 'https://science.nasa.gov/resource/global-color-map-of-triton/',
+    provider: 'NASA/JPL-Caltech/Lunar & Planetary Institute',
+    attribution: 'NASA/JPL-Caltech/Lunar & Planetary Institute',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'Observed color context is projected onto modeled cellular terrain; unobserved regions are not presented as mapped.'
+  },
+  asset: {
+    id: 'triton-voyager-context',
+    role: 'enhanced-color-albedo',
+    url: '/app/assets/textures/triton-voyager.jpg',
+    resolutionM: 600,
+    sourceProduct: 'Voyager 2 Triton global map PIA18668'
+  },
+  rollbackId: 'triton-voyager-modeled-runtime-v1'
+});
+
+const CERES_OCCATOR_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'ceres-occator-crater',
+  bodyId: 'ceres',
+  displayName: 'Occator Crater',
+  latitudeDeg: 19.82,
+  longitudeDegPositiveEast: 239.3,
+  coordinateSystem: 'IAU Ceres planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Dawn imaging; not local elevation data',
+  source: {
+    title: 'Dawn enhanced-color Ceres map',
+    url: 'https://science.nasa.gov/resource/colorful-ceres/',
+    provider: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
+    attribution: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'Enhanced-color observed context is projected onto modeled crater terrain; colors emphasize compositional differences.'
+  },
+  asset: {
+    id: 'ceres-dawn-context',
+    role: 'enhanced-color-albedo',
+    url: '/app/assets/textures/ceres-dawn-enhanced.jpg',
+    resolutionM: 140,
+    sourceProduct: 'Dawn Ceres enhanced-color map PIA20351'
+  },
+  rollbackId: 'ceres-occator-modeled-runtime-v1'
+});
+
+const VESTA_RHEASILVIA_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'vesta-rheasilvia-basin',
+  bodyId: 'vesta',
+  displayName: 'Rheasilvia Basin',
+  latitudeDeg: -75,
+  longitudeDegPositiveEast: 301,
+  coordinateSystem: 'IAU Vesta planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Dawn imaging; not local elevation data',
+  source: {
+    title: "Dawn false-color view of Vesta's southern hemisphere",
+    url: 'https://photojournal.jpl.nasa.gov/catalog/PIA15141',
+    provider: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
+    attribution: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'A clean observed-image window is projected onto modeled basin relief; false colors emphasize compositional differences and the local playable relief is not a measured DTM.'
+  },
+  asset: {
+    id: 'vesta-dawn-context',
+    role: 'albedo',
+    url: '/app/assets/textures/vesta-dawn-false-color.jpg',
+    sourceProduct: 'Dawn Vesta southern hemisphere false-color view PIA15141'
+  },
+  rollbackId: 'vesta-rheasilvia-modeled-runtime-v1'
+});
+
+const PLUTO_SPUTNIK_SURFACE_REGION = createModeledMissionSurface({
+  regionId: 'pluto-sputnik-planitia',
+  bodyId: 'pluto',
+  displayName: 'Sputnik Planitia',
+  latitudeDeg: 24,
+  longitudeDegPositiveEast: 175,
+  coordinateSystem: 'IAU Pluto planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by New Horizons imagery; imaging coverage and resolution vary',
+  source: {
+    title: 'New Horizons enhanced-color Pluto map',
+    url: 'https://science.nasa.gov/resource/pluto-global-color-map/',
+    provider: 'NASA/JHUAPL/SwRI',
+    attribution: 'NASA/JHUAPL/SwRI',
+    rights: 'NASA mission imagery is used with mission credit retained.',
+    processing: 'Observed global color context is projected onto modeled nitrogen-ice cells and water-ice mountain relief; local relief is not a measured DTM.'
+  },
+  asset: {
+    id: 'pluto-new-horizons-context',
+    role: 'enhanced-color-albedo',
+    url: '/app/assets/textures/pluto-new-horizons.jpg',
+    sourceProduct: 'New Horizons Pluto global color map PIA11707'
+  },
+  rollbackId: 'pluto-sputnik-modeled-runtime-v1'
+});
+
 const SURFACE_REGIONS = Object.freeze({
   [APOLLO11_SURFACE_REGION.regionId]: APOLLO11_SURFACE_REGION,
   [OLYMPUS_MONS_SURFACE_REGION.regionId]: OLYMPUS_MONS_SURFACE_REGION,
   [CALORIS_PLANITIA_SURFACE_REGION.regionId]: CALORIS_PLANITIA_SURFACE_REGION,
-  [MAXWELL_MONTES_SURFACE_REGION.regionId]: MAXWELL_MONTES_SURFACE_REGION
+  [MAXWELL_MONTES_SURFACE_REGION.regionId]: MAXWELL_MONTES_SURFACE_REGION,
+  [IO_TVASHTAR_SURFACE_REGION.regionId]: IO_TVASHTAR_SURFACE_REGION,
+  [EUROPA_CONAMARA_SURFACE_REGION.regionId]: EUROPA_CONAMARA_SURFACE_REGION,
+  [TITAN_SHANGRI_LA_SURFACE_REGION.regionId]: TITAN_SHANGRI_LA_SURFACE_REGION,
+  [ENCELADUS_SOUTH_POLAR_SURFACE_REGION.regionId]: ENCELADUS_SOUTH_POLAR_SURFACE_REGION,
+  [TRITON_CANTALOUPE_SURFACE_REGION.regionId]: TRITON_CANTALOUPE_SURFACE_REGION,
+  [CERES_OCCATOR_SURFACE_REGION.regionId]: CERES_OCCATOR_SURFACE_REGION,
+  [VESTA_RHEASILVIA_SURFACE_REGION.regionId]: VESTA_RHEASILVIA_SURFACE_REGION,
+  [PLUTO_SPUTNIK_SURFACE_REGION.regionId]: PLUTO_SPUTNIK_SURFACE_REGION
 });
 
 function getPlanetarySurfaceRegion(regionId) {
@@ -496,14 +743,22 @@ function ensurePlanetarySurfaceAuthority(appContext, options = {}) {
 export {
   APOLLO11_SURFACE_REGION,
   CALORIS_PLANITIA_SURFACE_REGION,
+  CERES_OCCATOR_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
   createSurfaceRegionManifest,
   ensurePlanetarySurfaceAuthority,
+  ENCELADUS_SOUTH_POLAR_SURFACE_REGION,
+  EUROPA_CONAMARA_SURFACE_REGION,
   getPlanetarySurfaceRegion,
   listPlanetarySurfaceRegions,
+  IO_TVASHTAR_SURFACE_REGION,
   MAXWELL_MONTES_SURFACE_REGION,
   OLYMPUS_MONS_SURFACE_REGION,
+  PLUTO_SPUTNIK_SURFACE_REGION,
   PLANETARY_SURFACE_SCHEMA_VERSION,
   SURFACE_PUBLICATION_STATUS,
-  SURFACE_TRUTH_CLASS
+  SURFACE_TRUTH_CLASS,
+  TITAN_SHANGRI_LA_SURFACE_REGION,
+  TRITON_CANTALOUPE_SURFACE_REGION,
+  VESTA_RHEASILVIA_SURFACE_REGION
 };

@@ -2,8 +2,8 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=4";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
-import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=1';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));

@@ -1,5 +1,5 @@
-import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=1';
-import { getPhysicalEnvironmentProfile, samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=1';
+import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { getPhysicalEnvironmentProfile, samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 
 const ATMOSPHERIC_EXPLORATION_SCHEMA_VERSION = 1;
 const MAX_ENTRY_ALTITUDE_M = 150_000;

@@ -4,11 +4,19 @@ import test from 'node:test';
 import {
   APOLLO11_SURFACE_REGION,
   CALORIS_PLANITIA_SURFACE_REGION,
+  CERES_OCCATOR_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
   createSurfaceRegionManifest,
+  ENCELADUS_SOUTH_POLAR_SURFACE_REGION,
+  EUROPA_CONAMARA_SURFACE_REGION,
+  IO_TVASHTAR_SURFACE_REGION,
   listPlanetarySurfaceRegions,
   MAXWELL_MONTES_SURFACE_REGION,
-  OLYMPUS_MONS_SURFACE_REGION
+  OLYMPUS_MONS_SURFACE_REGION,
+  PLUTO_SPUTNIK_SURFACE_REGION,
+  TITAN_SHANGRI_LA_SURFACE_REGION,
+  TRITON_CANTALOUPE_SURFACE_REGION,
+  VESTA_RHEASILVIA_SURFACE_REGION
 } from '../app/js/planetary/runtime/surface-authority.js';
 
 function readyPayload(region, sampleHeight = (x, z) => x * 0.1 + z * 0.01) {
@@ -30,7 +38,15 @@ test('published solid-world regions have isolated stable addresses and complete 
     'apollo-11-tranquility-base',
     'mars-olympus-mons',
     'mercury-caloris-planitia',
-    'venus-maxwell-montes'
+    'venus-maxwell-montes',
+    'io-tvashtar-paterae',
+    'europa-conamara-chaos',
+    'titan-shangri-la',
+    'enceladus-south-polar-terrain',
+    'triton-voyager-hemisphere',
+    'ceres-occator-crater',
+    'vesta-rheasilvia-basin',
+    'pluto-sputnik-planitia'
   ]);
   for (const region of regions) {
     assert.equal(region.address.bodyId, region.bodyId);
@@ -42,13 +58,27 @@ test('published solid-world regions have isolated stable addresses and complete 
     assert.ok(region.source.rights);
     assert.ok(region.source.processing);
     assert.ok(region.assets.length > 0);
-    assert.ok(region.assets.some((asset) => ['albedo', 'radar-albedo'].includes(asset.role)));
+    assert.ok(region.assets.some((asset) => asset.role.includes('albedo') || asset.role === 'height'));
     assert.ok(region.assets.every((asset) => asset.sourceProduct && asset.url.startsWith('/app/assets/')));
+    assert.ok(region.rollbackId);
     assert.equal(Object.isFrozen(region), true);
   }
   assert.equal(new Set(regions.map((region) => region.addressKey)).size, regions.length);
   assert.equal(CALORIS_PLANITIA_SURFACE_REGION.truthClass, 'modeled');
   assert.equal(MAXWELL_MONTES_SURFACE_REGION.truthClass, 'modeled');
+  for (const region of [
+    IO_TVASHTAR_SURFACE_REGION,
+    EUROPA_CONAMARA_SURFACE_REGION,
+    TITAN_SHANGRI_LA_SURFACE_REGION,
+    ENCELADUS_SOUTH_POLAR_SURFACE_REGION,
+    TRITON_CANTALOUPE_SURFACE_REGION,
+    CERES_OCCATOR_SURFACE_REGION,
+    VESTA_RHEASILVIA_SURFACE_REGION,
+    PLUTO_SPUTNIK_SURFACE_REGION
+  ]) {
+    assert.equal(region.truthClass, 'modeled');
+    assert.match(region.source.processing, /modeled/i);
+  }
   assert.notEqual(APOLLO11_SURFACE_REGION.addressKey, OLYMPUS_MONS_SURFACE_REGION.addressKey);
 });
 

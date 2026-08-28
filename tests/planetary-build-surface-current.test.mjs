@@ -9,6 +9,7 @@ import {
   APOLLO11_SURFACE_REGION,
   CALORIS_PLANITIA_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
+  listPlanetarySurfaceRegions,
   MAXWELL_MONTES_SURFACE_REGION,
   OLYMPUS_MONS_SURFACE_REGION
 } from '../app/js/planetary/runtime/surface-authority.js';
@@ -59,12 +60,7 @@ test('a stale accepted surface cannot answer for the currently active body', asy
 });
 
 test('every published solid world round-trips blocks through body-local storage', () => {
-  for (const region of [
-    APOLLO11_SURFACE_REGION,
-    OLYMPUS_MONS_SURFACE_REGION,
-    CALORIS_PLANITIA_SURFACE_REGION,
-    MAXWELL_MONTES_SURFACE_REGION
-  ]) {
+  for (const region of listPlanetarySurfaceRegions()) {
     const renderGrid = { gx: 211, gy: -98.5, gz: -944 };
     const stored = planetaryBlockStorageCoordinates(renderGrid, region.renderPlacement);
     const restored = planetaryBlockRenderCoordinates(stored, region.renderPlacement);
@@ -74,7 +70,7 @@ test('every published solid world round-trips blocks through body-local storage'
 });
 
 test('generic solid worlds use their active accepted surface instead of Earth', async () => {
-  for (const region of [CALORIS_PLANITIA_SURFACE_REGION, MAXWELL_MONTES_SURFACE_REGION]) {
+  for (const region of listPlanetarySurfaceRegions().filter((entry) => !['moon', 'mars'].includes(entry.bodyId))) {
     const authority = createPlanetarySurfaceAuthority();
     await authority.prepare(region.regionId, () => readyPayload(region, (x, z) => x * 0.03 + z * 0.02));
     const appContext = {

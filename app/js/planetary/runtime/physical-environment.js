@@ -3,7 +3,7 @@ import {
   getAstronomicalBody,
   LANDING_MODE,
   TRUTH_CLASS
-} from '../../astronomy/body-catalog.js?v=1';
+} from '../../astronomy/body-catalog.js?v=2';
 import { normalizeLatitudeDeg, normalizePositiveEastLongitudeDeg } from '../../astronomy/frames.js?v=1';
 
 const PHYSICAL_ENVIRONMENT_SCHEMA_VERSION = 1;
@@ -46,6 +46,78 @@ const PROFILE_ROWS = [
     scaleHeightM: 11_100, lapseRateKPerM: 0.0045, referenceVisibilityM: 45_000,
     weatherModelId: 'mars_dust_and_wind', windReferenceMps: 7,
     hazards: ['low_pressure', 'cold', 'dust', 'radiation']
+  },
+  {
+    id: 'phobos', referenceTemperatureK: 233, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'microgravity', 'radiation']
+  },
+  {
+    id: 'deimos', referenceTemperatureK: 233, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'microgravity', 'radiation']
+  },
+  {
+    id: 'io', referenceTemperatureK: 110, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'extreme_radiation', 'active_volcanism']
+  },
+  {
+    id: 'europa', referenceTemperatureK: 102, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'extreme_cold', 'extreme_radiation', 'ice_surface']
+  },
+  {
+    id: 'ganymede', referenceTemperatureK: 110, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'extreme_cold', 'radiation', 'ice_surface']
+  },
+  {
+    id: 'callisto', referenceTemperatureK: 134, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'extreme_cold', 'ice_surface']
+  },
+  {
+    id: 'titan', referenceTemperatureK: 94, referenceDensityKgM3: 5.3,
+    scaleHeightM: 40_000, lapseRateKPerM: 0.001, referenceVisibilityM: 5_000,
+    weatherModelId: 'titan_nitrogen_methane_haze', windReferenceMps: 2,
+    hazards: ['extreme_cold', 'unbreathable_atmosphere', 'methane_haze']
+  },
+  {
+    id: 'enceladus', referenceTemperatureK: 75, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'extreme_cold', 'ice_surface', 'plume_context']
+  },
+  {
+    id: 'triton', referenceTemperatureK: 38, referenceDensityKgM3: 0.00001,
+    scaleHeightM: 20_000, lapseRateKPerM: 0.0002, referenceVisibilityM: 90_000,
+    weatherModelId: 'triton_thin_nitrogen_context', windReferenceMps: 1,
+    hazards: ['near_vacuum', 'extreme_cold', 'nitrogen_ice']
+  },
+  {
+    id: 'ceres', referenceTemperatureK: 168, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'low_gravity', 'radiation']
+  },
+  {
+    id: 'vesta', referenceTemperatureK: 145, referenceDensityKgM3: 0,
+    scaleHeightM: null, lapseRateKPerM: 0, referenceVisibilityM: 1e9,
+    weatherModelId: 'none', windReferenceMps: 0,
+    hazards: ['vacuum', 'low_gravity', 'radiation']
+  },
+  {
+    id: 'pluto', referenceTemperatureK: 44, referenceDensityKgM3: 0.00002,
+    scaleHeightM: 50_000, lapseRateKPerM: 0.0001, referenceVisibilityM: 120_000,
+    weatherModelId: 'pluto_thin_nitrogen_haze', windReferenceMps: 0.5,
+    hazards: ['near_vacuum', 'extreme_cold', 'nitrogen_ice']
   },
   {
     id: 'jupiter', referenceTemperatureK: 165, referenceDensityKgM3: 0.16,

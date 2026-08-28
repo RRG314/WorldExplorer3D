@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { planetarySurfaceYAtRenderXZ } from './runtime/surface-query.js?v=1';
+import { activePlanetaryBodyId, planetarySurfaceYAtRenderXZ } from './runtime/surface-query.js?v=2';
 
 const TRACK_CAPACITY = 320;
 const TRACK_SPACING = 2.1;
@@ -49,7 +49,7 @@ function clearPlanetaryTracks() {
 }
 
 function updatePlanetaryTracks() {
-  const body = appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : '';
+  const body = activePlanetaryBodyId(appCtx) || '';
   if (!body || appCtx.droneMode || appCtx.Walk?.state?.mode === 'walk') {
     if (trackMesh) trackMesh.visible = false;
     lastPosition = null;

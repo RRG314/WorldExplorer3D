@@ -2,7 +2,7 @@ import { APOLLO11_TERRAIN, loadApollo11Terrain } from './moon-lroc-terrain.js?v=
 import {
   APOLLO11_SURFACE_REGION,
   ensurePlanetarySurfaceAuthority
-} from '../planetary/runtime/surface-authority.js?v=1';
+} from '../planetary/runtime/surface-authority.js?v=2';
 
 function createMeasuredSurface(appCtx) {
   const geometry = new THREE.PlaneGeometry(

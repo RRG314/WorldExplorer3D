@@ -1,4 +1,4 @@
-import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=1';
+import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
 import {
   createJourneyEphemeris,
   createJourneyPresentationMap,
@@ -22,7 +22,7 @@ import {
   createAssistedDescentPlan,
   createAssistedTransferPlan
 } from './assisted-guidance.js?v=1';
-import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=1';
+import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import {
   advanceAtmosphericExploration,
   createAtmosphericExploration,
@@ -189,7 +189,9 @@ function installSpaceJourneyRuntime(appContext) {
     const body = appContext.getAllSpaceBodies?.().find((entry) =>
       normalizeAstronomicalBodyId(entry?.name) === normalized
     );
-    return body?.mesh && body?.position ? { mesh: body.mesh, radius: Number(body.radius) || 28 } : null;
+    return body?.mesh && body?.position
+      ? { mesh: { position: body.position }, sourceMesh: body.mesh, radius: Number(body.radius) || 28 }
+      : null;
   };
 
   const beginRenderedSpaceJourney = (options = {}) => {
@@ -760,7 +762,9 @@ function installSpaceJourneyRuntime(appContext) {
 
   const startFastTravelJourney = async (destinationInput, options = {}) => {
     const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
-    const sourceBodyId = options.sourceBodyId || (appContext.onMoon ? 'moon' : appContext.onMars ? 'mars' : 'earth');
+    const sourceBodyId = options.sourceBodyId
+      || appContext.activePlanetaryBodyId
+      || (appContext.onMoon ? 'moon' : appContext.onMars ? 'mars' : 'earth');
     if (!destinationBodyId || destinationBodyId === sourceBodyId) return false;
     const currentOperation = ++operationId;
     const result = completeFastTravelEvidence({

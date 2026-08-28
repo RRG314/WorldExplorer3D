@@ -10,7 +10,7 @@ import {
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=7";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
-import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
+import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=2";
 import {
   arcadeSteeringYawTarget,
   earthDrivingSteeringProfile,
@@ -22,7 +22,7 @@ import {
   mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=2";
 import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=5";
-import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=1';
+import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=2';
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -214,7 +214,15 @@ function update(dt) {
     moon: { normal: 24, boost: 29, accel: 0.82, boostAccel: 0.76 },
     mars: { normal: 18, boost: 22, accel: 0.72, boostAccel: 0.66 },
     mercury: { normal: 20, boost: 24, accel: 0.74, boostAccel: 0.68 },
-    venus: { normal: 10, boost: 12, accel: 0.55, boostAccel: 0.5 }
+    venus: { normal: 10, boost: 12, accel: 0.55, boostAccel: 0.5 },
+    io: { normal: 14, boost: 17, accel: 0.62, boostAccel: 0.56 },
+    europa: { normal: 12, boost: 15, accel: 0.5, boostAccel: 0.46 },
+    titan: { normal: 16, boost: 19, accel: 0.64, boostAccel: 0.58 },
+    enceladus: { normal: 9, boost: 12, accel: 0.42, boostAccel: 0.38 },
+    triton: { normal: 12, boost: 15, accel: 0.5, boostAccel: 0.45 },
+    ceres: { normal: 10, boost: 13, accel: 0.46, boostAccel: 0.41 },
+    vesta: { normal: 9, boost: 12, accel: 0.44, boostAccel: 0.39 },
+    pluto: { normal: 11, boost: 14, accel: 0.48, boostAccel: 0.43 }
   }[planetaryBodyId] || { normal: 18, boost: 22, accel: 0.7, boostAccel: 0.64 };
   let planetaryNormalMaxSpd = planetaryDriveProfile.normal;
 
