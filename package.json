@@ -67,6 +67,7 @@
     "verify:creature-quality": "node --test tests/creature-quality.test.mjs",
     "verify:astronomy-catalog": "node --test tests/astronomy-body-catalog-current.test.mjs",
     "verify:astronomy-frames": "node --test tests/astronomy-frames-world-address-current.test.mjs",
+    "verify:planetary-environment": "node --test tests/planetary-physical-environment-current.test.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",
