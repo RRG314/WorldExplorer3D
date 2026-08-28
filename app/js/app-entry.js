@@ -179,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=16').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=17').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

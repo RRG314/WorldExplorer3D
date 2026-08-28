@@ -59,13 +59,22 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
       const pz = surface.start.z + dz * t;
       const lateral = Math.hypot(x - px, z - pz);
       if (lateral > Math.max(0.7, deps.finiteNumber(surface.halfWidth, 1))) continue;
+      const rampY = surface.yStart + (surface.yEnd - surface.yStart) * t;
+      const referenceY = Number.isFinite(walkerFeetY) ? walkerFeetY : activeFloorY;
+      // Stair ramps and floor polygons intentionally overlap in plan view. A
+      // walker already following the ramp must keep that continuous surface;
+      // otherwise the flat floor wins as soon as the ramp rises by a few
+      // centimetres and the character walks through the stairs at lobby height.
+      // A vertically distant ramp remains ineligible, preventing a mid-flight
+      // snap from the floor to the middle of a staircase.
+      const continuousRamp = Math.abs(rampY - referenceY) <= 0.55;
       consider({
-        y: surface.yStart + (surface.yEnd - surface.yStart) * t,
+        y: rampY,
         source: 'interior_stairs',
         feature: surface,
         dist: lateral,
         pt: { x: px, z: pz }
-      }, -0.08);
+      }, continuousRamp ? -0.7 : 0.25);
       continue;
     }
     if (surface.kind === "polygon") {

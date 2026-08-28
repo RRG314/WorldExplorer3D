@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { runLoggedStep } from './run-logged-step.mjs';
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(path.join(root, 'config/system-release-gates.json'), 'utf8'));
@@ -80,23 +80,21 @@ mkdirSync(outputDir, { recursive: true });
 const results = [];
 
 for (const [id, gate] of selected) {
-  const startedAt = Date.now();
   console.log(`[system-release] START ${id} (${results.length + 1}/${selected.length})`);
-  const result = spawnSync(gate.command[0], gate.command.slice(1), {
+  const result = await runLoggedStep(gate.command, {
     cwd: root,
     env: { ...process.env, WE3D_VERIFY_ROOT: artifactRoot },
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024
+    logPath: path.join(outputDir, `${id}.log`)
   });
   const record = {
     id,
-    ok: result.status === 0 && !result.error,
-    durationMs: Date.now() - startedAt,
+    ok: result.ok,
+    durationMs: result.durationMs,
     status: result.status,
-    error: result.error ? String(result.error.stack || result.error) : ''
+    signal: result.signal,
+    error: result.error
   };
   results.push(record);
-  writeFileSync(path.join(outputDir, `${id}.log`), `${result.stdout || ''}${result.stderr || ''}`, 'utf8');
   console.log(`[system-release] ${record.ok ? 'PASS' : 'FAIL'} ${id} (${record.durationMs} ms)`);
   if (!record.ok) break;
 }
@@ -113,4 +111,3 @@ const report = {
 writeFileSync(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2), 'utf8');
 console.log(JSON.stringify(report, null, 2));
 if (!report.ok) process.exitCode = 1;
-

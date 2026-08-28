@@ -25,6 +25,7 @@ const tests = [
   'tests/field-retention.test.mjs',
   'tests/fish-population-authority.test.mjs',
   'tests/game-facing-language.test.mjs',
+  'tests/interior-stair-authority-current.test.mjs',
   'tests/live-gps-field-session.test.mjs',
   'tests/mobile-touch-authority.test.mjs',
   'tests/planetary-build-surface-current.test.mjs',
@@ -52,4 +53,3 @@ const result = spawnSync(process.execPath, ['--test', ...tests], {
 
 if (result.error) throw result.error;
 process.exitCode = Number(result.status || 0);
-
