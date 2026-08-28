@@ -314,6 +314,7 @@ async function arriveAtMars(expectedSessionId = null) {
 
   await createMarsSurface();
   if (!retainMarsTransitionOwnership(sessionId)) return false;
+  appCtx.refreshBlockBuilderForCurrentLocation?.();
   setMarsObjectsVisible(true);
   enterMarsDriveMode();
   positionPlayerOnMars();

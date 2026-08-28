@@ -1,14 +1,13 @@
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
+
 export function updatePlanetaryVehicleHeight(appCtx, dt, options = {}) {
-  const { planetarySurface, getPlanetaryGravity, getRaycaster, rayStart, rayDir } = options;
+  const { planetarySurface, getPlanetaryGravity } = options;
   let carY = Number.isFinite(appCtx.car?.y) ? appCtx.car.y : 1.2;
 
   planetarySurface.updateMatrixWorld(true);
-  const raycaster = getRaycaster();
   const sampleMoonSurfaceY = (sx, sz) => {
-    rayStart.set(sx, 1200, sz);
-    raycaster.set(rayStart, rayDir || new THREE.Vector3(0, -1, 0));
-    const sampleHits = raycaster.intersectObject(planetarySurface, false);
-    return sampleHits.length > 0 ? sampleHits[0].point.y + 1.2 : null;
+    const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, sx, sz);
+    return Number.isFinite(surfaceY) ? surfaceY + 1.2 : null;
   };
 
   const targetY = sampleMoonSurfaceY(appCtx.car.x, appCtx.car.z);

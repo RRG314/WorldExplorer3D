@@ -69,6 +69,7 @@
     "verify:astronomy-frames": "node --test tests/astronomy-frames-world-address-current.test.mjs",
     "verify:planetary-environment": "node --test tests/planetary-physical-environment-current.test.mjs",
     "verify:planetary-surface": "node --test tests/planetary-surface-authority-current.test.mjs",
+    "verify:planetary-build": "node --test tests/planetary-build-surface-current.test.mjs tests/block-local-store-current.test.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",

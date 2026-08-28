@@ -89,6 +89,7 @@ function finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon) {
   if (!appCtx.onMoon) return;
   createApollo11LandingSite();
   positionCarOnMoon();
+  appCtx.refreshBlockBuilderForCurrentLocation?.();
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
   if (appCtx.camera) {
     appCtx.camera.position.set(appCtx.car.x, appCtx.car.y + 5, appCtx.car.z - 10);

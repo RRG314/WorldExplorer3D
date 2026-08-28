@@ -1,4 +1,5 @@
 import { createApollo11SiteEquipment } from './apollo11-site.js?v=1';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
 
 function createMoonLandingUiApi(context) {
   const {
@@ -21,17 +22,10 @@ function createMoonLandingUiApi(context) {
     appCtx.car.z = playerSpawn.z;
     if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
 
-    appCtx.moonSurface.updateMatrixWorld(true);
-
-    const spawnRaycaster = new THREE.Raycaster();
-    const spawnRayStart = new THREE.Vector3(appCtx.car.x, 1000, appCtx.car.z);
-    const spawnRayDir = new THREE.Vector3(0, -1, 0);
-    spawnRaycaster.set(spawnRayStart, spawnRayDir);
-
-    const spawnHits = spawnRaycaster.intersectObject(appCtx.moonSurface, false);
+    const sampledGround = planetarySurfaceYAtRenderXZ(appCtx, appCtx.car.x, appCtx.car.z, { bodyId: 'moon' });
     let groundHeight;
-    if (spawnHits.length > 0) {
-      groundHeight = spawnHits[0].point.y;
+    if (Number.isFinite(sampledGround)) {
+      groundHeight = sampledGround;
       appCtx.car.y = groundHeight + 1.2;
     } else {
       groundHeight = appCtx.moonSurface.position.y;
@@ -72,22 +66,17 @@ function createMoonLandingUiApi(context) {
     const landingZ = landingSite.z;
     if (!Array.isArray(window._moonObjects)) window._moonObjects = [];
 
-    const raycaster = new THREE.Raycaster();
-    const rayStart = new THREE.Vector3(landingX, 1000, landingZ);
-    const rayDir = new THREE.Vector3(0, -1, 0);
-    raycaster.set(rayStart, rayDir);
-
-    const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-    if (hits.length === 0) {
+    const sampledGround = planetarySurfaceYAtRenderXZ(appCtx, landingX, landingZ, { bodyId: 'moon' });
+    if (!Number.isFinite(sampledGround)) {
       console.error('Could not find ground at Apollo 11 site.');
       return;
     }
 
-    const groundY = hits[0].point.y;
+    const groundY = sampledGround;
 
     const groundAt = (x, z) => {
-      raycaster.set(new THREE.Vector3(x, 1000, z), rayDir);
-      return raycaster.intersectObject(appCtx.moonSurface, false)[0]?.point?.y ?? groundY;
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z, { bodyId: 'moon' });
+      return Number.isFinite(surfaceY) ? surfaceY : groundY;
     };
     const site = createApollo11SiteEquipment({ THREE, appCtx, landingX, landingZ, groundAt });
     apollo11Flag = site.flag;
@@ -114,18 +103,14 @@ function createMoonLandingUiApi(context) {
       const angle = i / 30 * Math.PI * 2;
       const radius = 5 + Math.random() * 10;
       const footprint = new THREE.Mesh(new THREE.CircleGeometry(0.4, 12), footprintMaterial);
-      const fpRayStart = new THREE.Vector3(
-        landingX + Math.cos(angle) * radius,
-        1000,
-        landingZ + Math.sin(angle) * radius
-      );
-      raycaster.set(fpRayStart, rayDir);
-      const fpHits = raycaster.intersectObject(appCtx.moonSurface, false);
-      if (fpHits.length > 0) {
+      const footprintX = landingX + Math.cos(angle) * radius;
+      const footprintZ = landingZ + Math.sin(angle) * radius;
+      const footprintY = planetarySurfaceYAtRenderXZ(appCtx, footprintX, footprintZ, { bodyId: 'moon' });
+      if (Number.isFinite(footprintY)) {
         footprint.position.set(
-          landingX + Math.cos(angle) * radius,
-          fpHits[0].point.y + 0.02,
-          landingZ + Math.sin(angle) * radius
+          footprintX,
+          footprintY + 0.02,
+          footprintZ
         );
         footprint.rotation.x = -Math.PI / 2;
         footprint.userData.moonObject = true;

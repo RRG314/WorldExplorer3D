@@ -1,10 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-
-function getPlanetarySurfaceMesh() {
-  if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
-  if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
-  return null;
-}
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
 
 function createWalkingTerrainHelpers({ car, state, CFG }) {
   function finiteOr(value, fallback) {
@@ -34,13 +29,9 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
 
   function getSafeDriveY(x, z, fallbackY) {
     let y = fallbackY;
-    const planetarySurface = getPlanetarySurfaceMesh();
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(x, 2200, z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      if (hits.length > 0 && Number.isFinite(hits[0].point.y)) y = hits[0].point.y + 1.2;
+    if (appCtx.onMoon || appCtx.onMars) {
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+      if (Number.isFinite(surfaceY)) y = surfaceY + 1.2;
     } else if (appCtx.SurfaceQuery) {
       const currentY = Number.isFinite(fallbackY) ? fallbackY - 1.2 : NaN;
       const surfaceY = appCtx.SurfaceQuery.driveAt(x, z, { currentY }).position.y;
@@ -50,13 +41,9 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
   }
 
   function getWalkGroundY(x, z, fallbackY = 0) {
-    const planetarySurface = getPlanetarySurfaceMesh();
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(x, 2200, z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      return hits.length > 0 && Number.isFinite(hits[0]?.point?.y) ? hits[0].point.y : fallbackY;
+    if (appCtx.onMoon || appCtx.onMars) {
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+      return Number.isFinite(surfaceY) ? surfaceY : fallbackY;
     }
 
     if (appCtx.SurfaceQuery) {

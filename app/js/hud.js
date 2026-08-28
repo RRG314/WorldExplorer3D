@@ -10,6 +10,7 @@ import {
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=1';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -604,15 +605,9 @@ function updateHUD() {
   if (appCtx.droneMode) {
     // Calculate ground elevation for altitude display
     let groundY = 0;
-    const planetarySurface = appCtx.onMars ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(appCtx.drone.x, 2000, appCtx.drone.z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir || new globalThis.THREE.Vector3(0, -1, 0));
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      if (hits.length > 0) {
-        groundY = hits[0].point.y;
-      }
+    if (appCtx.onMars || appCtx.onMoon) {
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, appCtx.drone.x, appCtx.drone.z);
+      if (Number.isFinite(surfaceY)) groundY = surfaceY;
     } else if (appCtx.terrainEnabled) {
       groundY = appCtx.SurfaceQuery?.terrainAt?.(appCtx.drone.x, appCtx.drone.z)?.position?.y ?? 0;
     }

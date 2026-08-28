@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=1';
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -89,17 +90,9 @@ function applyDroneRoofClearance(x, z, groundY, desiredY) {
 }
 
 function sampleDroneSpawnHeight(x, z) {
-  const planetarySurface = appCtx.onMars && appCtx.marsSurface ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
-  if (planetarySurface) {
-    const rc = appCtx._getPhysRaycaster?.();
-    if (rc && appCtx._physRayStart && appCtx._physRayDir) {
-      appCtx._physRayStart.set(x, 2000, z);
-      rc.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = rc.intersectObject(planetarySurface, false);
-      if (hits.length > 0 && Number.isFinite(hits[0]?.point?.y)) {
-        return hits[0].point.y + 10;
-      }
-    }
+  if (appCtx.onMars || appCtx.onMoon) {
+    const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+    if (Number.isFinite(surfaceY)) return surfaceY + 10;
     return 10;
   }
 

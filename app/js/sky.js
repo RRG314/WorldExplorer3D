@@ -274,6 +274,7 @@ function arriveAtMoon() {
     const resumeMoon = () => {
       if (!appCtx.onMoon) return;
       positionCarOnMoon();
+      appCtx.refreshBlockBuilderForCurrentLocation?.();
       if (appCtx.carMesh) appCtx.carMesh.visible = true;
       appCtx.setPauseReason?.('planetary_transition', false);
     };

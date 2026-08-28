@@ -2,6 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=4";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -9,12 +10,6 @@ function wrapYaw(angle = 0) {
 
 function isPlanetarySurface() {
   return !!(appCtx.onMoon || appCtx.onMars);
-}
-
-function getPlanetarySurfaceMesh() {
-  if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
-  if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
-  return null;
 }
 
 function createWalkingPhysicsHelpers({
@@ -160,13 +155,9 @@ function createWalkingPhysicsHelpers({
 
   function resolveWalkGroundState(x, z, walkerY, finiteOr) {
     let groundY;
-    const planetarySurface = getPlanetarySurfaceMesh();
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(x, 2200, z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      groundY = hits.length > 0 ? hits[0].point.y : -100;
+    if (isPlanetarySurface()) {
+      groundY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+      if (!Number.isFinite(groundY)) groundY = -100;
     } else {
       // Overlapping interior floors require a vertical reference. Preserve the
       // legacy outdoor query path, but choose the nearest published interior

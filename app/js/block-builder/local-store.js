@@ -28,17 +28,40 @@ export function createBlockLocalStore(options = {}) {
     }
   }
 
-  function preserveLegacyStorage() {
+  function migrateLegacyStorage() {
     if (!enabled || !globalThis.localStorage) return;
     try {
       if (localStorage.getItem(migrationKey) === 'done') return;
-      legacyKeys.forEach((key) => {
-        if (!key || key === storageKey || key === backupKey) return;
-      });
+      const currentStorageExists = localStorage.getItem(storageKey) !== null ||
+        localStorage.getItem(backupKey) !== null;
+      if (currentStorageExists) {
+        localStorage.setItem(migrationKey, 'done');
+        return;
+      }
+      for (const key of legacyKeys) {
+        if (!key || key === storageKey || key === backupKey) continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(localStorage.getItem(key));
+        } catch {
+          continue;
+        }
+        if (!Array.isArray(parsed)) continue;
+        const migrated = normalizeRows(parsed);
+        const previous = entries;
+        entries = migrated;
+        if (!save()) {
+          entries = previous;
+          return;
+        }
+        localStorage.setItem(migrationKey, 'done');
+        notice = 'migrated';
+        detail = `Migrated ${migrated.length} saved block${migrated.length === 1 ? '' : 's'} without deleting the previous copy.`;
+        return;
+      }
       localStorage.setItem(migrationKey, 'done');
-      detail = 'Existing local build data is preserved for compatibility on this browser.';
     } catch (error) {
-      console.warn('[blocks] Failed to preserve legacy build storage:', error);
+      console.warn('[blocks] Failed to migrate legacy build storage:', error);
     }
   }
 
@@ -130,8 +153,8 @@ export function createBlockLocalStore(options = {}) {
     enabled = storageState.enabled;
     detail = storageState.detail;
     notice = enabled ? 'none' : 'error';
-    preserveLegacyStorage();
     entries = load();
+    migrateLegacyStorage();
   }
 
   function countForLocation(locationKey) {

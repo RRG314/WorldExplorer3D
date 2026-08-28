@@ -11,6 +11,15 @@ import {
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
 import { createBlockLocalStore } from './block-builder/local-store.js?v=3';
 import { createSharedBlockSync } from './block-builder/shared-sync.js?v=3';
+import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=1';
+import {
+  activePlanetaryBodyId,
+  planetarySurfaceYAtRenderXZ
+} from './planetary/runtime/surface-query.js?v=1';
+import {
+  planetaryBlockRenderCoordinates,
+  planetaryBlockStorageCoordinates
+} from './block-builder/world-coordinates.js?v=1';
 // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
@@ -21,11 +30,14 @@ const BUILD_MAX_DISTANCE = 260;
 const BUILD_TOOLS = new Set(['place', 'remove']);
 const BUILD_HISTORY_LIMIT = 50;
 
-const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
-const BUILD_STORAGE_BACKUP_KEY = 'worldExplorer3D.buildBlocks.backup.v1';
+const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v2';
+const BUILD_STORAGE_BACKUP_KEY = 'worldExplorer3D.buildBlocks.backup.v2';
 const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
-const BUILD_STORAGE_MIGRATION_KEY = 'worldExplorer3D.buildBlocks.migrated.v2';
-const LEGACY_BUILD_STORAGE_KEYS = Object.freeze([]);
+const BUILD_STORAGE_MIGRATION_KEY = 'worldExplorer3D.buildBlocks.migrated.v3';
+const LEGACY_BUILD_STORAGE_KEYS = Object.freeze([
+  'worldExplorer3D.buildBlocks.v1',
+  'worldExplorer3D.buildBlocks.backup.v1'
+]);
 const BUILD_LOCATION_PRECISION = 5;
 const BUILD_MAX_PER_LOCATION = BLOCK_LIMIT_PER_LOCATION;
 const BUILD_MAX_TOTAL = 5000;
@@ -112,10 +124,41 @@ function getLocRef() {
   return loc;
 }
 
-function getCurrentLocationKey() {
+function getPlanetaryBuildWorldContext() {
+  const bodyId = activePlanetaryBodyId(appCtx);
+  if (!bodyId || (!appCtx.onMoon && !appCtx.onMars)) return null;
+  const active = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active || null;
+  if (!active || active.bodyId !== bodyId) return null;
+  const manifest = getPlanetarySurfaceRegion(active.regionId);
+  if (!manifest || manifest.bodyId !== bodyId) return null;
+  return Object.freeze({
+    kind: 'planetary',
+    locationKey: active.addressKey,
+    bodyId,
+    regionId: active.regionId,
+    addressKey: active.addressKey,
+    placement: manifest.renderPlacement
+  });
+}
+
+function getCurrentBuildWorldContext() {
+  const planetary = getPlanetaryBuildWorldContext();
+  if (planetary) return planetary;
+  if (appCtx.onMoon || appCtx.onMars) return null;
   const loc = getLocRef();
   if (!loc) return null;
-  return `${loc.lat.toFixed(BUILD_LOCATION_PRECISION)},${loc.lon.toFixed(BUILD_LOCATION_PRECISION)}`;
+  return Object.freeze({
+    kind: 'earth',
+    locationKey: `${loc.lat.toFixed(BUILD_LOCATION_PRECISION)},${loc.lon.toFixed(BUILD_LOCATION_PRECISION)}`,
+    bodyId: 'earth',
+    regionId: null,
+    addressKey: null,
+    placement: Object.freeze({ x: 0, y: 0, z: 0 })
+  });
+}
+
+function getCurrentLocationKey() {
+  return getCurrentBuildWorldContext()?.locationKey || null;
 }
 
 function worldToLatLonSafe(x, z) {
@@ -254,27 +297,51 @@ function showBuildTransientMessage(text) {
 }
 
 function canPersistBuildBlocks() {
-  if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined') {
-    return appCtx.isEnv(appCtx.ENV.EARTH);
-  }
-  return !appCtx.onMoon;
+  return !!getCurrentBuildWorldContext();
 }
 
 function normalizeBuildEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const locationKey = String(raw.locationKey || '');
-  const lat = Number(raw.lat);
-  const lon = Number(raw.lon);
+  const worldKind = raw.worldKind === 'planetary' ? 'planetary' : 'earth';
   const gy = Number(raw.gy);
   const gx = Number(raw.gx);
   const gz = Number(raw.gz);
 
   if (!locationKey) return null;
+  if (!isFiniteNumber(gx) || !isFiniteNumber(gy) || !isFiniteNumber(gz)) return null;
+
+  if (worldKind === 'planetary') {
+    const bodyId = String(raw.bodyId || '');
+    const regionId = String(raw.regionId || '');
+    const addressKey = String(raw.addressKey || locationKey);
+    if (!bodyId || !regionId || !addressKey || addressKey !== locationKey) return null;
+    return {
+      schemaVersion: 2,
+      id: String(raw.id || `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+      worldKind,
+      locationKey,
+      addressKey,
+      bodyId,
+      regionId,
+      gx: Number(gx.toFixed(6)),
+      gy: toVerticalGridCoord(gy),
+      gz: Number(gz.toFixed(6)),
+      materialIndex: normalizeBlockMaterial(raw.materialIndex),
+      shape: normalizeBlockShape(raw.shape),
+      rotation: normalizeBlockRotation(raw.rotation),
+      createdAt: String(raw.createdAt || new Date().toISOString())
+    };
+  }
+
+  const lat = Number(raw.lat);
+  const lon = Number(raw.lon);
   if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
-  if (!isFiniteNumber(gy)) return null;
 
   return {
+    schemaVersion: 2,
     id: String(raw.id || `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+    worldKind,
     locationKey,
     lat: Number(lat.toFixed(7)),
     lon: Number(lon.toFixed(7)),
@@ -387,12 +454,10 @@ function getSurfaceYAt(x, z) {
     const interiorY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
     if (Number.isFinite(interiorY)) return interiorY;
   }
-  if (appCtx.onMoon && appCtx.moonSurface && typeof appCtx._getPhysRaycaster === 'function' && appCtx._physRayStart && appCtx._physRayDir) {
-    const raycaster = appCtx._getPhysRaycaster();
-    appCtx._physRayStart.set(x, 2000, z);
-    raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-    const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-    if (hits.length > 0) return hits[0].point.y;
+  if (appCtx.onMoon || appCtx.onMars) {
+    const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+    if (Number.isFinite(surfaceY)) return surfaceY;
+    return Number.NaN;
   }
   return appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
 }
@@ -410,8 +475,28 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
   }
 
   if (!canPersistBuildBlocks()) return true;
-  const locationKey = getCurrentLocationKey();
-  if (!locationKey || !getLocRef()) return false;
+  const world = getCurrentBuildWorldContext();
+  if (!world) return false;
+
+  if (world.kind === 'planetary') {
+    const stored = planetaryBlockStorageCoordinates({ gx, gy, gz }, world.placement);
+    return blockLocalStore.upsert({
+      worldKind: 'planetary',
+      locationKey: world.locationKey,
+      addressKey: world.addressKey,
+      bodyId: world.bodyId,
+      regionId: world.regionId,
+      gx: stored.gx,
+      gy: stored.gy,
+      gz: stored.gz,
+      materialIndex: normalizeBlockMaterial(materialIndex),
+      shape: normalizeBlockShape(shape),
+      rotation: normalizeBlockRotation(rotation)
+    });
+  }
+
+  const locationKey = world.locationKey;
+  if (!getLocRef()) return false;
 
   const worldX = toWorldCoord(gx);
   const worldZ = toWorldCoord(gz);
@@ -451,8 +536,18 @@ function persistRemovedBuildBlock(gx, gy, gz) {
   }
 
   if (!canPersistBuildBlocks()) return true;
-  const locationKey = getCurrentLocationKey();
-  return locationKey ? blockLocalStore.removeAt(locationKey, gx, gy, gz) : false;
+  const world = getCurrentBuildWorldContext();
+  if (!world) return false;
+  if (world.kind === 'planetary') {
+    const stored = planetaryBlockStorageCoordinates({ gx, gy, gz }, world.placement);
+    return blockLocalStore.removeAt(
+      world.locationKey,
+      stored.gx,
+      toVerticalGridCoord(stored.gy),
+      stored.gz
+    );
+  }
+  return blockLocalStore.removeAt(world.locationKey, gx, gy, gz);
 }
 
 function clearPersistedBuildBlocksForCurrentLocation() {
@@ -473,7 +568,7 @@ function clearPersistedBuildBlocksForCurrentLocation() {
   }
 
   if (!canPersistBuildBlocks()) return true;
-  const locationKey = getCurrentLocationKey();
+  const locationKey = getCurrentBuildWorldContext()?.locationKey;
   return locationKey ? blockLocalStore.clearLocation(locationKey) : false;
 }
 
@@ -685,8 +780,32 @@ function refreshBlockBuilderForCurrentLocation() {
   }
 
   buildActionHistory = [];
+  const world = getCurrentBuildWorldContext();
+  if (!world) {
+    syncBlockBuilderUi();
+    return;
+  }
   const entries = getBuildEntriesForCurrentLocation();
   entries.forEach((entry) => {
+    if (world.kind === 'planetary') {
+      if (
+        entry.worldKind !== 'planetary' ||
+        entry.addressKey !== world.addressKey ||
+        entry.bodyId !== world.bodyId ||
+        entry.regionId !== world.regionId
+      ) return;
+      const render = planetaryBlockRenderCoordinates(entry, world.placement);
+      const gx = toGridCoord(render.gx);
+      const gy = toVerticalGridCoord(render.gy);
+      const gz = toGridCoord(render.gz);
+      placeBuildBlock(gx, gy, gz, entry.materialIndex, {
+        persist: false,
+        enforceLimit: false,
+        shape: entry.shape,
+        rotation: entry.rotation
+      });
+      return;
+    }
     if (!isFiniteNumber(entry.lat) || !isFiniteNumber(entry.lon) || !isFiniteNumber(entry.gy)) return;
     const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
     if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
