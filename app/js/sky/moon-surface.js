@@ -1,6 +1,8 @@
-import { APOLLO11_TERRAIN, landingLocal, loadApollo11Terrain } from './moon-lroc-terrain.js?v=1';
-
-const LANDING_SITE = Object.freeze({ x: 200, z: -500 });
+import { APOLLO11_TERRAIN, loadApollo11Terrain } from './moon-lroc-terrain.js?v=1';
+import {
+  APOLLO11_SURFACE_REGION,
+  ensurePlanetarySurfaceAuthority
+} from '../planetary/runtime/surface-authority.js?v=1';
 
 function createMeasuredSurface(appCtx) {
   const geometry = new THREE.PlaneGeometry(
@@ -22,12 +24,15 @@ function createMeasuredSurface(appCtx) {
   surface.receiveShadow = true;
   surface.frustumCulled = false;
   surface.position.set(
-    LANDING_SITE.x - landingLocal.x,
-    -100,
-    LANDING_SITE.z - landingLocal.z
+    APOLLO11_SURFACE_REGION.renderPlacement.x,
+    APOLLO11_SURFACE_REGION.renderPlacement.y,
+    APOLLO11_SURFACE_REGION.renderPlacement.z
   );
   surface.userData = {
     moonObject: true,
+    surfaceRegionId: APOLLO11_SURFACE_REGION.regionId,
+    worldAddress: APOLLO11_SURFACE_REGION.address,
+    worldAddressKey: APOLLO11_SURFACE_REGION.addressKey,
     terrainSource: APOLLO11_TERRAIN.source,
     sourceUrl: APOLLO11_TERRAIN.sourceUrl,
     originalResolutionMeters: APOLLO11_TERRAIN.originalDtmResolutionMeters,
@@ -93,17 +98,46 @@ function finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon) {
   appCtx.setPauseReason?.('planetary_transition', false);
 }
 
+export function activateMoonSurface(appCtx) {
+  const surfaceAuthority = ensurePlanetarySurfaceAuthority(appCtx);
+  return surfaceAuthority.activate(APOLLO11_SURFACE_REGION.regionId);
+}
+
 export function createMoonSurface(options = {}) {
   const { appCtx, createApollo11LandingSite, positionCarOnMoon } = options;
   const surface = createMeasuredSurface(appCtx);
+  const surfaceAuthority = ensurePlanetarySurfaceAuthority(appCtx);
   appCtx.moonSurface = surface;
-  appCtx.moonSurfaceReady = loadApollo11Terrain(THREE, appCtx.renderer, surface.geometry)
-    .then((terrain) => {
+  appCtx.moonSurfaceReady = surfaceAuthority.prepare(
+    APOLLO11_SURFACE_REGION.regionId,
+    async () => {
+      const terrain = await loadApollo11Terrain(THREE, appCtx.renderer, surface.geometry);
       surface.material.map = terrain.albedo;
       surface.material.color.setHex(0x9a9a98);
       surface.material.needsUpdate = true;
-      surface.userData.ready = true;
-      addScaleRocks(appCtx, surface, terrain.sampleHeight);
+      return {
+        sampleHeight: terrain.sampleHeight,
+        renderArtifact: surface,
+        readyAssetIds: APOLLO11_SURFACE_REGION.assets.map((asset) => asset.id)
+      };
+    }
+  ).then((publication) => {
+      const accepted = publication.status === 'accepted';
+      surface.userData.ready = accepted;
+      surface.userData.surfacePublication = publication;
+      if (!accepted) {
+        console.error('LROC lunar terrain failed acceptance.', publication.reason);
+        finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon);
+        return surface;
+      }
+      const sampleHeight = (localX, localZ) => {
+        const sample = surfaceAuthority.sampleAtLocalXZ(localX, localZ, {
+          bodyId: 'moon',
+          regionId: APOLLO11_SURFACE_REGION.regionId
+        });
+        return sample.status === 'available' ? sample.local.y : 0;
+      };
+      addScaleRocks(appCtx, surface, sampleHeight);
       finishMoonEntry(appCtx, createApollo11LandingSite, positionCarOnMoon);
       return surface;
     })

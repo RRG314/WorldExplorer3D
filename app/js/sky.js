@@ -19,7 +19,10 @@ import {
   ensureStarCatalogLoaded
 } from "./sky/starfield-ui.js?v=15";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
+import {
+  activateMoonSurface,
+  createMoonSurface as createMoonSurfaceRuntime
+} from "./sky/moon-surface.js?v=3";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
   commitEnvironment,
@@ -254,6 +257,10 @@ function arriveAtMoon() {
     // Car positioning will happen after moonSurface is fully created
     // (positionCarOnMoon is called in createMoonSurface's setTimeout)
   } else {
+    const surfaceActivation = activateMoonSurface(appCtx);
+    if (surfaceActivation.status !== 'accepted') {
+      console.error('Apollo 11 surface could not be activated.', surfaceActivation.reason);
+    }
     // Re-add and show all moon objects (safe even if already in scene)
     appCtx.moonSurface.visible = true;
     appCtx.scene.add(appCtx.moonSurface);

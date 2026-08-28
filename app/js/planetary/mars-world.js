@@ -8,10 +8,14 @@ import {
 } from '../session-coordinator.js?v=2';
 import { configureColorTexture } from './catalog.js?v=1';
 import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
+import {
+  ensurePlanetarySurfaceAuthority,
+  OLYMPUS_MONS_SURFACE_REGION
+} from './runtime/surface-authority.js?v=1';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 200;
-const MARS_SURFACE_Y = -80;
+const MARS_SURFACE_Y = OLYMPUS_MONS_SURFACE_REGION.renderPlacement.y;
 const MARS_SPAWN = Object.freeze({ x: 3200, z: 1900, angle: -2.08 });
 const OLYMPUS_REGION_DIAMETER_KM = 600;
 const OLYMPUS_RELIEF_KM = 21.9;
@@ -56,7 +60,7 @@ function loadMarsDemSample() {
       resolve(marsDemData);
     };
     image.onerror = () => resolve(null);
-    image.src = '/app/assets/textures/mars_mola_olympus_dem_512.jpg';
+    image.src = OLYMPUS_MONS_SURFACE_REGION.assets.find((asset) => asset.role === 'height').url;
   });
   return marsDemLoadPromise;
 }
@@ -77,49 +81,100 @@ function sampleMarsDem(x, z) {
 }
 
 function sampleMarsLocalHeight(x, z) {
+  const accepted = appCtx.planetarySurfaceAuthority?.sampleAtLocalXZ?.(x, z, {
+    bodyId: 'mars',
+    regionId: OLYMPUS_MONS_SURFACE_REGION.regionId
+  });
+  if (accepted?.status === 'available') return accepted.local.y;
   return sampleMarsDem(x, z);
 }
 
-function createMarsSurface() {
-  if (appCtx.marsSurface) return appCtx.marsSurface;
-  const geometry = new THREE.PlaneGeometry(MARS_SIZE, MARS_SIZE, MARS_SEGMENTS, MARS_SEGMENTS);
-  geometry.rotateX(-Math.PI / 2);
-  const positions = geometry.attributes.position;
-  for (let i = 0; i < positions.count; i++) {
-    positions.setY(i, sampleMarsLocalHeight(positions.getX(i), positions.getZ(i)));
-  }
-  positions.needsUpdate = true;
-  geometry.computeVertexNormals();
-
-  const texture = configureColorTexture(
-    new THREE.TextureLoader().load('/app/assets/textures/mars_olympus_viking_900.jpg'),
-    appCtx.renderer
-  );
-  const material = new THREE.MeshStandardMaterial({
-    map: texture,
-    color: 0xffffff,
-    roughness: 0.98,
-    metalness: 0,
-    emissive: 0x35160f,
-    emissiveIntensity: 0.18
+function loadMarsColorTexture() {
+  const asset = OLYMPUS_MONS_SURFACE_REGION.assets.find((entry) => entry.role === 'albedo');
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(
+      asset.url,
+      (texture) => resolve(configureColorTexture(texture, appCtx.renderer)),
+      undefined,
+      () => reject(new Error(`Unable to load Mars surface asset: ${asset.url}`))
+    );
   });
-  const surface = new THREE.Mesh(geometry, material);
-  surface.name = 'Mars Olympus Mons Surface';
-  surface.position.y = MARS_SURFACE_Y;
-  surface.receiveShadow = true;
-  surface.castShadow = true;
-  surface.frustumCulled = false;
-  surface.userData.planetaryBody = 'mars';
-  surface.userData.terrainSource = 'NASA MOLA regional elevation image';
-  surface.userData.reliefCalibration = {
-    regionDiameterKm: OLYMPUS_REGION_DIAMETER_KM,
-    summitReliefKm: OLYMPUS_RELIEF_KM,
-    displayReliefScene: OLYMPUS_RELIEF_SCENE
-  };
-  appCtx.marsSurface = surface;
-  appCtx.scene.add(surface);
-  createMarsRocks(surface);
-  return surface;
+}
+
+async function createMarsSurface() {
+  const surfaceAuthority = ensurePlanetarySurfaceAuthority(appCtx);
+  if (appCtx.marsSurface) {
+    const activation = surfaceAuthority.activate(OLYMPUS_MONS_SURFACE_REGION.regionId);
+    if (activation.status !== 'accepted') {
+      throw new Error(`Mars surface could not be activated: ${activation.reason || activation.status}`);
+    }
+    return appCtx.marsSurface;
+  }
+  let candidateSurface = null;
+  const publication = await surfaceAuthority.prepare(
+    OLYMPUS_MONS_SURFACE_REGION.regionId,
+    async () => {
+      const [dem, texture] = await Promise.all([
+        loadMarsDemSample(),
+        loadMarsColorTexture()
+      ]);
+      if (!dem) throw new Error('Mars measured elevation asset is unavailable.');
+      const geometry = new THREE.PlaneGeometry(MARS_SIZE, MARS_SIZE, MARS_SEGMENTS, MARS_SEGMENTS);
+      geometry.rotateX(-Math.PI / 2);
+      const positions = geometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        positions.setY(i, sampleMarsDem(positions.getX(i), positions.getZ(i)));
+      }
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        color: 0xffffff,
+        roughness: 0.98,
+        metalness: 0,
+        emissive: 0x35160f,
+        emissiveIntensity: 0.18
+      });
+      candidateSurface = new THREE.Mesh(geometry, material);
+      candidateSurface.name = 'Mars Olympus Mons Surface';
+      candidateSurface.position.set(
+        OLYMPUS_MONS_SURFACE_REGION.renderPlacement.x,
+        OLYMPUS_MONS_SURFACE_REGION.renderPlacement.y,
+        OLYMPUS_MONS_SURFACE_REGION.renderPlacement.z
+      );
+      candidateSurface.receiveShadow = true;
+      candidateSurface.castShadow = true;
+      candidateSurface.frustumCulled = false;
+      candidateSurface.userData.planetaryBody = 'mars';
+      candidateSurface.userData.surfaceRegionId = OLYMPUS_MONS_SURFACE_REGION.regionId;
+      candidateSurface.userData.worldAddress = OLYMPUS_MONS_SURFACE_REGION.address;
+      candidateSurface.userData.worldAddressKey = OLYMPUS_MONS_SURFACE_REGION.addressKey;
+      candidateSurface.userData.terrainSource = OLYMPUS_MONS_SURFACE_REGION.source.title;
+      candidateSurface.userData.sourceUrl = OLYMPUS_MONS_SURFACE_REGION.source.url;
+      candidateSurface.userData.reliefCalibration = {
+        regionDiameterKm: OLYMPUS_REGION_DIAMETER_KM,
+        summitReliefKm: OLYMPUS_RELIEF_KM,
+        displayReliefScene: OLYMPUS_RELIEF_SCENE
+      };
+      return {
+        sampleHeight: sampleMarsDem,
+        renderArtifact: candidateSurface,
+        readyAssetIds: OLYMPUS_MONS_SURFACE_REGION.assets.map((asset) => asset.id)
+      };
+    }
+  );
+  if (publication.status !== 'accepted' || !candidateSurface) {
+    candidateSurface?.geometry?.dispose?.();
+    candidateSurface?.material?.map?.dispose?.();
+    candidateSurface?.material?.dispose?.();
+    throw new Error(`Mars surface was not accepted: ${publication.reason || publication.status}`);
+  }
+  candidateSurface.userData.surfacePublication = publication;
+  appCtx.marsSurface = candidateSurface;
+  appCtx.scene.add(candidateSurface);
+  createMarsRocks(candidateSurface);
+  return candidateSurface;
 }
 
 function createMarsRocks(surface) {
@@ -257,9 +312,8 @@ async function arriveAtMars(expectedSessionId = null) {
   if (appCtx.moonSphere) appCtx.moonSphere.visible = false;
   appCtx.setLunarEarthVisible?.(false);
 
-  await loadMarsDemSample();
+  await createMarsSurface();
   if (!retainMarsTransitionOwnership(sessionId)) return false;
-  createMarsSurface();
   setMarsObjectsVisible(true);
   enterMarsDriveMode();
   positionPlayerOnMars();
