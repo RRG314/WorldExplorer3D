@@ -56,7 +56,7 @@ const PRESET_EXAMPLES = Object.freeze({
   ],
   water: [
     'Add a pond or basin polygon so the world renders the area as water.',
-    'Patch a local water outline that is missing from the base ingest.'
+    'Correct a local water outline that is missing from the map.'
   ],
   landuse_park: [
     'Add a park or plaza polygon that improves outdoor context and traversal.',

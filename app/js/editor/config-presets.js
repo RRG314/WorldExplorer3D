@@ -142,7 +142,7 @@ const OVERLAY_PRESETS = Object.freeze([
       description: 'Use for rail lines that need visual correction, supplementing, or clear subtype metadata.',
       whenToUse: [
         'A rail segment is missing or misclassified.',
-        'Bridge or tunnel handling is wrong in the runtime layer.'
+        'A bridge or tunnel appears incorrectly in the world.'
       ],
       doNotUse: [
         'Road traffic corridors.',
@@ -173,7 +173,7 @@ const OVERLAY_PRESETS = Object.freeze([
     fieldGroups: [
       presetFieldGroup('identity', 'Building Identity', ['name', 'building_type']),
       presetFieldGroup('shell', '3D Shell', ['building_levels', 'height', 'min_height', 'roof_shape']),
-      presetFieldGroup('future-indoor', 'Indoor Scaffold', ['indoor_shell_levels'])
+      presetFieldGroup('future-indoor', 'Indoor Levels', ['indoor_shell_levels'])
     ],
     requiredFields: ['building_type'],
     validationRules: ['feature.building.heightOrLevels'],
@@ -182,8 +182,8 @@ const OVERLAY_PRESETS = Object.freeze([
       description: 'Use for real building footprints and shells that affect how the 3D world renders.',
       whenToUse: [
         'A building footprint is missing or clearly wrong.',
-        'The runtime shell needs corrected levels, height, or roof shape.',
-        'You need to add entrances or prepare the shell for future indoor editing.'
+        'The building needs corrected levels, height, or roof shape.',
+        'You need to add entrances or describe its indoor levels.'
       ],
       doNotUse: [
         'Temporary props or decorative objects.',

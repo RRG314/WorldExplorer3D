@@ -65,13 +65,16 @@ async function actorState(page, target = null) {
   }, target);
 }
 
-async function turnToward(page, target, tolerance = 0.11, maxSteps = 160) {
+async function turnToward(page, target, tolerance = 0.11, maxSteps = 160, options = {}) {
   for (let step = 0; step < maxSteps; step += 1) {
     const state = await actorState(page, target);
+    if (state.custody?.active) return state;
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) <= tolerance) return state;
+    if (options.keepMoving === true) await page.keyboard.down('ArrowUp');
     await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', 55);
+    if (options.keepMoving === true) await page.keyboard.up('ArrowUp');
   }
   const final = await actorState(page, target);
   const desired = Math.atan2(Number(target.x) - final.x, Number(target.z) - final.z);
@@ -349,21 +352,30 @@ async function chaseOfficerUntilCustody(page, timeoutMs = 35_000) {
 
 async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
   const deadline = Date.now() + timeoutMs;
+  const trace = [];
   while (Date.now() < deadline) {
     const state = await diagnostics(page);
     const responders = state.urbanSandbox?.responders?.responders || [];
     if (responders.some((entry) => !!entry.officer)) return state;
-    const actor = state.activeActor?.position || {};
     const responder = responders.slice().sort((left, right) =>
-      Math.hypot(left.x - actor.x, left.z - actor.z) - Math.hypot(right.x - actor.x, right.z - actor.z))[0];
-    if (!responder) {
-      await page.waitForTimeout(200);
-      continue;
-    }
-    await walkTo(page, responder, { stopDistance: 9, maxSteps: 60, stagnantLimit: 16, detour: true });
-    await page.waitForTimeout(120);
+      Number(left.distanceToActor ?? Infinity) - Number(right.distanceToActor ?? Infinity))[0] || null;
+    trace.push({
+      civicPhase: state.urbanSandbox?.civicResponse?.phase || '',
+      civicRemaining: Number(state.urbanSandbox?.civicResponse?.phaseRemaining || 0),
+      responsePhase: state.urbanSandbox?.responders?.phase || '',
+      responderCount: responders.length,
+      distanceToActor: responder?.distanceToActor ?? null,
+      speed: responder?.speed ?? null
+    });
+    // The response vehicle owns this approach. Moving toward it continually
+    // changes its destination and does not represent a player holding at the
+    // reported incident while a dispatched unit arrives.
+    await page.evaluate(() => globalThis.advanceTime?.(240));
+    await page.waitForTimeout(60);
   }
-  return diagnostics(page);
+  const final = await diagnostics(page);
+  final.__responderMeetTrace = trace.slice(-20);
+  return final;
 }
 
 async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
@@ -396,19 +408,20 @@ async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
         x: Number(actor.x) + Math.sin(radialYaw) * 14,
         z: Number(actor.z) + Math.cos(radialYaw) * 14
       };
-      await turnToward(page, retreat, .18, 45);
+      await turnToward(page, retreat, .18, 45, { keepMoving: true });
       await inputStep(page, 'ArrowUp', 520);
     } else if (distance > 20) {
       const approach = {
         x: Number(actor.x) - Math.sin(radialYaw) * 14,
         z: Number(actor.z) - Math.cos(radialYaw) * 14
       };
-      await turnToward(page, approach, .18, 45);
+      await turnToward(page, approach, .18, 45, { keepMoving: true });
       await inputStep(page, 'ArrowUp', 260);
     } else {
       // Hold briefly in the officer's real firing lane so the projectile path
       // can resolve, then retreat before contact can become an arrest.
       await page.evaluate(() => globalThis.advanceTime?.(420));
+      await inputStep(page, 'ArrowUp', 80);
     }
     await page.waitForTimeout(45);
   }
@@ -583,6 +596,14 @@ async function runMedicalRecoveryJourney() {
     const witnessedResponse = await triggerWitnessedWeaponResponse(page);
     await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.responders?.activeCount || 0) > 0, null, { timeout: 45_000 });
     const before = await meetResponderUntilOfficer(page, 50_000);
+    if (!before.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer)) {
+      console.error('CP5 responder arrival evidence', JSON.stringify({
+        activeActor: before.activeActor,
+        civicResponse: before.urbanSandbox?.civicResponse,
+        responders: before.urbanSandbox?.responders,
+        trace: before.__responderMeetTrace
+      }, null, 2));
+    }
     assert.ok(before.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer), 'Normal walking input could not meet the medical recovery responder.');
     const custody = await evadeOfficerUntilHospital(page);
     if (custody.urbanSandbox?.custody?.type !== 'hospital') {
