@@ -14,7 +14,7 @@ import {
 } from './runtime/surface-authority.js?v=1';
 
 const MARS_SIZE = 24000;
-const MARS_SEGMENTS = 200;
+const MARS_SEGMENTS = 256;
 const MARS_SURFACE_Y = OLYMPUS_MONS_SURFACE_REGION.renderPlacement.y;
 const MARS_SPAWN = Object.freeze({ x: 3200, z: 1900, angle: -2.08 });
 const OLYMPUS_REGION_DIAMETER_KM = 600;
@@ -101,6 +101,23 @@ function loadMarsColorTexture() {
   });
 }
 
+function loadMarsReliefTexture() {
+  const asset = OLYMPUS_MONS_SURFACE_REGION.assets.find((entry) => entry.role === 'height');
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(
+      asset.url,
+      (texture) => {
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.anisotropy = Math.min(4, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+        texture.needsUpdate = true;
+        resolve(texture);
+      },
+      undefined,
+      () => reject(new Error(`Unable to load Mars relief asset: ${asset.url}`))
+    );
+  });
+}
+
 async function createMarsSurface() {
   const surfaceAuthority = ensurePlanetarySurfaceAuthority(appCtx);
   if (appCtx.marsSurface) {
@@ -114,9 +131,10 @@ async function createMarsSurface() {
   const publication = await surfaceAuthority.prepare(
     OLYMPUS_MONS_SURFACE_REGION.regionId,
     async () => {
-      const [dem, texture] = await Promise.all([
+      const [dem, texture, reliefTexture] = await Promise.all([
         loadMarsDemSample(),
-        loadMarsColorTexture()
+        loadMarsColorTexture(),
+        loadMarsReliefTexture()
       ]);
       if (!dem) throw new Error('Mars measured elevation asset is unavailable.');
       const geometry = new THREE.PlaneGeometry(MARS_SIZE, MARS_SIZE, MARS_SEGMENTS, MARS_SEGMENTS);
@@ -130,11 +148,13 @@ async function createMarsSurface() {
 
       const material = new THREE.MeshStandardMaterial({
         map: texture,
-        color: 0xffffff,
-        roughness: 0.98,
+        bumpMap: reliefTexture,
+        bumpScale: 18,
+        color: 0xdca080,
+        roughness: 0.92,
         metalness: 0,
-        emissive: 0x35160f,
-        emissiveIntensity: 0.18
+        emissive: 0x2a0d08,
+        emissiveIntensity: 0.11
       });
       candidateSurface = new THREE.Mesh(geometry, material);
       candidateSurface.name = 'Mars Olympus Mons Surface';
@@ -157,6 +177,11 @@ async function createMarsSurface() {
         summitReliefKm: OLYMPUS_RELIEF_KM,
         displayReliefScene: OLYMPUS_RELIEF_SCENE
       };
+      candidateSurface.userData.surfaceDetail = {
+        terrain: 'derived_from_observations',
+        material: 'derived_from_observations',
+        localRocksAndDust: 'generated_game_detail'
+      };
       return {
         sampleHeight: sampleMarsDem,
         renderArtifact: candidateSurface,
@@ -174,13 +199,16 @@ async function createMarsSurface() {
   appCtx.marsSurface = candidateSurface;
   appCtx.scene.add(candidateSurface);
   createMarsRocks(candidateSurface);
+  createMarsAtmosphericDust();
   return candidateSurface;
 }
 
 function createMarsRocks(surface) {
   const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
   const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x7d4432, roughness: 1, metalness: 0 });
-  const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, 620);
+  const regionalRockCount = 620;
+  const landingAreaRockCount = 580;
+  const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, regionalRockCount + landingAreaRockCount);
   const transform = new THREE.Object3D();
   const color = new THREE.Color();
   let seed = 0x4d415253;
@@ -188,16 +216,21 @@ function createMarsRocks(surface) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  for (let i = 0; i < 620; i++) {
+  for (let i = 0; i < regionalRockCount + landingAreaRockCount; i++) {
     let x;
     let z;
+    const isLandingAreaRock = i >= regionalRockCount;
     do {
-      const radius = 220 + Math.sqrt(random()) * MARS_SIZE * 0.46;
+      const radius = isLandingAreaRock
+        ? 18 + Math.sqrt(random()) * 900
+        : 220 + Math.sqrt(random()) * MARS_SIZE * 0.46;
       const theta = random() * Math.PI * 2;
-      x = Math.cos(theta) * radius;
-      z = Math.sin(theta) * radius;
-    } while (Math.hypot(x - MARS_SPAWN.x, z - MARS_SPAWN.z) < 280);
-    const scale = 0.7 + Math.pow(random(), 2.2) * 10;
+      x = (isLandingAreaRock ? MARS_SPAWN.x : 0) + Math.cos(theta) * radius;
+      z = (isLandingAreaRock ? MARS_SPAWN.z : 0) + Math.sin(theta) * radius;
+    } while (Math.hypot(x - MARS_SPAWN.x, z - MARS_SPAWN.z) < 14);
+    const scale = isLandingAreaRock
+      ? 0.35 + Math.pow(random(), 2.5) * 4.5
+      : 0.7 + Math.pow(random(), 2.2) * 10;
     transform.position.set(x, MARS_SURFACE_Y + sampleMarsLocalHeight(x, z) + scale * 0.33, z);
     transform.rotation.set(random(), random() * Math.PI * 2, random());
     transform.scale.set(scale * 1.25, scale * (0.5 + random() * 0.55), scale);
@@ -211,9 +244,50 @@ function createMarsRocks(surface) {
   if (rocks.instanceColor) rocks.instanceColor.needsUpdate = true;
   rocks.castShadow = true;
   rocks.receiveShadow = true;
+  rocks.name = 'Mars Generated Regional Rocks';
   rocks.userData.planetaryBody = 'mars';
-  appCtx.marsObjects = [rocks];
+  rocks.userData.truthClass = 'generated_game_detail';
+  appCtx.marsObjects = appCtx.marsObjects || [];
+  appCtx.marsObjects.push(rocks);
   appCtx.scene.add(rocks);
+}
+
+function createMarsAtmosphericDust() {
+  const count = 720;
+  const positions = new Float32Array(count * 3);
+  let seed = 0x44555354;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  for (let index = 0; index < count; index++) {
+    const radius = 40 + Math.sqrt(random()) * 1_300;
+    const theta = random() * Math.PI * 2;
+    const x = MARS_SPAWN.x + Math.cos(theta) * radius;
+    const z = MARS_SPAWN.z + Math.sin(theta) * radius;
+    const groundY = MARS_SURFACE_Y + sampleMarsLocalHeight(x, z);
+    positions[index * 3] = x;
+    positions[index * 3 + 1] = groundY + 2 + Math.pow(random(), 1.8) * 85;
+    positions[index * 3 + 2] = z;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0xd89972,
+    size: 1.25,
+    transparent: true,
+    opacity: 0.2,
+    depthWrite: false,
+    sizeAttenuation: true
+  });
+  const dust = new THREE.Points(geometry, material);
+  dust.name = 'Mars Modeled Airborne Dust';
+  dust.frustumCulled = false;
+  dust.userData.planetaryBody = 'mars';
+  dust.userData.truthClass = 'modeled_physics';
+  appCtx.marsObjects = appCtx.marsObjects || [];
+  appCtx.marsObjects.push(dust);
+  appCtx.scene.add(dust);
 }
 
 function positionPlayerOnMars() {
@@ -299,9 +373,9 @@ async function arriveAtMars(expectedSessionId = null) {
   if (!isCurrentMarsTransition(sessionId)) return false;
   if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.setPauseReason?.('planetary_transition', true);
-  appCtx.scene.background = new THREE.Color(0x9b5d43);
-  appCtx.scene.fog = new THREE.FogExp2(0xb06a4e, 0.000095);
-  if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.1;
+  appCtx.scene.background = new THREE.Color(0x6f3628);
+  appCtx.scene.fog = new THREE.FogExp2(0x8a4a36, 0.000075);
+  if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 0.96;
   if (appCtx.camera) {
     if (!Number.isFinite(earthCameraFar)) earthCameraFar = appCtx.camera.far;
     appCtx.camera.far = Math.max(30000, appCtx.camera.far);
@@ -325,11 +399,12 @@ async function arriveAtMars(expectedSessionId = null) {
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
 
   if (appCtx.sun) {
-    appCtx.sun.intensity = 1.35;
+    appCtx.sun.color?.setHex?.(0xffd8b8);
+    appCtx.sun.intensity = 1.7;
     appCtx.sun.position.set(-140, 210, 90);
   }
-  if (appCtx.ambientLight) appCtx.ambientLight.intensity = 0.34;
-  if (appCtx.fillLight) appCtx.fillLight.intensity = 0.18;
+  if (appCtx.ambientLight) appCtx.ambientLight.intensity = 0.38;
+  if (appCtx.fillLight) appCtx.fillLight.intensity = 0.2;
   if (!retainMarsTransitionOwnership(sessionId)) return false;
   if (!commitEnvironment(ENV.MARS, { source: 'mars_arrival' })) return false;
   appCtx.setPlanetarySky?.('mars');
