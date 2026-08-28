@@ -5,7 +5,7 @@ import {
   createCompanionInstance,
   normalizeCompanionInstance,
   resolveCompanionTravelPolicy,
-} from './companions.js?v=4';
+} from './companions.js?v=5';
 import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 

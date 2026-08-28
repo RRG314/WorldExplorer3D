@@ -4,18 +4,20 @@ import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=10';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=11';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=6';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=12';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=13';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-model.js?v=1';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
+import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
+import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -39,6 +41,7 @@ const NPC_DETAIL_RELEASE_DISTANCE = 174;
 const VEHICLE_DETAIL_PRELOAD_DISTANCE = 120;
 const VEHICLE_DETAIL_RELEASE_DISTANCE = 180;
 const STORE_INTERACTION_DISTANCE = 4.8;
+const LOOT_INTERACTION_DISTANCE = 3.4;
 let activeRuntime = null;
 
 function now() {
@@ -263,6 +266,8 @@ function applyCrashTargetMotion(target, response, at) {
     const downed = Number(target.ref.condition ?? 1) <= .05;
     target.ref.knockdownUntil = downed ? Infinity : at + response.knockdownSeconds * 1000;
     target.ref.reaction = downed ? 'downed' : 'knocked-down';
+    target.ref.combatState = downed ? NPC_COMBAT_STATES.DOWN : NPC_COMBAT_STATES.RECOVER;
+    target.ref.combatStateUntil = target.ref.knockdownUntil;
     target.ref.reactionUntil = target.ref.knockdownUntil;
     target.ref.visual?.setReaction?.(target.ref.reaction);
   } else if ('speed' in target.ref) {
@@ -370,6 +375,8 @@ function updateCrashBodies(state, dt) {
       if (npc.reaction === 'knocked-down' && Number(npc.condition ?? 1) > .05 && Number(npc.knockdownUntil || 0) <= at) {
         npc.reaction = '';
         npc.reactionUntil = 0;
+        npc.combatState = NPC_COMBAT_STATES.NORMAL;
+        npc.combatStateUntil = 0;
         npc.visual.setReaction('');
       }
       return;
@@ -388,6 +395,8 @@ function updateCrashBodies(state, dt) {
     if (Number(npc.condition ?? 1) > .05 && Number(npc.knockdownUntil || 0) <= at) {
       npc.reaction = '';
       npc.reactionUntil = 0;
+      npc.combatState = NPC_COMBAT_STATES.NORMAL;
+      npc.combatStateUntil = 0;
       npc.visual.setReaction('');
     }
   });
@@ -424,6 +433,8 @@ function prepareCrashScenarioForSupport(state, targetKind = 'vehicle', speedMph 
     npc.condition = 1;
     npc.crashMotion = null;
     npc.reaction = '';
+    npc.combatState = NPC_COMBAT_STATES.NORMAL;
+    npc.combatStateUntil = 0;
     npc.visual.root.position.set(npc.x, npc.y, npc.z);
     npc.visual.setReaction('');
     target = { id: npc.id, kind: 'npc', x: npc.x, z: npc.z };
@@ -559,7 +570,9 @@ function nearestNpcCandidate(state, radius = NPC_INTERACTION_DISTANCE) {
   const promoted = state.npcs.map((npc) => {
     const pose = npcPose(npc);
     return { npc, distance: Math.hypot(pose.x - walker.x, pose.z - walker.z), sourceAgentId: npc.sourceAgentId };
-  }).filter((entry) => entry.distance <= radius);
+  }).filter((entry) => entry.distance <= radius && !(
+    Number(entry.npc.condition ?? 1) <= .05 && entry.npc.lootClaimed === true
+  ));
   const ambient = (state.population?.nearbyPedestrians?.(walker, radius) || []).map((pedestrian) => ({
     pedestrian,
     distance: Math.hypot(pedestrian.x - walker.x, pedestrian.z - walker.z),
@@ -582,6 +595,128 @@ function nearestFurnitureCandidate(state, radius = 3.2) {
 function nearestResponderLootCandidate(state, radius = 3.2) {
   if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk') return null;
   return state.responders?.nearestDownedOfficer?.(appCtx.Walk?.state?.walker, radius) || null;
+}
+
+function nearestLootPickupCandidate(state, radius = LOOT_INTERACTION_DISTANCE) {
+  if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk') return null;
+  const walker = appCtx.Walk?.state?.walker;
+  if (!walker) return null;
+  return state.pickups.map((pickup) => ({
+    pickup,
+    distance: Math.hypot(pickup.position.x - walker.x, pickup.position.z - walker.z)
+  })).filter((entry) => !entry.pickup.claimed && entry.distance <= radius)
+    .sort((left, right) => left.distance - right.distance)[0] || null;
+}
+
+function createLootPickupVisual(THREE, pickup) {
+  const root = new THREE.Group();
+  root.name = `World loot pickup ${pickup.catalogId}`;
+  root.userData.worldLootPickupId = pickup.id;
+  const geometries = [
+    new THREE.TorusGeometry(.34, .035, 8, 24),
+    new THREE.BoxGeometry(.12, .12, .38),
+    new THREE.BoxGeometry(.09, .19, .12),
+    new THREE.BoxGeometry(.28, .13, .2)
+  ];
+  const materials = [
+    new THREE.MeshBasicMaterial({ color: 0x76c9ff, transparent: true, opacity: .72, depthWrite: false }),
+    new THREE.MeshStandardMaterial({ color: 0x263944, emissive: 0x16394d, emissiveIntensity: .65, roughness: .46, metalness: .34 }),
+    new THREE.MeshStandardMaterial({ color: 0x796a48, roughness: .74, metalness: .08 })
+  ];
+  const ring = new THREE.Mesh(geometries[0], materials[0]);
+  ring.rotation.x = -Math.PI * .5;
+  const body = new THREE.Mesh(geometries[1], materials[1]);
+  body.position.set(0, .18, 0);
+  body.rotation.x = Math.PI * .5;
+  const grip = new THREE.Mesh(geometries[2], materials[1]);
+  grip.position.set(-.03, .08, -.08);
+  grip.rotation.x = -.18;
+  const ammo = new THREE.Mesh(geometries[3], materials[2]);
+  ammo.position.set(.28, .08, .05);
+  root.add(ring, body, grip, ammo);
+  root.position.set(pickup.position.x, pickup.position.y + .12, pickup.position.z);
+  return Object.freeze({
+    root,
+    dispose() {
+      root.removeFromParent?.();
+      geometries.forEach((geometry) => geometry.dispose?.());
+      materials.forEach((material) => material.dispose?.());
+    }
+  });
+}
+
+function spawnLootPickup(state, details = {}) {
+  if (appCtx.getCurrentMultiplayerRoom?.()) return null;
+  const pickup = createLootPickup({
+    sourceActorId: details.sourceActorId,
+    catalogId: details.weaponId,
+    label: details.label,
+    rounds: details.rounds,
+    position: details.position,
+    authority: 'anonymous-local'
+  });
+  if (!pickup) return null;
+  const existing = state.pickups.find((entry) => entry.id === pickup.id);
+  if (existing) return existing;
+  pickup.visual = createLootPickupVisual(THREE, pickup);
+  pickup.spawnedAt = now();
+  state.group.add(pickup.visual.root);
+  state.pickups.push(pickup);
+  return pickup;
+}
+
+function dropNpcLoot(state, npc) {
+  if (!npc || npc.lootDropped || Number(npc.condition ?? 1) > .05) return null;
+  const weaponId = String(npc.heldEquipment || '');
+  if (!weaponId) {
+    npc.lootDropped = true;
+    npc.lootClaimed = true;
+    return null;
+  }
+  const definition = state.equipment.backpack?.definition?.(weaponId);
+  const pickup = spawnLootPickup(state, {
+    sourceActorId: npc.id,
+    weaponId,
+    label: definition?.label || 'Recovered equipment',
+    rounds: npc.lootRounds,
+    position: npcPose(npc)
+  });
+  if (!pickup) return null;
+  npc.lootDropped = true;
+  npc.lootClaimed = true;
+  if (npc.visual?.heldEquipment) npc.visual.heldEquipment.visible = false;
+  return pickup;
+}
+
+function collectLootPickup(state, pickupId) {
+  if (appCtx.getCurrentMultiplayerRoom?.()) {
+    setStatus(state, 'Shared loot is unavailable until the room can validate the pickup.', 2400);
+    return true;
+  }
+  const pickup = state.pickups.find((entry) => entry.id === String(pickupId || ''));
+  if (!pickup) return false;
+  const result = claimLootPickup(pickup, state.equipment, Date.now());
+  if (!result.ok) {
+    setStatus(state, result.reason === 'already_claimed' ? 'That gear was already collected.' : 'The Backpack could not collect that gear.', 1800);
+    return true;
+  }
+  pickup.visual?.dispose?.();
+  state.pickups.splice(state.pickups.indexOf(pickup), 1);
+  setStatus(state, `${result.label} collected · ${result.rounds} rounds added to Backpack`, 2400);
+  state.lastNpcAction = Object.freeze({ type: 'loot_collected', pickupId: pickup.id, weaponId: result.catalogId, rounds: result.rounds, at: now() });
+  emitProductTelemetry('loot_collected', { equipment_type: result.catalogId, rounds_band: result.rounds >= 20 ? 'high' : result.rounds > 0 ? 'standard' : 'none' });
+  renderEquipment(state);
+  return true;
+}
+
+function updateLootPickups(state, dt) {
+  const step = Math.max(0, Number(dt) || 0);
+  state.lootElapsed += step;
+  state.pickups.forEach((pickup, index) => {
+    if (!pickup.visual?.root) return;
+    pickup.visual.root.rotation.y += step * .9;
+    pickup.visual.root.position.y = pickup.position.y + .12 + Math.sin(state.lootElapsed * 2.2 + index) * .035;
+  });
 }
 
 function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
@@ -725,6 +860,12 @@ function handleStoreAction(state, event) {
         ? `${result.item.label} added to Backpack · rare trade complete`
         : `${result.item.label} added to Backpack · ${result.credits} credits available`
     : commerceFailureMessage(result.reason);
+  if (result.ok) {
+    emitProductTelemetry('local_store_exchange', {
+      exchange_type: action,
+      item_type: result.item?.category || result.item?.id || 'store_item'
+    });
+  }
   renderStore(state);
   renderEquipment(state);
   return true;
@@ -757,14 +898,16 @@ function promotePedestrian(state, source) {
   if (!promoted) return null;
   const promotedId = `urban-npc:${state.worldIdentity}:${promoted.id}`;
   const possessionSeed = [...promotedId].reduce((sum, char) => (sum * 33 + char.charCodeAt(0)) >>> 0, 5381);
+  const heldEquipment = possessionSeed % 13 === 0
+    ? 'compact-sidearm'
+    : possessionSeed % 17 === 0 ? 'laser-gun' : possessionSeed % 11 === 0 ? 'paintball-gun' : '';
   const definition = {
     ...promoted,
     id: promotedId,
     sourceAgentId: promoted.id,
     source: 'living-world-promoted-interaction',
-    heldEquipment: possessionSeed % 13 === 0
-      ? 'compact-sidearm'
-      : possessionSeed % 17 === 0 ? 'laser-gun' : possessionSeed % 11 === 0 ? 'paintball-gun' : ''
+    combatRole: heldEquipment ? 'armed-local' : 'civilian',
+    heldEquipment
   };
   const visual = createUrbanNpcVisual(THREE, definition);
   const npc = {
@@ -775,10 +918,13 @@ function promotePedestrian(state, source) {
     resistance: 100,
     possessionAvailable: possessionSeed % 5 !== 0,
     lootClaimed: false,
+    lootDropped: false,
     lootRounds: definition.heldEquipment ? 12 + possessionSeed % 25 : 0,
     hostileUntil: 0,
     nextShotAt: 0,
-    shotsFired: 0
+    shotsFired: 0,
+    combatState: NPC_COMBAT_STATES.NORMAL,
+    combatStateUntil: 0
   };
   visual.root.position.set(promoted.x, promoted.y, promoted.z);
   visual.root.rotation.set(0, promoted.yaw, 0);
@@ -973,12 +1119,14 @@ function interactionCandidate(state) {
   const nearestNpc = nearestNpcCandidate(state);
   const nearestFurniture = nearestFurnitureCandidate(state);
   const nearestResponderLoot = nearestResponderLootCandidate(state);
+  const nearestLoot = nearestLootPickupCandidate(state);
   const nearestStore = nearestStoreCandidate(state);
-  if (!nearestVehicle && !nearestNpc && !nearestFurniture && !nearestResponderLoot && !nearestStore) return null;
+  if (!nearestVehicle && !nearestNpc && !nearestFurniture && !nearestResponderLoot && !nearestLoot && !nearestStore) return null;
   const nearestOtherDistance = Math.min(
     nearestVehicle?.distance ?? Infinity,
     nearestNpc?.distance ?? Infinity,
     nearestFurniture?.distance ?? Infinity,
+    nearestLoot?.distance ?? Infinity,
     nearestStore?.distance ?? Infinity
   );
   if (nearestResponderLoot && nearestResponderLoot.distance <= nearestOtherDistance) {
@@ -990,6 +1138,21 @@ function interactionCandidate(state) {
       distance: nearestResponderLoot.distance,
       takeLabel: 'Collect gear',
       data: { officerId: nearestResponderLoot.officer.id }
+    };
+  }
+  if (nearestLoot && nearestLoot.distance <= Math.min(
+    nearestVehicle?.distance ?? Infinity,
+    nearestNpc?.distance ?? Infinity,
+    nearestFurniture?.distance ?? Infinity,
+    nearestStore?.distance ?? Infinity
+  )) {
+    return {
+      available: true,
+      action: 'collect_loot',
+      label: 'Collect gear',
+      detail: `${nearestLoot.pickup.label} · ${nearestLoot.pickup.rounds} rounds`,
+      distance: nearestLoot.distance,
+      data: { pickupId: nearestLoot.pickup.id }
     };
   }
   if (nearestStore && nearestStore.distance <= Math.min(
@@ -1254,6 +1417,10 @@ function updateTransition(state, dt) {
       vehicleId: transition.vehicle.id,
       at: now()
     });
+    emitProductTelemetry(transition.kind === 'enter' ? 'vehicle_entered' : 'vehicle_exited', {
+      vehicle_type: transition.vehicle.variant?.id || 'road_vehicle',
+      service_type: transition.vehicle.serviceType || 'civilian'
+    });
     state.transition = null;
   }
 }
@@ -1420,6 +1587,7 @@ function promoteCivicWitness(state, witness) {
     return npc;
   }
   npc.reaction = witness.reaction;
+  npc.combatState = NPC_COMBAT_STATES.ALERT;
   npc.visual.setReaction(witness.reaction);
   return npc;
 }
@@ -1535,12 +1703,53 @@ function updateCivicResponse(state, dt) {
   const witnessReaction = currentCivic?.phase === 'observed' || currentCivic?.phase === 'reporting'
     ? 'reporting'
     : currentCivic?.phase === 'searching' ? 'watching' : '';
+  const actor = civicActorPosition(state);
+  const current = now();
   state.npcs.forEach((npc) => {
-    if (Number(npc.condition ?? 1) <= .05 || Number(npc.knockdownUntil || 0) > now() || npc.reaction === 'knocked-down') return;
-    if (Number(npc.condition ?? 1) > .05 && Number(npc.hostileUntil || 0) > now()) return;
-    if (npc.reaction === witnessReaction) return;
-    npc.reaction = witnessReaction;
-    npc.visual.setReaction(witnessReaction);
+    const combatState = resolveNpcCombatState(npc, current, { alert: !!witnessReaction });
+    npc.combatState = combatState;
+    if (combatState === NPC_COMBAT_STATES.FLEE && actor) {
+      const pose = npcPose(npc);
+      const dx = pose.x - Number(actor.x || 0);
+      const dz = pose.z - Number(actor.z || 0);
+      const distance = Math.max(.001, Math.hypot(dx, dz));
+      const stepDistance = Math.min(.22, step * 2.25);
+      const nextX = pose.x + dx / distance * stepDistance;
+      const nextZ = pose.z + dz / distance * stepDistance;
+      const groundY = Number(appCtx.SurfaceQuery?.walkAt?.(nextX, nextZ)?.position?.y ?? pose.y);
+      const blocked = appCtx.checkBuildingCollision?.(nextX, nextZ, .34, { actorBaseY: groundY, actorHeight: 1.8 })?.collision === true;
+      if (!blocked) {
+        npc.x = nextX;
+        npc.z = nextZ;
+        npc.y = groundY;
+        npc.yaw = Math.atan2(dx, dz);
+        npc.visual.root.position.set(npc.x, npc.y, npc.z);
+        npc.visual.root.rotation.y = npc.yaw;
+      }
+      npc.reaction = 'fleeing';
+      npc.visual.setReaction('fleeing');
+      return;
+    }
+    if (combatState === NPC_COMBAT_STATES.DOWN) {
+      npc.reaction = 'downed';
+      npc.visual.setReaction('downed');
+      return;
+    }
+    if (combatState === NPC_COMBAT_STATES.RECOVER) {
+      npc.reaction = 'knocked-down';
+      npc.visual.setReaction('knocked-down');
+      return;
+    }
+    if ([NPC_COMBAT_STATES.DEFEND, NPC_COMBAT_STATES.COMBAT].includes(combatState)) return;
+    if (combatState === NPC_COMBAT_STATES.ALERT) {
+      npc.reaction = witnessReaction;
+      npc.visual.setReaction(witnessReaction);
+      return;
+    }
+    if (npc.reaction === 'talking' && Number(npc.reactionUntil || 0) > current) return;
+    npc.reaction = '';
+    npc.reactionUntil = 0;
+    npc.visual.setReaction('');
   });
   state.civicUiElapsed += step;
   if (state.civicUiElapsed >= .1) {
@@ -1632,29 +1841,12 @@ function performNpcTake(state, candidate) {
   const npc = resolveNpcFromCandidate(state, candidate);
   if (!npc) return false;
   if (Number(npc.condition ?? 1) <= .05) {
-    if (npc.lootClaimed) {
-      setStatus(state, 'No equipment or ammunition remains.');
-      return true;
-    }
-    npc.lootClaimed = true;
-    const weaponId = String(npc.heldEquipment || '');
-    if (weaponId && !state.equipment.has(weaponId)) {
-      state.equipment.upsertItem({
-        instanceId: `recovered:${npc.id}:${weaponId}`,
-        catalogId: weaponId,
-        quantity: 1,
-        authority: 'anonymous-local',
-        provenance: 'recovered-equipment',
-        sourceEventId: `downed:${npc.id}`,
-        acquiredAt: Date.now()
-      });
-    }
-    const rounds = weaponId ? state.equipment.grantAmmo(weaponId, npc.lootRounds) : 0;
-    setStatus(state, weaponId
-      ? `${state.equipment.snapshot().items.find((item) => item.id === weaponId)?.label || 'Weapon'} recovered · ${rounds} rounds added`
+    const existing = state.pickups.find((entry) => entry.sourceActorId === npc.id && !entry.claimed);
+    const pickup = existing || dropNpcLoot(state, npc);
+    setStatus(state, pickup
+      ? `${pickup.label} dropped nearby. Walk over and collect it.`
       : 'No recoverable equipment found.', 2400);
-    state.lastNpcAction = Object.freeze({ type: 'recovered_equipment', npcId: npc.id, weaponId, rounds, at: now() });
-    renderEquipment(state);
+    state.lastNpcAction = Object.freeze({ type: pickup ? 'loot_dropped' : 'no_loot', npcId: npc.id, pickupId: pickup?.id || '', at: now() });
     return true;
   }
   if (!npc.possessionAvailable) {
@@ -1700,20 +1892,15 @@ function performResponderLoot(state, candidate) {
     setStatus(state, 'No equipment or ammunition remains.');
     return true;
   }
-  if (!state.equipment.has(loot.weaponId)) {
-    state.equipment.upsertItem({
-      instanceId: `recovered:responder:${candidate?.data?.officerId}:${loot.weaponId}`,
-      catalogId: loot.weaponId,
-      quantity: 1,
-      authority: 'anonymous-local',
-      provenance: 'recovered-equipment',
-      sourceEventId: `downed:${candidate?.data?.officerId}`,
-      acquiredAt: Date.now()
-    });
-  }
-  const rounds = state.equipment.grantAmmo(loot.weaponId, loot.rounds);
-  setStatus(state, `Response sidearm recovered · ${rounds} rounds added`, 2400);
-  renderEquipment(state);
+  const officer = state.responders?.snapshot?.()?.responders?.map((entry) => entry.officer).find((entry) => entry?.id === candidate?.data?.officerId);
+  const pickup = spawnLootPickup(state, {
+    sourceActorId: candidate?.data?.officerId,
+    weaponId: loot.weaponId,
+    label: 'Response sidearm',
+    rounds: loot.rounds,
+    position: officer || appCtx.Walk?.state?.walker
+  });
+  setStatus(state, pickup ? 'Response gear dropped nearby. Walk over and collect it.' : 'No recoverable equipment found.', 2400);
   return true;
 }
 
@@ -1775,6 +1962,7 @@ function performInteraction(state, candidate) {
   if (candidate?.action === 'talk_npc') return performNpcTalk(state, candidate);
   if (candidate?.action === 'loot_npc') return performNpcTake(state, candidate);
   if (candidate?.action === 'loot_responder') return performResponderLoot(state, candidate);
+  if (candidate?.action === 'collect_loot') return collectLootPickup(state, candidate?.data?.pickupId);
   if (candidate?.action === 'visit_store') return openStore(state, candidate?.data?.storeId);
   if (candidate?.action === 'inspect_object') {
     const object = (appCtx.streetFurnitureMeshes || []).find((entry) => entry.uuid === candidate?.data?.objectUuid);
@@ -1842,6 +2030,7 @@ function updatePrompt(state) {
   if (candidate?.action === 'talk_npc') prompt.button.textContent = 'Talk';
   if (candidate?.action === 'loot_npc') prompt.button.textContent = 'Search';
   if (candidate?.action === 'loot_responder') prompt.button.textContent = 'Collect gear';
+  if (candidate?.action === 'collect_loot') prompt.button.textContent = 'Collect';
   if (candidate?.action === 'inspect_object') prompt.button.textContent = 'Inspect';
   if (candidate?.action === 'visit_store') prompt.button.textContent = 'Visit';
   prompt.button.disabled = !candidate?.available;
@@ -1945,7 +2134,9 @@ function snapshot(state) {
       id: npc.id,
       sourceAgentId: npc.sourceAgentId,
       archetype: npc.archetype,
+      combatRole: npc.combatRole,
       reaction: npc.reaction,
+      combatState: String(npc.combatState || NPC_COMBAT_STATES.NORMAL),
       condition: Number(Number(npc.condition ?? 1).toFixed(3)),
       heldEquipment: String(npc.heldEquipment || ''),
       defending: Number(npc.hostileUntil || 0) > now() && Number(npc.condition ?? 1) > .05,
@@ -1964,6 +2155,16 @@ function snapshot(state) {
       })()
     }))),
     ambientPedestrians: Object.freeze(ambientPedestrians),
+    lootPickups: Object.freeze(state.pickups.map((pickup) => Object.freeze({
+      id: pickup.id,
+      sourceActorId: pickup.sourceActorId,
+      catalogId: pickup.catalogId,
+      label: pickup.label,
+      rounds: pickup.rounds,
+      x: Number(pickup.position.x.toFixed(2)),
+      y: Number(pickup.position.y.toFixed(2)),
+      z: Number(pickup.position.z.toFixed(2))
+    }))),
     lastAction: state.lastAction,
     lastCivicAction: state.lastCivicAction,
     lastCivicOutcome: state.lastCivicOutcome,
@@ -2032,6 +2233,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.roomAuthorityRuntime?.dispose?.();
   state.disposed = true;
   stopServiceSiren(state);
+  try { void state.serviceAudioContext?.close?.(); } catch (_) {}
   closeStore(state);
   state.unregisterStoreInteraction?.();
   state.unregisterInteraction?.();
@@ -2050,6 +2252,7 @@ function disposeRuntime(state, reason = 'disposed') {
   document.removeEventListener('keydown', state.onStoreKeyDown);
   document.getElementById('caughtBtn')?.removeEventListener('click', state.onCustodyContinue);
   if (appCtx.handleUrbanCustodyContinue === state.onCustodyContinue) delete appCtx.handleUrbanCustodyContinue;
+  if (appCtx.toggleUrbanResponderEquipment === state.toggleServiceEquipment) delete appCtx.toggleUrbanResponderEquipment;
   const caughtMessage = document.getElementById('caughtScreen')?.querySelector?.('.caughtText');
   if (caughtMessage) caughtMessage.textContent = 'You were caught. Continue from the nearest safe location.';
   const caughtTitle = document.getElementById('caughtScreen')?.querySelector?.('.caughtTitle');
@@ -2067,14 +2270,24 @@ function disposeRuntime(state, reason = 'disposed') {
     state.activeVehicle.attachedToPlayer = false;
   }
   resetPlayerVehicleVisual(state);
-  state.vehicles.forEach((vehicle) => vehicle.visual.dispose());
-  state.npcs.forEach((npc) => npc.visual.dispose());
+  state.vehicles.forEach((vehicle) => {
+    if (vehicle.ambientTraffic && vehicle.trafficAgentId) {
+      state.population?.releaseVehicleDetail?.(vehicle.trafficAgentId);
+    }
+    vehicle.visual.dispose();
+  });
+  state.npcs.forEach((npc) => {
+    state.population?.releasePedestrian?.(npc.sourceAgentId);
+    npc.visual.dispose();
+  });
+  state.pickups.forEach((pickup) => pickup.visual?.dispose?.());
   state.equipmentVisual?.dispose?.();
   state.equipmentRuntime?.dispose?.();
   state.responders?.dispose?.();
   state.group.removeFromParent?.();
   state.vehicles.length = 0;
   state.npcs.length = 0;
+  state.pickups.length = 0;
   state.activeVehicle = null;
   state.civic?.clear?.();
   if (appCtx.isUrbanParachuteDeployed === state.isParachuteDeployed) delete appCtx.isUrbanParachuteDeployed;
@@ -2198,6 +2411,7 @@ function startUrbanSandboxRuntime(options = {}) {
     group,
     vehicles,
     npcs: [],
+    pickups: [],
     prompt,
     equipmentUi,
     storeUi,
@@ -2237,6 +2451,7 @@ function startUrbanSandboxRuntime(options = {}) {
     crashFeedbackUntil: 0,
     statusMessage: '',
     statusUntil: 0,
+    lootElapsed: 0,
     serviceLightElapsed: 0,
     serviceEquipmentKeyHeld: false,
     serviceAudioContext: null,
@@ -2291,6 +2506,7 @@ function startUrbanSandboxRuntime(options = {}) {
       const civic = civicSnapshot(state);
       if (Number(civic?.level || 0) >= 2) placePlayerInCustody(state, 'arrested');
     },
+    onOfficerDowned: (details) => spawnLootPickup(state, details),
     onResolution(outcome) {
       const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
       if (authorityMode === 'local') {
@@ -2326,6 +2542,7 @@ function startUrbanSandboxRuntime(options = {}) {
     promoteVehicle: (agentId) => promoteTrafficVehicle(state, agentId),
     reportCivicEvent: (event) => reportCivicEvent(state, event),
     onNpcShot: (impact) => applyArmedNpcImpact(state, impact),
+    onNpcDowned: (npc) => dropNpcLoot(state, npc),
     setStatus: (message, duration) => setStatus(state, message, duration),
     now
   });
@@ -2363,7 +2580,8 @@ function startUrbanSandboxRuntime(options = {}) {
   state.onSecondaryClick = () => useEquipped(state);
   state.onTakeClick = () => {
     const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
-    if (candidate?.action === 'talk_npc') performNpcTake(state, candidate);
+    if (candidate?.action === 'loot_responder') performResponderLoot(state, candidate);
+    else if (candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc') performNpcTake(state, candidate);
   };
   state.onEquipmentToggle = () => toggleEquipment(state);
   state.onEquipmentClose = () => toggleEquipment(state, false);
@@ -2432,6 +2650,7 @@ function startUrbanSandboxRuntime(options = {}) {
       updateServiceEquipment(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);
+      updateLootPickups(state, frame.dt);
       updateCrashBodies(state, frame.dt);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {
@@ -2460,7 +2679,8 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
-  appCtx.toggleUrbanResponderEquipment = () => toggleActiveServiceEquipment(state);
+  state.toggleServiceEquipment = () => toggleActiveServiceEquipment(state);
+  appCtx.toggleUrbanResponderEquipment = state.toggleServiceEquipment;
   if (appCtx.developerDiagnosticsEnabled) {
     state.crashSupportHook = Object.freeze({
       enterVehicle: (vehicleId) => enterVehicleAfterClaim(state, state.vehicles.find((vehicle) => vehicle.id === String(vehicleId || ''))),

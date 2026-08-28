@@ -521,6 +521,17 @@ function createUrbanResponderRuntime(options = {}) {
         const result = applyConditionImpact(responder.officer, force);
         responder.officer.condition = result.after;
         responder.officer.visual.setReaction(result.destroyed ? 'downed' : 'hit');
+        if (result.destroyed && !responder.officer.lootClaimed) {
+          responder.officer.lootClaimed = true;
+          if (responder.officer.visual?.heldEquipment) responder.officer.visual.heldEquipment.visible = false;
+          options.onOfficerDowned?.({
+            sourceActorId: responder.officer.id,
+            weaponId: 'responder-sidearm',
+            label: 'Response sidearm',
+            rounds: 24,
+            position: { x: responder.officer.x, y: responder.officer.y, z: responder.officer.z }
+          });
+        }
         return { kind: 'responder_officer', id: responder.officer.id, ...result };
       }
     }
@@ -533,7 +544,7 @@ function createUrbanResponderRuntime(options = {}) {
       responder,
       officer: responder.officer,
       distance: Math.hypot(responder.officer.x - finite(reference.x), responder.officer.z - finite(reference.z))
-    }) : null).filter((entry) => entry && Number(entry.officer.condition ?? 1) <= .05 && entry.distance <= radius)
+    }) : null).filter((entry) => entry && Number(entry.officer.condition ?? 1) <= .05 && !entry.officer.lootClaimed && entry.distance <= radius)
       .sort((left, right) => left.distance - right.distance)[0] || null;
   }
 
@@ -541,6 +552,7 @@ function createUrbanResponderRuntime(options = {}) {
     const officer = responders.map((responder) => responder.officer).find((entry) => entry?.id === String(officerId || ''));
     if (!officer || Number(officer.condition ?? 1) > .05 || officer.lootClaimed) return null;
     officer.lootClaimed = true;
+    if (officer.visual?.heldEquipment) officer.visual.heldEquipment.visible = false;
     return Object.freeze({ weaponId: 'responder-sidearm', rounds: 24 });
   }
 

@@ -1,5 +1,5 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
-import { createCompanionRuntime } from './companion-runtime.js?v=5';
+import { createCompanionRuntime } from './companion-runtime.js?v=6';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';

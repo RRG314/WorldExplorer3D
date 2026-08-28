@@ -77,6 +77,7 @@ test('today stock is stable for one store/day and changes by store or day', () =
     [first.standard.map((item) => item.id), first.rare.itemId],
     [otherStore.standard.map((item) => item.id), otherStore.rare.itemId]
   );
+  assert.ok(first.standard.every((item) => item.buyPrice > item.sellPrice), 'store resale values must not create a buy/sell credit loop');
 });
 
 test('buy, sell, daily rare trade, and Explorer Credits persist locally', () => {

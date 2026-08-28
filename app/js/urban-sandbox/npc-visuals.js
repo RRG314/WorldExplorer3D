@@ -98,7 +98,7 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     const reporting = reaction === 'reporting';
     const watching = reaction === 'watching';
     const talking = reaction === 'talking';
-    const startled = reaction === 'startled' || reaction === 'hit';
+    const startled = reaction === 'startled' || reaction === 'hit' || reaction === 'fleeing';
     const downed = reaction === 'downed' || reaction === 'knocked-down';
     const armed = reaction === 'armed' || reaction === 'defending';
     armPivots.right.rotation.x = reporting ? -1.42 : armed ? -1.18 : startled ? -1.05 : talking ? -.5 : watching ? -.35 : .04;

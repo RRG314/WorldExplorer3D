@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
-import { beginNpcDefense, npcFireDecision } from './npc-combat-policy.js?v=1';
+import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
 
 const ITEM_ICON_PATHS = Object.freeze({
   hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
@@ -45,6 +45,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   const promoteVehicle = options.promoteVehicle;
   const reportCivicEvent = options.reportCivicEvent;
   const onNpcShot = options.onNpcShot;
+  const onNpcDowned = options.onNpcDowned;
   const setStatus = options.setStatus;
   const clock = options.now || (() => performance.now());
   const effects = [];
@@ -252,12 +253,12 @@ function createUrbanEquipmentRuntime(options = {}) {
     return target;
   }
 
-  function prepareNpcDefense(npc, destroyed) {
-    const response = beginNpcDefense(npc, clock(), destroyed);
-    if (!response) return false;
+  function prepareNpcResponse(npc, destroyed) {
+    const response = beginNpcResponse(npc, clock(), destroyed);
     Object.assign(npc, response);
-    npc.reactionUntil = response.hostileUntil;
-    npc.visual.setReaction('defending');
+    npc.reactionUntil = response.combatStateUntil;
+    npc.visual.setReaction(response.reaction);
+    if (response.combatState === NPC_COMBAT_STATES.DOWN) onNpcDowned?.(npc);
     return true;
   }
 
@@ -271,7 +272,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       npc.reaction = result.destroyed ? 'downed' : 'hit';
       npc.reactionUntil = result.destroyed ? Infinity : clock() + 1300;
       npc.visual.setReaction(npc.reaction);
-      prepareNpcDefense(npc, result.destroyed);
+      prepareNpcResponse(npc, result.destroyed);
       return { kind: 'npc', id: npc.id, ...result };
     }
     if (detailed.kind === 'vehicle') {
@@ -318,7 +319,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       npc.reaction = destroyed ? 'downed' : 'hit';
       npc.reactionUntil = destroyed ? Infinity : clock() + 1300;
       npc.visual.setReaction(npc.reaction);
-      prepareNpcDefense(npc, destroyed);
+      prepareNpcResponse(npc, destroyed);
       return { kind: 'npc', id: npc.id, before: result.before, after, destroyed };
     }
     if (detailed.kind === 'vehicle') {
@@ -640,6 +641,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       if (!decision) return;
       npc.reaction = 'defending';
       npc.reactionUntil = npc.hostileUntil;
+      npc.combatState = Number(npc.shotsFired || 0) > 0 ? NPC_COMBAT_STATES.COMBAT : NPC_COMBAT_STATES.DEFEND;
       npc.visual.setReaction('defending');
       npc.visual.root.rotation.y = decision.yaw;
       if (!decision.ready) return;
@@ -653,6 +655,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       });
       if (!fired) return;
       npc.shotsFired = Number(npc.shotsFired || 0) + 1;
+      npc.combatState = NPC_COMBAT_STATES.COMBAT;
       npc.nextShotAt = decision.nextShotAt;
     });
   }
