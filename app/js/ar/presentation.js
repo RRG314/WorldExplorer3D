@@ -1,5 +1,5 @@
 import { animateAnimalModel, createAnimalModel } from '../discovery/animal-models.js?v=1';
-import { COMPANION_CATALOG } from '../discovery/catalog.js?v=2';
+import { COMPANION_CATALOG } from '../discovery/catalog.js?v=3';
 import { createNaturalHistoryModel } from '../discovery/natural-history-models.js?v=1';
 
 const ANIMAL_RECORD_SPECIES = Object.freeze({

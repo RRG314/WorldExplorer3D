@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=63";
+} from "./load-runtime-session.js?v=64";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";

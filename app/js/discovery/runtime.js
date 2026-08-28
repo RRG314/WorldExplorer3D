@@ -1,5 +1,5 @@
-import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=2';
-import { createCompanionRuntime } from './companion-runtime.js?v=2';
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=3';
+import { createCompanionRuntime } from './companion-runtime.js?v=4';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=2';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
@@ -26,7 +26,7 @@ import {
 } from './model.js?v=1';
 import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=2';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
-import { emitDiscoveryTelemetry } from './telemetry.js?v=1';
+import { emitDiscoveryTelemetry } from './telemetry.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
 import { tutorialForActivity } from './tutorials.js?v=1';
@@ -109,9 +109,13 @@ function projectDiscoveryItemsToBackpack(appCtx, items = []) {
 }
 
 const WILDLIFE_COMPANION_CATALOG = Object.freeze({
-  'rock-pigeon': 'city-pigeon',
-  mallard: 'marsh-mallard'
+  'rock-pigeon': 'city-pigeon'
 });
+
+const FIRST_RELEASE_COMPANION_IDS = new Set([
+  'trail-hound', 'field-retriever', 'park-terrier',
+  'harbor-cat', 'meadow-tabby', 'midnight-cat', 'city-pigeon'
+]);
 
 const TOOL_FIELD_USE = Object.freeze({
   'field-lens': 'Inspect plants, surfaces, and close field evidence.',
@@ -179,6 +183,7 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'virtual-field-record': 'Field record',
     'domestic-companion': 'Domestic companion',
     'virtual-wildlife-companion': 'Wildlife companion',
+    'game-wildlife-companion': 'Wildlife companion',
     'wildlife-clue': 'Wildlife sign',
     'wildlife-record': 'Wildlife observation',
     'botany-record': 'Plant observation',
@@ -212,7 +217,7 @@ function compactCompassDirection(value) {
 }
 
 function discoveryCatalogEntry(catalogId) {
-  return [...BUILTIN_DISCOVERY_CATALOGS.finds, ...BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries]
+  return [...BUILTIN_DISCOVERY_CATALOGS.finds, ...BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries, ...COMPANION_CATALOG]
     .find((entry) => entry.id === catalogId);
 }
 
@@ -291,8 +296,9 @@ function createDiscoveryUi(state) {
     const scopedCatalog = requestedScope === 'current' && regionalPack
       ? worldCatalog.filter((entry) => currentRegionIds.has(entry.id))
       : worldCatalog;
+    const companionCatalogIds = new Set(COMPANION_CATALOG.map((entry) => entry.id));
     const scopedGuide = requestedScope === 'current' && regionalPack
-      ? guideRecords.filter((entry) => currentRegionIds.has(entry.catalogId) && entry.regions?.includes(state.worldIdentityId))
+      ? guideRecords.filter((entry) => (currentRegionIds.has(entry.catalogId) || companionCatalogIds.has(entry.catalogId)) && entry.regions?.includes(state.worldIdentityId))
       : guideRecords;
     const knownIds = new Set(scopedGuide.map((entry) => entry.catalogId));
     const known = scopedGuide.filter((entry) => {
@@ -310,7 +316,10 @@ function createDiscoveryUi(state) {
     const knownMarkup = known.map((entry) => {
       const catalog = discoveryCatalogEntry(entry.catalogId);
       const regions = Array.isArray(entry.regionLabels) ? entry.regionLabels.filter(Boolean) : [];
-      return visualCard(entry, `${displayDiscoveryLabel(entry.family || catalog?.family)} · ${entry.observations || 1} observation${entry.observations === 1 ? '' : 's'} · ${regions.length || 1} region${regions.length === 1 ? '' : 's'} · ${displayDiscoveryLabel(entry.evidenceClass, 'Field record')}`, 'field-guide');
+      const owned = state.companionRuntime?.snapshot?.().companions?.filter((companion) => companion.catalogId === entry.catalogId) || [];
+      const bestLevel = owned.reduce((highest, companion) => Math.max(highest, Number(companion.progression?.level || 1)), 0);
+      const companionDetail = owned.length ? ` · ${owned.length} companion${owned.length === 1 ? '' : 's'} owned · best level ${bestLevel}` : '';
+      return visualCard(entry, `${displayDiscoveryLabel(entry.family || catalog?.family)} · ${entry.observations || 1} observation${entry.observations === 1 ? '' : 's'} · ${regions.length || 1} region${regions.length === 1 ? '' : 's'}${companionDetail}`, 'field-guide');
     }).join('');
     const familyLabels = {
       'mammal-taxon': 'mammals',
@@ -441,25 +450,39 @@ function createDiscoveryUi(state) {
       if (elements.equipped) elements.equipped.innerHTML = `<span>BACKPACK FIELD TOOL</span><strong>${escapeHtml(equippedTool?.label || 'Field Lens')}</strong><small>${escapeHtml(equippedTool ? equippedTool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · ') : 'Inspect · Classify')}</small>`;
     }
     if (elements.companions) {
-      const owned = state.companionRuntime?.snapshot?.().companions || [];
+      const companionSnapshot = state.companionRuntime?.snapshot?.() || { companions: [], presentation: {} };
+      const owned = companionSnapshot.companions || [];
+      const activeTravelLabel = companionSnapshot.presentation?.travelState === 'aboard'
+        ? 'Aboard'
+        : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
       elements.companions.innerHTML = COMPANION_CATALOG.map((catalog) => {
         const companion = owned.find((entry) => entry.catalogId === catalog.id);
         if (!companion) {
-          const eligible = state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
+          const releaseReady = FIRST_RELEASE_COMPANION_IDS.has(catalog.id);
+          const eligible = releaseReady && state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
           const encounter = state.companionEncounterState?.(catalog.id) || { step: 0 };
-          const domesticLabels = ['Approach Carefully', 'Offer Virtual Care', 'Adopt'];
-          const wildlifeLabels = ['Observe Safely', 'Complete Observation', 'Unlock Virtual Companion'];
-          const labels = catalog.companionPolicy === 'adoptable-domestic' ? domesticLabels : wildlifeLabels;
           const guidance = eligible
-            ? catalog.companionPolicy === 'adoptable-domestic'
-              ? 'This companion can be met here. Spend time together to build trust before adoption.'
-              : 'A wildlife companion encounter is available here. Observe real wildlife only from a safe distance.'
-            : 'Explore a compatible habitat to begin this companion encounter.';
+            ? encounter.trustState === 'Comfortable'
+              ? 'Comfortable — choose a name when you are ready.'
+              : `${encounter.trustState || 'Wary'} — meet this animal in the world and follow its response.`
+            : releaseReady
+              ? 'Explore a compatible area to meet one.'
+              : 'Observation only for now.';
           const visual = visualForCatalogId(catalog.id);
-          return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(`${displayDiscoveryLabel(catalog.family)} · ${displayDiscoveryLabel(catalog.rarityBand, 'Common')} · ${guidance}`)}</small>${eligible ? `<div class="discoveryCompanionActions"><button data-companion-action="locate" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Find in world · ${escapeHtml(labels[Math.min(2, encounter.step)])}</button></div>` : ''}${visual ? '</div>' : ''}</article>`;
+          const nameAndBefriend = eligible && encounter.trustState === 'Comfortable'
+            ? `<div class="discoveryCompanionName"><label>Name this companion<input data-companion-name maxlength="24" autocomplete="off" value="${escapeHtml(catalog.names.common)}"></label><button data-companion-action="befriend" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Befriend</button></div>`
+            : eligible ? `<div class="discoveryCompanionActions"><button data-companion-action="locate" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Find in world</button></div>` : '';
+          return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(guidance)}</small>${nameAndBefriend}${visual ? '</div>' : ''}</article>`;
         }
         const visual = visualForCatalogId(companion.catalogId);
-        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Trust ${companion.care?.trust || 0} · Fullness ${companion.care?.fullness || 0} · Find training ${companion.training?.find || 0}/5`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? 'Following' : 'Make Active'}</button><button data-companion-action="feed" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Feed</button><button data-companion-action="train" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Train Find</button><button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+        const level = Number(companion.progression?.level || 1);
+        const nextLevel = companion.progression?.nextLevelXp == null
+          ? 'Master Partner'
+          : `${Math.max(0, companion.progression.nextLevelXp - companion.progression.totalXp)} XP to level ${level + 1}`;
+        const lastAward = companion.progression?.lastAward
+          ? ` · Last: +${companion.progression.lastAward.points} ${companion.progression.lastAward.label}`
+          : '';
+        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
       }).join('');
     }
     if (elements.progress) {
@@ -477,7 +500,10 @@ function createDiscoveryUi(state) {
         if (event.catalogId) row.catalogs.add(event.catalogId);
         regionEvents.set(key, row);
       });
-      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.totalRecords || 0} Journal memories · ${progress.regions?.length || 0} places</small></article><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')}${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} field records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.records}</strong>${escapeHtml(region.label)}<small>${region.catalogs.size} Guide identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first Explorer memory will start this story.</div>'}`;
+      const companions = state.companionRuntime?.snapshot?.().companions || [];
+      const activeCompanion = companions.find((entry) => entry.active);
+      const bonded = companions.filter((entry) => Number(entry.progression?.level || 1) >= 8).length;
+      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.totalRecords || 0} Journal memories · ${progress.regions?.length || 0} places</small></article>${companions.length ? `<article class="discoveryProgressCard"><strong>${companions.length}</strong>Companions<small>${activeCompanion ? `${escapeHtml(activeCompanion.name)} active · level ${activeCompanion.progression?.level || 1}` : 'No active companion'} · ${bonded} Bonded</small></article>` : ''}<article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')}${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} field records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.records}</strong>${escapeHtml(region.label)}<small>${region.catalogs.size} Guide identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first Explorer memory will start this story.</div>'}`;
       if (badges.length) {
         elements.progress.insertAdjacentHTML('beforeend', badges.map((badge) => `<article class="discoveryProgressCard"><strong>◆</strong>${escapeHtml(badge.label)}<small>Explorer badge</small></article>`).join(''));
       }
@@ -571,7 +597,10 @@ function createDiscoveryUi(state) {
   });
   listen(elements.companions, 'click', (event) => {
     const button = event.target?.closest?.('[data-companion-action]');
-    if (button) void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog);
+    if (button) {
+      const name = button.closest('.discoveryItem')?.querySelector?.('[data-companion-name]')?.value || '';
+      void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog, name);
+    }
   });
   listen(elements.tools, 'click', (event) => {
     const help = event.target?.closest?.('[data-tool-help]');
@@ -906,7 +935,9 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   state.ui?.dispose?.();
   state.presentation?.dispose?.();
   state.companionRuntime?.dispose?.();
+  if (globalThis.__WE3D_COMPANION_SUPPORT__ === state.companionSupportHook) delete globalThis.__WE3D_COMPANION_SUPPORT__;
   state.wildlifeRuntime?.dispose?.();
+  state.unregisterCompanionTrainingInteraction?.();
   state.unregisterWildlifeInteraction?.();
   state.unsubscribeBackpackToolSync?.();
   state.unregisterExplorerListeners?.forEach?.((remove) => remove());
@@ -1053,7 +1084,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     active: true, activeActivityId: 'metal-detect', equippedToolId: initialEquippedToolId,
     toolProgress: initialToolProgress, regionLabel, worldIdentityId: worldIdentity.id,
     locationKey: String(request.selection?.key || (appCtx.selLoc !== 'custom' ? appCtx.selLoc : '') || ''),
-    tutorials: { ...(discoveryProfile.tutorials || {}) }, companionEncounters: new Map(), detectorSnapshot: session.snapshot(playerPosition(appCtx)),
+    tutorials: { ...(discoveryProfile.tutorials || {}) },
+    companionEncounters: new Map((Array.isArray(discoveryProfile.companionEncounters) ? discoveryProfile.companionEncounters : [])
+      .filter((entry) => entry?.encounterId)
+      .map((entry) => [String(entry.encounterId), { ...entry }])),
+    companionExercise: null,
+    detectorSnapshot: session.snapshot(playerPosition(appCtx)),
     lastSnapshot: session.snapshot(playerPosition(appCtx)),
     retentionSnapshot: null,
     creatureQualityAudit: auditRegionalCreatureQuality(resolveRegionalEcologyPack(worldIdentity.location))
@@ -1075,6 +1111,27 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       await state.ui?.refreshData?.();
     }
     return result || { recorded: false, reason: 'event-store-unavailable' };
+  };
+  state.saveCompanionEncounter = async (entry = {}) => {
+    if (!entry.encounterId) return false;
+    const normalized = {
+      encounterId: String(entry.encounterId).slice(0, 180),
+      actorId: String(entry.actorId || '').slice(0, 180),
+      catalogId: String(entry.catalogId || '').slice(0, 80),
+      worldIdentity: String(entry.worldIdentity || state.worldIdentityId).slice(0, 160),
+      trustState: ['Wary', 'Curious', 'Comfortable'].includes(entry.trustState) ? entry.trustState : 'Wary',
+      step: Math.max(0, Math.min(3, Math.floor(Number(entry.step) || 0))),
+      completed: entry.completed === true,
+      companionInstanceId: String(entry.companionInstanceId || '').slice(0, 180),
+      updatedAt: Math.max(0, Number(entry.updatedAt) || Date.now())
+    };
+    state.companionEncounters.set(normalized.encounterId, normalized);
+    const current = await profileStore.getProfile();
+    const companionEncounters = [...state.companionEncounters.values()]
+      .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0))
+      .slice(-120);
+    await profileStore.saveProfile({ ...current, companionEncounters });
+    return normalized;
   };
   appCtx.recordExplorerEvent = state.recordExplorerEvent;
   state.unregisterExplorerListeners = [];
@@ -1254,8 +1311,74 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.companionRuntime = await createCompanionRuntime(appCtx, {
     profileStore,
     worldIdentity: worldIdentity.id,
-    onChange: () => state.ui?.refreshData?.()
+    onChange: () => state.ui?.refreshData?.(),
+    onXpAward: (companion, award) => {
+      appCtx.showToast?.(`+${award.points} Companion XP · ${award.label}`);
+      emitDiscoveryTelemetry('companion_xp_awarded', { result: award.companion?.progression?.lastAward?.reasonId || 'shared-activity', contextBands: telemetryContextBands() });
+    },
+    onTrainingComplete: (companion, skill) => {
+      if (skill !== 'recall') return;
+      appCtx.showToast?.(`${companion.name} learned Recall.`);
+      emitDiscoveryTelemetry('companion_training_completed', { result: 'recall', contextBands: telemetryContextBands() });
+      void state.recordExplorerEvent({
+        eventId: `event:companion:training:${companion.instanceId}:recall`,
+        eventType: 'companion-training', sourceSystem: 'companions',
+        sourceId: companion.instanceId, pathId: 'companion',
+        name: `${companion.name} learned Recall`,
+        detail: 'The first recall exercise was completed in the world.',
+        firstCompletion: true, points: 0, progressReason: 'companion-memory'
+      });
+    },
+    onLevelUp: (companion, previousLevel) => {
+      const milestone = [3, 8, 12].includes(companion.progression.level);
+      appCtx.showToast?.(`${companion.name} reached level ${companion.progression.level} · ${companion.progression.trustState}`);
+      emitDiscoveryTelemetry('companion_level_reached', { result: `level-${companion.progression.level}`, contextBands: telemetryContextBands() });
+      if (!milestone) return;
+      void state.recordExplorerEvent({
+        eventId: `event:companion:level:${companion.instanceId}:${companion.progression.level}`,
+        eventType: 'companion-level',
+        sourceSystem: 'companions',
+        sourceId: companion.instanceId,
+        pathId: 'companion',
+        name: `${companion.name} reached level ${companion.progression.level}`,
+        detail: companion.progression.level === 3
+          ? 'Recall training built a trusting partnership.'
+          : companion.progression.level === 8 ? 'Field training built a bonded partnership.' : 'Companion mastery completed.',
+        firstCompletion: true,
+        points: 1,
+        progressReason: 'companion-bond-milestone',
+        metadata: { previousLevel, level: companion.progression.level }
+      });
+    }
   });
+  if (appCtx.developerDiagnosticsEnabled) {
+    state.companionSupportHook = Object.freeze({
+      adopt: (catalogId, options = {}) => state.companionRuntime.adopt(catalogId, options),
+      awardXp: (receiptId, reasonId) => state.companionRuntime.awardXp({ receiptId, reasonId }),
+      encounters: () => Object.freeze([...state.companionEncounters.values()].map((entry) => Object.freeze({ ...entry }))),
+      encounterExercise: () => state.companionExercise ? Object.freeze({
+        type: state.companionExercise.type,
+        actorId: state.companionExercise.actorId,
+        catalogId: state.companionExercise.catalogId,
+        elapsedMs: Math.max(0, performance.now() - state.companionExercise.startedAt),
+        completing: state.companionExercise.completing === true
+      }) : null,
+      worldActors: () => Object.freeze((state.publication.wildlife?.actors || []).map((actor) => Object.freeze({
+        id: actor.id, speciesId: actor.speciesId, companionPolicy: actor.companionPolicy, home: actor.home
+      }))),
+      snapshot: () => state.companionRuntime.snapshot()
+    });
+    globalThis.__WE3D_COMPANION_SUPPORT__ = state.companionSupportHook;
+  }
+  state.awardActiveCompanionForField = async (receiptBase, firstIdentification = false) => {
+    const stable = String(receiptBase || '').trim();
+    if (!stable || !state.companionRuntime.snapshot().activeInstanceId) return false;
+    const fieldAward = await state.companionRuntime.awardXp({ receiptId: `field:${stable}`, reasonId: 'field-activity' });
+    if (firstIdentification) {
+      await state.companionRuntime.awardXp({ receiptId: `species:${stable}`, reasonId: 'new-species' });
+    }
+    return fieldAward;
+  };
   state.wildlifeRuntime = createAmbientWildlifeRuntime(appCtx, wildlife);
   state.refreshToolProgress = async () => {
     const profile = await profileStore.getProfile();
@@ -1377,7 +1500,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.hasWorldCompanionEncounter = (catalogId) => wildlife.actors.some((actor) =>
     actor.speciesId === String(catalogId) || WILDLIFE_COMPANION_CATALOG[actor.speciesId] === String(catalogId)
   );
-  state.companionEncounterState = (catalogId) => state.companionEncounters.get(String(catalogId)) || { step: 0 };
+  state.companionEncounterState = (catalogId, actorId = '') => {
+    const matches = [...state.companionEncounters.values()].filter((entry) =>
+      entry.catalogId === String(catalogId) &&
+      entry.worldIdentity === state.worldIdentityId &&
+      (!actorId || entry.actorId === String(actorId)) &&
+      entry.completed !== true
+    );
+    return matches.sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))[0]
+      || { step: 0, trustState: 'Wary', actorId: String(actorId || '') };
+  };
   state.getArChallengeEligibility = () => evaluateArEligibility({ type: 'field-challenge' }, {
     environmentName: appCtx.getEnv?.() || 'EARTH',
     environment,
@@ -1411,7 +1543,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       companion: activeCompanion?.catalogId === 'trail-hound' ? activeCompanion : null
     });
   };
-  state.handleCompanionAction = async (action, instanceId, catalogId) => {
+  state.handleCompanionAction = async (action, instanceId, catalogId, requestedName = '') => {
     if (action === 'locate') {
       const catalog = COMPANION_CATALOG.find((entry) => entry.id === String(catalogId));
       if (!catalog || !state.isCompanionEligible(catalog)) return false;
@@ -1425,26 +1557,66 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.ui?.setOpen(false);
       return appCtx.openArExperience?.({ type: 'companion', companion });
     }
-    else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
-    else if (action === 'feed') await state.companionRuntime.feed(instanceId);
-    else if (action === 'train') await state.companionRuntime.train(instanceId, 'find');
-    const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
-    if (companion && ['activate', 'feed', 'train'].includes(action)) {
-      const day = new Date().toISOString().slice(0, 10);
-      const eventSuffix = action === 'train' ? `find-${companion.training?.find || 0}` : action === 'feed' ? day : 'active';
-      void state.recordExplorerEvent({
-        eventId: `event:companion:${action}:${companion.instanceId}:${eventSuffix}`,
-        eventType: `companion-${action}`,
-        sourceSystem: 'companions',
-        sourceId: companion.instanceId,
-        pathId: 'companion',
-        name: action === 'activate' ? `${companion.name} joined the journey` : action === 'feed' ? `Cared for ${companion.name}` : `${companion.name} practiced finding`,
-        detail: action === 'train' ? `Find training ${companion.training?.find || 0}/5.` : 'A companion memory was added to your Journal.',
-        firstCompletion: action === 'train' && companion.training?.find === 5,
-        points: action === 'train' && companion.training?.find === 5 ? 2 : 0,
-        progressReason: action === 'train' && companion.training?.find === 5 ? 'companion-skill-mastered' : 'companion-memory'
+    else if (action === 'befriend') {
+      const catalog = COMPANION_CATALOG.find((entry) => entry.id === String(catalogId));
+      const encounter = state.companionEncounterState(catalogId);
+      if (!catalog || encounter.trustState !== 'Comfortable' || !encounter.encounterId) return false;
+      const before = state.companionRuntime.snapshot().companions.length;
+      await state.companionRuntime.adopt(catalog.id, { name: requestedName, discoveryId: encounter.encounterId });
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.active);
+      if (!companion) return false;
+      await state.saveCompanionEncounter({ ...encounter, completed: true, companionInstanceId: companion.instanceId });
+      state.wildlifeRuntime?.interact?.(encounter.actorId, 'adopted');
+      await profileStore.recordObservation({
+        claimId: `companion-species:${catalog.id}`,
+        catalogId: catalog.id,
+        name: catalog.names.common,
+        family: catalog.family,
+        discipline: 'nature',
+        activityId: 'nature-observe',
+        evidenceClass: 'game-companion-encounter',
+        sourceRefs: catalog.sourceRefs,
+        regionId: state.worldIdentityId,
+        regionLabel: state.regionLabel,
+        worldIdentity: state.worldIdentityId,
+        locationKey: state.locationKey,
+        locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
+        environment: appCtx.getEnv?.() || 'EARTH',
+        localPosition: playerPosition(appCtx),
+        collectedAt: Date.now()
       });
+      void state.recordExplorerEvent({
+        eventId: `event:companion:befriended:${companion.instanceId}`,
+        eventType: 'companion-befriended',
+        sourceSystem: 'companions', sourceId: companion.instanceId, pathId: 'companion',
+        name: `${companion.name} joined the journey`,
+        detail: `${catalog.names.common} became an active companion.`,
+        firstCompletion: true,
+        points: before === 0 ? 1 : 0,
+        progressReason: before === 0 ? 'first-companion' : 'companion-memory'
+      });
+      emitDiscoveryTelemetry('companion_adopted', { result: 'befriended', contextBands: telemetryContextBands() });
+      appCtx.showToast?.(`${companion.name} joined you.`);
     }
+    else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
+    else if (action === 'care') {
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
+      if (!companion) return false;
+      await state.companionRuntime.care(instanceId, companion.speciesArchetype === 'bird' ? 'groom' : 'pet');
+      const day = new Date().toISOString().slice(0, 10);
+      if (companion.progression?.totalXp > 0) {
+        await state.companionRuntime.awardXp({ receiptId: `care:${companion.instanceId}:${day}`, reasonId: 'care-after-outing' });
+      }
+      appCtx.showToast?.(`${companion.name} enjoyed the attention.`);
+    }
+    else if (action === 'recall-training') {
+      if (!state.companionRuntime.beginRecallExercise(instanceId, playerPosition(appCtx))) return false;
+      state.ui?.setOpen(false);
+      appCtx.showToast?.('Walk at least 6 m away, then call your companion.');
+      emitDiscoveryTelemetry('companion_training_started', { result: 'recall', contextBands: telemetryContextBands() });
+      return true;
+    }
+    const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
     emitDiscoveryTelemetry(
       action === 'activate' ? 'companion_activated' : 'companion_cared_for',
       { result: action, contextBands: telemetryContextBands() }
@@ -1459,20 +1631,44 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (!actorId || !speciesId) return false;
     if (companionPolicy === 'trust-sequence-required') {
       const catalog = COMPANION_CATALOG.find((entry) => entry.id === speciesId);
-      if (!catalog) return false;
-      const current = state.companionEncounterState(catalog.id);
-      const nextStep = Math.min(3, Number(current.step || 0) + 1);
-      state.companionEncounters.set(catalog.id, { step: nextStep });
-      const adopted = nextStep >= 3;
-      state.wildlifeRuntime?.interact?.(actorId, adopted ? 'adopted' : 'trust');
-      if (adopted) {
-        await state.companionRuntime.adopt(catalog.id);
-        appCtx.showToast?.(`${catalog.names.common} joined you and is now following.`);
-        emitDiscoveryTelemetry('companion_adopted', { result: 'world-trust-sequence', contextBands: telemetryContextBands() });
+      if (!catalog || !FIRST_RELEASE_COMPANION_IDS.has(catalog.id)) return false;
+      const current = state.companionEncounterState(catalog.id, actorId);
+      const encounterId = current.encounterId || `encounter:${state.worldIdentityId}:${actorId}`;
+      if (current.step === 0) {
+        await state.saveCompanionEncounter({
+          ...current, encounterId, actorId, catalogId: catalog.id,
+          worldIdentity: state.worldIdentityId, step: 1, trustState: 'Curious'
+        });
+        state.wildlifeRuntime?.interact?.(actorId, 'watch');
+        emitDiscoveryTelemetry('companion_trust_advanced', { result: 'curious', contextBands: telemetryContextBands() });
+        appCtx.showToast?.(`${catalog.names.common} is watching you. Stay nearby and let it approach.`);
+      } else if (current.step === 1) {
+        if (state.companionExercise?.type === 'calm-wait') return true;
+        const startPosition = playerPosition(appCtx);
+        state.companionExercise = {
+          type: 'calm-wait', encounterId, actorId, catalogId: catalog.id,
+          startedAt: performance.now(), startPosition: { x: startPosition.x, z: startPosition.z }, completing: false
+        };
+        state.wildlifeRuntime?.interact?.(actorId, 'wait');
+        appCtx.showToast?.('Stay still for a moment.');
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        state.companionExercise = null;
+        if (state.disposed) return false;
+        await state.saveCompanionEncounter({
+          ...current, encounterId, actorId, catalogId: catalog.id,
+          worldIdentity: state.worldIdentityId, step: 2, trustState: 'Curious'
+        });
+        appCtx.showToast?.('It came closer. You can greet it now.');
+      } else if (current.step === 2) {
+        await state.saveCompanionEncounter({ ...current, step: 3, trustState: 'Comfortable' });
+        state.wildlifeRuntime?.interact?.(actorId, 'greet');
+        emitDiscoveryTelemetry('companion_trust_advanced', { result: 'comfortable', contextBands: telemetryContextBands() });
+        appCtx.showToast?.(`Comfortable · you can greet and name ${catalog.names.common}.`);
+        state.ui?.setOpen(true);
+        state.ui?.setTab('gear');
       } else {
-        appCtx.showToast?.(nextStep === 1
-          ? `${catalog.names.common} noticed you · stay nearby to build trust.`
-          : `${catalog.names.common} trusts you more · one more calm interaction.`);
+        state.ui?.setOpen(true);
+        state.ui?.setTab('gear');
       }
       await state.ui?.refreshData?.();
       return true;
@@ -1508,6 +1704,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     if (recorded.recorded) {
       await state.refreshToolProgress();
+      await state.awardActiveCompanionForField?.(
+        recorded.event?.eventId || `wildlife:${state.worldIdentityId}:${actorId}:${catalog.id}`,
+        recorded.event?.firstIdentification === true
+      );
       appCtx.showToast?.(`${catalog.names.common} recorded in your Field Guide.`);
       emitDiscoveryTelemetry('discovery_recorded', { activityId: 'photograph', catalogFamily: catalog.family, discipline: 'nature', contextBands: telemetryContextBands(), result: 'recorded-in-world' });
     } else {
@@ -1516,13 +1716,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
 
     const companionCatalogId = WILDLIFE_COMPANION_CATALOG[speciesId];
     if (companionCatalogId) {
-      const encounter = state.companionEncounterState(companionCatalogId);
-      const nextStep = Math.min(3, Number(encounter.step || 0) + 1);
-      state.companionEncounters.set(companionCatalogId, { step: nextStep });
-      if (nextStep >= 3) {
-        await state.companionRuntime.adopt(companionCatalogId);
-        appCtx.showToast?.(`${COMPANION_CATALOG.find((entry) => entry.id === companionCatalogId)?.names?.common || 'Virtual bird companion'} unlocked and following.`);
-        emitDiscoveryTelemetry('companion_adopted', { result: 'world-observation-sequence', contextBands: telemetryContextBands() });
+      const encounter = state.companionEncounterState(companionCatalogId, actorId);
+      if (encounter.step === 0) {
+        await state.saveCompanionEncounter({
+          ...encounter,
+          encounterId: `encounter:${state.worldIdentityId}:${actorId}`,
+          actorId,
+          catalogId: companionCatalogId,
+          worldIdentity: state.worldIdentityId,
+          step: 1,
+          trustState: 'Curious'
+        });
       }
     }
     await state.ui?.refreshData?.();
@@ -1672,6 +1876,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           result: outcome?.collected ? 'collected' : 'recorded'
         });
         if (recorded) {
+          await state.awardActiveCompanionForField?.(
+            resultRecord?.eventId || resultRecord?.claimId || resultRecord?.instanceId || completedSlot?.claimId,
+            resultRecord?.firstIdentification === true || outcome?.event?.firstIdentification === true
+          );
           discoveryHaptic([18, 36, 28]);
           state.ui.showResult(outcome);
         }
@@ -1713,6 +1921,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         result: 'collected'
       });
       if (recorded) {
+        await state.awardActiveCompanionForField?.(item?.eventId || item?.claimId || item?.instanceId, item?.firstIdentification === true);
         discoveryHaptic([20, 35, 40]);
         state.ui.showResult(state.session.snapshot(position).collectionResult);
       }
@@ -1754,6 +1963,28 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
     return true;
   };
+  state.unregisterCompanionTrainingInteraction = appCtx.registerContextInteraction?.({
+    id: 'world_discovery_companion_training',
+    priority: 96,
+    evaluate: () => {
+      if (state.disposed || state.ui?.open || appCtx.Walk?.state?.mode !== 'walk' || appCtx.getEnv?.() !== 'EARTH') return null;
+      const exercise = state.companionRuntime?.exerciseSnapshot?.(playerPosition(appCtx));
+      if (!exercise?.active || !exercise.readyToCall) return null;
+      return {
+        available: true,
+        action: 'call_companion',
+        label: 'Call',
+        detail: `${state.companionRuntime.snapshot().activeName} · Recall practice`,
+        distance: 0,
+        data: { exercise: 'recall' }
+      };
+    },
+    perform: () => {
+      const called = state.companionRuntime?.callRecall?.(playerPosition(appCtx)) === true;
+      if (called) appCtx.showToast?.('Good call. Wait for your companion to return.');
+      return called;
+    }
+  });
   state.unregisterWildlifeInteraction = appCtx.registerContextInteraction?.({
     id: 'world_discovery_wildlife',
     priority: 81,
@@ -1766,15 +1997,21 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       const companionCatalogId = actor.companionPolicy === 'trust-sequence-required'
         ? actor.speciesId
         : WILDLIFE_COMPANION_CATALOG[actor.speciesId];
-      const progress = companionCatalogId ? Number(state.companionEncounterState(companionCatalogId).step || 0) : 0;
+      const encounter = companionCatalogId ? state.companionEncounterState(companionCatalogId, actor.id) : { step: 0, trustState: 'Wary' };
+      const progress = Number(encounter.step || 0);
+      const isCat = ['harbor-cat', 'meadow-tabby', 'midnight-cat'].includes(actor.speciesId);
       const label = actor.companionPolicy === 'trust-sequence-required'
-        ? ['Meet', 'Offer care', 'Adopt'][Math.min(2, progress)]
+        ? (state.companionExercise?.actorId === actor.id
+          ? 'Stay still'
+          : (isCat ? ['Watch', 'Sit quietly', 'Play', 'Name'][Math.min(3, progress)] : ['Watch', 'Wait', 'Greet', 'Name'][Math.min(3, progress)]))
         : 'Observe';
       return {
         available: true,
         action: actor.companionPolicy === 'trust-sequence-required' ? 'build_animal_trust' : 'observe_wildlife',
         label,
-        detail: `${actor.label}${companionCatalogId ? ` · progress ${Math.min(3, progress)}/3` : ''}`,
+        detail: actor.companionPolicy === 'trust-sequence-required'
+          ? `${actor.label} · ${encounter.trustState || 'Wary'}`
+          : `${actor.label} · game encounter`,
         distance: nearby.distance,
         data: {
           actorId: actor.id,
