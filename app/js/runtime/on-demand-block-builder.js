@@ -29,8 +29,8 @@ function emptyPersistenceStatus() {
 function installOnDemandBlockBuilder(appCtx) {
   async function ensureBlockBuilderReady() {
     if (!modulePromise) {
-      modulePromise = import('../blocks.js?v=68').then(async (blocks) => {
-        const ui = await import('../block-builder/ui.js?v=6');
+      modulePromise = import('../blocks.js?v=69').then(async (blocks) => {
+        const ui = await import('../block-builder/ui.js?v=7');
         if (pendingSharedConfig) blocks.configureSharedBuildSync?.(pendingSharedConfig);
         blocks.setSharedBuildConnectionState?.(pendingSharedConnected);
         if (pendingSharedEntries) blocks.setSharedBuildEntries?.(pendingSharedEntries);

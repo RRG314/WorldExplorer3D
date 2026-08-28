@@ -9,6 +9,7 @@ import {
 } from '../app/js/character/catalog.js';
 import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../app/js/character/wildlife-assistance.js';
+import { constructionTuning } from '../app/js/character/construction-assistance.js';
 import { createCharacter, createDefaultCharacterState, validateCreationAttributes } from '../app/js/character/model.js';
 import { migrateLegacyCharacterState, projectCharacterProgress } from '../app/js/character/progression.js';
 import { createDetectorSession } from '../app/js/discovery/detector-session.js';
@@ -162,6 +163,21 @@ test('wildlife and companion experience improve cues without skipping the trust 
   assert.equal(practicedHandling.trustRadiusMeters <= 6.5, true);
   assert.equal(practicedHandling.calmWaitMs >= 2400, true);
   assert.doesNotMatch(`${practicedHandling.cueLabel} ${naturalistObservation.cueLabel}`, /procedural|encounter/i);
+});
+
+test('Engineering improves the existing construction controls within bounded authority', () => {
+  const general = constructionTuning(resolveCharacterCapability(
+    createCharacter({ backgroundId: 'general-explorer', now: 1 }),
+    'construction'
+  ));
+  const engineer = constructionTuning(resolveCharacterCapability(
+    createCharacter({ backgroundId: 'field-engineer', traits: ['equipment-minded'], now: 1 }),
+    'construction'
+  ));
+  assert.equal(engineer.placementRangeScale > general.placementRangeScale, true);
+  assert.equal(engineer.mappedSelectionRadiusMeters > general.mappedSelectionRadiusMeters, true);
+  assert.equal(engineer.placementRangeScale <= 1.1, true);
+  assert.equal(engineer.mappedSelectionRadiusMeters <= 48, true);
 });
 
 test('advanced requirements explain equipment and qualification while basic play remains open', () => {

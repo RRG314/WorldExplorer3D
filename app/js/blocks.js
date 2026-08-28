@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createBlockBuilderInteraction } from "./block-builder/interaction.js?v=3";
+import { createBlockBuilderInteraction } from "./block-builder/interaction.js?v=4";
 import {
   BLOCK_MATERIALS,
   BLOCK_LIMIT_PER_LOCATION,
@@ -20,6 +20,7 @@ import {
   planetaryBlockRenderCoordinates,
   planetaryBlockStorageCoordinates
 } from './block-builder/world-coordinates.js?v=1';
+import { constructionTuning } from './character/construction-assistance.js?v=1';
 // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
@@ -208,6 +209,12 @@ function getBuildLimits() {
   };
 }
 
+function getConstructionAssistance() {
+  return constructionTuning(appCtx.resolveCharacterCapability?.('construction', {
+    environment: appCtx.getEnv?.() || (getPlanetaryBuildWorldContext() ? 'PLANETARY' : 'EARTH')
+  }));
+}
+
 function getBlockBuilderSnapshot() {
   const limits = getBuildLimits();
   return {
@@ -219,7 +226,8 @@ function getBlockBuilderSnapshot() {
     canUndo: buildActionHistory.length > 0,
     count: limits.currentLocationCount,
     maxCount: limits.maxPerLocation,
-    shared: isSharedBuildSyncActive()
+    shared: isSharedBuildSyncActive(),
+    characterAssistance: getConstructionAssistance()
   };
 }
 
@@ -832,6 +840,7 @@ const { handleBlockBuilderClick } = createBlockBuilderInteraction({
   getRotation: () => buildRotation,
   getSurfaceYAt,
   isEnabled: () => buildModeEnabled,
+  getMaxDistance: () => BUILD_MAX_DISTANCE * getConstructionAssistance().placementRangeScale,
   maxDistance: BUILD_MAX_DISTANCE,
   onAction: rememberBuildAction,
   placeBuildBlock,
@@ -849,6 +858,7 @@ Object.assign(appCtx, {
   configureSharedBuildSync,
   getBuildCollisionAtWorldXZ,
   getBuildLimits,
+  getConstructionAssistance,
   getBlockBuilderSnapshot,
   getBuildPersistenceStatus,
   getSharedBuildSyncStatus,

@@ -165,7 +165,8 @@ export function createBlockBuilderInteraction(options) {
       toWorldCoord(action.gy) - reference.y,
       toWorldCoord(action.gz) - reference.z
     );
-    if (distance > options.maxDistance) return true;
+    const maxDistance = Math.max(1, Number(options.getMaxDistance?.() ?? options.maxDistance) || 1);
+    if (distance > maxDistance) return true;
 
     let changed = false;
     if (action.kind === 'remove') {
