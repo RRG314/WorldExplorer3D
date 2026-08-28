@@ -98,11 +98,12 @@ Rural worlds also need a visible domestic-animal layer. Farmland, farmyard,
 meadow, and field context may make a bounded **game farm encounter** eligible;
 mapped land use alone never proves that real livestock are present.
 
-The rural set is cattle, sheep, goats, chickens, pigs, and horses. They use
-species-specific scale, group spacing, grazing/pecking/resting behavior, sound
-distance, fence awareness, and mobile LOD instead of the generic wildlife
-follower. They can be observed, photographed, added to the Field Guide, and
-befriended as individual companions through farm-animal trust interactions.
+The rural set is cattle, sheep, goats, chickens, pigs, and horses. The current
+vertical slice gives them distinct silhouettes, bounded scale, follow spacing
+and response, individual identity, trust/naming, specialties, and mobile model
+budgets instead of presenting them as reskinned dogs. Grazing, pecking,
+resting, sound distance, fence awareness, and complete rural observation and
+photography journeys remain later depth work and are not claimed complete.
 
 Owning livestock does not make every travel mode physically interchangeable.
 Chickens, goats, sheep, and pigs may follow on foot in compatible open areas.
@@ -117,7 +118,7 @@ Farm-animal befriending remains game play. A mapped farm does not prove that a
 real animal exists there, and the game never suggests taking, feeding, entering
 property for, or claiming ownership of a real animal.
 
-Each future species must pass all of these gates: ecology eligibility,
+Each species must pass all of these gates before the full rural slice is called complete: ecology eligibility,
 sensitive/protected review, companion policy, model and scale review,
 locomotion, interaction animation, encounter behavior, personality variation,
 training compatibility, visible abilities, Guide and Collection presentation,
@@ -351,7 +352,7 @@ language to players.
 
 Implementation proceeds as complete vertical slices:
 
-1. **Domestic dog:** encounter, observation, trust, naming, persistence,
+1. **Domestic dog — verified foundation:** encounter, observation, trust, naming, persistence,
    following, vehicle boarding, explained XP, Recall training/command,
    Journal/Guide/Profile projections, AR, reload, desktop, and 390×844 mobile.
 2. **Eligible game wildlife:** city-pigeon observation and photography,
@@ -360,9 +361,13 @@ Implementation proceeds as complete vertical slices:
 3. **Collection depth:** cat archetype, duplicates, favorites/archive, all five
    Companion views, care/items, challenges, Expedition and Live GPS receipts,
    level table, specialization, and mastery.
-4. **Rural companions:** cattle, sheep, goat, chicken, pig, and horse game
-   encounters; species-specific trust, scale, follow limits, training, rural
-   Guide records, persistence, and mobile LOD.
+4. **Rural companions — foundation verified, depth incomplete:** cattle,
+   sheep, goat, chicken, pig, and horse are farm-context-eligible individual
+   companions with distinct models, scale/follow limits, specialties,
+   persistence, duplicate-safe collection rows, mobile budgets, and a vehicle
+   waiting rule. Species-specific ambient behavior, fences, sound, complete
+   observation/photography, rural Guide journeys, and persistence through a
+   naturally completed farm encounter remain to finish this slice.
 5. **Bounded social presentation:** sanitized remote companion presence,
    disconnect/rejoin recovery, reduced mobile LOD, and no client-authoritative
    ownership or rewards.

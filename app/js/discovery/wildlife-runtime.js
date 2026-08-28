@@ -1,16 +1,22 @@
 import { deterministicUnit } from './model.js?v=1';
-import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=1';
+import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
-import { COMPANION_CATALOG } from './catalog.js?v=3';
+import { COMPANION_CATALOG } from './catalog.js?v=4';
 
 const WILDLIFE_CONTEXTS = new Set(['urban', 'urban-core', 'park', 'field', 'forest', 'wetland', 'riverbank', 'fresh-water', 'coast', 'mountain', 'desert']);
 
 function archetypeForCell(cell, seed) {
   const contexts = new Set(cell.contexts || []);
+  if (contexts.has('farm')) return 'livestock';
   if (contexts.has('fresh-water') || contexts.has('wetland') || contexts.has('coast')) return 'waterbird';
   if (contexts.has('urban') || contexts.has('urban-core')) return deterministicUnit(`${seed}:domestic`) > 0.55 ? 'domestic-wanderer' : 'flying-bird';
   if (contexts.has('forest') || contexts.has('field') || contexts.has('park')) return deterministicUnit(`${seed}:ground`) > 0.46 ? 'small-mammal' : 'flying-bird';
   return 'flying-bird';
+}
+
+function livestockSpeciesForCell(seed) {
+  const choices = ['pasture-cow', 'wool-sheep', 'hill-goat', 'yard-chicken', 'heritage-pig', 'field-horse'];
+  return choices[Math.min(choices.length - 1, Math.floor(deterministicUnit(`${seed}:livestock-species`) * choices.length))];
 }
 
 function domesticSpeciesForCell(cell, seed) {
@@ -30,6 +36,12 @@ const WILDLIFE_LABELS = Object.freeze({
   'harbor-cat': 'Harbor Cat',
   'meadow-tabby': 'Meadow Tabby',
   'midnight-cat': 'Midnight Cat',
+  'pasture-cow': 'Pasture Cow',
+  'wool-sheep': 'Wool Sheep',
+  'hill-goat': 'Hill Goat',
+  'yard-chicken': 'Yard Chicken',
+  'heritage-pig': 'Heritage Pig',
+  'field-horse': 'Field Horse',
   mallard: 'Mallard',
   'small-mammal': 'Small Mammal',
   'rock-pigeon': 'Rock Pigeon'
@@ -65,7 +77,9 @@ function compileAmbientWildlifePlan(environment, options = {}) {
     }
     if (!home) continue;
     const archetype = archetypeForCell(cell, seed);
-    const speciesId = archetype === 'domestic-wanderer'
+    const speciesId = archetype === 'livestock'
+      ? livestockSpeciesForCell(seed)
+      : archetype === 'domestic-wanderer'
       ? domesticSpeciesForCell(cell, seed)
       : archetype === 'waterbird' ? 'mallard' : archetype === 'small-mammal' ? 'small-mammal' : 'rock-pigeon';
     actors.push(Object.freeze({
@@ -73,14 +87,14 @@ function compileAmbientWildlifePlan(environment, options = {}) {
       cellId: cell.cellId,
       archetype,
       speciesId,
-      label: archetype === 'domestic-wanderer'
+      label: ['domestic-wanderer', 'livestock'].includes(archetype)
         ? WILDLIFE_LABELS[speciesId]
         : `${WILDLIFE_LABELS[speciesId]} field lead`,
       home: Object.freeze(home),
       phase: deterministicUnit(`${seed}:phase`) * Math.PI * 2,
       evidenceClass: 'guided-wildlife-encounter',
       supportingEvidence: Object.freeze(['habitat-plausible']),
-      companionPolicy: archetype === 'domestic-wanderer' ? 'trust-sequence-required' : 'observe-only'
+      companionPolicy: ['domestic-wanderer', 'livestock'].includes(archetype) ? 'trust-sequence-required' : 'observe-only'
     }));
   }
   return Object.freeze({

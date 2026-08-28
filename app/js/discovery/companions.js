@@ -1,4 +1,4 @@
-import { COMPANION_CATALOG } from './catalog.js?v=3';
+import { COMPANION_CATALOG } from './catalog.js?v=4';
 import { deterministicUnit } from './model.js?v=1';
 
 const COMPANION_SCHEMA_VERSION = 2;
@@ -19,7 +19,8 @@ const COMPANION_XP_REASONS = Object.freeze({
 
 const FIRST_RELEASE_COMPANION_IDS = Object.freeze([
   'trail-hound', 'field-retriever', 'park-terrier',
-  'harbor-cat', 'meadow-tabby', 'midnight-cat', 'city-pigeon'
+  'harbor-cat', 'meadow-tabby', 'midnight-cat', 'city-pigeon',
+  'pasture-cow', 'wool-sheep', 'hill-goat', 'yard-chicken', 'heritage-pig', 'field-horse'
 ]);
 
 function companionLevelForXp(totalXp = 0) {
@@ -117,17 +118,23 @@ function companionArchetype(catalogId = '') {
   if (['trail-hound', 'field-retriever', 'park-terrier'].includes(id)) return 'dog';
   if (['harbor-cat', 'meadow-tabby', 'midnight-cat'].includes(id)) return 'cat';
   if (['city-pigeon', 'marsh-mallard'].includes(id)) return 'bird';
+  if (id === 'pasture-cow') return 'livestock-cattle';
+  if (id === 'wool-sheep') return 'livestock-sheep';
+  if (id === 'hill-goat') return 'livestock-goat';
+  if (id === 'yard-chicken') return 'livestock-bird';
+  if (id === 'heritage-pig') return 'livestock-pig';
+  if (id === 'field-horse') return 'livestock-horse';
   return 'legacy';
 }
 
-function normalizeTraining(source = {}) {
+function normalizeTraining(source = {}, defaultSpecialization = null) {
   const learned = Array.isArray(source.learnedCommands) ? source.learnedCommands : ['follow'];
   return Object.freeze({
     learnedCommands: Object.freeze([...new Set(learned.map(String).filter(Boolean))]),
     availableExercise: source.availableExercise ? String(source.availableExercise) : null,
     activeExercise: null,
     records: Object.freeze({ ...(source.records || {}) }),
-    specialization: source.specialization ? String(source.specialization) : null
+    specialization: source.specialization ? String(source.specialization) : defaultSpecialization ? String(defaultSpecialization) : null
   });
 }
 
@@ -164,7 +171,7 @@ function normalizeCompanionInstance(instance = {}) {
       size: Math.max(.9, Math.min(1.1, Number(instance.visualVariation?.size) || 1))
     }),
     care: normalizeCare(instance.care),
-    training: normalizeTraining(instance.training),
+    training: normalizeTraining(instance.training, catalog.trainingSpecialty),
     progression: normalizeCompanionProgression({ progression: progressionSeed }),
     favorite: instance.favorite === true,
     archived: instance.archived === true,
@@ -214,6 +221,9 @@ function careForCompanion(instance, interaction = 'pet', now = Date.now()) {
 function resolveCompanionTravelPolicy(instance, mode = 'walk', environment = 'EARTH') {
   if (!instance) return Object.freeze({ visible: false, state: 'none' });
   if (environment !== 'EARTH' || ['plane', 'drone'].includes(mode)) return Object.freeze({ visible: false, state: 'waiting' });
+  if (String(instance.speciesArchetype || '').startsWith('livestock-') && ['car', 'boat'].includes(mode)) {
+    return Object.freeze({ visible: false, state: 'waiting' });
+  }
   if (['car', 'boat'].includes(mode)) return Object.freeze({ visible: true, state: 'aboard', positionMode: 'aboard' });
   return Object.freeze({ visible: true, state: 'following' });
 }

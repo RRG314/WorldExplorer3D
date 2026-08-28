@@ -111,6 +111,77 @@ function createBird(THREE, species, waterbird = false) {
   return group;
 }
 
+function refreshAnimalProfile(group, species) {
+  let meshes = 0;
+  let triangles = 0;
+  const materials = new Set();
+  group.traverse((child) => {
+    if (!child?.isMesh) return;
+    meshes++;
+    const geometry = child.geometry;
+    triangles += geometry?.index ? geometry.index.count / 3 : (geometry?.attributes?.position?.count || 0) / 3;
+    (Array.isArray(child.material) ? child.material : [child.material]).filter(Boolean).forEach((material) => materials.add(material.uuid));
+  });
+  group.userData.performanceProfile = Object.freeze({ meshes, triangles: Math.round(triangles), materials: materials.size, species });
+  return group;
+}
+
+function decorateLivestock(THREE, group, species, detail = {}) {
+  const coat = group.getObjectByName(`${species} torso`)?.material;
+  const dark = group.getObjectByName('paw or hoof')?.material || coat;
+  const light = group.getObjectByName(`${species} chest`)?.material || coat;
+  const add = (geometry, material, name, position, rotation = null, scale = null) => {
+    const mesh = new THREE.Mesh(geometry, material || coat);
+    mesh.name = name;
+    mesh.position.set(...position);
+    if (rotation) mesh.rotation.set(...rotation);
+    if (scale) mesh.scale.set(...scale);
+    mesh.castShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+  if (detail.horns) {
+    [-1, 1].forEach((side) => add(
+      new THREE.ConeGeometry(.045, detail.hornLength || .3, 5), light,
+      `${species} horn`, [side * detail.hornSpread, detail.hornY, detail.hornZ],
+      [0, 0, side * (detail.hornTilt || .45)]
+    ));
+  }
+  if (detail.beard) add(new THREE.ConeGeometry(.06, .26, 5), dark, `${species} beard`, [0, detail.beardY, detail.beardZ], [0, 0, Math.PI]);
+  if (detail.wool) {
+    [[-.2, .87, -.1], [.2, .87, -.1], [0, .92, .28]].forEach((position, index) =>
+      add(new THREE.DodecahedronGeometry(.25, 0), light, `${species} wool ${index + 1}`, position, null, [1.25, .85, 1.35])
+    );
+  }
+  if (detail.mane) add(new THREE.BoxGeometry(.12, .62, .42), dark, `${species} mane`, [0, 1.16, -.3], [.22, 0, 0]);
+  if (detail.patches) {
+    add(new THREE.CircleGeometry(.18, 7), dark, `${species} flank patch left`, [-detail.patchX, .76, .08], [0, -Math.PI / 2, 0], [1, 1.35, 1]);
+    add(new THREE.CircleGeometry(.14, 7), dark, `${species} flank patch right`, [detail.patchX, .72, -.2], [0, Math.PI / 2, 0], [1, 1.2, 1]);
+  }
+  if (detail.snoutDisc) add(new THREE.CylinderGeometry(.11, .11, .045, 8), light, `${species} snout disc`, [0, detail.snoutY, detail.snoutZ], [Math.PI / 2, 0, 0]);
+  return refreshAnimalProfile(group, species);
+}
+
+function createChicken(THREE, species) {
+  const group = createBird(THREE, species, false);
+  const head = group.getObjectByName(`${species} head`);
+  const red = new THREE.MeshStandardMaterial({ color: 0xb9251c, roughness: .82, metalness: 0, flatShading: true });
+  const gold = new THREE.MeshStandardMaterial({ color: 0xd0a63a, roughness: .9, metalness: 0, flatShading: true });
+  [-.06, 0, .06].forEach((x, index) => {
+    const comb = new THREE.Mesh(new THREE.ConeGeometry(.045, .14 + index * .018, 5), red);
+    comb.name = `${species} comb`;
+    comb.position.set(x, .94, -.36);
+    group.add(comb);
+  });
+  const wattle = new THREE.Mesh(new THREE.ConeGeometry(.045, .13, 5), red);
+  wattle.name = `${species} wattle`;
+  wattle.position.set(0, .58, -.48);
+  wattle.rotation.z = Math.PI;
+  group.add(wattle);
+  if (head) head.material = gold;
+  return refreshAnimalProfile(group, species);
+}
+
 function createAnimalModel(THREE, species) {
   const variants = {
     'trail-hound': () => createQuadruped(THREE, species, { palette: { coat: 0x8d623f, secondary: 0xc2a17c, dark: 0x2c241e, light: 0xe0d2bd, accent: 0x2d7dff }, body: [.36, .31, .56], head: [.25, .25, .26], neckHeight: .35, muzzleLength: .19, earWidth: .11, earHeight: .30, earSides: 7, earTilt: .22, legWidth: .07, legLength: .54, tailBase: .065, tailTip: .035, tailLength: .62, tailLift: .05, tailAngle: -.72, collar: true }),
@@ -119,6 +190,12 @@ function createAnimalModel(THREE, species) {
     'harbor-cat': () => createQuadruped(THREE, species, { palette: { coat: 0x566573, secondary: 0x8996a0, dark: 0x17202a, light: 0xd4d7d8, accent: 0x4db3bf }, body: [.27, .24, .48], head: [.22, .21, .20], neckHeight: .18, muzzleLength: .10, earWidth: .10, earHeight: .25, earSides: 4, earTilt: .14, legWidth: .052, legLength: .42, tailBase: .05, tailTip: .032, tailLength: .72, tailLift: .12, tailAngle: -1.15, collar: true }),
     'meadow-tabby': () => createQuadruped(THREE, species, { palette: { coat: 0xb9793e, secondary: 0xd4a269, dark: 0x4b2d1c, light: 0xe9d2b3, accent: 0x467e75 }, body: [.26, .23, .45], head: [.21, .2, .19], neckHeight: .16, muzzleLength: .095, earWidth: .095, earHeight: .24, earSides: 4, earTilt: .1, legWidth: .049, legLength: .4, tailBase: .047, tailTip: .027, tailLength: .68, tailLift: .16, tailAngle: -1.28, collar: true }),
     'midnight-cat': () => createQuadruped(THREE, species, { palette: { coat: 0x20252c, secondary: 0x414b57, dark: 0x080b0f, light: 0xe1e3df, accent: 0x7e68cf }, body: [.25, .22, .47], head: [.2, .2, .19], neckHeight: .17, muzzleLength: .09, earWidth: .1, earHeight: .27, earSides: 4, earTilt: .08, legWidth: .047, legLength: .41, tailBase: .046, tailTip: .025, tailLength: .74, tailLift: .18, tailAngle: -1.2, collar: true }),
+    'pasture-cow': () => decorateLivestock(THREE, createQuadruped(THREE, species, { palette: { coat: 0xe7dfcf, secondary: 0xf3eee3, dark: 0x24211f, light: 0xd5c6ac, accent: 0x6d7f52 }, body: [.58, .5, .9], head: [.34, .31, .42], neckHeight: .46, muzzleLength: .28, earWidth: .14, earHeight: .24, earSides: 6, earTilt: .62, legWidth: .1, legLength: .72, tailBase: .055, tailTip: .035, tailLength: .68, tailLift: .06, tailAngle: -.8 }), species, { horns: true, hornLength: .31, hornSpread: .28, hornY: 1.38, hornZ: -.69, patches: true, patchX: .57 }),
+    'wool-sheep': () => decorateLivestock(THREE, createQuadruped(THREE, species, { palette: { coat: 0xe5dfce, secondary: 0xf2eee3, dark: 0x3d3832, light: 0xf4f0e5, accent: 0x73825d }, body: [.48, .46, .72], head: [.25, .27, .3], neckHeight: .32, muzzleLength: .2, earWidth: .11, earHeight: .22, earSides: 6, earTilt: .55, legWidth: .07, legLength: .54, tailBase: .07, tailTip: .045, tailLength: .24, tailLift: .05, tailAngle: -.45 }), species, { wool: true }),
+    'hill-goat': () => decorateLivestock(THREE, createQuadruped(THREE, species, { palette: { coat: 0xb6aa92, secondary: 0xd7cfbe, dark: 0x3c342a, light: 0xeee8da, accent: 0x687b56 }, body: [.4, .38, .69], head: [.25, .27, .31], neckHeight: .48, muzzleLength: .22, earWidth: .1, earHeight: .24, earSides: 6, earTilt: .48, legWidth: .064, legLength: .64, tailBase: .06, tailTip: .038, tailLength: .32, tailLift: .12, tailAngle: -.25 }), species, { horns: true, hornLength: .39, hornSpread: .19, hornY: 1.42, hornZ: -.58, hornTilt: .25, beard: true, beardY: .93, beardZ: -.83 }),
+    'yard-chicken': () => createChicken(THREE, species),
+    'heritage-pig': () => decorateLivestock(THREE, createQuadruped(THREE, species, { palette: { coat: 0xb87565, secondary: 0xd59b8c, dark: 0x4b302d, light: 0xe8b5a8, accent: 0x75624c }, body: [.48, .34, .7], head: [.3, .25, .32], neckHeight: .16, muzzleLength: .2, earWidth: .12, earHeight: .2, earSides: 4, earTilt: .28, legWidth: .075, legLength: .4, tailBase: .035, tailTip: .025, tailLength: .28, tailLift: .12, tailAngle: -1.4 }), species, { snoutDisc: true, snoutY: .91, snoutZ: -.71 }),
+    'field-horse': () => decorateLivestock(THREE, createQuadruped(THREE, species, { palette: { coat: 0x70482f, secondary: 0x9b6845, dark: 0x211812, light: 0xd9c1a5, accent: 0x536d49 }, body: [.46, .48, .84], head: [.24, .32, .38], neckHeight: .78, muzzleLength: .3, earWidth: .09, earHeight: .29, earSides: 5, earTilt: .18, legWidth: .07, legLength: .94, tailBase: .09, tailTip: .055, tailLength: .84, tailLift: .08, tailAngle: -.7 }), species, { mane: true }),
     'woodland-fox': () => createQuadruped(THREE, species, { palette: { coat: 0xb94f21, secondary: 0xd77b42, dark: 0x2a1915, light: 0xe8d4b5, accent: 0x8f552c }, body: [.31, .27, .58], head: [.23, .22, .27], neckHeight: .28, muzzleLength: .22, earWidth: .12, earHeight: .34, earSides: 5, earTilt: .12, legWidth: .055, legLength: .49, tailBase: .115, tailTip: .055, tailLength: .86, tailLift: .12, tailAngle: -.92, tailTipColor: true }),
     'white-tailed-deer': () => createQuadruped(THREE, species, { palette: { coat: 0x8a6546, secondary: 0xb89a74, dark: 0x2c251e, light: 0xe1d6c5, accent: 0x765336 }, body: [.36, .38, .69], head: [.20, .25, .29], neckHeight: .64, muzzleLength: .21, earWidth: .11, earHeight: .38, earSides: 6, earTilt: .25, legWidth: .055, legLength: .82, tailBase: .07, tailTip: .04, tailLength: .38, tailLift: .08, tailAngle: -.55, tailTipColor: true }),
     'small-mammal': () => createQuadruped(THREE, species, { palette: { coat: 0x7d6247, secondary: 0xa68b6d, dark: 0x29221c, light: 0xd3c5b0, accent: 0x6f543a }, body: [.23, .21, .38], head: [.18, .18, .19], neckHeight: .14, muzzleLength: .09, earWidth: .08, earHeight: .18, earSides: 6, earTilt: .14, legWidth: .045, legLength: .34, tailBase: .04, tailTip: .025, tailLength: .46, tailLift: .06, tailAngle: -.9 }),

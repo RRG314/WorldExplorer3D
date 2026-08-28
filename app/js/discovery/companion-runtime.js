@@ -1,12 +1,12 @@
-import { COMPANION_CATALOG } from './catalog.js?v=3';
+import { COMPANION_CATALOG } from './catalog.js?v=4';
 import {
   awardCompanionXp,
   careForCompanion,
   createCompanionInstance,
   normalizeCompanionInstance,
   resolveCompanionTravelPolicy,
-} from './companions.js?v=3';
-import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=1';
+} from './companions.js?v=4';
+import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 function disposeObject(object) {
@@ -34,8 +34,10 @@ function createCompanionMesh(appCtx, catalogId) {
 function resolveCompanionFollowTarget(actor, { archetype = 'dog' } = {}) {
   const angle = Number(actor?.angle || actor?.yaw || 0);
   const airborne = archetype === 'bird';
-  const followBack = airborne ? .45 : archetype === 'cat' ? 1.05 : .85;
-  const followSide = airborne ? 2.6 : archetype === 'cat' ? 1.15 : 1.8;
+  const largeLivestock = ['livestock-cattle', 'livestock-horse'].includes(archetype);
+  const smallLivestock = archetype.startsWith('livestock-');
+  const followBack = airborne ? .45 : largeLivestock ? 2.4 : smallLivestock ? 1.45 : archetype === 'cat' ? 1.05 : .85;
+  const followSide = airborne ? 2.6 : largeLivestock ? 2.8 : smallLivestock ? 1.8 : archetype === 'cat' ? 1.15 : 1.8;
   return Object.freeze({
     x: Number(actor?.x || 0) - Math.sin(angle) * followBack + Math.cos(angle) * followSide,
     z: Number(actor?.z || 0) - Math.cos(angle) * followBack - Math.sin(angle) * followSide
@@ -247,7 +249,8 @@ async function createCompanionRuntime(appCtx, options = {}) {
     const holdingRecall = exercise?.type === 'recall' && exercise.phase === 'move-away';
     const targetX = holdingRecall ? exercise.anchor.x : target.x;
     const targetZ = holdingRecall ? exercise.anchor.z : target.z;
-    const response = 1 - Math.exp(-Math.max(0, Number(dt) || 0) * (airborne ? 3.4 : archetype === 'cat' ? 3.55 : 4.2));
+    const largeLivestock = ['livestock-cattle', 'livestock-horse'].includes(archetype);
+    const response = 1 - Math.exp(-Math.max(0, Number(dt) || 0) * (airborne ? 3.4 : largeLivestock ? 2.25 : archetype.startsWith('livestock-') ? 3.0 : archetype === 'cat' ? 3.55 : 4.2));
     const separation = Math.hypot(targetX - presentation.group.position.x, targetZ - presentation.group.position.z);
     if (!positionInitialized || separation > 25) {
       presentation.group.position.x = targetX;

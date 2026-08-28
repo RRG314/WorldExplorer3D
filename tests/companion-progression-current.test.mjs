@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, validateDiscoveryCatalogs } from '../app/js/discovery/catalog.js';
+import { createEnvironmentFixture } from '../app/js/discovery/environment-context.js';
+import { compileAmbientWildlifePlan } from '../app/js/discovery/wildlife-runtime.js';
+
 import {
   COMPANION_LEVEL_THRESHOLDS,
   awardCompanionXp,
@@ -104,4 +108,37 @@ test('names are bounded, normalized, and safe for display escaping', () => {
   assert.equal(sanitizeCompanionName('  Copper\n  Bell  '), 'Copper Bell');
   assert.equal(sanitizeCompanionName('', 'Trail Hound'), 'Trail Hound');
   assert.equal(sanitizeCompanionName('123456789012345678901234567890'), '123456789012345678901234');
+});
+
+test('all six livestock species are individual companions with explicit specialties', () => {
+  assert.deepEqual(validateDiscoveryCatalogs(BUILTIN_DISCOVERY_CATALOGS), { ok: true, errors: [] });
+  const livestockIds = ['pasture-cow', 'wool-sheep', 'hill-goat', 'yard-chicken', 'heritage-pig', 'field-horse'];
+  const specialties = new Set();
+  livestockIds.forEach((catalogId, index) => {
+    const catalog = COMPANION_CATALOG.find((entry) => entry.id === catalogId);
+    assert.equal(catalog?.family, 'livestock-companion');
+    assert.deepEqual(catalog?.contexts, ['farm', 'rural']);
+    const companion = createCompanionInstance(catalogId, {
+      worldIdentity: 'fixture:farm', discoveryId: `livestock:${index}`, name: `Friend ${index + 1}`
+    });
+    assert.match(companion.speciesArchetype, /^livestock-/);
+    assert.ok(companion.training.specialization);
+    assert.equal(companion.tradeable, false);
+    assert.equal(companion.legacyContent, false);
+    assert.deepEqual(resolveCompanionTravelPolicy(companion, 'walk', 'EARTH'), { visible: true, state: 'following' });
+    assert.deepEqual(resolveCompanionTravelPolicy(companion, 'car', 'EARTH'), { visible: false, state: 'waiting' });
+    assert.deepEqual(resolveCompanionTravelPolicy(companion, 'boat', 'EARTH'), { visible: false, state: 'waiting' });
+    specialties.add(companion.training.specialization);
+  });
+  assert.equal(specialties.size, livestockIds.length);
+});
+
+test('mapped farm context creates a livestock trust encounter without a live-animal claim', () => {
+  const environment = createEnvironmentFixture('farm');
+  const plan = compileAmbientWildlifePlan(environment, { maxActors: 2 });
+  assert.ok(plan.actors.length >= 1);
+  assert.ok(plan.actors.every((actor) => actor.archetype === 'livestock'));
+  assert.ok(plan.actors.every((actor) => actor.companionPolicy === 'trust-sequence-required'));
+  assert.ok(plan.actors.every((actor) => actor.supportingEvidence.includes('habitat-plausible')));
+  assert.equal(plan.diagnostics.generatedWithAdditionalProviderQueries, false);
 });

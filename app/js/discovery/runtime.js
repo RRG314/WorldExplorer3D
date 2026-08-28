@@ -1,10 +1,10 @@
-import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=3';
-import { createCompanionRuntime } from './companion-runtime.js?v=4';
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
+import { createCompanionRuntime } from './companion-runtime.js?v=5';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=2';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
 import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
-import { compileEnvironmentContext } from './environment-context.js?v=1';
+import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
 import { createFieldExpedition } from './field-expedition.js?v=1';
@@ -31,7 +31,7 @@ import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
 import { tutorialForActivity } from './tutorials.js?v=1';
 import { visualForCatalogId } from './visual-content.js?v=1';
-import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=3';
+import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=4';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
@@ -114,7 +114,8 @@ const WILDLIFE_COMPANION_CATALOG = Object.freeze({
 
 const FIRST_RELEASE_COMPANION_IDS = new Set([
   'trail-hound', 'field-retriever', 'park-terrier',
-  'harbor-cat', 'meadow-tabby', 'midnight-cat', 'city-pigeon'
+  'harbor-cat', 'meadow-tabby', 'midnight-cat', 'city-pigeon',
+  'pasture-cow', 'wool-sheep', 'hill-goat', 'yard-chicken', 'heritage-pig', 'field-horse'
 ]);
 
 const TOOL_FIELD_USE = Object.freeze({
@@ -455,8 +456,11 @@ function createDiscoveryUi(state) {
       const activeTravelLabel = companionSnapshot.presentation?.travelState === 'aboard'
         ? 'Aboard'
         : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
-      elements.companions.innerHTML = COMPANION_CATALOG.map((catalog) => {
-        const companion = owned.find((entry) => entry.catalogId === catalog.id);
+      const companionRows = [
+        ...owned.map((companion) => ({ companion, catalog: COMPANION_CATALOG.find((entry) => entry.id === companion.catalogId) })).filter((row) => row.catalog),
+        ...COMPANION_CATALOG.filter((catalog) => !owned.some((companion) => companion.catalogId === catalog.id)).map((catalog) => ({ catalog, companion: null }))
+      ];
+      elements.companions.innerHTML = companionRows.map(({ catalog, companion }) => {
         if (!companion) {
           const releaseReady = FIRST_RELEASE_COMPANION_IDS.has(catalog.id);
           const eligible = releaseReady && state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
@@ -482,7 +486,8 @@ function createDiscoveryUi(state) {
         const lastAward = companion.progression?.lastAward
           ? ` · Last: +${companion.progression.lastAward.points} ${companion.progression.lastAward.label}`
           : '';
-        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+        const specialty = companion.training?.specialization ? ` · Specialty: ${companion.training.specialization}` : '';
+        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${specialty}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
       }).join('');
     }
     if (elements.progress) {

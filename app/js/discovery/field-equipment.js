@@ -1,5 +1,5 @@
 import { createNaturalHistoryModel } from './natural-history-models.js?v=1';
-import { animateAnimalModel } from './animal-models.js?v=1';
+import { animateAnimalModel } from './animal-models.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 const ACTIVITY_TOOL = Object.freeze({
