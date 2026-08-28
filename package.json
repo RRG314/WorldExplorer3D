@@ -71,6 +71,7 @@
     "verify:planetary-surface": "node --test tests/planetary-surface-authority-current.test.mjs",
     "verify:planetary-build": "node --test tests/planetary-build-surface-current.test.mjs tests/block-local-store-current.test.mjs",
     "verify:spacecraft-authority": "node --test tests/spacecraft-authority-current.test.mjs",
+    "verify:space-journey": "node --test tests/space-journey-authority-current.test.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",

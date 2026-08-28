@@ -377,12 +377,55 @@ function recoverSpacecraft(stateInput) {
   });
 }
 
+function executePlannedBurn(stateInput, deltaVelocityMps = {}) {
+  const state = stateRecord(stateInput);
+  const deltaVelocity = vector(deltaVelocityMps, 'Planned delta-v');
+  const deltaV = magnitude(deltaVelocity);
+  if (state.mode !== SPACECRAFT_MODE.FLIGHT) {
+    return Object.freeze({ executed: false, reason: 'spacecraft-not-in-flight', requiredPropellantKg: 0, state });
+  }
+  if (state.subsystems.propulsion === SUBSYSTEM_STATUS.FAILED) {
+    return Object.freeze({ executed: false, reason: 'propulsion-system-failed', requiredPropellantKg: 0, state });
+  }
+  if (deltaV <= 1e-9) {
+    return Object.freeze({ executed: true, reason: null, requiredPropellantKg: 0, state });
+  }
+  const propulsionAuthority = state.subsystems.propulsion === SUBSYSTEM_STATUS.DEGRADED ? 0.45 : 1;
+  const effectiveExhaustVelocityMps = state.specificImpulseS * STANDARD_GRAVITY_MPS2 * propulsionAuthority;
+  const initialMassKg = state.dryMassKg + state.propellantKg;
+  const finalMassKg = initialMassKg / Math.exp(deltaV / effectiveExhaustVelocityMps);
+  const requiredPropellantKg = initialMassKg - finalMassKg;
+  if (requiredPropellantKg > state.propellantKg + 1e-9) {
+    const maximumDeltaVMps = effectiveExhaustVelocityMps * Math.log(initialMassKg / state.dryMassKg);
+    return Object.freeze({
+      executed: false,
+      reason: 'insufficient-propellant',
+      requiredPropellantKg,
+      maximumDeltaVMps,
+      state
+    });
+  }
+  return Object.freeze({
+    executed: true,
+    reason: null,
+    requiredPropellantKg,
+    state: stateRecord({
+      ...state,
+      velocityMps: add(state.velocityMps, deltaVelocity),
+      propellantKg: state.propellantKg - requiredPropellantKg,
+      timeScale: 1,
+      lastEvent: 'planned-burn'
+    })
+  });
+}
+
 export {
   computeBodyRelativeNavigation,
   createBodyEphemerisState,
   createSpacecraftState,
   enterSpacecraftSafeMode,
   evaluateLandingEligibility,
+  executePlannedBurn,
   GRAVITATIONAL_CONSTANT,
   INERTIAL_FRAME_ID,
   propagateSpacecraft,
