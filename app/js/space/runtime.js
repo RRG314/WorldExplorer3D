@@ -164,6 +164,14 @@ export function forceSpaceFlightLanding(target, deps = {}) {
   if (!appCtx.spaceFlight.active || !appCtx.spaceFlight.rocket || appCtx.spaceFlight.mode === 'landing') return false;
   const normalized = normalizeLandingTargetName(target);
   if (!normalized) return false;
+  if (appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
+    const result = appCtx.requestRenderedJourneyLanding(normalized);
+    deps.showFlightMessage?.(
+      result.accepted ? 'DESCENT GUIDANCE ENGAGED' : String(result.reason || 'LANDING NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
+      result.accepted ? '#10b981' : '#f59e0b'
+    );
+    return result.accepted;
+  }
   if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') {
     if (normalized === 'Earth') return Boolean(appCtx.returnToEarthFromUniverse?.());
     deps.showFlightMessage?.('RETURN TO SOL BEFORE PLANETARY LANDING', '#8ab4ff');
@@ -404,6 +412,29 @@ export function updateSpaceFlightPhysics() {
 
   rocket.quaternion.normalize();
 
+  const siRuntimeActive = appCtx.updateRenderedSpaceJourney?.({
+    realDtS: frameScale / 60,
+    throttle: keys[' '] ? 1 : 0,
+    braking: !!keys['shift'],
+    thrustDirection: { x: _sfForward.x, y: _sfForward.y, z: _sfForward.z },
+    timeScale: appCtx.spaceFlight.timeScale || 1
+  }) === true;
+  if (siRuntimeActive) {
+    const glow = rocket.getObjectByName('engineGlow');
+    const exhaust = rocket.getObjectByName('exhaust');
+    const thrustLevel = appCtx.spaceFlight._isThrusting ? 1 : 0.16;
+    if (glow) {
+      glow.material.opacity = 0.2 + thrustLevel * 0.6;
+      glow.scale.y = 0.4 + thrustLevel * 0.6;
+    }
+    if (exhaust) {
+      exhaust.children.forEach((particle) => {
+        particle.material.opacity = 0.05 + thrustLevel * 0.35;
+      });
+    }
+    return;
+  }
+
   let isThrusting = false;
   if (keys[' ']) {
     const launchBoostMult = launchAssist ? SPACE_CONSTANTS.LAUNCH_BOOST_MULTIPLIER : 1;
@@ -587,6 +618,18 @@ export function animateSpaceFlight(deps = {}) {
 }
 
 export function attemptLanding(deps = {}) {
+  if (appCtx.spacecraftState && typeof appCtx.requestRenderedJourneyLanding === 'function') {
+    const targetName = normalizeLandingTargetName(
+      appCtx.spaceFlight._manualLandingTarget || appCtx.spaceFlight.destination
+    );
+    if (!targetName) return false;
+    const result = appCtx.requestRenderedJourneyLanding(targetName);
+    deps.showFlightMessage?.(
+      result.accepted ? 'DESCENT GUIDANCE ENGAGED' : String(result.reason || 'LANDING NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
+      result.accepted ? '#10b981' : '#f59e0b'
+    );
+    return result.accepted;
+  }
   let target = null;
   let targetRadius = 0;
   let targetName = '';

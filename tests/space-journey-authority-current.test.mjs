@@ -16,7 +16,10 @@ import {
   createSpacecraftState,
   executePlannedBurn
 } from '../app/js/space/spacecraft-authority.js';
-import { completeFastTravelEvidence } from '../app/js/space/journey-runtime.js';
+import {
+  completeFastTravelEvidence,
+  installSpaceJourneyRuntime
+} from '../app/js/space/journey-runtime.js';
 
 const startedAtMs = Date.UTC(2026, 7, 27, 14, 0, 0);
 
@@ -232,4 +235,64 @@ test('fast-travel runtime cannot manufacture a solid touchdown on a giant planet
     destinationBodyId: 'jupiter',
     epochMs: startedAtMs
   }), /solid-surface-landing-unavailable/);
+});
+
+test('rendered journey controller makes the mesh a presentation of fuel-accounted SI state', () => {
+  const position = (x, y, z) => ({
+    x, y, z,
+    set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; }
+  });
+  const appContext = {
+    spaceFlight: {
+      earth: { position: position(800, 0, 0) },
+      moon: { position: position(920, 20, 0) },
+      rocket: { position: position(858, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  assert.equal(runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'earth',
+    destinationBodyId: 'moon',
+    mode: JOURNEY_MODE.MANUAL
+  }), true);
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.PARKING_ORBIT);
+  const initialState = appContext.spacecraftState;
+  const initialMesh = { ...appContext.spaceFlight.rocket.position };
+  assert.equal(runtime.updateRenderedSpaceJourney({
+    realDtS: 0.1,
+    throttle: 1,
+    thrustDirection: { x: 1, y: 0, z: 0 }
+  }), true);
+  assert.ok(appContext.spacecraftState.propellantKg < initialState.propellantKg);
+  assert.ok(appContext.spacecraftState.velocityMps.x > initialState.velocityMps.x);
+  assert.notDeepEqual(
+    { x: appContext.spaceFlight.rocket.position.x, y: appContext.spaceFlight.rocket.position.y, z: appContext.spaceFlight.rocket.position.z },
+    { x: initialMesh.x, y: initialMesh.y, z: initialMesh.z }
+  );
+  assert.equal(appContext.spaceFlight.speed, Math.hypot(
+    appContext.spacecraftState.velocityMps.x,
+    appContext.spacecraftState.velocityMps.y,
+    appContext.spacecraftState.velocityMps.z
+  ));
+});
+
+test('rendered landing request fails closed before verified destination approach', () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const appContext = {
+    spaceFlight: {
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  runtime.beginRenderedSpaceJourney({ sourceBodyId: 'earth', destinationBodyId: 'moon' });
+  const landing = runtime.requestRenderedJourneyLanding('moon');
+  assert.equal(landing.accepted, false);
+  assert.equal(landing.reason, 'journey-not-in-approach');
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.PARKING_ORBIT);
 });

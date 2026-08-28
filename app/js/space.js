@@ -133,6 +133,11 @@ function startSpaceFlightToMoon() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
+  appCtx.beginRenderedSpaceJourney?.({
+    sourceBodyId: 'earth',
+    destinationBodyId: 'moon',
+    mode: 'manual'
+  });
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
@@ -184,6 +189,11 @@ function startSpaceFlightToEarth() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
+  appCtx.beginRenderedSpaceJourney?.({
+    sourceBodyId: 'moon',
+    destinationBodyId: 'earth',
+    mode: 'manual'
+  });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
 
@@ -235,6 +245,11 @@ function startSpaceFlightToMars() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMars();
+  appCtx.beginRenderedSpaceJourney?.({
+    sourceBodyId: appCtx.spaceFlight._launchSource?.toLowerCase?.() || 'earth',
+    destinationBodyId: 'mars',
+    mode: 'manual'
+  });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
   appCtx.showSolarSystemUI?.();
@@ -318,6 +333,7 @@ function exitSpaceFlight(source = 'runtime') {
   appCtx.spaceFlight._launchSource = null;
   appCtx.spaceFlight.launchStartMs = 0;
   appCtx.spaceFlight._isThrusting = false;
+  appCtx.clearRenderedSpaceJourney?.();
   if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
   if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
 }
@@ -348,6 +364,7 @@ function initSpaceFlightWhenReady() {
 
 Object.assign(appCtx, {
   animateSpaceFlight,
+  completeSpaceFlightJourneyLanding: completeLanding,
   exitSpaceFlight,
   forceSpaceFlightLanding,
   showSpaceFlightMessage: showFlightMessage,

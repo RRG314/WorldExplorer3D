@@ -1,5 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
+import {
+  computeBodyRelativeNavigation,
+  evaluateLandingEligibility
+} from './spacecraft-authority.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
 const BODY_RADIUS_KM = Object.freeze({
@@ -221,18 +225,31 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     setMetric('sfDistanceLabel', 'sfDistance', 'sfDistanceUnit', 'Frame span', span.value, span.unit);
     if (zoneLabel) zoneLabel.textContent = 'NAVIGATION FRAME';
   } else {
-    const physicalRadius = BODY_RADIUS_KM[String(activeHudBody.name || '').toLowerCase()];
+    const physicalBodyId = String(activeHudBody.name || '').toLowerCase();
+    const missionBody = appCtx.spaceJourneyEphemeris?.source?.bodyId === physicalBodyId
+      ? appCtx.spaceJourneyEphemeris.source
+      : appCtx.spaceJourneyEphemeris?.destination?.bodyId === physicalBodyId
+        ? appCtx.spaceJourneyEphemeris.destination
+        : null;
+    const physicalNavigation = appCtx.spacecraftState && missionBody
+      ? computeBodyRelativeNavigation(appCtx.spacecraftState, missionBody)
+      : null;
+    const physicalRadius = BODY_RADIUS_KM[physicalBodyId];
     const sceneToKm = physicalRadius && activeHudBody.radius > 0
       ? physicalRadius / activeHudBody.radius
       : null;
-    const speedKmS = Math.max(0, Math.min(1, displaySpeed / SPACE_CONSTANTS.MAX_SPEED)) * MAX_LOCAL_SPACECRAFT_SPEED_KM_S;
+    const speedKmS = physicalNavigation
+      ? physicalNavigation.relativeSpeedMps / 1000
+      : Math.max(0, Math.min(1, displaySpeed / SPACE_CONSTANTS.MAX_SPEED)) * MAX_LOCAL_SPACECRAFT_SPEED_KM_S;
     setMetric(
       'sfAltitudeLabel',
       'sfAltitude',
       'sfAltitudeUnit',
       'Altitude',
-      sceneToKm ? Math.round(altitude * sceneToKm).toLocaleString() : Math.floor(altitude).toLocaleString(),
-      sceneToKm ? 'km' : 'display u'
+      physicalNavigation
+        ? Math.max(0, Math.round(physicalNavigation.altitudeM / 1000)).toLocaleString()
+        : sceneToKm ? Math.round(altitude * sceneToKm).toLocaleString() : Math.floor(altitude).toLocaleString(),
+      physicalNavigation || sceneToKm ? 'km' : 'display u'
     );
     setMetric('sfSpeedLabel', 'sfSpeed', 'sfSpeedUnit', 'Velocity', speedKmS.toFixed(1), 'km/s');
     setMetric(
@@ -240,8 +257,10 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       'sfDistance',
       'sfDistanceUnit',
       'Distance',
-      sceneToKm ? Math.round(activeDist * sceneToKm).toLocaleString() : Math.floor(activeDist).toLocaleString(),
-      sceneToKm ? 'km' : 'display u'
+      physicalNavigation
+        ? Math.round(physicalNavigation.centerDistanceM / 1000).toLocaleString()
+        : sceneToKm ? Math.round(activeDist * sceneToKm).toLocaleString() : Math.floor(activeDist).toLocaleString(),
+      physicalNavigation || sceneToKm ? 'km' : 'display u'
     );
     if (zoneLabel) zoneLabel.textContent = 'LANDING ZONE';
   }
@@ -253,7 +272,12 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
 
   if (landingBar) landingBar.style.width = landingProgress * 100 + '%';
 
-  const canLand = activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
+  const physicalLanding = appCtx.spacecraftState && appCtx.spaceJourneyEphemeris?.destination
+    ? evaluateLandingEligibility(appCtx.spacecraftState, appCtx.spaceJourneyEphemeris.destination)
+    : null;
+  const canLand = physicalLanding
+    ? physicalLanding.eligible && appCtx.spaceJourney?.phase === 'approach'
+    : activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
   if (universeTarget) {
     if (landingBar) landingBar.style.width = '0%';
