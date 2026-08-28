@@ -3,9 +3,11 @@ import test from 'node:test';
 
 import {
   APOLLO11_SURFACE_REGION,
+  CALORIS_PLANITIA_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
   createSurfaceRegionManifest,
   listPlanetarySurfaceRegions,
+  MAXWELL_MONTES_SURFACE_REGION,
   OLYMPUS_MONS_SURFACE_REGION
 } from '../app/js/planetary/runtime/surface-authority.js';
 
@@ -22,11 +24,13 @@ function deferred() {
   return { promise, resolve };
 }
 
-test('reviewed Moon and Mars regions have isolated stable addresses and complete provenance', () => {
+test('published solid-world regions have isolated stable addresses and complete provenance', () => {
   const regions = listPlanetarySurfaceRegions();
   assert.deepEqual(regions.map((region) => region.regionId), [
     'apollo-11-tranquility-base',
-    'mars-olympus-mons'
+    'mars-olympus-mons',
+    'mercury-caloris-planitia',
+    'venus-maxwell-montes'
   ]);
   for (const region of regions) {
     assert.equal(region.address.bodyId, region.bodyId);
@@ -37,10 +41,14 @@ test('reviewed Moon and Mars regions have isolated stable addresses and complete
     assert.ok(region.source.attribution);
     assert.ok(region.source.rights);
     assert.ok(region.source.processing);
-    assert.deepEqual(region.assets.map((asset) => asset.role), ['height', 'albedo']);
+    assert.ok(region.assets.length > 0);
+    assert.ok(region.assets.some((asset) => ['albedo', 'radar-albedo'].includes(asset.role)));
     assert.ok(region.assets.every((asset) => asset.sourceProduct && asset.url.startsWith('/app/assets/')));
     assert.equal(Object.isFrozen(region), true);
   }
+  assert.equal(new Set(regions.map((region) => region.addressKey)).size, regions.length);
+  assert.equal(CALORIS_PLANITIA_SURFACE_REGION.truthClass, 'modeled');
+  assert.equal(MAXWELL_MONTES_SURFACE_REGION.truthClass, 'modeled');
   assert.notEqual(APOLLO11_SURFACE_REGION.addressKey, OLYMPUS_MONS_SURFACE_REGION.addressKey);
 });
 

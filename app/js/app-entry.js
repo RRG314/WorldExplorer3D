@@ -37,6 +37,7 @@ import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.j
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=4';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
+import './planetary/solid-world-runtime.js?v=1';
 import './planetary/vehicles.js?v=2';
 import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=13';
@@ -261,9 +262,9 @@ async function ensureOverlayRuntimeLayer() {
 
 function shouldBootOverlayRuntime() {
     if (!appCtx.gameStarted) return false;
-    if (appCtx.onMoon || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
+    if (appCtx.onMoon || appCtx.activePlanetaryBodyId || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
     if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
-        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
+        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.PLANETARY) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
     }
     return true;
 }

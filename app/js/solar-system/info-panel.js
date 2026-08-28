@@ -59,6 +59,14 @@ function showPlanetInfo(ctx, entry) {
 
   ctx.solarSystem.infoPanel.style.display = 'block';
   ctx.solarSystem.selectedPlanet = entry;
+  const setCourse = document.getElementById('ssInfoSetCourse');
+  if (setCourse) {
+    const canRetarget = ctx.appCtx.spaceJourney?.phase === 'parking_orbit' && planet.bodyId !== 'earth';
+    setCourse.style.display = planet.bodyId === 'earth' ? 'none' : 'block';
+    setCourse.disabled = !canRetarget;
+    setCourse.style.opacity = canRetarget ? '1' : '0.55';
+    setCourse.textContent = canRetarget ? `SET COURSE TO ${planet.name.toUpperCase()}` : 'CHANGE COURSE FROM PARKING ORBIT';
+  }
 
   ctx.solarSystem.planetMeshes.forEach((planetEntry) => {
     if (!planetEntry.mesh.children) return;

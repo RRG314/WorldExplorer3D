@@ -45,16 +45,17 @@ let _physRaycaster = null;
 const _physRayStart = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
 const _physRayDir = typeof THREE !== 'undefined' ? new THREE.Vector3(0, -1, 0) : null;
 
-function isPlanetarySurface() { return !!(appCtx.onMoon || appCtx.onMars); }
+function isPlanetarySurface() { return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId); }
 
 function getPlanetarySurfaceMesh() {
+  if (appCtx.activePlanetaryBodyId && appCtx.activeSolidWorldSurface) return appCtx.activeSolidWorldSurface;
   if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
   if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
   return null;
 }
 
 function getPlanetaryGravity() {
-  const bodyId = appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : 'earth';
+  const bodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : 'earth');
   return -samplePhysicalEnvironment(bodyId, {
     heightM: 0,
     timestampS: Number(appCtx.astronomicalSkyState?.timestampMs || Date.now()) / 1000
@@ -208,7 +209,14 @@ function update(dt) {
   const vehicleCondition = vehicleConditionDynamics(appCtx.car.condition ?? 1);
   appCtx.car.handlingProfile = vehicleHandling;
   let maxSpd, friction, accel;
-  let planetaryNormalMaxSpd = appCtx.onMars ? 18 : 24;
+  const planetaryBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
+  const planetaryDriveProfile = {
+    moon: { normal: 24, boost: 29, accel: 0.82, boostAccel: 0.76 },
+    mars: { normal: 18, boost: 22, accel: 0.72, boostAccel: 0.66 },
+    mercury: { normal: 20, boost: 24, accel: 0.74, boostAccel: 0.68 },
+    venus: { normal: 10, boost: 12, accel: 0.55, boostAccel: 0.5 }
+  }[planetaryBodyId] || { normal: 18, boost: 22, accel: 0.7, boostAccel: 0.64 };
+  let planetaryNormalMaxSpd = planetaryDriveProfile.normal;
 
   // We'll keep a single road query result for this frame (and optional precision check later)
   let nr = null;
@@ -217,15 +225,13 @@ function update(dt) {
     appCtx.car.onRoad = false;
     appCtx.car.road = null;
 
-    const moonMaxSpeed = appCtx.onMars ? 18 : 24;
-    const moonBoostSpeed = appCtx.onMars ? 22 : 29;
-    const moonBaseAccel = appCtx.CFG.accel * (appCtx.onMars ? 0.72 : 0.82);
-    const moonBoostAccel = appCtx.CFG.boostAccel * (appCtx.onMars ? 0.66 : 0.76);
+    const planetaryBaseAccel = appCtx.CFG.accel * planetaryDriveProfile.accel;
+    const planetaryBoostAccel = appCtx.CFG.boostAccel * planetaryDriveProfile.boostAccel;
 
-    maxSpd = appCtx.car.boost ? moonBoostSpeed : moonMaxSpeed;
-    planetaryNormalMaxSpd = moonMaxSpeed;
+    maxSpd = appCtx.car.boost ? planetaryDriveProfile.boost : planetaryDriveProfile.normal;
+    planetaryNormalMaxSpd = planetaryDriveProfile.normal;
     friction = appCtx.CFG.friction; // same as Earth road
-    accel = appCtx.car.boost ? moonBoostAccel : moonBaseAccel;
+    accel = appCtx.car.boost ? planetaryBoostAccel : planetaryBaseAccel;
   } else {
     const forceCheck = !_cachedNearRoad;
 

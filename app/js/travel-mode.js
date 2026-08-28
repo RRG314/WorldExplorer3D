@@ -28,18 +28,20 @@ function syncTravelModeButtons() {
   if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
   if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
+  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
   [
-    drivingBtn,
-    walkingBtn,
-    droneBtn,
-    planeBtn,
-    document.getElementById('fOceanMode'),
-    document.getElementById('fEarthMode'),
-    document.getElementById('fSpaceDirect'),
-    document.getElementById('fSpaceRocket'),
-    document.getElementById('fSpaceMars')
-  ].forEach((button) => {
-    if (button) button.style.display = boatLocked ? 'none' : '';
+    [drivingBtn, 'drive'],
+    [walkingBtn, 'walk'],
+    [droneBtn, 'drone'],
+    [planeBtn, 'plane'],
+    [boatBtn, 'boat'],
+    [document.getElementById('fOceanMode'), 'ocean'],
+    [document.getElementById('fEarthMode'), 'earth'],
+    [document.getElementById('fSpaceDirect'), 'space'],
+    [document.getElementById('fSpaceRocket'), 'space'],
+    [document.getElementById('fSpaceMars'), 'space']
+  ].forEach(([button, mode]) => {
+    if (button) button.style.display = boatLocked || (planetaryCapabilities && planetaryCapabilities[mode] !== true) ? 'none' : '';
   });
   return activeMode;
 }
@@ -202,6 +204,10 @@ function handoffAirPositionToGround(reference, targetMode) {
 function setTravelMode(mode, options = {}) {
   const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
+  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
+  if (planetaryCapabilities && planetaryCapabilities[targetMode] !== true) {
+    return syncTravelModeButtons();
+  }
   const modeReference = captureActiveModeReference(currentMode);
   if (targetMode !== currentMode) clearControllerLocalState(targetMode);
 

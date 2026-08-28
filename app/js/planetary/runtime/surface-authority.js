@@ -208,9 +208,79 @@ const OLYMPUS_MONS_SURFACE_REGION = createSurfaceRegionManifest({
   rollbackId: 'mars-olympus-runtime-v1'
 });
 
+const CALORIS_PLANITIA_SURFACE_REGION = createSurfaceRegionManifest({
+  regionId: 'mercury-caloris-planitia',
+  bodyId: 'mercury',
+  displayName: 'Caloris Planitia',
+  truthClass: SURFACE_TRUTH_CLASS.MODELED,
+  address: {
+    latitudeDeg: 30.5,
+    longitudeDegPositiveEast: 162.2,
+    heightM: 0,
+    scopeType: 'world',
+    scopeId: 'public'
+  },
+  coordinateSystem: 'IAU Mercury planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by MESSENGER global morphology; not local elevation data',
+  metersPerUnit: 1,
+  localBounds: { minX: -8000, maxX: 8000, minZ: -8000, maxZ: 8000 },
+  renderPlacement: { x: 0, y: -80, z: 0 },
+  source: {
+    title: 'MESSENGER enhanced-color Mercury map',
+    url: 'https://science.nasa.gov/resource/enhanced-color-mercury-map/',
+    provider: 'NASA MESSENGER',
+    attribution: 'NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington; USGS',
+    rights: 'NASA source imagery used with mission credit retained under NASA media usage guidance.',
+    processing: 'Enhanced colors represent compositional variation rather than human-eye color; local relief is labeled modeled game terrain.'
+  },
+  assets: [{
+    id: 'mercury-messenger-global',
+    role: 'albedo',
+    url: '/app/assets/textures/mercury_messenger.jpg',
+    sourceProduct: 'MESSENGER Mercury global mosaic'
+  }],
+  rollbackId: 'mercury-caloris-modeled-runtime-v1'
+});
+
+const MAXWELL_MONTES_SURFACE_REGION = createSurfaceRegionManifest({
+  regionId: 'venus-maxwell-montes',
+  bodyId: 'venus',
+  displayName: 'Maxwell Montes',
+  truthClass: SURFACE_TRUTH_CLASS.MODELED,
+  address: {
+    latitudeDeg: 65.2,
+    longitudeDegPositiveEast: 3.0,
+    heightM: 0,
+    scopeType: 'world',
+    scopeId: 'public'
+  },
+  coordinateSystem: 'IAU Venus planetocentric latitude / positive-east longitude',
+  verticalDatum: 'Modeled regional relief informed by Magellan radar morphology; not a visible-light terrain photograph',
+  metersPerUnit: 1,
+  localBounds: { minX: -8000, maxX: 8000, minZ: -8000, maxZ: 8000 },
+  renderPlacement: { x: 0, y: -80, z: 0 },
+  source: {
+    title: 'Magellan-derived Venus texture for 3D models',
+    url: 'https://science.nasa.gov/3d-resources/venus/',
+    provider: 'NASA/JPL-Caltech',
+    attribution: 'NASA/JPL-Caltech',
+    rights: 'NASA source imagery used with source credit retained under NASA media usage guidance.',
+    processing: 'Texture is stitched from Magellan radar imagery with gaps filled by a global texture; local relief and color are labeled modeled game presentation.'
+  },
+  assets: [{
+    id: 'venus-magellan-global-radar',
+    role: 'radar-albedo',
+    url: '/app/assets/textures/venus_magellan.jpg',
+    sourceProduct: 'Magellan global radar mosaic'
+  }],
+  rollbackId: 'venus-maxwell-modeled-runtime-v1'
+});
+
 const SURFACE_REGIONS = Object.freeze({
   [APOLLO11_SURFACE_REGION.regionId]: APOLLO11_SURFACE_REGION,
-  [OLYMPUS_MONS_SURFACE_REGION.regionId]: OLYMPUS_MONS_SURFACE_REGION
+  [OLYMPUS_MONS_SURFACE_REGION.regionId]: OLYMPUS_MONS_SURFACE_REGION,
+  [CALORIS_PLANITIA_SURFACE_REGION.regionId]: CALORIS_PLANITIA_SURFACE_REGION,
+  [MAXWELL_MONTES_SURFACE_REGION.regionId]: MAXWELL_MONTES_SURFACE_REGION
 });
 
 function getPlanetarySurfaceRegion(regionId) {
@@ -425,11 +495,13 @@ function ensurePlanetarySurfaceAuthority(appContext, options = {}) {
 
 export {
   APOLLO11_SURFACE_REGION,
+  CALORIS_PLANITIA_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
   createSurfaceRegionManifest,
   ensurePlanetarySurfaceAuthority,
   getPlanetarySurfaceRegion,
   listPlanetarySurfaceRegions,
+  MAXWELL_MONTES_SURFACE_REGION,
   OLYMPUS_MONS_SURFACE_REGION,
   PLANETARY_SURFACE_SCHEMA_VERSION,
   SURFACE_PUBLICATION_STATUS,

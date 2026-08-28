@@ -103,7 +103,7 @@ function restoreEarthMaterials() {
 function setPlanetaryCharacter(body = 'earth') {
   const character = appCtx.Walk?.state?.characterMesh;
   if (!character) return null;
-  const planetary = body === 'moon' || body === 'mars';
+  const planetary = ['moon', 'mars', 'mercury', 'venus'].includes(body);
   if (!astronautGear) astronautGear = createAstronautGear();
   if (astronautGear.parent !== character) character.add(astronautGear);
   astronautGear.visible = planetary;

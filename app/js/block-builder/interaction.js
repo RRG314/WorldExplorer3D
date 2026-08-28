@@ -94,7 +94,8 @@ export function createBlockBuilderInteraction(options) {
     appCtx.buildingMeshes?.forEach(addVisible);
     appCtx.landuseMeshes?.forEach(addVisible);
     appCtx.terrainGroup?.children?.forEach(addVisible);
-    if (appCtx.onMars) addVisible(appCtx.marsSurface);
+    if (appCtx.activePlanetaryBodyId) addVisible(appCtx.activeSolidWorldSurface);
+    else if (appCtx.onMars) addVisible(appCtx.marsSurface);
     else if (appCtx.onMoon) addVisible(appCtx.moonSurface);
     return targets;
   }

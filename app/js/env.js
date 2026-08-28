@@ -17,6 +17,7 @@ const ENV = Object.freeze({
   SPACE_FLIGHT: 'SPACE_FLIGHT',
   MOON: 'MOON',
   MARS: 'MARS',
+  PLANETARY: 'PLANETARY',
   OCEAN: 'OCEAN'
 });
 
@@ -26,10 +27,11 @@ let _transitioning = false; // guard against re-entrant transitions
 // Valid transitions: which env can switch to which
 const _validTransitions = {
   null: [ENV.EARTH, ENV.OCEAN],
-  EARTH: [ENV.SPACE_FLIGHT, ENV.MOON, ENV.MARS, ENV.OCEAN],
-  SPACE_FLIGHT: [ENV.EARTH, ENV.MOON, ENV.MARS, ENV.OCEAN],
-  MOON: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MARS, ENV.OCEAN],
-  MARS: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MOON],
+  EARTH: [ENV.SPACE_FLIGHT, ENV.MOON, ENV.MARS, ENV.PLANETARY, ENV.OCEAN],
+  SPACE_FLIGHT: [ENV.EARTH, ENV.MOON, ENV.MARS, ENV.PLANETARY, ENV.OCEAN],
+  MOON: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MARS, ENV.PLANETARY, ENV.OCEAN],
+  MARS: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MOON, ENV.PLANETARY],
+  PLANETARY: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MOON, ENV.MARS],
   OCEAN: [ENV.EARTH, ENV.MOON, ENV.SPACE_FLIGHT]
 };
 
@@ -109,6 +111,11 @@ function _syncLegacyFlags(env) {
     case ENV.MARS:
       appCtx.onMoon = false;
       appCtx.onMars = true;
+      setEnvironmentTransitionActive(false);
+      break;
+    case ENV.PLANETARY:
+      appCtx.onMoon = false;
+      appCtx.onMars = false;
       setEnvironmentTransitionActive(false);
       break;
     case ENV.OCEAN:

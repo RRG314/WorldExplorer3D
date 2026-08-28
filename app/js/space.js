@@ -157,8 +157,8 @@ function startSpaceFlightToMoon() {
 function startSpaceFlightToEarth() {
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'earth';
   console.log("Starting space flight to Earth...");
-  const sourceBodyId = appCtx.onMars ? 'mars' : 'moon';
-  const sourceLabel = sourceBodyId === 'mars' ? 'Mars' : 'Moon';
+  const sourceBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : 'moon');
+  const sourceLabel = sourceBodyId[0].toUpperCase() + sourceBodyId.slice(1);
   const sessionId = beginSpaceFlightSession();
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_earth' });
 
@@ -186,9 +186,9 @@ function startSpaceFlightToEarth() {
 
   hideGameUI();
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) {
-    createSpaceFlightScene({ includeExtendedSpace: sourceBodyId === 'mars' });
+    createSpaceFlightScene({ includeExtendedSpace: sourceBodyId !== 'moon' });
   }
-  if (sourceBodyId === 'mars') ensureExtendedSpaceScene();
+  if (sourceBodyId !== 'moon') ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
@@ -299,6 +299,8 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
       if (typeof appCtx.arriveAtMoon === 'function') appCtx.arriveAtMoon();
     } else if (targetName === 'Mars' || targetName === 'mars') {
       appCtx.arriveAtMars?.();
+    } else if (!['Earth', 'earth'].includes(targetName) && typeof appCtx.arriveAtSolidWorld === 'function') {
+      appCtx.arriveAtSolidWorld(targetName);
     } else if (typeof appCtx.arriveAtEarth === 'function') {
       appCtx.arriveAtEarth();
     }

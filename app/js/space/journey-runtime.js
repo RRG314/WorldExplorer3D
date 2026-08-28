@@ -595,7 +595,8 @@ function installSpaceJourneyRuntime(appContext) {
     const arrive = options.arrive || (
       destinationBodyId === 'moon' ? appContext.arriveAtMoon :
         destinationBodyId === 'mars' ? appContext.arriveAtMars :
-          appContext.arriveAtEarth
+          destinationBodyId === 'earth' ? appContext.arriveAtEarth :
+            () => appContext.arriveAtSolidWorld?.(destinationBodyId)
     );
     if (typeof arrive !== 'function') return false;
     await arrive();

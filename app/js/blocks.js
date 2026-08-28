@@ -126,7 +126,7 @@ function getLocRef() {
 
 function getPlanetaryBuildWorldContext() {
   const bodyId = activePlanetaryBodyId(appCtx);
-  if (!bodyId || (!appCtx.onMoon && !appCtx.onMars)) return null;
+  if (!bodyId || (!appCtx.onMoon && !appCtx.onMars && !appCtx.activePlanetaryBodyId)) return null;
   const active = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active || null;
   if (!active || active.bodyId !== bodyId) return null;
   const manifest = getPlanetarySurfaceRegion(active.regionId);
@@ -144,7 +144,7 @@ function getPlanetaryBuildWorldContext() {
 function getCurrentBuildWorldContext() {
   const planetary = getPlanetaryBuildWorldContext();
   if (planetary) return planetary;
-  if (appCtx.onMoon || appCtx.onMars) return null;
+  if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) return null;
   const loc = getLocRef();
   if (!loc) return null;
   return Object.freeze({

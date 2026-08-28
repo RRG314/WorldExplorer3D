@@ -7,7 +7,9 @@ import {
 } from '../app/js/block-builder/world-coordinates.js';
 import {
   APOLLO11_SURFACE_REGION,
+  CALORIS_PLANITIA_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
+  MAXWELL_MONTES_SURFACE_REGION,
   OLYMPUS_MONS_SURFACE_REGION
 } from '../app/js/planetary/runtime/surface-authority.js';
 import {
@@ -56,13 +58,38 @@ test('a stale accepted surface cannot answer for the currently active body', asy
   assert.equal(planetarySurfaceYAtRenderXZ(appContext, 0, 0), null);
 });
 
-test('Moon and Mars block coordinates round-trip through body-local storage', () => {
-  for (const region of [APOLLO11_SURFACE_REGION, OLYMPUS_MONS_SURFACE_REGION]) {
+test('every published solid world round-trips blocks through body-local storage', () => {
+  for (const region of [
+    APOLLO11_SURFACE_REGION,
+    OLYMPUS_MONS_SURFACE_REGION,
+    CALORIS_PLANITIA_SURFACE_REGION,
+    MAXWELL_MONTES_SURFACE_REGION
+  ]) {
     const renderGrid = { gx: 211, gy: -98.5, gz: -944 };
     const stored = planetaryBlockStorageCoordinates(renderGrid, region.renderPlacement);
     const restored = planetaryBlockRenderCoordinates(stored, region.renderPlacement);
     assert.deepEqual(restored, renderGrid);
     assert.equal(Object.isFrozen(stored), true);
+  }
+});
+
+test('generic solid worlds use their active accepted surface instead of Earth', async () => {
+  for (const region of [CALORIS_PLANITIA_SURFACE_REGION, MAXWELL_MONTES_SURFACE_REGION]) {
+    const authority = createPlanetarySurfaceAuthority();
+    await authority.prepare(region.regionId, () => readyPayload(region, (x, z) => x * 0.03 + z * 0.02));
+    const appContext = {
+      onMoon: false,
+      onMars: false,
+      activePlanetaryBodyId: region.bodyId,
+      planetarySurfaceAuthority: authority
+    };
+    const x = region.renderPlacement.x + 12;
+    const z = region.renderPlacement.z - 8;
+    assert.equal(activePlanetaryBodyId(appContext), region.bodyId);
+    assert.equal(samplePlanetarySurfaceAtRenderXZ(appContext, x, z).status, 'available');
+    assert.ok(Math.abs(
+      planetarySurfaceYAtRenderXZ(appContext, x, z) - (region.renderPlacement.y + 0.2)
+    ) < 1e-9);
   }
 });
 

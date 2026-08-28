@@ -20,6 +20,7 @@ import {
   completeFastTravelEvidence,
   installSpaceJourneyRuntime
 } from '../app/js/space/journey-runtime.js';
+import { normalizeLandingTargetName } from '../app/js/space/runtime.js';
 
 const startedAtMs = Date.UTC(2026, 7, 27, 14, 0, 0);
 
@@ -39,6 +40,13 @@ function landing(bodyId, altitudeM = 10, relativeSpeedMps = 5) {
     navigation: { bodyId, altitudeM, relativeSpeedMps }
   };
 }
+
+test('landing target normalization follows the canonical body catalog', () => {
+  assert.equal(normalizeLandingTargetName('mercury'), 'Mercury');
+  assert.equal(normalizeLandingTargetName('VENUS'), 'Venus');
+  assert.equal(normalizeLandingTargetName('jupiter'), 'Jupiter');
+  assert.equal(normalizeLandingTargetName('not-a-world'), null);
+});
 
 test('Earth-Moon journey cannot skip evidence-gated phases', () => {
   let journey = createSpaceJourney({
@@ -212,6 +220,10 @@ test('fast-travel runtime produces complete fuel-accounted evidence for supporte
   for (const [sourceBodyId, destinationBodyId] of [
     ['earth', 'moon'],
     ['moon', 'earth'],
+    ['earth', 'mercury'],
+    ['mercury', 'earth'],
+    ['earth', 'venus'],
+    ['venus', 'earth'],
     ['earth', 'mars'],
     ['mars', 'earth']
   ]) {

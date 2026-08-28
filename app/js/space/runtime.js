@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=1';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 
 let injectedThree = null;
@@ -45,11 +46,8 @@ function getSpaceControlMath(dependencies = {}) {
 }
 
 export function normalizeLandingTargetName(target) {
-  const t = String(target || '').trim().toLowerCase();
-  if (t === 'earth') return 'Earth';
-  if (t === 'moon') return 'Moon';
-  if (t === 'mars') return 'Mars';
-  return null;
+  const bodyId = normalizeAstronomicalBodyId(target);
+  return bodyId ? getAstronomicalBody(bodyId)?.name || null : null;
 }
 
 export function findLandableBodyByName(target) {

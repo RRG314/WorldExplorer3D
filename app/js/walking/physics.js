@@ -3,13 +3,18 @@ import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=1';
+import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
 function isPlanetarySurface() {
-  return !!(appCtx.onMoon || appCtx.onMars);
+  return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
+}
+
+function activePlanetaryBodyId() {
+  return appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
 }
 
 function createWalkingPhysicsHelpers({
@@ -250,8 +255,14 @@ function createWalkingPhysicsHelpers({
       state.walker.mobileMoveWasActive = false;
     }
     const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
-    const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
-    const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
+    const planetaryBodyId = activePlanetaryBodyId();
+    const gravityMagnitude = planetaryBodyId
+      ? samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
+      : 9.80665;
+    const gravity = -gravityMagnitude;
+    const jumpVelocity = planetaryBodyId
+      ? Math.max(2.8, Math.min(4.2, 5 * Math.sqrt(gravityMagnitude / 9.80665)))
+      : 5.0;
 
     const groundState = state.walker._resolvedGroundState ||
       resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
@@ -298,7 +309,7 @@ function createWalkingPhysicsHelpers({
       appCtx.onUrbanParachuteLanded?.();
     }
 
-    const speedMultiplier = appCtx.onMoon ? 0.6 : appCtx.onMars ? 0.72 : 1.0;
+    const speedMultiplier = planetaryBodyId === 'moon' ? 0.6 : planetaryBodyId ? 0.72 : 1.0;
     const adjustedSpeed = speed * speedMultiplier;
 
     const liveGpsMoved = !!liveGpsTarget && Math.hypot(

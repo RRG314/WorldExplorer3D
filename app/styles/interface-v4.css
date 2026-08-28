@@ -627,6 +627,17 @@ body.deflock-active .floatBtn::after {
 @media (max-width: 390px) {
   .tab-content { bottom: 108px; }
   .loc-grid { grid-template-columns: 1fr; }
+  body.solid-world-active #solidWorldPanel {
+    top: 76px !important;
+    right: 12px;
+    left: 12px !important;
+    max-width: none !important;
+  }
+  body.solid-world-active #solidWorldReturnBtn {
+    top: 218px !important;
+    right: 12px !important;
+    min-height: 44px;
+  }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {

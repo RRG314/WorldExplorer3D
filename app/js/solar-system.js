@@ -523,7 +523,7 @@ function getAllSpaceBodies() {
         massKg: entry.planet.massKg,
         physicalRadiusKm: entry.planet.physicalRadiusKm,
         mesh: entry.mesh,
-        landable: entry.planet.name === 'Mars'
+        landable: entry.planet.landingMode === 'solid_surface'
       });
     });
 

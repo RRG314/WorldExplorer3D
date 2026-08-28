@@ -55,6 +55,65 @@ function createMarsRoverFallback() {
   return rover;
 }
 
+function createMercurySurveyRover() {
+  const rover = new THREE.Group();
+  rover.name = 'Mercury Survey Rover';
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.34, 2.15), material(0xc8bda8, 0.55, 0.48));
+  frame.position.y = 1.05;
+  rover.add(frame);
+  const shade = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.12, 1.65), material(0xa7844f, 0.48, 0.58));
+  shade.position.set(0, 1.82, 0.05);
+  rover.add(shade);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.15, 10), material(0xd9d4c8, 0.7, 0.38));
+  mast.position.set(0.75, 2.35, -0.35);
+  rover.add(mast);
+  const sensor = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.3, 0.32), material(0x30343b, 0.5, 0.42));
+  sensor.position.set(0.75, 2.92, -0.35);
+  rover.add(sensor);
+  [-1.34, 1.34].forEach((x) => {
+    [-0.8, 0.8].forEach((z) => {
+      const wheel = createWheel(0.5, 0.3, 0x4a4641);
+      wheel.position.set(x, 0.54, z);
+      rover.add(wheel);
+    });
+  });
+  rover.rotation.y = Math.PI;
+  rover.userData.vehicleKind = 'mercury';
+  return rover;
+}
+
+function createVenusPressureCrawler() {
+  const crawler = new THREE.Group();
+  crawler.name = 'Venus Pressure Crawler';
+  const hullMaterial = material(0xd59a52, 0.68, 0.4);
+  const hull = new THREE.Mesh(new THREE.SphereGeometry(1.55, 24, 16), hullMaterial);
+  hull.scale.set(1.25, 0.82, 1);
+  hull.position.y = 1.65;
+  crawler.add(hull);
+  const viewport = new THREE.Mesh(
+    new THREE.SphereGeometry(1.58, 20, 12, -0.7, 1.4, 1.0, 0.55),
+    new THREE.MeshPhysicalMaterial({ color: 0x38251b, metalness: 0.5, roughness: 0.2, transparent: true, opacity: 0.82 })
+  );
+  viewport.scale.copy(hull.scale);
+  viewport.position.copy(hull.position);
+  viewport.rotation.y = Math.PI;
+  crawler.add(viewport);
+  const equipment = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.55, 1.3), material(0x70462d, 0.58, 0.55));
+  equipment.position.set(0, 1.05, 1.25);
+  crawler.add(equipment);
+  [-1.42, 1.42].forEach((x) => {
+    [-0.83, 0.83].forEach((z) => {
+      const wheel = createWheel(0.66, 0.42, 0x51453c);
+      wheel.position.set(x, 0.62, z);
+      crawler.add(wheel);
+    });
+  });
+  crawler.rotation.y = Math.PI;
+  crawler.userData.vehicleKind = 'venus';
+  crawler.userData.protectedSurfaceCapability = true;
+  return crawler;
+}
+
 function createLunarRovingVehicle() {
   const lrv = new THREE.Group();
   lrv.name = 'Apollo Lunar Roving Vehicle';
@@ -198,16 +257,18 @@ async function setPlanetaryVehicle(kind) {
   if (activeVehicle?.parent) activeVehicle.parent.remove(activeVehicle);
   activeVehicle = null;
 
-  if (kind !== 'moon' && kind !== 'mars') {
+  if (!['moon', 'mars', 'mercury', 'venus'].includes(kind)) {
     earthChildVisibility?.forEach((visible, child) => { child.visible = visible; });
     earthChildVisibility = null;
     return null;
   }
 
   hideEarthVehicleChildren();
-  activeVehicle = alignVehicleToSurface(
-    kind === 'moon' ? createLunarRovingVehicle() : createMarsRoverFallback()
-  );
+  const vehicle = kind === 'moon' ? createLunarRovingVehicle() :
+    kind === 'mars' ? createMarsRoverFallback() :
+      kind === 'mercury' ? createMercurySurveyRover() :
+        createVenusPressureCrawler();
+  activeVehicle = alignVehicleToSurface(vehicle);
   appCtx.carMesh.add(activeVehicle);
 
   if (kind === 'mars') {
