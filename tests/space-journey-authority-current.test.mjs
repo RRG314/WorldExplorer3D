@@ -16,6 +16,7 @@ import {
   createSpacecraftState,
   executePlannedBurn
 } from '../app/js/space/spacecraft-authority.js';
+import { completeFastTravelEvidence } from '../app/js/space/journey-runtime.js';
 
 const startedAtMs = Date.UTC(2026, 7, 27, 14, 0, 0);
 
@@ -202,4 +203,33 @@ test('invalid transitions and reversed journey time fail closed', () => {
     spacecraftReady: true
   }).reason, 'journey-time-cannot-reverse');
   assert.throws(() => createSpaceJourney({ sourceBodyId: 'earth', destinationBodyId: 'earth', startedAtMs }));
+});
+
+test('fast-travel runtime produces complete fuel-accounted evidence for supported solid worlds', () => {
+  for (const [sourceBodyId, destinationBodyId] of [
+    ['earth', 'moon'],
+    ['moon', 'earth'],
+    ['earth', 'mars'],
+    ['mars', 'earth']
+  ]) {
+    const result = completeFastTravelEvidence({
+      sourceBodyId,
+      destinationBodyId,
+      epochMs: startedAtMs
+    });
+    assert.equal(result.journey.phase, JOURNEY_PHASE.SURFACE);
+    assert.equal(result.journey.history.length, 6);
+    assert.equal(result.burn.executed, true);
+    assert.ok(result.burn.requiredPropellantKg > 0);
+    assert.equal(result.spacecraft.targetBodyId, destinationBodyId);
+    assert.equal(result.landingEligibility.eligible, true);
+  }
+});
+
+test('fast-travel runtime cannot manufacture a solid touchdown on a giant planet', () => {
+  assert.throws(() => completeFastTravelEvidence({
+    sourceBodyId: 'earth',
+    destinationBodyId: 'jupiter',
+    epochMs: startedAtMs
+  }), /solid-surface-landing-unavailable/);
 });

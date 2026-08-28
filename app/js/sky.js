@@ -116,6 +116,14 @@ async function directTravelToMoon() {
   if (appCtx.onMoon) return true;
   if (appCtx.travelingToMoon) return false;
 
+  if (typeof appCtx.startFastTravelJourney === 'function') {
+    return appCtx.startFastTravelJourney('moon', {
+      sourceBodyId: 'earth',
+      arrive: arriveAtMoon,
+      transitionDurationMs: 900
+    });
+  }
+
   if (typeof appCtx.showTransitionLoad === 'function') {
     await appCtx.showTransitionLoad('moon');
     if (appCtx.onMoon) return true;
@@ -155,6 +163,13 @@ async function directTravelToMoon() {
 
 // Direct return to Earth (bypasses space flight module)
 function returnToEarthDirect() {
+  if (typeof appCtx.startFastTravelJourney === 'function') {
+    return appCtx.startFastTravelJourney('earth', {
+      sourceBodyId: appCtx.onMars ? 'mars' : 'moon',
+      arrive: arriveAtEarth,
+      transitionDurationMs: 900
+    });
+  }
   return returnToEarth();
 }
 

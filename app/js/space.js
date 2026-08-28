@@ -11,6 +11,7 @@ import {
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -48,6 +49,8 @@ appCtx.spaceFlight = {
   overviewMode: false,
   _sessionId: 0
 };
+
+installSpaceJourneyRuntime(appCtx);
 
 let spaceSessionScope = null;
 const spaceModuleScope = createLifecycleScope('space-module');
