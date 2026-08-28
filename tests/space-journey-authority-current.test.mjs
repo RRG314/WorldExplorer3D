@@ -296,3 +296,87 @@ test('rendered landing request fails closed before verified destination approach
   assert.equal(landing.reason, 'journey-not-in-approach');
   assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.PARKING_ORBIT);
 });
+
+test('assisted rendered Earth-Moon journey reaches a guarded surface through continuous SI states', async () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  let landingCompletions = 0;
+  const appContext = {
+    completeSpaceFlightJourneyLanding() { landingCompletions += 1; },
+    spaceFlight: {
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying'
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  assert.equal(runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'earth', destinationBodyId: 'moon', mode: JOURNEY_MODE.ASSISTED
+  }), true);
+  const beforeDepartureFuel = appContext.spacecraftState.propellantKg;
+  assert.equal(runtime.engageRenderedJourneyAssist().accepted, true);
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.TRANSFER);
+  assert.ok(appContext.spacecraftState.propellantKg < beforeDepartureFuel);
+
+  for (let frame = 0; frame < 121; frame += 1) {
+    runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  }
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.APPROACH);
+  assert.equal(appContext.spaceJourneyAssistState.active, false);
+  const approachFuel = appContext.spacecraftState.propellantKg;
+  const landing = runtime.requestRenderedJourneyLanding('moon');
+  assert.equal(landing.accepted, true, landing.reason);
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.DESCENT);
+
+  for (let frame = 0; frame < 71; frame += 1) {
+    runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.SURFACE);
+  assert.ok(appContext.spacecraftState.propellantKg <= approachFuel);
+  assert.equal(landingCompletions, 1);
+});
+
+test('Moon takeoff and Earth return resume the same journey identity', async () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const appContext = {
+    completeSpaceFlightJourneyLanding() {},
+    spaceFlight: {
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying'
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  runtime.beginRenderedSpaceJourney({ sourceBodyId: 'earth', destinationBodyId: 'moon', mode: JOURNEY_MODE.ASSISTED });
+  runtime.engageRenderedJourneyAssist();
+  for (let frame = 0; frame < 121; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  runtime.requestRenderedJourneyLanding('moon');
+  for (let frame = 0; frame < 71; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  await new Promise((resolve) => setImmediate(resolve));
+  const journeyId = appContext.spaceJourney.journeyId;
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.SURFACE);
+
+  runtime.clearRenderedSpaceJourney();
+  assert.equal(runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'moon', destinationBodyId: 'earth', mode: JOURNEY_MODE.ASSISTED, resumeJourney: true
+  }), true);
+  assert.equal(appContext.spaceJourney.journeyId, journeyId);
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.ASCENT);
+  for (let frame = 0; frame < 201; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.HOME_APPROACH);
+  const heldEarthApproach = { ...appContext.spacecraftState.positionM };
+  for (let frame = 0; frame < 50; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  assert.deepEqual(appContext.spacecraftState.positionM, heldEarthApproach);
+  const landing = runtime.requestRenderedJourneyLanding('earth');
+  assert.equal(landing.accepted, true, landing.reason);
+  for (let frame = 0; frame < 71; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.COMPLETE);
+  assert.equal(appContext.spaceJourney.journeyId, journeyId);
+});

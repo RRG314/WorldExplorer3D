@@ -136,7 +136,7 @@ function startSpaceFlightToMoon() {
   appCtx.beginRenderedSpaceJourney?.({
     sourceBodyId: 'earth',
     destinationBodyId: 'moon',
-    mode: 'manual'
+    mode: 'assisted'
   });
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
@@ -192,7 +192,8 @@ function startSpaceFlightToEarth() {
   appCtx.beginRenderedSpaceJourney?.({
     sourceBodyId: 'moon',
     destinationBodyId: 'earth',
-    mode: 'manual'
+    mode: 'assisted',
+    resumeJourney: true
   });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
@@ -248,7 +249,7 @@ function startSpaceFlightToMars() {
   appCtx.beginRenderedSpaceJourney?.({
     sourceBodyId: appCtx.spaceFlight._launchSource?.toLowerCase?.() || 'earth',
     destinationBodyId: 'mars',
-    mode: 'manual'
+    mode: 'assisted'
   });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();

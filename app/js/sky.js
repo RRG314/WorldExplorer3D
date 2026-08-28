@@ -331,9 +331,11 @@ function cancelPendingEarthArrival() {
 
 function returnToEarth() {
   if (!appCtx.onMoon || appCtx.travelingToMoon) return;
+  if (typeof appCtx.startSpaceFlightToEarth === 'function') {
+    hideReturnToEarthButton();
+    return appCtx.startSpaceFlightToEarth();
+  }
   const arrivalSessionId = ++earthArrivalSessionId;
-
-  // Always use direct travel for return (no space flight)
 
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);

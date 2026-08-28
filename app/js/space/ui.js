@@ -62,6 +62,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
     <div style="font-size:16px;color:#667eea;margin-bottom:12px;font-weight:700;display:flex;align-items:center;gap:8px;">
       <span style="font-size:24px;">🚀</span> SPACE FLIGHT
     </div>
+    <div id="sfFlightStatus" style="margin-bottom:9px;color:#a5b4fc;font-size:11px;letter-spacing:0.04em;">Preparing flight</div>
     <div style="margin-bottom:6px;">Nearest: <span id="sfDestination" style="color:#10b981;font-weight:600;">---</span></div>
     <div style="margin-bottom:6px;"><span id="sfAltitudeLabel">Altitude</span>: <span id="sfAltitude">0</span> <span id="sfAltitudeUnit">km</span></div>
     <div style="margin-bottom:6px;"><span id="sfSpeedLabel">Velocity</span>: <span id="sfSpeed">0</span> <span id="sfSpeedUnit">km/s</span></div>
@@ -73,6 +74,9 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
       </div>
       <div id="sfLandingText" style="font-size:10px;margin-top:4px;opacity:0.7;">Fly closer to land</div>
     </div>
+    <button id="sfAssistBtn" style="width:100%;padding:12px;margin-bottom:8px;background:#315d9d;border:1px solid #60a5fa;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;">
+      ENGAGE FLIGHT ASSIST
+    </button>
     <button id="sfLandBtn" style="width:100%;padding:12px;background:#667eea;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;opacity:0.5;" disabled>
       EXPLORE SOLAR SYSTEM
     </button>
@@ -88,6 +92,16 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
     target.addEventListener(eventName, listener, options);
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
+  listen(document.getElementById('sfAssistBtn'), 'click', () => {
+    const result = appCtx.toggleRenderedJourneyAssist?.();
+    if (!result?.accepted) {
+      showFlightMessage('FLIGHT ASSIST IS NOT AVAILABLE HERE', '#f59e0b');
+    } else if (result.active === false) {
+      showFlightMessage('MANUAL CONTROL', '#60a5fa');
+    } else {
+      showFlightMessage('FLIGHT ASSIST ENGAGED', '#10b981');
+    }
+  });
 
   listen(document, 'keydown', (e) => {
     if (appCtx.spaceFlight.active) {
@@ -207,6 +221,41 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const altitude = Math.max(0, activeDist - activeHudBody.radius);
   const displaySpeed = appCtx.spaceFlight.velocity ? appCtx.spaceFlight.velocity.length() : appCtx.spaceFlight.speed;
   const zoneLabel = document.getElementById('sfZoneLabel');
+  const flightStatus = document.getElementById('sfFlightStatus');
+  const assistBtn = document.getElementById('sfAssistBtn');
+  const destinationName = appCtx.spaceJourneyEphemeris?.destination?.bodyId || appCtx.spaceFlight.destination || 'destination';
+  const departureName = appCtx.spaceJourneyEphemeris?.source?.bodyId || appCtx.spaceJourney?.sourceBodyId || 'departure point';
+  const phaseCopy = {
+    preparing: 'Preparing flight',
+    launch: 'Leaving the surface',
+    parking_orbit: `${appCtx.spaceJourney?.sourceBodyId || 'Earth'} orbit`,
+    transfer: `Cruising to ${destinationName}`,
+    approach: `${destinationName} approach`,
+    descent: `Landing on ${destinationName}`,
+    surface: `On ${destinationName}`,
+    ascent: `Leaving ${departureName}`,
+    return_transfer: `Returning to ${destinationName}`,
+    home_approach: `${destinationName} approach`,
+    home_descent: `Landing on ${destinationName}`,
+    complete: 'Journey complete'
+  };
+  if (flightStatus) {
+    const copy = phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';
+    flightStatus.textContent = copy.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+  if (assistBtn) {
+    const assist = appCtx.spaceJourneyAssistState;
+    assistBtn.style.display = assist?.available === false ? 'none' : '';
+    assistBtn.disabled = !assist?.available || !['parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
+    assistBtn.style.opacity = assistBtn.disabled ? '0.55' : '1';
+    assistBtn.textContent = assist?.holding
+      ? 'APPROACH HOLD · PRESS SPACE FOR MANUAL'
+      : assist?.active
+      ? assist.kind === 'ascent'
+        ? `ASSISTED TAKEOFF · ${Math.round((assist.progress || 0) * 100)}%`
+        : `TAKE MANUAL CONTROL · ${Math.round((assist.progress || 0) * 100)}%`
+      : `FLY TO ${String(destinationName).toUpperCase()} WITH ASSIST`;
+  }
 
   if (universeTarget?.navigation) {
     const navigation = universeTarget.navigation;
@@ -276,7 +325,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     ? evaluateLandingEligibility(appCtx.spacecraftState, appCtx.spaceJourneyEphemeris.destination)
     : null;
   const canLand = physicalLanding
-    ? physicalLanding.eligible && appCtx.spaceJourney?.phase === 'approach'
+    ? physicalLanding.eligible && ['approach', 'home_approach'].includes(appCtx.spaceJourney?.phase)
     : activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
   if (universeTarget) {
@@ -284,7 +333,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     if (landingText) {
       const dilation = universeTarget.encounter?.timeDilation;
       const generatedEncounter = universeTarget.encounter?.type === 'generated-asteroids'
-        ? `Generated asteroid field · X pulse · ${universeTarget.encounter.active} remaining`
+        ? `Asteroid field · X pulse · ${universeTarget.encounter.active} remaining`
         : '';
       landingText.textContent = Number.isFinite(dilation)
         ? `Relativistic clock rate: ${(dilation * 100).toFixed(1)}%`
@@ -315,12 +364,23 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     }
   } else {
     if (landingBar) landingBar.style.background = 'linear-gradient(90deg,#10b981,#34d399)';
-    if (landingText) landingText.textContent = 'Nearest: ' + activeHudBody.name + ' (' + Math.floor(altitude) + ' km)';
+    if (landingText) {
+      const physicalAltitudeKm = physicalLanding?.navigation?.altitudeM;
+      landingText.textContent = appCtx.spaceJourney?.phase === 'transfer'
+        ? `Cruising to ${activeHudBody.name}`
+        : appCtx.spaceJourney?.phase === 'parking_orbit'
+          ? 'Choose flight assist or take manual control'
+          : 'Distance to ' + activeHudBody.name + ': ' + (
+            Number.isFinite(physicalAltitudeKm)
+              ? Math.round(physicalAltitudeKm / 1000).toLocaleString()
+              : Math.floor(altitude).toLocaleString()
+          ) + ' km';
+    }
     if (landBtn) {
       landBtn.disabled = true;
       landBtn.style.opacity = '0.5';
       landBtn.style.background = '#667eea';
-      landBtn.textContent = 'FLY TO ' + activeHudBody.name.toUpperCase();
+      landBtn.textContent = 'LANDING NOT YET AVAILABLE';
     }
   }
 }
