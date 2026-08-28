@@ -9,7 +9,7 @@ import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
-import { explorerProgressSnapshot } from './explorer-events.js?v=2';
+import { explorerProgressSnapshot } from './explorer-events.js?v=3';
 import {
   RELEASED_EXPLORER_TOOLS,
   explorerGoalSnapshot,
@@ -24,7 +24,7 @@ import {
   createDiscoveryPublicationStore,
   resolveContextActions
 } from './model.js?v=1';
-import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=2';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=3';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
 import { emitDiscoveryTelemetry } from './telemetry.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
@@ -35,6 +35,7 @@ import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wild
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
+import { SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
   'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
@@ -493,7 +494,9 @@ function createDiscoveryUi(state) {
     if (elements.progress) {
       const progress = rank;
       const regional = regionalProgressSnapshot({ guide, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
-      const specialties = Object.entries(progress.specialties || {});
+      const specialties = Object.entries(profile.characterState?.specialties || {})
+        .filter(([, specialty]) => Number(specialty.xp) > 0)
+        .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
       const badges = progress.badgeAwards || [];
@@ -508,7 +511,7 @@ function createDiscoveryUi(state) {
       const companions = state.companionRuntime?.snapshot?.().companions || [];
       const activeCompanion = companions.find((entry) => entry.active);
       const bonded = companions.filter((entry) => Number(entry.progression?.level || 1) >= 8).length;
-      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.totalRecords || 0} Journal memories · ${progress.regions?.length || 0} places</small></article>${companions.length ? `<article class="discoveryProgressCard"><strong>${companions.length}</strong>Companions<small>${activeCompanion ? `${escapeHtml(activeCompanion.name)} active · level ${activeCompanion.progression?.level || 1}` : 'No active companion'} · ${bonded} Bonded</small></article>` : ''}<article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')}${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} field records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.records}</strong>${escapeHtml(region.label)}<small>${region.catalogs.size} Guide identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first Explorer memory will start this story.</div>'}`;
+      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.totalRecords || 0} Journal memories · ${progress.regions?.length || 0} places</small></article>${companions.length ? `<article class="discoveryProgressCard"><strong>${companions.length}</strong>Companions<small>${activeCompanion ? `${escapeHtml(activeCompanion.name)} active · level ${activeCompanion.progression?.level || 1}` : 'No active companion'} · ${bonded} Bonded</small></article>` : ''}<article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')}${specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const rank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${rank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(rank.label)} · ${specialty.xp} experience · ${specialty.meaningfulEvents || 0} activities</small></article>`; }).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.records}</strong>${escapeHtml(region.label)}<small>${region.catalogs.size} Guide identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first Explorer memory will start this story.</div>'}`;
       if (badges.length) {
         elements.progress.insertAdjacentHTML('beforeend', badges.map((badge) => `<article class="discoveryProgressCard"><strong>◆</strong>${escapeHtml(badge.label)}<small>Explorer badge</small></article>`).join(''));
       }
@@ -550,8 +553,14 @@ function createDiscoveryUi(state) {
     }
     const collection = event.projections?.collection === true;
     const points = Number(event.progress?.points) || 0;
+    const specialtyAwards = outcome?.characterReward?.specialtyAwards || [];
+    const specialtySummary = specialtyAwards.slice(0, 2).map((award) => {
+      const label = definitionById(SPECIALTY_DEFINITIONS, award.id)?.label || displayDiscoveryLabel(award.id);
+      return `${label} +${award.xp}`;
+    }).join(' · ');
+    const rewardSummary = [points > 0 ? `Explorer +${points}` : '', specialtySummary].filter(Boolean).join(' · ');
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation saved · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }

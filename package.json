@@ -18,6 +18,7 @@
     "verify:urban-equipment": "node scripts/verification/urban-equipment.mjs",
     "verify:urban-sandbox": "node scripts/verification/urban-sandbox.mjs",
     "verify:player-state": "node --test tests/player-state-migration.test.mjs",
+    "verify:character-progression": "node --test tests/character-progression-current.test.mjs",
     "verify:interiors": "node scripts/verification/interiors.mjs",
     "verify:creator-flow": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/creator-flow.mjs\"",
     "verify:world-editor-blocks-desktop": "WE3D_BLOCKS_SCOPE=desktop WE3D_REQUIRE_IMMUTABLE=1 firebase emulators:exec --config firebase.blocks-emulator.json --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/world-editor-blocks.mjs\"",

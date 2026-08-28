@@ -197,7 +197,8 @@ function createDetectorSession(options = {}) {
         instanceId: collectionResult.item.instanceId,
         eventId: collectionResult.event?.eventId || null,
         event: collectionResult.event || null,
-        progress: collectionResult.progress || null
+        progress: collectionResult.progress || null,
+        characterReward: collectionResult.characterReward || null
       } : null,
       fieldProgress: progress
     });

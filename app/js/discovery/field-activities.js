@@ -313,7 +313,8 @@ function createFieldActivitySession(options = {}) {
         instanceId: state.result.item?.instanceId || null,
         eventId: state.result.event?.eventId || null,
         event: state.result.event || null,
-        progress: state.result.progress || null
+        progress: state.result.progress || null,
+        characterReward: state.result.characterReward || null
       } : null,
       fieldProgress: progress
     });

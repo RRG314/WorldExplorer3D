@@ -167,7 +167,6 @@ function progressCreditForDiscovery({ firstIdentification = false, newRegion = f
 function projectExplorerProgress(current, record, credit) {
   const progress = normalizeExplorerProgress(current);
   const specialtyId = specialtyForDiscovery(record);
-  const specialty = { ...progress.specialties[specialtyId] };
   const regionId = boundedText(record.regionId || record.worldIdentity || 'local-region', 160);
   const points = Math.max(0, Number(credit?.points) || 0);
   const uniqueDiscovery = credit?.reason === 'new-identification';
@@ -176,17 +175,12 @@ function projectExplorerProgress(current, record, credit) {
   fieldPath.records += 1;
   if (uniqueDiscovery) fieldPath.firsts += 1;
 
-  specialty.points += points;
-  specialty.records += 1;
-  if (uniqueDiscovery) specialty.uniqueDiscoveries += 1;
-
   const next = normalizeExplorerProgress({
     ...progress,
     points: progress.points + points,
     totalRecords: progress.totalRecords + 1,
     uniqueDiscoveries: progress.uniqueDiscoveries + (uniqueDiscovery ? 1 : 0),
     regions: unique([...progress.regions, regionId]),
-    specialties: { ...progress.specialties, [specialtyId]: specialty },
     paths: { ...progress.paths, field: fieldPath }
   });
   return Object.freeze({ progress: next, specialtyId, points, reason: credit?.reason || 'no-credit' });

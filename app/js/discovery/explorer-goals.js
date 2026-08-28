@@ -1,4 +1,4 @@
-import { explorerProgressSnapshot } from './explorer-events.js?v=2';
+import { explorerProgressSnapshot } from './explorer-events.js?v=3';
 
 const RELEASED_EXPLORER_TOOLS = Object.freeze([
   'field-lens', 'field-camera', 'metal-detector', 'hand-trowel', 'fishing-rod',

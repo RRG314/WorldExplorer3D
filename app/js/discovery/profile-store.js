@@ -6,11 +6,14 @@ import {
   progressCreditForDiscovery,
   projectExplorerProgress,
   projectExplorerStoryProgress
-} from './explorer-events.js?v=2';
+} from './explorer-events.js?v=3';
+import { createDefaultCharacterState, normalizeCharacterState } from '../character/model.js?v=1';
+import { migrateLegacyCharacterState, projectCharacterProgress } from '../character/progression.js?v=1';
 
 const DISCOVERY_DB_NAME = 'world-explorer-discovery';
-const DISCOVERY_DB_VERSION = 2;
+const DISCOVERY_DB_VERSION = 3;
 const PROFILE_ID = 'local-explorer';
+const CHARACTER_MIGRATION_BACKUP_ID = 'character-v1:local-explorer';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -66,7 +69,8 @@ function createDefaultProfile() {
     toolMastery: {},
     collectionCount: 0,
     fieldGuideCount: 0,
-    explorerProgress: defaultExplorerProgress()
+    explorerProgress: defaultExplorerProgress(),
+    characterState: createDefaultCharacterState()
   };
 }
 
@@ -80,6 +84,7 @@ function normalizeProfile(profile) {
     disciplineProgress: { ...base.disciplineProgress, ...(profile?.disciplineProgress || {}) },
     toolMastery: { ...(profile?.toolMastery || {}) },
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
+    characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
     updatedAt: Date.now()
   };
@@ -121,18 +126,72 @@ function openDiscoveryDatabase(indexedDB = globalThis.indexedDB) {
         events.createIndex('regionId', 'regionId', { unique: false });
         events.createIndex('eventType', 'eventType', { unique: false });
       }
+      if (!db.objectStoreNames.contains('migrationBackups')) db.createObjectStore('migrationBackups', { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error('Could not open discovery database.'));
   });
 }
 
+async function ensureIndexedDbCharacterMigration(db) {
+  const transaction = db.transaction(['profiles', 'events', 'fieldGuide', 'companions', 'migrationBackups'], 'readwrite');
+  const profiles = transaction.objectStore('profiles');
+  const backups = transaction.objectStore('migrationBackups');
+  const [storedProfile, events, fieldGuide, companions, existingBackup] = await Promise.all([
+    requestPromise(profiles.get(PROFILE_ID)),
+    requestPromise(transaction.objectStore('events').getAll()),
+    requestPromise(transaction.objectStore('fieldGuide').getAll()),
+    requestPromise(transaction.objectStore('companions').getAll()),
+    requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID))
+  ]);
+  if (!storedProfile) {
+    const profile = createDefaultProfile();
+    profiles.put(profile);
+    await transactionPromise(transaction);
+    return profile;
+  }
+  if (storedProfile.characterState?.schemaVersion === 1) {
+    await transactionPromise(transaction);
+    return normalizeProfile(storedProfile);
+  }
+  const backedUpAt = Number(existingBackup?.backedUpAt) || Date.now();
+  if (!existingBackup) {
+    backups.put({
+      id: CHARACTER_MIGRATION_BACKUP_ID,
+      backedUpAt,
+      sourceProfileSchemaVersion: Number(storedProfile.schemaVersion) || 0,
+      profile: clone(storedProfile)
+    });
+  }
+  const characterState = migrateLegacyCharacterState({
+    profile: storedProfile,
+    events,
+    fieldGuide,
+    companions,
+    backupAvailable: true,
+    now: backedUpAt
+  });
+  const profile = normalizeProfile({ ...storedProfile, characterState });
+  profiles.put(profile);
+  await transactionPromise(transaction);
+  return profile;
+}
+
 function createIndexedDbDiscoveryProfileStore(options = {}) {
   const open = () => openDiscoveryDatabase(options.indexedDB);
+  let characterMigrationReady = false;
+
+  async function ensureCharacterMigration(db) {
+    if (characterMigrationReady) return true;
+    await ensureIndexedDbCharacterMigration(db);
+    characterMigrationReady = true;
+    return true;
+  }
 
   async function getProfile() {
     const db = await open();
     try {
+      await ensureCharacterMigration(db);
       const transaction = db.transaction(['profiles'], 'readonly');
       const profile = await requestPromise(transaction.objectStore('profiles').get(PROFILE_ID));
       await transactionPromise(transaction);
@@ -144,10 +203,16 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 
   async function saveProfile(nextProfile) {
     const db = await open();
-    const profile = normalizeProfile(nextProfile);
     try {
+      await ensureCharacterMigration(db);
       const transaction = db.transaction(['profiles'], 'readwrite');
-      transaction.objectStore('profiles').put(profile);
+      const store = transaction.objectStore('profiles');
+      const current = normalizeProfile(await requestPromise(store.get(PROFILE_ID)));
+      const profile = normalizeProfile({
+        ...nextProfile,
+        characterState: nextProfile?.characterState || current.characterState
+      });
+      store.put(profile);
       await transactionPromise(transaction);
       return clone(profile);
     } finally {
@@ -173,6 +238,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     if (collection && !record?.instanceId) throw new TypeError('Collected discoveries require a stable instance ID.');
     const db = await open();
     try {
+      await ensureCharacterMigration(db);
       const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'events'], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const items = transaction.objectStore('items');
@@ -206,6 +272,12 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         resolution: collection ? 'collected' : 'recorded',
         progress: { points: projected.points, reason: projected.reason }
       });
+      const characterProjection = projectCharacterProgress(current.characterState, event, {
+        noveltyReason: projected.reason,
+        meaningful: true,
+        explorerPointsBefore: current.explorerProgress.points,
+        explorerPointsAfter: projected.progress.points
+      });
       const discipline = String(record.discipline || 'exploration');
       const disciplineProgress = { ...(current.disciplineProgress[discipline] || { discoveries: 0, regions: [] }) };
       disciplineProgress.discoveries = Number(disciplineProgress.discoveries || 0) + 1;
@@ -215,7 +287,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         collectionCount: Number(current.collectionCount || 0) + (collection ? 1 : 0),
         fieldGuideCount: Number(current.fieldGuideCount || 0) + (existingGuide ? 0 : 1),
         disciplineProgress: { ...current.disciplineProgress, [discipline]: disciplineProgress },
-        explorerProgress: projected.progress
+        explorerProgress: projected.progress,
+        characterState: characterProjection.character
       });
       if (item) items.put(item);
       events.put(event);
@@ -229,7 +302,8 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         item: clone(item),
         event: clone(event),
         profile: clone(profile),
-        progress: { points: projected.points, reason: projected.reason, specialtyId: projected.specialtyId }
+        progress: { points: projected.points, reason: projected.reason, specialtyId: projected.specialtyId },
+        characterReward: clone(characterProjection.reward)
       };
     } finally {
       db.close();
@@ -240,6 +314,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     const event = createExplorerStoryEvent(record);
     const db = await open();
     try {
+      await ensureCharacterMigration(db);
       const transaction = db.transaction(['profiles', 'events'], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const events = transaction.objectStore('events');
@@ -249,13 +324,23 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         return { recorded: false, reason: 'already-recorded', event: clone(existing) };
       }
       const current = normalizeProfile(await requestPromise(profiles.get(PROFILE_ID)));
+      const nextExplorerProgress = event.projections.profile
+        ? projectExplorerStoryProgress(current.explorerProgress, event)
+        : current.explorerProgress;
+      const characterProjection = event.projections.profile
+        ? projectCharacterProgress(current.characterState, event, {
+            meaningful: true,
+            explorerPointsBefore: current.explorerProgress.points,
+            explorerPointsAfter: nextExplorerProgress.points
+          })
+        : { character: current.characterState, reward: null };
       const profile = event.projections.profile
-        ? normalizeProfile({ ...current, explorerProgress: projectExplorerStoryProgress(current.explorerProgress, event) })
+        ? normalizeProfile({ ...current, explorerProgress: nextExplorerProgress, characterState: characterProjection.character })
         : current;
       events.put(event);
       profiles.put(profile);
       await transactionPromise(transaction);
-      return { recorded: true, event: clone(event), profile: clone(profile) };
+      return { recorded: true, event: clone(event), profile: clone(profile), characterReward: clone(characterProjection.reward) };
     } finally {
       db.close();
     }
@@ -361,6 +446,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
   async function setActiveCompanion(instanceId = null) {
     const db = await open();
     try {
+      await ensureCharacterMigration(db);
       const transaction = db.transaction(['companions', 'profiles'], 'readwrite');
       const companionsStore = transaction.objectStore('companions');
       const profilesStore = transaction.objectStore('profiles');
@@ -381,6 +467,43 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
+  async function getCharacterMigrationBackup() {
+    const db = await open();
+    try {
+      const transaction = db.transaction(['migrationBackups'], 'readonly');
+      const backup = await requestPromise(transaction.objectStore('migrationBackups').get(CHARACTER_MIGRATION_BACKUP_ID));
+      await transactionPromise(transaction);
+      return clone(backup || null);
+    } finally {
+      db.close();
+    }
+  }
+
+  async function rollbackCharacterMigration() {
+    const db = await open();
+    try {
+      const transaction = db.transaction(['profiles', 'migrationBackups'], 'readwrite');
+      const backups = transaction.objectStore('migrationBackups');
+      const backup = await requestPromise(backups.get(CHARACTER_MIGRATION_BACKUP_ID));
+      if (!backup?.profile) {
+        await transactionPromise(transaction);
+        return false;
+      }
+      const rolledBackAt = Date.now();
+      const characterState = normalizeCharacterState({
+        ...createDefaultCharacterState({ now: rolledBackAt }),
+        migration: { version: 1, rolledBackAt, backupAvailable: true }
+      });
+      transaction.objectStore('profiles').put(normalizeProfile({ ...backup.profile, characterState }));
+      backups.put({ ...backup, rolledBackAt });
+      await transactionPromise(transaction);
+      characterMigrationReady = true;
+      return true;
+    } finally {
+      db.close();
+    }
+  }
+
   async function exportData() {
     const [profile, items, fieldGuide, companions, events] = await Promise.all([
       getProfile(), listItems(10000), listFieldGuide(10000), listCompanions(), listEvents(10000)
@@ -394,15 +517,26 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
     const db = await open();
     try {
-      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'companions', 'events'], 'readwrite');
+      const transaction = db.transaction(['profiles', 'items', 'claims', 'fieldGuide', 'companions', 'events', 'migrationBackups'], 'readwrite');
       const profiles = transaction.objectStore('profiles');
       const itemsStore = transaction.objectStore('items');
       const claims = transaction.objectStore('claims');
       const guideStore = transaction.objectStore('fieldGuide');
       const companionsStore = transaction.objectStore('companions');
       const eventsStore = transaction.objectStore('events');
+      const backupsStore = transaction.objectStore('migrationBackups');
       [profiles, itemsStore, claims, guideStore, companionsStore, eventsStore].forEach((store) => store.clear());
-      profiles.put(normalizeProfile(data.profile));
+      backupsStore.delete(CHARACTER_MIGRATION_BACKUP_ID);
+      const hasCharacterState = data.profile?.characterState?.schemaVersion === 1;
+      const importedProfile = hasCharacterState
+        ? normalizeProfile(data.profile)
+        : {
+            ...clone(data.profile || {}),
+            id: PROFILE_ID,
+            schemaVersion: DISCOVERY_DB_VERSION,
+            updatedAt: Date.now()
+          };
+      profiles.put(importedProfile);
       const items = Array.isArray(data.items) ? data.items : [];
       const companions = Array.isArray(data.companions) ? data.companions : [];
       items.filter((item) => item?.instanceId && item?.catalogId).forEach((item) => itemsStore.put(clone(item)));
@@ -416,6 +550,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         }
       });
       await transactionPromise(transaction);
+      characterMigrationReady = hasCharacterState;
       return { imported: true, events: data.events.length, guide: data.fieldGuide.length, items: items.length, companions: companions.length };
     } finally {
       db.close();
@@ -427,6 +562,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     applyTrustedReceipt,
     collect,
     exportData,
+    getCharacterMigrationBackup,
     getProfile,
     hasClaim,
     listCompanions,
@@ -437,6 +573,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     recordDiscovery,
     recordExplorerEvent,
     recordObservation,
+    rollbackCharacterMigration,
     saveCompanion,
     saveProfile,
     setActiveCompanion
@@ -444,7 +581,21 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
 }
 
 function createMemoryDiscoveryProfileStore(seed = {}) {
+  let legacyProfileBackup = seed.profile && !seed.profile.characterState ? clone(seed.profile) : null;
   let profile = normalizeProfile(seed.profile);
+  if (legacyProfileBackup) {
+    profile = normalizeProfile({
+      ...legacyProfileBackup,
+      characterState: migrateLegacyCharacterState({
+        profile: legacyProfileBackup,
+        events: seed.events,
+        fieldGuide: seed.fieldGuide,
+        companions: seed.companions,
+        backupAvailable: true,
+        now: Number(seed.migratedAt) || Date.now()
+      })
+    });
+  }
   const items = new Map((seed.items || []).map((item) => [item.instanceId, clone(item)]));
   const claims = new Map((seed.claims || []).map((claim) => [claim.claimId, clone(claim)]));
   const guide = new Map((seed.fieldGuide || []).map((entry) => [entry.catalogId, clone(entry)]));
@@ -471,6 +622,12 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       resolution: collection ? 'collected' : 'recorded',
       progress: { points: projected.points, reason: projected.reason }
     });
+    const characterProjection = projectCharacterProgress(profile.characterState, event, {
+      noveltyReason: projected.reason,
+      meaningful: true,
+      explorerPointsBefore: profile.explorerProgress.points,
+      explorerPointsAfter: projected.progress.points
+    });
     if (item) items.set(item.instanceId, item);
     events.set(event.eventId, event);
     claims.set(record.claimId, { claimId: record.claimId, item, event });
@@ -484,7 +641,8 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       collectionCount: Number(profile.collectionCount || 0) + (collection ? 1 : 0),
       fieldGuideCount: Number(profile.fieldGuideCount || 0) + (existingGuide ? 0 : 1),
       disciplineProgress: { ...profile.disciplineProgress, [discipline]: legacy },
-      explorerProgress: projected.progress
+      explorerProgress: projected.progress,
+      characterState: characterProjection.character
     });
     return {
       recorded: true,
@@ -492,7 +650,8 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       item: clone(item),
       event: clone(event),
       profile: clone(profile),
-      progress: { points: projected.points, reason: projected.reason, specialtyId: projected.specialtyId }
+      progress: { points: projected.points, reason: projected.reason, specialtyId: projected.specialtyId },
+      characterReward: clone(characterProjection.reward)
     };
   }
 
@@ -501,21 +660,35 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     const event = createExplorerStoryEvent(record);
     if (events.has(event.eventId)) return { recorded: false, reason: 'already-recorded', event: clone(events.get(event.eventId)) };
     events.set(event.eventId, event);
+    let characterReward = null;
     if (event.projections.profile) {
-      profile = normalizeProfile({ ...profile, explorerProgress: projectExplorerStoryProgress(profile.explorerProgress, event) });
+      const nextExplorerProgress = projectExplorerStoryProgress(profile.explorerProgress, event);
+      const characterProjection = projectCharacterProgress(profile.characterState, event, {
+        meaningful: true,
+        explorerPointsBefore: profile.explorerProgress.points,
+        explorerPointsAfter: nextExplorerProgress.points
+      });
+      characterReward = characterProjection.reward;
+      profile = normalizeProfile({ ...profile, explorerProgress: nextExplorerProgress, characterState: characterProjection.character });
     }
-    return { recorded: true, event: clone(event), profile: clone(profile) };
+    return { recorded: true, event: clone(event), profile: clone(profile), characterReward: clone(characterReward) };
   }
 
   return Object.freeze({
     type: 'MemoryDiscoveryProfileStore',
     async getProfile() { return clone(profile); },
-    async saveProfile(next) { profile = normalizeProfile(next); return clone(profile); },
+    async saveProfile(next) {
+      profile = normalizeProfile({ ...next, characterState: next?.characterState || profile.characterState });
+      return clone(profile);
+    },
     async hasClaim(claimId) { return claims.has(String(claimId)); },
     async listItems(limit = 200) { return [...items.values()].slice(0, limit).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].slice(0, limit).map(clone); },
     async listEvents(limit = 500) { return [...events.values()].sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).slice(0, limit).map(clone); },
     async listCompanions() { return [...companions.values()].map(clone); },
+    async getCharacterMigrationBackup() {
+      return legacyProfileBackup ? { id: CHARACTER_MIGRATION_BACKUP_ID, profile: clone(legacyProfileBackup) } : null;
+    },
     async saveCompanion(companion) { companions.set(companion.instanceId, clone(companion)); return clone(companion); },
     async applyTrustedReceipt(instanceId, receipt = {}) {
       const item = items.get(String(instanceId));
@@ -535,6 +708,18 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     recordDiscovery,
     recordExplorerEvent,
     recordObservation(record, policy = {}) { return recordDiscovery(record, { ...policy, collection: policy.collection === true }); },
+    async rollbackCharacterMigration() {
+      if (!legacyProfileBackup) return false;
+      const rolledBackAt = Date.now();
+      profile = normalizeProfile({
+        ...legacyProfileBackup,
+        characterState: {
+          ...createDefaultCharacterState({ now: rolledBackAt }),
+          migration: { version: 1, rolledBackAt, backupAvailable: true }
+        }
+      });
+      return true;
+    },
     async exportData() {
       return {
         schemaVersion: DISCOVERY_DB_VERSION,
@@ -547,7 +732,18 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     },
     async importData(data = {}) {
       if (!data || typeof data !== 'object' || !Array.isArray(data.events) || !Array.isArray(data.fieldGuide)) throw new TypeError('This is not a World Explorer Journal backup.');
-      profile = normalizeProfile(data.profile);
+      const hasCharacterState = data.profile?.characterState?.schemaVersion === 1;
+      legacyProfileBackup = hasCharacterState ? null : clone(data.profile || {});
+      const importedCharacter = hasCharacterState
+        ? data.profile.characterState
+        : migrateLegacyCharacterState({
+            profile: data.profile,
+            events: data.events,
+            fieldGuide: data.fieldGuide,
+            companions: data.companions,
+            backupAvailable: true
+          });
+      profile = normalizeProfile({ ...data.profile, characterState: importedCharacter });
       items.clear(); guide.clear(); companions.clear(); events.clear(); claims.clear();
       (data.items || []).filter((item) => item?.instanceId && item?.catalogId).forEach((item) => items.set(item.instanceId, clone(item)));
       data.fieldGuide.filter((entry) => entry?.catalogId).forEach((entry) => guide.set(entry.catalogId, clone(entry)));
@@ -562,6 +758,7 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
 }
 
 export {
+  CHARACTER_MIGRATION_BACKUP_ID,
   DISCOVERY_DB_NAME,
   DISCOVERY_DB_VERSION,
   createDefaultProfile,
