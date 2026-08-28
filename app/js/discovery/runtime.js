@@ -471,8 +471,8 @@ function createDiscoveryUi(state) {
     if (elements.companions) {
       const companionSnapshot = state.companionRuntime?.snapshot?.() || { companions: [], presentation: {} };
       const owned = companionSnapshot.companions || [];
-      const activeTravelLabel = companionSnapshot.presentation?.travelState === 'aboard'
-        ? 'Aboard'
+      const activeTravelLabel = ['aboard', 'vehicle-occupant'].includes(companionSnapshot.presentation?.travelState)
+        ? 'Riding with you'
         : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
       const companionRows = [
         ...owned.map((companion) => ({ companion, catalog: COMPANION_CATALOG.find((entry) => entry.id === companion.catalogId) })).filter((row) => row.catalog),

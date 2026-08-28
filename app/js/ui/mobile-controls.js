@@ -490,6 +490,12 @@ function initMobileControls() {
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     let actions = profile.actions;
+    if (mode === 'driving' && appCtx.car?.vehicleServiceType === 'responder') {
+      actions = [
+        ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
+        { label: appCtx.car?.vehicleServiceLightsActive ? 'Siren off' : 'Siren', binding: { channel: 'earth', key: 'KeyH' } }
+      ];
+    }
     if (appCtx.activePlanetaryBodyId && (mode === 'walking' || mode === 'driving')) {
       actions = [
         ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),

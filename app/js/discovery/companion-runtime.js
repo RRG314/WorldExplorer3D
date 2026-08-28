@@ -229,7 +229,13 @@ async function createCompanionRuntime(appCtx, options = {}) {
     const policy = resolveCompanionTravelPolicy(active, mode, environment);
     travelState = policy.state;
     presentation.group.visible = policy.visible;
-    if (!policy.visible || !actor) return;
+    if (!policy.visible || !actor) {
+      if (policy.positionMode === 'interior') {
+        exercise = null;
+        positionInitialized = false;
+      }
+      return;
+    }
     elapsed += Math.max(0, Number(dt) || 0);
     if (policy.positionMode === 'aboard') {
       exercise = null;

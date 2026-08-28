@@ -224,7 +224,12 @@ function resolveCompanionTravelPolicy(instance, mode = 'walk', environment = 'EA
   if (String(instance.speciesArchetype || '').startsWith('livestock-') && ['car', 'boat'].includes(mode)) {
     return Object.freeze({ visible: false, state: 'waiting' });
   }
-  if (['car', 'boat'].includes(mode)) return Object.freeze({ visible: true, state: 'aboard', positionMode: 'aboard' });
+  // Road vehicles do not expose a reliable passenger-seat volume across every
+  // body style. Keep the companion safely represented as an occupant instead
+  // of rendering it through the roof or beside a moving car. Boats have an
+  // open deck and retain their visible aboard presentation.
+  if (mode === 'car') return Object.freeze({ visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
+  if (mode === 'boat') return Object.freeze({ visible: true, state: 'aboard', positionMode: 'aboard' });
   return Object.freeze({ visible: true, state: 'following' });
 }
 

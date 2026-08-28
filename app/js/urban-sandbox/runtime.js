@@ -15,6 +15,7 @@ import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-model.js?v=1';
+import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -1070,7 +1071,92 @@ function resetPlayerVehicleVisual(state) {
   }
   appCtx.car.vehicleVariantId = 'sedan';
   appCtx.car.vehicleServiceType = '';
+  appCtx.car.vehicleServiceLightsActive = false;
   appCtx.car.condition = state.defaultCarCondition;
+}
+
+function stopServiceSiren(state) {
+  const audio = state.sirenAudio;
+  if (!audio) return false;
+  state.sirenAudio = null;
+  try {
+    const at = audio.context.currentTime;
+    audio.gain.gain.cancelScheduledValues(at);
+    audio.gain.gain.setValueAtTime(audio.gain.gain.value, at);
+    audio.gain.gain.linearRampToValueAtTime(0, at + .08);
+    audio.oscillator.stop(at + .1);
+  } catch (_) {
+    try { audio.oscillator.stop(); } catch (_) {}
+  }
+  return true;
+}
+
+function startServiceSiren(state) {
+  stopServiceSiren(state);
+  const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!AudioContext) return false;
+  try {
+    const context = state.serviceAudioContext || new AudioContext();
+    state.serviceAudioContext = context;
+    void context.resume?.();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 680;
+    gain.gain.value = .028;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    state.sirenAudio = { context, oscillator, gain };
+    return true;
+  } catch (_) {
+    state.sirenAudio = null;
+    return false;
+  }
+}
+
+function setActiveServiceEquipment(state, active) {
+  const vehicle = state.activeVehicle;
+  if (!vehicle?.attachedToPlayer || vehicle.serviceType !== 'responder') return false;
+  vehicle.serviceEquipmentActive = active === true;
+  appCtx.car.vehicleServiceLightsActive = vehicle.serviceEquipmentActive;
+  vehicle.visual?.setServiceLights?.(state.serviceLightElapsed, vehicle.serviceEquipmentActive);
+  if (vehicle.serviceEquipmentActive) startServiceSiren(state);
+  else stopServiceSiren(state);
+  setStatus(state, vehicle.serviceEquipmentActive
+    ? 'Emergency lights and siren on.'
+    : 'Emergency lights and siren off.', 1600);
+  state.lastAction = Object.freeze({
+    type: 'service_equipment_toggled',
+    vehicleId: vehicle.id,
+    active: vehicle.serviceEquipmentActive,
+    at: now()
+  });
+  emitProductTelemetry('responder_equipment_toggled', {
+    active: vehicle.serviceEquipmentActive,
+    vehicle_type: vehicle.variant?.id || 'responder'
+  });
+  appCtx.updateControlsModeUI?.();
+  return true;
+}
+
+function toggleActiveServiceEquipment(state) {
+  return setActiveServiceEquipment(state, !state.activeVehicle?.serviceEquipmentActive);
+}
+
+function updateServiceEquipment(state, dt) {
+  state.serviceLightElapsed += Math.max(0, Number(dt) || 0);
+  const keyDown = appCtx.keys?.KeyH === true;
+  if (keyDown && !state.serviceEquipmentKeyHeld) toggleActiveServiceEquipment(state);
+  state.serviceEquipmentKeyHeld = keyDown;
+  for (const vehicle of state.vehicles) {
+    if (vehicle.serviceType !== 'responder' || !vehicle.playerClaimed) continue;
+    vehicle.visual?.setServiceLights?.(state.serviceLightElapsed, vehicle.serviceEquipmentActive === true);
+  }
+  if (state.sirenAudio && state.activeVehicle?.serviceEquipmentActive) {
+    const frequency = 680 + Math.sin(state.serviceLightElapsed * 3.25) * 190;
+    state.sirenAudio.oscillator.frequency.setTargetAtTime(frequency, state.sirenAudio.context.currentTime, .025);
+  }
 }
 
 function mountVehicleForDriving(state, vehicle) {
@@ -1088,6 +1174,7 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.carMesh.userData.vehicleStyle = `urban-${vehicle.variant.bodyStyle}`;
   appCtx.car.vehicleVariantId = vehicle.variant.id;
   appCtx.car.vehicleServiceType = vehicle.serviceType || '';
+  appCtx.car.vehicleServiceLightsActive = vehicle.serviceEquipmentActive === true;
   appCtx.car.condition = Math.max(0, Math.min(1, Number(vehicle.condition ?? 1)));
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
@@ -1133,6 +1220,7 @@ function handoffEnter(state, transition) {
 function handoffExit(state, transition) {
   const vehicle = transition.vehicle;
   const exitSpawn = transition.exitSpawn;
+  if (vehicle.serviceEquipmentActive) setActiveServiceEquipment(state, false);
   parkActiveVehicle(state, vehicle);
   appCtx.applyResolvedWorldSpawn?.(exitSpawn, { mode: 'walk', syncCar: false, syncWalker: true });
   appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, preserveResolvedSurface: true });
@@ -1796,6 +1884,8 @@ function snapshot(state) {
     playerVehicle: state.activeVehicle ? Object.freeze({
       id: state.activeVehicle.id,
       speedMph: Number(Math.abs(carSpeedToMph(Number(appCtx.car?.speed || 0))).toFixed(1)),
+      serviceType: String(state.activeVehicle.serviceType || ''),
+      serviceEquipmentActive: state.activeVehicle.serviceEquipmentActive === true,
       condition: Number(Number(state.activeVehicle.condition ?? appCtx.car?.condition ?? 1).toFixed(3)),
       worldVelocityMps: Number((Math.hypot(Number(appCtx.car?.vx || 0), Number(appCtx.car?.vz || 0)) * Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11))).toFixed(2))
     }) : null,
@@ -1941,6 +2031,7 @@ function disposeRuntime(state, reason = 'disposed') {
   if (!state || state.disposed) return false;
   state.roomAuthorityRuntime?.dispose?.();
   state.disposed = true;
+  stopServiceSiren(state);
   closeStore(state);
   state.unregisterStoreInteraction?.();
   state.unregisterInteraction?.();
@@ -2146,6 +2237,10 @@ function startUrbanSandboxRuntime(options = {}) {
     crashFeedbackUntil: 0,
     statusMessage: '',
     statusUntil: 0,
+    serviceLightElapsed: 0,
+    serviceEquipmentKeyHeld: false,
+    serviceAudioContext: null,
+    sirenAudio: null,
     promptElapsed: 0,
     npcPromotionElapsed: 0,
     vehiclePromotionElapsed: 0,
@@ -2334,6 +2429,7 @@ function startUrbanSandboxRuntime(options = {}) {
     update(frame) {
       state.roomAuthorityRuntime?.update?.(frame.dt);
       updateTransition(state, frame.dt);
+      updateServiceEquipment(state, frame.dt);
       updateCivicResponse(state, frame.dt);
       updateEquipmentEffects(state, frame.dt);
       updateCrashBodies(state, frame.dt);
@@ -2364,6 +2460,7 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
+  appCtx.toggleUrbanResponderEquipment = () => toggleActiveServiceEquipment(state);
   if (appCtx.developerDiagnosticsEnabled) {
     state.crashSupportHook = Object.freeze({
       enterVehicle: (vehicleId) => enterVehicleAfterClaim(state, state.vehicles.find((vehicle) => vehicle.id === String(vehicleId || ''))),
