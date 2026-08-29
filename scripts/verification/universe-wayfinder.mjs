@@ -72,29 +72,7 @@ async function verifyViewport(viewport, name) {
         state.planetary?.nearestBody === 'TRAPPIST-1 e';
     }, null, { timeout: 15000 });
     const arrivalState = await diagnostics(page);
-    const targetVisual = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const body = ctx.universeRuntime?.frameGroup?.userData?.destinationMeshes?.get?.('trappist-1-e');
-      const entry = ctx.universeRuntime?.frameGroup?.userData?.orbitingPlanets?.find?.(
-        (candidate) => candidate.body === body
-      );
-      const screen = new THREE.Vector3();
-      body?.getWorldPosition(screen);
-      const targetWorld = screen.clone();
-      screen.project(ctx.spaceFlight.camera);
-      const cameraDirection = new THREE.Vector3();
-      ctx.spaceFlight.camera.getWorldDirection(cameraDirection);
-      const targetDirection = targetWorld.clone().sub(ctx.spaceFlight.camera.position).normalize();
-      const rocketForward = new THREE.Vector3(0, 1, 0).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
-      return {
-        markerVisible: entry?.marker?.visible === true,
-        ndcX: Number(screen.x),
-        ndcY: Number(screen.y),
-        cameraTargetDot: Number(cameraDirection.dot(targetDirection)),
-        rocketTargetDot: Number(rocketForward.dot(targetWorld.clone().sub(ctx.spaceFlight.rocket.position).normalize())),
-        targetDistance: Number(targetWorld.distanceTo(ctx.spaceFlight.camera.position))
-      };
-    });
+    const targetVisual = arrivalState.universeNavigation?.targetVisual;
     assert.equal(targetVisual.markerVisible, true);
     assert.ok(
       Math.abs(targetVisual.ndcX) < 0.92 && Math.abs(targetVisual.ndcY) < 0.92,

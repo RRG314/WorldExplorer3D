@@ -436,6 +436,46 @@ function getUniverseHudTarget() {
   };
 }
 
+function getUniverseCourseSnapshot() {
+  const course = universeRuntime.course;
+  const destination = course?.destination;
+  const body = destination?.objectClass === 'exoplanet'
+    ? getUniverseDestinationMesh(universeRuntime.frameGroup, destination.id)
+    : null;
+  const entry = body
+    ? (universeRuntime.frameGroup?.userData?.orbitingPlanets || []).find((candidate) => candidate.body === body)
+    : null;
+  let targetVisual = null;
+  if (body && appCtx.spaceFlight?.camera && appCtx.spaceFlight?.rocket) {
+    const targetWorld = new THREE.Vector3();
+    const projected = new THREE.Vector3();
+    const cameraDirection = new THREE.Vector3();
+    const targetDirection = new THREE.Vector3();
+    const rocketForward = new THREE.Vector3(0, 1, 0).applyQuaternion(appCtx.spaceFlight.rocket.quaternion).normalize();
+    body.getWorldPosition(targetWorld);
+    projected.copy(targetWorld).project(appCtx.spaceFlight.camera);
+    appCtx.spaceFlight.camera.getWorldDirection(cameraDirection);
+    targetDirection.copy(targetWorld).sub(appCtx.spaceFlight.camera.position).normalize();
+    targetVisual = Object.freeze({
+      markerVisible: entry?.marker?.visible === true,
+      ndcX: Number(projected.x),
+      ndcY: Number(projected.y),
+      cameraTargetDot: Number(cameraDirection.dot(targetDirection)),
+      rocketTargetDot: Number(rocketForward.dot(targetWorld.clone().sub(appCtx.spaceFlight.rocket.position).normalize())),
+      targetDistance: Number(targetWorld.distanceTo(appCtx.spaceFlight.camera.position))
+    });
+  }
+  return Object.freeze({
+    currentFrameId: universeRuntime.current?.id || null,
+    selectedDestinationId: universeRuntime.selected?.id || null,
+    courseDestinationId: destination?.id || null,
+    courseFrameId: course?.frame?.id || null,
+    courseStatus: course?.status || null,
+    transitionDestinationId: universeRuntime.transition?.destination?.id || null,
+    targetVisual
+  });
+}
+
 function getUniverseGravityBodies() {
   if (universeRuntime.current.objectClass !== 'planetary_system') return [];
   return (universeRuntime.frameGroup?.userData?.gravityBodies || []).map((mesh) => {
@@ -516,6 +556,7 @@ function hideUniverseUI() {
 }
 
 Object.assign(appCtx, {
+  getUniverseCourseSnapshot,
   getUniverseHudTarget,
   getUniverseGravityBodies,
   hideUniverseUI,
@@ -531,6 +572,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  getUniverseCourseSnapshot,
   getUniverseHudTarget,
   getUniverseGravityBodies,
   hideUniverseUI,

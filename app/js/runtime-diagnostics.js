@@ -949,14 +949,14 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
-    universeNavigation: appCtx.universeRuntime ? {
+    universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
       currentFrameId: appCtx.universeRuntime.current?.id || null,
       selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
       courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
       courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
       courseStatus: appCtx.universeRuntime.course?.status || null,
       transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
-    } : null,
+    } : null),
     spaceCatalog: spaceCatalogSnapshot(),
     curatedLandmarks: appCtx.curatedLandmarkMetrics || null,
     mappedLandmarks: appCtx.mappedLandmarkMetrics || null,
@@ -1081,14 +1081,14 @@ globalThis.render_game_to_text = () => JSON.stringify({
     flightMode: appCtx.spaceFlight?.mode || null,
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
-  universeNavigation: appCtx.universeRuntime ? {
+  universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
     currentFrameId: appCtx.universeRuntime.current?.id || null,
     selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
     courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
     courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
     courseStatus: appCtx.universeRuntime.course?.status || null,
     transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
-  } : null,
+  } : null),
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,
