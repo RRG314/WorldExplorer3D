@@ -118,7 +118,8 @@ async function walkTo(page, target, options = {}) {
       await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', 55);
     } else {
       if (state.distance > 20) await page.keyboard.down('ShiftLeft');
-      await inputStep(page, 'ArrowUp', state.distance > 20 ? 145 : 95);
+      const movementPulseMs = state.distance > 20 ? 520 : state.distance > 8 ? 260 : state.distance > 3 ? 140 : 80;
+      await inputStep(page, 'ArrowUp', movementPulseMs);
       if (state.distance > 20) await page.keyboard.up('ShiftLeft');
     }
     stagnant = state.distance >= previousDistance - 0.008 ? stagnant + 1 : 0;
@@ -170,7 +171,7 @@ async function launchBaltimore(page) {
   return diagnostics(page);
 }
 
-async function nearestVehicle(page) {
+async function reachableVehicleCandidates(page) {
   return page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
@@ -178,7 +179,7 @@ async function nearestVehicle(page) {
       .filter((vehicle) => vehicle.source === 'deterministic-parked-vehicle' &&
         !vehicle.attachedToPlayer && !vehicle.occupied && vehicle.driverDoor)
       .map((vehicle) => ({ ...vehicle, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
-      .sort((left, right) => left.distance - right.distance)[0] || null;
+      .sort((left, right) => left.distance - right.distance);
   });
 }
 
@@ -250,8 +251,9 @@ async function walkNearAmbientWitness(page, stopDistance = 5) {
     }));
     const candidates = [...ambient, ...promoted]
       .filter((entry) => Number.isFinite(entry.x) && Number.isFinite(entry.z) && !excluded.includes(String(entry.id)))
-      .sort((left, right) => Number(right.detailed) - Number(left.detailed) ||
-        Number(left.distance ?? Infinity) - Number(right.distance ?? Infinity));
+      .sort((left, right) =>
+        Number(left.distance ?? Infinity) - Number(right.distance ?? Infinity) ||
+        Number(right.detailed) - Number(left.detailed));
     return targetId
       ? candidates.find((entry) => String(entry.id) === String(targetId)) || null
       : candidates[0] || null;
@@ -281,7 +283,8 @@ async function walkNearAmbientWitness(page, stopDistance = 5) {
     });
     if (approach.reached) return { witness: await selectWitness(witnessId), approach };
     trace.push({ witnessId, detailed: witness.detailed, actor, approach });
-    if (!approach.blocked) continue;
+    const materiallyCloser = Number(approach.final?.distance ?? Infinity) < actor.distance - .5;
+    if (!approach.blocked && materiallyCloser) continue;
     excludedWitnessIds.add(witnessId);
     const replacement = await selectWitness('', [...excludedWitnessIds]);
     if (replacement) {
@@ -446,10 +449,27 @@ async function runVehicleEquipmentJourney() {
   bindEvidence(page);
   try {
     const ready = await launchBaltimore(page);
-    const vehicle = await nearestVehicle(page);
-    assert.ok(vehicle, 'Baltimore did not publish an enterable urban vehicle.');
-    const approach = await walkTo(page, vehicle.driverDoor, { interactionVehicleId: vehicle.id });
-    assert.equal(approach.reached, true, 'Normal walking input could not reach the vehicle door prompt.');
+    const candidates = await reachableVehicleCandidates(page);
+    assert.ok(candidates.length > 0, 'Baltimore did not publish an enterable urban vehicle.');
+    let vehicle = null;
+    let approach = null;
+    const approachEvidence = [];
+    for (const candidate of candidates) {
+      const result = await walkTo(page, candidate.driverDoor, {
+        interactionVehicleId: candidate.id,
+        maxSteps: 420,
+        stagnantLimit: 24,
+        detour: true
+      });
+      approachEvidence.push({ vehicleId: candidate.id, result });
+      if (result.reached) {
+        vehicle = candidate;
+        approach = result;
+        break;
+      }
+    }
+    if (!vehicle) console.error('CP5 vehicle approach evidence', JSON.stringify(approachEvidence, null, 2));
+    assert.equal(approach?.reached, true, 'Normal walking input could not reach the vehicle door prompt.');
     await page.keyboard.press('KeyE');
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
