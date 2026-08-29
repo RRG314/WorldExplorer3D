@@ -232,31 +232,9 @@ function setupUI() {
     }
   };
 
-  const floatMenuContainer = document.getElementById('floatMenuContainer');
-  if (floatMenuContainer && isTouchPreferredClient) {
-    floatMenuContainer.addEventListener('touchend', (event) => {
-      if (!appCtx.gameStarted) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target) return;
-
-      const menuBtn = target.closest('.floatBtn');
-      if (menuBtn && menuBtn.id) {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleFloatMenuByButton(menuBtn.id);
-        return;
-      }
-
-      const menuItem = target.closest('.floatItem');
-      if (menuItem) {
-        event.preventDefault();
-        event.stopPropagation();
-        menuItem.click();
-      }
-    }, { passive: false });
-  }
-
-  // Three separate float menu buttons
+  // Native click is the single menu input authority on mouse and touch. A
+  // second touchend dispatcher used to invoke the same toggle twice on some
+  // mobile browsers, making a menu appear to switch rapidly between states.
   document.getElementById('travelBtn').addEventListener('click', () => toggleFloatMenuByButton('travelBtn'));
   document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
   document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
@@ -267,6 +245,11 @@ function setupUI() {
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
+  document.getElementById('fBackpack')?.addEventListener('click', () => {
+    appCtx.toggleWorldDiscoveryJournal?.(false);
+    appCtx.toggleUrbanEquipment?.(true);
+    closeAllFloatMenus();
+  });
   document.getElementById('fEditorMode')?.addEventListener('click', () => {
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
     if (typeof appCtx.closeBlockBuilder === 'function') appCtx.closeBlockBuilder();

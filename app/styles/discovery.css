@@ -60,6 +60,9 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
   .discoveryPane{padding:16px 18px 18px}
   .discoveryModeNote{grid-template-columns:1fr;gap:3px;padding:10px 11px;font-size:10px}
   .discoveryModeNote b{font-size:8px}
+  .discoveryBackpackEntry{width:100%;min-height:48px;display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:9px;margin:10px 0 12px;padding:8px 11px;border:1px solid rgba(87,151,224,.48);background:linear-gradient(90deg,rgba(45,125,255,.16),rgba(11,27,40,.82));color:#e9f4ff;text-align:left;cursor:pointer}
+  .discoveryBackpackEntry:hover,.discoveryBackpackEntry:focus-visible{border-color:#6aaeff;background:linear-gradient(90deg,rgba(45,125,255,.25),rgba(11,27,40,.9))}
+  .discoveryBackpackEntry>span{color:#72aff5;font-size:18px;text-align:center}.discoveryBackpackEntry>strong{font:700 10px Orbitron,sans-serif;text-transform:uppercase}.discoveryBackpackEntry>small{color:#8da3b0;font:600 8px Orbitron,sans-serif;text-transform:uppercase}
   .discoverySectionHead{height:29px;font-size:10px}
   .discoveryActionChip{min-height:50px;padding-block:9px;font-size:11px}
   .discoveryActionChip small{font-size:8px}
@@ -105,9 +108,11 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
     #discoveryPanel .discoveryTab{flex-basis:25%;height:52px;flex-direction:column;gap:2px;border-top:2px solid transparent;border-bottom:0;padding:3px 2px;font-size:8px}
     #discoveryPanel .discoveryTab.active{border-top-color:var(--wx-blue);border-bottom:0}
     #discoveryPanel .discoveryTab span{font-size:15px}
+    #discoveryPanel .discoveryTab{font-size:7px}
     .discoveryPane{padding:12px 12px 16px}
     .discoveryActionList{grid-template-columns:1fr 1fr}
     .discoveryActionChip:first-child{grid-column:1/-1}
+    .discoveryBackpackEntry{grid-template-columns:26px minmax(0,1fr);margin-top:8px}.discoveryBackpackEntry>small{grid-column:2}
     .discoveryProfileHero{grid-template-columns:1fr}
     .discoveryProfileHero>div:first-child{grid-row:auto}
     .discoveryProfileGroupGrid{grid-template-columns:1fr}

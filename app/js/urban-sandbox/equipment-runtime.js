@@ -774,13 +774,19 @@ function createUrbanEquipmentRuntime(options = {}) {
     const prepared = state.equipment.prepareUse(Date.now());
     if (!prepared.ok) {
       if (prepared.reason === 'reload' && state.equipment.reload()) setStatus('Reloaded.');
-      else if (prepared.reason === 'no_direct_use') setStatus('Use this field tool through a nearby activity or contextual action.');
+      else if (prepared.reason === 'no_direct_use') {
+        state.equipmentVisual?.playUse?.(currentEquipment);
+        const fieldUse = appCtx.handleWorldDiscoveryToolUse?.(currentEquipment.id);
+        Promise.resolve(fieldUse).then((used) => {
+          if (used !== true) setStatus(`${currentEquipment.label} has no suitable activity at this spot.`, 1900);
+        });
+      }
       else setStatus(prepared.reason === 'cooldown' ? 'Equipment is not ready yet.' : 'No charges or ammunition remaining.');
       render();
       return true;
     }
     const equipment = prepared.definition;
-    state.equipmentVisual?.pulse?.();
+    state.equipmentVisual?.playUse?.(equipment);
     if (prepared.utility === 'flashlight') {
       state.flashlight.visible = prepared.enabled;
       setStatus(prepared.enabled ? 'Field light on.' : 'Field light off.');
@@ -829,6 +835,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function update(dt) {
+    state.equipmentVisual?.update?.(dt);
     updateProjectiles(dt);
     updateArmedNpcResponse();
     updateReticlePresentation();
@@ -885,6 +892,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     snapshot: () => Object.freeze({
       activeProjectiles: projectiles.length,
       lastProjectileAction: state.lastProjectileAction || null,
+      useAnimation: state.equipmentVisual?.actionSnapshot?.() || null,
       reticleVisible: state.equipmentUi?.reticle?.classList.contains('show') === true,
       armedNpcCount: state.npcs.filter((npc) => npc.heldEquipment && Number(npc.condition ?? 1) > .05).length,
       defendingNpcCount: state.npcs.filter((npc) => Number(npc.hostileUntil || 0) > clock() && Number(npc.condition ?? 1) > .05).length

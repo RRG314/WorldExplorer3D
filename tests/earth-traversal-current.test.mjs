@@ -68,8 +68,9 @@ test('walking and running use the restored responsive game pace', () => {
   assert.equal(DEFAULT_WALKING_SPEEDS.run / DEFAULT_WALKING_SPEEDS.walk, 2);
 });
 
-test('mobile exposes the real action for parachutes as well as ranged equipment', () => {
+test('mobile exposes the real action for travel, ranged, and contextual field equipment', () => {
   assert.equal(canUseEquippedItemOnMobile({ id: 'parachute', actionLabel: 'Deploy', verbs: ['equip', 'use'] }), true);
   assert.equal(canUseEquippedItemOnMobile({ id: 'pulse-sidearm', projectileKind: 'pulse', verbs: ['equip', 'use'] }), true);
-  assert.equal(canUseEquippedItemOnMobile({ id: 'field-camera', verbs: ['equip'] }), false);
+  assert.equal(canUseEquippedItemOnMobile({ id: 'field-camera', verbs: ['equip', 'use-context'] }), true);
+  assert.equal(canUseEquippedItemOnMobile({ id: 'keepsake', verbs: ['equip'] }), false);
 });

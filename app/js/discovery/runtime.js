@@ -245,6 +245,7 @@ function createDiscoveryUi(state) {
   const byId = (id) => document.getElementById(id);
   const elements = {
     panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
+    todayBackpack: byId('discoveryOpenBackpackTodayBtn'),
     title: byId('discoveryPanelTitle'), actions: byId('discoveryActionList'), quickLabel: byId('discoveryQuickToolBtn')?.querySelector('strong'),
     quickSignal: byId('discoveryQuickSignal'), prompt: byId('discoveryContextPrompt'), promptText: byId('discoveryContextText'),
     promptOpen: byId('discoveryContextOpenBtn'), phase: byId('discoveryPhase'), bearing: byId('discoveryBearing'),
@@ -593,6 +594,10 @@ function createDiscoveryUi(state) {
     setOpen(false);
     state.appCtx.toggleUrbanEquipment?.(true);
   }));
+  listen(elements.todayBackpack, 'click', () => {
+    setOpen(false);
+    state.appCtx.toggleUrbanEquipment?.(true);
+  });
   listen(elements.profileButton, 'click', () => setTab(activeTab === 'profile' ? 'today' : 'profile'));
   listen(elements.quick, 'click', () => setOpen(!open));
   listen(elements.menu, 'click', () => {
@@ -1006,6 +1011,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.worldDiscoveryRuntime = null;
   appCtx.toggleWorldDiscoveryJournal = null;
   appCtx.handleWorldDiscoveryQuickAction = null;
+  appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
   if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
@@ -1834,7 +1840,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     await state.ui?.refreshData?.();
     return true;
   };
-  state.selectActivity = async (activityId) => {
+  state.selectActivity = async (activityId, options = {}) => {
     const id = String(activityId || 'inspect');
     const selectedAction = state.actions.find((action) => action.id === id);
     const activityToolId = ACTIVITY_TOOL[id];
@@ -1852,9 +1858,19 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       await appCtx.openFishingGame?.();
       return true;
     }
-    if (activityToolId) await state.equipTool(activityToolId, { silent: true });
+    // Commit the visible selection before any IndexedDB/profile refresh. The
+    // previous ordering left the old activity highlighted during the await,
+    // so a single click could visibly bounce old → new several times.
+    const previousActivityId = state.activeActivityId;
     state.activeActivityId = id;
     state.applyCharacterCapability(id);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    if (activityToolId && await state.equipTool(activityToolId, { silent: true }) !== true) {
+      state.activeActivityId = previousActivityId;
+      state.applyCharacterCapability(previousActivityId);
+      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+      return false;
+    }
     if (id === 'metal-detect') {
       state.fieldSession.reset();
       state.lastSnapshot = state.detectorSnapshot;
@@ -1867,11 +1883,20 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.presentation.setRevealed(null, false);
     state.presentation.setExcavation(null, 'idle');
     state.ui.showResult(null);
-    state.ui.setOpen(true);
-    state.ui.setTab('today');
+    state.ui.setOpen(options.openPanel === false ? false : true);
+    if (options.openPanel !== false) state.ui.setTab('today');
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-    void state.showActivityTutorial(false);
+    if (options.tutorial !== false) void state.showActivityTutorial(false);
     return true;
+  };
+  state.useEquippedFieldTool = async (toolId) => {
+    const id = String(toolId || '');
+    state.presentation.previewUse?.(id);
+    const action = state.actions.find((entry) => ACTIVITY_TOOL[entry.id] === id);
+    if (!action) return false;
+    const selected = await state.selectActivity(action.id, { openPanel: false, tutorial: false });
+    if (!selected) return false;
+    return state.handlePrimary();
   };
   state.startFieldObjective = async (slotId) => {
     const objective = state.fieldExpedition.snapshot(playerPosition(appCtx), state.evaluateFieldTarget)
@@ -2075,6 +2100,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
     return true;
   };
+  appCtx.handleWorldDiscoveryToolUse = (toolId) => state.useEquippedFieldTool(toolId);
   state.unregisterCompanionTrainingInteraction = appCtx.registerContextInteraction?.({
     id: 'world_discovery_companion_training',
     priority: 96,
@@ -2147,13 +2173,18 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.actionTimer -= frame.dt;
       if (state.actionTimer <= 0) {
         state.actionTimer = 0.2;
-        state.actions = resolveContextActions({ environment, interaction, position, limit: 25 })
-          .filter((action) => RELEASED_EXPLORER_ACTIVITIES.has(action.id))
-          .filter((action) => {
-            const toolId = ACTIVITY_TOOL[action.id];
-            return !toolId || state.entitlements.canUseTool(toolId).allowed;
-          })
-          .slice(0, 3);
+        // Choices describe the place where the panel was opened. Hold them
+        // steady while the player is reading or selecting; refresh again once
+        // the panel is closed and movement resumes.
+        if (!state.ui?.open || !state.actions.length) {
+          state.actions = resolveContextActions({ environment, interaction, position, limit: 25 })
+            .filter((action) => RELEASED_EXPLORER_ACTIVITIES.has(action.id))
+            .filter((action) => {
+              const toolId = ACTIVITY_TOOL[action.id];
+              return !toolId || state.entitlements.canUseTool(toolId).allowed;
+            })
+            .slice(0, 3);
+        }
         state.currentCellId = state.actions[0]?.cellId || null;
       }
       state.detectorSnapshot = state.session.update(position, frame.dt);

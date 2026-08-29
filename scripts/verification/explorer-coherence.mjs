@@ -68,7 +68,8 @@ try {
   assert.equal(progressDisclosureOpen, false);
   assert.equal(await page.locator('#discoveryPanelTitle').textContent(), 'Today');
   assert.equal(await page.locator('[data-discovery-tab]').count(), 3);
-  assert.deepEqual(await page.locator('.discoveryTabs > button').allTextContents(), ['⌖Today', '≡Journal', '▤Guide', '▣Pack']);
+  assert.deepEqual(await page.locator('.discoveryTabs > button').allTextContents(), ['⌖Today', '≡Journal', '▤Guide', '▣Backpack']);
+  assert.equal(await page.locator('#discoveryOpenBackpackTodayBtn').isVisible(), true);
   assert.equal(await page.locator('#discoverySectionTutorial').isVisible(), false, 'Help must not block the Explorer when it opens.');
   assert.doesNotMatch(explorerCopy || '', /procedural encounter|deployable artifact|pipeline status|schema version|generated encounter/i);
   await page.screenshot({ path: `${evidenceDir}/desktop-explorer.png` });

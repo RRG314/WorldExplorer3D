@@ -687,12 +687,13 @@ Graphics changes apply to the current session.
       <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
       <button class="discoveryTab" data-discovery-tab="journal" type="button"><span>≡</span>Journal</button>
       <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Guide</button>
-      <button class="discoveryTab discoveryPackDestination" data-discovery-destination="pack" type="button"><span>▣</span>Pack</button>
+      <button class="discoveryTab discoveryPackDestination" data-discovery-destination="pack" type="button"><span>▣</span>Backpack</button>
     </nav>
     <div class="discoveryContent">
       <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
       <section class="discoveryPane active" data-discovery-pane="today">
         <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Choose one activity, then return to the world. The active tool and nearby cues will guide you.</span></div>
+        <button id="discoveryOpenBackpackTodayBtn" class="discoveryBackpackEntry" type="button"><span>▣</span><strong>Open Backpack</strong><small>Tools · quick slots · finds</small></button>
         <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
         <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
         <div class="discoverySectionHead"><span>CHOOSE AN ACTIVITY</span><small>BEST LOCAL FIT FIRST</small></div>
@@ -1176,7 +1177,8 @@ Explore the area
 <div class="floatItems">
 <div class="floatItem" id="fDriving">🚗 Driving Mode</div>
 <div class="floatItem" id="fWalk">🚶 Walk Mode</div>
-<div class="floatItem" id="fWorldDiscovery">⌖ Field Journal &amp; Activities</div>
+<div class="floatItem" id="fWorldDiscovery">⌖ My Explorer &amp; Activities</div>
+<div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
 <div class="floatItem" id="fDrone">🚁 Drone Mode</div>
 <div class="floatItem" id="fPlane">✈️ Plane Mode</div>
 <div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
