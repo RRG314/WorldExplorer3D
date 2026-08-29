@@ -32,6 +32,7 @@
     "verify:block-local-store": "node --test tests/block-local-store-current.test.mjs",
     "verify:block-shared-sync": "node --test tests/shared-block-sync.test.mjs",
     "verify:jfx-player-surface": "node scripts/verification/jfx-player-surface.mjs",
+    "verify:bridge-endpoints": "node scripts/verification/bridge-endpoints-current.mjs",
     "verify:environments": "node scripts/verification/environments.mjs",
     "verify:assembled-locations": "node scripts/verification/assembled-locations.mjs",
     "verify:assembled-locations-fallback": "WE3D_FORCE_TRANSPORT_FALLBACK=1 node scripts/verification/assembled-locations.mjs",

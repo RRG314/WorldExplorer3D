@@ -125,6 +125,7 @@ function surfaceSampleSnapshot(sample) {
                 publishBody: assembly.publishBody === true,
                 bodyCoverage: numberOrNull(assembly.bodyCoverage),
                 supportStationCount: Number(assembly.supportStations?.length || 0),
+                terminalSupportCount: Number(assembly.terminalSupports?.length || 0),
                 abutmentCount: Number(assembly.abutments?.length || 0),
                 connectedEndpoints,
                 connectedEndpointAbutmentCount: connectedEndpointAbutments.length
@@ -579,6 +580,63 @@ function worldCompositionSnapshot() {
 function transportStructureSnapshot() {
   const roads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const visuals = Array.isArray(appCtx.structureVisualMeshes) ? appCtx.structureVisualMeshes : [];
+  const generalizedEndpointRecords = roads.filter((road) =>
+    road?.transportRecord?.completeness === 'generalized' &&
+    road?.structureSemantics?.gradeSeparated === true &&
+    road?.transportStructureAssembly?.publishBody === true &&
+    Array.isArray(road?.pts) && road.pts.length >= 2
+  ).flatMap((road) => {
+    const profile = road.transportSurfaceModel;
+    const distances = profile?.distances || [];
+    const heights = profile?.centerHeights || [];
+    return ['start', 'end'].map((endpoint) => {
+      const atStart = endpoint === 'start';
+      const point = atStart ? road.pts[0] : road.pts[road.pts.length - 1];
+      const surfaceY = Number(heights[atStart ? 0 : heights.length - 1]);
+      const terrainY = Number(
+        appCtx.terrainMeshHeightAt?.(Number(point?.x), Number(point?.z)) ??
+        appCtx.elevationWorldYAtWorldXZ?.(Number(point?.x), Number(point?.z))
+      );
+      const endpointRef = road?.transportStructureRef?.[endpoint] || null;
+      const abutmentPublished = (road?.transportStructureAssembly?.abutments || [])
+        .some((abutment) => String(abutment?.endpoint || '').startsWith(endpoint));
+      const terminalSupportPublished = (road?.transportStructureAssembly?.terminalSupports || [])
+        .some((station) => String(station?.terminalFor || '') === endpoint);
+      const supportWithinEndpointRun = (road?.transportStructureAssembly?.supportStations || [])
+        .some((station) => atStart
+          ? Number(station?.distance) <= 18
+          : Number(road?.transportStructureAssembly?.total) - Number(station?.distance) <= 18);
+      return {
+        id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || ''),
+        name: String(road?.name || ''),
+        type: String(road?.type || ''),
+        endpoint,
+        state: String(endpointRef?.state || ''),
+        policy: String(endpointRef?.policy || ''),
+        connectionCount: Number(endpointRef?.connectionCount || 0),
+        surfaceY: numberOrNull(surfaceY),
+        terrainY: numberOrNull(terrainY),
+        clearance: Number.isFinite(surfaceY) && Number.isFinite(terrainY)
+          ? surfaceY - terrainY
+          : null,
+        x: numberOrNull(Number(point?.x)),
+        z: numberOrNull(Number(point?.z)),
+        terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+        verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
+        abutmentPublished,
+        terminalSupportPublished,
+        supportWithinEndpointRun
+      };
+    });
+  });
+  const unsupportedGeneralizedOpenBoundaries = generalizedEndpointRecords
+    .filter((record) =>
+      record.state === 'open_boundary' &&
+      Number(record.clearance) > 1.2 &&
+      record.abutmentPublished !== true &&
+      record.terminalSupportPublished !== true &&
+      record.supportWithinEndpointRun !== true)
+    .sort((left, right) => Number(right.clearance) - Number(left.clearance));
   const exactStructureSamples = roads.filter((road) =>
     road?.transportRecord?.completeness === 'lossless' &&
     road?.structureSemantics?.gradeSeparated === true &&
@@ -729,6 +787,20 @@ function transportStructureSnapshot() {
       })),
     sharedPhysicalSurfaces,
     exactStructureSamples,
+    transportNetwork: {
+      ...(appCtx.transportNetworkModel?.stats || {}),
+      generalizedJoinToleranceMeters:
+        numberOrNull(appCtx.transportNetworkModel?.generalizedJoinToleranceMeters),
+      generalizedExpandedEndpointConnections:
+        (appCtx.transportNetworkModel?.connections || []).filter((connection) =>
+          String(connection?.provenance?.method || '').startsWith('generalized-aligned-')).length
+    },
+    generalizedEndpointIntegrity: {
+      authority: 'compiled-generalized-structure-endpoints',
+      sampledEndpoints: generalizedEndpointRecords.length,
+      unsupportedOpenBoundaryCount: unsupportedGeneralizedOpenBoundaries.length,
+      unsupportedOpenBoundaries: unsupportedGeneralizedOpenBoundaries.slice(0, 24)
+    },
     junctionContinuity: appCtx.transportJunctionProfile?.continuity || null,
     continuityRepair: appCtx.transportJunctionProfile?.continuityRepair || null,
     gradeProfile: {

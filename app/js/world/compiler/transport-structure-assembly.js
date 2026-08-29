@@ -93,16 +93,29 @@ function endpointHasCompiledConnection(feature, endpoint) {
   });
 }
 
-function compileSupportColumns(feature, station, width, baseThickness, sampleTerrainY, supportConflict) {
+function compileSupportColumns(
+  feature,
+  station,
+  width,
+  baseThickness,
+  sampleTerrainY,
+  supportConflict,
+  minimumHeight = 1.6,
+  allowRemoteOffsets = false
+) {
   const pierWidth = Math.max(1, Math.min(2.5, width * 0.16));
   const topY = station.surfaceY - baseThickness;
   const nx = -station.tangentZ;
   const nz = station.tangentX;
   const internalOffset = Math.max(1.2, Math.min(width * 0.38, width * 0.5 - pierWidth * 0.62));
   const externalOffset = width * 0.5 + pierWidth * 0.78;
-  const layouts = width >= 8
+  const remoteOffset = width * 0.5 + pierWidth + 4.5;
+  const layouts = (width >= 8
     ? [[-internalOffset, internalOffset], [-externalOffset, externalOffset], [0]]
-    : [[0], [-externalOffset, externalOffset]];
+    : [[0], [-externalOffset, externalOffset]])
+    .concat(allowRemoteOffsets
+      ? [[-remoteOffset, remoteOffset], [-remoteOffset], [remoteOffset]]
+      : []);
   for (const offsets of layouts) {
     const columns = [];
     let blocked = false;
@@ -111,7 +124,7 @@ function compileSupportColumns(feature, station, width, baseThickness, sampleTer
       const z = station.z + nz * offset;
       const terrainY = finite(sampleTerrainY(x, z), NaN);
       const height = topY - terrainY;
-      if (!(height > 1.6)) {
+      if (!(height > minimumHeight)) {
         blocked = true;
         break;
       }
@@ -201,6 +214,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
   const exclusionRanges = transitionExclusion(feature, width);
   const supportSpacing = supportSpacingFor(feature, specification);
   const supportStations = [];
+  const terminalSupports = [];
   if (visualSupportDetail) {
     const endpointSkip = Math.max(7, Math.min(18, width * 1.35));
     for (let distance = supportSpacing * 0.5; distance < total; distance += supportSpacing) {
@@ -255,7 +269,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
   const abutments = [];
   if (visualSupportDetail) {
     const publishAbutment = (endpoint, sample) => {
-      if (endpointHasCompiledConnection(feature, endpoint.replace('_tie_in', ''))) return;
+      if (endpointHasCompiledConnection(feature, endpoint.replace('_tie_in', ''))) return true;
       const halfSpan = width * 0.46;
       if (typeof options.supportSpanConflict === 'function' && options.supportSpanConflict(feature, {
         x: sample.x,
@@ -265,7 +279,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
         bottomY: sample.terrainY,
         topY: sample.y - sample.thickness,
         halfSpan
-      })) return;
+      })) return false;
       abutments.push(Object.freeze({
         endpoint,
         distance: sample.distance,
@@ -279,6 +293,55 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
         height: Math.max(0.28, sample.y - sample.thickness - sample.terrainY),
         onMappedWater: sample.onMappedWater === true
       }));
+      return true;
+    };
+    const hasEndpointSupport = (endpoint) => supportStations.some((station) =>
+      endpoint === 'start'
+        ? station.distance <= Math.max(18, width * 1.8)
+        : total - station.distance <= Math.max(18, width * 1.8));
+    const publishTerminalSupport = (endpoint) => {
+      if (endpointHasCompiledConnection(feature, endpoint) || hasEndpointSupport(endpoint)) return true;
+      const maximumSetback = Math.max(18, width * 1.8);
+      const candidates = surfaceSamples.filter((sample) =>
+        (endpoint === 'start'
+          ? sample.distance <= maximumSetback
+          : total - sample.distance <= maximumSetback) &&
+        sample.onMappedWater !== true &&
+        sample.undersideClearance > 0.55
+      ).sort((left, right) => endpoint === 'start'
+        ? right.distance - left.distance
+        : left.distance - right.distance);
+      for (const sample of candidates) {
+        const station = {
+          distance: sample.distance,
+          x: sample.x,
+          z: sample.z,
+          tangentX: sample.tangentX,
+          tangentZ: sample.tangentZ,
+          surfaceY: sample.y,
+          terrainY: sample.terrainY,
+          height: sample.y - baseThickness - sample.terrainY,
+          kind: 'terminal_pier',
+          terminalFor: endpoint
+        };
+        const columns = compileSupportColumns(
+          feature,
+          station,
+          width,
+          baseThickness,
+          sampleTerrainY,
+          options.supportConflict,
+          0.18,
+          true
+        );
+        if (columns.length === 0) continue;
+        terminalSupports.push(Object.freeze({
+          ...station,
+          columns: Object.freeze(columns)
+        }));
+        return true;
+      }
+      return false;
     };
     if (engineeredApproach) {
       for (const anchor of feature?.structureTransitionAnchors || []) {
@@ -307,7 +370,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
           entry.onMappedWater !== true &&
           entry.undersideClearance > 0.3
         );
-        if (sample) publishAbutment(endpoint, sample);
+        if (!sample || !publishAbutment(endpoint, sample)) publishTerminalSupport(endpoint);
       }
     }
   }
@@ -327,6 +390,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
     supportSpacing,
     surfaceSamples: Object.freeze(surfaceSamples),
     supportStations: Object.freeze(supportStations),
+    terminalSupports: Object.freeze(terminalSupports),
     abutments: Object.freeze(abutments),
     exclusionRanges,
     bodyCoverage: publishBody && surfaceSamples.length >= 2 ? 1 : 0
@@ -346,7 +410,7 @@ export function compileTransportStructureAssemblies(features = [], sampleTerrain
     if (!assembly) continue;
     elevatedCount += 1;
     if (assembly.publishBody) bodyCount += 1;
-    supportCount += assembly.supportStations.length;
+    supportCount += assembly.supportStations.length + assembly.terminalSupports.length;
     abutmentCount += assembly.abutments.length;
     if (assembly.engineeredDetail && assembly.bodyCoverage < 1) unsupportedExactCount += 1;
   }

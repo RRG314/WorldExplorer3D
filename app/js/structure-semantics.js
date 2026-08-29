@@ -8,7 +8,7 @@ import { classifyStructureSemantics, normalizedTagValue } from './structure-sema
 import {
   assignFeatureConnections,
   assignStructureStackRanks as assignStructureStackRanksByGraph
-} from './structure-semantics/stacking.js?v=9';
+} from './structure-semantics/stacking.js?v=10';
 import {
   boundsIntersect,
   pointInPolygonXZ,
