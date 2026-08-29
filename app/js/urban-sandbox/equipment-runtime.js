@@ -1,5 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
+import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
 import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
@@ -490,21 +491,14 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function segmentWorldContact(from, to) {
-    const segment = to.clone().sub(from);
-    const distance = segment.length();
-    if (!(distance > .0001)) return null;
-    const steps = Math.max(1, Math.ceil(distance / .28));
-    for (let step = 1; step <= steps; step += 1) {
-      const t = step / steps;
-      const point = from.clone().addScaledVector(segment, t);
+    const swept = sampleSweptContact(from, to, .28, (point) => {
       const terrainY = terrainHeight(point.x, point.z);
       const building = appCtx.checkBuildingCollision?.(point.x, point.z, .08, {
         actorBaseY: point.y - .1,
         actorHeight: .2
       })?.collision === true;
-      if (!building && point.y > terrainY + .12) continue;
+      if (!building && point.y > terrainY + .12) return null;
       return {
-        t,
         kind: building ? 'building' : 'terrain',
         position: {
           x: point.x,
@@ -512,8 +506,8 @@ function createUrbanEquipmentRuntime(options = {}) {
           z: point.z
         }
       };
-    }
-    return null;
+    });
+    return swept ? { ...swept.contact, t: swept.t } : null;
   }
 
   function resolveProjectile(projectile, position, directTarget = null) {

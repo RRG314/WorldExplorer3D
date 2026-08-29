@@ -2,6 +2,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 import { createExpeditionPlaneMesh } from './plane/expedition-plane-mesh.js?v=1';
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=1';
+import { sampleSweptContact } from './physics/swept-contact.js?v=1';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -347,27 +348,11 @@ function buildingImpactAt(x, y, z) {
 }
 
 function sweptBuildingImpact(from, to) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const dz = to.z - from.z;
-  const distance = Math.hypot(dx, dy, dz);
-  if (!(distance > 0.01)) return null;
   // The fuselage collision radius is 2.15 world units. Sampling well below
   // that radius keeps thin mapped walls from falling between physics poses.
-  const steps = Math.max(1, Math.ceil(distance / 0.65));
-  let lastSafe = { ...from };
-  for (let step = 1; step <= steps; step += 1) {
-    const t = step / steps;
-    const position = {
-      x: from.x + dx * t,
-      y: from.y + dy * t,
-      z: from.z + dz * t
-    };
-    const impact = buildingImpactAt(position.x, position.y, position.z);
-    if (impact) return { impact, position, lastSafe, t };
-    lastSafe = position;
-  }
-  return null;
+  return sampleSweptContact(from, to, .65, (position) =>
+    buildingImpactAt(position.x, position.y, position.z)
+  );
 }
 
 function updatePlane(dt) {

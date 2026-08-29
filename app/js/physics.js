@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
 import { updateDrone } from "./physics/drone-flight.js?v=9";
-import { updatePlane } from "./plane-mode.js?v=20";
+import { updatePlane } from "./plane-mode.js?v=21";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,

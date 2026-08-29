@@ -4,7 +4,7 @@ import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=13';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=14';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -14,6 +14,7 @@ import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
+import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
 import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-model.js?v=1';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
@@ -287,23 +288,11 @@ function showCrashFeedback(state, severity) {
 
 function sweptBuildingContact(from, to, radius, options = {}) {
   if (typeof appCtx.checkBuildingCollision !== 'function') return null;
-  const dx = Number(to.x) - Number(from.x);
-  const dz = Number(to.z) - Number(from.z);
-  const distance = Math.hypot(dx, dz);
   const spacing = Math.max(.22, Math.min(.65, Number(radius) * .6));
-  const steps = Math.max(1, Math.ceil(distance / spacing));
-  let lastSafe = { x: Number(from.x), z: Number(from.z) };
-  for (let step = 1; step <= steps; step += 1) {
-    const t = step / steps;
-    const position = {
-      x: Number(from.x) + dx * t,
-      z: Number(from.z) + dz * t
-    };
+  return sampleSweptContact(from, to, spacing, (position) => {
     const collision = appCtx.checkBuildingCollision(position.x, position.z, radius, options);
-    if (collision?.collision) return { collision, position, lastSafe, t };
-    lastSafe = position;
-  }
-  return null;
+    return collision?.collision ? collision : null;
+  });
 }
 
 function reflectedCrashVelocity(motion, collision, restitution = .18) {
@@ -391,7 +380,7 @@ function updateCrashBodies(state, dt) {
       actorHeight: Number(vehicle.variant?.height || 1.5)
     });
     if (buildingContact) {
-      const reflected = reflectedCrashVelocity(motion, buildingContact.collision);
+      const reflected = reflectedCrashVelocity(motion, buildingContact.contact);
       vehicle.crashMotion = {
         ...motion,
         ...reflected,
@@ -434,7 +423,7 @@ function updateCrashBodies(state, dt) {
       actorHeight: 1.8
     });
     if (buildingContact) {
-      const reflected = reflectedCrashVelocity(motion, buildingContact.collision, .08);
+      const reflected = reflectedCrashVelocity(motion, buildingContact.contact, .08);
       npc.crashMotion = { ...npc.crashMotion, ...motion, ...reflected };
       npc.x = buildingContact.lastSafe.x;
       npc.z = buildingContact.lastSafe.z;
