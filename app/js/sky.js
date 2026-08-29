@@ -184,8 +184,7 @@ async function travelToMoon() {
 
   // Use the new space flight system if available
   if (typeof appCtx.startSpaceFlightToMoon === 'function') {
-    appCtx.startSpaceFlightToMoon();
-    return;
+    return appCtx.startSpaceFlightToMoon();
   }
 
   // Fallback to original behavior if space.js not loaded

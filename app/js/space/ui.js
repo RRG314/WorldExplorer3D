@@ -289,7 +289,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   if (assistBtn) {
     const assist = appCtx.spaceJourneyAssistState;
     const atmosphericClimb = appCtx.spaceJourney?.phase === 'atmospheric_exploration';
-    assistBtn.style.display = assist?.available === false && !atmosphericClimb ? 'none' : '';
+    assistBtn.style.display = universeTarget || (assist?.available === false && !atmosphericClimb) ? 'none' : '';
     assistBtn.disabled = atmosphericClimb
       ? false
       : !assist?.available || !['launch', 'ascent', 'parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
@@ -306,7 +306,11 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   }
   if (environmentText) {
     const environment = appCtx.spaceFlightEnvironment;
-    if (!environment) {
+    if (universeTarget?.targetKind === 'exoplanet') {
+      environmentText.textContent = 'Deep-space orbital approach · appearance model labeled in Wayfinder';
+    } else if (universeTarget) {
+      environmentText.textContent = 'Deep-space navigation frame';
+    } else if (!environment) {
       environmentText.textContent = 'Deep space';
     } else if (environment.pressurePa > 0.5) {
       const pressure = environment.pressurePa >= 1000
@@ -435,7 +439,9 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       const generatedEncounter = universeTarget.encounter?.type === 'generated-asteroids'
         ? `Asteroid field · X pulse · ${universeTarget.encounter.active} remaining`
         : '';
-      landingText.textContent = Number.isFinite(dilation)
+      landingText.textContent = universeTarget.targetKind === 'exoplanet'
+        ? `Course locked · orbital entry marker active`
+        : Number.isFinite(dilation)
         ? `Relativistic clock rate: ${(dilation * 100).toFixed(1)}%`
         : generatedEncounter || `${formatAcceleration(universeTarget.navigation?.timeAcceleration)} · ${universeTarget.address}`;
     }

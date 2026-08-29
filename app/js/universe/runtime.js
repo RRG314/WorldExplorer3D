@@ -5,6 +5,7 @@ import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
+import { createUniverseCourse, setUniverseCourseStatus } from './course-authority.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
 import {
   createUniverseFrameVisual,
@@ -150,7 +151,7 @@ function positionRocketForCourseDestination(destination) {
   const approach = target.clone().normalize();
   if (approach.lengthSq() < 0.01) approach.set(0, 0, 1);
   const rocket = appCtx.spaceFlight.rocket;
-  rocket.position.copy(target).addScaledVector(approach, Math.max(120, radius * 18));
+  rocket.position.copy(target).addScaledVector(approach, Math.max(90, radius * 12));
   _forward.copy(target).sub(rocket.position).normalize();
   rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _forward);
   if (appCtx.spaceFlight.camera) {
@@ -206,12 +207,11 @@ function travelToUniverseDestination(addressOrId, options = {}) {
   const destinationFrame = getUniverseFrame(destination);
   if (!destination || !destinationFrame) return false;
   universeRuntime.selected = destination;
-  universeRuntime.course = {
-    destination,
-    frame: destinationFrame,
-    status: destinationFrame.id === universeRuntime.current.id ? 'active' : 'transit',
-    setAt: performance.now()
-  };
+  universeRuntime.course = createUniverseCourse(destination, universeRuntime.current.id, performance.now());
+  // Wayfinder owns the active deep-space course. Release the Solar System's
+  // optional SI journey so it cannot continue moving or reorienting the ship
+  // toward the Moon behind the player's selected interstellar destination.
+  appCtx.releaseRenderedJourneyToManualFlight?.();
   if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
     setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
     showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
@@ -219,7 +219,7 @@ function travelToUniverseDestination(addressOrId, options = {}) {
     return true;
   }
   if (destination.id === universeRuntime.current.id) {
-    universeRuntime.course.status = 'active';
+    universeRuntime.course = setUniverseCourseStatus(universeRuntime.course, 'active');
     updateUniverseNavigator(universeRuntime);
     return false;
   }
@@ -337,7 +337,9 @@ function updateTransition(nowMs) {
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
   appCtx.spaceFlight.mode = 'flying';
-  if (universeRuntime.course) universeRuntime.course.status = 'active';
+  if (universeRuntime.course) {
+    universeRuntime.course = setUniverseCourseStatus(universeRuntime.course, 'active');
+  }
   positionRocketForCourseDestination(transition.destination);
   updateUniverseNavigator(universeRuntime);
   showMessage(`${transition.destination?.name || transition.to.name} APPROACH ACQUIRED`, '#68d8c0');
@@ -400,7 +402,7 @@ function rebaseActiveFrame() {
 }
 
 function getUniverseHudTarget() {
-  if (universeRuntime.current.id === 'sol') return null;
+  if (universeRuntime.current.id === 'sol' && !universeRuntime.transition) return null;
   const group = universeRuntime.frameGroup;
   const courseDestination = universeRuntime.course?.destination;
   const courseInTransit = Boolean(universeRuntime.transition && courseDestination);
@@ -443,8 +445,8 @@ function getUniverseGravityBodies() {
     return {
       name: mesh.name,
       position,
-      radius: planet ? Math.max(3.5, Math.min(10, Number(planet.radiusEarth || 1) * 4.5)) :
-        Math.max(18, Math.min(38, 24 + Number(universeRuntime.current.physical?.hostMassSolar || 1) * 8)),
+      radius: Number(mesh.geometry?.parameters?.radius) || (planet ? Math.max(7, Math.min(22, Math.sqrt(Number(planet.radiusEarth || 1)) * 7)) :
+        Math.max(18, Math.min(38, 24 + Number(universeRuntime.current.physical?.hostMassSolar || 1) * 8))),
       massKg: mesh.userData.massKg,
       physicalRadiusKm: mesh.userData.physicalRadiusKm,
       mesh,

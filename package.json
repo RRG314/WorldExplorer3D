@@ -82,6 +82,8 @@
     "verify:space-journey": "node --test tests/space-journey-authority-current.test.mjs",
     "verify:space-atmosphere": "node --test tests/space-atmospheric-exploration-current.test.mjs",
     "verify:space-destinations": "node --test tests/space-destination-completeness-current.test.mjs",
+    "verify:universe-wayfinder": "node --test tests/universe-wayfinder-current.test.mjs",
+    "verify:universe-wayfinder-browser": "node scripts/verification/universe-wayfinder.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",
     "verify:pr": "npm run verify:source",

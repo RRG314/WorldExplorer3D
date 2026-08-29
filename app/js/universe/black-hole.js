@@ -36,8 +36,11 @@ function makeAccretionMaterial(color, visualRadius) {
         float radius = length(vLocal.xy) / visualRadius;
         float normalizedRadius = clamp((radius - 3.0) / 9.0, 0.0, 1.0);
         float angle = atan(vLocal.y, vLocal.x);
-        float plasmaWave = sin(radius * 7.0 - time * 2.4 + sin(angle * 5.0 - time) * 0.7);
-        float band = 0.82 + 0.18 * plasmaWave;
+        float spiral = sin(radius * 7.0 - time * 2.4 + sin(angle * 5.0 - time) * 0.7);
+        float turbulence = sin(angle * 17.0 + radius * 2.3 - time * 1.7) *
+          sin(angle * 7.0 - radius * 5.1 + time * 0.9);
+        float filaments = smoothstep(0.38, 0.96, abs(sin(angle * 11.0 + radius * 4.6 - time * 1.2)));
+        float band = 0.7 + 0.17 * spiral + 0.1 * turbulence + 0.12 * filaments;
         float edge = smoothstep(3.0, 3.35, radius) * (1.0 - smoothstep(11.2, 12.0, radius));
 
         // Schwarzschild gravitational redshift, evaluated in units of Rs.
@@ -49,7 +52,7 @@ function makeAccretionMaterial(color, visualRadius) {
         float heat = 1.0 - normalizedRadius;
         vec3 hotColor = mix(diskColor * 0.45, vec3(1.0, 0.94, 0.78), heat * heat);
         vec3 finalColor = hotColor * band * redshift * doppler;
-        gl_FragColor = vec4(finalColor, edge * (0.48 + heat * 0.5));
+        gl_FragColor = vec4(finalColor, edge * (0.42 + heat * 0.48) * (0.82 + filaments * 0.18));
       }
     `,
     side: THREE.DoubleSide,

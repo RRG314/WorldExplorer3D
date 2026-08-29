@@ -161,7 +161,7 @@ function createPlanetTexture(profile, mobile) {
   return texture;
 }
 
-function createCourseMarker(radius) {
+function createCourseMarker(radius, destinationName) {
   const marker = new THREE.Group();
   marker.name = 'Active destination marker';
   const material = new THREE.MeshBasicMaterial({
@@ -171,11 +171,14 @@ function createCourseMarker(radius) {
     depthWrite: false,
     blending: THREE.AdditiveBlending
   });
-  const outer = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.8, Math.max(0.12, radius * 0.045), 8, 64), material);
+  const outer = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.8, Math.max(0.14, radius * 0.055), 8, 64), material);
   outer.rotation.x = Math.PI / 2;
-  const cross = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.38, Math.max(0.1, radius * 0.035), 8, 48), material.clone());
+  const cross = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.15, Math.max(0.12, radius * 0.045), 8, 48), material.clone());
   cross.rotation.y = Math.PI / 2;
-  marker.add(outer, cross);
+  const label = createLabel(`${destinationName} · COURSE`, 460);
+  label.position.y = radius * 3.7;
+  label.scale.set(44, 9, 1);
+  marker.add(outer, cross, label);
   marker.userData.baseScale = 1;
   marker.visible = false;
   return marker;
@@ -221,7 +224,7 @@ function createPlanetarySystem(entity) {
     const axis = Math.max(0.005, Number(planet.semiMajorAxisAu || (index + 1) * 0.1));
     const orbitRadius = 70 + Math.sqrt(axis / maxAxis) * 290;
     group.add(makeOrbit(orbitRadius));
-    const radius = Math.max(3.5, Math.min(10, Number(planet.radiusEarth || 1) * 4.5));
+    const radius = Math.max(7, Math.min(22, Math.sqrt(Number(planet.radiusEarth || 1)) * 7));
     const profile = derivePlanetVisualProfile(planet, entity);
     const texture = createPlanetTexture(profile, mobile);
     const body = new THREE.Mesh(
@@ -267,7 +270,7 @@ function createPlanetarySystem(entity) {
       rings.name = `${planet.name} model-derived ring system`;
       body.add(rings);
     }
-    const marker = createCourseMarker(radius);
+    const marker = createCourseMarker(radius, planet.name);
     body.add(marker);
     group.userData.destinationMeshes.set(planet.id, body);
     group.userData.gravityBodies.push(body);
@@ -463,14 +466,51 @@ function createGalaxyPoints(entity, count = null, radius = 900) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   return new THREE.Points(geometry, createRoundStarMaterial({
-    size: 2.4,
+    size: 2.6,
+    sizeAttenuation: false,
     color: 0xffffff,
     vertexColors: true,
     transparent: true,
-    opacity: 0.84,
+    opacity: 0.96,
     depthWrite: false,
     blending: THREE.AdditiveBlending
   }));
+}
+
+function createGalaxyBulge(entity) {
+  const mobile = globalThis.matchMedia?.('(max-width: 768px)').matches === true;
+  const count = mobile ? 1000 : 2200;
+  const random = seededRandom((entity.visualProfile?.seed || 1) + 7703);
+  const positions = [];
+  const colors = [];
+  const inner = new THREE.Color(0xfff1cf);
+  const outer = new THREE.Color(0xd7a872);
+  for (let index = 0; index < count; index += 1) {
+    const radius = Math.pow(random(), 2.2) * 190;
+    const theta = random() * Math.PI * 2;
+    const phi = Math.acos(2 * random() - 1);
+    positions.push(
+      radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.cos(phi) * 0.32,
+      radius * Math.sin(phi) * Math.sin(theta)
+    );
+    const color = inner.clone().lerp(outer, radius / 190);
+    colors.push(color.r, color.g, color.b);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const bulge = new THREE.Points(geometry, createRoundStarMaterial({
+    size: mobile ? 2.4 : 3,
+    sizeAttenuation: false,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  }));
+  bulge.name = 'Model-derived galactic bulge stars';
+  return bulge;
 }
 
 function createGalaxy(entity) {
@@ -500,16 +540,7 @@ function createGalaxy(entity) {
     starField.material.size = 2.25;
   }
   group.add(starField);
-  const core = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: createFeatheredAlphaMap(),
-    color: 0xffdfae,
-    transparent: true,
-    opacity: entity.visualProfile?.image ? 0.18 : 0.68,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  }));
-  core.scale.set(220, 150, 1);
-  group.add(core);
+  if (!entity.visualProfile?.image) group.add(createGalaxyBulge(entity));
   if (!entity.visualProfile?.image) {
     const haloTexture = createNebulaCloudTexture((entity.visualProfile?.seed || 1) + 9001);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -594,9 +625,13 @@ function setUniverseCourseMarker(group, destinationId, active = true) {
 function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
   if (!group) return;
   const orbiters = group.userData.orbitingPlanets || [];
+  if (orbiters.length && !Number.isFinite(group.userData.orbitEpochSeconds)) {
+    group.userData.orbitEpochSeconds = elapsedSeconds;
+  }
+  const localOrbitSeconds = Math.max(0, elapsedSeconds - Number(group.userData.orbitEpochSeconds || 0));
   orbiters.forEach((entry) => {
     const period = Math.max(1, entry.orbitDays);
-    const angle = entry.phase + elapsedSeconds * Math.PI * 2 / Math.max(8, Math.sqrt(period) * 9);
+    const angle = entry.phase + localOrbitSeconds * Math.PI * 2 / Math.max(900, Math.sqrt(period) * 150);
     entry.body.position.x = Math.cos(angle) * entry.orbitRadius;
     entry.body.position.z = Math.sin(angle) * entry.orbitRadius;
     entry.body.rotation.y += 0.006 * frameScale;

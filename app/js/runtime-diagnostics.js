@@ -1068,6 +1068,27 @@ globalThis.render_game_to_text = () => JSON.stringify({
     capturedErrors: runtimeErrors.length
   },
   environment: appCtx.getEnv?.() || null,
+  modes: {
+    boat: !!appCtx.boatMode?.active,
+    drone: !!appCtx.droneMode,
+    plane: !!appCtx.planeMode?.active,
+    ocean: !!appCtx.oceanMode?.active,
+    space: !!appCtx.spaceFlight?.active,
+    walking: appCtx.Walk?.state?.mode === 'walk'
+  },
+  planetary: {
+    flightDestination: appCtx.spaceFlight?.destination || null,
+    flightMode: appCtx.spaceFlight?.mode || null,
+    nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
+  },
+  universeNavigation: appCtx.universeRuntime ? {
+    currentFrameId: appCtx.universeRuntime.current?.id || null,
+    selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
+    courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
+    courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
+    courseStatus: appCtx.universeRuntime.course?.status || null,
+    transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
+  } : null,
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,
