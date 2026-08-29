@@ -1,5 +1,6 @@
 import { mphToCarSpeed } from './vehicle-speed-units.js?v=2';
 import { resolveCrashImpact } from '../urban-sandbox/crash-physics.js?v=1';
+import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 
 function stopVehicle(car) {
   car.speed = 0;
@@ -48,7 +49,7 @@ function applyWallCrashResponse(appCtx, buildingCheck) {
   appCtx.car.vz = response.moverVelocity.z / units;
   appCtx.car.yawRate = Number(appCtx.car.yawRate || 0) + response.moverYawImpulse;
   appCtx.car.rearSlip = Number(appCtx.car.rearSlip || 0) + response.moverYawImpulse * .42;
-  appCtx.car.condition = Math.max(0, Number(appCtx.car.condition ?? 1) - response.moverDamageForce / 175);
+  applyTransportDamage(appCtx.car, response.moverDamageForce);
   appCtx.car.lastWorldImpact = Object.freeze({
     severity: response.severity,
     closingMph: Number(response.closingMph.toFixed(1)),

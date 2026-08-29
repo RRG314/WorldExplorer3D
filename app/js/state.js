@@ -73,7 +73,15 @@ const PropertyUI = {
   button: null
 };
 
-const car = { x: 0, z: 0, y: 0, angle: 0, speed: 0, vx: 0, vz: 0, vy: 0, grip: 1, onRoad: true, road: null, boost: false, boostTime: 0, boostReady: true, boostDecayTime: 0, driftAngle: 0 };
+const car = {
+  x: 0, z: 0, y: 0, angle: 0, speed: 0, vx: 0, vz: 0, vy: 0,
+  grip: 1, onRoad: true, road: null, boost: false, boostTime: 0,
+  boostReady: true, boostDecayTime: 0, driftAngle: 0,
+  condition: 1,
+  durabilityPolicy: 'exploration_unlimited',
+  resistance: 175,
+  transportCatalogId: 'sedan'
+};
 const boat = {
   x: 0,
   z: 0,

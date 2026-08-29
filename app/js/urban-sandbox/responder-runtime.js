@@ -1,11 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=5';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=3';
-import { vehicleDoorPosition } from './vehicle-model.js?v=6';
+import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';
+import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 import { dampCrashMotion } from './crash-physics.js?v=1';
 
@@ -161,7 +162,10 @@ function createUrbanResponderRuntime(options = {}) {
       avoidanceSide: 0,
       avoidanceRemaining: 0,
       condition: 1,
-      resistance: 190,
+      durabilityPolicy: variant.durabilityPolicy,
+      resistance: variant.resistance,
+      playable: true,
+      enterable: true,
       officer: null
     };
     visual.root.position.set(responder.x, responder.y, responder.z);
@@ -547,7 +551,7 @@ function createUrbanResponderRuntime(options = {}) {
   function applyImpact(targetId, force) {
     for (const responder of responders) {
       if (responder.id === targetId) {
-        const result = applyConditionImpact(responder, force);
+        const result = applyTransportDamage(responder, force);
         responder.condition = result.after;
         responder.visual.setCondition(result.after);
         return { kind: 'responder_vehicle', id: responder.id, ...result };

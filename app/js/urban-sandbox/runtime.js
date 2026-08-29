@@ -1,17 +1,18 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
+import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=14';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=15';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=15';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=6';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=16';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
@@ -244,8 +245,8 @@ function applyPlayerCrashResponse(state, response, metersPerWorldUnit) {
   appCtx.car.yawRate = Number(appCtx.car.yawRate || 0) + response.moverYawImpulse;
   appCtx.car.rearSlip = Number(appCtx.car.rearSlip || 0) + response.moverYawImpulse * .48;
   if (response.moverDamageForce > 0) {
-    const target = state.activeVehicle || { condition: appCtx.car.condition ?? 1, resistance: 175 };
-    const result = applyConditionImpact(target, response.moverDamageForce);
+    const target = state.activeVehicle || appCtx.car;
+    const result = applyTransportDamage(target, response.moverDamageForce);
     appCtx.car.condition = result.after;
     if (state.activeVehicle) {
       state.activeVehicle.condition = result.after;
@@ -360,7 +361,7 @@ function updateCrashBodies(state, dt) {
           angularVelocity: response.moverYawImpulse,
           severity: response.severity
         };
-        const damage = applyConditionImpact(vehicle, response.moverDamageForce);
+        const damage = applyTransportDamage(vehicle, response.moverDamageForce);
         vehicle.condition = damage.after;
         vehicle.visual?.setCondition?.(damage.after);
         state.equipmentRuntime?.applyCollisionImpact?.(secondaryTarget, response.targetDamageForce);
@@ -390,7 +391,7 @@ function updateCrashBodies(state, dt) {
       vehicle.z = buildingContact.lastSafe.z;
       vehicle.yaw += motion.angularVelocity * step;
       syncVehiclePose(vehicle, vehicle);
-      const damage = applyConditionImpact(vehicle, Math.min(42, Math.hypot(motion.velocityX, motion.velocityZ) * 3.1));
+      const damage = applyTransportDamage(vehicle, Math.min(42, Math.hypot(motion.velocityX, motion.velocityZ) * 3.1));
       vehicle.condition = damage.after;
       vehicle.visual?.setCondition?.(damage.after);
     } else {
@@ -1052,7 +1053,10 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
     variant: promoted.variant,
     color: promoted.color,
     condition: 1,
-    resistance: 160,
+    durabilityPolicy: promoted.variant.durabilityPolicy,
+    resistance: promoted.variant.resistance,
+    playable: promoted.variant.playable,
+    enterable: promoted.variant.enterable,
     source: 'living-world-detailed-traffic',
     trafficAgentId,
     ambientTraffic: true,
@@ -1283,6 +1287,9 @@ function resetPlayerVehicleVisual(state) {
   appCtx.car.vehicleServiceType = '';
   appCtx.car.vehicleServiceLightsActive = false;
   appCtx.car.condition = state.defaultCarCondition;
+  appCtx.car.durabilityPolicy = state.defaultCarDurabilityPolicy;
+  appCtx.car.resistance = state.defaultCarResistance;
+  appCtx.car.transportCatalogId = 'sedan';
 }
 
 function stopServiceSiren(state) {
@@ -1360,6 +1367,7 @@ function updateServiceEquipment(state, dt) {
   if (keyDown && !state.serviceEquipmentKeyHeld) toggleActiveServiceEquipment(state);
   state.serviceEquipmentKeyHeld = keyDown;
   for (const vehicle of state.vehicles) {
+    vehicle.visual?.updateDamageVisual?.(state.serviceLightElapsed);
     if (vehicle.serviceType !== 'responder' || !vehicle.playerClaimed) continue;
     vehicle.visual?.setServiceLights?.(state.serviceLightElapsed, vehicle.serviceEquipmentActive === true);
   }
@@ -1386,6 +1394,9 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.car.vehicleServiceType = vehicle.serviceType || '';
   appCtx.car.vehicleServiceLightsActive = vehicle.serviceEquipmentActive === true;
   appCtx.car.condition = Math.max(0, Math.min(1, Number(vehicle.condition ?? 1)));
+  appCtx.car.durabilityPolicy = vehicle.durabilityPolicy || vehicle.variant?.durabilityPolicy || 'standard';
+  appCtx.car.resistance = Number(vehicle.resistance || vehicle.variant?.resistance || 160);
+  appCtx.car.transportCatalogId = vehicle.variant.id;
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;
@@ -1842,7 +1853,10 @@ function promoteTrafficVehicle(state, trafficAgentId, vehicleId = '') {
     variant: promoted.variant,
     color: promoted.color,
     condition: 1,
-    resistance: 160,
+    durabilityPolicy: promoted.variant.durabilityPolicy,
+    resistance: promoted.variant.resistance,
+    playable: promoted.variant.playable,
+    enterable: promoted.variant.enterable,
     source: 'living-world-promoted-traffic',
     trafficAgentId,
     x: promoted.x,
@@ -2401,7 +2415,10 @@ function startUrbanSandboxRuntime(options = {}) {
     const visual = createUrbanVehicleVisual(THREE, anchor);
     const vehicle = {
       ...anchor,
-      resistance: 160,
+      durabilityPolicy: anchor.durabilityPolicy || anchor.variant?.durabilityPolicy,
+      resistance: anchor.resistance || anchor.variant?.resistance,
+      playable: anchor.playable !== false,
+      enterable: anchor.enterable !== false,
       visual,
       attachedToPlayer: false,
       occupied: false,
@@ -2501,6 +2518,8 @@ function startUrbanSandboxRuntime(options = {}) {
     defaultWheelMeshes: [...(appCtx.wheelMeshes || [])],
     defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'classic-utility-d'),
     defaultCarCondition: Math.max(0, Math.min(1, Number(appCtx.car?.condition ?? 1))),
+    defaultCarDurabilityPolicy: String(appCtx.car?.durabilityPolicy || 'exploration_unlimited'),
+    defaultCarResistance: Number(appCtx.car?.resistance || 175),
     crashSupportHook: null,
     storeSupportHook: null,
     lastAction: null,

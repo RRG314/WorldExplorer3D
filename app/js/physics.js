@@ -8,7 +8,7 @@ import {
   updateVehicleSurface
 } from "./physics/vehicle-surface.js?v=6";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
-import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=7";
+import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=8";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=3";
 import {
@@ -21,7 +21,7 @@ import {
   carSpeedToWorldUnitsPerSecond,
   mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=2";
-import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=5";
+import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=6";
 import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=2';
 import { groundVehicleTuning } from './character/vehicle-assistance.js?v=1';
 // RDT-based adaptive throttling state

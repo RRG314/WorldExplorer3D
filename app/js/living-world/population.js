@@ -1,4 +1,5 @@
-import { selectVehicleVariant, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=5';
+import { selectVehicleVariant } from '../engine/vehicle-catalog.js?v=6';
+import { roadVehicleVisualRecipe } from '../transport/road-vehicle-visual-recipe.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
 
@@ -317,32 +318,24 @@ function pedestrianTransform(role, agent, slot = 0) {
 }
 
 function vehicleLayout(agent) {
-  const variant = agent.variant;
-  const style = variant.bodyStyle || variant.id;
-  const length = variant.length;
-  const height = variant.height;
-  const truck = style === 'box-truck';
-  const bus = style === 'bus';
-  const pickup = style === 'pickup';
-  const van = style === 'van';
-  const suv = style === 'suv';
-  const cabinLength = bus ? length * .88 : truck ? length * .24 : pickup ? length * .34 : van ? length * .7 : suv ? length * .58 : length * .47;
-  const cabinZ = truck ? length * .31 : pickup ? length * .17 : van ? -length * .04 : -length * .07;
-  const cabinHeight = bus ? height * .7 : truck ? height * .55 : van ? height * .62 : suv ? height * .53 : height * .46;
-  return { variant, style, length, height, truck, bus, pickup, van, suv, cabinLength, cabinZ, cabinHeight };
+  const recipe = roadVehicleVisualRecipe(agent.variant);
+  return {
+    ...recipe,
+    variant: agent.variant,
+    truck: recipe.flags.boxTruck,
+    bus: recipe.flags.bus,
+    pickup: recipe.flags.pickup,
+    van: recipe.flags.van,
+    suv: recipe.flags.crossover
+  };
 }
 
 function vehicleTransform(role, agent, slot = 0) {
   const l = vehicleLayout(agent);
   const width = l.variant.width;
-  const wheelLayout = vehicleWheelContactLayout(l.variant);
-  const wheelRadius = l.variant.wheelRadius || Math.min(.5, l.height * .23);
-  const bodyBottom = wheelRadius * .42;
-  const bodyTop = Math.min(l.height * (l.bus ? .34 : l.truck ? .33 : l.van ? .42 : l.suv || l.pickup ? .46 : .5), l.height - .42);
-  const bodyHeight = Math.max(.42, bodyTop - bodyBottom);
-  const cabinBottom = bodyTop - .08;
-  const cabinHeight = Math.max(.32, l.height - cabinBottom - .055);
-  const cabinY = cabinBottom + cabinHeight * .5;
+  const wheelLayout = l.wheelLayout;
+  const wheelRadius = l.wheelRadius;
+  const { bodyBottom, bodyTop, bodyHeight, cabinBottom, cabinHeight, cabinY } = l;
   if (role === 'body') return { y: bodyBottom + bodyHeight * .5, sx: width, sy: bodyHeight, sz: l.length };
   if (role === 'cabin') return { y: cabinY, z: l.cabinZ, sx: width * .86, sy: cabinHeight, sz: l.cabinLength };
   if (role === 'glass') return { y: cabinY + cabinHeight * .04, z: l.cabinZ + (l.truck ? .04 : 0), sx: width * .875, sy: Math.max(.24, cabinHeight * .48), sz: l.cabinLength * .82 };

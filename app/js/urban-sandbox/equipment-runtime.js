@@ -1,5 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
+import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
 import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
@@ -303,7 +304,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     }
     if (detailed.kind === 'vehicle') {
       const vehicle = detailed.ref;
-      const result = applyConditionImpact({ condition: vehicle.condition, resistance: vehicle.resistance || 160 }, force);
+      const result = applyTransportDamage(vehicle, force);
       vehicle.condition = result.after;
       vehicle.visual.setCondition(result.after);
       return { kind: 'vehicle', id: vehicle.id, ...result };

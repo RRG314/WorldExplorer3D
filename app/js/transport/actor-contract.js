@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { transportDamagePresentation } from './damage-model.js?v=1';
 
 function finite(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
@@ -20,9 +21,15 @@ function actorRecord(mode, actor, options = {}) {
   const y = finite(actor.y ?? actor.position?.y, NaN);
   const z = finite(actor.z ?? actor.position?.z, NaN);
   if (![x, y, z].every(Number.isFinite)) return null;
+  const condition = transportDamagePresentation(actor.condition ?? options.condition ?? 1);
   return {
     mode,
     source: mode,
+    identity: {
+      entityId: String(options.entityId || actor.id || ''),
+      catalogId: String(options.catalogId || actor.transportCatalogId || actor.vehicleVariantId || mode),
+      domain: String(options.domain || (mode === 'boat' || mode === 'ocean' ? 'maritime' : mode === 'plane' || mode === 'drone' ? 'aviation' : mode === 'rocket' ? 'space' : mode === 'walk' ? 'person' : 'road'))
+    },
     position: { x, y, z },
     velocity: {
       x: finite(actor.vx ?? actor.velocity?.x),
@@ -38,6 +45,17 @@ function actorRecord(mode, actor, options = {}) {
     contact: {
       grounded: options.grounded ?? !actor.airborne,
       kind: String(options.contactKind || actor.contactKind || '')
+    },
+    condition: {
+      value: condition.condition,
+      band: condition.band,
+      operable: condition.operable,
+      durabilityPolicy: String(options.durabilityPolicy || actor.durabilityPolicy || 'standard')
+    },
+    interaction: {
+      playable: options.playable !== false,
+      enterable: options.enterable !== false,
+      companionAboard: options.companionAboard !== false
     }
   };
 }
@@ -88,7 +106,9 @@ function activeTransportActor() {
   return actorRecord(mode, appCtx.car, {
     bounds: { radius: 2, height: 1.9 },
     grounded: !appCtx.car?.isAirborne,
-    contactKind: appCtx.car?.onRoad ? 'road' : 'terrain'
+    contactKind: appCtx.car?.onRoad ? 'road' : 'terrain',
+    entityId: appCtx.urbanSandboxRuntime?.activeVehicle?.id || 'player-default-car',
+    catalogId: appCtx.car?.vehicleVariantId || appCtx.car?.transportCatalogId || 'sedan'
   });
 }
 

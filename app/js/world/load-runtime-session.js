@@ -452,7 +452,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
     appCtx.worldPublication?.sequence === publication.sequence
   );
   try {
-    const livingWorldModule = await import('../living-world/runtime.js?v=24');
+    const livingWorldModule = await import('../living-world/runtime.js?v=25');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-living-world-startup');
@@ -462,7 +462,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       request: worldSession?.request
     });
     if (!livingWorld) throw new Error('Living World did not start for the active publication.');
-    const urbanSandboxModule = await import('../urban-sandbox/runtime.js?v=51');
+    const urbanSandboxModule = await import('../urban-sandbox/runtime.js?v=52');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-urban-sandbox-startup');

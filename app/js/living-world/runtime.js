@@ -7,7 +7,7 @@ import {
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
 import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=10';
-import { createLivingWorldPopulation } from './population.js?v=13';
+import { createLivingWorldPopulation } from './population.js?v=14';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();

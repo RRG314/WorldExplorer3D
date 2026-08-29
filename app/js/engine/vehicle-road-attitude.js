@@ -1,4 +1,4 @@
-import { vehicleWheelContactLayout } from './vehicle-catalog.js?v=5';
+import { vehicleWheelContactLayout } from './vehicle-catalog.js?v=6';
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);

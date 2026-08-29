@@ -1,9 +1,14 @@
 // One authoritative, meter-based vehicle catalog for traffic, parked,
 // enterable, and responder presentation. Dimensions retain the existing
 // real-world scale; renderers must fit their geometry inside this envelope.
+import {
+  TRANSPORT_DURABILITY_POLICIES,
+  defineTransportCatalogEntry
+} from '../transport/catalog-contract.js?v=1';
+
 const VEHICLE_ROOT_TO_GROUND_METERS = 1.12;
 
-const VEHICLE_CATALOG = Object.freeze([
+const ROAD_VEHICLE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'compact', label: 'Compact hatchback', bodyStyle: 'compact', handlingLabel: 'Nimble', width: 1.65, height: 1.42, length: 3.65, cabinScale: 0.48, wheelRadius: .34, speedFactor: 1.04, acceleration: 2.8, turningRadius: 4.6, accelerationScale: 1.13, steeringScale: 1.14, gripScale: .98, brakeScale: 1.04, topSpeedMph: 120, weight: 18, color: 0x8a3f45, parkedEligible: true }),
   Object.freeze({ id: 'sedan', label: 'Four-door sedan', bodyStyle: 'sedan', handlingLabel: 'Balanced', width: 1.78, height: 1.45, length: 4.45, cabinScale: 0.5, wheelRadius: .36, speedFactor: 1, acceleration: 2.5, turningRadius: 5.2, accelerationScale: 1, steeringScale: 1, gripScale: 1, brakeScale: 1, topSpeedMph: 120, weight: 22, color: 0x315f79, parkedEligible: true }),
   Object.freeze({ id: 'suv', label: 'Trail SUV', bodyStyle: 'suv', handlingLabel: 'Planted', width: 1.9, height: 1.72, length: 4.65, cabinScale: 0.54, wheelRadius: .41, speedFactor: 0.94, acceleration: 2.2, turningRadius: 5.6, accelerationScale: .96, steeringScale: .92, gripScale: 1.1, brakeScale: 1.08, topSpeedMph: 120, weight: 15, color: 0x7a5141, parkedEligible: true }),
@@ -14,6 +19,41 @@ const VEHICLE_CATALOG = Object.freeze([
   Object.freeze({ id: 'box_truck', label: 'Local box truck', bodyStyle: 'box-truck', handlingLabel: 'Heavy', width: 2.25, height: 2.85, length: 6.8, cabinScale: 0.7, wheelRadius: .48, speedFactor: 0.72, acceleration: 1.25, turningRadius: 8.2, accelerationScale: .64, steeringScale: .61, gripScale: .92, brakeScale: .84, topSpeedMph: 94, weight: 5, color: 0xaeb9bd, parkedEligible: false }),
   Object.freeze({ id: 'city_bus', label: 'City bus', bodyStyle: 'bus', handlingLabel: 'Transit-heavy', width: 2.45, height: 3.05, length: 10.4, cabinScale: 0.76, wheelRadius: .52, speedFactor: 0.64, acceleration: 1.05, turningRadius: 10.5, accelerationScale: .52, steeringScale: .48, gripScale: .9, brakeScale: .8, topSpeedMph: 82, weight: 3, color: 0x3f6685, parkedEligible: false, majorRoadOnly: true })
 ]);
+
+const ROAD_VEHICLE_METADATA = Object.freeze({
+  compact: Object.freeze({ massKg: 1240, seatCount: 4, resistance: 145 }),
+  sedan: Object.freeze({ massKg: 1520, seatCount: 5, resistance: 160 }),
+  suv: Object.freeze({ massKg: 1980, seatCount: 5, resistance: 185 }),
+  pickup: Object.freeze({ massKg: 2240, seatCount: 5, resistance: 195 }),
+  van: Object.freeze({ massKg: 2350, seatCount: 8, resistance: 205 }),
+  delivery_van: Object.freeze({ massKg: 2480, seatCount: 2, resistance: 210 }),
+  taxi: Object.freeze({ massKg: 1640, seatCount: 5, resistance: 165 }),
+  box_truck: Object.freeze({ massKg: 5200, seatCount: 3, resistance: 285, durabilityPolicy: TRANSPORT_DURABILITY_POLICIES.HEAVY_DUTY }),
+  city_bus: Object.freeze({ massKg: 11800, seatCount: 38, resistance: 360, durabilityPolicy: TRANSPORT_DURABILITY_POLICIES.HEAVY_DUTY })
+});
+
+const ROAD_FLEET_REFERENCE = 'docs/reference-art/road-fleet-and-damage-2026-08-29.png';
+const VEHICLE_CATALOG = Object.freeze(ROAD_VEHICLE_DEFINITIONS.map((definition) => {
+  const metadata = ROAD_VEHICLE_METADATA[definition.id] || ROAD_VEHICLE_METADATA.sedan;
+  return defineTransportCatalogEntry({
+    ...definition,
+    ...metadata,
+    domain: 'road',
+    playable: true,
+    enterable: true,
+    boardingPoints: ['driver-door', 'passenger-door'],
+    companionAboard: true,
+    damageZones: ['front', 'rear', 'left', 'right', 'glass', 'lights', 'running-gear'],
+    recovery: 'nearby-safe-road-or-ground',
+    visualRecipeId: `road-family:${definition.id}`,
+    visual: {
+      recipeId: `road-family:${definition.id}`,
+      lods: ['promoted', 'ambient', 'distant'],
+      mobileBudget: definition.id === 'city_bus' || definition.id === 'box_truck' ? 'heavy-bounded' : 'standard-bounded',
+      referenceEvidence: ROAD_FLEET_REFERENCE
+    }
+  });
+}));
 
 const VEHICLE_BY_ID = Object.freeze(Object.fromEntries(VEHICLE_CATALOG.map((entry) => [entry.id, entry])));
 const PARKED_VEHICLE_CATALOG = Object.freeze(VEHICLE_CATALOG.filter((entry) => entry.parkedEligible === true));
@@ -45,6 +85,7 @@ function vehicleMassKg(variantOrId = 'sedan') {
   const variant = typeof variantOrId === 'string'
     ? vehicleDefinitionById(variantOrId)
     : variantOrId || vehicleDefinitionById('sedan');
+  if (Number.isFinite(Number(variant.massKg)) && Number(variant.massKg) > 0) return Number(variant.massKg);
   const style = String(variant.bodyStyle || variant.id || 'sedan');
   const masses = {
     compact: 1240,
@@ -103,6 +144,7 @@ export {
   VEHICLE_BY_ID,
   VEHICLE_CATALOG,
   VEHICLE_ROOT_TO_GROUND_METERS,
+  ROAD_FLEET_REFERENCE,
   selectVehicleVariant,
   vehicleDefinitionById,
   vehicleConditionDynamics,

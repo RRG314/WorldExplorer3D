@@ -1,20 +1,14 @@
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleWheelContactLayout } from '../engine/vehicle-catalog.js?v=5';
+import { roadVehicleVisualRecipe } from '../transport/road-vehicle-visual-recipe.js?v=1';
+import { transportDamagePresentation } from '../transport/damage-model.js?v=1';
 
 function createUrbanVehicleVisual(THREE, definition = {}) {
   const variant = definition.variant || {};
-  const width = Number(variant.width || 1.8);
-  const height = Number(variant.height || 1.48);
-  const length = Number(variant.length || 4.4);
-  const wheelRadius = Number(variant.wheelRadius || 0.36);
-  const style = String(variant.bodyStyle || 'sedan');
-  const pickup = style === 'pickup';
-  const crossover = style === 'crossover' || style === 'suv';
-  const compact = style === 'compact';
-  const van = style === 'van';
-  const taxi = style === 'taxi';
-  const boxTruck = style === 'box-truck';
-  const bus = style === 'bus';
+  const recipe = roadVehicleVisualRecipe(variant);
+  const { width, height, length, wheelRadius, style } = recipe;
+  const {
+    pickup, crossover, compact, van, taxi, boxTruck, bus
+  } = recipe.flags;
   const responder = definition.serviceType === 'responder';
   const deliveryVan = van && /delivery|parcel/i.test(String(variant.id || variant.label || ''));
   const root = new THREE.Group();
@@ -44,6 +38,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   if (responderRed && responderBlue) materials.push(responderRed, responderBlue);
   const ownedGeometries = new Set();
   const serviceLights = [];
+  const damageParts = { bumpers: [], glass: [], hood: null, lamps: [], wheels: [] };
   const add = (geometry, material, name, position, rotation = null, parent = root) => {
     ownedGeometries.add(geometry);
     const mesh = new THREE.Mesh(geometry, material);
@@ -53,20 +48,24 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     mesh.castShadow = true;
     mesh.receiveShadow = false;
     parent.add(mesh);
+    if (/hood/i.test(name)) damageParts.hood = mesh;
+    if (/bumper/i.test(name)) damageParts.bumpers.push(mesh);
+    if (/window|glass|windshield/i.test(name)) damageParts.glass.push(mesh);
+    if (/headlight|taillight/i.test(name)) damageParts.lamps.push(mesh);
     return mesh;
   };
 
-  const ground = -VEHICLE_ROOT_TO_GROUND_METERS;
-  const roofY = ground + height;
-  const bodyBottom = ground + wheelRadius * .42;
-  const bodyTop = ground + Math.min(height * (bus ? .34 : boxTruck ? .33 : van ? .42 : crossover || pickup ? .46 : .5), height - .42);
-  const bodyHeight = Math.max(.42, bodyTop - bodyBottom);
-  const bodyY = (bodyBottom + bodyTop) * .5;
-  const cabinLength = bus ? length * 0.9 : boxTruck ? length * 0.27 : van ? length * 0.7 : pickup ? length * 0.38 : compact ? length * 0.49 : length * 0.5;
-  const cabinZ = bus ? 0 : boxTruck ? length * 0.34 : van ? length * 0.02 : pickup ? length * 0.18 : -length * 0.08;
-  const cabinBottom = bodyTop - .08;
-  const cabinHeight = Math.max(.32, roofY - cabinBottom - .055);
-  const cabinY = cabinBottom + cabinHeight * .5;
+  const ground = -recipe.rootToGround;
+  const roofY = ground + recipe.roofY;
+  const bodyBottom = ground + recipe.bodyBottom;
+  const bodyTop = ground + recipe.bodyTop;
+  const bodyHeight = recipe.bodyHeight;
+  const bodyY = ground + recipe.bodyY;
+  const cabinLength = recipe.cabinLength;
+  const cabinZ = recipe.cabinZ;
+  const cabinBottom = ground + recipe.cabinBottom;
+  const cabinHeight = recipe.cabinHeight;
+  const cabinY = ground + recipe.cabinY;
 
   add(createBeveledVehicleBoxGeometry(THREE, width, bodyHeight, length, Math.min(.13, bodyHeight * .2)), paint, 'Urban rounded lower body', [0, bodyY, 0]);
   add(createTaperedPrismGeometry(THREE, {
@@ -170,7 +169,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   }
 
   const wheels = [];
-  const wheelLayout = vehicleWheelContactLayout(variant);
+  const wheelLayout = recipe.wheelLayout;
   for (const [side, front] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
     const wheel = new THREE.Group();
     wheel.name = 'Urban Wheel';
@@ -180,6 +179,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     add(new THREE.CylinderGeometry(wheelRadius * 0.52, wheelRadius * 0.52, Math.min(.26, width * 0.145), 20), chrome, 'Urban wheel hub', [0, 0, 0], [0, 0, Math.PI / 2], wheel);
     root.add(wheel);
     wheels.push(wheel);
+    damageParts.wheels.push(wheel);
   }
 
   for (const front of [-1, 1]) {
@@ -208,19 +208,80 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     groundOffset: Number((bounds.min.y - ground).toFixed(3)),
     roofOverflow: Number(Math.max(0, bounds.max.y - roofY).toFixed(3))
   });
-  return Object.freeze({
+  const damageSmokeMaterial = new THREE.MeshBasicMaterial({
+    color: 0x30383b,
+    transparent: true,
+    opacity: .34,
+    depthWrite: false
+  });
+  materials.push(damageSmokeMaterial);
+  const damageSmoke = new THREE.Group();
+  damageSmoke.name = 'Vehicle critical damage smoke';
+  damageSmoke.position.set(width * .18, bodyTop + .04, length * .3);
+  damageSmoke.visible = false;
+  for (let index = 0; index < 3; index += 1) {
+    const puff = add(new THREE.SphereGeometry(.18 + index * .035, 7, 5), damageSmokeMaterial, 'Vehicle damage smoke puff', [0, index * .18, 0], null, damageSmoke);
+    puff.userData.damageSmokeIndex = index;
+  }
+  root.add(damageSmoke);
+  const baseTransforms = new Map([
+    ...damageParts.bumpers,
+    ...damageParts.wheels,
+    ...(damageParts.hood ? [damageParts.hood] : [])
+  ].map((object) => [object, Object.freeze({
+    x: object.position.x,
+    y: object.position.y,
+    z: object.position.z,
+    rx: object.rotation.x,
+    ry: object.rotation.y,
+    rz: object.rotation.z
+  })]));
+  const setCondition = (condition = 1) => {
+    const damage = transportDamagePresentation(condition);
+    root.userData.condition = damage.condition;
+    root.userData.damageState = damage;
+    paint.color.setHex(Number(definition.color || variant.color || 0x466579)).multiplyScalar(1 - damage.dirt * .38);
+    darkPaint.color.copy(paint.color).multiplyScalar(0.72);
+    glass.color.setHex(damage.glassDamage ? 0x59666a : 0x172932);
+    headlight.emissiveIntensity = damage.lampFailure ? .02 : .5;
+    taillight.emissiveIntensity = damage.lampFailure ? .04 : .62;
+    if (damageParts.hood) {
+      const base = baseTransforms.get(damageParts.hood);
+      damageParts.hood.position.y = base.y - damage.panelDisplacement * .22;
+      damageParts.hood.rotation.x = base.rx - damage.panelDisplacement * 1.8;
+    }
+    damageParts.bumpers.forEach((bumper, index) => {
+      const base = baseTransforms.get(bumper);
+      const frontDamage = /front/i.test(bumper.name) ? 1 : .55;
+      bumper.position.y = base.y - damage.panelDisplacement * frontDamage;
+      bumper.rotation.z = base.rz + (index % 2 ? -1 : 1) * damage.panelDisplacement * .7;
+    });
+    damageParts.wheels.forEach((wheel, index) => {
+      const base = baseTransforms.get(wheel);
+      wheel.rotation.z = base.rz + (damage.wheelDamage && index === 0 ? -.18 : 0);
+    });
+    damageSmoke.visible = damage.smoke;
+    root.rotation.z = damage.band === 'disabled' ? .035 : 0;
+    return damage;
+  };
+  const updateDamageVisual = (elapsed = 0) => {
+    if (!damageSmoke.visible) return;
+    damageSmoke.children.forEach((puff, index) => {
+      const phase = Number(elapsed || 0) * .7 + index * 1.8;
+      puff.position.x = Math.sin(phase) * (.05 + index * .025);
+      puff.position.y = index * .18 + (Math.sin(phase * .8) + 1) * .055;
+      const scale = .82 + (Math.sin(phase) + 1) * .14;
+      puff.scale.setScalar(scale);
+    });
+  };
+  const api = {
     root,
     wheels,
     doors: Object.freeze(doors),
     serviceLights: Object.freeze(serviceLights),
     materials: Object.freeze(materials),
-    setCondition(condition = 1) {
-      const value = Math.max(0, Math.min(1, Number(condition) || 0));
-      root.userData.condition = value;
-      paint.color.setHex(Number(definition.color || variant.color || 0x466579)).multiplyScalar(0.42 + value * 0.58);
-      darkPaint.color.copy(paint.color).multiplyScalar(0.72);
-      root.rotation.z = value <= 0 ? 0.035 : 0;
-    },
+    setCondition,
+    updateDamageVisual,
     setServiceLights(elapsed = 0, active = true) {
       if (!responderRed || !responderBlue) return;
       const redActive = active && Math.sin(Number(elapsed || 0) * 11) >= 0;
@@ -232,7 +293,9 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
       ownedGeometries.forEach((geometry) => geometry.dispose?.());
       materials.forEach((material) => material.dispose?.());
     }
-  });
+  };
+  setCondition(definition.condition ?? 1);
+  return Object.freeze(api);
 }
 
 export { createUrbanVehicleVisual };
