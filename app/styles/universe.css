@@ -178,15 +178,7 @@
 
 @media (max-width: 720px) {
   .solar-system-scale {
-    right: 10px;
-    bottom: 10px;
-    width: 176px;
-    height: 104px;
-  }
-
-  .solar-system-scale canvas {
-    width: 176px;
-    height: 104px;
+    display: none !important;
   }
 
   .universe-navigator {

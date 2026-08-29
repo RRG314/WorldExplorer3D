@@ -43,9 +43,9 @@ function createWalkingEncounterDirector(options = {}) {
   if (plan?.type !== 'FieldActivityPlan') throw new TypeError('Walking encounters require a FieldActivityPlan.');
   const claimedIds = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const canUseSlot = typeof options.canUseSlot === 'function' ? options.canUseSlot : () => true;
-  const initialDelaySeconds = Math.max(0, Number(options.initialDelaySeconds) || 2.5);
-  const fallbackDelaySeconds = Math.max(initialDelaySeconds, Number(options.fallbackDelaySeconds) || 6);
-  const requiredWalkMeters = Math.max(0, Number(options.requiredWalkMeters) || 4);
+  const initialDelaySeconds = Math.max(0, Number(options.initialDelaySeconds) || 5);
+  const fallbackDelaySeconds = Math.max(initialDelaySeconds, Number(options.fallbackDelaySeconds) || 10);
+  const requiredWalkMeters = Math.max(0, Number(options.requiredWalkMeters) || 8);
   const cooldownSeconds = Math.max(0, Number(options.cooldownSeconds) || 24);
   const maxLeadDistance = Math.max(30, Number(options.maxLeadDistance) || 145);
   const suppressedSlotIds = new Set();

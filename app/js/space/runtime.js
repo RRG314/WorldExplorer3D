@@ -434,7 +434,7 @@ export function updateSpaceFlightPhysics() {
       keys[' '] || keys['shift'] ||
       keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright']
     ),
-    manualFlightRate: 100
+    manualFlightRate: 1000
   }) === true;
   if (siRuntimeActive) {
     const environment = appCtx.spaceFlightEnvironment;
@@ -472,7 +472,9 @@ export function updateSpaceFlightPhysics() {
     const exhaust = rocket.getObjectByName('exhaust');
     const thrustLevel = appCtx.spaceFlight._isThrusting ? 1 : 0.16;
     if (glow) {
-      glow.material.opacity = 0.2 + thrustLevel * 0.6;
+      glow.traverse((part) => {
+        if (part.material) part.material.opacity = 0.2 + thrustLevel * 0.6;
+      });
       glow.scale.y = 0.4 + thrustLevel * 0.6;
     }
     if (exhaust) {
@@ -599,12 +601,12 @@ export function updateSpaceFlightCamera() {
   if (appCtx.spaceFlight.mode === 'launching' && launchBody?.position && launchAltitude < 180) {
     _sfLaunchRadial.copy(rocket.position).sub(launchBody.position).normalize();
     _sfTargetPos.copy(rocket.position)
-      .addScaledVector(_sfLaunchRadial, 48)
-      .addScaledVector(_sfTempVec, 24);
+      .addScaledVector(_sfLaunchRadial, 34)
+      .addScaledVector(_sfTempVec, 16);
   } else {
     _sfTargetPos.copy(rocket.position)
-      .addScaledVector(_sfForward, -70)
-      .addScaledVector(_sfTempVec, 25);
+      .addScaledVector(_sfForward, -48)
+      .addScaledVector(_sfTempVec, 18);
   }
 
   appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);

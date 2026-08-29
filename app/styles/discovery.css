@@ -38,3 +38,8 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
 }
 
 .discoveryCharacterAssist{display:flex;align-items:center;gap:8px;margin-top:8px;padding:7px 8px;border-left:2px solid var(--wx-blue);background:rgba(36,118,255,.08);color:#aebdc7;font-size:10px}.discoveryCharacterAssist[hidden]{display:none}.discoveryCharacterAssist strong{color:#dce9ff;font:700 8px Orbitron,sans-serif;letter-spacing:.06em;text-transform:uppercase}.discoveryCharacterAssist span{text-transform:capitalize}
+
+@media(min-width:761px){
+  body:has(#floatMenuContainer.show) #discoveryQuickToolBtn{bottom:94px}
+  body:has(#floatMenuContainer.show) #discoveryContextPrompt{bottom:140px}
+}

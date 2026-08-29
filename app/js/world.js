@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=31";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=17";
+} from "./world/furniture.js?v=18";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,

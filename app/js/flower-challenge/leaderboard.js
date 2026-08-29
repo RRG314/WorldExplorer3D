@@ -1,4 +1,5 @@
-import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=1';
+import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=2';
+import { explorerProgressSnapshot } from '../discovery/explorer-events.js?v=3';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 
 function createFlowerChallengeLeaderboardApi(context) {
@@ -171,6 +172,12 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function readRemoteLeaderboard(challengeType = 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
+    // The existing cloud collection belongs to Community League. Keep the
+    // Explorer profile separate until its server schema is reviewed.
+    if (normalizedType === 'explorer') {
+      challengeState.leaderboardBackend = 'local';
+      return null;
+    }
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return null;
 
@@ -256,6 +263,39 @@ function createFlowerChallengeLeaderboardApi(context) {
     }
   }
 
+  async function syncExplorerProfileToLocalLeaderboard() {
+    const profileStore = appCtx.worldDiscoveryRuntime?.profileStore;
+    if (typeof profileStore?.getProfile !== 'function') return null;
+    try {
+      const profile = await profileStore.getProfile();
+      const progress = explorerProgressSnapshot(profile?.explorerProgress);
+      if (progress.points <= 0 && progress.totalRecords <= 0) return null;
+      const entry = normalizeLeaderboardEntry({
+        id: 'explorer_profile_local',
+        challenge: 'explorer',
+        player: resolvePlayerName(),
+        score: progress.points,
+        rankLabel: progress.rankLabel,
+        totalRecords: progress.totalRecords,
+        uniqueDiscoveries: progress.uniqueDiscoveries,
+        regionsVisited: progress.regions.length,
+        badgeCount: progress.badgeAwards.length,
+        location: getRuntimeLocationLabel(),
+        mode: inferTravelMode(),
+        foundAt: new Date().toISOString(),
+        source: 'device'
+      }, 'explorer');
+      if (!entry) return null;
+      const existing = readLocalLeaderboard('explorer')
+        .filter((candidate) => candidate.id !== entry.id);
+      writeLocalLeaderboard('explorer', [entry, ...existing]);
+      return entry;
+    } catch (error) {
+      console.warn('[explorer-profile] Could not refresh the local Explorer profile.', error);
+      return null;
+    }
+  }
+
   async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
     const definition = getLeaderboardDefinition(normalizedType);
@@ -280,6 +320,7 @@ function createFlowerChallengeLeaderboardApi(context) {
       ui.status.textContent = `Loading ${definition.label}…`;
       ui.status.classList.remove('error', 'ok');
     }
+    if (normalizedType === 'explorer') await syncExplorerProfileToLocalLeaderboard();
     const localEntries = readLocalLeaderboard(normalizedType).map((entry) => ({ ...entry, source: 'device' }));
     const remoteEntries = await readRemoteLeaderboard(normalizedType);
     const entries = remoteEntries === null
@@ -441,6 +482,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     setChallengeLeaderboardView,
     sortLeaderboardEntries,
     storeLocalResult,
+    syncExplorerProfileToLocalLeaderboard,
     submitFishingScore,
     submitDeFlockScore,
     submitPaintTownScore,

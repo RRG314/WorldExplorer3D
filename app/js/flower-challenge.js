@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=2";
-import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=1";
+import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=3";
+import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=2";
 import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
-import { normalizeLeaderboardId } from "./leaderboards/catalog.js?v=1";
+import { normalizeLeaderboardId } from "./leaderboards/catalog.js?v=2";
 import { emitProductTelemetry } from "./platform/product-telemetry.js?v=1";
 import { getCurrentUser } from "../../js/auth-ui.js?v=55";
 import { initFirebase } from "../../js/firebase-init.js?v=55";

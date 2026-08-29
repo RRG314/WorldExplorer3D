@@ -1,4 +1,4 @@
-import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=1';
+import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=2';
 
 export function createFlowerLeaderboardView(deps = {}) {
   const {
@@ -43,6 +43,11 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   const roomsJoined = Number(raw.roomsJoined);
   const artifactsShared = Number(raw.artifactsShared);
   const friendsAdded = Number(raw.friendsAdded);
+  const rankLabel = String(raw.rankLabel || '').slice(0, 48);
+  const totalRecords = Number(raw.totalRecords);
+  const uniqueDiscoveries = Number(raw.uniqueDiscoveries);
+  const regionsVisited = Number(raw.regionsVisited);
+  const badgeCount = Number(raw.badgeCount);
   const disabledCameras = Number(raw.disabledCameras);
   const totalCameras = Number(raw.totalCameras);
   const detections = Number(raw.detections);
@@ -85,6 +90,11 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
     roomsJoined: Number.isFinite(roomsJoined) ? Math.max(0, Math.round(roomsJoined)) : 0,
     artifactsShared: Number.isFinite(artifactsShared) ? Math.max(0, Math.round(artifactsShared)) : 0,
     friendsAdded: Number.isFinite(friendsAdded) ? Math.max(0, Math.round(friendsAdded)) : 0,
+    rankLabel,
+    totalRecords: Number.isFinite(totalRecords) ? Math.max(0, Math.round(totalRecords)) : 0,
+    uniqueDiscoveries: Number.isFinite(uniqueDiscoveries) ? Math.max(0, Math.round(uniqueDiscoveries)) : 0,
+    regionsVisited: Number.isFinite(regionsVisited) ? Math.max(0, Math.round(regionsVisited)) : 0,
+    badgeCount: Number.isFinite(badgeCount) ? Math.max(0, Math.round(badgeCount)) : 0,
     disabledCameras: Number.isFinite(disabledCameras) ? Math.max(0, Math.round(disabledCameras)) : 0,
     totalCameras: Number.isFinite(totalCameras) ? Math.max(0, Math.round(totalCameras)) : 0,
     detections: Number.isFinite(detections) ? Math.max(0, Math.round(detections)) : 0,
@@ -148,7 +158,7 @@ function renderLeaderboard(entries) {
       locationLine = `${safeText(entry.species || 'Fish')} | ${Number(entry.weightKg || 0).toFixed(2)} kg | ${Number(entry.lengthCm || 0).toFixed(1)} cm | ${safeText(entry.location)}`;
     } else if (challengeType === 'explorer') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
-      locationLine = `Rooms ${entry.roomsJoined || 0} | Artifacts ${entry.artifactsShared || 0} | Friends ${entry.friendsAdded || 0}`;
+      locationLine = `${safeText(entry.rankLabel || 'Trailhead')} | ${entry.totalRecords || 0} journal records | ${entry.uniqueDiscoveries || 0} discoveries | ${entry.regionsVisited || 0} regions`;
     } else if (challengeType === 'deflock') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
       locationLine = `${entry.disabledCameras || 0}/${entry.totalCameras || 0} virtual cameras | ${((Number(entry.timeMs) || 0) / 1000).toFixed(1)}s | ${safeText(entry.location)}`;

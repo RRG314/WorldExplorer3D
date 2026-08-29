@@ -67,10 +67,10 @@ function resolveMobileSemanticActions(mode = 'walk', state = {}) {
     turn: walking ? 0 : -moveX,
     steer: walking ? 0 : -moveX,
     strafe: walking ? moveX : 0,
-    // Screen-space touch intent: dragging the look pad right must turn the
-    // camera right. The old negation inverted that relationship on phones.
-    lookYaw: lookX,
-    lookPitch: -lookY,
+    // Match the established drag-to-look camera used by mouse input: dragging
+    // right rotates the view right, and dragging up raises the view.
+    lookYaw: -lookX,
+    lookPitch: lookY,
     moveActive: state.move?.active === true,
     lookActive: state.look?.active === true,
     enabled: state.enabled === true,

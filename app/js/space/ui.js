@@ -33,6 +33,13 @@ function formatAcceleration(value) {
   return `time acceleration ×${value.toExponential(1)}`;
 }
 
+function normalizedSpaceKey(event) {
+  if (event.code === 'Space' || event.key === ' ') return ' ';
+  if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') return 'shift';
+  if (event.code?.startsWith('Arrow')) return event.code.toLowerCase();
+  return String(event.key || '').toLowerCase();
+}
+
 export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   console.log("Initializing Space Flight UI...");
 
@@ -48,19 +55,21 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
 
   const hud = document.createElement('div');
   hud.id = 'spaceFlightHUD';
-  hud.style.cssText = 'position:fixed;bottom:20px;left:20px;background:rgba(10,10,30,0.95);border:2px solid #667eea;border-radius:12px;padding:16px;color:#fff;font-family:Orbitron,sans-serif;font-size:13px;z-index:10001;display:none;min-width:248px;';
+  hud.className = 'spaceFlightHud';
   hud.innerHTML = `
-    <div style="font-size:16px;color:#667eea;margin-bottom:12px;font-weight:700;display:flex;align-items:center;gap:8px;">
-      <span style="font-size:24px;">🚀</span> SPACE FLIGHT
+    <div class="spaceFlightHudHead">
+      <span aria-hidden="true">✦</span><strong>WAYFINDER FLIGHT</strong>
+      <button id="sfHudToggle" type="button" aria-expanded="true" aria-label="Collapse flight instruments">−</button>
     </div>
-    <div id="sfFlightStatus" style="margin-bottom:9px;color:#a5b4fc;font-size:11px;letter-spacing:0.04em;">Preparing flight</div>
-    <div id="sfFlightRead" style="margin:-4px 0 9px;color:#cbd5e1;font-size:10px;">Basic flight guidance</div>
-    <div style="margin-bottom:6px;">Nearest: <span id="sfDestination" style="color:#10b981;font-weight:600;">---</span></div>
-    <div style="margin-bottom:6px;"><span id="sfAltitudeLabel">Altitude</span>: <span id="sfAltitude">0</span> <span id="sfAltitudeUnit">km</span></div>
-    <div style="margin-bottom:6px;"><span id="sfSpeedLabel">Velocity</span>: <span id="sfSpeed">0</span> <span id="sfSpeedUnit">km/s</span></div>
-    <div style="margin-bottom:12px;"><span id="sfDistanceLabel">Distance</span>: <span id="sfDistance" style="color:#fbbf24;">---</span> <span id="sfDistanceUnit">km</span></div>
-    <div id="sfEnvironment" style="margin:-4px 0 12px;color:#cbd5e1;font-size:10px;line-height:1.45;">Deep space</div>
-    <div style="background:rgba(102,126,234,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
+    <div id="sfFlightStatus" class="spaceFlightHudStatus">Preparing flight</div>
+    <div class="spaceFlightHudBody">
+    <div id="sfFlightRead" class="spaceFlightHudRead">Basic flight guidance</div>
+    <div class="spaceFlightMetric"><span>Nearest</span><b id="sfDestination">---</b></div>
+    <div class="spaceFlightMetric"><span id="sfAltitudeLabel">Altitude</span><b><span id="sfAltitude">0</span> <span id="sfAltitudeUnit">km</span></b></div>
+    <div class="spaceFlightMetric"><span id="sfSpeedLabel">Velocity</span><b><span id="sfSpeed">0</span> <span id="sfSpeedUnit">km/s</span></b></div>
+    <div class="spaceFlightMetric"><span id="sfDistanceLabel">Distance</span><b><span id="sfDistance">---</span> <span id="sfDistanceUnit">km</span></b></div>
+    <div id="sfEnvironment" class="spaceFlightHudEnvironment">Deep space</div>
+    <div class="spaceFlightZone">
       <div id="sfZoneLabel" style="font-size:11px;opacity:0.8;margin-bottom:6px;">LANDING ZONE</div>
       <div style="height:8px;background:rgba(0,0,0,0.3);border-radius:4px;overflow:hidden;">
         <div id="sfLandingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#10b981,#34d399);transition:width 0.3s;"></div>
@@ -73,11 +82,13 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
     <button id="sfLandBtn" style="width:100%;padding:12px;background:#667eea;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;opacity:0.5;" disabled>
       EXPLORE SOLAR SYSTEM
     </button>
+    </div>
   `;
   document.body.appendChild(hud);
   appCtx.spaceFlight.hud = hud;
 
   setupSpaceFlightControls(attemptLanding, lifecycleScope);
+  if (globalThis.matchMedia?.('(max-width: 768px)').matches) hud.classList.add('collapsed');
 }
 
 function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
@@ -85,6 +96,16 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
     target.addEventListener(eventName, listener, options);
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
+  listen(document.getElementById('sfHudToggle'), 'click', () => {
+    const hud = document.getElementById('spaceFlightHUD');
+    const collapsed = hud?.classList.toggle('collapsed') === true;
+    const toggle = document.getElementById('sfHudToggle');
+    if (toggle) {
+      toggle.textContent = collapsed ? '+' : '−';
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.setAttribute('aria-label', collapsed ? 'Expand flight instruments' : 'Collapse flight instruments');
+    }
+  });
   listen(document.getElementById('sfAssistBtn'), 'click', () => {
     if (appCtx.spaceJourney?.phase === 'atmospheric_exploration') return;
     const result = appCtx.toggleRenderedJourneyAssist?.();
@@ -109,8 +130,9 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
 
   listen(document, 'keydown', (e) => {
     if (appCtx.spaceFlight.active) {
-      appCtx.spaceFlight.keys[e.key.toLowerCase()] = true;
-      if ([' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+      const key = normalizedSpaceKey(e);
+      appCtx.spaceFlight.keys[key] = true;
+      if ([' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         e.preventDefault();
       }
     }
@@ -118,7 +140,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
 
   listen(document, 'keyup', (e) => {
     if (appCtx.spaceFlight.active) {
-      appCtx.spaceFlight.keys[e.key.toLowerCase()] = false;
+      appCtx.spaceFlight.keys[normalizedSpaceKey(e)] = false;
     }
   });
 
@@ -268,7 +290,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     assistBtn.style.display = assist?.available === false && !atmosphericClimb ? 'none' : '';
     assistBtn.disabled = atmosphericClimb
       ? false
-      : !assist?.available || !['parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
+      : !assist?.available || !['launch', 'ascent', 'parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
     assistBtn.style.opacity = assistBtn.disabled ? '0.55' : '1';
     assistBtn.textContent = atmosphericClimb
       ? 'HOLD TO CLIMB'
@@ -469,7 +491,8 @@ export function showFlightMessage(text, color) {
 
   const msg = document.createElement('div');
   msg.id = 'sfMessage';
-  msg.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);border:3px solid ${color};border-radius:16px;padding:24px 48px;color:${color};font-family:Orbitron,sans-serif;font-size:24px;font-weight:700;z-index:10002;text-align:center;pointer-events:none;`;
+  msg.className = 'spaceFlightMessage';
+  msg.style.setProperty('--space-flight-message-color', color);
   msg.textContent = text;
   document.body.appendChild(msg);
 
@@ -477,5 +500,5 @@ export function showFlightMessage(text, color) {
     msg.style.transition = 'opacity 0.5s';
     msg.style.opacity = '0';
     setTimeout(() => msg.remove(), 500);
-  }, 2000);
+  }, 1200);
 }

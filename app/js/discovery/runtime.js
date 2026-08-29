@@ -281,6 +281,8 @@ function createDiscoveryUi(state) {
   let guideRecords = [];
   let journalRecords = [];
   let expeditionSignature = '';
+  let encounterPromptRevision = -1;
+  let encounterPromptShownAt = 0;
 
   function listen(element, type, handler) {
     if (!element) return;
@@ -730,7 +732,19 @@ function createDiscoveryUi(state) {
     // remains available and returns as soon as the direct interaction clears.
     const directInteraction = state.appCtx.resolvePrimaryContextInteraction?.() || null;
     const interiorInteraction = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
-    const showEncounterLead = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
+    const encounterPromptEligible = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
+    const encounterRevision = Number(encounterLead?.revision);
+    const promptNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (!encounterLead?.available) {
+      encounterPromptRevision = -1;
+      encounterPromptShownAt = 0;
+    } else if (encounterPromptEligible && encounterRevision !== encounterPromptRevision) {
+      encounterPromptRevision = encounterRevision;
+      encounterPromptShownAt = promptNow;
+    }
+    // A field lead is an invitation, not a permanent HUD layer. Keep the
+    // underlying lead available in Explorer after this short notice expires.
+    const showEncounterLead = encounterPromptEligible && promptNow - encounterPromptShownAt < 7000;
     elements.prompt?.classList.toggle('show', showEncounterLead);
     if (elements.prompt) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';

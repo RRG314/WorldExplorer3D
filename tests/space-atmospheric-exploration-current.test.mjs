@@ -124,7 +124,9 @@ test('rendered giant-planet flight keeps one journey identity through atmosphere
   }), true);
   const journeyId = appContext.spaceJourney.journeyId;
   assert.equal(runtime.engageRenderedJourneyAssist().accepted, true);
-  for (let frame = 0; frame < 251; frame += 1) runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  for (let frame = 0; frame < 400 && appContext.spaceJourney.phase !== JOURNEY_PHASE.APPROACH; frame += 1) {
+    runtime.updateRenderedSpaceJourney({ realDtS: 0.1 });
+  }
   assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.APPROACH);
   const entry = runtime.requestRenderedAtmosphericEntry('jupiter');
   assert.equal(entry.accepted, true, entry.reason);

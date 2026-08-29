@@ -30,7 +30,7 @@ import {
 } from './atmospheric-descent-authority.js?v=1';
 import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';
 
-const MANUAL_FLIGHT_RATE = 100;
+const MANUAL_FLIGHT_RATE = 1000;
 const SPACECRAFT_SCENE_CLEARANCE = 6;
 
 const FAST_TRAVEL_DELTA_V_MPS = Object.freeze({
@@ -299,12 +299,10 @@ function installSpaceJourneyRuntime(appContext) {
         startedAtMs: epochMs
       });
       journey = transitionOrThrow(journey, 'launch_ready', { atMs: epochMs + 1, spacecraftReady: true });
-      spacecraft = createMissionSpacecraft(ephemeris, destinationBodyId, epochMs);
-      const sourceNavigation = computeBodyRelativeNavigation(spacecraft, ephemeris.source);
-      journey = transitionOrThrow(journey, 'parking_orbit_established', {
-        atMs: epochMs + 2,
-        navigation: sourceNavigation
-      });
+      spacecraft = createSurfaceDepartureSpacecraft(ephemeris, destinationBodyId, epochMs);
+      if (journey.mode !== JOURNEY_MODE.MANUAL) {
+        initialAssistedPlan = createAssistedAscentPlan(spacecraft, ephemeris.source);
+      }
     }
     const presentation = createLivePresentation(ephemeris, sourceScene, destinationScene);
     rendered = {
@@ -323,6 +321,11 @@ function installSpaceJourneyRuntime(appContext) {
       continuingReturn
     };
     rocket.position.set(rendered.lastScenePosition.x, rendered.lastScenePosition.y, rendered.lastScenePosition.z);
+    if (rocket.quaternion?.setFromUnitVectors && rocket.position?.clone) {
+      const outward = rocket.position.clone().set(sceneOffset.x, sceneOffset.y, sceneOffset.z).normalize();
+      const localForward = rocket.position.clone().set(0, 1, 0);
+      rocket.quaternion.setFromUnitVectors(localForward, outward);
+    }
     appContext.spaceJourney = journey;
     appContext.spacecraftState = spacecraft;
     appContext.spaceJourneyEphemeris = ephemeris;
@@ -338,6 +341,11 @@ function installSpaceJourneyRuntime(appContext) {
     }
     if (rendered.assistedPlan) {
       return Object.freeze({ accepted: true, reason: null, alreadyActive: true });
+    }
+    if (rendered.journey.phase === JOURNEY_PHASE.LAUNCH || rendered.journey.phase === JOURNEY_PHASE.ASCENT) {
+      rendered.assistedPlan = createAssistedAscentPlan(rendered.spacecraft, rendered.ephemeris.source);
+      publishAssistState();
+      return Object.freeze({ accepted: true, reason: null, plan: rendered.assistedPlan });
     }
     if (![JOURNEY_PHASE.PARKING_ORBIT, JOURNEY_PHASE.TRANSFER, JOURNEY_PHASE.RETURN_TRANSFER].includes(rendered.journey.phase)) {
       return Object.freeze({ accepted: false, reason: 'flight-assist-not-available-in-phase' });
@@ -369,7 +377,7 @@ function installSpaceJourneyRuntime(appContext) {
   };
 
   const retargetRenderedSpaceJourney = (destinationInput) => {
-    if (!rendered || rendered.journey.phase !== JOURNEY_PHASE.PARKING_ORBIT || rendered.assistedPlan) {
+    if (!rendered || ![JOURNEY_PHASE.LAUNCH, JOURNEY_PHASE.PARKING_ORBIT].includes(rendered.journey.phase)) {
       return Object.freeze({ accepted: false, reason: 'destination-change-requires-parking-orbit' });
     }
     const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
@@ -398,6 +406,16 @@ function installSpaceJourneyRuntime(appContext) {
     if (!rendered) return;
     const sourceNavigation = computeBodyRelativeNavigation(rendered.spacecraft, rendered.ephemeris.source);
     const destinationNavigation = computeBodyRelativeNavigation(rendered.spacecraft, rendered.ephemeris.destination);
+    if (
+      rendered.journey.phase === JOURNEY_PHASE.LAUNCH &&
+      sourceNavigation.altitudeM >= 100_000 &&
+      sourceNavigation.captured
+    ) {
+      rendered.journey = transitionOrThrow(rendered.journey, 'parking_orbit_established', {
+        atMs,
+        navigation: sourceNavigation
+      });
+    }
     if (
       rendered.journey.phase === JOURNEY_PHASE.PARKING_ORBIT &&
       sourceNavigation.altitudeM >= 500_000 &&
@@ -535,7 +553,10 @@ function installSpaceJourneyRuntime(appContext) {
       rendered.spacecraft = assistedUpdate.state;
       if (assistedUpdate.complete && rendered.assistedPlan.kind === 'ascent') {
         const navigation = computeBodyRelativeNavigation(rendered.spacecraft, rendered.ephemeris.source);
-        rendered.journey = transitionOrThrow(rendered.journey, 'departure_cleared', {
+        const ascentEvent = rendered.journey.phase === JOURNEY_PHASE.LAUNCH
+          ? 'parking_orbit_established'
+          : 'departure_cleared';
+        rendered.journey = transitionOrThrow(rendered.journey, ascentEvent, {
           atMs: Math.max(rendered.journey.updatedAtMs, rendered.spacecraft.epochMs),
           navigation
         });
@@ -544,6 +565,12 @@ function installSpaceJourneyRuntime(appContext) {
           rendered.assistedPlan = null;
           publishAssistState({ failureReason: transferPlan.reason });
         } else {
+          if (rendered.journey.phase === JOURNEY_PHASE.PARKING_ORBIT) {
+            rendered.journey = transitionOrThrow(rendered.journey, 'transfer_burn_complete', {
+              atMs: Math.max(rendered.journey.updatedAtMs, transferPlan.startState.epochMs),
+              burn: transferPlan.departureBurn
+            });
+          }
           rendered.spacecraft = transferPlan.startState;
           rendered.assistedPlan = transferPlan;
           publishAssistState();
@@ -833,25 +860,6 @@ function installSpaceJourneyRuntime(appContext) {
       propellantKg: rendered.spacecraft.propellantKg,
       lastEvent: 'atmospheric-departure-ready'
     });
-    const returnAxis = {
-      x: sceneOffset.x / sceneDistance,
-      y: sceneOffset.y / sceneDistance,
-      z: sceneOffset.z / sceneDistance
-    };
-    const extractionVelocityMps = {
-      x: ephemeris.source.velocityMps.x + returnAxis.x * 6_000,
-      y: ephemeris.source.velocityMps.y + returnAxis.y * 6_000,
-      z: ephemeris.source.velocityMps.z + returnAxis.z * 6_000
-    };
-    const extractionBurn = executePlannedBurn(spacecraft, {
-      x: extractionVelocityMps.x - spacecraft.velocityMps.x,
-      y: extractionVelocityMps.y - spacecraft.velocityMps.y,
-      z: extractionVelocityMps.z - spacecraft.velocityMps.z
-    });
-    if (!extractionBurn.executed) {
-      return Object.freeze({ accepted: false, reason: extractionBurn.reason || 'atmospheric-extraction-burn-failed' });
-    }
-    spacecraft = extractionBurn.state;
     const presentation = createLivePresentation(ephemeris, sourceScene, destinationScene);
     rendered = {
       ...rendered,
@@ -867,7 +875,7 @@ function installSpaceJourneyRuntime(appContext) {
       continuingReturn: true,
       assistedPlan: result.journey.mode === JOURNEY_MODE.MANUAL
         ? null
-        : createAssistedAscentPlan(spacecraft, ephemeris.source, { endVelocityMps: extractionVelocityMps })
+        : createAssistedAscentPlan(spacecraft, ephemeris.source)
     };
     appContext.spaceFlight.rocket.position.set(
       rendered.lastScenePosition.x,
@@ -884,7 +892,9 @@ function installSpaceJourneyRuntime(appContext) {
     const destinationElement = globalThis.document?.getElementById?.('sfDestination');
     if (destinationElement) destinationElement.textContent = getAstronomicalBody(destinationBodyId)?.name || destinationBodyId;
     publishAssistState();
-    return Object.freeze({ accepted: true, reason: null, extractionBurn });
+    // The shared transfer plan performs and accounts for the departure burn
+    // after ascent clears the atmospheric body.
+    return Object.freeze({ accepted: true, reason: null });
   };
 
   const clearRenderedSpaceJourney = () => {

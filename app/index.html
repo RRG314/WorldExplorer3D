@@ -22,17 +22,17 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=94">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=111">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=112">
 <link rel="stylesheet" href="styles/block-builder.css?v=7">
-<link rel="stylesheet" href="styles/universe.css?v=5">
+<link rel="stylesheet" href="styles/universe.css?v=6">
 <link rel="stylesheet" href="styles/fishing-game.css?v=5">
 <link rel="stylesheet" href="styles/interface-v4.css?v=19">
 <link rel="stylesheet" href="styles/start-hub.css?v=16">
-<link rel="stylesheet" href="styles/discovery.css?v=13">
+<link rel="stylesheet" href="styles/discovery.css?v=14">
 <link rel="stylesheet" href="styles/tutorial.css?v=3">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=1">
-<link rel="stylesheet" href="styles/map-explorer.css?v=3">
+<link rel="stylesheet" href="styles/map-explorer.css?v=4">
 <link rel="stylesheet" href="styles/accessibility.css?v=1">
 </head>
 <body>
@@ -921,83 +921,83 @@ Graphics changes apply to the current session.
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
 <div id="mapExplorerHint">Drag to explore · use +/− to zoom · tap a marker for details</div>
 <button id="mapClose" type="button" aria-label="Close world map">Close</button>
-<button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">📋 Legend</button>
+<button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">Map layers</button>
 <div id="legendPanel" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
-    <div style="font-size:14px;font-weight:bold">MAP LEGEND & FILTERS</div>
+    <div style="font-size:14px;font-weight:bold">MAP LAYERS</div>
     <button id="legendCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
   </div>
 
   <div style="margin-bottom:12px;padding:8px;background:rgba(0,255,200,0.1);border-radius:6px">
-    <div style="font-size:10px;margin-bottom:6px;opacity:0.8">Toggle map features on/off:</div>
+    <div style="font-size:10px;margin-bottom:6px;opacity:0.8">Choose what appears on the map.</div>
     <button id="legendShowAllBtn" style="background:#0fc;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;margin-right:6px;font-family:Orbitron;font-weight:bold">Show All</button>
     <button id="legendHideAllBtn" style="background:#f36;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;font-family:Orbitron;font-weight:bold">Hide All</button>
   </div>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterProperties" checked style="cursor:pointer">
-      <label for="filterProperties" style="cursor:pointer">PROPERTIES</label>
-    </div>
+      <label for="filterProperties" style="cursor:pointer">Properties</label>
+    </summary>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px"><span style="color:#10b981">● Green</span> - For Sale</div>
       <div style="margin-bottom:3px"><span style="color:#3b82f6">● Blue</span> - For Rent</div>
       <div style="margin-bottom:3px">Click marker for details & navigation</div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterNavigation" checked style="cursor:pointer">
-      <label for="filterNavigation" style="cursor:pointer">NAVIGATION ROUTE</label>
-    </div>
+      <label for="filterNavigation" style="cursor:pointer">Active route</label>
+    </summary>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px"><span style="color:#00ff88">⋯⋯⋯</span> Active Route Line</div>
       <div style="margin-bottom:3px"><span style="color:#00ff88">◉</span> Destination Marker</div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterInteriors" checked style="cursor:pointer">
-      <label for="filterInteriors" style="cursor:pointer">ENTERABLE BUILDINGS</label>
-    </div>
+      <label for="filterInteriors" style="cursor:pointer">Enterable buildings</label>
+    </summary>
     <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
       <div id="enterableBuildingsStatus" style="margin-bottom:6px">Open the legend to scan nearby enterable buildings.</div>
       <div style="margin-bottom:6px;color:#8ef9ff">Press <strong>E</strong> near a listed building to enter or exit.</div>
       <div id="enterableBuildingsList" style="display:grid;gap:4px"></div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterContributions" checked style="cursor:pointer">
-      <label for="filterContributions" style="cursor:pointer">APPROVED CONTRIBUTIONS</label>
-    </div>
+      <label for="filterContributions" style="cursor:pointer">Community places</label>
+    </summary>
     <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px"><span style="color:#14b8a6">●</span> Approved place info</div>
       <div style="margin-bottom:3px"><span style="color:#a855f7">◆</span> Approved artifact markers</div>
       <div style="margin-bottom:3px">Drafts and pending submissions stay private until approved.</div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterActivities" checked style="cursor:pointer">
-      <label for="filterActivities" style="cursor:pointer">WORLD ACTIVITIES</label>
-    </div>
+      <label for="filterActivities" style="cursor:pointer">Activities</label>
+    </summary>
     <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px"><span style="color:#f59e0b">▲</span> Nearby and featured activities</div>
       <div style="margin-bottom:3px"><span style="color:#8b5cf6">◆</span> Room sessions and creator routes</div>
       <div style="margin-bottom:3px">Click markers to inspect and join them.</div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterPOIsAll" checked style="cursor:pointer">
-      <label for="filterPOIsAll" style="cursor:pointer">POINTS OF INTEREST</label>
-    </div>
+      <label for="filterPOIsAll" style="cursor:pointer">Places</label><small>14 types</small>
+    </summary>
     <div style="font-size:10px;line-height:1.4;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
         <input type="checkbox" id="filterSchools" checked style="cursor:pointer">
@@ -1056,10 +1056,10 @@ Graphics changes apply to the current session.
         <label for="filterTourism" style="cursor:pointer">⭐ Tourism & Viewpoints</label>
       </div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff">MEMORY MARKERS</div>
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff">Memories</summary>
     <div style="font-size:11px;line-height:1.5;padding-left:24px;opacity:0.95">
       <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
         <input type="checkbox" id="filterMemoryPins" checked style="cursor:pointer">
@@ -1077,13 +1077,13 @@ Graphics changes apply to the current session.
       </div>
       <div style="margin-bottom:3px;font-size:10px;opacity:0.85">Shown on minimap and large map</div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterGameElementsAll" checked style="cursor:pointer">
-      <label for="filterGameElementsAll" style="cursor:pointer">GAME ELEMENTS</label>
-    </div>
+      <label for="filterGameElementsAll" style="cursor:pointer">Games and routes</label>
+    </summary>
     <div style="font-size:10px;line-height:1.4;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
         <input type="checkbox" id="filterCheckpoints" checked style="cursor:pointer">
@@ -1098,29 +1098,29 @@ Graphics changes apply to the current session.
         <label for="filterCustomTrack" style="cursor:pointer"><span style="color:#fa0">━━</span> Custom Track</label>
       </div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterPolice" checked style="cursor:pointer">
-      <label for="filterPolice" style="cursor:pointer">POLICE CARS</label>
-    </div>
+      <label for="filterPolice" style="cursor:pointer">Police vehicles</label>
+    </summary>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px">🚓 Police Vehicles</div>
       <div style="margin-bottom:3px"><span style="color:#f00">Red/Blue</span> when chasing</div>
     </div>
-  </div>
+  </details>
 
-  <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterRoads" checked style="cursor:pointer">
-      <label for="filterRoads" style="cursor:pointer">ROAD OVERLAY</label>
-    </div>
+      <label for="filterRoads" style="cursor:pointer">Roads</label>
+    </summary>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px">🛣️ Street Network</div>
       <div style="margin-bottom:3px">Shows the driveable street network</div>
     </div>
-  </div>
+  </details>
 
   <div style="margin-bottom:12px" hidden>
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
