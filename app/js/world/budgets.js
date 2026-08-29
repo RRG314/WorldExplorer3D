@@ -339,10 +339,10 @@ export function getAdaptiveLoadProfile(
         poiPerTile: scaledInt(200, scale, 40),
         poiMinPerTile: scaledInt(90, scale, 20)
       },
-      overpassTimeoutMs: 30000,
+      overpassTimeoutMs: mobileLike ? 12000 : 30000,
       optionalProviderTimeoutMs: mobileLike ? 2500 : 9000,
-      fixedRegionalGroundTimeoutMs: mobileLike ? 8000 : 35000,
-      regionalContextRadiusMeters: mobileLike ? 9000 : 14000,
+      fixedRegionalGroundTimeoutMs: mobileLike ? 2500 : 35000,
+      regionalContextRadiusMeters: mobileLike ? 6000 : 14000,
       maxTotalLoadMs: mobileLike ? 32000 : 62000
     };
   }
@@ -445,8 +445,8 @@ export function getAdaptiveLoadProfile(
     },
     overpassTimeoutMs: mobileLike ? Math.min(12000, profileByDepth.overpassTimeoutMs) : profileByDepth.overpassTimeoutMs,
     optionalProviderTimeoutMs: mobileLike ? 2500 : 9000,
-    fixedRegionalGroundTimeoutMs: mobileLike ? 8000 : 35000,
-    regionalContextRadiusMeters: mobileLike ? 9000 : 14000,
+    fixedRegionalGroundTimeoutMs: mobileLike ? 2500 : 35000,
+    regionalContextRadiusMeters: mobileLike ? 6000 : 14000,
     maxTotalLoadMs: mobileLike ? 32000 : profileByDepth.maxTotalLoadMs
   };
 }

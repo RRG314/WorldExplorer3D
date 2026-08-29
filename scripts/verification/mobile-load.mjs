@@ -150,7 +150,7 @@ try {
     liveGpsPermissionToPlayUnder40Seconds: liveGps.permissionToPlayableMs <= 40_000,
     mobileProfileActuallyActive:
       standard.loadProfile?.dynamicBudgetScale <= 0.28 &&
-      standard.loadProfile?.regionalContextRadiusMeters === 9_000 &&
+      standard.loadProfile?.regionalContextRadiusMeters === 6_000 &&
       standard.loadProfile?.optionalProviderTimeoutMs <= 2_500 &&
       standard.loadProfile?.overpassTimeoutMs <= 12_000 &&
       standard.loadProfile?.maxTotalLoadMs <= 32_000,

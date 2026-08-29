@@ -298,9 +298,11 @@ function applyTransportTerrainCorridors() {
     (mesh) => mesh?.userData?.isTerrainMesh
   );
   let adjustedVertices = 0;
+  let waterMaskedVertices = 0;
   for (const mesh of meshes) {
     applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
     adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
+    waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
   clearTerrainHeightCache();
@@ -313,6 +315,13 @@ function applyTransportTerrainCorridors() {
     terrainSeams
   });
   appCtx.transportTerrainCorridorStats = stats;
+  appCtx.waterTerrainMaskStats = Object.freeze({
+    terrainMeshes: meshes.length,
+    waterAreas: Number(appCtx.waterAreas?.length || 0),
+    maskedVertices: waterMaskedVertices,
+    terrainSeams,
+    authority: 'compiled-transport-terrain-rebuild'
+  });
   return stats;
 }
 

@@ -32,8 +32,8 @@ test('mobile world load policy bounds provider time and geometry without changin
     assert.equal(mobile.maxTotalLoadMs, 32_000);
     assert.equal(mobile.overpassTimeoutMs, 12_000);
     assert.equal(mobile.optionalProviderTimeoutMs, 2_500);
-    assert.equal(mobile.fixedRegionalGroundTimeoutMs, 8_000);
-    assert.equal(mobile.regionalContextRadiusMeters, 9_000);
+    assert.equal(mobile.fixedRegionalGroundTimeoutMs, 2_500);
+    assert.equal(mobile.regionalContextRadiusMeters, 6_000);
     assert.ok(mobile.maxBuildingWays < desktop.maxBuildingWays);
     assert.ok(mobile.maxRoadWays < desktop.maxRoadWays);
     assert.equal(desktop.maxTotalLoadMs, 44_000);

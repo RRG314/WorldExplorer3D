@@ -29,11 +29,10 @@ function isLanduseCandidate(tags) {
 }
 
 function setWorldSurfaceProfile(worldSurfaceProfile) {
-  if (typeof appCtx.setWorldSurfaceProfile === 'function') {
-    appCtx.setWorldSurfaceProfile(worldSurfaceProfile);
-  } else {
-    appCtx.worldSurfaceProfile = worldSurfaceProfile;
-  }
+  // Selection owns semantic state, not terrain material publication. Calling
+  // the public setter here recolored every terrain tile before landuse and
+  // transport data existed, then finalization repeated the same full pass.
+  appCtx.worldSurfaceProfile = worldSurfaceProfile;
 }
 
 function mappedTagIsPresent(value) {

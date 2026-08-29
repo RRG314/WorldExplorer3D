@@ -48,7 +48,7 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=15";
+} from "./world/budgets.js?v=16";
 import { publishLocationWorld } from "./world/publication.js?v=1";
 import {
   buildPoiGeometryPass,
@@ -58,7 +58,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=36";
+} from "./world/load-support.js?v=37";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -66,7 +66,7 @@ import {
 } from "./world/load-reset.js?v=17";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=18";
+} from "./world/load-budgeting.js?v=19";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,

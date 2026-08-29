@@ -60,9 +60,14 @@ export async function finalizeLoadedWorld(options = {}) {
     runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
     await yieldToMainThread();
   }
-  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.applyWaterTerrainMask === 'function') {
+  const transportWillRebuildTerrain = appCtx.terrainEnabled && !appCtx.onMoon &&
+    Array.isArray(appCtx.roads) && appCtx.roads.length > 0 &&
+    typeof appCtx.publishCompiledTransportMeshes === 'function';
+  if (appCtx.terrainEnabled && !appCtx.onMoon && !transportWillRebuildTerrain && typeof appCtx.applyWaterTerrainMask === 'function') {
     runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
     await yieldToMainThread();
+  } else if (transportWillRebuildTerrain) {
+    loadMetrics.waterTerrainMaskDeferredToTransport = true;
   }
   let transportPublication = null;
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
