@@ -5,6 +5,7 @@ import { evaluateParachuteDeployment } from './parachute-model.js?v=1';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
 import { reticlePresentation } from './weapon-reticle-authority.js?v=1';
+import { resolvePlayerProjectileLaunch } from './projectile-ballistics.js?v=1';
 
 const ITEM_ICON_PATHS = Object.freeze({
   hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
@@ -362,6 +363,14 @@ function createUrbanEquipmentRuntime(options = {}) {
     return typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ?.(x, z) || 0;
   }
 
+  function projectileSupportHeight(x, z, currentY) {
+    const surfaceY = appCtx.SurfaceQuery?.walkAt?.(x, z, {
+      currentY,
+      sampleRenderedMesh: false
+    })?.position?.y;
+    return Number.isFinite(surfaceY) ? Number(surfaceY) : terrainHeight(x, z);
+  }
+
   function impactPulse(position, radius = 1, style = 'pulse') {
     const blast = radius > 1.2;
     const color = style === 'paintball' ? 0xff4f9a : style === 'laser' ? 0x64fff4 : 0xbbe8ff;
@@ -495,22 +504,59 @@ function createUrbanEquipmentRuntime(options = {}) {
 
   function segmentWorldContact(from, to) {
     const swept = sampleSweptContact(from, to, .28, (point) => {
-      const terrainY = terrainHeight(point.x, point.z);
+      const supportY = projectileSupportHeight(point.x, point.z, point.y);
       const building = appCtx.checkBuildingCollision?.(point.x, point.z, .08, {
         actorBaseY: point.y - .1,
         actorHeight: .2
       })?.collision === true;
-      if (!building && point.y > terrainY + .12) return null;
+      if (!building && point.y > supportY + .12) return null;
       return {
         kind: building ? 'building' : 'terrain',
         position: {
           x: point.x,
-          y: building ? point.y : Math.max(terrainY, point.y),
+          y: building ? point.y : Math.max(supportY, point.y),
           z: point.z
         }
       };
     });
     return swept ? { ...swept.contact, t: swept.t } : null;
+  }
+
+  function reticleAimPoint(equipment, actor, direction) {
+    const range = Math.max(1, Number(equipment.range || 40));
+    const cameraOrigin = new THREE.Vector3(
+      Number(appCtx.camera?.position?.x ?? actor.x),
+      Number(appCtx.camera?.position?.y ?? actor.y),
+      Number(appCtx.camera?.position?.z ?? actor.z)
+    );
+    const rayEnd = cameraOrigin.clone().addScaledVector(direction, range);
+    const targetContact = segmentTarget({ equipment }, cameraOrigin, rayEnd);
+    const worldContact = segmentWorldContact(cameraOrigin, rayEnd);
+    if (targetContact && (!worldContact || targetContact.t < worldContact.t)) {
+      return new THREE.Vector3(targetContact.x, targetContact.y, targetContact.z);
+    }
+    if (worldContact) {
+      return new THREE.Vector3(worldContact.position.x, worldContact.position.y, worldContact.position.z);
+    }
+    if (equipment.projectileKind === 'thrown-charge') {
+      const flat = direction.clone();
+      flat.y = 0;
+      if (flat.lengthSq() < .001) flat.set(Math.sin(actor.angle), 0, Math.cos(actor.angle));
+      flat.normalize();
+      const landingX = actor.x + flat.x * range;
+      const landingZ = actor.z + flat.z * range;
+      return new THREE.Vector3(landingX, projectileSupportHeight(landingX, landingZ, actor.y) + .04, landingZ);
+    }
+    return rayEnd;
+  }
+
+  function alignActorToAim(actor, direction) {
+    const horizontal = Math.hypot(direction.x, direction.z);
+    if (horizontal <= .001) return;
+    actor.angle = Math.atan2(direction.x, direction.z);
+    if (appCtx.Walk?.state?.characterMesh?.visible) {
+      appCtx.Walk.state.characterMesh.rotation.y = actor.angle;
+    }
   }
 
   function resolveProjectile(projectile, position, directTarget = null) {
@@ -543,15 +589,19 @@ function createUrbanEquipmentRuntime(options = {}) {
 
   function spawnProjectile(equipment, actor, direction, roomActive) {
     const kind = equipment.projectileKind || 'pulse';
-    const origin = new THREE.Vector3(
-      Number(appCtx.camera?.position?.x ?? actor.x),
-      Number(appCtx.camera?.position?.y ?? actor.y),
-      Number(appCtx.camera?.position?.z ?? actor.z)
-    );
-    const velocityDirection = direction.clone();
-    if (kind === 'thrown-charge') velocityDirection.y = Math.max(.3, velocityDirection.y + .24);
-    velocityDirection.normalize();
     const speed = Number(equipment.projectileSpeed || 48);
+    const aimPoint = reticleAimPoint(equipment, actor, direction);
+    const launch = resolvePlayerProjectileLaunch({
+      actor,
+      aimDirection: direction,
+      aimPoint,
+      kind,
+      speed,
+      range: Number(equipment.range || 40),
+      gravity: kind === 'thrown-charge' ? 9.81 : Number(equipment.projectileGravity || 0),
+      fuseSeconds: Number(equipment.fuseSeconds || 2.2)
+    });
+    const origin = new THREE.Vector3(launch.origin.x, launch.origin.y, launch.origin.z);
     const visual = createProjectileVisual(kind);
     visual.root.position.copy(origin);
     const projectile = {
@@ -560,16 +610,31 @@ function createUrbanEquipmentRuntime(options = {}) {
       roomActive,
       visual,
       position: origin,
-      velocity: velocityDirection.multiplyScalar(speed),
+      launchOrigin: launch.origin,
+      velocity: new THREE.Vector3(launch.velocity.x, launch.velocity.y, launch.velocity.z),
       distance: 0,
       elapsed: 0,
-      maxLife: kind === 'thrown-charge'
-        ? Number(equipment.fuseSeconds || 1.2)
-        : Math.min(.95, Number(equipment.range || 30) / speed + .12)
+      maxDistance: launch.maxDistance,
+      maxLife: launch.maxLife,
+      aimPoint: launch.target,
+      landed: false
     };
     projectiles.push(projectile);
     reticleFeedback.firedAt = clock();
-    state.lastProjectileAction = Object.freeze({ equipmentId: equipment.id, phase: 'travel', targetKind: '', at: clock() });
+    state.lastProjectileAction = Object.freeze({
+      equipmentId: equipment.id,
+      phase: 'travel',
+      targetKind: '',
+      aimX: Number(launch.target.x.toFixed(2)),
+      aimY: Number(launch.target.y.toFixed(2)),
+      aimZ: Number(launch.target.z.toFixed(2)),
+      originX: Number(launch.origin.x.toFixed(2)),
+      originY: Number(launch.origin.y.toFixed(2)),
+      originZ: Number(launch.origin.z.toFixed(2)),
+      maxDistance: Number(launch.maxDistance.toFixed(2)),
+      expectedFlightSeconds: Number(launch.expectedFlightSeconds.toFixed(2)),
+      at: clock()
+    });
     if (equipment.category === 'sidearm') {
       reportCivicEvent({
         kind: 'weapon_discharge', position: { x: actor.x, y: actor.y, z: actor.z }, severity: 2,
@@ -632,6 +697,10 @@ function createUrbanEquipmentRuntime(options = {}) {
     const step = Math.max(0, Math.min(.12, Number(dt) || 0));
     for (const projectile of projectiles.slice()) {
       projectile.elapsed += step;
+      if (projectile.landed) {
+        if (projectile.elapsed >= projectile.maxLife) resolveProjectile(projectile, projectile.position);
+        continue;
+      }
       const from = projectile.position.clone();
       if (projectile.kind === 'thrown-charge') projectile.velocity.y -= 9.81 * step;
       else if (Number(projectile.equipment.projectileGravity) > 0) projectile.velocity.y -= Number(projectile.equipment.projectileGravity) * step;
@@ -659,12 +728,24 @@ function createUrbanEquipmentRuntime(options = {}) {
         }
         continue;
       }
-      if (worldContact || projectile.elapsed >= projectile.maxLife || projectile.distance >= Number(projectile.equipment.range || 30)) {
-        const impactPosition = worldContact?.position || {
-          x: to.x,
-          y: Math.max(terrainHeight(to.x, to.z), to.y),
-          z: to.z
-        };
+      if (worldContact) {
+        const impactPosition = worldContact.position;
+        if (projectile.kind === 'thrown-charge' && worldContact.kind === 'terrain') {
+          projectile.position.set(impactPosition.x, impactPosition.y, impactPosition.z);
+          projectile.velocity.set(0, 0, 0);
+          projectile.landed = true;
+          projectile.visual.root.position.set(impactPosition.x, impactPosition.y + .16, impactPosition.z);
+          state.lastProjectileAction = Object.freeze({
+            equipmentId: projectile.equipment.id,
+            phase: 'landed',
+            targetKind: '',
+            x: Number(impactPosition.x.toFixed(2)),
+            y: Number(impactPosition.y.toFixed(2)),
+            z: Number(impactPosition.z.toFixed(2)),
+            at: clock()
+          });
+          continue;
+        }
         if (projectile.owner === 'npc') {
           const index = projectiles.indexOf(projectile);
           if (index >= 0) projectiles.splice(index, 1);
@@ -672,6 +753,25 @@ function createUrbanEquipmentRuntime(options = {}) {
           impactPulse(impactPosition, .8, projectile.kind);
         } else {
           resolveProjectile(projectile, impactPosition);
+        }
+        continue;
+      }
+      if (projectile.elapsed >= projectile.maxLife || projectile.distance >= Number(projectile.maxDistance || projectile.equipment.range || 30)) {
+        if (projectile.kind === 'thrown-charge') {
+          resolveProjectile(projectile, { x: to.x, y: to.y, z: to.z });
+        } else {
+          const index = projectiles.indexOf(projectile);
+          if (index >= 0) projectiles.splice(index, 1);
+          disposeProjectile(projectile);
+          state.lastProjectileAction = Object.freeze({
+            equipmentId: projectile.equipment.id,
+            phase: 'expired',
+            targetKind: '',
+            x: Number(to.x.toFixed(2)),
+            y: Number(to.y.toFixed(2)),
+            z: Number(to.z.toFixed(2)),
+            at: clock()
+          });
         }
         continue;
       }
@@ -799,6 +899,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (direction.lengthSq() < .01) direction.set(Math.sin(actor.angle), 0, Math.cos(actor.angle));
     direction.normalize();
     if (equipment.projectileKind) {
+      alignActorToAim(actor, direction);
       spawnProjectile(equipment, actor, direction, roomActive);
       render();
       return true;
@@ -893,6 +994,30 @@ function createUrbanEquipmentRuntime(options = {}) {
       activeProjectiles: projectiles.length,
       lastProjectileAction: state.lastProjectileAction || null,
       useAnimation: state.equipmentVisual?.actionSnapshot?.() || null,
+      projectiles: projectiles.map((projectile) => Object.freeze({
+        equipmentId: projectile.equipment.id,
+        kind: projectile.kind,
+        position: Object.freeze({
+          x: Number(projectile.position.x.toFixed(2)),
+          y: Number(projectile.position.y.toFixed(2)),
+          z: Number(projectile.position.z.toFixed(2))
+        }),
+        launchOrigin: projectile.launchOrigin ? Object.freeze({
+          x: Number(projectile.launchOrigin.x.toFixed(2)),
+          y: Number(projectile.launchOrigin.y.toFixed(2)),
+          z: Number(projectile.launchOrigin.z.toFixed(2))
+        }) : null,
+        aimPoint: projectile.aimPoint ? Object.freeze({
+          x: Number(projectile.aimPoint.x.toFixed(2)),
+          y: Number(projectile.aimPoint.y.toFixed(2)),
+          z: Number(projectile.aimPoint.z.toFixed(2))
+        }) : null,
+        distance: Number(projectile.distance.toFixed(2)),
+        elapsed: Number(projectile.elapsed.toFixed(2)),
+        maxDistance: Number((projectile.maxDistance || projectile.equipment.range || 0).toFixed(2)),
+        maxLife: Number(projectile.maxLife.toFixed(2)),
+        landed: projectile.landed === true
+      })),
       reticleVisible: state.equipmentUi?.reticle?.classList.contains('show') === true,
       armedNpcCount: state.npcs.filter((npc) => npc.heldEquipment && Number(npc.condition ?? 1) > .05).length,
       defendingNpcCount: state.npcs.filter((npc) => Number(npc.hostileUntil || 0) > clock() && Number(npc.condition ?? 1) > .05).length

@@ -314,9 +314,13 @@ const GroundHeight = {
 
     const terrainY = this.terrainY(x, z);
     const nr = this._nearestWalkRoad(x, z, currentY);
+    const elevatedWalkSurface = nr?.road?.structureSemantics?.terrainMode === 'elevated';
     const roadOnSurface = isRoadSurfaceReachable(nr, {
       currentRoad: appCtx.car?.road || null,
-      extraLateralPadding: -0.1
+      // A bridge deck stops supporting a walking actor at its authored edge.
+      // The general road query carries generous vehicle/transition padding;
+      // retaining that padding here created an invisible ledge beside bridges.
+      extraLateralPadding: elevatedWalkSurface ? -1.05 : -0.1
     });
     const linear = this._nearestLinearWalkFeature(x, z);
     const featureWidth = Number(linear?.feature?.width) || 0;

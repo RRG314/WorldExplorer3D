@@ -103,12 +103,41 @@ try {
   await page.waitForTimeout(500);
   await page.keyboard.press('Digit4');
   await page.keyboard.press('KeyV');
-  await page.waitForTimeout(90);
+  await page.waitForTimeout(40);
   const weapon = (await diagnostics()).urbanSandbox?.projectileRuntime;
   assert.equal(weapon?.useAnimation?.id, 'pulse-sidearm');
   assert.equal(weapon?.lastProjectileAction?.equipmentId, 'pulse-sidearm');
+  assert.ok(Number(weapon?.lastProjectileAction?.maxDistance) >= 100);
+  assert.ok([
+    weapon?.lastProjectileAction?.originX,
+    weapon?.lastProjectileAction?.originY,
+    weapon?.lastProjectileAction?.originZ,
+    weapon?.lastProjectileAction?.aimX,
+    weapon?.lastProjectileAction?.aimY,
+    weapon?.lastProjectileAction?.aimZ
+  ].every(Number.isFinite));
   assert.equal(await page.locator('#urbanWeaponReticle').isVisible(), true);
   await page.screenshot({ path: `${evidenceDir}/mobile-sidearm-action.png` });
+
+  await page.waitForTimeout(450);
+  await page.keyboard.press('Digit5');
+  await page.keyboard.press('KeyV');
+  await page.waitForFunction(() => {
+    const action = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime?.lastProjectileAction;
+    return action?.equipmentId === 'concussion-charge' && action?.phase === 'landed';
+  }, null, { timeout: 4_000 });
+  const chargeLanded = (await diagnostics()).urbanSandbox?.projectileRuntime;
+  assert.equal(chargeLanded?.projectiles?.some((projectile) =>
+    projectile.equipmentId === 'concussion-charge' && projectile.landed === true
+  ), true);
+  await page.screenshot({ path: `${evidenceDir}/mobile-charge-landed.png` });
+  await page.waitForFunction(() => {
+    const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime;
+    return runtime?.lastProjectileAction?.equipmentId === 'concussion-charge' &&
+      runtime.lastProjectileAction.phase === 'impact' && runtime.activeProjectiles === 0;
+  }, null, { timeout: 4_000 });
+  const chargeResolved = (await diagnostics()).urbanSandbox?.projectileRuntime;
+  await page.screenshot({ path: `${evidenceDir}/mobile-charge-impact.png` });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openExploreMenu();
@@ -129,6 +158,14 @@ try {
       visibleHandsAction: handsUse?.category === 'unarmed',
       visibleStaffAction: staffUse?.category === 'melee',
       visibleWeaponActionAndReticle: weapon?.useAnimation?.id === 'pulse-sidearm' && weapon?.lastProjectileAction?.equipmentId === 'pulse-sidearm',
+      sidearmUsesHandOriginAndExtendedReticleRange:
+        Number(weapon?.lastProjectileAction?.maxDistance) >= 100 &&
+        Number.isFinite(weapon?.lastProjectileAction?.originX) &&
+        Number.isFinite(weapon?.lastProjectileAction?.aimX),
+      chargeLandsBeforeFuseInsteadOfHanging:
+        chargeLanded?.lastProjectileAction?.phase === 'landed' &&
+        chargeLanded?.projectiles?.some((projectile) => projectile.equipmentId === 'concussion-charge' && projectile.landed === true) === true &&
+        chargeResolved?.lastProjectileAction?.phase === 'impact' && chargeResolved?.activeProjectiles === 0,
       desktopAndMobileRenderedFromOneWorldLoad: true,
       earthGameplayRuntime: current.gameStarted === true && current.environment === 'EARTH',
       noPageErrors: pageErrors.length === 0,
