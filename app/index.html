@@ -677,32 +677,25 @@ Graphics changes apply to the current session.
 <div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
 <button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
-<aside id="discoveryPanel" aria-label="World discovery tools" aria-hidden="true">
+<aside id="discoveryPanel" aria-label="My Explorer" aria-hidden="true">
   <header class="discoveryHead">
-    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">Explorer Journal</span><strong id="discoveryPanelTitle">Explorer</strong></div></div>
-    <div class="discoveryHeadActions"><button id="discoveryHelpBtn" type="button" aria-label="Show tool help">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize discovery panel" title="Minimize during play">—</button></div>
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">My Explorer</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open My Explorer profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize My Explorer" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
-    <nav class="discoveryTabs" aria-label="Explorer Journal sections">
-      <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Explorer</button>
+    <nav class="discoveryTabs" aria-label="My Explorer sections">
+      <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
       <button class="discoveryTab" data-discovery-tab="journal" type="button"><span>≡</span>Journal</button>
-      <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Field Guide</button>
-      <button class="discoveryTab" data-discovery-tab="collection" type="button"><span>◇</span>Places</button>
-      <button class="discoveryTab" data-discovery-tab="gear" type="button"><span>⌁</span>Field Kit</button>
-      <button class="discoveryTab" data-discovery-tab="progress" type="button"><span>↗</span>Progress</button>
+      <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Guide</button>
+      <button class="discoveryTab discoveryPackDestination" data-discovery-destination="pack" type="button"><span>▣</span>Pack</button>
     </nav>
     <div class="discoveryContent">
       <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
       <section class="discoveryPane active" data-discovery-pane="today">
-        <div class="discoveryModeNote"><b>EXPLORE THIS PLACE</b><span>Choose one nearby lead, then minimize this journal. Your tool and the world will guide the active field action.</span></div>
+        <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Choose one activity, then return to the world. The active tool and nearby cues will guide you.</span></div>
         <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
-        <div class="discoveryFieldExpedition">
-          <div class="discoverySectionHead"><span>FIELD TODAY</span><small id="discoveryExpeditionMode">THREE NEARBY FIELD STOPS</small></div>
-          <div id="discoveryExpeditionList" class="discoveryExpeditionList"></div>
-        </div>
-        <details class="discoveryTodayDetails"><summary>Progress and expeditions</summary><div id="discoveryRankSummary" class="discoveryRankSummary"><span>EXPLORER RANK</span><strong>Trailhead</strong><small>Build records to reveal follow-up opportunities.</small></div><div id="discoveryGoal" class="discoveryGoal" aria-live="polite"></div><div class="discoverySubsection discoveryRetentionSection"><h3>Field Rhythm</h3><p>Daily, weekly, and seasonal goals build on your permanent Journal. Missed days never remove progress.</p><div id="discoveryRetentionDashboard" class="discoveryRetentionDashboard"></div></div></details>
         <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
-        <div class="discoverySectionHead"><span>NEARBY LEADS</span><small>ONE RECOMMENDED / TWO ALTERNATIVES</small></div>
+        <div class="discoverySectionHead"><span>CHOOSE AN ACTIVITY</span><small>BEST LOCAL FIT FIRST</small></div>
         <div id="discoveryActionList" class="discoveryActionList" aria-label="Available activities"></div>
         <div id="discoveryTutorial" class="discoveryTutorial" hidden><strong id="discoveryTutorialTitle">Tool guide</strong><ol id="discoveryTutorialSteps"></ol><button id="discoveryTutorialDoneBtn" type="button">Understood</button></div>
         <div id="discoveryInspection" class="discoveryInspection" hidden></div>
@@ -716,32 +709,30 @@ Graphics changes apply to the current session.
         <div class="discoverySafety"><b>EXPLORE RESPONSIBLY</b><span>Activities are virtual and do not grant access, collecting, or excavation permission in the real world.</span></div>
         <button id="discoveryArChallengeBtn" class="discoveryArContextAction" type="button" hidden><span>AR FIELD CHALLENGE</span><strong>Photograph virtual waterfowl</strong></button>
         <div class="discoveryActions"><button id="discoverySecondaryBtn" type="button">Close</button><button id="discoveryPrimaryBtn" class="primary" type="button">Start Sweep</button></div>
+        <details class="discoveryTodayRoute"><summary><span>Today's route</span><small id="discoveryExpeditionMode">Three nearby field stops</small></summary><div id="discoveryExpeditionList" class="discoveryExpeditionList"></div></details>
+        <details class="discoveryTodayDetails"><summary>Goals and Expeditions</summary><div id="discoveryRankSummary" class="discoveryRankSummary"><span>EXPLORER RANK</span><strong>Trailhead</strong><small>Build records to reveal follow-up opportunities.</small></div><div id="discoveryGoal" class="discoveryGoal" aria-live="polite"></div><div class="discoverySubsection discoveryRetentionSection"><h3>Field Rhythm</h3><p>Daily, weekly, and seasonal goals build on your permanent Journal. Missed days never remove progress.</p><div id="discoveryRetentionDashboard" class="discoveryRetentionDashboard"></div></div></details>
       </section>
       <section class="discoveryPane" data-discovery-pane="journal">
-        <div class="discoverySectionHead"><span>JOURNAL</span><small>YOUR STORY ACROSS THE SANDBOX</small></div>
-        <div class="discoveryModeNote"><b>EVERY PATH, ONE STORY</b><span>Fieldwork, games, things you make, places, rooms, and companions all meet here.</span></div>
+        <div class="discoverySectionHead"><span>JOURNAL</span><small>YOUR STORY</small></div>
+        <div class="discoveryModeNote"><b>MEMORIES</b><span>Fieldwork, games, making, travel, rooms, and companions appear here in time order.</span></div>
         <div class="discoveryJournalFilters"><select id="discoveryJournalCategory" aria-label="Filter Journal by Explorer path"><option value="all">All paths</option><option value="field">Fieldwork</option><option value="activity">Games</option><option value="creation">Making</option><option value="travel">Travel</option><option value="community">Community</option><option value="companion">Companions</option></select><select id="discoveryJournalRegion" aria-label="Filter Journal by region"><option value="all">All regions</option></select></div><div id="discoveryJournalList" class="discoveryList"></div>
+        <details class="discoveryJournalPlaces"><summary>Visited places</summary><p>Places are part of your story, not a separate collection.</p><div id="discoveryCollectionList" class="discoveryList"></div></details>
       </section>
       <section class="discoveryPane" data-discovery-pane="guide">
-        <div class="discoverySectionHead"><span>FIELD GUIDE</span><small>REGIONAL REFERENCES / YOUR IDENTIFICATIONS</small></div>
+        <div class="discoverySectionHead"><span>FIELD GUIDE</span><small>WHAT YOU HAVE LEARNED</small></div>
         <div class="discoveryGuideControls"><input id="discoveryGuideSearch" type="search" placeholder="Search your Field Guide" aria-label="Search your Field Guide"><select id="discoveryGuideScope" aria-label="Choose Field Guide scope"><option value="current">Current region</option><option value="world">World Guide</option></select><select id="discoveryGuideCategory" aria-label="Filter Field Guide category"><option value="all">All categories</option><option value="wildlife">Wildlife</option><option value="plants">Plants &amp; Fungi</option><option value="geology">Geology</option><option value="fossils">Fossils</option><option value="places">Places &amp; History</option><option value="ocean">Ocean</option></select><button id="discoveryGuideHelpBtn" type="button">How This Works</button></div>
         <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Field lead</dt><dd>A field lead uses broad habitat and season information. It does not report a nearby animal.</dd></div><div><dt>Backpack</dt><dd>A virtual specimen, find, catch trophy, or created item enters your Backpack only when you acquire it.</dd></div><div><dt>Rarity</dt><dd>How often an opportunity appears in the game, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
         <div id="discoveryGuideOverview" class="discoveryGuideOverview"></div>
-        <div id="discoveryLifeList" class="discoveryLifeList"></div>
+        <details class="discoveryGuideLifeDetails"><summary>Regional life list</summary><div id="discoveryLifeList" class="discoveryLifeList"></div></details>
         <div id="discoveryFieldGuideList" class="discoveryList"></div>
       </section>
-      <section class="discoveryPane" data-discovery-pane="collection"><div class="discoverySectionHead"><span>PLACES</span><small>WHERE YOUR EXPLORER STORY HAPPENED</small></div><div class="discoveryModeNote"><b>YOUR WORLD MEMORY</b><span>Return to places connected to your Journal. Acquired objects and tools live in your Backpack.</span></div><div id="discoveryCollectionList" class="discoveryList"></div></section>
-      <section class="discoveryPane" data-discovery-pane="gear">
-        <div class="discoverySectionHead"><span>FIELD KIT GUIDE</span><small>HOW TO USE YOUR BACKPACK TOOLS</small></div>
-        <div id="discoveryEquippedSummary" class="discoveryEquippedSummary"></div>
-        <div class="discoverySubsection"><h3>Tools</h3><p>This is guidance only. Equip and organize every carried object in the Backpack.</p><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList" class="discoveryList"></div></div>
-        <div class="discoverySubsection"><h3>Companions</h3><p>Meet individual animals, build trust, and explore together.</p><div id="discoveryCompanionList" class="discoveryList"></div></div>
-      </section>
-      <section class="discoveryPane" data-discovery-pane="progress">
-        <div class="discoverySectionHead"><span>EXPLORER PROGRESS</span><small>RANK / SPECIALTIES / REGIONS</small></div>
-        <div class="discoveryModeNote"><b>YOUR EXPLORER STORY</b><span>New identifications and new-region evidence build rank. Repeating the same record here can still document an observation without adding rank points.</span></div>
+      <section class="discoveryPane discoveryProfilePane" data-discovery-pane="profile">
+        <div class="discoverySectionHead"><span>MY EXPLORER</span><small>IDENTITY / SKILLS / COMPANIONS</small></div>
+        <div id="discoveryProfileHero" class="discoveryProfileHero"></div>
         <div id="discoveryProgress" class="discoveryProgressGrid"></div>
-        <details class="discoveryOnlineService"><summary>Journal backup and account status</summary><p>Your complete Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
+        <section class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
+        <details class="discoveryOnlineService"><summary>Data and backup</summary><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
+        <div class="discoveryLegacyEquipmentData" hidden><div id="discoveryEquippedSummary"></div><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList"></div></div>
       </section>
     </div>
   </div>

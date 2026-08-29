@@ -105,8 +105,11 @@ function createUrbanEquipmentRuntime(options = {}) {
     const slots = item.verbs?.includes('equip')
       ? Array.from({ length: 6 }, (_, index) => `<button data-backpack-slot="${index + 1}" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Slot ${index + 1}</button>`).join('')
       : '';
-    const description = item.metadata?.description || `${source}${acquired ? ` · added ${acquired}` : ''}`;
-    ui.detail.innerHTML = `<strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(description)}</small>${item.metadata?.regionLabel ? `<small>${escapeHtml(item.metadata.regionLabel)}</small>` : ''}<div class="urbanBackpackDetailActions">${actions.join('')}${slots}</div>`;
+    const description = item.metadata?.description || item.description || `${source}${acquired ? ` · added ${acquired}` : ''}`;
+    const capabilities = Array.isArray(item.capabilities) && item.capabilities.length
+      ? `<span class="urbanBackpackUse"><b>Useful for</b>${escapeHtml(item.capabilities.map((value) => String(value).replaceAll('-', ' ')).join(' · '))}</span>`
+      : '';
+    ui.detail.innerHTML = `<strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(description)}</small>${capabilities}${item.metadata?.regionLabel ? `<small>${escapeHtml(item.metadata.regionLabel)}</small>` : ''}<div class="urbanBackpackDetailActions">${actions.join('')}${slots}</div>`;
   }
 
   function render() {

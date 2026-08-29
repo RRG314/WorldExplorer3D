@@ -79,9 +79,8 @@ async function openCompanions() {
     }
   }
   await page.waitForSelector('#discoveryPanel.show');
-  await page.locator('[data-discovery-tab="gear"]').click();
-  const guide = page.locator('#discoverySectionTutorial:not([hidden])');
-  if (await guide.isVisible().catch(() => false)) await page.locator('#discoverySectionTutorialDoneBtn').click();
+  await page.locator('#discoveryProfileBtn').click();
+  await page.waitForSelector('.discoveryPane[data-discovery-pane="profile"].active');
 }
 
 await mkdir(outputDir, { recursive: true });

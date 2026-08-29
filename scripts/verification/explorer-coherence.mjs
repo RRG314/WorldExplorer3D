@@ -39,8 +39,12 @@ async function openExplorer() {
 
 async function chooseTab(tab) {
   await page.locator(`[data-discovery-tab="${tab}"]`).click();
-  await dismissSectionGuide();
   await page.waitForSelector(`.discoveryPane[data-discovery-pane="${tab}"].active`);
+}
+
+async function chooseProfile() {
+  await page.locator('#discoveryProfileBtn').click();
+  await page.waitForSelector('.discoveryPane[data-discovery-pane="profile"].active');
 }
 
 try {
@@ -62,7 +66,10 @@ try {
   const explorerCopy = await page.locator('#discoveryPanel').textContent();
   const progressDisclosureOpen = await page.locator('.discoveryTodayDetails').evaluate((element) => element.open);
   assert.equal(progressDisclosureOpen, false);
-  assert.equal(await page.locator('#discoveryPanelTitle').textContent(), 'Explorer');
+  assert.equal(await page.locator('#discoveryPanelTitle').textContent(), 'Today');
+  assert.equal(await page.locator('[data-discovery-tab]').count(), 3);
+  assert.deepEqual(await page.locator('.discoveryTabs > button').allTextContents(), ['⌖Today', '≡Journal', '▤Guide', '▣Pack']);
+  assert.equal(await page.locator('#discoverySectionTutorial').isVisible(), false, 'Help must not block the Explorer when it opens.');
   assert.doesNotMatch(explorerCopy || '', /procedural encounter|deployable artifact|pipeline status|schema version|generated encounter/i);
   await page.screenshot({ path: `${evidenceDir}/desktop-explorer.png` });
 
@@ -70,25 +77,31 @@ try {
   const journalCopy = await page.locator('.discoveryPane[data-discovery-pane="journal"]').textContent();
   assert.match(journalCopy || '', /Explored Baltimore/i);
   assert.match(journalCopy || '', /Travel/i);
+  assert.equal(await page.locator('.discoveryJournalPlaces').evaluate((element) => element.open), false);
   await page.locator('#discoveryJournalCategory').selectOption('travel');
   assert.match(await page.locator('#discoveryJournalList').textContent(), /Explored Baltimore/i);
   await page.screenshot({ path: `${evidenceDir}/desktop-journal.png` });
   await page.locator('#discoveryJournalCategory').selectOption('all');
 
   await chooseTab('guide');
-  await page.waitForFunction(() => /REGIONAL LIFE LIST/.test(document.querySelector('#discoveryLifeList')?.textContent || ''));
+  await page.waitForFunction(() => /60/.test(document.querySelector('#discoveryLifeList')?.textContent || ''));
   const guideCopy = await page.locator('.discoveryPane[data-discovery-pane="guide"]').textContent();
   assert.match(guideCopy || '', /0\s*\/\s*60/);
   assert.match(guideCopy || '', /Baltimore/i);
   assert.match(guideCopy || '', /5 mammals left to identify/i);
+  assert.equal(await page.locator('.discoveryGuideLifeDetails').evaluate((element) => element.open), false);
+  assert.equal(await page.locator('#discoveryLifeList').isVisible(), false);
   assert.doesNotMatch(guideCopy || '', /Unknown Mammal Taxon|pilot|Creature Quality|reference fallbacks|procedural encounter|pipeline/i);
   await page.screenshot({ path: `${evidenceDir}/desktop-guide.png` });
 
-  await chooseTab('progress');
-  await page.waitForFunction(() => /Travel/i.test(document.querySelector('#discoveryProgress')?.textContent || ''));
-  const progressCopy = await page.locator('#discoveryProgress').textContent();
-  assert.match(progressCopy || '', /Travel/i);
-  assert.match(progressCopy || '', /Baltimore/i);
+  await chooseProfile();
+  await page.waitForFunction(() => /Specialties/i.test(document.querySelector('#discoveryProgress')?.textContent || ''));
+  const profileCopy = await page.locator('.discoveryPane[data-discovery-pane="profile"]').textContent();
+  assert.match(profileCopy || '', /Specialties/i);
+  assert.match(profileCopy || '', /Companions/i);
+  assert.match(profileCopy || '', /Baltimore/i);
+  assert.equal(await page.locator('#discoveryProfileBtn').getAttribute('aria-pressed'), 'true');
+  await page.screenshot({ path: `${evidenceDir}/desktop-profile.png` });
   await page.locator('.discoveryOnlineService summary').click();
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#discoveryExportBtn').click();
@@ -96,13 +109,13 @@ try {
   assert.match(download.suggestedFilename(), /^world-explorer-journal-\d{4}-\d{2}-\d{2}\.json$/);
   assert.match(await page.locator('#discoveryBackupStatus').textContent(), /downloaded/i);
 
-  await chooseTab('gear');
-  await page.locator('#discoveryOpenBackpackBtn').click();
+  await page.locator('[data-discovery-destination="pack"]').click();
   await page.waitForSelector('#urbanEquipment.show');
+  assert.equal(await page.locator('#discoveryPanel.show').isVisible().catch(() => false), false);
   await page.locator('[data-backpack-filter="field-tool"]').click();
   const fieldLens = page.locator('#urbanBackpackContents [data-equipment-id]').filter({ hasText: 'Field Lens' });
   await fieldLens.click();
-  assert.match(await page.locator('#urbanBackpackDetail').textContent(), /Field Lens.*Explorer field kit/is);
+  assert.match(await page.locator('#urbanBackpackDetail').textContent(), /Field Lens.*Inspect plants.*Useful for/is);
   assert.equal(await page.locator('#urbanBackpackDetail [data-backpack-action="field"]').isVisible(), true);
   await page.locator('#urbanBackpackDetail [data-backpack-slot="6"]').click();
   await page.waitForFunction(() => /Field Lens/i.test(document.querySelector('#urbanEquipmentSlots')?.textContent || ''));
@@ -126,8 +139,12 @@ try {
   assert.equal(mobileGuideOverflow, false);
   await page.screenshot({ path: `${evidenceDir}/mobile-guide.png` });
 
-  await chooseTab('gear');
-  await page.locator('#discoveryOpenBackpackBtn').click();
+  await chooseProfile();
+  const mobileProfileOverflow = await page.locator('#discoveryPanel').evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+  assert.equal(mobileProfileOverflow, false);
+  await page.screenshot({ path: `${evidenceDir}/mobile-profile.png` });
+
+  await page.locator('[data-discovery-destination="pack"]').click();
   await page.waitForSelector('#urbanEquipment.show');
   const mobileBackpackOverflow = await page.locator('#urbanEquipment').evaluate((element) => element.scrollWidth > element.clientWidth + 1);
   assert.equal(mobileBackpackOverflow, false);
@@ -141,9 +158,10 @@ try {
       actualBaltimoreWorld: diagnostics.gameStarted === true && diagnostics.environment === 'EARTH' && diagnostics.worldLoading === false,
       journalPlaceMemory: /Explored Baltimore/i.test(journalCopy || '') && /Travel/i.test(journalCopy || ''),
       currentRegionalGuide: /0\s*\/\s*60/.test(guideCopy || ''),
-      travelProgress: /Travel/i.test(progressCopy || ''),
+      groupedExplorerProfile: /Specialties/i.test(profileCopy || '') && /Companions/i.test(profileCopy || ''),
       journalBackup: /world-explorer-journal-/.test(download.suggestedFilename()),
       workingBackpackDetailAndSlot: true,
+      fourPrimaryDestinations: true,
       desktopAndMobileNoHorizontalOverflow: true,
       noInternalExplorerCopy: !/procedural encounter|deployable artifact|pipeline status|schema version|generated encounter/i.test(`${explorerCopy} ${guideCopy}`),
       noBrowserErrors: browserErrors.length === 0,

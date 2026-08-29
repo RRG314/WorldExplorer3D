@@ -35,7 +35,7 @@ import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wild
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
-import { SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
+import { ATTRIBUTE_DEFINITIONS, BACKGROUND_DEFINITIONS, SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
 import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../character/wildlife-assistance.js?v=1';
 
@@ -73,6 +73,7 @@ function fieldToolBackpackDefinition(tool) {
     category: 'field-tool',
     icon: 'TOOL',
     verbs: ['equip', 'use-context'],
+    description: TOOL_FIELD_USE[tool.id] || 'Use this during a compatible field activity.',
     capabilities: tool.capabilities,
     discipline: tool.discipline,
     sourceRefs: tool.sourceRefs
@@ -153,10 +154,10 @@ const TOOL_FIELD_USE = Object.freeze({
 
 const EXPLORER_SECTION_TUTORIALS = Object.freeze({
   workspace: Object.freeze({ id: 'explorer-workspace-v1', title: 'Your Explorer loop', steps: Object.freeze([
-    'Choose one nearby lead. The first option is the best fit for this place; the next two are alternatives.',
-    'Begin, then minimize this Journal so the equipped tool and world-space signal can guide you.',
-    'Record the result. Everything you finish enters the Journal. Field identifications also update the Guide; acquired virtual objects enter your Backpack.',
-    'Current Goal and Progress show what to pursue next without forcing every system at once.'
+    'Choose an activity in Today. The first option is the best fit for this place; the next two are alternatives.',
+    'Begin, then return to the world so your tool and the nearby clues can guide you.',
+    'Finish the activity to add a memory to your Journal. Identifications also update the Guide, and objects you keep enter your Pack.',
+    'Open My Explorer when you want to see your rank, specialties, and companions.'
   ]) }),
   journal: Object.freeze({ id: 'explorer-journal-v1', title: 'Journal', steps: Object.freeze([
     'The Journal is the shared story of your fieldwork, games, creations, travel, rooms, and companions.',
@@ -168,20 +169,10 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
     'Unidentified groups show how much is left and which field methods can help. Search and category filters narrow the Guide.',
     'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
   ]) }),
-  collection: Object.freeze({ id: 'explorer-places-v3', title: 'Places', steps: Object.freeze([
-    'Places collects the regions connected to your Journal records.',
-    'It is a guide to where things happened. Acquired objects live only in the Backpack.'
-  ]) }),
-  gear: Object.freeze({ id: 'explorer-field-kit-v2', title: 'Field Kit Guide', steps: Object.freeze([
-    'This section explains what each field tool does; it does not own equipment.',
-    'Open the Backpack to equip or organize a released tool. Compatible nearby leads can request it explicitly.',
-    'Locked gear represents a real capability unlock. Explorer points persist and reveal the next field kit at rank milestones.',
-    'How to use explains the purpose and field context before an activity begins.'
-  ]) }),
-  progress: Object.freeze({ id: 'explorer-progress-v1', title: 'Explorer Progress', steps: Object.freeze([
-    'New identifications earn the strongest rank credit; documenting known evidence in a new region also counts.',
-    'Regional goals mix Nature, Earth, Places, and field activities so one repeated action cannot complete everything.',
-    'Fieldwork, Games, Making, Travel, Community, and Companion paths describe your Explorer story while rank unlocks additional ways to play.'
+  profile: Object.freeze({ id: 'my-explorer-profile-v1', title: 'My Explorer', steps: Object.freeze([
+    'This is your identity: Explorer rank, developing specialties, and the companions you have met.',
+    'Detailed progress stays grouped here instead of competing with the activities you can do today.',
+    'Wild species belong in the Field Guide. Individual animals you befriend belong with your Explorer profile.'
   ]) })
 });
 
@@ -266,6 +257,7 @@ function createDiscoveryUi(state) {
     guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
     companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
     equipped: byId('discoveryEquippedSummary'), openBackpack: byId('discoveryOpenBackpackBtn'),
+    profileButton: byId('discoveryProfileBtn'), profileRank: byId('discoveryProfileRank'), profilePoints: byId('discoveryProfilePoints'), profileHero: byId('discoveryProfileHero'),
     tutorial: byId('discoveryTutorial'), tutorialTitle: byId('discoveryTutorialTitle'),
     tutorialSteps: byId('discoveryTutorialSteps'), tutorialDone: byId('discoveryTutorialDoneBtn'),
     sectionTutorial: byId('discoverySectionTutorial'), sectionTutorialTitle: byId('discoverySectionTutorialTitle'),
@@ -297,10 +289,7 @@ function createDiscoveryUi(state) {
     elements.panel?.classList.toggle('show', open);
     elements.panel?.setAttribute('aria-hidden', open ? 'false' : 'true');
     elements.quick?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-      void refreshData();
-      void state.showSectionTutorial?.('workspace');
-    }
+    if (open) void refreshData();
     return open;
   }
 
@@ -470,17 +459,23 @@ function createDiscoveryUi(state) {
       const equippedTool = state.entitlements.listAvailableTools().find((tool) => tool.id === equippedToolId);
       if (elements.equipped) elements.equipped.innerHTML = `<span>BACKPACK FIELD TOOL</span><strong>${escapeHtml(equippedTool?.label || 'Field Lens')}</strong><small>${escapeHtml(equippedTool ? equippedTool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · ') : 'Inspect · Classify')}</small>`;
     }
+    const companionSnapshot = state.companionRuntime?.snapshot?.() || { companions: [], presentation: {} };
+    const ownedCompanions = companionSnapshot.companions || [];
     if (elements.companions) {
-      const companionSnapshot = state.companionRuntime?.snapshot?.() || { companions: [], presentation: {} };
-      const owned = companionSnapshot.companions || [];
+      const owned = ownedCompanions;
       const activeTravelLabel = ['aboard', 'vehicle-occupant'].includes(companionSnapshot.presentation?.travelState)
         ? 'Riding with you'
         : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
+      const localSuggestions = COMPANION_CATALOG.filter((catalog) =>
+        FIRST_RELEASE_COMPANION_IDS.has(catalog.id) &&
+        !owned.some((companion) => companion.catalogId === catalog.id) &&
+        state.isCompanionEligible?.(catalog) === true
+      ).sort((left, right) => Number(state.hasWorldCompanionEncounter?.(right.id)) - Number(state.hasWorldCompanionEncounter?.(left.id))).slice(0, 4);
       const companionRows = [
         ...owned.map((companion) => ({ companion, catalog: COMPANION_CATALOG.find((entry) => entry.id === companion.catalogId) })).filter((row) => row.catalog),
-        ...COMPANION_CATALOG.filter((catalog) => !owned.some((companion) => companion.catalogId === catalog.id)).map((catalog) => ({ catalog, companion: null }))
+        ...localSuggestions.map((catalog) => ({ catalog, companion: null }))
       ];
-      elements.companions.innerHTML = companionRows.map(({ catalog, companion }) => {
+      elements.companions.innerHTML = companionRows.length ? companionRows.map(({ catalog, companion }) => {
         if (!companion) {
           const releaseReady = FIRST_RELEASE_COMPANION_IDS.has(catalog.id);
           const eligible = releaseReady && state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
@@ -508,7 +503,7 @@ function createDiscoveryUi(state) {
           : '';
         const specialty = companion.training?.specialization ? ` · Specialty: ${companion.training.specialization}` : '';
         return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${specialty}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
-      }).join('');
+      }).join('') : '<div class="discoveryEmpty">Explore animal-friendly places to meet a potential companion.</div>';
     }
     if (elements.progress) {
       const progress = rank;
@@ -519,21 +514,27 @@ function createDiscoveryUi(state) {
       const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
       const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
       const badges = progress.badgeAwards || [];
-      const regionEvents = new Map();
-      events.forEach((event) => {
-        const key = event.regionId || event.worldIdentity || 'local-region';
-        const row = regionEvents.get(key) || { label: event.regionLabel || 'Current region', records: 0, catalogs: new Set() };
-        row.records += 1;
-        if (event.catalogId) row.catalogs.add(event.catalogId);
-        regionEvents.set(key, row);
-      });
-      const companions = state.companionRuntime?.snapshot?.().companions || [];
-      const activeCompanion = companions.find((entry) => entry.active);
-      const bonded = companions.filter((entry) => Number(entry.progression?.level || 1) >= 8).length;
-      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.totalRecords || 0} Journal memories · ${progress.regions?.length || 0} places</small></article>${companions.length ? `<article class="discoveryProgressCard"><strong>${companions.length}</strong>Companions<small>${activeCompanion ? `${escapeHtml(activeCompanion.name)} active · level ${activeCompanion.progression?.level || 1}` : 'No active companion'} · ${bonded} Bonded</small></article>` : ''}<article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')}${specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const rank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${rank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(rank.label)} · ${specialty.xp} experience · ${specialty.meaningfulEvents || 0} activities</small></article>`; }).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.records}</strong>${escapeHtml(region.label)}<small>${region.catalogs.size} Guide identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first Explorer memory will start this story.</div>'}`;
-      if (badges.length) {
-        elements.progress.insertAdjacentHTML('beforeend', badges.map((badge) => `<article class="discoveryProgressCard"><strong>◆</strong>${escapeHtml(badge.label)}<small>Explorer badge</small></article>`).join(''));
+      const activeCompanion = ownedCompanions.find((entry) => entry.active);
+      const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
+      const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({
+        ...definition,
+        value: Number(profile.characterState?.attributes?.[definition.id]) || 0
+      })).sort((left, right) => right.value - left.value || left.label.localeCompare(right.label)).slice(0, 3);
+      if (elements.profileRank) elements.profileRank.textContent = progress.rankLabel;
+      if (elements.profilePoints) elements.profilePoints.textContent = String(progress.points);
+      if (elements.profileHero) {
+        elements.profileHero.innerHTML = `<div><span>${escapeHtml(background.label)}</span><strong>${escapeHtml(progress.rankLabel)}</strong><small>${progress.points} Explorer points · ${progress.totalRecords || 0} Journal memories</small></div><div class="discoveryProfileStrengths"><span>Current strengths</span><b>${strengths.map((entry) => escapeHtml(entry.label)).join(' · ')}</b></div>${activeCompanion ? `<div class="discoveryProfileCompanion"><span>Exploring with</span><strong>${escapeHtml(activeCompanion.name)}</strong><small>Level ${activeCompanion.progression?.level || 1} · ${escapeHtml(activeCompanion.progression?.trustState || 'Comfortable')}</small></div>` : ''}`;
       }
+      const specialtyMarkup = specialties.length
+        ? specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const specialtyRank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${specialtyRank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(specialtyRank.label)} · ${specialty.meaningfulEvents || 0} meaningful activities</small></article>`; }).join('')
+        : '<div class="discoveryEmpty">Complete meaningful activities to begin developing specialties.</div>';
+      const pathMarkup = paths.length
+        ? paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')
+        : '<div class="discoveryEmpty">Your first Journal memory will begin your Explorer paths.</div>';
+      const badgeMarkup = badges.length
+        ? badges.map((badge) => `<article class="discoveryProgressCard"><strong>◆</strong>${escapeHtml(badge.label)}<small>Explorer badge</small></article>`).join('')
+        : '<div class="discoveryEmpty">Badges appear as your Explorer story grows.</div>';
+      elements.progress.innerHTML = `<details class="discoveryProfileGroup" open><summary>Specialties <span>${specialties.length}</span></summary><div class="discoveryProfileGroupGrid">${specialtyMarkup}</div></details><details class="discoveryProfileGroup"><summary>Explorer paths <span>${paths.length}</span></summary><div class="discoveryProfileGroupGrid">${pathMarkup}</div></details><details class="discoveryProfileGroup"><summary>Current place</summary><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article></details><details class="discoveryProfileGroup"><summary>Badges <span>${badges.length}</span></summary><div class="discoveryProfileGroupGrid">${badgeMarkup}</div></details>`;
     }
   }
 
@@ -551,15 +552,18 @@ function createDiscoveryUi(state) {
   }
 
   function setTab(tab) {
-    activeTab = tab;
-    const tabTitles = { today: 'Explorer', journal: 'Journal', guide: 'Field Guide', collection: 'Places', gear: 'Field Kit', progress: 'Explorer Progress' };
-    if (elements.title) elements.title.textContent = tabTitles[tab] || 'Explorer';
-    document.querySelectorAll('.discoveryTab').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === tab));
-    document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === tab));
-    const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${tab}"]`);
+    const normalizedTab = tab === 'gear' || tab === 'progress' ? 'profile' : tab === 'collection' ? 'journal' : tab;
+    activeTab = ['today', 'journal', 'guide', 'profile'].includes(normalizedTab) ? normalizedTab : 'today';
+    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'My Explorer' };
+    if (elements.title) elements.title.textContent = tabTitles[activeTab] || 'Today';
+    document.querySelectorAll('[data-discovery-tab]').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === activeTab));
+    elements.profileButton?.classList.toggle('active', activeTab === 'profile');
+    elements.profileButton?.setAttribute('aria-pressed', activeTab === 'profile' ? 'true' : 'false');
+    elements.profileButton?.setAttribute('aria-label', activeTab === 'profile' ? 'Return to Today' : 'Open My Explorer profile');
+    document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === activeTab));
+    const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${activeTab}"]`);
     if (activePane) activePane.scrollTop = 0;
-    if (tab !== 'today') void refreshData();
-    if (tab !== 'today') void state.showSectionTutorial?.(tab);
+    if (activeTab !== 'today') void refreshData();
   }
 
   function showResult(outcome) {
@@ -579,12 +583,17 @@ function createDiscoveryUi(state) {
     }).join(' · ');
     const rewardSummary = [points > 0 ? `Explorer +${points}` : '', specialtySummary].filter(Boolean).join(' · ');
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">My Explorer</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }
 
-  document.querySelectorAll('.discoveryTab').forEach((button) => listen(button, 'click', () => setTab(button.dataset.discoveryTab || 'today')));
+  document.querySelectorAll('[data-discovery-tab]').forEach((button) => listen(button, 'click', () => setTab(button.dataset.discoveryTab || 'today')));
+  document.querySelectorAll('[data-discovery-destination="pack"]').forEach((button) => listen(button, 'click', () => {
+    setOpen(false);
+    state.appCtx.toggleUrbanEquipment?.(true);
+  }));
+  listen(elements.profileButton, 'click', () => setTab(activeTab === 'profile' ? 'today' : 'profile'));
   listen(elements.quick, 'click', () => setOpen(!open));
   listen(elements.menu, 'click', () => {
     document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
@@ -596,12 +605,7 @@ function createDiscoveryUi(state) {
     else setOpen(true);
   });
   listen(elements.close, 'click', () => setOpen(false));
-  listen(elements.help, 'click', () => {
-    if (activeTab === 'guide' && elements.guideHelp) {
-      elements.guideHelp.hidden = !elements.guideHelp.hidden;
-      elements.guideHelpButton?.setAttribute('aria-expanded', elements.guideHelp.hidden ? 'false' : 'true');
-    } else void state.showActivityTutorial(true);
-  });
+  listen(elements.help, 'click', () => void state.showSectionTutorial?.(activeTab === 'today' ? 'workspace' : activeTab, true));
   listen(elements.guideHelpButton, 'click', () => {
     if (!elements.guideHelp) return;
     elements.guideHelp.hidden = !elements.guideHelp.hidden;
@@ -766,7 +770,7 @@ function createDiscoveryUi(state) {
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
-    if (elements.title && activeTab === 'today') elements.title.textContent = 'Explorer';
+    if (elements.title && activeTab === 'today') elements.title.textContent = 'Today';
     if (elements.quickLabel) elements.quickLabel.textContent = `Resume ${activeAction?.label || 'Field Activity'}`;
     if (!snapshot) return;
     if (elements.inspection) {

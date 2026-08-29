@@ -43,3 +43,72 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
   body:has(#floatMenuContainer.show) #discoveryQuickToolBtn{bottom:94px}
   body:has(#floatMenuContainer.show) #discoveryContextPrompt{bottom:140px}
 }
+
+@layer interface {
+  #discoveryPanel{width:min(500px,calc(100vw - 32px))}
+  .discoveryHead{height:66px}
+  .discoveryHeadActions{align-items:center}
+  .discoveryProfileBtn{min-width:104px;height:34px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px;border:1px solid rgba(45,125,255,.34);border-radius:2px;padding:0 8px;background:rgba(45,125,255,.07);color:#a9c9ff;cursor:pointer}
+  .discoveryProfileBtn span{overflow:hidden;text-overflow:ellipsis;color:#a9b9c5;font:600 7px Orbitron,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+  .discoveryProfileBtn b{display:grid;place-items:center;min-width:22px;height:22px;border-radius:50%;background:rgba(45,125,255,.18);color:#dceaff;font:700 9px Orbitron,sans-serif}
+  .discoveryProfileBtn:hover,.discoveryProfileBtn.active{border-color:var(--wx-blue);background:rgba(45,125,255,.15)}
+  .discoveryWorkspace{grid-template-columns:1fr;grid-template-rows:48px minmax(0,1fr)}
+  .discoveryTabs{flex-direction:row;border-right:0;border-bottom:1px solid var(--wx-line-soft);padding:0;background:#060d13}
+  .discoveryTab{flex:1 1 25%;height:48px;display:flex;justify-content:center;gap:7px;border-left:0;border-bottom:2px solid transparent;padding:0 8px;text-align:center;font-size:9px}
+  .discoveryTab.active{border-left:0;border-bottom-color:var(--wx-blue);background:linear-gradient(0deg,rgba(45,125,255,.16),rgba(45,125,255,.02))}
+  .discoveryTab span{font-size:14px}
+  .discoveryPane{padding:16px 18px 18px}
+  .discoveryModeNote{grid-template-columns:1fr;gap:3px;padding:10px 11px;font-size:10px}
+  .discoveryModeNote b{font-size:8px}
+  .discoverySectionHead{height:29px;font-size:10px}
+  .discoveryActionChip{min-height:50px;padding-block:9px;font-size:11px}
+  .discoveryActionChip small{font-size:8px}
+  .discoveryTodayRoute,.discoveryJournalPlaces,.discoveryGuideLifeDetails,.discoveryProfileGroup{margin-top:12px;border:1px solid var(--wx-line-soft);background:#071018}
+  .discoveryTodayRoute>summary,.discoveryJournalPlaces>summary,.discoveryGuideLifeDetails>summary,.discoveryProfileGroup>summary{min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;color:#c8d9e5;font:700 9px Orbitron,sans-serif;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
+  .discoveryTodayRoute>summary small,.discoveryProfileGroup>summary span{color:#7f94a1;font:600 7px Orbitron,sans-serif}
+  .discoveryTodayRoute[open],.discoveryJournalPlaces[open],.discoveryGuideLifeDetails[open],.discoveryProfileGroup[open]{padding:0 10px 10px}
+  .discoveryTodayRoute[open]>summary,.discoveryJournalPlaces[open]>summary,.discoveryGuideLifeDetails[open]>summary,.discoveryProfileGroup[open]>summary{margin:0 -10px 10px;border-bottom:1px solid var(--wx-line-soft)}
+  .discoveryJournalPlaces>p,.discoveryCompanionSection>p{margin:0 0 9px;color:#82939e;font-size:10px}
+  .discoveryGuideLifeDetails .discoveryLifeList{margin:0;border:0;padding:0;background:transparent}
+  .discoveryGuideLifeDetails:not([open])>.discoveryLifeList{display:none}
+  .discoveryProfileHero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px}
+  .discoveryProfileHero>div{min-width:0;border:1px solid var(--wx-line-soft);padding:12px;background:#09131b}
+  .discoveryProfileHero>div:first-child{grid-row:span 2;border-left:3px solid var(--wx-blue);background:linear-gradient(120deg,rgba(45,125,255,.13),#09131b 70%)}
+  .discoveryProfileHero span{display:block;color:#78909f;font:700 7px Orbitron,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+  .discoveryProfileHero strong{display:block;margin-top:5px;color:#e7f0f5;font:700 16px Orbitron,sans-serif;text-transform:uppercase}
+  .discoveryProfileHero small,.discoveryProfileStrengths b{display:block;margin-top:5px;color:#91a3ae;font-size:9px}
+  .discoveryProfileGroup{width:100%;box-sizing:border-box;margin-top:7px}
+  .discoveryProfileGroupGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .discoveryProgressGrid{display:block}
+  .discoveryProgressCard{min-height:62px;box-sizing:border-box;text-transform:none}
+  .discoveryProgressCard strong{font-size:18px}
+  .discoveryRegionalProgress{grid-column:auto}
+  .discoveryCompanionSection{margin-top:18px;padding-top:12px;border-top:1px solid var(--wx-line-soft)}
+  .discoveryCompanionSection .discoverySectionHead{margin-bottom:5px}
+  .discoveryOnlineService{margin-bottom:8px}
+  .discoveryLegacyEquipmentData{display:none!important}
+
+  @media(max-width:760px){
+    #discoveryPanel{right:6px;height:min(74dvh,680px)}
+    .discoveryHead{height:58px;padding:0 9px 0 11px}
+    .discoveryHeadActions{gap:4px}
+    .discoveryProfileBtn{min-width:0;width:74px;height:32px;padding:0 5px;gap:4px}
+    .discoveryProfileBtn span{font-size:6px}
+    .discoveryProfileBtn b{min-width:20px;height:20px;font-size:8px}
+    #discoveryCloseBtn,#discoveryHelpBtn{width:32px;height:32px}
+    .discoveryWorkspace{grid-template-rows:minmax(0,1fr) 52px}
+    .discoveryContent{grid-row:1}
+    .discoveryTabs{grid-row:2;border-top:1px solid var(--wx-line-soft);border-bottom:0}
+    #discoveryPanel .discoveryTab{flex-basis:25%;height:52px;flex-direction:column;gap:2px;border-top:2px solid transparent;border-bottom:0;padding:3px 2px;font-size:8px}
+    #discoveryPanel .discoveryTab.active{border-top-color:var(--wx-blue);border-bottom:0}
+    #discoveryPanel .discoveryTab span{font-size:15px}
+    .discoveryPane{padding:12px 12px 16px}
+    .discoveryActionList{grid-template-columns:1fr 1fr}
+    .discoveryActionChip:first-child{grid-column:1/-1}
+    .discoveryProfileHero{grid-template-columns:1fr}
+    .discoveryProfileHero>div:first-child{grid-row:auto}
+    .discoveryProfileGroupGrid{grid-template-columns:1fr}
+    .discoveryGuideOverview{grid-template-columns:1fr 1fr}
+    .discoveryGuideOverview article:last-child{grid-column:1/-1}
+  }
+}

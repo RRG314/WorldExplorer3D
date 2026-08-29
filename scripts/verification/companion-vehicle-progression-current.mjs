@@ -60,9 +60,8 @@ async function openCompanions(page) {
     }
   }
   await page.waitForSelector('#discoveryPanel.show', { timeout: 10_000 });
-  await page.locator('[data-discovery-tab="gear"]').click();
-  const guide = page.locator('#discoverySectionTutorial:not([hidden])');
-  if (await guide.isVisible().catch(() => false)) await page.locator('#discoverySectionTutorialDoneBtn').click();
+  await page.locator('#discoveryProfileBtn').click();
+  await page.waitForSelector('.discoveryPane[data-discovery-pane="profile"].active');
 }
 
 async function moveWalker(page, x, z) {
