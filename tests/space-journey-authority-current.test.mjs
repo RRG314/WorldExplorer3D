@@ -308,8 +308,37 @@ test('rendered journey controller makes the mesh a presentation of fuel-accounte
     appContext.spaceFlight.rocket.position.x - initialMesh.x,
     appContext.spaceFlight.rocket.position.y - initialMesh.y,
     appContext.spaceFlight.rocket.position.z - initialMesh.z
-  ) > 0.1, 'manual flight must be visibly meaningful in one input interval');
-  assert.equal(appContext.spaceFlight.manualFlightRate, 1000);
+  ) > 0, 'the SI propagation path must advance when explicitly commanded');
+  assert.equal(appContext.spaceFlight.manualFlightRate, 100);
+});
+
+test('classic manual flight can take presentation ownership without a second position authority', () => {
+  const position = (x, y, z) => ({
+    x, y, z,
+    set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; }
+  });
+  const appContext = {
+    spaceFlight: {
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'earth', destinationBodyId: 'moon', mode: JOURNEY_MODE.ASSISTED
+  });
+  const scenePosition = { ...appContext.spaceFlight.rocket.position };
+
+  assert.equal(runtime.releaseRenderedJourneyToManualFlight(), true);
+  assert.equal(appContext.spaceFlight.presentationAuthority, 'classic');
+  assert.equal(appContext.spaceJourney, null);
+  assert.equal(appContext.spacecraftState, null);
+  assert.equal(appContext.spaceJourneyEphemeris, null);
+  assert.deepEqual(appContext.spaceFlight.rocket.position, scenePosition);
+  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1, throttle: 1 }), false);
 });
 
 test('rendered journey follows live body positions without changing physical spacecraft state', () => {

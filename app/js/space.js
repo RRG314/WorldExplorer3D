@@ -2,16 +2,16 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=15";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=16";
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=23";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=7";
+import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=8";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=4';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=5';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -45,6 +45,7 @@ appCtx.spaceFlight = {
   launchStartMs: 0,
   _launchSource: null,
   _isThrusting: false,
+  presentationAuthority: 'classic',
   _lastFrameMs: 0,
   _frameScale: 1,
   overviewMode: false,

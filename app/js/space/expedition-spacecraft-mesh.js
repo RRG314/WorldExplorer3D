@@ -51,18 +51,17 @@ function createExpeditionSpacecraftMesh() {
   });
 
   // Local +Y is the shared flight authority's forward axis.
-  const saucer = addCylinder(craft, 5.7, 5.7, 0.82, ceramic, [0, 4.9, 0], null, 40);
-  saucer.scale.z = 0.72;
-  const saucerLower = addCylinder(craft, 4.75, 3.65, 0.72, ceramicDark, [0, 4.25, 0], null, 36);
-  saucerLower.scale.z = 0.72;
+  const saucer = addCylinder(craft, 5.7, 5.7, 0.82, ceramic, [0, 4.9, 0], [Math.PI / 2, 0, 0], 40);
+  saucer.scale.y = 0.78;
+  const saucerLower = addCylinder(craft, 4.75, 3.65, 0.72, ceramicDark, [0, 4.25, -0.36], [Math.PI / 2, 0, 0], 36);
+  saucerLower.scale.y = 0.78;
   const bridge = new THREE.Mesh(new THREE.SphereGeometry(1.35, 20, 12), ceramic);
-  bridge.scale.set(1.25, 0.32, 0.92);
-  bridge.position.set(0, 5.55, 0);
+  bridge.scale.set(1.25, 0.92, 0.32);
+  bridge.position.set(0, 5.1, 0.58);
   craft.add(bridge);
   const bridgeGlass = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.12, 8, 28), windowMat);
-  bridgeGlass.rotation.x = Math.PI / 2;
-  bridgeGlass.scale.z = 0.72;
-  bridgeGlass.position.set(0, 5.72, 0);
+  bridgeGlass.scale.y = 0.78;
+  bridgeGlass.position.set(0, 5.1, 0.86);
   craft.add(bridgeGlass);
 
   addBox(craft, [2.1, 6.2, 1.6], hullShadow, [0, 0.75, 0], [0, 0, -0.04]);

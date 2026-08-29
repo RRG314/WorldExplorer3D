@@ -272,7 +272,9 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     complete: 'Journey complete'
   };
   if (flightStatus) {
-    const copy = phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';
+    const copy = appCtx.spaceFlight.presentationAuthority === 'classic'
+      ? appCtx.spaceFlight.speed > 0 ? 'Manual flight' : 'Ready to fly'
+      : phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';
     flightStatus.textContent = copy;
   }
   if (flightRead) {
@@ -339,7 +341,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       : appCtx.spaceJourneyEphemeris?.destination?.bodyId === physicalBodyId
         ? appCtx.spaceJourneyEphemeris.destination
         : null;
-    const physicalNavigation = appCtx.spacecraftState && missionBody
+    const physicalNavigation = appCtx.spaceFlight.presentationAuthority === 'si' && appCtx.spacecraftState && missionBody
       ? computeBodyRelativeNavigation(appCtx.spacecraftState, missionBody)
       : null;
     const physicalRadius = getAstronomicalBody(physicalBodyId)?.physical?.meanRadiusM / 1000;
