@@ -443,6 +443,23 @@ async function continueFromCustody(page) {
   return diagnostics(page);
 }
 
+async function verifyCustodyIncidentEnded(page) {
+  const before = await diagnostics(page);
+  const start = before.activeActor?.position || {};
+  for (let index = 0; index < 4; index += 1) {
+    await page.evaluate(() => globalThis.advanceTime?.(1600));
+    await inputStep(page, 'ArrowUp', 180);
+  }
+  await page.waitForTimeout(300);
+  const after = await diagnostics(page);
+  const end = after.activeActor?.position || {};
+  return {
+    after,
+    moved: Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z)),
+    caughtVisible: await page.locator('#caughtScreen.show').isVisible().catch(() => false)
+  };
+}
+
 async function runVehicleEquipmentJourney() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -601,7 +618,13 @@ async function runArrestRecoveryJourney() {
     }
     assert.equal(custody.urbanSandbox?.custody?.type, 'police', 'Responder contact did not resolve to a mapped police custody path.');
     const recovered = await continueFromCustody(page);
-    return { witnessedResponse, responderArrived, custody, recovered };
+    const ended = await verifyCustodyIncidentEnded(page);
+    assert.equal(ended.caughtVisible, false, 'The completed custody incident reopened the caught screen.');
+    assert.equal(ended.after.urbanSandbox?.custody || null, null, 'The completed custody incident arrested the player again.');
+    assert.equal(ended.after.urbanSandbox?.civicResponse?.phase, 'clear', 'Civic attention remained active after custody release.');
+    assert.equal(Number(ended.after.urbanSandbox?.responders?.activeCount || 0), 0, 'Responders from the completed custody incident remained active.');
+    assert.ok(ended.moved > .2, 'Normal walking control did not recover after custody release.');
+    return { witnessedResponse, responderArrived, custody, recovered, ended };
   } finally {
     await context.close();
   }
@@ -660,6 +683,11 @@ try {
       recoveryRestoresWalking:
         !arrest.recovered.urbanSandbox.custody && arrest.recovered.activeActor?.mode === 'walk' &&
         arrest.recovered.urbanSandbox.playerCondition === 1,
+      completedIncidentCannotReplay:
+        !arrest.ended.caughtVisible && !arrest.ended.after.urbanSandbox?.custody &&
+        arrest.ended.after.urbanSandbox?.civicResponse?.phase === 'clear' &&
+        Number(arrest.ended.after.urbanSandbox?.responders?.activeCount || 0) === 0 &&
+        arrest.ended.moved > .2,
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };

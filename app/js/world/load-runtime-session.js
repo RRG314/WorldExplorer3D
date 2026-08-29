@@ -353,7 +353,26 @@ export function verifyWorldPublicationStable(appCtx = {}, publication = null) {
   });
 }
 
-export function finishWorldLoadRuntimeSession(session = {}) {
+function gameplayRuntimeMatchesPublication(runtime, publication) {
+  if (!runtime || !publication) return false;
+  const sequence = Number(runtime.sequence ?? runtime.publication?.sequence);
+  const requestId = String(runtime.requestId ?? runtime.publication?.requestId ?? '');
+  return sequence === Number(publication.sequence) && requestId === String(publication.requestId || '');
+}
+
+function disposeGameplayRuntimesForPublication(appCtx, publication, reason) {
+  if (gameplayRuntimeMatchesPublication(appCtx.worldDiscoveryRuntime, publication)) {
+    appCtx.disposeWorldDiscoveryRuntime?.(reason);
+  }
+  if (gameplayRuntimeMatchesPublication(appCtx.urbanSandboxRuntime, publication)) {
+    appCtx.disposeUrbanSandboxRuntime?.(reason);
+  }
+  if (gameplayRuntimeMatchesPublication(appCtx.livingWorldRuntime, publication)) {
+    appCtx.disposeLivingWorldRuntime?.(reason);
+  }
+}
+
+export async function finishWorldLoadRuntimeSession(session = {}) {
   const {
     appCtx, finalizePerfLoad, loadMetrics, phaseTotals, releaseWorldLoadCancellation,
     runtimeState, syncWorldSessionState, worldSession, loaded = false
@@ -411,37 +430,101 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     layerProducts,
     createdAt: performance.now()
   });
-  appCtx.worldLoading = false;
+  // Publish the completed scene while it is still hidden by worldLoading. The
+  // living-world, interaction, and Explorer runtimes all compile against this
+  // immutable publication and are required for a playable Earth session. They
+  // used to start from an idle callback after the loading screen disappeared,
+  // which made city changes report ready and then freeze for seconds while the
+  // main thread built navigation graphs and encounter plans.
   appCtx.publishEarthWorldSceneLoad?.(publication.sequence);
+  if (runtimeState) {
+    runtimeState.status = 'starting-gameplay';
+    runtimeState.gameplayRuntimesReady = false;
+    runtimeState.updatedAt = performance.now();
+  }
+  const gameplayRuntimeStartedAt = performance.now();
+  let livingWorld = null;
+  let urbanSandbox = null;
+  let worldDiscovery = null;
+  const startupIsCurrent = () => !!(
+    worldSession?.isActive?.() &&
+    appCtx.worldPublication?.requestId === publication.requestId &&
+    appCtx.worldPublication?.sequence === publication.sequence
+  );
+  try {
+    const livingWorldModule = await import('../living-world/runtime.js?v=24');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-living-world-startup');
+    }
+    livingWorld = livingWorldModule.startLivingWorldRuntime(appCtx, {
+      snapshot: publication,
+      request: worldSession?.request
+    });
+    if (!livingWorld) throw new Error('Living World did not start for the active publication.');
+    const urbanSandboxModule = await import('../urban-sandbox/runtime.js?v=51');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-urban-sandbox-startup');
+    }
+    urbanSandbox = urbanSandboxModule.startUrbanSandboxRuntime({
+      snapshot: publication,
+      request: worldSession?.request,
+      livingWorld
+    });
+    if (!urbanSandbox) throw new Error('Urban Sandbox did not start for the active publication.');
+    const worldDiscoveryModule = await import('../discovery/runtime.js?v=26');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-explorer-startup');
+    }
+    worldDiscovery = await worldDiscoveryModule.startWorldDiscoveryRuntime(appCtx, {
+      snapshot: publication,
+      request: worldSession?.request
+    });
+    if (!worldDiscovery) throw new Error('Explorer runtime did not start for the active publication.');
+  } catch (error) {
+    disposeGameplayRuntimesForPublication(appCtx, publication, 'gameplay-startup-failed');
+    if (worldSession?.isActive?.() === false) {
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
+    }
+    if (runtimeState) {
+      runtimeState.status = 'failed';
+      runtimeState.gameplayRuntimesReady = false;
+      runtimeState.gameplayRuntimeError = String(error?.message || error);
+      runtimeState.updatedAt = performance.now();
+      runtimeState.finishedAt = runtimeState.updatedAt;
+    }
+    console.warn('[WorldLoad] Essential Earth gameplay runtime startup failed:', error);
+    worldSession?.fail?.('essential-gameplay-runtime-startup-failed');
+    syncWorldSessionState?.();
+    appCtx.worldLoading = false;
+    appCtx.enforceEnvironmentSceneOwnership?.();
+    appCtx.hideLoad?.();
+    appCtx.showToast?.('This location could not finish loading. Try switching locations or reload.');
+    finalizePerfLoad(false, { reason: 'essential-gameplay-runtime-startup-failed' });
+    releaseWorldLoadCancellation?.();
+    return worldSession?.snapshot?.() || null;
+  }
+  if (runtimeState) {
+    runtimeState.gameplayRuntimesReady = !!(
+      livingWorld && urbanSandbox && worldDiscovery &&
+      appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.worldDiscoveryRuntime
+    );
+    runtimeState.gameplayRuntimeDurationMs = Math.round(performance.now() - gameplayRuntimeStartedAt);
+    runtimeState.updatedAt = performance.now();
+  }
+  if (worldSession?.isActive?.() === false) {
+    disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+    return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
+  }
+  appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();
   appCtx.hideLoad?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);
   }, { timeout: 1200 });
-  scheduleAfterFirstPlay(`living-world-${publication.sequence}`, async () => {
-    if (
-      appCtx.worldPublication?.requestId !== publication.requestId ||
-      appCtx.worldPublication?.sequence !== publication.sequence
-    ) return null;
-    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=24');
-    const livingWorld = startLivingWorldRuntime(appCtx, {
-      snapshot: publication,
-      request: worldSession?.request
-    });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=50');
-    const urbanSandbox = startUrbanSandboxRuntime({
-      snapshot: publication,
-      request: worldSession?.request,
-      livingWorld
-    });
-    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=26');
-    const worldDiscovery = await startWorldDiscoveryRuntime(appCtx, {
-      snapshot: publication,
-      request: worldSession?.request
-    });
-    return { livingWorld, urbanSandbox, worldDiscovery };
-  }, { timeout: 900 });
   markFirstPlayReady({
     environment: 'earth',
     loadDurationMs: Math.round(performance.now() - Number(runtimeState?.startedAt || performance.now())),

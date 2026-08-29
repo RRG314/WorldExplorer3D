@@ -9,7 +9,7 @@ import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=14';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=15';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -1566,6 +1566,12 @@ function placePlayerAtMappedFacility(state, type, reason) {
   state.playerCondition = 1;
   renderEquipment(state);
   state.civic?.clear?.();
+  state.responders?.clearIncident?.();
+  state.actorCollisionCooldowns?.clear?.();
+  state.secondaryCrashCooldowns?.clear?.();
+  state.recklessElapsed = 0;
+  state.recklessEventCooldown = 4;
+  appCtx.clearControlInputState?.('urban_custody');
   return true;
 }
 
@@ -2560,7 +2566,24 @@ function startUrbanSandboxRuntime(options = {}) {
       // handled but silently returns the player to walking mode.
       if (state.transition) return;
       const civic = civicSnapshot(state);
-      if (Number(civic?.level || 0) >= 2) placePlayerInCustody(state, 'arrested');
+      if (Number(civic?.level || 0) < 2) return;
+      const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
+      if (authorityMode === 'local') {
+        placePlayerInCustody(state, 'arrested');
+        return;
+      }
+      // Shared incidents must be resolved by the room authority before local
+      // custody is applied. Teleporting first left the shared event active, so
+      // the same officer contact could arrest the player again after Continue.
+      if (state.civicResolutionPending) return;
+      state.civicResolutionPending = true;
+      state.roomAuthorityRuntime.resolveCivicOutcome().then((result) => {
+        if (!activeWorldMatches(state) || !result?.accepted) return;
+        state.lastCivicOutcome = Object.freeze({ ...result.outcome, authority: 'room', at: now() });
+        if (result.outcome?.type === 'arrest') placePlayerInCustody(state, 'shared_responder_contact');
+      }).catch(() => {
+        if (activeWorldMatches(state)) setStatus(state, 'Shared civic outcome is reconnecting.', 2200);
+      }).finally(() => { state.civicResolutionPending = false; });
     },
     onOfficerDowned: (details) => spawnLootPickup(state, details),
     onResolution(outcome) {
@@ -2643,8 +2666,16 @@ function startUrbanSandboxRuntime(options = {}) {
   state.onEquipmentClose = () => toggleEquipment(state, false);
   state.onCustodyContinue = () => {
     if (!state.custody?.resolved) return false;
-    appCtx.applyResolvedWorldSpawn?.(state.custody.resolved, { mode: 'walk', syncCar: false, syncWalker: true });
+    const resolved = state.custody.resolved;
     state.custody = null;
+    state.civic?.clear?.();
+    state.responders?.clearIncident?.();
+    state.actorCollisionCooldowns.clear();
+    state.secondaryCrashCooldowns.clear();
+    state.recklessElapsed = 0;
+    state.recklessEventCooldown = 4;
+    appCtx.clearControlInputState?.('urban_custody_release');
+    appCtx.applyResolvedWorldSpawn?.(resolved, { mode: 'walk', syncCar: false, syncWalker: true });
     state.playerCondition = 1;
     renderEquipment(state);
     return true;

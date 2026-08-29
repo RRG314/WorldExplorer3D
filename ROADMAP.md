@@ -59,6 +59,10 @@ In the 5.1 candidate:
 
 Before 5.1 production:
 
+- Complete the dependency-ordered transport sandbox expansion described in
+  [docs/TRANSPORT_SANDBOX.md](docs/TRANSPORT_SANDBOX.md):
+  lifecycle authority, shared road vehicle quality and damage, mapped airport
+  and maritime facilities, aviation, then marina/harbor/large-port operations.
 - Pass the current System Inventory and Architecture release matrix against one
   immutable staging artifact.
 - Complete owner testing on desktop and a physical phone.

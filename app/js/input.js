@@ -218,7 +218,10 @@ function onKey(code, event) {
       toggleTrackRecording();
     }
   }
-  if (code === 'KeyN') nextCity();
+  if (code === 'KeyN') {
+    if (event?.repeat) return;
+    nextCity();
+  }
   if (code === 'KeyM') {
     if (event?.repeat) return;
     toggleLargeMap();

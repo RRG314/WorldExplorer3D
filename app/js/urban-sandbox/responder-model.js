@@ -122,7 +122,15 @@ function createResponderResponseModel(options = {}) {
     return snapshot({ activeCount, resolution: outcome });
   }
 
-  return Object.freeze({ snapshot, update });
+  function clear() {
+    state.phase = 'idle';
+    state.eventId = '';
+    state.contactElapsed = 0;
+    state.lastOutcome = null;
+    return snapshot({ activeCount: 0 });
+  }
+
+  return Object.freeze({ clear, snapshot, update });
 }
 
 export {

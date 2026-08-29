@@ -3,7 +3,7 @@ import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=5';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
-import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=2';
+import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=3';
 import { vehicleDoorPosition } from './vehicle-model.js?v=6';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
@@ -591,15 +591,24 @@ function createUrbanResponderRuntime(options = {}) {
     return Object.freeze({ weaponId: 'responder-sidearm', rounds: 24 });
   }
 
-  function dispose() {
-    if (disposed) return false;
-    disposed = true;
+  function clearIncident() {
     responders.slice().forEach(removeResponder);
-    lastSnapshot = Object.freeze({ ...model.snapshot({ activeCount: 0 }), responders: Object.freeze([]) });
+    model.clear?.();
+    lastSnapshot = Object.freeze({
+      ...model.snapshot({ activeCount: 0 }),
+      responders: Object.freeze([])
+    });
     return true;
   }
 
-  return Object.freeze({ applyImpact, claimVehicle, dispose, lootOfficer, nearestDownedOfficer, nearestEnterable, snapshot, targets, update });
+  function dispose() {
+    if (disposed) return false;
+    disposed = true;
+    clearIncident();
+    return true;
+  }
+
+  return Object.freeze({ applyImpact, claimVehicle, clearIncident, dispose, lootOfficer, nearestDownedOfficer, nearestEnterable, snapshot, targets, update });
 }
 
 export { createUrbanResponderRuntime, responderVariant };
