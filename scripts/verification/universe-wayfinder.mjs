@@ -90,6 +90,75 @@ async function verifyViewport(viewport, name) {
     assert.match(hud.wayfinder, /TRAPPIST-1 e/);
     await page.screenshot({ path: path.join(outputDir, `${name}-trappist-course.png`), fullPage: true });
 
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(1800);
+    await page.keyboard.up('ArrowRight');
+    await page.waitForFunction(() => document.getElementById('universeCourseCue')?.hidden === false, null, { timeout: 5000 });
+    const cue = await page.evaluate(() => {
+      const element = document.getElementById('universeCourseCue');
+      const rect = element?.getBoundingClientRect();
+      return {
+        hidden: element?.hidden,
+        text: element?.textContent?.replace(/\s+/g, ' ').trim(),
+        left: rect?.left,
+        right: rect?.right,
+        top: rect?.top,
+        bottom: rect?.bottom
+      };
+    });
+    assert.equal(cue.hidden, false);
+    assert.match(cue.text, /COURSE.*TRAPPIST-1 e/i);
+    assert.ok(cue.left >= 0 && cue.right <= viewport.width, `course cue must stay inside viewport: ${JSON.stringify(cue)}`);
+    assert.ok(cue.top >= 0 && cue.bottom <= viewport.height, `course cue must stay inside viewport: ${JSON.stringify(cue)}`);
+    await page.screenshot({ path: path.join(outputDir, `${name}-trappist-course-direction.png`), fullPage: true });
+
+    await page.keyboard.down('Space');
+    await page.waitForTimeout(900);
+    await page.keyboard.up('Space');
+    await page.waitForTimeout(200);
+
+    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) {
+      await page.locator('#sfHudToggle').click();
+    }
+    const assistButton = page.locator('#sfAssistBtn');
+    await assistButton.waitFor({ state: 'visible' });
+    assert.equal(await assistButton.isEnabled(), true);
+    assert.match(await assistButton.innerText(), /ASSIST TO TRAPPIST-1 E/i);
+    const assistStart = await diagnostics(page);
+    assert.ok(
+      assistStart.universeNavigation.targetVisual.rocketTargetDistance > arrivalState.universeNavigation.targetVisual.rocketTargetDistance + 8,
+      'manual flight away from the selected planet must create a meaningful local approach distance'
+    );
+    await assistButton.click();
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.universeNavigation?.courseGuidance === 'assisted' &&
+        state.universeNavigation?.targetVisual?.rocketTargetDot > 0.97;
+    }, null, { timeout: 10000 });
+    const assistStartDistance = assistStart.universeNavigation.targetVisual.rocketTargetDistance;
+    await page.waitForFunction((startDistance) => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.universeNavigation?.courseGuidance === 'assisted' &&
+        state.universeNavigation?.targetVisual?.rocketTargetDistance < startDistance - 8;
+    }, assistStartDistance, { timeout: 10000 });
+    await page.waitForTimeout(300);
+    const assistedState = await diagnostics(page);
+    assert.equal(assistedState.universeNavigation.courseGuidance, 'assisted');
+    assert.ok(
+      assistedState.universeNavigation.targetVisual.rocketTargetDot > assistStart.universeNavigation.targetVisual.rocketTargetDot + 0.2,
+      'flight assist must materially turn the spacecraft toward the selected planet'
+    );
+    assert.match(await assistButton.innerText(), /RESUME MANUAL FLIGHT/i);
+    await page.screenshot({ path: path.join(outputDir, `${name}-trappist-assisted.png`), fullPage: true });
+
+    await page.keyboard.down('ArrowLeft');
+    await page.waitForTimeout(120);
+    await page.keyboard.up('ArrowLeft');
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.universeNavigation?.courseGuidance === 'manual';
+    });
+
     if (name === 'desktop') {
       await setCourse(page, 'sagittarius-a-star');
       await page.waitForFunction(() => {
@@ -119,7 +188,9 @@ async function verifyViewport(viewport, name) {
       planetOptionCount,
       arrivalState: arrivalState.universeNavigation,
       targetVisual,
-      hud
+      hud,
+      cue,
+      assistedState: assistedState.universeNavigation
     });
   } finally {
     await context.close();

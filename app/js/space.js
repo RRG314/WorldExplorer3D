@@ -2,9 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=16";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=24";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=9";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=17";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=25";
+import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=10";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,

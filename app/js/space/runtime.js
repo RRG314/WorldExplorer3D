@@ -205,6 +205,14 @@ function nearestLandableDistance(rocket, bodies) {
   return minDist;
 }
 
+function getActiveSpaceBodies() {
+  const activeUniverseId = appCtx.universeRuntime?.current?.id;
+  if (activeUniverseId && activeUniverseId !== 'sol') {
+    return appCtx.getUniverseGravityBodies?.() || [];
+  }
+  return appCtx.getAllSpaceBodies?.() || [];
+}
+
 function sunGravityWeightByLocalBodies(nearestLandableDist) {
   if (!Number.isFinite(nearestLandableDist)) return 1.0;
   if (nearestLandableDist <= 2200) return 0;
@@ -321,7 +329,7 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
     gravitySum: _sfGravitySum,
     gravityTemporary: _sfGravityTmp
   } = getSpaceControlMath();
-  if (!appCtx.spaceFlight.gravityVelocity || typeof appCtx.getAllSpaceBodies !== 'function') return;
+  if (!appCtx.spaceFlight.gravityVelocity) return;
 
   if (launchAssist && !isThrusting) {
     appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
@@ -329,7 +337,7 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
     return;
   }
 
-  const bodies = appCtx.getAllSpaceBodies();
+  const bodies = getActiveSpaceBodies();
   const nearLandableDist = nearestLandableDistance(rocket, bodies);
   _sfGravitySum.set(0, 0, 0);
 
@@ -374,8 +382,8 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
 }
 
 function preserveManualEscapeAuthority(rocket, forward, isThrusting, frameScale) {
-  if (!isThrusting || !appCtx.spaceFlight.gravityVelocity || typeof appCtx.getAllSpaceBodies !== 'function') return;
-  const bodies = appCtx.getAllSpaceBodies();
+  if (!isThrusting || !appCtx.spaceFlight.gravityVelocity) return;
+  const bodies = getActiveSpaceBodies();
   let nearest = null;
   let nearestSurfaceDistance = Infinity;
   bodies.forEach((body) => {
@@ -561,10 +569,7 @@ export function updateSpaceFlightPhysics() {
   }
   const previousPosition = rocket.position.clone();
   const nextPosition = previousPosition.clone().addScaledVector(appCtx.spaceFlight.velocity, frameScale);
-  const activeUniverseId = appCtx.universeRuntime?.current?.id;
-  const collisionBodies = typeof appCtx.getAllSpaceBodies === 'function' && (!activeUniverseId || activeUniverseId === 'sol')
-    ? appCtx.getAllSpaceBodies()
-    : [];
+  const collisionBodies = getActiveSpaceBodies();
   const collision = resolveCelestialSceneCollision(previousPosition, nextPosition, collisionBodies, {
     clearance: 5,
     padding: 0.08,

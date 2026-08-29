@@ -5,7 +5,13 @@ import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
-import { createUniverseCourse, setUniverseCourseStatus } from './course-authority.js?v=1';
+import {
+  createUniverseCourse,
+  setUniverseCourseGuidance,
+  setUniverseCourseStatus,
+  UNIVERSE_GUIDANCE_MODE
+} from './course-authority.js?v=2';
+import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
 import {
   createUniverseFrameVisual,
@@ -19,8 +25,9 @@ import {
   hideUniverseNavigator,
   setUniverseSelection,
   showUniverseNavigator,
+  updateUniverseCourseCue,
   updateUniverseNavigator
-} from './ui.js?v=4';
+} from './ui.js?v=5';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -34,6 +41,31 @@ const WORMHOLE_DURATION_MS = 4800;
 const FRAME_REBASE_DISTANCE = 30000;
 const _rebase = new THREE.Vector3();
 const _forward = new THREE.Vector3();
+const _courseTarget = new THREE.Vector3();
+const _courseDirection = new THREE.Vector3();
+const _courseCameraDirection = new THREE.Vector3();
+const _courseCameraLocal = new THREE.Vector3();
+const _courseCameraInverse = new THREE.Quaternion();
+const _courseDesiredRotation = new THREE.Quaternion();
+const _courseProjected = new THREE.Vector3();
+const _courseForwardAxis = new THREE.Vector3(0, 1, 0);
+const _localCourseTarget = {
+  destination: null,
+  position: _courseTarget,
+  radius: 0,
+  mesh: null
+};
+const _localCourseCue = {
+  visible: false,
+  onScreen: false,
+  x: 0,
+  y: 0,
+  angleDeg: 0,
+  label: '',
+  assisted: false,
+  ndcX: 0,
+  ndcY: 0
+};
 
 const universeRuntime = {
   initialized: false,
@@ -436,6 +468,144 @@ function getUniverseHudTarget() {
   };
 }
 
+function getLocalCourseTarget() {
+  const course = universeRuntime.course;
+  if (
+    universeRuntime.transition ||
+    course?.status !== 'active' ||
+    course.frame?.id !== universeRuntime.current?.id ||
+    !universeRuntime.frameGroup
+  ) return null;
+  const mesh = getUniverseDestinationMesh(universeRuntime.frameGroup, course.destination.id)
+    || (course.destination.id === universeRuntime.current.id ? universeRuntime.frameGroup : null);
+  if (!mesh) return null;
+  mesh.getWorldPosition(_courseTarget);
+  _localCourseTarget.destination = course.destination;
+  _localCourseTarget.radius = Number(mesh.geometry?.parameters?.radius) || (
+    course.destination.objectClass === 'planetary_system' ? 24 : 80
+  );
+  _localCourseTarget.mesh = mesh;
+  return _localCourseTarget;
+}
+
+function toggleUniverseCourseAssist() {
+  const target = getLocalCourseTarget();
+  if (!target || !universeRuntime.course) {
+    return Object.freeze({ accepted: false, active: false, reason: 'local-course-target-unavailable' });
+  }
+  const active = universeRuntime.course.guidance !== UNIVERSE_GUIDANCE_MODE.ASSISTED;
+  universeRuntime.course = setUniverseCourseGuidance(
+    universeRuntime.course,
+    active ? UNIVERSE_GUIDANCE_MODE.ASSISTED : UNIVERSE_GUIDANCE_MODE.MANUAL
+  );
+  updateUniverseNavigator(universeRuntime);
+  showMessage(
+    active ? `FLIGHT ASSIST · ${target.destination.name.toUpperCase()}` : 'MANUAL FLIGHT',
+    active ? '#68d8c0' : '#60a5fa'
+  );
+  return Object.freeze({ accepted: true, active, reason: null });
+}
+
+function updateLocalCourseAssist(frameSeconds) {
+  const target = getLocalCourseTarget();
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!target || !rocket || universeRuntime.course?.guidance !== UNIVERSE_GUIDANCE_MODE.ASSISTED) return target;
+  const keys = appCtx.spaceFlight.keys || {};
+  const manualInput = Boolean(
+    keys[' '] || keys.shift || keys.arrowup || keys.arrowdown || keys.arrowleft || keys.arrowright
+  );
+  if (manualInput) {
+    universeRuntime.course = setUniverseCourseGuidance(universeRuntime.course, UNIVERSE_GUIDANCE_MODE.MANUAL);
+    updateUniverseNavigator(universeRuntime);
+    showMessage('MANUAL FLIGHT', '#60a5fa');
+    return target;
+  }
+
+  _courseDirection.copy(target.position).sub(rocket.position);
+  const distance = _courseDirection.length();
+  if (distance <= 0.001) return target;
+  _courseDirection.multiplyScalar(1 / distance);
+  _courseDesiredRotation.setFromUnitVectors(_courseForwardAxis, _courseDirection);
+  const turnBlend = 1 - Math.exp(-Math.max(0, frameSeconds) * 2.8);
+  rocket.quaternion.slerp(_courseDesiredRotation, turnBlend).normalize();
+
+  _forward.set(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+  const alignment = Math.max(0, _forward.dot(_courseDirection));
+  const holdDistance = Math.max(90, target.radius * 12);
+  const remaining = Math.max(0, distance - holdDistance);
+  const desiredSpeed = remaining <= 2
+    ? 0
+    : Math.min(SPACE_CONSTANTS.MAX_SPEED * 0.72, Math.max(SPACE_CONSTANTS.CRUISE_SPEED, remaining / 55)) * alignment;
+  const response = desiredSpeed > appCtx.spaceFlight.speed ? SPACE_CONSTANTS.BOOST * 0.65 : SPACE_CONSTANTS.BRAKE * 0.8;
+  const maxChange = response * (appCtx.spaceFlight._frameScale || 1);
+  appCtx.spaceFlight.speed += Math.max(-maxChange, Math.min(maxChange, desiredSpeed - appCtx.spaceFlight.speed));
+  if (remaining <= 2 && appCtx.spaceFlight.gravityVelocity) {
+    appCtx.spaceFlight.gravityVelocity.multiplyScalar(Math.max(0, 1 - frameSeconds * 3));
+  }
+  return target;
+}
+
+function updateLocalCourseCue(target = getLocalCourseTarget()) {
+  const camera = appCtx.spaceFlight?.camera;
+  if (!target || !camera || !appCtx.spaceFlight?.active) {
+    _localCourseCue.visible = false;
+    _localCourseCue.onScreen = false;
+    updateUniverseCourseCue(null);
+    return null;
+  }
+  _courseDirection.copy(target.position).sub(camera.position);
+  if (_courseDirection.lengthSq() <= 0.001) {
+    updateUniverseCourseCue(null);
+    return null;
+  }
+  _courseDirection.normalize();
+  camera.getWorldDirection(_courseCameraDirection);
+  _courseProjected.copy(target.position).project(camera);
+  const inFront = _courseCameraDirection.dot(_courseDirection) > 0;
+  const onScreen = inFront && Math.abs(_courseProjected.x) < 0.78 && Math.abs(_courseProjected.y) < 0.68;
+  if (onScreen) {
+    _localCourseCue.visible = false;
+    _localCourseCue.onScreen = true;
+    _localCourseCue.ndcX = _courseProjected.x;
+    _localCourseCue.ndcY = _courseProjected.y;
+    updateUniverseCourseCue(null);
+    return _localCourseCue;
+  }
+
+  _courseCameraInverse.copy(camera.quaternion).invert();
+  _courseCameraLocal.copy(target.position).sub(camera.position).applyQuaternion(_courseCameraInverse);
+  let directionX = _courseCameraLocal.x;
+  let directionY = -_courseCameraLocal.y;
+  if (_courseCameraLocal.z > 0) {
+    directionX *= -1;
+    directionY *= -1;
+  }
+  const directionLength = Math.hypot(directionX, directionY) || 1;
+  directionX /= directionLength;
+  directionY /= directionLength;
+  const width = Math.max(320, window.innerWidth || 320);
+  const height = Math.max(480, window.innerHeight || 480);
+  const marginX = width <= 720 ? 62 : 86;
+  const marginY = width <= 720 ? 190 : 88;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const edgeScale = Math.min(
+    (halfWidth - marginX) / Math.max(0.001, Math.abs(directionX)),
+    (halfHeight - marginY) / Math.max(0.001, Math.abs(directionY))
+  );
+  _localCourseCue.visible = true;
+  _localCourseCue.onScreen = false;
+  _localCourseCue.x = halfWidth + directionX * edgeScale;
+  _localCourseCue.y = halfHeight + directionY * edgeScale;
+  _localCourseCue.angleDeg = Math.atan2(directionY, directionX) * 180 / Math.PI + 90;
+  _localCourseCue.label = target.destination.name;
+  _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED;
+  _localCourseCue.ndcX = _courseProjected.x;
+  _localCourseCue.ndcY = _courseProjected.y;
+  updateUniverseCourseCue(_localCourseCue);
+  return _localCourseCue;
+}
+
 function getUniverseCourseSnapshot() {
   const course = universeRuntime.course;
   const destination = course?.destination;
@@ -446,6 +616,7 @@ function getUniverseCourseSnapshot() {
     ? (universeRuntime.frameGroup?.userData?.orbitingPlanets || []).find((candidate) => candidate.body === body)
     : null;
   let targetVisual = null;
+  const directionCue = updateLocalCourseCue();
   if (body && appCtx.spaceFlight?.camera && appCtx.spaceFlight?.rocket) {
     const targetWorld = new THREE.Vector3();
     const projected = new THREE.Vector3();
@@ -462,7 +633,8 @@ function getUniverseCourseSnapshot() {
       ndcY: Number(projected.y),
       cameraTargetDot: Number(cameraDirection.dot(targetDirection)),
       rocketTargetDot: Number(rocketForward.dot(targetWorld.clone().sub(appCtx.spaceFlight.rocket.position).normalize())),
-      targetDistance: Number(targetWorld.distanceTo(appCtx.spaceFlight.camera.position))
+      targetDistance: Number(targetWorld.distanceTo(appCtx.spaceFlight.camera.position)),
+      rocketTargetDistance: Number(targetWorld.distanceTo(appCtx.spaceFlight.rocket.position))
     });
   }
   return Object.freeze({
@@ -471,8 +643,10 @@ function getUniverseCourseSnapshot() {
     courseDestinationId: destination?.id || null,
     courseFrameId: course?.frame?.id || null,
     courseStatus: course?.status || null,
+    courseGuidance: course?.guidance || null,
     transitionDestinationId: universeRuntime.transition?.destination?.id || null,
-    targetVisual
+    targetVisual,
+    directionCue: directionCue ? Object.freeze({ ...directionCue }) : null
   });
 }
 
@@ -505,6 +679,8 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   if (universeRuntime.encounter?.type === 'generated-asteroids') {
     updateRegionEncounter(universeRuntime.encounter, frameSeconds);
   }
+  const localCourseTarget = updateLocalCourseAssist(frameSeconds);
+  updateLocalCourseCue(localCourseTarget);
   rebaseActiveFrame();
   updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket);
   updateDeepSkyLayer(
@@ -566,6 +742,7 @@ Object.assign(appCtx, {
   returnUniverseToSolImmediate,
   setUniverseDestination: setSelectedDestination,
   showUniverseUI,
+  toggleUniverseCourseAssist,
   travelToUniverseDestination,
   universeRuntime,
   updateUniverseRuntime
@@ -581,6 +758,7 @@ export {
   returnUniverseToSol,
   returnUniverseToSolImmediate,
   showUniverseUI,
+  toggleUniverseCourseAssist,
   travelToUniverseDestination,
   universeRuntime,
   updateUniverseRuntime

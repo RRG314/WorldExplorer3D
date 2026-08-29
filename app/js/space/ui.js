@@ -108,7 +108,10 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfAssistBtn'), 'click', () => {
     if (appCtx.spaceJourney?.phase === 'atmospheric_exploration') return;
-    const result = appCtx.toggleRenderedJourneyAssist?.();
+    const universeTarget = appCtx.getUniverseHudTarget?.();
+    const result = universeTarget
+      ? appCtx.toggleUniverseCourseAssist?.()
+      : appCtx.toggleRenderedJourneyAssist?.();
     if (!result?.accepted) {
       showFlightMessage('FLIGHT ASSIST IS NOT AVAILABLE HERE', '#f59e0b');
     } else if (result.active === false) {
@@ -272,7 +275,10 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     complete: 'Journey complete'
   };
   if (flightStatus) {
-    const copy = appCtx.spaceFlight.presentationAuthority === 'classic'
+    const universeAssistActive = universeTarget?.course?.guidance === 'assisted';
+    const copy = universeTarget
+      ? universeAssistActive ? `Assisted approach to ${universeTarget.name}` : `Course set for ${universeTarget.name}`
+      : appCtx.spaceFlight.presentationAuthority === 'classic'
       ? appCtx.spaceFlight.speed > 0 ? 'Manual flight' : 'Ready to fly'
       : phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';
     flightStatus.textContent = copy;
@@ -282,19 +288,32 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       appCtx.resolveCharacterCapability?.('spacecraft', { vehicleAvailable: true, environment: 'SPACE_FLIGHT' })
     );
     const flightRate = Number(appCtx.spaceFlight.manualFlightRate) || 1;
-    flightRead.textContent = flightRate > 1
+    flightRead.textContent = universeTarget
+      ? universeTarget.course?.guidance === 'assisted' ? 'Wayfinder guidance · assisted flight' : 'Wayfinder guidance · manual flight'
+      : flightRate > 1
       ? `${characterFlight.guidanceLabel} · manual flight ×${flightRate}`
       : characterFlight.guidanceLabel;
   }
   if (assistBtn) {
     const assist = appCtx.spaceJourneyAssistState;
     const atmosphericClimb = appCtx.spaceJourney?.phase === 'atmospheric_exploration';
-    assistBtn.style.display = universeTarget || (assist?.available === false && !atmosphericClimb) ? 'none' : '';
-    assistBtn.disabled = atmosphericClimb
+    const universeAssistAvailable = Boolean(
+      universeTarget?.course?.status === 'active' && universeTarget.targetKind !== 'course-transit'
+    );
+    assistBtn.style.display = universeTarget || assist?.available !== false || atmosphericClimb ? '' : 'none';
+    assistBtn.disabled = universeTarget
+      ? !universeAssistAvailable
+      : atmosphericClimb
       ? false
       : !assist?.available || !['launch', 'ascent', 'parking_orbit', 'transfer', 'return_transfer'].includes(appCtx.spaceJourney?.phase);
     assistBtn.style.opacity = assistBtn.disabled ? '0.55' : '1';
-    assistBtn.textContent = atmosphericClimb
+    assistBtn.textContent = universeTarget
+      ? universeTarget.targetKind === 'course-transit'
+        ? `ASSIST READY AFTER ARRIVAL`
+        : universeTarget.course?.guidance === 'assisted'
+          ? `RESUME MANUAL FLIGHT`
+          : `ASSIST TO ${String(universeTarget.name).toUpperCase()}`
+      : atmosphericClimb
       ? 'HOLD TO CLIMB'
       : assist?.holding
       ? 'APPROACH HOLD · PRESS SPACE FOR MANUAL'

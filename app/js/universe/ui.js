@@ -120,6 +120,22 @@ function createUniverseNavigator(handlers) {
   `;
   document.body.appendChild(panel);
 
+  if (!document.getElementById('universeCourseCue')) {
+    const cue = document.createElement('div');
+    cue.id = 'universeCourseCue';
+    cue.className = 'universe-course-cue';
+    cue.hidden = true;
+    cue.setAttribute('aria-live', 'polite');
+    cue.innerHTML = `
+      <span class="universe-course-cue-arrow" aria-hidden="true">▲</span>
+      <span class="universe-course-cue-copy">
+        <strong>COURSE</strong>
+        <small>Destination</small>
+      </span>
+    `;
+    document.body.appendChild(cue);
+  }
+
   const select = panel.querySelector('#universeDestinationSelect');
   populateDestinationSelect(select);
   const primaryActions = panel.querySelector('#universePrimaryActions');
@@ -169,6 +185,21 @@ function createUniverseNavigator(handlers) {
     existingControls.appendChild(toggle);
   }
   return panel;
+}
+
+function updateUniverseCourseCue(cueState = null) {
+  const cue = document.getElementById('universeCourseCue');
+  if (!cue) return;
+  const visible = Boolean(cueState?.visible);
+  cue.hidden = !visible;
+  cue.setAttribute('aria-hidden', String(!visible));
+  if (!visible) return;
+  cue.style.left = `${Math.round(Number(cueState.x) || 0)}px`;
+  cue.style.top = `${Math.round(Number(cueState.y) || 0)}px`;
+  cue.style.setProperty('--course-cue-angle', `${Number(cueState.angleDeg) || 0}deg`);
+  cue.classList.toggle('is-assisted', cueState.assisted === true);
+  cue.querySelector('strong').textContent = cueState.assisted ? 'FLIGHT ASSIST' : 'COURSE';
+  cue.querySelector('small').textContent = cueState.label || 'Destination';
 }
 
 function setUniverseSelection(entity) {
@@ -258,6 +289,7 @@ function showUniverseNavigator() {
 function hideUniverseNavigator() {
   const toggle = document.getElementById('universeToggle');
   if (toggle) toggle.style.display = 'none';
+  updateUniverseCourseCue(null);
   closeUniverseNavigator();
 }
 
@@ -268,5 +300,6 @@ export {
   setUniverseSelection,
   showUniverseNavigator,
   toggleUniverseNavigator,
+  updateUniverseCourseCue,
   updateUniverseNavigator
 };

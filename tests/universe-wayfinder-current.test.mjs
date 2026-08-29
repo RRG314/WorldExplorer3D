@@ -14,6 +14,7 @@ import {
 import {
   courseTargetsFrame,
   createUniverseCourse,
+  setUniverseCourseGuidance,
   setUniverseCourseStatus
 } from '../app/js/universe/course-authority.js';
 
@@ -39,13 +40,19 @@ test('one course preserves the selected planet while routing through its parent 
   assert.equal(course.destination.id, 'trappist-1-e');
   assert.equal(course.frame.id, 'trappist-1');
   assert.equal(course.status, 'transit');
+  assert.equal(course.guidance, 'manual');
   assert.equal(courseTargetsFrame(course, 'trappist-1'), true);
   assert.equal(courseTargetsFrame(course, 'sol'), false);
   const active = setUniverseCourseStatus(course, 'active');
   assert.equal(active.status, 'active');
   assert.equal(active.destination, course.destination);
   assert.equal(active.frame, course.frame);
+  const assisted = setUniverseCourseGuidance(active, 'assisted');
+  assert.equal(assisted.guidance, 'assisted');
+  assert.equal(assisted.destination, course.destination);
+  assert.equal(assisted.status, 'active');
   assert.ok(Object.isFrozen(active));
+  assert.ok(Object.isFrozen(assisted));
 });
 
 test('stellar rendering responds to catalog temperature instead of one generic sphere', () => {
