@@ -59,6 +59,9 @@ export function resetWorldForReload(options = {}) {
   appCtx.closeArExperience?.('world_reload');
   appCtx.disposeEditableWorldPresentation?.();
   appCtx.disposeUrbanSandboxRuntime?.('world_reload');
+  appCtx.transportFacilityVisual?.dispose?.();
+  appCtx.transportFacilityVisual = null;
+  appCtx.transportFacilityGraph = null;
 
   if (typeof appCtx.resetEarthStreaming !== 'function') {
     throw new Error('Earth streaming lifecycle owner is unavailable during world reset.');

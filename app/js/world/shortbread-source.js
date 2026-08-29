@@ -165,6 +165,23 @@ function roadTags(properties = {}) {
       _sourceCompleteness: 'generalized'
     };
   }
+  // The Shortbread streets layer carries OSM aeroway=runway/taxiway in the
+  // same `kind` field as highways. Preserve that source meaning instead of
+  // publishing an invented highway whose value happens to be "runway".
+  if (kind === 'runway' || kind === 'taxiway') {
+    return {
+      aeroway: kind,
+      bridge: booleanTag('bridge'),
+      tunnel: booleanTag('tunnel'),
+      layer: raw('layer'),
+      surface: raw('surface'),
+      width: raw('width'),
+      access: raw('access'),
+      ref: raw('ref'),
+      name: raw('name'),
+      _sourceCompleteness: 'generalized'
+    };
+  }
   const highway = properties.link === true && !kind.endsWith('_link') ? `${kind}_link` : kind;
   return {
     highway,
@@ -247,15 +264,61 @@ function poiTags(properties = {}) {
   return tags;
 }
 
+function publicTransportTags(properties = {}) {
+  const kind = String(properties.kind || '').toLowerCase();
+  if (kind === 'aerodrome' || kind === 'helipad') {
+    return {
+      aeroway: kind,
+      name: String(properties.name || ''),
+      ref: String(properties.ref || ''),
+      iata: String(properties.iata || ''),
+      icao: String(properties.icao || ''),
+      _sourceCompleteness: 'generalized'
+    };
+  }
+  if (kind === 'ferry_terminal') {
+    return {
+      amenity: 'ferry_terminal',
+      name: String(properties.name || ''),
+      ref: String(properties.ref || ''),
+      _sourceCompleteness: 'generalized'
+    };
+  }
+  return null;
+}
+
 function featureTags(layerName, properties = {}) {
   if (layerName === 'streets') return roadTags(properties);
   if (layerName === 'land') return landTags(properties);
   if (layerName === 'sites') return siteTags(properties);
   if (layerName === 'pois') return poiTags(properties);
+  if (layerName === 'public_transport') return publicTransportTags(properties);
+  if (layerName === 'ferries') return {
+    route: 'ferry',
+    name: String(properties.name || ''),
+    ref: String(properties.ref || ''),
+    _sourceCompleteness: 'generalized'
+  };
+  if (layerName === 'pier_lines' || layerName === 'pier_polygons') return {
+    man_made: String(properties.kind || 'pier'),
+    name: String(properties.name || ''),
+    _sourceCompleteness: 'generalized'
+  };
   if (layerName === 'buildings') return { building: 'yes' };
   if (layerName === 'street_polygons') {
     const kind = String(properties.kind || '').toLowerCase();
     if (!kind) return null;
+    if (kind === 'runway' || kind === 'taxiway') {
+      return {
+        'area:aeroway': kind,
+        aeroway: kind,
+        area: 'yes',
+        surface: properties.surface || '',
+        bridge: properties.bridge ? 'yes' : '',
+        tunnel: properties.tunnel ? 'yes' : '',
+        _sourceCompleteness: 'generalized'
+      };
+    }
     return {
       'area:highway': kind,
       area: 'yes',
@@ -601,6 +664,7 @@ export async function fetchShortbreadBuildingData(options = {}) {
 }
 
 export {
+  featureTags as shortbreadFeatureTags,
   SHORTBREAD_DECODED_TILE_CACHE_LIMIT,
   SHORTBREAD_TILE_CONCURRENCY,
   SHORTBREAD_ZOOM

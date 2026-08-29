@@ -8,7 +8,7 @@ import {
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=21";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -28,7 +28,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=51";
+} from "./terrain/surface-profiles.js?v=52";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -52,7 +52,7 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=47";
+} from "./terrain/tiles.js?v=48";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -65,7 +65,7 @@ import {
 } from "./terrain/debug-tools.js?v=15";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=72";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=73";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {

@@ -3,7 +3,7 @@ import {
   createWorldSnapshotStore,
   WORLD_SNAPSHOT_LAYERS
 } from '../earth-core/world-snapshot.js?v=2';
-import { worldLayerProductCounts } from './compiler/world-layer-products.js?v=3';
+import { worldLayerProductCounts } from './compiler/world-layer-products.js?v=4';
 
 function snapshotLayerFromProduct(product, request, name) {
   if (

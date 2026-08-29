@@ -33,6 +33,24 @@ function vectorSnapshot(vector) {
   };
 }
 
+function transportFacilitySnapshot() {
+  const graph = appCtx.transportFacilityGraph;
+  const visual = appCtx.transportFacilityVisual?.group;
+  if (!graph) return { active: false, recordCount: 0, aviation: 0, maritime: 0 };
+  return {
+    active: true,
+    authority: String(graph.authority || ''),
+    bounded: graph.coverage?.bounded === true,
+    recordCount: Number(graph.records?.length || 0),
+    aviation: Number(graph.byDomain?.aviation?.length || 0),
+    maritime: Number(graph.byDomain?.maritime?.length || 0),
+    typeCounts: graph.diagnostics?.typeCounts || {},
+    visualAttached: Boolean(visual?.parent),
+    visualCount: Number(visual?.children?.length || 0),
+    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false)
+  };
+}
+
 function cameraFollowSnapshot(activeActor) {
   const camera = appCtx.camera;
   const yaw = Number(activeActor?.orientation?.yaw);
@@ -919,6 +937,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
+    transportFacilities: transportFacilitySnapshot(),
     activeActor,
     cameraFollow: cameraFollowSnapshot(activeActor),
     surfaceChain: surfaceChainSnapshot(activeActor),
@@ -1103,6 +1122,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
   augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
   livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
   urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+  transportFacilities: transportFacilitySnapshot(),
   fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false, stage: 'idle' },
   blockBuilder: {
     ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),

@@ -13,7 +13,7 @@ import {
   startMode,
   stopGameplayPlugin,
   updateMode
-} from "./game/modes.js?v=8";
+} from "./game/modes.js?v=9";
 import {
   applyPaintTownRemoteClaimsFromSync,
   clearPaintTownMultiplayerConfig,

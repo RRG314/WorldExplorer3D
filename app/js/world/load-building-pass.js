@@ -5,7 +5,7 @@ import {
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=27";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=28";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {

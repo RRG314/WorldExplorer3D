@@ -10,7 +10,7 @@ import {
 } from "./worldcover-baseline.js?v=17";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import { latLonToTileXY } from './tile-coordinates.js?v=1';
-import { pointInMappedLandArea } from './far-field-mapped-context.js?v=18';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=19';
 import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
 import {
   applyTerrainProfileSurfaceMaterialMix,

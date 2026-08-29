@@ -129,11 +129,17 @@ export function compileWorldLayerProducts(options = {}) {
       provider: transportProvider,
       compiler: 'transport-surface-compiler',
       coverage,
-      compilation: compactScalars(transportPublication, [
-        'transportGraphId', 'roadCount', 'meshCount', 'intersectionCount',
-        'topologyIntersectionCount', 'compiledSampleCount', 'vertices', 'triangles',
-        'worldLoadSequence'
-      ])
+      compilation: {
+        ...compactScalars(transportPublication, [
+          'transportGraphId', 'roadCount', 'meshCount', 'intersectionCount',
+          'topologyIntersectionCount', 'compiledSampleCount', 'vertices', 'triangles',
+          'worldLoadSequence'
+        ]),
+        facilityGraphAuthority: runtimeState.transportFacilityGraph?.authority || null,
+        mappedFacilityCount: finiteCount(runtimeState.transportFacilityGraph?.records?.length),
+        mappedAviationFacilityCount: finiteCount(runtimeState.transportFacilityGraph?.byDomain?.aviation?.length),
+        mappedMaritimeFacilityCount: finiteCount(runtimeState.transportFacilityGraph?.byDomain?.maritime?.length)
+      }
     }),
     buildings: layerProduct({
       request,

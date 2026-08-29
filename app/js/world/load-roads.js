@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=76";
+} from "./load-runtime-session.js?v=78";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -33,6 +33,8 @@ import {
   completeFixedRegionalStructureLoad
 } from "./fixed-regional-structures.js?v=15";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
+import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=1";
+import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=1";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -396,6 +398,8 @@ export function createWorldRoadLoader(deps = {}) {
           civicFacilityQuery,
           commercePlaceCacheMeta,
           commercePlaceQuery,
+          transportFacilityCacheMeta,
+          transportFacilityQuery,
           waterStructureCacheMeta,
           waterStructureQuery,
           featureRadius,
@@ -431,6 +435,23 @@ export function createWorldRoadLoader(deps = {}) {
           })
         ).then((poiData) => ({ poiData, error: null }))
           .catch((error) => ({ poiData: null, error }));
+        const generalizedTransportFacilityRequest = runProviderWork(
+          'openstreetmap-shortbread',
+          'mapped-transport-facilities',
+          (signal) => fetchShortbreadWorldData({
+            lat: appCtx.LOC.lat,
+            lon: appCtx.LOC.lon,
+            radius: Math.min(0.02, Math.max(0.008, featureRadius)),
+            zoom: 14,
+            includeBuildings: false,
+            layerNames: [
+              'streets', 'street_polygons', 'public_transport', 'ferries',
+              'pier_lines', 'pier_polygons', 'sites', 'pois'
+            ],
+            signal
+          })
+        ).then((facilityData) => ({ facilityData, error: null }))
+          .catch((error) => ({ facilityData: null, error }));
         startLoadPhase('fetchFixedRegionalStructures');
         const regionalStructureRequest = beginFixedRegionalStructureLoad({
           deadlineMs: loadDeadline,
@@ -463,6 +484,18 @@ export function createWorldRoadLoader(deps = {}) {
           )
         ).then((placeData) => ({ placeData, error: null }))
           .catch((error) => ({ placeData: null, error }));
+        const transportFacilityRequest = runProviderWork(
+          'osm-overpass',
+          'transport-facilities',
+          (signal) => fetchOverpassJSON(
+            transportFacilityQuery,
+            Math.min(optionalProviderTimeoutMs, overpassTimeoutMs),
+            loadDeadline,
+            transportFacilityCacheMeta,
+            { signal }
+          )
+        ).then((facilityData) => ({ facilityData, error: null }))
+          .catch((error) => ({ facilityData: null, error }));
         startLoadPhase('fetchOverpass');
         let data;
         let exactTransportLoaded = false;
@@ -593,6 +626,48 @@ export function createWorldRoadLoader(deps = {}) {
           inventoryAuthority: 'world-explorer-gameplay'
         };
         runtimeState.commercePlaces = loadMetrics.commercePlaces;
+        const transportFacilityResult = await transportFacilityRequest;
+        const generalizedTransportFacilityResult = await generalizedTransportFacilityRequest;
+        const exactFacilityElements = transportFacilityResult.facilityData?.elements || [];
+        const generalizedFacilityElements = generalizedTransportFacilityResult.facilityData?.elements || [];
+        const facilityElements = new Map(generalizedFacilityElements.map((element) => [
+          String(element?.tags?._sourceFeatureId || `${element.type}:${element.id}`), element
+        ]));
+        exactFacilityElements.forEach((element) => facilityElements.set(`osm:${element.type}:${element.id}`, element));
+        const transportFacilityData = {
+          ...(generalizedTransportFacilityResult.facilityData || {}),
+          ...(transportFacilityResult.facilityData || {}),
+          elements: [...facilityElements.values()],
+          _overpassSource: exactFacilityElements.length ? 'osm-overpass+shortbread-vector' : 'shortbread-vector',
+          _overpassEndpoint: exactFacilityElements.length
+            ? transportFacilityResult.facilityData?._overpassEndpoint || ''
+            : generalizedTransportFacilityResult.facilityData?._overpassEndpoint || ''
+        };
+        if (transportFacilityResult.error) {
+          recordLoadWarning('mapped aviation and maritime facilities', transportFacilityResult.error);
+        }
+        if (generalizedTransportFacilityResult.error) {
+          recordLoadWarning('generalized mapped aviation and maritime facilities', generalizedTransportFacilityResult.error);
+        }
+        const transportFacilityGraph = compileTransportFacilityGraph(transportFacilityData, {
+          location: appCtx.LOC,
+          scale: appCtx.SCALE
+        });
+        appCtx.transportFacilityGraph = transportFacilityGraph;
+        runtimeState.transportFacilityGraph = transportFacilityGraph;
+        loadMetrics.transportFacilities = {
+          provider: exactFacilityElements.length ? 'osm-overpass+openstreetmap-shortbread' : 'openstreetmap-shortbread',
+          mapped: transportFacilityGraph.records.length,
+          aviation: transportFacilityGraph.byDomain.aviation.length,
+          maritime: transportFacilityGraph.byDomain.maritime.length,
+          status: transportFacilityGraph.records.length ? 'loaded' :
+            transportFacilityResult.error && generalizedTransportFacilityResult.error ? 'unavailable' : 'authoritative-empty',
+          exactMapped: exactFacilityElements.length,
+          generalizedMapped: generalizedFacilityElements.length,
+          bounded: true,
+          generatedActivity: false
+        };
+        runtimeState.transportFacilities = loadMetrics.transportFacilities;
         const reviewedCivicFacilities = reviewedCivicFacilitiesForLocation(appCtx.LOC);
         if (reviewedCivicFacilities.length) {
           const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
@@ -620,6 +695,11 @@ export function createWorldRoadLoader(deps = {}) {
           endLoadPhase,
           { timeoutMs: fixedRegionalGroundTimeoutMs }
         );
+        appCtx.transportFacilityVisual?.dispose?.();
+        appCtx.transportFacilityVisual = createTransportFacilityVisuals(globalThis.THREE, transportFacilityGraph, {
+          sampleGround: (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z) || 0
+        });
+        appCtx.addEarthWorldObject?.(appCtx.transportFacilityVisual.group);
         const nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         const baselineFullWorld = perfModeNow === 'baseline';

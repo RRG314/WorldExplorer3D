@@ -10,8 +10,8 @@ import {
 } from '../earth-core/world-load-request.js?v=1';
 import { createWorldLoadSession } from '../earth-core/world-load-session.js?v=1';
 import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
-import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=3';
-import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=3';
+import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=4';
+import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -60,6 +60,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     },
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
     commercePlaces: { provider: 'osm-overpass', mapped: 0, status: 'pending', inventoryAuthority: 'world-explorer-gameplay' },
+    transportFacilities: { provider: 'osm-overpass', mapped: 0, aviation: 0, maritime: 0, status: 'pending', bounded: true },
     phases: {}
   };
   const traceWorldLoad = typeof globalThis.location?.search === 'string' &&
@@ -128,6 +129,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.buildingProvenanceModel = null;
   appCtx.waterSurfaceRegistry = null;
   appCtx.waterSurfaceRegistrySnapshot = null;
+  appCtx.transportFacilityGraph = null;
 
   if (!loadRequest) {
     appCtx.showLoad('Choose a valid location');

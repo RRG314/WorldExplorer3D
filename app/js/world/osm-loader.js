@@ -314,6 +314,14 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'commerce-places'
     },
+    transportFacilityCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'transport-facilities-v1'
+    },
     waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"="ship"]${waterStructureBounds};
                 way["historic"="ship"]${waterStructureBounds};
@@ -325,6 +333,18 @@ export function buildWorldOverpassPlan({
     commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];
             nwr["shop"="convenience"]${poiBounds};
             out body center qt;`,
+    transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate)$"]${featureBounds};
+            nwr["leisure"="marina"]${featureBounds};
+            nwr["harbour"="yes"]${featureBounds};
+            nwr["landuse"~"^(port|harbour)$"]${featureBounds};
+            nwr["man_made"~"^(pier|quay)$"]${featureBounds};
+            nwr["waterway"="dock"]${featureBounds};
+            nwr["amenity"="ferry_terminal"]${featureBounds};
+            nwr["route"="ferry"]${featureBounds};
+            nwr["mooring"]${featureBounds};
+            nwr["seamark:type"~"^(harbour|berth)$"]${featureBounds};
+        );out body center;>;out skel qt;`,
     buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
             );out tags center qt;`,

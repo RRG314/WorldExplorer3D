@@ -4,8 +4,8 @@
 // comparatively large local-world compiler. Import order preserves the
 // initialization contract that previously lived in app-entry.js.
 import '../ground.js?v=90';
-import '../terrain.js?v=273';
-import '../world.js?v=427';
+import '../terrain.js?v=274';
+import '../world.js?v=428';
 import '../building-entry.js?v=7';
 
 export const EARTH_RUNTIME_READY = true;
