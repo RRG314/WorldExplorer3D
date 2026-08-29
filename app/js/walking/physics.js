@@ -4,6 +4,8 @@ import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2"
 import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
 import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
@@ -380,6 +382,30 @@ function createWalkingPhysicsHelpers({
 
       let newX = liveGpsMoved ? liveGpsTarget.x : state.walker.x + moveX;
       let newZ = liveGpsMoved ? liveGpsTarget.z : state.walker.z + moveZ;
+      if (planetaryBodyId) {
+        const activeSurface = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active;
+        const manifest = activeSurface?.regionId
+          ? getPlanetarySurfaceRegion(activeSurface.regionId)
+          : null;
+        if (manifest?.bodyId === planetaryBodyId) {
+          const boundary = resolvePlanetarySurfaceBoundary(
+            { x: newX, z: newZ },
+            manifest,
+            { inset: 40 }
+          );
+          if (boundary.clamped) {
+            newX = boundary.x;
+            newZ = boundary.z;
+            appCtx.planetarySurfaceBoundary = Object.freeze({
+              bodyId: activeSurface.bodyId,
+              regionId: activeSurface.regionId,
+              edge: boundary.edge,
+              mode: 'walk',
+              atMs: Date.now()
+            });
+          }
+        }
+      }
       const sharedBuildingCollision = !isPlanetarySurface() && typeof appCtx.checkBuildingCollision === "function"
         ? appCtx.checkBuildingCollision
         : null;

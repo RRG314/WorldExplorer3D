@@ -88,6 +88,11 @@ function resolveCelestialSceneCollision(startInput, endInput, bodiesInput = [], 
     const center = finiteVector(candidate.position, 'Celestial body position');
     const expandedRadius = radius + clearance;
     const contact = segmentSphereContact(start, end, center, expandedRadius);
+    if (contact.startedInside && options.allowOutwardEscape === true) {
+      const startDistance = Math.hypot(start.x - center.x, start.y - center.y, start.z - center.z);
+      const endDistance = Math.hypot(end.x - center.x, end.y - center.y, end.z - center.z);
+      if (endDistance > startDistance + 1e-6) continue;
+    }
     if (!contact.hit || (earliest && contact.t >= earliest.contact.t)) continue;
     earliest = { body: candidate, center, expandedRadius, contact };
   }

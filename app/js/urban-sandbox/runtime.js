@@ -4,7 +4,7 @@ import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=5';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=12';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=13';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -285,6 +285,46 @@ function showCrashFeedback(state, severity) {
   state.crashFeedbackUntil = now() + 360;
 }
 
+function sweptBuildingContact(from, to, radius, options = {}) {
+  if (typeof appCtx.checkBuildingCollision !== 'function') return null;
+  const dx = Number(to.x) - Number(from.x);
+  const dz = Number(to.z) - Number(from.z);
+  const distance = Math.hypot(dx, dz);
+  const spacing = Math.max(.22, Math.min(.65, Number(radius) * .6));
+  const steps = Math.max(1, Math.ceil(distance / spacing));
+  let lastSafe = { x: Number(from.x), z: Number(from.z) };
+  for (let step = 1; step <= steps; step += 1) {
+    const t = step / steps;
+    const position = {
+      x: Number(from.x) + dx * t,
+      z: Number(from.z) + dz * t
+    };
+    const collision = appCtx.checkBuildingCollision(position.x, position.z, radius, options);
+    if (collision?.collision) return { collision, position, lastSafe, t };
+    lastSafe = position;
+  }
+  return null;
+}
+
+function reflectedCrashVelocity(motion, collision, restitution = .18) {
+  const normalX = Number(collision?.pushX || 0);
+  const normalZ = Number(collision?.pushZ || 0);
+  const length = Math.hypot(normalX, normalZ);
+  if (!(length > .0001)) {
+    return { velocityX: -Number(motion.velocityX || 0) * restitution, velocityZ: -Number(motion.velocityZ || 0) * restitution };
+  }
+  const nx = normalX / length;
+  const nz = normalZ / length;
+  const vx = Number(motion.velocityX || 0);
+  const vz = Number(motion.velocityZ || 0);
+  const inwardSpeed = vx * nx + vz * nz;
+  if (inwardSpeed >= 0) return { velocityX: vx, velocityZ: vz };
+  return {
+    velocityX: (vx - (1 + restitution) * inwardSpeed * nx) * .62,
+    velocityZ: (vz - (1 + restitution) * inwardSpeed * nz) * .62
+  };
+}
+
 function updateCrashBodies(state, dt) {
   const step = Math.max(0, Math.min(.1, Number(dt) || 0));
   const metersPerWorldUnit = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
@@ -345,17 +385,22 @@ function updateCrashBodies(state, dt) {
         return;
       }
     }
-    const collision = appCtx.checkBuildingCollision?.(nextX, nextZ, Math.max(.72, Number(vehicle.variant?.width || 1.8) * .46), {
+    const collisionRadius = Math.max(.72, Number(vehicle.variant?.width || 1.8) * .46);
+    const buildingContact = sweptBuildingContact(vehicle, { x: nextX, z: nextZ }, collisionRadius, {
       actorBaseY: Number(vehicle.y || 0) - VEHICLE_ROOT_TO_GROUND_METERS,
       actorHeight: Number(vehicle.variant?.height || 1.5)
     });
-    if (collision?.collision) {
+    if (buildingContact) {
+      const reflected = reflectedCrashVelocity(motion, buildingContact.collision);
       vehicle.crashMotion = {
         ...motion,
-        velocityX: -motion.velocityX * .18,
-        velocityZ: -motion.velocityZ * .18,
+        ...reflected,
         angularVelocity: motion.angularVelocity * .35
       };
+      vehicle.x = buildingContact.lastSafe.x;
+      vehicle.z = buildingContact.lastSafe.z;
+      vehicle.yaw += motion.angularVelocity * step;
+      syncVehiclePose(vehicle, vehicle);
       const damage = applyConditionImpact(vehicle, Math.min(42, Math.hypot(motion.velocityX, motion.velocityZ) * 3.1));
       vehicle.condition = damage.after;
       vehicle.visual?.setCondition?.(damage.after);
@@ -382,9 +427,22 @@ function updateCrashBodies(state, dt) {
       return;
     }
     const motion = dampCrashMotion(npc.crashMotion, step, { kind: 'npc' });
-    npc.crashMotion = { ...npc.crashMotion, ...motion };
-    npc.x += motion.velocityX / metersPerWorldUnit * step;
-    npc.z += motion.velocityZ / metersPerWorldUnit * step;
+    const nextX = npc.x + motion.velocityX / metersPerWorldUnit * step;
+    const nextZ = npc.z + motion.velocityZ / metersPerWorldUnit * step;
+    const buildingContact = sweptBuildingContact(npc, { x: nextX, z: nextZ }, .34, {
+      actorBaseY: Number(npc.y || 0),
+      actorHeight: 1.8
+    });
+    if (buildingContact) {
+      const reflected = reflectedCrashVelocity(motion, buildingContact.collision, .08);
+      npc.crashMotion = { ...npc.crashMotion, ...motion, ...reflected };
+      npc.x = buildingContact.lastSafe.x;
+      npc.z = buildingContact.lastSafe.z;
+    } else {
+      npc.crashMotion = { ...npc.crashMotion, ...motion };
+      npc.x = nextX;
+      npc.z = nextZ;
+    }
     npc.y = Number(appCtx.SurfaceQuery?.walkAt?.(npc.x, npc.z)?.position?.y ?? npc.y);
     npc.yaw += motion.angularVelocity * step;
     npc.visual.root.position.set(npc.x, npc.y, npc.z);

@@ -196,7 +196,7 @@ export function prepareWorldFeatureSelections(options = {}) {
     appCtx.isLikelyMobileDevice();
   const regionalRoadCap = regionalRoadWays.length > 0
     ? mobileLike
-      ? Math.min(1600, Math.max(1400, Math.floor(maxRoadWays * 0.6)))
+      ? Math.min(900, Math.max(650, Math.floor(maxRoadWays * 0.45)))
       : Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
     : 0;
   const regionalPartition = partitionFixedRegionalRoads(regionalRoadWays);
@@ -215,9 +215,9 @@ export function prepareWorldFeatureSelections(options = {}) {
       // Exact structures are never capped. The generalized outer source is a
       // geographically distributed continuity LOD; bounding it prevents the
       // quadratic profile work of thousands of duplicate low-detail segments.
-      globalCap: 600,
-      basePerTile: 20,
-      minPerTile: 8,
+      globalCap: mobileLike ? 180 : 600,
+      basePerTile: mobileLike ? 8 : 20,
+      minPerTile: mobileLike ? 3 : 8,
       tileDegrees: tileBudgetCfg.tileDegrees,
       useRdt: false,
       spreadAcrossArea: true,
@@ -230,8 +230,8 @@ export function prepareWorldFeatureSelections(options = {}) {
     ...selectedGeneralizedEngineered
   ];
   const regionalConnectorCap = Math.min(
-    1200,
-    Math.max(160, Math.ceil(regionalPartition.engineered.length * 0.5))
+    mobileLike ? 240 : 1200,
+    Math.max(mobileLike ? 80 : 160, Math.ceil(regionalPartition.engineered.length * (mobileLike ? 0.25 : 0.5)))
   );
   const selectedCoreRoadWays = limitWaysByTileBudget(coreRoadWays, nodes, {
     // The fixed outer context is additive. It must not consume the existing
@@ -243,11 +243,11 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting,
     compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
   });
-  const regionalPerTile = Math.max(16, Math.floor(regionalRoadCap / 64));
+  const regionalPerTile = Math.max(mobileLike ? 8 : 16, Math.floor(regionalRoadCap / 64));
   const selectedRegionalRoadWays = limitWaysByTileBudget(regionalPartition.general, nodes, {
     globalCap: regionalRoadCap,
     basePerTile: regionalPerTile,
-    minPerTile: Math.max(12, Math.floor(regionalPerTile * 0.65)),
+    minPerTile: Math.max(mobileLike ? 5 : 12, Math.floor(regionalPerTile * 0.65)),
     tileDegrees: tileBudgetCfg.tileDegrees,
     useRdt: false,
     spreadAcrossArea: true,
@@ -256,8 +256,8 @@ export function prepareWorldFeatureSelections(options = {}) {
   });
   const selectedRegionalConnectors = limitWaysByTileBudget(regionalPartition.connectors, nodes, {
     globalCap: regionalConnectorCap,
-    basePerTile: Math.max(12, Math.ceil(regionalConnectorCap / 64)),
-    minPerTile: 8,
+    basePerTile: Math.max(mobileLike ? 5 : 12, Math.ceil(regionalConnectorCap / 64)),
+    minPerTile: mobileLike ? 3 : 8,
     tileDegrees: tileBudgetCfg.tileDegrees,
     useRdt: false,
     spreadAcrossArea: true,

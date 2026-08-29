@@ -11,7 +11,7 @@ import {
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=2';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=3';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {

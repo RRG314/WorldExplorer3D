@@ -346,6 +346,30 @@ function buildingImpactAt(x, y, z) {
   return hit;
 }
 
+function sweptBuildingImpact(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const distance = Math.hypot(dx, dy, dz);
+  if (!(distance > 0.01)) return null;
+  // The fuselage collision radius is 2.15 world units. Sampling well below
+  // that radius keeps thin mapped walls from falling between physics poses.
+  const steps = Math.max(1, Math.ceil(distance / 0.65));
+  let lastSafe = { ...from };
+  for (let step = 1; step <= steps; step += 1) {
+    const t = step / steps;
+    const position = {
+      x: from.x + dx * t,
+      y: from.y + dy * t,
+      z: from.z + dz * t
+    };
+    const impact = buildingImpactAt(position.x, position.y, position.z);
+    if (impact) return { impact, position, lastSafe, t };
+    lastSafe = position;
+  }
+  return null;
+}
+
 function updatePlane(dt) {
   if (!state.active) return false;
   if (dt > 1 / 30) {
@@ -448,13 +472,17 @@ function updatePlane(dt) {
   state.z += flightForward.z * state.speed * dt;
   const horizontalMovement = Math.hypot(state.x - previousX, state.z - previousZ);
   const impact = horizontalMovement > 0.05 && state.y - groundY < 520 ?
-    buildingImpactAt(state.x, state.y, state.z) :
+    sweptBuildingImpact(
+      { x: previousX, y: previousY, z: previousZ },
+      { x: state.x, y: state.y, z: state.z }
+    ) :
     null;
   if (impact) {
     state.lastImpactAt = performance.now();
     state.lastImpactSpeed = state.speed;
-    state.x = previousX;
-    state.z = previousZ;
+    state.x = impact.lastSafe.x;
+    state.y = impact.lastSafe.y;
+    state.z = impact.lastSafe.z;
     state.speed = Math.min(2.5, state.speed * 0.12);
     state.throttle = 0;
     state.climbRate = Math.max(0, state.climbRate * 0.2);

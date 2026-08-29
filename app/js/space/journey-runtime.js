@@ -28,7 +28,7 @@ import {
   createAtmosphericExploration,
   evaluateAtmosphericEntry
 } from './atmospheric-descent-authority.js?v=1';
-import { resolveCelestialSceneCollision } from './celestial-collision.js?v=1';
+import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';
 
 const MANUAL_FLIGHT_RATE = 100;
 const SPACECRAFT_SCENE_CLEARANCE = 6;
@@ -216,6 +216,35 @@ function installSpaceJourneyRuntime(appContext) {
     return bodies;
   };
 
+  const createLivePresentation = (ephemeris, sourceScene, destinationScene) =>
+    createJourneyPresentationMap({
+      physicalSource: ephemeris.source.positionM,
+      physicalDestination: ephemeris.destination.positionM,
+      sceneSource: sourceScene.mesh.position,
+      sceneDestination: destinationScene.mesh.position,
+      sourcePhysicalRadiusM: ephemeris.source.radiusM,
+      destinationPhysicalRadiusM: ephemeris.destination.radiusM,
+      sourceSceneRadius: sourceScene.radius,
+      destinationSceneRadius: destinationScene.radius
+    });
+
+  const refreshRenderedPresentation = () => {
+    if (!rendered) return false;
+    const sourceScene = sceneBody(rendered.ephemeris.source.bodyId);
+    const destinationScene = sceneBody(rendered.ephemeris.destination.bodyId);
+    if (!sourceScene || !destinationScene) return false;
+    const separation = Math.hypot(
+      destinationScene.mesh.position.x - sourceScene.mesh.position.x,
+      destinationScene.mesh.position.y - sourceScene.mesh.position.y,
+      destinationScene.mesh.position.z - sourceScene.mesh.position.z
+    );
+    if (!(separation > 1e-6)) return false;
+    rendered.sourceScene = sourceScene;
+    rendered.destinationScene = destinationScene;
+    rendered.presentation = createLivePresentation(rendered.ephemeris, sourceScene, destinationScene);
+    return true;
+  };
+
   const beginRenderedSpaceJourney = (options = {}) => {
     const sourceBodyId = normalizeAstronomicalBodyId(options.sourceBodyId);
     const destinationBodyId = normalizeAstronomicalBodyId(options.destinationBodyId);
@@ -277,16 +306,7 @@ function installSpaceJourneyRuntime(appContext) {
         navigation: sourceNavigation
       });
     }
-    const presentation = createJourneyPresentationMap({
-      physicalSource: ephemeris.source.positionM,
-      physicalDestination: ephemeris.destination.positionM,
-      sceneSource: sourcePosition,
-      sceneDestination: destinationPosition,
-      sourcePhysicalRadiusM: ephemeris.source.radiusM,
-      destinationPhysicalRadiusM: ephemeris.destination.radiusM,
-      sourceSceneRadius: sourceScene.radius,
-      destinationSceneRadius: destinationScene.radius
-    });
+    const presentation = createLivePresentation(ephemeris, sourceScene, destinationScene);
     rendered = {
       ephemeris,
       journey,
@@ -493,6 +513,9 @@ function installSpaceJourneyRuntime(appContext) {
   const updateRenderedSpaceJourney = (options = {}) => {
     if (!rendered || !appContext.spaceFlight?.rocket) return false;
     const realDtS = Math.max(0, Math.min(0.1, Number(options.realDtS) || 0));
+    const previousPhysicalPosition = rendered.spacecraft.positionM;
+    refreshRenderedPresentation();
+    const prior = rendered.presentation.physicalToScene(previousPhysicalPosition);
     let assistedUpdate = null;
     const angular = options.angular || {};
     const manualControl = options.manualControl === true ||
@@ -600,21 +623,21 @@ function installSpaceJourneyRuntime(appContext) {
       }
     }
     let scenePosition = rendered.presentation.physicalToScene(rendered.spacecraft.positionM);
-    const prior = rendered.lastScenePosition;
-    const collisionProtectedPhase = [
-      JOURNEY_PHASE.PARKING_ORBIT,
-      JOURNEY_PHASE.TRANSFER,
-      JOURNEY_PHASE.RETURN_TRANSFER,
-      JOURNEY_PHASE.APPROACH,
-      JOURNEY_PHASE.HOME_APPROACH
-    ].includes(rendered.journey.phase);
-    if (!assistedUpdate && !rendered.approachHold && collisionProtectedPhase) {
-      const collision = resolveCelestialSceneCollision(prior, scenePosition, collisionBodies(), {
+    if (!rendered.approachHold && rendered.journey.phase !== JOURNEY_PHASE.SURFACE) {
+      const exemptBodyId = [JOURNEY_PHASE.DESCENT, JOURNEY_PHASE.HOME_DESCENT, JOURNEY_PHASE.ATMOSPHERIC_EXPLORATION]
+        .includes(rendered.journey.phase)
+        ? rendered.ephemeris.destination.bodyId
+        : null;
+      const protectedBodies = collisionBodies().filter((body) => body.bodyId !== exemptBodyId);
+      const collision = resolveCelestialSceneCollision(prior, scenePosition, protectedBodies, {
         clearance: SPACECRAFT_SCENE_CLEARANCE,
-        padding: 0.08
+        padding: 0.08,
+        allowOutwardEscape: true
       });
       if (collision.collided) {
         scenePosition = collision.position;
+        rendered.assistedPlan = null;
+        rendered.approachHold = false;
         rendered.spacecraft = createSpacecraftState({
           ...rendered.spacecraft,
           positionM: rendered.presentation.sceneToPhysical(scenePosition),
@@ -773,16 +796,7 @@ function installSpaceJourneyRuntime(appContext) {
       return Object.freeze({ accepted: false, reason: extractionBurn.reason || 'atmospheric-extraction-burn-failed' });
     }
     spacecraft = extractionBurn.state;
-    const presentation = createJourneyPresentationMap({
-      physicalSource: ephemeris.source.positionM,
-      physicalDestination: ephemeris.destination.positionM,
-      sceneSource: sourceScene.mesh.position,
-      sceneDestination: destinationScene.mesh.position,
-      sourcePhysicalRadiusM: ephemeris.source.radiusM,
-      destinationPhysicalRadiusM: ephemeris.destination.radiusM,
-      sourceSceneRadius: sourceScene.radius,
-      destinationSceneRadius: destinationScene.radius
-    });
+    const presentation = createLivePresentation(ephemeris, sourceScene, destinationScene);
     rendered = {
       ...rendered,
       ephemeris,

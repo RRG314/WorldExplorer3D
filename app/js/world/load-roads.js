@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=72";
+} from "./load-runtime-session.js?v=73";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -792,7 +792,7 @@ export function createWorldRoadLoader(deps = {}) {
             buildingGeometryGuards,
             buildBuildingGeometryPass,
             cacheMeta: buildingPublicationCacheMeta,
-            deadlineMs: performance.now() + Math.max(5000, optionalProviderTimeoutMs + 1000),
+            deadlineMs: loadDeadline,
             endLoadPhase,
             fetchOverpassJSON: (...args) => runProviderWork(
               'osm-overpass', 'building-detail', (signal) => fetchOverpassJSON(...args, { signal })
@@ -857,7 +857,7 @@ export function createWorldRoadLoader(deps = {}) {
             mappedWaterStructureCoverageComplete,
             maxBuildingWays,
             metadataCacheMeta: buildingMetadataCacheMeta,
-            metadataDeadlineMs: Infinity,
+            metadataDeadlineMs: loadDeadline,
             metadataQuery: buildingMetadataQuery,
             metadataTimeoutMs: optionalProviderTimeoutMs,
             pickBuildingBaseColor,
@@ -871,7 +871,7 @@ export function createWorldRoadLoader(deps = {}) {
             tileBudgetCfg,
             timeoutMs: overpassTimeoutMs,
             waterStructureCacheMeta,
-            waterStructureDeadlineMs: Infinity,
+            waterStructureDeadlineMs: loadDeadline,
             waterStructureQuery,
             waterStructureTimeoutMs: optionalProviderTimeoutMs,
             useRdtBudgeting

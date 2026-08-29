@@ -48,7 +48,7 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=14";
+} from "./world/budgets.js?v=15";
 import { publishLocationWorld } from "./world/publication.js?v=1";
 import {
   buildPoiGeometryPass,
@@ -66,7 +66,7 @@ import {
 } from "./world/load-reset.js?v=17";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=17";
+} from "./world/load-budgeting.js?v=18";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=177";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=178";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
@@ -171,7 +171,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=13";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=72";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=73";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

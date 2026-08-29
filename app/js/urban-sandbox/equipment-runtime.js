@@ -463,22 +463,57 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function segmentTarget(projectile, from, to) {
-    const dx = to.x - from.x;
-    const dz = to.z - from.z;
-    const lengthSq = dx * dx + dz * dz;
+    const segment = to.clone().sub(from);
+    const lengthSq = segment.lengthSq();
     let nearest = null;
     for (const target of worldTargets(projectile.equipment.range + (projectile.equipment.blastRadius || 0))) {
+      const baseTargetY = Number(target.y);
+      const targetY = (Number.isFinite(baseTargetY) ? baseTargetY : terrainHeight(target.x, target.z)) + (
+        target.kind.includes('vehicle') ? .65 :
+          target.kind === 'furniture' ? .45 : .95
+      );
+      const toward = new THREE.Vector3(
+        Number(target.x) - from.x,
+        targetY - from.y,
+        Number(target.z) - from.z
+      );
       const t = lengthSq > .0001
-        ? Math.max(0, Math.min(1, ((target.x - from.x) * dx + (target.z - from.z) * dz) / lengthSq))
+        ? Math.max(0, Math.min(1, toward.dot(segment) / lengthSq))
         : 0;
-      const px = from.x + dx * t;
-      const pz = from.z + dz * t;
-      const radius = target.kind.includes('vehicle') ? 1.35 : target.kind === 'furniture' ? .55 : .68;
-      const distance = Math.hypot(target.x - px, target.z - pz);
+      const point = from.clone().addScaledVector(segment, t);
+      const radius = target.kind.includes('vehicle') ? 1.45 : target.kind === 'furniture' ? .62 : .78;
+      const distance = point.distanceTo(new THREE.Vector3(Number(target.x), targetY, Number(target.z)));
       if (distance > radius || nearest && t >= nearest.t) continue;
-      nearest = { target, t, x: px, y: from.y + (to.y - from.y) * t, z: pz };
+      nearest = { target, t, x: point.x, y: point.y, z: point.z };
     }
     return nearest;
+  }
+
+  function segmentWorldContact(from, to) {
+    const segment = to.clone().sub(from);
+    const distance = segment.length();
+    if (!(distance > .0001)) return null;
+    const steps = Math.max(1, Math.ceil(distance / .28));
+    for (let step = 1; step <= steps; step += 1) {
+      const t = step / steps;
+      const point = from.clone().addScaledVector(segment, t);
+      const terrainY = terrainHeight(point.x, point.z);
+      const building = appCtx.checkBuildingCollision?.(point.x, point.z, .08, {
+        actorBaseY: point.y - .1,
+        actorHeight: .2
+      })?.collision === true;
+      if (!building && point.y > terrainY + .12) continue;
+      return {
+        t,
+        kind: building ? 'building' : 'terrain',
+        position: {
+          x: point.x,
+          y: building ? point.y : Math.max(terrainY, point.y),
+          z: point.z
+        }
+      };
+    }
+    return null;
   }
 
   function resolveProjectile(projectile, position, directTarget = null) {
@@ -591,7 +626,9 @@ function createUrbanEquipmentRuntime(options = {}) {
     const toward = new THREE.Vector3(targetX - from.x, targetY - from.y, targetZ - from.z);
     const t = lengthSq > .0001 ? Math.max(0, Math.min(1, toward.dot(segment) / lengthSq)) : 0;
     const point = from.clone().addScaledVector(segment, t);
-    return point.distanceTo(new THREE.Vector3(targetX, targetY, targetZ)) <= .72 ? point : null;
+    return point.distanceTo(new THREE.Vector3(targetX, targetY, targetZ)) <= .72
+      ? { point, t }
+      : null;
   }
 
   function updateProjectiles(dt) {
@@ -605,38 +642,39 @@ function createUrbanEquipmentRuntime(options = {}) {
       projectile.distance += from.distanceTo(to);
       const playerHit = projectile.owner === 'npc' ? segmentHitsPlayer(from, to) : null;
       const collision = projectile.owner === 'npc' ? null : segmentTarget(projectile, from, to);
-      const terrainY = terrainHeight(to.x, to.z);
-      const buildingHit = appCtx.checkBuildingCollision?.(to.x, to.z, .08, {
-        actorBaseY: to.y - .1,
-        actorHeight: .2
-      })?.collision === true;
-      const reachedGround = to.y <= terrainY + .12;
-      if (playerHit) {
+      const worldContact = segmentWorldContact(from, to);
+      const directContact = projectile.owner === 'npc' ? playerHit : collision;
+      if (directContact && (!worldContact || directContact.t < worldContact.t)) {
         const index = projectiles.indexOf(projectile);
-        if (index >= 0) projectiles.splice(index, 1);
-        disposeProjectile(projectile);
-        impactPulse(playerHit, .8, projectile.kind);
-        projectile.onPlayerImpact?.({ force: projectile.equipment.force, sourceId: projectile.sourceId, position: playerHit });
-        state.lastProjectileAction = Object.freeze({
-          equipmentId: projectile.equipment.id,
-          phase: 'player-impact',
-          targetKind: 'player',
-          at: clock()
-        });
+        if (projectile.owner === 'npc') {
+          if (index >= 0) projectiles.splice(index, 1);
+          disposeProjectile(projectile);
+          impactPulse(playerHit.point, .8, projectile.kind);
+          projectile.onPlayerImpact?.({ force: projectile.equipment.force, sourceId: projectile.sourceId, position: playerHit.point });
+          state.lastProjectileAction = Object.freeze({
+            equipmentId: projectile.equipment.id,
+            phase: 'player-impact',
+            targetKind: 'player',
+            at: clock()
+          });
+        } else {
+          resolveProjectile(projectile, { x: collision.x, y: collision.y, z: collision.z }, collision.target);
+        }
         continue;
       }
-      if (collision) {
-        resolveProjectile(projectile, { x: collision.x, y: collision.y, z: collision.z }, collision.target);
-        continue;
-      }
-      if (buildingHit || reachedGround || projectile.elapsed >= projectile.maxLife || projectile.distance >= Number(projectile.equipment.range || 30)) {
+      if (worldContact || projectile.elapsed >= projectile.maxLife || projectile.distance >= Number(projectile.equipment.range || 30)) {
+        const impactPosition = worldContact?.position || {
+          x: to.x,
+          y: Math.max(terrainHeight(to.x, to.z), to.y),
+          z: to.z
+        };
         if (projectile.owner === 'npc') {
           const index = projectiles.indexOf(projectile);
           if (index >= 0) projectiles.splice(index, 1);
           disposeProjectile(projectile);
-          impactPulse({ x: to.x, y: Math.max(terrainY, to.y), z: to.z }, .8, projectile.kind);
+          impactPulse(impactPosition, .8, projectile.kind);
         } else {
-          resolveProjectile(projectile, { x: to.x, y: Math.max(terrainY, to.y), z: to.z });
+          resolveProjectile(projectile, impactPosition);
         }
         continue;
       }
