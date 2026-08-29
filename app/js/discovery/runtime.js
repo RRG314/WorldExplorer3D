@@ -1,5 +1,5 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
-import { createCompanionRuntime } from './companion-runtime.js?v=6';
+import { createCompanionRuntime } from './companion-runtime.js?v=7';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
@@ -1621,7 +1621,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     environmentName: appCtx.getEnv?.() || 'EARTH',
     environment,
     position: playerPosition(appCtx),
-    travelMode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car',
+    travelMode: appCtx.Walk?.state?.mode === 'walk' ? appCtx.urbanSandboxRuntime?.parachute?.skydiving ? 'skydive' : 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car',
     liveGpsSnapshot: appCtx.getLiveGpsSnapshot?.() || { active: false }
   });
   state.handleArRecord = async (recordId, source = 'field-guide') => {
@@ -2209,7 +2209,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.presentation.setExcavation(targetSlot, state.activeActivityId === 'metal-detect' ? state.detectorSnapshot.phase : 'idle');
       state.presentation.setFieldRevealed(fieldTargetSlot, state.activeActivityId !== 'metal-detect' && ['revealed', 'recorded'].includes(state.lastSnapshot.phase));
       state.presentation.update(position, state.lastSnapshot, frame.dt, state.activeActivityId);
-      const travelMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car';
+      const travelMode = appCtx.Walk?.state?.mode === 'walk' ? appCtx.urbanSandboxRuntime?.parachute?.skydiving ? 'skydive' : 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car';
       state.companionRuntime?.update?.(position, frame.dt, travelMode, appCtx.getEnv?.() || 'EARTH');
       state.wildlifeRuntime?.update?.(position, frame.dt, appCtx.getEnv?.() || 'EARTH');
       const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };

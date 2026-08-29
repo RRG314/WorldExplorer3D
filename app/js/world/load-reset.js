@@ -59,6 +59,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.closeArExperience?.('world_reload');
   appCtx.disposeEditableWorldPresentation?.();
   appCtx.disposeUrbanSandboxRuntime?.('world_reload');
+  appCtx.disposeAviationRuntime?.('world_reload');
   appCtx.transportFacilityVisual?.dispose?.();
   appCtx.transportFacilityVisual = null;
   appCtx.transportFacilityGraph = null;

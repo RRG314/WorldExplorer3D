@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
+import { integrateParachuteFall, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=3";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
@@ -211,7 +211,11 @@ function createWalkingPhysicsHelpers({
     const liveGpsTarget = liveGpsOwnsTranslation
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
       : null;
-    const speed = Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
+    const skydiving = appCtx.urbanSandboxRuntime?.parachute?.skydiving === true;
+    const parachuteDeployedAtFrameStart = appCtx.isUrbanParachuteDeployed?.() === true;
+    const speed = skydiving
+      ? parachuteHorizontalSpeed(parachuteDeployedAtFrameStart)
+      : Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
     state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
@@ -257,7 +261,8 @@ function createWalkingPhysicsHelpers({
       state.walker.mobileMoveBasisYaw = null;
       state.walker.mobileMoveWasActive = false;
     }
-    const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
+    let jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
+    if (skydiving && appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute') jumpAction = 0;
     const planetaryBodyId = activePlanetaryBodyId();
     const gravityMagnitude = planetaryBodyId
       ? samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
@@ -300,10 +305,12 @@ function createWalkingPhysicsHelpers({
 
     const parachuteDeployed = appCtx.isUrbanParachuteDeployed?.() === true &&
       !isPlanetarySurface() && !state.walker.onGround && state.walker.vy < 0;
+    const parachuteFlare = parachuteDeployed && Number(actions.jump) > .05;
     state.walker.vy = parachuteDeployed
-      ? integrateParachuteFall(state.walker.vy, dt, true)
+      ? integrateParachuteFall(state.walker.vy, dt, true, parachuteFlare)
       : state.walker.vy + gravity * dt;
     state.walker.y += state.walker.vy * dt;
+    if (parachuteDeployed) forward = parachuteFlare ? .34 + forward * .18 : .65 + forward * .35;
 
     if (appCtx.activeInterior) {
       const ceiling = resolveInteriorCeiling({

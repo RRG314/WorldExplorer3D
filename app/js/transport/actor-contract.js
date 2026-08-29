@@ -1,5 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { transportDamagePresentation } from './damage-model.js?v=1';
+import { getAviationCatalogEntry } from './aviation-catalog.js?v=2';
 
 function finite(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
@@ -26,7 +27,7 @@ function actorRecord(mode, actor, options = {}) {
     mode,
     source: mode,
     identity: {
-      entityId: String(options.entityId || actor.id || ''),
+      entityId: String(options.entityId || actor.id || actor.transportEntityId || ''),
       catalogId: String(options.catalogId || actor.transportCatalogId || actor.vehicleVariantId || mode),
       domain: String(options.domain || (mode === 'boat' || mode === 'ocean' ? 'maritime' : mode === 'plane' || mode === 'drone' ? 'aviation' : mode === 'rocket' ? 'space' : mode === 'walk' ? 'person' : 'road'))
     },
@@ -84,9 +85,13 @@ function activeTransportActor() {
     });
   }
   if (mode === 'plane') {
+    const catalog = getAviationCatalogEntry(appCtx.planeMode?.transportCatalogId);
     return actorRecord(mode, appCtx.planeMode, {
-      bounds: { radius: 3.4, height: 1.7 },
-      grounded: !appCtx.planeMode?.airborne
+      bounds: { radius: Math.max(catalog.dimensions.length, catalog.dimensions.wingspan) * .5, height: catalog.dimensions.height },
+      grounded: !appCtx.planeMode?.airborne,
+      entityId: appCtx.planeMode?.transportEntityId,
+      catalogId: catalog.id,
+      durabilityPolicy: catalog.damage.durabilityPolicy
     });
   }
   if (mode === 'drone') {

@@ -220,7 +220,7 @@ function careForCompanion(instance, interaction = 'pet', now = Date.now()) {
 
 function resolveCompanionTravelPolicy(instance, mode = 'walk', environment = 'EARTH') {
   if (!instance) return Object.freeze({ visible: false, state: 'none' });
-  if (environment !== 'EARTH' || ['plane', 'drone'].includes(mode)) return Object.freeze({ visible: false, state: 'waiting' });
+  if (environment !== 'EARTH' || mode === 'drone' || mode === 'skydive') return Object.freeze({ visible: false, state: 'waiting' });
   if (String(instance.speciesArchetype || '').startsWith('livestock-') && ['car', 'boat'].includes(mode)) {
     return Object.freeze({ visible: false, state: 'waiting' });
   }
@@ -229,6 +229,7 @@ function resolveCompanionTravelPolicy(instance, mode = 'walk', environment = 'EA
   // of rendering it through the roof or beside a moving car. Boats have an
   // open deck and retain their visible aboard presentation.
   if (mode === 'car') return Object.freeze({ visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
+  if (mode === 'plane') return Object.freeze({ visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
   if (mode === 'boat') return Object.freeze({ visible: true, state: 'aboard', positionMode: 'aboard' });
   return Object.freeze({ visible: true, state: 'following' });
 }

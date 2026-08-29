@@ -1,8 +1,14 @@
 const PARACHUTE_POLICY = Object.freeze({
   minimumClearance: 3.25,
+  minimumAircraftExitClearance: 12,
+  automaticEquipClearance: 18,
   minimumDescentSpeed: 0.8,
   terminalDescentSpeed: 6.4,
-  deployedGravity: -2.35
+  flaredDescentSpeed: 3.1,
+  flareRecovery: 8.2,
+  deployedGravity: -2.35,
+  canopyForwardSpeed: 8.5,
+  freefallControlSpeed: 3.2
 });
 
 function finite(value, fallback = 0) {
@@ -30,13 +36,43 @@ function evaluateParachuteDeployment(input = {}) {
   return Object.freeze({ allowed: true, reason: '', clearance });
 }
 
-function integrateParachuteFall(verticalVelocity, dt, deployed = false) {
+function integrateParachuteFall(verticalVelocity, dt, deployed = false, flaring = false) {
   const step = Math.max(0, Math.min(0.25, finite(dt)));
   if (!deployed) return finite(verticalVelocity);
+  if (flaring) {
+    return Math.min(
+      -PARACHUTE_POLICY.flaredDescentSpeed,
+      Math.max(-PARACHUTE_POLICY.terminalDescentSpeed, finite(verticalVelocity)) + PARACHUTE_POLICY.flareRecovery * step
+    );
+  }
   return Math.max(
     -PARACHUTE_POLICY.terminalDescentSpeed,
     finite(verticalVelocity) + PARACHUTE_POLICY.deployedGravity * step
   );
 }
 
-export { PARACHUTE_POLICY, evaluateParachuteDeployment, integrateParachuteFall };
+function evaluateAircraftSkydivingExit(input = {}) {
+  const clearance = Math.max(0, finite(input.aircraftY) - finite(input.groundY));
+  if (input.airborne !== true) return Object.freeze({ allowed: false, reason: 'aircraft-grounded', clearance, autoEquip: false });
+  if (clearance < PARACHUTE_POLICY.minimumAircraftExitClearance) {
+    return Object.freeze({ allowed: false, reason: 'too-low-to-jump', clearance, autoEquip: false });
+  }
+  return Object.freeze({
+    allowed: true,
+    reason: '',
+    clearance,
+    autoEquip: clearance >= PARACHUTE_POLICY.automaticEquipClearance
+  });
+}
+
+function parachuteHorizontalSpeed(deployed = false) {
+  return deployed ? PARACHUTE_POLICY.canopyForwardSpeed : PARACHUTE_POLICY.freefallControlSpeed;
+}
+
+export {
+  PARACHUTE_POLICY,
+  evaluateAircraftSkydivingExit,
+  evaluateParachuteDeployment,
+  integrateParachuteFall,
+  parachuteHorizontalSpeed
+};

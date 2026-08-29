@@ -82,6 +82,19 @@ function onKey(code, event) {
     return;
   }
 
+  if (
+    code === 'Space' &&
+    !event?.repeat &&
+    appCtx.Walk?.state?.mode === 'walk' &&
+    appCtx.Walk?.state?.walker?.onGround === false &&
+    appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute'
+  ) {
+    if (appCtx.handleUrbanEquipmentUse?.()) {
+      event?.preventDefault?.();
+      return;
+    }
+  }
+
   if (code === 'KeyI' && typeof appCtx.toggleUrbanEquipment === 'function') {
     if (event?.repeat) return;
     appCtx.toggleWorldDiscoveryJournal?.(false);

@@ -586,10 +586,10 @@ function updateHUD() {
     const plane = appCtx.planeMode;
     const groundY = appCtx.SurfaceQuery?.terrainAt?.(plane.x, plane.z)?.position?.y ?? 0;
     const altitude = Math.max(0, Math.round(plane.y - groundY));
-    const mph = Math.max(0, Math.round(worldUnitsPerSecondToMph(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
-    setHudUnitLabels('MPH', 'ALT');
-    document.getElementById('speed').textContent = `${mph}`;
-    document.getElementById('speed').classList.toggle('fast', mph > 105);
+    const knots = Math.max(0, Math.round(worldUnitsPerSecondToKnots(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
+    setHudUnitLabels('KTS', 'ALT');
+    document.getElementById('speed').textContent = `${knots}`;
+    document.getElementById('speed').classList.toggle('fast', knots > 120);
     document.getElementById('limit').textContent = `${altitude}`;
     setStreetAndLocation(plane.airborne ? 'Flight' : 'Taxi', locationName());
     const bf = document.getElementById('boostFill');

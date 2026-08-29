@@ -369,6 +369,9 @@ function disposeGameplayRuntimesForPublication(appCtx, publication, reason) {
   if (gameplayRuntimeMatchesPublication(appCtx.urbanSandboxRuntime, publication)) {
     appCtx.disposeUrbanSandboxRuntime?.(reason);
   }
+  if (gameplayRuntimeMatchesPublication(appCtx.aviationRuntime, publication)) {
+    appCtx.disposeAviationRuntime?.(reason);
+  }
   if (gameplayRuntimeMatchesPublication(appCtx.livingWorldRuntime, publication)) {
     appCtx.disposeLivingWorldRuntime?.(reason);
   }
@@ -447,6 +450,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   const gameplayRuntimeStartedAt = performance.now();
   let livingWorld = null;
   let urbanSandbox = null;
+  let aviation = null;
   let worldDiscovery = null;
   const startupIsCurrent = () => !!(
     worldSession?.isActive?.() &&
@@ -464,7 +468,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       request: worldSession?.request
     });
     if (!livingWorld) throw new Error('Living World did not start for the active publication.');
-    const urbanSandboxModule = await import('../urban-sandbox/runtime.js?v=52');
+    const urbanSandboxModule = await import('../urban-sandbox/runtime.js?v=54');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-urban-sandbox-startup');
@@ -475,7 +479,17 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       livingWorld
     });
     if (!urbanSandbox) throw new Error('Urban Sandbox did not start for the active publication.');
-    const worldDiscoveryModule = await import('../discovery/runtime.js?v=26');
+    const aviationModule = await import('../transport/aviation-runtime.js?v=5');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-aviation-startup');
+    }
+    aviation = aviationModule.startAviationRuntime({
+      snapshot: publication,
+      request: worldSession?.request
+    });
+    if (!aviation) throw new Error('Aviation runtime did not start for the active publication.');
+    const worldDiscoveryModule = await import('../discovery/runtime.js?v=27');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-explorer-startup');
@@ -510,8 +524,8 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   }
   if (runtimeState) {
     runtimeState.gameplayRuntimesReady = !!(
-      livingWorld && urbanSandbox && worldDiscovery &&
-      appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.worldDiscoveryRuntime
+      livingWorld && urbanSandbox && aviation && worldDiscovery &&
+      appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.aviationRuntime && appCtx.worldDiscoveryRuntime
     );
     runtimeState.gameplayRuntimeDurationMs = Math.round(performance.now() - gameplayRuntimeStartedAt);
     runtimeState.updatedAt = performance.now();

@@ -936,6 +936,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     },
     mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+    aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     transportFacilities: transportFacilitySnapshot(),
     activeActor,
@@ -1122,6 +1123,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
   augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
   livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
   urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+  aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
   transportFacilities: transportFacilitySnapshot(),
   fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false, stage: 'idle' },
   blockBuilder: {

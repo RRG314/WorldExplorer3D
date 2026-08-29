@@ -5,7 +5,7 @@ import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=15';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=17';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -2271,7 +2271,9 @@ function snapshot(state) {
     parachute: Object.freeze({
       deployed: state.parachute?.deployed === true,
       deployedAt: Number(state.parachute?.deployedAt || 0),
-      landedAt: Number(state.parachute?.landedAt || 0)
+      landedAt: Number(state.parachute?.landedAt || 0),
+      skydiving: state.parachute?.skydiving === true,
+      automaticEquip: state.parachute?.automaticEquip === true
     }),
     civicResponse: civicSnapshot(state),
     responders: state.responders?.snapshot?.() || null,
@@ -2368,6 +2370,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.civic?.clear?.();
   if (appCtx.isUrbanParachuteDeployed === state.isParachuteDeployed) delete appCtx.isUrbanParachuteDeployed;
   if (appCtx.onUrbanParachuteLanded === state.onParachuteLanded) delete appCtx.onUrbanParachuteLanded;
+  if (appCtx.prepareAirborneParachute === state.prepareAirborneParachute) delete appCtx.prepareAirborneParachute;
   if (globalThis.__WE3D_URBAN_CRASH_SUPPORT__ === state.crashSupportHook) {
     delete globalThis.__WE3D_URBAN_CRASH_SUPPORT__;
   }
@@ -2556,7 +2559,7 @@ function startUrbanSandboxRuntime(options = {}) {
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
-    parachute: { deployed: false, deployedAt: 0, landedAt: 0 },
+    parachute: { deployed: false, deployedAt: 0, landedAt: 0, skydiving: false, automaticEquip: false },
     playerCondition: 1,
     custody: null,
     flashlight,
@@ -2785,6 +2788,20 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
+  state.prepareAirborneParachute = (options = {}) => {
+    state.parachute.skydiving = true;
+    state.parachute.automaticEquip = options.autoEquip === true;
+    if (options.autoEquip === true && state.equipment.has?.('parachute')) {
+      state.equipment.equip?.('parachute');
+      state.backpackStore.save(state.equipment.exportState());
+      state.equipmentRuntime?.render?.();
+      setStatus(state, 'Parachute ready · press Space while descending to deploy.', 2600);
+    } else {
+      setStatus(state, 'Freefall · select the parachute and press Space to deploy.', 2600);
+    }
+    return state.equipment.equipped?.()?.id === 'parachute';
+  };
+  appCtx.prepareAirborneParachute = state.prepareAirborneParachute;
   state.toggleServiceEquipment = () => toggleActiveServiceEquipment(state);
   appCtx.toggleUrbanResponderEquipment = state.toggleServiceEquipment;
   if (appCtx.developerDiagnosticsEnabled) {
@@ -2803,8 +2820,10 @@ function startUrbanSandboxRuntime(options = {}) {
   }
   state.isParachuteDeployed = () => activeWorldMatches(state) && state.parachute.deployed === true;
   state.onParachuteLanded = () => {
-    if (!state.parachute.deployed) return false;
+    if (!state.parachute.deployed && !state.parachute.skydiving) return false;
     state.parachute.deployed = false;
+    state.parachute.skydiving = false;
+    state.parachute.automaticEquip = false;
     state.parachute.landedAt = now();
     state.equipmentVisual?.setParachuteDeployed?.(false);
     setStatus(state, 'Landed safely · parachute repacked.', 1800);
