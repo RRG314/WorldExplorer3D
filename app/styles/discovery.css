@@ -65,12 +65,15 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
   .discoveryActionChip small{font-size:8px}
   .discoveryTodayRoute,.discoveryJournalPlaces,.discoveryGuideLifeDetails,.discoveryProfileGroup{margin-top:12px;border:1px solid var(--wx-line-soft);background:#071018}
   .discoveryTodayRoute>summary,.discoveryJournalPlaces>summary,.discoveryGuideLifeDetails>summary,.discoveryProfileGroup>summary{min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;color:#c8d9e5;font:700 9px Orbitron,sans-serif;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
+  .discoveryTodayRoute>summary::after,.discoveryJournalPlaces>summary::after,.discoveryGuideLifeDetails>summary::after,.discoveryProfileGroup>summary::after{content:'+';margin-left:auto;color:#6f9fd2;font:700 13px Orbitron,sans-serif}
+  .discoveryTodayRoute[open]>summary::after,.discoveryJournalPlaces[open]>summary::after,.discoveryGuideLifeDetails[open]>summary::after,.discoveryProfileGroup[open]>summary::after{content:'−'}
   .discoveryTodayRoute>summary small,.discoveryProfileGroup>summary span{color:#7f94a1;font:600 7px Orbitron,sans-serif}
   .discoveryTodayRoute[open],.discoveryJournalPlaces[open],.discoveryGuideLifeDetails[open],.discoveryProfileGroup[open]{padding:0 10px 10px}
   .discoveryTodayRoute[open]>summary,.discoveryJournalPlaces[open]>summary,.discoveryGuideLifeDetails[open]>summary,.discoveryProfileGroup[open]>summary{margin:0 -10px 10px;border-bottom:1px solid var(--wx-line-soft)}
   .discoveryJournalPlaces>p,.discoveryCompanionSection>p{margin:0 0 9px;color:#82939e;font-size:10px}
   .discoveryGuideLifeDetails .discoveryLifeList{margin:0;border:0;padding:0;background:transparent}
   .discoveryGuideLifeDetails:not([open])>.discoveryLifeList{display:none}
+  .discoveryGuideLeadsHead{margin-top:14px}
   .discoveryProfileHero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:8px;margin-bottom:12px}
   .discoveryProfileHero>div{min-width:0;border:1px solid var(--wx-line-soft);padding:12px;background:#09131b}
   .discoveryProfileHero>div:first-child{grid-row:span 2;border-left:3px solid var(--wx-blue);background:linear-gradient(120deg,rgba(45,125,255,.13),#09131b 70%)}

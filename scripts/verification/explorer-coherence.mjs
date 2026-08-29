@@ -89,6 +89,7 @@ try {
   assert.match(guideCopy || '', /0\s*\/\s*60/);
   assert.match(guideCopy || '', /Baltimore/i);
   assert.match(guideCopy || '', /5 mammals left to identify/i);
+  assert.match(guideCopy || '', /Identification Leads/i);
   assert.equal(await page.locator('.discoveryGuideLifeDetails').evaluate((element) => element.open), false);
   assert.equal(await page.locator('#discoveryLifeList').isVisible(), false);
   assert.doesNotMatch(guideCopy || '', /Unknown Mammal Taxon|pilot|Creature Quality|reference fallbacks|procedural encounter|pipeline/i);
