@@ -622,13 +622,58 @@ function installSpaceJourneyRuntime(appContext) {
         globalThis.queueMicrotask?.(() => appContext.completeSpaceFlightJourneyLanding?.());
       }
     }
+    const collisionActive = !rendered.approachHold && rendered.journey.phase !== JOURNEY_PHASE.SURFACE;
+    const destinationContactAuthorized = [
+      JOURNEY_PHASE.DESCENT,
+      JOURNEY_PHASE.HOME_DESCENT,
+      JOURNEY_PHASE.ATMOSPHERIC_EXPLORATION
+    ].includes(rendered.journey.phase);
+    if (collisionActive) {
+      const protectedPhysicalBodies = [rendered.ephemeris.source, rendered.ephemeris.destination]
+        .filter((body) => !destinationContactAuthorized || body.bodyId !== rendered.ephemeris.destination.bodyId)
+        .map((body) => ({
+          bodyId: body.bodyId,
+          name: getAstronomicalBody(body.bodyId)?.name || body.bodyId,
+          position: body.positionM,
+          radius: body.radiusM
+        }));
+      const physicalCollision = resolveCelestialSceneCollision(
+        previousPhysicalPosition,
+        rendered.spacecraft.positionM,
+        protectedPhysicalBodies,
+        { clearance: 6, padding: 0.5, allowOutwardEscape: true }
+      );
+      if (physicalCollision.collided) {
+        rendered.assistedPlan = null;
+        rendered.approachHold = false;
+        rendered.spacecraft = createSpacecraftState({
+          ...rendered.spacecraft,
+          positionM: physicalCollision.position,
+          velocityMps: { x: 0, y: 0, z: 0 },
+          propellantCapacityKg: rendered.spacecraft.propellantCapacityKg,
+          propellantKg: rendered.spacecraft.propellantKg,
+          lastEvent: `contact-${physicalCollision.bodyId || 'celestial-body'}`
+        });
+        appContext.spaceFlight.lastCelestialContact = Object.freeze({
+          bodyId: physicalCollision.bodyId,
+          bodyName: physicalCollision.bodyName,
+          atMs: Date.now()
+        });
+        publishAssistState({ cancelled: true, collision: true });
+      }
+    }
     let scenePosition = rendered.presentation.physicalToScene(rendered.spacecraft.positionM);
-    if (!rendered.approachHold && rendered.journey.phase !== JOURNEY_PHASE.SURFACE) {
+    if (collisionActive) {
       const exemptBodyId = [JOURNEY_PHASE.DESCENT, JOURNEY_PHASE.HOME_DESCENT, JOURNEY_PHASE.ATMOSPHERIC_EXPLORATION]
         .includes(rendered.journey.phase)
         ? rendered.ephemeris.destination.bodyId
         : null;
-      const protectedBodies = collisionBodies().filter((body) => body.bodyId !== exemptBodyId);
+      const journeyBodyIds = new Set([
+        rendered.ephemeris.source.bodyId,
+        rendered.ephemeris.destination.bodyId,
+        exemptBodyId
+      ].filter(Boolean));
+      const protectedBodies = collisionBodies().filter((body) => !journeyBodyIds.has(body.bodyId));
       const collision = resolveCelestialSceneCollision(prior, scenePosition, protectedBodies, {
         clearance: SPACECRAFT_SCENE_CLEARANCE,
         padding: 0.08,
@@ -636,21 +681,32 @@ function installSpaceJourneyRuntime(appContext) {
       });
       if (collision.collided) {
         scenePosition = collision.position;
-        rendered.assistedPlan = null;
-        rendered.approachHold = false;
+        const guidedAvoidance = Boolean(assistedUpdate && rendered.assistedPlan);
+        if (!guidedAvoidance) {
+          rendered.assistedPlan = null;
+          rendered.approachHold = false;
+        }
         rendered.spacecraft = createSpacecraftState({
           ...rendered.spacecraft,
           positionM: rendered.presentation.sceneToPhysical(scenePosition),
-          velocityMps: { x: 0, y: 0, z: 0 },
+          velocityMps: guidedAvoidance
+            ? rendered.spacecraft.velocityMps
+            : { x: 0, y: 0, z: 0 },
           propellantCapacityKg: rendered.spacecraft.propellantCapacityKg,
           propellantKg: rendered.spacecraft.propellantKg,
-          lastEvent: `contact-${collision.bodyId || 'celestial-body'}`
+          lastEvent: `${guidedAvoidance ? 'avoid' : 'contact'}-${collision.bodyId || 'celestial-body'}`
         });
-        appContext.spaceFlight.lastCelestialContact = Object.freeze({
+        const event = Object.freeze({
           bodyId: collision.bodyId,
           bodyName: collision.bodyName,
           atMs: Date.now()
         });
+        if (guidedAvoidance) {
+          appContext.spaceFlight.lastCelestialAvoidance = event;
+        } else {
+          appContext.spaceFlight.lastCelestialContact = event;
+          publishAssistState({ cancelled: true, collision: true });
+        }
       }
     }
     appContext.spaceFlight.rocket.position.set(scenePosition.x, scenePosition.y, scenePosition.z);

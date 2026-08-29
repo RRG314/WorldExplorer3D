@@ -277,6 +277,7 @@ export function prepareWorldFeatureSelections(options = {}) {
   ];
   loadMetrics.regionalTransportSelection = {
     available: regionalRoadWays.length,
+    regionalCap: regionalRoadCap,
     engineeredAvailable: regionalPartition.engineered.length,
     exactEngineered: exactRegionalEngineered.length,
     generalizedEngineeredSelected: selectedGeneralizedEngineered.length,

@@ -146,11 +146,16 @@ try {
   const standard = await runStandardJourney();
   const liveGps = await runLiveGpsJourney();
   const checks = {
-    standardFirstPlayUnder45Seconds: standard.firstPlayableMs <= 45_000,
-    liveGpsPermissionToPlayUnder50Seconds: liveGps.permissionToPlayableMs <= 50_000,
+    standardFirstPlayUnder38Seconds: standard.firstPlayableMs <= 38_000,
+    liveGpsPermissionToPlayUnder40Seconds: liveGps.permissionToPlayableMs <= 40_000,
     mobileProfileActuallyActive:
-      standard.loadProfile?.dynamicBudgetScale <= 0.32 &&
-      standard.loadProfile?.regionalContextRadiusMeters === 12_000,
+      standard.loadProfile?.dynamicBudgetScale <= 0.28 &&
+      standard.loadProfile?.regionalContextRadiusMeters === 9_000 &&
+      standard.loadProfile?.optionalProviderTimeoutMs <= 2_500 &&
+      standard.loadProfile?.overpassTimeoutMs <= 12_000 &&
+      standard.loadProfile?.maxTotalLoadMs <= 32_000,
+    regionalContextRespectsMobileBudget:
+      Number(standard.regionalTransportSelection?.regionalCap || Infinity) <= 900,
     standardMappedWorldPresent:
       Number(standard.worldCounts?.roads || 0) >= 900 &&
       Number(standard.worldCounts?.buildings || 0) >= 2400,
@@ -163,8 +168,8 @@ try {
   };
   const report = {
     ok: Object.values(checks).every(Boolean),
-    contract: 'mobile-cold-start-and-live-gps-current-v1',
-    measurementAuthority: 'installed Chrome, 390x844 touch/mobile emulation',
+    contract: 'mobile-cold-start-and-live-gps-current-v2',
+    measurementAuthority: 'installed Chrome, 390x844 touch/mobile emulation; owner device proof remains required',
     checks,
     standard,
     liveGps

@@ -301,6 +301,39 @@ test('rendered journey controller makes the mesh a presentation of fuel-accounte
   assert.equal(appContext.spaceFlight.manualFlightRate, 100);
 });
 
+test('rendered journey follows live body positions without changing physical spacecraft state', () => {
+  const position = (x, y, z) => ({
+    x, y, z,
+    set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; }
+  });
+  const earthPosition = position(0, 0, 0);
+  const moonPosition = position(120, 20, 0);
+  const appContext = {
+    spaceFlight: {
+      earth: { position: earthPosition },
+      moon: { position: moonPosition },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  assert.equal(runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'earth', destinationBodyId: 'moon', mode: JOURNEY_MODE.MANUAL
+  }), true);
+  const physicalBefore = appContext.spacecraftState;
+  const sceneBefore = { ...appContext.spaceFlight.rocket.position };
+
+  earthPosition.x += 50;
+  moonPosition.x += 50;
+  runtime.updateRenderedSpaceJourney({ realDtS: 0 });
+
+  assert.deepEqual(appContext.spacecraftState, physicalBefore);
+  assert.ok(Math.abs(appContext.spaceFlight.rocket.position.x - (sceneBefore.x + 50)) < 1e-9);
+  assert.ok(Math.abs(appContext.spaceFlight.rocket.position.y - sceneBefore.y) < 1e-9);
+  assert.ok(Math.abs(appContext.spaceFlight.rocket.position.z - sceneBefore.z) < 1e-9);
+});
+
 test('manual flight input immediately takes control from an active assisted transfer', () => {
   const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
   const appContext = {

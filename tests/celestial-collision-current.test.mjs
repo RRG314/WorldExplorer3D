@@ -50,3 +50,25 @@ test('celestial collision restores a craft that begins inside a body and ignores
   assert.equal(safe.collided, false);
   assert.deepEqual(safe.position, { x: 20, y: 20, z: 0 });
 });
+
+test('surface departure can escape outward but cannot use that exception to fly inward', () => {
+  const body = [{ bodyId: 'mercury', name: 'Mercury', position: { x: 0, y: 0, z: 0 }, radius: 10 }];
+  const outward = resolveCelestialSceneCollision(
+    { x: 10.5, y: 0, z: 0 },
+    { x: 18, y: 0, z: 0 },
+    body,
+    { clearance: 2, allowOutwardEscape: true }
+  );
+  assert.equal(outward.collided, false);
+  assert.deepEqual(outward.position, { x: 18, y: 0, z: 0 });
+
+  const inward = resolveCelestialSceneCollision(
+    { x: 10.5, y: 0, z: 0 },
+    { x: 2, y: 0, z: 0 },
+    body,
+    { clearance: 2, allowOutwardEscape: true }
+  );
+  assert.equal(inward.collided, true);
+  assert.equal(inward.startedInside, true);
+  assert.ok(inward.position.x > 12);
+});
