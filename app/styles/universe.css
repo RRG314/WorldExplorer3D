@@ -91,6 +91,44 @@
   font-size: 11px;
 }
 
+.universe-course-readout {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 10px 11px;
+  background: rgba(19, 31, 52, 0.8);
+  border: 1px solid rgba(91, 123, 166, 0.58);
+  border-left: 3px solid #5b7ba6;
+  border-radius: 5px;
+}
+
+.universe-course-readout.has-course {
+  background: rgba(15, 58, 73, 0.82);
+  border-color: rgba(93, 225, 240, 0.7);
+  border-left-color: #6fe8ff;
+  box-shadow: inset 0 0 20px rgba(48, 188, 219, 0.08);
+}
+
+.universe-course-status {
+  color: #8ba5c8;
+  font: 700 9px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.universe-course-readout.has-course .universe-course-status {
+  color: #75ecff;
+}
+
+.universe-course-readout strong {
+  color: #f4f8ff;
+  font: 700 14px Inter, sans-serif;
+}
+
+.universe-course-readout small {
+  color: #aebfd5;
+  font: 500 10px/1.4 Inter, sans-serif;
+}
+
 .universe-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -153,6 +191,15 @@
   border-radius: 8px;
   font: 600 11px Orbitron, sans-serif;
   cursor: pointer;
+}
+
+#universeToggle.has-course {
+  max-width: min(280px, 56vw);
+  overflow: hidden;
+  color: #8df2ff;
+  border-color: #6fe8ff !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .solar-system-scale {

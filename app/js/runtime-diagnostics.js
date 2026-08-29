@@ -949,6 +949,14 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
+    universeNavigation: appCtx.universeRuntime ? {
+      currentFrameId: appCtx.universeRuntime.current?.id || null,
+      selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
+      courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
+      courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
+      courseStatus: appCtx.universeRuntime.course?.status || null,
+      transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
+    } : null,
     spaceCatalog: spaceCatalogSnapshot(),
     curatedLandmarks: appCtx.curatedLandmarkMetrics || null,
     mappedLandmarks: appCtx.mappedLandmarkMetrics || null,

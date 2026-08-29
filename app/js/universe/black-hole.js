@@ -64,15 +64,25 @@ function createBlackHoleVisual(entity, visualRadius = 115) {
   group.name = entity.name;
   group.userData = { universeEntityId: entity.id, isBlackHole: true };
 
+  const mobile = globalThis.matchMedia?.('(max-width: 768px)').matches === true;
+  const sphereWidth = mobile ? 48 : 80;
+  const sphereHeight = mobile ? 32 : 56;
   const horizon = new THREE.Mesh(
-    new THREE.SphereGeometry(visualRadius, 48, 32),
+    new THREE.SphereGeometry(visualRadius, sphereWidth, sphereHeight),
     new THREE.MeshBasicMaterial({ color: 0x000000 })
   );
   horizon.name = 'Event horizon';
   group.add(horizon);
 
+  const shadow = new THREE.Mesh(
+    new THREE.SphereGeometry(visualRadius * 1.82, sphereWidth, sphereHeight),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.98, depthWrite: true })
+  );
+  shadow.name = 'Gravitationally enlarged event-horizon shadow';
+  group.add(shadow);
+
   const photonShell = new THREE.Mesh(
-    new THREE.SphereGeometry(visualRadius * 1.52, 48, 32),
+    new THREE.SphereGeometry(visualRadius * 1.94, sphereWidth, sphereHeight),
     new THREE.MeshBasicMaterial({
       color: entity.visualProfile?.diskColor || 0xffa45c,
       transparent: true,
@@ -86,7 +96,7 @@ function createBlackHoleVisual(entity, visualRadius = 115) {
   group.add(photonShell);
 
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(visualRadius * 1.5, visualRadius * 0.035, 12, 128),
+    new THREE.TorusGeometry(visualRadius * 1.92, visualRadius * 0.028, mobile ? 10 : 16, mobile ? 128 : 224),
     new THREE.MeshBasicMaterial({
       color: 0xfff0cb,
       transparent: true,
@@ -98,7 +108,12 @@ function createBlackHoleVisual(entity, visualRadius = 115) {
   ring.name = 'Photon ring';
   group.add(ring);
 
-  const diskGeometry = new THREE.RingGeometry(visualRadius * 3, visualRadius * 12, 192, 20);
+  const diskGeometry = new THREE.RingGeometry(
+    visualRadius * 3,
+    visualRadius * 12,
+    mobile ? 128 : 256,
+    mobile ? 12 : 28
+  );
   const diskMaterial = makeAccretionMaterial(entity.visualProfile?.diskColor, visualRadius);
   const disk = new THREE.Mesh(diskGeometry, diskMaterial);
   disk.name = 'Accretion disk';
@@ -122,6 +137,27 @@ function createBlackHoleVisual(entity, visualRadius = 115) {
   lensArc.rotation.x = inclination;
   group.add(lensArc);
 
+  const lensMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffd19a,
+    transparent: true,
+    opacity: 0.48,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const upperLens = new THREE.Mesh(
+    new THREE.TorusGeometry(visualRadius * 2.16, visualRadius * 0.045, mobile ? 8 : 12, mobile ? 72 : 128, Math.PI),
+    lensMaterial
+  );
+  upperLens.name = 'Upper lensed accretion-disk image';
+  upperLens.position.y = visualRadius * 0.58;
+  const lowerLens = upperLens.clone();
+  lowerLens.name = 'Lower lensed accretion-disk image';
+  lowerLens.position.y = -visualRadius * 0.58;
+  lowerLens.rotation.z = Math.PI;
+  lowerLens.material = lensMaterial.clone();
+  lowerLens.material.opacity = 0.3;
+  group.add(upperLens, lowerLens);
+
   const catalogRs = Number(entity.physical?.schwarzschildRadiusKm);
   const calculatedRs = physicalSchwarzschildRadiusKm(entity.physical?.massSolar);
   group.userData.blackHole = {
@@ -131,9 +167,15 @@ function createBlackHoleVisual(entity, visualRadius = 115) {
     photonSphereRadiusKm: (Number.isFinite(catalogRs) ? catalogRs : calculatedRs) * 1.5,
     iscoRadiusKm: (Number.isFinite(catalogRs) ? catalogRs : calculatedRs) * 3,
     disk,
+    horizon,
+    shadow,
     photonShell,
     ring,
-    lensArc
+    lensArc,
+    upperLens,
+    lowerLens,
+    qualityTier: mobile ? 'mobile' : 'desktop-high',
+    renderingEvidence: 'Event-horizon shadow, photon ring, Doppler-brightened accretion disk, and far-side lens images are a real-time visual approximation.'
   };
   return group;
 }
@@ -148,6 +190,11 @@ function updateBlackHoleVisual(group, camera, elapsedSeconds) {
   const pulse = 0.88 + Math.sin(elapsedSeconds * 1.7) * 0.08;
   model.photonShell.material.opacity = 0.07 + pulse * 0.04;
   model.lensArc.material.opacity = 0.22 + pulse * 0.09;
+  model.upperLens.material.opacity = 0.38 + pulse * 0.12;
+  model.lowerLens.material.opacity = 0.24 + pulse * 0.08;
+  model.upperLens.quaternion.copy(camera.quaternion);
+  model.lowerLens.quaternion.copy(camera.quaternion);
+  model.lowerLens.rotateZ(Math.PI);
 }
 
 function updateBlackHoleEncounter(group, rocket, gravityVelocity, frameScale = 1) {

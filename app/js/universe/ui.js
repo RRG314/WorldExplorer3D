@@ -1,4 +1,4 @@
-import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=9';
+import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=10';
 
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',
@@ -48,7 +48,31 @@ function toggleUniverseNavigator() {
 
 function populateDestinationSelect(select) {
   const destinations = getUniverseDestinations();
+  const systems = destinations.filter((item) => item.objectClass === 'planetary_system');
+  const systemGroup = document.createElement('optgroup');
+  systemGroup.label = CLASS_LABELS.planetary_system;
+  systems.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.name;
+    systemGroup.appendChild(option);
+  });
+  if (systemGroup.children.length) select.appendChild(systemGroup);
+  systems.forEach((system) => {
+    const planets = destinations.filter((item) => item.objectClass === 'exoplanet' && item.parentFrameId === system.id);
+    if (!planets.length) return;
+    const group = document.createElement('optgroup');
+    group.label = `${system.name} · planets`;
+    planets.forEach((planet) => {
+      const option = document.createElement('option');
+      option.value = planet.id;
+      option.textContent = planet.name;
+      group.appendChild(option);
+    });
+    select.appendChild(group);
+  });
   Object.entries(CLASS_LABELS).forEach(([objectClass, label]) => {
+    if (objectClass === 'planetary_system') return;
     const group = document.createElement('optgroup');
     group.label = label;
     destinations.filter((item) => item.objectClass === objectClass).forEach((item) => {
@@ -68,13 +92,13 @@ function createUniverseNavigator(handlers) {
   panel = document.createElement('aside');
   panel.id = 'universeNavigator';
   panel.className = 'universe-navigator';
-  panel.setAttribute('aria-label', 'Universe navigation map');
+  panel.setAttribute('aria-label', 'Wayfinder navigation map');
   panel.setAttribute('aria-hidden', 'true');
   panel.hidden = true;
   panel.innerHTML = `
     <div class="universe-heading">
       <div>
-        <div class="universe-kicker">NAVIGATION FRAME</div>
+        <div class="universe-kicker">WAYFINDER · NAVIGATION FRAME</div>
         <div id="universeFrameName" class="universe-frame-name">Solar System</div>
       </div>
       <button id="universeCloseBtn" class="universe-icon-button" type="button" aria-label="Close universe navigator" title="Close universe map">×</button>
@@ -85,6 +109,11 @@ function createUniverseNavigator(handlers) {
       <select id="universeDestinationSelect"></select>
     </label>
     <div id="universeDestinationMeta" class="universe-destination-meta"></div>
+    <div id="universeCourseReadout" class="universe-course-readout" aria-live="polite">
+      <span class="universe-course-status">NO COURSE SET</span>
+      <strong>Choose a destination</strong>
+      <small>The flight HUD and in-world marker will follow the course you engage.</small>
+    </div>
     <div class="universe-actions" id="universePrimaryActions"></div>
     <div class="universe-actions universe-return-actions" id="universeReturnActions"></div>
     <a id="universeSourceLink" class="universe-source" href="#" target="_blank" rel="noopener noreferrer">Catalog source</a>
@@ -132,7 +161,7 @@ function createUniverseNavigator(handlers) {
 
   const existingControls = document.getElementById('ssToggleContainer');
   if (existingControls && !document.getElementById('universeToggle')) {
-    const toggle = makeButton('universeToggle', 'UNIVERSE MAP');
+    const toggle = makeButton('universeToggle', 'WAYFINDER');
     toggle.classList.add('ssToggleBtn');
     toggle.setAttribute('aria-controls', 'universeNavigator');
     toggle.setAttribute('aria-expanded', 'false');
@@ -147,8 +176,9 @@ function setUniverseSelection(entity) {
   if (!panel || !entity) return;
   const meta = panel.querySelector('#universeDestinationMeta');
   const source = entity.provenance?.[0];
-  const generated = entity.generatedFlags?.length ? ' · generated detail labeled in scene' : '';
-  meta.textContent = formatDistance(entity) + ' · ' + entity.accuracy + generated;
+  const host = entity.objectClass === 'exoplanet' ? ` · ${entity.hostName}` : '';
+  const generated = entity.generatedFlags?.length ? ' · modeled display details' : '';
+  meta.textContent = formatDistance(entity) + host + ' · ' + entity.accuracy + generated;
   const link = panel.querySelector('#universeSourceLink');
   if (source?.url) {
     link.href = source.url;
@@ -168,9 +198,46 @@ function updateUniverseNavigator(state) {
   if (!state.transition && select.value !== state.selected?.id) select.value = state.selected?.id || state.current.id;
   setUniverseSelection(state.selected || state.current);
 
+  const course = state.course;
+  const readout = panel.querySelector('#universeCourseReadout');
+  const status = readout.querySelector('.universe-course-status');
+  const title = readout.querySelector('strong');
+  const detail = readout.querySelector('small');
+  if (course?.destination) {
+    const isTransit = course.status === 'transit' || Boolean(state.transition);
+    readout.classList.add('has-course');
+    status.textContent = isTransit ? 'COURSE ENGAGED' : 'COURSE ACTIVE';
+    title.textContent = course.destination.name;
+    detail.textContent = course.destination.objectClass === 'exoplanet'
+      ? `Orbital approach via ${course.frame.name} · marker and flight HUD linked`
+      : `${course.frame.address} · flight HUD linked`;
+  } else {
+    readout.classList.remove('has-course');
+    status.textContent = 'NO COURSE SET';
+    title.textContent = 'Choose a destination';
+    detail.textContent = 'The flight HUD and in-world marker will follow the course you engage.';
+  }
+  const toggle = document.getElementById('universeToggle');
+  if (toggle) {
+    toggle.textContent = course?.destination
+      ? `WAYFINDER · ${course.destination.name}`
+      : 'WAYFINDER';
+    toggle.classList.toggle('has-course', Boolean(course?.destination));
+    toggle.title = course?.destination
+      ? `Active course: ${course.destination.name}`
+      : 'Open Wayfinder';
+  }
+
   panel.classList.toggle('is-busy', Boolean(state.transition));
   select.disabled = Boolean(state.transition);
-  panel.querySelector('#universeTravelBtn').disabled = Boolean(state.transition) || state.selected?.id === state.current.id;
+  const travel = panel.querySelector('#universeTravelBtn');
+  const selectedName = state.selected?.name || 'destination';
+  travel.textContent = state.transition
+    ? `TRAVELING · ${state.transition.destination?.name || state.transition.to?.name || selectedName}`
+    : state.course?.destination?.id === state.selected?.id
+      ? `COURSE ACTIVE · ${selectedName}`
+      : `SET COURSE · ${selectedName}`;
+  travel.disabled = Boolean(state.transition) || state.course?.destination?.id === state.selected?.id;
   const enterGalaxy = panel.querySelector('#universeEnterGalaxyBtn');
   const canEnterGalaxy = Boolean(state.galaxyEntry && state.current.objectClass === 'galaxy');
   enterGalaxy.hidden = !canEnterGalaxy;

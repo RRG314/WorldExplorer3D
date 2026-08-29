@@ -1,12 +1,17 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
-import { getGalaxyEntryDestination, resolveUniverseAddress } from './catalog.js?v=9';
-import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=2';
+import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=10';
+import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=3';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
-import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=17';
+import {
+  createUniverseFrameVisual,
+  getUniverseDestinationMesh,
+  setUniverseCourseMarker,
+  updateUniverseFrameVisual
+} from './visuals.js?v=18';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
@@ -14,7 +19,7 @@ import {
   setUniverseSelection,
   showUniverseNavigator,
   updateUniverseNavigator
-} from './ui.js?v=3';
+} from './ui.js?v=4';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -39,6 +44,7 @@ const universeRuntime = {
   deepSky: null,
   current: resolveUniverseAddress('sol'),
   selected: resolveUniverseAddress('sol'),
+  course: null,
   transition: null,
   pendingEarthReturn: false,
   elapsedSeconds: 0,
@@ -124,10 +130,36 @@ function installFrame(entity) {
     universeRuntime.frameGroup = createUniverseFrameVisual(entity);
     universeRuntime.scene.add(universeRuntime.frameGroup);
     universeRuntime.encounter = createRegionEncounter(universeRuntime.frameGroup, entity);
+    const courseDestination = universeRuntime.course?.destination;
+    if (courseDestination?.objectClass === 'exoplanet' && courseDestination.parentFrameId === entity.id) {
+      setUniverseCourseMarker(universeRuntime.frameGroup, courseDestination.id, true);
+    }
   }
   positionRocketForFrame(entity);
   resetFlightMotion();
   updateUniverseNavigator(universeRuntime);
+}
+
+function positionRocketForCourseDestination(destination) {
+  if (destination?.objectClass !== 'exoplanet' || !appCtx.spaceFlight?.rocket) return false;
+  const body = getUniverseDestinationMesh(universeRuntime.frameGroup, destination.id);
+  if (!body) return false;
+  const target = new THREE.Vector3();
+  body.getWorldPosition(target);
+  const radius = Number(body.geometry?.parameters?.radius) || 6;
+  const approach = target.clone().normalize();
+  if (approach.lengthSq() < 0.01) approach.set(0, 0, 1);
+  const rocket = appCtx.spaceFlight.rocket;
+  rocket.position.copy(target).addScaledVector(approach, Math.max(120, radius * 18));
+  _forward.copy(target).sub(rocket.position).normalize();
+  rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _forward);
+  if (appCtx.spaceFlight.camera) {
+    appCtx.spaceFlight.camera.position.copy(rocket.position).addScaledVector(approach, Math.max(35, radius * 5));
+    appCtx.spaceFlight.camera.position.y += Math.max(16, radius * 2);
+    appCtx.spaceFlight.camera.lookAt(target);
+  }
+  resetFlightMotion();
+  return true;
 }
 
 function createTransitVisual(scene) {
@@ -171,12 +203,31 @@ function setSelectedDestination(id) {
 function travelToUniverseDestination(addressOrId, options = {}) {
   if (!appCtx.spaceFlight?.active || universeRuntime.transition) return false;
   const destination = resolveUniverseAddress(addressOrId);
-  if (!destination || destination.id === universeRuntime.current.id) return false;
+  const destinationFrame = getUniverseFrame(destination);
+  if (!destination || !destinationFrame) return false;
   universeRuntime.selected = destination;
+  universeRuntime.course = {
+    destination,
+    frame: destinationFrame,
+    status: destinationFrame.id === universeRuntime.current.id ? 'active' : 'transit',
+    setAt: performance.now()
+  };
+  if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
+    setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
+    showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
+    updateUniverseNavigator(universeRuntime);
+    return true;
+  }
+  if (destination.id === universeRuntime.current.id) {
+    universeRuntime.course.status = 'active';
+    updateUniverseNavigator(universeRuntime);
+    return false;
+  }
   universeRuntime.pendingEarthReturn = Boolean(options.returnToEarth);
   universeRuntime.transition = {
     from: universeRuntime.current,
-    to: destination,
+    to: destinationFrame,
+    destination,
     startedAt: performance.now(),
     swapped: false,
     kind: options.kind || 'navigation',
@@ -188,7 +239,7 @@ function travelToUniverseDestination(addressOrId, options = {}) {
     universeRuntime.transitGroup.visible = universeRuntime.transition.kind !== 'wormhole';
   }
   closeUniverseNavigator();
-  showMessage(`NAVIGATING TO ${destination.name.toUpperCase()}`, '#8ab4ff');
+  showMessage(`COURSE ENGAGED · ${destination.name.toUpperCase()}`, '#8ab4ff');
   updateUniverseNavigator(universeRuntime);
   return true;
 }
@@ -223,6 +274,8 @@ function returnUniverseToSolImmediate() {
   universeRuntime.pendingEarthReturn = false;
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
+  universeRuntime.course = null;
+  universeRuntime.selected = resolveUniverseAddress('sol');
   if (universeRuntime.scene) installFrame(resolveUniverseAddress('sol'));
   return true;
 }
@@ -284,8 +337,10 @@ function updateTransition(nowMs) {
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
   appCtx.spaceFlight.mode = 'flying';
+  if (universeRuntime.course) universeRuntime.course.status = 'active';
+  positionRocketForCourseDestination(transition.destination);
   updateUniverseNavigator(universeRuntime);
-  showMessage(`${transition.to.name.toUpperCase()} FRAME ACQUIRED`, '#68d8c0');
+  showMessage(`${transition.destination?.name || transition.to.name} APPROACH ACQUIRED`, '#68d8c0');
   if (universeRuntime.pendingEarthReturn && transition.to.id === 'sol') {
     window.setTimeout(forceEarthLandingFromSol, 250);
   }
@@ -347,18 +402,28 @@ function rebaseActiveFrame() {
 function getUniverseHudTarget() {
   if (universeRuntime.current.id === 'sol') return null;
   const group = universeRuntime.frameGroup;
+  const courseDestination = universeRuntime.course?.destination;
+  const courseInTransit = Boolean(universeRuntime.transition && courseDestination);
+  const courseBody = courseDestination?.objectClass === 'exoplanet' && courseDestination.parentFrameId === universeRuntime.current.id
+    ? getUniverseDestinationMesh(group, courseDestination.id)
+    : null;
+  const coursePosition = new THREE.Vector3();
+  if (courseBody) courseBody.getWorldPosition(coursePosition);
   const radius = universeRuntime.current.objectClass === 'black_hole'
     ? group?.userData?.blackHole?.visualRadius || 100
     : universeRuntime.current.objectClass === 'planetary_system' ? 24
       : universeRuntime.current.objectClass === 'nebula' ? 240
         : universeRuntime.current.objectClass === 'stellar_region' ? 180 : 80;
   return {
-    name: universeRuntime.current.name,
-    position: group?.position || new THREE.Vector3(),
-    radius,
+    name: courseBody || courseInTransit ? courseDestination.name : universeRuntime.current.name,
+    position: courseBody ? coursePosition : group?.position || new THREE.Vector3(),
+    radius: courseBody ? Number(courseBody.geometry?.parameters?.radius) || 6 : radius,
+    physicalRadiusKm: courseBody ? Number(courseBody.userData?.physicalRadiusKm) || null : null,
     landable: false,
-    objectClass: universeRuntime.current.objectClass,
-    address: universeRuntime.current.address,
+    objectClass: courseBody ? 'exoplanet' : universeRuntime.current.objectClass,
+    address: courseBody || courseInTransit ? courseDestination.address : universeRuntime.current.address,
+    course: universeRuntime.course,
+    targetKind: courseBody ? 'exoplanet' : courseInTransit ? 'course-transit' : 'frame',
     encounter: universeRuntime.encounter,
     navigation: getUniverseNavigationMetrics(
       universeRuntime.current,
@@ -421,6 +486,7 @@ function initUniverseRuntime(scene) {
     universeRuntime.pendingEarthReturn = false;
     universeRuntime.current = resolveUniverseAddress('sol');
     universeRuntime.selected = universeRuntime.current;
+    universeRuntime.course = null;
     setSolVisibility(true);
     setUniverseSkyFrame(universeRuntime.sky, universeRuntime.current, false);
     setDeepSkyFrame(universeRuntime.deepSky, universeRuntime.current, false);

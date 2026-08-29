@@ -318,7 +318,38 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     }
   }
 
-  if (universeTarget?.navigation) {
+  if (universeTarget?.targetKind === 'exoplanet') {
+    const sceneToKm = universeTarget.physicalRadiusKm && universeTarget.radius > 0
+      ? universeTarget.physicalRadiusKm / universeTarget.radius
+      : null;
+    const rangeKm = sceneToKm ? Math.max(0, activeDist - universeTarget.radius) * sceneToKm : null;
+    const speedKmS = sceneToKm ? displaySpeed * sceneToKm : null;
+    setMetric(
+      'sfAltitudeLabel',
+      'sfAltitude',
+      'sfAltitudeUnit',
+      'Approach range',
+      rangeKm == null ? Math.floor(activeDist).toLocaleString() : Math.round(rangeKm).toLocaleString(),
+      rangeKm == null ? 'display u' : 'km'
+    );
+    setMetric(
+      'sfSpeedLabel',
+      'sfSpeed',
+      'sfSpeedUnit',
+      'Relative speed',
+      speedKmS == null ? displaySpeed.toFixed(1) : speedKmS.toFixed(1),
+      speedKmS == null ? 'display u/s' : 'km/s'
+    );
+    setMetric(
+      'sfDistanceLabel',
+      'sfDistance',
+      'sfDistanceUnit',
+      'Center distance',
+      sceneToKm == null ? Math.floor(activeDist).toLocaleString() : Math.round(activeDist * sceneToKm).toLocaleString(),
+      sceneToKm == null ? 'display u' : 'km'
+    );
+    if (zoneLabel) zoneLabel.textContent = 'PLANET APPROACH';
+  } else if (universeTarget?.navigation) {
     const navigation = universeTarget.navigation;
     const offset = formatLightYears(navigation.offsetLy);
     const span = formatLightYears(navigation.frameSpanLy);
@@ -412,7 +443,9 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       landBtn.disabled = true;
       landBtn.style.opacity = '0.7';
       landBtn.style.background = '#315d9d';
-      landBtn.textContent = 'EXPLORING ' + activeHudBody.name.toUpperCase();
+      landBtn.textContent = universeTarget.targetKind === 'exoplanet'
+        ? 'ORBIT TARGET · ' + activeHudBody.name.toUpperCase()
+        : 'EXPLORING ' + activeHudBody.name.toUpperCase();
     }
   } else if (atmosphericExploration) {
     const pressurePa = Number(atmosphericExploration.environment?.pressurePa) || 0;

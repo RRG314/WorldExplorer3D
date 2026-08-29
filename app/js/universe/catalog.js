@@ -500,8 +500,37 @@ const CATALOG = [
   })
 ];
 
-const BY_ID = new Map(CATALOG.map((item) => [item.id, item]));
-const BY_ADDRESS = new Map(CATALOG.map((item) => [item.address, item]));
+function makeChildDestination(parent, child) {
+  return Object.freeze({
+    ...child,
+    parentId: parent.id,
+    parentFrameId: parent.id,
+    hostName: parent.name,
+    address: `${parent.address}/planets/${child.id}`,
+    canonicalPosition: parent.canonicalPosition,
+    provenance: parent.provenance,
+    aliases: Object.freeze(child.aliases || []),
+    children: Object.freeze([]),
+    generatedFlags: Object.freeze([
+      ...(child.generatedFlags || []),
+      'display-scale',
+      'model-derived-appearance'
+    ]),
+    uncertainty: Object.freeze({
+      ...(child.uncertainty || {}),
+      appearance: 'Surface, atmosphere, cloud, and ring details are model-derived unless explicitly stated otherwise.'
+    })
+  });
+}
+
+const CHILD_DESTINATIONS = Object.freeze(CATALOG.flatMap((parent) =>
+  parent.objectClass === 'planetary_system'
+    ? parent.children.map((child) => makeChildDestination(parent, child))
+    : []
+));
+const ALL_DESTINATIONS = Object.freeze([...CATALOG, ...CHILD_DESTINATIONS]);
+const BY_ID = new Map(ALL_DESTINATIONS.map((item) => [item.id, item]));
+const BY_ADDRESS = new Map(ALL_DESTINATIONS.map((item) => [item.address, item]));
 
 function distanceLightYears(item) {
   const canonical = item?.canonicalPosition || {};
@@ -528,14 +557,25 @@ function resolveUniverseAddress(addressOrId) {
 }
 
 function getUniverseDestinations() {
-  return CATALOG.filter((item) => [
+  return ALL_DESTINATIONS.filter((item) => [
     'planetary_system',
+    'exoplanet',
     'nebula',
     'stellar_region',
     'galaxy',
     'galaxy_cluster',
     'black_hole'
   ].includes(item.objectClass));
+}
+
+function getUniverseFrame(destinationOrId) {
+  const destination = typeof destinationOrId === 'string'
+    ? resolveUniverseAddress(destinationOrId)
+    : destinationOrId;
+  if (!destination) return null;
+  return destination.objectClass === 'exoplanet'
+    ? BY_ID.get(destination.parentFrameId || destination.parentId) || null
+    : destination;
 }
 
 function getGalaxyEntryDestination(galaxyId) {
@@ -550,6 +590,7 @@ export {
   distanceLightYears,
   getGalaxyEntryDestination,
   getUniverseDestinations,
+  getUniverseFrame,
   icrsToCartesian,
   resolveUniverseAddress
 };
