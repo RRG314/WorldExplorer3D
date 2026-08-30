@@ -372,6 +372,9 @@ function disposeGameplayRuntimesForPublication(appCtx, publication, reason) {
   if (gameplayRuntimeMatchesPublication(appCtx.aviationRuntime, publication)) {
     appCtx.disposeAviationRuntime?.(reason);
   }
+  if (gameplayRuntimeMatchesPublication(appCtx.maritimeRuntime, publication)) {
+    appCtx.disposeMaritimeRuntime?.(reason);
+  }
   if (gameplayRuntimeMatchesPublication(appCtx.livingWorldRuntime, publication)) {
     appCtx.disposeLivingWorldRuntime?.(reason);
   }
@@ -451,6 +454,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   let livingWorld = null;
   let urbanSandbox = null;
   let aviation = null;
+  let maritime = null;
   let worldDiscovery = null;
   const startupIsCurrent = () => !!(
     worldSession?.isActive?.() &&
@@ -489,6 +493,16 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       request: worldSession?.request
     });
     if (!aviation) throw new Error('Aviation runtime did not start for the active publication.');
+    const maritimeModule = await import('../transport/maritime-runtime.js?v=8');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-maritime-startup');
+    }
+    maritime = maritimeModule.startMaritimeRuntime({
+      snapshot: publication,
+      request: worldSession?.request
+    });
+    if (!maritime) throw new Error('Maritime runtime did not start for the active publication.');
     const worldDiscoveryModule = await import('../discovery/runtime.js?v=27');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
@@ -524,8 +538,8 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   }
   if (runtimeState) {
     runtimeState.gameplayRuntimesReady = !!(
-      livingWorld && urbanSandbox && aviation && worldDiscovery &&
-      appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.aviationRuntime && appCtx.worldDiscoveryRuntime
+      livingWorld && urbanSandbox && aviation && maritime && worldDiscovery &&
+      appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.aviationRuntime && appCtx.maritimeRuntime && appCtx.worldDiscoveryRuntime
     );
     runtimeState.gameplayRuntimeDurationMs = Math.round(performance.now() - gameplayRuntimeStartedAt);
     runtimeState.updatedAt = performance.now();

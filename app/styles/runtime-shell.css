@@ -61,6 +61,7 @@
 @media(hover:none),(pointer:coarse){#interiorPrompt{top:max(112px,calc(env(safe-area-inset-top) + 102px));bottom:auto}#interiorPrompt.show{pointer-events:auto;cursor:pointer;min-height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;touch-action:manipulation}}
 #boatPrompt{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);display:none;max-width:min(82vw,480px);padding:10px 14px;border-radius:999px;background:rgba(8,47,73,0.92);border:1px solid rgba(125,211,252,0.5);color:#e0f2fe;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.2px;z-index:141;box-shadow:0 12px 28px rgba(8,47,73,0.28);backdrop-filter:blur(8px);pointer-events:none}
 #boatPrompt.show{display:block}
+body:has(#urbanVehiclePrompt.show) #boatPrompt{display:none!important}
 body.game-panel-layer-open #urbanVehiclePrompt,
 body.game-panel-layer-open #interiorPrompt,
 body.game-panel-layer-open #boatPrompt,
@@ -893,7 +894,8 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
 #roomChatToggleBtn.on{background:#16a34a;color:#fff}
 
 @media (max-width: 768px){
-  #boatWaveDock{bottom:max(90px,calc(env(safe-area-inset-bottom) + 88px));min-width:calc(100vw - 20px);max-width:calc(100vw - 20px);box-sizing:border-box}
+  #boatWaveDock{display:none!important}
+  #boatPrompt{bottom:max(90px,calc(env(safe-area-inset-bottom) + 88px));max-width:calc(100vw - 20px);box-sizing:border-box}
   #memoryComposer{left:10px;right:10px;bottom:12px;width:auto}
   #memoryInfoPanel{left:10px;right:10px;top:72px;width:auto}
   #editorPanel{left:10px;right:10px;top:72px;width:auto;max-height:calc(100dvh - 84px)}

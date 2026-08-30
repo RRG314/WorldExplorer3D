@@ -1,4 +1,5 @@
 import { clamp, normalizeAngle } from "./dynamics.js?v=1";
+import { getMaritimeCatalogEntry } from '../transport/maritime-catalog.js?v=1';
 
 export function createBoatRuntimeDynamics(deps = {}) {
   const {
@@ -16,7 +17,8 @@ export function createBoatRuntimeDynamics(deps = {}) {
     updateBoatLodBias,
     updateBoatMesh,
     updateBoatWaterPatch,
-    syncOpenOceanSurfaceLayers
+    syncOpenOceanSurfaceLayers,
+    onBoatImpact
   } = deps;
 
   return function updateBoatMode(dt) {
@@ -28,6 +30,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
       return true;
     }
     const cfg = getSeaStateConfig();
+    const catalog = getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
     const profile = getBoatWaveProfile(appCtx.boatMode.currentWater || null);
     const fishingLocked = !!appCtx.fishingGame?.active;
     const actions = appCtx.readControlActions?.('boat') || {};
@@ -58,7 +61,9 @@ export function createBoatRuntimeDynamics(deps = {}) {
     const throttleTarget = throttleInput > 0.05 ? throttleInput : reverseInput > 0.05 ? -0.58 * reverseInput : 0;
     appCtx.boat.throttle += (throttleTarget - appCtx.boat.throttle) * clamp(dt * 3.6, 0.06, 0.24);
 
-    const maxForwardSpeed = Math.max(1, cfg.speedMax || 1);
+    const metersPerWorldUnit = Math.max(.01, Number(appCtx.METERS_PER_WORLD_UNIT) || 1);
+    const seaSpeedFactor = clamp(1 - Number(profile.intensity || 0) * .18, .76, 1);
+    const maxForwardSpeed = Math.max(1, Number(catalog.performance.topSpeed) / 1.943844 / metersPerWorldUnit * seaSpeedFactor);
     const speedNorm = clamp(Math.abs(appCtx.boat.forwardSpeed) / maxForwardSpeed, 0, 1.4);
     const waveDirX = Number.isFinite(appCtx.boatMode.waveDirectionX) ? appCtx.boatMode.waveDirectionX : Math.sin(appCtx.boat.angle);
     const waveDirZ = Number.isFinite(appCtx.boatMode.waveDirectionZ) ? appCtx.boatMode.waveDirectionZ : Math.cos(appCtx.boat.angle);
@@ -66,8 +71,8 @@ export function createBoatRuntimeDynamics(deps = {}) {
     const headSea = clamp(-forwardDotWave, 0, 1);
     const followingSea = clamp(forwardDotWave, 0, 1);
     const driveAccel = appCtx.boat.throttle >= 0 ?
-      appCtx.boat.throttle * cfg.accel * (1 - speedNorm * 0.14) :
-      appCtx.boat.throttle * cfg.accel * 0.68;
+      appCtx.boat.throttle * cfg.accel * catalog.performance.accelerationScale * (1 - speedNorm * 0.14) :
+      appCtx.boat.throttle * cfg.accel * catalog.performance.accelerationScale * 0.68;
     const hullDrag =
       (0.26 + profile.intensity * 0.22 + headSea * 0.12) *
       appCtx.boat.forwardSpeed * Math.abs(appCtx.boat.forwardSpeed) /
@@ -89,7 +94,8 @@ export function createBoatRuntimeDynamics(deps = {}) {
     appCtx.boat.lateralSpeed = clamp(appCtx.boat.lateralSpeed, -maxForwardSpeed * 0.18, maxForwardSpeed * 0.18);
 
     const steerAuthority = clamp(0.12 + Math.abs(appCtx.boat.forwardSpeed) / maxForwardSpeed * 1.12, 0.12, 1.24);
-    const desiredTurn = steerInput * (0.2 + steerAuthority * 1.12) * (1 - profile.intensity * 0.04);
+    const turningScale = clamp(10 / Math.max(1, catalog.performance.turningRadius), .12, 1.5);
+    const desiredTurn = steerInput * (0.2 + steerAuthority * 1.12) * catalog.performance.steeringScale * turningScale * (1 - profile.intensity * 0.04);
     const turnBlend = clamp(dt * (2.2 + steerAuthority * 1.6 + Math.abs(appCtx.boat.lateralSpeed) * 0.08), 0.04, 0.26);
     appCtx.boat.turnRate += (desiredTurn - appCtx.boat.turnRate) * turnBlend;
     appCtx.boat.turnRate -= appCtx.boat.lateralSpeed * 0.008 * dt;
@@ -118,12 +124,35 @@ export function createBoatRuntimeDynamics(deps = {}) {
     let nextZ = appCtx.boat.z + appCtx.boat.vz * dt;
     const currentWater = appCtx.boatMode.currentWater || null;
     const syntheticTraversal = currentWater?.synthetic === true || currentWater?.source?.synthetic === true;
-    const nextCandidate = findNearestBoatCandidate(nextX, nextZ, 24, {
+    let nextCandidate = findNearestBoatCandidate(nextX, nextZ, 24, {
       allowSynthetic: syntheticTraversal,
       syntheticCandidate: currentWater,
       waterKind: currentWater?.source?.waterKind || currentWater?.waterKind || 'open_ocean'
     });
+    if (nextCandidate && currentWater?.synthetic !== true && currentWater?.source?.synthetic !== true) {
+      const halfLength = catalog.dimensions.length * .44;
+      const halfWidth = catalog.dimensions.width * .44;
+      const forwardX = Math.sin(appCtx.boat.angle);
+      const forwardZ = Math.cos(appCtx.boat.angle);
+      const rightX = Math.cos(appCtx.boat.angle);
+      const rightZ = -Math.sin(appCtx.boat.angle);
+      const includeWaterways = catalog.dimensions.length < 32;
+      const edgeBuffer = Math.max(1.2, Math.min(8, catalog.dimensions.width * .08));
+      const footprintSamples = [
+        [0, 0], [0, halfLength], [0, -halfLength],
+        [halfWidth, halfLength * .72], [-halfWidth, halfLength * .72],
+        [halfWidth, -halfLength * .72], [-halfWidth, -halfLength * .72]
+      ];
+      const footprintFits = footprintSamples.every(([right, forward]) => appCtx.isPointInsideWaterFootprint?.(
+        nextX + rightX * right + forwardX * forward,
+        nextZ + rightZ * right + forwardZ * forward,
+        { includeWaterways, edgeBuffer }
+      ) === true);
+      if (!footprintFits) nextCandidate = null;
+    }
     if (!nextCandidate) {
+      const impactSpeed = Math.hypot(Number(appCtx.boat.vx) || 0, Number(appCtx.boat.vz) || 0);
+      if (impactSpeed > 1.8) onBoatImpact?.(impactSpeed, { catalog, reason: 'shoreline' });
       appCtx.boat.speed *= 0.45;
       appCtx.boat.forwardSpeed *= 0.45;
       appCtx.boat.lateralSpeed *= 0.42;

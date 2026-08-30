@@ -47,6 +47,11 @@ async function transferBoatToSubmarine(options = {}) {
   }
 
   captureEarthWorldSession();
+  appCtx.boatMode.oceanTransferVessel = Object.freeze({
+    transportEntityId: String(appCtx.boatMode.transportEntityId || ''),
+    transportCatalogId: String(appCtx.boatMode.transportCatalogId || 'marina-runabout'),
+    condition: Number(appCtx.boatMode.condition ?? 1)
+  });
   setPromptSignature('boat_to_submarine_transfer');
   showBoatPrompt('Diving underwater…', 'supported', promptDurationMs);
 
@@ -85,6 +90,7 @@ async function transferSubmarineToBoat(options = {}) {
   const lat = launchSite.lat - sub.position.z / appCtx.SCALE;
   const lon = launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
   const customName = `${launchSite.name || 'Ocean Site'} Surface`;
+  const transferVessel = appCtx.boatMode?.oceanTransferVessel || null;
   const customLatInput = document.getElementById('customLat');
   const customLonInput = document.getElementById('customLon');
   if (customLatInput) customLatInput.value = lat.toFixed(6);
@@ -114,6 +120,7 @@ async function transferSubmarineToBoat(options = {}) {
       });
     }
     if (appCtx.boatMode?.active) {
+      appCtx.boatMode.oceanTransferVessel = null;
       if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
       return true;
     }
@@ -138,7 +145,10 @@ async function transferSubmarineToBoat(options = {}) {
         candidate,
         allowSynthetic: true,
         waterKind: candidate.waterKind || 'open_ocean',
-        entryMode: 'walk'
+        entryMode: 'walk',
+        transportEntityId: transferVessel?.transportEntityId,
+        transportCatalogId: transferVessel?.transportCatalogId,
+        condition: transferVessel?.condition
       }) :
       startBoatMode({
         source: options.source || 'submarine_transfer',
@@ -148,9 +158,14 @@ async function transferSubmarineToBoat(options = {}) {
         candidate,
         allowSynthetic: true,
         waterKind: candidate.waterKind || 'open_ocean',
-        entryMode: 'walk'
+        entryMode: 'walk',
+        transportEntityId: transferVessel?.transportEntityId,
+        transportCatalogId: transferVessel?.transportCatalogId,
+        condition: transferVessel?.condition
       });
-    return resolved === 'boat' || resolved === true;
+    const surfaced = resolved === 'boat' || resolved === true;
+    if (surfaced) appCtx.boatMode.oceanTransferVessel = null;
+    return surfaced;
   } catch (error) {
     console.warn('[BoatMode] submarine transfer failed', error);
     setPromptSignature('submarine_transfer_error');

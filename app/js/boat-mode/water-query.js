@@ -444,6 +444,10 @@ function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANC
 function getBoatModeSnapshot() {
   return {
     active: !!appCtx.boatMode?.active,
+    transportEntityId: String(appCtx.boatMode?.transportEntityId || ''),
+    transportCatalogId: String(appCtx.boatMode?.transportCatalogId || 'marina-runabout'),
+    vesselLabel: String(appCtx.boatMode?.vesselLabel || 'Marina runabout'),
+    condition: Number(appCtx.boatMode?.condition ?? 1),
     available: !!appCtx.boatMode?.available,
     seaState: appCtx.boatMode?.seaState || 'moderate',
     waveIntensity: getWaveIntensity(),

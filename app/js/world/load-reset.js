@@ -60,6 +60,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.disposeEditableWorldPresentation?.();
   appCtx.disposeUrbanSandboxRuntime?.('world_reload');
   appCtx.disposeAviationRuntime?.('world_reload');
+  appCtx.disposeMaritimeRuntime?.('world_reload');
   appCtx.transportFacilityVisual?.dispose?.();
   appCtx.transportFacilityVisual = null;
   appCtx.transportFacilityGraph = null;

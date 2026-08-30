@@ -1,6 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { transportDamagePresentation } from './damage-model.js?v=1';
 import { getAviationCatalogEntry } from './aviation-catalog.js?v=2';
+import { getMaritimeCatalogEntry } from './maritime-catalog.js?v=1';
 
 function finite(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
@@ -78,10 +79,14 @@ function activeTransportActor() {
     });
   }
   if (mode === 'boat') {
+    const catalog = getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
     return actorRecord(mode, appCtx.boat, {
-      bounds: { radius: 3.2, height: 2.2 },
+      bounds: { radius: Math.max(catalog.dimensions.width, catalog.dimensions.length) * .5, height: catalog.dimensions.height },
       grounded: false,
-      contactKind: appCtx.boatMode?.waterKind || 'water'
+      contactKind: appCtx.boatMode?.waterKind || 'water',
+      entityId: appCtx.boatMode?.transportEntityId,
+      catalogId: catalog.id,
+      durabilityPolicy: catalog.damage.durabilityPolicy
     });
   }
   if (mode === 'plane') {

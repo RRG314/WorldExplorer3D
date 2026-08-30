@@ -285,7 +285,10 @@ function setTravelMode(mode, options = {}) {
         spawnZ: Number.isFinite(options.spawnZ) ? options.spawnZ : undefined,
         yaw: Number.isFinite(options.yaw) ? options.yaw : undefined,
         candidate: options.candidate || undefined,
-        entryMode: options.entryMode || undefined
+        entryMode: options.entryMode || undefined,
+        transportEntityId: options.transportEntityId || undefined,
+        transportCatalogId: options.transportCatalogId || undefined,
+        condition: Number.isFinite(options.condition) ? options.condition : undefined
       });
       if (!started) {
         return syncTravelModeButtons();
