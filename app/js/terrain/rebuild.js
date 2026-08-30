@@ -72,9 +72,18 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   }
 }
 
+export function shouldRenderRoadCenterMarkings(road) {
+  if (!/(motorway|trunk|primary)/.test(String(road?.type || ""))) return false;
+  // Elevated ribbons and their engineered bodies are compiled by separate
+  // owners. Until those meshes share one published top surface, lane quads can
+  // remain visible when the body is occluded and read as white bars in midair.
+  // Keep all at-grade markings unchanged and omit only elevated markings.
+  return road?.structureSemantics?.terrainMode !== 'elevated';
+}
+
 function appendRoadCenterMarkings(road, points, targetVerts, targetIndices, widthSamplesMeters = null) {
   if (
-    !/(motorway|trunk|primary)/.test(String(road?.type || "")) ||
+    !shouldRenderRoadCenterMarkings(road) ||
     !Array.isArray(points) ||
     points.length < 2
   ) return;

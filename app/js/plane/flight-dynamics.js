@@ -7,7 +7,17 @@ function clamp(value, min, max) {
 function applyAircraftHeadingTurn(yaw, leftPositiveTurnRate, dt) {
   const heading = Number(yaw) || 0;
   const turnRate = Number(leftPositiveTurnRate) || 0;
-  return heading - turnRate * clamp(dt, 0, .25);
+  // Preserve the established World Explorer aircraft convention from 4.3:
+  // positive bank/turn input advances positive world yaw. The aircraft mesh,
+  // chase camera, and movement vector were authored around that convention.
+  return heading + turnRate * clamp(dt, 0, .25);
+}
+
+function classicAircraftBankTurnRate(roll, rollRate, speed) {
+  const controlAuthority = clamp((Number(speed) || 0) / 20, .3, 1.25);
+  const aerobaticBlend = clamp(Math.abs(Number(rollRate) || 0) / .72, 0, 1);
+  const bankTurnFactor = Math.sin(Number(roll) || 0) * (1 - aerobaticBlend);
+  return bankTurnFactor * (.55 + controlAuthority * .58);
 }
 
 function resolveAircraftFlightTuning(catalog = {}) {
@@ -106,6 +116,7 @@ function integrateFixedWingFlight(state = {}, input = {}, catalog = {}, dt = 0) 
 export {
   GRAVITY_MPS2,
   applyAircraftHeadingTurn,
+  classicAircraftBankTurnRate,
   integrateFixedWingFlight,
   resolveAircraftFlightTuning
 };

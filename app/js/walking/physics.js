@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=5";
+import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=6";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';

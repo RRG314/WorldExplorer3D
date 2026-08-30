@@ -1,7 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
-import { applyAircraftHeadingTurn, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=3';
+import { applyAircraftHeadingTurn, classicAircraftBankTurnRate, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=4';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
 import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=4';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=10';
@@ -511,8 +511,6 @@ function updatePlane(dt) {
   const groundY = samplePlaneSurface(dt);
   if (catalog.aircraftKind === 'rotorcraft') {
     const forwardCommand = -pitchInput;
-    // Control input defines positive turn as left, while positive world yaw
-    // points right. Keep that convention consistent for every aircraft.
     state.yaw = applyAircraftHeadingTurn(
       state.yaw,
       rollInput * 1.15 * catalog.performance.steeringScale,
@@ -549,10 +547,13 @@ function updatePlane(dt) {
     state.roll = damp(state.roll, 0, 6, dt);
     state.pitchRate = 0;
     state.rollRate = 0;
-    const steerScale = clamp(state.speed / Math.max(8, catalog.performance.turningRadius), 0.2, 1);
+    const classicPlayerControls = catalog.id === 'personal-prop';
+    const steerScale = classicPlayerControls
+      ? clamp(state.speed / 12, 0.3, 1)
+      : clamp(state.speed / Math.max(8, catalog.performance.turningRadius), 0.2, 1);
     state.yaw = applyAircraftHeadingTurn(
       state.yaw,
-      rollInput * 1.02 * steerScale * catalog.performance.steeringScale,
+      rollInput * 1.02 * steerScale * (classicPlayerControls ? 1 : catalog.performance.steeringScale),
       dt
     );
     state.y = damp(state.y, groundY + groundOffset, 12, dt);
@@ -568,12 +569,17 @@ function updatePlane(dt) {
     state.turnRate = 0;
     state.stalled = false;
   } else {
-    const controlAuthority = clamp(state.speed / Math.max(10, flightTuning.stallSpeed * 1.2), 0.28, 1.15) * catalog.performance.steeringScale;
-    const stallBlend = clamp((flightTuning.stallSpeed - state.speed) / Math.max(4, flightTuning.stallSpeed * .35), 0, 1);
+    const classicPlayerControls = catalog.id === 'personal-prop';
+    const controlAuthority = classicPlayerControls
+      ? clamp(state.speed / 20, 0.3, 1.25)
+      : clamp(state.speed / Math.max(10, flightTuning.stallSpeed * 1.2), 0.28, 1.15) * catalog.performance.steeringScale;
+    const stallBlend = classicPlayerControls
+      ? clamp((13 - state.speed) / 5, 0, 1)
+      : clamp((flightTuning.stallSpeed - state.speed) / Math.max(4, flightTuning.stallSpeed * .35), 0, 1);
     const previousRoll = state.roll;
     const attitude = integrateAerobaticAttitude(state, {
-      pitch: pitchInput * flightTuning.pitchControl,
-      roll: (Math.abs(aerobaticRollInput) > 0.05 ? aerobaticRollInput : rollInput) * flightTuning.rollControl,
+      pitch: pitchInput * (classicPlayerControls ? 1 : flightTuning.pitchControl),
+      roll: (Math.abs(aerobaticRollInput) > 0.05 ? aerobaticRollInput : rollInput) * (classicPlayerControls ? 1 : flightTuning.rollControl),
       aerobaticRoll: aerobaticRollInput,
       authority: controlAuthority,
       stallBlend
@@ -610,9 +616,11 @@ function updatePlane(dt) {
     state.flightPathAngle = flight.flightPathAngle;
     state.angleOfAttack = flight.angleOfAttack;
     state.liftLoad = flight.liftLoad;
-    state.turnRate = Math.abs(aerobaticRollInput) > .05
-      ? aircraftBankTurnFactor(state.roll, state.rollRate) * .18
-      : flight.turnRate;
+    state.turnRate = classicPlayerControls
+      ? classicAircraftBankTurnRate(state.roll, state.rollRate, state.speed)
+      : Math.abs(aerobaticRollInput) > .05
+        ? aircraftBankTurnFactor(state.roll, state.rollRate) * .18
+        : flight.turnRate;
     state.stalled = flight.stalled;
     state.yaw = applyAircraftHeadingTurn(state.yaw, state.turnRate, dt);
     state.y += state.climbRate * dt;
