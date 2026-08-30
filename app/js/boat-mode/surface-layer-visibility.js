@@ -1,3 +1,14 @@
+const OPEN_OCEAN_SHORE_VISIBILITY_METERS = 1600;
+
+function shouldSuppressOpenOceanSurfaceLayers(input = {}) {
+  if (input.forceInactive === true || input.active !== true) return false;
+  if (String(input.waterKind || '').toLowerCase() !== 'open_ocean') return false;
+  const shorelineDistance = Number(input.shorelineDistance);
+  // Unknown distance must keep land visible. Hiding a real coast is a worse
+  // failure than drawing distant terrain behind an open-water scene.
+  return Number.isFinite(shorelineDistance) && shorelineDistance > OPEN_OCEAN_SHORE_VISIBILITY_METERS;
+}
+
 function createSurfaceLayerSuppression(resolveLayers = () => []) {
   const previousVisibility = new Map();
 
@@ -21,4 +32,8 @@ function createSurfaceLayerSuppression(resolveLayers = () => []) {
   });
 }
 
-export { createSurfaceLayerSuppression };
+export {
+  OPEN_OCEAN_SHORE_VISIBILITY_METERS,
+  createSurfaceLayerSuppression,
+  shouldSuppressOpenOceanSurfaceLayers
+};

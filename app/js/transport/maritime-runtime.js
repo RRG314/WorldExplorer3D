@@ -22,6 +22,31 @@ function recordYaw(record) {
   return Math.atan2(last.x - first.x, last.z - first.z);
 }
 
+function mappedVesselRadius(mesh) {
+  const points = mesh?.userData?.buildingFootprint || [];
+  const center = mesh?.userData?.lodCenter;
+  if (!center || !Array.isArray(points) || points.length < 3) return 12;
+  return points.reduce((radius, point) => Math.max(
+    radius,
+    Math.hypot(Number(point?.x) - Number(center.x), Number(point?.z) - Number(center.z))
+  ), 0) || 12;
+}
+
+function vesselPlacementConflictsWithMappedShip(x, z, catalog, mappedMeshes = appCtx.buildingMeshes || []) {
+  if (![x, z].every(Number.isFinite) || !catalog?.dimensions) return false;
+  const generatedRadius = Math.max(
+    Number(catalog.dimensions.width || 0),
+    Number(catalog.dimensions.length || 0) * .52
+  );
+  return (mappedMeshes || []).some((mesh) => {
+    if (!mesh?.userData?.isMappedVessel) return false;
+    const center = mesh.userData.lodCenter;
+    if (![center?.x, center?.z].every(Number.isFinite)) return false;
+    const clearance = generatedRadius + mappedVesselRadius(mesh) + 12;
+    return Math.hypot(x - Number(center.x), z - Number(center.z)) < clearance;
+  });
+}
+
 function maritimeAnchors(graph) {
   const priority = ['marina', 'pier', 'ferry_terminal', 'quay', 'dock', 'berth', 'port', 'harbour', 'mooring', 'ferry_route'];
   return (graph?.byDomain?.maritime || [])
@@ -41,6 +66,7 @@ function preferredAnchor(anchors, catalog, index) {
 }
 
 function vesselFootprintFitsWater(x, z, yaw, catalog) {
+  if (vesselPlacementConflictsWithMappedShip(x, z, catalog)) return false;
   const halfLength = catalog.dimensions.length * .44;
   const halfWidth = catalog.dimensions.width * .44;
   const forwardX = Math.sin(yaw);
@@ -187,6 +213,35 @@ function nearestVessel(runtime) {
     .sort((left, right) => left.distance - right.distance)[0] || null;
 }
 
+function mappedVesselRecords() {
+  return (appCtx.buildingMeshes || []).filter((mesh) => mesh?.userData?.isMappedVessel)
+    .map((mesh, index) => {
+      const center = mesh.userData.lodCenter;
+      if (![center?.x, center?.z].every(Number.isFinite)) return null;
+      return Object.freeze({
+        id: `mapped-vessel:${mesh.userData.vesselName || index}`,
+        label: String(mesh.userData.vesselLabel || mesh.userData.vesselName || 'Mapped vessel'),
+        name: String(mesh.userData.vesselName || ''),
+        typeId: String(mesh.userData.vesselType || 'ship'),
+        typeLabel: String(mesh.userData.vesselTypeLabel || 'Mapped vessel'),
+        x: Number(center.x),
+        z: Number(center.z),
+        radius: mappedVesselRadius(mesh)
+      });
+    }).filter(Boolean);
+}
+
+function nearestMappedVessel(runtime) {
+  if (appCtx.boatMode?.active) return null;
+  const actor = actorPosition();
+  if (!actor) return null;
+  return (runtime.mappedVessels || []).map((vessel) => ({
+    vessel,
+    distance: Math.hypot(vessel.x - actor.x, vessel.z - actor.z)
+  })).filter(({ vessel, distance }) => distance <= Math.max(20, vessel.radius + 12))
+    .sort((left, right) => left.distance - right.distance)[0] || null;
+}
+
 function interactionCandidate(runtime) {
   if (!runtimeMatches(runtime) || appCtx.getEnv?.() !== 'EARTH' || appCtx.worldLoading || appCtx.activeInterior) return null;
   if (appCtx.boatMode?.active && runtime.activeVessel) {
@@ -200,14 +255,25 @@ function interactionCandidate(runtime) {
     };
   }
   const nearest = nearestVessel(runtime);
-  if (!nearest) return null;
+  if (nearest) {
+    return {
+      available: true,
+      action: 'enter_vessel',
+      label: `Pilot ${nearest.vessel.catalog.label}`,
+      detail: `Ready near the local ${String(nearest.vessel.anchorFacilityType || 'waterfront').replaceAll('_', ' ')}`,
+      distance: nearest.distance,
+      data: { vesselId: nearest.vessel.id }
+    };
+  }
+  const mapped = nearestMappedVessel(runtime);
+  if (!mapped) return null;
   return {
     available: true,
-    action: 'enter_vessel',
-    label: `Pilot ${nearest.vessel.catalog.label}`,
-    detail: `Ready near the local ${String(nearest.vessel.anchorFacilityType || 'waterfront').replaceAll('_', ' ')}`,
-    distance: nearest.distance,
-    data: { vesselId: nearest.vessel.id }
+    action: 'inspect_mapped_vessel',
+    label: `View ${mapped.vessel.name || mapped.vessel.typeLabel}`,
+    detail: mapped.vessel.typeLabel,
+    distance: mapped.distance,
+    data: { vesselId: mapped.vessel.id }
   };
 }
 
@@ -258,6 +324,12 @@ function performInteraction(runtime, candidate) {
   if (candidate?.action === 'enter_vessel') {
     return enterVessel(runtime, runtime.vessels.find(({ id }) => id === candidate.data?.vesselId));
   }
+  if (candidate?.action === 'inspect_mapped_vessel') {
+    const vessel = runtime.mappedVessels.find(({ id }) => id === candidate.data?.vesselId);
+    if (!vessel) return false;
+    appCtx.showToast?.(vessel.label);
+    return true;
+  }
   if (candidate?.action !== 'exit_vessel') return false;
   if (appCtx.canExitBoatMode?.('walk', { source: 'boat_prompt_exit', showNotice: true }) !== true) return true;
   appCtx.setTravelMode?.('walk', { source: 'boat_prompt_exit', force: true });
@@ -293,12 +365,14 @@ function startMaritimeRuntime(options = {}) {
     group.add(visual.root);
     return vessel;
   });
+  const mappedVessels = mappedVesselRecords();
   appCtx.addEarthWorldObject?.(group);
   const runtime = {
     requestId: String(publication.requestId || ''),
     sequence: Number(publication.sequence),
     group,
     vessels,
+    mappedVessels,
     activeVessel: null,
     systemId: `maritime-runtime:${publication.sequence}`,
     reason: ''
@@ -331,6 +405,8 @@ function startMaritimeRuntime(options = {}) {
     playableCount: runtime.vessels.filter(({ catalog }) => catalog.playable && catalog.enterable).length,
     generatedActivityCount: runtime.vessels.filter(({ generatedActivity }) => generatedActivity).length,
     mappedAnchorCount: new Set(runtime.vessels.map(({ anchorFacilityId }) => anchorFacilityId)).size,
+    mappedVesselCount: runtime.mappedVessels.length,
+    mappedVessels: Object.freeze(runtime.mappedVessels),
     activeVesselId: runtime.activeVessel?.id || '',
     activeBoat: appCtx.getBoatModeSnapshot?.() || null,
     catalogIds: Object.freeze(runtime.vessels.map(({ catalog }) => catalog.id)),
@@ -365,6 +441,22 @@ function startMaritimeRuntime(options = {}) {
         appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
         return true;
       },
+      moveNearMapped(vesselId = runtime.mappedVessels[0]?.id) {
+        const vessel = runtime.mappedVessels.find(({ id }) => id === String(vesselId));
+        const walker = appCtx.Walk?.state?.walker;
+        if (!vessel || !walker) return false;
+        const distance = vessel.radius + 7;
+        walker.x = vessel.x + distance;
+        walker.z = vessel.z;
+        walker.y = Number(appCtx.GroundHeight?.walkSurfaceY?.(walker.x, walker.z)) || 1.7;
+        walker.angle = Math.atan2(vessel.x - walker.x, vessel.z - walker.z);
+        walker.yaw = walker.angle;
+        walker.vy = 0;
+        walker.onGround = true;
+        walker._resolvedGroundState = null;
+        appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
+        return true;
+      },
       snapshot: runtime.snapshot
     });
     globalThis.__WE3D_MARITIME_SUPPORT__ = runtime.supportHook;
@@ -380,4 +472,9 @@ Object.assign(appCtx, {
   startMaritimeRuntime
 });
 
-export { derivedFleet, disposeMaritimeRuntime, startMaritimeRuntime };
+export {
+  derivedFleet,
+  disposeMaritimeRuntime,
+  startMaritimeRuntime,
+  vesselPlacementConflictsWithMappedShip
+};

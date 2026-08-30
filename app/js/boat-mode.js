@@ -40,7 +40,10 @@ import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boa
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=12";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=3";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=3";
-import { createSurfaceLayerSuppression } from './boat-mode/surface-layer-visibility.js?v=1';
+import {
+  createSurfaceLayerSuppression,
+  shouldSuppressOpenOceanSurfaceLayers
+} from './boat-mode/surface-layer-visibility.js?v=2';
 import { getMaritimeCatalogEntry } from './transport/maritime-catalog.js?v=1';
 import { applyTransportDamage, transportDamagePresentation } from './transport/damage-model.js?v=1';
 import { updateVesselVisual } from './transport/vessel-visual-recipe.js?v=6';
@@ -74,9 +77,20 @@ const openOceanSurfaceSuppression = createSurfaceLayerSuppression(() => [
 ]);
 
 function syncOpenOceanSurfaceLayers(forceInactive = false) {
-  const openOcean = !forceInactive && appCtx.boatMode?.active && String(appCtx.boatMode?.waterKind || '').toLowerCase() === 'open_ocean';
-  openOceanSurfaceSuppression.setActive(openOcean);
-  appCtx.boatMode.openOceanSurfaceSuppression = openOceanSurfaceSuppression.snapshot();
+  const suppress = shouldSuppressOpenOceanSurfaceLayers({
+    active: appCtx.boatMode?.active,
+    forceInactive,
+    waterKind: appCtx.boatMode?.waterKind,
+    shorelineDistance: appCtx.boatMode?.shorelineDistance
+  });
+  openOceanSurfaceSuppression.setActive(suppress);
+  appCtx.boatMode.openOceanSurfaceSuppression = Object.freeze({
+    ...openOceanSurfaceSuppression.snapshot(),
+    shorelineDistance: Number.isFinite(Number(appCtx.boatMode?.shorelineDistance))
+      ? Number(appCtx.boatMode.shorelineDistance)
+      : null,
+    shoreVisible: !suppress
+  });
 }
 
 function resetBoatDynamics() {

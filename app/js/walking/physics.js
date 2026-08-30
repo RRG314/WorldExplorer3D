@@ -84,6 +84,12 @@ function createWalkingPhysicsHelpers({
     return buildingBaseYAt(b, x, z) + Math.max(0, Number(b?.height) || 0);
   }
 
+  function walkerIsAtOrAboveRoof(building, walkerFeetY, tolerance = 1) {
+    if (!building || !Number.isFinite(walkerFeetY)) return false;
+    const roofY = buildingRoofYAt(building, state.walker.x, state.walker.z);
+    return Number.isFinite(roofY) && walkerFeetY >= roofY - Math.max(0.12, tolerance);
+  }
+
   function findNearestWall(x, z) {
     const allBuildings = queryBuildings(x, z, CFG.wallDetectRadius + 12);
     if (!allBuildings || allBuildings.length === 0) return null;
@@ -434,7 +440,15 @@ function createWalkingPhysicsHelpers({
           if (sharedBuildingCollision) {
             const collision = sharedBuildingCollision(px, pz, sampleRadius, {
               actorBaseY: walkerFeetY,
-              actorHeight: CFG.eyeHeight * 0.95
+              actorHeight: CFG.eyeHeight * 0.95,
+              // The building collider owns walls, while the walking surface
+              // query owns a roof beneath the actor's feet. Once the walker
+              // has reached that roof, the same solid must not block every
+              // horizontal step across it.
+              acceptCollision: (candidate) => !walkerIsAtOrAboveRoof(
+                candidate?.building,
+                walkerFeetY
+              )
             });
             if (collision?.collision) return true;
           }

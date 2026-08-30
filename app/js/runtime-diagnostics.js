@@ -1092,6 +1092,57 @@ function getWorldExplorerRuntimeDiagnostics() {
 }
 
 globalThis.getWorldExplorerRuntimeDiagnostics = getWorldExplorerRuntimeDiagnostics;
+if (developerDiagnosticsEnabled) {
+  const roofCandidates = () => {
+    const actor = appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 };
+    return (appCtx.buildings || []).filter((building) => {
+      const minY = Number(building?.minY ?? building?.baseY);
+      const maxY = Number(building?.maxY ?? (minY + Number(building?.height)));
+      const width = Number(building?.maxX) - Number(building?.minX);
+      const depth = Number(building?.maxZ) - Number(building?.minZ);
+      return !building?.collisionDisabled && building?.allowsPassageBelow !== true &&
+        building?.collisionKind !== 'barrier' && Number.isFinite(minY) && Number.isFinite(maxY) &&
+        maxY - minY >= 3 && width >= 7 && depth >= 7;
+    }).map((building, index) => ({
+      id: String(building.sourceBuildingId || `roof:${index}`),
+      x: Number(building.centerX ?? (building.minX + building.maxX) * .5),
+      z: Number(building.centerZ ?? (building.minZ + building.maxZ) * .5),
+      roofY: Number(building.maxY ?? (Number(building.baseY) + Number(building.height))),
+      width: Number(building.maxX) - Number(building.minX),
+      depth: Number(building.maxZ) - Number(building.minZ),
+      distance: Math.hypot(Number(building.centerX || 0) - Number(actor.x || 0), Number(building.centerZ || 0) - Number(actor.z || 0))
+    })).filter((roof) => [roof.x, roof.z, roof.roofY].every(Number.isFinite))
+      .sort((left, right) => left.distance - right.distance);
+  };
+  globalThis.__WE3D_ROOF_SUPPORT__ = Object.freeze({
+    list: () => roofCandidates().slice(0, 24),
+    landOn(roofId) {
+      const roof = roofCandidates().find(({ id }) => id === String(roofId)) || roofCandidates()[0];
+      const walker = appCtx.Walk?.state?.walker;
+      if (!roof || !walker) return false;
+      appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
+      walker.x = roof.x;
+      walker.z = roof.z;
+      walker.y = roof.roofY + Number(appCtx.Walk?.CFG?.eyeHeight || 1.7) + 10;
+      walker.vy = -3;
+      walker.onGround = false;
+      walker.onBuilding = false;
+      walker._resolvedGroundState = null;
+      walker.angle = 0;
+      walker.yaw = 0;
+      return roof;
+    },
+    snapshot: () => {
+      const walker = appCtx.Walk?.state?.walker;
+      return walker ? {
+        x: Number(walker.x), y: Number(walker.y), z: Number(walker.z),
+        onGround: walker.onGround === true,
+        onBuilding: walker.onBuilding === true,
+        vy: Number(walker.vy || 0)
+      } : null;
+    }
+  });
+}
 globalThis.render_game_to_text = () => JSON.stringify({
   developerDiagnostics: {
     enabled: developerDiagnosticsEnabled,

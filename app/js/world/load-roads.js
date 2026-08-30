@@ -7,7 +7,7 @@ import {
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=88";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=26";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=15";
