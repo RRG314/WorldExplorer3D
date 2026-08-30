@@ -110,11 +110,17 @@ function compileSupportColumns(
   const internalOffset = Math.max(1.2, Math.min(width * 0.38, width * 0.5 - pierWidth * 0.62));
   const externalOffset = width * 0.5 + pierWidth * 0.78;
   const remoteOffset = width * 0.5 + pierWidth + 4.5;
+  const farRemoteOffset = width * 0.5 + pierWidth + Math.max(12, width);
+  const outerRemoteOffset = width * 0.5 + pierWidth + Math.max(22, width * 1.8);
   const layouts = (width >= 8
     ? [[-internalOffset, internalOffset], [-externalOffset, externalOffset], [0]]
     : [[0], [-externalOffset, externalOffset]])
     .concat(allowRemoteOffsets
-      ? [[-remoteOffset, remoteOffset], [-remoteOffset], [remoteOffset]]
+      ? [
+          [-remoteOffset, remoteOffset], [-remoteOffset], [remoteOffset],
+          [-farRemoteOffset, farRemoteOffset], [-farRemoteOffset], [farRemoteOffset],
+          [-outerRemoteOffset, outerRemoteOffset], [-outerRemoteOffset], [outerRemoteOffset]
+        ]
       : []);
   for (const offsets of layouts) {
     const columns = [];
