@@ -65,6 +65,7 @@ export function constrainBuildingWaysToPublicationDomain(ways, nodes, options = 
 
 export function shouldFetchSupplementalWaterStructures(options = {}) {
   return options.authoritativeMassing === true &&
+    options.providerAvailable !== false &&
     options.waterStructureQueryAvailable === true &&
     options.primaryCoverageComplete !== true &&
     Number(options.semanticVessels || 0) === 0;
@@ -216,6 +217,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
         try {
           if (shouldFetchSupplementalWaterStructures({
             authoritativeMassing,
+            providerAvailable: options.overpassProviderAvailable,
             waterStructureQueryAvailable: true,
             primaryCoverageComplete: options.mappedWaterStructureCoverageComplete,
             semanticVessels: waterStructureSummary.semanticVessels

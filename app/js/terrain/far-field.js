@@ -9,7 +9,7 @@ import {
   loadFarMappedContext,
   pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=19';
+} from './far-field-mapped-context.js?v=20';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -34,7 +34,7 @@ import {
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=52';
+} from './surface-profiles.js?v=54';
 import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,

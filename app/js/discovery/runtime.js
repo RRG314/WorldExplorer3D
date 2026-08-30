@@ -24,7 +24,7 @@ import {
   createDiscoveryPublicationStore,
   resolveContextActions
 } from './model.js?v=1';
-import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=3';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=4';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
 import { emitDiscoveryTelemetry } from './telemetry.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
@@ -1093,12 +1093,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
 
   const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
   appCtx.discoveryProfileStore = profileStore;
-  const [existingItems, existingEvents, existingGuide, discoveryProfile] = await Promise.all([
-    profileStore.listItems(10000).catch(() => []),
-    profileStore.listEvents?.(10000).catch(() => []) || [],
-    profileStore.listFieldGuide?.(10000).catch(() => []) || [],
-    profileStore.getProfile().catch(() => ({ tutorials: {} }))
-  ]);
+  const bootstrap = typeof profileStore.loadRuntimeBootstrap === 'function'
+    ? await profileStore.loadRuntimeBootstrap().catch(() => null)
+    : null;
+  const [existingItems, existingEvents, existingGuide, discoveryProfile] = bootstrap
+    ? [bootstrap.items, bootstrap.events, bootstrap.fieldGuide, bootstrap.profile]
+    : await Promise.all([
+        profileStore.listItems(10000).catch(() => []),
+        profileStore.listEvents?.(10000).catch(() => []) || [],
+        profileStore.listFieldGuide?.(10000).catch(() => []) || [],
+        profileStore.getProfile().catch(() => ({ tutorials: {} }))
+      ]);
   const claimedIds = new Set([...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean));
   const observedCatalogIds = new Set([...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean));
   const progress = fieldProgress(discoveryProfile);

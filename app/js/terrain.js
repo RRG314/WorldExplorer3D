@@ -27,8 +27,9 @@ import {
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
+  refreshTerrainSurfaceProfilesCooperatively,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=52";
+} from "./terrain/surface-profiles.js?v=54";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -52,12 +53,12 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=48";
+} from "./terrain/tiles.js?v=49";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=46";
+} from "./terrain/rebuild.js?v=47";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -268,7 +269,7 @@ const terrainTileDeps = {
   applyHeightsToTerrainMesh: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps)
 };
 
-function applyWaterTerrainMask() {
+function applyWaterTerrainMask(options = {}) {
   const meshes = (appCtx.terrainGroup?.children || []).filter((mesh) => mesh?.userData?.isTerrainMesh);
   const waterAreaCount = Number(appCtx.waterAreas?.length || 0);
   if (waterAreaCount === 0) {
@@ -278,7 +279,10 @@ function applyWaterTerrainMask() {
   }
   let maskedVertices = 0;
   for (const mesh of meshes) {
-    applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps, {
+      reuseBaseElevations: true,
+      refreshVisualProfile: options.deferVisualProfile !== true
+    });
     maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
@@ -293,14 +297,17 @@ function applyWaterTerrainMask() {
   return stats;
 }
 
-function applyTransportTerrainCorridors() {
+function applyTransportTerrainCorridors(options = {}) {
   const meshes = (appCtx.terrainGroup?.children || []).filter(
     (mesh) => mesh?.userData?.isTerrainMesh
   );
   let adjustedVertices = 0;
   let waterMaskedVertices = 0;
   for (const mesh of meshes) {
-    applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps, {
+      reuseBaseElevations: true,
+      refreshVisualProfile: options.deferVisualProfile !== true
+    });
     adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
     waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
@@ -585,6 +592,7 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  refreshTerrainSurfaceProfilesCooperatively,
   refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
   resetEarthStreaming,
@@ -650,6 +658,7 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  refreshTerrainSurfaceProfilesCooperatively,
   resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,

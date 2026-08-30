@@ -456,62 +456,85 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   let aviation = null;
   let maritime = null;
   let worldDiscovery = null;
+  const gameplayStartupDurationsMs = Object.create(null);
+  const measureGameplayStartup = async (name, task) => {
+    const startedAt = performance.now();
+    try {
+      return await task();
+    } finally {
+      gameplayStartupDurationsMs[name] = Math.round(performance.now() - startedAt);
+    }
+  };
   const startupIsCurrent = () => !!(
     worldSession?.isActive?.() &&
     appCtx.worldPublication?.requestId === publication.requestId &&
     appCtx.worldPublication?.sequence === publication.sequence
   );
   try {
-    const livingWorldModule = await import('../living-world/runtime.js?v=25');
+    // Fetch and evaluate independent runtime modules as one dependency stage.
+    // Runtime construction remains deliberately ordered below because urban
+    // interaction consumes Living World and Explorer consumes the published
+    // interaction authorities.
+    const moduleLoadStartedAt = performance.now();
+    const [
+      livingWorldModule,
+      urbanSandboxModule,
+      aviationModule,
+      maritimeModule,
+      worldDiscoveryModule
+    ] = await Promise.all([
+      import('../living-world/runtime.js?v=25'),
+      import('../urban-sandbox/runtime.js?v=54'),
+      import('../transport/aviation-runtime.js?v=5'),
+      import('../transport/maritime-runtime.js?v=8'),
+      import('../discovery/runtime.js?v=27')
+    ]);
+    gameplayStartupDurationsMs.moduleLoad = Math.round(performance.now() - moduleLoadStartedAt);
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-living-world-startup');
     }
-    livingWorld = livingWorldModule.startLivingWorldRuntime(appCtx, {
+    livingWorld = await measureGameplayStartup('livingWorld', () => livingWorldModule.startLivingWorldRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
-    });
+    }));
     if (!livingWorld) throw new Error('Living World did not start for the active publication.');
-    const urbanSandboxModule = await import('../urban-sandbox/runtime.js?v=54');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-urban-sandbox-startup');
     }
-    urbanSandbox = urbanSandboxModule.startUrbanSandboxRuntime({
+    urbanSandbox = await measureGameplayStartup('urbanSandbox', () => urbanSandboxModule.startUrbanSandboxRuntime({
       snapshot: publication,
       request: worldSession?.request,
       livingWorld
-    });
+    }));
     if (!urbanSandbox) throw new Error('Urban Sandbox did not start for the active publication.');
-    const aviationModule = await import('../transport/aviation-runtime.js?v=5');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-aviation-startup');
     }
-    aviation = aviationModule.startAviationRuntime({
+    aviation = await measureGameplayStartup('aviation', () => aviationModule.startAviationRuntime({
       snapshot: publication,
       request: worldSession?.request
-    });
+    }));
     if (!aviation) throw new Error('Aviation runtime did not start for the active publication.');
-    const maritimeModule = await import('../transport/maritime-runtime.js?v=8');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-maritime-startup');
     }
-    maritime = maritimeModule.startMaritimeRuntime({
+    maritime = await measureGameplayStartup('maritime', () => maritimeModule.startMaritimeRuntime({
       snapshot: publication,
       request: worldSession?.request
-    });
+    }));
     if (!maritime) throw new Error('Maritime runtime did not start for the active publication.');
-    const worldDiscoveryModule = await import('../discovery/runtime.js?v=27');
     if (!startupIsCurrent()) {
       disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
       return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-explorer-startup');
     }
-    worldDiscovery = await worldDiscoveryModule.startWorldDiscoveryRuntime(appCtx, {
+    worldDiscovery = await measureGameplayStartup('worldDiscovery', () => worldDiscoveryModule.startWorldDiscoveryRuntime(appCtx, {
       snapshot: publication,
       request: worldSession?.request
-    });
+    }));
     if (!worldDiscovery) throw new Error('Explorer runtime did not start for the active publication.');
   } catch (error) {
     disposeGameplayRuntimesForPublication(appCtx, publication, 'gameplay-startup-failed');
@@ -542,6 +565,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.aviationRuntime && appCtx.maritimeRuntime && appCtx.worldDiscoveryRuntime
     );
     runtimeState.gameplayRuntimeDurationMs = Math.round(performance.now() - gameplayRuntimeStartedAt);
+    runtimeState.gameplayStartupDurationsMs = Object.freeze({ ...gameplayStartupDurationsMs });
     runtimeState.updatedAt = performance.now();
   }
   if (worldSession?.isActive?.() === false) {

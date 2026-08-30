@@ -948,6 +948,16 @@ function getWorldExplorerRuntimeDiagnostics() {
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
     worldLoad: appCtx.worldLoadRuntimeState || null,
+    onDemandModes: appCtx.getOnDemandModeSnapshot?.() || {
+      ocean: { requested: false, active: false, rendererReady: false },
+      space: { requested: false, active: false, rendererReady: false }
+    },
+    transportCompilation: appCtx.transportSurfacePublication ? {
+      roadCount: Number(appCtx.transportSurfacePublication.roadCount || 0),
+      meshCount: Number(appCtx.transportSurfacePublication.meshCount || 0),
+      phaseDurationsMs: appCtx.transportSurfacePublication.phaseDurationsMs || null
+    } : null,
+    terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
     mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),

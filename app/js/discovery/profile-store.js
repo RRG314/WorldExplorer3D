@@ -180,12 +180,42 @@ async function ensureIndexedDbCharacterMigration(db) {
 function createIndexedDbDiscoveryProfileStore(options = {}) {
   const open = () => openDiscoveryDatabase(options.indexedDB);
   let characterMigrationReady = false;
+  let characterMigrationPromise = null;
 
   async function ensureCharacterMigration(db) {
     if (characterMigrationReady) return true;
-    await ensureIndexedDbCharacterMigration(db);
-    characterMigrationReady = true;
-    return true;
+    if (!characterMigrationPromise) {
+      characterMigrationPromise = ensureIndexedDbCharacterMigration(db).then(() => {
+        characterMigrationReady = true;
+        return true;
+      }).finally(() => {
+        characterMigrationPromise = null;
+      });
+    }
+    return characterMigrationPromise;
+  }
+
+  async function loadRuntimeBootstrap() {
+    const db = await open();
+    try {
+      await ensureCharacterMigration(db);
+      const transaction = db.transaction(['profiles', 'items', 'fieldGuide', 'events'], 'readonly');
+      const [profile, items, fieldGuide, events] = await Promise.all([
+        requestPromise(transaction.objectStore('profiles').get(PROFILE_ID)),
+        requestPromise(transaction.objectStore('items').getAll()),
+        requestPromise(transaction.objectStore('fieldGuide').getAll()),
+        requestPromise(transaction.objectStore('events').getAll())
+      ]);
+      await transactionPromise(transaction);
+      return {
+        profile: normalizeProfile(profile),
+        items: items.sort((a, b) => Number(b.collectedAt) - Number(a.collectedAt)).map(clone),
+        fieldGuide: fieldGuide.sort((a, b) => Number(b.lastObservedAt) - Number(a.lastObservedAt)).map(clone),
+        events: events.sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).map(clone)
+      };
+    } finally {
+      db.close();
+    }
   }
 
   async function getProfile() {
@@ -569,6 +599,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     listEvents,
     listFieldGuide,
     listItems,
+    loadRuntimeBootstrap,
     importData,
     recordDiscovery,
     recordExplorerEvent,
@@ -685,6 +716,14 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
     async listItems(limit = 200) { return [...items.values()].slice(0, limit).map(clone); },
     async listFieldGuide(limit = 500) { return [...guide.values()].slice(0, limit).map(clone); },
     async listEvents(limit = 500) { return [...events.values()].sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).slice(0, limit).map(clone); },
+    async loadRuntimeBootstrap() {
+      return {
+        profile: clone(profile),
+        items: [...items.values()].map(clone),
+        fieldGuide: [...guide.values()].map(clone),
+        events: [...events.values()].sort((a, b) => Number(b.occurredAt) - Number(a.occurredAt)).map(clone)
+      };
+    },
     async listCompanions() { return [...companions.values()].map(clone); },
     async getCharacterMigrationBackup() {
       return legacyProfileBackup ? { id: CHARACTER_MIGRATION_BACKUP_ID, profile: clone(legacyProfileBackup) } : null;

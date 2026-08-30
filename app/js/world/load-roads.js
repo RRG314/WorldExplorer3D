@@ -6,8 +6,8 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=87";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=25";
+} from "./load-runtime-session.js?v=88";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=26";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=15";
@@ -668,6 +668,16 @@ export function createWorldRoadLoader(deps = {}) {
           generatedActivity: false
         };
         runtimeState.transportFacilities = loadMetrics.transportFacilities;
+        const settledOverpassProvider = worldSession.snapshot()?.providers?.['osm-overpass'] || null;
+        const overpassProviderAvailable = Number(settledOverpassProvider?.completed || 0) > 0;
+        runtimeState.providerAvailability = Object.freeze({
+          osmOverpass: overpassProviderAvailable ? 'available' : 'unavailable-for-this-load',
+          settledRequests: Number(settledOverpassProvider?.completed || 0) +
+            Number(settledOverpassProvider?.failed || 0),
+          completedRequests: Number(settledOverpassProvider?.completed || 0),
+          failedRequests: Number(settledOverpassProvider?.failed || 0)
+        });
+        loadMetrics.providerAvailability = runtimeState.providerAvailability;
         const reviewedCivicFacilities = reviewedCivicFacilitiesForLocation(appCtx.LOC);
         if (reviewedCivicFacilities.length) {
           const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
@@ -935,6 +945,7 @@ export function createWorldRoadLoader(deps = {}) {
             lodThresholds,
             mappedWaterStructureData: data,
             mappedWaterStructureCoverageComplete,
+            overpassProviderAvailable,
             maxBuildingWays,
             metadataCacheMeta: buildingMetadataCacheMeta,
             metadataDeadlineMs: loadDeadline,

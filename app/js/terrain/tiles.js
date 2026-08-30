@@ -18,7 +18,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=52";
+} from "./surface-profiles.js?v=54";
 import { stitchTerrainMeshEdges } from "./seams.js?v=2";
 import {
   cancelTerrainTileRequest as cancelTileRequest,
@@ -699,7 +699,13 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     deps.computeElevationStatsMeters(elevationMetersSamples) :
     { min: minMeters, max: maxMeters, p75: maxMeters, p90: maxMeters };
   mesh.userData.elevationStatsMeters = elevationStats;
-  applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
+  // A batch world-finalization caller may own the one complete terrain
+  // presentation pass after every tile has its final water/transport height.
+  // In that case, repeating the full per-vertex material pass here would
+  // publish the same presentation twice before first play.
+  if (options.refreshVisualProfile !== false) {
+    applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
+  }
 }
 
 export {

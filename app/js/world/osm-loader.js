@@ -17,10 +17,58 @@ const OVERPASS_STAGGER_MS = 2000;
 const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
 const OVERPASS_MEMORY_CACHE_MAX = 6;
 const OVERPASS_LOC_EPSILON = 1e-7;
+const OVERPASS_PROVIDER_COOLDOWN_MS = 2 * 60 * 1000;
+const OVERPASS_PROVIDER_HEALTH_KEY = 'world-explorer:overpass-provider-health-v1';
 
 const overpassMemoryCache = [];
 let lastOverpassEndpoint = null;
 let readPerfModeValue = () => 'balanced';
+
+function readOverpassProviderHealth() {
+  try {
+    const parsed = JSON.parse(globalThis.sessionStorage?.getItem?.(OVERPASS_PROVIDER_HEALTH_KEY) || 'null');
+    return {
+      unavailableUntil: Math.max(0, Number(parsed?.unavailableUntil) || 0),
+      lastSuccessAt: Math.max(0, Number(parsed?.lastSuccessAt) || 0)
+    };
+  } catch {
+    return { unavailableUntil: 0, lastSuccessAt: 0 };
+  }
+}
+
+function writeOverpassProviderHealth(health) {
+  try {
+    globalThis.sessionStorage?.setItem?.(OVERPASS_PROVIDER_HEALTH_KEY, JSON.stringify(health));
+  } catch {
+    // Provider health is an optimization only. Storage denial must not affect loading.
+  }
+}
+
+function markOverpassProviderAvailable(nowMs = Date.now()) {
+  writeOverpassProviderHealth({ unavailableUntil: 0, lastSuccessAt: nowMs });
+}
+
+function markOverpassProviderUnavailable(requestStartedAt, nowMs = Date.now()) {
+  const health = readOverpassProviderHealth();
+  // A sibling request from the same provider batch may have succeeded while
+  // this request was still exhausting its endpoints. One success keeps the
+  // provider available for the rest of the session.
+  if (health.lastSuccessAt >= requestStartedAt) return;
+  writeOverpassProviderHealth({
+    unavailableUntil: nowMs + OVERPASS_PROVIDER_COOLDOWN_MS,
+    lastSuccessAt: health.lastSuccessAt
+  });
+}
+
+export function getOverpassProviderHealth() {
+  const nowMs = Date.now();
+  const health = readOverpassProviderHealth();
+  return Object.freeze({
+    status: health.unavailableUntil > nowMs ? 'cooldown' : 'probe-allowed',
+    retryAfterMs: Math.max(0, health.unavailableUntil - nowMs),
+    lastSuccessAt: health.lastSuccessAt || null
+  });
+}
 
 export function getOverpassRuntimeCacheStats() {
   return Object.freeze({
@@ -387,6 +435,7 @@ function externalAbortError(signal) {
 }
 
 export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, options = {}) {
+  const requestStartedAt = Date.now();
   const externalSignal = options.signal || null;
   if (externalSignal?.aborted) throw externalAbortError(externalSignal);
   const cached = findOverpassMemoryCache(cacheMeta);
@@ -405,6 +454,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     persistent.data._overpassCacheAgeMs = Math.max(0, Date.now() - Number(persistent.savedAt || 0));
     storeOverpassMemoryCache(cacheMeta, persistent.data, persistent.endpoint);
     return persistent.data;
+  }
+
+  const usesDefaultProvider = !Array.isArray(options.endpoints) && typeof options.fetchImpl !== 'function';
+  const providerHealth = usesDefaultProvider ? getOverpassProviderHealth() : null;
+  if (providerHealth?.status === 'cooldown' && options.ignoreProviderCooldown !== true) {
+    const error = new Error(`Overpass provider retry paused for ${Math.ceil(providerHealth.retryAfterMs / 1000)}s after a complete endpoint failure.`);
+    error.code = 'OVERPASS_PROVIDER_COOLDOWN';
+    throw error;
   }
 
   const controllers = [];
@@ -491,6 +548,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       data._overpassCacheAgeMs = 0;
       requestSettled = true;
       lastOverpassEndpoint = endpoint;
+      if (usesDefaultProvider) markOverpassProviderAvailable();
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
@@ -525,6 +583,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
       return fallback.data;
     }
+    if (usesDefaultProvider) markOverpassProviderUnavailable(requestStartedAt);
     throw error?.message?.startsWith?.('All Overpass endpoints failed:')
       ? error
       : new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);

@@ -4,6 +4,7 @@ import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=89";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
+import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
@@ -611,7 +612,9 @@ function initTitleScreenUi({
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
     appCtx.kickOptionalRuntimeBoot?.('boot');
-    if (requestedLaunchMode !== 'ocean') void appCtx.ensureStarCatalogLoaded?.();
+    if (requestedLaunchMode !== 'ocean' && requestedLaunchMode !== 'earth') {
+      void appCtx.ensureStarCatalogLoaded?.();
+    }
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
@@ -666,6 +669,9 @@ function initTitleScreenUi({
     }
 
     await appCtx.loadRoads();
+    scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
+      timeout: 1800
+    });
     const startedOnWater = appCtx.boatMode?.active === true;
     if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
     if (!startedOnWater && appCtx.Walk) {

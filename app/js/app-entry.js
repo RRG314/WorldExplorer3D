@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=58';
+import './runtime-diagnostics.js?v=59';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -50,7 +50,7 @@ import './hud.js?v=100';
 import './map.js?v=60';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=140';
+import { setupUI } from './ui.js?v=141';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -262,7 +262,10 @@ async function ensureOverlayRuntimeLayer() {
 }
 
 function shouldBootOverlayRuntime() {
-    if (!appCtx.gameStarted) return false;
+    // The public editor overlay is optional for first play. Starting it from
+    // the early gameStarted flag made its network/parse work overlap the
+    // blocking Earth compiler before a publication existed.
+    if (!appCtx.gameStarted || appCtx.worldLoading || appCtx.initialEarthWorldReady !== true) return false;
     if (appCtx.onMoon || appCtx.activePlanetaryBodyId || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
     if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
         if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.PLANETARY) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
