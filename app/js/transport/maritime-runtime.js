@@ -1,7 +1,8 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { MARITIME_CATALOG } from './maritime-catalog.js?v=1';
-import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=6';
+import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=7';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
+import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
 
 let activeRuntime = null;
 
@@ -66,7 +67,7 @@ function preferredAnchor(anchors, catalog, index) {
   return anchors.find((record) => roleTypes.includes(record.type)) || anchors[index % anchors.length];
 }
 
-function vesselFootprintFitsWater(x, z, yaw, catalog) {
+function vesselFootprintFitsWater(x, z, yaw, catalog, candidate = null) {
   if (vesselPlacementConflictsWithMappedShip(x, z, catalog)) return false;
   const halfLength = catalog.dimensions.length * .44;
   const halfWidth = catalog.dimensions.width * .44;
@@ -85,11 +86,31 @@ function vesselFootprintFitsWater(x, z, yaw, catalog) {
   ];
   const includeWaterways = catalog.dimensions.length < 32;
   const edgeBuffer = Math.max(1.2, Math.min(8, catalog.dimensions.width * .08));
-  return samples.every(([right, forward]) => appCtx.isPointInsideWaterFootprint?.(
-    x + rightX * right + forwardX * forward,
-    z + rightZ * right + forwardZ * forward,
-    { includeWaterways, edgeBuffer }
-  ) === true);
+  return samples.every(([right, forward]) => {
+    const sampleX = x + rightX * right + forwardX * forward;
+    const sampleZ = z + rightZ * right + forwardZ * forward;
+    if (candidate && appCtx.isPointInsideBoatCandidate?.(candidate, sampleX, sampleZ) !== true) return false;
+    return appCtx.isPointInsideWaterFootprint?.(sampleX, sampleZ, { includeWaterways, edgeBuffer }) === true;
+  });
+}
+
+function orientYawTowardPoint(yaw, x, z, targetX, targetZ) {
+  if (![targetX, targetZ].every(Number.isFinite)) return yaw;
+  const towardX = Number(targetX) - x;
+  const towardZ = Number(targetZ) - z;
+  const forwardDot = Math.sin(yaw) * towardX + Math.cos(yaw) * towardZ;
+  return forwardDot >= 0 ? yaw : yaw + Math.PI;
+}
+
+function operationalLargeVesselYaw(x, z, yaw, catalog, candidate = null) {
+  if (Number(catalog.dimensions?.length || 0) < 80) return yaw;
+  const lookAhead = Math.max(24, Math.min(72, catalog.dimensions.length * .32));
+  for (const candidateYaw of [yaw, yaw + Math.PI]) {
+    const aheadX = x + Math.sin(candidateYaw) * lookAhead;
+    const aheadZ = z + Math.cos(candidateYaw) * lookAhead;
+    if (vesselFootprintFitsWater(aheadX, aheadZ, candidateYaw, catalog, candidate)) return candidateYaw;
+  }
+  return yaw;
 }
 
 function findWaterPlacement(anchor, catalog, index) {
@@ -118,7 +139,37 @@ function findWaterPlacement(anchor, catalog, index) {
     const candidateYaw = candidate.tangent && Number.isFinite(candidate.tangent.x) && Number.isFinite(candidate.tangent.z)
       ? Math.atan2(candidate.tangent.x, candidate.tangent.z)
       : yaw;
+    let operationalLaunch = null;
     if (candidate.type === 'area' && candidate.entryPoint && Number.isFinite(candidate.centerX) && Number.isFinite(candidate.centerZ)) {
+      if (catalog.dimensions.length >= 80) {
+        const centerX = Number(candidate.centerX);
+        const centerZ = Number(candidate.centerZ);
+        const centerYaw = operationalLargeVesselYaw(centerX, centerZ, candidateYaw, catalog, candidate);
+        if (vesselFootprintFitsWater(centerX, centerZ, centerYaw, catalog, candidate)) {
+          const centerCandidate = appCtx.inspectBoatCandidate?.(centerX, centerZ, searchRadius, {
+            allowSynthetic: false,
+            requireContainment: true,
+            waterKind: candidate.waterKind || 'harbor'
+          });
+          if (centerCandidate) operationalLaunch = Object.freeze({
+            x: centerX,
+            z: centerZ,
+            yaw: centerYaw,
+            candidate: centerCandidate
+          });
+        }
+        if (!operationalLaunch) {
+          const syntheticCandidate = appCtx.buildSyntheticBoatCandidate?.(centerX, centerZ, {
+            waterKind: candidate.waterKind === 'harbor' ? 'coastal' : candidate.waterKind || 'coastal'
+          });
+          if (syntheticCandidate) operationalLaunch = Object.freeze({
+            x: centerX,
+            z: centerZ,
+            yaw: candidateYaw,
+            candidate: syntheticCandidate
+          });
+        }
+      }
       const inwardX = Number(candidate.centerX) - Number(candidate.entryPoint.x);
       const inwardZ = Number(candidate.centerZ) - Number(candidate.entryPoint.z);
       const inwardLength = Math.hypot(inwardX, inwardZ) || 1;
@@ -133,13 +184,37 @@ function findWaterPlacement(anchor, catalog, index) {
           requireContainment: true,
           waterKind: candidate.waterKind || 'harbor'
         });
-        if (berthCandidate) return { x: berthX, z: berthZ, yaw: candidateYaw, candidate: berthCandidate };
+        if (berthCandidate) return {
+          x: berthX,
+          z: berthZ,
+          yaw: operationalLargeVesselYaw(
+            berthX,
+            berthZ,
+            orientYawTowardPoint(candidateYaw, berthX, berthZ, candidate.centerX, candidate.centerZ),
+            catalog,
+            berthCandidate
+          ),
+          candidate: berthCandidate,
+          launch: operationalLaunch
+        };
       }
     }
     const x = Number(candidate.spawnX);
     const z = Number(candidate.spawnZ);
     if (![x, z].every(Number.isFinite) || !vesselFootprintFitsWater(x, z, candidateYaw, catalog)) continue;
-    return { x, z, yaw: candidateYaw, candidate };
+    return {
+      x,
+      z,
+      yaw: operationalLargeVesselYaw(
+        x,
+        z,
+        orientYawTowardPoint(candidateYaw, x, z, candidate.centerX, candidate.centerZ),
+        catalog,
+        candidate
+      ),
+      candidate,
+      launch: operationalLaunch
+    };
   }
   return null;
 }
@@ -187,6 +262,87 @@ function placeVessel(vessel) {
   vessel.visual.root.userData.transportEntityId = vessel.id;
   vessel.visual.root.userData.anchorFacilityId = vessel.anchorFacilityId;
   vessel.visual.root.userData.generatedActivity = true;
+}
+
+function trafficPoint(home, yaw, right, forward) {
+  return {
+    x: home.x + Math.cos(yaw) * right + Math.sin(yaw) * forward,
+    z: home.z - Math.sin(yaw) * right + Math.cos(yaw) * forward
+  };
+}
+
+function routeFitsWater(points, vessel) {
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    for (let sample = 0; sample <= 6; sample += 1) {
+      const amount = sample / 6;
+      const x = start.x + (end.x - start.x) * amount;
+      const z = start.z + (end.z - start.z) * amount;
+      const yaw = Math.atan2(end.x - start.x, end.z - start.z);
+      if (!vesselFootprintFitsWater(x, z, yaw, vessel.catalog)) return false;
+    }
+  }
+  return true;
+}
+
+function createVesselTrafficMotion(vessel, index = 0) {
+  if (!['runabout', 'workboat', 'ferry', 'research'].includes(vessel.catalog.role)) return null;
+  if (vessel.mobile && vessel.catalog.role !== 'runabout') return null;
+  const home = vessel.home;
+  const length = vessel.catalog.dimensions.length;
+  const baseDistance = Math.max(28, Math.min(150, length * 1.7));
+  const baseLane = Math.max(10, Math.min(65, vessel.catalog.dimensions.width * 2.3));
+  let route = null;
+  for (const scale of [1, .72, .48, .32]) {
+    for (const direction of [index % 2 === 0 ? 1 : -1, index % 2 === 0 ? -1 : 1]) {
+      const distance = baseDistance * scale;
+      const lane = baseLane * scale * direction;
+      const points = [
+        { x: home.x, z: home.z },
+        trafficPoint(home, home.yaw, lane, distance),
+        trafficPoint(home, home.yaw, lane, -distance * .55),
+        trafficPoint(home, home.yaw, 0, -distance * .38),
+        { x: home.x, z: home.z }
+      ];
+      if (routeFitsWater(points, vessel)) {
+        route = points;
+        break;
+      }
+    }
+    if (route) break;
+  }
+  if (!route) {
+    for (const direction of [1, -1]) {
+      const end = trafficPoint(home, home.yaw, 0, direction * Math.max(16, length * .8));
+      const points = [{ x: home.x, z: home.z }, end, { x: home.x, z: home.z }];
+      if (routeFitsWater(points, vessel)) {
+        route = points;
+        break;
+      }
+    }
+  }
+  if (!route) return null;
+  const cruiseSpeed = vessel.catalog.role === 'runabout' ? 4.8 : vessel.catalog.role === 'tug' ? 2.1 : vessel.catalog.role === 'workboat' ? 2.8 : 3.4;
+  return createAmbientRouteMotion(route, {
+    cruiseSpeed,
+    acceleration: vessel.catalog.role === 'runabout' ? .62 : vessel.catalog.role === 'tug' ? .18 : .26,
+    yawRate: vessel.catalog.role === 'runabout' ? .42 : vessel.catalog.role === 'tug' ? .11 : .08,
+    dwellSeconds: 7,
+    initialDwellSeconds: 1 + index * 1.15
+  });
+}
+
+function updateAmbientVessel(vessel, dt) {
+  const motion = vessel?.ambientMotion;
+  if (!motion || vessel.condition <= .05) return false;
+  advanceAmbientRouteMotion(vessel, motion, dt);
+  vessel.available = motion.state === 'docked';
+  vessel.y = waterYAt(vessel.x, vessel.z) + Math.min(vessel.catalog.dimensions.draft * .5, vessel.catalog.dimensions.width * .22);
+  vessel.visual.root.position.set(vessel.x, vessel.y, vessel.z);
+  vessel.visual.root.rotation.set(0, vessel.yaw, 0);
+  updateVesselVisual(vessel.visual, vessel.condition);
+  return true;
 }
 
 function runtimeMatches(runtime) {
@@ -281,15 +437,17 @@ function interactionCandidate(runtime) {
 function enterVessel(runtime, vessel) {
   if (!vessel?.available || !runtimeMatches(runtime)) return false;
   runtime.activeVessel = vessel;
+  vessel.ambientMotion = null;
   vessel.available = false;
   vessel.visual.root.visible = false;
+  const launch = vessel.launch || vessel;
   const started = appCtx.setTravelMode?.('boat', {
     source: 'maritime_boarding',
     force: true,
-    spawnX: vessel.x,
-    spawnZ: vessel.z,
-    yaw: vessel.yaw,
-    candidate: vessel.candidate,
+    spawnX: launch.x,
+    spawnZ: launch.z,
+    yaw: launch.yaw,
+    candidate: launch.candidate,
     entryMode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive',
     transportEntityId: vessel.id,
     transportCatalogId: vessel.catalog.id,
@@ -389,11 +547,12 @@ function startMaritimeRuntime(options = {}) {
   disposeMaritimeRuntime(activeRuntime, 'replacement');
   const group = new THREE.Group();
   group.name = 'Playable Maritime Fleet';
-  const vessels = derivedFleet(appCtx.transportFacilityGraph, { mobile: isTouchClient() }).map((record) => {
+  const vessels = derivedFleet(appCtx.transportFacilityGraph, { mobile: isTouchClient() }).map((record, index) => {
     const visual = createVesselVisual(THREE, record.catalog, { mobile: record.mobile, state: 'berthed' });
     const vessel = { ...record, visual, disabledAt: 0 };
     placeVessel(vessel);
     vessel.home = Object.freeze({ x: vessel.x, y: vessel.y, z: vessel.z, yaw: vessel.yaw, candidate: vessel.candidate });
+    vessel.ambientMotion = createVesselTrafficMotion(vessel, index);
     group.add(visual.root);
     return vessel;
   });
@@ -424,9 +583,12 @@ function startMaritimeRuntime(options = {}) {
     priority: 43,
     critical: false,
     enabled: () => runtimeMatches(runtime),
-    update() {
+    update(frame) {
       runtime.vessels.forEach((vessel) => {
-        if (vessel !== runtime.activeVessel) updateVesselLifecycle(vessel);
+        if (vessel !== runtime.activeVessel) {
+          updateAmbientVessel(vessel, frame.dt);
+          updateVesselLifecycle(vessel);
+        }
       });
       if (runtime.activeVessel && appCtx.boatMode?.active) {
         runtime.activeVessel.condition = Number(appCtx.boatMode.condition ?? runtime.activeVessel.condition);
@@ -443,6 +605,7 @@ function startMaritimeRuntime(options = {}) {
     mappedVesselCount: runtime.mappedVessels.length,
     mappedVessels: Object.freeze(runtime.mappedVessels),
     activeVesselId: runtime.activeVessel?.id || '',
+    underwayVesselCount: runtime.vessels.filter((vessel) => vessel.ambientMotion?.state === 'underway').length,
     activeBoat: appCtx.getBoatModeSnapshot?.() || null,
     catalogIds: Object.freeze(runtime.vessels.map(({ catalog }) => catalog.id)),
     vessels: Object.freeze(runtime.vessels.map((vessel) => Object.freeze({
@@ -454,6 +617,7 @@ function startMaritimeRuntime(options = {}) {
       z: Number(vessel.z.toFixed(2)),
       available: vessel.available === true,
       condition: Number(vessel.condition.toFixed(3)),
+      traffic: ambientRouteSnapshot(vessel.ambientMotion),
       anchorFacilityId: vessel.anchorFacilityId
     }))),
     interaction: interactionCandidate(runtime)
@@ -491,6 +655,17 @@ function startMaritimeRuntime(options = {}) {
         walker._resolvedGroundState = null;
         appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
         return true;
+      },
+      dock(vesselId = runtime.activeVessel?.id) {
+        const vessel = runtime.vessels.find(({ id }) => id === String(vesselId));
+        if (!vessel || vessel !== runtime.activeVessel || !appCtx.boatMode?.active || !vessel.home?.candidate) return false;
+        return appCtx.enterBoatAtWorldPoint?.(vessel.home.x, vessel.home.z, {
+          candidate: vessel.home.candidate,
+          yaw: vessel.home.yaw,
+          transportEntityId: vessel.id,
+          transportCatalogId: vessel.catalog.id,
+          condition: vessel.condition
+        }) === true;
       },
       snapshot: runtime.snapshot,
       ageDisabled(vesselId = runtime.vessels[0]?.id) {

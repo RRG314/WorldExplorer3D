@@ -14,7 +14,7 @@ canvas{display:block}#label{position:fixed;left:24px;top:22px;padding:10px 14px;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script type="module">
 import { AVIATION_CATALOG } from '/app/js/transport/aviation-catalog.js?v=2';
-import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from '/app/js/transport/aircraft-visual-recipe.js?v=4';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from '/app/js/transport/aircraft-visual-recipe.js?v=7';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9da9af);
 scene.fog=new THREE.Fog(0x9da9af,90,260);
 const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,500);

@@ -14,7 +14,7 @@ canvas{display:block}#label{position:fixed;left:24px;top:22px;padding:10px 14px;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script type="module">
 import { MARITIME_CATALOG } from '/app/js/transport/maritime-catalog.js?v=1';
-import { createVesselVisual, updateVesselVisual } from '/app/js/transport/vessel-visual-recipe.js?v=6';
+import { createVesselVisual, updateVesselVisual } from '/app/js/transport/vessel-visual-recipe.js?v=7';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9da9af);scene.fog=new THREE.Fog(0x9da9af,220,620);
 const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,1200);
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;document.body.append(renderer.domElement);

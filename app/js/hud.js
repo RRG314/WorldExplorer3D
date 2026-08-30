@@ -599,7 +599,7 @@ function updateHUD() {
     document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
     document.getElementById('indBoost').textContent = 'PWR';
     document.getElementById('indDrift').classList.toggle('on', plane.airborne);
-    document.getElementById('indDrift').textContent = plane.airborne ? 'AIR' : 'GEAR';
+    document.getElementById('indDrift').textContent = plane.stalled ? 'STALL' : plane.airborne ? 'AIR' : 'GEAR';
     updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }

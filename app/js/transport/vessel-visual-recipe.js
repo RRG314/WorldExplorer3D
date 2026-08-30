@@ -261,29 +261,64 @@ function addResearch(THREE, group, entry, materials, options) {
 }
 
 function addCargo(THREE, group, entry, materials, options) {
-  const bridge = addWheelhouse(THREE, group, entry, materials, { z: -entry.dimensions.length * .34, widthScale: .72, lengthScale: .1, height: entry.dimensions.height * .18, mobile: options.mobile });
-  const bridgeUpper = addWheelhouse(THREE, group, entry, materials, { z: bridge.z, widthScale: .58, lengthScale: .075, baseY: bridge.topY, height: entry.dimensions.height * .12, mobile: options.mobile });
-  addMast(THREE, group, 0, bridgeUpper.topY, bridge.z, entry.dimensions.height * .22, materials);
-  const rows = options.mobile ? 3 : 5;
+  const length = entry.dimensions.length;
+  const width = entry.dimensions.width;
+  const height = entry.dimensions.height;
+  const bridge = addWheelhouse(THREE, group, entry, materials, { z: -length * .34, widthScale: .78, lengthScale: .105, height: height * .16, mobile: options.mobile });
+  const bridgeUpper = addWheelhouse(THREE, group, entry, materials, { z: bridge.z + length * .006, widthScale: .64, lengthScale: .082, baseY: bridge.topY, height: height * .115, mobile: options.mobile });
+  addMast(THREE, group, 0, bridgeUpper.topY, bridge.z, height * .22, materials);
+  const frontWindowCount = options.mobile ? 5 : 9;
+  for (let index = 0; index < frontWindowCount; index += 1) {
+    const window = new THREE.Mesh(new THREE.BoxGeometry(width * .055, height * .035, .08), materials.glass);
+    window.position.set(
+      (index - (frontWindowCount - 1) * .5) * width * .073,
+      bridgeUpper.topY - height * .04,
+      bridgeUpper.z + bridgeUpper.length * .505
+    );
+    group.add(window);
+  }
+  const funnel = new THREE.Mesh(new THREE.CylinderGeometry(width * .075, width * .1, height * .16, options.mobile ? 10 : 18), materials.dark);
+  funnel.position.set(width * .2, bridge.topY + height * .08, bridge.z - length * .045);
+  group.add(funnel);
+  [-1, 1].forEach((side) => {
+    const lifeboat = new THREE.Mesh(new THREE.SphereGeometry(1, options.mobile ? 10 : 16, options.mobile ? 6 : 10), materials.accent);
+    lifeboat.scale.set(length * .032, width * .055, width * .045);
+    lifeboat.position.set(side * width * .43, bridge.topY * .72, bridge.z + length * .02);
+    group.add(lifeboat);
+  });
+  const rows = options.mobile ? 4 : 7;
   const columns = options.mobile ? 2 : 4;
-  const levels = options.mobile ? 2 : 3;
-  const containerLength = entry.dimensions.length * .1;
-  const containerWidth = entry.dimensions.width * .16;
-  const containerHeight = entry.dimensions.height * .055;
+  const levels = options.mobile ? 2 : 4;
+  const containerLength = length * .082;
+  const containerWidth = width * .17;
+  const containerHeight = height * .047;
   const containerMaterials = [materials.containerA, materials.containerB, materials.containerC];
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
-      for (let level = 0; level < levels; level += 1) {
-        const container = new THREE.Mesh(new THREE.BoxGeometry(containerWidth, containerHeight, containerLength), containerMaterials[(row + column + level) % containerMaterials.length]);
-        container.position.set(
-          (column - (columns - 1) * .5) * containerWidth * 1.05,
-          1.2 + containerHeight * (.5 + level),
-          entry.dimensions.length * (.24 - row * .11)
-        );
-        group.add(container);
-      }
+      const stack = new THREE.Mesh(
+        new THREE.BoxGeometry(containerWidth, containerHeight * levels, containerLength),
+        containerMaterials[(row + column) % containerMaterials.length]
+      );
+      stack.position.set(
+        (column - (columns - 1) * .5) * containerWidth * 1.05,
+        1.2 + containerHeight * levels * .5,
+        length * (.29 - row * .09)
+      );
+      group.add(stack);
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(containerWidth * 1.025, .045, containerLength * 1.015),
+        materials.metal
+      );
+      frame.position.set(stack.position.x, stack.position.y + containerHeight * levels * .505, stack.position.z);
+      group.add(frame);
     }
   }
+  for (const z of [length * .39, length * .31, length * .22, length * .13, length * .04, -length * .05, -length * .14]) {
+    const hatch = new THREE.Mesh(new THREE.BoxGeometry(width * .73, height * .018, length * .055), materials.dark);
+    hatch.position.set(0, Math.max(1.25, height * .07), z);
+    group.add(hatch);
+  }
+  addRail(THREE, group, entry, materials, -.46, .45);
 }
 
 function createVesselVisual(THREE, entry, options = {}) {

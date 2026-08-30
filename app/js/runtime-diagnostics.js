@@ -937,6 +937,19 @@ function getWorldExplorerRuntimeDiagnostics() {
     mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
     aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+    flightDynamics: appCtx.planeMode?.active ? {
+      catalogId: String(appCtx.planeMode.transportCatalogId || ''),
+      airborne: appCtx.planeMode.airborne === true,
+      airspeed: numberOrNull(appCtx.planeMode.speed),
+      horizontalSpeed: numberOrNull(appCtx.planeMode.horizontalSpeed),
+      climbRate: numberOrNull(appCtx.planeMode.climbRate),
+      pitch: numberOrNull(appCtx.planeMode.pitch),
+      flightPathAngle: numberOrNull(appCtx.planeMode.flightPathAngle),
+      angleOfAttack: numberOrNull(appCtx.planeMode.angleOfAttack),
+      liftLoad: numberOrNull(appCtx.planeMode.liftLoad),
+      turnRate: numberOrNull(appCtx.planeMode.turnRate),
+      stalled: appCtx.planeMode.stalled === true
+    } : null,
     maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
     boatNavigation: appCtx.boatMode?.active ? {
       waterKind: String(appCtx.boatMode.waterKind || ''),

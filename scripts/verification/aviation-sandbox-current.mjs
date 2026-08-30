@@ -36,6 +36,39 @@ try {
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const firstAircraft = initial.aviation.vehicles.find((vehicle) => vehicle.catalogId === 'expedition-prop');
   assert.ok(firstAircraft, 'The expedition aircraft was not published.');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.taxiingAircraftCount > 0, null, { timeout: 15_000 });
+  const trafficBefore = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation);
+  const movingAircraft = trafficBefore.vehicles.find((vehicle) => vehicle.traffic?.state === 'underway');
+  assert.ok(movingAircraft, 'No aircraft entered the bounded airport taxi route.');
+  await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), movingAircraft.id);
+  await page.waitForTimeout(1500);
+  const trafficAfter = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation);
+  const movedAircraft = trafficAfter.vehicles.find((vehicle) => vehicle.id === movingAircraft.id);
+  const taxiTravel = Math.hypot(movedAircraft.x - movingAircraft.x, movedAircraft.z - movingAircraft.z);
+  await page.screenshot({ path: `${outputDir}/bwi-tarmac-traffic.png`, fullPage: true });
+
+  const airliner = trafficAfter.vehicles.find((vehicle) => vehicle.catalogId === 'long-range-airliner');
+  assert.ok(airliner, 'The large airliner was not published.');
+  assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.dock(id), airliner.id), true);
+  assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), airliner.id), true);
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.data?.aircraftId?.includes('long-range-airliner'));
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics?.catalogId === 'long-range-airliner');
+  await page.keyboard.down('Space');
+  await page.keyboard.down('ArrowDown');
+  await page.waitForTimeout(3200);
+  await page.keyboard.up('ArrowDown');
+  await page.keyboard.up('Space');
+  const largeAircraftGroundResponse = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics);
+  await page.keyboard.down('ShiftLeft');
+  await page.keyboard.down('ControlLeft');
+  await page.waitForTimeout(4200);
+  await page.keyboard.up('ControlLeft');
+  await page.keyboard.up('ShiftLeft');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.data?.canExit === true, null, { timeout: 15_000 });
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.walking === true);
+
   const recoveryAircraft = initial.aviation.vehicles.find((vehicle) => vehicle.id !== firstAircraft.id);
   const aircraftRecovered = recoveryAircraft
     ? await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.ageDisabled(id), recoveryAircraft.id)
@@ -58,6 +91,7 @@ try {
     return diagnostics?.modes?.plane === true && plane?.contact?.grounded === false &&
       interaction?.action === 'exit_aircraft' && interaction?.data?.canJump === true && interaction?.data?.autoEquip === true;
   }, null, { timeout: 30_000 });
+  const aerodynamicRotation = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics);
   await page.keyboard.up('ArrowDown');
   await page.keyboard.up('Space');
   await page.waitForFunction(() => {
@@ -97,6 +131,10 @@ try {
     catalogPublished: initial.aviation.fleetCount === 5 && initial.aviation.playableCount === 5,
     mappedFacilityAnchors: initial.aviation.mappedAnchorCount > 0,
     disabledAircraftRecoveredAtFacility: aircraftRecovered === true,
+    boundedTaxiTrafficMoved: trafficBefore.taxiingAircraftCount > 0 && taxiTravel > .25,
+    largeAircraftRequiredGroundRoll: largeAircraftGroundResponse?.airborne === false && largeAircraftGroundResponse?.airspeed < 49,
+    aerodynamicPathLagsNose: aerodynamicRotation?.angleOfAttack > .01 && aerodynamicRotation?.liftLoad > 1 &&
+      aerodynamicRotation?.pitch > aerodynamicRotation?.flightPathAngle,
     enteredThroughVisiblePrompt: beforeJump?.identity?.catalogId === 'expedition-prop',
     manualTakeoffReachedSafeHeight: beforeJump?.contact?.grounded === false && beforeJump.position.y > 20,
     airbornePoseHandoff: Math.hypot(
@@ -115,6 +153,11 @@ try {
     ok: Object.values(checks).every(Boolean),
     checks,
     initialAviation: initial.aviation,
+    trafficBefore,
+    trafficAfter,
+    taxiTravel,
+    largeAircraftGroundResponse,
+    aerodynamicRotation,
     aircraftRecovered,
     beforeJump,
     exitStart,
@@ -125,7 +168,7 @@ try {
     landed: { actor: landed.activeActor, parachute: landed.urbanSandbox?.parachute, aviation: landed.aviation },
     pageErrors,
     localFailures,
-    screenshotPaths: [`${outputDir}/bwi-flight.png`, `${outputDir}/bwi-canopy.png`]
+    screenshotPaths: [`${outputDir}/bwi-tarmac-traffic.png`, `${outputDir}/bwi-flight.png`, `${outputDir}/bwi-canopy.png`]
   };
   await fs.writeFile(`${outputDir}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

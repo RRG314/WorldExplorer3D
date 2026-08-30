@@ -51,10 +51,12 @@ function ellipticalFuselageGeometry(THREE, length, radiusX, radiusY, segments = 
   const stations = [
     { z: -.5, radius: .08, lift: .02 },
     { z: -.44, radius: .52, lift: .02 },
+    { z: -.39, radius: .72, lift: .01 },
     { z: -.33, radius: .86, lift: 0 },
     { z: -.08, radius: 1, lift: 0 },
     { z: .25, radius: .98, lift: .01 },
     { z: .4, radius: .76, lift: .03 },
+    { z: .455, radius: .46, lift: .035 },
     { z: .49, radius: .18, lift: .02 }
   ];
   const vertices = [];
@@ -184,7 +186,7 @@ function fixedWingVisual(THREE, entry, options, mats) {
   const span = entry.dimensions.wingspan;
   const fuselageRadius = Math.max(.42, width * .43);
   const fuselageRadiusY = Math.max(.4, width * .4);
-  const segments = options.mobile ? 16 : 24;
+  const segments = options.mobile ? 18 : 32;
   const fuselage = new THREE.Mesh(
     ellipticalFuselageGeometry(THREE, length, fuselageRadius, fuselageRadiusY, segments),
     mats.body
@@ -211,6 +213,17 @@ function fixedWingVisual(THREE, entry, options, mats) {
   );
   fin.position.set(0, fuselageRadiusY * .32, -length * .38);
   group.add(fin);
+  if (['business', 'regional', 'airliner'].includes(entry.role)) {
+    [-1, 1].forEach((side) => {
+      const winglet = new THREE.Mesh(
+        sweptFinGeometry(THREE, Math.max(.06, width * .025), Math.max(.45, height * .16), Math.max(.42, length * .025)),
+        mats.accent
+      );
+      winglet.position.set(side * span * .495, wing.position.y, wing.position.z - length * .015);
+      winglet.rotation.z = side * -.16;
+      group.add(winglet);
+    });
+  }
   [-1, 1].forEach((side) => {
     const windshield = new THREE.Mesh(new THREE.BoxGeometry(width * .32, width * .16, .045), mats.glass);
     windshield.position.set(side * width * .16, fuselageRadiusY * .62, length * .405);
@@ -280,6 +293,21 @@ function fixedWingVisual(THREE, entry, options, mats) {
       const intakeFan = new THREE.Mesh(new THREE.CircleGeometry(engineRadius * .78, segments), mats.underside);
       intakeFan.position.set(x, engineY, engineZ + engineLength * .505);
       group.add(intakeFan);
+      const fan = new THREE.Group();
+      for (let bladeIndex = 0; bladeIndex < (options.mobile ? 5 : 9); bladeIndex += 1) {
+        const blade = new THREE.Mesh(
+          new THREE.BoxGeometry(engineRadius * .07, engineRadius * .67, .018),
+          mats.metal
+        );
+        blade.position.y = engineRadius * .31;
+        const pivot = new THREE.Group();
+        pivot.rotation.z = bladeIndex * Math.PI * 2 / (options.mobile ? 5 : 9);
+        pivot.add(blade);
+        fan.add(pivot);
+      }
+      fan.position.set(x, engineY, engineZ + engineLength * .512);
+      fan.userData.aircraftRotor = 'fan';
+      group.add(fan);
       const exhaust = new THREE.Mesh(new THREE.TorusGeometry(engineRadius * .66, Math.max(.035, width * .018), 8, segments), mats.underside);
       exhaust.position.set(x, engineY, engineZ - engineLength * .5);
       group.add(exhaust);
@@ -294,6 +322,14 @@ function fixedWingVisual(THREE, entry, options, mats) {
   }
   addGear(THREE, group, entry, mats);
   addNavigationLights(THREE, group, span, 0, height * .17);
+  [-1, 1].forEach((side) => {
+    const landingLight = new THREE.Mesh(
+      new THREE.SphereGeometry(Math.max(.06, width * .035), 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xfff4ce })
+    );
+    landingLight.position.set(side * span * .22, wing.position.y - height * .025, length * .08);
+    group.add(landingLight);
+  });
   return group;
 }
 
@@ -424,11 +460,11 @@ function createAircraftVisual(THREE, entry, options = {}) {
   let root = personalPlane?.plane;
   if (!root) {
     const mats = {
-      body: material(THREE, PALETTE.body),
+      body: material(THREE, PALETTE.body, .4, .16),
       underside: material(THREE, PALETTE.underside, .72, .15),
       accent: material(THREE, PALETTE.accent, .5, .12),
       trim: material(THREE, PALETTE.trim, .58, .18),
-      glass: material(THREE, PALETTE.glass, .2, .2, { emissive: 0x061219, emissiveIntensity: .28 }),
+      glass: material(THREE, PALETTE.glass, .14, .3, { emissive: 0x061219, emissiveIntensity: .34 }),
       tire: material(THREE, PALETTE.tire, .94, .01),
       metal: material(THREE, PALETTE.metal, .35, .62)
     };
@@ -471,7 +507,7 @@ function updateAircraftVisual(visual, condition = 1, dt = 0) {
   visual.root.traverse((object) => {
     if (object.userData?.aircraftRotor) {
       const rotorKind = object.userData.aircraftRotor;
-      const factor = rotorKind === 'tail' || rotorKind === 'propeller' ? 18 : 8;
+      const factor = rotorKind === 'fan' ? 22 : rotorKind === 'tail' || rotorKind === 'propeller' ? 18 : 8;
       const rotationStep = Math.max(0, Number(dt) || 0) * factor;
       // Main rotors turn around the vertical mast. Nose and tail propellers
       // sit in the XY plane, so rotating them around Y makes the blades wobble

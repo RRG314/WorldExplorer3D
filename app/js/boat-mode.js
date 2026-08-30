@@ -16,6 +16,7 @@ import {
   getBoatWaveProfile,
   getReferencePosition,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   localizeBoatCandidate,
   measureBoatShorelineDistance,
   minimumBoatShorelineDistance,
@@ -25,7 +26,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=19";
+} from "./boat-mode/water-query.js?v=21";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
@@ -37,7 +38,7 @@ import {
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=7";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=2";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=12";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=16";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=3";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=3";
 import {
@@ -747,6 +748,7 @@ function initBoatMode() {
 
 Object.assign(appCtx, {
   boatHudLabel,
+  buildSyntheticBoatCandidate,
   canDiveBoatMode,
   canExitBoatMode,
   cycleBoatSeaState,
@@ -757,6 +759,7 @@ Object.assign(appCtx, {
   getBoatWaveIntensity: getWaveIntensity,
   initBoatMode,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   refreshBoatAvailability: syncBoatPromptState,
   sampleDynamicWaterAt,
   setBoatWaveIntensity,
@@ -772,6 +775,7 @@ Object.assign(appCtx, {
 
 export {
   boatHudLabel,
+  buildSyntheticBoatCandidate,
   canDiveBoatMode,
   canExitBoatMode,
   cycleBoatSeaState,
@@ -782,6 +786,7 @@ export {
   getWaveIntensity as getBoatWaveIntensity,
   initBoatMode,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   syncBoatPromptState as refreshBoatAvailability,
   sampleDynamicWaterAt,
   setBoatWaveIntensity,

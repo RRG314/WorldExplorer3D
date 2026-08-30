@@ -77,10 +77,25 @@ Aircraft and maritime fleets adapt the existing Plane and Boat controllers
 rather than creating competing movement systems. Mapped airports, helipads,
 marinas, harbors, and ports anchor generated playable fleets. Mapped vessels
 keep their provider identity and remain separate from generated activity
-vessels. Boat camera framing uses the active water class: harbors and channels
-keep large-ship follow distance bounded, while open water retains a wider view.
-Terrestrial layers remain visible near shore and are suppressed only in known,
-distant open ocean.
+vessels.
+
+`app/js/plane-mode.js` remains the player flight owner. The shared fixed-wing
+dynamics in `app/js/plane/flight-dynamics.js` resolves aircraft-class tuning,
+airspeed, flight path, angle of attack, lift, stall, drag, bank-limited turning,
+and ground roll. `app/js/transport/aviation-runtime.js` adds airport fleet and
+taxi activity without running a second player controller.
+
+`app/js/boat-mode/runtime-dynamics.js` remains the player vessel owner. The
+handling profile in `app/js/boat-mode/vessel-handling.js` derives throttle,
+acceleration, drag, braking, rudder response, and turning inertia from vessel
+class and displacement. `app/js/transport/maritime-runtime.js` adds port fleet
+and bounded harbor activity, then hands a boarded vessel to Boat Mode. Large
+ships retain their mapped berth and use a bounded port-water transition when a
+clipped provider polygon cannot contain the hull; mapped water must take over
+at the transition edge. Boat camera framing uses the active water class:
+harbors and channels keep large-ship follow distance bounded, while open water
+retains a wider view. Terrestrial layers remain visible near shore and are
+suppressed only in known, distant open ocean.
 
 ## Character, companions, and urban play
 

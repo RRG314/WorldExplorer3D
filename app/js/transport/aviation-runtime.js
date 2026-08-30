@@ -1,9 +1,10 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=3';
-import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=6';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=7';
 import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=3';
+import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
 
 const BOARDING_DISTANCE = 8;
 const EXIT_SPEED_LIMIT = 1.5;
@@ -96,6 +97,52 @@ function placeVehicle(vehicle) {
   vehicle.visual.root.userData.generatedActivity = true;
 }
 
+function taxiPoint(home, yaw, right, forward) {
+  return {
+    x: home.x + Math.cos(yaw) * right + Math.sin(yaw) * forward,
+    z: home.z - Math.sin(yaw) * right + Math.cos(yaw) * forward
+  };
+}
+
+function createAircraftTaxiMotion(vehicle, index = 0) {
+  if (vehicle.catalog.aircraftKind !== 'fixed-wing') return null;
+  if (!['business', 'regional', 'airliner'].includes(vehicle.catalog.role)) return null;
+  if (vehicle.mobile && vehicle.catalog.role !== 'business') return null;
+  const length = vehicle.catalog.dimensions.length;
+  const span = vehicle.catalog.dimensions.wingspan;
+  const forward = Math.max(34, Math.min(118, length * 1.7));
+  const lane = Math.max(11, Math.min(34, span * .55));
+  const direction = index % 2 === 0 ? 1 : -1;
+  const home = vehicle.home;
+  const points = [
+    { x: home.x, z: home.z },
+    taxiPoint(home, home.yaw, lane * direction, forward),
+    taxiPoint(home, home.yaw, lane * direction, -forward * .72),
+    taxiPoint(home, home.yaw, 0, -forward * .38),
+    { x: home.x, z: home.z }
+  ];
+  const cruiseSpeed = vehicle.catalog.role === 'airliner' ? 3.6 : vehicle.catalog.role === 'regional' ? 4.4 : 5.2;
+  return createAmbientRouteMotion(points, {
+    cruiseSpeed,
+    acceleration: vehicle.catalog.role === 'airliner' ? .2 : .34,
+    yawRate: vehicle.catalog.role === 'airliner' ? .08 : vehicle.catalog.role === 'regional' ? .12 : .18,
+    dwellSeconds: 6,
+    initialDwellSeconds: 1.5 + index * 1.4
+  });
+}
+
+function updateAmbientTaxi(vehicle, dt) {
+  const motion = vehicle?.ambientMotion;
+  if (!motion || vehicle.condition <= .05 || vehicle.unmanned) return false;
+  advanceAmbientRouteMotion(vehicle, motion, dt);
+  vehicle.available = motion.state === 'docked';
+  vehicle.y = groundYAt(vehicle.x, vehicle.z) + aircraftGroundOffset(vehicle.catalog);
+  vehicle.visual.root.position.set(vehicle.x, vehicle.y, vehicle.z);
+  vehicle.visual.root.rotation.set(0, vehicle.yaw, 0);
+  updateAircraftVisual(vehicle.visual, vehicle.condition, dt * (.45 + motion.speed * .12));
+  return true;
+}
+
 function runtimeMatches(runtime) {
   return !!runtime && runtime.sequence === Number(appCtx.worldPublication?.sequence) &&
     runtime.requestId === String(appCtx.worldPublication?.requestId || '');
@@ -154,6 +201,7 @@ function interactionCandidate(runtime) {
 function enterAircraft(runtime, vehicle) {
   if (!vehicle?.available || !runtimeMatches(runtime)) return false;
   runtime.activeAircraft = vehicle;
+  vehicle.ambientMotion = null;
   vehicle.available = false;
   vehicle.visual.root.visible = false;
   const started = appCtx.setTravelMode?.('plane', {
@@ -366,11 +414,12 @@ function startAviationRuntime(options = {}) {
   disposeAviationRuntime(activeRuntime, 'replacement');
   const group = new THREE.Group();
   group.name = 'Playable Aviation Fleet';
-  const vehicles = derivedFleet(appCtx.transportFacilityGraph, { mobile: isTouchClient() }).map((record) => {
+  const vehicles = derivedFleet(appCtx.transportFacilityGraph, { mobile: isTouchClient() }).map((record, index) => {
     const visual = createAircraftVisual(THREE, record.catalog, { mobile: record.mobile, state: 'parked' });
     const vehicle = { ...record, visual, available: true, unmanned: null, disabledAt: 0 };
     placeVehicle(vehicle);
     vehicle.home = Object.freeze({ x: vehicle.x, y: vehicle.y, z: vehicle.z, yaw: vehicle.yaw });
+    vehicle.ambientMotion = createAircraftTaxiMotion(vehicle, index);
     group.add(visual.root);
     return vehicle;
   });
@@ -403,7 +452,7 @@ function startAviationRuntime(options = {}) {
       runtime.vehicles.forEach((vehicle) => {
         if (vehicle.unmanned) updateUnmannedAircraft(vehicle, frame.dt);
         else if (vehicle !== runtime.activeAircraft) {
-          if (vehicle.available) updateAircraftVisual(vehicle.visual, vehicle.condition, frame.dt);
+          if (!updateAmbientTaxi(vehicle, frame.dt) && vehicle.available) updateAircraftVisual(vehicle.visual, vehicle.condition, frame.dt);
           updateAircraftLifecycle(vehicle);
         }
       });
@@ -421,6 +470,7 @@ function startAviationRuntime(options = {}) {
     mappedAnchorCount: new Set(runtime.vehicles.map(({ anchorFacilityId }) => anchorFacilityId)).size,
     activeAircraftId: runtime.activeAircraft?.id || '',
     unmannedAircraftCount: runtime.vehicles.filter(({ unmanned }) => unmanned).length,
+    taxiingAircraftCount: runtime.vehicles.filter((vehicle) => vehicle.ambientMotion?.state === 'underway').length,
     catalogIds: Object.freeze(runtime.vehicles.map(({ catalog }) => catalog.id)),
     vehicles: Object.freeze(runtime.vehicles.map((vehicle) => Object.freeze({
       id: vehicle.id,
@@ -432,6 +482,7 @@ function startAviationRuntime(options = {}) {
       available: vehicle.available === true,
       unmanned: vehicle.unmanned != null,
       condition: Number(vehicle.condition.toFixed(3)),
+      traffic: ambientRouteSnapshot(vehicle.ambientMotion),
       anchorFacilityId: vehicle.anchorFacilityId
     }))),
     interaction: interactionCandidate(runtime)
@@ -451,6 +502,23 @@ function startAviationRuntime(options = {}) {
         return true;
       },
       snapshot: runtime.snapshot,
+      dock(aircraftId) {
+        const vehicle = runtime.vehicles.find(({ id }) => id === String(aircraftId));
+        if (!vehicle || vehicle === runtime.activeAircraft || !vehicle.home) return false;
+        vehicle.x = vehicle.home.x;
+        vehicle.y = vehicle.home.y;
+        vehicle.z = vehicle.home.z;
+        vehicle.yaw = vehicle.home.yaw;
+        if (vehicle.ambientMotion) {
+          vehicle.ambientMotion.targetIndex = 1;
+          vehicle.ambientMotion.speed = 0;
+          vehicle.ambientMotion.state = 'docked';
+          vehicle.ambientMotion.dwellRemaining = 20;
+        }
+        vehicle.available = vehicle.condition > .05;
+        placeVehicle(vehicle);
+        return vehicle.available;
+      },
       ageDisabled(aircraftId = runtime.vehicles[0]?.id) {
         const vehicle = runtime.vehicles.find(({ id }) => id === String(aircraftId));
         if (!vehicle || vehicle === runtime.activeAircraft) return false;

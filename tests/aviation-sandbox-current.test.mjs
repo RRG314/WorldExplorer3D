@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { AVIATION_CATALOG } from '../app/js/transport/aviation-catalog.js';
+import { AVIATION_CATALOG, AVIATION_FLEET_CATALOG } from '../app/js/transport/aviation-catalog.js';
 import { derivedFleet } from '../app/js/transport/aviation-runtime.js';
 import {
   PARACHUTE_POLICY,
@@ -27,10 +27,10 @@ const graph = Object.freeze({
   })
 });
 
-test('all five original aviation classes use the shared playable transport contract', () => {
-  assert.equal(AVIATION_CATALOG.length, 5);
+test('personal and airport-fleet aviation classes use the shared playable transport contract', () => {
+  assert.equal(AVIATION_CATALOG.length, 6);
   assert.deepEqual(AVIATION_CATALOG.map(({ id }) => id), [
-    'expedition-prop', 'business-jet', 'regional-jet', 'long-range-airliner', 'utility-helicopter'
+    'personal-prop', 'expedition-prop', 'business-jet', 'regional-jet', 'long-range-airliner', 'utility-helicopter'
   ]);
   for (const entry of AVIATION_CATALOG) {
     assert.equal(entry.domain, 'aviation');
@@ -47,7 +47,8 @@ test('all five original aviation classes use the shared playable transport contr
 
 test('playable aircraft are generated as explicit gameplay activity anchored to mapped facilities', () => {
   const fleet = derivedFleet(graph);
-  assert.equal(fleet.length, AVIATION_CATALOG.length);
+  assert.equal(fleet.length, AVIATION_FLEET_CATALOG.length);
+  assert.equal(fleet.some(({ catalog }) => catalog.directModeOnly === true), false);
   assert.equal(new Set(fleet.map(({ id }) => id)).size, fleet.length);
   assert.equal(fleet.every(({ mapped }) => mapped === false), true);
   assert.equal(fleet.every(({ generatedActivity }) => generatedActivity === true), true);
