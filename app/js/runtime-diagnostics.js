@@ -24,6 +24,19 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
+function compiledEndpointConnectionPublished(feature, endpoint) {
+  const connected = feature?.connectedFeatures?.[endpoint];
+  if (Array.isArray(connected) && connected.length > 0) return true;
+  const total = Number(feature?.transportGraphRef?.totalDistance);
+  if (!Number.isFinite(total)) return false;
+  const tolerance = Math.max(0.2, Math.min(1.25, (Number(feature?.width) || 6) * 0.08));
+  return (feature?.transportGraphRef?.stations || []).some((station) => {
+    const distance = Number(station?.distanceAlong);
+    if (!Number.isFinite(distance)) return false;
+    return endpoint === 'start' ? distance <= tolerance : total - distance <= tolerance;
+  });
+}
+
 function vectorSnapshot(vector) {
   if (!vector) return null;
   return {
@@ -624,6 +637,7 @@ function transportStructureSnapshot() {
         .some((station) => atStart
           ? Number(station?.distance) <= 18
           : Number(road?.transportStructureAssembly?.total) - Number(station?.distance) <= 18);
+      const compiledConnectionPublished = compiledEndpointConnectionPublished(road, endpoint);
       return {
         id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || ''),
         name: String(road?.name || ''),
@@ -643,7 +657,8 @@ function transportStructureSnapshot() {
         verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
         abutmentPublished,
         terminalSupportPublished,
-        supportWithinEndpointRun
+        supportWithinEndpointRun,
+        compiledConnectionPublished
       };
     });
   });
@@ -651,6 +666,7 @@ function transportStructureSnapshot() {
     .filter((record) =>
       record.state === 'open_boundary' &&
       Number(record.clearance) > 1.2 &&
+      record.compiledConnectionPublished !== true &&
       record.abutmentPublished !== true &&
       record.terminalSupportPublished !== true &&
       record.supportWithinEndpointRun !== true)
