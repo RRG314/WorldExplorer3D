@@ -5,7 +5,7 @@ import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=6';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
-import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=3';
+import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=4';
 import { createAirportHub } from './airport-hub.js?v=3';
 
 const BOARDING_DISTANCE = 8;

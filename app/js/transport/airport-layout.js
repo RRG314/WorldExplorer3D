@@ -82,10 +82,15 @@ function compileAirportOperationalLayout(graph, options = {}) {
   const aviation = Array.isArray(graph?.byDomain?.aviation) ? graph.byDomain.aviation : [];
   if (!aviation.length) return null;
   const runways = aviation.filter((record) => record.type === 'runway' && recordPoints(record).length >= 2);
+  const aerodromes = aviation.filter((record) => record.type === 'aerodrome' && recordPoint(record));
+  // A helipad or heliport is valid aviation infrastructure, but it is not
+  // evidence for a fixed-wing airport. Generating a runway from any aviation
+  // point placed full runway layouts across hospitals and rooftop pads.
+  if (!runways.length && !aerodromes.length) return null;
   const terminals = aviation.filter((record) => record.type === 'terminal');
   const aprons = aviation.filter((record) => record.type === 'apron');
   const mappedStands = aviation.filter((record) => ['parking_position', 'gate'].includes(record.type));
-  const aerodrome = aviation.find((record) => ['aerodrome', 'heliport'].includes(record.type));
+  const aerodrome = aerodromes[0];
   const centerRecord = terminals[0] || aprons[0] || aerodrome || runways[0] || aviation[0];
   const center = recordPoint(centerRecord);
   if (!center) return null;

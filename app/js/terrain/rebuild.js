@@ -73,11 +73,12 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
 }
 
 export function shouldRenderRoadCenterMarkings(road) {
-  // Road markings are a presentation-only layer. They were being published as
-  // independent white quads and could remain visible above a road or after its
-  // owning surface changed. Keep the authoritative road surface and collision,
-  // but do not publish this detached decoration.
-  return false;
+  if (!/(motorway|trunk|primary)/.test(String(road?.type || ""))) return false;
+  // Elevated ribbons and their engineered bodies are compiled by separate
+  // owners. Until those meshes share one published top surface, lane quads can
+  // remain visible when the body is occluded. Preserve ordinary ground-road
+  // markings while leaving elevated decoration to its structure owner.
+  return road?.structureSemantics?.terrainMode !== 'elevated';
 }
 
 function appendRoadCenterMarkings(road, points, targetVerts, targetIndices, widthSamplesMeters = null) {

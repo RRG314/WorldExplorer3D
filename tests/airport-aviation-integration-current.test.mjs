@@ -45,6 +45,16 @@ test('one airport layout supplies runway, stands, tower, and ticket hall without
   assert.equal(mobileLayout.stands.length, 7);
 });
 
+test('standalone helipads never authorize a generated runway or fixed-wing airport fleet', () => {
+  const source = graph([
+    record('mapped:hospital-pad', 'helipad', [{ x: 20, z: -10 }]),
+    record('mapped:rooftop-pad', 'helipad', [{ x: -40, z: 35 }])
+  ]);
+  const layout = compileAirportOperationalLayout(source, { location: { name: 'Downtown' }, mobile: false });
+  assert.equal(layout, null);
+  assert.deepEqual(derivedFleet(source, { airportLayout: layout, mobile: false }), []);
+});
+
 test('mapped runway geometry remains the operational runway and dense fleet uses its stands', () => {
   const source = graph([
     record('mapped:runway', 'runway', [{ x: 0, z: -600 }, { x: 0, z: 600 }], { width: 46, ref: '15/33' }),
