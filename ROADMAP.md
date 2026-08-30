@@ -40,7 +40,7 @@ travel and sandbox play.
 | Character and companions | Attributes, skills, condition, equipment, companion care, trust, levels, livestock, and vehicle travel | Player-selectable Explorer identities, richer appearance, training, and ability growth |
 | Earth travel | Walking, distinct road vehicles, responder vehicles, drone, personal aircraft, airport aircraft, boats, ships, and skydiving | More vehicle classes, facilities, damage presentation, and physical-device tuning |
 | Water | Shore visibility, mapped vessel identity, marinas, ports, playable boat and ship classes, shore/boat/underwater fishing | Wider port coverage, water traffic, maritime activities, and reviewed bathymetry |
-| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return | More complete planetary activities, destinations, spacecraft, and visual review |
+| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return | Optional long-distance Expeditions, more complete planetary activities, destinations, spacecraft, and visual review |
 | World construction | One World Editor containing persistent local and room Blocks | Terrain shaping, building materials, interiors, decoration, and creator publishing |
 | Community | Bounded rooms, presence, chat, activities, shared Blocks, persistent room vehicles, and public game leaderboards | Larger-room review, moderation depth, clubs, events, and shared settlements |
 | Access and performance | Keyboard, touch, mobile layouts, accessibility settings, bounded loading, and lifecycle cleanup | Broader phone, browser, assistive-technology, battery, and thermal review |
@@ -197,6 +197,203 @@ adding city-specific exceptions.
   atmospheres, hazards, activities, visuals, and return journeys.
 - Preserve manual control. Assistance remains optional, visible, local to the
   selected destination, and interruptible by the player.
+
+## Interstellar Expeditions
+
+Interstellar Expeditions will make the journey between distant destinations a
+game of its own without replacing the current space sandbox. Players will keep
+three choices through the same universe and destination catalog:
+
+1. **Free flight:** enter a personal spacecraft, fly manually, orbit, land,
+   leave the craft, and explore with the existing Character, geology, building,
+   and planetary systems.
+2. **Assisted travel:** select a destination and use the current optional,
+   interruptible travel assistance.
+3. **Interstellar Expedition:** deliberately plan and provision a persistent
+   long-range ship, manage the voyage, and return to ordinary local exploration
+   on arrival.
+
+Mars, a discovered world, a player base, and an outpost remain the same places
+regardless of how the player reaches them. Expedition work will extend the
+existing body catalog, world addresses, Space Flight, Character, Backpack,
+Journal, geology, World Editor, Blocks, rooms, and persistence. It will not
+create Expedition-only copies of those systems.
+
+### Stage 1: research and system decisions
+
+- Produce one primary `INTERSTELLAR_EXPEDITION_SYSTEM.md` before broad
+  implementation. It will make decisions about propulsion, relativity,
+  strategic time, crew, closed life support, ship interiors, resources,
+  failure, multiplayer, persistence, performance, and the boundary with
+  ordinary Space.
+- Base physical claims on authoritative scientific and engineering sources.
+  Distinguish catalog observations, established physics, modeled values,
+  speculative engineering, game-generated content, and fictional technology.
+- Retain known physical distance while presenting simulated mission duration
+  and expected player time separately. One travel calculator will own route
+  feasibility, acceleration and deceleration, propellant, external elapsed
+  time, crew-experienced time when relativity matters, and play-time
+  compression.
+- Use hierarchical world addresses and reference frames so nearby flight stays
+  precise while the same architecture can address planets, stars, nebulae, and
+  galaxies. Catalog objects take precedence; deterministic generated objects
+  fill appropriate gaps without being presented as observed fact.
+- Separate Expedition chronology from contemporary Earth context. A voyage
+  representing centuries will not silently move the live Earth world into a
+  fictional future.
+
+This stage is complete when the design names one owner for every shared state,
+resolves the scientific and gameplay decisions needed for implementation, and
+defines schema migration and rollback. It will not remain an open list of
+alternatives.
+
+### Stage 2: one complete journey foundation
+
+- Add one Expedition planner with a small set of understandable realism and
+  survival presets plus an advanced custom choice. The planner covers
+  destination, ship, propulsion, crew role coverage, resources, route stops,
+  risk, and a clear Ready, Marginal, or Insufficient assessment.
+- Create data-driven ship and propulsion profiles whose mass, thrust, range,
+  crew, cargo, power, life support, maintenance, and interior requirements
+  produce meaningfully different journeys. Real, speculative, and fictional
+  drives retain honest classifications and explanations.
+- Keep personal equipment in the Backpack, voyage supplies in ship cargo, and
+  outpost resources in settlement storage. Every transfer is explicit and
+  conservation-checked.
+- Use one versioned Expedition record for the ship, route, current leg,
+  strategic time, crew, supplies, system condition, cargo, discoveries, major
+  events, and mission state. Stable ship identity includes its class,
+  configuration, upgrades, condition, crew association, and history.
+- Add an interim mission allocation for initial provisioning without embedding
+  a temporary currency throughout the game. It must be replaceable by the
+  future shared World Explorer economy.
+
+The first implementation proves a complete representative journey: prepare,
+board, depart, advance time, consume supplies, respond to a real ship problem,
+record a discovery, arrive, leave the Expedition ship, and continue as the same
+Explorer through the existing local Space and planetary systems.
+
+### Stage 3: the ship, crew, and voyage
+
+- Make each Expedition ship a bounded, high-quality, walkable place assembled
+  from validated class-specific layouts. Required rooms must exist, remain
+  reachable, fit the exterior, support collision, and perform real functions;
+  unused decorative labels do not count as systems.
+- Connect bridge, engineering, life support, medical, cargo, fabrication,
+  science, crew, food production, cryogenic, and vehicle spaces only when the
+  selected ship requires them. Room and deck visibility, shared assets,
+  bounded lighting, and crew detail levels keep interiors playable in a
+  browser and on supported phones.
+- Use the existing Explorer as a crew member. NPC crew have names, ages,
+  health, fatigue, experience, assignments, and overlapping technical roles.
+  They work, rest, repair, treat, and perform science in the visible ship with
+  purposeful bounded behavior. Routine schedules and maintenance are automatic
+  unless the player chooses deeper control.
+- Track a focused set of consequential supplies: food, water and life support,
+  power, propulsion resources, medical supplies, maintenance material,
+  fabrication feedstock, and mission cargo. Forecast consumption, recycling
+  losses, production, uncertainty, and safety margin before departure.
+- Give propulsion, power, life support, navigation, thermal control, medical,
+  fabrication, food production, sensors, and hull systems condition that can
+  degrade, warn, fail, and recover. Repairs use crew skill, time, spares, or
+  valid fabrication; temporary repairs restore limited capability.
+- Advance months or centuries through an analytical strategic clock rather
+  than faster render frames. The player can run normal time, choose a faster
+  rate, or advance to the next event or milestone; local exploration pauses
+  long-travel compression.
+- Generate quiet travel and bounded state-driven events as well as contextual
+  uncertainty. Every event changes actual crew, resources, route, or ship state,
+  and unresolved problems can form an understandable failure chain. A prepared
+  Expedition normally has backups, warnings, repair, diversion, and rescue
+  opportunities before it can be lost.
+- Record departures, arrivals, repairs, losses, discoveries, route changes,
+  resupply, rescue, outposts, and outcomes in a Captain's Log presentation
+  backed by the existing Journal and progression authority.
+
+### Stage 4: stops, discoveries, and long-duration missions
+
+- Let a route include known planets, moons, small bodies, bases, outposts, and
+  stable game-generated destinations. Reachability comes from distance, ship,
+  propulsion, supplies, and valid stops rather than an arbitrary player level.
+- Make resource recovery use the existing planetary flight, geology, mining,
+  rover, Backpack, and cargo paths. A player may land and gather, deploy a
+  capable rover, trade with a stocked location, salvage a valid object, or
+  receive a trusted transfer; no menu may create supplies from nothing.
+- Let sensors progress an unknown object from detection to a better supported
+  classification. Generated discoveries retain a stable identity, designation,
+  seed, and truth label across save, reload, departure, and return. Known
+  catalog objects are never presented as player-created discoveries.
+- Support cryogenic missions with reserve specialists who can be awakened when
+  needed. Treat human long-term suspension as speculative, with costs and
+  limitations rather than a cosmetic label.
+- Support generation voyages with bounded population continuity, aging,
+  training, role succession, knowledge preservation, food, life support,
+  medical capability, and maintenance. This is not a politics, relationship,
+  or civilization simulator, and it will not store individual genetic data.
+- Apply established Special Relativity to ships reaching meaningful fractions
+  of light speed, including acceleration, deceleration, external time, and
+  crew-experienced time. Explicitly fictional faster-than-light travel remains
+  available only under its honest game classification.
+
+### Stage 5: shared Expeditions and persistent outposts
+
+- Extend the current room and backend authority so one human with NPC crew or
+  multiple humans can share one ship, route, clock, crew, cargo, resource, and
+  system state. Clients do not independently award or consume shared supplies.
+- Synchronize players walking through the same interior while leaving routine
+  NPC animation and effects local where they do not affect authority. Time
+  compression requires a clear host or consent decision and remains safe when
+  a player disconnects and rejoins.
+- Allow a compatible player Expedition to answer a distress request only when
+  route and time make a rendezvous possible. Trusted transfers remove the exact
+  cargo from the assisting ship before adding it to the receiving ship, and
+  both Captain's Logs record the rescue.
+- Let a suitable Expedition establish a bounded outpost at an existing
+  planetary destination using the existing World Editor and Blocks. Its crew,
+  habitat, power, food, water, life support, medical capacity, maintenance,
+  production, and storage determine what survives or becomes available later.
+- Keep an outpost present for ordinary Free-Roam visits and future Expeditions.
+  It is a persistent resupply node, not a separate colony-management game or a
+  duplicate planetary world.
+
+### Completion and release gates
+
+Interstellar Expeditions are complete only when the following connected
+journeys work from planning through persistence, not merely as menus or meters:
+
+- unchanged Free-Roam flight, assisted travel, landing, planetary exploration,
+  geology, building, takeoff, and return with no Expedition requirements;
+- one complete Expedition with a functional walkable ship, active crew,
+  consequential resources and systems, a repair, a discovery, arrival, local
+  exploration, and continuation;
+- a real multi-stop resupply using existing planetary or rover gameplay;
+- cryogenic crew replacement, a multigenerational voyage, and numerically
+  validated relativistic travel;
+- shared human crew, disconnect and reconnect, coordinated strategic time, and
+  a resource-conserving multiplayer rescue;
+- one persistent outpost that advances within its bounded model and is the same
+  place in Expedition and Free-Roam play;
+- a recoverable and an unrecoverable multi-stage failure with a causal report;
+- a stable generated discovery that survives save, reload, departure, and
+  return; and
+- a full active-journey save and restore with the same Explorer, ship layout,
+  crew, ages, supplies, systems, route, time, cargo, discoveries, log, and
+  outposts.
+
+A deterministic non-rendering simulation will exercise representative short,
+interplanetary, nearby-star, cryogenic, generation, relativistic, fictional,
+multi-stop, rescue, and outpost journeys across long simulated durations. It
+will test conservation and deliberately reproduce failure chains rather than
+only successful missions. Actual desktop and mobile gameplay review will still
+verify planning, ship interiors, crew activity, cruise, emergencies, arrival,
+local exploration, visual quality, audio, accessibility, lifecycle cleanup,
+and the unchanged ordinary Space experience.
+
+The initial system stops at this complete loop. It does not add a technology
+tree, politics, romance, factions, alien civilizations, diplomacy, banking, a
+manufacturing empire, or a full city, colony, or interstellar-market simulator.
+Galaxy-scale addressing does not claim that every destination is handcrafted
+or reachable by every ship.
 
 ## Creation and community
 
