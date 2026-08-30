@@ -6,7 +6,7 @@ import {
 import {
   registerStreetLamp,
   resetStreetLampFixtures
-} from "../engine/night-lighting.js?v=7";
+} from "../engine/night-lighting.js?v=8";
 import { roadWidthAtSegment } from './road-cross-section-profile.js?v=1';
 
 let furnitureMaterialsReady = false;
@@ -144,8 +144,8 @@ function initFurnitureGeometries() {
   geoSignBoard = new THREE.BoxGeometry(4, 0.8, 0.1);
   geoTreeTrunk = new THREE.CylinderGeometry(0.24, 0.42, 4.6, 7);
   geoTreeCanopy = createOrganicTreeCanopyGeometry();
-  geoLampPole = new THREE.CylinderGeometry(0.12, 0.15, 6, 6);
-  geoLampHead = new THREE.SphereGeometry(0.5, 8, 6);
+  geoLampPole = new THREE.CylinderGeometry(0.12, 0.17, 7, 8);
+  geoLampHead = new THREE.BoxGeometry(1.2, 0.22, 0.55);
   geoTrashBody = new THREE.CylinderGeometry(0.4, 0.35, 1.0, 8);
   geoTrashLid = new THREE.CylinderGeometry(0.45, 0.45, 0.1, 8);
   geoSignalHousing = new THREE.BoxGeometry(.52, 1.5, .42);
@@ -249,23 +249,42 @@ function markFurniture(group, kind, provenance = 'inferred') {
   group.userData.urbanEntityId = `furniture:${kind}:${(hash >>> 0).toString(16)}`;
 }
 
-function createLightPost(x, z, provenance = 'inferred') {
+function createLightPost(x, z, provenance = 'inferred', roadTarget = null) {
   const group = new THREE.Group();
 
   const pole = new THREE.Mesh(geoLampPole, matPole);
-  pole.position.y = 3;
+  pole.position.y = 3.5;
   group.add(pole);
 
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(3.25, 0.16, 0.16), matPole);
+  arm.position.set(1.55, 6.92, 0);
+  group.add(arm);
+
+  const brace = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.1, 0.1), matPole);
+  brace.position.set(0.72, 6.48, 0);
+  brace.rotation.z = 0.5;
+  group.add(brace);
+
   const head = new THREE.Mesh(geoLampHead, matLampHead);
-  head.position.y = 6.2;
+  head.position.set(3.1, 6.78, 0);
+  head.rotation.z = -0.08;
   group.add(head);
 
   group.position.set(x, terrainHeightAt(x, z), z);
+  const targetX = Number(roadTarget?.x);
+  const targetZ = Number(roadTarget?.z);
+  if (Number.isFinite(targetX) && Number.isFinite(targetZ)) {
+    const dx = targetX - x;
+    const dz = targetZ - z;
+    if (Math.hypot(dx, dz) > 0.01) group.rotation.y = Math.atan2(-dz, dx);
+  }
   group.userData.furniturePos = { x, z };
   markFurniture(group, 'street_lamp', provenance);
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
-  registerStreetLamp(group, head);
+  registerStreetLamp(group, head, Number.isFinite(targetX) && Number.isFinite(targetZ)
+    ? { x: targetX, z: targetZ }
+    : { x: x + 3.1, z });
 }
 
 function createTrashCan(x, z, provenance = 'inferred') {
@@ -359,7 +378,13 @@ function nearestRoadsidePoint(point) {
       const length = Math.sqrt(lengthSq);
       const side = ((point.x - x) * (-dz / length) + (point.z - z) * (dx / length)) >= 0 ? 1 : -1;
       const offset = roadWidthAtSegment(road, index, t) * .5 + 1.35;
-      best = { x: x + (-dz / length) * offset * side, z: z + (dx / length) * offset * side, distance };
+      best = {
+        x: x + (-dz / length) * offset * side,
+        z: z + (dx / length) * offset * side,
+        centerX: x,
+        centerZ: z,
+        distance
+      };
     }
   }
   return best && best.distance <= 42 ? best : null;
@@ -416,7 +441,12 @@ export function generateStreetFurniture(options = {}) {
   const semanticPlacements = trafficControlPlacements(options.mappedFurnitureNodes);
   let totalControls = 0;
   semanticPlacements.forEach((placement) => {
-    if (placement.kind === 'street_lamp') return createLightPost(placement.x, placement.z, placement.provenance);
+    if (placement.kind === 'street_lamp') {
+      const roadside = nearestRoadsidePoint(placement);
+      return createLightPost(placement.x, placement.z, placement.provenance, roadside
+        ? { x: roadside.centerX, z: roadside.centerZ }
+        : null);
+    }
     if (placement.kind === 'waste_basket') return createTrashCan(placement.x, placement.z, placement.provenance);
     if (totalControls >= budget.maxTrafficControls) return;
     const roadside = nearestRoadsidePoint(placement) || placement;
@@ -492,7 +522,7 @@ export function generateStreetFurniture(options = {}) {
         const lx = p1.x + nx * offset;
         const lz = p1.z + nz * offset;
         if (!semanticPlacements.some((placement) => placement.kind === 'street_lamp' && Math.hypot(placement.x - lx, placement.z - lz) < 18)) {
-          createLightPost(lx, lz);
+          createLightPost(lx, lz, 'inferred', { x: p1.x, z: p1.z });
         }
         totalLamps += 1;
       }

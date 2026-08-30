@@ -1,5 +1,5 @@
 import { createNaturalHistoryModel } from './natural-history-models.js?v=1';
-import { animateAnimalModel } from './animal-models.js?v=1';
+import { animateAnimalModel } from './animal-models.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 const ACTIVITY_TOOL = Object.freeze({
@@ -7,6 +7,7 @@ const ACTIVITY_TOOL = Object.freeze({
   photograph: 'field-camera', 'fossil-document': 'specimen-brush', forage: 'field-lens',
   'nature-observe': 'field-binoculars', 'insect-macro': 'field-camera',
   'habitat-survey': 'field-lens', 'community-survey': 'field-lens',
+  'sonar-survey': 'portable-sonar',
   'wildlife-track': 'field-binoculars', 'trail-camera-survey': 'field-camera', survey: 'field-lens',
   inspect: 'field-lens', beachcomb: 'hand-trowel', 'virtual-archaeology': 'hand-trowel',
   'treasure-hunt': 'field-shovel', 'forest-survey': 'field-lens', 'weather-observe': 'field-lens'
@@ -23,7 +24,7 @@ function disposeObject(object) {
 
 function createFieldEquipmentPresentation(appCtx) {
   const THREE = globalThis.THREE;
-  if (!THREE) return { update() {}, setRevealed() {}, setFieldRevealed() {}, setExcavation() {}, dispose() {}, diagnostics: { meshes: 0, triangles: 0, drawCalls: 0 } };
+  if (!THREE) return { update() {}, previewUse() { return false; }, setRevealed() {}, setFieldRevealed() {}, setExcavation() {}, dispose() {}, diagnostics: { meshes: 0, triangles: 0, drawCalls: 0 } };
   const holder = new THREE.Group();
   holder.name = 'World Discovery Held Field Equipment';
   const materials = {
@@ -43,6 +44,8 @@ function createFieldEquipmentPresentation(appCtx) {
   let fieldRevealSlotId = null;
   let revealCatalogId = null;
   let elapsed = 0;
+  let previewToolId = '';
+  let previewRemaining = 0;
 
   const mesh = (parent, geometry, material, name, position, rotation) => {
     const item = new THREE.Mesh(geometry, material);
@@ -123,6 +126,12 @@ function createFieldEquipmentPresentation(appCtx) {
     mesh(tool, new THREE.CylinderGeometry(.28, .18, .10, 20, 1, true), materials.dark, 'Sediment pan', [.36, .72, .43], [0, 0, .16]);
     mesh(tool, new THREE.TorusGeometry(.28, .025, 8, 24), materials.blue, 'Sediment pan rim', [.36, .77, .43], [Math.PI / 2, 0, 0]);
   }
+  {
+    const tool = toolGroup('portable-sonar');
+    mesh(tool, new THREE.BoxGeometry(.32, .22, .14), materials.dark, 'Portable sonar body', [.36, 1.02, .36]);
+    mesh(tool, new THREE.BoxGeometry(.23, .13, .018), materials.screen, 'Portable sonar display', [.36, 1.04, .44]);
+    mesh(tool, new THREE.CylinderGeometry(.045, .045, .18, 10), materials.blue, 'Portable sonar transducer', [.53, .88, .38], [Math.PI / 2, 0, 0]);
+  }
 
   holder.userData.worldDiscoveryEquipment = true;
 
@@ -176,16 +185,20 @@ function createFieldEquipmentPresentation(appCtx) {
   }
 
   function update(actor, sessionSnapshot, dt, activityId = 'metal-detect') {
-    elapsed += Math.max(0, Number(dt) || 0);
+    const step = Math.max(0, Number(dt) || 0);
+    elapsed += step;
+    previewRemaining = Math.max(0, previewRemaining - step);
+    if (previewRemaining <= 0) previewToolId = '';
     attachToCharacter();
     const isWalking = appCtx.Walk?.state?.mode === 'walk' && !!attachmentTarget;
     const phase = sessionSnapshot?.phase || 'idle';
-    const equipmentActive = !!sessionSnapshot?.active && !['recorded', 'collected', 'left', 'complete'].includes(phase);
-    const toolId = sessionSnapshot?.activeToolId || ACTIVITY_TOOL[activityId] || 'field-lens';
+    const previewing = !!previewToolId && previewRemaining > 0;
+    const equipmentActive = previewing || !!sessionSnapshot?.active && !['recorded', 'collected', 'left', 'complete'].includes(phase);
+    const toolId = previewToolId || sessionSnapshot?.activeToolId || ACTIVITY_TOOL[activityId] || 'field-lens';
     tools.forEach((tool, id) => { tool.visible = equipmentActive && isWalking && id === toolId; });
     holder.visible = equipmentActive && isWalking;
     const excavating = phase === 'excavating';
-    const observing = phase === 'observing';
+    const observing = previewing || phase === 'observing';
     const deliberateSwing = observing && (toolId === 'rock-hammer' || toolId === 'specimen-brush');
     holder.rotation.z = toolId === 'metal-detector'
       ? Math.sin(elapsed * 3.2) * .18
@@ -206,6 +219,8 @@ function createFieldEquipmentPresentation(appCtx) {
     if (arm && equipmentActive) {
       arm.rotation.x = toolId === 'field-binoculars' || toolId === 'field-camera'
         ? -1.25
+        : toolId === 'field-lens' && previewing
+          ? -.72 + Math.sin(elapsed * 7.2) * .12
         : toolId === 'rock-hammer' && observing
           ? -.65 + Math.sin(elapsed * 6.4) * .55
           : toolId === 'specimen-brush' && observing
@@ -222,6 +237,14 @@ function createFieldEquipmentPresentation(appCtx) {
       excavation.scale.setScalar(.96 + Math.sin(elapsed * 5) * .015);
     }
     if (fieldReveal?.visible && fieldReveal.userData?.worldDiscoveryAnimal) animateAnimalModel(fieldReveal, elapsed, .42);
+  }
+
+  function previewUse(toolId) {
+    const id = String(toolId || '');
+    if (!tools.has(id)) return false;
+    previewToolId = id;
+    previewRemaining = .72;
+    return true;
   }
 
   function setRevealed(slot, visible) {
@@ -321,7 +344,7 @@ function createFieldEquipmentPresentation(appCtx) {
     triangleCount += child.geometry?.index ? child.geometry.index.count / 3 : (child.geometry?.attributes?.position?.count || 0) / 3;
   });
   return {
-    holder, reveal, excavation, update, setRevealed, setFieldRevealed, setExcavation,
+    holder, reveal, excavation, update, previewUse, setRevealed, setFieldRevealed, setExcavation,
     get fieldReveal() { return fieldReveal; },
     dispose() { disposeObject(holder); disposeObject(reveal); disposeObject(excavation); disposeObject(fieldReveal); },
     diagnostics: Object.freeze({ meshes: meshCount + 12, triangles: Math.round(triangleCount + 600), drawCalls: meshCount + 12, heldAttachment: true, distinctTools: tools.size, excavationFeedback: true })

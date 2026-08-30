@@ -1,10 +1,10 @@
-import { vectorTileRangeForBounds } from "./shortbread-source.js?v=17";
+import { vectorTileRangeForBounds } from "./shortbread-source.js?v=19";
 import {
   OVERTURE_RELEASE,
   OVERTURE_RELEASE_POLICY,
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl
-} from './overture-tile-source.js?v=5';
+} from './overture-tile-source.js?v=6';
 import { shouldSuppressBuildingParent } from './building-provenance-model.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { throwIfWorldLoadAborted } from '../earth-core/request-cancellation.js?v=1';

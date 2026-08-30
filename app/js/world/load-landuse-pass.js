@@ -53,13 +53,11 @@ function hardscapeMaterialOptions(appCtx, landuseType, composition) {
     : appCtx.pavementDiffuse
       ? { map: appCtx.pavementDiffuse, normalMap: appCtx.pavementNormal, roughnessMap: appCtx.pavementRoughness }
       : null;
-  return {
-    material: {
+  const material = {
       color: textures?.map ? 0xffffff : (appCtx.LANDUSE_STYLES?.[landuseType]?.color ?? 0xb8b8b8),
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
-      normalScale: textures?.normalMap ? new THREE.Vector2(0.34, 0.34) : undefined,
       roughness: 0.9,
       metalness: 0.0,
       transparent: false,
@@ -68,7 +66,10 @@ function hardscapeMaterialOptions(appCtx, landuseType, composition) {
       polygonOffset: true,
       polygonOffsetFactor: composition.polygonOffsetFactor,
       polygonOffsetUnits: composition.polygonOffsetUnits
-    },
+  };
+  if (textures?.normalMap) material.normalScale = new THREE.Vector2(0.34, 0.34);
+  return {
+    material,
     metersPerTile: 3.2
   };
 }

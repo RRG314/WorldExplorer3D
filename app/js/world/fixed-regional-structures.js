@@ -1,4 +1,4 @@
-import { fixedRegionalContextBounds } from './fixed-regional-context.js?v=8';
+import { fixedRegionalContextBounds } from './fixed-regional-context.js?v=9';
 import { fetchBundledLandmarkData } from './landmark-source.js?v=3';
 
 const DRIVEABLE_HIGHWAYS =

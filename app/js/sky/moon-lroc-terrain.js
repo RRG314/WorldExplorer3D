@@ -1,7 +1,13 @@
+import { APOLLO11_SURFACE_REGION } from '../planetary/runtime/surface-authority.js?v=3';
+
+const heightAsset = APOLLO11_SURFACE_REGION.assets.find((asset) => asset.role === 'height');
+const albedoAsset = APOLLO11_SURFACE_REGION.assets.find((asset) => asset.role === 'albedo');
+
 const APOLLO11_TERRAIN = Object.freeze({
-  source: 'LROC NAC Apollo 11 Landing Site DTM and orthophoto',
-  sourceUrl: 'https://data.lroc.im-ldi.com/lroc/view_rdr/NAC_DTM_APOLLO11',
-  horizontalResolutionMeters: 8,
+  regionId: APOLLO11_SURFACE_REGION.regionId,
+  source: APOLLO11_SURFACE_REGION.source.title,
+  sourceUrl: APOLLO11_SURFACE_REGION.source.url,
+  horizontalResolutionMeters: heightAsset.resolutionM,
   originalDtmResolutionMeters: 2,
   minLatitude: 0.31464201,
   maxLatitude: 1.23650584,
@@ -12,10 +18,10 @@ const APOLLO11_TERRAIN = Object.freeze({
   landingElevationMeters: -1927.6068,
   landingLatitude: 0.67416,
   landingLongitude: 23.47314,
-  widthMeters: 4220.256187689549,
-  lengthMeters: 27953.999960438563,
-  heightAsset: new URL('../../assets/textures/moon/apollo11_lroc_dtm_8m.png', import.meta.url).href,
-  albedoAsset: new URL('../../assets/textures/moon/apollo11_lroc_ortho_8m.jpg', import.meta.url).href
+  widthMeters: APOLLO11_SURFACE_REGION.localBounds.maxX - APOLLO11_SURFACE_REGION.localBounds.minX,
+  lengthMeters: APOLLO11_SURFACE_REGION.localBounds.maxZ - APOLLO11_SURFACE_REGION.localBounds.minZ,
+  heightAsset: heightAsset.url,
+  albedoAsset: albedoAsset.url
 });
 
 function imageRequest(url) {

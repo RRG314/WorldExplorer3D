@@ -99,6 +99,9 @@ try {
           environment: diagnostics.environment,
           worldCounts: diagnostics.worldCounts || {},
           transportContinuity: diagnostics.transportStructures?.junctionContinuity || null,
+          transportNetwork: diagnostics.transportStructures?.transportNetwork || null,
+          generalizedEndpointIntegrity:
+            diagnostics.transportStructures?.generalizedEndpointIntegrity || null,
           transportGradeProfile: diagnostics.transportStructures?.gradeProfile || null,
           roadSurfaceIntegrity: diagnostics.transportStructures?.roadSurfaceIntegrity || null,
           atGradeTerrainAuthority: diagnostics.transportStructures?.atGradeTerrainAuthority || null,
@@ -213,6 +216,10 @@ try {
           ) <= 2700
         ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
+        generalizedStructureEndpointsSupported:
+          snapshot.generalizedEndpointIntegrity?.authority ===
+            'compiled-generalized-structure-endpoints' &&
+          Number(snapshot.generalizedEndpointIntegrity?.unsupportedOpenBoundaryCount || 0) === 0,
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         solidRoadSurfaceFootprints:
           snapshot.roadSurfaceIntegrity?.authority ===

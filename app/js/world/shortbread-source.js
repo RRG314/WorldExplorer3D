@@ -165,6 +165,23 @@ function roadTags(properties = {}) {
       _sourceCompleteness: 'generalized'
     };
   }
+  // The Shortbread streets layer carries OSM aeroway=runway/taxiway in the
+  // same `kind` field as highways. Preserve that source meaning instead of
+  // publishing an invented highway whose value happens to be "runway".
+  if (kind === 'runway' || kind === 'taxiway') {
+    return {
+      aeroway: kind,
+      bridge: booleanTag('bridge'),
+      tunnel: booleanTag('tunnel'),
+      layer: raw('layer'),
+      surface: raw('surface'),
+      width: raw('width'),
+      access: raw('access'),
+      ref: raw('ref'),
+      name: raw('name'),
+      _sourceCompleteness: 'generalized'
+    };
+  }
   const highway = properties.link === true && !kind.endsWith('_link') ? `${kind}_link` : kind;
   return {
     highway,
@@ -229,14 +246,79 @@ function siteTags(properties = {}) {
   return null;
 }
 
+function poiTags(properties = {}) {
+  const supportedKeys = [
+    'amenity', 'leisure', 'tourism', 'shop', 'man_made',
+    'historic', 'emergency', 'highway'
+  ];
+  const tags = {};
+  supportedKeys.forEach((key) => {
+    const value = String(properties[key] || '').trim();
+    if (value) tags[key] = value;
+  });
+  if (Object.keys(tags).length === 0) return null;
+  ['name', 'name_en', 'name_de', 'ref'].forEach((key) => {
+    const value = String(properties[key] || '').trim();
+    if (value) tags[key === 'name_en' ? 'name:en' : key === 'name_de' ? 'name:de' : key] = value;
+  });
+  return tags;
+}
+
+function publicTransportTags(properties = {}) {
+  const kind = String(properties.kind || '').toLowerCase();
+  if (kind === 'aerodrome' || kind === 'helipad') {
+    return {
+      aeroway: kind,
+      name: String(properties.name || ''),
+      ref: String(properties.ref || ''),
+      iata: String(properties.iata || ''),
+      icao: String(properties.icao || ''),
+      _sourceCompleteness: 'generalized'
+    };
+  }
+  if (kind === 'ferry_terminal') {
+    return {
+      amenity: 'ferry_terminal',
+      name: String(properties.name || ''),
+      ref: String(properties.ref || ''),
+      _sourceCompleteness: 'generalized'
+    };
+  }
+  return null;
+}
+
 function featureTags(layerName, properties = {}) {
   if (layerName === 'streets') return roadTags(properties);
   if (layerName === 'land') return landTags(properties);
   if (layerName === 'sites') return siteTags(properties);
+  if (layerName === 'pois') return poiTags(properties);
+  if (layerName === 'public_transport') return publicTransportTags(properties);
+  if (layerName === 'ferries') return {
+    route: 'ferry',
+    name: String(properties.name || ''),
+    ref: String(properties.ref || ''),
+    _sourceCompleteness: 'generalized'
+  };
+  if (layerName === 'pier_lines' || layerName === 'pier_polygons') return {
+    man_made: String(properties.kind || 'pier'),
+    name: String(properties.name || ''),
+    _sourceCompleteness: 'generalized'
+  };
   if (layerName === 'buildings') return { building: 'yes' };
   if (layerName === 'street_polygons') {
     const kind = String(properties.kind || '').toLowerCase();
     if (!kind) return null;
+    if (kind === 'runway' || kind === 'taxiway') {
+      return {
+        'area:aeroway': kind,
+        aeroway: kind,
+        area: 'yes',
+        surface: properties.surface || '',
+        bridge: properties.bridge ? 'yes' : '',
+        tunnel: properties.tunnel ? 'yes' : '',
+        _sourceCompleteness: 'generalized'
+      };
+    }
     return {
       'area:highway': kind,
       area: 'yes',
@@ -336,6 +418,38 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
         const geojson = feature.toGeoJSON(x, y, z);
         const tags = featureTags(layerName, geojson.properties || {});
         if (!tags) continue;
+        if (geojson.geometry?.type === 'Point') {
+          const lon = Number(geojson.geometry.coordinates?.[0]);
+          const lat = Number(geojson.geometry.coordinates?.[1]);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+          if (bounds && (
+            lat < bounds.minLat || lat > bounds.maxLat ||
+            lon < bounds.minLon || lon > bounds.maxLon
+          )) continue;
+          const sourceFeatureId = [
+            'shortbread', layerName, z, x, y,
+            feature.id ?? index
+          ].join(':');
+          const signature = `${layerName}:${sourceFeatureId}:${lat.toFixed(7)}:${lon.toFixed(7)}`;
+          if (featureSignatures.has(signature)) continue;
+          featureSignatures.add(signature);
+          const id = sourceFeatureId;
+          elements.push({
+            type: 'node',
+            id,
+            lat,
+            lon,
+            sourceElementType: 'node',
+            sourceElementId: sourceFeatureId,
+            tags: {
+              ...tags,
+              _sourceFeatureId: sourceFeatureId,
+              _sourceElementType: 'node',
+              _sourceElementId: sourceFeatureId
+            }
+          });
+          continue;
+        }
           const parts = geometryParts(geojson.geometry);
           for (let partIndex = 0; partIndex < parts.length; partIndex++) {
             const part = parts[partIndex];
@@ -483,7 +597,7 @@ export async function fetchShortbreadWorldData(options = {}) {
   );
   const layerNames = Array.isArray(options.layerNames)
     ? options.layerNames.slice()
-    : ['streets', 'land', 'sites', 'street_polygons'];
+    : ['streets', 'land', 'sites', 'pois', 'street_polygons'];
   if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
   const elements = await convertTilesToElements(tiles, layerNames, bounds);
   if (metrics.rejected > 0) {
@@ -507,7 +621,12 @@ export async function fetchShortbreadWorldData(options = {}) {
       zoom,
       bounds,
       status: elements.length > 0 ? 'available' : 'authoritative-empty',
-      capabilities: { transport: 'generalized', landuse: 'generalized', buildings: includeBuildings ? 'generalized' : 'not-requested' }
+      capabilities: {
+        transport: 'generalized',
+        landuse: 'generalized',
+        pois: layerNames.includes('pois') ? 'shortbread-schema' : 'not-requested',
+        buildings: includeBuildings ? 'generalized' : 'not-requested'
+      }
     }
   };
 }
@@ -545,6 +664,7 @@ export async function fetchShortbreadBuildingData(options = {}) {
 }
 
 export {
+  featureTags as shortbreadFeatureTags,
   SHORTBREAD_DECODED_TILE_CACHE_LIMIT,
   SHORTBREAD_TILE_CONCURRENCY,
   SHORTBREAD_ZOOM

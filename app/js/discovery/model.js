@@ -1,4 +1,4 @@
-import { BUILTIN_DISCOVERY_CATALOGS } from './catalog.js?v=1';
+import { BUILTIN_DISCOVERY_CATALOGS } from './catalog.js?v=4';
 
 const DISCOVERY_SCHEMA_VERSION = 1;
 

@@ -4,7 +4,7 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=513';
+} from './modules/manifest.js?v=549';
 import { loadScriptList } from './modules/script-loader.js?v=56';
 import {
   initStartupDiagnostics,
@@ -12,7 +12,6 @@ import {
   showStartupDiagnostics,
   summarizeStartupError
 } from './startup-diagnostics.js?v=2';
-import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
 
 initStartupDiagnostics();
 recordStartupDiagnostic('bootstrap', 'bootstrap script loaded');
@@ -50,6 +49,17 @@ function formatReason(reason) {
   if (!reason) return null;
   if (typeof reason === 'string') return reason;
   return reason?.stack || reason?.message || String(reason);
+}
+
+function scheduleBootstrapIdle(task, timeout = 2400) {
+  const run = () => Promise.resolve().then(task).catch((error) => {
+    console.warn('[bootstrap] Deferred boot task failed:', error);
+  });
+  if (typeof globalThis.requestIdleCallback === 'function') {
+    globalThis.requestIdleCallback(run, { timeout: Math.max(250, Number(timeout) || 2400) });
+  } else {
+    globalThis.setTimeout(run, 32);
+  }
 }
 
 async function boot() {
@@ -99,7 +109,12 @@ async function boot() {
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
     if (vendorScriptsOptional.length > 0) {
-      scheduleAfterFirstPlay('optional-rendering-vendors', () =>
+      // These scripts change the active renderer when they finish. Starting
+      // their network and parse work only after the first playable frame made
+      // initial Earth play freeze and then visually switch pipelines. Begin
+      // them while the title/globe is idle so normal world assembly overlaps
+      // the work and the first playable frame uses the settled visual path.
+      scheduleBootstrapIdle(() =>
         loadScriptList(vendorScriptsOptional, { timeoutMs: 10000, parallel: true })
         .then(() => {
           recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
@@ -113,7 +128,7 @@ async function boot() {
           if (typeof appApi?.tryEnablePostProcessing === 'function') {
             appApi.tryEnablePostProcessing();
           }
-        }), { timeout: 2400 });
+        }), 2400);
     }
   } catch (error) {
     recordStartupDiagnostic('bootstrap', 'fatal load error', summarizeStartupError(error));

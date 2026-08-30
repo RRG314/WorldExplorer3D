@@ -26,10 +26,10 @@ const LEADERBOARD_CATALOG = Object.freeze({
   explorer: Object.freeze({
     id: 'explorer',
     icon: '🧭',
-    label: 'Explorer League',
-    scope: 'Global • All time',
-    objective: 'Build your community score through rooms, shared artifacts, and friends.',
-    empty: 'No Explorer League activity yet. Join a room or share an artifact to begin.'
+    label: 'Explorer Profile',
+    scope: 'This device • Current profile',
+    objective: 'Earn Explorer points through fieldwork, travel, games, making, community, and companions.',
+    empty: 'No Explorer progress yet. Record a discovery or complete an Explorer activity to begin.'
   }),
   deflock: Object.freeze({
     id: 'deflock',

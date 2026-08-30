@@ -102,7 +102,7 @@ assert.equal(cancelled.cancellation.resumable, true);
 assert.equal(cancelled.cancellation.losesPermanentProgress, false);
 
 const [claims, explorerEvents] = await Promise.all([
-  readFile('config/public-feature-claims-5.0.json', 'utf8').then(JSON.parse),
+  readFile('config/public-feature-claims.json', 'utf8').then(JSON.parse),
   readFile('app/js/discovery/explorer-events.js', 'utf8')
 ]);
 assert.equal(MISSION_LIFECYCLE_SCHEMA_VERSION, 1);

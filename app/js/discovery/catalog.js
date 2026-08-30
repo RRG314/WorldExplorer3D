@@ -1,12 +1,12 @@
 import {
-  BALTIMORE_TAXON_DISCOVERIES,
-  ECOLOGY_SOURCE_MANIFEST
-} from './ecology/baltimore-pack.js?v=1';
+  ALL_REGIONAL_SOURCE_MANIFEST,
+  REGIONAL_TAXON_DISCOVERIES
+} from './ecology/regional-packs.js?v=2';
 
-const DISCOVERY_CATALOG_VERSION = '2026.08.24.2';
+const DISCOVERY_CATALOG_VERSION = '2026.08.27.2';
 
 const SOURCE_MANIFEST = Object.freeze({
-  ...ECOLOGY_SOURCE_MANIFEST,
+  ...ALL_REGIONAL_SOURCE_MANIFEST,
   'we3d-original': Object.freeze({
     id: 'we3d-original',
     label: 'World Explorer 3D original game content',
@@ -300,7 +300,7 @@ const FIND_CATALOG = Object.freeze([
 const FIELD_DISCOVERY_CATALOG = Object.freeze([
   { id: 'area-survey-note', names: { common: 'Area Survey Note' }, family: 'exploration-record', activityIds: ['inspect', 'survey'], contexts: ['any'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual note describing the current compiled environment context.', sourceRefs: [sourceRef('we3d-original', 'field:area-survey')] },
   { id: 'granite-field-sample', names: { common: 'Granite Field Sample', scientific: 'Coarse-grained intrusive igneous rock' }, visualId: 'granite', family: 'rock', activityIds: ['geology-inspect'], contexts: ['mountain', 'outcrop'], rarityBand: 'common', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual specimen representing coarse-grained igneous rock. The photograph is an identification reference, not a location claim.', sourceRefs: [sourceRef('we3d-original', 'field:granite')] },
-  { id: 'quartz-vein-sample', names: { common: 'Quartz Vein Sample', scientific: 'SiO₂' }, visualId: 'quartz', family: 'mineral', activityIds: ['geology-inspect', 'pan-sediment'], contexts: ['outcrop', 'mountain', 'riverbank'], rarityBand: 'uncommon', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual quartz-bearing sample generated for Earth-science gameplay. The photograph is an identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:quartz')] },
+  { id: 'quartz-vein-sample', names: { common: 'Quartz Vein Sample', scientific: 'SiO₂' }, visualId: 'quartz', family: 'mineral', activityIds: ['geology-inspect', 'pan-sediment'], contexts: ['outcrop', 'mountain', 'riverbank'], rarityBand: 'uncommon', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual quartz-bearing sample for Earth-science play. The photograph is an identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:quartz')] },
   { id: 'river-heavy-sand', names: { common: 'Heavy River Sand' }, family: 'sediment', activityIds: ['pan-sediment'], contexts: ['riverbank', 'stream'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'specimen', description: 'A concentrate from virtual sediment panning.', sourceRefs: [sourceRef('we3d-original', 'field:river-sand')] },
   { id: 'shell-impression-cast', names: { common: 'Shell Impression Cast', scientific: 'Molluscan fossil material' }, visualId: 'fossil-shells', family: 'fossil-representation', activityIds: ['fossil-document'], contexts: ['fossil-formation'], rarityBand: 'uncommon', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual cast, not a claim of a fossil at this exact location. The photograph is a museum reference.', sourceRefs: [sourceRef('we3d-original', 'field:shell-impression')] },
   { id: 'sea-glass-fragment', names: { common: 'Sea Glass Fragment' }, family: 'beach-find', activityIds: ['beachcomb'], contexts: ['beach'], rarityBand: 'common', qualityBand: 'weathered', tradePolicy: 'collectible', description: 'A virtual shoreline find.', sourceRefs: [sourceRef('we3d-original', 'field:sea-glass')] },
@@ -318,7 +318,7 @@ const FIELD_DISCOVERY_CATALOG = Object.freeze([
   { id: 'urban-place-note', names: { common: 'Urban Place Note' }, family: 'urban-record', activityIds: ['urban-survey', 'transport-job'], contexts: ['urban', 'urban-core'], rarityBand: 'common', qualityBand: 'documented', tradePolicy: 'not-tradeable', description: 'A virtual survey or service record without asserting access to private property.', sourceRefs: [sourceRef('we3d-original', 'field:urban-note')] },
   { id: 'modeled-habitat-transect', names: { common: 'Modeled Habitat Transect' }, family: 'habitat-record', activityIds: ['habitat-survey'], contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A modeled habitat-context record. It does not confirm field conditions, access, or species presence.', sourceRefs: [sourceRef('we3d-original', 'field:modeled-habitat-transect')] },
   { id: 'local-game-checklist', names: { common: 'Local Game Checklist' }, family: 'community-survey-record', activityIds: ['community-survey'], contexts: ['forest', 'park', 'field', 'wetland', 'riverbank', 'coast', 'urban'], rarityBand: 'common', qualityBand: 'survey', tradePolicy: 'not-tradeable', description: 'A local checklist kept inside the game; it is not submitted to a community-science provider.', sourceRefs: [sourceRef('we3d-original', 'field:local-game-checklist')] },
-  ...BALTIMORE_TAXON_DISCOVERIES
+  ...REGIONAL_TAXON_DISCOVERIES
 ].map(Object.freeze));
 
 const COMPANION_CATALOG = Object.freeze([
@@ -328,9 +328,15 @@ const COMPANION_CATALOG = Object.freeze([
   { id: 'harbor-cat', names: { common: 'Harbor Cat' }, family: 'domestic-companion', contexts: ['urban', 'coast', 'park'], behaviorArchetype: 'ground-follower', sizeClass: 'cat', worldScale: .36, arScale: .62, companionPolicy: 'adoptable-domestic', tradePolicy: 'not-tradeable', rarityBand: 'uncommon', sourceRefs: [sourceRef('we3d-original', 'companion:harbor-cat')] },
   { id: 'meadow-tabby', names: { common: 'Meadow Tabby' }, family: 'domestic-companion', contexts: ['park', 'field', 'suburban'], behaviorArchetype: 'ground-follower', sizeClass: 'cat', worldScale: .35, arScale: .62, companionPolicy: 'adoptable-domestic', tradePolicy: 'not-tradeable', rarityBand: 'common', sourceRefs: [sourceRef('we3d-original', 'companion:meadow-tabby')] },
   { id: 'midnight-cat', names: { common: 'Midnight Cat' }, family: 'domestic-companion', contexts: ['urban', 'park', 'coast'], behaviorArchetype: 'ground-follower', sizeClass: 'cat', worldScale: .34, arScale: .62, companionPolicy: 'adoptable-domestic', tradePolicy: 'not-tradeable', rarityBand: 'rare', sourceRefs: [sourceRef('we3d-original', 'companion:midnight-cat')] },
-  { id: 'marsh-mallard', names: { common: 'Virtual Marsh Mallard' }, family: 'virtual-wildlife-companion', contexts: ['wetland', 'riverbank', 'fresh-water', 'coast'], behaviorArchetype: 'air-follower', sizeClass: 'waterbird', worldScale: .38, arScale: .58, flightHeight: 1.35, companionPolicy: 'virtual-unlock-only', tradePolicy: 'not-tradeable', rarityBand: 'uncommon', sourceRefs: [sourceRef('we3d-original', 'companion:marsh-mallard')] },
-  { id: 'city-pigeon', names: { common: 'Virtual City Pigeon' }, family: 'virtual-wildlife-companion', contexts: ['urban', 'urban-core', 'park'], behaviorArchetype: 'air-follower', sizeClass: 'small-bird', worldScale: .28, arScale: .52, flightHeight: 1.55, companionPolicy: 'virtual-unlock-only', tradePolicy: 'not-tradeable', rarityBand: 'common', sourceRefs: [sourceRef('we3d-original', 'companion:city-pigeon')] },
-  { id: 'woodland-fox', names: { common: 'Virtual Woodland Fox' }, family: 'virtual-wildlife-companion', contexts: ['forest', 'field', 'mountain'], behaviorArchetype: 'ground-follower', sizeClass: 'fox', worldScale: .45, arScale: .66, companionPolicy: 'virtual-unlock-only', tradePolicy: 'not-tradeable', rarityBand: 'rare', sourceRefs: [sourceRef('we3d-original', 'companion:woodland-fox')] }
+  { id: 'pasture-cow', names: { common: 'Pasture Cow' }, family: 'livestock-companion', contexts: ['farm', 'rural'], behaviorArchetype: 'large-ground-follower', sizeClass: 'cattle', worldScale: 1.02, arScale: .82, companionPolicy: 'adoptable-domestic', travelClass: 'waits-during-vehicle-travel', trainingSpecialty: 'Trail Calm', tradePolicy: 'not-tradeable', rarityBand: 'common', sourceRefs: [sourceRef('we3d-original', 'companion:pasture-cow')] },
+  { id: 'wool-sheep', names: { common: 'Wool Sheep' }, family: 'livestock-companion', contexts: ['farm', 'rural'], behaviorArchetype: 'ground-follower', sizeClass: 'sheep', worldScale: .67, arScale: .72, companionPolicy: 'adoptable-domestic', travelClass: 'waits-during-vehicle-travel', trainingSpecialty: 'Flock Focus', tradePolicy: 'not-tradeable', rarityBand: 'common', sourceRefs: [sourceRef('we3d-original', 'companion:wool-sheep')] },
+  { id: 'hill-goat', names: { common: 'Hill Goat' }, family: 'livestock-companion', contexts: ['farm', 'rural'], behaviorArchetype: 'ground-follower', sizeClass: 'goat', worldScale: .62, arScale: .7, companionPolicy: 'adoptable-domestic', travelClass: 'waits-during-vehicle-travel', trainingSpecialty: 'Trail Balance', tradePolicy: 'not-tradeable', rarityBand: 'uncommon', sourceRefs: [sourceRef('we3d-original', 'companion:hill-goat')] },
+  { id: 'yard-chicken', names: { common: 'Yard Chicken' }, family: 'livestock-companion', contexts: ['farm', 'rural'], behaviorArchetype: 'ground-bird-follower', sizeClass: 'chicken', worldScale: .48, arScale: .62, companionPolicy: 'adoptable-domestic', travelClass: 'waits-during-vehicle-travel', trainingSpecialty: 'Come to Call', tradePolicy: 'not-tradeable', rarityBand: 'common', sourceRefs: [sourceRef('we3d-original', 'companion:yard-chicken')] },
+  { id: 'heritage-pig', names: { common: 'Heritage Pig' }, family: 'livestock-companion', contexts: ['farm', 'rural'], behaviorArchetype: 'ground-follower', sizeClass: 'pig', worldScale: .72, arScale: .72, companionPolicy: 'adoptable-domestic', travelClass: 'waits-during-vehicle-travel', trainingSpecialty: 'Scent Search', tradePolicy: 'not-tradeable', rarityBand: 'uncommon', sourceRefs: [sourceRef('we3d-original', 'companion:heritage-pig')] },
+  { id: 'field-horse', names: { common: 'Field Horse' }, family: 'livestock-companion', contexts: ['farm', 'rural'], behaviorArchetype: 'large-ground-follower', sizeClass: 'horse', worldScale: .92, arScale: .82, companionPolicy: 'adoptable-domestic', travelClass: 'waits-during-vehicle-travel', trainingSpecialty: 'Route Memory', tradePolicy: 'not-tradeable', rarityBand: 'rare', sourceRefs: [sourceRef('we3d-original', 'companion:field-horse')] },
+  { id: 'marsh-mallard', names: { common: 'Marsh Mallard' }, family: 'game-wildlife-companion', contexts: ['wetland', 'riverbank', 'fresh-water', 'coast'], behaviorArchetype: 'air-follower', sizeClass: 'waterbird', worldScale: .38, arScale: .58, flightHeight: 1.35, companionPolicy: 'virtual-unlock-only', tradePolicy: 'not-tradeable', rarityBand: 'uncommon', sourceRefs: [sourceRef('we3d-original', 'companion:marsh-mallard')] },
+  { id: 'city-pigeon', names: { common: 'City Pigeon' }, family: 'game-wildlife-companion', contexts: ['urban', 'urban-core', 'park'], behaviorArchetype: 'air-follower', sizeClass: 'small-bird', worldScale: .28, arScale: .52, flightHeight: 1.55, companionPolicy: 'virtual-unlock-only', tradePolicy: 'not-tradeable', rarityBand: 'common', sourceRefs: [sourceRef('we3d-original', 'companion:city-pigeon')] },
+  { id: 'woodland-fox', names: { common: 'Woodland Fox' }, family: 'game-wildlife-companion', contexts: ['forest', 'field', 'mountain'], behaviorArchetype: 'ground-follower', sizeClass: 'fox', worldScale: .45, arScale: .66, companionPolicy: 'virtual-unlock-only', tradePolicy: 'not-tradeable', rarityBand: 'rare', sourceRefs: [sourceRef('we3d-original', 'companion:woodland-fox')] }
 ].map(Object.freeze));
 
 function validateSourceRefs(entry, errors) {
@@ -361,8 +367,8 @@ function validateDiscoveryCatalogs(catalogs = {}) {
       seen.add(entry.id);
       validateSourceRefs(entry, errors);
       if (catalogs.companions?.includes(entry)) {
-        if (!['ground-follower', 'air-follower'].includes(entry.behaviorArchetype)) errors.push(`${entry.id}: invalid companion behavior`);
-        if (!(Number(entry.worldScale) > 0 && Number(entry.worldScale) <= .55)) errors.push(`${entry.id}: invalid world companion scale`);
+        if (!['ground-follower', 'air-follower', 'large-ground-follower', 'ground-bird-follower'].includes(entry.behaviorArchetype)) errors.push(`${entry.id}: invalid companion behavior`);
+        if (!(Number(entry.worldScale) > 0 && Number(entry.worldScale) <= 1.1)) errors.push(`${entry.id}: invalid world companion scale`);
       }
     });
   });

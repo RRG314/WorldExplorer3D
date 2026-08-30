@@ -10,8 +10,8 @@ import {
 } from '../earth-core/world-load-request.js?v=1';
 import { createWorldLoadSession } from '../earth-core/world-load-session.js?v=1';
 import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
-import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=3';
-import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=3';
+import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=4';
+import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -59,6 +59,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
       generated: 0
     },
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
+    commercePlaces: { provider: 'osm-overpass', mapped: 0, status: 'pending', inventoryAuthority: 'world-explorer-gameplay' },
+    transportFacilities: { provider: 'osm-overpass', mapped: 0, aviation: 0, maritime: 0, status: 'pending', bounded: true },
     phases: {}
   };
   const traceWorldLoad = typeof globalThis.location?.search === 'string' &&
@@ -127,6 +129,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.buildingProvenanceModel = null;
   appCtx.waterSurfaceRegistry = null;
   appCtx.waterSurfaceRegistrySnapshot = null;
+  appCtx.transportFacilityGraph = null;
 
   if (!loadRequest) {
     appCtx.showLoad('Choose a valid location');
@@ -249,7 +252,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
   const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
-  const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow, dynamicBudgetState.budgetScale);
+  const loadProfile = getAdaptiveLoadProfile(
+    rdtLoadComplexity,
+    perfModeNow,
+    dynamicBudgetState.budgetScale,
+    dynamicBudgetState.deviceClass
+  );
   const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
   const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
@@ -272,8 +280,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
     maxPoiNodes: loadProfile.maxPoiNodes,
     tileBudgetCfg: loadProfile.tileBudgetCfg,
     overpassTimeoutMs: loadProfile.overpassTimeoutMs,
+    optionalProviderTimeoutMs: loadProfile.optionalProviderTimeoutMs,
+    fixedRegionalGroundTimeoutMs: loadProfile.fixedRegionalGroundTimeoutMs,
+    regionalContextRadiusMeters: loadProfile.regionalContextRadiusMeters,
     maxTotalLoadMs: loadProfile.maxTotalLoadMs
   };
+  runtimeState.loadProfile = { ...loadMetrics.loadProfile };
   loadMetrics.dynamicBudget = {
     auto: !!dynamicBudgetState.auto,
     tier: dynamicBudgetState.tier || 'balanced',
@@ -343,7 +355,32 @@ export function verifyWorldPublicationStable(appCtx = {}, publication = null) {
   });
 }
 
-export function finishWorldLoadRuntimeSession(session = {}) {
+function gameplayRuntimeMatchesPublication(runtime, publication) {
+  if (!runtime || !publication) return false;
+  const sequence = Number(runtime.sequence ?? runtime.publication?.sequence);
+  const requestId = String(runtime.requestId ?? runtime.publication?.requestId ?? '');
+  return sequence === Number(publication.sequence) && requestId === String(publication.requestId || '');
+}
+
+function disposeGameplayRuntimesForPublication(appCtx, publication, reason) {
+  if (gameplayRuntimeMatchesPublication(appCtx.worldDiscoveryRuntime, publication)) {
+    appCtx.disposeWorldDiscoveryRuntime?.(reason);
+  }
+  if (gameplayRuntimeMatchesPublication(appCtx.urbanSandboxRuntime, publication)) {
+    appCtx.disposeUrbanSandboxRuntime?.(reason);
+  }
+  if (gameplayRuntimeMatchesPublication(appCtx.aviationRuntime, publication)) {
+    appCtx.disposeAviationRuntime?.(reason);
+  }
+  if (gameplayRuntimeMatchesPublication(appCtx.maritimeRuntime, publication)) {
+    appCtx.disposeMaritimeRuntime?.(reason);
+  }
+  if (gameplayRuntimeMatchesPublication(appCtx.livingWorldRuntime, publication)) {
+    appCtx.disposeLivingWorldRuntime?.(reason);
+  }
+}
+
+export async function finishWorldLoadRuntimeSession(session = {}) {
   const {
     appCtx, finalizePerfLoad, loadMetrics, phaseTotals, releaseWorldLoadCancellation,
     runtimeState, syncWorldSessionState, worldSession, loaded = false
@@ -401,37 +438,147 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     layerProducts,
     createdAt: performance.now()
   });
-  appCtx.worldLoading = false;
+  // Publish the completed scene while it is still hidden by worldLoading. The
+  // living-world, interaction, and Explorer runtimes all compile against this
+  // immutable publication and are required for a playable Earth session. They
+  // used to start from an idle callback after the loading screen disappeared,
+  // which made city changes report ready and then freeze for seconds while the
+  // main thread built navigation graphs and encounter plans.
   appCtx.publishEarthWorldSceneLoad?.(publication.sequence);
+  if (runtimeState) {
+    runtimeState.status = 'starting-gameplay';
+    runtimeState.gameplayRuntimesReady = false;
+    runtimeState.updatedAt = performance.now();
+  }
+  const gameplayRuntimeStartedAt = performance.now();
+  let livingWorld = null;
+  let urbanSandbox = null;
+  let aviation = null;
+  let maritime = null;
+  let worldDiscovery = null;
+  const gameplayStartupDurationsMs = Object.create(null);
+  const measureGameplayStartup = async (name, task) => {
+    const startedAt = performance.now();
+    try {
+      return await task();
+    } finally {
+      gameplayStartupDurationsMs[name] = Math.round(performance.now() - startedAt);
+    }
+  };
+  const startupIsCurrent = () => !!(
+    worldSession?.isActive?.() &&
+    appCtx.worldPublication?.requestId === publication.requestId &&
+    appCtx.worldPublication?.sequence === publication.sequence
+  );
+  try {
+    // Fetch and evaluate independent runtime modules as one dependency stage.
+    // Runtime construction remains deliberately ordered below because urban
+    // interaction consumes Living World and Explorer consumes the published
+    // interaction authorities.
+    const moduleLoadStartedAt = performance.now();
+    const [
+      livingWorldModule,
+      urbanSandboxModule,
+      aviationModule,
+      maritimeModule,
+      worldDiscoveryModule
+    ] = await Promise.all([
+      import('../living-world/runtime.js?v=26'),
+      import('../urban-sandbox/runtime.js?v=60'),
+      import('../transport/aviation-runtime.js?v=12'),
+      import('../transport/maritime-runtime.js?v=16'),
+      import('../discovery/runtime.js?v=27')
+    ]);
+    gameplayStartupDurationsMs.moduleLoad = Math.round(performance.now() - moduleLoadStartedAt);
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-living-world-startup');
+    }
+    livingWorld = await measureGameplayStartup('livingWorld', () => livingWorldModule.startLivingWorldRuntime(appCtx, {
+      snapshot: publication,
+      request: worldSession?.request
+    }));
+    if (!livingWorld) throw new Error('Living World did not start for the active publication.');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-urban-sandbox-startup');
+    }
+    urbanSandbox = await measureGameplayStartup('urbanSandbox', () => urbanSandboxModule.startUrbanSandboxRuntime({
+      snapshot: publication,
+      request: worldSession?.request,
+      livingWorld
+    }));
+    if (!urbanSandbox) throw new Error('Urban Sandbox did not start for the active publication.');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-aviation-startup');
+    }
+    aviation = await measureGameplayStartup('aviation', () => aviationModule.startAviationRuntime({
+      snapshot: publication,
+      request: worldSession?.request
+    }));
+    if (!aviation) throw new Error('Aviation runtime did not start for the active publication.');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-maritime-startup');
+    }
+    maritime = await measureGameplayStartup('maritime', () => maritimeModule.startMaritimeRuntime({
+      snapshot: publication,
+      request: worldSession?.request
+    }));
+    if (!maritime) throw new Error('Maritime runtime did not start for the active publication.');
+    if (!startupIsCurrent()) {
+      disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-before-explorer-startup');
+    }
+    worldDiscovery = await measureGameplayStartup('worldDiscovery', () => worldDiscoveryModule.startWorldDiscoveryRuntime(appCtx, {
+      snapshot: publication,
+      request: worldSession?.request
+    }));
+    if (!worldDiscovery) throw new Error('Explorer runtime did not start for the active publication.');
+  } catch (error) {
+    disposeGameplayRuntimesForPublication(appCtx, publication, 'gameplay-startup-failed');
+    if (worldSession?.isActive?.() === false) {
+      return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
+    }
+    if (runtimeState) {
+      runtimeState.status = 'failed';
+      runtimeState.gameplayRuntimesReady = false;
+      runtimeState.gameplayRuntimeError = String(error?.message || error);
+      runtimeState.updatedAt = performance.now();
+      runtimeState.finishedAt = runtimeState.updatedAt;
+    }
+    console.warn('[WorldLoad] Essential Earth gameplay runtime startup failed:', error);
+    worldSession?.fail?.('essential-gameplay-runtime-startup-failed');
+    syncWorldSessionState?.();
+    appCtx.worldLoading = false;
+    appCtx.enforceEnvironmentSceneOwnership?.();
+    appCtx.hideLoad?.();
+    appCtx.showToast?.('This location could not finish loading. Try switching locations or reload.');
+    finalizePerfLoad(false, { reason: 'essential-gameplay-runtime-startup-failed' });
+    releaseWorldLoadCancellation?.();
+    return worldSession?.snapshot?.() || null;
+  }
+  if (runtimeState) {
+    runtimeState.gameplayRuntimesReady = !!(
+      livingWorld && urbanSandbox && aviation && maritime && worldDiscovery &&
+      appCtx.livingWorldRuntime && appCtx.urbanSandboxRuntime && appCtx.aviationRuntime && appCtx.maritimeRuntime && appCtx.worldDiscoveryRuntime
+    );
+    runtimeState.gameplayRuntimeDurationMs = Math.round(performance.now() - gameplayRuntimeStartedAt);
+    runtimeState.gameplayStartupDurationsMs = Object.freeze({ ...gameplayStartupDurationsMs });
+    runtimeState.updatedAt = performance.now();
+  }
+  if (worldSession?.isActive?.() === false) {
+    disposeGameplayRuntimesForPublication(appCtx, publication, 'superseded-gameplay-startup');
+    return finishSupersededWorldLoadRuntimeSession(session, 'superseded-during-gameplay-runtime-startup');
+  }
+  appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();
   appCtx.hideLoad?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);
   }, { timeout: 1200 });
-  scheduleAfterFirstPlay(`living-world-${publication.sequence}`, async () => {
-    if (
-      appCtx.worldPublication?.requestId !== publication.requestId ||
-      appCtx.worldPublication?.sequence !== publication.sequence
-    ) return null;
-    const { startLivingWorldRuntime } = await import('../living-world/runtime.js?v=24');
-    const livingWorld = startLivingWorldRuntime(appCtx, {
-      snapshot: publication,
-      request: worldSession?.request
-    });
-    const { startUrbanSandboxRuntime } = await import('../urban-sandbox/runtime.js?v=38');
-    const urbanSandbox = startUrbanSandboxRuntime({
-      snapshot: publication,
-      request: worldSession?.request,
-      livingWorld
-    });
-    const { startWorldDiscoveryRuntime } = await import('../discovery/runtime.js?v=11');
-    const worldDiscovery = await startWorldDiscoveryRuntime(appCtx, {
-      snapshot: publication,
-      request: worldSession?.request
-    });
-    return { livingWorld, urbanSandbox, worldDiscovery };
-  }, { timeout: 900 });
   markFirstPlayReady({
     environment: 'earth',
     loadDurationMs: Math.round(performance.now() - Number(runtimeState?.startedAt || performance.now())),

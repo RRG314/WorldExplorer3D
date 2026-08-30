@@ -1,4 +1,4 @@
-import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=2';
+import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 
 // Compatibility export only. Parked and traffic vehicles now share one data owner.
@@ -23,6 +23,10 @@ function stableVehicleDefinition(worldIdentity, edgeIndex, slot = 0) {
     variant,
     color: palette[(seed >>> 5) % palette.length],
     condition: 1,
+    durabilityPolicy: variant.durabilityPolicy,
+    resistance: variant.resistance,
+    playable: variant.playable,
+    enterable: variant.enterable,
     source: 'deterministic-parked-vehicle'
   });
 }

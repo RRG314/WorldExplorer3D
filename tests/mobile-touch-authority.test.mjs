@@ -30,8 +30,10 @@ test('walking uses a left movement stick and independent right camera stick', ()
   assert.ok(actions.move > 0);
   assert.ok(actions.strafe > 0);
   assert.equal(actions.turn, 0);
-  assert.ok(actions.lookYaw > 0, 'dragging right must look right');
-  assert.ok(actions.lookPitch > 0);
+  // The camera orbits opposite the thumb's screen displacement, matching the
+  // established mouse-drag convention instead of reversing it on touch.
+  assert.ok(actions.lookYaw < 0, 'dragging right must orbit the camera for a rightward view');
+  assert.ok(actions.lookPitch < 0, 'dragging up must raise the view');
 });
 
 test('driving maps the left stick to throttle and steering', () => {

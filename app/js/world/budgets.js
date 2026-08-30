@@ -48,7 +48,7 @@ export function getRuntimeDynamicBudget(mode = runtime.getPerfModeValue()) {
       clampNumber(source.lodScale, 0.72, 1.00, 1) :
       clampNumber(source.lodScale, 0.72, 1.14, 1);
   const budgetScale = mobileLike
-    ? Math.min(requestedBudgetScale, mode === 'baseline' ? 0.32 : 0.52)
+    ? Math.min(requestedBudgetScale, mode === 'baseline' ? 0.28 : 0.28)
     : requestedBudgetScale;
   const lodScale = mobileLike
     ? Math.min(requestedLodScale, mode === 'baseline' ? 0.68 : 0.78)
@@ -307,9 +307,15 @@ export function getWorldLodThresholds(loadDepth, mode = runtime.getPerfModeValue
   return { near, mid, farVisible: mid + 450 };
 }
 
-export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValue(), budgetScale = 1) {
+export function getAdaptiveLoadProfile(
+  loadDepth,
+  mode = runtime.getPerfModeValue(),
+  budgetScale = 1,
+  deviceClass = 'desktop'
+) {
   const depth = Math.max(0, loadDepth | 0);
-  const scale = clampNumber(budgetScale, 0.30, 1.35, 1);
+  const scale = clampNumber(budgetScale, 0.22, 1.35, 1);
+  const mobileLike = String(deviceClass || '').toLowerCase() === 'mobile';
   const radiusScale = clampNumber(Math.sqrt(scale), 0.58, 1.08, 1);
   const scaledRadii = (radii) => radii.map((r) => Number((r * radiusScale).toFixed(5)));
 
@@ -333,8 +339,11 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
         poiPerTile: scaledInt(200, scale, 40),
         poiMinPerTile: scaledInt(90, scale, 20)
       },
-      overpassTimeoutMs: 30000,
-      maxTotalLoadMs: 62000
+      overpassTimeoutMs: mobileLike ? 12000 : 30000,
+      optionalProviderTimeoutMs: mobileLike ? 2500 : 9000,
+      fixedRegionalGroundTimeoutMs: mobileLike ? 2500 : 35000,
+      regionalContextRadiusMeters: mobileLike ? 6000 : 14000,
+      maxTotalLoadMs: mobileLike ? 32000 : 62000
     };
   }
 
@@ -434,7 +443,10 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       poiPerTile: scaledInt(profileByDepth.poiPerTile, scale, 6),
       poiMinPerTile: scaledInt(profileByDepth.poiMinPerTile, scale, 3)
     },
-    overpassTimeoutMs: profileByDepth.overpassTimeoutMs,
-    maxTotalLoadMs: profileByDepth.maxTotalLoadMs
+    overpassTimeoutMs: mobileLike ? Math.min(12000, profileByDepth.overpassTimeoutMs) : profileByDepth.overpassTimeoutMs,
+    optionalProviderTimeoutMs: mobileLike ? 2500 : 9000,
+    fixedRegionalGroundTimeoutMs: mobileLike ? 2500 : 35000,
+    regionalContextRadiusMeters: mobileLike ? 6000 : 14000,
+    maxTotalLoadMs: mobileLike ? 32000 : profileByDepth.maxTotalLoadMs
   };
 }

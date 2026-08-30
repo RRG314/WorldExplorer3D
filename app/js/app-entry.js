@@ -8,15 +8,15 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=52';
+import './runtime-diagnostics.js?v=66';
 import './ui/legal-attribution.js?v=1';
-import './state.js?v=62';
+import './state.js?v=65';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=5';
-import './controls/action-input.js?v=9';
+import './location-session.js?v=6';
+import './controls/action-input.js?v=10';
 import './interaction/context-router.js?v=4';
-import './transport/actor-contract.js?v=2';
+import './transport/actor-contract.js?v=6';
 import './world/collection-registry.js?v=1';
 import './world/water-environment.js?v=2';
 import './perf.js?v=57';
@@ -25,30 +25,32 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
-import './physics.js?v=112';
-import './walking.js?v=80';
-import './travel-mode.js?v=21';
-import { initBoatMode } from './boat-mode.js?v=42';
-import './sky.js?v=86';
+import './physics.js?v=122';
+import './walking.js?v=87';
+import './travel-mode.js?v=23';
+import { initBoatMode } from './boat-mode.js?v=57';
+import './sky.js?v=88';
 import './weather.js?v=10';
-import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=128';
-import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=8';
+import './runtime/on-demand-modes.js?v=12';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=167';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
-import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=3';
+import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=5';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/vehicles.js?v=2';
-import './planetary/astronaut.js?v=1';
+import './planetary/solid-world-runtime.js?v=7';
+import './planetary/vehicles.js?v=3';
+import './planetary/astronaut.js?v=2';
 import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
-import './planetary/tracks.js?v=1';
-import './game.js?v=62';
-import './input.js?v=67';
-import './hud.js?v=95';
-import './map.js?v=60';
+import './planetary/tracks.js?v=2';
+import './planetary/field-activities.js?v=8';
+import './game.js?v=63';
+import './input.js?v=72';
+import './hud.js?v=102';
+import './map.js?v=61';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=136';
+import { setupUI } from './ui.js?v=145';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -119,7 +121,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=6');
+            const mod = await import('./activity-discovery/session.js?v=7');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -177,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=15').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=17').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -260,10 +262,13 @@ async function ensureOverlayRuntimeLayer() {
 }
 
 function shouldBootOverlayRuntime() {
-    if (!appCtx.gameStarted) return false;
-    if (appCtx.onMoon || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
+    // The public editor overlay is optional for first play. Starting it from
+    // the early gameStarted flag made its network/parse work overlap the
+    // blocking Earth compiler before a publication existed.
+    if (!appCtx.gameStarted || appCtx.worldLoading || appCtx.initialEarthWorldReady !== true) return false;
+    if (appCtx.onMoon || appCtx.activePlanetaryBodyId || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
     if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
-        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
+        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.PLANETARY) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
     }
     return true;
 }
@@ -286,16 +291,25 @@ async function ensureMultiplayerPlatformReady() {
 function scheduleTutorialInit() {
     if (_tutorialInitPromise) return _tutorialInitPromise;
     _tutorialInitPromise = new Promise((resolve) => {
-        scheduleAfterFirstPlay('tutorial-runtime', async () => {
+        let started = false;
+        const startTutorial = async () => {
+            if (started) return;
+            started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=5');
+                const mod = await import('./tutorial/tutorial.js?v=8');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
             } finally {
                 resolve(true);
             }
-        }, { timeout: 2200 });
+        };
+        scheduleAfterFirstPlay('tutorial-runtime', startTutorial, { timeout: 1200 });
+        globalThis.addEventListener?.('we3d:first-play-ready', startTutorial, { once: true });
+        // Continuous WebGL rendering can starve requestIdleCallback on some
+        // mobile browsers. The tutorial is small, so a bounded fallback keeps
+        // First Journey available without returning it to the blocking boot path.
+        globalThis.setTimeout(startTutorial, 6000);
     });
     return _tutorialInitPromise;
 }

@@ -5,7 +5,7 @@ import {
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=27";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=28";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
@@ -23,7 +23,7 @@ import {
   classifyBuildingWaterRelationship,
   createWaterAreaSpatialIndex,
   createMappedVesselMesh
-} from './water-adjacent-structures.js?v=3';
+} from './water-adjacent-structures.js?v=4';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
@@ -205,6 +205,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       const vesselMesh = createMappedVesselMesh(pts, waterSurfaceY, way.tags || {});
       if (vesselMesh) {
         vesselMesh.userData.waterRelationship = waterRelationship.kind;
+        vesselMesh.userData.buildingFootprint = pts;
         appCtx.addEarthWorldObject(vesselMesh);
         appCtx.buildingMeshes.push(vesselMesh);
         loadMetrics.buildingWater.vessels += 1;

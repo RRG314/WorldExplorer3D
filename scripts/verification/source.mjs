@@ -705,9 +705,10 @@ const deferredStructureMergeFixture = mergeExactRegionalStructures({
   elements: [structureFallbackNodes[1], structureFallbackNodes[2], exactBridge]
 });
 const structureFallbackAuthorityFailures = [];
-const exactTransportFeature = ({ id, points, nodeIds, terrainMode = 'at_grade', type = 'residential', completeness = 'lossless' }) => ({
+const exactTransportFeature = ({ id, points, nodeIds, terrainMode = 'at_grade', type = 'residential', completeness = 'lossless', name = '' }) => ({
   sourceFeatureId: id,
   type,
+  name,
   pts: points,
   sourceTopologyNodes: nodeIds?.map((nodeId, index) => ({ id: nodeId, ...points[index] })) || [],
   structureSemantics: {
@@ -718,7 +719,7 @@ const exactTransportFeature = ({ id, points, nodeIds, terrainMode = 'at_grade', 
     identity: id,
     completeness,
     routeState: 'complete',
-    sourceTags: { highway: type }
+    sourceTags: { highway: type, ...(name ? { name } : {}) }
   }
 });
 const exactSurfaceEndpoint = exactTransportFeature({
@@ -789,6 +790,150 @@ const generalizedMetricConnection = compileTransportNetworkModel([
 if (generalizedMetricConnection.connections.length === 0 ||
     !String(generalizedMetricConnection.connections[0].provenance?.method || '').startsWith('metric-')) {
   structureFallbackAuthorityFailures.push('generalized transport lost its bounded metric conflation fallback');
+}
+const generalizedDriftConnection = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'shortbread:drift-left',
+    points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+    completeness: 'generalized'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:drift-right',
+    points: [{ x: 11.5, z: 0 }, { x: 20, z: 0 }],
+    completeness: 'generalized'
+  })
+]);
+if (generalizedDriftConnection.connections.length !== 1 ||
+    generalizedDriftConnection.connections[0].provenance?.method !==
+      'generalized-aligned-endpoint-conflation') {
+  structureFallbackAuthorityFailures.push('aligned generalized tile-edge continuation was left open');
+}
+const generalizedRampMerge = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'shortbread:ramp-link',
+    points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+    terrainMode: 'elevated',
+    type: 'motorway_link',
+    completeness: 'generalized'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:through-road',
+    points: [{ x: 0, z: 1.6 }, { x: 20, z: 1.6 }],
+    terrainMode: 'elevated',
+    type: 'motorway',
+    completeness: 'generalized'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:nearby-parallel-road',
+    points: [{ x: 0, z: 2 }, { x: 20, z: 2 }],
+    terrainMode: 'elevated',
+    type: 'motorway',
+    completeness: 'generalized'
+  })
+]);
+const generalizedInteriorMerges = generalizedRampMerge.connections.filter((connection) =>
+  connection.kind === 'endpoint-interior' &&
+  connection.provenance?.method === 'generalized-aligned-endpoint-interior');
+if (generalizedInteriorMerges.length !== 1 ||
+    !generalizedInteriorMerges[0].left.featureId.includes('ramp-link') ||
+    !generalizedInteriorMerges[0].right.featureId.includes('through-road')) {
+  structureFallbackAuthorityFailures.push('generalized ramp did not select its nearest aligned interior carriageway');
+}
+const generalizedNamedSpur = exactTransportFeature({
+  id: 'shortbread:named-through-fragment',
+  points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+  terrainMode: 'elevated',
+  type: 'motorway',
+  completeness: 'generalized',
+  name: 'Example Expressway'
+});
+const generalizedNamedThrough = exactTransportFeature({
+  id: 'shortbread:named-through-road',
+  points: [{ x: 0, z: 0.25 }, { x: 20, z: 0.25 }],
+  terrainMode: 'elevated',
+  type: 'motorway',
+  completeness: 'generalized',
+  name: 'Example Expressway'
+});
+generalizedNamedSpur.transportSurfaceModel = {
+  distances: new Float32Array([0, 10]),
+  centerHeights: new Float32Array([12, 12])
+};
+generalizedNamedThrough.transportSurfaceModel = {
+  distances: new Float32Array([0, 20]),
+  centerHeights: new Float32Array([20, 20])
+};
+const generalizedNamedRouteMerge = compileTransportNetworkModel([
+  generalizedNamedSpur,
+  generalizedNamedThrough
+]);
+if (generalizedNamedRouteMerge.connections.filter((connection) =>
+  connection.kind === 'endpoint-interior' &&
+  connection.provenance?.method === 'generalized-aligned-endpoint-interior').length !== 1) {
+  structureFallbackAuthorityFailures.push('same-route generalized bridge join was rejected by its provisional height mismatch');
+}
+const generalizedNamedRouteGap = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'shortbread:named-gap-left',
+    points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+    terrainMode: 'elevated',
+    type: 'motorway_link',
+    completeness: 'generalized',
+    name: 'Example Expressway'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:named-gap-right',
+    points: [{ x: 23, z: 0 }, { x: 40, z: 0 }],
+    terrainMode: 'elevated',
+    type: 'motorway',
+    completeness: 'generalized',
+    name: 'Example Expressway'
+  })
+]);
+if (generalizedNamedRouteGap.connections.length !== 1 ||
+    generalizedNamedRouteGap.connections[0].snapDistanceMeters !== 13) {
+  structureFallbackAuthorityFailures.push('named generalized route gap inside one vector cell was left hanging');
+}
+const generalizedDifferentRouteGap = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'shortbread:different-gap-left',
+    points: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+    terrainMode: 'elevated',
+    type: 'motorway',
+    completeness: 'generalized',
+    name: 'First Expressway'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:different-gap-right',
+    points: [{ x: 23, z: 0 }, { x: 40, z: 0 }],
+    terrainMode: 'elevated',
+    type: 'motorway',
+    completeness: 'generalized',
+    name: 'Second Expressway'
+  })
+]);
+if (generalizedDifferentRouteGap.connections.length !== 0) {
+  structureFallbackAuthorityFailures.push('long generalized gap joined different named routes');
+}
+const generalizedPerpendicularCrossing = compileTransportNetworkModel([
+  exactTransportFeature({
+    id: 'shortbread:perpendicular-link',
+    points: [{ x: 10, z: -10 }, { x: 10, z: 0 }],
+    terrainMode: 'elevated',
+    type: 'motorway_link',
+    completeness: 'generalized'
+  }),
+  exactTransportFeature({
+    id: 'shortbread:perpendicular-through',
+    points: [{ x: 0, z: 1.6 }, { x: 20, z: 1.6 }],
+    terrainMode: 'elevated',
+    type: 'motorway',
+    completeness: 'generalized'
+  })
+]);
+if (generalizedPerpendicularCrossing.connections.some((connection) =>
+    connection.provenance?.method === 'generalized-aligned-endpoint-interior')) {
+  structureFallbackAuthorityFailures.push('generalized perpendicular overpass was mistaken for a ramp merge');
 }
 const engineeredSurfaceLeft = exactTransportFeature({
   id: 'osm:way:engineered-surface-left',

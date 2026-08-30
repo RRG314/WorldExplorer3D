@@ -106,3 +106,52 @@ test('current Blocks storage keeps rendered authority aligned with the last comm
     else globalThis.localStorage = priorStorage;
   }
 });
+
+test('versioned Blocks storage migrates a valid legacy copy without deleting it', () => {
+  const priorStorage = globalThis.localStorage;
+  const storage = new FaultableStorage();
+  const legacyPrimaryKey = 'blocks.legacy.primary';
+  const legacyBackupKey = 'blocks.legacy.backup';
+  const nextPrimaryKey = 'blocks.v2.primary';
+  const nextBackupKey = 'blocks.v2.backup';
+  const nextMigrationKey = 'blocks.v2.migration';
+  storage.setItem(legacyPrimaryKey, '{damaged');
+  storage.setItem(legacyBackupKey, JSON.stringify([row()]));
+  globalThis.localStorage = storage;
+  try {
+    const store = createBlockLocalStore({
+      backupKey: nextBackupKey,
+      legacyKeys: [legacyPrimaryKey, legacyBackupKey],
+      maxPerLocation: 200,
+      maxTotal: 5000,
+      migrationKey: nextMigrationKey,
+      normalizeEntry,
+      storageKey: nextPrimaryKey,
+      testKey
+    });
+    store.initialize();
+
+    assert.equal(store.countForLocation(row().locationKey), 1);
+    assert.equal(store.getStatus().notice, 'migrated');
+    assert.equal(storage.getItem(nextMigrationKey), 'done');
+    assert.deepEqual(JSON.parse(storage.getItem(nextPrimaryKey)), JSON.parse(storage.getItem(nextBackupKey)));
+    assert.equal(storage.getItem(legacyPrimaryKey), '{damaged', 'damaged legacy input remains recoverable');
+    assert.equal(JSON.parse(storage.getItem(legacyBackupKey)).length, 1, 'legacy backup is not deleted');
+
+    const reloaded = createBlockLocalStore({
+      backupKey: nextBackupKey,
+      legacyKeys: [legacyPrimaryKey, legacyBackupKey],
+      maxPerLocation: 200,
+      maxTotal: 5000,
+      migrationKey: nextMigrationKey,
+      normalizeEntry,
+      storageKey: nextPrimaryKey,
+      testKey
+    });
+    reloaded.initialize();
+    assert.equal(reloaded.countForLocation(row().locationKey), 1, 'migration is idempotent');
+  } finally {
+    if (priorStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = priorStorage;
+  }
+});

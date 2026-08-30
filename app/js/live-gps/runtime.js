@@ -16,8 +16,8 @@ import {
 
 const LIVE_GPS_WATCH_OPTIONS = Object.freeze({
   enableHighAccuracy: true,
-  timeout: 20_000,
-  maximumAge: 5_000
+  timeout: 8_000,
+  maximumAge: 10_000
 });
 const LIVE_GPS_LOW_POWER_WATCH_OPTIONS = Object.freeze({
   enableHighAccuracy: false,
@@ -103,8 +103,7 @@ function requestFreshPosition(options = LIVE_GPS_WATCH_OPTIONS) {
       return;
     }
     globalThis.navigator.geolocation.getCurrentPosition(resolve, reject, {
-      ...options,
-      maximumAge: 0
+      ...options
     });
   });
 }
@@ -114,7 +113,7 @@ async function prepareLiveGpsStart(options = {}) {
   const setWorldLocation = options.setWorldLocation !== false;
   const consented = await requestConsent();
   if (!consented) return false;
-  setConsentStatus('Getting a fresh GPS fix…');
+  setConsentStatus('Finding your location…');
   const continueButton = document.getElementById('liveGpsPermissionContinue');
   if (continueButton) continueButton.disabled = true;
   try {

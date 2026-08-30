@@ -73,7 +73,15 @@ const PropertyUI = {
   button: null
 };
 
-const car = { x: 0, z: 0, y: 0, angle: 0, speed: 0, vx: 0, vz: 0, vy: 0, grip: 1, onRoad: true, road: null, boost: false, boostTime: 0, boostReady: true, boostDecayTime: 0, driftAngle: 0 };
+const car = {
+  x: 0, z: 0, y: 0, angle: 0, speed: 0, vx: 0, vz: 0, vy: 0,
+  grip: 1, onRoad: true, road: null, boost: false, boostTime: 0,
+  boostReady: true, boostDecayTime: 0, driftAngle: 0,
+  condition: 1,
+  durabilityPolicy: 'exploration_unlimited',
+  resistance: 175,
+  transportCatalogId: 'sedan'
+};
 const boat = {
   x: 0,
   z: 0,
@@ -124,7 +132,15 @@ let boatMode = {
   bowSplashStrength: 0,
   sternFoamStrength: 0,
   slamStrength: 0,
-  manualExitPending: false
+  manualExitPending: false,
+  transportEntityId: 'boat-mode:marina-runabout',
+  transportCatalogId: 'marina-runabout',
+  vesselLabel: 'Marina runabout',
+  condition: 1,
+  durabilityPolicy: 'standard',
+  lastImpactAt: 0,
+  lastDamageBand: 'healthy',
+  oceanTransferVessel: null
 };
 const keys = {};
 let roads = [],roadMeshes = [],urbanSurfaceMeshes = [],buildingMeshes = [],buildings = [],dynamicBuildingColliders = [],landuses = [],surfaceFeatureHints = [],landuseMeshes = [],waterAreas = [],waterways = [],linearFeatures = [],linearFeatureMeshes = [],structureVisualMeshes = [],pois = [],poiMeshes = [],scene,camera,renderer,carMesh,wheelMeshes = [];

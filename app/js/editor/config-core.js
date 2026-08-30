@@ -58,7 +58,7 @@ const OVERLAY_PRESET_CATEGORIES = Object.freeze([
   { id: 'structures', label: 'Structures', description: 'Buildings, entrances, and built shells that affect 3D rendering.' },
   { id: 'landscape', label: 'Landscape', description: 'Water, vegetation, landuse, and outdoor environmental features.' },
   { id: 'places', label: 'Places', description: 'Named points of interest, trees, markers, and public-facing content.' },
-  { id: 'indoors', label: 'Indoors', description: 'Level-aware indoor shells and connector scaffolding for future interior editing.' }
+  { id: 'indoors', label: 'Indoors', description: 'Level-aware rooms, corridors, stairs, and elevators.' }
 ]);
 
 const OVERLAY_VALIDATION_RULES = Object.freeze([

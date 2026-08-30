@@ -270,6 +270,12 @@ export async function saveSelectedFeature(ctx) {
         : `Draft ${overlayFeatureLabel(saved)} saved.`,
       'ok'
     );
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:editor-feature-saved', { detail: {
+      featureId: saved.featureId,
+      label: overlayFeatureLabel(saved),
+      storageMode: saved.storageMode || 'local',
+      reviewState: saved.reviewState || 'draft'
+    } }));
     return true;
   } catch (error) {
     setStatus(ctx, error?.message || 'Could not save overlay draft.', 'error');
@@ -305,6 +311,12 @@ export async function submitSelectedFeatureForReview(ctx) {
     addWorkspaceFeature(ctx, saved);
     pushHistory(ctx);
     setStatus(ctx, `Submitted ${overlayFeatureLabel(saved)} for moderation.`, 'ok');
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:editor-feature-saved', { detail: {
+      featureId: saved.featureId,
+      label: overlayFeatureLabel(saved),
+      storageMode: saved.storageMode || 'cloud',
+      reviewState: 'submitted'
+    } }));
     return true;
   } catch (error) {
     setStatus(ctx, error?.message || 'Could not submit overlay draft.', 'error');

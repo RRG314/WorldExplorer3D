@@ -1,6 +1,8 @@
 const ALLOWED_EVENTS = new Set([
   'activity_started', 'activity_completed', 'discovery_recorded',
   'companion_adopted', 'companion_activated', 'companion_cared_for',
+  'companion_trust_advanced', 'companion_training_started', 'companion_training_completed',
+  'companion_xp_awarded', 'companion_level_reached',
   'museum_viewed', 'trade_opened'
 ]);
 const ALLOWED_CONTEXTS = new Set([

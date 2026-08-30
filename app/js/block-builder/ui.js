@@ -65,7 +65,8 @@ function openBlockBuilder() {
     const recoveryNotice = snapshot.shared !== true && persistence.notice && persistence.notice !== 'none'
       ? String(persistence.detail || '')
       : '';
-    setStatus(recoveryNotice || 'Choose a piece and color, or select a nearby mapped building to edit this virtual world.');
+    const guidance = snapshot.characterAssistance?.guidanceLabel || 'Basic placement guidance';
+    setStatus(recoveryNotice || `${guidance}. Choose a piece and color, or select a nearby mapped building.`);
   }
   return enabled;
 }
@@ -155,9 +156,10 @@ function initBlockBuilderUi() {
   });
   const selectionLabel = document.getElementById('editableWorldSelection');
   document.getElementById('editableWorldSelectBuilding')?.addEventListener('click', () => {
-    const selected = appCtx.selectNearestEditableBuilding?.(42);
+    const radius = Number(appCtx.getConstructionAssistance?.().mappedSelectionRadiusMeters) || 42;
+    const selected = appCtx.selectNearestEditableBuilding?.(radius);
     if (!selected) {
-      if (selectionLabel) selectionLabel.textContent = 'No mapped building within 42 m. Move closer and try again.';
+      if (selectionLabel) selectionLabel.textContent = `No mapped building within ${radius.toFixed(0)} m. Move closer and try again.`;
       return;
     }
     if (selectionLabel) selectionLabel.textContent = `${selected.label} · ${selected.distance.toFixed(1)} m · ${selected.sourceFeatureId}`;

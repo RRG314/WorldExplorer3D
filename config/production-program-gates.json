@@ -1,13 +1,13 @@
 {
   "schemaVersion": 3,
-  "programId": "world-explorer-5.0-minimum-2026-08-25",
-  "targetVersion": "5.0.0",
+  "programId": "world-explorer-5.1-release-2026-08-27",
+  "targetVersion": "5.1.0",
   "productionBaseline": {
-    "version": "4.3.1",
-    "releaseCommit": "1611d666f8c469c573ad184128b019a7f1e3f961"
+    "version": "5.0.0",
+    "releaseCommit": "caa95d990db8ee30806b28e7962af2777eff56bf"
   },
   "roadmap": "ROADMAP.md",
-  "acceptanceContract": "RELEASE_NOTES_5.0.0.md",
+  "acceptanceContract": "RELEASE_NOTES_5.1.0.md",
   "deploymentRequiresExplicitUserApproval": true,
   "requiredCompleteStatus": "complete",
   "statusDefinitions": ["complete", "in-progress", "partial", "not-implemented"],
@@ -15,8 +15,8 @@
     "CP0": {
       "name": "Current feature evidence",
       "status": "complete",
-      "minimumDecision": "Retain only public feature claims backed by a fresh normal-input journey on the immutable 5.0 candidate.",
-      "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:5.0-claims"],
+      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable 5.1 candidate.",
+      "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:release-claims", "verify:explorer-coherence-browser", "verify:regional-guide-new-york"],
       "openItems": []
     },
     "CP1": {
@@ -36,36 +36,36 @@
     "CP3": {
       "name": "Buildings, facades, entrances, and interiors",
       "status": "complete",
-      "minimumDecision": "Ship mapped indoor geometry on each available source level and generated fallback floors with working stairs, elevator, collision, keyboard/touch entry, exit recovery, and reload teardown. Explicit mapped connector semantics and moderated indoor overlay publication remain staged beyond the minimum 5.0 and are not public claims.",
+      "minimumDecision": "Retain mapped indoor geometry on each available source level and generated fallback floors with working stairs, elevator, collision, keyboard/touch entry, exit recovery, and reload teardown. Explicit mapped connector semantics and moderated indoor overlay publication remain staged beyond 5.1 and are not public claims.",
       "requiredCommands": ["verify:world", "verify:assembled-locations", "verify:interiors"],
       "openItems": []
     },
     "CP4": {
       "name": "Player, Backpack, Journal, progression, and controls",
       "status": "complete",
-      "minimumDecision": "Ship one versioned local/account reconciliation contract for Backpack rewards, Journal, Field Guide, and progression; retain the tested Standard/Southpaw touch profiles with reset and reload recovery. Full per-action remapping, gamepad profiles, and editor/AR-specific bindings remain staged and are not minimum-5.0 claims.",
-      "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui"],
+      "minimumDecision": "Ship one Explorer event and profile authority across the Backpack, Journal, Field Guide, fieldwork, games, making, travel, community, and companions; retain tested touch profiles with reset and reload recovery. Full cross-device Journal sync and per-action remapping remain staged and are not 5.1 claims.",
+      "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui", "verify:explorer-coherence", "verify:discovery-receipts", "verify:explorer-coherence-browser"],
       "openItems": []
     },
     "CP5": {
       "name": "Urban Sandbox",
       "status": "complete",
-      "minimumDecision": "Ship the retained equipment, vehicle, responder, custody, mapped-facility, and room-authority journeys proven by normal input. Universal full-body embodiment and broader sandbox simulation remain staged and are not minimum-5.0 claims.",
+      "minimumDecision": "Retain the equipment, vehicle, responder, custody, mapped-facility, and room-authority journeys proven by normal input. Universal full-body embodiment and broader sandbox simulation remain staged and are not 5.1 claims.",
       "requiredCommands": ["verify:urban-sandbox", "verify:urban-equipment", "verify:actors-vehicles", "verify:multiplayer"],
       "openItems": []
     },
     "CP6": {
       "name": "Missions, engagement, crafting, and economy",
       "status": "complete",
-      "minimumDecision": "The minimum 5.0 retains Field Today, daily/weekly Expeditions, seasonal surveys, progression, and existing games. Crafting, currency, and a reward-grade unified economy are excluded and must not be publicly claimed.",
-      "requiredCommands": ["verify:mission-lifecycle", "verify:retention-release", "verify:field-retention-ui", "audit:5.0-claims"],
+      "minimumDecision": "Retain Field Today, daily and weekly Expeditions, seasonal surveys, progression, and existing games while projecting them into the same Explorer Journal. Crafting, currency, and a reward-grade unified economy are excluded and must not be publicly claimed.",
+      "requiredCommands": ["verify:mission-lifecycle", "verify:retention-release", "verify:field-retention-ui", "verify:explorer-coherence", "audit:release-claims"],
       "openItems": []
     },
     "CP7": {
       "name": "Live GPS Field Expeditions and regional ecology",
       "status": "complete",
-      "minimumDecision": "Ship the reviewed Baltimore 60-taxon regional slice and honest virtual field leads; make no worldwide ecology or live-animal-presence claim.",
-      "requiredCommands": ["verify:live-gps-authority", "verify:live-gps", "verify:walking-encounters", "verify:regional-ecology", "verify:field-evidence", "verify:game-language", "verify:field-retention-ui", "verify:creature-quality"],
+      "minimumDecision": "Retain the reviewed Baltimore 60-taxon slice and add ten source-bounded 12-entry regional slices so every built-in Earth destination has attainable field play. Expansion entries remain reference presentation unless media or models are separately reviewed; make no worldwide ecology, abundance, or live-animal-presence claim.",
+      "requiredCommands": ["verify:live-gps-authority", "verify:live-gps", "verify:walking-encounters", "verify:regional-ecology", "verify:regional-world-richness", "verify:regional-guide-new-york", "verify:field-evidence", "verify:game-language", "verify:field-retention-ui", "verify:creature-quality"],
       "openItems": []
     },
     "CP8": {
@@ -92,8 +92,8 @@
     "CP11": {
       "name": "UI, accessibility, presentation, and release identity",
       "status": "complete",
-      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.0 identity.",
-      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:5.0-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
+      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.1 identity.",
+      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
       "openItems": []
     }
   }

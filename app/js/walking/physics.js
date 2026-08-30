@@ -1,20 +1,23 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=4";
+import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateParachuteFall } from "../urban-sandbox/parachute-model.js?v=1";
+import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=5";
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
+import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
 function isPlanetarySurface() {
-  return !!(appCtx.onMoon || appCtx.onMars);
+  return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 }
 
-function getPlanetarySurfaceMesh() {
-  if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
-  if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
-  return null;
+function activePlanetaryBodyId() {
+  return appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
 }
 
 function createWalkingPhysicsHelpers({
@@ -79,6 +82,12 @@ function createWalkingPhysicsHelpers({
   function buildingRoofYAt(b, x, z) {
     if (Number.isFinite(b?.maxY)) return b.maxY;
     return buildingBaseYAt(b, x, z) + Math.max(0, Number(b?.height) || 0);
+  }
+
+  function walkerIsAtOrAboveRoof(building, walkerFeetY, tolerance = 1) {
+    if (!building || !Number.isFinite(walkerFeetY)) return false;
+    const roofY = buildingRoofYAt(building, state.walker.x, state.walker.z);
+    return Number.isFinite(roofY) && walkerFeetY >= roofY - Math.max(0.12, tolerance);
   }
 
   function findNearestWall(x, z) {
@@ -160,13 +169,9 @@ function createWalkingPhysicsHelpers({
 
   function resolveWalkGroundState(x, z, walkerY, finiteOr) {
     let groundY;
-    const planetarySurface = getPlanetarySurfaceMesh();
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(x, 2200, z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      groundY = hits.length > 0 ? hits[0].point.y : -100;
+    if (isPlanetarySurface()) {
+      groundY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+      if (!Number.isFinite(groundY)) groundY = -100;
     } else {
       // Overlapping interior floors require a vertical reference. Preserve the
       // legacy outdoor query path, but choose the nearest published interior
@@ -212,7 +217,11 @@ function createWalkingPhysicsHelpers({
     const liveGpsTarget = liveGpsOwnsTranslation
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
       : null;
-    const speed = Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
+    const skydiving = appCtx.urbanSandboxRuntime?.parachute?.skydiving === true;
+    const parachuteDeployedAtFrameStart = appCtx.isUrbanParachuteDeployed?.() === true;
+    const speed = skydiving
+      ? parachuteHorizontalSpeed(parachuteDeployedAtFrameStart)
+      : Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
     state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
@@ -258,9 +267,16 @@ function createWalkingPhysicsHelpers({
       state.walker.mobileMoveBasisYaw = null;
       state.walker.mobileMoveWasActive = false;
     }
-    const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
-    const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
-    const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
+    let jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
+    if (skydiving && appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute') jumpAction = 0;
+    const planetaryBodyId = activePlanetaryBodyId();
+    const gravityMagnitude = planetaryBodyId
+      ? samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
+      : 9.80665;
+    const gravity = -gravityMagnitude;
+    const jumpVelocity = planetaryBodyId
+      ? Math.max(2.8, Math.min(4.2, 5 * Math.sqrt(gravityMagnitude / 9.80665)))
+      : 5.0;
 
     const groundState = state.walker._resolvedGroundState ||
       resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
@@ -295,10 +311,40 @@ function createWalkingPhysicsHelpers({
 
     const parachuteDeployed = appCtx.isUrbanParachuteDeployed?.() === true &&
       !isPlanetarySurface() && !state.walker.onGround && state.walker.vy < 0;
-    state.walker.vy = parachuteDeployed
-      ? integrateParachuteFall(state.walker.vy, dt, true)
-      : state.walker.vy + gravity * dt;
+    const parachuteFlare = parachuteDeployed && Number(actions.jump) > .05;
+    let skydivingFlight = null;
+    if (skydiving) {
+      skydivingFlight = integrateSkydivingDynamics(state.walker.skydivingFlight, {
+        deployed: parachuteDeployed,
+        flare: parachuteFlare,
+        forward,
+        turn: Number(actions.turn) || -strafe,
+        vx: state.walker.vx,
+        vz: state.walker.vz,
+        verticalVelocity: state.walker.vy
+      }, dt);
+      state.walker.skydivingFlight = skydivingFlight;
+      state.walker.angle = skydivingFlight.heading;
+      state.walker.vy = skydivingFlight.verticalSpeed;
+    } else {
+      state.walker.skydivingFlight = null;
+      state.walker.vy += gravity * dt;
+    }
     state.walker.y += state.walker.vy * dt;
+
+    if (appCtx.activeInterior) {
+      const ceiling = resolveInteriorCeiling({
+        activeInterior: appCtx.activeInterior,
+        x: state.walker.x,
+        z: state.walker.z,
+        eyeY: state.walker.y,
+        verticalVelocity: state.walker.vy
+      });
+      if (ceiling.collided) {
+        state.walker.y = ceiling.eyeY;
+        state.walker.vy = ceiling.verticalVelocity;
+      }
+    }
 
     if (state.walker.y <= effectiveGroundY + CFG.eyeHeight) {
       state.walker.y = effectiveGroundY + CFG.eyeHeight;
@@ -307,7 +353,7 @@ function createWalkingPhysicsHelpers({
       appCtx.onUrbanParachuteLanded?.();
     }
 
-    const speedMultiplier = appCtx.onMoon ? 0.6 : appCtx.onMars ? 0.72 : 1.0;
+    const speedMultiplier = planetaryBodyId === 'moon' ? 0.6 : planetaryBodyId ? 0.72 : 1.0;
     const adjustedSpeed = speed * speedMultiplier;
 
     const liveGpsMoved = !!liveGpsTarget && Math.hypot(
@@ -347,14 +393,18 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    if (forward !== 0 || strafe !== 0 || liveGpsMoved) {
+    if (forward !== 0 || strafe !== 0 || liveGpsMoved || skydivingFlight) {
       const cameraYaw = mobileTouch && Number.isFinite(state.walker.mobileMoveBasisYaw)
         ? state.walker.mobileMoveBasisYaw
         : wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
-      const moveX = mobileTouch && !liveGpsMoved
+      const moveX = skydivingFlight
+        ? skydivingFlight.vx * dt
+        : mobileTouch && !liveGpsMoved
         ? (Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
         : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = mobileTouch && !liveGpsMoved
+      const moveZ = skydivingFlight
+        ? skydivingFlight.vz * dt
+        : mobileTouch && !liveGpsMoved
         ? (Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
         : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
       if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
@@ -363,6 +413,30 @@ function createWalkingPhysicsHelpers({
 
       let newX = liveGpsMoved ? liveGpsTarget.x : state.walker.x + moveX;
       let newZ = liveGpsMoved ? liveGpsTarget.z : state.walker.z + moveZ;
+      if (planetaryBodyId) {
+        const activeSurface = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active;
+        const manifest = activeSurface?.regionId
+          ? getPlanetarySurfaceRegion(activeSurface.regionId)
+          : null;
+        if (manifest?.bodyId === planetaryBodyId) {
+          const boundary = resolvePlanetarySurfaceBoundary(
+            { x: newX, z: newZ },
+            manifest,
+            { inset: 40 }
+          );
+          if (boundary.clamped) {
+            newX = boundary.x;
+            newZ = boundary.z;
+            appCtx.planetarySurfaceBoundary = Object.freeze({
+              bodyId: activeSurface.bodyId,
+              regionId: activeSurface.regionId,
+              edge: boundary.edge,
+              mode: 'walk',
+              atMs: Date.now()
+            });
+          }
+        }
+      }
       const sharedBuildingCollision = !isPlanetarySurface() && typeof appCtx.checkBuildingCollision === "function"
         ? appCtx.checkBuildingCollision
         : null;
@@ -384,7 +458,15 @@ function createWalkingPhysicsHelpers({
           if (sharedBuildingCollision) {
             const collision = sharedBuildingCollision(px, pz, sampleRadius, {
               actorBaseY: walkerFeetY,
-              actorHeight: CFG.eyeHeight * 0.95
+              actorHeight: CFG.eyeHeight * 0.95,
+              // The building collider owns walls, while the walking surface
+              // query owns a roof beneath the actor's feet. Once the walker
+              // has reached that roof, the same solid must not block every
+              // horizontal step across it.
+              acceptCollision: (candidate) => !walkerIsAtOrAboveRoof(
+                candidate?.building,
+                walkerFeetY
+              )
             });
             if (collision?.collision) return true;
           }
@@ -493,8 +575,11 @@ function createWalkingPhysicsHelpers({
         ? finalGroundState.effectiveGroundY + 0.04
         : Math.max(state.walker.y - CFG.eyeHeight, finalGroundState.effectiveGroundY + 0.02);
       state.characterMesh.position.set(state.walker.x, meshFeetY, state.walker.z);
+      state.characterMesh.rotation.order = 'YXZ';
       state.characterMesh.rotation.y = state.walker.angle;
-      animateCharacterWalk(state.characterMesh, state.walker.speedMph > 0, dt);
+      state.characterMesh.rotation.x = skydivingFlight?.bodyPitch || 0;
+      state.characterMesh.rotation.z = skydivingFlight ? -skydivingFlight.bank : 0;
+      animateCharacterWalk(state.characterMesh, !skydivingFlight && state.walker.speedMph > 0, dt);
     }
 
     if (profileEnabled) {

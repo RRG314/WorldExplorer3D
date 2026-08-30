@@ -1,14 +1,36 @@
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
+
 export function updatePlanetaryVehicleHeight(appCtx, dt, options = {}) {
-  const { planetarySurface, getPlanetaryGravity, getRaycaster, rayStart, rayDir } = options;
+  const { planetarySurface, getPlanetaryGravity } = options;
   let carY = Number.isFinite(appCtx.car?.y) ? appCtx.car.y : 1.2;
 
+  const activeSurface = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active;
+  const manifest = activeSurface?.regionId ? getPlanetarySurfaceRegion(activeSurface.regionId) : null;
+  if (manifest) {
+    const boundary = resolvePlanetarySurfaceBoundary(appCtx.car, manifest, { inset: 180 });
+    if (boundary.clamped) {
+      appCtx.car.x = boundary.x;
+      appCtx.car.z = boundary.z;
+      appCtx.car.vx = 0;
+      appCtx.car.vz = 0;
+      appCtx.car.vFwd = 0;
+      appCtx.car.vLat = 0;
+      appCtx.car.speed = 0;
+      appCtx.planetarySurfaceBoundary = Object.freeze({
+        bodyId: activeSurface.bodyId,
+        regionId: activeSurface.regionId,
+        edge: boundary.edge,
+        atMs: Date.now()
+      });
+    }
+  }
+
   planetarySurface.updateMatrixWorld(true);
-  const raycaster = getRaycaster();
   const sampleMoonSurfaceY = (sx, sz) => {
-    rayStart.set(sx, 1200, sz);
-    raycaster.set(rayStart, rayDir || new THREE.Vector3(0, -1, 0));
-    const sampleHits = raycaster.intersectObject(planetarySurface, false);
-    return sampleHits.length > 0 ? sampleHits[0].point.y + 1.2 : null;
+    const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, sx, sz);
+    return Number.isFinite(surfaceY) ? surfaceY + 1.2 : null;
   };
 
   const targetY = sampleMoonSurfaceY(appCtx.car.x, appCtx.car.z);

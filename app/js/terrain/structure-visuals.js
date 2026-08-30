@@ -498,20 +498,38 @@ export function collectStructureVisualInstances(deps = {}) {
               structureFamily: structureAssembly.family
             });
           }
-          const capHalfSpan = Math.max(
-            width * 0.42,
-            ...columns.map((column) => Math.abs(Number(column.offset) || 0) + column.width * 0.6)
-          );
-          addBeam(
-            capInstances,
-            station.x,
-            station.surfaceY - deckThickness - 0.18,
-            station.z,
-            capHalfSpan * 2,
-            0.34,
-            Math.max(0.58, ...columns.map((column) => column.width * 1.2)),
-            Math.atan2(station.tangentX, station.tangentZ)
-          );
+          if (station.publishCap !== false) {
+            const capHalfSpan = Math.max(
+              width * 0.42,
+              ...columns.map((column) => Math.abs(Number(column.offset) || 0) + column.width * 0.6)
+            );
+            addBeam(
+              capInstances,
+              station.x,
+              station.surfaceY - deckThickness - 0.18,
+              station.z,
+              capHalfSpan * 2,
+              0.34,
+              Math.max(0.58, ...columns.map((column) => column.width * 1.2)),
+              Math.atan2(station.tangentX, station.tangentZ)
+            );
+          }
+        }
+      }
+      if (!isConnectorLike && renderRoadSupports) {
+        for (const station of structureAssembly.terminalSupports || []) {
+          for (const column of station.columns || []) {
+            addSupportInstance({
+              x: column.x,
+              y: column.terrainY + column.height * 0.5,
+              z: column.z,
+              scaleX: column.width,
+              scaleY: column.height,
+              scaleZ: Math.max(1, column.width * 1.1),
+              supportKind: 'terminal_pier',
+              structureFamily: structureAssembly.family
+            });
+          }
         }
       }
 

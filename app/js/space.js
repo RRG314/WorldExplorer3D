@@ -2,15 +2,17 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=13";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=23";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=17";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=25";
+import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=10";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=5';
+import { resolveCompletedLandingTarget } from './space/landing-target.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -43,11 +45,14 @@ appCtx.spaceFlight = {
   launchStartMs: 0,
   _launchSource: null,
   _isThrusting: false,
+  presentationAuthority: 'classic',
   _lastFrameMs: 0,
   _frameScale: 1,
   overviewMode: false,
   _sessionId: 0
 };
+
+installSpaceJourneyRuntime(appCtx);
 
 let spaceSessionScope = null;
 const spaceModuleScope = createLifecycleScope('space-module');
@@ -57,6 +62,7 @@ function beginSpaceFlightSession() {
   spaceSessionScope = createLifecycleScope('space-flight-session');
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
   appCtx.spaceFlight.overviewMode = false;
+  appCtx.spaceFlight._landingTarget = null;
   return appCtx.spaceFlight._sessionId;
 }
 
@@ -130,6 +136,11 @@ function startSpaceFlightToMoon() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
+  appCtx.beginRenderedSpaceJourney?.({
+    sourceBodyId: 'earth',
+    destinationBodyId: 'moon',
+    mode: 'assisted'
+  });
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
@@ -149,6 +160,8 @@ function startSpaceFlightToMoon() {
 function startSpaceFlightToEarth() {
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'earth';
   console.log("Starting space flight to Earth...");
+  const sourceBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : 'moon');
+  const sourceLabel = sourceBodyId[0].toUpperCase() + sourceBodyId.slice(1);
   const sessionId = beginSpaceFlightSession();
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_earth' });
 
@@ -160,7 +173,7 @@ function startSpaceFlightToEarth() {
   appCtx.spaceFlight.destination = 'earth';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
-  appCtx.spaceFlight._launchSource = 'Moon';
+  appCtx.spaceFlight._launchSource = sourceLabel;
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
   if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
@@ -176,11 +189,19 @@ function startSpaceFlightToEarth() {
 
   hideGameUI();
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) {
-    createSpaceFlightScene({ includeExtendedSpace: false });
+    createSpaceFlightScene({ includeExtendedSpace: sourceBodyId !== 'moon' });
   }
+  if (sourceBodyId !== 'moon') ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
+  appCtx.spaceFlight._launchSource = sourceLabel;
+  appCtx.beginRenderedSpaceJourney?.({
+    sourceBodyId,
+    destinationBodyId: 'earth',
+    mode: 'assisted',
+    resumeJourney: true
+  });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
 
@@ -232,6 +253,11 @@ function startSpaceFlightToMars() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMars();
+  appCtx.beginRenderedSpaceJourney?.({
+    sourceBodyId: appCtx.spaceFlight._launchSource?.toLowerCase?.() || 'earth',
+    destinationBodyId: 'mars',
+    mode: 'assisted'
+  });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
   appCtx.showSolarSystemUI?.();
@@ -263,7 +289,7 @@ function attemptLanding() {
 
 function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
   if (!isCurrentSpaceFlightSession(sessionId)) return;
-  const targetName = appCtx.spaceFlight._landingTarget || appCtx.spaceFlight.destination;
+  const targetName = resolveCompletedLandingTarget(appCtx.spaceFlight, appCtx.spaceJourney);
   console.log("Landing complete! Target:", targetName);
 
   showFlightMessage('LANDING SUCCESSFUL!', '#10b981');
@@ -276,6 +302,8 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
       if (typeof appCtx.arriveAtMoon === 'function') appCtx.arriveAtMoon();
     } else if (targetName === 'Mars' || targetName === 'mars') {
       appCtx.arriveAtMars?.();
+    } else if (!['Earth', 'earth'].includes(targetName) && typeof appCtx.arriveAtSolidWorld === 'function') {
+      appCtx.arriveAtSolidWorld(targetName);
     } else if (typeof appCtx.arriveAtEarth === 'function') {
       appCtx.arriveAtEarth();
     }
@@ -315,6 +343,7 @@ function exitSpaceFlight(source = 'runtime') {
   appCtx.spaceFlight._launchSource = null;
   appCtx.spaceFlight.launchStartMs = 0;
   appCtx.spaceFlight._isThrusting = false;
+  appCtx.clearRenderedSpaceJourney?.();
   if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
   if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
 }
@@ -345,6 +374,7 @@ function initSpaceFlightWhenReady() {
 
 Object.assign(appCtx, {
   animateSpaceFlight,
+  completeSpaceFlightJourneyLanding: completeLanding,
   exitSpaceFlight,
   forceSpaceFlightLanding,
   showSpaceFlightMessage: showFlightMessage,

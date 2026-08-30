@@ -4,11 +4,11 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=57";
+} from "./terrain/structure-visuals.js?v=58";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=21";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -27,8 +27,9 @@ import {
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
+  refreshTerrainSurfaceProfilesCooperatively,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=51";
+} from "./terrain/surface-profiles.js?v=54";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -52,12 +53,12 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=47";
+} from "./terrain/tiles.js?v=49";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=46";
+} from "./terrain/rebuild.js?v=47";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -65,7 +66,7 @@ import {
 } from "./terrain/debug-tools.js?v=15";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=71";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=73";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -268,7 +269,7 @@ const terrainTileDeps = {
   applyHeightsToTerrainMesh: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps)
 };
 
-function applyWaterTerrainMask() {
+function applyWaterTerrainMask(options = {}) {
   const meshes = (appCtx.terrainGroup?.children || []).filter((mesh) => mesh?.userData?.isTerrainMesh);
   const waterAreaCount = Number(appCtx.waterAreas?.length || 0);
   if (waterAreaCount === 0) {
@@ -278,7 +279,10 @@ function applyWaterTerrainMask() {
   }
   let maskedVertices = 0;
   for (const mesh of meshes) {
-    applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps, {
+      reuseBaseElevations: true,
+      refreshVisualProfile: options.deferVisualProfile !== true
+    });
     maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
@@ -293,14 +297,19 @@ function applyWaterTerrainMask() {
   return stats;
 }
 
-function applyTransportTerrainCorridors() {
+function applyTransportTerrainCorridors(options = {}) {
   const meshes = (appCtx.terrainGroup?.children || []).filter(
     (mesh) => mesh?.userData?.isTerrainMesh
   );
   let adjustedVertices = 0;
+  let waterMaskedVertices = 0;
   for (const mesh of meshes) {
-    applyHeightsToTerrainMesh(mesh, terrainTileDeps, { reuseBaseElevations: true });
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps, {
+      reuseBaseElevations: true,
+      refreshVisualProfile: options.deferVisualProfile !== true
+    });
     adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
+    waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
   clearTerrainHeightCache();
@@ -313,6 +322,13 @@ function applyTransportTerrainCorridors() {
     terrainSeams
   });
   appCtx.transportTerrainCorridorStats = stats;
+  appCtx.waterTerrainMaskStats = Object.freeze({
+    terrainMeshes: meshes.length,
+    waterAreas: Number(appCtx.waterAreas?.length || 0),
+    maskedVertices: waterMaskedVertices,
+    terrainSeams,
+    authority: 'compiled-transport-terrain-rebuild'
+  });
   return stats;
 }
 
@@ -576,6 +592,7 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  refreshTerrainSurfaceProfilesCooperatively,
   refreshFarTerrainSurfaceColors,
   resetFarTerrainClipmap,
   resetEarthStreaming,
@@ -641,6 +658,7 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  refreshTerrainSurfaceProfilesCooperatively,
   resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,

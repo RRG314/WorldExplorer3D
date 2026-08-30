@@ -19,7 +19,7 @@ import {
   pointInPolygonSafe,
   polygonCentroid,
   ringAreaAbs
-} from "./core.js?v=3";
+} from "./core.js?v=4";
 import {
   constrainPointToFootprint,
   findInteriorAnchor,

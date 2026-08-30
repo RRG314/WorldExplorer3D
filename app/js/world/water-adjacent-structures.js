@@ -10,6 +10,44 @@ function normalized(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+const KNOWN_MAPPED_VESSEL_IDENTITIES = Object.freeze({
+  'uss constellation': Object.freeze({
+    typeId: 'sloop-of-war',
+    typeLabel: 'Sloop-of-war museum ship'
+  })
+});
+
+const MAPPED_VESSEL_TYPE_LABELS = Object.freeze({
+  cargo: 'Cargo ship',
+  container: 'Container ship',
+  ferry: 'Passenger ferry',
+  fishing: 'Fishing vessel',
+  houseboat: 'Houseboat',
+  lightship: 'Lightship',
+  military: 'Naval vessel',
+  passenger: 'Passenger ship',
+  research: 'Research vessel',
+  sail: 'Sailing ship',
+  sailing: 'Sailing ship',
+  submarine: 'Submarine',
+  tug: 'Tugboat'
+});
+
+function resolveMappedVesselIdentity(tags = {}) {
+  const name = String(tags.name || tags['name:en'] || '').trim();
+  const known = KNOWN_MAPPED_VESSEL_IDENTITIES[normalized(name)];
+  const rawType = normalized(tags['ship:type'] || tags.ship || tags.vessel || tags.building);
+  const historic = normalized(tags.historic) === 'ship';
+  const typeId = known?.typeId || (rawType && rawType !== 'ship' ? rawType : historic ? 'historic-ship' : 'ship');
+  const typeLabel = known?.typeLabel || MAPPED_VESSEL_TYPE_LABELS[typeId] || (historic ? 'Historic museum ship' : 'Mapped vessel');
+  return Object.freeze({
+    name,
+    typeId,
+    typeLabel,
+    label: name ? `${name} · ${typeLabel}` : typeLabel
+  });
+}
+
 function classifyMappedWaterStructure(tags = {}) {
   const building = normalized(tags.building || tags['building:part']);
   const historic = normalized(tags.historic);
@@ -227,6 +265,7 @@ function createMappedVesselMesh(points, waterSurfaceY, tags = {}, options = {}) 
   centerX /= points.length;
   centerZ /= points.length;
   const verticalProfile = mappedVesselVerticalProfile(waterSurfaceY, options.hullHeight);
+  const identity = resolveMappedVesselIdentity(tags);
   const { hullHeight, hullBottomY, hullTopY, waterlineClearance } = verticalProfile;
   const hullGeometry = new THREE.ExtrudeGeometry(makeShape(points), { depth: hullHeight, bevelEnabled: false });
   hullGeometry.rotateX(-Math.PI / 2);
@@ -237,6 +276,7 @@ function createMappedVesselMesh(points, waterSurfaceY, tags = {}, options = {}) 
     metalness: 0.12
   });
   const vessel = new THREE.Group();
+  vessel.name = identity.label;
   const hull = new THREE.Mesh(hullGeometry, hullMaterial);
   // Keep only the lower portion submerged. The old half-height placement put
   // most of a low ship outline behind the opaque water sheet.
@@ -292,8 +332,15 @@ function createMappedVesselMesh(points, waterSurfaceY, tags = {}, options = {}) 
   vessel.add(cabin);
 
   vessel.userData.isMappedVessel = true;
-  vessel.userData.vesselName = String(tags.name || '');
-  vessel.userData.vesselType = normalized(tags['ship:type']) || 'ship';
+  vessel.userData.vesselName = identity.name;
+  vessel.userData.vesselType = identity.typeId;
+  vessel.userData.vesselTypeLabel = identity.typeLabel;
+  vessel.userData.vesselLabel = identity.label;
+  vessel.userData.mappedIdentity = identity;
+  vessel.userData.mappedProvider = String(tags._provider || 'OpenStreetMap');
+  vessel.userData.mappedLicense = String(tags._license || 'ODbL-1.0');
+  vessel.userData.mappedSourceFeatureId = String(tags._sourceFeatureId || '');
+  vessel.userData.mappedReviewedAt = String(tags._reviewedAt || '');
   vessel.userData.lodTier = 'vessel';
   vessel.userData.lodCenter = { x: centerX, z: centerZ };
   vessel.userData.waterSurfaceY = waterSurfaceY;
@@ -313,5 +360,6 @@ export {
   createWaterAreaSpatialIndex,
   createMappedVesselMesh,
   footprintWaterCoverage,
-  mappedVesselVerticalProfile
+  mappedVesselVerticalProfile,
+  resolveMappedVesselIdentity
 };

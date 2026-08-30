@@ -20,7 +20,7 @@ const EDITOR_HELP_TOPICS = Object.freeze([
   {
     id: 'workflow',
     label: 'How Editing Works',
-    summary: 'World Explorer editing is preset-first, geometry-first, moderation-backed, and currently presented as a beta demo.',
+    summary: 'Choose what you are mapping, draw it in the world, and submit it for review.',
     sections: [
       {
         title: 'Default workflow',
@@ -35,8 +35,8 @@ const EDITOR_HELP_TOPICS = Object.freeze([
         items: [
           'Not a raw-tag workflow that expects contributors to memorize a giant wiki.',
           'Not a sandbox build mode for decorative objects.',
-          'Not a direct edit path into imported OSM source records.',
-          'Not connected to OpenStreetMap contribution workflows in this beta demo.'
+          'It does not edit the original map source.',
+          'Contributions are reviewed for World Explorer and are not sent to OpenStreetMap.'
         ]
       }
     ]
@@ -44,14 +44,14 @@ const EDITOR_HELP_TOPICS = Object.freeze([
   {
     id: 'overlay_model',
     label: 'Overlay Model',
-    summary: 'Approved overlays merge into the runtime world without mutating the imported base ingest.',
+    summary: 'Approved contributions can improve World Explorer without changing the original map source.',
     sections: [
       {
         title: 'Base versus overlay',
         items: [
-          'Base world data remains the stable ingest layer.',
-          'Overlay features can supplement missing content or override local runtime behavior.',
-          'Only approved overlays publish into runtime layers.'
+          'The original map remains unchanged.',
+          'Contributions can add missing details or correct how a place appears locally.',
+          'Only approved contributions appear in the shared world.'
         ]
       },
       {
@@ -74,7 +74,7 @@ const EDITOR_HELP_TOPICS = Object.freeze([
         items: [
           'Draft stays private to the contributor until it is submitted.',
           'Submitted enters the moderation queue for review.',
-          'Approved and published overlays affect runtime output only after review.'
+          'Approved contributions appear in the shared world only after review.'
         ]
       },
       {

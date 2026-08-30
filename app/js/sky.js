@@ -7,7 +7,7 @@ import {
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=5";
+} from "./sky/astronomical-state.js?v=6";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -18,8 +18,11 @@ import {
   showStarInfo,
   ensureStarCatalogLoaded
 } from "./sky/starfield-ui.js?v=15";
-import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
+import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=3";
+import {
+  activateMoonSurface,
+  createMoonSurface as createMoonSurfaceRuntime
+} from "./sky/moon-surface.js?v=3";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
   commitEnvironment,
@@ -113,6 +116,14 @@ async function directTravelToMoon() {
   if (appCtx.onMoon) return true;
   if (appCtx.travelingToMoon) return false;
 
+  if (typeof appCtx.startFastTravelJourney === 'function') {
+    return appCtx.startFastTravelJourney('moon', {
+      sourceBodyId: 'earth',
+      arrive: arriveAtMoon,
+      transitionDurationMs: 900
+    });
+  }
+
   if (typeof appCtx.showTransitionLoad === 'function') {
     await appCtx.showTransitionLoad('moon');
     if (appCtx.onMoon) return true;
@@ -152,6 +163,13 @@ async function directTravelToMoon() {
 
 // Direct return to Earth (bypasses space flight module)
 function returnToEarthDirect() {
+  if (typeof appCtx.startFastTravelJourney === 'function') {
+    return appCtx.startFastTravelJourney('earth', {
+      sourceBodyId: appCtx.onMars ? 'mars' : 'moon',
+      arrive: arriveAtEarth,
+      transitionDurationMs: 900
+    });
+  }
   return returnToEarth();
 }
 
@@ -166,8 +184,7 @@ async function travelToMoon() {
 
   // Use the new space flight system if available
   if (typeof appCtx.startSpaceFlightToMoon === 'function') {
-    appCtx.startSpaceFlightToMoon();
-    return;
+    return appCtx.startSpaceFlightToMoon();
   }
 
   // Fallback to original behavior if space.js not loaded
@@ -254,6 +271,10 @@ function arriveAtMoon() {
     // Car positioning will happen after moonSurface is fully created
     // (positionCarOnMoon is called in createMoonSurface's setTimeout)
   } else {
+    const surfaceActivation = activateMoonSurface(appCtx);
+    if (surfaceActivation.status !== 'accepted') {
+      console.error('Apollo 11 surface could not be activated.', surfaceActivation.reason);
+    }
     // Re-add and show all moon objects (safe even if already in scene)
     appCtx.moonSurface.visible = true;
     appCtx.scene.add(appCtx.moonSurface);
@@ -267,6 +288,7 @@ function arriveAtMoon() {
     const resumeMoon = () => {
       if (!appCtx.onMoon) return;
       positionCarOnMoon();
+      appCtx.refreshBlockBuilderForCurrentLocation?.();
       if (appCtx.carMesh) appCtx.carMesh.visible = true;
       appCtx.setPauseReason?.('planetary_transition', false);
     };
@@ -308,9 +330,11 @@ function cancelPendingEarthArrival() {
 
 function returnToEarth() {
   if (!appCtx.onMoon || appCtx.travelingToMoon) return;
+  if (typeof appCtx.startSpaceFlightToEarth === 'function') {
+    hideReturnToEarthButton();
+    return appCtx.startSpaceFlightToEarth();
+  }
   const arrivalSessionId = ++earthArrivalSessionId;
-
-  // Always use direct travel for return (no space flight)
 
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);

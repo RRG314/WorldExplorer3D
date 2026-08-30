@@ -9,7 +9,7 @@ import {
   loadFarMappedContext,
   pointInMappedLandArea,
   pointInMappedWaterArea
-} from './far-field-mapped-context.js?v=18';
+} from './far-field-mapped-context.js?v=20';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -34,7 +34,7 @@ import {
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=51';
+} from './surface-profiles.js?v=54';
 import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,
@@ -49,8 +49,8 @@ import {
   buildFarWaterGeometry,
   buildMappedWaterTerrainOwnershipMask,
   createFarWaterMesh
-} from './far-field-water.js?v=6';
-import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=8';
+} from './far-field-water.js?v=7';
+import { FIXED_REGIONAL_CONTEXT_RADIUS_METERS } from '../world/fixed-regional-context.js?v=9';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const FAR_FIELD_SOURCE_ZOOM_OFFSET = 3;
@@ -477,7 +477,14 @@ function createFarFieldTerrainApi(deps = {}) {
         spec.contextGeographic,
         spec.detailExclusionGeographic,
         spec.geographic,
-        { signal }
+        {
+          signal,
+          // Mobile renders the exact playable district separately. The aerial
+          // ring only needs generalized land/water context; requesting hundreds
+          // of z14 building tiles before first play duplicates detail that is
+          // not resolvable on a phone screen.
+          contextZoom: appCtx.isLikelyMobileDevice?.() ? 13 : undefined
+        }
       ),
       loadWorldCoverBaseline(spec.geographic, {
         size: FAR_FIELD_WORLDCOVER_SIZE,

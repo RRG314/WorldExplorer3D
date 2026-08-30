@@ -27,11 +27,6 @@ const steps = [
     command: ['npm', 'run', 'verify:firestore-rules']
   },
   {
-    name: 'Two authenticated multiplayer clients converge in one bounded room',
-    command: ['npm', 'run', 'verify:multiplayer'],
-    environment: { WE3D_VERIFY_ROOT: 'dist' }
-  },
-  {
     name: 'Build the production hosting artifact',
     command: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production']
   },
@@ -40,8 +35,13 @@ const steps = [
     command: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify']
   },
   {
-    name: 'Verify one 5.0 version, commit, artifact, and displayed identity',
+    name: 'Verify one release version, commit, artifact, and displayed identity',
     command: [process.execPath, 'scripts/verification/release-identity.mjs']
+  },
+  {
+    name: 'Two authenticated multiplayer clients converge in one bounded room',
+    command: ['npm', 'run', 'verify:multiplayer'],
+    environment: { WE3D_VERIFY_ROOT: 'dist' }
   },
   {
     name: 'Verify reachable hosting sources',

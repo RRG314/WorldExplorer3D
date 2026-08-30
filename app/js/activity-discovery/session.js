@@ -12,7 +12,7 @@ import {
   startActivity,
   stopActivity,
   updateActivityRuntime
-} from './runtime.js?v=5';
+} from './runtime.js?v=6';
 import {
   discoveryActionLabel,
   discoveryBadgeForActivity,
@@ -225,7 +225,7 @@ function renderDetail() {
     </div>
     <div class="activityDiscoveryDetailSection">
       <div class="activityDiscoveryDetailSectionTitle">Completion</div>
-      <div class="activityDiscoveryCompletionText">${completion?.count ? `Completed ${completion.count} time${completion.count === 1 ? '' : 's'}${completion.bestTimeMs ? ` • best ${(completion.bestTimeMs / 1000).toFixed(1)}s` : ''}` : 'Not completed yet on this device.'}</div>
+      <div class="activityDiscoveryCompletionText">${completion?.count ? `Completed ${completion.count} time${completion.count === 1 ? '' : 's'}${completion.bestTimeMs ? ` • best ${(completion.bestTimeMs / 1000).toFixed(1)}s` : ''} • saved in your Journal` : 'First completion adds this activity to your Journal and Games path.'}</div>
     </div>
   `;
 }

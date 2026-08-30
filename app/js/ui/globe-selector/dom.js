@@ -15,6 +15,7 @@ function getGlobeSelectorElements() {
     mobileSearchInput: document.getElementById('globeMobileLocationSearch'),
     mobileSearchBtn: document.getElementById('globeMobileLocationSearchBtn'),
     searchStatus: document.getElementById('globeLocationSearchStatus'),
+    searchResults: document.getElementById('globeLocationSearchResults'),
     latInput: document.getElementById('globeCustomLat'),
     lonInput: document.getElementById('globeCustomLon'),
     startBtn: document.getElementById('globeSelectorStartBtn'),

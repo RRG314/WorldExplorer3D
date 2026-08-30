@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
+Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
 
 ## Location and map coverage
 
@@ -25,6 +25,9 @@ Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
   turn-by-turn navigation, engineering, surveying or safety-critical use.
 - Very narrow service roads and unusually complex multi-level junctions can
   leave limited clearance for larger vehicles.
+- Airport runways, aprons, terminals, gates, and towers use available map data.
+  The shared airport experience fills missing playable details, but its shape
+  and scale may differ from the real airport when mapping is incomplete.
 
 ## Performance and compatibility
 
@@ -59,6 +62,29 @@ Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
   observations.
 - Solar-system distance and body-size presentation uses documented visual
   scaling so destinations remain playable; it is not an orbital simulator.
+
+## Action and combat
+
+- Ranged equipment has a screen reticle, camera-directed projectiles, visible
+  use actions, impact handling, and bounded projectile cleanup. Precision aim,
+  sight alignment, recoil, spread, throwing feel, hit feedback, sound, and
+  mobile aiming still need further tuning and presentation work.
+- Combat is part of the sandbox rather than a competitive shooting simulator.
+  Collision and impact results can vary with browser frame timing and complex
+  world geometry.
+
+## Field Guide and Journal
+
+- The eleven regional packs are bounded identification and activity slices for
+  built-in destinations, not a complete worldwide species catalog. Their field
+  leads use broad habitat and seasonal context; they do not report abundance or
+  confirm that an organism is present at the selected point.
+- Expansion-pack entries currently use reference presentation unless separately
+  reviewed media or creature models are available. Missing media does not block
+  identification, Journal, life-list, or activity progress.
+- The complete Journal, Guide, companion history, and local Backpack history are
+  stored in the current browser. Backup and restore are available, but full
+  cross-device Journal sync is not yet provided.
 
 ## Online features
 

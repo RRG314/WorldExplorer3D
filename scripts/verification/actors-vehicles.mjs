@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG } from '../../app/js/engine/vehicle-catalog.js?v=2';
+import { VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG } from '../../app/js/engine/vehicle-catalog.js?v=5';
 import { resolveVehicleRoadContactPose } from '../../app/js/engine/vehicle-road-attitude.js?v=2';
 import {
   compilePedestrianGraph,

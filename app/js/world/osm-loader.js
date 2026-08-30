@@ -17,10 +17,58 @@ const OVERPASS_STAGGER_MS = 2000;
 const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
 const OVERPASS_MEMORY_CACHE_MAX = 6;
 const OVERPASS_LOC_EPSILON = 1e-7;
+const OVERPASS_PROVIDER_COOLDOWN_MS = 2 * 60 * 1000;
+const OVERPASS_PROVIDER_HEALTH_KEY = 'world-explorer:overpass-provider-health-v1';
 
 const overpassMemoryCache = [];
 let lastOverpassEndpoint = null;
 let readPerfModeValue = () => 'balanced';
+
+function readOverpassProviderHealth() {
+  try {
+    const parsed = JSON.parse(globalThis.sessionStorage?.getItem?.(OVERPASS_PROVIDER_HEALTH_KEY) || 'null');
+    return {
+      unavailableUntil: Math.max(0, Number(parsed?.unavailableUntil) || 0),
+      lastSuccessAt: Math.max(0, Number(parsed?.lastSuccessAt) || 0)
+    };
+  } catch {
+    return { unavailableUntil: 0, lastSuccessAt: 0 };
+  }
+}
+
+function writeOverpassProviderHealth(health) {
+  try {
+    globalThis.sessionStorage?.setItem?.(OVERPASS_PROVIDER_HEALTH_KEY, JSON.stringify(health));
+  } catch {
+    // Provider health is an optimization only. Storage denial must not affect loading.
+  }
+}
+
+function markOverpassProviderAvailable(nowMs = Date.now()) {
+  writeOverpassProviderHealth({ unavailableUntil: 0, lastSuccessAt: nowMs });
+}
+
+function markOverpassProviderUnavailable(requestStartedAt, nowMs = Date.now()) {
+  const health = readOverpassProviderHealth();
+  // A sibling request from the same provider batch may have succeeded while
+  // this request was still exhausting its endpoints. One success keeps the
+  // provider available for the rest of the session.
+  if (health.lastSuccessAt >= requestStartedAt) return;
+  writeOverpassProviderHealth({
+    unavailableUntil: nowMs + OVERPASS_PROVIDER_COOLDOWN_MS,
+    lastSuccessAt: health.lastSuccessAt
+  });
+}
+
+export function getOverpassProviderHealth() {
+  const nowMs = Date.now();
+  const health = readOverpassProviderHealth();
+  return Object.freeze({
+    status: health.unavailableUntil > nowMs ? 'cooldown' : 'probe-allowed',
+    retryAfterMs: Math.max(0, health.unavailableUntil - nowMs),
+    lastSuccessAt: health.lastSuccessAt || null
+  });
+}
 
 export function getOverpassRuntimeCacheStats() {
   return Object.freeze({
@@ -306,6 +354,22 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'civic-facilities'
     },
+    commercePlaceCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'commerce-places'
+    },
+    transportFacilityCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'transport-facilities-v1'
+    },
     waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"="ship"]${waterStructureBounds};
                 way["historic"="ship"]${waterStructureBounds};
@@ -314,6 +378,21 @@ export function buildWorldOverpassPlan({
     civicFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];
             nwr["amenity"~"^(police|hospital)$"]${poiBounds};
             out body center qt;`,
+    commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];
+            nwr["shop"="convenience"]${poiBounds};
+            out body center qt;`,
+    transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${featureBounds};
+            nwr["leisure"="marina"]${featureBounds};
+            nwr["harbour"="yes"]${featureBounds};
+            nwr["landuse"~"^(port|harbour)$"]${featureBounds};
+            nwr["man_made"~"^(pier|quay)$"]${featureBounds};
+            nwr["waterway"="dock"]${featureBounds};
+            nwr["amenity"="ferry_terminal"]${featureBounds};
+            nwr["route"="ferry"]${featureBounds};
+            nwr["mooring"]${featureBounds};
+            nwr["seamark:type"~"^(harbour|berth)$"]${featureBounds};
+        );out body center;>;out skel qt;`,
     buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
             );out tags center qt;`,
@@ -356,6 +435,7 @@ function externalAbortError(signal) {
 }
 
 export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, options = {}) {
+  const requestStartedAt = Date.now();
   const externalSignal = options.signal || null;
   if (externalSignal?.aborted) throw externalAbortError(externalSignal);
   const cached = findOverpassMemoryCache(cacheMeta);
@@ -376,6 +456,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     return persistent.data;
   }
 
+  const usesDefaultProvider = !Array.isArray(options.endpoints) && typeof options.fetchImpl !== 'function';
+  const providerHealth = usesDefaultProvider ? getOverpassProviderHealth() : null;
+  if (providerHealth?.status === 'cooldown' && options.ignoreProviderCooldown !== true) {
+    const error = new Error(`Overpass provider retry paused for ${Math.ceil(providerHealth.retryAfterMs / 1000)}s after a complete endpoint failure.`);
+    error.code = 'OVERPASS_PROVIDER_COOLDOWN';
+    throw error;
+  }
+
   const controllers = [];
   const errors = [];
   const configuredEndpoints = Array.isArray(options.endpoints)
@@ -387,6 +475,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const staggerIntervalMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
     ? Number(options.staggerMs)
     : OVERPASS_STAGGER_MS);
+  // `timeoutMs` is the budget for the optional provider as a whole, not a
+  // separate allowance for every hedged endpoint. Otherwise a 3.5 second
+  // mobile probe can take nine seconds after endpoint staggering.
+  const requestedTimeoutMs = Math.max(1000, Number(timeoutMs) || OVERPASS_MIN_TIMEOUT_MS);
+  const requestDeadlineMs = Math.min(
+    Number.isFinite(deadlineMs) ? deadlineMs : Infinity,
+    performance.now() + requestedTimeoutMs
+  );
   const requestController = new AbortController();
   const abortRequest = () => requestController.abort(externalAbortError(externalSignal));
   externalSignal?.addEventListener?.('abort', abortRequest, { once: true });
@@ -399,15 +495,18 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
 
     const now = performance.now();
-    if (now >= deadlineMs - 300) {
+    if (now >= requestDeadlineMs - 300) {
       throw new Error(`[${endpoint}] skipped: load budget exhausted`);
     }
 
-    const timeLeftMs = deadlineMs - now;
+    const timeLeftMs = requestDeadlineMs - now;
     const timeoutForEndpointMs = Math.max(
-      3500,
+      500,
       Math.min(
-        Math.max(OVERPASS_MIN_TIMEOUT_MS, timeoutMs - idx * 1200),
+        Math.max(
+          Math.min(OVERPASS_MIN_TIMEOUT_MS, requestedTimeoutMs),
+          requestedTimeoutMs - idx * 1200
+        ),
         timeLeftMs - 250
       )
     );
@@ -449,6 +548,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       data._overpassCacheAgeMs = 0;
       requestSettled = true;
       lastOverpassEndpoint = endpoint;
+      if (usesDefaultProvider) markOverpassProviderAvailable();
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
@@ -483,6 +583,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
       return fallback.data;
     }
+    if (usesDefaultProvider) markOverpassProviderUnavailable(requestStartedAt);
     throw error?.message?.startsWith?.('All Overpass endpoints failed:')
       ? error
       : new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);

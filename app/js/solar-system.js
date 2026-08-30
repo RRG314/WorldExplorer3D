@@ -1,9 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import { getAstronomicalBody } from './astronomy/body-catalog.js?v=2';
 import {
   createAsteroidBelt as createSolarSystemAsteroidBelt,
   createKuiperBelt as createSolarSystemKuiperBelt,
   createMoonSystems as createSolarSystemMoonSystems
-} from "./solar-system/minor-bodies.js?v=9";
+} from "./solar-system/minor-bodies.js?v=10";
 import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=2";
 import { initSolarSystemModel } from "./solar-system/init.js?v=5";
 import {
@@ -15,7 +16,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=16";
+} from "./solar-system/ui.js?v=17";
 import {
   ASTEROID_BELT,
   AU_TO_SCENE,
@@ -28,7 +29,7 @@ import {
   PLANET_MOONS,
   SOLAR_SYSTEM_PLANETS,
   SPACECRAFT
-} from "./solar-system/catalog.js?v=6";
+} from "./solar-system/catalog.js?v=7";
 import {
   createSpacecraft as createSolarSystemSpacecraft,
   updateSpacecraftPositions as updateSolarSystemSpacecraftPositions
@@ -63,6 +64,7 @@ const solarSystem = {
   orbitsVisible: true, // toggle for active orbit display
   infoPanel: null,
   selectedPlanet: null,
+  selectedBodyId: null,
   raycaster: null,
   mouse: null,
   MOON_TIME_SCALE: 1,
@@ -348,6 +350,9 @@ function resetSolarSystemRuntime() {
   if (appCtx.spaceFlight?.canvas) {
     appCtx.spaceFlight.canvas.removeEventListener('click', onSolarSystemClick);
   }
+  ['solarSystemInfo', 'ssToggleContainer', 'solarSystemScale', 'ssProximity'].forEach((id) => {
+    document.getElementById(id)?.remove();
+  });
   Object.assign(solarSystem, {
     group: null,
     sunMesh: null,
@@ -361,6 +366,7 @@ function resetSolarSystemRuntime() {
     galaxyMeshes: [],
     orbitMarkers: [],
     selectedPlanet: null,
+    selectedBodyId: null,
     raycaster: null,
     mouse: null,
     _earthVisualPos: null,
@@ -523,31 +529,38 @@ function getAllSpaceBodies() {
         massKg: entry.planet.massKg,
         physicalRadiusKm: entry.planet.physicalRadiusKm,
         mesh: entry.mesh,
-        landable: entry.planet.name === 'Mars'
+        landable: entry.planet.landingMode === 'solid_surface'
       });
     });
 
     // Planet moons (world position = group.pos + planet.pos + moon local pos)
     solarSystem.moonMeshes.forEach((entry) => {
+      if (entry.name === 'Moon') return;
       const worldPos = new THREE.Vector3();
       entry.mesh.getWorldPosition(worldPos);
+      const body = getAstronomicalBody(entry.name);
       bodies.push({
         name: entry.name,
         position: worldPos,
         radius: entry.radiusScaled,
+        massKg: body?.physical?.massKg,
+        physicalRadiusKm: body?.physical?.meanRadiusM ? body.physical.meanRadiusM / 1000 : null,
         mesh: entry.mesh,
-        landable: false
+        landable: body?.exploration?.landingMode === 'solid_surface'
       });
     });
 
     // Named asteroids
     solarSystem.asteroidMeshes.forEach((entry) => {
+      const body = getAstronomicalBody(entry.asteroid.name);
       bodies.push({
         name: entry.asteroid.name,
         position: entry.mesh.position.clone().add(solarSystem.group.position),
         radius: entry.asteroid.radiusScaled,
+        massKg: body?.physical?.massKg,
+        physicalRadiusKm: body?.physical?.meanRadiusM ? body.physical.meanRadiusM / 1000 : null,
         mesh: entry.mesh,
-        landable: false
+        landable: body?.exploration?.landingMode === 'solid_surface'
       });
     });
   }

@@ -70,7 +70,12 @@ function contextSetForCell(cell, options) {
   if (nearbyBuildings.length >= 2 || nearbyRoads.length >= 2) contexts.add('urban');
   if (/park|recreation|garden|village_green/.test(tags)) contexts.add('park');
   if (/forest|wood/.test(tags)) contexts.add('forest');
+  const mappedRuralLand = /meadow|farmland|farmyard|farm|orchard|pasture/.test(tags);
   if (/meadow|grass|farmland|farm|orchard/.test(tags)) contexts.add('field');
+  if (mappedRuralLand) {
+    contexts.add('farm');
+    if (nearbyBuildings.length < 2 && nearbyRoads.length < 2) contexts.add('rural');
+  }
   if (/wetland|marsh|swamp|bog/.test(tags)) contexts.add('wetland');
   if (/sand|beach|dune/.test(tags)) contexts.add('beach');
   if (/quarry|rock|bare_rock|scree/.test(tags)) contexts.add('outcrop');
@@ -171,7 +176,7 @@ function compileEnvironmentContext(options = {}) {
 
 function createEnvironmentFixture(name) {
   const profiles = {
-    downtown: ['urban', 'urban-core'], suburb: ['urban', 'park'], field: ['field'], forest: ['forest', 'trail'],
+    downtown: ['urban', 'urban-core'], suburb: ['urban', 'park'], field: ['field'], farm: ['farm', 'field', 'rural'], forest: ['forest', 'trail'],
     river: ['fresh-water', 'stream', 'riverbank'], beach: ['coast', 'beach'], mountain: ['mountain', 'outcrop', 'trail'],
     desert: ['desert', 'outcrop'], outcrop: ['outcrop', 'field'], 'fossil-formation': ['outcrop', 'fossil-formation'],
     'open-ocean': ['open-ocean', 'coast']

@@ -1,20 +1,33 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
-import { getGalaxyEntryDestination, resolveUniverseAddress } from './catalog.js?v=9';
-import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=2';
+import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=10';
+import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=3';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
+import {
+  createUniverseCourse,
+  setUniverseCourseGuidance,
+  setUniverseCourseStatus,
+  UNIVERSE_GUIDANCE_MODE
+} from './course-authority.js?v=2';
+import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
-import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=17';
+import {
+  createUniverseFrameVisual,
+  getUniverseDestinationMesh,
+  setUniverseCourseMarker,
+  updateUniverseFrameVisual
+} from './visuals.js?v=18';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
   hideUniverseNavigator,
   setUniverseSelection,
   showUniverseNavigator,
+  updateUniverseCourseCue,
   updateUniverseNavigator
-} from './ui.js?v=3';
+} from './ui.js?v=5';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -28,6 +41,31 @@ const WORMHOLE_DURATION_MS = 4800;
 const FRAME_REBASE_DISTANCE = 30000;
 const _rebase = new THREE.Vector3();
 const _forward = new THREE.Vector3();
+const _courseTarget = new THREE.Vector3();
+const _courseDirection = new THREE.Vector3();
+const _courseCameraDirection = new THREE.Vector3();
+const _courseCameraLocal = new THREE.Vector3();
+const _courseCameraInverse = new THREE.Quaternion();
+const _courseDesiredRotation = new THREE.Quaternion();
+const _courseProjected = new THREE.Vector3();
+const _courseForwardAxis = new THREE.Vector3(0, 1, 0);
+const _localCourseTarget = {
+  destination: null,
+  position: _courseTarget,
+  radius: 0,
+  mesh: null
+};
+const _localCourseCue = {
+  visible: false,
+  onScreen: false,
+  x: 0,
+  y: 0,
+  angleDeg: 0,
+  label: '',
+  assisted: false,
+  ndcX: 0,
+  ndcY: 0
+};
 
 const universeRuntime = {
   initialized: false,
@@ -39,6 +77,7 @@ const universeRuntime = {
   deepSky: null,
   current: resolveUniverseAddress('sol'),
   selected: resolveUniverseAddress('sol'),
+  course: null,
   transition: null,
   pendingEarthReturn: false,
   elapsedSeconds: 0,
@@ -124,10 +163,36 @@ function installFrame(entity) {
     universeRuntime.frameGroup = createUniverseFrameVisual(entity);
     universeRuntime.scene.add(universeRuntime.frameGroup);
     universeRuntime.encounter = createRegionEncounter(universeRuntime.frameGroup, entity);
+    const courseDestination = universeRuntime.course?.destination;
+    if (courseDestination?.objectClass === 'exoplanet' && courseDestination.parentFrameId === entity.id) {
+      setUniverseCourseMarker(universeRuntime.frameGroup, courseDestination.id, true);
+    }
   }
   positionRocketForFrame(entity);
   resetFlightMotion();
   updateUniverseNavigator(universeRuntime);
+}
+
+function positionRocketForCourseDestination(destination) {
+  if (destination?.objectClass !== 'exoplanet' || !appCtx.spaceFlight?.rocket) return false;
+  const body = getUniverseDestinationMesh(universeRuntime.frameGroup, destination.id);
+  if (!body) return false;
+  const target = new THREE.Vector3();
+  body.getWorldPosition(target);
+  const radius = Number(body.geometry?.parameters?.radius) || 6;
+  const approach = target.clone().normalize();
+  if (approach.lengthSq() < 0.01) approach.set(0, 0, 1);
+  const rocket = appCtx.spaceFlight.rocket;
+  rocket.position.copy(target).addScaledVector(approach, Math.max(90, radius * 12));
+  _forward.copy(target).sub(rocket.position).normalize();
+  rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _forward);
+  if (appCtx.spaceFlight.camera) {
+    appCtx.spaceFlight.camera.position.copy(rocket.position).addScaledVector(approach, Math.max(35, radius * 5));
+    appCtx.spaceFlight.camera.position.y += Math.max(16, radius * 2);
+    appCtx.spaceFlight.camera.lookAt(target);
+  }
+  resetFlightMotion();
+  return true;
 }
 
 function createTransitVisual(scene) {
@@ -171,12 +236,30 @@ function setSelectedDestination(id) {
 function travelToUniverseDestination(addressOrId, options = {}) {
   if (!appCtx.spaceFlight?.active || universeRuntime.transition) return false;
   const destination = resolveUniverseAddress(addressOrId);
-  if (!destination || destination.id === universeRuntime.current.id) return false;
+  const destinationFrame = getUniverseFrame(destination);
+  if (!destination || !destinationFrame) return false;
   universeRuntime.selected = destination;
+  universeRuntime.course = createUniverseCourse(destination, universeRuntime.current.id, performance.now());
+  // Wayfinder owns the active deep-space course. Release the Solar System's
+  // optional SI journey so it cannot continue moving or reorienting the ship
+  // toward the Moon behind the player's selected interstellar destination.
+  appCtx.releaseRenderedJourneyToManualFlight?.();
+  if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
+    setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
+    showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
+    updateUniverseNavigator(universeRuntime);
+    return true;
+  }
+  if (destination.id === universeRuntime.current.id) {
+    universeRuntime.course = setUniverseCourseStatus(universeRuntime.course, 'active');
+    updateUniverseNavigator(universeRuntime);
+    return false;
+  }
   universeRuntime.pendingEarthReturn = Boolean(options.returnToEarth);
   universeRuntime.transition = {
     from: universeRuntime.current,
-    to: destination,
+    to: destinationFrame,
+    destination,
     startedAt: performance.now(),
     swapped: false,
     kind: options.kind || 'navigation',
@@ -188,7 +271,7 @@ function travelToUniverseDestination(addressOrId, options = {}) {
     universeRuntime.transitGroup.visible = universeRuntime.transition.kind !== 'wormhole';
   }
   closeUniverseNavigator();
-  showMessage(`NAVIGATING TO ${destination.name.toUpperCase()}`, '#8ab4ff');
+  showMessage(`COURSE ENGAGED · ${destination.name.toUpperCase()}`, '#8ab4ff');
   updateUniverseNavigator(universeRuntime);
   return true;
 }
@@ -223,6 +306,8 @@ function returnUniverseToSolImmediate() {
   universeRuntime.pendingEarthReturn = false;
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
+  universeRuntime.course = null;
+  universeRuntime.selected = resolveUniverseAddress('sol');
   if (universeRuntime.scene) installFrame(resolveUniverseAddress('sol'));
   return true;
 }
@@ -284,8 +369,12 @@ function updateTransition(nowMs) {
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
   appCtx.spaceFlight.mode = 'flying';
+  if (universeRuntime.course) {
+    universeRuntime.course = setUniverseCourseStatus(universeRuntime.course, 'active');
+  }
+  positionRocketForCourseDestination(transition.destination);
   updateUniverseNavigator(universeRuntime);
-  showMessage(`${transition.to.name.toUpperCase()} FRAME ACQUIRED`, '#68d8c0');
+  showMessage(`${transition.destination?.name || transition.to.name} APPROACH ACQUIRED`, '#68d8c0');
   if (universeRuntime.pendingEarthReturn && transition.to.id === 'sol') {
     window.setTimeout(forceEarthLandingFromSol, 250);
   }
@@ -345,20 +434,30 @@ function rebaseActiveFrame() {
 }
 
 function getUniverseHudTarget() {
-  if (universeRuntime.current.id === 'sol') return null;
+  if (universeRuntime.current.id === 'sol' && !universeRuntime.transition) return null;
   const group = universeRuntime.frameGroup;
+  const courseDestination = universeRuntime.course?.destination;
+  const courseInTransit = Boolean(universeRuntime.transition && courseDestination);
+  const courseBody = courseDestination?.objectClass === 'exoplanet' && courseDestination.parentFrameId === universeRuntime.current.id
+    ? getUniverseDestinationMesh(group, courseDestination.id)
+    : null;
+  const coursePosition = new THREE.Vector3();
+  if (courseBody) courseBody.getWorldPosition(coursePosition);
   const radius = universeRuntime.current.objectClass === 'black_hole'
     ? group?.userData?.blackHole?.visualRadius || 100
     : universeRuntime.current.objectClass === 'planetary_system' ? 24
       : universeRuntime.current.objectClass === 'nebula' ? 240
         : universeRuntime.current.objectClass === 'stellar_region' ? 180 : 80;
   return {
-    name: universeRuntime.current.name,
-    position: group?.position || new THREE.Vector3(),
-    radius,
+    name: courseBody || courseInTransit ? courseDestination.name : universeRuntime.current.name,
+    position: courseBody ? coursePosition : group?.position || new THREE.Vector3(),
+    radius: courseBody ? Number(courseBody.geometry?.parameters?.radius) || 6 : radius,
+    physicalRadiusKm: courseBody ? Number(courseBody.userData?.physicalRadiusKm) || null : null,
     landable: false,
-    objectClass: universeRuntime.current.objectClass,
-    address: universeRuntime.current.address,
+    objectClass: courseBody ? 'exoplanet' : universeRuntime.current.objectClass,
+    address: courseBody || courseInTransit ? courseDestination.address : universeRuntime.current.address,
+    course: universeRuntime.course,
+    targetKind: courseBody ? 'exoplanet' : courseInTransit ? 'course-transit' : 'frame',
     encounter: universeRuntime.encounter,
     navigation: getUniverseNavigationMetrics(
       universeRuntime.current,
@@ -367,6 +466,188 @@ function getUniverseHudTarget() {
       appCtx.spaceFlight?.speed
     )
   };
+}
+
+function getLocalCourseTarget() {
+  const course = universeRuntime.course;
+  if (
+    universeRuntime.transition ||
+    course?.status !== 'active' ||
+    course.frame?.id !== universeRuntime.current?.id ||
+    !universeRuntime.frameGroup
+  ) return null;
+  const mesh = getUniverseDestinationMesh(universeRuntime.frameGroup, course.destination.id)
+    || (course.destination.id === universeRuntime.current.id ? universeRuntime.frameGroup : null);
+  if (!mesh) return null;
+  mesh.getWorldPosition(_courseTarget);
+  _localCourseTarget.destination = course.destination;
+  _localCourseTarget.radius = Number(mesh.geometry?.parameters?.radius) || (
+    course.destination.objectClass === 'planetary_system' ? 24 : 80
+  );
+  _localCourseTarget.mesh = mesh;
+  return _localCourseTarget;
+}
+
+function toggleUniverseCourseAssist() {
+  const target = getLocalCourseTarget();
+  if (!target || !universeRuntime.course) {
+    return Object.freeze({ accepted: false, active: false, reason: 'local-course-target-unavailable' });
+  }
+  const active = universeRuntime.course.guidance !== UNIVERSE_GUIDANCE_MODE.ASSISTED;
+  universeRuntime.course = setUniverseCourseGuidance(
+    universeRuntime.course,
+    active ? UNIVERSE_GUIDANCE_MODE.ASSISTED : UNIVERSE_GUIDANCE_MODE.MANUAL
+  );
+  updateUniverseNavigator(universeRuntime);
+  showMessage(
+    active ? `FLIGHT ASSIST · ${target.destination.name.toUpperCase()}` : 'MANUAL FLIGHT',
+    active ? '#68d8c0' : '#60a5fa'
+  );
+  return Object.freeze({ accepted: true, active, reason: null });
+}
+
+function updateLocalCourseAssist(frameSeconds) {
+  const target = getLocalCourseTarget();
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!target || !rocket || universeRuntime.course?.guidance !== UNIVERSE_GUIDANCE_MODE.ASSISTED) return target;
+  const keys = appCtx.spaceFlight.keys || {};
+  const manualInput = Boolean(
+    keys[' '] || keys.shift || keys.arrowup || keys.arrowdown || keys.arrowleft || keys.arrowright
+  );
+  if (manualInput) {
+    universeRuntime.course = setUniverseCourseGuidance(universeRuntime.course, UNIVERSE_GUIDANCE_MODE.MANUAL);
+    updateUniverseNavigator(universeRuntime);
+    showMessage('MANUAL FLIGHT', '#60a5fa');
+    return target;
+  }
+
+  _courseDirection.copy(target.position).sub(rocket.position);
+  const distance = _courseDirection.length();
+  if (distance <= 0.001) return target;
+  _courseDirection.multiplyScalar(1 / distance);
+  _courseDesiredRotation.setFromUnitVectors(_courseForwardAxis, _courseDirection);
+  const turnBlend = 1 - Math.exp(-Math.max(0, frameSeconds) * 2.8);
+  rocket.quaternion.slerp(_courseDesiredRotation, turnBlend).normalize();
+
+  _forward.set(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+  const alignment = Math.max(0, _forward.dot(_courseDirection));
+  const holdDistance = Math.max(90, target.radius * 12);
+  const remaining = Math.max(0, distance - holdDistance);
+  const desiredSpeed = remaining <= 2
+    ? 0
+    : Math.min(SPACE_CONSTANTS.MAX_SPEED * 0.72, Math.max(SPACE_CONSTANTS.CRUISE_SPEED, remaining / 55)) * alignment;
+  const response = desiredSpeed > appCtx.spaceFlight.speed ? SPACE_CONSTANTS.BOOST * 0.65 : SPACE_CONSTANTS.BRAKE * 0.8;
+  const maxChange = response * (appCtx.spaceFlight._frameScale || 1);
+  appCtx.spaceFlight.speed += Math.max(-maxChange, Math.min(maxChange, desiredSpeed - appCtx.spaceFlight.speed));
+  if (remaining <= 2 && appCtx.spaceFlight.gravityVelocity) {
+    appCtx.spaceFlight.gravityVelocity.multiplyScalar(Math.max(0, 1 - frameSeconds * 3));
+  }
+  return target;
+}
+
+function updateLocalCourseCue(target = getLocalCourseTarget()) {
+  const camera = appCtx.spaceFlight?.camera;
+  if (!target || !camera || !appCtx.spaceFlight?.active) {
+    _localCourseCue.visible = false;
+    _localCourseCue.onScreen = false;
+    updateUniverseCourseCue(null);
+    return null;
+  }
+  _courseDirection.copy(target.position).sub(camera.position);
+  if (_courseDirection.lengthSq() <= 0.001) {
+    updateUniverseCourseCue(null);
+    return null;
+  }
+  _courseDirection.normalize();
+  camera.getWorldDirection(_courseCameraDirection);
+  _courseProjected.copy(target.position).project(camera);
+  const inFront = _courseCameraDirection.dot(_courseDirection) > 0;
+  const onScreen = inFront && Math.abs(_courseProjected.x) < 0.78 && Math.abs(_courseProjected.y) < 0.68;
+  if (onScreen) {
+    _localCourseCue.visible = false;
+    _localCourseCue.onScreen = true;
+    _localCourseCue.ndcX = _courseProjected.x;
+    _localCourseCue.ndcY = _courseProjected.y;
+    updateUniverseCourseCue(null);
+    return _localCourseCue;
+  }
+
+  _courseCameraInverse.copy(camera.quaternion).invert();
+  _courseCameraLocal.copy(target.position).sub(camera.position).applyQuaternion(_courseCameraInverse);
+  let directionX = _courseCameraLocal.x;
+  let directionY = -_courseCameraLocal.y;
+  if (_courseCameraLocal.z > 0) {
+    directionX *= -1;
+    directionY *= -1;
+  }
+  const directionLength = Math.hypot(directionX, directionY) || 1;
+  directionX /= directionLength;
+  directionY /= directionLength;
+  const width = Math.max(320, window.innerWidth || 320);
+  const height = Math.max(480, window.innerHeight || 480);
+  const marginX = width <= 720 ? 62 : 86;
+  const marginY = width <= 720 ? 190 : 88;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const edgeScale = Math.min(
+    (halfWidth - marginX) / Math.max(0.001, Math.abs(directionX)),
+    (halfHeight - marginY) / Math.max(0.001, Math.abs(directionY))
+  );
+  _localCourseCue.visible = true;
+  _localCourseCue.onScreen = false;
+  _localCourseCue.x = halfWidth + directionX * edgeScale;
+  _localCourseCue.y = halfHeight + directionY * edgeScale;
+  _localCourseCue.angleDeg = Math.atan2(directionY, directionX) * 180 / Math.PI + 90;
+  _localCourseCue.label = target.destination.name;
+  _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED;
+  _localCourseCue.ndcX = _courseProjected.x;
+  _localCourseCue.ndcY = _courseProjected.y;
+  updateUniverseCourseCue(_localCourseCue);
+  return _localCourseCue;
+}
+
+function getUniverseCourseSnapshot() {
+  const course = universeRuntime.course;
+  const destination = course?.destination;
+  const body = destination?.objectClass === 'exoplanet'
+    ? getUniverseDestinationMesh(universeRuntime.frameGroup, destination.id)
+    : null;
+  const entry = body
+    ? (universeRuntime.frameGroup?.userData?.orbitingPlanets || []).find((candidate) => candidate.body === body)
+    : null;
+  let targetVisual = null;
+  const directionCue = updateLocalCourseCue();
+  if (body && appCtx.spaceFlight?.camera && appCtx.spaceFlight?.rocket) {
+    const targetWorld = new THREE.Vector3();
+    const projected = new THREE.Vector3();
+    const cameraDirection = new THREE.Vector3();
+    const targetDirection = new THREE.Vector3();
+    const rocketForward = new THREE.Vector3(0, 1, 0).applyQuaternion(appCtx.spaceFlight.rocket.quaternion).normalize();
+    body.getWorldPosition(targetWorld);
+    projected.copy(targetWorld).project(appCtx.spaceFlight.camera);
+    appCtx.spaceFlight.camera.getWorldDirection(cameraDirection);
+    targetDirection.copy(targetWorld).sub(appCtx.spaceFlight.camera.position).normalize();
+    targetVisual = Object.freeze({
+      markerVisible: entry?.marker?.visible === true,
+      ndcX: Number(projected.x),
+      ndcY: Number(projected.y),
+      cameraTargetDot: Number(cameraDirection.dot(targetDirection)),
+      rocketTargetDot: Number(rocketForward.dot(targetWorld.clone().sub(appCtx.spaceFlight.rocket.position).normalize())),
+      targetDistance: Number(targetWorld.distanceTo(appCtx.spaceFlight.camera.position)),
+      rocketTargetDistance: Number(targetWorld.distanceTo(appCtx.spaceFlight.rocket.position))
+    });
+  }
+  return Object.freeze({
+    currentFrameId: universeRuntime.current?.id || null,
+    selectedDestinationId: universeRuntime.selected?.id || null,
+    courseDestinationId: destination?.id || null,
+    courseFrameId: course?.frame?.id || null,
+    courseStatus: course?.status || null,
+    courseGuidance: course?.guidance || null,
+    transitionDestinationId: universeRuntime.transition?.destination?.id || null,
+    targetVisual,
+    directionCue: directionCue ? Object.freeze({ ...directionCue }) : null
+  });
 }
 
 function getUniverseGravityBodies() {
@@ -378,8 +659,8 @@ function getUniverseGravityBodies() {
     return {
       name: mesh.name,
       position,
-      radius: planet ? Math.max(3.5, Math.min(10, Number(planet.radiusEarth || 1) * 4.5)) :
-        Math.max(18, Math.min(38, 24 + Number(universeRuntime.current.physical?.hostMassSolar || 1) * 8)),
+      radius: Number(mesh.geometry?.parameters?.radius) || (planet ? Math.max(7, Math.min(22, Math.sqrt(Number(planet.radiusEarth || 1)) * 7)) :
+        Math.max(18, Math.min(38, 24 + Number(universeRuntime.current.physical?.hostMassSolar || 1) * 8))),
       massKg: mesh.userData.massKg,
       physicalRadiusKm: mesh.userData.physicalRadiusKm,
       mesh,
@@ -398,6 +679,8 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   if (universeRuntime.encounter?.type === 'generated-asteroids') {
     updateRegionEncounter(universeRuntime.encounter, frameSeconds);
   }
+  const localCourseTarget = updateLocalCourseAssist(frameSeconds);
+  updateLocalCourseCue(localCourseTarget);
   rebaseActiveFrame();
   updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket);
   updateDeepSkyLayer(
@@ -421,6 +704,7 @@ function initUniverseRuntime(scene) {
     universeRuntime.pendingEarthReturn = false;
     universeRuntime.current = resolveUniverseAddress('sol');
     universeRuntime.selected = universeRuntime.current;
+    universeRuntime.course = null;
     setSolVisibility(true);
     setUniverseSkyFrame(universeRuntime.sky, universeRuntime.current, false);
     setDeepSkyFrame(universeRuntime.deepSky, universeRuntime.current, false);
@@ -448,6 +732,7 @@ function hideUniverseUI() {
 }
 
 Object.assign(appCtx, {
+  getUniverseCourseSnapshot,
   getUniverseHudTarget,
   getUniverseGravityBodies,
   hideUniverseUI,
@@ -457,12 +742,14 @@ Object.assign(appCtx, {
   returnUniverseToSolImmediate,
   setUniverseDestination: setSelectedDestination,
   showUniverseUI,
+  toggleUniverseCourseAssist,
   travelToUniverseDestination,
   universeRuntime,
   updateUniverseRuntime
 });
 
 export {
+  getUniverseCourseSnapshot,
   getUniverseHudTarget,
   getUniverseGravityBodies,
   hideUniverseUI,
@@ -471,6 +758,7 @@ export {
   returnUniverseToSol,
   returnUniverseToSolImmediate,
   showUniverseUI,
+  toggleUniverseCourseAssist,
   travelToUniverseDestination,
   universeRuntime,
   updateUniverseRuntime

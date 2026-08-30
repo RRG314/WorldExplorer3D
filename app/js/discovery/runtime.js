@@ -1,15 +1,15 @@
-import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=1';
-import { createCompanionRuntime } from './companion-runtime.js?v=2';
+import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
+import { createCompanionRuntime } from './companion-runtime.js?v=7';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
-import { createDetectorSession } from './detector-session.js?v=2';
+import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
-import { resolveRegionalEcologyPack } from './ecology/baltimore-pack.js?v=1';
-import { compileEnvironmentContext } from './environment-context.js?v=1';
+import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
+import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
-import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=2';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=3';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
-import { explorerProgressSnapshot } from './explorer-events.js?v=1';
+import { explorerProgressSnapshot } from './explorer-events.js?v=3';
 import {
   RELEASED_EXPLORER_TOOLS,
   explorerGoalSnapshot,
@@ -24,23 +24,41 @@ import {
   createDiscoveryPublicationStore,
   resolveContextActions
 } from './model.js?v=1';
-import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=1';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=4';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
-import { emitDiscoveryTelemetry } from './telemetry.js?v=1';
+import { emitDiscoveryTelemetry } from './telemetry.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
 import { tutorialForActivity } from './tutorials.js?v=1';
 import { visualForCatalogId } from './visual-content.js?v=1';
-import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=3';
+import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=4';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
+import { ATTRIBUTE_DEFINITIONS, BACKGROUND_DEFINITIONS, SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
+import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
+import { companionHandlingTuning, wildlifeObservationTuning } from '../character/wildlife-assistance.js?v=1';
 
 const RELEASED_EXPLORER_ACTIVITIES = new Set([
   'metal-detect', 'inspect', 'photograph', 'geology-inspect', 'pan-sediment',
   'fossil-document', 'forage', 'wildlife-track', 'beachcomb', 'fish',
-  'nature-observe', 'insect-macro', 'habitat-survey', 'community-survey'
+  'nature-observe', 'insect-macro', 'habitat-survey', 'community-survey', 'sonar-survey'
 ]);
+
+const CHARACTER_CAPABILITY_BY_ACTIVITY = Object.freeze({
+  'metal-detect': 'detector',
+  'geology-inspect': 'geology-inspection',
+  'pan-sediment': 'geology-inspection',
+  'fossil-document': 'excavation'
+});
+
+function backpackEquipmentIds(appCtx, fallbackIds = []) {
+  const itemIds = appCtx.playerBackpackInventory?.snapshot?.().items
+    ?.filter((item) => Number(item.quantity || 1) > 0)
+    .map((item) => String(item.catalogId || ''))
+    .filter(Boolean) || [];
+  return [...new Set([...fallbackIds.map(String), ...itemIds])];
+}
 
 const WILDLIFE_OBSERVATION_CATALOG = Object.freeze({
   'rock-pigeon': 'urban-nature-photo',
@@ -55,6 +73,7 @@ function fieldToolBackpackDefinition(tool) {
     category: 'field-tool',
     icon: 'TOOL',
     verbs: ['equip', 'use-context'],
+    description: TOOL_FIELD_USE[tool.id] || 'Use this during a compatible field activity.',
     capabilities: tool.capabilities,
     discipline: tool.discipline,
     sourceRefs: tool.sourceRefs
@@ -76,7 +95,10 @@ function discoveryItemBackpackRecord(item) {
       label: item.name || item.catalogId,
       category: 'specimen',
       icon: 'FIND',
-      verbs: ['inspect', 'trade', 'quest']
+      verbs: ['inspect'],
+      description: item.description || `${item.name || item.catalogId} was added through ${displayDiscoveryLabel(item.activityId, 'an Explorer activity')}.`,
+      regionLabel: item.regionLabel || '',
+      evidenceClass: item.evidenceClass || ''
     }
   };
 }
@@ -94,7 +116,8 @@ function projectDiscoveryItemsToBackpack(appCtx, items = []) {
         label: record.metadata.label,
         category: record.metadata.category,
         icon: record.metadata.icon,
-        verbs: record.metadata.verbs
+        verbs: record.metadata.verbs,
+        description: record.metadata.description
       },
       silent: true
     });
@@ -105,9 +128,14 @@ function projectDiscoveryItemsToBackpack(appCtx, items = []) {
 }
 
 const WILDLIFE_COMPANION_CATALOG = Object.freeze({
-  'rock-pigeon': 'city-pigeon',
-  mallard: 'marsh-mallard'
+  'rock-pigeon': 'city-pigeon'
 });
+
+const FIRST_RELEASE_COMPANION_IDS = new Set([
+  'trail-hound', 'field-retriever', 'park-terrier',
+  'harbor-cat', 'meadow-tabby', 'midnight-cat', 'city-pigeon',
+  'pasture-cow', 'wool-sheep', 'hill-goat', 'yard-chicken', 'heritage-pig', 'field-horse'
+]);
 
 const TOOL_FIELD_USE = Object.freeze({
   'field-lens': 'Inspect plants, surfaces, and close field evidence.',
@@ -120,35 +148,31 @@ const TOOL_FIELD_USE = Object.freeze({
   'sediment-pan': 'Survey virtual sediment along suitable streams and riverbanks.',
   'fossil-brush': 'Clean and document virtual fossil evidence.',
   'specimen-brush': 'Reveal delicate virtual fossil and specimen details.',
-  'field-shovel': 'Excavate moderate-depth detector finds after classification.'
+  'field-shovel': 'Excavate moderate-depth detector finds after classification.',
+  'portable-sonar': 'Scan a modeled water habitat and add regional fish references to your Guide without claiming a live fish is present.'
 });
 
 const EXPLORER_SECTION_TUTORIALS = Object.freeze({
   workspace: Object.freeze({ id: 'explorer-workspace-v1', title: 'Your Explorer loop', steps: Object.freeze([
-    'Choose one nearby lead. The first option is the best fit for this place; the next two are alternatives.',
-    'Begin, then minimize this Journal so the equipped tool and world-space signal can guide you.',
-    'Record the result. Every completed action enters the Journal and Field Guide; only acquired virtual objects enter your Backpack.',
-    'Current Goal and Progress show what to pursue next without forcing every system at once.'
+    'Choose an activity in Today. The first option is the best fit for this place; the next two are alternatives.',
+    'Begin, then return to the world so your tool and the nearby clues can guide you.',
+    'Finish the activity to add a memory to your Journal. Identifications also update the Guide, and objects you keep enter your Pack.',
+    'Open My Explorer when you want to see your rank, specialties, and companions.'
+  ]) }),
+  journal: Object.freeze({ id: 'explorer-journal-v1', title: 'Journal', steps: Object.freeze([
+    'The Journal is the shared story of your fieldwork, games, creations, travel, rooms, and companions.',
+    'Filter by Explorer path or place when you want to find a particular memory.',
+    'A saved location can return you to that place. Guide entries and Backpack items stay in their own sections.'
   ]) }),
   guide: Object.freeze({ id: 'explorer-guide-v1', title: 'Field Guide', steps: Object.freeze([
-    'The Field Guide answers what exists and what you have identified; it is not an inventory.',
-    'Unknown silhouettes are future identification targets. Search and category filters narrow the catalog.',
+    'The Field Guide shows regional reference groups and what you have identified; it is not an inventory.',
+    'Unidentified groups show how much is left and which field methods can help. Search and category filters narrow the Guide.',
     'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
   ]) }),
-  collection: Object.freeze({ id: 'explorer-places-v2', title: 'Places & Contacts', steps: Object.freeze([
-    'Places collects the regions and contacts connected to your Journal records.',
-    'It is a guide to where things happened. Acquired objects live only in the Backpack.'
-  ]) }),
-  gear: Object.freeze({ id: 'explorer-field-kit-v2', title: 'Field Kit Guide', steps: Object.freeze([
-    'This section explains what each field tool does; it does not own equipment.',
-    'Open the Backpack to equip or organize a released tool. Compatible nearby leads can request it explicitly.',
-    'Locked gear represents a real capability unlock. Explorer points persist and reveal the next field kit at rank milestones.',
-    'How to use explains the purpose and field context before an activity begins.'
-  ]) }),
-  progress: Object.freeze({ id: 'explorer-progress-v1', title: 'Explorer Progress', steps: Object.freeze([
-    'New identifications earn the strongest rank credit; documenting known evidence in a new region also counts.',
-    'Regional goals mix Nature, Earth, Places, and field activities so one repeated action cannot complete everything.',
-    'Specialties describe your Explorer story while rank unlocks additional ways to play.'
+  profile: Object.freeze({ id: 'my-explorer-profile-v1', title: 'My Explorer', steps: Object.freeze([
+    'This is your identity: Explorer rank, developing specialties, and the companions you have met.',
+    'Detailed progress stays grouped here instead of competing with the activities you can do today.',
+    'Wild species belong in the Field Guide. Individual animals you befriend belong with your Explorer profile.'
   ]) })
 });
 
@@ -169,6 +193,7 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'virtual-field-record': 'Field record',
     'domestic-companion': 'Domestic companion',
     'virtual-wildlife-companion': 'Wildlife companion',
+    'game-wildlife-companion': 'Wildlife companion',
     'wildlife-clue': 'Wildlife sign',
     'wildlife-record': 'Wildlife observation',
     'botany-record': 'Plant observation',
@@ -178,7 +203,17 @@ function displayDiscoveryLabel(value, fallback = 'Discovery') {
     'exploration-record': 'Field note',
     'creation-record': 'Stewardship record',
     'service-record': 'Survey record',
-    'not-tradeable': 'Personal record'
+    'not-tradeable': 'Personal record',
+    'place-visited': 'Place visit',
+    'activity-completed': 'Game completed',
+    'world-edited': 'World edit',
+    'building-milestone': 'Blocks milestone',
+    'creation-saved': 'Creation saved',
+    'creation-submitted': 'Creation shared',
+    'room-joined': 'Room joined',
+    'companion-activate': 'Companion selected',
+    'companion-feed': 'Companion care',
+    'companion-train': 'Companion training'
   };
   if (labels[key]) return labels[key];
   const spaced = key.replaceAll('-', ' ').replaceAll('_', ' ').replace(/\s+/g, ' ').trim();
@@ -192,7 +227,7 @@ function compactCompassDirection(value) {
 }
 
 function discoveryCatalogEntry(catalogId) {
-  return [...BUILTIN_DISCOVERY_CATALOGS.finds, ...BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries]
+  return [...BUILTIN_DISCOVERY_CATALOGS.finds, ...BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries, ...COMPANION_CATALOG]
     .find((entry) => entry.id === catalogId);
 }
 
@@ -210,24 +245,27 @@ function createDiscoveryUi(state) {
   const byId = (id) => document.getElementById(id);
   const elements = {
     panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
+    todayBackpack: byId('discoveryOpenBackpackTodayBtn'),
     title: byId('discoveryPanelTitle'), actions: byId('discoveryActionList'), quickLabel: byId('discoveryQuickToolBtn')?.querySelector('strong'),
     quickSignal: byId('discoveryQuickSignal'), prompt: byId('discoveryContextPrompt'), promptText: byId('discoveryContextText'),
     promptOpen: byId('discoveryContextOpenBtn'), phase: byId('discoveryPhase'), bearing: byId('discoveryBearing'),
     fill: byId('discoverySignalFill'), distance: byId('discoveryDistance'), classification: byId('discoveryClassification'),
-    message: byId('discoveryMessage'), primary: byId('discoveryPrimaryBtn'), secondary: byId('discoverySecondaryBtn'),
+    message: byId('discoveryMessage'), characterAssist: byId('discoveryCharacterAssist'), primary: byId('discoveryPrimaryBtn'), secondary: byId('discoverySecondaryBtn'),
     journal: byId('discoveryJournalList'), journalCategory: byId('discoveryJournalCategory'), journalRegion: byId('discoveryJournalRegion'), result: byId('discoveryResultCard'),
     fieldGuide: byId('discoveryFieldGuideList'), collection: byId('discoveryCollectionList'),
-    guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'),
+    guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'), guideScope: byId('discoveryGuideScope'),
     lifeList: byId('discoveryLifeList'), retention: byId('discoveryRetentionDashboard'),
     guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
     companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
     equipped: byId('discoveryEquippedSummary'), openBackpack: byId('discoveryOpenBackpackBtn'),
+    profileButton: byId('discoveryProfileBtn'), profileRank: byId('discoveryProfileRank'), profilePoints: byId('discoveryProfilePoints'), profileHero: byId('discoveryProfileHero'),
     tutorial: byId('discoveryTutorial'), tutorialTitle: byId('discoveryTutorialTitle'),
     tutorialSteps: byId('discoveryTutorialSteps'), tutorialDone: byId('discoveryTutorialDoneBtn'),
     sectionTutorial: byId('discoverySectionTutorial'), sectionTutorialTitle: byId('discoverySectionTutorialTitle'),
     sectionTutorialSteps: byId('discoverySectionTutorialSteps'), sectionTutorialDone: byId('discoverySectionTutorialDoneBtn'),
     inspection: byId('discoveryInspection'), arChallenge: byId('discoveryArChallengeBtn'), rank: byId('discoveryRankSummary'), goal: byId('discoveryGoal'),
-    fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList')
+    fieldSession: byId('discoveryFieldSession'), expedition: byId('discoveryExpeditionList'), expeditionMode: byId('discoveryExpeditionMode'),
+    exportData: byId('discoveryExportBtn'), importData: byId('discoveryImportBtn'), importFile: byId('discoveryImportFile'), backupStatus: byId('discoveryBackupStatus')
   };
   const listeners = [];
   let activeTab = 'today';
@@ -236,6 +274,8 @@ function createDiscoveryUi(state) {
   let guideRecords = [];
   let journalRecords = [];
   let expeditionSignature = '';
+  let encounterPromptRevision = -1;
+  let encounterPromptShownAt = 0;
 
   function listen(element, type, handler) {
     if (!element) return;
@@ -250,10 +290,7 @@ function createDiscoveryUi(state) {
     elements.panel?.classList.toggle('show', open);
     elements.panel?.setAttribute('aria-hidden', open ? 'false' : 'true');
     elements.quick?.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-      void refreshData();
-      void state.showSectionTutorial?.('workspace');
-    }
+    if (open) void refreshData();
     return open;
   }
 
@@ -261,47 +298,91 @@ function createDiscoveryUi(state) {
     if (!elements.fieldGuide) return;
     const search = String(elements.guideSearch?.value || '').trim().toLowerCase();
     const category = String(elements.guideCategory?.value || 'all');
-    const knownIds = new Set(guideRecords.map((entry) => entry.catalogId));
-    const known = guideRecords.filter((entry) => {
+    const requestedScope = String(elements.guideScope?.value || 'current');
+    const regionalPack = resolveRegionalEcologyPack(state.publication.worldIdentity?.location);
+    const currentRegionIds = new Set(regionalPack?.taxa?.map((entry) => entry.id) || []);
+    const worldCatalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.filter((entry) =>
+      entry.activityIds?.some((activityId) => RELEASED_EXPLORER_ACTIVITIES.has(activityId))
+    );
+    const scopedCatalog = requestedScope === 'current' && regionalPack
+      ? worldCatalog.filter((entry) => currentRegionIds.has(entry.id))
+      : worldCatalog;
+    const companionCatalogIds = new Set(COMPANION_CATALOG.map((entry) => entry.id));
+    const scopedGuide = requestedScope === 'current' && regionalPack
+      ? guideRecords.filter((entry) => (currentRegionIds.has(entry.catalogId) || companionCatalogIds.has(entry.catalogId)) && entry.regions?.includes(state.worldIdentityId))
+      : guideRecords;
+    const knownIds = new Set(scopedGuide.map((entry) => entry.catalogId));
+    const known = scopedGuide.filter((entry) => {
       const catalog = discoveryCatalogEntry(entry.catalogId);
       if (category !== 'all' && guideCategoryFor(entry) !== category) return false;
       const haystack = `${entry.name || ''} ${entry.family || ''} ${catalog?.names?.scientific || ''}`.toLowerCase();
       return !search || haystack.includes(search);
     });
-    const unknown = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.filter((entry) => {
+    const unknown = scopedCatalog.filter((entry) => {
       if (knownIds.has(entry.id)) return false;
       if (category !== 'all' && guideCategoryFor(entry) !== category) return false;
       const haystack = `${entry.names?.common || ''} ${entry.family || ''} ${entry.names?.scientific || ''}`.toLowerCase();
       return !search || haystack.includes(search);
-    }).slice(0, 6);
+    });
     const knownMarkup = known.map((entry) => {
       const catalog = discoveryCatalogEntry(entry.catalogId);
       const regions = Array.isArray(entry.regionLabels) ? entry.regionLabels.filter(Boolean) : [];
-      return visualCard(entry, `${displayDiscoveryLabel(entry.family || catalog?.family)} · ${entry.observations || 1} observation${entry.observations === 1 ? '' : 's'} · ${regions.length || 1} region${regions.length === 1 ? '' : 's'} · ${displayDiscoveryLabel(entry.evidenceClass, 'Field record')}`, 'field-guide');
+      const owned = state.companionRuntime?.snapshot?.().companions?.filter((companion) => companion.catalogId === entry.catalogId) || [];
+      const bestLevel = owned.reduce((highest, companion) => Math.max(highest, Number(companion.progression?.level || 1)), 0);
+      const companionDetail = owned.length ? ` · ${owned.length} companion${owned.length === 1 ? '' : 's'} owned · best level ${bestLevel}` : '';
+      return visualCard(entry, `${displayDiscoveryLabel(entry.family || catalog?.family)} · ${entry.observations || 1} observation${entry.observations === 1 ? '' : 's'} · ${regions.length || 1} region${regions.length === 1 ? '' : 's'}${companionDetail}`, 'field-guide');
     }).join('');
-    const unknownMarkup = unknown.map((entry) => `<article class="discoveryItem discoveryUnknown"><span class="discoveryUnknownMark" aria-hidden="true">?</span><div><strong>Unknown ${escapeHtml(displayDiscoveryLabel(entry.family, 'discovery'))}</strong><small>Explore a compatible place and use the right field tool to identify this entry.</small></div></article>`).join('');
+    const familyLabels = {
+      'mammal-taxon': 'mammals',
+      'bird-taxon': 'birds',
+      'insect-arachnid-taxon': 'insects and arachnids',
+      'plant-taxon': 'plants',
+      'freshwater-fish-taxon': 'freshwater fish',
+      'marine-fish-taxon': 'marine fish'
+    };
+    const unknownGroups = new Map();
+    unknown.forEach((entry) => {
+      const key = String(entry.family || 'discoveries');
+      const group = unknownGroups.get(key) || { entries: [], activityIds: new Set() };
+      group.entries.push(entry);
+      entry.activityIds?.filter((id) => RELEASED_EXPLORER_ACTIVITIES.has(id)).forEach((id) => group.activityIds.add(id));
+      unknownGroups.set(key, group);
+    });
+    const unknownMarkup = [...unknownGroups.entries()].map(([family, group]) => {
+      const label = familyLabels[family] || displayDiscoveryLabel(family, 'discoveries').replace(/ taxon$/i, '').toLowerCase();
+      const methods = [...group.activityIds].slice(0, 3).map((id) => displayDiscoveryLabel(id)).join(', ');
+      return `<article class="discoveryItem discoveryUnknown"><span class="discoveryUnknownMark" aria-hidden="true">?</span><div><strong>${group.entries.length} ${escapeHtml(label)} left to identify</strong><small>${methods ? `Try ${escapeHtml(methods)} in a suitable place.` : 'Explore a suitable place to begin.'}</small></div></article>`;
+    }).join('');
     elements.fieldGuide.innerHTML = knownMarkup || unknownMarkup
       ? `${knownMarkup}${unknownMarkup}`
       : '<div class="discoveryEmpty">No Guide entries match this search.</div>';
     if (elements.guideOverview) {
-      const total = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.length;
-      elements.guideOverview.innerHTML = `<article><strong>${guideRecords.length}</strong><span>identified</span></article><article><strong>${Math.max(0, total - guideRecords.length)}</strong><span>unknown in this catalog</span></article><article><strong>${new Set(guideRecords.flatMap((entry) => entry.regionLabels || [])).size}</strong><span>named regions</span></article>`;
+      const total = new Set([...scopedCatalog.map((entry) => entry.id), ...knownIds]).size;
+      const scopeLabel = requestedScope === 'current' && regionalPack ? `${state.regionLabel} area` : 'World';
+      elements.guideOverview.innerHTML = `<article><strong>${knownIds.size}</strong><span>identified here</span></article><article><strong>${Math.max(0, total - knownIds.size)}</strong><span>left to discover</span></article><article><strong>${escapeHtml(scopeLabel)}</strong><span>Guide scope</span></article>`;
     }
   }
 
   function renderJournal() {
     if (!elements.journal) return;
-    const specialty = String(elements.journalCategory?.value || 'all');
+    const path = String(elements.journalCategory?.value || 'all');
     const regionId = String(elements.journalRegion?.value || 'all');
     const filtered = journalRecords.filter((event) =>
-      (specialty === 'all' || event.specialtyId === specialty) &&
+      (path === 'all' || (event.pathId || 'field') === path) &&
       (regionId === 'all' || event.regionId === regionId)
     );
+    const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
     elements.journal.innerHTML = filtered.length ? filtered.slice(0, 16).map((event) => {
       const when = new Date(Number(event.occurredAt) || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      const destination = event.projections?.collection ? 'Guide + Backpack item' : 'Guide record';
-      const returnButton = event.locationKey ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${displayDiscoveryLabel(event.activityId, 'Field work')} · ${destination}`)}</small><span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Documented · no repeat rank credit'}</span>${returnButton}</article>`;
+      const connections = [
+        event.projections?.fieldGuide ? 'also in Field Guide' : '',
+        event.projections?.collection ? 'also in Backpack' : ''
+      ].filter(Boolean).join(' + ');
+      const canReturn = event.locationKey || (Number.isFinite(event.locationSnapshot?.lat) && Number.isFinite(event.locationSnapshot?.lon));
+      const returnButton = canReturn ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
+      const activity = displayDiscoveryLabel(event.activityId || event.eventType || event.pathId, 'Explorer memory');
+      const eventPath = event.pathId || 'field';
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${returnButton}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
   }
 
@@ -322,7 +403,7 @@ function createDiscoveryUi(state) {
       elements.journalRegion.value = regions.some(([id]) => id === selectedRegion) ? selectedRegion : 'all';
     }
     const rank = explorerProgressSnapshot(profile.explorerProgress);
-    if (elements.rank) elements.rank.innerHTML = `<span>EXPLORER RANK</span><strong>${escapeHtml(rank.rankLabel)}</strong><small>${rank.next ? `${rank.next.pointsRemaining} points to ${escapeHtml(rank.next.label)} · new identifications and new-region evidence count` : 'Highest current rank · keep building your regional story'}</small>`;
+    if (elements.rank) elements.rank.innerHTML = `<span>EXPLORER RANK</span><strong>${escapeHtml(rank.rankLabel)}</strong><small>${rank.next ? `${rank.next.pointsRemaining} points to ${escapeHtml(rank.next.label)} · find something new or explore a new place` : 'Highest current rank · keep exploring and building your story'}</small>`;
     const goal = explorerGoalSnapshot({ profile, guide, items, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
     if (elements.goal) elements.goal.innerHTML = `<div class="discoveryGoalCopy"><span>CURRENT GOAL</span><strong>${escapeHtml(goal.label)}</strong><small>${escapeHtml(goal.detail)}</small></div><div class="discoveryGoalMeter" aria-label="${escapeHtml(`${goal.current} of ${goal.target}`)}"><i style="width:${goal.progressPercent}%"></i></div><div class="discoveryGoalFoot"><b>${goal.current}/${goal.target}</b><span>${escapeHtml(goal.reward)}</span></div>`;
     const regionalPack = resolveRegionalEcologyPack(state.publication.worldIdentity?.location);
@@ -337,7 +418,7 @@ function createDiscoveryUi(state) {
       const rhythm = [retention.daily, retention.weekly, retention.seasonal].map((period) => {
         const objectives = period.objectives || [period.objective];
         const programNote = period.phase === 'ineligible'
-          ? 'A reviewed regional survey is not available for this location yet.'
+          ? 'Seasonal surveys are not available in this place yet.'
           : 'Personal field progress · missed days never remove permanent records';
         return `<article class="discoveryRetentionCard" data-mission-phase="${escapeHtml(period.phase)}"><span>${escapeHtml(period.label)}</span>${objectives.map((entry) => `<div class="discoveryRetentionObjective${entry.complete ? ' complete' : ''}"><div><strong>${entry.complete ? '✓ ' : ''}${escapeHtml(entry.label)}</strong><small>${escapeHtml(entry.detail)}</small></div><b>${Math.min(entry.current, entry.target)}/${entry.target}</b><i><em style="width:${entry.progressPercent}%"></em></i></div>`).join('')}<small>${escapeHtml(programNote)}</small></article>`;
       }).join('');
@@ -348,8 +429,8 @@ function createDiscoveryUi(state) {
       const groups = retention.lifeList.groups.filter((entry) => entry.target > 0);
       const methods = retention.evidenceSpecialties.filter((entry) => entry.records > 0);
       elements.lifeList.innerHTML = regionalPack
-        ? `<div class="discoveryLifeListHead"><div><span>REGIONAL LIFE LIST</span><strong>${retention.lifeList.identified}/${retention.lifeList.target}</strong></div><small>Reviewed catalog progress · not a live-presence count</small></div><div class="discoveryLifeListGrid">${groups.map((entry) => `<article><span>${escapeHtml(entry.label)}</span><b>${entry.current}/${entry.target}</b><i><em style="width:${Math.min(100, Math.round(entry.current / Math.max(1, entry.target) * 100))}%"></em></i></article>`).join('')}</div><div class="discoveryEvidenceSpecialties"><span>EVIDENCE SPECIALTIES</span><small>${methods.length ? methods.map((entry) => `${displayDiscoveryLabel(entry.id)} ${entry.records}`).join(' · ') : 'Complete a typed field record to begin.'}</small></div><div class="discoveryEvidenceSpecialties"><span>CREATURE QUALITY</span><small>${state.creatureQualityAudit.tiers['reference-fallback'] || 0} reference fallbacks · ${state.creatureQualityAudit.promotionReadyCount} reviewed media/model promotions</small></div>`
-        : '<div class="discoveryEmpty">Regional life lists appear where a reviewed ecology pack is available.</div>';
+        ? `<div class="discoveryLifeListHead"><div><span>REGIONAL LIFE LIST</span><strong>${retention.lifeList.identified}/${retention.lifeList.target}</strong></div><small>Guide progress · not a live wildlife count</small></div><div class="discoveryLifeListGrid">${groups.map((entry) => `<article><span>${escapeHtml(entry.label)}</span><b>${entry.current}/${entry.target}</b><i><em style="width:${Math.min(100, Math.round(entry.current / Math.max(1, entry.target) * 100))}%"></em></i></article>`).join('')}</div><div class="discoveryEvidenceSpecialties"><span>WAYS YOU EXPLORE</span><small>${methods.length ? methods.map((entry) => `${displayDiscoveryLabel(entry.id)} ${entry.records}`).join(' · ') : 'Complete a field record to begin.'}</small></div>`
+        : '<div class="discoveryEmpty">Regional life lists appear in places with a dedicated Field Guide.</div>';
     }
     renderJournal();
     if (elements.collection) {
@@ -359,16 +440,17 @@ function createDiscoveryUi(state) {
         count: events.filter((candidate) => candidate.regionId === event.regionId).length,
         lastAt: Math.max(...events.filter((candidate) => candidate.regionId === event.regionId).map((candidate) => Number(candidate.occurredAt) || 0))
       }])).values()].sort((left, right) => right.lastAt - left.lastAt);
-      elements.collection.innerHTML = places.length ? places.map((place) =>
-        `<article class="discoveryItem"><strong>${escapeHtml(place.label)}</strong><small>${place.count} Journal record${place.count === 1 ? '' : 's'} · saved Explorer region</small></article>`
-      ).join('') : '<div class="discoveryEmpty">Complete an activity or observation to add its region to Places.</div>';
+      elements.collection.innerHTML = places.length ? places.map((place) => {
+        const latest = events.find((event) => event.regionId === place.id && (event.locationKey || (Number.isFinite(event.locationSnapshot?.lat) && Number.isFinite(event.locationSnapshot?.lon))));
+        return `<article class="discoveryItem"><strong>${escapeHtml(place.label)}</strong><small>${place.count} Journal record${place.count === 1 ? '' : 's'} · saved Explorer place</small>${latest ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(latest.eventId)}" type="button">Return to place</button>` : ''}</article>`;
+      }).join('') : '<div class="discoveryEmpty">Complete an activity or observation to add its region to Places.</div>';
     }
     if (elements.tools) {
       const equippedToolId = String(state.equippedToolId || 'field-lens');
       const available = state.entitlements.listAvailableTools();
       const lockedProgress = new Map((state.toolProgress?.lockedTools || []).map((entry) => [entry.toolId, entry]));
       const availableMarkup = available.map((tool) =>
-        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Active activity tool' : ' · In Backpack'}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
+        `<article class="discoveryItem discoveryGearItem${tool.id === equippedToolId ? ' equipped' : ''}"><strong>${escapeHtml(tool.label)}${tool.id === equippedToolId ? ' · Ready for fieldwork' : ' · In Backpack'}</strong><small>${escapeHtml(TOOL_FIELD_USE[tool.id] || tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</small><span class="discoveryGearCapabilities">${escapeHtml(tool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · '))}</span><div class="discoveryCompanionActions"><button data-tool-help="${escapeHtml(tool.id)}" type="button">How to use</button></div></article>`
       ).join('');
       const lockedMarkup = state.entitlements.listLockedTools().map((tool) => {
         const unlock = lockedProgress.get(tool.id);
@@ -378,41 +460,82 @@ function createDiscoveryUi(state) {
       const equippedTool = state.entitlements.listAvailableTools().find((tool) => tool.id === equippedToolId);
       if (elements.equipped) elements.equipped.innerHTML = `<span>BACKPACK FIELD TOOL</span><strong>${escapeHtml(equippedTool?.label || 'Field Lens')}</strong><small>${escapeHtml(equippedTool ? equippedTool.capabilities.map((value) => displayDiscoveryLabel(value)).join(' · ') : 'Inspect · Classify')}</small>`;
     }
+    const companionSnapshot = state.companionRuntime?.snapshot?.() || { companions: [], presentation: {} };
+    const ownedCompanions = companionSnapshot.companions || [];
     if (elements.companions) {
-      const owned = state.companionRuntime?.snapshot?.().companions || [];
-      elements.companions.innerHTML = COMPANION_CATALOG.map((catalog) => {
-        const companion = owned.find((entry) => entry.catalogId === catalog.id);
+      const owned = ownedCompanions;
+      const activeTravelLabel = ['aboard', 'vehicle-occupant'].includes(companionSnapshot.presentation?.travelState)
+        ? 'Riding with you'
+        : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
+      const localSuggestions = COMPANION_CATALOG.filter((catalog) =>
+        FIRST_RELEASE_COMPANION_IDS.has(catalog.id) &&
+        !owned.some((companion) => companion.catalogId === catalog.id) &&
+        state.isCompanionEligible?.(catalog) === true
+      ).sort((left, right) => Number(state.hasWorldCompanionEncounter?.(right.id)) - Number(state.hasWorldCompanionEncounter?.(left.id))).slice(0, 4);
+      const companionRows = [
+        ...owned.map((companion) => ({ companion, catalog: COMPANION_CATALOG.find((entry) => entry.id === companion.catalogId) })).filter((row) => row.catalog),
+        ...localSuggestions.map((catalog) => ({ catalog, companion: null }))
+      ];
+      elements.companions.innerHTML = companionRows.length ? companionRows.map(({ catalog, companion }) => {
         if (!companion) {
-          const eligible = state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
+          const releaseReady = FIRST_RELEASE_COMPANION_IDS.has(catalog.id);
+          const eligible = releaseReady && state.isCompanionEligible?.(catalog) === true && state.hasWorldCompanionEncounter?.(catalog.id) === true;
           const encounter = state.companionEncounterState?.(catalog.id) || { step: 0 };
-          const domesticLabels = ['Approach Carefully', 'Offer Virtual Care', 'Adopt'];
-          const wildlifeLabels = ['Observe Safely', 'Complete Observation', 'Unlock Virtual Companion'];
-          const labels = catalog.companionPolicy === 'adoptable-domestic' ? domesticLabels : wildlifeLabels;
           const guidance = eligible
-            ? catalog.companionPolicy === 'adoptable-domestic'
-              ? 'This companion can be met here. Spend time together to build trust before adoption.'
-              : 'A wildlife companion encounter is available here. Observe real wildlife only from a safe distance.'
-            : 'Explore a compatible habitat to begin this companion encounter.';
+            ? encounter.trustState === 'Comfortable'
+              ? 'Comfortable — choose a name when you are ready.'
+              : `${encounter.trustState || 'Wary'} — meet this animal in the world and follow its response.`
+            : releaseReady
+              ? 'Explore a compatible area to meet one.'
+              : 'Observation only for now.';
           const visual = visualForCatalogId(catalog.id);
-          return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(`${displayDiscoveryLabel(catalog.family)} · ${displayDiscoveryLabel(catalog.rarityBand, 'Common')} · ${guidance}`)}</small>${eligible ? `<div class="discoveryCompanionActions"><button data-companion-action="locate" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Find in world · ${escapeHtml(labels[Math.min(2, encounter.step)])}</button></div>` : ''}${visual ? '</div>' : ''}</article>`;
+          const nameAndBefriend = eligible && encounter.trustState === 'Comfortable'
+            ? `<div class="discoveryCompanionName"><label>Name this companion<input data-companion-name maxlength="24" autocomplete="off" value="${escapeHtml(catalog.names.common)}"></label><button data-companion-action="befriend" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Befriend</button></div>`
+            : eligible ? `<div class="discoveryCompanionActions"><button data-companion-action="locate" data-companion-catalog="${escapeHtml(catalog.id)}" type="button">Find in world</button></div>` : '';
+          return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(catalog.names.common)}</strong><small>${escapeHtml(guidance)}</small>${nameAndBefriend}${visual ? '</div>' : ''}</article>`;
         }
         const visual = visualForCatalogId(companion.catalogId);
-        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Trust ${companion.care?.trust || 0} · Fullness ${companion.care?.fullness || 0} · Find training ${companion.training?.find || 0}/5`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? 'Following' : 'Make Active'}</button><button data-companion-action="feed" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Feed</button><button data-companion-action="train" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Train Find</button><button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
-      }).join('');
+        const level = Number(companion.progression?.level || 1);
+        const nextLevel = companion.progression?.nextLevelXp == null
+          ? 'Master Partner'
+          : `${Math.max(0, companion.progression.nextLevelXp - companion.progression.totalXp)} XP to level ${level + 1}`;
+        const lastAward = companion.progression?.lastAward
+          ? ` · Last: +${companion.progression.lastAward.points} ${companion.progression.lastAward.label}`
+          : '';
+        const specialty = companion.training?.specialization ? ` · Specialty: ${companion.training.specialization}` : '';
+        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${specialty}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+      }).join('') : '<div class="discoveryEmpty">Explore animal-friendly places to meet a potential companion.</div>';
     }
     if (elements.progress) {
       const progress = rank;
       const regional = regionalProgressSnapshot({ guide, events, regionId: state.worldIdentityId, regionLabel: state.regionLabel });
-      const specialties = Object.entries(progress.specialties || {});
-      const regionEvents = new Map();
-      events.forEach((event) => {
-        const key = event.regionId || event.worldIdentity || 'local-region';
-        const row = regionEvents.get(key) || { label: event.regionLabel || 'Current region', records: 0, catalogs: new Set() };
-        row.records += 1;
-        if (event.catalogId) row.catalogs.add(event.catalogId);
-        regionEvents.set(key, row);
-      });
-      elements.progress.innerHTML = `<article class="discoveryProgressCard discoveryProgressRank"><strong>${progress.points}</strong>Explorer points<small>${progress.uniqueDiscoveries || 0} unique identifications · ${progress.regions?.length || 0} regions</small></article><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article>${specialties.map(([id, specialty]) => `<article class="discoveryProgressCard"><strong>${specialty.points || 0}</strong>${escapeHtml(displayDiscoveryLabel(id))}<small>${specialty.uniqueDiscoveries || 0} unique · ${specialty.records || 0} records</small></article>`).join('')}${[...regionEvents.values()].map((region) => `<article class="discoveryProgressCard discoveryRegionCard"><strong>${region.catalogs.size}</strong>${escapeHtml(region.label)}<small>${region.records} Journal record${region.records === 1 ? '' : 's'} · ${region.catalogs.size} identification${region.catalogs.size === 1 ? '' : 's'}</small></article>`).join('') || '<div class="discoveryEmpty">Your first completed field record will start regional progress.</div>'}`;
+      const specialties = Object.entries(profile.characterState?.specialties || {})
+        .filter(([, specialty]) => Number(specialty.xp) > 0)
+        .sort((left, right) => Number(right[1].xp) - Number(left[1].xp));
+      const pathLabels = { field: 'Fieldwork', activity: 'Games', creation: 'Making', travel: 'Travel', community: 'Community', companion: 'Companions' };
+      const paths = Object.entries(progress.paths || {}).filter(([, path]) => path.records > 0);
+      const badges = progress.badgeAwards || [];
+      const activeCompanion = ownedCompanions.find((entry) => entry.active);
+      const background = definitionById(BACKGROUND_DEFINITIONS, profile.characterState?.backgroundId) || BACKGROUND_DEFINITIONS[0];
+      const strengths = ATTRIBUTE_DEFINITIONS.map((definition) => ({
+        ...definition,
+        value: Number(profile.characterState?.attributes?.[definition.id]) || 0
+      })).sort((left, right) => right.value - left.value || left.label.localeCompare(right.label)).slice(0, 3);
+      if (elements.profileRank) elements.profileRank.textContent = progress.rankLabel;
+      if (elements.profilePoints) elements.profilePoints.textContent = String(progress.points);
+      if (elements.profileHero) {
+        elements.profileHero.innerHTML = `<div><span>${escapeHtml(background.label)}</span><strong>${escapeHtml(progress.rankLabel)}</strong><small>${progress.points} Explorer points · ${progress.totalRecords || 0} Journal memories</small></div><div class="discoveryProfileStrengths"><span>Current strengths</span><b>${strengths.map((entry) => escapeHtml(entry.label)).join(' · ')}</b></div>${activeCompanion ? `<div class="discoveryProfileCompanion"><span>Exploring with</span><strong>${escapeHtml(activeCompanion.name)}</strong><small>Level ${activeCompanion.progression?.level || 1} · ${escapeHtml(activeCompanion.progression?.trustState || 'Comfortable')}</small></div>` : ''}`;
+      }
+      const specialtyMarkup = specialties.length
+        ? specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const specialtyRank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${specialtyRank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(specialtyRank.label)} · ${specialty.meaningfulEvents || 0} meaningful activities</small></article>`; }).join('')
+        : '<div class="discoveryEmpty">Complete meaningful activities to begin developing specialties.</div>';
+      const pathMarkup = paths.length
+        ? paths.map(([id, path]) => `<article class="discoveryProgressCard"><strong>${path.records}</strong>${escapeHtml(pathLabels[id] || displayDiscoveryLabel(id))}<small>${path.points || 0} points · ${path.firsts || 0} first-time milestone${path.firsts === 1 ? '' : 's'}</small></article>`).join('')
+        : '<div class="discoveryEmpty">Your first Journal memory will begin your Explorer paths.</div>';
+      const badgeMarkup = badges.length
+        ? badges.map((badge) => `<article class="discoveryProgressCard"><strong>◆</strong>${escapeHtml(badge.label)}<small>Explorer badge</small></article>`).join('')
+        : '<div class="discoveryEmpty">Badges appear as your Explorer story grows.</div>';
+      elements.progress.innerHTML = `<details class="discoveryProfileGroup" open><summary>Specialties <span>${specialties.length}</span></summary><div class="discoveryProfileGroupGrid">${specialtyMarkup}</div></details><details class="discoveryProfileGroup"><summary>Explorer paths <span>${paths.length}</span></summary><div class="discoveryProfileGroupGrid">${pathMarkup}</div></details><details class="discoveryProfileGroup"><summary>Current place</summary><article class="discoveryRegionalProgress"><div><span>CURRENT REGION</span><strong>${escapeHtml(regional.regionLabel)}</strong><small>${regional.journalEvents} Journal records · ${regional.identifications} identifications</small></div>${regional.categories.map((category) => `<div class="discoveryRegionalRow"><span>${escapeHtml(category.label)}</span><b>${Math.min(category.current, category.target)}/${category.target}</b><i><em style="width:${Math.min(100, Math.round(category.current / category.target * 100))}%"></em></i></div>`).join('')}</article></details><details class="discoveryProfileGroup"><summary>Badges <span>${badges.length}</span></summary><div class="discoveryProfileGroupGrid">${badgeMarkup}</div></details>`;
     }
   }
 
@@ -430,15 +553,18 @@ function createDiscoveryUi(state) {
   }
 
   function setTab(tab) {
-    activeTab = tab;
-    const tabTitles = { today: 'Activities', guide: 'Field Guide', collection: 'Places & Contacts', gear: 'Field Kit Guide', progress: 'Explorer Progress' };
-    if (tab !== 'today' && elements.title) elements.title.textContent = tabTitles[tab] || 'Explorer Journal';
-    document.querySelectorAll('.discoveryTab').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === tab));
-    document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === tab));
-    const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${tab}"]`);
+    const normalizedTab = tab === 'gear' || tab === 'progress' ? 'profile' : tab === 'collection' ? 'journal' : tab;
+    activeTab = ['today', 'journal', 'guide', 'profile'].includes(normalizedTab) ? normalizedTab : 'today';
+    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'My Explorer' };
+    if (elements.title) elements.title.textContent = tabTitles[activeTab] || 'Today';
+    document.querySelectorAll('[data-discovery-tab]').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === activeTab));
+    elements.profileButton?.classList.toggle('active', activeTab === 'profile');
+    elements.profileButton?.setAttribute('aria-pressed', activeTab === 'profile' ? 'true' : 'false');
+    elements.profileButton?.setAttribute('aria-label', activeTab === 'profile' ? 'Return to Today' : 'Open My Explorer profile');
+    document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === activeTab));
+    const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${activeTab}"]`);
     if (activePane) activePane.scrollTop = 0;
-    if (tab !== 'today') void refreshData();
-    if (tab !== 'today') void state.showSectionTutorial?.(tab);
+    if (activeTab !== 'today') void refreshData();
   }
 
   function showResult(outcome) {
@@ -451,13 +577,28 @@ function createDiscoveryUi(state) {
     }
     const collection = event.projections?.collection === true;
     const points = Number(event.progress?.points) || 0;
+    const specialtyAwards = outcome?.characterReward?.specialtyAwards || [];
+    const specialtySummary = specialtyAwards.slice(0, 2).map((award) => {
+      const label = definitionById(SPECIALTY_DEFINITIONS, award.id)?.label || displayDiscoveryLabel(award.id);
+      return `${label} +${award.xp}`;
+    }).join(' · ');
+    const rewardSummary = [points > 0 ? `Explorer +${points}` : '', specialtySummary].filter(Boolean).join(' · ');
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · New Field Guide evidence · Item added to Backpack' : 'Journal updated · New Field Guide evidence · No owned item created')}</p><div class="discoveryResultProgress">${points > 0 ? `+${points} Explorer points · ${escapeHtml(displayDiscoveryLabel(event.specialtyId))}` : 'Observation documented · already credited in this region'}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="progress" type="button">View Progress</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">My Explorer</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }
 
-  document.querySelectorAll('.discoveryTab').forEach((button) => listen(button, 'click', () => setTab(button.dataset.discoveryTab || 'today')));
+  document.querySelectorAll('[data-discovery-tab]').forEach((button) => listen(button, 'click', () => setTab(button.dataset.discoveryTab || 'today')));
+  document.querySelectorAll('[data-discovery-destination="pack"]').forEach((button) => listen(button, 'click', () => {
+    setOpen(false);
+    state.appCtx.toggleUrbanEquipment?.(true);
+  }));
+  listen(elements.todayBackpack, 'click', () => {
+    setOpen(false);
+    state.appCtx.toggleUrbanEquipment?.(true);
+  });
+  listen(elements.profileButton, 'click', () => setTab(activeTab === 'profile' ? 'today' : 'profile'));
   listen(elements.quick, 'click', () => setOpen(!open));
   listen(elements.menu, 'click', () => {
     document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
@@ -469,18 +610,14 @@ function createDiscoveryUi(state) {
     else setOpen(true);
   });
   listen(elements.close, 'click', () => setOpen(false));
-  listen(elements.help, 'click', () => {
-    if (activeTab === 'guide' && elements.guideHelp) {
-      elements.guideHelp.hidden = !elements.guideHelp.hidden;
-      elements.guideHelpButton?.setAttribute('aria-expanded', elements.guideHelp.hidden ? 'false' : 'true');
-    } else void state.showActivityTutorial(true);
-  });
+  listen(elements.help, 'click', () => void state.showSectionTutorial?.(activeTab === 'today' ? 'workspace' : activeTab, true));
   listen(elements.guideHelpButton, 'click', () => {
     if (!elements.guideHelp) return;
     elements.guideHelp.hidden = !elements.guideHelp.hidden;
     elements.guideHelpButton.setAttribute('aria-expanded', elements.guideHelp.hidden ? 'false' : 'true');
   });
   listen(elements.guideSearch, 'input', renderGuide);
+  listen(elements.guideScope, 'change', renderGuide);
   listen(elements.guideCategory, 'change', renderGuide);
   listen(elements.journalCategory, 'change', renderJournal);
   listen(elements.journalRegion, 'change', renderJournal);
@@ -502,7 +639,10 @@ function createDiscoveryUi(state) {
   });
   listen(elements.companions, 'click', (event) => {
     const button = event.target?.closest?.('[data-companion-action]');
-    if (button) void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog);
+    if (button) {
+      const name = button.closest('.discoveryItem')?.querySelector?.('[data-companion-name]')?.value || '';
+      void state.handleCompanionAction(button.dataset.companionAction, button.dataset.companionId, button.dataset.companionCatalog, name);
+    }
   });
   listen(elements.tools, 'click', (event) => {
     const help = event.target?.closest?.('[data-tool-help]');
@@ -511,6 +651,37 @@ function createDiscoveryUi(state) {
   listen(elements.openBackpack, 'click', () => {
     setOpen(false);
     state.appCtx.toggleUrbanEquipment?.(true);
+  });
+  listen(elements.exportData, 'click', async () => {
+    try {
+      const data = await state.profileStore.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `world-explorer-journal-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      if (elements.backupStatus) elements.backupStatus.textContent = 'Journal backup downloaded.';
+    } catch (error) {
+      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'The backup could not be created.';
+    }
+  });
+  listen(elements.importData, 'click', () => elements.importFile?.click());
+  listen(elements.importFile, 'change', async () => {
+    const file = elements.importFile?.files?.[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!globalThis.confirm?.('Restore this Journal backup? Current local Explorer records in this browser will be replaced.')) return;
+      const result = await state.profileStore.importData(data);
+      await refreshData();
+      if (elements.backupStatus) elements.backupStatus.textContent = `Restored ${result.events} Journal memories and ${result.guide} Guide entries.`;
+    } catch (error) {
+      if (elements.backupStatus) elements.backupStatus.textContent = error?.message || 'This backup could not be restored.';
+    } finally {
+      if (elements.importFile) elements.importFile.value = '';
+    }
   });
   listen(elements.result, 'click', (event) => {
     if (event.target?.closest?.('[data-open-backpack]')) {
@@ -522,6 +693,11 @@ function createDiscoveryUi(state) {
     if (button) setTab(button.dataset.resultTab || 'today');
   });
   [elements.fieldGuide, elements.collection].forEach((container) => listen(container, 'click', (event) => {
+    const returnButton = event.target?.closest?.('[data-journal-return]');
+    if (returnButton) {
+      void state.returnToJournalEvent?.(returnButton.dataset.journalReturn);
+      return;
+    }
     const button = event.target?.closest?.('[data-ar-record]');
     if (button) void state.handleArRecord(button.dataset.arRecord, button.dataset.arSource);
   }));
@@ -529,6 +705,9 @@ function createDiscoveryUi(state) {
 
   function render(actions, snapshot, activityId = 'metal-detect') {
     const liveGps = state.appCtx.getLiveGpsSnapshot?.() || { active: false };
+    if (elements.expeditionMode) elements.expeditionMode.textContent = liveGps.active
+      ? 'THREE GPS WALKING STOPS'
+      : 'THREE NEARBY FIELD STOPS';
     const expedition = state.fieldExpedition?.snapshot?.(
       playerPosition(state.appCtx),
       liveGps.active ? (target) => state.evaluateFieldTarget?.(target) : null
@@ -562,7 +741,19 @@ function createDiscoveryUi(state) {
     // remains available and returns as soon as the direct interaction clears.
     const directInteraction = state.appCtx.resolvePrimaryContextInteraction?.() || null;
     const interiorInteraction = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
-    const showEncounterLead = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
+    const encounterPromptEligible = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
+    const encounterRevision = Number(encounterLead?.revision);
+    const promptNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (!encounterLead?.available) {
+      encounterPromptRevision = -1;
+      encounterPromptShownAt = 0;
+    } else if (encounterPromptEligible && encounterRevision !== encounterPromptRevision) {
+      encounterPromptRevision = encounterRevision;
+      encounterPromptShownAt = promptNow;
+    }
+    // A field lead is an invitation, not a permanent HUD layer. Keep the
+    // underlying lead available in Explorer after this short notice expires.
+    const showEncounterLead = encounterPromptEligible && promptNow - encounterPromptShownAt < 7000;
     elements.prompt?.classList.toggle('show', showEncounterLead);
     if (elements.prompt) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';
@@ -584,7 +775,7 @@ function createDiscoveryUi(state) {
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
-    if (elements.title && activeTab === 'today') elements.title.textContent = activeAction?.label || (activityId === 'metal-detect' ? 'Metal Detector' : 'Today');
+    if (elements.title && activeTab === 'today') elements.title.textContent = 'Today';
     if (elements.quickLabel) elements.quickLabel.textContent = `Resume ${activeAction?.label || 'Field Activity'}`;
     if (!snapshot) return;
     if (elements.inspection) {
@@ -607,6 +798,16 @@ function createDiscoveryUi(state) {
     if (elements.message) {
       elements.message.textContent = snapshot.error || snapshot.message;
       elements.message.classList.toggle('error', !!snapshot.error);
+    }
+    if (elements.characterAssist) {
+      const assistance = snapshot.characterAssistance;
+      elements.characterAssist.hidden = !assistance;
+      if (assistance) {
+        const detail = assistance.type === 'DetectorCharacterAssistance'
+          ? `${assistance.informationTier} cues · focus ${Math.round(assistance.focusRadiusMeters)} m · reveal ${Number(assistance.excavationSeconds).toFixed(1)} s`
+          : `${assistance.informationTier} cues · observation range ${Math.round(assistance.observationRadiusMeters)} m · steady range ${Math.round(assistance.steadyRangeMeters)} m`;
+        elements.characterAssist.innerHTML = `<strong>${escapeHtml(assistance.label)}</strong><span>${escapeHtml(detail)}</span>`;
+      }
     }
     if (elements.quickSignal) elements.quickSignal.textContent = isDetector && snapshot.signalStrength > 0.7 ? 'Strong' : isDetector && snapshot.signalStrength > 0.25 ? 'Signal' : isDetector ? 'Sweeping' : snapshot.phase === 'seeking' && snapshot.distanceMeters != null ? `${Math.ceil(snapshot.distanceMeters)} m · ${Math.round(snapshot.bearingDegrees)}°` : snapshot.phase === 'revealed' ? 'Result ready' : 'Observing';
     const detectorControls = {
@@ -798,15 +999,22 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   state.ui?.dispose?.();
   state.presentation?.dispose?.();
   state.companionRuntime?.dispose?.();
+  if (globalThis.__WE3D_COMPANION_SUPPORT__ === state.companionSupportHook) delete globalThis.__WE3D_COMPANION_SUPPORT__;
   state.wildlifeRuntime?.dispose?.();
+  state.unregisterCompanionTrainingInteraction?.();
   state.unregisterWildlifeInteraction?.();
+  state.unsubscribeBackpackToolSync?.();
+  state.unregisterExplorerListeners?.forEach?.((remove) => remove());
   state.audioContext?.close?.().catch?.(() => {});
   appCtx.worldDiscoveryPublicationStore?.clear?.();
   appCtx.worldDiscoveryPublication = null;
   appCtx.worldDiscoveryRuntime = null;
   appCtx.toggleWorldDiscoveryJournal = null;
   appCtx.handleWorldDiscoveryQuickAction = null;
+  appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
+  if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
+  if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
   return true;
 }
 
@@ -885,12 +1093,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
 
   const profileStore = appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
   appCtx.discoveryProfileStore = profileStore;
-  const [existingItems, existingEvents, existingGuide, discoveryProfile] = await Promise.all([
-    profileStore.listItems(10000).catch(() => []),
-    profileStore.listEvents?.(10000).catch(() => []) || [],
-    profileStore.listFieldGuide?.(10000).catch(() => []) || [],
-    profileStore.getProfile().catch(() => ({ tutorials: {} }))
-  ]);
+  const bootstrap = typeof profileStore.loadRuntimeBootstrap === 'function'
+    ? await profileStore.loadRuntimeBootstrap().catch(() => null)
+    : null;
+  const [existingItems, existingEvents, existingGuide, discoveryProfile] = bootstrap
+    ? [bootstrap.items, bootstrap.events, bootstrap.fieldGuide, bootstrap.profile]
+    : await Promise.all([
+        profileStore.listItems(10000).catch(() => []),
+        profileStore.listEvents?.(10000).catch(() => []) || [],
+        profileStore.listFieldGuide?.(10000).catch(() => []) || [],
+        profileStore.getProfile().catch(() => ({ tutorials: {} }))
+      ]);
   const claimedIds = new Set([...existingItems, ...existingEvents].map((entry) => entry.claimId).filter(Boolean));
   const observedCatalogIds = new Set([...existingItems, ...existingGuide].map((entry) => entry.catalogId).filter(Boolean));
   const progress = fieldProgress(discoveryProfile);
@@ -928,25 +1141,191 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   appCtx.playerBackpackStore?.save?.(backpackInventory?.exportState?.());
   const backpackEquipped = backpackInventory?.snapshot?.().equippedCatalogId;
   const initialEquippedToolId = entitlements.canUseTool(backpackEquipped).allowed ? backpackEquipped : legacyEquippedToolId;
+  const capabilityResolver = createCapabilityResolver();
+  const initialEquipmentIds = backpackEquipmentIds(appCtx, entitlements.listAvailableTools().map((tool) => tool.id));
+  const initialDetectorCapability = capabilityResolver.resolve(discoveryProfile.characterState, 'detector', {
+    difficulty: 'basic',
+    equipmentIds: initialEquipmentIds,
+    environment: appCtx.getEnv?.() || 'EARTH'
+  });
   const session = createDetectorSession({
     plan: encounters, claimedIds,
     observedCatalogIds, progress,
-    availableToolIds: entitlements.listAvailableTools().map((tool) => tool.id)
+    availableToolIds: entitlements.listAvailableTools().map((tool) => tool.id),
+    characterCapability: initialDetectorCapability
   });
   const fieldSession = createFieldActivitySession({ plan: fieldActivities, claimedIds, observedCatalogIds, progress });
   const owner = `world-discovery:${snapshot.sequence}`;
   const state = {
     type: 'WorldDiscoveryRuntime', owner, appCtx, publication, environment, profileStore, entitlements, session, fieldSession,
+    capabilityResolver, characterState: discoveryProfile.characterState, activeCharacterCapability: initialDetectorCapability,
     actions: [], currentCellId: null, presentation: null, ui: null,
     disposed: false, reason: null, actionTimer: 0, toneTimer: 0, audioContext: null, fieldFeedbackPhase: 'idle',
     active: true, activeActivityId: 'metal-detect', equippedToolId: initialEquippedToolId,
     toolProgress: initialToolProgress, regionLabel, worldIdentityId: worldIdentity.id,
     locationKey: String(request.selection?.key || (appCtx.selLoc !== 'custom' ? appCtx.selLoc : '') || ''),
-    tutorials: { ...(discoveryProfile.tutorials || {}) }, companionEncounters: new Map(), detectorSnapshot: session.snapshot(playerPosition(appCtx)),
+    tutorials: { ...(discoveryProfile.tutorials || {}) },
+    companionEncounters: new Map((Array.isArray(discoveryProfile.companionEncounters) ? discoveryProfile.companionEncounters : [])
+      .filter((entry) => entry?.encounterId)
+      .map((entry) => [String(entry.encounterId), { ...entry }])),
+    companionExercise: null,
+    detectorSnapshot: session.snapshot(playerPosition(appCtx)),
     lastSnapshot: session.snapshot(playerPosition(appCtx)),
     retentionSnapshot: null,
     creatureQualityAudit: auditRegionalCreatureQuality(resolveRegionalEcologyPack(worldIdentity.location))
   };
+  state.resolveCharacterCapability = (capabilityId, context = {}) => state.capabilityResolver.resolve(
+    state.characterState,
+    capabilityId,
+    {
+      difficulty: 'basic',
+      environment: appCtx.getEnv?.() || 'EARTH',
+      equipmentIds: backpackEquipmentIds(appCtx, state.entitlements.listAvailableTools().map((tool) => tool.id)),
+      ...context
+    }
+  );
+  state.characterCapabilityForActivity = (activityId) => {
+    const capabilityId = CHARACTER_CAPABILITY_BY_ACTIVITY[String(activityId || '')];
+    return capabilityId ? state.resolveCharacterCapability(capabilityId) : null;
+  };
+  state.applyCharacterCapability = (activityId = state.activeActivityId) => {
+    const capability = state.characterCapabilityForActivity(activityId);
+    state.activeCharacterCapability = capability;
+    if (activityId === 'metal-detect') state.session.setCharacterCapability?.(capability);
+    return capability;
+  };
+  state.syncCharacterState = (profile) => {
+    if (!profile?.characterState) return state.characterState;
+    state.characterState = profile.characterState;
+    state.capabilityResolver.clear();
+    state.applyCharacterCapability();
+    return state.characterState;
+  };
+  appCtx.resolveCharacterCapability = state.resolveCharacterCapability;
+  state.recordExplorerEvent = async (record = {}) => {
+    const position = playerPosition(appCtx);
+    const result = await profileStore.recordExplorerEvent?.({
+      regionId: state.worldIdentityId,
+      regionLabel: state.regionLabel,
+      worldIdentity: state.worldIdentityId,
+      locationKey: state.locationKey,
+      locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
+      environment: appCtx.getEnv?.() || 'EARTH',
+      localPosition: position,
+      ...record
+    });
+    if (result?.recorded) {
+      await state.refreshToolProgress?.();
+      await state.ui?.refreshData?.();
+    }
+    return result || { recorded: false, reason: 'event-store-unavailable' };
+  };
+  state.saveCompanionEncounter = async (entry = {}) => {
+    if (!entry.encounterId) return false;
+    const normalized = {
+      encounterId: String(entry.encounterId).slice(0, 180),
+      actorId: String(entry.actorId || '').slice(0, 180),
+      catalogId: String(entry.catalogId || '').slice(0, 80),
+      worldIdentity: String(entry.worldIdentity || state.worldIdentityId).slice(0, 160),
+      trustState: ['Wary', 'Curious', 'Comfortable'].includes(entry.trustState) ? entry.trustState : 'Wary',
+      step: Math.max(0, Math.min(3, Math.floor(Number(entry.step) || 0))),
+      completed: entry.completed === true,
+      companionInstanceId: String(entry.companionInstanceId || '').slice(0, 180),
+      updatedAt: Math.max(0, Number(entry.updatedAt) || Date.now())
+    };
+    state.companionEncounters.set(normalized.encounterId, normalized);
+    const current = await profileStore.getProfile();
+    const companionEncounters = [...state.companionEncounters.values()]
+      .sort((left, right) => Number(left.updatedAt || 0) - Number(right.updatedAt || 0))
+      .slice(-120);
+    await profileStore.saveProfile({ ...current, companionEncounters });
+    return normalized;
+  };
+  appCtx.recordExplorerEvent = state.recordExplorerEvent;
+  state.unregisterExplorerListeners = [];
+  const listenForExplorerEvent = (type, handler) => {
+    globalThis.addEventListener?.(type, handler);
+    state.unregisterExplorerListeners.push(() => globalThis.removeEventListener?.(type, handler));
+  };
+  listenForExplorerEvent('we3d:editable-world-change', (event) => {
+    const detail = event.detail || {};
+    if (!detail.worldId || !detail.action || detail.action === 'reset_world') return;
+    void state.recordExplorerEvent({
+      eventId: `event:creation:${detail.worldId}:${detail.revision || Date.now()}`,
+      eventType: 'world-edited',
+      sourceSystem: 'world-editor',
+      sourceId: `${detail.worldId}:${detail.revision || ''}`,
+      pathId: 'creation',
+      name: 'World edit saved',
+      detail: 'A change to this place was saved in the World Editor.',
+      points: 0,
+      progressReason: 'creative-history'
+    });
+  });
+  listenForExplorerEvent('we3d:block-builder-change', (event) => {
+    const detail = event.detail || {};
+    const count = Math.max(0, Number(detail.count) || 0);
+    const milestone = [1, 10, 25, 50, 100].find((target) => count === target);
+    if (!milestone || detail.action !== 'place') return;
+    void state.recordExplorerEvent({
+      eventId: `event:block-milestone:${detail.worldId}:${milestone}`,
+      eventType: 'building-milestone',
+      sourceSystem: 'blocks',
+      sourceId: `${detail.worldId}:${milestone}`,
+      pathId: 'creation',
+      name: milestone === 1 ? 'Placed the first block here' : `Built with ${milestone} blocks here`,
+      detail: detail.shared ? 'A shared-world building milestone.' : 'A building milestone saved at this place.',
+      firstCompletion: true,
+      points: milestone === 1 ? 2 : milestone >= 25 ? 3 : 2,
+      progressReason: 'building-milestone'
+    });
+  });
+  listenForExplorerEvent('we3d:editor-feature-saved', (event) => {
+    const detail = event.detail || {};
+    if (!detail.featureId) return;
+    const submitted = detail.reviewState === 'submitted';
+    void state.recordExplorerEvent({
+      eventId: `event:editor-feature:${detail.featureId}:${submitted ? 'submitted' : 'saved'}`,
+      eventType: submitted ? 'creation-submitted' : 'creation-saved',
+      sourceSystem: 'world-editor',
+      sourceId: detail.featureId,
+      pathId: 'creation',
+      name: `${detail.label || 'World feature'} ${submitted ? 'submitted' : 'saved'}`,
+      detail: submitted ? 'Submitted for community review.' : detail.storageMode === 'local' ? 'Saved on this device.' : 'Saved to your account.',
+      firstCompletion: true,
+      points: submitted ? 2 : 1,
+      progressReason: submitted ? 'creation-submitted' : 'creation-saved'
+    });
+  });
+  listenForExplorerEvent('we3d-room-changed', (event) => {
+    const room = event.detail?.room;
+    const roomId = String(room?.code || room?.id || '').trim();
+    if (!roomId) return;
+    void state.recordExplorerEvent({
+      eventId: `event:room-joined:${roomId}`,
+      eventType: 'room-joined',
+      sourceSystem: 'multiplayer',
+      sourceId: roomId,
+      pathId: 'community',
+      name: `Joined ${room.name || 'a shared room'}`,
+      detail: 'A shared-world visit was added to your Explorer story.',
+      firstCompletion: true,
+      points: 1,
+      progressReason: 'new-community-experience'
+    });
+  });
+  void state.recordExplorerEvent({
+    eventId: `event:place-visited:${state.worldIdentityId}`,
+    eventType: 'place-visited',
+    sourceSystem: 'world-travel',
+    sourceId: state.worldIdentityId,
+    pathId: 'travel',
+    name: `Explored ${state.regionLabel}`,
+    detail: 'This place is now part of your Explorer story.',
+    firstCompletion: true,
+    points: 1,
+    progressReason: 'new-place-visited'
+  });
   state.evaluateFieldTarget = (target, evidence = null) => {
     const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
     return liveGps.active ? appCtx.getLiveGpsFieldEligibility?.(target, evidence || approachEvidenceAt(target)) || null : null;
@@ -976,10 +1355,15 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.recordFishingExplorerCatch = async (catchRecord = {}) => {
     if (!catchRecord.id || !catchRecord.speciesId) return false;
     const position = playerPosition(appCtx);
+    const regionalPack = resolveRegionalEcologyPack(worldIdentity.location);
+    const regionalTaxon = regionalPack?.taxa?.find((entry) =>
+      entry.group.endsWith('-fish') &&
+      String(entry.localizedNames?.['en-US'] || '').toLowerCase() === String(catchRecord.species || '').toLowerCase()
+    ) || null;
     const result = await profileStore.recordObservation({
       instanceId: `fish-catch:${catchRecord.id}`,
       claimId: `claim:fishing:${catchRecord.id}`,
-      catalogId: catchRecord.speciesId,
+      catalogId: regionalTaxon?.id || catchRecord.speciesId,
       name: catchRecord.species || catchRecord.speciesId,
       description: 'Virtual fishing catch recorded through the shared Explorer Journal.',
       family: 'fish',
@@ -991,6 +1375,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       regionId: worldIdentity.id,
       regionLabel,
       locationKey: state.locationKey,
+      locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
       worldIdentity: worldIdentity.id,
       environment: appCtx.getEnv?.() || 'EARTH',
       localPosition: position,
@@ -1012,14 +1397,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         livePresenceClaim: false,
         locationRewardEligible: catchRecord.locationRewardEligible === true
       },
-      stableTaxonId: `we3d-game-fish:${catchRecord.speciesId}`,
-      taxonGroup: 'fish',
+      regionalPackId: regionalTaxon ? regionalPack.id : null,
+      regionalPackVersion: regionalTaxon ? regionalPack.version : null,
+      stableTaxonId: regionalTaxon?.stableTaxonId || `we3d-game-fish:${catchRecord.speciesId}`,
+      taxonGroup: regionalTaxon?.group || 'fish',
       supportingEvidence: [
         catchRecord.occurrenceTruth || 'simulated-gameplay-event',
         catchRecord.populationEvidence || 'gameplay-model-only',
         catchRecord.accessTruth || 'unknown-access'
       ],
-      sourceRefs: [],
+      sourceRefs: regionalTaxon?.sourceRefs || [],
       collectedAt: Date.now()
     }, { collection: true });
     if (!result.recorded && !result.collected) return false;
@@ -1032,11 +1419,78 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.companionRuntime = await createCompanionRuntime(appCtx, {
     profileStore,
     worldIdentity: worldIdentity.id,
-    onChange: () => state.ui?.refreshData?.()
+    onChange: () => state.ui?.refreshData?.(),
+    onXpAward: (companion, award) => {
+      appCtx.showToast?.(`+${award.points} Companion XP · ${award.label}`);
+      emitDiscoveryTelemetry('companion_xp_awarded', { result: award.companion?.progression?.lastAward?.reasonId || 'shared-activity', contextBands: telemetryContextBands() });
+    },
+    onTrainingComplete: (companion, skill) => {
+      if (skill !== 'recall') return;
+      appCtx.showToast?.(`${companion.name} learned Recall.`);
+      emitDiscoveryTelemetry('companion_training_completed', { result: 'recall', contextBands: telemetryContextBands() });
+      void state.recordExplorerEvent({
+        eventId: `event:companion:training:${companion.instanceId}:recall`,
+        eventType: 'companion-training', sourceSystem: 'companions',
+        sourceId: companion.instanceId, pathId: 'companion',
+        name: `${companion.name} learned Recall`,
+        detail: 'The first recall exercise was completed in the world.',
+        firstCompletion: true, points: 0, progressReason: 'companion-memory'
+      });
+    },
+    onLevelUp: (companion, previousLevel) => {
+      const milestone = [3, 8, 12].includes(companion.progression.level);
+      appCtx.showToast?.(`${companion.name} reached level ${companion.progression.level} · ${companion.progression.trustState}`);
+      emitDiscoveryTelemetry('companion_level_reached', { result: `level-${companion.progression.level}`, contextBands: telemetryContextBands() });
+      if (!milestone) return;
+      void state.recordExplorerEvent({
+        eventId: `event:companion:level:${companion.instanceId}:${companion.progression.level}`,
+        eventType: 'companion-level',
+        sourceSystem: 'companions',
+        sourceId: companion.instanceId,
+        pathId: 'companion',
+        name: `${companion.name} reached level ${companion.progression.level}`,
+        detail: companion.progression.level === 3
+          ? 'Recall training built a trusting partnership.'
+          : companion.progression.level === 8 ? 'Field training built a bonded partnership.' : 'Companion mastery completed.',
+        firstCompletion: true,
+        points: 1,
+        progressReason: 'companion-bond-milestone',
+        metadata: { previousLevel, level: companion.progression.level }
+      });
+    }
   });
+  if (appCtx.developerDiagnosticsEnabled) {
+    state.companionSupportHook = Object.freeze({
+      adopt: (catalogId, options = {}) => state.companionRuntime.adopt(catalogId, options),
+      awardXp: (receiptId, reasonId) => state.companionRuntime.awardXp({ receiptId, reasonId }),
+      encounters: () => Object.freeze([...state.companionEncounters.values()].map((entry) => Object.freeze({ ...entry }))),
+      encounterExercise: () => state.companionExercise ? Object.freeze({
+        type: state.companionExercise.type,
+        actorId: state.companionExercise.actorId,
+        catalogId: state.companionExercise.catalogId,
+        elapsedMs: Math.max(0, performance.now() - state.companionExercise.startedAt),
+        completing: state.companionExercise.completing === true
+      }) : null,
+      worldActors: () => Object.freeze((state.publication.wildlife?.actors || []).map((actor) => Object.freeze({
+        id: actor.id, speciesId: actor.speciesId, companionPolicy: actor.companionPolicy, home: actor.home
+      }))),
+      snapshot: () => state.companionRuntime.snapshot()
+    });
+    globalThis.__WE3D_COMPANION_SUPPORT__ = state.companionSupportHook;
+  }
+  state.awardActiveCompanionForField = async (receiptBase, firstIdentification = false) => {
+    const stable = String(receiptBase || '').trim();
+    if (!stable || !state.companionRuntime.snapshot().activeInstanceId) return false;
+    const fieldAward = await state.companionRuntime.awardXp({ receiptId: `field:${stable}`, reasonId: 'field-activity' });
+    if (firstIdentification) {
+      await state.companionRuntime.awardXp({ receiptId: `species:${stable}`, reasonId: 'new-species' });
+    }
+    return fieldAward;
+  };
   state.wildlifeRuntime = createAmbientWildlifeRuntime(appCtx, wildlife);
   state.refreshToolProgress = async () => {
     const profile = await profileStore.getProfile();
+    state.syncCharacterState(profile);
     const previous = new Set(state.toolProgress?.unlockedToolIds || []);
     state.toolProgress = explorerToolProgress(profile);
     state.entitlements = createExplorationEntitlementService({
@@ -1055,6 +1509,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     appCtx.playerBackpackStore?.save?.(appCtx.playerBackpackInventory?.exportState?.());
     state.session.setAvailableToolIds?.(state.entitlements.listAvailableTools().map((tool) => tool.id));
+    state.applyCharacterCapability();
     const unlocked = state.toolProgress.unlockedToolIds.filter((toolId) => !previous.has(toolId));
     if (unlocked.length) {
       const labels = state.entitlements.listAvailableTools().filter((tool) => unlocked.includes(tool.id)).map((tool) => tool.label);
@@ -1100,10 +1555,20 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (appCtx.playerBackpackInventory?.equip?.(id) !== true) return false;
     appCtx.playerBackpackStore?.save?.(appCtx.playerBackpackInventory.exportState?.());
     state.equippedToolId = id;
+    state.applyCharacterCapability();
     if (!options.silent) appCtx.showToast?.(`${tool.label} equipped`);
     await state.ui?.refreshData?.();
     return true;
   };
+  state.unsubscribeBackpackToolSync = appCtx.playerBackpackInventory?.subscribe?.((change) => {
+    if (change?.reason !== 'equipped-changed') return;
+    const equippedId = appCtx.playerBackpackInventory?.snapshot?.().equippedCatalogId;
+    if (!equippedId || state.entitlements.canUseTool(equippedId).allowed !== true || equippedId === state.equippedToolId) return;
+    state.equippedToolId = equippedId;
+    state.applyCharacterCapability();
+    void profileStore.getProfile().then((profile) => profileStore.saveProfile({ ...profile, equippedToolId: equippedId }));
+    void state.ui?.refreshData?.();
+  });
   state.showToolHelp = async (toolId) => {
     const tool = state.entitlements.listAvailableTools().find((entry) => entry.id === String(toolId));
     if (!tool) return false;
@@ -1124,21 +1589,22 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     const events = await profileStore.listEvents?.(500) || [];
     const event = events.find((entry) => entry.eventId === String(eventId));
     const locationKey = String(event?.locationKey || '');
-    if (!event || !locationKey) return false;
-    if (!appCtx.LOCS?.[locationKey] || typeof appCtx.selectPresetLocation !== 'function') {
-      appCtx.showToast?.('This saved location can be reviewed here, but it is not a reusable preset.');
-      return false;
-    }
+    if (!event) return false;
+    const savedLocation = event.locationSnapshot || {};
+    const isPreset = !!(locationKey && appCtx.LOCS?.[locationKey] && typeof appCtx.selectPresetLocation === 'function');
+    const isCoordinate = Number.isFinite(savedLocation.lat) && Number.isFinite(savedLocation.lon) && typeof appCtx.setCustomLocation === 'function';
+    if (!isPreset && !isCoordinate) return false;
     state.ui?.setOpen(false);
-    if (String(appCtx.selLoc) === locationKey) {
+    if (isPreset && String(appCtx.selLoc) === locationKey) {
       appCtx.showToast?.(`Already exploring ${event.regionLabel || 'this location'}`);
       return true;
     }
-    appCtx.selectPresetLocation(locationKey);
+    if (isPreset) appCtx.selectPresetLocation(locationKey);
+    else appCtx.setCustomLocation({ lat: savedLocation.lat, lon: savedLocation.lon, name: savedLocation.name || event.regionLabel || 'Saved place' }, { transient: false });
     if (appCtx.ENV?.EARTH && appCtx.getEnv?.() !== appCtx.ENV.EARTH) appCtx.switchEnv?.(appCtx.ENV.EARTH);
     await appCtx.loadRoads?.();
     appCtx.spawnOnRoad?.();
-    appCtx.showToast?.(`Returned to ${event.regionLabel || appCtx.LOCS[locationKey].name}`);
+    appCtx.showToast?.(`Returned to ${event.regionLabel || appCtx.LOCS?.[locationKey]?.name || savedLocation.name || 'saved place'}`);
     return true;
   };
   const telemetryContextBands = () => environment.cells.find((cell) => cell.cellId === state.currentCellId)?.contexts || [];
@@ -1146,12 +1612,21 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   state.hasWorldCompanionEncounter = (catalogId) => wildlife.actors.some((actor) =>
     actor.speciesId === String(catalogId) || WILDLIFE_COMPANION_CATALOG[actor.speciesId] === String(catalogId)
   );
-  state.companionEncounterState = (catalogId) => state.companionEncounters.get(String(catalogId)) || { step: 0 };
+  state.companionEncounterState = (catalogId, actorId = '') => {
+    const matches = [...state.companionEncounters.values()].filter((entry) =>
+      entry.catalogId === String(catalogId) &&
+      entry.worldIdentity === state.worldIdentityId &&
+      (!actorId || entry.actorId === String(actorId)) &&
+      entry.completed !== true
+    );
+    return matches.sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0))[0]
+      || { step: 0, trustState: 'Wary', actorId: String(actorId || '') };
+  };
   state.getArChallengeEligibility = () => evaluateArEligibility({ type: 'field-challenge' }, {
     environmentName: appCtx.getEnv?.() || 'EARTH',
     environment,
     position: playerPosition(appCtx),
-    travelMode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car',
+    travelMode: appCtx.Walk?.state?.mode === 'walk' ? appCtx.urbanSandboxRuntime?.parachute?.skydiving ? 'skydive' : 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car',
     liveGpsSnapshot: appCtx.getLiveGpsSnapshot?.() || { active: false }
   });
   state.handleArRecord = async (recordId, source = 'field-guide') => {
@@ -1180,7 +1655,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       companion: activeCompanion?.catalogId === 'trail-hound' ? activeCompanion : null
     });
   };
-  state.handleCompanionAction = async (action, instanceId, catalogId) => {
+  state.handleCompanionAction = async (action, instanceId, catalogId, requestedName = '') => {
     if (action === 'locate') {
       const catalog = COMPANION_CATALOG.find((entry) => entry.id === String(catalogId));
       if (!catalog || !state.isCompanionEligible(catalog)) return false;
@@ -1194,9 +1669,66 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.ui?.setOpen(false);
       return appCtx.openArExperience?.({ type: 'companion', companion });
     }
+    else if (action === 'befriend') {
+      const catalog = COMPANION_CATALOG.find((entry) => entry.id === String(catalogId));
+      const encounter = state.companionEncounterState(catalogId);
+      if (!catalog || encounter.trustState !== 'Comfortable' || !encounter.encounterId) return false;
+      const before = state.companionRuntime.snapshot().companions.length;
+      await state.companionRuntime.adopt(catalog.id, { name: requestedName, discoveryId: encounter.encounterId });
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.active);
+      if (!companion) return false;
+      await state.saveCompanionEncounter({ ...encounter, completed: true, companionInstanceId: companion.instanceId });
+      state.wildlifeRuntime?.interact?.(encounter.actorId, 'adopted');
+      await profileStore.recordObservation({
+        claimId: `companion-species:${catalog.id}`,
+        catalogId: catalog.id,
+        name: catalog.names.common,
+        family: catalog.family,
+        discipline: 'nature',
+        activityId: 'nature-observe',
+        evidenceClass: 'game-companion-encounter',
+        sourceRefs: catalog.sourceRefs,
+        regionId: state.worldIdentityId,
+        regionLabel: state.regionLabel,
+        worldIdentity: state.worldIdentityId,
+        locationKey: state.locationKey,
+        locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
+        environment: appCtx.getEnv?.() || 'EARTH',
+        localPosition: playerPosition(appCtx),
+        collectedAt: Date.now()
+      });
+      void state.recordExplorerEvent({
+        eventId: `event:companion:befriended:${companion.instanceId}`,
+        eventType: 'companion-befriended',
+        sourceSystem: 'companions', sourceId: companion.instanceId, pathId: 'companion',
+        name: `${companion.name} joined the journey`,
+        detail: `${catalog.names.common} became an active companion.`,
+        firstCompletion: true,
+        points: before === 0 ? 1 : 0,
+        progressReason: before === 0 ? 'first-companion' : 'companion-memory'
+      });
+      emitDiscoveryTelemetry('companion_adopted', { result: 'befriended', contextBands: telemetryContextBands() });
+      appCtx.showToast?.(`${companion.name} joined you.`);
+    }
     else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
-    else if (action === 'feed') await state.companionRuntime.feed(instanceId);
-    else if (action === 'train') await state.companionRuntime.train(instanceId, 'find');
+    else if (action === 'care') {
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
+      if (!companion) return false;
+      await state.companionRuntime.care(instanceId, companion.speciesArchetype === 'bird' ? 'groom' : 'pet');
+      const day = new Date().toISOString().slice(0, 10);
+      if (companion.progression?.totalXp > 0) {
+        await state.companionRuntime.awardXp({ receiptId: `care:${companion.instanceId}:${day}`, reasonId: 'care-after-outing' });
+      }
+      appCtx.showToast?.(`${companion.name} enjoyed the attention.`);
+    }
+    else if (action === 'recall-training') {
+      if (!state.companionRuntime.beginRecallExercise(instanceId, playerPosition(appCtx))) return false;
+      state.ui?.setOpen(false);
+      appCtx.showToast?.('Walk at least 6 m away, then call your companion.');
+      emitDiscoveryTelemetry('companion_training_started', { result: 'recall', contextBands: telemetryContextBands() });
+      return true;
+    }
+    const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
     emitDiscoveryTelemetry(
       action === 'activate' ? 'companion_activated' : 'companion_cared_for',
       { result: action, contextBands: telemetryContextBands() }
@@ -1211,20 +1743,45 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     if (!actorId || !speciesId) return false;
     if (companionPolicy === 'trust-sequence-required') {
       const catalog = COMPANION_CATALOG.find((entry) => entry.id === speciesId);
-      if (!catalog) return false;
-      const current = state.companionEncounterState(catalog.id);
-      const nextStep = Math.min(3, Number(current.step || 0) + 1);
-      state.companionEncounters.set(catalog.id, { step: nextStep });
-      const adopted = nextStep >= 3;
-      state.wildlifeRuntime?.interact?.(actorId, adopted ? 'adopted' : 'trust');
-      if (adopted) {
-        await state.companionRuntime.adopt(catalog.id);
-        appCtx.showToast?.(`${catalog.names.common} joined you and is now following.`);
-        emitDiscoveryTelemetry('companion_adopted', { result: 'world-trust-sequence', contextBands: telemetryContextBands() });
+      if (!catalog || !FIRST_RELEASE_COMPANION_IDS.has(catalog.id)) return false;
+      const current = state.companionEncounterState(catalog.id, actorId);
+      const encounterId = current.encounterId || `encounter:${state.worldIdentityId}:${actorId}`;
+      if (current.step === 0) {
+        await state.saveCompanionEncounter({
+          ...current, encounterId, actorId, catalogId: catalog.id,
+          worldIdentity: state.worldIdentityId, step: 1, trustState: 'Curious'
+        });
+        state.wildlifeRuntime?.interact?.(actorId, 'watch');
+        emitDiscoveryTelemetry('companion_trust_advanced', { result: 'curious', contextBands: telemetryContextBands() });
+        appCtx.showToast?.(`${catalog.names.common} is watching you. Stay nearby and let it approach.`);
+      } else if (current.step === 1) {
+        if (state.companionExercise?.type === 'calm-wait') return true;
+        const startPosition = playerPosition(appCtx);
+        state.companionExercise = {
+          type: 'calm-wait', encounterId, actorId, catalogId: catalog.id,
+          startedAt: performance.now(), startPosition: { x: startPosition.x, z: startPosition.z }, completing: false
+        };
+        state.wildlifeRuntime?.interact?.(actorId, 'wait');
+        const handling = companionHandlingTuning(state.resolveCharacterCapability('companion-handling'));
+        appCtx.showToast?.('Stay still and let it choose the distance.');
+        await new Promise((resolve) => setTimeout(resolve, handling.calmWaitMs));
+        state.companionExercise = null;
+        if (state.disposed) return false;
+        await state.saveCompanionEncounter({
+          ...current, encounterId, actorId, catalogId: catalog.id,
+          worldIdentity: state.worldIdentityId, step: 2, trustState: 'Curious'
+        });
+        appCtx.showToast?.('It came closer. You can greet it now.');
+      } else if (current.step === 2) {
+        await state.saveCompanionEncounter({ ...current, step: 3, trustState: 'Comfortable' });
+        state.wildlifeRuntime?.interact?.(actorId, 'greet');
+        emitDiscoveryTelemetry('companion_trust_advanced', { result: 'comfortable', contextBands: telemetryContextBands() });
+        appCtx.showToast?.(`Comfortable · you can greet and name ${catalog.names.common}.`);
+        state.ui?.setOpen(true);
+        state.ui?.setTab('gear');
       } else {
-        appCtx.showToast?.(nextStep === 1
-          ? `${catalog.names.common} noticed you · stay nearby to build trust.`
-          : `${catalog.names.common} trusts you more · one more calm interaction.`);
+        state.ui?.setOpen(true);
+        state.ui?.setTab('gear');
       }
       await state.ui?.refreshData?.();
       return true;
@@ -1253,12 +1810,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       regionLabel: state.regionLabel,
       worldIdentity: state.worldIdentityId,
       locationKey: state.locationKey,
+      locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
       environment: appCtx.getEnv?.() || 'EARTH',
       localPosition: position,
       collectedAt: Date.now()
     });
     if (recorded.recorded) {
       await state.refreshToolProgress();
+      await state.awardActiveCompanionForField?.(
+        recorded.event?.eventId || `wildlife:${state.worldIdentityId}:${actorId}:${catalog.id}`,
+        recorded.event?.firstIdentification === true
+      );
       appCtx.showToast?.(`${catalog.names.common} recorded in your Field Guide.`);
       emitDiscoveryTelemetry('discovery_recorded', { activityId: 'photograph', catalogFamily: catalog.family, discipline: 'nature', contextBands: telemetryContextBands(), result: 'recorded-in-world' });
     } else {
@@ -1267,19 +1829,23 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
 
     const companionCatalogId = WILDLIFE_COMPANION_CATALOG[speciesId];
     if (companionCatalogId) {
-      const encounter = state.companionEncounterState(companionCatalogId);
-      const nextStep = Math.min(3, Number(encounter.step || 0) + 1);
-      state.companionEncounters.set(companionCatalogId, { step: nextStep });
-      if (nextStep >= 3) {
-        await state.companionRuntime.adopt(companionCatalogId);
-        appCtx.showToast?.(`${COMPANION_CATALOG.find((entry) => entry.id === companionCatalogId)?.names?.common || 'Virtual bird companion'} unlocked and following.`);
-        emitDiscoveryTelemetry('companion_adopted', { result: 'world-observation-sequence', contextBands: telemetryContextBands() });
+      const encounter = state.companionEncounterState(companionCatalogId, actorId);
+      if (encounter.step === 0) {
+        await state.saveCompanionEncounter({
+          ...encounter,
+          encounterId: `encounter:${state.worldIdentityId}:${actorId}`,
+          actorId,
+          catalogId: companionCatalogId,
+          worldIdentity: state.worldIdentityId,
+          step: 1,
+          trustState: 'Curious'
+        });
       }
     }
     await state.ui?.refreshData?.();
     return true;
   };
-  state.selectActivity = async (activityId) => {
+  state.selectActivity = async (activityId, options = {}) => {
     const id = String(activityId || 'inspect');
     const selectedAction = state.actions.find((action) => action.id === id);
     const activityToolId = ACTIVITY_TOOL[id];
@@ -1297,8 +1863,19 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       await appCtx.openFishingGame?.();
       return true;
     }
-    if (activityToolId) await state.equipTool(activityToolId, { silent: true });
+    // Commit the visible selection before any IndexedDB/profile refresh. The
+    // previous ordering left the old activity highlighted during the await,
+    // so a single click could visibly bounce old → new several times.
+    const previousActivityId = state.activeActivityId;
     state.activeActivityId = id;
+    state.applyCharacterCapability(id);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    if (activityToolId && await state.equipTool(activityToolId, { silent: true }) !== true) {
+      state.activeActivityId = previousActivityId;
+      state.applyCharacterCapability(previousActivityId);
+      state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+      return false;
+    }
     if (id === 'metal-detect') {
       state.fieldSession.reset();
       state.lastSnapshot = state.detectorSnapshot;
@@ -1311,11 +1888,20 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.presentation.setRevealed(null, false);
     state.presentation.setExcavation(null, 'idle');
     state.ui.showResult(null);
-    state.ui.setOpen(true);
-    state.ui.setTab('today');
+    state.ui.setOpen(options.openPanel === false ? false : true);
+    if (options.openPanel !== false) state.ui.setTab('today');
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-    void state.showActivityTutorial(false);
+    if (options.tutorial !== false) void state.showActivityTutorial(false);
     return true;
+  };
+  state.useEquippedFieldTool = async (toolId) => {
+    const id = String(toolId || '');
+    state.presentation.previewUse?.(id);
+    const action = state.actions.find((entry) => ACTIVITY_TOOL[entry.id] === id);
+    if (!action) return false;
+    const selected = await state.selectActivity(action.id, { openPanel: false, tutorial: false });
+    if (!selected) return false;
+    return state.handlePrimary();
   };
   state.startFieldObjective = async (slotId) => {
     const objective = state.fieldExpedition.snapshot(playerPosition(appCtx), state.evaluateFieldTarget)
@@ -1329,10 +1915,14 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     }
     if (toolId) await state.equipTool(toolId, { silent: true });
     state.activeActivityId = activityId;
+    const characterCapability = state.applyCharacterCapability(activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(playerPosition(appCtx));
     state.fieldSession.reset();
-    const began = state.fieldSession.beginSlot(slotId, playerPosition(appCtx), { evaluateFieldTarget: state.evaluateFieldTarget });
+    const began = state.fieldSession.beginSlot(slotId, playerPosition(appCtx), {
+      evaluateFieldTarget: state.evaluateFieldTarget,
+      characterCapability
+    });
     state.lastSnapshot = state.fieldSession.snapshot(playerPosition(appCtx));
     state.ui.showResult(null);
     state.ui.setTab('today');
@@ -1353,10 +1943,14 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     }
     if (toolId) await state.equipTool(toolId, { silent: true });
     state.activeActivityId = lead.activityId;
+    const characterCapability = state.applyCharacterCapability(lead.activityId);
     state.session.reset();
     state.detectorSnapshot = state.session.snapshot(position);
     state.fieldSession.reset();
-    const began = state.fieldSession.beginSlot(lead.slotId, position, { evaluateFieldTarget: state.evaluateFieldTarget });
+    const began = state.fieldSession.beginSlot(lead.slotId, position, {
+      evaluateFieldTarget: state.evaluateFieldTarget,
+      characterCapability
+    });
     if (!began) {
       state.encounterDirector.reject(lead.slotId);
       state.encounterLead = state.encounterDirector.snapshot(position, liveGps.active === true);
@@ -1392,7 +1986,8 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         state.fieldSession.reset();
         const began = state.fieldSession.begin(state.activeActivityId, environment, position, {
           evaluateFieldTarget: state.evaluateFieldTarget,
-          preferNearby: (appCtx.getLiveGpsSnapshot?.() || {}).active === true
+          preferNearby: (appCtx.getLiveGpsSnapshot?.() || {}).active === true,
+          characterCapability: state.applyCharacterCapability(state.activeActivityId)
         });
         if (began) state.ui.setOpen(false);
       } else if (fieldPhase === 'revealed') {
@@ -1401,6 +1996,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           toolId: ACTIVITY_TOOL[state.activeActivityId] || '',
           regionLabel,
           locationKey: state.locationKey,
+          locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
           environment: appCtx.getEnv?.() || 'EARTH',
           localPosition: position,
           evaluateFieldTarget: state.evaluateFieldTarget
@@ -1422,6 +2018,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           result: outcome?.collected ? 'collected' : 'recorded'
         });
         if (recorded) {
+          await state.awardActiveCompanionForField?.(
+            resultRecord?.eventId || resultRecord?.claimId || resultRecord?.instanceId || completedSlot?.claimId,
+            resultRecord?.firstIdentification === true || outcome?.event?.firstIdentification === true
+          );
           discoveryHaptic([18, 36, 28]);
           state.ui.showResult(outcome);
         }
@@ -1446,6 +2046,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         toolId: 'metal-detector',
         regionLabel,
         locationKey: state.locationKey,
+        locationSnapshot: { ...worldIdentity.location, name: state.regionLabel },
         environment: appCtx.getEnv?.() || 'EARTH',
         localPosition: position
       });
@@ -1462,6 +2063,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         result: 'collected'
       });
       if (recorded) {
+        await state.awardActiveCompanionForField?.(item?.eventId || item?.claimId || item?.instanceId, item?.firstIdentification === true);
         discoveryHaptic([20, 35, 40]);
         state.ui.showResult(state.session.snapshot(position).collectionResult);
       }
@@ -1503,27 +2105,58 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
     return true;
   };
+  appCtx.handleWorldDiscoveryToolUse = (toolId) => state.useEquippedFieldTool(toolId);
+  state.unregisterCompanionTrainingInteraction = appCtx.registerContextInteraction?.({
+    id: 'world_discovery_companion_training',
+    priority: 96,
+    evaluate: () => {
+      if (state.disposed || state.ui?.open || appCtx.Walk?.state?.mode !== 'walk' || appCtx.getEnv?.() !== 'EARTH') return null;
+      const exercise = state.companionRuntime?.exerciseSnapshot?.(playerPosition(appCtx));
+      if (!exercise?.active || !exercise.readyToCall) return null;
+      return {
+        available: true,
+        action: 'call_companion',
+        label: 'Call',
+        detail: `${state.companionRuntime.snapshot().activeName} · Recall practice`,
+        distance: 0,
+        data: { exercise: 'recall' }
+      };
+    },
+    perform: () => {
+      const called = state.companionRuntime?.callRecall?.(playerPosition(appCtx)) === true;
+      if (called) appCtx.showToast?.('Good call. Wait for your companion to return.');
+      return called;
+    }
+  });
   state.unregisterWildlifeInteraction = appCtx.registerContextInteraction?.({
     id: 'world_discovery_wildlife',
     priority: 81,
     evaluate: () => {
       if (state.disposed || state.ui?.open || appCtx.Walk?.state?.mode !== 'walk' || appCtx.getEnv?.() !== 'EARTH') return null;
-      const nearby = state.wildlifeRuntime?.nearest?.(playerPosition(appCtx), 12);
+      const observation = wildlifeObservationTuning(state.resolveCharacterCapability('wildlife-observation'));
+      const handling = companionHandlingTuning(state.resolveCharacterCapability('companion-handling'));
+      const nearby = state.wildlifeRuntime?.nearest?.(playerPosition(appCtx), observation.observationRadiusMeters);
       if (!nearby) return null;
       const actor = nearby.actor;
-      if (actor.companionPolicy === 'trust-sequence-required' && nearby.distance > 5.2) return null;
+      if (actor.companionPolicy === 'trust-sequence-required' && nearby.distance > handling.trustRadiusMeters) return null;
       const companionCatalogId = actor.companionPolicy === 'trust-sequence-required'
         ? actor.speciesId
         : WILDLIFE_COMPANION_CATALOG[actor.speciesId];
-      const progress = companionCatalogId ? Number(state.companionEncounterState(companionCatalogId).step || 0) : 0;
+      const encounter = companionCatalogId ? state.companionEncounterState(companionCatalogId, actor.id) : { step: 0, trustState: 'Wary' };
+      const progress = Number(encounter.step || 0);
+      const isCat = ['harbor-cat', 'meadow-tabby', 'midnight-cat'].includes(actor.speciesId);
       const label = actor.companionPolicy === 'trust-sequence-required'
-        ? ['Meet', 'Offer care', 'Adopt'][Math.min(2, progress)]
+        ? (state.companionExercise?.actorId === actor.id
+          ? 'Stay still'
+          : (isCat ? ['Watch', 'Sit quietly', 'Play', 'Name'][Math.min(3, progress)] : ['Watch', 'Wait', 'Greet', 'Name'][Math.min(3, progress)]))
         : 'Observe';
       return {
         available: true,
         action: actor.companionPolicy === 'trust-sequence-required' ? 'build_animal_trust' : 'observe_wildlife',
         label,
-        detail: `${actor.label}${companionCatalogId ? ` · progress ${Math.min(3, progress)}/3` : ''}`,
+        detail: actor.companionPolicy === 'trust-sequence-required'
+          ? `${actor.label} · ${encounter.trustState || 'Wary'} · ${handling.cueLabel}`
+          : `${actor.label} · ${observation.cueLabel}`,
         distance: nearby.distance,
         data: {
           actorId: actor.id,
@@ -1545,13 +2178,18 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.actionTimer -= frame.dt;
       if (state.actionTimer <= 0) {
         state.actionTimer = 0.2;
-        state.actions = resolveContextActions({ environment, interaction, position, limit: 25 })
-          .filter((action) => RELEASED_EXPLORER_ACTIVITIES.has(action.id))
-          .filter((action) => {
-            const toolId = ACTIVITY_TOOL[action.id];
-            return !toolId || state.entitlements.canUseTool(toolId).allowed;
-          })
-          .slice(0, 3);
+        // Choices describe the place where the panel was opened. Hold them
+        // steady while the player is reading or selecting; refresh again once
+        // the panel is closed and movement resumes.
+        if (!state.ui?.open || !state.actions.length) {
+          state.actions = resolveContextActions({ environment, interaction, position, limit: 25 })
+            .filter((action) => RELEASED_EXPLORER_ACTIVITIES.has(action.id))
+            .filter((action) => {
+              const toolId = ACTIVITY_TOOL[action.id];
+              return !toolId || state.entitlements.canUseTool(toolId).allowed;
+            })
+            .slice(0, 3);
+        }
         state.currentCellId = state.actions[0]?.cellId || null;
       }
       state.detectorSnapshot = state.session.update(position, frame.dt);
@@ -1576,7 +2214,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       state.presentation.setExcavation(targetSlot, state.activeActivityId === 'metal-detect' ? state.detectorSnapshot.phase : 'idle');
       state.presentation.setFieldRevealed(fieldTargetSlot, state.activeActivityId !== 'metal-detect' && ['revealed', 'recorded'].includes(state.lastSnapshot.phase));
       state.presentation.update(position, state.lastSnapshot, frame.dt, state.activeActivityId);
-      const travelMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car';
+      const travelMode = appCtx.Walk?.state?.mode === 'walk' ? appCtx.urbanSandboxRuntime?.parachute?.skydiving ? 'skydive' : 'walk' : appCtx.boatMode?.active ? 'boat' : appCtx.droneMode ? 'drone' : appCtx.planeMode?.active ? 'plane' : 'car';
       state.companionRuntime?.update?.(position, frame.dt, travelMode, appCtx.getEnv?.() || 'EARTH');
       state.wildlifeRuntime?.update?.(position, frame.dt, appCtx.getEnv?.() || 'EARTH');
       const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
@@ -1653,4 +2291,4 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
   });
 }
 
-export { disposeWorldDiscoveryRuntime, startWorldDiscoveryRuntime, worldDiscoveryRuntimeSnapshot };
+export { RELEASED_EXPLORER_ACTIVITIES, disposeWorldDiscoveryRuntime, startWorldDiscoveryRuntime, worldDiscoveryRuntimeSnapshot };

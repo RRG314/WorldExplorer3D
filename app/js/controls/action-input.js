@@ -3,7 +3,7 @@ import {
   loadMobileTouchSettings,
   resolveMobileSemanticActions,
   saveMobileTouchSettings
-} from './mobile-touch-authority.js?v=4';
+} from './mobile-touch-authority.js?v=5';
 
 const DEAD_ZONE = 0.16;
 const inputState = {
@@ -25,7 +25,7 @@ const PLANE_DOUBLE_TAP_WINDOW_MS = 340;
 const HELD_CONTROL_CODES = Object.freeze([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyX', 'KeyZ'
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyH', 'KeyR', 'KeyX', 'KeyZ'
 ]);
 
 function clamp(value, min = -1, max = 1) {

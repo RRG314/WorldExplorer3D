@@ -91,6 +91,44 @@
   font-size: 11px;
 }
 
+.universe-course-readout {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 10px 11px;
+  background: rgba(19, 31, 52, 0.8);
+  border: 1px solid rgba(91, 123, 166, 0.58);
+  border-left: 3px solid #5b7ba6;
+  border-radius: 5px;
+}
+
+.universe-course-readout.has-course {
+  background: rgba(15, 58, 73, 0.82);
+  border-color: rgba(93, 225, 240, 0.7);
+  border-left-color: #6fe8ff;
+  box-shadow: inset 0 0 20px rgba(48, 188, 219, 0.08);
+}
+
+.universe-course-status {
+  color: #8ba5c8;
+  font: 700 9px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.universe-course-readout.has-course .universe-course-status {
+  color: #75ecff;
+}
+
+.universe-course-readout strong {
+  color: #f4f8ff;
+  font: 700 14px Inter, sans-serif;
+}
+
+.universe-course-readout small {
+  color: #aebfd5;
+  font: 500 10px/1.4 Inter, sans-serif;
+}
+
 .universe-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -155,6 +193,74 @@
   cursor: pointer;
 }
 
+#universeToggle.has-course {
+  max-width: min(280px, 56vw);
+  overflow: hidden;
+  color: #8df2ff;
+  border-color: #6fe8ff !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universe-course-cue {
+  position: fixed;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(230px, calc(100vw - 36px));
+  padding: 7px 10px;
+  transform: translate(-50%, -50%);
+  color: #eafcff;
+  background: rgba(4, 16, 30, 0.88);
+  border: 1px solid rgba(111, 232, 255, 0.78);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 18px rgba(73, 213, 240, 0.12);
+  font-family: Inter, sans-serif;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+}
+
+.universe-course-cue[hidden] {
+  display: none;
+}
+
+.universe-course-cue-arrow {
+  color: #6fe8ff;
+  font-size: 16px;
+  line-height: 1;
+  transform: rotate(var(--course-cue-angle, 0deg));
+}
+
+.universe-course-cue-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.universe-course-cue-copy strong {
+  color: #76efff;
+  font: 700 8px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.universe-course-cue-copy small {
+  overflow: hidden;
+  color: #fff;
+  font: 700 11px Inter, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universe-course-cue.is-assisted {
+  border-color: rgba(104, 216, 192, 0.88);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 20px rgba(104, 216, 192, 0.18);
+}
+
+.universe-course-cue.is-assisted .universe-course-cue-arrow,
+.universe-course-cue.is-assisted .universe-course-cue-copy strong {
+  color: #7af0c9;
+}
+
 .solar-system-scale {
   display: none;
   position: fixed;
@@ -178,15 +284,7 @@
 
 @media (max-width: 720px) {
   .solar-system-scale {
-    right: 10px;
-    bottom: 10px;
-    width: 176px;
-    height: 104px;
-  }
-
-  .solar-system-scale canvas {
-    width: 176px;
-    height: 104px;
+    display: none !important;
   }
 
   .universe-navigator {
@@ -202,6 +300,11 @@
 
   .universe-return-actions {
     grid-template-columns: 1fr;
+  }
+
+  .universe-course-cue {
+    max-width: min(180px, calc(100vw - 28px));
+    padding: 6px 8px;
   }
 }
 }

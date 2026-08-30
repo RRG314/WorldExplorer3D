@@ -136,7 +136,15 @@ try {
   await page.waitForSelector('#urbanEquipment.show', { timeout: 5000 });
   const opened = await snapshot();
 
-  await page.locator('#urbanBackpackContents [data-equipment-id]').filter({ hasText: 'Laser gun' }).click();
+  const laserItem = page.locator('#urbanBackpackContents [data-equipment-id]').filter({ hasText: 'Laser gun' });
+  await laserItem.click();
+  await page.waitForFunction(() => {
+    const detail = document.querySelector('#urbanBackpackDetail');
+    const selected = document.querySelector('#urbanBackpackContents [data-equipment-id][aria-current="true"]');
+    return detail?.querySelector('strong')?.textContent?.trim() === 'Laser gun' &&
+      selected?.textContent?.includes('Laser gun') === true;
+  }, null, { timeout: 5000 });
+  await page.locator('#urbanBackpackDetail').getByRole('button', { name: 'Equip', exact: true }).click();
   await page.waitForFunction(() => {
     const equipment = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment;
     return equipment?.equippedId === 'laser-gun';
@@ -194,7 +202,7 @@ try {
     keyboardOpensAccessibleBackpack:
       opened.ui.open && opened.ui.ariaHidden === 'false' &&
       opened.ui.itemButtonCount === readyItems.length && opened.ui.equippedButtonCount === 1,
-    pointerEquipsExistingLooseItem:
+    pointerInspectsThenExplicitlyEquipsExistingLooseItem:
       laserEquipped.equipment?.equippedId === 'laser-gun' &&
       item(laserEquipped, 'laser-gun')?.equipped === true &&
       laserEquipped.equipment?.items?.length === readyItems.length,

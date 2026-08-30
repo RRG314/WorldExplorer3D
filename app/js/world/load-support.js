@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
-import { generateStreetFurniture } from "./furniture.js?v=17";
+import { generateStreetFurniture } from "./furniture.js?v=18";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
@@ -60,9 +60,17 @@ export async function finalizeLoadedWorld(options = {}) {
     runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
     await yieldToMainThread();
   }
-  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.applyWaterTerrainMask === 'function') {
-    runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
+  const transportWillRebuildTerrain = appCtx.terrainEnabled && !appCtx.onMoon &&
+    Array.isArray(appCtx.roads) && appCtx.roads.length > 0 &&
+    typeof appCtx.publishCompiledTransportMeshes === 'function';
+  if (appCtx.terrainEnabled && !appCtx.onMoon && !transportWillRebuildTerrain && typeof appCtx.applyWaterTerrainMask === 'function') {
+    runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask({
+      // The final refresh below owns terrain presentation for this load.
+      deferVisualProfile: true
+    }));
     await yieldToMainThread();
+  } else if (transportWillRebuildTerrain) {
+    loadMetrics.waterTerrainMaskDeferredToTransport = true;
   }
   let transportPublication = null;
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
@@ -84,7 +92,18 @@ export async function finalizeLoadedWorld(options = {}) {
     await yieldToMainThread();
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
-    runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
+    startLoadPhase('refreshTerrainSurfaceProfiles');
+    try {
+      if (typeof appCtx.refreshTerrainSurfaceProfilesCooperatively === 'function') {
+        await appCtx.refreshTerrainSurfaceProfilesCooperatively();
+      } else {
+        appCtx.refreshTerrainSurfaceProfiles();
+      }
+    } catch (error) {
+      recordWorldLoadWarning(loadMetrics, 'refreshTerrainSurfaceProfiles', error);
+    } finally {
+      endLoadPhase('refreshTerrainSurfaceProfiles');
+    }
   }
   if (
     transportPublication?.authority === 'compiled_transport_surface' &&

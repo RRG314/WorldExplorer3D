@@ -89,8 +89,14 @@ function drawGameModeMarkers(ctx, w, h, isLarge, worldToScreen, mx, my) {
     ctx.fill();
   }
 
-  if (appCtx.mapLayers.police && appCtx.policeOn) {
-    appCtx.police.forEach((cop) => {
+  if (appCtx.mapLayers.police) {
+    const response = appCtx.urbanSandboxRuntimeSnapshot?.()?.responders;
+    const authoritativeResponders = Array.isArray(response?.responders) ? response.responders : [];
+    const legacyPoliceMode = appCtx.gameMode === 'police' && appCtx.policeOn && Array.isArray(appCtx.police);
+    const markers = authoritativeResponders.length
+      ? authoritativeResponders.map((responder) => ({ ...responder, chasing: ['pursuit', 'contact'].includes(response.phase) }))
+      : legacyPoliceMode ? appCtx.police : [];
+    markers.forEach((cop) => {
       const pos = worldToScreen(cop.x, cop.z);
       if (Math.abs(pos.x - mx) < w / 2 && Math.abs(pos.y - my) < h / 2) {
         ctx.fillStyle = cop.chasing ? "#f00" : "#06f";

@@ -302,7 +302,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     await yieldToMainThread();
   }
   if (typeof applyTransportTerrainCorridors === 'function') {
-    measure('applyTransportTerrainCorridors', () => applyTransportTerrainCorridors());
+    measure('applyTransportTerrainCorridors', () => applyTransportTerrainCorridors({
+      // finalizeLoadedWorld owns the one semantic terrain-material
+      // publication after the complete transport height rebuild.
+      deferVisualProfile: true
+    }));
     if (typeof repositionBuildingsWithTerrain === 'function') {
       measure('reprojectGroundAttachedWorld', () => repositionBuildingsWithTerrain());
     }

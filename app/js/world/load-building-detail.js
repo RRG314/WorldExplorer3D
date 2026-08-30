@@ -5,6 +5,7 @@ import {
   mappedWaterStructurePriority,
   mergeMappedWaterStructures
 } from './water-structure-source.js?v=3';
+import { reviewedMappedVesselDataNear } from './reviewed-mapped-vessels.js?v=1';
 
 const COMPLETE_BUILDING_TILE_CAP = 1200;
 const BUILDING_COVERAGE_TARGET = 0.85;
@@ -65,6 +66,7 @@ export function constrainBuildingWaysToPublicationDomain(ways, nodes, options = 
 
 export function shouldFetchSupplementalWaterStructures(options = {}) {
   return options.authoritativeMassing === true &&
+    options.providerAvailable !== false &&
     options.waterStructureQueryAvailable === true &&
     options.primaryCoverageComplete !== true &&
     Number(options.semanticVessels || 0) === 0;
@@ -213,9 +215,19 @@ export async function loadBuildingDetailForPublication(options = {}) {
           options.mappedWaterStructureData,
           { lat: options.location?.lat, lon: options.location?.lon }
         );
+        if (Number(waterStructureSummary.semanticVessels || 0) === 0) {
+          const reviewedVessels = reviewedMappedVesselDataNear(options.location);
+          if (reviewedVessels) {
+            waterStructureSummary = mergeMappedWaterStructures(data, reviewedVessels, {
+              lat: options.location?.lat,
+              lon: options.location?.lon
+            });
+          }
+        }
         try {
           if (shouldFetchSupplementalWaterStructures({
             authoritativeMassing,
+            providerAvailable: options.overpassProviderAvailable,
             waterStructureQueryAvailable: true,
             primaryCoverageComplete: options.mappedWaterStructureCoverageComplete,
             semanticVessels: waterStructureSummary.semanticVessels

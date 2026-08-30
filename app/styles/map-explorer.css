@@ -19,6 +19,25 @@
 #mapLegend{left:var(--map-edge)!important;bottom:max(14px,env(safe-area-inset-bottom))!important;padding:0 13px!important}
 #largeMap.browsing #mapExplorerStatus{color:#f2c56e}
 #largeMap.browsing #mapRecenter{border-color:#f2c56e!important;color:#f8d998!important}
-body:has(#largeMap.show) #mainMenuBtn,body:has(#largeMap.show) #hud,body:has(#largeMap.show) #minimap,body:has(#largeMap.show) #minimapZoomControls,body:has(#largeMap.show) #coords,body:has(#largeMap.show) #floatMenuContainer,body:has(#largeMap.show) #controlsTab,body:has(#largeMap.show) #urbanEquipmentToggle,body:has(#largeMap.show) #urbanVehiclePrompt,body:has(#largeMap.show) #mobileTouchControls,body:has(#largeMap.show) #liveGpsHud,body:has(#largeMap.show) .tutorial-card{display:none!important}
+body:has(#largeMap.show) #mainMenuBtn,body:has(#largeMap.show) #hud,body:has(#largeMap.show) #minimap,body:has(#largeMap.show) #minimapZoomControls,body:has(#largeMap.show) #coords,body:has(#largeMap.show) #floatMenuContainer,body:has(#largeMap.show) #controlsTab,body:has(#largeMap.show) #urbanEquipmentToggle,body:has(#largeMap.show) #urbanVehiclePrompt,body:has(#largeMap.show) #urbanWeaponReticle,body:has(#largeMap.show) #mobileTouchControls,body:has(#largeMap.show) #liveGpsHud,body:has(#largeMap.show) .tutorial-card{display:none!important}
 @media(max-width:760px),(pointer:coarse){#largeMap{padding:max(64px,calc(env(safe-area-inset-top) + 58px)) 8px max(112px,calc(env(safe-area-inset-bottom) + 104px))}#largeMapCanvas{width:min(calc(100vw - 16px),calc(100dvh - max(176px,calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 162px))));height:auto;max-width:none;max-height:none;border-radius:8px}#mapExplorerHeader{right:8px;left:8px;padding-right:63px}#mapExplorerHeader>div{padding:7px 9px}#mapExplorerHeader button{padding:0 9px;font-size:8px!important}#mapClose{right:8px;padding:0 12px}#mapExplorerHint{left:8px;right:8px;bottom:max(66px,calc(env(safe-area-inset-bottom) + 58px));max-width:none;text-align:center;transform:none}#mapControlDock{right:8px;bottom:max(8px,env(safe-area-inset-bottom));display:flex}#mapControlDock>span{display:none}#mapControlDock #zoomLevel{display:grid;min-width:40px;place-items:center}#mapLegend{left:8px!important;bottom:max(8px,env(safe-area-inset-bottom))!important}#legendPanel{inset:62px 8px 64px!important;max-width:none!important;max-height:none!important;box-sizing:border-box}#mapInfoPanel{inset:62px 8px 64px!important;width:auto!important;max-height:none!important;box-sizing:border-box}}
+}
+
+@layer interface{
+@media(min-width:761px) and (pointer:fine){
+  #largeMap{padding:48px 24px 24px}
+  #largeMapCanvas{width:min(calc(100vw - 48px),calc(100dvh - 48px),1040px);max-width:1040px;max-height:1040px}
+  #legendPanel{top:70px!important;left:14px!important;width:min(390px,calc(100vw - 28px));max-width:390px!important;max-height:calc(100% - 140px)!important;box-sizing:border-box;padding:12px!important}
+}
+#legendPanel{border:1px solid rgba(112,196,222,.55)!important;background:rgba(3,14,22,.96)!important;color:#d9edf4!important}
+#legendPanel>div{margin-bottom:8px!important}
+#legendPanel label{color:#d9edf4;text-transform:none}
+#legendPanel input[type="checkbox"]{accent-color:#55c9e9}
+.mapLegendGroup{margin:7px 0;border:1px solid rgba(112,196,222,.22);border-radius:7px;background:rgba(7,29,41,.54)}
+.mapLegendSummary{display:flex!important;align-items:center;gap:6px;min-height:40px;box-sizing:border-box;margin:0!important;padding:9px 10px;cursor:pointer;list-style:none;color:#aee7f5!important}
+.mapLegendSummary::-webkit-details-marker{display:none}
+.mapLegendSummary::after{content:'+';margin-left:auto;color:#71d7ef;font-size:14px}
+.mapLegendGroup[open]>.mapLegendSummary::after{content:'−'}
+.mapLegendSummary small{margin-left:auto;color:#789aa8;font:600 8px Inter,sans-serif}
+.mapLegendGroup>div{padding:2px 10px 10px!important}
 }

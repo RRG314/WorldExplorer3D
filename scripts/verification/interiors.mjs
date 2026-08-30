@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -28,12 +28,14 @@ function bindPageEvidence(targetPage) {
 bindPageEvidence(page);
 
 const params = new URLSearchParams({
-  loc: 'custom', lat: '39.28305', lon: '-76.61270', lname: 'Baltimore Inner Harbor',
+  loc: 'custom', lat: '39.28378', lon: '-76.61244', lname: 'Baltimore Visitor Center',
   launch: 'earth', gm: 'free', mode: 'walk'
 });
 
 async function waitForWorld() {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  const consentButton = page.locator('#analyticsConsentDenyBtn');
+  if (await consentButton.isVisible()) await consentButton.click();
   if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) {
     await page.locator('#globeSelectorStartBtn').click();
   }
@@ -43,6 +45,20 @@ async function waitForWorld() {
       Number(diagnostics.worldCounts?.buildings || 0) > 0;
   }, null, { timeout: 300_000 });
   await page.waitForTimeout(2_500);
+}
+
+async function openNearbyInteriorDirectory() {
+  await page.locator('#minimap').click();
+  await page.locator('#largeMap.show').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('#mapLegend').click();
+  await page.locator('#legendPanel').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.waitForFunction(() =>
+    (globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.candidates || []).length > 0,
+    null,
+    { timeout: 30_000 }
+  );
+  await page.locator('#mapClose').click();
+  await page.locator('#largeMap').waitFor({ state: 'hidden', timeout: 10_000 });
 }
 
 async function chooseTarget() {
@@ -127,6 +143,37 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
   const path = [];
   let stagnant = 0;
   let previousDistance = Infinity;
+  let detourCount = 0;
+
+  const turnTowardYaw = async (targetYaw) => {
+    for (let turn = 0; turn < 56; turn += 1) {
+      const yaw = await page.evaluate(() =>
+        Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.orientation?.yaw)
+      );
+      const delta = wrapYaw(targetYaw - yaw);
+      if (Math.abs(delta) <= 0.11) return true;
+      await page.keyboard.down(delta > 0 ? 'ArrowLeft' : 'ArrowRight');
+      await page.evaluate(() => globalThis.advanceTime?.(70));
+      await page.keyboard.up(delta > 0 ? 'ArrowLeft' : 'ArrowRight');
+    }
+    return false;
+  };
+
+  const walkTangentDetour = async (desiredYaw, remainingDistance) => {
+    const side = detourCount % 2 === 0 ? 1 : -1;
+    detourCount += 1;
+    const tangentYaw = wrapYaw(desiredYaw + side * Math.PI / 2);
+    const turned = await turnTowardYaw(tangentYaw);
+    if (!turned) return false;
+    const detourDurationMs = Math.max(900, Math.min(5_200, Number(remainingDistance || 0) * 125));
+    await page.keyboard.down('ShiftLeft');
+    await page.keyboard.down('ArrowUp');
+    await page.evaluate((durationMs) => globalThis.advanceTime?.(durationMs), detourDurationMs);
+    await page.keyboard.up('ArrowUp');
+    await page.keyboard.up('ShiftLeft');
+    return true;
+  };
+
   for (let step = 0; step < maxSteps; step += 1) {
     const state = await page.evaluate(({ x, z }) => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -168,7 +215,12 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
     if (state.distance >= previousDistance - 0.015) stagnant += 1;
     else stagnant = 0;
     previousDistance = state.distance;
-    if (stagnant > 90) break;
+    if (stagnant > 20) {
+      if (detourCount >= 10 || !(await walkTangentDetour(desiredYaw, state.distance))) break;
+      path.push({ ...state, detour: detourCount });
+      stagnant = 0;
+      previousDistance = Infinity;
+    }
   }
   const final = await page.evaluate(() => {
     const prompt = document.querySelector('#interiorPrompt');
@@ -181,10 +233,12 @@ async function walkToPoint(target, options = {}) {
   const stopDistance = Number.isFinite(options.stopDistance) ? options.stopDistance : 0.55;
   const maxSteps = Number.isFinite(options.maxSteps) ? options.maxSteps : 900;
   const allowBlocked = options.allowBlocked === true;
+  const allowDetour = options.detour === true;
   const path = [];
   let stagnant = 0;
   let previousDistance = Infinity;
   let start = null;
+  let detourCount = 0;
   for (let step = 0; step < maxSteps; step += 1) {
     const state = await page.evaluate(({ x, z }) => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -219,6 +273,30 @@ async function walkToPoint(target, options = {}) {
     if (state.distance >= previousDistance - 0.008) stagnant += 1;
     else stagnant = 0;
     previousDistance = state.distance;
+    if (allowDetour && stagnant > 20 && detourCount < 8) {
+      const side = detourCount % 2 === 0 ? 1 : -1;
+      detourCount += 1;
+      const tangentYaw = wrapYaw(desiredYaw + side * Math.PI / 2);
+      for (let turn = 0; turn < 56; turn += 1) {
+        const yaw = await page.evaluate(() =>
+          Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.orientation?.yaw)
+        );
+        const delta = wrapYaw(tangentYaw - yaw);
+        if (Math.abs(delta) <= 0.11) break;
+        const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
+        await page.keyboard.down(turnKey);
+        await page.evaluate(() => globalThis.advanceTime?.(65));
+        await page.keyboard.up(turnKey);
+      }
+      const detourDurationMs = Math.max(700, Math.min(2_500, state.distance * 160));
+      await page.keyboard.down('ArrowUp');
+      await page.evaluate((durationMs) => globalThis.advanceTime?.(durationMs), detourDurationMs);
+      await page.keyboard.up('ArrowUp');
+      path.push({ ...state, detour: detourCount });
+      stagnant = 0;
+      previousDistance = Infinity;
+      continue;
+    }
     if (stagnant > 70) {
       if (allowBlocked) return { reached: false, blocked: true, steps: step, start, final: state, path };
       break;
@@ -303,15 +381,33 @@ async function climbPublishedStairs() {
     x: Number(prepared.start.x) - dx / length * 1.65,
     z: Number(prepared.start.z) - dz / length * 1.65
   };
-  const staging = await walkToPoint(stagingPoint, { stopDistance: 0.5, maxSteps: 900 });
-  const approach = await walkToPoint(prepared.start, { stopDistance: 0.42, maxSteps: 320 });
+  // The connector core deliberately blocks a straight line from the lobby to
+  // the lower landing. Follow collision-aware detours to the published stair
+  // entrance; approaching the upper endpoint from the side is not a climb.
+  const staging = await walkToPoint(stagingPoint, {
+    stopDistance: 0.5,
+    maxSteps: 900,
+    detour: true
+  });
+  const approach = await walkToPoint(prepared.start, {
+    stopDistance: 0.42,
+    maxSteps: 420,
+    detour: true
+  });
   const traversal = await walkToPoint(prepared.end, { stopDistance: 0.42, maxSteps: 520 });
+  const landingTarget = {
+    x: Number(prepared.end.x) + dx / length * 1.4,
+    z: Number(prepared.end.z) + dz / length * 1.4
+  };
+  const landing = await walkToPoint(landingTarget, { stopDistance: 0.5, maxSteps: 240 });
   return {
     ...prepared,
     stagingPoint,
+    landingTarget,
     staging,
     approach,
     traversal,
+    landing,
     ...(await page.evaluate(() => {
       const interior = globalThis.getWorldExplorerRuntimeDiagnostics?.().interior || {};
       return { activeLevel: interior.activeLevel, floorId: interior.floorId, loadedLevels: interior.loadedLevels };
@@ -340,7 +436,8 @@ async function prepareInteriorInteraction(kind) {
   if (!interaction) return null;
   const approach = await walkToPoint(interaction, {
     stopDistance: Math.max(0.5, Math.min(1.15, Number(interaction.radius || 1) * 0.45)),
-    maxSteps: 900
+    maxSteps: 900,
+    detour: true
   });
   return page.evaluate(({ interactionKind, approachEvidence }) => {
     const active = globalThis.getWorldExplorerRuntimeDiagnostics?.().interior || {};
@@ -366,14 +463,33 @@ async function tapVisibleInteriorPrompt() {
   return bounds;
 }
 
+async function chooseElevatorFloor(level) {
+  await page.waitForSelector('#interiorElevatorFloorPicker', { timeout: 10_000 });
+  const choices = await page.locator('#interiorElevatorFloorPicker [data-elevator-level]').evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      level: Number(button.dataset.elevatorLevel),
+      disabled: button.disabled,
+      current: button.getAttribute('aria-current') === 'true',
+      label: String(button.textContent || '').trim()
+    }))
+  );
+  const destination = page.locator(`#interiorElevatorFloorPicker [data-elevator-level="${Number(level)}"]`);
+  assert.equal(await destination.count(), 1, `Elevator chooser did not offer floor ${level}: ${JSON.stringify(choices)}`);
+  assert.equal(await destination.isEnabled(), true, `Elevator floor ${level} was not selectable: ${JSON.stringify(choices)}`);
+  await destination.click();
+  await page.waitForFunction((expectedLevel) =>
+    Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.activeLevel) === Number(expectedLevel),
+    Number(level),
+    { timeout: 10_000 }
+  );
+  await page.waitForSelector('#interiorElevatorFloorPicker', { state: 'detached', timeout: 10_000 });
+  return choices;
+}
+
 try {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
-  await page.waitForFunction(() =>
-    (globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.candidates || []).length > 0,
-    null,
-    { timeout: 30_000 }
-  );
+  await openNearbyInteriorDirectory();
   const target = await chooseTarget();
   assert.ok(target, 'No published enterable building support was available within 650 meters.');
 
@@ -412,7 +528,9 @@ try {
 
   const stairTraversal = await climbPublishedStairs();
   assert.equal(
-    stairTraversal.staging.reached && stairTraversal.approach.reached && stairTraversal.traversal.reached &&
+    stairTraversal.staging.reached === true &&
+      stairTraversal.approach.reached === true &&
+      Number(stairTraversal.landing?.final?.distance) <= 0.75 &&
       stairTraversal.activeLevel === stairTraversal.targetLevel,
     true,
     `Published stairs were not traversable through normal walking input: ${JSON.stringify(stairTraversal)}`
@@ -420,31 +538,27 @@ try {
   await page.screenshot({ path: 'output/release-evidence/current/interior-stairs-desktop.png', fullPage: true });
 
   const elevatorPrepared = await prepareInteriorInteraction('elevator');
-  assert.equal(elevatorPrepared?.promptVisible, true, 'Elevator did not publish a contextual interaction prompt.');
+  assert.equal(
+    elevatorPrepared?.promptVisible,
+    true,
+    `Elevator did not publish a contextual interaction prompt: ${JSON.stringify(elevatorPrepared)}`
+  );
   assert.match(elevatorPrepared.promptText, /elevator/i);
   await page.keyboard.press('KeyE');
-  await page.waitForFunction((level) =>
-    Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.activeLevel) === Number(level),
-    elevatorPrepared.targetLevel,
-    { timeout: 10_000 }
-  );
+  const elevatorPickerDown = await chooseElevatorFloor(0);
   const elevatorArrival = await interiorOwnershipSnapshot(target.sourceBuildingId);
   await page.screenshot({ path: 'output/release-evidence/current/interior-elevator-desktop.png', fullPage: true });
 
-  for (let guard = 0; guard < 10; guard += 1) {
-    const activeLevel = await page.evaluate(() =>
-      Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.activeLevel || 0)
-    );
-    if (activeLevel === 0) break;
-    const elevator = await prepareInteriorInteraction('elevator');
-    assert.ok(elevator, 'Upper floor did not retain its elevator interaction.');
-    await page.keyboard.press('KeyE');
-    await page.waitForFunction((previousLevel) =>
-      Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.activeLevel) !== Number(previousLevel),
-      activeLevel,
-      { timeout: 10_000 }
-    );
-  }
+  const elevatorUpPrepared = await prepareInteriorInteraction('elevator');
+  assert.equal(elevatorUpPrepared?.promptVisible, true, 'Lobby did not retain its elevator interaction.');
+  await page.keyboard.press('KeyE');
+  const elevatorPickerUp = await chooseElevatorFloor(stairTraversal.targetLevel);
+  const elevatorUpperArrival = await interiorOwnershipSnapshot(target.sourceBuildingId);
+
+  const elevatorReturnPrepared = await prepareInteriorInteraction('elevator');
+  assert.equal(elevatorReturnPrepared?.promptVisible, true, 'Upper floor did not retain its elevator interaction.');
+  await page.keyboard.press('KeyE');
+  await chooseElevatorFloor(0);
 
   const wallContact = await pushAgainstInteriorWall();
   const wallRecovery = await backAwayFromWall();
@@ -463,7 +577,7 @@ try {
   mobileParams.set('rz', String(afterExit.walker.z));
   mobileParams.set('yaw', '0');
   await context.close();
-  context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
   page = await context.newPage();
   bindPageEvidence(page);
   await page.goto(`${baseUrl}/app/?${mobileParams}`, { waitUntil: 'load', timeout: 120_000 });
@@ -520,9 +634,15 @@ try {
       ) > 0.15 && Number(wallContact.final?.distance) > 0.08 && wallRecovery.distance > 0.5,
     realStairInputChangesFloor: stairTraversal.activeLevel === stairTraversal.targetLevel &&
       stairTraversal.startLevel !== stairTraversal.activeLevel && stairTraversal.loadedLevels.includes(stairTraversal.activeLevel) &&
-      stairTraversal.staging.reached === true && stairTraversal.approach.reached === true && stairTraversal.traversal.reached === true,
-    contextualElevatorChangesFloor: elevatorArrival.activeLevel === elevatorPrepared.targetLevel &&
-      elevatorArrival.floorId !== stairTraversal.floorId,
+      stairTraversal.staging.reached === true && stairTraversal.approach.reached === true &&
+      Number(stairTraversal.landing?.final?.distance) <= 0.75,
+    contextualElevatorChangesFloor: elevatorArrival.activeLevel === 0 &&
+      elevatorArrival.floorId !== stairTraversal.floorId &&
+      elevatorUpperArrival.activeLevel === stairTraversal.targetLevel &&
+      elevatorPickerDown.some((choice) => choice.current && choice.level === stairTraversal.targetLevel && /Here/.test(choice.label)) &&
+      elevatorPickerDown.some((choice) => choice.level === 0 && /↓/.test(choice.label)) &&
+      elevatorPickerUp.some((choice) => choice.current && choice.level === 0 && /Here/.test(choice.label)) &&
+      elevatorPickerUp.some((choice) => choice.level === stairTraversal.targetLevel && /↑/.test(choice.label)),
     contextualKeyboardExit: afterExit.active === false && distanceRestored < 0.6,
     exteriorOwnershipRestored: afterExit.colliderCount === 0 && afterExit.buildingCollisionDisabled === false,
     mobilePromptFitsViewport: mobileEnterBounds.left >= 0 && mobileEnterBounds.right <= 390 &&
@@ -544,7 +664,11 @@ try {
     wallContact,
     stairTraversal,
     elevatorPrepared,
+    elevatorPickerDown,
     elevatorArrival,
+    elevatorUpPrepared,
+    elevatorPickerUp,
+    elevatorUpperArrival,
     wallRecovery,
     afterExit,
     mobileEnterBounds,
@@ -561,6 +685,21 @@ try {
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Interior entry/exit/reload journey failed.');
+} catch (error) {
+  const failure = {
+    ok: false,
+    contract: 'published-multifloor-building-keyboard-touch-lifecycle-v2',
+    failedAt: new Date().toISOString(),
+    error: String(error?.stack || error),
+    diagnostics: await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null),
+    browserErrors,
+    browserConsole,
+    localFailures
+  };
+  await mkdir(path.dirname(reportPath), { recursive: true });
+  await writeFile(reportPath, `${JSON.stringify(failure, null, 2)}\n`, 'utf8');
+  console.error(JSON.stringify(failure, null, 2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();

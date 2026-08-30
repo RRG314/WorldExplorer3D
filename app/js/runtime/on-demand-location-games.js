@@ -10,7 +10,7 @@ let liveGpsGeneration = 0;
 function ensureDeFlockModule() {
   if (deFlockModule) return Promise.resolve(deFlockModule);
   if (!deFlockModulePromise) {
-    deFlockModulePromise = import('../deflock/runtime.js?v=6').then((module) => {
+    deFlockModulePromise = import('../deflock/runtime.js?v=7').then((module) => {
       deFlockModule = module;
       return module;
     }).catch((error) => {
@@ -24,7 +24,7 @@ function ensureDeFlockModule() {
 function ensureLiveGpsModule() {
   if (liveGpsModule) return Promise.resolve(liveGpsModule);
   if (!liveGpsModulePromise) {
-    liveGpsModulePromise = import('../live-gps/runtime.js?v=3').then((module) => {
+    liveGpsModulePromise = import('../live-gps/runtime.js?v=4').then((module) => {
       liveGpsModule = module;
       return module;
     }).catch((error) => {

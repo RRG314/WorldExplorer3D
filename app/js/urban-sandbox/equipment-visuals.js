@@ -1,5 +1,6 @@
 function createEquipmentVisuals(THREE, characterMesh) {
   const hand = characterMesh?.userData?.limbs?.arm2;
+  const offHand = characterMesh?.userData?.limbs?.arm1;
   if (!hand) return null;
   const root = new THREE.Group();
   root.name = 'Urban equipped item';
@@ -17,6 +18,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
   const materials = [dark, metal, accent, safety, canopyMaterial, canopyAccent, lineMaterial];
   const geometries = new Set();
   const items = new Map();
+  let useAction = null;
   const makeItem = (id) => {
     const group = new THREE.Group();
     group.name = `${id} equipped visual`;
@@ -113,10 +115,18 @@ function createEquipmentVisuals(THREE, characterMesh) {
   suspensionLines.name = 'Parachute suspension lines';
   parachuteCanopy.add(suspensionLines);
 
+  const visualIdFor = (id) => ['compact-sidearm', 'responder-sidearm'].includes(String(id || '')) ? 'pulse-sidearm' : String(id || 'hands');
+  const resetRootPose = () => {
+    root.position.set(0, -.52, .08);
+    root.rotation.set(-Math.PI * .48, 0, 0);
+    root.scale.setScalar(1);
+  };
   const setEquipped = (id) => {
-    items.forEach((group, itemId) => { group.visible = itemId === id; });
+    const visualId = visualIdFor(id);
+    items.forEach((group, itemId) => { group.visible = itemId === visualId; });
     parachutePack.visible = id === 'parachute' || parachuteCanopy.visible;
     root.userData.equippedId = String(id || 'hands');
+    resetRootPose();
   };
   setEquipped('hands');
   return Object.freeze({
@@ -126,9 +136,58 @@ function createEquipmentVisuals(THREE, characterMesh) {
       parachuteCanopy.visible = deployed === true;
       parachutePack.visible = deployed === true || root.userData.equippedId === 'parachute';
     },
-    pulse() {
-      root.scale.setScalar(.9);
-      globalThis.requestAnimationFrame?.(() => root.scale.setScalar(1));
+    playUse(definition = {}) {
+      const category = String(definition.category || 'utility');
+      useAction = {
+        id: String(definition.id || root.userData.equippedId || 'hands'),
+        category,
+        elapsed: 0,
+        duration: category === 'melee' || category === 'unarmed' ? .42 : category === 'explosive' ? .58 : .3
+      };
+      return true;
+    },
+    update(dt = 0) {
+      if (!useAction) return;
+      useAction.elapsed += Math.max(0, Number(dt) || 0);
+      const progress = Math.min(1, useAction.elapsed / useAction.duration);
+      const motion = Math.sin(progress * Math.PI);
+      resetRootPose();
+      if (useAction.category === 'unarmed') {
+        hand.rotation.x = -1.35 * motion;
+        hand.rotation.z = -.12 * motion;
+        if (offHand) {
+          offHand.rotation.x = -1.12 * motion;
+          offHand.rotation.z = .12 * motion;
+        }
+      } else if (useAction.category === 'melee') {
+        hand.rotation.x = -.55 - motion * 1.15;
+        hand.rotation.z = -.18 - motion * .46;
+        root.rotation.z = -motion * 1.15;
+        root.rotation.y = motion * .28;
+      } else if (useAction.category === 'sidearm') {
+        hand.rotation.x = -1.12;
+        hand.rotation.z = -.12;
+        root.position.z -= motion * .11;
+        root.position.y += motion * .035;
+        root.rotation.x += motion * .28;
+      } else if (useAction.category === 'explosive') {
+        hand.rotation.x = -motion * 2.05;
+        hand.rotation.z = -motion * .32;
+        root.rotation.x += motion * .65;
+        root.rotation.z -= motion * .3;
+      } else {
+        hand.rotation.x = -motion * 1.05;
+        hand.rotation.z = -motion * .14;
+        root.position.y += motion * .06;
+      }
+      root.scale.setScalar(1 + motion * .06);
+      if (progress >= 1) {
+        useAction = null;
+        resetRootPose();
+      }
+    },
+    actionSnapshot() {
+      return useAction ? Object.freeze({ id: useAction.id, category: useAction.category, progress: Math.min(1, useAction.elapsed / useAction.duration) }) : null;
     },
     dispose() {
       root.removeFromParent?.();

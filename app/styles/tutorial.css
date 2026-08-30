@@ -1,7 +1,37 @@
 #tutorialHintCard[hidden]{display:none!important}
-.tutorial-card{position:fixed;right:16px;bottom:18px;z-index:250;width:min(360px,calc(100vw - 30px));padding:14px;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:2px;background:rgba(5,12,18,.97);color:var(--wx-text);box-shadow:0 22px 54px rgba(0,0,0,.5);font:500 12px/1.45 Inter,sans-serif;backdrop-filter:blur(12px);pointer-events:auto}
-.tutorial-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.tutorial-eyebrow,.tutorial-settings-eyebrow{display:block;color:var(--wx-blue);font:600 8px/1.2 Orbitron,sans-serif;letter-spacing:.13em;text-transform:uppercase}.tutorial-title{display:block;margin-top:6px;color:var(--wx-text);font:700 14px/1.25 Orbitron,sans-serif;text-transform:uppercase}.tutorial-icon-btn{width:28px;height:28px;border:1px solid var(--wx-line-soft);border-radius:2px;background:#101921;color:var(--wx-muted);font:500 17px/1 Inter,sans-serif;cursor:pointer}.tutorial-body{margin:12px 0;color:var(--wx-muted);white-space:pre-line}.tutorial-progress-track{height:2px;background:#1b2730;overflow:hidden}.tutorial-progress-track span{display:block;width:10%;height:100%;background:var(--wx-blue);transition:width .25s ease}.tutorial-actions{display:flex;align-items:center;gap:7px;margin-top:12px}.tutorial-actions button{min-height:32px;border-radius:2px;padding:7px 10px;font:600 10px/1 Inter,sans-serif;cursor:pointer}.tutorial-primary{border:1px solid var(--wx-blue);background:var(--wx-blue);color:#fff}.tutorial-secondary{border:1px solid var(--wx-line-soft);background:#101921;color:var(--wx-text)}.tutorial-text-btn{margin-left:auto;border:0;background:transparent;color:var(--wx-muted)}
-.tutorial-settings-card{margin-top:18px;padding:14px;border:1px solid rgba(157,174,186,.28);border-radius:2px;background:#071018;color:#f4f7f9;font:500 12px/1.45 Inter,sans-serif}.tutorial-settings-card h3{margin:6px 0 8px;font:700 14px/1.2 Orbitron,sans-serif;text-transform:uppercase}.tutorial-settings-card p{margin:0 0 12px;color:#9aa8b2}.tutorial-settings-card label{display:flex;align-items:center;gap:8px;color:#f4f7f9}.tutorial-settings-card input{accent-color:#2d7dff}.tutorial-settings-actions{margin-top:12px}.tutorial-settings-actions button{border:1px solid rgba(157,174,186,.28);border-radius:2px;padding:8px 11px;background:#101921;color:#f4f7f9;font:600 10px Inter,sans-serif;cursor:pointer}#tutorialSettingsStatus{min-height:16px;margin-top:9px;color:#9aa8b2;font-size:10px}
-@media(min-width:701px){body:has(#floatMenuContainer.show) #tutorialHintCard{bottom:96px}}
-@media(max-width:700px){.tutorial-card{top:max(276px,calc(env(safe-area-inset-top) + 268px));right:max(8px,env(safe-area-inset-right));bottom:auto;width:calc(100vw - 16px);padding:11px}.tutorial-body{margin:8px 0}.tutorial-actions{margin-top:9px;flex-wrap:wrap}body:has(.floatMenu.open) .tutorial-card{display:none!important}.tutorial-text-btn{margin-left:auto}}
-@media(max-width:700px) and (pointer:coarse){#tutorialHintCard{top:max(276px,calc(env(safe-area-inset-top) + 268px))!important;bottom:auto!important;max-height:calc(100dvh - max(276px,calc(env(safe-area-inset-top) + 268px)) - 78px);overflow:auto}}
+.tutorial-card{position:fixed;top:86px;right:16px;z-index:250;width:min(344px,calc(100vw - 30px));padding:13px;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:3px;background:rgba(5,12,18,.96);color:var(--wx-text);box-shadow:0 18px 44px rgba(0,0,0,.46);font:500 12px/1.45 Inter,sans-serif;backdrop-filter:blur(12px);pointer-events:none;transition:width .16s ease,padding .16s ease}
+.tutorial-card button{pointer-events:auto}
+.tutorial-card.compact{width:min(292px,calc(100vw - 24px));padding:10px 11px}
+.tutorial-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tutorial-card-head>div:first-child{min-width:0}
+.tutorial-eyebrow,.tutorial-settings-eyebrow{display:block;color:var(--wx-blue);font:600 8px/1.2 Orbitron,sans-serif;letter-spacing:.13em;text-transform:uppercase}
+.tutorial-title{display:block;margin-top:5px;overflow:hidden;color:var(--wx-text);font:700 13px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}
+.tutorial-head-actions{display:flex;flex:0 0 auto;gap:5px}
+.tutorial-details-btn,.tutorial-icon-btn{height:27px;border:1px solid var(--wx-line-soft);border-radius:2px;background:#101921;color:var(--wx-muted);font:600 9px/1 Inter,sans-serif;cursor:pointer}
+.tutorial-details-btn{padding:0 8px}
+.tutorial-icon-btn{width:27px;font-size:16px}
+.tutorial-body{margin:11px 0;color:var(--wx-muted);white-space:pre-line}
+.tutorial-progress-track{height:2px;background:#1b2730;overflow:hidden}
+.tutorial-progress-track span{display:block;width:10%;height:100%;background:var(--wx-blue);transition:width .25s ease}
+.tutorial-actions{display:flex;align-items:center;gap:7px;margin-top:11px}
+.tutorial-actions button{min-height:31px;border-radius:2px;padding:7px 10px;font:600 10px/1 Inter,sans-serif;cursor:pointer}
+.tutorial-primary{border:1px solid var(--wx-blue);background:var(--wx-blue);color:#fff}
+.tutorial-secondary{border:1px solid var(--wx-line-soft);background:#101921;color:var(--wx-text)}
+.tutorial-text-btn{margin-left:auto;border:0;background:transparent;color:var(--wx-muted)}
+.tutorial-card.compact .tutorial-body,.tutorial-card.compact .tutorial-progress-track,.tutorial-card.compact .tutorial-actions{display:none}
+.tutorial-settings-card{margin-top:18px;padding:14px;border:1px solid rgba(157,174,186,.28);border-radius:2px;background:#071018;color:#f4f7f9;font:500 12px/1.45 Inter,sans-serif}
+.tutorial-settings-card h3{margin:6px 0 8px;font:700 14px/1.2 Orbitron,sans-serif;text-transform:uppercase}
+.tutorial-settings-card p{margin:0 0 12px;color:#9aa8b2}
+.tutorial-settings-card label{display:flex;align-items:center;gap:8px;color:#f4f7f9}
+.tutorial-settings-card input{accent-color:#2d7dff}
+.tutorial-settings-actions{margin-top:12px}
+.tutorial-settings-actions button{border:1px solid rgba(157,174,186,.28);border-radius:2px;padding:8px 11px;background:#101921;color:#f4f7f9;font:600 10px Inter,sans-serif;cursor:pointer}
+#tutorialSettingsStatus{min-height:16px;margin-top:9px;color:#9aa8b2;font-size:10px}
+body:has(.floatMenu.open) #tutorialHintCard,
+body:has(#discoveryPanel.show) #tutorialHintCard,
+body:has(#urbanEquipment[aria-hidden="false"]) #tutorialHintCard{display:none!important}
+@media(max-width:700px){
+  .tutorial-card{top:max(164px,calc(env(safe-area-inset-top) + 154px));right:max(9px,env(safe-area-inset-right));bottom:auto;width:min(330px,calc(100vw - 18px));max-height:calc(100dvh - 250px);overflow:auto;padding:11px}
+  .tutorial-card.compact{width:min(286px,calc(100vw - 18px));padding:9px 10px}
+  .tutorial-body{margin:8px 0}.tutorial-actions{margin-top:9px;flex-wrap:wrap}.tutorial-text-btn{margin-left:auto}
+}

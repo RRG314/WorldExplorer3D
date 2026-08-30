@@ -1,12 +1,15 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=2';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=8';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=4';
-import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=2';
-import { vehicleDoorPosition } from './vehicle-model.js?v=6';
+import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
+import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=3';
+import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';
+import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import { dampCrashMotion } from './crash-physics.js?v=1';
+import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
@@ -157,8 +160,13 @@ function createUrbanResponderRuntime(options = {}) {
       navigationElapsed: 1,
       surfaceElapsed: 1,
       returnElapsed: 0,
+      avoidanceSide: 0,
+      avoidanceRemaining: 0,
       condition: 1,
-      resistance: 190,
+      durabilityPolicy: variant.durabilityPolicy,
+      resistance: variant.resistance,
+      playable: true,
+      enterable: true,
       officer: null
     };
     visual.root.position.set(responder.x, responder.y, responder.z);
@@ -210,6 +218,24 @@ function createUrbanResponderRuntime(options = {}) {
     if (!officer) return;
     if (Number(officer.condition ?? 1) <= .05) {
       officer.visual.setReaction('downed');
+      return;
+    }
+    const current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (officer.crashMotion) {
+      const motion = dampCrashMotion(officer.crashMotion, dt, { kind: 'npc' });
+      const units = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+      officer.crashMotion = { ...officer.crashMotion, ...motion };
+      officer.x += motion.velocityX / units * dt;
+      officer.z += motion.velocityZ / units * dt;
+      officer.yaw += motion.angularVelocity * dt;
+      officer.y = surfaceY(officer.x, officer.z, officer.y);
+      officer.visual.root.position.set(officer.x, officer.y, officer.z);
+      officer.visual.root.rotation.y = officer.yaw;
+      officer.visual.setReaction('knocked-down');
+      if (Math.hypot(motion.velocityX, motion.velocityZ) < .1 && Math.abs(motion.angularVelocity) < .04) officer.crashMotion = null;
+    }
+    if (Number(officer.knockdownUntil || 0) > current) {
+      officer.visual.setReaction('knocked-down');
       return;
     }
     officer.activeElapsed += dt;
@@ -264,6 +290,26 @@ function createUrbanResponderRuntime(options = {}) {
   }
 
   function updateMotion(responder, dt, civic, actor, returning, actorWithinSearch) {
+    if (responder.crashMotion) {
+      const motion = dampCrashMotion(responder.crashMotion, dt, { kind: 'vehicle' });
+      const units = Math.max(.001, Number(appCtx.METERS_PER_WORLD_UNIT || 1.11));
+      responder.crashMotion = { ...responder.crashMotion, ...motion };
+      responder.x += motion.velocityX / units * dt;
+      responder.z += motion.velocityZ / units * dt;
+      responder.yaw += motion.angularVelocity * dt;
+      responder.y = surfaceY(responder.x, responder.z, responder.y - RESPONDER_BASE_Y) + RESPONDER_BASE_Y;
+      responder.speed = Math.hypot(motion.velocityX, motion.velocityZ) / units;
+      responder.visual.root.position.set(responder.x, responder.y, responder.z);
+      responder.visual.root.rotation.y = responder.yaw;
+      responder.visual.wheels.forEach((wheel) => { wheel.rotation.x += responder.speed * dt / .38; });
+      responder.visual.setServiceLights(elapsed, true);
+      if (responder.speed < .12 && Math.abs(motion.angularVelocity) < .04) {
+        responder.crashMotion = null;
+        responder.speed = 0;
+        responder.navigationTarget = null;
+      }
+      return;
+    }
     responder.navigationElapsed += dt;
     responder.surfaceElapsed += dt;
     if (!responder.navigationTarget || responder.navigationElapsed >= .28) {
@@ -275,25 +321,58 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = target.z - responder.z;
     const distance = Math.hypot(dx, dz);
     const targetYaw = Math.atan2(dx, dz);
-    responder.yaw += angleDelta(targetYaw, responder.yaw) * Math.min(1, dt * 2.8);
+    responder.avoidanceRemaining = Math.max(0, finite(responder.avoidanceRemaining) - dt);
+    const steeringTargetYaw = targetYaw + (responder.avoidanceRemaining > 0 ? responder.avoidanceSide * .68 : 0);
+    responder.yaw += angleDelta(steeringTargetYaw, responder.yaw) * Math.min(1, dt * 2.8);
     const civicLevel = Math.max(1, Number(civic.level) || 1);
     const stopDistance = returning ? 4 : actorWithinSearch ? 9 : 15;
     const targetSpeed = distance <= stopDistance ? 0 : Math.min(22 + civicLevel * 2, 7 + distance * .24);
     const acceleration = targetSpeed > responder.speed ? 7.5 : 11;
     responder.speed += Math.sign(targetSpeed - responder.speed) * Math.min(Math.abs(targetSpeed - responder.speed), acceleration * dt);
-    let nextX = responder.x + Math.sin(responder.yaw) * responder.speed * dt;
-    let nextZ = responder.z + Math.cos(responder.yaw) * responder.speed * dt;
     const vehicleBlockers = [
       ...responders.filter((entry) => entry !== responder),
       ...(options.getVehicles?.() || []).filter((entry) => !entry.attachedToPlayer)
     ];
-    const blockedByVehicle = vehicleBlockers.some((entry) =>
-      Math.hypot(finite(entry.x) - nextX, finite(entry.z) - nextZ) < Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9)
-    );
+    const travelSpeed = responder.avoidanceRemaining > 0 ? Math.min(responder.speed, 5.5) : responder.speed;
+    let nextX = responder.x + Math.sin(responder.yaw) * travelSpeed * dt;
+    let nextZ = responder.z + Math.cos(responder.yaw) * travelSpeed * dt;
+    const nearestBlocker = vehicleBlockers.map((entry) => ({
+      entry,
+      currentDistance: Math.hypot(finite(entry.x) - responder.x, finite(entry.z) - responder.z),
+      nextDistance: Math.hypot(finite(entry.x) - nextX, finite(entry.z) - nextZ),
+      clearance: Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9)
+    })).filter((candidate) => candidate.nextDistance < candidate.clearance)
+      .sort((left, right) => left.nextDistance - right.nextDistance)[0] || null;
+    const blockedByVehicle = !!nearestBlocker && nearestBlocker.nextDistance < nearestBlocker.currentDistance - .015;
     if (blockedByVehicle) {
-      responder.speed = 0;
-      nextX = responder.x;
-      nextZ = responder.z;
+      const blockerYaw = Math.atan2(
+        finite(nearestBlocker.entry.x) - responder.x,
+        finite(nearestBlocker.entry.z) - responder.z
+      );
+      if (responder.avoidanceRemaining <= 0) {
+        responder.avoidanceSide = angleDelta(blockerYaw, responder.yaw) >= 0 ? -1 : 1;
+      }
+      responder.avoidanceRemaining = 1.25;
+      const bypassTargetYaw = targetYaw + responder.avoidanceSide * .82;
+      responder.yaw += angleDelta(bypassTargetYaw, responder.yaw) * Math.min(1, dt * 5.5);
+      const bypassSpeed = Math.min(Math.max(responder.speed, 2.2), 4.8);
+      const bypassX = responder.x + Math.sin(responder.yaw) * bypassSpeed * dt;
+      const bypassZ = responder.z + Math.cos(responder.yaw) * bypassSpeed * dt;
+      const bypassClears = vehicleBlockers.every((entry) => {
+        const currentDistance = Math.hypot(finite(entry.x) - responder.x, finite(entry.z) - responder.z);
+        const bypassDistance = Math.hypot(finite(entry.x) - bypassX, finite(entry.z) - bypassZ);
+        const clearance = Math.max(3.7, finite(entry.variant?.width, 1.8) + 1.9);
+        return bypassDistance >= clearance || bypassDistance >= currentDistance - .015;
+      });
+      if (bypassClears) {
+        nextX = bypassX;
+        nextZ = bypassZ;
+        responder.speed = bypassSpeed;
+      } else {
+        responder.speed = 0;
+        nextX = responder.x;
+        nextZ = responder.z;
+      }
     }
     const road = roadAnchorNear(nextX, nextZ, responder.y - RESPONDER_BASE_Y, responder.road);
     if (road && road.distance <= 14) {
@@ -417,6 +496,21 @@ function createUrbanResponderRuntime(options = {}) {
     responders.slice().forEach((responder) => {
       updateMotion(responder, step, civic || {}, actor, returning, actorWithinSearch);
       updateOfficer(responder, step, civic || {}, actor, returning);
+      const current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (Number(responder.condition ?? 1) <= .05) {
+        const disabledAt = markLifecycleStart(responder, 'disabledAt', current);
+        if (lifecycleExpired(disabledAt, ENTITY_LIFECYCLE_MS.disabledResponder, current)) {
+          removeResponder(responder);
+          return;
+        }
+      } else responder.disabledAt = 0;
+      if (responder.officer && Number(responder.officer.condition ?? 1) <= .05) {
+        const downedAt = markLifecycleStart(responder.officer, 'downedAt', current);
+        if (lifecycleExpired(downedAt, ENTITY_LIFECYCLE_MS.downedActor, current)) {
+          responder.officer.visual?.dispose?.();
+          responder.officer = null;
+        }
+      }
       if (!returning) return;
       const originDistance = Math.hypot(responder.x - responder.origin.x, responder.z - responder.origin.z);
       const actorDistance = actor ? Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)) : Infinity;
@@ -473,7 +567,7 @@ function createUrbanResponderRuntime(options = {}) {
   function applyImpact(targetId, force) {
     for (const responder of responders) {
       if (responder.id === targetId) {
-        const result = applyConditionImpact(responder, force);
+        const result = applyTransportDamage(responder, force);
         responder.condition = result.after;
         responder.visual.setCondition(result.after);
         return { kind: 'responder_vehicle', id: responder.id, ...result };
@@ -482,6 +576,17 @@ function createUrbanResponderRuntime(options = {}) {
         const result = applyConditionImpact(responder.officer, force);
         responder.officer.condition = result.after;
         responder.officer.visual.setReaction(result.destroyed ? 'downed' : 'hit');
+        if (result.destroyed && !responder.officer.lootClaimed) {
+          responder.officer.lootClaimed = true;
+          if (responder.officer.visual?.heldEquipment) responder.officer.visual.heldEquipment.visible = false;
+          options.onOfficerDowned?.({
+            sourceActorId: responder.officer.id,
+            weaponId: 'responder-sidearm',
+            label: 'Response sidearm',
+            rounds: 24,
+            position: { x: responder.officer.x, y: responder.officer.y, z: responder.officer.z }
+          });
+        }
         return { kind: 'responder_officer', id: responder.officer.id, ...result };
       }
     }
@@ -494,7 +599,7 @@ function createUrbanResponderRuntime(options = {}) {
       responder,
       officer: responder.officer,
       distance: Math.hypot(responder.officer.x - finite(reference.x), responder.officer.z - finite(reference.z))
-    }) : null).filter((entry) => entry && Number(entry.officer.condition ?? 1) <= .05 && entry.distance <= radius)
+    }) : null).filter((entry) => entry && Number(entry.officer.condition ?? 1) <= .05 && !entry.officer.lootClaimed && entry.distance <= radius)
       .sort((left, right) => left.distance - right.distance)[0] || null;
   }
 
@@ -502,18 +607,28 @@ function createUrbanResponderRuntime(options = {}) {
     const officer = responders.map((responder) => responder.officer).find((entry) => entry?.id === String(officerId || ''));
     if (!officer || Number(officer.condition ?? 1) > .05 || officer.lootClaimed) return null;
     officer.lootClaimed = true;
-    return Object.freeze({ weaponId: 'pulse-sidearm', rounds: 24 });
+    if (officer.visual?.heldEquipment) officer.visual.heldEquipment.visible = false;
+    return Object.freeze({ weaponId: 'responder-sidearm', rounds: 24 });
+  }
+
+  function clearIncident() {
+    responders.slice().forEach(removeResponder);
+    model.clear?.();
+    lastSnapshot = Object.freeze({
+      ...model.snapshot({ activeCount: 0 }),
+      responders: Object.freeze([])
+    });
+    return true;
   }
 
   function dispose() {
     if (disposed) return false;
     disposed = true;
-    responders.slice().forEach(removeResponder);
-    lastSnapshot = Object.freeze({ ...model.snapshot({ activeCount: 0 }), responders: Object.freeze([]) });
+    clearIncident();
     return true;
   }
 
-  return Object.freeze({ applyImpact, claimVehicle, dispose, lootOfficer, nearestDownedOfficer, nearestEnterable, snapshot, targets, update });
+  return Object.freeze({ applyImpact, claimVehicle, clearIncident, dispose, lootOfficer, nearestDownedOfficer, nearestEnterable, snapshot, targets, update });
 }
 
 export { createUrbanResponderRuntime, responderVariant };

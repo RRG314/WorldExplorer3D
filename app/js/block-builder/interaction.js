@@ -94,7 +94,8 @@ export function createBlockBuilderInteraction(options) {
     appCtx.buildingMeshes?.forEach(addVisible);
     appCtx.landuseMeshes?.forEach(addVisible);
     appCtx.terrainGroup?.children?.forEach(addVisible);
-    if (appCtx.onMars) addVisible(appCtx.marsSurface);
+    if (appCtx.activePlanetaryBodyId) addVisible(appCtx.activeSolidWorldSurface);
+    else if (appCtx.onMars) addVisible(appCtx.marsSurface);
     else if (appCtx.onMoon) addVisible(appCtx.moonSurface);
     return targets;
   }
@@ -164,7 +165,8 @@ export function createBlockBuilderInteraction(options) {
       toWorldCoord(action.gy) - reference.y,
       toWorldCoord(action.gz) - reference.z
     );
-    if (distance > options.maxDistance) return true;
+    const maxDistance = Math.max(1, Number(options.getMaxDistance?.() ?? options.maxDistance) || 1);
+    if (distance > maxDistance) return true;
 
     let changed = false;
     if (action.kind === 'remove') {

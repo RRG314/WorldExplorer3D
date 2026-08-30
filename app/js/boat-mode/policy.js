@@ -6,7 +6,7 @@ function canExitBoatMode(targetMode = 'walk', options = {}) {
   if (options.source !== 'boat_prompt_exit') {
     if (options.showNotice !== false) {
       setPromptSignature(`blocked_mode_switch:${targetMode}`);
-      showBoatPrompt('Boat Mode is locked on the water • Use Exit Boat near shore', 'notice', promptDurationMs);
+      showBoatPrompt('Stay with the vessel on open water • Use Exit Vessel near shore', 'notice', promptDurationMs);
     }
     updateBoatMenuUi();
     return false;
@@ -16,7 +16,7 @@ function canExitBoatMode(targetMode = 'walk', options = {}) {
   if (Number.isFinite(shoreline) && shoreline <= maxShoreline) return true;
   if (options.showNotice !== false) {
     setPromptSignature(`blocked_exit:${targetMode}`);
-    showBoatPrompt('Move closer to shore before leaving Boat Mode', 'notice', promptDurationMs);
+    showBoatPrompt('Move closer to shore before leaving the vessel', 'notice', promptDurationMs);
   }
   updateBoatMenuUi();
   return false;

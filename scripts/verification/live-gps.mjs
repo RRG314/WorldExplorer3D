@@ -93,6 +93,8 @@ try {
   if (await page.locator('#discoverySectionTutorial:not([hidden])').isVisible().catch(() => false)) {
     await page.locator('#discoverySectionTutorialDoneBtn').click();
   }
+  await page.locator('.discoveryTodayRoute > summary').click();
+  await page.waitForSelector('.discoveryTodayRoute[open] #discoveryExpeditionList [data-field-objective]', { timeout: 30_000 });
   await page.waitForTimeout(300);
   const fieldToday = await page.evaluate(() => ({
     sessionText: document.getElementById('discoveryFieldSession')?.textContent?.replace(/\s+/g, ' ').trim() || '',
@@ -148,9 +150,10 @@ try {
       (metersPerDegree * Math.cos(currentLatitude * Math.PI / 180));
     await page.locator('#liveGpsFieldBtn').click();
     await page.waitForSelector('#discoveryPanel.show', { timeout: 30_000 });
-    await page.locator('#discoveryExpeditionList [data-field-objective]').evaluateAll((buttons, slotId) => {
-      buttons.find((button) => button.dataset.fieldObjective === slotId)?.click();
-    }, objective.slotId);
+    if (!(await page.locator('.discoveryTodayRoute').evaluate((route) => route.open))) {
+      await page.locator('.discoveryTodayRoute > summary').click();
+    }
+    await page.locator(`#discoveryExpeditionList [data-field-objective="${objective.slotId}"]`).click();
     await page.waitForFunction((slotId) => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.targetId === slotId, objective.slotId, { timeout: 30_000 });
     const routeSteps = Math.max(1, Math.ceil(Math.hypot(deltaX, deltaZ) / 12));
     for (let step = 1; step <= routeSteps + 10; step += 1) {

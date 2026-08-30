@@ -24,12 +24,43 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
+function compiledEndpointConnectionPublished(feature, endpoint) {
+  const connected = feature?.connectedFeatures?.[endpoint];
+  if (Array.isArray(connected) && connected.length > 0) return true;
+  const total = Number(feature?.transportGraphRef?.totalDistance);
+  if (!Number.isFinite(total)) return false;
+  const tolerance = Math.max(0.2, Math.min(1.25, (Number(feature?.width) || 6) * 0.08));
+  return (feature?.transportGraphRef?.stations || []).some((station) => {
+    const distance = Number(station?.distanceAlong);
+    if (!Number.isFinite(distance)) return false;
+    return endpoint === 'start' ? distance <= tolerance : total - distance <= tolerance;
+  });
+}
+
 function vectorSnapshot(vector) {
   if (!vector) return null;
   return {
     x: numberOrNull(vector.x),
     y: numberOrNull(vector.y),
     z: numberOrNull(vector.z)
+  };
+}
+
+function transportFacilitySnapshot() {
+  const graph = appCtx.transportFacilityGraph;
+  const visual = appCtx.transportFacilityVisual?.group;
+  if (!graph) return { active: false, recordCount: 0, aviation: 0, maritime: 0 };
+  return {
+    active: true,
+    authority: String(graph.authority || ''),
+    bounded: graph.coverage?.bounded === true,
+    recordCount: Number(graph.records?.length || 0),
+    aviation: Number(graph.byDomain?.aviation?.length || 0),
+    maritime: Number(graph.byDomain?.maritime?.length || 0),
+    typeCounts: graph.diagnostics?.typeCounts || {},
+    visualAttached: Boolean(visual?.parent),
+    visualCount: Number(visual?.children?.length || 0),
+    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false)
   };
 }
 
@@ -125,6 +156,7 @@ function surfaceSampleSnapshot(sample) {
                 publishBody: assembly.publishBody === true,
                 bodyCoverage: numberOrNull(assembly.bodyCoverage),
                 supportStationCount: Number(assembly.supportStations?.length || 0),
+                terminalSupportCount: Number(assembly.terminalSupports?.length || 0),
                 abutmentCount: Number(assembly.abutments?.length || 0),
                 connectedEndpoints,
                 connectedEndpointAbutmentCount: connectedEndpointAbutments.length
@@ -579,6 +611,74 @@ function worldCompositionSnapshot() {
 function transportStructureSnapshot() {
   const roads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const visuals = Array.isArray(appCtx.structureVisualMeshes) ? appCtx.structureVisualMeshes : [];
+  const generalizedEndpointAuditRadius = Number.isFinite(Number(appCtx.worldTraversalRadiusWorld)) &&
+    Number(appCtx.worldTraversalRadiusWorld) > 0
+    ? Number(appCtx.worldTraversalRadiusWorld)
+    : 2700;
+  const allGeneralizedEndpointRecords = roads.filter((road) =>
+    road?.transportRecord?.completeness === 'generalized' &&
+    road?.structureSemantics?.gradeSeparated === true &&
+    road?.transportStructureAssembly?.publishBody === true &&
+    Array.isArray(road?.pts) && road.pts.length >= 2
+  ).flatMap((road) => {
+    const profile = road.transportSurfaceModel;
+    const distances = profile?.distances || [];
+    const heights = profile?.centerHeights || [];
+    return ['start', 'end'].map((endpoint) => {
+      const atStart = endpoint === 'start';
+      const point = atStart ? road.pts[0] : road.pts[road.pts.length - 1];
+      const surfaceY = Number(heights[atStart ? 0 : heights.length - 1]);
+      const terrainY = Number(
+        appCtx.terrainMeshHeightAt?.(Number(point?.x), Number(point?.z)) ??
+        appCtx.elevationWorldYAtWorldXZ?.(Number(point?.x), Number(point?.z))
+      );
+      const endpointRef = road?.transportStructureRef?.[endpoint] || null;
+      const abutmentPublished = (road?.transportStructureAssembly?.abutments || [])
+        .some((abutment) => String(abutment?.endpoint || '').startsWith(endpoint));
+      const terminalSupportPublished = (road?.transportStructureAssembly?.terminalSupports || [])
+        .some((station) => String(station?.terminalFor || '') === endpoint);
+      const supportWithinEndpointRun = (road?.transportStructureAssembly?.supportStations || [])
+        .some((station) => atStart
+          ? Number(station?.distance) <= 18
+          : Number(road?.transportStructureAssembly?.total) - Number(station?.distance) <= 18);
+      const compiledConnectionPublished = compiledEndpointConnectionPublished(road, endpoint);
+      return {
+        id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || ''),
+        name: String(road?.name || ''),
+        type: String(road?.type || ''),
+        endpoint,
+        state: String(endpointRef?.state || ''),
+        policy: String(endpointRef?.policy || ''),
+        connectionCount: Number(endpointRef?.connectionCount || 0),
+        surfaceY: numberOrNull(surfaceY),
+        terrainY: numberOrNull(terrainY),
+        clearance: Number.isFinite(surfaceY) && Number.isFinite(terrainY)
+          ? surfaceY - terrainY
+          : null,
+        x: numberOrNull(Number(point?.x)),
+        z: numberOrNull(Number(point?.z)),
+        terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+        verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
+        abutmentPublished,
+        terminalSupportPublished,
+        supportWithinEndpointRun,
+        compiledConnectionPublished
+      };
+    });
+  });
+  const generalizedEndpointRecords = allGeneralizedEndpointRecords.filter((record) =>
+    Number.isFinite(record.x) && Number.isFinite(record.z) &&
+    Math.hypot(record.x, record.z) <= generalizedEndpointAuditRadius
+  );
+  const unsupportedGeneralizedOpenBoundaries = generalizedEndpointRecords
+    .filter((record) =>
+      record.state === 'open_boundary' &&
+      Number(record.clearance) > 1.2 &&
+      record.compiledConnectionPublished !== true &&
+      record.abutmentPublished !== true &&
+      record.terminalSupportPublished !== true &&
+      record.supportWithinEndpointRun !== true)
+    .sort((left, right) => Number(right.clearance) - Number(left.clearance));
   const exactStructureSamples = roads.filter((road) =>
     road?.transportRecord?.completeness === 'lossless' &&
     road?.structureSemantics?.gradeSeparated === true &&
@@ -729,6 +829,22 @@ function transportStructureSnapshot() {
       })),
     sharedPhysicalSurfaces,
     exactStructureSamples,
+    transportNetwork: {
+      ...(appCtx.transportNetworkModel?.stats || {}),
+      generalizedJoinToleranceMeters:
+        numberOrNull(appCtx.transportNetworkModel?.generalizedJoinToleranceMeters),
+      generalizedExpandedEndpointConnections:
+        (appCtx.transportNetworkModel?.connections || []).filter((connection) =>
+          String(connection?.provenance?.method || '').startsWith('generalized-aligned-')).length
+    },
+    generalizedEndpointIntegrity: {
+      authority: 'compiled-generalized-structure-endpoints',
+      horizontalAuditRadius: generalizedEndpointAuditRadius,
+      sourceEndpoints: allGeneralizedEndpointRecords.length,
+      sampledEndpoints: generalizedEndpointRecords.length,
+      unsupportedOpenBoundaryCount: unsupportedGeneralizedOpenBoundaries.length,
+      unsupportedOpenBoundaries: unsupportedGeneralizedOpenBoundaries.slice(0, 24)
+    },
     junctionContinuity: appCtx.transportJunctionProfile?.continuity || null,
     continuityRepair: appCtx.transportJunctionProfile?.continuityRepair || null,
     gradeProfile: {
@@ -846,7 +962,38 @@ function getWorldExplorerRuntimeDiagnostics() {
     },
     mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+    aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+    flightDynamics: appCtx.planeMode?.active ? {
+      catalogId: String(appCtx.planeMode.transportCatalogId || ''),
+      airborne: appCtx.planeMode.airborne === true,
+      airspeed: numberOrNull(appCtx.planeMode.speed),
+      horizontalSpeed: numberOrNull(appCtx.planeMode.horizontalSpeed),
+      climbRate: numberOrNull(appCtx.planeMode.climbRate),
+      pitch: numberOrNull(appCtx.planeMode.pitch),
+      flightPathAngle: numberOrNull(appCtx.planeMode.flightPathAngle),
+      angleOfAttack: numberOrNull(appCtx.planeMode.angleOfAttack),
+      liftLoad: numberOrNull(appCtx.planeMode.liftLoad),
+      turnRate: numberOrNull(appCtx.planeMode.turnRate),
+      stalled: appCtx.planeMode.stalled === true,
+      passengerMode: appCtx.planeMode.passengerMode === true
+    } : null,
+    boatDynamics: appCtx.boatMode?.active ? {
+      catalogId: String(appCtx.boatMode.transportCatalogId || ''),
+      steerInput: numberOrNull(appCtx.readControlActions?.('boat')?.steer),
+      throttle: numberOrNull(appCtx.boat?.throttle),
+      forwardSpeed: numberOrNull(appCtx.boat?.forwardSpeed),
+      lateralSpeed: numberOrNull(appCtx.boat?.lateralSpeed),
+      turnRate: numberOrNull(appCtx.boat?.turnRate)
+    } : null,
+    maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+    boatNavigation: appCtx.boatMode?.active ? {
+      waterKind: String(appCtx.boatMode.waterKind || ''),
+      shorelineDistance: numberOrNull(appCtx.boatMode.shorelineDistance),
+      shoreVisible: appCtx.boatMode.openOceanSurfaceSuppression?.shoreVisible !== false,
+      cameraFraming: appCtx.camera?.userData?.boatrig?.framing || null
+    } : null,
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
+    transportFacilities: transportFacilitySnapshot(),
     activeActor,
     cameraFollow: cameraFollowSnapshot(activeActor),
     surfaceChain: surfaceChainSnapshot(activeActor),
@@ -855,6 +1002,16 @@ function getWorldExplorerRuntimeDiagnostics() {
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
     worldLoad: appCtx.worldLoadRuntimeState || null,
+    onDemandModes: appCtx.getOnDemandModeSnapshot?.() || {
+      ocean: { requested: false, active: false, rendererReady: false },
+      space: { requested: false, active: false, rendererReady: false }
+    },
+    transportCompilation: appCtx.transportSurfacePublication ? {
+      roadCount: Number(appCtx.transportSurfacePublication.roadCount || 0),
+      meshCount: Number(appCtx.transportSurfacePublication.meshCount || 0),
+      phaseDurationsMs: appCtx.transportSurfacePublication.phaseDurationsMs || null
+    } : null,
+    terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
     mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),
@@ -877,6 +1034,14 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
+    universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
+      currentFrameId: appCtx.universeRuntime.current?.id || null,
+      selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
+      courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
+      courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
+      courseStatus: appCtx.universeRuntime.course?.status || null,
+      transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
+    } : null),
     spaceCatalog: spaceCatalogSnapshot(),
     curatedLandmarks: appCtx.curatedLandmarkMetrics || null,
     mappedLandmarks: appCtx.mappedLandmarkMetrics || null,
@@ -981,6 +1146,57 @@ function getWorldExplorerRuntimeDiagnostics() {
 }
 
 globalThis.getWorldExplorerRuntimeDiagnostics = getWorldExplorerRuntimeDiagnostics;
+if (developerDiagnosticsEnabled) {
+  const roofCandidates = () => {
+    const actor = appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 };
+    return (appCtx.buildings || []).filter((building) => {
+      const minY = Number(building?.minY ?? building?.baseY);
+      const maxY = Number(building?.maxY ?? (minY + Number(building?.height)));
+      const width = Number(building?.maxX) - Number(building?.minX);
+      const depth = Number(building?.maxZ) - Number(building?.minZ);
+      return !building?.collisionDisabled && building?.allowsPassageBelow !== true &&
+        building?.collisionKind !== 'barrier' && Number.isFinite(minY) && Number.isFinite(maxY) &&
+        maxY - minY >= 3 && width >= 7 && depth >= 7;
+    }).map((building, index) => ({
+      id: String(building.sourceBuildingId || `roof:${index}`),
+      x: Number(building.centerX ?? (building.minX + building.maxX) * .5),
+      z: Number(building.centerZ ?? (building.minZ + building.maxZ) * .5),
+      roofY: Number(building.maxY ?? (Number(building.baseY) + Number(building.height))),
+      width: Number(building.maxX) - Number(building.minX),
+      depth: Number(building.maxZ) - Number(building.minZ),
+      distance: Math.hypot(Number(building.centerX || 0) - Number(actor.x || 0), Number(building.centerZ || 0) - Number(actor.z || 0))
+    })).filter((roof) => [roof.x, roof.z, roof.roofY].every(Number.isFinite))
+      .sort((left, right) => left.distance - right.distance);
+  };
+  globalThis.__WE3D_ROOF_SUPPORT__ = Object.freeze({
+    list: () => roofCandidates().slice(0, 24),
+    landOn(roofId) {
+      const roof = roofCandidates().find(({ id }) => id === String(roofId)) || roofCandidates()[0];
+      const walker = appCtx.Walk?.state?.walker;
+      if (!roof || !walker) return false;
+      appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
+      walker.x = roof.x;
+      walker.z = roof.z;
+      walker.y = roof.roofY + Number(appCtx.Walk?.CFG?.eyeHeight || 1.7) + 10;
+      walker.vy = -3;
+      walker.onGround = false;
+      walker.onBuilding = false;
+      walker._resolvedGroundState = null;
+      walker.angle = 0;
+      walker.yaw = 0;
+      return roof;
+    },
+    snapshot: () => {
+      const walker = appCtx.Walk?.state?.walker;
+      return walker ? {
+        x: Number(walker.x), y: Number(walker.y), z: Number(walker.z),
+        onGround: walker.onGround === true,
+        onBuilding: walker.onBuilding === true,
+        vy: Number(walker.vy || 0)
+      } : null;
+    }
+  });
+}
 globalThis.render_game_to_text = () => JSON.stringify({
   developerDiagnostics: {
     enabled: developerDiagnosticsEnabled,
@@ -988,6 +1204,27 @@ globalThis.render_game_to_text = () => JSON.stringify({
     capturedErrors: runtimeErrors.length
   },
   environment: appCtx.getEnv?.() || null,
+  modes: {
+    boat: !!appCtx.boatMode?.active,
+    drone: !!appCtx.droneMode,
+    plane: !!appCtx.planeMode?.active,
+    ocean: !!appCtx.oceanMode?.active,
+    space: !!appCtx.spaceFlight?.active,
+    walking: appCtx.Walk?.state?.mode === 'walk'
+  },
+  planetary: {
+    flightDestination: appCtx.spaceFlight?.destination || null,
+    flightMode: appCtx.spaceFlight?.mode || null,
+    nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
+  },
+  universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
+    currentFrameId: appCtx.universeRuntime.current?.id || null,
+    selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
+    courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
+    courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
+    courseStatus: appCtx.universeRuntime.course?.status || null,
+    transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
+  } : null),
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,
@@ -1002,6 +1239,9 @@ globalThis.render_game_to_text = () => JSON.stringify({
   augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
   livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
   urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+  aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+  maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+  transportFacilities: transportFacilitySnapshot(),
   fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false, stage: 'idle' },
   blockBuilder: {
     ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),

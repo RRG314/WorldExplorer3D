@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -248,7 +248,7 @@ async function runDesktop() {
 
 async function runMobileRegression() {
   const viewport = budgets.mobileRegressionTier.viewport;
-  const client = await createMeasuredClient({ viewport, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+  const client = await createMeasuredClient({ ...devices['iPhone 13'], viewport });
   try {
     const launch = await launchWorld(client);
     await selectMode(client.page, 'walk', '#fWalk');

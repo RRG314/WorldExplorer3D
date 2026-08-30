@@ -14,7 +14,15 @@ export function createMoonSystems(ctx) {
       });
       const moonMesh = new THREE.Mesh(moonGeo, moonMat);
       moonMesh.name = moon.name;
+      moonMesh.userData = { isMoon: true, moonIndex: ctx.solarSystem.moonMeshes.length };
       entry.mesh.add(moonMesh);
+
+      const moonHitbox = new THREE.Mesh(
+        new THREE.SphereGeometry(Math.max(14, moon.radiusScaled * 3), 8, 8),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      moonHitbox.userData = { isMoon: true, moonIndex: ctx.solarSystem.moonMeshes.length };
+      moonMesh.add(moonHitbox);
 
       const moonOrbitGeo = new THREE.RingGeometry(moon.orbitRadius - 0.4, moon.orbitRadius + 0.4, 64);
       const moonOrbitMat = new THREE.MeshBasicMaterial({
@@ -29,6 +37,7 @@ export function createMoonSystems(ctx) {
 
       ctx.solarSystem.moonMeshes.push({
         mesh: moonMesh,
+        hitbox: moonHitbox,
         planetMesh: entry.mesh,
         orbitRadius: moon.orbitRadius,
         orbitDays: moon.orbitDays,

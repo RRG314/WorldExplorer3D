@@ -1,4 +1,4 @@
-import { FIND_CATALOG } from './catalog.js?v=1';
+import { FIND_CATALOG } from './catalog.js?v=4';
 import { fieldProgress, prioritizeProgressiveSlots } from './pacing.js?v=2';
 import { resolveExcavationTool } from './tools.js?v=1';
 
@@ -13,6 +13,23 @@ function distanceTo(position, target) {
 function detectorBearing(position, target) {
   const radians = Math.atan2(Number(target?.x || 0) - Number(position?.x || 0), Number(target?.z || 0) - Number(position?.z || 0));
   return (radians * 180 / Math.PI + 360) % 360;
+}
+
+function detectorTuning(capability = null) {
+  const usable = capability?.type === 'CharacterCapability' && capability.allowed === true;
+  const control = usable ? clamp(Number(capability.assistance?.control) || 0, 0, 100) : 0;
+  const interpretation = usable ? clamp(Number(capability.assistance?.interpretation) || 0, 0, 100) : 0;
+  const controlBonus = Math.max(0, control - 25);
+  const interpretationBonus = Math.max(0, interpretation - 25);
+  return Object.freeze({
+    label: capability?.label || 'Detector read',
+    informationTier: capability?.assistance?.informationTier || 'basic',
+    focusRadius: Number((16 + controlBonus * 0.08).toFixed(1)),
+    signalRange: Number((90 + interpretationBonus * 0.25).toFixed(1)),
+    excavationSeconds: Number(Math.max(0.85, 1.25 - controlBonus * 0.006).toFixed(2)),
+    specialtyRank: Number(capability?.contributions?.specialty?.rank) || 0,
+    proficiencyRank: Number(capability?.contributions?.proficiency?.rank) || 0
+  });
 }
 
 function createDetectorSession(options = {}) {
@@ -30,6 +47,7 @@ function createDetectorSession(options = {}) {
   let error = '';
   let collectionResult = null;
   let activeToolId = 'metal-detector';
+  let tuning = detectorTuning(options.characterCapability);
 
   function nearestUnclaimed(position) {
     return prioritizeProgressiveSlots(plan.slots, { claimedIds: claimed, observedCatalogIds, progress })
@@ -53,8 +71,8 @@ function createDetectorSession(options = {}) {
     }
     target = candidate.slot;
     phase = 'sweeping';
-    signalStrength = clamp(1 - candidate.distance / 90, 0.02, 1);
-    message = candidate.distance <= 16
+    signalStrength = clamp(1 - candidate.distance / tuning.signalRange, 0.02, 1);
+    message = candidate.distance <= tuning.focusRadius
       ? 'A focused signal is under the coil. Refine it.'
       : 'A weak signal is nearby. Follow the bearing and watch the meter.';
     return true;
@@ -64,14 +82,14 @@ function createDetectorSession(options = {}) {
     if (!target || !['sweeping', 'signal', 'classified', 'excavating'].includes(phase)) return snapshot(position);
     elapsed += Math.max(0, Number(dt) || 0);
     const distance = distanceTo(position, target.position);
-    signalStrength = clamp(1 - distance / 90, 0.02, 1);
-    if (phase === 'sweeping' && distance <= 16) {
+    signalStrength = clamp(1 - distance / tuning.signalRange, 0.02, 1);
+    if (phase === 'sweeping' && distance <= tuning.focusRadius) {
       phase = 'signal';
       message = 'Focused signal found. Refine the signal to classify it.';
-    } else if (phase === 'signal' && distance > 22) {
+    } else if (phase === 'signal' && distance > tuning.focusRadius + 6) {
       phase = 'sweeping';
       message = 'The signal weakened. Move back toward the indicated bearing.';
-    } else if (phase === 'excavating' && elapsed >= 1.25) {
+    } else if (phase === 'excavating' && elapsed >= tuning.excavationSeconds) {
       phase = 'revealed';
       const find = FIND_CATALOG.find((entry) => entry.id === target.catalogId);
       message = `${find?.names?.common || 'Virtual find'} revealed. Inspect it, collect it, or leave it in place.`;
@@ -83,8 +101,8 @@ function createDetectorSession(options = {}) {
     error = '';
     if (!target || !['signal', 'sweeping'].includes(phase)) return false;
     const distance = distanceTo(position, target.position);
-    if (distance > 16) {
-      error = `Move ${Math.ceil(distance - 16)} m closer before refining.`;
+    if (distance > tuning.focusRadius) {
+      error = `Move ${Math.ceil(distance - tuning.focusRadius)} m closer before refining.`;
       return false;
     }
     phase = 'classified';
@@ -128,6 +146,7 @@ function createDetectorSession(options = {}) {
       regionId: plan.worldIdentity.id,
       regionLabel: context.regionLabel || 'Current region',
       locationKey: context.locationKey || '',
+      locationSnapshot: context.locationSnapshot || null,
       worldIdentity: plan.worldIdentity.id,
       environment: context.environment || 'EARTH',
       localPosition: context.localPosition || target.position,
@@ -175,6 +194,11 @@ function createDetectorSession(options = {}) {
     return availableToolIds.slice();
   }
 
+  function setCharacterCapability(capability = null) {
+    tuning = detectorTuning(capability);
+    return tuning;
+  }
+
   function snapshot(position = {}) {
     const find = target ? FIND_CATALOG.find((entry) => entry.id === target.catalogId) : null;
     const distance = target ? distanceTo(position, target.position) : null;
@@ -190,19 +214,29 @@ function createDetectorSession(options = {}) {
       bearingDegrees: target ? Number(detectorBearing(position, target.position).toFixed(1)) : null,
       claimState: target ? claimed.has(target.claimId) ? 'claimed' : 'unclaimed' : null,
       activeToolId,
+      characterAssistance: Object.freeze({
+        type: 'DetectorCharacterAssistance',
+        label: tuning.label,
+        informationTier: tuning.informationTier,
+        focusRadiusMeters: tuning.focusRadius,
+        excavationSeconds: tuning.excavationSeconds,
+        specialtyRank: tuning.specialtyRank,
+        proficiencyRank: tuning.proficiencyRank
+      }),
       collectionResult: collectionResult ? {
         recorded: true,
         collected: true,
         instanceId: collectionResult.item.instanceId,
         eventId: collectionResult.event?.eventId || null,
         event: collectionResult.event || null,
-        progress: collectionResult.progress || null
+        progress: collectionResult.progress || null,
+        characterReward: collectionResult.characterReward || null
       } : null,
       fieldProgress: progress
     });
   }
 
-  return Object.freeze({ collect, excavate, leave, refine, reset, setAvailableToolIds, snapshot, sweep, update });
+  return Object.freeze({ collect, excavate, leave, refine, reset, setAvailableToolIds, setCharacterCapability, snapshot, sweep, update });
 }
 
-export { createDetectorSession, detectorBearing, distanceTo };
+export { createDetectorSession, detectorBearing, detectorTuning, distanceTo };

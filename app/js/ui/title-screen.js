@@ -1,9 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=89";
+import { createGlobeSelector } from "./globe-selector.js?v=91";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
+import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
@@ -611,7 +612,9 @@ function initTitleScreenUi({
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
     appCtx.kickOptionalRuntimeBoot?.('boot');
-    if (requestedLaunchMode !== 'ocean') void appCtx.ensureStarCatalogLoaded?.();
+    if (requestedLaunchMode !== 'ocean' && requestedLaunchMode !== 'earth') {
+      void appCtx.ensureStarCatalogLoaded?.();
+    }
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
@@ -666,6 +669,9 @@ function initTitleScreenUi({
     }
 
     await appCtx.loadRoads();
+    scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
+      timeout: 1800
+    });
     const startedOnWater = appCtx.boatMode?.active === true;
     if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
     if (!startedOnWater && appCtx.Walk) {
@@ -711,6 +717,10 @@ function initTitleScreenUi({
     document.getElementById('fPaths')?.classList.remove('on');
     document.getElementById('fLandUse')?.classList.remove('on');
     document.getElementById('fLandUseRE')?.classList.remove('on');
+    // World publication and all entry-mode setup are complete. A late optional
+    // loader may have reasserted the transition overlay after loadRoads hid it;
+    // the title launch owns the final handoff to playable input.
+    appCtx.hideLoad?.();
     appCtx.loadingScreenMode = 'earth';
     return true;
   };

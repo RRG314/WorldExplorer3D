@@ -1,6 +1,11 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
-import { createExpeditionPlaneMesh } from './plane/expedition-plane-mesh.js?v=1';
+import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
+import { integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=2';
+import { sampleSweptContact } from './physics/swept-contact.js?v=1';
+import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=4';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=10';
+import { applyTransportDamage } from './transport/damage-model.js?v=1';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -24,6 +29,12 @@ const state = {
   vz: 0,
   throttle: 0,
   climbRate: 0,
+  horizontalSpeed: 0,
+  flightPathAngle: 0,
+  angleOfAttack: 0,
+  liftLoad: 0,
+  turnRate: 0,
+  stalled: false,
   airborne: false,
   cameraYaw: 0,
   cameraPitch: 0,
@@ -34,8 +45,19 @@ const state = {
   launchClearanceY: null,
   lastImpactAt: 0,
   lastImpactSpeed: 0,
+  transportEntityId: 'direct-flight:personal-prop',
+  transportCatalogId: 'personal-prop',
+  condition: 1,
+  durabilityPolicy: 'standard',
+  resistance: 150,
+  passengerMode: false,
+  passengerElapsed: 0,
+  passengerCenter: null,
+  passengerRadius: 220,
+  passengerAngle: Math.PI,
+  passengerAltitude: 120,
   mesh: null,
-  propeller: null
+  visual: null
 };
 
 const surfaceSample = {
@@ -57,19 +79,24 @@ function damp(current, target, rate, dt) {
   return current + (target - current) * (1 - Math.exp(-rate * dt));
 }
 
-function createPlaneMesh() {
-  const { plane, propeller } = createExpeditionPlaneMesh();
-  plane.visible = false;
-  appCtx.scene.add(plane);
-  state.mesh = plane;
-  state.propeller = propeller;
-  return plane;
+function planeGroundOffset(catalog = getAviationCatalogEntry(state.transportCatalogId)) {
+  return aircraftGroundOffset(catalog);
 }
 
-function ensurePlaneMesh() {
-  if (state.mesh) return state.mesh;
+function createPlaneMesh(catalog) {
+  state.visual?.dispose?.();
+  const visual = createAircraftVisual(globalThis.THREE, catalog, { mobile: appCtx.isTouchPreferredClient === true, state: 'active' });
+  visual.root.visible = false;
+  appCtx.scene.add(visual.root);
+  state.visual = visual;
+  state.mesh = visual.root;
+  return visual.root;
+}
+
+function ensurePlaneMesh(catalog) {
+  if (state.mesh?.userData?.transportCatalogId === catalog.id) return state.mesh;
   if (!appCtx.scene || typeof THREE === 'undefined') return null;
-  return createPlaneMesh();
+  return createPlaneMesh(catalog);
 }
 
 function buildingTopY(building) {
@@ -111,7 +138,7 @@ function pointToBuildingFootprintDistance(x, z, building) {
   return best;
 }
 
-function safePlaneLaunchAboveUrbanGeometry(x, z, groundY) {
+function safePlaneLaunchAboveUrbanGeometry(x, z, groundY, groundOffset = .72) {
   const aircraftAndCameraRadius = 18;
   const candidates = appCtx.getNearbyBuildings?.(
     x,
@@ -135,18 +162,18 @@ function safePlaneLaunchAboveUrbanGeometry(x, z, groundY) {
     nearbyBuildingCount += 1;
   }
   if (nearbyBuildingCount === 0) {
-    return { required: false, y: groundY + 0.72, nearbyBuildingCount: 0 };
+    return { required: false, y: groundY + groundOffset, nearbyBuildingCount: 0 };
   }
   return {
     required: true,
-    y: highestRoofY + 12,
+    y: highestRoofY + groundOffset + 12,
     highestRoofY,
     nearbyBuildingCount
   };
 }
 
 function buildingRoofSurfaceAt(x, z, terrainY) {
-  const gearY = state.y - 0.72;
+  const gearY = state.y - planeGroundOffset();
   const candidates = appCtx.getNearbyBuildings?.(x, z, 8) || appCtx.buildings || [];
   let best = null;
   for (let i = 0; i < candidates.length; i += 1) {
@@ -174,6 +201,13 @@ function groundSurfaceAt(x, z, options = {}) {
   return roof && roof.y > surface.y ? roof : surface;
 }
 
+function aircraftGroundSurfaceAt(x, z, options = {}) {
+  const catalog = getAviationCatalogEntry(state.transportCatalogId);
+  return aircraftGearSamplePoints(x, z, state.yaw, catalog.dimensions)
+    .map((point) => groundSurfaceAt(point.x, point.z, options))
+    .sort((left, right) => right.y - left.y)[0];
+}
+
 function samplePlaneSurface(dt = 0, force = false) {
   surfaceSample.age += Math.max(0, Number(dt) || 0);
   const moved = surfaceSample.valid ? Math.hypot(state.x - surfaceSample.x, state.z - surfaceSample.z) : Infinity;
@@ -185,7 +219,7 @@ function samplePlaneSurface(dt = 0, force = false) {
     return surfaceSample.y;
   }
   const includeRoad = !state.airborne || clearance < 12;
-  const sampled = groundSurfaceAt(state.x, state.z, { includeRoad });
+  const sampled = aircraftGroundSurfaceAt(state.x, state.z, { includeRoad });
   surfaceSample.y = sampled.y;
   surfaceSample.kind = sampled.kind;
   surfaceSample.building = sampled.building;
@@ -211,36 +245,65 @@ function startPlaneMode(options = {}) {
     appCtx.worldLoading ||
     (appCtx.earthResumePending && options.allowDuringEarthResume !== true)
   ) return false;
-  const mesh = ensurePlaneMesh();
+  const catalog = getAviationCatalogEntry(options.transportCatalogId);
+  const mesh = ensurePlaneMesh(catalog);
   if (!mesh) return false;
   const reference = referencePosition();
+  state.transportEntityId = String(options.transportEntityId || `direct-flight:${catalog.id}`);
+  state.transportCatalogId = catalog.id;
+  state.condition = Math.max(0, Math.min(1, Number(options.condition ?? 1)));
+  state.durabilityPolicy = catalog.damage.durabilityPolicy;
+  state.resistance = catalog.damage.resistance;
   state.x = Number.isFinite(options.x) ? options.x : Number(reference?.x) || 0;
   state.z = Number.isFinite(options.z) ? options.z : Number(reference?.z) || 0;
+  state.passengerMode = options.airportPassenger === true;
+  state.passengerElapsed = 0;
+  state.passengerRadius = Math.max(140, Number(options.airportTourRadius) || 220);
+  state.passengerAngle = Math.PI;
+  state.passengerCenter = state.passengerMode ? {
+    x: Number(options.airportTourCenter?.x ?? state.x) || 0,
+    z: Number(options.airportTourCenter?.z ?? state.z) || 0
+  } : null;
+  if (state.passengerCenter) {
+    state.x = state.passengerCenter.x;
+    state.z = state.passengerCenter.z - state.passengerRadius;
+  }
   state.yaw = Number.isFinite(options.yaw) ? options.yaw : Number(reference?.angle ?? reference?.yaw) || 0;
   if (Number.isFinite(options.y)) state.y = options.y;
   surfaceSample.valid = false;
   const groundY = samplePlaneSurface(0, true);
   const hasExplicitY = Number.isFinite(options.y);
+  const groundOffset = planeGroundOffset(catalog);
   const safeLaunch = hasExplicitY
-    ? { required: false, y: Math.max(groundY + 0.72, options.y) }
-    : safePlaneLaunchAboveUrbanGeometry(state.x, state.z, groundY);
+    ? { required: false, y: Math.max(groundY + groundOffset, options.y) }
+    : safePlaneLaunchAboveUrbanGeometry(state.x, state.z, groundY, groundOffset);
   state.y = safeLaunch.y;
-  state.pitch = clamp(Number(options.pitch) || 0, -0.35, 0.35);
-  state.roll = clamp(Number(options.roll) || 0, -0.65, 0.65);
+  state.passengerAltitude = state.y;
+  state.pitch = clamp(Number(options.pitch) || 0, catalog.aircraftKind === 'rotorcraft' ? -0.28 : -0.35, catalog.aircraftKind === 'rotorcraft' ? 0.28 : 0.35);
+  state.roll = clamp(Number(options.roll) || 0, catalog.aircraftKind === 'rotorcraft' ? -0.35 : -0.65, catalog.aircraftKind === 'rotorcraft' ? 0.35 : 0.65);
+  const startSpeedLimit = catalog.aircraftKind === 'rotorcraft'
+    ? 40
+    : Math.min(240, catalog.performance.topSpeed * .514444 / Math.max(.2, Number(appCtx.METERS_PER_WORLD_UNIT || 1)));
   state.speed = clamp(
     safeLaunch.required ? Math.max(20, Number(options.speed) || 0) : Number(options.speed) || 0,
     0,
-    62
+    startSpeedLimit
   );
   state.throttle = clamp(
     safeLaunch.required ? Math.max(0.48, Number(options.throttle) || 0) : Number(options.throttle) || 0,
     0,
     1
   );
-  state.airborne = safeLaunch.required || options.airborne === true || state.y > groundY + 1.4;
-  state.launchKind = safeLaunch.required ? 'urban_airborne' : 'ground';
+  state.airborne = safeLaunch.required || options.airborne === true || state.y > groundY + groundOffset + .7;
+  state.launchKind = safeLaunch.required ? 'urban_airborne' : options.anchorFacilityId ? 'mapped-facility' : 'ground';
   state.launchClearanceY = safeLaunch.required ? safeLaunch.y : null;
   state.climbRate = 0;
+  state.horizontalSpeed = state.speed;
+  state.flightPathAngle = 0;
+  state.angleOfAttack = 0;
+  state.liftLoad = 0;
+  state.turnRate = 0;
+  state.stalled = false;
   state.pitchRate = 0;
   state.rollRate = 0;
   state.barrelRollActive = false;
@@ -259,6 +322,7 @@ function startPlaneMode(options = {}) {
   mesh.visible = true;
   appCtx.setCameraMode(appCtx.camMode);
   syncPlaneMesh();
+  updateAircraftVisual(state.visual, state.condition, 0);
   return true;
 }
 
@@ -271,22 +335,35 @@ function stopPlaneMode(options = {}) {
   state.speed = 0;
   state.throttle = 0;
   state.climbRate = 0;
+  state.horizontalSpeed = 0;
+  state.flightPathAngle = 0;
+  state.angleOfAttack = 0;
+  state.liftLoad = 0;
+  state.turnRate = 0;
+  state.stalled = false;
   state.pitchRate = 0;
   state.rollRate = 0;
   state.barrelRollActive = false;
   state.barrelRollDirection = 0;
   state.barrelRollProgress = 0;
+  state.passengerMode = false;
+  state.passengerCenter = null;
   state.vx = 0;
   state.vy = 0;
   state.vz = 0;
   appCtx.camera?.up?.set?.(0, 1, 0);
   if (appCtx.camera?.userData) delete appCtx.camera.userData.planeLookTarget;
 
+  if (options.suppressFlightEnded !== true) appCtx.onAircraftFlightEnded?.(exitState, { targetMode });
+
+  if (targetMode === 'skydive') return exitState;
+
   if (targetMode === 'drone') return exitState;
 
   const targetGroundMode = targetMode === 'walk' ? 'walk' : 'drive';
+  const groundOffset = planeGroundOffset();
   const landedOnRoof = targetGroundMode === 'walk' && surfaceSample.kind === 'building' &&
-    Math.abs((exitState.y - 0.72) - surfaceSample.y) <= 1.25;
+    Math.abs((exitState.y - groundOffset) - surfaceSample.y) <= 1.25;
   exitState.landedOnRoof = landedOnRoof;
   exitState.surfaceY = surfaceSample.y;
   const resolved = appCtx.resolveSafeWorldSpawn?.(state.x, state.z, {
@@ -328,15 +405,41 @@ function syncPlaneMesh() {
 }
 
 function buildingImpactAt(x, y, z) {
-  const actorBaseY = y - 0.68;
-  const hit = appCtx.checkBuildingCollision?.(x, z, 2.15, {
-    actorBaseY,
-    actorHeight: 1.45
-  });
-  if (!hit?.collision || !hit.building) return null;
-  const roofY = buildingTopY(hit.building);
-  if (Number.isFinite(roofY) && actorBaseY >= roofY - 0.32) return null;
-  return hit;
+  const catalog = getAviationCatalogEntry(state.transportCatalogId);
+  const forwardX = Math.sin(state.yaw);
+  const forwardZ = Math.cos(state.yaw);
+  const rightX = Math.cos(state.yaw);
+  const rightZ = -Math.sin(state.yaw);
+  const offsets = [
+    [0, 0],
+    [0, catalog.dimensions.length * .34],
+    [0, -catalog.dimensions.length * .32],
+    [catalog.dimensions.wingspan * .42, 0],
+    [-catalog.dimensions.wingspan * .42, 0]
+  ];
+  const actorBaseY = y - Math.max(.58, catalog.dimensions.height * .28);
+  const actorHeight = Math.max(1.1, catalog.dimensions.height * .58);
+  const radius = Math.max(.65, Math.min(2.2, catalog.dimensions.width * .34));
+  for (const [right, forward] of offsets) {
+    const sampleX = x + rightX * right + forwardX * forward;
+    const sampleZ = z + rightZ * right + forwardZ * forward;
+    const hit = appCtx.checkBuildingCollision?.(sampleX, sampleZ, radius, { actorBaseY, actorHeight });
+    if (!hit?.collision || !hit.building) continue;
+    const roofY = buildingTopY(hit.building);
+    if (Number.isFinite(roofY) && actorBaseY >= roofY - .32) continue;
+    return hit;
+  }
+  return null;
+}
+
+function sweptBuildingImpact(from, to) {
+  // The fuselage collision radius is 2.15 world units. Sampling well below
+  // that radius keeps thin mapped walls from falling between physics poses.
+  const catalog = getAviationCatalogEntry(state.transportCatalogId);
+  const step = catalog.dimensions.length > 20 ? 1.5 : .65;
+  return sampleSweptContact(from, to, step, (position) =>
+    buildingImpactAt(position.x, position.y, position.z)
+  );
 }
 
 function updatePlane(dt) {
@@ -351,6 +454,9 @@ function updatePlane(dt) {
   const previousY = state.y;
   const previousZ = state.z;
   const actions = appCtx.readControlActions?.('plane') || {};
+  const catalog = getAviationCatalogEntry(state.transportCatalogId);
+  const flightTuning = resolveAircraftFlightTuning(catalog);
+  const groundOffset = planeGroundOffset(catalog);
   const pitchInput = Number(actions.pitch) || 0;
   const rollInput = Number(actions.roll) || 0;
   const triggeredBarrelRoll = Number(appCtx.consumePlaneBarrelRollTrigger?.()) || 0;
@@ -364,41 +470,112 @@ function updatePlane(dt) {
   const aerobaticRollInput = state.barrelRollActive ? state.barrelRollDirection : explicitAerobaticRoll;
   const throttleAdjust = Number(actions.throttleAdjust) || 0;
   const brake = Number(actions.brake) > 0.05;
+  const operable = state.condition > .05;
+  const powerFactor = operable ? clamp(.35 + state.condition * .65, .35, 1) : 0;
 
-  state.throttle = clamp(state.throttle + throttleAdjust * dt * 0.66, 0, 1);
-  if (!state.airborne && pitchInput > 0.2) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
-  const targetSpeed = state.throttle * PLANE_MAX_SPEED_MPS;
-  const speedRate = state.airborne ? 0.72 : 1.35;
-  state.speed = damp(state.speed, targetSpeed, speedRate, dt);
-  if (brake && !state.airborne) state.speed *= Math.exp(-5.8 * dt);
+  if (state.passengerMode && state.passengerCenter && catalog.aircraftKind === 'fixed-wing') {
+    const manualInput = Math.abs(pitchInput) > .08 || Math.abs(rollInput) > .08 || Math.abs(throttleAdjust) > .08 || Math.abs(Number(actions.aerobaticRoll) || 0) > .08;
+    if (manualInput) {
+      state.passengerMode = false;
+      state.passengerCenter = null;
+      appCtx.showToast?.('You have the controls.');
+    } else {
+      state.passengerElapsed += dt;
+      const angularSpeed = Math.max(.055, Math.min(.14, 52 / state.passengerRadius));
+      state.passengerAngle += angularSpeed * dt;
+      const nextX = state.passengerCenter.x + Math.sin(state.passengerAngle) * state.passengerRadius;
+      const nextZ = state.passengerCenter.z + Math.cos(state.passengerAngle) * state.passengerRadius;
+      state.yaw = state.passengerAngle + Math.PI * .5;
+      state.roll = -.19;
+      state.pitch = Math.sin(state.passengerElapsed * .16) * .035;
+      state.speed = state.passengerRadius * angularSpeed;
+      state.horizontalSpeed = state.speed;
+      state.climbRate = Math.cos(state.passengerElapsed * .16) * .16;
+      state.y = state.passengerAltitude + Math.sin(state.passengerElapsed * .16);
+      state.airborne = true;
+      state.throttle = .68;
+      state.vx = (nextX - previousX) / Math.max(.001, dt);
+      state.vy = (state.y - previousY) / Math.max(.001, dt);
+      state.vz = (nextZ - previousZ) / Math.max(.001, dt);
+      state.x = nextX;
+      state.z = nextZ;
+      updateAircraftVisual(state.visual, state.condition, dt);
+      syncPlaneMesh();
+      return true;
+    }
+  }
 
+  state.throttle = operable
+    ? clamp(state.throttle + throttleAdjust * dt * (catalog.aircraftKind === 'rotorcraft' ? .78 : .66), 0, 1)
+    : damp(state.throttle, 0, 4.5, dt);
   const groundY = samplePlaneSurface(dt);
+  if (catalog.aircraftKind === 'rotorcraft') {
+    const forwardCommand = -pitchInput;
+    state.yaw += rollInput * dt * 1.15 * catalog.performance.steeringScale;
+    state.pitch = damp(state.pitch, -forwardCommand * .2, 4.2, dt);
+    state.roll = damp(state.roll, -rollInput * .18, 4.8, dt);
+    const horizontalTarget = forwardCommand * Math.min(34, catalog.performance.topSpeed * .23) * catalog.performance.accelerationScale;
+    state.speed = damp(state.speed, horizontalTarget, 1.8, dt);
+    const desiredClimb = (state.throttle * powerFactor - .52) * 13;
+    state.climbRate = damp(state.climbRate, desiredClimb, 2.1, dt);
+    if (!state.airborne && state.throttle > .58) state.airborne = true;
+    if (state.airborne) state.y += state.climbRate * dt;
+    if (state.y <= groundY + groundOffset) {
+      state.y = groundY + groundOffset;
+      state.airborne = false;
+      state.climbRate = Math.max(0, state.climbRate);
+    }
+  } else {
+  if (!state.airborne && pitchInput > 0.2) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
+  const catalogTopSpeed = Math.min(240, catalog.performance.topSpeed * .514444 / Math.max(.2, Number(appCtx.METERS_PER_WORLD_UNIT || 1)));
+  const targetSpeed = state.throttle * catalogTopSpeed * powerFactor;
+  if (!state.airborne) {
+    const acceleration = flightTuning.groundAcceleration * catalog.performance.accelerationScale;
+    const deceleration = acceleration * 0.42;
+    const speedDelta = targetSpeed - state.speed;
+    const maximumDelta = (speedDelta >= 0 ? acceleration : deceleration) * dt;
+    state.speed += clamp(speedDelta, -maximumDelta, maximumDelta);
+  }
+  if (brake && !state.airborne) state.speed *= Math.exp(-5.8 * dt);
 
   if (!state.airborne) {
     state.pitch = damp(state.pitch, clamp(pitchInput * 0.16, -0.12, 0.18), 3.5, dt);
     state.roll = damp(state.roll, 0, 6, dt);
     state.pitchRate = 0;
     state.rollRate = 0;
-    const steerScale = clamp(state.speed / 12, 0.3, 1);
-    state.yaw += rollInput * dt * 1.02 * steerScale;
-    state.y = damp(state.y, groundY + 0.72, 12, dt);
-    if (state.speed > 13.5 && pitchInput > 0.2) {
+    const steerScale = clamp(state.speed / Math.max(8, catalog.performance.turningRadius), 0.2, 1);
+    state.yaw += rollInput * dt * 1.02 * steerScale * catalog.performance.steeringScale;
+    state.y = damp(state.y, groundY + groundOffset, 12, dt);
+    const takeoffSpeed = flightTuning.rotationSpeed;
+    if (state.speed > takeoffSpeed && pitchInput > 0.2) {
       state.airborne = true;
-      state.climbRate = 1.4;
+      state.climbRate = Math.max(.35, state.climbRate);
     }
+    state.horizontalSpeed = state.speed;
+    state.flightPathAngle = 0;
+    state.angleOfAttack = state.pitch;
+    state.liftLoad = 0;
+    state.turnRate = 0;
+    state.stalled = false;
   } else {
-    const controlAuthority = clamp(state.speed / 20, 0.3, 1.25);
-    const stallBlend = clamp((13 - state.speed) / 5, 0, 1);
+    const controlAuthority = clamp(state.speed / Math.max(10, flightTuning.stallSpeed * 1.2), 0.28, 1.15) * catalog.performance.steeringScale;
+    const stallBlend = clamp((flightTuning.stallSpeed - state.speed) / Math.max(4, flightTuning.stallSpeed * .35), 0, 1);
     const previousRoll = state.roll;
     const attitude = integrateAerobaticAttitude(state, {
-      pitch: pitchInput,
-      roll: Math.abs(aerobaticRollInput) > 0.05 ? aerobaticRollInput : rollInput,
+      pitch: pitchInput * flightTuning.pitchControl,
+      roll: (Math.abs(aerobaticRollInput) > 0.05 ? aerobaticRollInput : rollInput) * flightTuning.rollControl,
       aerobaticRoll: aerobaticRollInput,
       authority: controlAuthority,
       stallBlend
     }, dt);
-    state.pitch = attitude.pitch;
-    state.roll = attitude.roll;
+    const ordinaryPitchLimit = flightTuning.maxPitch;
+    const loopCapable = catalog.role === 'aerobatic';
+    state.pitch = loopCapable || Math.abs(aerobaticRollInput) > .05
+      ? attitude.pitch
+      : clamp(attitude.pitch, -ordinaryPitchLimit, ordinaryPitchLimit);
+    state.roll = Math.abs(aerobaticRollInput) > .05
+      ? attitude.roll
+      : clamp(attitude.roll, -flightTuning.maxBank, flightTuning.maxBank);
     state.pitchRate = attitude.pitchRate;
     state.rollRate = attitude.rollRate;
     if (state.barrelRollActive) {
@@ -412,17 +589,25 @@ function updatePlane(dt) {
         state.rollRate = 0;
       }
     }
-    const turnFactor = Math.abs(aerobaticRollInput) > 0.05
-      ? aircraftBankTurnFactor(state.roll, state.rollRate)
-      : Math.sin(state.roll);
-    state.yaw += turnFactor * dt * (0.55 + controlAuthority * 0.58);
-    const liftBalance = clamp((state.speed - 15) * 0.09, -2.4, 2.8);
-    const stallSink = stallBlend * (2.2 + (13 - state.speed) * 0.32);
-    const desiredClimb = Math.sin(state.pitch) * state.speed + liftBalance - 0.8 - stallSink;
-    state.climbRate = damp(state.climbRate, desiredClimb, 1.6, dt);
+    const flight = integrateFixedWingFlight(state, {
+      throttle: state.throttle,
+      powerFactor,
+      topSpeed: catalogTopSpeed
+    }, catalog, dt);
+    state.speed = flight.speed;
+    state.climbRate = flight.climbRate;
+    state.horizontalSpeed = flight.horizontalSpeed;
+    state.flightPathAngle = flight.flightPathAngle;
+    state.angleOfAttack = flight.angleOfAttack;
+    state.liftLoad = flight.liftLoad;
+    state.turnRate = Math.abs(aerobaticRollInput) > .05
+      ? aircraftBankTurnFactor(state.roll, state.rollRate) * .18
+      : flight.turnRate;
+    state.stalled = flight.stalled;
+    state.yaw += state.turnRate * dt;
     state.y += state.climbRate * dt;
-    if (state.y <= groundY + 0.72) {
-      state.y = groundY + 0.72;
+    if (state.y <= groundY + groundOffset) {
+      state.y = groundY + groundOffset;
       state.airborne = false;
       state.climbRate = 0;
       if (Math.abs(state.pitch) > 0.24 || Math.abs(state.roll) > 0.42) state.speed *= 0.42;
@@ -435,19 +620,25 @@ function updatePlane(dt) {
       state.barrelRollProgress = 0;
     }
   }
+  }
 
-  const flightForward = aircraftForwardVector(state.yaw, state.pitch);
-  state.x += flightForward.x * state.speed * dt;
-  state.z += flightForward.z * state.speed * dt;
+  const flightForward = aircraftForwardVector(state.yaw, catalog.aircraftKind === 'rotorcraft' ? state.pitch : 0);
+  const travelSpeed = catalog.aircraftKind === 'rotorcraft' ? state.speed : state.horizontalSpeed;
+  state.x += flightForward.x * travelSpeed * dt;
+  state.z += flightForward.z * travelSpeed * dt;
   const horizontalMovement = Math.hypot(state.x - previousX, state.z - previousZ);
   const impact = horizontalMovement > 0.05 && state.y - groundY < 520 ?
-    buildingImpactAt(state.x, state.y, state.z) :
+    sweptBuildingImpact(
+      { x: previousX, y: previousY, z: previousZ },
+      { x: state.x, y: state.y, z: state.z }
+    ) :
     null;
   if (impact) {
     state.lastImpactAt = performance.now();
     state.lastImpactSpeed = state.speed;
-    state.x = previousX;
-    state.z = previousZ;
+    state.x = impact.lastSafe.x;
+    state.y = impact.lastSafe.y;
+    state.z = impact.lastSafe.z;
     state.speed = Math.min(2.5, state.speed * 0.12);
     state.throttle = 0;
     state.climbRate = Math.max(0, state.climbRate * 0.2);
@@ -455,10 +646,14 @@ function updatePlane(dt) {
     state.roll = damp(state.roll, 0, 8, dt);
     state.pitchRate = 0;
     state.rollRate = 0;
+    applyTransportDamage(state, Math.max(12, state.lastImpactSpeed * 3.2), {
+      resistance: state.resistance,
+      durabilityPolicy: state.durabilityPolicy
+    });
   }
   const localGround = groundY;
-  state.y = clamp(state.y, localGround + 0.72, localGround + 1400);
-  if (state.airborne && state.y <= localGround + 0.73) state.airborne = false;
+  state.y = clamp(state.y, localGround + groundOffset, localGround + 1400);
+  if (state.airborne && state.y <= localGround + groundOffset + .01) state.airborne = false;
   const elapsed = Math.max(0.001, dt);
   state.vx = (state.x - previousX) / elapsed;
   state.vy = (state.y - previousY) / elapsed;
@@ -466,7 +661,7 @@ function updatePlane(dt) {
   state.contactKind = surfaceSample.kind;
   state.contactBuildingId = String(surfaceSample.building?.sourceBuildingId || '');
 
-  if (state.propeller) state.propeller.rotation.z += dt * (8 + state.throttle * 70);
+  updateAircraftVisual(state.visual, state.condition, dt * (.25 + state.throttle));
   syncPlaneMesh();
   return true;
 }
@@ -492,6 +687,7 @@ function applyPlaneCamera(dt) {
   const flightPose = appCtx.presentationPose?.mode === 'plane'
     ? appCtx.presentationPose.plane
     : state;
+  const catalog = getAviationCatalogEntry(state.transportCatalogId);
   const viewYaw = flightPose.yaw + state.cameraYaw;
   if (appCtx.camMode === 1 && state.mesh && typeof THREE !== 'undefined') {
     if (!planeCameraUp) planeCameraUp = new THREE.Vector3();
@@ -505,14 +701,16 @@ function applyPlaneCamera(dt) {
   state.mesh.visible = appCtx.camMode !== 1;
 
   if (appCtx.camMode === 1) {
-    appCtx.camera.position.set(flightPose.x + forward.x * 0.65, flightPose.y + 0.62, flightPose.z + forward.z * 0.65);
-    appCtx.camera.lookAt(flightPose.x + forward.x * 18, lookY, flightPose.z + forward.z * 18);
+    const cockpitOffset = catalog.aircraftKind === 'rotorcraft' ? catalog.dimensions.length * .16 : catalog.dimensions.length * .29;
+    appCtx.camera.position.set(flightPose.x + forward.x * cockpitOffset, flightPose.y + catalog.dimensions.height * .2, flightPose.z + forward.z * cockpitOffset);
+    appCtx.camera.lookAt(flightPose.x + forward.x * Math.max(18, catalog.dimensions.length * .7), lookY, flightPose.z + forward.z * Math.max(18, catalog.dimensions.length * .7));
   } else if (appCtx.camMode === 2) {
-    appCtx.camera.position.set(flightPose.x, flightPose.y + 24, flightPose.z - 2);
+    appCtx.camera.position.set(flightPose.x, flightPose.y + Math.max(24, catalog.dimensions.wingspan * .7), flightPose.z - 2);
     appCtx.camera.lookAt(flightPose.x + forward.x * 5, flightPose.y, flightPose.z + forward.z * 5);
   } else {
-    const distance = 12 + clamp(state.speed / 18, 0, 4);
-    const chaseOffset = aircraftChaseOffset(viewYaw, flightPose.pitch, distance, 4.2 + Math.sin(state.cameraPitch) * 6);
+    const distance = Math.max(12, catalog.dimensions.length * .62, catalog.dimensions.wingspan * .34) + clamp(Math.abs(state.speed) / 18, 0, 8);
+    const cameraHeight = Math.max(4.2, catalog.dimensions.height * .58) + Math.sin(state.cameraPitch) * Math.max(6, catalog.dimensions.height * .35);
+    const chaseOffset = aircraftChaseOffset(viewYaw, flightPose.pitch, distance, cameraHeight);
     const targetX = flightPose.x + chaseOffset.x;
     const targetY = flightPose.y + chaseOffset.y;
     const targetZ = flightPose.z + chaseOffset.z;
@@ -554,6 +752,13 @@ function getPlaneSnapshot() {
     vy: state.vy,
     vz: state.vz,
     throttle: state.throttle,
+    climbRate: state.climbRate,
+    horizontalSpeed: state.horizontalSpeed,
+    flightPathAngle: state.flightPathAngle,
+    angleOfAttack: state.angleOfAttack,
+    liftLoad: state.liftLoad,
+    turnRate: state.turnRate,
+    stalled: state.stalled,
     airborne: state.airborne,
     contactKind: state.contactKind,
     contactBuildingId: state.contactBuildingId,
@@ -561,6 +766,12 @@ function getPlaneSnapshot() {
     launchClearanceY: state.launchClearanceY,
     lastImpactAt: state.lastImpactAt,
     lastImpactSpeed: state.lastImpactSpeed
+    ,transportEntityId: state.transportEntityId
+    ,transportCatalogId: state.transportCatalogId
+    ,condition: state.condition
+    ,durabilityPolicy: state.durabilityPolicy
+    ,operable: state.condition > .05
+    ,passengerMode: state.passengerMode
   };
 }
 

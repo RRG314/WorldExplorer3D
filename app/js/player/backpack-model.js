@@ -147,6 +147,34 @@ function createBackpackModel(options = {}) {
     return instanceId ? equip(instanceId) : false;
   }
 
+  function consume(identity, quantity = 1, settings = {}) {
+    const item = resolveItem(identity);
+    const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+    if (!item || item.quantity < amount) return false;
+    const remaining = item.quantity - amount;
+    if (remaining > 0) {
+      items.set(item.instanceId, { ...item, quantity: remaining });
+    } else {
+      items.delete(item.instanceId);
+      aliases.forEach((canonical, alias) => {
+        if (canonical === item.instanceId || alias === item.instanceId) aliases.delete(alias);
+      });
+      for (let index = 0; index < hotbar.length; index += 1) {
+        if (hotbar[index] === item.instanceId) hotbar[index] = null;
+      }
+      if (equippedInstanceId === item.instanceId) {
+        equippedInstanceId = resolveItem('hands')?.instanceId || [...items.keys()][0] || null;
+      }
+    }
+    if (!settings.silent) notify('item-consumed', {
+      instanceId: item.instanceId,
+      catalogId: item.catalogId,
+      quantity: amount,
+      remaining
+    });
+    return true;
+  }
+
   function snapshot() {
     const records = [...items.values()].map((item) => {
       const definition = definitionForItem(item);
@@ -195,6 +223,7 @@ function createBackpackModel(options = {}) {
   return Object.freeze({
     type: 'BackpackModel',
     assignHotbar,
+    consume,
     definition(id) { return definitions.get(text(id)) || null; },
     equip,
     equipSlot,

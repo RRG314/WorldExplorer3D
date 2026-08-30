@@ -1,6 +1,6 @@
 # Controls Reference
 
-Last reviewed: 2026-08-26 for World Explorer 3D 5.0.0.
+Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
 
 Canonical control map for current runtime behavior.
 

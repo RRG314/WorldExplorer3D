@@ -576,6 +576,7 @@ function startOceanMode(options = {}) {
     if (oceanMode.canvas) oceanMode.canvas.style.display = 'block';
 
     oceanMode.active = true;
+    appCtx.updateInteriorInteraction?.();
     oceanMode.lastFrameMs = 0;
     oceanMode.weatherRefreshTimer = 0;
     oceanMode.animationId = oceanSessionScope.animationFrame(animateOceanMode);
@@ -653,6 +654,7 @@ function stopOceanMode(options = {}) {
     commitEnvironment(appCtx.ENV.EARTH, { source: 'ocean_stop' });
   }
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+  appCtx.updateInteriorInteraction?.();
   if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
   if (oceanMode.scene || oceanMode.renderer) destroyOceanScene();
   return wasActive;

@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createLifecycleScope } from "../runtime/lifecycle-scope.js?v=2";
+import { canUseEquippedItemOnMobile } from './equipment-action-policy.js?v=1';
 
 const MOBILE_CONTROL_PROFILES = {
   driving: {
@@ -55,6 +56,23 @@ const MOBILE_CONTROL_PROFILES = {
       { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
       { label: 'Run', binding: { channel: 'earth', key: 'ShiftLeft' } }
     ]
+  },
+  skydiving: {
+    moveLabel: 'Canopy',
+    lookLabel: 'Look',
+    move: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
+    },
+    actions: [{ label: 'Deploy', binding: { channel: 'earth', key: 'Space' } }]
   },
   drone: {
     moveLabel: 'Move',
@@ -137,6 +155,7 @@ const MOBILE_CONTROL_GUIDANCE = {
   driving: ['Driving', 'Throttle · steer', 'Look', 'Brake'],
   boat: ['Boat', 'Throttle · steer', 'Look', 'Brake'],
   walking: ['Walking', 'Move', 'Look', 'Jump · Run'],
+  skydiving: ['Skydiving', 'Steer · flare', 'Look', 'Deploy parachute'],
   drone: ['Drone', 'Fly · turn', 'Look', 'Ascend · descend'],
   plane: ['Plane', 'Pitch · roll', 'Look', 'Throttle + · −'],
   rocket: ['Rocket', '—', 'Steer', 'Accelerate · brake'],
@@ -164,6 +183,7 @@ function initMobileControls() {
   const mobileLookLabel = document.getElementById('mobileLookLabel');
   const mobileActionPrimary = document.getElementById('mobileActionPrimary');
   const mobileActionSecondary = document.getElementById('mobileActionSecondary');
+  const mobileEquipmentUse = document.getElementById('mobileEquipmentUse');
   const mobileActionStack = document.getElementById('mobileActionStack');
   const urbanEquipmentToggle = document.getElementById('urbanEquipmentToggle');
   const mobileControlsHandedness = document.getElementById('mobileControlsHandedness');
@@ -411,6 +431,13 @@ function initMobileControls() {
       }
       const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 0;
       beginHold(`${btn.id}:p:${pointerId}`, btn.dataset.channel || 'earth', btn.dataset.key);
+      if (
+        btn === mobileActionPrimary &&
+        btn.dataset.key === 'Space' &&
+        detectControlsMode() === 'skydiving'
+      ) {
+        appCtx.handleUrbanEquipmentUse?.();
+      }
     };
 
     const onPointerRelease = (event) => {
@@ -425,6 +452,13 @@ function initMobileControls() {
       for (let index = 0; index < event.changedTouches.length; index++) {
         const id = event.changedTouches[index]?.identifier;
         if (Number.isFinite(id)) beginHold(`${btn.id}:t:${id}`, btn.dataset.channel || 'earth', btn.dataset.key);
+      }
+      if (
+        btn === mobileActionPrimary &&
+        btn.dataset.key === 'Space' &&
+        detectControlsMode() === 'skydiving'
+      ) {
+        appCtx.handleUrbanEquipmentUse?.();
       }
     };
 
@@ -460,7 +494,9 @@ function initMobileControls() {
     if (appCtx.boatMode?.active) return 'boat';
     if (appCtx.planeMode?.active) return 'plane';
     if (appCtx.droneMode) return 'drone';
-    if (appCtx.Walk?.state?.mode === 'walk') return 'walking';
+    if (appCtx.Walk?.state?.mode === 'walk') {
+      return appCtx.urbanSandboxRuntime?.parachute?.skydiving === true ? 'skydiving' : 'walking';
+    }
     return 'driving';
   }
 
@@ -483,13 +519,28 @@ function initMobileControls() {
       mobileTouchControls.dataset.mode = mode;
     }
 
-    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-drone', 'mode-plane', 'mode-rocket', 'mode-ocean');
+    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-skydiving', 'mode-drone', 'mode-plane', 'mode-rocket', 'mode-ocean');
     mobileTouchControls.classList.add(`mode-${mode}`);
     mobileTouchControls.dataset.handedness = appCtx.getMobileTouchInputSnapshot?.().settings?.handedness || 'standard';
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     let actions = profile.actions;
+    if (mode === 'skydiving' && appCtx.isUrbanParachuteDeployed?.() === true) {
+      actions = [{ label: 'Flare', binding: { channel: 'earth', key: 'Space' } }];
+    }
+    if (mode === 'driving' && appCtx.car?.vehicleServiceType === 'responder') {
+      actions = [
+        ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
+        { label: appCtx.car?.vehicleServiceLightsActive ? 'Siren off' : 'Siren', binding: { channel: 'earth', key: 'KeyH' } }
+      ];
+    }
+    if (appCtx.activePlanetaryBodyId && (mode === 'walking' || mode === 'driving')) {
+      actions = [
+        ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
+        { label: 'Explore', binding: { channel: 'earth', key: 'KeyE' } }
+      ];
+    }
     if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {
       actions = Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : [];
       actions.push({ label: 'DeFlock', binding: { channel: 'earth', key: 'KeyE' } });
@@ -498,6 +549,16 @@ function initMobileControls() {
     applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
     applyActionProfile(actions);
     const showPackAction = mode === 'walking' && urbanEquipmentToggle && !urbanEquipmentToggle.hidden;
+    const equipped = appCtx.playerBackpackInventory?.equipped?.() || null;
+    const showEquipmentUse = mode === 'walking' &&
+      canUseEquippedItemOnMobile(equipped) &&
+      typeof appCtx.handleUrbanEquipmentUse === 'function';
+    if (mobileEquipmentUse) {
+      mobileEquipmentUse.textContent = equipped?.actionLabel || 'Use';
+      mobileEquipmentUse.setAttribute('aria-label', `${equipped?.actionLabel || 'Use'} ${equipped?.label || 'equipped item'}`);
+      mobileEquipmentUse.classList.toggle('hidden', !showEquipmentUse);
+      mobileEquipmentUse.disabled = !showEquipmentUse;
+    }
     urbanEquipmentToggle?.classList.toggle('mobile-mode-hidden', !showPackAction);
     mobileActionStack?.classList.toggle('has-pack-action', !!showPackAction);
     mobileTouchControls.classList.add('show');
@@ -542,7 +603,7 @@ function initMobileControls() {
     if (typeof appCtx.syncTravelModeButtons === 'function') appCtx.syncTravelModeButtons();
     if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
     if (boatControls) boatControls.style.display = mode === 'boat' ? 'block' : 'none';
-    if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
+    if (walkingControls) walkingControls.style.display = mode === 'walking' || mode === 'skydiving' ? 'block' : 'none';
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
     if (planeControls) planeControls.style.display = mode === 'plane' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
@@ -565,8 +626,9 @@ function initMobileControls() {
       const modeLabel =
         mode === 'boat' ? 'Boat Mode' :
         mode === 'walking' ? 'Walking Mode' :
+        mode === 'skydiving' ? 'Skydiving' :
         mode === 'drone' ? 'Drone Mode' :
-        mode === 'plane' ? 'Plane Mode' :
+        mode === 'plane' ? 'Personal Plane' :
         mode === 'rocket' ? 'Rocket Mode' :
         mode === 'ocean' ? 'Submarine Mode' :
         'Driving Mode';
@@ -586,6 +648,11 @@ function initMobileControls() {
     bindAnalogPad(mobileMovePad, 'move');
     bindAnalogPad(mobileLookPad, 'look');
     mobileHoldButtons.forEach((btn) => bindMobileHoldButton(btn));
+    mobileControlScope.listen(mobileEquipmentUse, 'click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      appCtx.handleUrbanEquipmentUse?.();
+    });
     syncMobileControlSettingsUi();
     mobileControlScope.listen(mobileControlsHandedness, 'change', () => updateMobileSettings({ handedness: mobileControlsHandedness.value }));
     mobileControlScope.listen(mobileMoveSensitivity, 'input', () => updateMobileSettings({ moveSensitivity: Number(mobileMoveSensitivity.value) / 100 }));

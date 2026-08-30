@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { updateNightLighting } from "./engine/night-lighting.js?v=7";
+import { updateNightLighting } from "./engine/night-lighting.js?v=8";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
-import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=3";
+import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=5";
 import {
   carSpeedToMph,
   worldUnitsPerSecondToKnots,
@@ -10,6 +10,7 @@ import {
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -422,7 +423,7 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
+  const planetaryChase = !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 
   // Get car's actual Y position (follows terrain)
   const carGroundY = Number(presentationCar?.y ?? appCtx.carMesh.position.y) - CAR_BODY_HEIGHT_FROM_GROUND;
@@ -444,10 +445,10 @@ function updateCamera(dt = 1 / 60) {
   const insideTunnel = tunnelCameraState.inside;
   const d = insideTunnel
     ? tunnelCameraEnvelope.chaseDistance
-    : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
+    : planetaryChase ? 12 : CHASE_CAMERA_DISTANCE;
   const h = insideTunnel
     ? tunnelCameraEnvelope.cameraHeight
-    : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
+    : planetaryChase ? 6.5 : CHASE_CAMERA_HEIGHT;
   const viewAngle = carAngle + carLook.yaw + (lb ? Math.PI : 0);
 
   // Show car mesh for non-first-person modes
@@ -484,11 +485,13 @@ function updateCamera(dt = 1 / 60) {
           targetX, targetY, targetZ,
           dt
         );
-    if (!planetaryChase && !insideTunnel) {
+    if (!insideTunnel) {
       const terrainTarget = resolveChaseCameraTerrainCollision(
         { x: lookX, y: lookY, z: lookZ },
         collisionTarget,
-        (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+        planetaryChase
+          ? (x, z) => planetarySurfaceYAtRenderXZ(appCtx, x, z)
+          : (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
       );
       collisionTarget = {
         ...terrainTarget,
@@ -583,10 +586,10 @@ function updateHUD() {
     const plane = appCtx.planeMode;
     const groundY = appCtx.SurfaceQuery?.terrainAt?.(plane.x, plane.z)?.position?.y ?? 0;
     const altitude = Math.max(0, Math.round(plane.y - groundY));
-    const mph = Math.max(0, Math.round(worldUnitsPerSecondToMph(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
-    setHudUnitLabels('MPH', 'ALT');
-    document.getElementById('speed').textContent = `${mph}`;
-    document.getElementById('speed').classList.toggle('fast', mph > 105);
+    const knots = Math.max(0, Math.round(worldUnitsPerSecondToKnots(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
+    setHudUnitLabels('KTS', 'ALT');
+    document.getElementById('speed').textContent = `${knots}`;
+    document.getElementById('speed').classList.toggle('fast', knots > 120);
     document.getElementById('limit').textContent = `${altitude}`;
     setStreetAndLocation(plane.airborne ? 'Flight' : 'Taxi', locationName());
     const bf = document.getElementById('boostFill');
@@ -596,7 +599,7 @@ function updateHUD() {
     document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
     document.getElementById('indBoost').textContent = 'PWR';
     document.getElementById('indDrift').classList.toggle('on', plane.airborne);
-    document.getElementById('indDrift').textContent = plane.airborne ? 'AIR' : 'GEAR';
+    document.getElementById('indDrift').textContent = plane.stalled ? 'STALL' : plane.airborne ? 'AIR' : 'GEAR';
     updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }
@@ -604,15 +607,9 @@ function updateHUD() {
   if (appCtx.droneMode) {
     // Calculate ground elevation for altitude display
     let groundY = 0;
-    const planetarySurface = appCtx.onMars ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(appCtx.drone.x, 2000, appCtx.drone.z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir || new globalThis.THREE.Vector3(0, -1, 0));
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      if (hits.length > 0) {
-        groundY = hits[0].point.y;
-      }
+    if (appCtx.onMars || appCtx.onMoon) {
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, appCtx.drone.x, appCtx.drone.z);
+      if (Number.isFinite(surfaceY)) groundY = surfaceY;
     } else if (appCtx.terrainEnabled) {
       groundY = appCtx.SurfaceQuery?.terrainAt?.(appCtx.drone.x, appCtx.drone.z)?.position?.y ?? 0;
     }

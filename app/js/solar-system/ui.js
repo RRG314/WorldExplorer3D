@@ -1,14 +1,18 @@
 import {
-  handleMarsLandingAction,
   handleMoonLandingAction,
   handleSpaceReturnAction,
   hidePlanetInfo,
   showAsteroidInfo,
   showGalaxyInfo,
+  showMoonInfo,
   showPlanetInfo,
   showSpacecraftInfo,
   showSunInfo
-} from "./info-panel.js?v=2";
+} from "./info-panel.js?v=3";
+import {
+  getAstronomicalBody,
+  SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
+} from '../astronomy/body-catalog.js?v=2';
 
 function formatKilometers(km) {
   if (km >= 1e9) return (km / 1e9).toFixed(1) + 'B';
@@ -28,6 +32,7 @@ export function onSolarSystemClick(ctx, event) {
   ctx.solarSystem.planetMeshes.forEach((entry) => {
     clickables.push(entry.mesh, entry.hitbox);
   });
+  ctx.solarSystem.moonMeshes.forEach((entry) => clickables.push(entry.mesh, entry.hitbox));
   ctx.solarSystem.asteroidMeshes.forEach((entry) => {
     clickables.push(entry.mesh, entry.hitbox);
   });
@@ -54,6 +59,7 @@ export function onSolarSystemClick(ctx, event) {
   while (
     target &&
     !target.userData.isPlanet &&
+    !target.userData.isMoon &&
     !target.userData.isAsteroid &&
     !target.userData.isSpacecraft &&
     !target.userData.isGalaxy &&
@@ -68,6 +74,9 @@ export function onSolarSystemClick(ctx, event) {
     const idx = target.userData.planetIndex;
     const entry = ctx.solarSystem.planetMeshes.find((item) => item.planet === ctx.SOLAR_SYSTEM_PLANETS[idx]);
     if (entry) showPlanetInfo(ctx, entry);
+  } else if (target && target.userData.isMoon) {
+    const entry = ctx.solarSystem.moonMeshes[target.userData.moonIndex];
+    if (entry) showMoonInfo(ctx, entry);
   } else if (target && target.userData.isAsteroid) {
     const idx = target.userData.asteroidIndex;
     const entry = ctx.solarSystem.asteroidMeshes.find((item) => item.asteroid === ctx.NAMED_ASTEROIDS[idx]);
@@ -121,16 +130,22 @@ export function createInfoPanel(ctx) {
     </div>
     <div id="ssInfoType" style="margin-bottom:8px;color:#10b981;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:1px;"></div>
     <div id="ssInfoDesc" style="margin-bottom:12px;color:#94a3b8;font-family:Inter,sans-serif;font-size:12px;"></div>
-    <div style="background:rgba(102,126,234,0.15);border-radius:8px;padding:12px;margin-bottom:0;">
+    <div style="background:rgba(102,126,234,0.15);border-radius:8px;padding:12px;margin-bottom:12px;">
       <div id="ssInfoMetaLabel" style="font-size:10px;opacity:0.7;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">ORBITAL DATA</div>
       <div style="margin-bottom:6px;"><span id="ssInfoMetric1Label">Mean Distance</span>: <span id="ssInfoDistAU" style="color:#fbbf24;font-weight:600;"></span></div>
       <div style="margin-bottom:6px;"><span id="ssInfoMetric2Label">Mean Distance</span>: <span id="ssInfoDistKM" style="color:#fbbf24;font-weight:600;"></span></div>
       <div><span id="ssInfoMetric3Label">Current from Earth</span>: <span id="ssInfoDistEarth" style="color:#0fc;font-weight:600;"></span></div>
     </div>
+    <button id="ssInfoSetCourse" style="display:none;width:100%;padding:10px;background:#315d9d;border:1px solid #8ab4ff;border-radius:7px;color:#fff;font:600 11px Orbitron,sans-serif;cursor:pointer;">SET COURSE</button>
   `;
   document.body.appendChild(panel);
   ctx.solarSystem.infoPanel = panel;
   document.getElementById('ssInfoClose').addEventListener('click', () => hidePlanetInfo(ctx));
+  document.getElementById('ssInfoSetCourse').addEventListener('click', () => {
+    const bodyId = ctx.solarSystem.selectedBodyId;
+    const result = ctx.appCtx.retargetRenderedSpaceJourney?.(bodyId);
+    if (result?.accepted) hidePlanetInfo(ctx);
+  });
 }
 
 export function createToggleButton(ctx) {
@@ -165,10 +180,11 @@ export function createToggleButton(ctx) {
   btn.addEventListener('click', () => handleSpaceReturnAction(ctx));
   container.appendChild(btn);
 
-  const orbitBtn = document.createElement('button');
-  orbitBtn.id = 'orbitsToggle';
-  orbitBtn.className = 'ssToggleBtn';
-  orbitBtn.style.cssText = `
+  const destinationSelect = document.createElement('select');
+  destinationSelect.id = 'spaceDestinationSelect';
+  destinationSelect.className = 'ssToggleBtn';
+  destinationSelect.setAttribute('aria-label', 'Choose a Solar System destination');
+  destinationSelect.style.cssText = `
     background: rgba(10, 10, 30, 0.9);
     border: 2px solid #10b981;
     border-radius: 8px;
@@ -180,17 +196,24 @@ export function createToggleButton(ctx) {
     cursor: pointer;
     transition: all 0.2s;
   `;
-  orbitBtn.textContent = 'LAND ON MOON';
-  orbitBtn.addEventListener('click', () => handleMoonLandingAction(ctx));
-  container.appendChild(orbitBtn);
-
-  const marsBtn = document.createElement('button');
-  marsBtn.id = 'marsLandingToggle';
-  marsBtn.className = 'ssToggleBtn';
-  marsBtn.style.cssText = orbitBtn.style.cssText.replace('#10b981', '#d97745');
-  marsBtn.textContent = 'LAND ON MARS';
-  marsBtn.addEventListener('click', () => handleMarsLandingAction(ctx));
-  container.appendChild(marsBtn);
+  destinationSelect.innerHTML = `
+    <option value="">SET COURSE...</option>
+    ${SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
+      .map((bodyId) => getAstronomicalBody(bodyId))
+      .filter(Boolean)
+      .map((body) => `<option value="${body.id}">${body.name.toUpperCase()}</option>`)
+      .join('')}
+  `;
+  destinationSelect.addEventListener('change', () => {
+    const bodyId = destinationSelect.value;
+    if (!bodyId) return;
+    const result = ctx.appCtx.retargetRenderedSpaceJourney?.(bodyId);
+    if (!result?.accepted) {
+      destinationSelect.value = '';
+      destinationSelect.title = 'Course changes are available from parking orbit.';
+    }
+  });
+  container.appendChild(destinationSelect);
 
   document.body.appendChild(container);
   createSolarSystemScale(ctx);
@@ -279,11 +302,9 @@ export function showSolarSystemUI(ctx) {
   const container = document.getElementById('ssToggleContainer');
   if (container) container.style.display = 'flex';
   const returnBtn = document.getElementById('solarSystemToggle');
-  const landMoonBtn = document.getElementById('orbitsToggle');
-  const landMarsBtn = document.getElementById('marsLandingToggle');
+  const destinationSelect = document.getElementById('spaceDestinationSelect');
   if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
-  if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
-  if (landMarsBtn) landMarsBtn.textContent = 'LAND ON MARS';
+  if (destinationSelect) destinationSelect.value = '';
   const scale = document.getElementById('solarSystemScale');
   if (scale) scale.style.display = 'block';
   ctx?.appCtx?.showUniverseUI?.();
