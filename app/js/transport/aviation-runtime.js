@@ -2,6 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=3';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=6';
 import { applyTransportDamage } from './damage-model.js?v=1';
+import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=3';
 
 const BOARDING_DISTANCE = 8;
@@ -186,12 +187,42 @@ function restoreActiveAircraft(runtime, snapshot = {}) {
   vehicle.y = Number.isFinite(snapshot.y) ? snapshot.y : groundYAt(vehicle.x, vehicle.z) + aircraftGroundOffset(vehicle.catalog);
   vehicle.yaw = Number.isFinite(snapshot.yaw) ? snapshot.yaw : vehicle.yaw;
   vehicle.condition = Number.isFinite(snapshot.condition) ? snapshot.condition : vehicle.condition;
-  vehicle.available = true;
+  vehicle.available = vehicle.condition > .05;
+  vehicle.disabledAt = vehicle.available ? 0 : (typeof performance !== 'undefined' ? performance.now() : Date.now());
   placeVehicle(vehicle);
   vehicle.visual.root.visible = true;
   updateAircraftVisual(vehicle.visual, vehicle.condition, 0);
   runtime.activeAircraft = null;
   return true;
+}
+
+function recoverDisabledAircraft(vehicle) {
+  if (!vehicle?.home) return false;
+  vehicle.x = vehicle.home.x;
+  vehicle.y = vehicle.home.y;
+  vehicle.z = vehicle.home.z;
+  vehicle.yaw = vehicle.home.yaw;
+  vehicle.condition = 1;
+  vehicle.disabledAt = 0;
+  vehicle.unmanned = null;
+  vehicle.available = true;
+  placeVehicle(vehicle);
+  vehicle.visual.root.visible = true;
+  updateAircraftVisual(vehicle.visual, vehicle.condition, 0);
+  return true;
+}
+
+function updateAircraftLifecycle(vehicle) {
+  if (!vehicle || vehicle.unmanned) return;
+  if (vehicle.condition > .05) {
+    vehicle.disabledAt = 0;
+    return;
+  }
+  vehicle.available = false;
+  vehicle.visual.root.visible = true;
+  const current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const disabledAt = markLifecycleStart(vehicle, 'disabledAt', current);
+  if (lifecycleExpired(disabledAt, ENTITY_LIFECYCLE_MS.disabledTransport, current)) recoverDisabledAircraft(vehicle);
 }
 
 function beginUnmannedFlight(runtime, snapshot = {}) {
@@ -298,6 +329,7 @@ function updateUnmannedAircraft(vehicle, dt) {
     vehicle.unmanned = null;
     applyTransportDamage(vehicle, Math.max(0, impactSpeed - 4) * 2.8);
     vehicle.available = vehicle.condition > .05;
+    vehicle.disabledAt = vehicle.available ? 0 : (typeof performance !== 'undefined' ? performance.now() : Date.now());
   } else if (flight.elapsed >= 40) {
     vehicle.x = vehicle.home.x;
     vehicle.y = vehicle.home.y;
@@ -305,6 +337,7 @@ function updateUnmannedAircraft(vehicle, dt) {
     vehicle.yaw = vehicle.home.yaw;
     vehicle.unmanned = null;
     vehicle.available = vehicle.condition > .05;
+    vehicle.disabledAt = vehicle.available ? 0 : (typeof performance !== 'undefined' ? performance.now() : Date.now());
   }
   vehicle.visual.root.position.set(vehicle.x, vehicle.y, vehicle.z);
   vehicle.visual.root.rotation.set(0, vehicle.yaw, 0);
@@ -335,7 +368,7 @@ function startAviationRuntime(options = {}) {
   group.name = 'Playable Aviation Fleet';
   const vehicles = derivedFleet(appCtx.transportFacilityGraph, { mobile: isTouchClient() }).map((record) => {
     const visual = createAircraftVisual(THREE, record.catalog, { mobile: record.mobile, state: 'parked' });
-    const vehicle = { ...record, visual, available: true, unmanned: null };
+    const vehicle = { ...record, visual, available: true, unmanned: null, disabledAt: 0 };
     placeVehicle(vehicle);
     vehicle.home = Object.freeze({ x: vehicle.x, y: vehicle.y, z: vehicle.z, yaw: vehicle.yaw });
     group.add(visual.root);
@@ -369,7 +402,10 @@ function startAviationRuntime(options = {}) {
     update(frame) {
       runtime.vehicles.forEach((vehicle) => {
         if (vehicle.unmanned) updateUnmannedAircraft(vehicle, frame.dt);
-        else if (vehicle.available) updateAircraftVisual(vehicle.visual, vehicle.condition, frame.dt);
+        else if (vehicle !== runtime.activeAircraft) {
+          if (vehicle.available) updateAircraftVisual(vehicle.visual, vehicle.condition, frame.dt);
+          updateAircraftLifecycle(vehicle);
+        }
       });
       if (runtime.activeAircraft && appCtx.planeMode?.active) {
         runtime.activeAircraft.condition = Number(appCtx.planeMode.condition ?? runtime.activeAircraft.condition);
@@ -414,7 +450,16 @@ function startAviationRuntime(options = {}) {
         appCtx.applyResolvedWorldSpawn?.(resolved, { mode: 'walk', syncWalker: true, syncCar: false });
         return true;
       },
-      snapshot: runtime.snapshot
+      snapshot: runtime.snapshot,
+      ageDisabled(aircraftId = runtime.vehicles[0]?.id) {
+        const vehicle = runtime.vehicles.find(({ id }) => id === String(aircraftId));
+        if (!vehicle || vehicle === runtime.activeAircraft) return false;
+        vehicle.condition = 0;
+        vehicle.available = false;
+        vehicle.disabledAt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - ENTITY_LIFECYCLE_MS.disabledTransport - 1;
+        updateAircraftLifecycle(vehicle);
+        return vehicle.condition === 1 && vehicle.available === true;
+      }
     });
     globalThis.__WE3D_AVIATION_SUPPORT__ = runtime.supportHook;
   }

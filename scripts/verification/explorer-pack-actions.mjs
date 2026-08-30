@@ -32,7 +32,7 @@ async function openExploreMenu() {
 
 try {
   await mkdir(evidenceDir, { recursive: true });
-  await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
+  await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await page.locator('#globeSelectorStartBtn').click();
@@ -106,15 +106,15 @@ try {
   await page.waitForTimeout(40);
   const weapon = (await diagnostics()).urbanSandbox?.projectileRuntime;
   assert.equal(weapon?.useAnimation?.id, 'pulse-sidearm');
-  assert.equal(weapon?.lastProjectileAction?.equipmentId, 'pulse-sidearm');
-  assert.ok(Number(weapon?.lastProjectileAction?.maxDistance) >= 100);
+  assert.equal(weapon?.lastPlayerProjectileLaunch?.equipmentId, 'pulse-sidearm');
+  assert.ok(Number(weapon?.lastPlayerProjectileLaunch?.maxDistance) >= 100);
   assert.ok([
-    weapon?.lastProjectileAction?.originX,
-    weapon?.lastProjectileAction?.originY,
-    weapon?.lastProjectileAction?.originZ,
-    weapon?.lastProjectileAction?.aimX,
-    weapon?.lastProjectileAction?.aimY,
-    weapon?.lastProjectileAction?.aimZ
+    weapon?.lastPlayerProjectileLaunch?.originX,
+    weapon?.lastPlayerProjectileLaunch?.originY,
+    weapon?.lastPlayerProjectileLaunch?.originZ,
+    weapon?.lastPlayerProjectileLaunch?.aimX,
+    weapon?.lastPlayerProjectileLaunch?.aimY,
+    weapon?.lastPlayerProjectileLaunch?.aimZ
   ].every(Number.isFinite));
   assert.equal(await page.locator('#urbanWeaponReticle').isVisible(), true);
   await page.screenshot({ path: `${evidenceDir}/mobile-sidearm-action.png` });
@@ -123,7 +123,7 @@ try {
   await page.keyboard.press('Digit5');
   await page.keyboard.press('KeyV');
   await page.waitForFunction(() => {
-    const action = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime?.lastProjectileAction;
+    const action = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime?.lastPlayerProjectileAction;
     return action?.equipmentId === 'concussion-charge' && action?.phase === 'landed';
   }, null, { timeout: 4_000 });
   const chargeLanded = (await diagnostics()).urbanSandbox?.projectileRuntime;
@@ -133,11 +133,19 @@ try {
   await page.screenshot({ path: `${evidenceDir}/mobile-charge-landed.png` });
   await page.waitForFunction(() => {
     const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime;
-    return runtime?.lastProjectileAction?.equipmentId === 'concussion-charge' &&
-      runtime.lastProjectileAction.phase === 'impact' && runtime.activeProjectiles === 0;
+    return runtime?.lastImpactAction?.equipmentId === 'concussion-charge' &&
+      runtime.projectiles?.some((projectile) => projectile.equipmentId === 'concussion-charge') !== true;
   }, null, { timeout: 4_000 });
   const chargeResolved = (await diagnostics()).urbanSandbox?.projectileRuntime;
+  assert.equal(chargeResolved?.projectiles?.some((projectile) => projectile.owner === 'player'), false);
+  assert.equal(chargeResolved?.projectiles?.every((projectile) => projectile.elapsed <= projectile.maxLife), true);
   await page.screenshot({ path: `${evidenceDir}/mobile-charge-impact.png` });
+
+  const lifecycle = await page.evaluate(() => globalThis.__WE3D_URBAN_CRASH_SUPPORT__?.verifyEntityLifecycle?.());
+  assert.ok(lifecycle?.before?.npcId);
+  assert.ok(lifecycle?.before?.vehicleId);
+  assert.ok(lifecycle?.before?.pickupId);
+  assert.deepEqual(lifecycle.after, { npcPresent: false, vehiclePresent: false, pickupPresent: false });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openExploreMenu();
@@ -157,15 +165,21 @@ try {
       stableActivitySelection: true,
       visibleHandsAction: handsUse?.category === 'unarmed',
       visibleStaffAction: staffUse?.category === 'melee',
-      visibleWeaponActionAndReticle: weapon?.useAnimation?.id === 'pulse-sidearm' && weapon?.lastProjectileAction?.equipmentId === 'pulse-sidearm',
+      visibleWeaponActionAndReticle: weapon?.useAnimation?.id === 'pulse-sidearm' && weapon?.lastPlayerProjectileLaunch?.equipmentId === 'pulse-sidearm',
       sidearmUsesHandOriginAndExtendedReticleRange:
-        Number(weapon?.lastProjectileAction?.maxDistance) >= 100 &&
-        Number.isFinite(weapon?.lastProjectileAction?.originX) &&
-        Number.isFinite(weapon?.lastProjectileAction?.aimX),
+        Number(weapon?.lastPlayerProjectileLaunch?.maxDistance) >= 100 &&
+        Number.isFinite(weapon?.lastPlayerProjectileLaunch?.originX) &&
+        Number.isFinite(weapon?.lastPlayerProjectileLaunch?.aimX),
       chargeLandsBeforeFuseInsteadOfHanging:
-        chargeLanded?.lastProjectileAction?.phase === 'landed' &&
+        chargeLanded?.lastPlayerProjectileAction?.phase === 'landed' &&
         chargeLanded?.projectiles?.some((projectile) => projectile.equipmentId === 'concussion-charge' && projectile.landed === true) === true &&
-        chargeResolved?.lastProjectileAction?.phase === 'impact' && chargeResolved?.activeProjectiles === 0,
+        chargeResolved?.lastImpactAction?.equipmentId === 'concussion-charge' &&
+        chargeResolved?.projectiles?.some((projectile) => projectile.owner === 'player') !== true &&
+        chargeResolved?.projectiles?.every((projectile) => projectile.elapsed <= projectile.maxLife) === true,
+      expiredLootPeopleAndRoadVehiclesAreDisposed:
+        lifecycle?.after?.npcPresent === false &&
+        lifecycle?.after?.vehiclePresent === false &&
+        lifecycle?.after?.pickupPresent === false,
       desktopAndMobileRenderedFromOneWorldLoad: true,
       earthGameplayRuntime: current.gameStarted === true && current.environment === 'EARTH',
       noPageErrors: pageErrors.length === 0,

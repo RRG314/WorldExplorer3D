@@ -65,12 +65,12 @@ try {
   assert.equal(await page.locator('.flowerLeaderboardSource', { hasText: 'This device' }).count() > 0, true, 'Device results must remain visible beside cloud results.');
 
   const boardChecks = [];
-  for (const [id, label] of [
-    ['leaderboardTabFlower', 'Flower Sprint'],
-    ['leaderboardTabPaintTown', 'Paint Town'],
-    ['leaderboardTabFishing', 'Fishing'],
-    ['leaderboardTabExplorer', 'Explorer League'],
-    ['leaderboardTabDeFlock', 'DeFlock Hunt']
+  for (const [id, label, expectedScope] of [
+    ['leaderboardTabFlower', 'Flower Sprint', /Global.*All time/i],
+    ['leaderboardTabPaintTown', 'Paint Town', /Global.*All time/i],
+    ['leaderboardTabFishing', 'Fishing', /Global.*All time/i],
+    ['leaderboardTabExplorer', 'Explorer Profile', /This device.*Current profile/i],
+    ['leaderboardTabDeFlock', 'DeFlock Hunt', /Global.*All time/i]
   ]) {
     await page.locator(`#${id}`).click();
     await page.waitForFunction(() => !/Loading/i.test(document.getElementById('flowerChallengeStatus')?.textContent || ''), null, { timeout: 30_000 });
@@ -78,15 +78,15 @@ try {
     const scope = await page.locator('#gameLeaderboardScope').textContent();
     boardChecks.push({ id, heading, scope });
     assert.equal(heading?.trim(), label);
-    assert.match(scope || '', /Global.*All time/i);
+    assert.match(scope || '', expectedScope);
   }
 
   await page.locator('#flowerChallengeToggleBtn').click();
   await page.locator('[data-globe-destination="multiplayer"]').click();
   await page.waitForSelector('#tab-multiplayer.active');
-  await page.waitForFunction(() => !/Loading public Explorer League/i.test(document.getElementById('mpLeaderboardList')?.textContent || ''), null, { timeout: 30_000 });
+  await page.waitForFunction(() => !/Loading public Community League/i.test(document.getElementById('mpLeaderboardList')?.textContent || ''), null, { timeout: 30_000 });
   const signedOutExplorerText = (await page.locator('#mpLeaderboardList').textContent())?.replace(/\s+/g, ' ').trim() || '';
-  assert.ok(signedOutExplorerText.length > 0, 'Signed-out Explorer League must resolve to results or a useful empty state.');
+  assert.ok(signedOutExplorerText.length > 0, 'Signed-out Community League must resolve to results or a useful empty state.');
 
   await page.screenshot({ path: 'output/verification/retention-ui/globe-legal-and-retention.png', fullPage: true });
   const report = {

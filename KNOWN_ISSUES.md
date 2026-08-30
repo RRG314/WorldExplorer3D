@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
+Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
 
 ## Location and map coverage
 
@@ -59,6 +59,16 @@ Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
   observations.
 - Solar-system distance and body-size presentation uses documented visual
   scaling so destinations remain playable; it is not an orbital simulator.
+
+## Action and combat
+
+- Ranged equipment has a screen reticle, camera-directed projectiles, visible
+  use actions, impact handling, and bounded projectile cleanup. Precision aim,
+  sight alignment, recoil, spread, throwing feel, hit feedback, sound, and
+  mobile aiming still need further tuning and presentation work.
+- Combat is part of the sandbox rather than a competitive shooting simulator.
+  Collision and impact results can vary with browser frame timing and complex
+  world geometry.
 
 ## Field Guide and Journal
 

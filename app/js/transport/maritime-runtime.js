@@ -1,6 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { MARITIME_CATALOG } from './maritime-catalog.js?v=1';
 import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=6';
+import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 
 let activeRuntime = null;
 
@@ -313,11 +314,41 @@ function restoreActiveVessel(runtime, snapshot = {}) {
   vessel.condition = Number.isFinite(snapshot.condition) ? snapshot.condition : vessel.condition;
   vessel.candidate = snapshot.water || vessel.candidate;
   vessel.available = vessel.condition > .05;
+  vessel.disabledAt = vessel.available ? 0 : (typeof performance !== 'undefined' ? performance.now() : Date.now());
   placeVessel(vessel);
   updateVesselVisual(vessel.visual, vessel.condition);
-  vessel.visual.root.visible = vessel.available;
+  vessel.visual.root.visible = true;
   runtime.activeVessel = null;
   return true;
+}
+
+function recoverDisabledVessel(vessel) {
+  if (!vessel?.home) return false;
+  vessel.x = vessel.home.x;
+  vessel.y = vessel.home.y;
+  vessel.z = vessel.home.z;
+  vessel.yaw = vessel.home.yaw;
+  vessel.candidate = vessel.home.candidate;
+  vessel.condition = 1;
+  vessel.disabledAt = 0;
+  vessel.available = true;
+  placeVessel(vessel);
+  vessel.visual.root.visible = true;
+  updateVesselVisual(vessel.visual, vessel.condition);
+  return true;
+}
+
+function updateVesselLifecycle(vessel) {
+  if (!vessel) return;
+  if (vessel.condition > .05) {
+    vessel.disabledAt = 0;
+    return;
+  }
+  vessel.available = false;
+  vessel.visual.root.visible = true;
+  const current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const disabledAt = markLifecycleStart(vessel, 'disabledAt', current);
+  if (lifecycleExpired(disabledAt, ENTITY_LIFECYCLE_MS.disabledTransport, current)) recoverDisabledVessel(vessel);
 }
 
 function performInteraction(runtime, candidate) {
@@ -360,8 +391,9 @@ function startMaritimeRuntime(options = {}) {
   group.name = 'Playable Maritime Fleet';
   const vessels = derivedFleet(appCtx.transportFacilityGraph, { mobile: isTouchClient() }).map((record) => {
     const visual = createVesselVisual(THREE, record.catalog, { mobile: record.mobile, state: 'berthed' });
-    const vessel = { ...record, visual };
+    const vessel = { ...record, visual, disabledAt: 0 };
     placeVessel(vessel);
+    vessel.home = Object.freeze({ x: vessel.x, y: vessel.y, z: vessel.z, yaw: vessel.yaw, candidate: vessel.candidate });
     group.add(visual.root);
     return vessel;
   });
@@ -393,6 +425,9 @@ function startMaritimeRuntime(options = {}) {
     critical: false,
     enabled: () => runtimeMatches(runtime),
     update() {
+      runtime.vessels.forEach((vessel) => {
+        if (vessel !== runtime.activeVessel) updateVesselLifecycle(vessel);
+      });
       if (runtime.activeVessel && appCtx.boatMode?.active) {
         runtime.activeVessel.condition = Number(appCtx.boatMode.condition ?? runtime.activeVessel.condition);
       }
@@ -457,7 +492,16 @@ function startMaritimeRuntime(options = {}) {
         appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
         return true;
       },
-      snapshot: runtime.snapshot
+      snapshot: runtime.snapshot,
+      ageDisabled(vesselId = runtime.vessels[0]?.id) {
+        const vessel = runtime.vessels.find(({ id }) => id === String(vesselId));
+        if (!vessel || vessel === runtime.activeVessel) return false;
+        vessel.condition = 0;
+        vessel.available = false;
+        vessel.disabledAt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - ENTITY_LIFECYCLE_MS.disabledTransport - 1;
+        updateVesselLifecycle(vessel);
+        return vessel.condition === 1 && vessel.available === true;
+      }
     });
     globalThis.__WE3D_MARITIME_SUPPORT__ = runtime.supportHook;
   }

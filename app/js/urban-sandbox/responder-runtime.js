@@ -9,6 +9,7 @@ import { applyConditionImpact } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 import { dampCrashMotion } from './crash-physics.js?v=1';
+import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
@@ -495,6 +496,21 @@ function createUrbanResponderRuntime(options = {}) {
     responders.slice().forEach((responder) => {
       updateMotion(responder, step, civic || {}, actor, returning, actorWithinSearch);
       updateOfficer(responder, step, civic || {}, actor, returning);
+      const current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (Number(responder.condition ?? 1) <= .05) {
+        const disabledAt = markLifecycleStart(responder, 'disabledAt', current);
+        if (lifecycleExpired(disabledAt, ENTITY_LIFECYCLE_MS.disabledResponder, current)) {
+          removeResponder(responder);
+          return;
+        }
+      } else responder.disabledAt = 0;
+      if (responder.officer && Number(responder.officer.condition ?? 1) <= .05) {
+        const downedAt = markLifecycleStart(responder.officer, 'downedAt', current);
+        if (lifecycleExpired(downedAt, ENTITY_LIFECYCLE_MS.downedActor, current)) {
+          responder.officer.visual?.dispose?.();
+          responder.officer = null;
+        }
+      }
       if (!returning) return;
       const originDistance = Math.hypot(responder.x - responder.origin.x, responder.z - responder.origin.z);
       const actorDistance = actor ? Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)) : Infinity;

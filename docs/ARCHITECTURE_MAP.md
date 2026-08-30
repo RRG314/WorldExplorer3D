@@ -73,6 +73,15 @@ damage response without creating separate vehicle loops. Responder vehicles,
 traffic, claimed vehicles, cameras, HUD units, crash state, and companions all
 consume that same contract.
 
+Aircraft and maritime fleets adapt the existing Plane and Boat controllers
+rather than creating competing movement systems. Mapped airports, helipads,
+marinas, harbors, and ports anchor generated playable fleets. Mapped vessels
+keep their provider identity and remain separate from generated activity
+vessels. Boat camera framing uses the active water class: harbors and channels
+keep large-ship follow distance bounded, while open water retains a wider view.
+Terrestrial layers remain visible near shore and are suppressed only in known,
+distant open ocean.
+
 ## Character, companions, and urban play
 
 The Character Backpack is the item authority for equipment, ammunition,
@@ -86,6 +95,13 @@ civic response, defensive behavior, and collision, then returns them to the
 population owner. Downed-actor items become bounded world pickups before the
 Backpack can receive them. Mapped stores use exact eligible place records and a
 stable per-store exchange model.
+
+Temporary effects and entities follow one lifecycle policy. Projectiles and
+impact effects dispose after impact or a short maximum flight. Unclaimed loot,
+downed local actors, disabled road vehicles, responders, aircraft, and vessels
+have bounded retirement or recovery rules that also dispose their rendering
+resources. Room-owned entities are excluded from client-only retirement;
+shared cleanup must be accepted by the room authority.
 
 Companions retain individual identity, care, trust, experience, level, and
 travel state. Domestic animals, birds, and eligible livestock use one companion
@@ -109,8 +125,8 @@ authority. Live GPS may supply trusted physical-movement context, but generated
 field leads remain game opportunities rather than live-occurrence claims.
 
 Regional ecology packs are versioned separately from runtime logic and resolved
-through one registry. The released Baltimore–Chesapeake pack and 5.1 candidate
-packs share the same field-activity authority. Taxon records carry category,
+through one registry. The Baltimore–Chesapeake pack and the additional 5.1
+regional packs share the same field-activity authority. Taxon records carry category,
 habitat, seasonality, region, source, license, attribution, localization seed,
 sensitive-species policy, migration, and rollback metadata.
 
@@ -155,6 +171,11 @@ Client code may request an action, but authentication, membership, ownership,
 moderation, and payload checks are enforced at the backend or in Firestore
 rules. Production credentials are never part of the public source tree.
 
+Room presence is the source for player and room discovery. Future map-based
+discovery will aggregate privacy-safe activity areas and current counts from
+that authority; it will not publish precise coordinates from an unrelated
+client or infer online players from local scene objects.
+
 ## Data classification
 
 Provider records preserve identity, source, freshness, units, and a truth
@@ -179,8 +200,8 @@ the selected Firebase environment configuration. Backend deployment is a
 separate operation from hosting deployment.
 
 Production promotion is intentionally separate from staging preview creation.
-The 5.1 candidate is built once, preserved with its manifest and content hash,
-and exercised on desktop and mobile. Backend authorization, multiplayer, and
-creator checks run against local Firebase emulators. Production hosting and
-backend services are not changed until that exact candidate is reviewed and
+The 5.1 release build is built once, preserved with its manifest and content
+hash, and exercised on desktop and mobile. Backend authorization, multiplayer,
+and creator checks run against local Firebase emulators. Production hosting and
+backend services are not changed until that exact build is reviewed and
 explicitly approved.

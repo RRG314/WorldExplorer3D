@@ -36,6 +36,11 @@ try {
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const firstAircraft = initial.aviation.vehicles.find((vehicle) => vehicle.catalogId === 'expedition-prop');
   assert.ok(firstAircraft, 'The expedition aircraft was not published.');
+  const recoveryAircraft = initial.aviation.vehicles.find((vehicle) => vehicle.id !== firstAircraft.id);
+  const aircraftRecovered = recoveryAircraft
+    ? await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.ageDisabled(id), recoveryAircraft.id)
+    : false;
+  assert.equal(aircraftRecovered, true);
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), firstAircraft.id), true);
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.action === 'enter_aircraft');
   await page.keyboard.press('KeyE');
@@ -91,6 +96,7 @@ try {
   const checks = Object.freeze({
     catalogPublished: initial.aviation.fleetCount === 5 && initial.aviation.playableCount === 5,
     mappedFacilityAnchors: initial.aviation.mappedAnchorCount > 0,
+    disabledAircraftRecoveredAtFacility: aircraftRecovered === true,
     enteredThroughVisiblePrompt: beforeJump?.identity?.catalogId === 'expedition-prop',
     manualTakeoffReachedSafeHeight: beforeJump?.contact?.grounded === false && beforeJump.position.y > 20,
     airbornePoseHandoff: Math.hypot(
@@ -109,6 +115,7 @@ try {
     ok: Object.values(checks).every(Boolean),
     checks,
     initialAviation: initial.aviation,
+    aircraftRecovered,
     beforeJump,
     exitStart,
     freefall: { actor: freefall.activeActor, parachute: freefall.urbanSandbox?.parachute, aviation: freefall.aviation },

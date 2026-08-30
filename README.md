@@ -6,94 +6,84 @@
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=semver)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
-World Explorer 3D is a browser-based geospatial exploration game. Choose a
-place on the globe, enter coordinates, or use a preset destination, then
-explore on foot, by road, over water, through the air, or beyond Earth.
+World Explorer 3D is a browser-based world sandbox built around real places.
+Choose a location, step into the world, and explore by land, water, air, or
+space.
 
-**[Play World Explorer 3D](https://worldexplorer3d.io/app/)**
+<p align="center">
+  <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
+  · <a href="CONTROLS_REFERENCE.md">Controls</a>
+  · <a href="RELEASE_NOTES_5.1.0.md">What’s new</a>
+  · <a href="ROADMAP.md">Roadmap</a>
+</p>
 
-![Expanded New York world viewed from the air](assets/landing/gameplay/showcase/new-york-expanded-aerial.webp)
+![Walking beside USS Constellation in Baltimore's Inner Harbor](assets/readme/baltimore-harbor.webp)
 
-*New York viewed from the air in World Explorer 3D.*
+*Baltimore’s Inner Harbor, with the mapped USS Constellation identified as a
+sloop-of-war museum ship.*
 
-## Overview
+## A world you can play in
 
-World Explorer 3D turns real-world map context into bounded, playable 3D
-locations in the browser. A selected location combines available terrain,
-roads, buildings, water, land cover, and places with game systems for walking,
-vehicles, field exploration, fishing, building, and multiplayer rooms. Separate
-Ocean, Moon, Mars, solar-system, and deep-space environments extend play beyond
-the active Earth location.
+Select a city, landmark, airport, harbor, or coordinates and enter a bounded 3D
+world shaped by available terrain, roads, buildings, water, land cover, and
+places. Walk the streets, cross bridges and rooftops, enter mapped or eligible
+generated interiors, drive, fly, sail, fish, survey habitats, build, or meet
+other players in a room tied to that location.
 
-The game supports solo exploration and location-bound multiplayer. Player
-progress connects the Backpack, Journal, Field Guide, activities, Expeditions,
-specialties, companions, and seasonal surveys. The World Editor is the shared
-home for reviewed overlays and persistent local or room Blocks.
+The same Explorer connects your Backpack, quick slots, Journal, Field Guide,
+activities, Expeditions, specialties, companions, and seasonal surveys. The
+World Editor holds both reviewed overlays and persistent Blocks, so creating a
+place remains part of the world instead of a separate building game.
 
-World Explorer uses attributed public and licensed sources where their coverage
-allows, and keeps mapped, observed, modeled, reference, and game-generated
-content distinct. It is an exploration game—not a navigation, wildlife-presence,
-surveying, or safety tool.
+| Water and shore | Flight |
+| :--: | :--: |
+| ![Shore fishing beside Baltimore's Inner Harbor](assets/readme/baltimore-shore-fishing-mobile.webp) | ![Personal aircraft at BWI](assets/readme/bwi-personal-plane.webp) |
+| **Fish from shore, pilot boats, dive, and explore ports** | **Use a personal aircraft or board aircraft at mapped airports** |
+
+| Deep space | Explorer progression |
+| :--: | :--: |
+| ![Wayfinder approach to Sagittarius A star](assets/readme/space-wayfinder-sagittarius.webp) | ![Field Today in My Explorer](assets/readme/explorer-today.webp) |
+| **Fly manually or use optional Wayfinder assistance** | **Choose an activity and carry the result into one Explorer record** |
+
+![A playable container cargo ship underway near Rotterdam](assets/readme/rotterdam-cargo-ship.webp)
+
+*A playable cargo ship underway near Rotterdam, with the shoreline kept in the
+active world.*
+
+## What you can do
+
+- Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
+  astronaut, or spacecraft, or use optional Live GPS play while walking.
+- Search for places by familiar names, including cities, landmarks, airports,
+  and other expected location searches.
+- Use configurable Backpack quick slots for field tools, fishing gear,
+  equipment, and ranged actions.
+- Photograph, inspect, survey, identify, fish, follow tracks and signs, and
+  record finds in the Journal and Field Guide.
+- Care for companions, build trust and levels, and travel with eligible
+  domestic, bird, and livestock companions.
+- Enter persistent multiplayer rooms with presence, chat, activities, shared
+  Blocks, and room vehicles.
+- Build with Blocks inside the World Editor and return to supported local or
+  shared creations later.
+- Leave Earth for the Moon, planets, the solar system, and selected deep-space
+  destinations, with manual flight always available.
 
 ## Version 5.1
 
-World Explorer 3D 5.1 makes the Explorer, Journal, Field Guide, and Backpack one
-connected record of what you do across the sandbox. It also expands regional
-field play beyond Baltimore while keeping every lead honest about what the game
-does and does not know.
+Version 5.1 brings the Explorer systems into one clearer experience and expands
+the sandbox across Earth, oceans, airports, and space. It includes distinct
+vehicle handling, visible damage, enterable responder vehicles, aviation and
+skydiving, playable maritime fleets, regional field guides, companion growth,
+configurable quick slots, improved place search, a redesigned First Journey,
+rooftop traversal, and a more capable Wayfinder.
 
-Highlights include:
+Eleven regional Field Guide packs provide 180 attainable entries across the
+built-in Earth destinations. Field leads are game opportunities: they do not
+claim that a real animal is physically present at the player’s location.
 
-- Walking, driving, drone, plane, boat, underwater, rover, astronaut, and
-  spacecraft traversal.
-- Distinct road-vehicle handling, a 120 MPH car ceiling, enterable responder
-  vehicles, readable collision damage, and lights and siren controls.
-- Configurable quick slots, ranged-weapon aiming, recoverable weapons and
-  ammunition, mapped convenience-store exchange, and bounded NPC response.
-- Individual companion care, trust, levels, vehicle travel, and eligible
-  domestic, bird, and livestock companions.
-- Manual solar-system flight, assisted journeys, solid-world traversal,
-  atmospheric destinations, body collision, landing, and Earth return.
-- A unified World Editor with persistent local and multiplayer Blocks.
-- A dedicated Journal for Fieldwork, Games, Making, Travel, Community, and
-  Companions, connected to one Explorer profile.
-- A shared Backpack, Field Today activities, Expeditions, Field Guide, life
-  lists, specialties, companions, and seasonal surveys.
-- Eleven regional Field Guide packs covering 180 attainable entries across
-  plants, animals, birds, insects and arachnids, freshwater fish, and marine
-  fish. Every built-in Earth destination resolves to an appropriate pack.
-- Searchable current-region and World Guide views, grouped unidentified
-  entries, and downloadable Journal backup and restore.
-- Field leads shared by normal walking and optional Live GPS play. Field leads
-  are game opportunities and do not claim a real animal is physically present.
-- Shore, boat, and underwater fishing connected to the same Journal and Field
-  Guide records.
-- Bounded multiplayer rooms with presence, chat, shared building, activities,
-  and persistent vehicle ownership.
-- Keyboard, touch, browser-zoom, focus, contrast, larger-text, and reduced-motion
-  support.
-- Faster mobile Earth and Live GPS entry with a bounded regional world budget
-  that keeps the playable district and GPS recovery boundary intact.
-
-Version 5.1 does not claim complete worldwide ecology, universal detailed
-interiors, survey-grade terrain, or identical data quality at every location.
-See [Known Issues](KNOWN_ISSUES.md) for current limits.
-
-## Explore the world
-
-| Baltimore waterfront | Monaco coast |
-| :--: | :--: |
-| ![Baltimore Inner Harbor and surrounding city](assets/landing/gameplay/showcase/baltimore-waterfront-skyline.webp) | ![Monaco's mapped streets, buildings, hills, and coast](assets/landing/gameplay/showcase/monaco-coast-aerial.webp) |
-| **Harbor, roads, and city context** | **Dense development along the Mediterranean** |
-
-| San Francisco Bay | Tokyo |
-| :--: | :--: |
-| ![San Francisco skyline and bay](assets/landing/gameplay/showcase/san-francisco-bay-skyline.webp) | ![Shinjuku and the surrounding Tokyo city world](assets/landing/gameplay/showcase/tokyo-shinjuku-aerial.webp) |
-| **A city shaped by land and water** | **Local detail inside a large urban region** |
-
-Bridges, elevated roads, ramps, tunnels, streets, shorelines, and terrain are
-part of play rather than static scenery. Available detail depends on source
-coverage and the selected location.
+Read the full [5.1 release notes](RELEASE_NOTES_5.1.0.md) and the current
+[known issues](KNOWN_ISSUES.md).
 
 ## Multiplayer and building
 
@@ -102,16 +92,19 @@ shares one location, player presence, chat, activities, persistent vehicles,
 and player-built Blocks. Private rooms use invite codes; public rooms can be
 found by city.
 
-Blocks now live inside the World Editor so building and reviewed overlays no
-longer compete as separate editing systems. Existing supported local and room
-blocks are retained through the migration.
+Blocks are part of the World Editor. Existing supported local and room Blocks
+remain on that shared persistence path, with one owner for placement,
+permissions, saving, and recovery.
 
-## Data and accuracy
+## World data and accuracy
 
-Earth scenes use OpenStreetMap-derived geometry and other attributed public
-datasets. Coverage, freshness, height information, and provider availability
-vary. World Explorer uses clearly labeled fallbacks when information is
-missing, but it is not a navigation tool or a source of survey-grade data.
+Earth scenes use OpenStreetMap-derived geometry and other attributed public or
+licensed sources. Coverage, freshness, height information, and provider
+availability vary by location. Mapped, observed, modeled, reference, and
+game-created content stay visibly distinct.
+
+World Explorer 3D is a game. It is not a navigation, appraisal, surveying,
+wildlife-presence, or safety service.
 
 - [Data sources](DATA_SOURCES.md)
 - [Attribution](ATTRIBUTION.md)
@@ -134,11 +127,14 @@ python3 -m http.server --directory dist 4173
 
 Open `http://127.0.0.1:4173/app/`.
 
-Core exploration can run without production credentials. Account,
-multiplayer, moderation, and other backend-dependent features require an
-authorized environment. Secrets are not included in the repository.
+Keyboard and touch controls support browser zoom, visible focus, higher
+contrast, larger text, and reduced motion.
 
-## Project documents
+Core exploration can run without production credentials. Accounts,
+multiplayer, moderation, and other online features require an authorized
+environment. Secrets are not included in the repository.
+
+## Project guide
 
 - [Release notes](RELEASE_NOTES_5.1.0.md)
 - [Changelog](CHANGELOG.md)
@@ -146,7 +142,6 @@ authorized environment. Secrets are not included in the repository.
 - [System inventory](docs/SYSTEM_INVENTORY.md)
 - [Architecture](docs/ARCHITECTURE_MAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
-- [DeFlock Hunt](docs/DEFLOCK_MODE.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

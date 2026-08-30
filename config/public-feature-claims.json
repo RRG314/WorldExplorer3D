@@ -15,13 +15,13 @@
     {
       "id": "fixed-location-earth",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Choose a\\s+place on the globe" },
+      "source": { "file": "README.md", "pattern": "Choose a location, step into the world" },
       "evidenceCommands": ["verify:world", "verify:assembled-locations", "verify:artifact-runtime"]
     },
     {
       "id": "earth-traversal",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Walking, driving, drone, plane, boat, underwater, rover, astronaut, and\\s+spacecraft traversal" },
+      "source": { "file": "README.md", "pattern": "Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,\\s+astronaut, or spacecraft" },
       "evidenceCommands": ["verify:actors-vehicles", "verify:environments"]
     },
     {
@@ -33,7 +33,7 @@
     {
       "id": "buildings-and-interiors",
       "status": "candidate-verified",
-      "source": { "file": "app/index.html", "pattern": "ENTERABLE BUILDINGS" },
+      "source": { "file": "README.md", "pattern": "enter mapped or eligible\\s+generated interiors" },
       "evidenceCommands": ["verify:interiors"]
     },
     {
@@ -45,19 +45,19 @@
     {
       "id": "vehicle-handling-and-response",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Distinct road-vehicle handling" },
+      "source": { "file": "README.md", "pattern": "distinct\\s+vehicle handling" },
       "evidenceCommands": ["verify:current-contracts", "verify:actors-vehicles", "verify:player-reported-blockers"]
     },
     {
       "id": "character-quick-slots-and-urban-equipment",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Configurable quick slots" },
+      "source": { "file": "README.md", "pattern": "configurable Backpack quick slots" },
       "evidenceCommands": ["verify:current-contracts", "verify:urban-equipment"]
     },
     {
       "id": "companion-progression-and-travel",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Individual companion care" },
+      "source": { "file": "README.md", "pattern": "Care for companions, build trust and levels" },
       "evidenceCommands": ["verify:current-contracts", "verify:explorer-coherence-browser"]
     },
     {
@@ -75,37 +75,37 @@
     {
       "id": "fishing",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Shore, boat, and underwater fishing" },
+      "source": { "file": "README.md", "pattern": "Fish from shore, pilot boats, dive, and explore ports" },
       "evidenceCommands": ["verify:shore-fishing", "verify:unified-fishing", "verify:fishing-loss-recovery"]
     },
     {
       "id": "deflock-hunt",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "DeFlock Hunt" },
+      "source": { "file": "app/index.html", "pattern": "DeFlock Hunt" },
       "evidenceCommands": ["verify:deflock-live-ui"]
     },
     {
       "id": "live-gps",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "optional Live GPS play" },
+      "source": { "file": "README.md", "pattern": "optional Live GPS play while walking" },
       "evidenceCommands": ["verify:live-gps", "verify:walking-encounters", "verify:shore-fishing"]
     },
     {
       "id": "connected-explorer-journal",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "dedicated Journal for Fieldwork, Games, Making, Travel, Community, and\\s+Companions" },
+      "source": { "file": "README.md", "pattern": "The same Explorer connects your Backpack, quick slots, Journal, Field Guide" },
       "evidenceCommands": ["verify:explorer-coherence", "verify:explorer-coherence-browser"]
     },
     {
       "id": "regional-field-guide",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Eleven regional Field Guide packs covering 180 attainable entries" },
+      "source": { "file": "README.md", "pattern": "Eleven regional Field Guide packs provide 180 attainable entries" },
       "evidenceCommands": ["verify:regional-ecology", "verify:regional-world-richness", "verify:regional-guide-new-york"]
     },
     {
       "id": "journal-backup",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "downloadable Journal backup and restore" },
+      "source": { "file": "app/index.html", "pattern": "Download backup" },
       "evidenceCommands": ["verify:explorer-coherence", "verify:explorer-coherence-browser"]
     },
     {
@@ -123,19 +123,19 @@
     {
       "id": "mobile-touch-controls",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Keyboard, touch, browser-zoom" },
+      "source": { "file": "github-pages/index.html", "pattern": "Touch controls, quick slots, the Backpack" },
       "evidenceCommands": ["verify:mobile-controls"]
     },
     {
       "id": "minimum-accessibility-boundary",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Keyboard, touch, browser-zoom, focus, contrast, larger-text, and reduced-motion" },
+      "source": { "file": "README.md", "pattern": "Keyboard and touch controls support browser zoom, visible focus, higher\\s+contrast, larger text, and reduced motion" },
       "evidenceCommands": ["verify:accessibility-release", "verify:mobile-controls"]
     },
     {
       "id": "planetary-and-space-travel",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Ocean, Moon, Mars, solar-system, and deep-space environments" },
+      "source": { "file": "README.md", "pattern": "Leave Earth for the Moon, planets, the solar system, and selected deep-space\\s+destinations" },
       "evidenceCommands": ["verify:current-contracts", "verify:environments"]
     }
   ]

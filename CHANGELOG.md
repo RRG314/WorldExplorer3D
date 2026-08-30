@@ -2,7 +2,7 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.1.0] - 2026-08-27
+## [5.1.0] - 2026-08-30
 
 ### Added
 
@@ -23,6 +23,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 - Manual and assisted solar-system journeys, accepted planetary surfaces,
   celestial collision, solid-world landing, atmospheric destinations, and
   Earth return.
+- Airport and helipad aircraft, in-flight exit and skydiving, mapped marinas
+  and ports, playable boat and ship classes, and mapped historic-vessel labels.
+- Familiar-name place search, including landmarks and airports, plus a
+  location-aware First Journey that can be postponed or turned off.
 
 ### Changed
 
@@ -35,6 +39,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   Today, Expedition, and seasonal opportunities.
 - Mobile Earth compilation keeps the near-player district and a bounded regional
   context while shortening optional provider waits and repeated feature scans.
+- Boats retain nearby shores and use tighter follow-camera framing in harbors
+  and channels; open-ocean travel keeps its wider view.
+- Projectiles, spent charges, world loot, downed actors, wrecked local vehicles,
+  responders, aircraft, and vessels now use bounded disposal or recovery rules.
 
 ### Fixed
 
@@ -50,6 +58,9 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   interior collision, elevator floor choice, weapon reticles, open-water layer
   ownership, mobile walking direction, follow camera, loading coverage, globe
   selection, prompt overlap, and mode-specific speed units.
+- Kept mapped ship identity separate from generated maritime activity, restored
+  USS Constellation as a sloop-of-war museum ship, and preserved rooftop walking
+  after landing or climbing onto an eligible building.
 
 ## [5.0.0] - 2026-08-26
 

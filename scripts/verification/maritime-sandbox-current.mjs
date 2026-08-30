@@ -62,6 +62,7 @@ try {
     Number(underway.activeActor.position.z) - Number(start.position.z)
   );
   const screenshotPath = `${outputDir}/rotterdam-cargo-underway.png`;
+  const cameraFraming = underway.boatNavigation?.cameraFraming;
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
   await page.waitForFunction(() => globalThis.__WE3D_MARITIME_SUPPORT__?.snapshot?.().interaction?.action === 'exit_vessel');
@@ -79,6 +80,11 @@ try {
     sharedBoatAuthorityActive: initialMaritime.authority === 'shared-transport-maritime-adapter' && entered.modes?.boat === true,
     classSpecificLargeShipBounds: entered.activeActor?.bounds?.radius >= 100 && entered.activeActor?.bounds?.height === 48,
     largeShipUnderway: travel > 5,
+    shoreLayersAvailableForNavigation: underway.boatNavigation?.shoreVisible === true,
+    channelCameraIsBounded: !['harbor', 'channel'].includes(underway.boatNavigation?.waterKind) || (
+      Number(cameraFraming?.chaseDistance) > Number(cameraFraming?.classLength) * .5 + 4 &&
+      Number(cameraFraming?.lookAhead) > Number(cameraFraming?.classLength) * .5 + 15
+    ),
     exitedToWalkingAndVesselPersisted: exited.modes?.walking === true && returnedCargo?.available === true,
     noRuntimeErrors: (exited.runtimeErrors || []).length === 0,
     noPageErrors: pageErrors.length === 0,

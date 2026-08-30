@@ -64,7 +64,7 @@ function createEquipmentInventory(options = {}) {
     });
     if (definition.quantity) quantities.set(definition.id, Number(options.quantities?.[definition.id] ?? persistedQuantities?.[definition.id] ?? definition.quantity));
   });
-  let lastUseAt = -Infinity;
+  const lastUseAtByEquipment = new Map();
   let flashlightEnabled = false;
 
   const snapshot = () => {
@@ -154,10 +154,11 @@ function createEquipmentInventory(options = {}) {
         return Object.freeze({ ok: false, reason: 'no_direct_use', definition });
       }
       const timestamp = Number(at) || 0;
+      const lastUseAt = Number(lastUseAtByEquipment.get(definition.id) ?? -Infinity);
       if (timestamp - lastUseAt < Number(definition.cooldownMs || 0)) return Object.freeze({ ok: false, reason: 'cooldown', definition });
       if (definition.category === 'utility') {
         flashlightEnabled = !flashlightEnabled;
-        lastUseAt = timestamp;
+        lastUseAtByEquipment.set(definition.id, timestamp);
         return Object.freeze({ ok: true, definition, utility: 'flashlight', enabled: flashlightEnabled });
       }
       const rounds = ammo.get(definition.id);
@@ -167,7 +168,7 @@ function createEquipmentInventory(options = {}) {
       if (rounds) rounds.magazine -= 1;
       if (quantity !== undefined) quantities.set(definition.id, quantity - 1);
       if (rounds || quantity !== undefined) backpack.touch?.('equipment-consumed', { catalogId: definition.id });
-      lastUseAt = timestamp;
+      lastUseAtByEquipment.set(definition.id, timestamp);
       return Object.freeze({ ok: true, definition });
     }
   });

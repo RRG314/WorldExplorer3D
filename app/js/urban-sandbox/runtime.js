@@ -4,13 +4,13 @@ import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=7';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=17';
+import { createEquipmentInventory } from './equipment-model.js?v=8';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=19';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=2';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=16';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=17';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -20,6 +20,7 @@ import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-mo
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
+import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -757,10 +758,23 @@ function collectLootPickup(state, pickupId) {
   return true;
 }
 
+function disposeLootPickup(state, pickup) {
+  const index = state.pickups.indexOf(pickup);
+  if (index < 0) return false;
+  pickup.visual?.dispose?.();
+  state.pickups.splice(index, 1);
+  return true;
+}
+
 function updateLootPickups(state, dt) {
   const step = Math.max(0, Number(dt) || 0);
   state.lootElapsed += step;
-  state.pickups.forEach((pickup, index) => {
+  const current = now();
+  state.pickups.slice().forEach((pickup, index) => {
+    if (lifecycleExpired(pickup.spawnedAt, ENTITY_LIFECYCLE_MS.lootPickup, current)) {
+      disposeLootPickup(state, pickup);
+      return;
+    }
     if (!pickup.visual?.root) return;
     pickup.visual.root.rotation.y += step * .9;
     pickup.visual.root.position.y = pickup.position.y + .12 + Math.sin(state.lootElapsed * 2.2 + index) * .035;
@@ -919,10 +933,11 @@ function handleStoreAction(state, event) {
   return true;
 }
 
-function releasePromotedNpc(state, npc) {
+function releasePromotedNpc(state, npc, options = {}) {
   const index = state.npcs.indexOf(npc);
   if (index < 0) return false;
-  state.population?.releasePedestrian?.(npc.sourceAgentId);
+  if (options.retire === true) state.population?.retirePedestrian?.(npc.sourceAgentId);
+  else state.population?.releasePedestrian?.(npc.sourceAgentId);
   npc.visual.dispose();
   state.npcs.splice(index, 1);
   return true;
@@ -1024,6 +1039,98 @@ function releaseDetailedTrafficVehicle(state, vehicle) {
   vehicle.visual.dispose();
   state.vehicles.splice(index, 1);
   return true;
+}
+
+function retireDetailedTrafficVehicle(state, vehicle) {
+  if (!vehicle?.ambientTraffic || vehicle.attachedToPlayer || vehicle.occupied) return false;
+  const index = state.vehicles.indexOf(vehicle);
+  if (index < 0) return false;
+  state.population?.retireVehicleDetail?.(vehicle.trafficAgentId);
+  vehicle.visual.dispose();
+  state.vehicles.splice(index, 1);
+  return true;
+}
+
+function retireDisabledRoadVehicle(state, vehicle) {
+  if (!vehicle || vehicle.attachedToPlayer || vehicle.occupied || vehicle.playerClaimed) return false;
+  if (state.remoteEntities?.has(vehicle.id)) return false;
+  if (vehicle.ambientTraffic) return retireDetailedTrafficVehicle(state, vehicle);
+  const index = state.vehicles.indexOf(vehicle);
+  if (index < 0) return false;
+  vehicle.visual?.dispose?.();
+  state.vehicles.splice(index, 1);
+  return true;
+}
+
+function updateEntityLifecycle(state) {
+  if (!activeWorldMatches(state)) return;
+  const current = now();
+  state.npcs.slice().forEach((npc) => {
+    if (Number(npc.condition ?? 1) > .05) {
+      npc.downedAt = 0;
+      return;
+    }
+    const downedAt = markLifecycleStart(npc, 'downedAt', current);
+    if (state.remoteEntities?.has(npc.id)) return;
+    if (lifecycleExpired(downedAt, ENTITY_LIFECYCLE_MS.downedActor, current)) {
+      releasePromotedNpc(state, npc, { retire: true });
+    }
+  });
+  state.vehicles.slice().forEach((vehicle) => {
+    if (Number(vehicle.condition ?? 1) > .05) {
+      vehicle.disabledAt = 0;
+      return;
+    }
+    const disabledAt = markLifecycleStart(vehicle, 'disabledAt', current);
+    if (lifecycleExpired(disabledAt, ENTITY_LIFECYCLE_MS.disabledRoadVehicle, current)) {
+      retireDisabledRoadVehicle(state, vehicle);
+    }
+  });
+}
+
+function verifyEntityLifecycleForSupport(state) {
+  if (!appCtx.developerDiagnosticsEnabled || appCtx.getCurrentMultiplayerRoom?.()) return null;
+  const current = now();
+  const actor = civicActorPosition(state);
+  const nearby = state.population?.nearbyPedestrians?.(actor, NPC_DETAIL_PRELOAD_DISTANCE) || [];
+  const populationFallback = (state.population?.pedestrianSnapshots?.() || []).find((entry) => !entry.promoted);
+  const npc = state.npcs[0] || promotePedestrian(state, nearby[0] || populationFallback);
+  const vehicle = state.vehicles.find((entry) => !entry.attachedToPlayer && !entry.occupied && !entry.playerClaimed);
+  const pickup = spawnLootPickup(state, {
+    sourceActorId: 'lifecycle-verification',
+    weaponId: 'compact-sidearm',
+    label: 'Recovered equipment',
+    rounds: 1,
+    position: actor
+  });
+  const before = Object.freeze({
+    npcId: npc?.id || '',
+    vehicleId: vehicle?.id || '',
+    pickupId: pickup?.id || ''
+  });
+  if (npc) {
+    npc.condition = 0;
+    npc.reaction = 'downed';
+    npc.reactionUntil = Infinity;
+    npc.downedAt = current - ENTITY_LIFECYCLE_MS.downedActor - 1;
+    npc.visual?.setReaction?.('downed');
+  }
+  if (vehicle) {
+    vehicle.condition = 0;
+    vehicle.disabledAt = current - ENTITY_LIFECYCLE_MS.disabledRoadVehicle - 1;
+    vehicle.visual?.setCondition?.(0);
+  }
+  if (pickup) pickup.spawnedAt = current - ENTITY_LIFECYCLE_MS.lootPickup - 1;
+  updateLootPickups(state, 0);
+  updateEntityLifecycle(state);
+  return Object.freeze({
+    before,
+    after: Object.freeze({
+      npcPresent: npc ? state.npcs.includes(npc) : false,
+      vehiclePresent: vehicle ? state.vehicles.includes(vehicle) : false,
+      pickupPresent: pickup ? state.pickups.includes(pickup) : false
+    })
+  });
 }
 
 function reserveInteractiveVehicleSlot(state) {
@@ -2530,6 +2637,8 @@ function startUrbanSandboxRuntime(options = {}) {
     lastCivicOutcome: null,
     lastNpcAction: null,
     lastImpactAction: null,
+    lastPlayerProjectileAction: null,
+    lastPlayerProjectileLaunch: null,
     lastCrashAction: null,
     crashFeedback: document.getElementById('urbanCrashFeedback'),
     crashFeedbackUntil: 0,
@@ -2761,6 +2870,7 @@ function startUrbanSandboxRuntime(options = {}) {
       updateEquipmentEffects(state, frame.dt);
       updateLootPickups(state, frame.dt);
       updateCrashBodies(state, frame.dt);
+      updateEntityLifecycle(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {
         state.npcPromotionElapsed = 0;
@@ -2808,6 +2918,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.crashSupportHook = Object.freeze({
       enterVehicle: (vehicleId) => enterVehicleAfterClaim(state, state.vehicles.find((vehicle) => vehicle.id === String(vehicleId || ''))),
       prepare: (targetKind, speedMph, lateralOffset) => prepareCrashScenarioForSupport(state, targetKind, speedMph, lateralOffset),
+      verifyEntityLifecycle: () => verifyEntityLifecycleForSupport(state),
       snapshot: () => snapshot(state)
     });
     globalThis.__WE3D_URBAN_CRASH_SUPPORT__ = state.crashSupportHook;

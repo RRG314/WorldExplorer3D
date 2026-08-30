@@ -938,6 +938,12 @@ function getWorldExplorerRuntimeDiagnostics() {
     urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
     aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
     maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+    boatNavigation: appCtx.boatMode?.active ? {
+      waterKind: String(appCtx.boatMode.waterKind || ''),
+      shorelineDistance: numberOrNull(appCtx.boatMode.shorelineDistance),
+      shoreVisible: appCtx.boatMode.openOceanSurfaceSuppression?.shoreVisible !== false,
+      cameraFraming: appCtx.camera?.userData?.boatrig?.framing || null
+    } : null,
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
     transportFacilities: transportFacilitySnapshot(),
     activeActor,

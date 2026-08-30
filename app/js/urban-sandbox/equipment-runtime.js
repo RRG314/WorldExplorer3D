@@ -577,7 +577,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     }
     commitImpacts(equipment, position, selected, projectile.roomActive);
     if (directTarget && projectile.owner !== 'npc') reticleFeedback.hitAt = clock();
-    state.lastProjectileAction = Object.freeze({
+    const action = Object.freeze({
       equipmentId: equipment.id,
       phase: 'impact',
       targetKind: directTarget?.kind || '',
@@ -586,6 +586,8 @@ function createUrbanEquipmentRuntime(options = {}) {
       z: Number(position.z.toFixed(2)),
       at: clock()
     });
+    state.lastProjectileAction = action;
+    if (projectile.owner !== 'npc') state.lastPlayerProjectileAction = action;
   }
 
   function spawnProjectile(equipment, actor, direction, roomActive) {
@@ -608,6 +610,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const projectile = {
       equipment,
       kind,
+      owner: 'player',
       roomActive,
       visual,
       position: origin,
@@ -622,7 +625,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     };
     projectiles.push(projectile);
     reticleFeedback.firedAt = clock();
-    state.lastProjectileAction = Object.freeze({
+    const action = Object.freeze({
       equipmentId: equipment.id,
       phase: 'travel',
       targetKind: '',
@@ -636,6 +639,9 @@ function createUrbanEquipmentRuntime(options = {}) {
       expectedFlightSeconds: Number(launch.expectedFlightSeconds.toFixed(2)),
       at: clock()
     });
+    state.lastProjectileAction = action;
+    state.lastPlayerProjectileAction = action;
+    state.lastPlayerProjectileLaunch = action;
     if (equipment.category === 'sidearm') {
       reportCivicEvent({
         kind: 'weapon_discharge', position: { x: actor.x, y: actor.y, z: actor.z }, severity: 2,
@@ -718,12 +724,14 @@ function createUrbanEquipmentRuntime(options = {}) {
           disposeProjectile(projectile);
           impactPulse(playerHit.point, .8, projectile.kind);
           projectile.onPlayerImpact?.({ force: projectile.equipment.force, sourceId: projectile.sourceId, position: playerHit.point });
-          state.lastProjectileAction = Object.freeze({
+          const action = Object.freeze({
             equipmentId: projectile.equipment.id,
             phase: 'player-impact',
             targetKind: 'player',
             at: clock()
           });
+          state.lastProjectileAction = action;
+          state.lastPlayerProjectileAction = action;
         } else {
           resolveProjectile(projectile, { x: collision.x, y: collision.y, z: collision.z }, collision.target);
         }
@@ -736,7 +744,7 @@ function createUrbanEquipmentRuntime(options = {}) {
           projectile.velocity.set(0, 0, 0);
           projectile.landed = true;
           projectile.visual.root.position.set(impactPosition.x, impactPosition.y + .16, impactPosition.z);
-          state.lastProjectileAction = Object.freeze({
+          const action = Object.freeze({
             equipmentId: projectile.equipment.id,
             phase: 'landed',
             targetKind: '',
@@ -745,6 +753,8 @@ function createUrbanEquipmentRuntime(options = {}) {
             z: Number(impactPosition.z.toFixed(2)),
             at: clock()
           });
+          state.lastProjectileAction = action;
+          if (projectile.owner !== 'npc') state.lastPlayerProjectileAction = action;
           continue;
         }
         if (projectile.owner === 'npc') {
@@ -764,7 +774,7 @@ function createUrbanEquipmentRuntime(options = {}) {
           const index = projectiles.indexOf(projectile);
           if (index >= 0) projectiles.splice(index, 1);
           disposeProjectile(projectile);
-          state.lastProjectileAction = Object.freeze({
+          const action = Object.freeze({
             equipmentId: projectile.equipment.id,
             phase: 'expired',
             targetKind: '',
@@ -773,6 +783,8 @@ function createUrbanEquipmentRuntime(options = {}) {
             z: Number(to.z.toFixed(2)),
             at: clock()
           });
+          state.lastProjectileAction = action;
+          if (projectile.owner !== 'npc') state.lastPlayerProjectileAction = action;
         }
         continue;
       }
@@ -994,10 +1006,16 @@ function createUrbanEquipmentRuntime(options = {}) {
     snapshot: () => Object.freeze({
       activeProjectiles: projectiles.length,
       lastProjectileAction: state.lastProjectileAction || null,
+      lastPlayerProjectileAction: state.lastPlayerProjectileAction || null,
+      lastPlayerProjectileLaunch: state.lastPlayerProjectileLaunch || null,
+      lastImpactAction: state.lastImpactAction || null,
       useAnimation: state.equipmentVisual?.actionSnapshot?.() || null,
       projectiles: projectiles.map((projectile) => Object.freeze({
         equipmentId: projectile.equipment.id,
         kind: projectile.kind,
+        owner: projectile.owner || 'player',
+        elapsed: Number(projectile.elapsed.toFixed(3)),
+        maxLife: Number(Number(projectile.maxLife || 0).toFixed(3)),
         position: Object.freeze({
           x: Number(projectile.position.x.toFixed(2)),
           y: Number(projectile.position.y.toFixed(2)),

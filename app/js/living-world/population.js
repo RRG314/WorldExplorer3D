@@ -640,6 +640,20 @@ export function createLivingWorldPopulation(options = {}) {
       });
       return true;
     },
+    retirePedestrian(agentId) {
+      const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.promoted) return false;
+      agent.promoted = false;
+      agent.reaction = '';
+      agent.reactionRemaining = 0;
+      agent.reactionTarget = null;
+      relocateAgent(agent, pedestrianGraph, random, 'pedestrian', referencePosition());
+      agent.visibility = 0;
+      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
+        reference: referencePosition(), activeRatio: activeRatio(), dt: .1
+      });
+      return true;
+    },
     witnessEvent(event = {}) {
       const position = event.position;
       if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return Object.freeze([]);
@@ -707,6 +721,16 @@ export function createLivingWorldPopulation(options = {}) {
       agent.relocationCooldown = 0;
       agent.visibility = 1;
       agent.visibleTarget = true;
+      refreshVehiclePresentation();
+      return true;
+    },
+    retireVehicleDetail(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.detailPromoted) return false;
+      agent.promoted = false;
+      agent.detailPromoted = false;
+      relocateAgent(agent, trafficGraph, random, 'vehicle', referencePosition());
+      agent.visibility = 0;
       refreshVehiclePresentation();
       return true;
     },

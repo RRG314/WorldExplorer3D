@@ -48,6 +48,19 @@ test('custom quick-slot choices survive Backpack export and reload without a sec
   assert.equal(reloaded.snapshot().equippedId, 'compact-sidearm');
 });
 
+test('each equipped item owns its cooldown so a quick-slot change remains responsive', () => {
+  const inventory = createEquipmentInventory();
+  assert.equal(inventory.equipSlot(4), true);
+  assert.equal(inventory.prepareUse(1_000).ok, true);
+
+  assert.equal(inventory.equipSlot(5), true);
+  assert.equal(inventory.prepareUse(1_450).ok, true);
+  assert.equal(inventory.prepareUse(1_900).reason, 'cooldown');
+
+  assert.equal(inventory.equipSlot(4), true);
+  assert.equal(inventory.prepareUse(1_450).ok, true);
+});
+
 test('downed-actor gear becomes an idempotent world pickup before entering the Backpack', () => {
   const inventory = createEquipmentInventory();
   const pickup = createLootPickup({

@@ -1,6 +1,6 @@
 # World Explorer 3D System Inventory
 
-Last updated: 2026-08-28 for the 5.1 release candidate.
+Last updated: 2026-08-30 for World Explorer 3D 5.1.
 
 This inventory describes the systems present in the current source tree and
 their honest product boundaries. See [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md)
@@ -25,11 +25,11 @@ with explicit entry and exit lifecycles.
 | Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, and deep space | Distances use explicit game scales; planetary detail is intentionally different from Earth |
 | Mobile play | Analog movement/look controls, mode actions, handedness, sensitivity, camera follow, map, Backpack, and recovery | Physical-device battery and thermal performance still require device testing |
 | Character and equipment | One persistent character profile, attributes, skills, condition, six assignable quick slots, ammunition, field tools, and usable equipment | Complete cross-device character sync is not yet available |
-| Vehicles and collisions | Distinct road-vehicle families plus boats, aircraft, rovers, and spacecraft; enter/exit, condition, collision, and recovery | Collisions are game physics, not an engineering or accident simulator |
-| Urban play | Pedestrian behavior, bounded defensive combat, civic response, recoverable world loot, mapped convenience-store trade, and responder vehicles | Shared-room combat and loot remain restricted where server authority is unavailable |
+| Vehicles and collisions | Distinct road-vehicle families plus boats, aircraft, rovers, and spacecraft; enter/exit, condition, collision, damage presentation, and recovery | Collisions are game physics, not an engineering or accident simulator |
+| Urban play | Pedestrian behavior, bounded defensive combat, civic response, recoverable world loot, mapped convenience-store trade, responder vehicles, and lifecycle cleanup for temporary entities | Shared-room combat, loot, and retirement remain restricted where server authority is unavailable |
 | Companions | Individual domestic animals, birds, livestock, trust, care, level progression, travel state, and vehicle boarding | Availability follows the game catalog and regional rules, not live occurrence reports |
 | Field exploration | Field leads, Journal, Field Guide, typed activities, life lists, specialties, companions, Field Today, Expeditions, and seasonal surveys | Game opportunities do not assert live real-world animal presence |
-| Regional ecology | One versioned registry with 11 packs and 180 taxa covers all 15 built-in Earth destinations; packs retain habitat, season, source, license, attribution, sensitive-species, localization, migration, and rollback metadata | The 10 expansion packs are 5.1 candidates pending independent domain review; this is not worldwide completeness |
+| Regional ecology | One versioned registry with 11 packs and 180 taxa covers all 15 built-in Earth destinations; packs retain habitat, season, source, license, attribution, sensitive-species, localization, migration, and rollback metadata | The 10 expansion packs still await independent domain review; this is not worldwide completeness |
 | Fishing | Shared shore, boat, and underwater records with catch, loss, retry, and recovery | Fish availability depends on the current water and regional data boundary |
 | Live GPS | Optional foreground location following, privacy/consent controls, three-stop Expeditions, and shared field activities | No continuous world streaming; background tracking is not part of the product |
 | Multiplayer | Bounded public/private rooms, presence, chat, shared Blocks, activities, published overlays, and persistent room vehicles | Large-room capacity and moderation continue to evolve |
@@ -45,12 +45,12 @@ with explicit entry and exit lifecycles.
 | Terrain and ground | `app/js/terrain.js`, `app/js/terrain/`, `data/ground-attestations/` | Ground height, land cover, seams, collision, and regional fallbacks |
 | Roads and structures | `app/js/world/compiler/`, `app/js/world/transport-structures/` | Roads, bridges, ramps, elevated ways, underpasses, and tunnels |
 | Buildings and interiors | `app/js/buildings/`, `app/js/interiors/` | Building form, facades, entrances, generated floors, and mapped indoor detail |
-| Water | `app/js/world/water-*`, `app/js/boat-mode/`, `app/js/ocean/` | Surface water, shore transfer, boats, underwater play, and fish life |
+| Water | `app/js/world/water-*`, `app/js/boat-mode/`, `app/js/ocean/`, `app/js/transport/maritime-*` | Surface water, near-shore rendering, channel camera framing, playable vessel fleets, mapped ship identity, underwater play, and fish life |
 | Living world | `app/js/living-world/`, `app/js/urban-sandbox/` | Pedestrians, traffic, wildlife, vehicles, and civic-response play |
 | Field and progression | `app/js/discovery/`, `app/js/player/` | Ecology, activities, Backpack, Journal, progression, and retention programs |
 | Character and companions | `app/js/character/`, `app/js/discovery/companions/` | Attributes, skills, equipment integration, individual companions, care, trust, levels, and travel state |
-| Commerce and combat | `app/js/urban-sandbox/`, `app/js/player/` | Mapped-store exchange, weapons, ammunition, defensive NPC behavior, condition, world loot, and Backpack delivery |
-| Input and cameras | `app/js/controls/`, `app/js/ui/mobile-controls.js`, `app/js/hud.js`, `app/js/walking/` | Keyboard, touch, gamepad, movement, follow cameras, and HUD units |
+| Commerce and combat | `app/js/urban-sandbox/`, `app/js/player/`, `app/js/runtime/entity-lifecycle-policy.js` | Mapped-store exchange, weapons, ammunition, defensive NPC behavior, condition, world loot, Backpack delivery, and bounded local cleanup |
+| Input and cameras | `app/js/controls/`, `app/js/ui/mobile-controls.js`, `app/js/hud.js`, `app/js/hud/boat-camera.js`, `app/js/walking/` | Keyboard, touch, gamepad, movement, follow cameras, harbor/channel framing, and HUD units |
 | Editor and Blocks | `app/js/editor/`, `app/js/block-builder/`, `app/js/blocks.js` | Integrated editing, persistence, undo, sharing, moderation, and rollback |
 | Multiplayer | `app/js/multiplayer/`, `firestore.rules`, `functions/` | Room state, authorization, presence, chat, shared content, and activities |
 | Planetary and space | `app/js/planetary/`, `app/js/space/`, `app/js/universe/` | Body catalog, physical environments, accepted surfaces, spacecraft state, journeys, collision, landing, and return |
@@ -108,8 +108,8 @@ committed.
 - Building and interior detail depends on mapped metadata and local coverage.
 - The ecology registry covers built-in destination regions, not the whole
   world. Locations outside reviewed pack bounds use the global field catalog.
-- The 10 expansion packs remain source-reviewed candidates pending independent
-  domain review.
+- The 10 expansion packs remain source-reviewed and await independent domain
+  review.
 - Creature presentation still includes quality tiers and reference fallbacks;
   not every taxon has a promoted animated model.
 - Live GPS remains foreground-only and depends on browser permission, signal

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=8";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
-import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=4";
+import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=5";
 import {
   carSpeedToMph,
   worldUnitsPerSecondToKnots,

@@ -29,6 +29,55 @@ function normalizeVec3(x = 0, y = 1, z = 0) {
   return { x: x / len, y: y / len, z: z / len };
 }
 
+function resolveBoatCameraFraming(input = {}) {
+  const fishingOpen = input.fishingOpen === true;
+  const waterKind = String(input.waterKind || '').toLowerCase();
+  const narrowWater = waterKind === 'harbor' || waterKind === 'channel';
+  const classLength = Math.max(1, Number(input.classLength) || 1);
+  const classHeight = Math.max(1, Number(input.classHeight) || 1);
+  const speedNorm = clampValue(Number(input.speedNorm) || 0, 0, 1.4);
+  const waveIntensity = clampValue(Number(input.waveIntensity) || 0, 0, 1);
+  if (fishingOpen) {
+    return Object.freeze({
+      chaseDistance: Math.max(6.4, classLength * .38) + waveIntensity * .45,
+      chaseHeight: Math.max(3.25, classHeight * .34) + waveIntensity * .52,
+      lookAhead: Math.max(1.8, classLength * .12),
+      classLength,
+      classHeight,
+      narrowWater
+    });
+  }
+  if (narrowWater) {
+    const largeVessel = classLength >= 60;
+    if (largeVessel) {
+      return Object.freeze({
+        chaseDistance: classLength * .53 + 10 + speedNorm * 8 + waveIntensity * .6,
+        chaseHeight: Math.max(classHeight * .82, Math.min(30, classLength * .1)) + waveIntensity * .55,
+        lookAhead: classLength * .52 + 26 + speedNorm * 18,
+        classLength,
+        classHeight,
+        narrowWater
+      });
+    }
+    return Object.freeze({
+      chaseDistance: Math.max(9.2, Math.min(36, classLength * .46)) + speedNorm * Math.min(4.8, classLength * .035) + waveIntensity * .45,
+      chaseHeight: Math.max(4.8, Math.min(17, classHeight * .66)) + waveIntensity * .55,
+      lookAhead: Math.max(10, Math.min(52, classLength * .28)) + speedNorm * Math.min(12, classLength * .08),
+      classLength,
+      classHeight,
+      narrowWater
+    });
+  }
+  return Object.freeze({
+    chaseDistance: Math.max(10.8, classLength * .68) + speedNorm * Math.max(4.2, classLength * .08) + waveIntensity * 1.15,
+    chaseHeight: Math.max(4.25, classHeight * .72) + waveIntensity * .82,
+    lookAhead: Math.max(7.4, classLength * .34) + speedNorm * Math.max(12, classLength * .1) + waveIntensity * 2,
+    classLength,
+    classHeight,
+    narrowWater
+  });
+}
+
 function ensureBoatCameraRig(forceReset = false) {
   if (!appCtx.camera?.userData) return null;
   if (forceReset || !appCtx.camera.userData.boatrig) {
@@ -100,9 +149,17 @@ function updateBoatCamera() {
 
     const classLength = catalog.dimensions.length;
     const classHeight = catalog.dimensions.height;
-    const chaseDistance = fishingOpen ? Math.max(6.4, classLength * .38) + waveIntensity * 0.45 : Math.max(10.8, classLength * .68) + speedNorm * Math.max(4.2, classLength * .08) + waveIntensity * 1.15;
+    const framing = resolveBoatCameraFraming({
+      fishingOpen,
+      waterKind: appCtx.boatMode?.waterKind,
+      classLength,
+      classHeight,
+      speedNorm,
+      waveIntensity
+    });
+    const chaseDistance = framing.chaseDistance;
     const cameraPitch = Number(appCtx.boatMode?.cameraPitch) || 0;
-    const chaseHeight = fishingOpen ? Math.max(3.25, classHeight * .34) + waveIntensity * 0.52 : Math.max(4.25, classHeight * .72) + waveIntensity * 0.82 + Math.abs(appCtx.boat?.pitch || 0) * Math.max(2.2, classLength * .03) + Math.sin(cameraPitch) * Math.max(5.2, classHeight * .22);
+    const chaseHeight = framing.chaseHeight + (fishingOpen ? 0 : Math.abs(appCtx.boat?.pitch || 0) * Math.max(2.2, Math.min(8, classLength * .03)) + Math.sin(cameraPitch) * Math.max(5.2, classHeight * .22));
     const lateralOffset = fishingOpen ? -2.25 : clampValue(-(appCtx.boat?.turnRate || 0) * (1.08 + speedNorm * 0.72), -1.55, 1.55);
     const offsetX = -Math.sin(rig.yaw) * chaseDistance + Math.cos(rig.yaw) * lateralOffset;
     const offsetZ = -Math.cos(rig.yaw) * chaseDistance - Math.sin(rig.yaw) * lateralOffset;
@@ -119,7 +176,7 @@ function updateBoatCamera() {
       y: boatY + chaseHeight + surfaceSteepness * 0.12,
       z: appCtx.boat.z + offsetZ
     };
-    const lookAhead = fishingOpen ? Math.max(1.8, classLength * .12) : Math.max(7.4, classLength * .34) + speedNorm * Math.max(12, classLength * .1) + waveIntensity * 2;
+    const lookAhead = framing.lookAhead;
     const fishingSide = fishingOpen ? 15 + Number(appCtx.fishingGame?.fishDirection || 0) * 1.8 : 0;
     const desiredLook = {
       x: appCtx.boat.x + Math.sin(appCtx.boat.angle) * lookAhead + Math.cos(appCtx.boat.angle) * fishingSide,
@@ -137,6 +194,7 @@ function updateBoatCamera() {
     appCtx.camera.up.set(stableUp.x, stableUp.y, stableUp.z);
     appCtx.camera.position.set(rig.pos.x, rig.pos.y, rig.pos.z);
     appCtx.camera.lookAt(rig.look.x, rig.look.y, rig.look.z);
+    rig.framing = Object.freeze({ ...framing, waterKind: String(appCtx.boatMode?.waterKind || '') });
   } else if (appCtx.camMode === 1) {
     const fwdX = Math.sin(appCtx.boat.angle);
     const fwdZ = Math.cos(appCtx.boat.angle);
@@ -169,4 +227,4 @@ function updateBoatCamera() {
 }
 
 
-export { clampValue, normalizeHeading, updateBoatCamera };
+export { clampValue, normalizeHeading, resolveBoatCameraFraming, updateBoatCamera };

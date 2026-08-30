@@ -46,10 +46,43 @@ try {
   assert.match(constellation.label, /Sloop-of-war museum ship/);
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_MARITIME_SUPPORT__.moveNearMapped(id), constellation.id), true);
   await page.waitForFunction(() => globalThis.__WE3D_MARITIME_SUPPORT__.snapshot().interaction?.action === 'inspect_mapped_vessel');
+  await page.evaluate(async () => {
+    const { setTimeOfDay } = await import('/app/js/sky.js?v=88');
+    setTimeOfDay('day');
+    const tutorial = document.getElementById('tutorialHintCard');
+    if (tutorial) tutorial.hidden = true;
+  });
+  await page.waitForTimeout(500);
   const mappedPrompt = await page.locator('#urbanVehiclePrompt').textContent();
   assert.match(mappedPrompt, /USS Constellation/i);
   assert.match(mappedPrompt, /Sloop-of-war museum ship/i);
   await page.screenshot({ path: `${outputDir}/baltimore-constellation.png`, fullPage: true });
+
+  const harborVessel = initial.vessels.find((vessel) => vessel.catalogId === 'harbor-tug') || initial.vessels[0];
+  assert.ok(harborVessel, 'No playable harbor vessel was available for the navigation-camera path.');
+  assert.equal(await page.evaluate((id) => globalThis.__WE3D_MARITIME_SUPPORT__.moveNear(id), harborVessel.id), true);
+  await page.waitForFunction(() => globalThis.__WE3D_MARITIME_SUPPORT__.snapshot().interaction?.action === 'enter_vessel');
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.boat === true, null, { timeout: 30_000 });
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(1_200);
+  await page.keyboard.up('ArrowUp');
+  await page.waitForTimeout(400);
+  const harborNavigation = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().boatNavigation);
+  assert.equal(harborNavigation?.shoreVisible, true);
+  if (['harbor', 'channel'].includes(harborNavigation?.waterKind)) {
+    const framing = harborNavigation.cameraFraming;
+    assert.ok(Number(framing?.chaseDistance) > Number(framing?.classLength) * .5 + 4);
+    assert.ok(Number(framing?.lookAhead) > Number(framing?.classLength) * .5 + 15);
+  }
+  await page.screenshot({ path: `${outputDir}/baltimore-harbor-navigation.png`, fullPage: true });
+  await page.waitForFunction(() => globalThis.__WE3D_MARITIME_SUPPORT__.snapshot().interaction?.action === 'exit_vessel');
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.walking === true, null, { timeout: 30_000 });
+  const recoveryVessel = initial.vessels.find((vessel) => vessel.id !== harborVessel.id);
+  const vesselRecovered = recoveryVessel
+    ? await page.evaluate((id) => globalThis.__WE3D_MARITIME_SUPPORT__.ageDisabled(id), recoveryVessel.id)
+    : false;
 
   const roof = await page.evaluate(() => {
     const candidate = globalThis.__WE3D_ROOF_SUPPORT__.list()[0];
@@ -82,16 +115,23 @@ try {
     }),
     roofLandingHeld: landed.onGround === true && landed.onBuilding === true,
     roofWalkHeld: walked.onGround === true && walked.onBuilding === true && roofTravel > 1,
+    harborShoreVisible: harborNavigation?.shoreVisible === true,
+    harborCameraBounded: !['harbor', 'channel'].includes(harborNavigation?.waterKind) || (
+      Number(harborNavigation.cameraFraming?.chaseDistance) > Number(harborNavigation.cameraFraming?.classLength) * .5 + 4 &&
+      Number(harborNavigation.cameraFraming?.lookAhead) > Number(harborNavigation.cameraFraming?.classLength) * .5 + 15
+    ),
+    disabledVesselRecoveredAtFacility: vesselRecovered === true,
     noRuntimeErrors: (finalDiagnostics?.runtimeErrors || []).length === 0,
     noPageErrors: pageErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
     ok: Object.values(checks).every(Boolean), checks, constellation,
-    mappedPrompt: String(mappedPrompt || '').trim(), roof, landed, walked, roofTravel,
+    mappedPrompt: String(mappedPrompt || '').trim(), harborNavigation, vesselRecovered, roof, landed, walked, roofTravel,
     runtimeErrors: finalDiagnostics?.runtimeErrors || [], pageErrors, localFailures,
     screenshots: [
       `${outputDir}/baltimore-constellation.png`,
+      `${outputDir}/baltimore-harbor-navigation.png`,
       `${outputDir}/baltimore-roof-walk.png`
     ]
   };
