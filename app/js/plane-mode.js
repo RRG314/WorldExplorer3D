@@ -4,7 +4,7 @@ import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
 import { applyAircraftHeadingTurn, classicAircraftBankTurnRate, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=4';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
 import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=4';
-import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=10';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './transport/damage-model.js?v=1';
 
 const PLANE_MAX_SPEED_MPS = 84;

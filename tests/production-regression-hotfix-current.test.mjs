@@ -127,7 +127,7 @@ test('a generalized urban bridge searches beyond parallel roads for visible supp
   ));
 });
 
-test('elevated roads do not publish lane quads that can remain visible without the deck', () => {
+test('detached road-marking quads are not published at any elevation', () => {
   const generalizedBridge = {
     type: 'primary',
     transportRecord: { completeness: 'generalized' },
@@ -137,7 +137,7 @@ test('elevated roads do not publish lane quads that can remain visible without t
   assert.equal(shouldRenderRoadCenterMarkings({
     ...generalizedBridge,
     structureSemantics: { terrainMode: 'at_grade' }
-  }), true);
+  }), false);
   assert.equal(shouldRenderRoadCenterMarkings({
     ...generalizedBridge,
     transportRecord: { completeness: 'lossless' }

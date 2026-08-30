@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { compileAirportOperationalLayout } from '../app/js/transport/airport-layout.js';
 import { derivedFleet } from '../app/js/transport/aviation-runtime.js';
 import { getAviationCatalogEntry } from '../app/js/transport/aviation-catalog.js';
+import { aircraftVisualSpecification } from '../app/js/transport/aircraft-visual-recipe.js';
 import { integrateFixedWingFlight } from '../app/js/plane/flight-dynamics.js';
 import { integrateSkydivingDynamics } from '../app/js/urban-sandbox/parachute-model.js';
 import { createCivicResponseModel } from '../app/js/urban-sandbox/civic-response-model.js';
@@ -108,6 +109,10 @@ test('personal aircraft is an aerobatic jet with a continuous loop flight path',
   const jet = getAviationCatalogEntry('personal-prop');
   assert.equal(jet.role, 'aerobatic');
   assert.match(jet.label, /aerobatic jet/i);
+  const visual = aircraftVisualSpecification(jet, { mobile: false });
+  assert.equal(visual.engineCount, 2);
+  assert.equal(visual.canopyKind, 'flush-fuselage-panels');
+  assert.equal(visual.passengerWindowCount, 0);
   const top = integrateFixedWingFlight({ speed: 75, flightPathAngle: 1.45, pitch: Math.PI / 2, pitchRate: 1 }, { throttle: .85, powerFactor: 1, topSpeed: 150 }, jet, .05);
   const inverted = integrateFixedWingFlight({ speed: top.speed, flightPathAngle: 3.05, pitch: Math.PI, pitchRate: 1 }, { throttle: .85, powerFactor: 1, topSpeed: 150 }, jet, .05);
   assert.ok(top.climbRate > 0, 'top quarter of loop climbs');
