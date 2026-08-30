@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { searchPlaces } from '../places/place-search.js?v=1';
+import { searchPlaces } from '../places/place-search.js?v=2';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
@@ -423,7 +423,10 @@ function createGlobeSelector(options = {}) {
         kind: result.kindLabel,
         region: result.region,
         country: result.country,
-        countryCode: result.countryCode
+        countryCode: result.countryCode,
+        airportClass: result.airportClass || '',
+        iata: result.iata || '',
+        icao: result.icao || ''
       }
     });
     if (searchInput) searchInput.value = result.name;

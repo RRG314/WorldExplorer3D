@@ -25,6 +25,9 @@ Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
   turn-by-turn navigation, engineering, surveying or safety-critical use.
 - Very narrow service roads and unusually complex multi-level junctions can
   leave limited clearance for larger vehicles.
+- Airport runways, aprons, terminals, gates, and towers use available map data.
+  The shared airport experience fills missing playable details, but its shape
+  and scale may differ from the real airport when mapping is incomplete.
 
 ## Performance and compatibility
 

@@ -19,7 +19,14 @@ function cloneCustomLocation(location) {
         county: String(rawDetails.county || '').slice(0, 100),
         region: String(rawDetails.region || '').slice(0, 100),
         country: String(rawDetails.country || '').slice(0, 100),
-        countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null
+        countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null,
+        airportClass: String(rawDetails.airportClass || rawDetails.aerodrome || '').trim().toLowerCase().slice(0, 40),
+        iata: /^[A-Z0-9]{3}$/.test(String(rawDetails.iata || '').trim().toUpperCase())
+          ? String(rawDetails.iata).trim().toUpperCase()
+          : '',
+        icao: /^[A-Z0-9]{4}$/.test(String(rawDetails.icao || '').trim().toUpperCase())
+          ? String(rawDetails.icao).trim().toUpperCase()
+          : ''
       })
     : null;
   return {

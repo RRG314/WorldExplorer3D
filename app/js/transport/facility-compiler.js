@@ -99,7 +99,8 @@ function compileTransportFacilityGraph(data = {}, options = {}) {
         icao: String(tags.icao || '').trim().toUpperCase(),
         width: Number.isFinite(Number(tags.width)) ? Number(tags.width) : null,
         height: Number.isFinite(Number(tags.height)) ? Number(tags.height) : null,
-        buildingLevels: Number.isFinite(Number(tags['building:levels'])) ? Number(tags['building:levels']) : null
+        buildingLevels: Number.isFinite(Number(tags['building:levels'])) ? Number(tags['building:levels']) : null,
+        airportClass: String(tags.aerodrome || tags['aerodrome:type'] || tags.passenger || '').trim().toLowerCase()
       }),
       completeness: geometry.complete ? 'mapped-geometry' : 'mapped-center-only',
       provenance: Object.freeze({

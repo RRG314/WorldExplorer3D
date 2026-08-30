@@ -45,6 +45,9 @@ at the selected location.
   claiming them.
 - Board aircraft at mapped airports and helipads, fly planes and helicopters,
   exit in the air, and deploy the Explorer parachute while skydiving.
+- Find gates, stands, taxiing aircraft, runway activity, a control tower, and a
+  ticket hall at supported mapped airports. Choose a pilot or passenger journey,
+  search for a destination, or take a local sightseeing flight.
 - Pilot boats and ships from mapped marinas, harbors, and ports. Nearby land
   remains visible, and large ships use a tighter camera in channels and
   harbors.
@@ -100,6 +103,9 @@ aiming and presentation remain continuing work. See [Known Issues](KNOWN_ISSUES.
 - Keep mobile entry, action, exit, and recovery usable at a 390×844 layout.
 - Release superseded world, provider, scene, and temporary gameplay resources
   when changing locations or ending a session.
+- Use the same airport travel and aircraft system wherever mapped airport data
+  is available; density scales down on touch devices without changing the
+  travel, boarding, or flight experience.
 
 The complete Journal, Guide, companion history, and local Backpack history stay
 in the current browser. Backup and restore are included. Complete cross-device

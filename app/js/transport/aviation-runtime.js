@@ -5,8 +5,8 @@ import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=5';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
-import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=2';
-import { createAirportHub } from './airport-hub.js?v=2';
+import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=3';
+import { createAirportHub } from './airport-hub.js?v=3';
 
 const BOARDING_DISTANCE = 8;
 const EXIT_SPEED_LIMIT = 1.5;
@@ -161,7 +161,12 @@ function derivedFleet(graph, options = {}) {
   if (!layout?.stands?.length) return [];
   const fixedWingAnchor = anchors.find((record) => !['heliport', 'helipad'].includes(record.type)) || anchors[0];
   const rotorAnchor = anchors.find((record) => ['heliport', 'helipad'].includes(record.type)) || fixedWingAnchor;
-  const catalogPattern = ['regional-jet', 'business-jet', 'long-range-airliner', 'expedition-prop', 'business-jet', 'regional-jet', 'utility-helicopter'];
+  const catalogPatterns = Object.freeze({
+    major: Object.freeze(['regional-jet', 'business-jet', 'long-range-airliner', 'expedition-prop', 'business-jet', 'regional-jet', 'utility-helicopter']),
+    regional: Object.freeze(['expedition-prop', 'business-jet', 'regional-jet', 'expedition-prop', 'utility-helicopter', 'business-jet', 'regional-jet']),
+    local: Object.freeze(['expedition-prop', 'expedition-prop', 'business-jet', 'expedition-prop', 'utility-helicopter', 'expedition-prop'])
+  });
+  const catalogPattern = catalogPatterns[layout.scale] || catalogPatterns.regional;
   const catalogById = new Map(AVIATION_FLEET_CATALOG.map((catalog) => [catalog.id, catalog]));
   return layout.stands.map((stand, index) => {
     const catalog = catalogById.get(catalogPattern[index % catalogPattern.length]) || AVIATION_FLEET_CATALOG[index % AVIATION_FLEET_CATALOG.length];
@@ -646,11 +651,15 @@ function startAviationRuntime(options = {}) {
   const group = new THREE.Group();
   group.name = 'Playable Aviation Fleet';
   const mobile = isTouchClient();
+  const airportLocation = options.request?.selection || {
+    ...(options.request?.location || appCtx.LOC),
+    name: options.request?.name || appCtx.worldLoadRuntimeState?.location?.name || ''
+  };
   const publishedLayout = appCtx.transportFacilityVisual?.airportLayout;
   const airportLayout = publishedLayout?.mobile === mobile
     ? publishedLayout
-    : compileAirportOperationalLayout(appCtx.transportFacilityGraph, { location: appCtx.LOC, mobile });
-  const vehicles = derivedFleet(appCtx.transportFacilityGraph, { mobile, airportLayout, location: appCtx.LOC }).map((record, index) => {
+    : compileAirportOperationalLayout(appCtx.transportFacilityGraph, { location: airportLocation, mobile });
+  const vehicles = derivedFleet(appCtx.transportFacilityGraph, { mobile, airportLayout, location: airportLocation }).map((record, index) => {
     const visual = createAircraftVisual(THREE, record.catalog, { mobile: record.mobile, state: 'parked' });
     const vehicle = { ...record, visual, available: true, boardable: true, unmanned: null, disabledAt: 0 };
     createAircraftColliders(vehicle);
@@ -719,6 +728,7 @@ function startAviationRuntime(options = {}) {
     parkedAircraftCount: runtime.vehicles.filter((vehicle) => !vehicle.ambientMotion && !vehicle.ambientFlight).length,
     boardableAircraftCount: runtime.vehicles.filter((vehicle) => vehicle.boardable).length,
     airportLayoutAuthority: runtime.airportLayout?.authority || '',
+    airportScale: runtime.airportLayout?.scale || '',
     airportHub: runtime.hub?.snapshot?.() || null,
     catalogIds: Object.freeze(runtime.vehicles.map(({ catalog }) => catalog.id)),
     vehicles: Object.freeze(runtime.vehicles.map((vehicle) => Object.freeze({

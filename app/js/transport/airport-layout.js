@@ -66,6 +66,18 @@ function runwayDesignator(yaw) {
   return String(number).padStart(2, '0');
 }
 
+function airportScale({ locationLabel = '', airportClasses = [], mappedLength = 0, runways = [], terminals = [], aprons = [], mappedStands = [] } = {}) {
+  const label = String(locationLabel).toLowerCase();
+  const majorLabel = /international|intercontinental/.test(label) ||
+    airportClasses.some((value) => /international|intercontinental/.test(String(value).toLowerCase()));
+  const majorInfrastructure = mappedLength >= 2200 &&
+    (runways.length >= 2 || terminals.length >= 1 || mappedStands.length >= 4);
+  if (majorLabel || majorInfrastructure || terminals.length >= 2 || mappedStands.length >= 8) return 'major';
+  if (mappedLength >= 900 || runways.length || terminals.length || aprons.length || mappedStands.length ||
+    /airport|aerodrome|airfield|regional/.test(label)) return 'regional';
+  return 'local';
+}
+
 function compileAirportOperationalLayout(graph, options = {}) {
   const aviation = Array.isArray(graph?.byDomain?.aviation) ? graph.byDomain.aviation : [];
   if (!aviation.length) return null;
@@ -81,9 +93,15 @@ function compileAirportOperationalLayout(graph, options = {}) {
   const mappedLength = mappedPrimary ? recordLength(mappedPrimary) : 0;
   const mappedYaw = mappedPrimary ? recordYaw(mappedPrimary) : recordYaw(centerRecord);
   const locationLabel = String(options.location?.name || options.location?.city || '').toLowerCase();
-  const large = mappedLength >= 900 || terminals.length > 0 || mappedStands.length >= 4 || /international|airport|airfield/.test(locationLabel);
-  const fallbackLength = large ? 920 : 520;
-  const fallbackWidth = large ? 46 : 32;
+  const airportClasses = [
+    options.location?.locationDetails?.airportClass,
+    options.location?.airportClass,
+    ...aviation.map((record) => record.attributes?.airportClass)
+  ].filter(Boolean);
+  const scale = airportScale({ locationLabel, airportClasses, mappedLength, runways, terminals, aprons, mappedStands });
+  const large = scale !== 'local';
+  const fallbackLength = scale === 'major' ? 1100 : scale === 'regional' ? 720 : 480;
+  const fallbackWidth = scale === 'major' ? 48 : scale === 'regional' ? 40 : 30;
   const primaryRunway = mappedPrimary || generatedRunway(center, mappedYaw, fallbackLength, fallbackWidth);
   const yaw = recordYaw(primaryRunway);
   const length = Math.max(180, recordLength(primaryRunway));
@@ -91,10 +109,11 @@ function compileAirportOperationalLayout(graph, options = {}) {
   const runwayPoints = recordPoints(primaryRunway);
   const runwayStart = runwayPoints[0];
   const runwayEnd = runwayPoints.at(-1);
-  const standTarget = Math.max(
-    options.mobile === true ? 7 : 14,
-    Math.min(options.mobile === true ? 10 : 22, mappedStands.length + terminals.length * 4 + runways.length * 3)
-  );
+  const standLimits = options.mobile === true
+    ? scale === 'major' ? { min: 10, max: 14 } : scale === 'regional' ? { min: 7, max: 10 } : { min: 5, max: 7 }
+    : scale === 'major' ? { min: 18, max: 24 } : scale === 'regional' ? { min: 14, max: 18 } : { min: 8, max: 10 };
+  const standTarget = Math.max(standLimits.min,
+    Math.min(standLimits.max, mappedStands.length + terminals.length * 4 + runways.length * 3));
   const stands = mappedStands.map((record, index) => Object.freeze({
     id: record.id,
     ...recordPoint(record),
@@ -109,7 +128,7 @@ function compileAirportOperationalLayout(graph, options = {}) {
     const column = index % 6;
     const side = row % 2 === 0 ? 1 : -1;
     const lateral = side * (width * 2.2 + row * 34);
-    const forward = (column - 2.5) * (large ? 34 : 24);
+    const forward = (column - 2.5) * (scale === 'major' ? 38 : scale === 'regional' ? 30 : 22);
     const point = offsetPoint(standOrigin, yaw, lateral, forward);
     stands.push(Object.freeze({
       id: `generated-airport-layout:stand:${index}`,
@@ -128,7 +147,7 @@ function compileAirportOperationalLayout(graph, options = {}) {
     ...towerPoint,
     mapped: !!mappedTower,
     generatedActivity: !mappedTower,
-    height: large ? 34 : 22
+    height: scale === 'major' ? 38 : scale === 'regional' ? 30 : 22
   });
   const ticketPoint = recordPoint(terminals[0]) || offsetPoint(standOrigin, yaw, -width * 1.7, -length * .08);
   const ticketCounter = Object.freeze({
@@ -144,6 +163,7 @@ function compileAirportOperationalLayout(graph, options = {}) {
     type: 'AirportOperationalLayout',
     authority: 'compiled-airport-operational-layout',
     mobile: options.mobile === true,
+    scale,
     center: Object.freeze({ x: center.x, z: center.z }),
     large,
     yaw,
@@ -170,6 +190,7 @@ function compileAirportOperationalLayout(graph, options = {}) {
 }
 
 export {
+  airportScale,
   compileAirportOperationalLayout,
   offsetPoint,
   recordLength,

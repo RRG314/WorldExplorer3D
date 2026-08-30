@@ -7,6 +7,7 @@ import { getAviationCatalogEntry } from '../app/js/transport/aviation-catalog.js
 import { integrateFixedWingFlight } from '../app/js/plane/flight-dynamics.js';
 import { integrateSkydivingDynamics } from '../app/js/urban-sandbox/parachute-model.js';
 import { createCivicResponseModel } from '../app/js/urban-sandbox/civic-response-model.js';
+import { normalizeProviderResult } from '../app/js/places/place-search.js';
 
 function record(id, type, points, attributes = {}) {
   return Object.freeze({
@@ -57,6 +58,50 @@ test('mapped runway geometry remains the operational runway and dense fleet uses
   assert.ok(fleet.some(({ trafficIntent }) => trafficIntent === 'circuit'));
   assert.ok(fleet.some(({ trafficIntent }) => trafficIntent === 'taxi'));
   assert.ok(fleet.filter(({ trafficIntent }) => trafficIntent === 'parked').length > fleet.length / 2);
+  assert.equal(layout.scale, 'regional');
+  assert.equal(fleet.some(({ catalog }) => catalog.id === 'long-range-airliner'), false);
+});
+
+test('airport scale preserves presentation quality without putting international airliners at local fields', () => {
+  const majorSource = graph([
+    record('major:runway:1', 'runway', [{ x: 0, z: -1400 }, { x: 0, z: 1400 }], { width: 50 }),
+    record('major:runway:2', 'runway', [{ x: -300, z: -1300 }, { x: -300, z: 1300 }], { width: 50 }),
+    record('major:terminal', 'terminal', [{ x: 180, z: 0 }])
+  ]);
+  const major = compileAirportOperationalLayout(majorSource, { location: { name: 'Example International Airport' } });
+  const majorFleet = derivedFleet(majorSource, { airportLayout: major });
+  assert.equal(major.scale, 'major');
+  assert.equal(major.stands.length, 18);
+  assert.ok(majorFleet.some(({ catalog }) => catalog.id === 'long-range-airliner'));
+
+  const localSource = graph([record('local:aerodrome', 'aerodrome', [{ x: 0, z: 0 }])]);
+  const providerClassifiedMajor = compileAirportOperationalLayout(localSource, {
+    location: { name: 'Heathrow Airport', locationDetails: { airportClass: 'international' } }
+  });
+  assert.equal(providerClassifiedMajor.scale, 'major');
+
+  const local = compileAirportOperationalLayout(localSource, { location: { name: 'Mesa Airstrip' } });
+  const localFleet = derivedFleet(localSource, { airportLayout: local });
+  assert.equal(local.scale, 'local');
+  assert.equal(local.stands.length, 8);
+  assert.equal(localFleet.some(({ catalog }) => ['regional-jet', 'long-range-airliner'].includes(catalog.id)), false);
+});
+
+test('place search retains mapped airport classification for the world session', () => {
+  const result = normalizeProviderResult({
+    lat: '51.47',
+    lon: '-0.4543',
+    category: 'aeroway',
+    type: 'aerodrome',
+    name: 'London Heathrow Airport',
+    display_name: 'London Heathrow Airport, United Kingdom',
+    extratags: { aerodrome: 'international', iata: 'LHR', icao: 'EGLL' },
+    address: { country: 'United Kingdom', country_code: 'gb' }
+  }, 0);
+  assert.equal(result.airportClass, 'international');
+  assert.equal(result.iata, 'LHR');
+  assert.equal(result.icao, 'EGLL');
+  assert.equal(result.kindLabel, 'Airport');
 });
 
 test('personal aircraft is an aerobatic jet with a continuous loop flight path', () => {

@@ -1,4 +1,4 @@
-import { searchPlaces } from '../places/place-search.js?v=1';
+import { searchPlaces } from '../places/place-search.js?v=2';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
@@ -125,7 +125,14 @@ function createAirportHub(options = {}) {
         name: destination.name,
         countryCode: destination.countryCode,
         arrivalMode: 'walk',
-        locationDetails: { region: destination.region, country: destination.country, displayName: destination.displayName }
+        locationDetails: {
+          region: destination.region,
+          country: destination.country,
+          displayName: destination.displayName,
+          airportClass: destination.airportClass || '',
+          iata: destination.iata || '',
+          icao: destination.icao || ''
+        }
       }, { transient: false });
       await appCtx.loadRoads?.();
     }

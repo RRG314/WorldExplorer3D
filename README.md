@@ -54,6 +54,8 @@ active world.*
 
 - Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
   astronaut, or spacecraft, or use optional Live GPS play while walking.
+- Visit supported mapped airports to board aircraft, choose pilot or passenger
+  travel, search for destinations, or take a local sightseeing flight.
 - Search for places by familiar names, including cities, landmarks, airports,
   and other expected location searches.
 - Use configurable Backpack quick slots for field tools, fishing gear,

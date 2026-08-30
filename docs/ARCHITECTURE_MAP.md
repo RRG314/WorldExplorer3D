@@ -84,7 +84,10 @@ dynamics in `app/js/plane/flight-dynamics.js` resolves aircraft-class tuning,
 airspeed, flight path, angle of attack, lift, stall, drag, bank-limited turning,
 and ground roll. `app/js/transport/airport-layout.js` compiles mapped aviation
 features and explicitly labeled gameplay fallbacks into one runway, stand,
-tower, terminal, and mobile-budget layout. `app/js/transport/aviation-runtime.js`
+tower, terminal, and mobile-budget layout. Provider airport classification and
+mapped runway, terminal, apron, and stand evidence select a major, regional, or
+local layout, so fleet size and aircraft mix fit the airport instead of applying
+one commercial-airport pattern worldwide. `app/js/transport/aviation-runtime.js`
 uses that same layout for presentation, collision, parked aircraft, taxi routes,
 and bounded takeoff/landing circuits without running a second player controller.
 `app/js/transport/airport-hub.js` is the single pilot/passenger destination

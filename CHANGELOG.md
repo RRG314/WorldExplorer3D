@@ -25,6 +25,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   Earth return.
 - Airport and helipad aircraft, in-flight exit and skydiving, mapped marinas
   and ports, playable boat and ship classes, and mapped historic-vessel labels.
+- Shared airport layouts with gates, stands, taxi and runway activity, control
+  towers, ticket halls, destination search, and pilot or passenger journeys.
 - Familiar-name place search, including landmarks and airports, plus a
   location-aware First Journey that can be postponed or turned off.
 

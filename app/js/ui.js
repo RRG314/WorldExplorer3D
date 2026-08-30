@@ -8,7 +8,7 @@ import { initMobileControls } from "./ui/mobile-controls.js?v=77";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=111";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=112";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {

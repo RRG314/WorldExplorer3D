@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=98";
+} from "./load-runtime-session.js?v=99";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -33,8 +33,8 @@ import {
   completeFixedRegionalStructureLoad
 } from "./fixed-regional-structures.js?v=15";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
-import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=2";
-import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=3";
+import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=3";
+import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=4";
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -711,7 +711,7 @@ export function createWorldRoadLoader(deps = {}) {
           Number(globalThis.navigator?.maxTouchPoints || 0) > 0;
         appCtx.transportFacilityVisual = createTransportFacilityVisuals(globalThis.THREE, transportFacilityGraph, {
           sampleGround: (x, z) => appCtx.elevationWorldYAtWorldXZ?.(x, z) || 0,
-          location: appCtx.LOC,
+          location: worldSession?.request?.selection || appCtx.resolveLocationSelection?.() || appCtx.LOC,
           mobile: mobileTransportClient
         });
         appCtx.addEarthWorldObject?.(appCtx.transportFacilityVisual.group);

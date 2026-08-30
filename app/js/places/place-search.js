@@ -86,6 +86,7 @@ function normalizeProviderResult(result, index) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   const address = result.address || {};
   const named = result.namedetails || {};
+  const extra = result.extratags || {};
   const name = firstText(
     named.name,
     result.name,
@@ -113,6 +114,11 @@ function normalizeProviderResult(result, index) {
     region: firstText(address.state, address.region, address.county),
     country: firstText(address.country),
     countryCode: String(address.country_code || '').toLowerCase(),
+    airportClass: category === 'aeroway' || type === 'aerodrome'
+      ? firstText(extra.aerodrome, extra['aerodrome:type'], extra.passenger)
+      : '',
+    iata: String(extra.iata || '').trim().toUpperCase(),
+    icao: String(extra.icao || '').trim().toUpperCase(),
     arrivalMode: water ? 'boat' : 'walk'
   };
 }
@@ -171,4 +177,4 @@ async function resolvePrimaryPlace(query, options = {}) {
   return results[0] || null;
 }
 
-export { parseCoordinates, resolvePrimaryPlace, searchPlaces };
+export { normalizeProviderResult, parseCoordinates, resolvePrimaryPlace, searchPlaces };
