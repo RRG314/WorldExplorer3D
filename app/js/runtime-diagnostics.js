@@ -950,6 +950,14 @@ function getWorldExplorerRuntimeDiagnostics() {
       turnRate: numberOrNull(appCtx.planeMode.turnRate),
       stalled: appCtx.planeMode.stalled === true
     } : null,
+    boatDynamics: appCtx.boatMode?.active ? {
+      catalogId: String(appCtx.boatMode.transportCatalogId || ''),
+      steerInput: numberOrNull(appCtx.readControlActions?.('boat')?.steer),
+      throttle: numberOrNull(appCtx.boat?.throttle),
+      forwardSpeed: numberOrNull(appCtx.boat?.forwardSpeed),
+      lateralSpeed: numberOrNull(appCtx.boat?.lateralSpeed),
+      turnRate: numberOrNull(appCtx.boat?.turnRate)
+    } : null,
     maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
     boatNavigation: appCtx.boatMode?.active ? {
       waterKind: String(appCtx.boatMode.waterKind || ''),

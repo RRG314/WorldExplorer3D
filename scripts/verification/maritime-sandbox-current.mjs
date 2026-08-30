@@ -80,22 +80,22 @@ try {
   await page.evaluate(() => globalThis.advanceTime?.(18_000));
   const beforeTurn = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor);
   await page.keyboard.down('ArrowLeft');
-  const rudderInput = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+  const rudderInput = await page.evaluate(() => {
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return {
-      keyHeld: ctx.keys?.ArrowLeft === true,
-      steer: Number(ctx.readControlActions?.('boat')?.steer || 0),
-      speed: Number(ctx.boat?.forwardSpeed || 0),
-      turnRate: Number(ctx.boat?.turnRate || 0)
+      keyHeld: diagnostics?.boatDynamics?.steerInput > .9,
+      steer: Number(diagnostics?.boatDynamics?.steerInput || 0),
+      speed: Number(diagnostics?.boatDynamics?.forwardSpeed || 0),
+      turnRate: Number(diagnostics?.boatDynamics?.turnRate || 0)
     };
   });
   await page.waitForTimeout(8000);
-  const rudderResponse = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+  const rudderResponse = await page.evaluate(() => {
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return {
-      steer: Number(ctx.readControlActions?.('boat')?.steer || 0),
-      speed: Number(ctx.boat?.forwardSpeed || 0),
-      turnRate: Number(ctx.boat?.turnRate || 0)
+      steer: Number(diagnostics?.boatDynamics?.steerInput || 0),
+      speed: Number(diagnostics?.boatDynamics?.forwardSpeed || 0),
+      turnRate: Number(diagnostics?.boatDynamics?.turnRate || 0)
     };
   });
   await page.keyboard.up('ArrowLeft');
