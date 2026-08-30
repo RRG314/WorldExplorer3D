@@ -12,6 +12,12 @@ import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
 } from "./structure-tunnel-visuals.js?v=24";
+import {
+  barrierPointConflictsWithDriveableRoad,
+  createDriveableRoadConflictIndex,
+  elevatedSegmentSafety,
+  supportPointConflictsWithDriveableRoad
+} from "../world/bridge-safety.js?v=13";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
@@ -59,6 +65,8 @@ export function collectStructureVisualInstances(deps = {}) {
   const featuresToProcess = Array.isArray(deps.featuresToProcess)
     ? deps.featuresToProcess
     : elevatedFeatures;
+  const roadConflictIndex = deps.roadConflictIndex || createDriveableRoadConflictIndex(appCtx.roads);
+
   const addSupportInstance = (instance) => {
     if (!instance || !(instance.scaleY > 0.5)) return;
     supportInstances.push(instance);
@@ -249,12 +257,80 @@ export function collectStructureVisualInstances(deps = {}) {
           );
         }
 
-        // Visual guardrails and parapets previously published as independent
-        // pale quads and beams. When an elevated feature was generalized or
-        // its deck was culled, those objects remained as white stripes and
-        // upright bars in the air. Collision remains owned by
-        // world/bridge-guardrails.js; this presentation owner intentionally
-        // publishes no standalone barrier geometry.
+        const guardrailSafety = elevatedSegmentSafety(feature, {
+          x: midX,
+          z: midZ,
+          deckY,
+          terrainY: terrainMidY,
+          distance: segmentCenterDistance,
+          total,
+          waterAreas: appCtx.waterAreas
+        });
+        if (guardrailSafety.protected && (isConnectorLike || isSkywalk)) {
+          const railOffset = width * 0.5 + 0.28;
+          for (const side of [-1, 1]) {
+            if (barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * railOffset * side,
+              z: midZ + nz * railOffset * side,
+              deckY,
+              roadIndex: roadConflictIndex
+            })) continue;
+            addBeam(
+              guardrailInstances,
+              midX + nx * railOffset * side,
+              deckY + (Number(structureSpecification.barrierHeight) || 1.1) - 0.08,
+              midZ + nz * railOffset * side,
+              0.14,
+              0.16,
+              deckDepth,
+              rotationY,
+              segmentQuat
+            );
+            addBeam(
+              guardrailInstances,
+              midX + nx * railOffset * side,
+              deckY + 0.56,
+              midZ + nz * railOffset * side,
+              0.1,
+              0.12,
+              deckDepth,
+              rotationY,
+              segmentQuat
+            );
+            addBeam(
+              guardrailInstances,
+              midX + nx * railOffset * side,
+              deckY + 0.52,
+              midZ + nz * railOffset * side,
+              0.1,
+              1.04,
+              0.1,
+              rotationY
+            );
+          }
+        } else if (guardrailSafety.protected) {
+          const barrierHalfWidth = width * 0.5 + 0.18;
+          const barrierSides = [-1, 1].filter((side) =>
+            !barrierPointConflictsWithDriveableRoad(feature, {
+              x: midX + nx * barrierHalfWidth * side,
+              z: midZ + nz * barrierHalfWidth * side,
+              deckY,
+              roadIndex: roadConflictIndex
+            })
+          );
+          if (barrierSides.length > 0) {
+            elevatedBarrierSegments.push({
+              p1: { x: p1.x, y: startY, z: p1.z },
+              p2: { x: p2.x, y: endY, z: p2.z },
+              halfWidth: barrierHalfWidth,
+              sides: barrierSides,
+              // Road bridges use a low concrete parapet. The collision owner
+              // remains full protective height, but a 1.25 m solid visual wall
+              // made ordinary ramps read as narrow trenches.
+              height: 0.58
+            });
+          }
+        }
 
         const sideOffset = Math.max(0.7, width * 0.34);
         const sideBeamWidth =
@@ -545,12 +621,14 @@ export async function collectStructureVisualInstancesCooperatively(deps = {}) {
     .concat(Array.isArray(appCtx.linearFeatures)
       ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true)
       : []);
+  const roadConflictIndex = createDriveableRoadConflictIndex(appCtx.roads);
   const merged = {};
   const chunkSize = 180;
   for (let start = 0; start < allElevatedFeatures.length; start += chunkSize) {
     const partial = collectStructureVisualInstances({
       ...deps,
       allElevatedFeatures,
+      roadConflictIndex,
       featuresToProcess: allElevatedFeatures.slice(start, start + chunkSize)
     });
     for (const [key, value] of Object.entries(partial)) {
