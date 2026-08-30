@@ -224,7 +224,11 @@ function createWalkingPhysicsHelpers({
       : Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
-    state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
+    // Skydiving owns heading below. Applying the walking turn a second time
+    // rotates the camera opposite the canopy and makes steering unreadable.
+    if (!skydiving) {
+      state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
+    }
     state.walker.lookYawOffset += (Number(actions.lookYaw) || 0) * lookSpeed;
     state.walker.pitch += (Number(actions.lookPitch) || 0) * lookSpeed;
 
@@ -326,6 +330,15 @@ function createWalkingPhysicsHelpers({
       state.walker.skydivingFlight = skydivingFlight;
       state.walker.angle = skydivingFlight.heading;
       state.walker.vy = skydivingFlight.verticalSpeed;
+      const activeLook = actions.mobileLookActive === true ||
+        Math.abs(Number(actions.lookYaw) || 0) > .01;
+      if (!activeLook) {
+        const headingDelta = wrapYaw(skydivingFlight.heading - state.walker.yaw);
+        const followBlend = 1 - Math.exp(-dt * 6.2);
+        state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
+        state.walker.lookYawOffset *= Math.exp(-dt * 4.6);
+        if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+      }
     } else {
       state.walker.skydivingFlight = null;
       state.walker.vy += gravity * dt;

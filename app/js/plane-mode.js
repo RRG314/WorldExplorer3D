@@ -1,7 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
-import { integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=2';
+import { applyAircraftHeadingTurn, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=3';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
 import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=4';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=10';
@@ -511,7 +511,13 @@ function updatePlane(dt) {
   const groundY = samplePlaneSurface(dt);
   if (catalog.aircraftKind === 'rotorcraft') {
     const forwardCommand = -pitchInput;
-    state.yaw += rollInput * dt * 1.15 * catalog.performance.steeringScale;
+    // Control input defines positive turn as left, while positive world yaw
+    // points right. Keep that convention consistent for every aircraft.
+    state.yaw = applyAircraftHeadingTurn(
+      state.yaw,
+      rollInput * 1.15 * catalog.performance.steeringScale,
+      dt
+    );
     state.pitch = damp(state.pitch, -forwardCommand * .2, 4.2, dt);
     state.roll = damp(state.roll, -rollInput * .18, 4.8, dt);
     const horizontalTarget = forwardCommand * Math.min(34, catalog.performance.topSpeed * .23) * catalog.performance.accelerationScale;
@@ -544,7 +550,11 @@ function updatePlane(dt) {
     state.pitchRate = 0;
     state.rollRate = 0;
     const steerScale = clamp(state.speed / Math.max(8, catalog.performance.turningRadius), 0.2, 1);
-    state.yaw += rollInput * dt * 1.02 * steerScale * catalog.performance.steeringScale;
+    state.yaw = applyAircraftHeadingTurn(
+      state.yaw,
+      rollInput * 1.02 * steerScale * catalog.performance.steeringScale,
+      dt
+    );
     state.y = damp(state.y, groundY + groundOffset, 12, dt);
     const takeoffSpeed = flightTuning.rotationSpeed;
     if (state.speed > takeoffSpeed && pitchInput > 0.2) {
@@ -604,7 +614,7 @@ function updatePlane(dt) {
       ? aircraftBankTurnFactor(state.roll, state.rollRate) * .18
       : flight.turnRate;
     state.stalled = flight.stalled;
-    state.yaw += state.turnRate * dt;
+    state.yaw = applyAircraftHeadingTurn(state.yaw, state.turnRate, dt);
     state.y += state.climbRate * dt;
     if (state.y <= groundY + groundOffset) {
       state.y = groundY + groundOffset;
