@@ -191,10 +191,12 @@ function groundSurfaceAt(x, z, options = {}) {
   const terrainY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
   let surface = { y: terrainY, kind: 'terrain', building: null };
   if (options.includeRoad !== false) {
-    const nearest = appCtx.findNearestRoad?.(x, z, { y: state.y, maxVerticalDelta: 80 });
-    const roadHalfWidth = Math.max(2.5, Number(nearest?.road?.width || 5) * 0.5);
-    if (Number(nearest?.dist) <= roadHalfWidth + 1.2 && Number.isFinite(nearest?.y)) {
-      surface = { y: nearest.y, kind: 'road', building: null };
+    const sampled = appCtx.SurfaceQuery?.driveAt?.(x, z, {
+      currentY: state.y - planeGroundOffset(),
+      preferRoad: true
+    });
+    if (Number.isFinite(sampled?.position?.y)) {
+      surface = { y: sampled.position.y, kind: sampled.kind, building: null };
     }
   }
   const roof = buildingRoofSurfaceAt(x, z, surface.y);

@@ -277,6 +277,17 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   const profile = () => activeSourceProfile(appCtx);
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
   const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
+  const airportSurfaceYAt = (x, z) => {
+    const y = Number(appCtx.transportFacilityVisual?.surfaceYAt?.(Number(x), Number(z)));
+    return Number.isFinite(y) ? y : null;
+  };
+  const airportSurfaceProvenance = Object.freeze({
+    provider: 'OpenStreetMap contributors',
+    dataset: 'OpenStreetMap airport geometry',
+    source: 'exact_osm_airport_surface',
+    confidence: 0.94,
+    fallback: false
+  });
 
   function terrainAt(x, z) {
     return createSurfaceSample({
@@ -292,18 +303,25 @@ function createSurfaceQuery(appCtx, GroundHeight) {
 
   function walkAt(x, z, options = {}) {
     const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY, options);
-    const kind = surfaceKindFromWalkInfo(info);
+    const airportY = airportSurfaceYAt(x, z);
+    const usesAirportSurface = Number.isFinite(airportY) && airportY > Number(info.y) + 0.001;
+    const y = usesAirportSurface ? airportY : info.y;
+    const kind = usesAirportSurface ? SURFACE_KIND.ROAD : surfaceKindFromWalkInfo(info);
     return createSurfaceSample({
       x,
-      y: info.y,
+      y,
       z,
       kind,
       profile: profile(),
       metersPerWorldUnit: units(),
-      feature: info.feature,
-      contact: info.pt ? { x: info.pt.x, y: info.y, z: info.pt.z } : null,
-      distance: info.dist,
-      provenance: kind === SURFACE_KIND.TERRAIN ? terrainProvenance(appCtx) : {},
+      feature: usesAirportSurface ? appCtx.transportFacilityVisual?.airportLayout : info.feature,
+      contact: usesAirportSurface
+        ? { x, y, z }
+        : info.pt ? { x: info.pt.x, y, z: info.pt.z } : null,
+      distance: usesAirportSurface ? 0 : info.dist,
+      provenance: usesAirportSurface
+        ? airportSurfaceProvenance
+        : kind === SURFACE_KIND.TERRAIN ? terrainProvenance(appCtx) : {},
       traversal: { drive: kind === SURFACE_KIND.ROAD || kind === SURFACE_KIND.TERRAIN }
     });
   }
@@ -312,19 +330,26 @@ function createSurfaceQuery(appCtx, GroundHeight) {
     const preferRoad = options.preferRoad !== false;
     const currentY = Number.isFinite(Number(options.currentY)) ? Number(options.currentY) : NaN;
     const info = GroundHeight.driveSurfaceInfo(x, z, preferRoad, currentY, options);
-    const road = info.source === 'road';
+    const airportY = airportSurfaceYAt(x, z);
+    const usesAirportSurface = Number.isFinite(airportY) && airportY > Number(info.y) + 0.001;
+    const y = usesAirportSurface ? airportY : info.y;
+    const road = usesAirportSurface || info.source === 'road';
     return createSurfaceSample({
       x,
-      y: info.y,
+      y,
       z,
       kind: road ? SURFACE_KIND.ROAD : SURFACE_KIND.TERRAIN,
       profile: profile(),
       metersPerWorldUnit: units(),
       normal: options.includeNormal === true ? GroundHeight._computeNormal(x, z) : null,
-      feature: info.road,
-      contact: info.roadPt ? { x: info.roadPt.x, y: info.y, z: info.roadPt.z } : null,
-      distance: info.roadDist,
-      provenance: road ? {} : terrainProvenance(appCtx)
+      feature: usesAirportSurface ? appCtx.transportFacilityVisual?.airportLayout : info.road,
+      contact: usesAirportSurface
+        ? { x, y, z }
+        : info.roadPt ? { x: info.roadPt.x, y, z: info.roadPt.z } : null,
+      distance: usesAirportSurface ? 0 : info.roadDist,
+      provenance: usesAirportSurface
+        ? airportSurfaceProvenance
+        : road ? {} : terrainProvenance(appCtx)
     });
   }
 
