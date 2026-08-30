@@ -17,6 +17,18 @@ const FACILITY_COLORS = Object.freeze({
   gate: 0xe7c951
 });
 
+const TAXIWAY_MARKING_RENDER_POLICY = Object.freeze({
+  color: 0xf4c62b,
+  desktopWidth: .28,
+  mobileWidth: .34,
+  surfaceOffset: .085,
+  renderOrder: 9,
+  frustumCulled: false,
+  depthWrite: false,
+  polygonOffsetFactor: -6,
+  polygonOffsetUnits: -6
+});
+
 function pointsFor(record, sampleGround) {
   return record.geometry.points.map((point) => ({
     x: point.x,
@@ -166,7 +178,23 @@ function addBox(THREE, parent, track, size, position, mat, name) {
 }
 
 function runwayMarkingMaterial(THREE, track) {
-  return track.material(new THREE.MeshBasicMaterial({ color: 0xf4f5ef, polygonOffset: true, polygonOffsetFactor: -4 }));
+  return track.material(new THREE.MeshBasicMaterial({
+    color: 0xf4f5ef,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  }));
+}
+
+function taxiwayMarkingMaterial(THREE, track) {
+  return track.material(new THREE.MeshBasicMaterial({
+    color: TAXIWAY_MARKING_RENDER_POLICY.color,
+    depthWrite: TAXIWAY_MARKING_RENDER_POLICY.depthWrite,
+    polygonOffset: true,
+    polygonOffsetFactor: TAXIWAY_MARKING_RENDER_POLICY.polygonOffsetFactor,
+    polygonOffsetUnits: TAXIWAY_MARKING_RENDER_POLICY.polygonOffsetUnits,
+    toneMapped: false
+  }));
 }
 
 function addRunwayPresentation(THREE, group, record, profile, track, mobile) {
@@ -399,9 +427,18 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
         if (record.id === airportLayout?.primaryRunway?.id) primaryRunwayProfile = surfaceProfile;
         addRunwayPresentation(THREE, group, record, surfaceProfile, track, options.mobile === true);
       } else if (record.type === 'taxiway') {
-        const centerline = track.geometry(createRibbonGeometry(THREE, surfaceProfile.map((point) => ({ ...point, y: point.y + .06 })), .18));
-        const centerlineMesh = new THREE.Mesh(centerline, track.material(new THREE.MeshBasicMaterial({ color: 0xe7c743 })));
+        const centerline = track.geometry(createRibbonGeometry(
+          THREE,
+          surfaceProfile.map((point) => ({ ...point, y: point.y + TAXIWAY_MARKING_RENDER_POLICY.surfaceOffset })),
+          options.mobile === true ? TAXIWAY_MARKING_RENDER_POLICY.mobileWidth : TAXIWAY_MARKING_RENDER_POLICY.desktopWidth
+        ));
+        centerline.computeBoundingBox();
+        centerline.computeBoundingSphere();
+        const centerlineMesh = new THREE.Mesh(centerline, taxiwayMarkingMaterial(THREE, track));
         centerlineMesh.name = 'Taxiway centerline';
+        centerlineMesh.renderOrder = TAXIWAY_MARKING_RENDER_POLICY.renderOrder;
+        centerlineMesh.frustumCulled = TAXIWAY_MARKING_RENDER_POLICY.frustumCulled;
+        centerlineMesh.userData.mappedAirportMarking = true;
         group.add(centerlineMesh);
       }
     } else {
@@ -440,6 +477,7 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
 }
 
 export {
+  TAXIWAY_MARKING_RENDER_POLICY,
   createTransportFacilityVisuals,
   physicalPublicationAllowed,
   profileSurfaceYAt,

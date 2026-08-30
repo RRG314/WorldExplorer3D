@@ -8,6 +8,7 @@ import {
 } from '../app/js/transport/facility-compiler.js';
 import { shortbreadFeatureTags } from '../app/js/world/shortbread-source.js';
 import {
+  TAXIWAY_MARKING_RENDER_POLICY,
   physicalPublicationAllowed,
   profileSurfaceYAt,
   runwaySurfaceProfile
@@ -136,6 +137,17 @@ test('runway body, markings, and aircraft share a terrain-clearing surface profi
   assert.ok(Number.isFinite(surfaceY));
   assert.ok(surfaceY >= terrain(20, 60) + .089);
   assert.equal(profileSurfaceYAt([{ profile, width: 40 }], 80, 60), null);
+});
+
+test('mapped taxiway centerlines retain a distance-stable surface render policy', () => {
+  assert.equal(TAXIWAY_MARKING_RENDER_POLICY.frustumCulled, false);
+  assert.equal(TAXIWAY_MARKING_RENDER_POLICY.depthWrite, false);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.desktopWidth >= .28);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.mobileWidth >= TAXIWAY_MARKING_RENDER_POLICY.desktopWidth);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.surfaceOffset >= .08);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.polygonOffsetFactor <= -4);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.polygonOffsetUnits <= -4);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.renderOrder > 8);
 });
 
 test('Overpass endpoint fallbacks are serial and never hedge concurrent requests', async () => {

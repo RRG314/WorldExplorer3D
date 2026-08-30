@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=105";
+} from "./load-runtime-session.js?v=106";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -34,7 +34,7 @@ import {
 } from "./fixed-regional-structures.js?v=15";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
 import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=4";
-import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=6";
+import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=7";
 import { fetchMappedAirportData, isAirportSelection } from "./osm-airport-source.js?v=1";
 
 const EXACT_AVIATION_TYPES = new Set([

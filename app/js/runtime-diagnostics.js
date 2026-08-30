@@ -50,6 +50,20 @@ function transportFacilitySnapshot() {
   const graph = appCtx.transportFacilityGraph;
   const visual = appCtx.transportFacilityVisual?.group;
   if (!graph) return { active: false, recordCount: 0, aviation: 0, maritime: 0 };
+  const taxiwayMarkings = [];
+  visual?.traverse?.((object) => {
+    if (object?.userData?.mappedAirportMarking !== true) return;
+    taxiwayMarkings.push({
+      visible: object.visible !== false,
+      frustumCulled: object.frustumCulled === true,
+      renderOrder: Number(object.renderOrder || 0),
+      depthWrite: object.material?.depthWrite !== false,
+      polygonOffset: object.material?.polygonOffset === true,
+      polygonOffsetFactor: Number(object.material?.polygonOffsetFactor || 0),
+      polygonOffsetUnits: Number(object.material?.polygonOffsetUnits || 0),
+      boundsReady: Boolean(object.geometry?.boundingBox && object.geometry?.boundingSphere)
+    });
+  });
   return {
     active: true,
     authority: String(graph.authority || ''),
@@ -60,7 +74,16 @@ function transportFacilitySnapshot() {
     typeCounts: graph.diagnostics?.typeCounts || {},
     visualAttached: Boolean(visual?.parent),
     visualCount: Number(visual?.children?.length || 0),
-    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false)
+    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false),
+    taxiwayMarkings: {
+      count: taxiwayMarkings.length,
+      distanceStableCount: taxiwayMarkings.filter((marking) =>
+        marking.visible && !marking.frustumCulled && marking.renderOrder >= 9 &&
+        !marking.depthWrite && marking.polygonOffset &&
+        marking.polygonOffsetFactor <= -4 && marking.polygonOffsetUnits <= -4 &&
+        marking.boundsReady
+      ).length
+    }
   };
 }
 

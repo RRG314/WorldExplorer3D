@@ -779,6 +779,24 @@ function startAviationRuntime(options = {}) {
         const point = offsetPoint(layout.runwayStart, layout.yaw, 0, Math.min(70, layout.runwayLength * .08));
         return moveWalkerForSupport(point.x, point.z, layout.yaw);
       },
+      moveAlongTaxiway() {
+        const taxiways = (appCtx.transportFacilityGraph?.byDomain?.aviation || [])
+          .filter((record) => record.type === 'taxiway' && record.geometry?.points?.length >= 2)
+          .map((record) => ({
+            record,
+            length: record.geometry.points.slice(1).reduce((total, point, index) => {
+              const previous = record.geometry.points[index];
+              return total + Math.hypot(point.x - previous.x, point.z - previous.z);
+            }, 0)
+          }))
+          .sort((left, right) => right.length - left.length);
+        const points = taxiways[0]?.record?.geometry?.points;
+        if (!points?.length) return false;
+        const start = points[0];
+        const look = points.find((point) => Math.hypot(point.x - start.x, point.z - start.z) >= 18) || points[1];
+        const yaw = Math.atan2(look.x - start.x, look.z - start.z);
+        return moveWalkerForSupport(start.x, start.z, yaw);
+      },
       openHub(source = 'ticket_hall', aircraftId = '') {
         const vehicle = aircraftId ? runtime.vehicles.find(({ id }) => id === String(aircraftId)) : null;
         return runtime.hub?.open?.({ source, vehicle }) === true;

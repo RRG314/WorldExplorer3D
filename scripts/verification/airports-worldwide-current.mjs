@@ -88,6 +88,9 @@ try {
       assert.equal(await page.evaluate(() => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNearRunway()), true);
       await page.waitForTimeout(1200);
       await page.screenshot({ path: `${outputDir}/${airport.id}-airfield.png`, fullPage: true });
+      assert.equal(await page.evaluate(() => globalThis.__WE3D_AVIATION_SUPPORT__?.moveAlongTaxiway()), true);
+      await page.waitForTimeout(1200);
+      await page.screenshot({ path: `${outputDir}/${airport.id}-taxiway-ahead.png`, fullPage: true });
       assert.equal(await page.evaluate(() => globalThis.__WE3D_AVIATION_SUPPORT__?.openHub('aircraft')), true);
       await page.waitForSelector('.airport-hub[open]', { timeout: 10_000 });
       const hubText = await page.locator('.airport-hub').innerText();
@@ -101,6 +104,9 @@ try {
         sharedAirportLayout: aviation.airportLayoutAuthority === 'compiled-airport-operational-layout',
         mappedRunwayAuthority: aviation.mappedRunway === true &&
           aviation.generatedRunwayFallback === false && aviation.mappedRunwayCount >= 1,
+        taxiwayMarkingsRemainPublishedAhead: diagnostics?.transportFacilities?.taxiwayMarkings?.count > 0 &&
+          diagnostics.transportFacilities.taxiwayMarkings.distanceStableCount ===
+            diagnostics.transportFacilities.taxiwayMarkings.count,
         boundedFleet: aviation.fleetCount <= 24 && aviation.publishedStandCount === aviation.fleetCount,
         scaleAppropriateDensity: aviation.airportScale === 'major'
           ? aviation.fleetCount >= 14
