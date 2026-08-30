@@ -46,9 +46,7 @@ try {
   assert.match(constellation.label, /Sloop-of-war museum ship/);
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_MARITIME_SUPPORT__.moveNearMapped(id), constellation.id), true);
   await page.waitForFunction(() => globalThis.__WE3D_MARITIME_SUPPORT__.snapshot().interaction?.action === 'inspect_mapped_vessel');
-  await page.evaluate(async () => {
-    const { setTimeOfDay } = await import('/app/js/sky.js?v=88');
-    setTimeOfDay('day');
+  await page.evaluate(() => {
     const tutorial = document.getElementById('tutorialHintCard');
     if (tutorial) tutorial.hidden = true;
   });
