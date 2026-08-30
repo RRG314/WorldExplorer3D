@@ -611,7 +611,11 @@ function worldCompositionSnapshot() {
 function transportStructureSnapshot() {
   const roads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const visuals = Array.isArray(appCtx.structureVisualMeshes) ? appCtx.structureVisualMeshes : [];
-  const generalizedEndpointRecords = roads.filter((road) =>
+  const generalizedEndpointAuditRadius = Number.isFinite(Number(appCtx.worldTraversalRadiusWorld)) &&
+    Number(appCtx.worldTraversalRadiusWorld) > 0
+    ? Number(appCtx.worldTraversalRadiusWorld)
+    : 2700;
+  const allGeneralizedEndpointRecords = roads.filter((road) =>
     road?.transportRecord?.completeness === 'generalized' &&
     road?.structureSemantics?.gradeSeparated === true &&
     road?.transportStructureAssembly?.publishBody === true &&
@@ -662,6 +666,10 @@ function transportStructureSnapshot() {
       };
     });
   });
+  const generalizedEndpointRecords = allGeneralizedEndpointRecords.filter((record) =>
+    Number.isFinite(record.x) && Number.isFinite(record.z) &&
+    Math.hypot(record.x, record.z) <= generalizedEndpointAuditRadius
+  );
   const unsupportedGeneralizedOpenBoundaries = generalizedEndpointRecords
     .filter((record) =>
       record.state === 'open_boundary' &&
@@ -831,6 +839,8 @@ function transportStructureSnapshot() {
     },
     generalizedEndpointIntegrity: {
       authority: 'compiled-generalized-structure-endpoints',
+      horizontalAuditRadius: generalizedEndpointAuditRadius,
+      sourceEndpoints: allGeneralizedEndpointRecords.length,
       sampledEndpoints: generalizedEndpointRecords.length,
       unsupportedOpenBoundaryCount: unsupportedGeneralizedOpenBoundaries.length,
       unsupportedOpenBoundaries: unsupportedGeneralizedOpenBoundaries.slice(0, 24)
