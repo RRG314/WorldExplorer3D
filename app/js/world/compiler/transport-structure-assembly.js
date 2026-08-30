@@ -306,7 +306,6 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
         (endpoint === 'start'
           ? sample.distance <= maximumSetback
           : total - sample.distance <= maximumSetback) &&
-        sample.onMappedWater !== true &&
         sample.undersideClearance > 0.55
       ).sort((left, right) => endpoint === 'start'
         ? right.distance - left.distance
