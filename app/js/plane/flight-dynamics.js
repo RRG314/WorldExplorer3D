@@ -8,6 +8,7 @@ function resolveAircraftFlightTuning(catalog = {}) {
   const role = String(catalog.role || 'personal');
   const defaults = {
     personal: { stallSpeed: 13, rotationSpeed: 15.5, groundAcceleration: 6.4, pitchControl: 1, rollControl: 1, thrustResponse: .72, liftSlope: 3.2, inducedDrag: .11, turnResponse: 1, maxBank: .58, maxPitch: .46, maxClimbRate: 13 },
+    aerobatic: { stallSpeed: 18, rotationSpeed: 21, groundAcceleration: 9.2, pitchControl: 1.36, rollControl: 1.42, thrustResponse: .82, liftSlope: 3.8, inducedDrag: .075, turnResponse: 1.2, maxBank: Math.PI, maxPitch: Math.PI, maxClimbRate: 55 },
     bush: { stallSpeed: 13.5, rotationSpeed: 16, groundAcceleration: 5.4, pitchControl: .95, rollControl: .94, thrustResponse: .62, liftSlope: 3.15, inducedDrag: .12, turnResponse: .96, maxBank: .54, maxPitch: .44, maxClimbRate: 12 },
     business: { stallSpeed: 25, rotationSpeed: 29, groundAcceleration: 4.1, pitchControl: .72, rollControl: .7, thrustResponse: .34, liftSlope: 2.9, inducedDrag: .1, turnResponse: .82, maxBank: .46, maxPitch: .36, maxClimbRate: 22 },
     regional: { stallSpeed: 32, rotationSpeed: 37, groundAcceleration: 2.9, pitchControl: .5, rollControl: .48, thrustResponse: .22, liftSlope: 2.75, inducedDrag: .09, turnResponse: .7, maxBank: .38, maxPitch: .3, maxClimbRate: 17 },
@@ -24,6 +25,31 @@ function integrateFixedWingFlight(state = {}, input = {}, catalog = {}, dt = 0) 
   const powerFactor = clamp(input.powerFactor ?? 1, 0, 1);
   let speed = Math.max(0, Number(state.speed) || 0);
   let climbRate = Number(state.climbRate) || 0;
+  if (String(catalog.role || '') === 'aerobatic') {
+    const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+    const pitch = wrap(Number(state.pitch) || 0);
+    const roll = wrap(Number(state.roll) || 0);
+    let flightPathAngle = wrap(Number(state.flightPathAngle) || Math.atan2(climbRate, Math.max(1, speed)));
+    const angleOfAttack = clamp(wrap(pitch - flightPathAngle), -.52, .52);
+    const targetSpeed = throttle * topSpeed * powerFactor;
+    const gravityAlongPath = GRAVITY_MPS2 * Math.sin(flightPathAngle);
+    const maneuverDrag = (Math.abs(angleOfAttack) * .28 + Math.abs(Number(state.pitchRate) || 0) * .06) * Math.max(speed, tuning.stallSpeed);
+    speed = clamp(speed + ((targetSpeed - speed) * tuning.thrustResponse - gravityAlongPath - maneuverDrag) * step, 0, topSpeed);
+    const controlAuthority = clamp(speed / Math.max(1, tuning.stallSpeed), .24, 1.25);
+    const pathError = wrap(pitch - flightPathAngle);
+    const pathRate = clamp(pathError * 3.4 * controlAuthority + (Number(state.pitchRate) || 0) * .46, -2.2, 2.2);
+    flightPathAngle = wrap(flightPathAngle + pathRate * step);
+    const horizontalSpeed = speed * Math.cos(flightPathAngle);
+    climbRate = speed * Math.sin(flightPathAngle);
+    const stalled = speed < tuning.stallSpeed * .78;
+    const liftLoad = clamp(1 + Math.abs(pathRate) * speed / Math.max(10, GRAVITY_MPS2 * 4.2), 0, 5.5);
+    const turnRate = clamp(
+      GRAVITY_MPS2 * Math.sin(roll) * Math.max(.18, Math.abs(Math.cos(flightPathAngle))) / Math.max(tuning.stallSpeed, speed) * tuning.turnResponse,
+      -1.12,
+      1.12
+    );
+    return Object.freeze({ speed, climbRate, horizontalSpeed, flightPathAngle, angleOfAttack, liftLoad, turnRate, stalled, tuning });
+  }
   const pitch = clamp(state.pitch, -tuning.maxPitch, tuning.maxPitch);
   const roll = clamp(state.roll, -tuning.maxBank, tuning.maxBank);
   const flightPathAngle = Math.atan2(climbRate, Math.max(1, speed));

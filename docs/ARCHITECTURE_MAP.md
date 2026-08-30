@@ -82,8 +82,16 @@ vessels.
 `app/js/plane-mode.js` remains the player flight owner. The shared fixed-wing
 dynamics in `app/js/plane/flight-dynamics.js` resolves aircraft-class tuning,
 airspeed, flight path, angle of attack, lift, stall, drag, bank-limited turning,
-and ground roll. `app/js/transport/aviation-runtime.js` adds airport fleet and
-taxi activity without running a second player controller.
+and ground roll. `app/js/transport/airport-layout.js` compiles mapped aviation
+features and explicitly labeled gameplay fallbacks into one runway, stand,
+tower, terminal, and mobile-budget layout. `app/js/transport/aviation-runtime.js`
+uses that same layout for presentation, collision, parked aircraft, taxi routes,
+and bounded takeoff/landing circuits without running a second player controller.
+`app/js/transport/airport-hub.js` is the single pilot/passenger destination
+surface for terminal and aircraft entry; destination arrival hands control to
+Plane Mode and records travel through the existing Explorer progression owner.
+Airborne exit hands the same actor to Walking and the Backpack parachute rather
+than creating a separate skydiving character or inventory.
 
 `app/js/boat-mode/runtime-dynamics.js` remains the player vessel owner. The
 handling profile in `app/js/boat-mode/vessel-handling.js` derives throttle,

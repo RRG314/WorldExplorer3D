@@ -147,6 +147,11 @@ environment. Secrets are not included in the repository.
 
 ## License
 
-This repository is source-available under the custom terms in [LICENSE](LICENSE).
-It is not licensed as OSI open-source software. Third-party data and assets
-remain subject to their respective licenses.
+Copyright © 2026 Steven Reid / World Explorer 3D. All Rights Reserved.
+
+This repository is publicly viewable under the custom source-available terms
+in [LICENSE](LICENSE). It is not licensed as OSI open-source software, and
+attribution alone does not grant permission to copy, redistribute, publish,
+host, or create derivative works. Third-party data, software, and assets remain
+subject to their respective terms in [ATTRIBUTION.md](ATTRIBUTION.md) and
+[ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).

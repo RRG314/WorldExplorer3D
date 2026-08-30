@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateParachuteFall, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=3";
+import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=5";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
@@ -312,11 +312,25 @@ function createWalkingPhysicsHelpers({
     const parachuteDeployed = appCtx.isUrbanParachuteDeployed?.() === true &&
       !isPlanetarySurface() && !state.walker.onGround && state.walker.vy < 0;
     const parachuteFlare = parachuteDeployed && Number(actions.jump) > .05;
-    state.walker.vy = parachuteDeployed
-      ? integrateParachuteFall(state.walker.vy, dt, true, parachuteFlare)
-      : state.walker.vy + gravity * dt;
+    let skydivingFlight = null;
+    if (skydiving) {
+      skydivingFlight = integrateSkydivingDynamics(state.walker.skydivingFlight, {
+        deployed: parachuteDeployed,
+        flare: parachuteFlare,
+        forward,
+        turn: Number(actions.turn) || -strafe,
+        vx: state.walker.vx,
+        vz: state.walker.vz,
+        verticalVelocity: state.walker.vy
+      }, dt);
+      state.walker.skydivingFlight = skydivingFlight;
+      state.walker.angle = skydivingFlight.heading;
+      state.walker.vy = skydivingFlight.verticalSpeed;
+    } else {
+      state.walker.skydivingFlight = null;
+      state.walker.vy += gravity * dt;
+    }
     state.walker.y += state.walker.vy * dt;
-    if (parachuteDeployed) forward = parachuteFlare ? .34 + forward * .18 : .65 + forward * .35;
 
     if (appCtx.activeInterior) {
       const ceiling = resolveInteriorCeiling({
@@ -379,14 +393,18 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    if (forward !== 0 || strafe !== 0 || liveGpsMoved) {
+    if (forward !== 0 || strafe !== 0 || liveGpsMoved || skydivingFlight) {
       const cameraYaw = mobileTouch && Number.isFinite(state.walker.mobileMoveBasisYaw)
         ? state.walker.mobileMoveBasisYaw
         : wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
-      const moveX = mobileTouch && !liveGpsMoved
+      const moveX = skydivingFlight
+        ? skydivingFlight.vx * dt
+        : mobileTouch && !liveGpsMoved
         ? (Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
         : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = mobileTouch && !liveGpsMoved
+      const moveZ = skydivingFlight
+        ? skydivingFlight.vz * dt
+        : mobileTouch && !liveGpsMoved
         ? (Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
         : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
       if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
@@ -557,8 +575,11 @@ function createWalkingPhysicsHelpers({
         ? finalGroundState.effectiveGroundY + 0.04
         : Math.max(state.walker.y - CFG.eyeHeight, finalGroundState.effectiveGroundY + 0.02);
       state.characterMesh.position.set(state.walker.x, meshFeetY, state.walker.z);
+      state.characterMesh.rotation.order = 'YXZ';
       state.characterMesh.rotation.y = state.walker.angle;
-      animateCharacterWalk(state.characterMesh, state.walker.speedMph > 0, dt);
+      state.characterMesh.rotation.x = skydivingFlight?.bodyPitch || 0;
+      state.characterMesh.rotation.z = skydivingFlight ? -skydivingFlight.bank : 0;
+      animateCharacterWalk(state.characterMesh, !skydivingFlight && state.walker.speedMph > 0, dt);
     }
 
     if (profileEnabled) {

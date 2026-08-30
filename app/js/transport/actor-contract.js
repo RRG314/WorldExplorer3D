@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { transportDamagePresentation } from './damage-model.js?v=1';
-import { getAviationCatalogEntry } from './aviation-catalog.js?v=3';
+import { getAviationCatalogEntry } from './aviation-catalog.js?v=4';
 import { getMaritimeCatalogEntry } from './maritime-catalog.js?v=1';
 
 function finite(value, fallback = 0) {

@@ -948,7 +948,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       angleOfAttack: numberOrNull(appCtx.planeMode.angleOfAttack),
       liftLoad: numberOrNull(appCtx.planeMode.liftLoad),
       turnRate: numberOrNull(appCtx.planeMode.turnRate),
-      stalled: appCtx.planeMode.stalled === true
+      stalled: appCtx.planeMode.stalled === true,
+      passengerMode: appCtx.planeMode.passengerMode === true
     } : null,
     boatDynamics: appCtx.boatMode?.active ? {
       catalogId: String(appCtx.boatMode.transportCatalogId || ''),

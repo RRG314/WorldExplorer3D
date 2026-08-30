@@ -87,7 +87,7 @@ function onKey(code, event) {
     code === 'Space' &&
     !event?.repeat &&
     appCtx.Walk?.state?.mode === 'walk' &&
-    appCtx.Walk?.state?.walker?.onGround === false &&
+    (appCtx.urbanSandboxRuntime?.parachute?.skydiving === true || appCtx.Walk?.state?.walker?.onGround === false) &&
     appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute'
   ) {
     if (appCtx.handleUrbanEquipmentUse?.()) {

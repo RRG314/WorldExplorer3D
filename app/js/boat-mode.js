@@ -47,7 +47,7 @@ import {
 } from './boat-mode/surface-layer-visibility.js?v=2';
 import { getMaritimeCatalogEntry } from './transport/maritime-catalog.js?v=1';
 import { applyTransportDamage, transportDamagePresentation } from './transport/damage-model.js?v=1';
-import { updateVesselVisual } from './transport/vessel-visual-recipe.js?v=6';
+import { updateVesselVisual } from './transport/vessel-visual-recipe.js?v=7';
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;

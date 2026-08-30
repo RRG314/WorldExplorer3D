@@ -5,7 +5,7 @@ import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
 import { createEquipmentInventory } from './equipment-model.js?v=8';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=19';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -1845,7 +1845,13 @@ function reportCivicEvent(state, event = {}) {
 function updateCivicResponse(state, dt) {
   const step = Math.max(0, Number(dt) || 0);
   const authorityMode = state.roomAuthorityRuntime?.snapshot?.()?.mode || 'local';
-  if (authorityMode === 'local') state.civic.update(step, civicActorPosition(state));
+  if (authorityMode === 'local') {
+    const responderSnapshot = state.responders?.snapshot?.();
+    const detected = (responderSnapshot?.responders || []).some((responder) =>
+      Number(responder.distanceToActor) <= (responder.officer ? 46 : 58)
+    );
+    state.civic.update(step, civicActorPosition(state), { detected });
+  }
   state.recklessEventCooldown = Math.max(0, state.recklessEventCooldown - step);
   if (state.activeVehicle?.attachedToPlayer && appCtx.Walk?.state?.mode !== 'walk') {
     const mph = Math.abs(carSpeedToMph(Number(appCtx.car?.speed || 0)));
@@ -2380,7 +2386,13 @@ function snapshot(state) {
       deployedAt: Number(state.parachute?.deployedAt || 0),
       landedAt: Number(state.parachute?.landedAt || 0),
       skydiving: state.parachute?.skydiving === true,
-      automaticEquip: state.parachute?.automaticEquip === true
+      automaticEquip: state.parachute?.automaticEquip === true,
+      phase: appCtx.Walk?.state?.walker?.skydivingFlight?.phase || '',
+      heading: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.heading || 0),
+      bank: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.bank || 0),
+      horizontalSpeed: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.horizontalSpeed || 0),
+      verticalSpeed: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.verticalSpeed || 0),
+      profileId: String(appCtx.Walk?.state?.walker?.skydivingFlight?.profileId || '')
     }),
     civicResponse: civicSnapshot(state),
     responders: state.responders?.snapshot?.() || null,

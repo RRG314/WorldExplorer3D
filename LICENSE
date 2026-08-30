@@ -1,56 +1,102 @@
-WORLD EXPLORER 3D SOURCE-AVAILABLE LICENSE
+WORLD EXPLORER 3D SOURCE-AVAILABLE LICENSE 1.0
+
+SPDX-License-Identifier: LicenseRef-World-Explorer-3D-Source-Available-1.0
+Effective date: August 30, 2026
 
 Copyright (c) 2026 Steven Reid / World Explorer 3D
 All Rights Reserved.
 
-1. License Model
+1. Ownership and Scope
 
-This repository is publicly viewable source code, but it is not open-source software.
-No permission is granted to use, copy, modify, distribute, sublicense, sell, or create derivative works from this codebase except as explicitly stated below.
+Steven Reid owns the copyright in the original World Explorer 3D materials
+included in this repository (the "Project Materials"), including original
+source code, game content, interface and visual designs, documentation, and
+original art, audio, and other assets.
+
+Project Materials do not include third-party software, data, services, fonts,
+models, textures, media, or other material identified in ATTRIBUTION.md,
+ACKNOWLEDGEMENTS.md, accompanying asset records, or dependency metadata. Those
+materials remain subject to their respective owners' terms. Project Materials
+also do not include player or contributor content except to the extent rights
+are granted under Section 5.
 
 2. Limited Permission
 
-You may:
+Subject to this license, you may:
 
-- view and read the source code in the public repository
-- clone/fork for private evaluation, testing, and review
-- submit pull requests to this repository
+- view and read the Project Materials in the public repository;
+- use GitHub's view and fork functionality;
+- make a private copy solely for personal evaluation, testing, security review,
+  or preparation of a contribution to this repository; and
+- submit contributions to this repository.
 
-You may not, without prior written permission from the copyright holder:
+These permissions do not make World Explorer 3D open-source software and do not
+grant permission to operate, publish, or distribute a competing or derivative
+game, service, application, or library. All rights not expressly granted are
+reserved.
 
-- redistribute this software or modified versions
-- publish derivative works
-- use this software in commercial or production systems
-- relicense this software
-- package or mirror this repository as a reusable code library
+3. Restrictions
 
-3. Contributions
+Without prior written permission from the copyright holder, you may not:
 
-By submitting code, docs, or other material to this repository, you grant the project maintainer a perpetual, worldwide, royalty-free right to use, modify, and incorporate that contribution into World Explorer 3D.
+- publish, redistribute, sublicense, sell, rent, or commercially exploit any
+  Project Materials or modified versions;
+- deploy or operate Project Materials in a public, commercial, production, or
+  hosted system, including a public mirror or playable copy;
+- create or distribute derivative works based on Project Materials, except for
+  a private modification made only for a permitted purpose in Section 2;
+- package Project Materials as a reusable library, asset pack, dataset, model,
+  template, or other product;
+- remove or alter copyright, license, attribution, provenance, or rights
+  notices; or
+- use the World Explorer 3D name, logos, trade dress, or other brand features
+  in a way that suggests affiliation, endorsement, or ownership.
 
-4. Third-Party Components
+Attribution alone does not grant permission to use Project Materials.
 
-This project uses third-party libraries and datasets under their own terms, including:
+4. Notices and Attribution
 
-- Three.js (MIT License)
-- OpenStreetMap data (ODbL)
-- Other provider APIs and assets as documented in `ACKNOWLEDGEMENTS.md`
+Every copy permitted under Section 2 must retain this license, all copyright
+notices, and the attribution records supplied with the repository. Any use
+separately authorized in writing must include the notices and attribution
+specified in that authorization and must preserve applicable third-party
+credits, including "© OpenStreetMap contributors" where required.
 
-Third-party components remain under their original licenses.
+5. Contributions
 
-5. Attribution Requirements
+By submitting code, documentation, art, audio, data, or other material to this
+repository, you represent that you have the right to submit it and grant Steven
+Reid a perpetual, worldwide, non-exclusive, irrevocable, royalty-free license
+to use, reproduce, modify, prepare derivative works from, distribute, display,
+perform, sublicense, and incorporate that contribution into World Explorer 3D
+and related Project Materials.
 
-Any permitted demonstration or reference to this project should retain:
+6. Third-Party Materials
 
-- "World Explorer 3D (c) 2026 Steven Reid / World Explorer 3D. All Rights Reserved."
-- "Map data (c) OpenStreetMap contributors"
+Third-party components remain under their original licenses and terms. If this
+license conflicts with the valid terms for an identified third-party component,
+the third-party terms control only for that component. The public attribution
+index is in ATTRIBUTION.md, acknowledgements are in ACKNOWLEDGEMENTS.md, and
+asset-level records are retained beside bundled assets.
 
-6. Disclaimer
+7. Termination
 
-THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+The permissions in Section 2 terminate automatically if you violate this
+license. On termination, you must stop using and delete copies of Project
+Materials made under those permissions, except copies GitHub retains through
+its platform functionality or copies that applicable law requires you to keep.
 
-IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+8. Disclaimer and Limitation of Liability
 
-7. Contact
+THE PROJECT MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
 
-For licensing questions or commercial inquiries, contact the project maintainer.
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER WILL NOT BE LIABLE
+FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE
+PROJECT MATERIALS OR THEIR USE.
+
+9. Contact
+
+For licensing questions, commercial permissions, or other rights inquiries,
+contact mail@worldexplorer3d.io.

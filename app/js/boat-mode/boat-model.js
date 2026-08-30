@@ -1,5 +1,5 @@
 import { getMaritimeCatalogEntry } from '../transport/maritime-catalog.js?v=1';
-import { createVesselVisual } from '../transport/vessel-visual-recipe.js?v=6';
+import { createVesselVisual } from '../transport/vessel-visual-recipe.js?v=7';
 
 function createBoatModeMesh(entry = getMaritimeCatalogEntry(), options = {}) {
   if (typeof THREE === 'undefined') throw new Error('Boat Mode visual authority requires Three.js.');

@@ -1,5 +1,4 @@
 import { transportDamagePresentation } from './damage-model.js?v=1';
-import { createExpeditionPlaneMesh } from '../plane/expedition-plane-mesh.js?v=2';
 
 const PALETTE = Object.freeze({
   body: 0xc6c1b1,
@@ -47,21 +46,35 @@ function taperedCylinderBetween(THREE, start, end, startRadius, endRadius, mat, 
   return mesh;
 }
 
+const FUSELAGE_STATIONS = Object.freeze([
+  Object.freeze({ z: -.5, radius: .08, lift: .02 }),
+  Object.freeze({ z: -.44, radius: .52, lift: .02 }),
+  Object.freeze({ z: -.39, radius: .72, lift: .01 }),
+  Object.freeze({ z: -.33, radius: .86, lift: 0 }),
+  Object.freeze({ z: -.08, radius: 1, lift: 0 }),
+  Object.freeze({ z: .25, radius: .98, lift: .01 }),
+  Object.freeze({ z: .4, radius: .76, lift: .03 }),
+  Object.freeze({ z: .455, radius: .46, lift: .035 }),
+  Object.freeze({ z: .49, radius: .18, lift: .02 })
+]);
+
+function fuselageScaleAt(z, length) {
+  if (!Number.isFinite(length) || length <= 0) return 1;
+  const normalized = Math.max(-.5, Math.min(.49, z / length));
+  for (let index = 1; index < FUSELAGE_STATIONS.length; index += 1) {
+    const previous = FUSELAGE_STATIONS[index - 1];
+    const next = FUSELAGE_STATIONS[index];
+    if (normalized > next.z) continue;
+    const progress = (normalized - previous.z) / Math.max(.0001, next.z - previous.z);
+    return previous.radius + (next.radius - previous.radius) * progress;
+  }
+  return FUSELAGE_STATIONS.at(-1).radius;
+}
+
 function ellipticalFuselageGeometry(THREE, length, radiusX, radiusY, segments = 18) {
-  const stations = [
-    { z: -.5, radius: .08, lift: .02 },
-    { z: -.44, radius: .52, lift: .02 },
-    { z: -.39, radius: .72, lift: .01 },
-    { z: -.33, radius: .86, lift: 0 },
-    { z: -.08, radius: 1, lift: 0 },
-    { z: .25, radius: .98, lift: .01 },
-    { z: .4, radius: .76, lift: .03 },
-    { z: .455, radius: .46, lift: .035 },
-    { z: .49, radius: .18, lift: .02 }
-  ];
   const vertices = [];
   const indices = [];
-  for (const station of stations) {
+  for (const station of FUSELAGE_STATIONS) {
     for (let segment = 0; segment < segments; segment += 1) {
       const angle = segment / segments * Math.PI * 2;
       vertices.push(
@@ -71,7 +84,7 @@ function ellipticalFuselageGeometry(THREE, length, radiusX, radiusY, segments = 
       );
     }
   }
-  for (let ring = 0; ring < stations.length - 1; ring += 1) {
+  for (let ring = 0; ring < FUSELAGE_STATIONS.length - 1; ring += 1) {
     const nextRing = ring + 1;
     for (let segment = 0; segment < segments; segment += 1) {
       const next = (segment + 1) % segments;
@@ -81,6 +94,16 @@ function ellipticalFuselageGeometry(THREE, length, radiusX, radiusY, segments = 
       const d = nextRing * segments + next;
       indices.push(a, c, b, b, c, d);
     }
+  }
+  const tailCenter = vertices.length / 3;
+  vertices.push(0, 0, -length * .5);
+  const noseCenter = vertices.length / 3;
+  vertices.push(0, 0, length * .5);
+  const lastRing = (FUSELAGE_STATIONS.length - 1) * segments;
+  for (let segment = 0; segment < segments; segment += 1) {
+    const next = (segment + 1) % segments;
+    indices.push(tailCenter, next, segment);
+    indices.push(noseCenter, lastRing + segment, lastRing + next);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -138,6 +161,77 @@ function taperedWingGeometry(THREE, span, rootChord, tipChord, thickness) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function flushFuselagePanelGeometry(THREE, side, radiusX, radiusY, centerY, height, centerZ, length, fuselageLength = 0) {
+  const y0 = centerY - height * .5;
+  const y1 = centerY + height * .5;
+  const surfaceX = (y, z) => {
+    const scale = fuselageScaleAt(z, fuselageLength);
+    const localRadiusY = Math.max(.001, radiusY * scale);
+    return side * radiusX * scale * Math.sqrt(Math.max(.04, 1 - (y * y) / (localRadiusY * localRadiusY))) * 1.004;
+  };
+  const vertices = [
+    surfaceX(y0, centerZ - length * .5), y0, centerZ - length * .5,
+    surfaceX(y1, centerZ - length * .5), y1, centerZ - length * .5,
+    surfaceX(y1, centerZ + length * .5), y1, centerZ + length * .5,
+    surfaceX(y0, centerZ + length * .5), y0, centerZ + length * .5
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(side > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function flushFuselageOvalPanelGeometry(THREE, side, radiusX, radiusY, centerY, height, centerZ, length, fuselageLength, segments = 12) {
+  const surfaceX = (y, z) => {
+    const scale = fuselageScaleAt(z, fuselageLength);
+    const localRadiusY = Math.max(.001, radiusY * scale);
+    return side * radiusX * scale * Math.sqrt(Math.max(.04, 1 - (y * y) / (localRadiusY * localRadiusY))) * 1.004;
+  };
+  const vertices = [surfaceX(centerY, centerZ), centerY, centerZ];
+  for (let index = 0; index < segments; index += 1) {
+    const angle = index / segments * Math.PI * 2;
+    const y = centerY + Math.sin(angle) * height * .5;
+    const z = centerZ + Math.cos(angle) * length * .5;
+    vertices.push(surfaceX(y, z), y, z);
+  }
+  const indices = [];
+  for (let index = 0; index < segments; index += 1) {
+    const current = index + 1;
+    const next = (index + 1) % segments + 1;
+    if (side > 0) indices.push(0, next, current);
+    else indices.push(0, current, next);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function flushFuselageTopPanelGeometry(THREE, radiusX, radiusY, centerX, width, centerZ, length, fuselageLength) {
+  const surfaceY = (x, z) => {
+    const scale = fuselageScaleAt(z, fuselageLength);
+    const localRadiusX = Math.max(.001, radiusX * scale);
+    return radiusY * scale * Math.sqrt(Math.max(.04, 1 - (x * x) / (localRadiusX * localRadiusX))) * 1.004;
+  };
+  const x0 = centerX - width * .5;
+  const x1 = centerX + width * .5;
+  const z0 = centerZ - length * .5;
+  const z1 = centerZ + length * .5;
+  const vertices = [
+    x0, surfaceY(x0, z0), z0,
+    x1, surfaceY(x1, z0), z0,
+    x1, surfaceY(x1, z1), z1,
+    x0, surfaceY(x0, z1), z1
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex([0, 2, 1, 0, 3, 2]);
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -209,7 +303,7 @@ function fixedWingVisual(THREE, entry, options, mats) {
   const finHeight = entry.role === 'airliner' ? height * .54 : entry.role === 'regional' ? height * .48 : Math.max(height * .45, width * .62);
   const fin = new THREE.Mesh(
     sweptFinGeometry(THREE, Math.max(.1, width * .055), finHeight, length * .13),
-    mats.body
+    ['business', 'regional', 'airliner'].includes(entry.role) ? mats.trim : mats.body
   );
   fin.position.set(0, fuselageRadiusY * .32, -length * .38);
   group.add(fin);
@@ -224,27 +318,68 @@ function fixedWingVisual(THREE, entry, options, mats) {
       group.add(winglet);
     });
   }
-  [-1, 1].forEach((side) => {
-    const windshield = new THREE.Mesh(new THREE.BoxGeometry(width * .32, width * .16, .045), mats.glass);
-    windshield.position.set(side * width * .16, fuselageRadiusY * .62, length * .405);
-    windshield.rotation.y = side * -.16;
-    windshield.rotation.x = -.24;
-    group.add(windshield);
-  });
+  if (['business', 'regional', 'airliner'].includes(entry.role)) {
+    for (let side = -1; side <= 1; side += 2) {
+      for (const [centerZ, windowLength] of [[length * .385, width * .29], [length * .422, width * .25]]) {
+        group.add(new THREE.Mesh(flushFuselageOvalPanelGeometry(
+          THREE, side, fuselageRadius, fuselageRadiusY, fuselageRadiusY * .3,
+          Math.max(.2, width * .15), centerZ, windowLength, length, options.mobile ? 8 : 12
+        ), mats.glass));
+      }
+    }
+    for (const side of [-1, 1]) {
+      group.add(new THREE.Mesh(flushFuselageTopPanelGeometry(
+        THREE, fuselageRadius, fuselageRadiusY, side * width * .11, width * .17,
+        length * .397, width * .36, length
+      ), mats.glass));
+    }
+  } else {
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(1, segments, Math.max(10, segments / 2)), mats.glass);
+    canopy.scale.set(width * .34, Math.max(.18, width * .17), Math.max(.34, length * .075));
+    canopy.position.set(0, fuselageRadiusY * .56, length * .405);
+    canopy.rotation.x = -.16;
+    group.add(canopy);
+  }
+  if (entry.role !== 'bush') {
+    group.add(new THREE.Mesh(flushFuselageTopPanelGeometry(
+      THREE, fuselageRadius, fuselageRadiusY, 0, Math.max(.07, width * .035),
+      -.015 * length, length * .62, length
+    ), mats.trim));
+    group.add(new THREE.Mesh(flushFuselageTopPanelGeometry(
+      THREE, fuselageRadius, fuselageRadiusY, width * .045, Math.max(.045, width * .018),
+      .035 * length, length * .46, length
+    ), mats.accent));
+  }
   const windowCount = options.mobile ? Math.min(12, Math.max(3, Math.round(length / 5))) : Math.min(24, Math.max(4, Math.round(length / 2.7)));
   for (let side = -1; side <= 1; side += 2) {
     for (let index = 0; index < windowCount; index += 1) {
       const windowHeight = Math.max(.14, Math.min(.3, width * .11));
       const windowLength = Math.max(.22, Math.min(.48, width * .17));
-      const window = new THREE.Mesh(new THREE.BoxGeometry(.035, windowHeight, windowLength), mats.glass);
-      window.position.set(side * fuselageRadius * .985, fuselageRadiusY * .35, length * (.18 - index * .36 / Math.max(1, windowCount - 1)));
+      const window = new THREE.Mesh(flushFuselageOvalPanelGeometry(
+        THREE,
+        side,
+        fuselageRadius,
+        fuselageRadiusY,
+        fuselageRadiusY * .35,
+        windowHeight,
+        length * (.18 - index * .36 / Math.max(1, windowCount - 1)),
+        windowLength,
+        length,
+        options.mobile ? 8 : 12
+      ), mats.glass);
       group.add(window);
     }
-    const livery = new THREE.Mesh(new THREE.BoxGeometry(.04, Math.max(.055, width * .04), length * .58), mats.trim);
-    livery.position.set(side * fuselageRadius * .92, -fuselageRadiusY * .16, -.015 * length);
+    const livery = new THREE.Mesh(flushFuselagePanelGeometry(
+      THREE, side, fuselageRadius, fuselageRadiusY, -fuselageRadiusY * .16,
+      Math.max(.055, width * .04), -.015 * length, length * .58
+      ,length
+    ), mats.trim);
     group.add(livery);
-    const liveryAccent = new THREE.Mesh(new THREE.BoxGeometry(.045, Math.max(.035, width * .025), length * .42), mats.accent);
-    liveryAccent.position.set(side * fuselageRadius * .94, -fuselageRadiusY * .25, .045 * length);
+    const liveryAccent = new THREE.Mesh(flushFuselagePanelGeometry(
+      THREE, side, fuselageRadius, fuselageRadiusY, -fuselageRadiusY * .25,
+      Math.max(.035, width * .025), .045 * length, length * .42
+      ,length
+    ), mats.accent);
     group.add(liveryAccent);
   }
   const engineCount = entry.role === 'airliner' ? 4 : entry.role === 'regional' || entry.role === 'business' ? 2 : 1;
@@ -456,9 +591,8 @@ function helicopterVisual(THREE, entry, options, mats) {
 }
 
 function createAircraftVisual(THREE, entry, options = {}) {
-  const personalPlane = entry.id === 'personal-prop' ? createExpeditionPlaneMesh() : null;
-  let root = personalPlane?.plane;
-  if (!root) {
+  let root = null;
+  {
     const mats = {
       body: material(THREE, PALETTE.body, .4, .16),
       underside: material(THREE, PALETTE.underside, .72, .15),
@@ -472,7 +606,6 @@ function createAircraftVisual(THREE, entry, options = {}) {
       ? helicopterVisual(THREE, entry, options, mats)
       : fixedWingVisual(THREE, entry, options, mats);
   }
-  if (personalPlane?.propeller) personalPlane.propeller.userData.aircraftRotor = 'propeller';
   root.name = entry.label;
   root.userData.transportCatalogId = entry.id;
   root.userData.transportDomain = 'aviation';

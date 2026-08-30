@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { evaluateParachuteDeployment } from './parachute-model.js?v=3';
+import { evaluateParachuteDeployment } from './parachute-model.js?v=5';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
 import { reticlePresentation } from './weapon-reticle-authority.js?v=1';
@@ -471,9 +471,13 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function disposeProjectile(projectile) {
+    if (!projectile || projectile.resolved === true) return false;
+    projectile.resolved = true;
+    projectile.visual.root.visible = false;
     projectile.visual.root.removeFromParent?.();
     projectile.visual.geometries.forEach((geometry) => geometry.dispose?.());
     projectile.visual.materials.forEach((material) => material.dispose?.());
+    return true;
   }
 
   function segmentTarget(projectile, from, to) {
@@ -619,7 +623,9 @@ function createUrbanEquipmentRuntime(options = {}) {
       distance: 0,
       elapsed: 0,
       maxDistance: launch.maxDistance,
-      maxLife: launch.maxLife,
+      maxLife: Math.max(.08, Math.min(kind === 'thrown-charge' ? 3.6 : 1.6, Number(launch.maxLife) || .8)),
+      createdAt: clock(),
+      hardExpiresAt: clock() + Math.max(120, Math.min(kind === 'thrown-charge' ? 3800 : 1700, (Number(launch.maxLife) || .8) * 1000 + 140)),
       aimPoint: launch.target,
       landed: false
     };
@@ -680,6 +686,8 @@ function createUrbanEquipmentRuntime(options = {}) {
       distance: 0,
       elapsed: 0,
       maxLife: Math.min(.9, equipment.range / equipment.projectileSpeed + .12)
+      ,createdAt: clock()
+      ,hardExpiresAt: clock() + Math.min(1100, equipment.range / equipment.projectileSpeed * 1000 + 180)
     });
     return true;
   }
@@ -703,6 +711,19 @@ function createUrbanEquipmentRuntime(options = {}) {
   function updateProjectiles(dt) {
     const step = Math.max(0, Math.min(.12, Number(dt) || 0));
     for (const projectile of projectiles.slice()) {
+      const finiteState = [
+        projectile.position?.x, projectile.position?.y, projectile.position?.z,
+        projectile.velocity?.x, projectile.velocity?.y, projectile.velocity?.z,
+        projectile.maxLife
+      ].every(Number.isFinite);
+      const hardExpired = Number(projectile.hardExpiresAt) > 0 && clock() >= projectile.hardExpiresAt;
+      const stalledBallistic = projectile.kind !== 'thrown-charge' && projectile.velocity?.lengthSq?.() < .04;
+      if (!finiteState || hardExpired || stalledBallistic) {
+        const index = projectiles.indexOf(projectile);
+        if (index >= 0) projectiles.splice(index, 1);
+        disposeProjectile(projectile);
+        continue;
+      }
       projectile.elapsed += step;
       if (projectile.landed) {
         if (projectile.elapsed >= projectile.maxLife) resolveProjectile(projectile, projectile.position);
@@ -848,7 +869,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       const deployment = evaluateParachuteDeployment({
         environment: appCtx.onMoon || appCtx.onMars ? 'SPACE' : 'EARTH',
         travelMode: appCtx.Walk?.state?.mode,
-        onGround: actor?.onGround,
+        onGround: state.parachute?.skydiving === true ? false : actor?.onGround,
         feetY,
         groundY,
         verticalVelocity: actor?.vy

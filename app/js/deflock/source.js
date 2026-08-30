@@ -1,4 +1,4 @@
-import { fetchOverpassJSON } from "../world/osm-loader.js?v=25";
+import { fetchOverpassJSON } from "../world/osm-loader.js?v=26";
 
 const DEFLOCK_SOURCE_VERSION = "osm-surveillance-v1";
 const DEFLOCK_RADIUS_DEGREES = 0.022;

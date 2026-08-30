@@ -2,7 +2,7 @@ const TRANSPORT_FACILITY_SCHEMA_VERSION = 1;
 
 const AVIATION_TYPES = new Set([
   'aerodrome', 'heliport', 'runway', 'taxiway', 'apron', 'terminal',
-  'helipad', 'hangar', 'parking_position', 'gate'
+  'helipad', 'hangar', 'parking_position', 'gate', 'control_tower'
 ]);
 const MARITIME_TYPES = new Set([
   'harbour', 'marina', 'port', 'pier', 'quay', 'dock', 'berth',
@@ -93,6 +93,14 @@ function compileTransportFacilityGraph(data = {}, options = {}) {
       generatedActivity: false,
       access: tags.access == null ? 'unknown' : String(tags.access),
       surface: tags.surface == null ? 'unknown' : String(tags.surface),
+      attributes: Object.freeze({
+        ref: String(tags.ref || '').trim(),
+        iata: String(tags.iata || '').trim().toUpperCase(),
+        icao: String(tags.icao || '').trim().toUpperCase(),
+        width: Number.isFinite(Number(tags.width)) ? Number(tags.width) : null,
+        height: Number.isFinite(Number(tags.height)) ? Number(tags.height) : null,
+        buildingLevels: Number.isFinite(Number(tags['building:levels'])) ? Number(tags['building:levels']) : null
+      }),
       completeness: geometry.complete ? 'mapped-geometry' : 'mapped-center-only',
       provenance: Object.freeze({
         provider: 'OpenStreetMap',

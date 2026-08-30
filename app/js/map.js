@@ -5,4 +5,4 @@ export {
   latLonToTile,
   loadTile,
   worldToScreenLarge
-} from "./map/runtime.js?v=5";
+} from "./map/runtime.js?v=6";

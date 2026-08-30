@@ -7,13 +7,13 @@ const REFERENCE_EVIDENCE = 'docs/reference-art/aviation-fleet-and-damage-2026-08
 
 const definitions = [
   {
-    id: 'personal-prop', label: 'Personal plane', aircraftKind: 'fixed-wing', role: 'personal',
+    id: 'personal-prop', label: 'Explorer aerobatic jet', aircraftKind: 'fixed-wing', role: 'aerobatic',
     directModeOnly: true,
-    width: 1.35, height: 1.72, length: 6.65, wingspan: 6.65, massKg: 820,
-    topSpeedMph: 132, performance: { topSpeed: 132, topSpeedUnit: 'knots-ias', accelerationScale: 1.12, steeringScale: 1.16, gripScale: 1, brakeScale: 1.08, turningRadius: 5.8 },
+    width: 1.48, height: 2.35, length: 9.4, wingspan: 7.8, massKg: 3650,
+    topSpeedMph: 310, performance: { topSpeed: 310, topSpeedUnit: 'knots-ias', accelerationScale: 1.42, steeringScale: 1.34, gripScale: 1, brakeScale: 1.16, turningRadius: 7.2 },
     seatCount: 2, boardingPoints: ['left', 'right'], resistance: 135,
     damageZones: ['nose', 'fuselage', 'left-wing', 'right-wing', 'tail', 'landing-gear'],
-    visualRecipeId: 'aviation:personal-prop'
+    visualRecipeId: 'aviation:explorer-aerobatic-jet'
   },
   {
     id: 'expedition-prop', label: 'Expedition plane', aircraftKind: 'fixed-wing', role: 'bush',

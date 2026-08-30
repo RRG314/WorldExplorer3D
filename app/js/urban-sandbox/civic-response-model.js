@@ -36,6 +36,10 @@ function createCivicResponseModel(options = {}) {
     level: 0,
     phaseRemaining: 0,
     searchCenter: null,
+    lastKnownPosition: null,
+    lastSeenAt: 0,
+    unseenSeconds: 0,
+    pursuit: false,
     lastEvent: null,
     lastIgnoredEvent: null,
     witnesses: [],
@@ -65,6 +69,10 @@ function createCivicResponseModel(options = {}) {
     state.phase = 'observed';
     state.phaseRemaining = PHASE_DURATION.observed;
     state.searchCenter = Object.freeze({ x: Number(position.x), z: Number(position.z) });
+    state.lastKnownPosition = state.searchCenter;
+    state.lastSeenAt = Number(options.now?.() || Date.now());
+    state.unseenSeconds = 0;
+    state.pursuit = false;
     state.witnesses = normalizedWitnesses.map((entry) => Object.freeze({
       id: String(entry.id),
       distance: Number(entry.distance || 0),
@@ -84,11 +92,24 @@ function createCivicResponseModel(options = {}) {
     return Object.freeze({ accepted: true, event: state.lastEvent, snapshot: snapshot() });
   };
 
-  const update = (dt, actorPosition = null) => {
+  const update = (dt, actorPosition = null, awareness = {}) => {
     const step = clamp(dt, 0, .25);
     if (state.phase === 'clear' || step <= 0) return snapshot();
+    const detected = awareness.detected === true && actorPosition && Number.isFinite(actorPosition.x) && Number.isFinite(actorPosition.z);
+    if (detected && ['searching', 'cooling'].includes(state.phase)) {
+      state.phase = 'searching';
+      state.pursuit = true;
+      state.unseenSeconds = 0;
+      state.lastSeenAt = Number(options.now?.() || Date.now());
+      state.lastKnownPosition = Object.freeze({ x: Number(actorPosition.x), z: Number(actorPosition.z) });
+      state.searchCenter = state.lastKnownPosition;
+      state.phaseRemaining = Math.max(state.phaseRemaining, 12 + state.level * 5);
+    } else if (state.phase === 'searching') {
+      state.unseenSeconds += step;
+      if (state.unseenSeconds >= 1.5) state.pursuit = false;
+    }
     let decay = step;
-    if (state.phase === 'searching' && distanceFromSearch(actorPosition) > searchRadius()) decay *= 2.5;
+    if (state.phase === 'searching' && !state.pursuit && distanceFromSearch(actorPosition) > searchRadius()) decay *= 1.65;
     state.phaseRemaining = Math.max(0, state.phaseRemaining - decay);
     if (state.phaseRemaining > 0) return snapshot();
     if (state.phase === 'observed') {
@@ -105,6 +126,9 @@ function createCivicResponseModel(options = {}) {
       state.level = 0;
       state.phaseRemaining = 0;
       state.searchCenter = null;
+      state.lastKnownPosition = null;
+      state.pursuit = false;
+      state.unseenSeconds = 0;
       state.witnesses = [];
     }
     return snapshot();
@@ -124,8 +148,8 @@ function createCivicResponseModel(options = {}) {
     });
     if (state.phase === 'searching') return Object.freeze({
       visible: true,
-      title: 'Local search active',
-      detail: distanceFromSearch(options.getActorPosition?.()) > searchRadius() ? 'Search is weakening' : agency
+      title: state.pursuit ? 'Pursuit active' : 'Searching last known area',
+      detail: state.pursuit ? agency : distanceFromSearch(options.getActorPosition?.()) > searchRadius() ? 'Attention is fading' : agency
     });
     return Object.freeze({ visible: true, title: 'Attention fading', detail: 'Keep exploring calmly' });
   };
@@ -138,6 +162,10 @@ function createCivicResponseModel(options = {}) {
       phaseRemaining: Number(state.phaseRemaining.toFixed(2)),
       searchRadius: state.phase === 'clear' ? 0 : searchRadius(),
       searchCenter: state.searchCenter,
+      lastKnownPosition: state.lastKnownPosition,
+      lastSeenAt: state.lastSeenAt,
+      unseenSeconds: Number(state.unseenSeconds.toFixed(2)),
+      pursuit: state.pursuit,
       witnesses: Object.freeze([...state.witnesses]),
       lastEvent: state.lastEvent,
       lastIgnoredEvent: state.lastIgnoredEvent,
@@ -151,6 +179,9 @@ function createCivicResponseModel(options = {}) {
     state.level = 0;
     state.phaseRemaining = 0;
     state.searchCenter = null;
+    state.lastKnownPosition = null;
+    state.pursuit = false;
+    state.unseenSeconds = 0;
     state.witnesses = [];
     return snapshot();
   };

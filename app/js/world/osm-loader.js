@@ -382,7 +382,7 @@ export function buildWorldOverpassPlan({
             nwr["shop"="convenience"]${poiBounds};
             out body center qt;`,
     transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate)$"]${featureBounds};
+            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${featureBounds};
             nwr["leisure"="marina"]${featureBounds};
             nwr["harbour"="yes"]${featureBounds};
             nwr["landuse"~"^(port|harbour)$"]${featureBounds};

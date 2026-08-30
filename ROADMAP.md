@@ -160,6 +160,14 @@ adding city-specific exceptions.
   access, furnishings, weather response, and day/night activity.
 - Add more playable vehicles and vessels through shared catalogs, handling,
   damage, repair, entry, storage, and facility rules.
+- Expand airports as playable travel centers through the existing airport
+  layout and flight owners: richer mapped terminals, gates, ticket halls,
+  ground service, traffic sequencing, takeoff/landing activity, and regional
+  airport character without city-specific controller forks.
+- Connect airport arrivals, routes, cities visited, flight roles, Expeditions,
+  Journal history, and optional competition through the existing Explorer
+  progression and leaderboard authorities. Labels must describe game journeys,
+  not claim live schedules, ticket sales, or real-world airport operations.
 - Keep the personal mode-switch vehicles distinct from heavier world vehicles.
 - Extend city-switch and memory cleanup so repeated travel remains playable on
   supported desktop and mobile hardware.
