@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { AVIATION_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=2';
-import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=5';
+import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=3';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=6';
 import { applyTransportDamage } from './damage-model.js?v=1';
 import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=3';
 
@@ -47,7 +47,7 @@ function derivedFleet(graph, options = {}) {
     { x: -58, z: -24 },
     { x: 112, z: 42 }
   ];
-  return AVIATION_CATALOG.map((catalog, index) => {
+  return AVIATION_FLEET_CATALOG.map((catalog, index) => {
     const anchor = catalog.aircraftKind === 'rotorcraft' ? rotorAnchor : fixedWingAnchor;
     const point = recordPoint(anchor);
     const yaw = recordYaw(anchor);

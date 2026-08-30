@@ -1,4 +1,5 @@
 import { transportDamagePresentation } from './damage-model.js?v=1';
+import { createExpeditionPlaneMesh } from '../plane/expedition-plane-mesh.js?v=2';
 
 const PALETTE = Object.freeze({
   body: 0xc6c1b1,
@@ -419,18 +420,23 @@ function helicopterVisual(THREE, entry, options, mats) {
 }
 
 function createAircraftVisual(THREE, entry, options = {}) {
-  const mats = {
-    body: material(THREE, PALETTE.body),
-    underside: material(THREE, PALETTE.underside, .72, .15),
-    accent: material(THREE, PALETTE.accent, .5, .12),
-    trim: material(THREE, PALETTE.trim, .58, .18),
-    glass: material(THREE, PALETTE.glass, .2, .2, { emissive: 0x061219, emissiveIntensity: .28 }),
-    tire: material(THREE, PALETTE.tire, .94, .01),
-    metal: material(THREE, PALETTE.metal, .35, .62)
-  };
-  const root = entry.aircraftKind === 'rotorcraft'
-    ? helicopterVisual(THREE, entry, options, mats)
-    : fixedWingVisual(THREE, entry, options, mats);
+  const personalPlane = entry.id === 'personal-prop' ? createExpeditionPlaneMesh() : null;
+  let root = personalPlane?.plane;
+  if (!root) {
+    const mats = {
+      body: material(THREE, PALETTE.body),
+      underside: material(THREE, PALETTE.underside, .72, .15),
+      accent: material(THREE, PALETTE.accent, .5, .12),
+      trim: material(THREE, PALETTE.trim, .58, .18),
+      glass: material(THREE, PALETTE.glass, .2, .2, { emissive: 0x061219, emissiveIntensity: .28 }),
+      tire: material(THREE, PALETTE.tire, .94, .01),
+      metal: material(THREE, PALETTE.metal, .35, .62)
+    };
+    root = entry.aircraftKind === 'rotorcraft'
+      ? helicopterVisual(THREE, entry, options, mats)
+      : fixedWingVisual(THREE, entry, options, mats);
+  }
+  if (personalPlane?.propeller) personalPlane.propeller.userData.aircraftRotor = 'propeller';
   root.name = entry.label;
   root.userData.transportCatalogId = entry.id;
   root.userData.transportDomain = 'aviation';

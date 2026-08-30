@@ -16,7 +16,7 @@ import './pause-state.js?v=1';
 import './location-session.js?v=5';
 import './controls/action-input.js?v=10';
 import './interaction/context-router.js?v=4';
-import './transport/actor-contract.js?v=5';
+import './transport/actor-contract.js?v=6';
 import './world/collection-registry.js?v=1';
 import './world/water-environment.js?v=2';
 import './perf.js?v=57';
@@ -45,12 +45,12 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=8';
 import './game.js?v=63';
-import './input.js?v=69';
+import './input.js?v=70';
 import './hud.js?v=100';
 import './map.js?v=60';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=141';
+import { setupUI } from './ui.js?v=144';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -291,16 +291,25 @@ async function ensureMultiplayerPlatformReady() {
 function scheduleTutorialInit() {
     if (_tutorialInitPromise) return _tutorialInitPromise;
     _tutorialInitPromise = new Promise((resolve) => {
-        scheduleAfterFirstPlay('tutorial-runtime', async () => {
+        let started = false;
+        const startTutorial = async () => {
+            if (started) return;
+            started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=5');
+                const mod = await import('./tutorial/tutorial.js?v=8');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
             } finally {
                 resolve(true);
             }
-        }, { timeout: 2200 });
+        };
+        scheduleAfterFirstPlay('tutorial-runtime', startTutorial, { timeout: 1200 });
+        globalThis.addEventListener?.('we3d:first-play-ready', startTutorial, { once: true });
+        // Continuous WebGL rendering can starve requestIdleCallback on some
+        // mobile browsers. The tutorial is small, so a bounded fallback keeps
+        // First Journey available without returning it to the blocking boot path.
+        globalThis.setTimeout(startTutorial, 6000);
     });
     return _tutorialInitPromise;
 }

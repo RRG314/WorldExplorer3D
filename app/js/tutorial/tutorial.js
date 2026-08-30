@@ -1,34 +1,32 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createTutorialUi } from './ui.js?v=3';
+import { createTutorialUi } from './ui.js?v=4';
 
-const STORAGE_KEY = 'worldExplorer3D.tutorialState.v2';
-const LEGACY_STORAGE_KEY = 'worldExplorer3D.tutorialState.v1';
-const TUTORIAL_VERSION = 2;
-const CORE_JOURNEY_ID = 'first-earth-discovery';
-const MOVE_TARGET_METERS = 12;
+const STORAGE_KEY = 'worldExplorer3D.tutorialState.v3';
+const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v2';
+const TUTORIAL_VERSION = 3;
+const CORE_JOURNEY_ID = 'first-journey';
+const MOVE_TARGET_METERS = 8;
 
 const STAGES = Object.freeze({
   MOVE: 'move',
-  EXPLORE: 'explore',
-  DISCOVER: 'discover',
+  PACK: 'pack',
+  EXPLORER: 'explorer',
+  CHOOSE: 'choose',
   COMPLETE: 'complete'
 });
-const STAGE_ORDER = [STAGES.MOVE, STAGES.EXPLORE, STAGES.DISCOVER, STAGES.COMPLETE];
-const STAGE_NUMBER = Object.freeze({ move: 1, explore: 2, discover: 3, complete: 3 });
+const STAGE_ORDER = [STAGES.MOVE, STAGES.PACK, STAGES.EXPLORER, STAGES.CHOOSE, STAGES.COMPLETE];
+const STAGE_NUMBER = Object.freeze({ move: 1, pack: 2, explorer: 3, choose: 4, complete: 4 });
+const CORE_STAGE_COUNT = 4;
 
 function safeCall(fn, ...args) {
   if (typeof fn !== 'function') return undefined;
-  try { return fn(...args); } catch (_) { return undefined; }
+  try { return fn(...args); } catch { return undefined; }
 }
 
 function tutorialTelemetry(name, params = {}) {
   const detail = {
     name,
-    params: {
-      journey_id: CORE_JOURNEY_ID,
-      tutorial_version: TUTORIAL_VERSION,
-      ...params
-    }
+    params: { journey_id: CORE_JOURNEY_ID, tutorial_version: TUTORIAL_VERSION, ...params }
   };
   if (globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ === true) {
     globalThis.dispatchEvent?.(new CustomEvent('we3d:tutorial-telemetry', { detail }));
@@ -73,6 +71,7 @@ const runtime = {
   laterBtn: null,
   skipBtn: null,
   closeBtn: null,
+  detailsBtn: null,
   settingsMount: null,
   settingsStatus: null,
   settingsToggle: null,
@@ -82,7 +81,9 @@ const runtime = {
     inSpace: false,
     inMoon: false,
     roomPanelOpen: false,
-    buildModeOn: false
+    buildModeOn: false,
+    backpackOpen: false,
+    explorerOpen: false
   }
 };
 
@@ -107,33 +108,35 @@ function loadState() {
   try {
     const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (current && typeof current === 'object') return normalizeState(current);
-    const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || 'null');
-    if (legacy && typeof legacy === 'object') {
+    const previous = JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY) || 'null');
+    if (previous && typeof previous === 'object') {
       return normalizeState({
-        enabled: legacy.enabled !== false,
-        completed: legacy.completed === true,
-        stage: legacy.completed === true ? STAGES.COMPLETE : STAGES.MOVE
+        enabled: previous.enabled !== false,
+        completed: false,
+        skipped: false,
+        stage: STAGES.MOVE,
+        contextSeen: previous.contextSeen
       });
     }
-  } catch (_) {
-    // Private browsing and malformed historical state must never block play.
+  } catch {
+    // Storage failures must never block play.
   }
   return defaultState();
 }
 
 function saveState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(runtime.state)); } catch (_) { /* non-fatal */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(runtime.state)); } catch { /* non-fatal */ }
 }
 
 const tutorialUi = createTutorialUi({
   runtime,
   safeCall,
-  onLater: () => dismissCurrentPrompt('later'),
-  onSkip: () => skipTutorial(),
+  onLater: () => dismissCurrentPrompt('not_now'),
+  onSkip: () => disableTutorial(),
   setTutorialEnabled: (enabled) => setTutorialEnabled(enabled),
   restartTutorial: () => restartTutorial()
 });
-const { createCardIfNeeded, ensureSettingsControls, hidePrompt, updateSettingsStatus } = tutorialUi;
+const { createCardIfNeeded, ensureSettingsControls, hidePrompt, updateSettingsStatus, setExpanded } = tutorialUi;
 
 function playerPosition() {
   const target = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker
@@ -142,45 +145,61 @@ function playerPosition() {
       ? appCtx.boat
       : appCtx.droneMode
         ? appCtx.drone
-        : appCtx.car;
+        : appCtx.planeMode?.active
+          ? appCtx.planeMode
+          : appCtx.car;
   const x = Number(target?.x);
   const z = Number(target?.z);
   return Number.isFinite(x) && Number.isFinite(z) ? { x, z } : null;
 }
 
 function showPrompt(stage, config = {}) {
-  if (!runtime.state.enabled || runtime.state.skipped || (runtime.state.completed && !config.contextual)) return;
-  if (!config.contextual && runtime.sessionPresented.has(stage)) return;
+  if (!runtime.state.enabled || runtime.state.skipped || (runtime.state.completed && !config.contextual)) return false;
+  if (!config.contextual && runtime.sessionPresented.has(stage)) return false;
+  if (uiBlocksTutorial()) return false;
   createCardIfNeeded();
-  if (!runtime.card) return;
+  if (!runtime.card) return false;
   runtime.sessionPresented.add(stage);
   runtime.currentStage = stage;
   runtime.currentButtonAction = typeof config.onAction === 'function' ? config.onAction : null;
-  runtime.eyebrowEl.textContent = config.eyebrow || `First expedition · ${STAGE_NUMBER[stage] || 1} of 3`;
-  runtime.titleEl.textContent = config.title || 'Next step';
+  runtime.eyebrowEl.textContent = config.eyebrow || `First Journey · ${STAGE_NUMBER[stage] || 1} of ${CORE_STAGE_COUNT}`;
+  runtime.titleEl.textContent = config.title || 'Try this next';
   runtime.bodyEl.textContent = config.body || '';
-  runtime.progressEl.style.width = `${Math.max(8, Math.min(100, Number(config.progress) || (STAGE_NUMBER[stage] / 3 * 100)))}%`;
+  runtime.progressEl.style.width = `${Math.max(8, Math.min(100, Number(config.progress) || (STAGE_NUMBER[stage] / CORE_STAGE_COUNT * 100)))}%`;
   runtime.actionBtn.hidden = !(config.actionLabel && runtime.currentButtonAction);
   runtime.actionBtn.textContent = config.actionLabel || '';
   runtime.skipBtn.hidden = config.contextual === true;
   runtime.card.hidden = false;
+  setExpanded(config.expanded === true);
   tutorialTelemetry('we3d_tutorial_step', { action: 'presented', step_id: stage });
 
   if (runtime.dismissTimer) clearTimeout(runtime.dismissTimer);
-  const autoHideMs = Math.max(5000, Number(config.autoHideMs) || 11000);
-  runtime.dismissTimer = window.setTimeout(() => dismissCurrentPrompt('auto_hidden'), autoHideMs);
+  runtime.dismissTimer = 0;
+  if (config.contextual) {
+    runtime.dismissTimer = window.setTimeout(() => dismissCurrentPrompt('auto_hidden'), Math.max(6000, Number(config.autoHideMs) || 10000));
+  }
+  return true;
 }
 
-function dismissCurrentPrompt(action = 'later') {
+function dismissCurrentPrompt(action = 'not_now') {
   if (runtime.currentStage) tutorialTelemetry('we3d_tutorial_step', { action, step_id: runtime.currentStage });
   hidePrompt();
 }
 
-function openExploration() {
-  const direct = document.getElementById('fWorldDiscovery');
-  const quick = document.getElementById('discoveryQuickToolBtn');
-  if (direct instanceof HTMLElement) direct.click();
-  else if (quick instanceof HTMLElement) quick.click();
+function openBackpack() {
+  const menuItem = document.getElementById('fBackpack');
+  if (menuItem instanceof HTMLElement) menuItem.click();
+  else appCtx.toggleUrbanEquipment?.(true);
+}
+
+function openExplorer() {
+  const menuItem = document.getElementById('fWorldDiscovery');
+  if (menuItem instanceof HTMLElement) menuItem.click();
+  else appCtx.toggleWorldDiscoveryJournal?.(true);
+}
+
+function openTravelMenu() {
+  document.getElementById('exploreBtn')?.click();
 }
 
 function presentCurrentStage() {
@@ -191,27 +210,35 @@ function presentCurrentStage() {
   if (runtime.state.stage === STAGES.MOVE) {
     const touchControls = appCtx.getMobileTouchInputSnapshot?.().enabled === true;
     showPrompt(STAGES.MOVE, {
-      title: 'Take your first steps',
+      title: 'Move and look around',
       body: touchControls
-        ? 'Move about 12 metres. Left thumb moves; right thumb looks. Hold Run to sprint, and the camera returns behind you after looking around.'
-        : 'Move about 12 metres and look around. Arrow keys move and turn; WASD looks around; Shift runs.',
-      progress: 33
+        ? 'Use the left control to move and the right control to look. Travel a short distance so the camera and movement feel familiar.'
+        : 'Use the arrow keys to move and turn. WASD looks around, and Shift runs.',
+      progress: 25
     });
-  } else if (runtime.state.stage === STAGES.EXPLORE) {
-    showPrompt(STAGES.EXPLORE, {
-      title: 'Choose one field activity',
-      body: 'Open Exploration, then choose an activity that fits this place. You only need to learn one right now.',
-      actionLabel: 'Open Exploration',
-      onAction: openExploration,
-      progress: 66,
-      autoHideMs: 14000
+  } else if (runtime.state.stage === STAGES.PACK) {
+    showPrompt(STAGES.PACK, {
+      title: 'Open your Backpack',
+      body: 'Your tools, finds, gear, and six quick slots live in one place. Open it now; you do not need to equip anything yet.',
+      actionLabel: 'Open Backpack',
+      onAction: openBackpack,
+      progress: 50
     });
-  } else if (runtime.state.stage === STAGES.DISCOVER) {
-    showPrompt(STAGES.DISCOVER, {
-      title: 'Record one discovery',
-      body: 'Follow the signal and document the find. Knowledge goes to your Journal; any object you keep appears in your Backpack (I).',
-      progress: 92,
-      autoHideMs: 15000
+  } else if (runtime.state.stage === STAGES.EXPLORER) {
+    showPrompt(STAGES.EXPLORER, {
+      title: 'Open My Explorer',
+      body: 'This is the home for Field Today, activities, Journal records, the Field Guide, companions, and your Explorer progress.',
+      actionLabel: 'Open My Explorer',
+      onAction: openExplorer,
+      progress: 75
+    });
+  } else if (runtime.state.stage === STAGES.CHOOSE) {
+    showPrompt(STAGES.CHOOSE, {
+      title: 'Choose how to explore',
+      body: 'Start an activity in My Explorer, or try another travel mode. There is no required route through the sandbox.',
+      actionLabel: 'Open Travel Modes',
+      onAction: openTravelMenu,
+      progress: 94
     });
   }
 }
@@ -224,11 +251,11 @@ function setStage(nextStage, reason = 'progress') {
   saveState();
   tutorialTelemetry('we3d_tutorial_step', { action: 'completed', step_id: previous, result: reason });
   presentCurrentStage();
-  updateSettingsStatus(`First expedition: ${Math.min(3, STAGE_NUMBER[nextStage] || 1)} of 3.`);
+  updateSettingsStatus(`First Journey: ${Math.min(CORE_STAGE_COUNT, STAGE_NUMBER[nextStage] || 1)} of ${CORE_STAGE_COUNT}.`);
   return true;
 }
 
-function completeTutorial(reason = 'discovery_recorded') {
+function completeTutorial(reason = 'path_chosen') {
   if (runtime.state.completed) return;
   const completedStep = runtime.state.stage;
   runtime.state.completed = true;
@@ -238,34 +265,36 @@ function completeTutorial(reason = 'discovery_recorded') {
   saveState();
   tutorialTelemetry('we3d_tutorial_step', { action: 'completed', step_id: completedStep, result: reason });
   tutorialTelemetry('tutorial_complete');
-  updateSettingsStatus('First expedition complete. Contextual tips remain available when you open advanced systems.');
+  updateSettingsStatus('First Journey complete. Optional tips appear once when you enter an unfamiliar system.');
   hidePrompt();
   runtime.sessionPresented.delete('core_complete');
   showPrompt('core_complete', {
     contextual: true,
-    eyebrow: 'First expedition complete',
-    title: 'Your Explorer story has started',
-    body: 'Journal remembers what you learned. Backpack (I) holds what you carry. Use its pictures and 1–6 quick slots to equip items.',
+    eyebrow: 'First Journey complete',
+    title: 'Explore your way',
+    body: 'My Explorer remembers what you learn. Your Backpack carries what you use. Travel modes change how you move through the same world.',
     progress: 100,
+    expanded: true,
     autoHideMs: 12000
   });
 }
 
-function skipTutorial() {
-  if (runtime.state.completed || runtime.state.skipped) return;
+function disableTutorial() {
   runtime.state.enabled = false;
   runtime.state.skipped = true;
   saveState();
-  tutorialTelemetry('we3d_tutorial_step', { action: 'skipped', step_id: runtime.state.stage });
-  updateSettingsStatus('First expedition skipped. You can restart it here at any time.');
+  tutorialTelemetry('we3d_tutorial_step', { action: 'disabled', step_id: runtime.state.stage });
+  updateSettingsStatus('Guidance is off. Your game progress is unchanged, and First Journey can be replayed here.');
   hidePrompt();
 }
 
 function showContextTip(id, config) {
-  if (!runtime.state.completed || runtime.state.contextSeen[id]) return;
-  runtime.state.contextSeen[id] = true;
-  saveState();
-  showPrompt(`context_${id}`, { ...config, contextual: true, progress: 100, autoHideMs: 9000 });
+  if (!runtime.state.completed || !runtime.state.enabled || runtime.state.contextSeen[id]) return;
+  const presented = showPrompt(`context_${id}`, { ...config, contextual: true, progress: 100, autoHideMs: 9000 });
+  if (presented) {
+    runtime.state.contextSeen[id] = true;
+    saveState();
+  }
 }
 
 function tutorialOnEvent(eventName, payload = {}) {
@@ -275,20 +304,29 @@ function tutorialOnEvent(eventName, payload = {}) {
     runtime.movementOrigin = playerPosition();
     runtime.lastPosition = runtime.movementOrigin;
     presentCurrentStage();
+  } else if (name === 'opened_backpack' && runtime.state.stage === STAGES.PACK) {
+    setStage(STAGES.EXPLORER, 'backpack_opened');
+  } else if (name === 'opened_explorer' && runtime.state.stage === STAGES.EXPLORER) {
+    setStage(STAGES.CHOOSE, 'explorer_opened');
+  } else if (name === 'mode_switched' && runtime.state.stage === STAGES.CHOOSE) {
+    completeTutorial(`mode_${String(payload.mode || 'changed')}`);
   } else if (name === 'build_mode_entered') {
     showContextTip('building', {
-      eyebrow: 'Contextual guide', title: 'Build locally first',
-      body: 'Place and adjust a few pieces locally. Publish or share only after the result is ready.'
+      eyebrow: 'Building tip',
+      title: 'Build in this world',
+      body: 'Build with Blocks and the Editor share the same placed-work authority. Save locally as you work; publish only when you choose.'
     });
   } else if (name === 'opened_rooms_menu' || name === 'room_created_or_toggled') {
     showContextTip('rooms', {
-      eyebrow: 'Contextual guide', title: 'Rooms share this world',
-      body: 'Create or join a room when you want company. Room roles control who can edit or moderate shared content.'
+      eyebrow: 'Room tip',
+      title: 'Explore together',
+      body: 'Create or join a room when you want company. Room roles decide who can edit or moderate shared work.'
     });
   } else if (name === 'entered_space') {
     showContextTip('space', {
-      eyebrow: 'Contextual guide', title: 'Space flight controls',
-      body: 'Arrow keys steer, Space adds thrust, and Shift brakes. Return to Earth whenever you are ready.'
+      eyebrow: 'Spaceflight tip',
+      title: 'Fly your own course',
+      body: 'Use the Wayfinder for direction or fly manually. Arrow keys steer, Space adds thrust, and Shift slows the ship.'
     });
   }
   if (payload?.forceStage && STAGE_ORDER.includes(payload.forceStage)) setStage(payload.forceStage, 'forced');
@@ -297,48 +335,60 @@ function tutorialOnEvent(eventName, payload = {}) {
 function onDiscoveryTelemetry(event) {
   if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
   const type = String(event?.detail?.type || '');
-  if (type === 'activity_started' && runtime.state.stage === STAGES.EXPLORE) {
-    setStage(STAGES.DISCOVER, 'activity_started');
-    // A walking encounter immediately returns the player to the world-space
-    // bearing. Advance the first-expedition journey, then clear its card so it
-    // cannot cover the tracking controls or target.
-    if (event?.detail?.result === 'walking-encounter') dismissCurrentPrompt('encounter_tracking');
-  } else if (type === 'discovery_recorded') {
-    completeTutorial('discovery_recorded');
-  }
+  if (type !== 'activity_started') return;
+  if (runtime.state.stage === STAGES.EXPLORER) setStage(STAGES.CHOOSE, 'activity_selected');
+  if (runtime.state.stage === STAGES.CHOOSE) completeTutorial('activity_started');
+}
+
+function panelIsOpen(id) {
+  const element = document.getElementById(id);
+  return !!element && (element.classList.contains('show') || element.getAttribute('aria-hidden') === 'false');
+}
+
+function uiBlocksTutorial() {
+  return panelIsOpen('discoveryPanel') || panelIsOpen('urbanEquipment') ||
+    panelIsOpen('roomPanelModal') || !!document.querySelector('.floatMenu.open');
 }
 
 function detectContextTransitions() {
   const inSpace = !!(appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.isEnv(appCtx.ENV?.SPACE_FLIGHT)));
   const inMoon = !!appCtx.onMoon;
-  const roomPanelOpen = !!document.getElementById('roomPanelModal')?.classList.contains('show');
+  const roomPanelOpen = panelIsOpen('roomPanelModal');
   const buildModeOn = !!document.getElementById('fBlockBuild')?.classList.contains('on');
+  const backpackOpen = panelIsOpen('urbanEquipment');
+  const explorerOpen = panelIsOpen('discoveryPanel');
   if (!runtime.previous.gameStarted && appCtx.gameStarted) tutorialOnEvent('spawned_in_world');
   if (!runtime.previous.inSpace && inSpace) tutorialOnEvent('entered_space');
   if (!runtime.previous.inMoon && inMoon) showContextTip('moon', {
-    eyebrow: 'Contextual guide', title: 'Explore the Moon',
-    body: 'Walking and driving use the same basic controls. Try one mode, then explore freely.'
+    eyebrow: 'Moon tip',
+    title: 'Explore the surface',
+    body: 'Walking and driving keep their familiar controls here. Use Travel Modes whenever you want to change how you explore.'
   });
   if (!runtime.previous.roomPanelOpen && roomPanelOpen) tutorialOnEvent('opened_rooms_menu');
   if (!runtime.previous.buildModeOn && buildModeOn) tutorialOnEvent('build_mode_entered');
-  runtime.previous.gameStarted = !!appCtx.gameStarted;
-  runtime.previous.inSpace = inSpace;
-  runtime.previous.inMoon = inMoon;
-  runtime.previous.roomPanelOpen = roomPanelOpen;
-  runtime.previous.buildModeOn = buildModeOn;
+  if (!runtime.previous.backpackOpen && backpackOpen) tutorialOnEvent('opened_backpack', { source: 'panel_state' });
+  if (!runtime.previous.explorerOpen && explorerOpen) tutorialOnEvent('opened_explorer', { source: 'panel_state' });
+  runtime.previous = {
+    gameStarted: !!appCtx.gameStarted,
+    inSpace,
+    inMoon,
+    roomPanelOpen,
+    buildModeOn,
+    backpackOpen,
+    explorerOpen
+  };
 }
 
 function tutorialUpdate() {
   if (!runtime.initialized) return;
   detectContextTransitions();
-  // The field workspace already contains the instructions needed for the
-  // current activity. Yield the compact guide while that workspace is open so
-  // onboarding never stacks a second panel over active play UI.
-  if (document.getElementById('discoveryPanel')?.classList.contains('show')) {
+  const activePanel = uiBlocksTutorial();
+  if (activePanel) {
     if (runtime.card && !runtime.card.hidden) hidePrompt();
     return;
   }
   if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !appCtx.gameStarted) return;
+  if ((!runtime.card || runtime.card.hidden) && !runtime.sessionPresented.has(runtime.state.stage)) presentCurrentStage();
   if (runtime.state.stage !== STAGES.MOVE) return;
   const current = playerPosition();
   if (!current) return;
@@ -350,18 +400,17 @@ function tutorialUpdate() {
   runtime.lastPosition = current;
   if (runtime.state.distanceMoved >= MOVE_TARGET_METERS) {
     saveState();
-    setStage(STAGES.EXPLORE, 'moved_12m');
+    setStage(STAGES.PACK, 'moved_8m');
   }
 }
 
 function setTutorialEnabled(enabled) {
-  const next = !!enabled;
-  runtime.state.enabled = next;
-  if (next) runtime.state.skipped = false;
+  runtime.state.enabled = !!enabled;
+  if (enabled) runtime.state.skipped = false;
   else if (!runtime.state.completed) runtime.state.skipped = true;
   saveState();
-  updateSettingsStatus(next ? 'First expedition guidance enabled.' : 'Guidance disabled. Your game progress is unchanged.');
-  if (next) presentCurrentStage();
+  updateSettingsStatus(enabled ? 'Guidance enabled.' : 'Guidance disabled. Your game progress is unchanged.');
+  if (enabled) presentCurrentStage();
   else hidePrompt();
 }
 
@@ -374,8 +423,24 @@ function restartTutorial() {
   runtime.lastPosition = runtime.movementOrigin;
   saveState();
   tutorialTelemetry('tutorial_begin');
-  updateSettingsStatus('First expedition restarted: step 1 of 3.');
+  updateSettingsStatus(`First Journey restarted: step 1 of ${CORE_STAGE_COUNT}.`);
   presentCurrentStage();
+}
+
+function getTutorialSnapshot() {
+  return {
+    version: TUTORIAL_VERSION,
+    enabled: runtime.state.enabled,
+    completed: runtime.state.completed,
+    skipped: runtime.state.skipped,
+    stage: runtime.state.stage,
+    step: STAGE_NUMBER[runtime.state.stage] || CORE_STAGE_COUNT,
+    steps: CORE_STAGE_COUNT,
+    distanceMoved: Number(runtime.state.distanceMoved.toFixed(2)),
+    promptVisible: !!runtime.card && !runtime.card.hidden && getComputedStyle(runtime.card).display !== 'none',
+    promptExpanded: !!runtime.card && !runtime.card.classList.contains('compact'),
+    title: runtime.titleEl?.textContent || ''
+  };
 }
 
 function initTutorial(appContext = null) {
@@ -384,11 +449,15 @@ function initTutorial(appContext = null) {
   runtime.state = loadState();
   createCardIfNeeded();
   ensureSettingsControls();
-  runtime.previous.gameStarted = !!appCtx.gameStarted;
-  runtime.previous.inSpace = !!appCtx.spaceFlight?.active;
-  runtime.previous.inMoon = !!appCtx.onMoon;
-  runtime.previous.roomPanelOpen = !!document.getElementById('roomPanelModal')?.classList.contains('show');
-  runtime.previous.buildModeOn = !!document.getElementById('fBlockBuild')?.classList.contains('on');
+  runtime.previous = {
+    gameStarted: !!appCtx.gameStarted,
+    inSpace: !!appCtx.spaceFlight?.active,
+    inMoon: !!appCtx.onMoon,
+    roomPanelOpen: panelIsOpen('roomPanelModal'),
+    buildModeOn: !!document.getElementById('fBlockBuild')?.classList.contains('on'),
+    backpackOpen: panelIsOpen('urbanEquipment'),
+    explorerOpen: panelIsOpen('discoveryPanel')
+  };
   runtime.movementOrigin = playerPosition();
   runtime.lastPosition = runtime.movementOrigin;
   runtime.discoveryListener = onDiscoveryTelemetry;
@@ -402,13 +471,20 @@ function initTutorial(appContext = null) {
   }
   saveState();
   updateSettingsStatus(runtime.state.completed
-    ? 'First expedition complete. Replay it whenever you want.'
+    ? 'First Journey complete. Replay it whenever you want.'
     : runtime.state.enabled && !runtime.state.skipped
-      ? `First expedition: ${STAGE_NUMBER[runtime.state.stage] || 1} of 3.`
-      : 'First expedition skipped. Restart it whenever you want.');
+      ? `First Journey: ${STAGE_NUMBER[runtime.state.stage] || 1} of ${CORE_STAGE_COUNT}.`
+      : 'Guidance is off. Replay First Journey whenever you want.');
   presentCurrentStage();
 }
 
-Object.assign(appCtx, { initTutorial, tutorialOnEvent, tutorialUpdate, setTutorialEnabled, restartTutorial });
+Object.assign(appCtx, {
+  getTutorialSnapshot,
+  initTutorial,
+  restartTutorial,
+  setTutorialEnabled,
+  tutorialOnEvent,
+  tutorialUpdate
+});
 
-export { initTutorial, restartTutorial, setTutorialEnabled, tutorialOnEvent, tutorialUpdate };
+export { getTutorialSnapshot, initTutorial, restartTutorial, setTutorialEnabled, tutorialOnEvent, tutorialUpdate };

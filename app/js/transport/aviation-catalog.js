@@ -7,6 +7,15 @@ const REFERENCE_EVIDENCE = 'docs/reference-art/aviation-fleet-and-damage-2026-08
 
 const definitions = [
   {
+    id: 'personal-prop', label: 'Personal plane', aircraftKind: 'fixed-wing', role: 'personal',
+    directModeOnly: true,
+    width: 1.35, height: 1.72, length: 6.65, wingspan: 6.65, massKg: 820,
+    topSpeedMph: 132, performance: { topSpeed: 132, topSpeedUnit: 'knots-ias', accelerationScale: 1.12, steeringScale: 1.16, gripScale: 1, brakeScale: 1.08, turningRadius: 5.8 },
+    seatCount: 2, boardingPoints: ['left', 'right'], resistance: 135,
+    damageZones: ['nose', 'fuselage', 'left-wing', 'right-wing', 'tail', 'landing-gear'],
+    visualRecipeId: 'aviation:personal-prop'
+  },
+  {
     id: 'expedition-prop', label: 'Expedition plane', aircraftKind: 'fixed-wing', role: 'bush',
     width: 1.65, height: 2.2, length: 7.9, wingspan: 10.9, massKg: 1280,
     topSpeedMph: 145, performance: { topSpeed: 145, topSpeedUnit: 'knots-ias', accelerationScale: 1.05, steeringScale: 1.08, gripScale: 1, brakeScale: 1.05, turningRadius: 7.5 },
@@ -70,9 +79,15 @@ const AVIATION_CATALOG = Object.freeze(definitions.map((definition) => defineTra
 })));
 
 const byId = new Map(AVIATION_CATALOG.map((entry) => [entry.id, entry]));
+const AVIATION_FLEET_CATALOG = Object.freeze(AVIATION_CATALOG.filter((entry) => entry.directModeOnly !== true));
 
 function getAviationCatalogEntry(id) {
-  return byId.get(String(id || '')) || byId.get('expedition-prop');
+  return byId.get(String(id || '')) || byId.get('personal-prop');
 }
 
-export { AVIATION_CATALOG, REFERENCE_EVIDENCE as AVIATION_REFERENCE_EVIDENCE, getAviationCatalogEntry };
+export {
+  AVIATION_CATALOG,
+  AVIATION_FLEET_CATALOG,
+  REFERENCE_EVIDENCE as AVIATION_REFERENCE_EVIDENCE,
+  getAviationCatalogEntry
+};

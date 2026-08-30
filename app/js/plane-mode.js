@@ -2,8 +2,8 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cameraSmoothingBlend, integrateAerobaticAttitude } from './controls/traversal-control-policy.js?v=8';
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
-import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=2';
-import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=5';
+import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=3';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=6';
 import { applyTransportDamage } from './transport/damage-model.js?v=1';
 
 const PLANE_MAX_SPEED_MPS = 84;
@@ -38,8 +38,8 @@ const state = {
   launchClearanceY: null,
   lastImpactAt: 0,
   lastImpactSpeed: 0,
-  transportEntityId: 'direct-flight:expedition-prop',
-  transportCatalogId: 'expedition-prop',
+  transportEntityId: 'direct-flight:personal-prop',
+  transportCatalogId: 'personal-prop',
   condition: 1,
   durabilityPolicy: 'standard',
   resistance: 150,

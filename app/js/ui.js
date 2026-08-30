@@ -4,11 +4,11 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=60";
-import { initMobileControls } from "./ui/mobile-controls.js?v=76";
+import { initMobileControls } from "./ui/mobile-controls.js?v=77";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=110";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=111";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -248,6 +248,7 @@ function setupUI() {
   document.getElementById('fBackpack')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
     appCtx.toggleUrbanEquipment?.(true);
+    emitTutorialEvent('opened_backpack', { source: 'exploration_menu' });
     closeAllFloatMenus();
   });
   document.getElementById('fEditorMode')?.addEventListener('click', () => {

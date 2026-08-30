@@ -27,9 +27,9 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/universe.css?v=7">
 <link rel="stylesheet" href="styles/fishing-game.css?v=5">
 <link rel="stylesheet" href="styles/interface-v4.css?v=19">
-<link rel="stylesheet" href="styles/start-hub.css?v=16">
+<link rel="stylesheet" href="styles/start-hub.css?v=17">
 <link rel="stylesheet" href="styles/discovery.css?v=14">
-<link rel="stylesheet" href="styles/tutorial.css?v=3">
+<link rel="stylesheet" href="styles/tutorial.css?v=4">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=1">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
@@ -375,16 +375,16 @@ Graphics changes apply to the current session.
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
-<div class="ctrl-section">Plane Controls</div>
+<div class="ctrl-section">Personal Plane</div>
 <div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Ctrl + ← / →</span><span class="ctrl-action">Barrel Roll</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Double-tap ← / →</span><span class="ctrl-action">Barrel Roll while airborne</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">Up to ~188 MPH</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">About 150 MPH; boarded aircraft differ</span></div>
 <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
-<div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Plane</span></div>
+<div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Personal Plane</span></div>
 <div class="ctrl-section">Camera & View</div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Look Back</span></div>
@@ -576,6 +576,7 @@ Graphics changes apply to the current session.
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
 <button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
 <div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
+<div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
 <div class="globe-selector-row globe-selector-coordinate-row">
 <input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
@@ -1180,7 +1181,7 @@ Explore the area
 <div class="floatItem" id="fWorldDiscovery">⌖ My Explorer &amp; Activities</div>
 <div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
 <div class="floatItem" id="fDrone">🚁 Drone Mode</div>
-<div class="floatItem" id="fPlane">✈️ Plane Mode</div>
+<div class="floatItem" id="fPlane">✈️ Personal Plane</div>
 <div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
 <div class="floatItem" id="fOceanMode">🌊 Ocean Mode</div>
 <div class="floatItem" id="fEarthMode">🌍 Earth Mode</div>
@@ -1847,17 +1848,17 @@ Explore the area
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="planeControls" style="display:none">
-<b>✈️ Plane Mode:</b><br>
+<b>✈️ Personal Plane:</b><br>
 • Arrow Up/Down - Nose down / pull up (inverted)<br>
 • Arrow Left/Right - Bank or ground steer<br>
 • Double-tap Arrow Left/Right - Deliberate barrel roll while airborne<br>
 • Space/Shift - Increase / reduce throttle<br>
-• Full throttle - Up to about 188 MPH<br>
+• Full throttle - About 150 MPH; boarded aircraft differ<br>
 • Hold pitch for loops; ordinary left/right banks into a coordinated turn<br>
 • Ctrl - Wheel brake on the ground<br>
 • WASD - Look around<br>
 • C - Chase / cockpit / overhead camera<br>
-• P - Enter / exit plane mode<br>
+• P - Enter / exit your personal plane<br>
 </div>
 <div id="rocketControls" style="display:none">
 <b>🚀 Rocket Mode:</b><br>

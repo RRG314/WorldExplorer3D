@@ -628,7 +628,7 @@ function initMobileControls() {
         mode === 'walking' ? 'Walking Mode' :
         mode === 'skydiving' ? 'Skydiving' :
         mode === 'drone' ? 'Drone Mode' :
-        mode === 'plane' ? 'Plane Mode' :
+        mode === 'plane' ? 'Personal Plane' :
         mode === 'rocket' ? 'Rocket Mode' :
         mode === 'ocean' ? 'Submarine Mode' :
         'Driving Mode';

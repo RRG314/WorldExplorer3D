@@ -1,7 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { searchPlaces } from '../places/place-search.js?v=1';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
-import { getGlobeSelectorElements } from './globe-selector/dom.js?v=3';
+import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
 import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
 import {
@@ -31,7 +32,7 @@ function createGlobeSelector(options = {}) {
   const {
     root, stage, canvas, mapBasemapBtn, satelliteBasemapBtn, basemapAttribution,
     zoomInBtn, zoomOutBtn, scaleReadout, latLonReadout, placeReadout, searchInput, mobileSearchInput,
-    mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
+    mobileSearchBtn, searchStatus, searchResults, latInput, lonInput, startBtn, backBtn, moonBtn,
     spaceBtn, oceanBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
     liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn, saveFavoriteBtn,
@@ -59,6 +60,7 @@ function createGlobeSelector(options = {}) {
   let panelMode = 'explore';
   const reverseLookupCache = new Map();
   let nearbyLookupController = null, nearbyLookupToken = 0;
+  let searchController = null;
   let savedFavoriteCities = [], recentPlaces = [];
 
   const globeScene = createGlobeSelectorScene({
@@ -262,11 +264,9 @@ function createGlobeSelector(options = {}) {
         ? meta.arrivalMode
         : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto',
       waterKind: coordsChanged ? null : meta.waterKind || selected?.waterKind || null,
-      countryCode: coordsChanged ? null : meta.countryCode || selected?.countryCode || null,
-      locationDetails: coordsChanged ? null : meta.locationDetails || selected?.locationDetails || null,
-      surfaceEvidence: coordsChanged
-        ? null
-        : meta.surfaceEvidence || selected?.surfaceEvidence || null
+      countryCode: meta.countryCode || (coordsChanged ? null : selected?.countryCode || null),
+      locationDetails: meta.locationDetails || (coordsChanged ? null : selected?.locationDetails || null),
+      surfaceEvidence: meta.surfaceEvidence || (coordsChanged ? null : selected?.surfaceEvidence || null)
     };
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
@@ -404,6 +404,58 @@ function createGlobeSelector(options = {}) {
     }
   }
 
+  function clearSearchResults() {
+    if (!searchResults) return;
+    searchResults.replaceChildren();
+    searchResults.hidden = true;
+  }
+
+  function selectSearchResult(result) {
+    if (!result) return;
+    setSelection(result.lat, result.lon, {
+      name: result.name,
+      focus: true,
+      fetchNearby: true,
+      arrivalMode: result.arrivalMode,
+      countryCode: result.countryCode,
+      locationDetails: {
+        displayName: result.displayName,
+        kind: result.kindLabel,
+        region: result.region,
+        country: result.country,
+        countryCode: result.countryCode
+      }
+    });
+    if (searchInput) searchInput.value = result.name;
+    if (mobileSearchInput) mobileSearchInput.value = result.name;
+    searchResults?.querySelectorAll('[role="option"]').forEach((button) => {
+      button.setAttribute('aria-selected', String(button.dataset.resultId === result.id));
+    });
+  }
+
+  function renderSearchResults(results) {
+    if (!searchResults) return;
+    searchResults.replaceChildren();
+    results.slice(0, 6).forEach((result, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'globe-location-search-result';
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', String(index === 0));
+      button.dataset.resultId = result.id;
+      const name = document.createElement('strong');
+      name.textContent = result.name;
+      const kind = document.createElement('span');
+      kind.textContent = result.kindLabel;
+      const detail = document.createElement('small');
+      detail.textContent = result.displayName;
+      button.append(name, kind, detail);
+      button.addEventListener('click', () => selectSearchResult(result));
+      searchResults.append(button);
+    });
+    searchResults.hidden = results.length === 0;
+  }
+
   async function runSearchFromOverlay() {
     const query = (searchInput?.value || '').trim();
     if (!query) {
@@ -414,47 +466,37 @@ function createGlobeSelector(options = {}) {
       return;
     }
 
-    const legacyInput = document.getElementById('locationSearch');
-    const legacyStatus = document.getElementById('locationSearchStatus');
-    if (legacyInput) legacyInput.value = query;
+    searchController?.abort();
+    searchController = new AbortController();
     if (searchStatus) {
-      searchStatus.textContent = 'Searching...';
+      searchStatus.textContent = 'Searching places…';
       searchStatus.style.color = '#64748b';
     }
+    clearSearchResults();
 
     try {
-      if (typeof appCtx.searchLocation === 'function') {
-        searchInFlight = true;
-        if (searchBtn) searchBtn.disabled = true;
-        const result = await appCtx.searchLocation();
-        if (!result || !Number.isFinite(result.lat) || !Number.isFinite(result.lon)) {
-          throw new Error(legacyStatus?.textContent || 'Location was not found');
-        }
-        setSelection(result.lat, result.lon, {
-          name: result.name || query,
-          focus: true,
-          fetchNearby: true,
-          arrivalMode: result.arrivalMode || 'walk'
-        });
-        beginReverseLookup(result.lat, result.lon);
-      } else {
-        throw new Error('Search function unavailable');
-      }
+      searchInFlight = true;
+      if (searchBtn) searchBtn.disabled = true;
+      if (mobileSearchBtn) mobileSearchBtn.disabled = true;
+      const results = await searchPlaces(query, { signal: searchController.signal });
+      if (!results.length) throw new Error('No matching places. Try a city, landmark, airport, or coordinates.');
+      renderSearchResults(results);
+      selectSearchResult(results[0]);
 
       if (searchStatus) {
-        const legacyText = legacyStatus?.textContent || 'Search complete.';
-        searchStatus.textContent = legacyText;
-        const legacyColor = legacyStatus?.style?.color || '#64748b';
-        searchStatus.style.color = legacyColor;
+        searchStatus.textContent = results.length === 1 ? '1 place found.' : `${results.length} places found. Choose the best match.`;
+        searchStatus.style.color = '#059669';
       }
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       if (searchStatus) {
-        searchStatus.textContent = `Search failed: ${error?.message || error}`;
+        searchStatus.textContent = error?.message || 'Place search is unavailable right now.';
         searchStatus.style.color = '#dc2626';
       }
     } finally {
       searchInFlight = false;
       if (searchBtn) searchBtn.disabled = false;
+      if (mobileSearchBtn) mobileSearchBtn.disabled = false;
     }
   }
 
@@ -648,6 +690,7 @@ function createGlobeSelector(options = {}) {
     setGlobeSelectorScrollLock(false);
     reverseLookupToken += 1;
     nearbyLookupToken += 1;
+    searchController?.abort();
     nearbyLookupController?.abort();
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');

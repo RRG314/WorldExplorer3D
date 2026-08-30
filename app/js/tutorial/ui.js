@@ -8,17 +8,28 @@ export function createTutorialUi(options = {}) {
     }
     runtime.currentButtonAction = null;
     runtime.currentStage = '';
-    if (runtime.card) runtime.card.hidden = true;
+    if (runtime.card) {
+      runtime.card.hidden = true;
+      setExpanded(false);
+    }
+  }
+
+  function setExpanded(expanded) {
+    if (!runtime.card) return;
+    const open = expanded === true;
+    runtime.card.classList.toggle('compact', !open);
+    runtime.detailsBtn?.setAttribute('aria-expanded', String(open));
+    if (runtime.detailsBtn) runtime.detailsBtn.textContent = open ? 'Less' : 'Details';
   }
 
   function createCardIfNeeded() {
     if (runtime.card) return;
     const card = document.createElement('aside');
     card.id = 'tutorialHintCard';
-    card.className = 'tutorial-card';
+    card.className = 'tutorial-card compact';
     card.hidden = true;
     card.setAttribute('aria-live', 'polite');
-    card.setAttribute('aria-label', 'First expedition guidance');
+    card.setAttribute('aria-label', 'First Journey guidance');
 
     const header = document.createElement('div');
     header.className = 'tutorial-card-head';
@@ -28,12 +39,20 @@ export function createTutorialUi(options = {}) {
     const title = document.createElement('strong');
     title.className = 'tutorial-title';
     heading.append(eyebrow, title);
+    const headerActions = document.createElement('div');
+    headerActions.className = 'tutorial-head-actions';
+    const details = document.createElement('button');
+    details.type = 'button';
+    details.className = 'tutorial-details-btn';
+    details.setAttribute('aria-expanded', 'false');
+    details.textContent = 'Details';
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'tutorial-icon-btn';
     close.setAttribute('aria-label', 'Show this tutorial step later');
     close.textContent = '×';
-    header.append(heading, close);
+    headerActions.append(details, close);
+    header.append(heading, headerActions);
 
     const body = document.createElement('p');
     body.className = 'tutorial-body';
@@ -51,11 +70,11 @@ export function createTutorialUi(options = {}) {
     const later = document.createElement('button');
     later.type = 'button';
     later.className = 'tutorial-secondary';
-    later.textContent = 'Later';
+    later.textContent = 'Not now';
     const skip = document.createElement('button');
     skip.type = 'button';
     skip.className = 'tutorial-text-btn';
-    skip.textContent = 'Skip guide';
+    skip.textContent = 'Turn off tips';
     actions.append(action, later, skip);
     card.append(header, body, progressTrack, actions);
     document.body.appendChild(card);
@@ -70,8 +89,10 @@ export function createTutorialUi(options = {}) {
       laterBtn: later,
       skipBtn: skip,
       closeBtn: close
+      ,detailsBtn: details
     });
 
+    details.addEventListener('click', () => setExpanded(card.classList.contains('compact')));
     close.addEventListener('click', () => safeCall(onLater));
     later.addEventListener('click', () => safeCall(onLater));
     skip.addEventListener('click', () => safeCall(onSkip));
@@ -91,10 +112,10 @@ export function createTutorialUi(options = {}) {
     wrap.className = 'tutorial-settings-card';
     wrap.innerHTML = `
       <span class="tutorial-settings-eyebrow">Learning</span>
-      <h3>First Expedition</h3>
-      <p>Three short steps introduce movement, field work, Journal knowledge and Backpack items. Advanced systems explain themselves when first opened.</p>
-      <label><input id="tutorialEnabledToggle" type="checkbox"> <span>Show contextual guidance</span></label>
-      <div class="tutorial-settings-actions"><button id="tutorialRestartBtn" type="button">Replay First Expedition</button></div>
+      <h3>First Journey</h3>
+      <p>Four short steps introduce movement, your Backpack, My Explorer, activities, and travel modes. Optional tips appear once when you enter an unfamiliar system.</p>
+      <label><input id="tutorialEnabledToggle" type="checkbox"> <span>Show First Journey and contextual tips</span></label>
+      <div class="tutorial-settings-actions"><button id="tutorialRestartBtn" type="button">Replay First Journey</button></div>
       <div id="tutorialSettingsStatus" role="status"></div>
     `;
     tabSettings.appendChild(wrap);
@@ -112,5 +133,5 @@ export function createTutorialUi(options = {}) {
     if (runtime.settingsToggle) runtime.settingsToggle.checked = runtime.state.enabled && !runtime.state.skipped;
   }
 
-  return { createCardIfNeeded, ensureSettingsControls, hidePrompt, updateSettingsStatus };
+  return { createCardIfNeeded, ensureSettingsControls, hidePrompt, setExpanded, updateSettingsStatus };
 }

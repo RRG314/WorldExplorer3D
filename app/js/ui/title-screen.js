@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=89";
+import { createGlobeSelector } from "./globe-selector.js?v=90";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
@@ -717,6 +717,10 @@ function initTitleScreenUi({
     document.getElementById('fPaths')?.classList.remove('on');
     document.getElementById('fLandUse')?.classList.remove('on');
     document.getElementById('fLandUseRE')?.classList.remove('on');
+    // World publication and all entry-mode setup are complete. A late optional
+    // loader may have reasserted the transition overlay after loadRoads hid it;
+    // the title launch owns the final handoff to playable input.
+    appCtx.hideLoad?.();
     appCtx.loadingScreenMode = 'earth';
     return true;
   };
