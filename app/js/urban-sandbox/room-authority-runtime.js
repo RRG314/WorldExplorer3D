@@ -21,6 +21,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   let pendingVehicleId = '';
   let impactPending = false;
   let poseElapsed = 0;
+  let leaseSweepElapsed = 0;
 
   const active = () => !disposed && options.isActive();
   const currentRoom = () => appCtx.getCurrentMultiplayerRoom?.() || null;
@@ -34,6 +35,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
       if (!remote || remote.kind !== 'vehicle') {
         vehicle.roomOccupiedByOther = false;
         vehicle.roomLeaseOwnerUid = '';
+        if (!vehicle.attachedToPlayer) vehicle.visual.root.visible = true;
         continue;
       }
       vehicle.condition = remote.condition;
@@ -122,6 +124,24 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   }
 
   function update(dt) {
+    leaseSweepElapsed += Math.max(0, Number(dt) || 0);
+    if (leaseSweepElapsed >= .5) {
+      leaseSweepElapsed = 0;
+      const currentTime = Date.now();
+      for (const vehicle of state.vehicles) {
+        const remote = state.remoteEntities.get(vehicle.id);
+        if (!remote || remote.kind !== 'vehicle') {
+          vehicle.roomOccupiedByOther = false;
+          vehicle.roomLeaseOwnerUid = '';
+          if (!vehicle.attachedToPlayer) vehicle.visual.root.visible = true;
+          continue;
+        }
+        const lease = resolveRoomVehicleLease(remote, state.authority?.actorUid, currentTime);
+        vehicle.roomOccupiedByOther = lease.occupiedByOther;
+        vehicle.roomLeaseOwnerUid = lease.leaseOwnerUid;
+        vehicle.visual.root.visible = !lease.occupiedByOther || vehicle.attachedToPlayer;
+      }
+    }
     impactPending = state.authorityImpactPending === true;
     if (!state.activeVehicle?.attachedToPlayer) {
       poseElapsed = 0;
