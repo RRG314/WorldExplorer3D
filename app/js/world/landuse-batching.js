@@ -5,7 +5,7 @@ import {
   buildMergedGeometry,
   disposeSceneMesh,
   materialBatchKey
-} from "./geometry-batching.js?v=4";
+} from "./geometry-batching.js?v=6";
 
 export function batchLanduseMeshes() {
   try {
@@ -69,11 +69,21 @@ export function batchLanduseMeshes() {
 
       const batch = { positions: [], normals: [], uvs: [], indices: [] };
       const xzPoints = [];
+      const editableIndexRanges = [];
 
       for (let i = 0; i < group.meshes.length; i++) {
         const mesh = group.meshes[i];
         mesh.updateMatrixWorld(true);
-        appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+        const indexStart = batch.indices.length;
+        const appendCount = appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+        const sourceBuildingId = String(mesh.userData?.sourceBuildingId || '');
+        if (appendCount > 0 && sourceBuildingId) {
+          editableIndexRanges.push(Object.freeze({
+            sourceBuildingId,
+            start: indexStart,
+            count: batch.indices.length - indexStart
+          }));
+        }
 
         let cx = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
         let cz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
@@ -129,6 +139,7 @@ export function batchLanduseMeshes() {
         isLanduseBatch: true,
         alwaysVisible: group.alwaysVisible,
         batchCount: group.meshes.length,
+        editableBuildingIndexRanges: Object.freeze(editableIndexRanges),
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };

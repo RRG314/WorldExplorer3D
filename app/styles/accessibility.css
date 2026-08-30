@@ -1,0 +1,124 @@
+@layer interface {
+  .we3d-skip-link {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 10000;
+    padding: 10px 14px;
+    border: 2px solid #fff;
+    border-radius: 6px;
+    color: #fff;
+    background: #071821;
+    transform: translateY(-150%);
+  }
+
+  .we3d-skip-link:focus { transform: translateY(0); }
+
+  .we3d-visually-hidden {
+    position: fixed !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  #accessibilitySettingsStatus {
+    margin: 0;
+    color: #b9d8e3;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  #tab-controls #accessibilitySettings {
+    color: #1e293b;
+    background: #f8fafc;
+  }
+
+  #tab-controls #accessibilitySettingsStatus { color: #475569; }
+
+  #accessibilitySettings {
+    display: grid;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 12px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+  }
+
+  #accessibilitySettings > strong { color: inherit; }
+  #accessibilitySettings label { display: flex; align-items: center; gap: 9px; }
+  #accessibilitySettings label:has(select) { display: grid; grid-template-columns: 1fr minmax(120px, 1.2fr); }
+  #accessibilitySettings select { min-height: 40px; }
+  #accessibilitySettings input[type="checkbox"] { width: 20px; height: 20px; }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid #ffdf5d !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 0 2px #071821 !important;
+  }
+
+  html[data-we3d-text-scale="115"] :where(
+    #globeSelectorScreen, #globeHubOverlay, #controlsTab, #pauseScreen,
+    #resultScreen, #caughtScreen, #urbanEquipment, #discoveryPanel,
+    #roomPanelModal, #liveGpsPermissionPanel, #arExperience
+  ) { font-size: 115%; }
+
+  html[data-we3d-text-scale="130"] :where(
+    #globeSelectorScreen, #globeHubOverlay, #controlsTab, #pauseScreen,
+    #resultScreen, #caughtScreen, #urbanEquipment, #discoveryPanel,
+    #roomPanelModal, #liveGpsPermissionPanel, #arExperience
+  ) { font-size: 130%; }
+
+  html[data-we3d-contrast="more"] :where(
+    #globeSelectorScreen, #globeHubOverlay, #controlsTab, #pauseScreen,
+    #resultScreen, #caughtScreen, #urbanEquipment, #discoveryPanel,
+    #roomPanelModal, #liveGpsPermissionPanel, #arExperience
+  ) {
+    --wx-text: #fff;
+    --wx-muted: #e5edf2;
+    --wx-line-soft: rgba(255, 255, 255, .68);
+    filter: contrast(1.12);
+  }
+
+  html[data-we3d-contrast="more"] :where(button, input, select, textarea) {
+    border-color: currentColor !important;
+  }
+
+  html[data-we3d-motion="reduce"] *,
+  html[data-we3d-motion="reduce"] *::before,
+  html[data-we3d-motion="reduce"] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+
+  @media (forced-colors: active) {
+    :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+      outline: 3px solid Highlight !important;
+      box-shadow: none !important;
+    }
+  }
+
+  @media (pointer: coarse) {
+    :where(button, input[type="button"], input[type="submit"], select, a) {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    #accessibilitySettings select { min-height: 44px; }
+    #accessibilitySettings label, #mobileControlsReset { min-height: 44px !important; }
+  }
+}

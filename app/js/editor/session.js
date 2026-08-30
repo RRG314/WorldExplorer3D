@@ -1,4 +1,4 @@
-import { observeAuth } from '../../../js/auth-ui.js';
+import { observeAuth } from '../../../js/auth-ui.js?v=55';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { featureWorldCenter, sampleSurfaceY, worldToGeoPoint } from './geometry.js?v=1';
 import { EditorHistoryStack } from './history.js?v=1';
@@ -14,13 +14,13 @@ import {
   restoreEditorPerformanceMode as restoreEditorSessionPerformanceMode,
   restoreEditorViewMode as restoreEditorSessionViewMode,
   restoreRuntimeUiAfterEditor as restoreEditorRuntimeUi
-} from './session-runtime-ui.js?v=1';
+} from './session-runtime-ui.js?v=2';
 import {
   scheduleWorkspacePreviewRefresh as scheduleEditorWorkspacePreviewRefresh,
   refreshWorkspacePreview as refreshEditorWorkspacePreview
 } from './session-scene.js?v=1';
-import { bindRefEvents as bindEditorSessionRefEvents } from './session-events.js?v=1';
-import { renderUi as renderEditorSessionUi } from './session-ui.js?v=1';
+import { bindRefEvents as bindEditorSessionRefEvents } from './session-events.js?v=3';
+import { renderUi as renderEditorSessionUi } from './session-ui.js?v=2';
 import {
   addWorkspaceFeature as addEditorWorkspaceFeature,
   applyHistorySnapshot as applyEditorHistorySnapshot,
@@ -162,6 +162,7 @@ function getRefs() {
     toolbar: document.getElementById('editorToolbar'),
     workspaceTabBtn: document.getElementById('editorTabWorkspace'),
     mineTabBtn: document.getElementById('editorTabMine'),
+    blocksTabBtn: document.getElementById('editorTabBlocks'),
     moderationTabBtn: document.getElementById('editorTabModeration'),
     sidebarPanel: document.getElementById('editorSidebarPanel'),
     sidebarStartBtn: document.getElementById('editorSidebarStartBtn'),
@@ -421,6 +422,7 @@ function openEditorSession(options = {}) {
   bindCanvasEvents();
   bindRefEvents();
   ensureAuthObserver();
+  state.userIsAdmin = readAdminState(state.authUser);
   collapseEditorRuntimeUi(buildEditorSessionContext());
   enterEditorSessionPerformanceMode(buildEditorSessionContext());
   state.active = true;

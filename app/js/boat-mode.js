@@ -8,7 +8,7 @@ import {
   getWaveIntensity,
   intensityFromSeaState,
   seaStateFromIntensity
-} from "./water-dynamics.js?v=4";
+} from "./water-dynamics.js?v=9";
 import {
   buildSyntheticBoatCandidate,
   findNearestBoatCandidate,
@@ -16,6 +16,7 @@ import {
   getBoatWaveProfile,
   getReferencePosition,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   localizeBoatCandidate,
   measureBoatShorelineDistance,
   minimumBoatShorelineDistance,
@@ -25,7 +26,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=18";
+} from "./boat-mode/water-query.js?v=21";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
@@ -33,13 +34,20 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=13";
-import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
-import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
+} from "./boat-mode/surface-effects.js?v=18";
+import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=7";
+import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=2";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=8";
-import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
-import { createBoatModePolicy } from "./boat-mode/policy.js?v=2";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=16";
+import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=3";
+import { createBoatModePolicy } from "./boat-mode/policy.js?v=3";
+import {
+  createSurfaceLayerSuppression,
+  shouldSuppressOpenOceanSurfaceLayers
+} from './boat-mode/surface-layer-visibility.js?v=2';
+import { getMaritimeCatalogEntry } from './transport/maritime-catalog.js?v=1';
+import { applyTransportDamage, transportDamagePresentation } from './transport/damage-model.js?v=1';
+import { updateVesselVisual } from './transport/vessel-visual-recipe.js?v=7';
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -56,6 +64,35 @@ const BOAT_EDGE_BUFFER_MIN = 1.2;
 
 let _boatMeshReady = false;
 let _boatPromptSignature = '';
+
+const openOceanSurfaceSuppression = createSurfaceLayerSuppression(() => [
+  appCtx.terrainGroup,
+  appCtx.urbanSandboxRuntime?.group,
+  ...(appCtx.roadMeshes || []),
+  ...(appCtx.buildingMeshes || []),
+  ...(appCtx.landuseMeshes || []),
+  ...(appCtx.vegetationMeshes || []),
+  ...(appCtx.streetFurnitureMeshes || []),
+  ...(appCtx.structureVisualMeshes || []),
+  ...(appCtx.poiMeshes || [])
+]);
+
+function syncOpenOceanSurfaceLayers(forceInactive = false) {
+  const suppress = shouldSuppressOpenOceanSurfaceLayers({
+    active: appCtx.boatMode?.active,
+    forceInactive,
+    waterKind: appCtx.boatMode?.waterKind,
+    shorelineDistance: appCtx.boatMode?.shorelineDistance
+  });
+  openOceanSurfaceSuppression.setActive(suppress);
+  appCtx.boatMode.openOceanSurfaceSuppression = Object.freeze({
+    ...openOceanSurfaceSuppression.snapshot(),
+    shorelineDistance: Number.isFinite(Number(appCtx.boatMode?.shorelineDistance))
+      ? Number(appCtx.boatMode.shorelineDistance)
+      : null,
+    shoreVisible: !suppress
+  });
+}
 
 function resetBoatDynamics() {
   appCtx.boat.speed = 0;
@@ -134,15 +171,40 @@ function snapBoatChaseCamera() {
   if (camera.userData) camera.userData.boatrig = null;
 }
 
-function createBoatMesh() {
-  if (_boatMeshReady || typeof THREE === 'undefined' || !appCtx.scene) return;
-  const group = createBoatModeMesh();
+function isTouchClient() {
+  return globalThis.matchMedia?.('(pointer: coarse)')?.matches === true || Number(globalThis.navigator?.maxTouchPoints || 0) > 0;
+}
+
+function disposeBoatMesh() {
+  const mesh = appCtx.boatMode?.mesh;
+  if (!mesh) return;
+  if (typeof mesh.userData?.disposeVesselVisual === 'function') mesh.userData.disposeVesselVisual();
+  else {
+    if (mesh.parent?.remove) mesh.parent.remove(mesh);
+    else mesh.removeFromParent?.();
+    mesh.traverse?.((object) => {
+      object.geometry?.dispose?.();
+      if (Array.isArray(object.material)) object.material.forEach((entryMaterial) => entryMaterial?.dispose?.());
+      else object.material?.dispose?.();
+    });
+  }
+  appCtx.boatMode.mesh = null;
+  _boatMeshReady = false;
+}
+
+function createBoatMesh(catalogId = appCtx.boatMode?.transportCatalogId) {
+  const catalog = getMaritimeCatalogEntry(catalogId);
+  const currentId = String(appCtx.boatMode?.mesh?.userData?.transportCatalogId || '');
+  if (_boatMeshReady && currentId === catalog.id) return;
+  if (_boatMeshReady || appCtx.boatMode?.mesh) disposeBoatMesh();
+  if (typeof THREE === 'undefined' || !appCtx.scene) return;
+  const group = createBoatModeMesh(catalog, { mobile: isTouchClient(), state: 'active' });
   appCtx.scene.add(group);
   if (typeof THREE.Box3 === 'function') {
     group.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(group);
     if (Number.isFinite(bounds.min.y)) {
-      appCtx.boatMode.meshDraft = Math.max(0.36, -bounds.min.y);
+      appCtx.boatMode.meshDraft = Math.max(0.36, Number(catalog.dimensions.draft) || -bounds.min.y);
     }
   }
   appCtx.boatMode.mesh = group;
@@ -160,6 +222,25 @@ function updateBoatMesh() {
   mesh.rotation.y = appCtx.boat.angle;
   mesh.rotation.x = appCtx.boat.pitch;
   mesh.rotation.z = appCtx.boat.roll;
+  updateVesselVisual({ root: mesh }, Number(appCtx.boatMode.condition ?? 1));
+}
+
+function applyBoatImpact(impactSpeed, options = {}) {
+  const now = performance.now();
+  if (now - Number(appCtx.boatMode.lastImpactAt || 0) < 900) return null;
+  const catalog = options.catalog || getMaritimeCatalogEntry(appCtx.boatMode?.transportCatalogId);
+  const priorBand = transportDamagePresentation(appCtx.boatMode.condition ?? 1).band;
+  const damage = applyTransportDamage(appCtx.boatMode, Math.max(0, Number(impactSpeed) - 1.8) * 7.5, {
+    resistance: catalog.damage.resistance,
+    durabilityPolicy: catalog.damage.durabilityPolicy
+  });
+  appCtx.boatMode.lastImpactAt = now;
+  appCtx.boatMode.lastDamageBand = damage.band;
+  if (damage.band !== priorBand) {
+    const label = transportDamagePresentation(damage.after).label.toLowerCase();
+    appCtx.showToast?.(`${catalog.label} condition: ${label}.`);
+  }
+  return damage;
 }
 
 function updateBoatLodBias() {
@@ -218,8 +299,8 @@ function syncBoatPromptState(force = false) {
     const shoreline = Number.isFinite(appCtx.boatMode.shorelineDistance) ? Math.round(appCtx.boatMode.shorelineDistance) : null;
     const message =
       shoreline && shoreline < 90 ?
-        `Boat Mode Active • Press G or choose Exit Boat to dock • ${shoreline}m to shore` :
-        'Boat Mode Active • Press G or choose Exit Boat to dock';
+        `${appCtx.boatMode.vesselLabel || 'Vessel'} underway • Press G or choose Exit Vessel • ${shoreline}m to shore` :
+        `${appCtx.boatMode.vesselLabel || 'Vessel'} underway • Press G or choose Exit Vessel near shore`;
     const promptSignature = `active:${message}`;
     if (force || _boatPromptSignature !== promptSignature) {
       _boatPromptSignature = promptSignature;
@@ -244,6 +325,7 @@ function syncBoatPromptState(force = false) {
     return null;
   }
   const candidate = findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
+    requireContainment: false,
     referenceY: ref.y,
     structureTerrainMode: ref.structureTerrainMode
   });
@@ -293,7 +375,8 @@ const boatOceanTransferApi = createBoatOceanTransferApi({
   showBoatPrompt,
   startBoatMode: (options) => startBoatMode(options),
   updateBoatMenuUi,
-  updateWaterWaveVisuals
+  updateWaterWaveVisuals,
+  restoreEarthSurfaceLayers: () => syncOpenOceanSurfaceLayers(true)
 });
 const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat } = boatOceanTransferApi;
 
@@ -313,6 +396,7 @@ function startBoatMode(options = {}) {
     appCtx.boatMode?.candidate ||
     findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
       allowSynthetic: options.allowSynthetic === true,
+      requireContainment: false,
       waterKind: options.waterKind || 'open_ocean',
       referenceY: ref.y,
       structureTerrainMode: ref.structureTerrainMode
@@ -344,6 +428,14 @@ function startBoatMode(options = {}) {
   appCtx.setCameraMode(0);
   appCtx.boatMode.active = true;
   appCtx.boatMode.available = true;
+  const transferVessel = appCtx.boatMode.oceanTransferVessel || null;
+  const catalog = getMaritimeCatalogEntry(options.transportCatalogId || transferVessel?.transportCatalogId);
+  appCtx.boatMode.transportEntityId = String(options.transportEntityId || transferVessel?.transportEntityId || 'boat-mode:marina-runabout');
+  appCtx.boatMode.transportCatalogId = catalog.id;
+  appCtx.boatMode.vesselLabel = catalog.label;
+  appCtx.boatMode.condition = Number.isFinite(options.condition) ? options.condition : Number.isFinite(transferVessel?.condition) ? transferVessel.condition : 1;
+  appCtx.boatMode.durabilityPolicy = catalog.damage.durabilityPolicy;
+  appCtx.boatMode.lastDamageBand = transportDamagePresentation(appCtx.boatMode.condition).band;
 
   const startAngle = Number.isFinite(options.yaw) ?
     options.yaw :
@@ -361,8 +453,9 @@ function startBoatMode(options = {}) {
   resetBoatDynamics();
   resetBoatFoamFx();
   setBoatActorPose(spawnPoint.x, spawnPoint.z, startAngle, activeCandidate, { forceSnap: true });
-  createBoatMesh();
+  createBoatMesh(catalog.id);
   updateBoatWaterPatch(activeCandidate);
+  syncOpenOceanSurfaceLayers();
   updateBoatMesh();
   snapBoatChaseCamera();
   if (appCtx.carMesh) appCtx.carMesh.visible = false;
@@ -405,6 +498,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     resetBoatFoamFx();
     setBoatActorPose(spawnPoint.x, spawnPoint.z, yaw, activeCandidate, { forceSnap: true });
     updateBoatWaterPatch(activeCandidate);
+    syncOpenOceanSurfaceLayers();
     snapBoatChaseCamera();
     updateBoatLodBias();
     updateBoatMesh();
@@ -425,7 +519,10 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
       candidate,
       allowSynthetic: options.allowSynthetic === true,
       waterKind: options.waterKind || 'open_ocean',
-      entryMode: options.entryMode || 'walk'
+      entryMode: options.entryMode || 'walk',
+      transportEntityId: options.transportEntityId,
+      transportCatalogId: options.transportCatalogId,
+      condition: options.condition
     }) === 'boat';
   }
 
@@ -437,7 +534,10 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     candidate,
     allowSynthetic: options.allowSynthetic === true,
     waterKind: options.waterKind || 'open_ocean',
-    entryMode: options.entryMode || 'walk'
+    entryMode: options.entryMode || 'walk',
+    transportEntityId: options.transportEntityId,
+    transportCatalogId: options.transportCatalogId,
+    condition: options.condition
   });
 }
 
@@ -451,6 +551,16 @@ function stopBoatMode(options = {}) {
     angle: appCtx.boat.angle
   };
   const currentWater = appCtx.boatMode.currentWater || appCtx.boatMode.candidate || null;
+  const vesselSnapshot = {
+    x: appCtx.boat.x,
+    y: appCtx.boat.y,
+    z: appCtx.boat.z,
+    yaw: appCtx.boat.angle,
+    condition: Number(appCtx.boatMode.condition ?? 1),
+    transportEntityId: String(appCtx.boatMode.transportEntityId || ''),
+    transportCatalogId: String(appCtx.boatMode.transportCatalogId || 'marina-runabout'),
+    water: currentWater
+  };
   const dockTargetX = Number.isFinite(currentWater?.entryPoint?.x) ? currentWater.entryPoint.x : entry.x;
   const dockTargetZ = Number.isFinite(currentWater?.entryPoint?.z) ? currentWater.entryPoint.z : entry.z;
   const exitModeName = exitMode === 'walk' ? 'walk' : 'drive';
@@ -484,6 +594,7 @@ function stopBoatMode(options = {}) {
   }
 
   appCtx.boatMode.active = false;
+  syncOpenOceanSurfaceLayers(true);
   appCtx.boatMode.available = false;
   appCtx.boatMode.candidate = null;
   appCtx.boatMode.currentWater = null;
@@ -546,6 +657,7 @@ function stopBoatMode(options = {}) {
     appCtx.updateInteriorInteraction();
   }
   syncBoatPromptState(true);
+  appCtx.onVesselTripEnded?.(vesselSnapshot);
   return true;
 }
 
@@ -599,7 +711,9 @@ const updateBoatMode = createBoatRuntimeDynamics({
   updateBoatFoamFx,
   updateBoatLodBias,
   updateBoatMesh,
-  updateBoatWaterPatch
+  updateBoatWaterPatch,
+  syncOpenOceanSurfaceLayers,
+  onBoatImpact: applyBoatImpact
 });
 
 function initBoatMode() {
@@ -634,6 +748,7 @@ function initBoatMode() {
 
 Object.assign(appCtx, {
   boatHudLabel,
+  buildSyntheticBoatCandidate,
   canDiveBoatMode,
   canExitBoatMode,
   cycleBoatSeaState,
@@ -644,6 +759,7 @@ Object.assign(appCtx, {
   getBoatWaveIntensity: getWaveIntensity,
   initBoatMode,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   refreshBoatAvailability: syncBoatPromptState,
   sampleDynamicWaterAt,
   setBoatWaveIntensity,
@@ -659,6 +775,7 @@ Object.assign(appCtx, {
 
 export {
   boatHudLabel,
+  buildSyntheticBoatCandidate,
   canDiveBoatMode,
   canExitBoatMode,
   cycleBoatSeaState,
@@ -669,6 +786,7 @@ export {
   getWaveIntensity as getBoatWaveIntensity,
   initBoatMode,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   syncBoatPromptState as refreshBoatAvailability,
   sampleDynamicWaterAt,
   setBoatWaveIntensity,

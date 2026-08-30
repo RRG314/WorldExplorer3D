@@ -1,16 +1,16 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=48";
-import { updateDrone } from "./physics/drone-flight.js?v=8";
-import { updatePlane } from "./plane-mode.js?v=17";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
+import { updateDrone } from "./physics/drone-flight.js?v=9";
+import { updatePlane } from "./plane-mode.js?v=30";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
   updateVehicleSurface
 } from "./physics/vehicle-surface.js?v=6";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
-import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=6";
+import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=8";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
-import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
+import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=3";
 import {
   arcadeSteeringYawTarget,
   earthDrivingSteeringProfile,
@@ -18,8 +18,12 @@ import {
 } from "./controls/traversal-control-policy.js?v=8";
 import {
   carSpeedToMph,
-  carSpeedToWorldUnitsPerSecond
-} from "./physics/vehicle-speed-units.js?v=1";
+  carSpeedToWorldUnitsPerSecond,
+  mphToCarSpeed
+} from "./physics/vehicle-speed-units.js?v=2";
+import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=6";
+import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=2';
+import { groundVehicleTuning } from './character/vehicle-assistance.js?v=1';
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -42,18 +46,21 @@ let _physRaycaster = null;
 const _physRayStart = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
 const _physRayDir = typeof THREE !== 'undefined' ? new THREE.Vector3(0, -1, 0) : null;
 
-function isPlanetarySurface() { return !!(appCtx.onMoon || appCtx.onMars); }
+function isPlanetarySurface() { return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId); }
 
 function getPlanetarySurfaceMesh() {
+  if (appCtx.activePlanetaryBodyId && appCtx.activeSolidWorldSurface) return appCtx.activeSolidWorldSurface;
   if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
   if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
   return null;
 }
 
 function getPlanetaryGravity() {
-  if (appCtx.onMars) return -3.71;
-  if (appCtx.onMoon) return -1.62;
-  return -9.80665;
+  const bodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : 'earth');
+  return -samplePhysicalEnvironment(bodyId, {
+    heightM: 0,
+    timestampS: Number(appCtx.astronomicalSkyState?.timestampMs || Date.now()) / 1000
+  }).gravityMagnitudeMps2;
 }
 function _getPhysRaycaster() {
   if (!_physRaycaster && typeof THREE !== 'undefined') {
@@ -133,6 +140,14 @@ function update(dt) {
 
   if (updateAlternateTravelMode(appCtx, dt, { isPlanetarySurface, updateDrone, updatePlane })) return;
 
+  const liveGpsSnapshot = appCtx.getLiveGpsSnapshot?.() || null;
+  const liveGpsOwnsDrive = !isPlanetarySurface() && liveGpsSnapshot?.active === true &&
+    liveGpsSnapshot?.following === true && liveGpsSnapshot?.travelMode === 'drive' &&
+    appCtx.liveGpsTranslationOwned?.() === true;
+  const liveGpsDriveTarget = liveGpsOwnsDrive
+    ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: appCtx.car.x, z: appCtx.car.z }) || null
+    : null;
+
   appCtx.updateInteriorInteraction?.();
 
   const actions = appCtx.readControlActions?.('drive') || {};
@@ -189,8 +204,33 @@ function update(dt) {
     boostDecayFactor = Math.max(0, appCtx.car.boostDecayTime / 1.5);
   }
 
+  const vehicleHandling = vehicleHandlingProfile(appCtx.car.vehicleVariantId || 'sedan', {
+    serviceType: appCtx.car.vehicleServiceType || ''
+  });
+  const vehicleCondition = vehicleConditionDynamics(appCtx.car.condition ?? 1);
+  const characterVehicle = groundVehicleTuning(appCtx.resolveCharacterCapability?.('ground-vehicle', {
+    vehicleAvailable: true,
+    environment: appCtx.getEnv?.() || (isPlanetarySurface() ? 'PLANETARY' : 'EARTH')
+  }));
+  appCtx.car.handlingProfile = vehicleHandling;
+  appCtx.car.characterHandling = characterVehicle;
   let maxSpd, friction, accel;
-  let planetaryNormalMaxSpd = appCtx.onMars ? 18 : 24;
+  const planetaryBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
+  const planetaryDriveProfile = {
+    moon: { normal: 24, boost: 29, accel: 0.82, boostAccel: 0.76 },
+    mars: { normal: 18, boost: 22, accel: 0.72, boostAccel: 0.66 },
+    mercury: { normal: 20, boost: 24, accel: 0.74, boostAccel: 0.68 },
+    venus: { normal: 10, boost: 12, accel: 0.55, boostAccel: 0.5 },
+    io: { normal: 14, boost: 17, accel: 0.62, boostAccel: 0.56 },
+    europa: { normal: 12, boost: 15, accel: 0.5, boostAccel: 0.46 },
+    titan: { normal: 16, boost: 19, accel: 0.64, boostAccel: 0.58 },
+    enceladus: { normal: 9, boost: 12, accel: 0.42, boostAccel: 0.38 },
+    triton: { normal: 12, boost: 15, accel: 0.5, boostAccel: 0.45 },
+    ceres: { normal: 10, boost: 13, accel: 0.46, boostAccel: 0.41 },
+    vesta: { normal: 9, boost: 12, accel: 0.44, boostAccel: 0.39 },
+    pluto: { normal: 11, boost: 14, accel: 0.48, boostAccel: 0.43 }
+  }[planetaryBodyId] || { normal: 18, boost: 22, accel: 0.7, boostAccel: 0.64 };
+  let planetaryNormalMaxSpd = planetaryDriveProfile.normal;
 
   // We'll keep a single road query result for this frame (and optional precision check later)
   let nr = null;
@@ -199,15 +239,13 @@ function update(dt) {
     appCtx.car.onRoad = false;
     appCtx.car.road = null;
 
-    const moonMaxSpeed = appCtx.onMars ? 18 : 24;
-    const moonBoostSpeed = appCtx.onMars ? 22 : 29;
-    const moonBaseAccel = appCtx.CFG.accel * (appCtx.onMars ? 0.72 : 0.82);
-    const moonBoostAccel = appCtx.CFG.boostAccel * (appCtx.onMars ? 0.66 : 0.76);
+    const planetaryBaseAccel = appCtx.CFG.accel * planetaryDriveProfile.accel;
+    const planetaryBoostAccel = appCtx.CFG.boostAccel * planetaryDriveProfile.boostAccel;
 
-    maxSpd = appCtx.car.boost ? moonBoostSpeed : moonMaxSpeed;
-    planetaryNormalMaxSpd = moonMaxSpeed;
+    maxSpd = appCtx.car.boost ? planetaryDriveProfile.boost : planetaryDriveProfile.normal;
+    planetaryNormalMaxSpd = planetaryDriveProfile.normal;
     friction = appCtx.CFG.friction; // same as Earth road
-    accel = appCtx.car.boost ? moonBoostAccel : moonBaseAccel;
+    accel = appCtx.car.boost ? planetaryBoostAccel : planetaryBaseAccel;
   } else {
     const forceCheck = !_cachedNearRoad;
 
@@ -233,23 +271,32 @@ function update(dt) {
       if (appCtx.car._roadContinuityTimer <= 0) appCtx.car.road = null;
     }
 
-    maxSpd = appCtx.car.boost ? appCtx.CFG.boostMax : appCtx.CFG.maxSpd;
+    const vehicleMaxSpd = mphToCarSpeed(vehicleHandling.topSpeedMph);
+    maxSpd = Math.min(vehicleMaxSpd, appCtx.car.boost ? appCtx.CFG.boostMax : appCtx.CFG.maxSpd);
     friction = appCtx.CFG.friction;
-    accel = appCtx.car.boost ? appCtx.CFG.boostAccel : appCtx.CFG.accel;
+    accel = (appCtx.car.boost ? appCtx.CFG.boostAccel : appCtx.CFG.accel) * vehicleHandling.accelerationScale;
   }
 
   const surfaceDynamics = updateVehicleSurface(appCtx, dt);
   maxSpd *= surfaceDynamics.topSpeed;
   friction *= surfaceDynamics.rolling;
   accel *= surfaceDynamics.accel;
+  if (!isPlanetarySurface()) {
+    maxSpd *= vehicleCondition.topSpeedScale;
+    accel *= vehicleCondition.accelerationScale;
+  }
+  accel *= characterVehicle.accelerationScale;
 
   const spd = Math.abs(appCtx.car.speed);
-  const canAccelerate = !appCtx.car.isAirborne;
+  const hasGroundControl = !appCtx.car.isAirborne;
+  const canAccelerate = hasGroundControl && (isPlanetarySurface() || vehicleCondition.operable);
   const driftBrakeSpeed = 10;
   const earthDriftBrakeIntent = !isPlanetarySurface() && braking && (left || right) && spd > driftBrakeSpeed;
 
-  if (driveCommand.serviceBrake && canAccelerate) {
-    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18);
+  if (driveCommand.serviceBrake && hasGroundControl) {
+    const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) *
+      (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) *
+      characterVehicle.brakingScale;
     const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
     appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
     if (nextMagnitude < 0.5) appCtx.car.speed = 0;
@@ -264,7 +311,7 @@ function update(dt) {
     appCtx.car.speed += throttleAccel * driveCommand.forward * (1 - spd / maxSpd * 0.7) * dt;
   }
 
-  if (braking && spd > 0.5 && canAccelerate) {
+  if (braking && spd > 0.5 && hasGroundControl) {
     if (earthDriftBrakeIntent) {
       // Handbrake-like brake response: keep momentum so brake+steer can initiate drift.
       const driftBrakeRate = 0.72;
@@ -289,7 +336,9 @@ function update(dt) {
   appCtx.car.speed = Math.max(-maxSpd * 0.3, Math.min(maxSpd, appCtx.car.speed));
 
   if (boostDecayFactor > 0 && !appCtx.car.boost) {
-    const normalMaxSpd = isPlanetarySurface() ? planetaryNormalMaxSpd : appCtx.CFG.maxSpd;
+    const normalMaxSpd = isPlanetarySurface()
+      ? planetaryNormalMaxSpd
+      : Math.min(appCtx.CFG.maxSpd, mphToCarSpeed(vehicleHandling.topSpeedMph));
     if (Math.abs(appCtx.car.speed) > normalMaxSpd) {
       const targetSpeed = normalMaxSpd + (Math.abs(appCtx.car.speed) - normalMaxSpd) * boostDecayFactor;
       const sign = appCtx.car.speed >= 0 ? 1 : -1;
@@ -304,7 +353,7 @@ function update(dt) {
   const steerInput = steerControl;
   const throttleInput = gas && !reverse ? throttleControl : 0;
 
-  const steerSmooth = 1 - Math.exp(-dt * 14);
+  const steerSmooth = 1 - Math.exp(-dt * 14 * characterVehicle.steeringResponseScale);
   const throttleSmooth = 1 - Math.exp(-dt * 6);
   if (Math.abs(steerInput) > 0.05 && steerInput * appCtx.car.steerSm < 0) {
     // A deliberate steering reversal must not spend visible frames applying
@@ -332,7 +381,7 @@ function update(dt) {
   const earthSteering = earthDrivingSteeringProfile(carSpeedToMph(spdAbs));
   const maxSteer = isPlanetarySurface()
     ? 1.02 + (0.28 - 1.02) * Math.max(0, Math.min(1, (spdAbs - 5) / 90))
-    : earthSteering.maxSteeringAngle;
+    : earthSteering.maxSteeringAngle * vehicleHandling.steeringScale * vehicleCondition.steeringScale * characterVehicle.steeringAngleScale;
 
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
@@ -369,7 +418,7 @@ function update(dt) {
   const isDrifting = driftStartIntent || !!appCtx.car.isDrifting && driftCanSustain;
 
   // Surface grip baseline using existing runtime config values.
-  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip;
+  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip * (isPlanetarySurface() ? 1 : vehicleHandling.gripScale * vehicleCondition.gripScale);
 
   // Moon handling remains unchanged by drift tuning.
   if (isPlanetarySurface()) gripBase = 1.0;
@@ -409,7 +458,12 @@ function update(dt) {
     }
   }
 
-  const wheelBase = 2.6;
+  if (!isDrifting) {
+    latDamp *= characterVehicle.recoveryScale;
+    yawResponse *= characterVehicle.steeringResponseScale;
+  }
+
+  const wheelBase = isPlanetarySurface() ? 2.6 : vehicleHandling.wheelBase;
   const v = isPlanetarySurface()
     ? appCtx.car.speed
     : carSpeedToWorldUnitsPerSecond(appCtx.car.speed, appCtx.METERS_PER_WORLD_UNIT);
@@ -420,7 +474,10 @@ function update(dt) {
   if (!isPlanetarySurface() && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= 1.22;
   }
-  const maxYawRate = isPlanetarySurface() ? Infinity : earthSteering.maxYawRate;
+  const radiusAuthority = Math.max(.76, Math.min(1.22, 5.2 / vehicleHandling.turningRadius));
+  const maxYawRate = isPlanetarySurface()
+    ? Infinity
+    : earthSteering.maxYawRate * vehicleHandling.steeringScale * radiusAuthority * characterVehicle.steeringAngleScale;
   const yawRateTarget = arcadeSteeringYawTarget(
     v,
     steerAngle * steerAuthority,
@@ -436,7 +493,7 @@ function update(dt) {
   } else if (!isDrifting) {
     appCtx.car.yawRate *= Math.exp(-dt * yawDamp * 0.08);
   }
-  if (canAccelerate) {
+  if (hasGroundControl) {
     appCtx.car.angle += appCtx.car.yawRate * dt;
   } else {
     appCtx.car.yawRate *= Math.exp(-dt * 2.0);
@@ -499,6 +556,9 @@ function update(dt) {
   }
   appCtx.car.isDrifting = isDrifting;
 
+  if (liveGpsDriveTarget && Number.isFinite(liveGpsDriveTarget.headingDegrees)) {
+    appCtx.car.angle = Math.PI - liveGpsDriveTarget.headingDegrees * Math.PI / 180;
+  }
   const sinA = Math.sin(appCtx.car.angle),cosA = Math.cos(appCtx.car.angle);
   const lateralVelForPosition = !isPlanetarySurface() && isDrifting ?
     appCtx.car.vLat * 0.34 :
@@ -539,6 +599,10 @@ function update(dt) {
     nx = appCtx.car.x + appCtx.car.vx * dt;
     nz = appCtx.car.z + appCtx.car.vz * dt;
   }
+  if (liveGpsDriveTarget) {
+    nx = liveGpsDriveTarget.x;
+    nz = liveGpsDriveTarget.z;
+  }
 
   // Building collisions remain enforced without a second terrain-handling mode.
 
@@ -551,6 +615,26 @@ function update(dt) {
     );
     nx = resolved.x;
     nz = resolved.z;
+    if (typeof appCtx.resolveUrbanActorCollision === 'function') {
+      const actorCollision = appCtx.resolveUrbanActorCollision(
+        { x: appCtx.car.x, z: appCtx.car.z },
+        { x: nx, z: nz },
+        {
+          mode: 'drive',
+          radius: .92,
+          speedMph: carSpeedToMph(appCtx.car.speed),
+          velocityX: appCtx.car.vx,
+          velocityZ: appCtx.car.vz
+        }
+      );
+      nx = actorCollision.x;
+      nz = actorCollision.z;
+      if (actorCollision.collision && !actorCollision.responseApplied) {
+        appCtx.car.speed *= .18;
+        appCtx.car.vFwd *= .18;
+        appCtx.car.vLat *= .12;
+      }
+    }
   }
 
   if (typeof appCtx.getBuildVehicleContact === 'function') {
@@ -578,6 +662,14 @@ function update(dt) {
 
   appCtx.car.x = nx;
   appCtx.car.z = nz;
+  if (liveGpsDriveTarget) {
+    const gpsMph = Math.max(0, Number(liveGpsDriveTarget.speedMps || 0) * 2.236936);
+    appCtx.car.speed = mphToCarSpeed(gpsMph);
+    appCtx.car.vFwd = appCtx.car.speed;
+    appCtx.car.vLat = 0;
+    appCtx.car.rearSlip = 0;
+    appCtx.car.isDrifting = false;
+  }
 
   let carY = 1.2;
 
@@ -600,6 +692,7 @@ function update(dt) {
       preferRoad: !!appCtx.car.onRoad,
       nearestRoad: appCtx.car.onRoad ? nr : null
     }, dt, Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined);
+    appCtx.car.groundContact = groundContact;
     let surfaceY = stabilizeEarthVehicleSurfaceY(
       groundContact?.supportY,
       appCtx.car._lastSurfaceY,

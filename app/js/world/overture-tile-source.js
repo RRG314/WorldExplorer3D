@@ -1,6 +1,16 @@
-import { getVectorTileLib } from './shortbread-source.js?v=17';
+import { getVectorTileLib } from './shortbread-source.js?v=19';
 
-const OVERTURE_RELEASE = '2026-06-17.0';
+// Overture retains public releases for a bounded window. Keep the reviewed
+// release explicit so one immutable application build never changes datasets
+// underneath the player. Release reachability and age are enforced by the
+// source/release gates before a candidate can be accepted.
+const OVERTURE_RELEASE = '2026-08-19.0';
+const OVERTURE_RELEASE_POLICY = Object.freeze({
+  authority: 'build-pinned-reviewed-overture-release',
+  release: OVERTURE_RELEASE,
+  reviewedOn: '2026-08-21',
+  publicRetentionDays: 60
+});
 const OVERTURE_THEME_ZOOM = Object.freeze({
   base: 13,
   buildings: 14,
@@ -105,6 +115,7 @@ async function fetchOvertureThemeTile(theme, z, x, y, options = {}) {
 
 export {
   OVERTURE_RELEASE,
+  OVERTURE_RELEASE_POLICY,
   OVERTURE_THEME_ZOOM,
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl,

@@ -1,11 +1,13 @@
 export const ROAD_CAR_CONFIG = Object.freeze({
   // Simulation speed is 2 units per displayed MPH. Keep the road-car envelope
   // in one importable data contract so physics and verification share values.
-  maxSpd: 180,
-  accel: 80,
-  boostAccel: 120,
+  maxSpd: 240,
+  accel: 108,
+  boostAccel: 156,
   brake: 150,
   friction: 25,
+  // Boost improves acceleration and recovery, but never exceeds the advertised
+  // 120 mph road-car ceiling.
   boostMax: 240,
   boostDur: 2.5,
   brakeForce: 4.0,

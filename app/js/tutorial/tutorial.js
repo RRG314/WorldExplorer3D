@@ -1,672 +1,490 @@
-import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createTutorialUi } from "./ui.js?v=1";
+import { ctx as appCtx } from '../shared-context.js?v=55';
+import { createTutorialUi } from './ui.js?v=4';
 
-const STORAGE_KEY = 'worldExplorer3D.tutorialState.v1';
+const STORAGE_KEY = 'worldExplorer3D.tutorialState.v3';
+const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v2';
+const TUTORIAL_VERSION = 3;
+const CORE_JOURNEY_ID = 'first-journey';
+const MOVE_TARGET_METERS = 8;
 
-const STAGES = {
-  AWAIT_GLOBE: 'await_globe',
-  MOVE_HINT: 'move_hint',
-  MODE_HINT: 'mode_hint',
-  SPACE_HINT: 'space_hint',
-  SPACE_FLY: 'space_fly',
-  MOON_HINT: 'moon_hint',
-  MOON_MOVE: 'moon_move',
-  RETURN_HINT: 'return_hint',
-  BUILD_HINT: 'build_hint',
-  ROOM_HINT: 'room_hint',
-  INVITE_HINT: 'invite_hint',
+const STAGES = Object.freeze({
+  MOVE: 'move',
+  PACK: 'pack',
+  EXPLORER: 'explorer',
+  CHOOSE: 'choose',
   COMPLETE: 'complete'
-};
-
-const STAGE_ORDER = [
-  STAGES.AWAIT_GLOBE,
-  STAGES.MOVE_HINT,
-  STAGES.MODE_HINT,
-  STAGES.SPACE_HINT,
-  STAGES.SPACE_FLY,
-  STAGES.MOON_HINT,
-  STAGES.MOON_MOVE,
-  STAGES.RETURN_HINT,
-  STAGES.BUILD_HINT,
-  STAGES.ROOM_HINT,
-  STAGES.INVITE_HINT,
-  STAGES.COMPLETE
-];
-
-function clampStage(stage) {
-  return STAGE_ORDER.includes(stage) ? stage : STAGES.AWAIT_GLOBE;
-}
-
-function normalizeShownStages(value) {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  const out = [];
-  value.forEach((entry) => {
-    const stage = String(entry || '');
-    if (!STAGE_ORDER.includes(stage) || seen.has(stage)) return;
-    seen.add(stage);
-    out.push(stage);
-  });
-  return out;
-}
+});
+const STAGE_ORDER = [STAGES.MOVE, STAGES.PACK, STAGES.EXPLORER, STAGES.CHOOSE, STAGES.COMPLETE];
+const STAGE_NUMBER = Object.freeze({ move: 1, pack: 2, explorer: 3, choose: 4, complete: 4 });
+const CORE_STAGE_COUNT = 4;
 
 function safeCall(fn, ...args) {
-  if (typeof fn === 'function') {
-    try {
-      fn(...args);
-    } catch (_) {
-      // Keep tutorial non-fatal.
-    }
+  if (typeof fn !== 'function') return undefined;
+  try { return fn(...args); } catch { return undefined; }
+}
+
+function tutorialTelemetry(name, params = {}) {
+  const detail = {
+    name,
+    params: { journey_id: CORE_JOURNEY_ID, tutorial_version: TUTORIAL_VERSION, ...params }
+  };
+  if (globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ === true) {
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:tutorial-telemetry', { detail }));
+    return;
   }
+  const queue = globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__ ||= [];
+  queue.push(detail);
+  if (queue.length > 24) queue.splice(0, queue.length - 24);
+}
+
+function defaultState() {
+  return {
+    version: TUTORIAL_VERSION,
+    enabled: true,
+    completed: false,
+    skipped: false,
+    stage: STAGES.MOVE,
+    distanceMoved: 0,
+    startedAtMs: 0,
+    completedAtMs: 0,
+    analyticsBegan: false,
+    contextSeen: {}
+  };
 }
 
 const runtime = {
   initialized: false,
-  state: {
-    enabled: true,
-    completed: false,
-    stage: STAGES.AWAIT_GLOBE,
-    worldSeconds: 0,
-    moonSeconds: 0,
-    modeSwitchCount: 0,
-    moonModeSwitchCount: 0,
-    buildInteracted: false,
-    roomInteracted: false,
-    openedMainMenu: false,
-    openedRoomsMenu: false,
-    selectedLocation: false,
-    spawned: false,
-    inSpace: false,
-    inMoon: false,
-    shownStages: []
-  },
-  stageShown: new Set(),
+  state: defaultState(),
+  sessionPresented: new Set(),
   dismissTimer: 0,
   currentButtonAction: null,
+  currentStage: '',
+  movementOrigin: null,
+  lastPosition: null,
+  discoveryListener: null,
   card: null,
+  eyebrowEl: null,
   titleEl: null,
   bodyEl: null,
+  progressEl: null,
   actionBtn: null,
+  laterBtn: null,
+  skipBtn: null,
   closeBtn: null,
+  detailsBtn: null,
   settingsMount: null,
   settingsStatus: null,
   settingsToggle: null,
   settingsRestartBtn: null,
   previous: {
     gameStarted: false,
-    mode: '',
     inSpace: false,
     inMoon: false,
-    roomCode: '',
     roomPanelOpen: false,
     buildModeOn: false,
-    titleVisible: true
+    backpackOpen: false,
+    explorerOpen: false
   }
 };
 
+function normalizeState(input) {
+  const base = defaultState();
+  const stage = STAGE_ORDER.includes(input?.stage) ? input.stage : STAGES.MOVE;
+  return {
+    ...base,
+    enabled: input?.enabled !== false,
+    completed: input?.completed === true,
+    skipped: input?.skipped === true,
+    stage: input?.completed === true ? STAGES.COMPLETE : stage,
+    distanceMoved: Math.max(0, Number(input?.distanceMoved) || 0),
+    startedAtMs: Math.max(0, Number(input?.startedAtMs) || 0),
+    completedAtMs: Math.max(0, Number(input?.completedAtMs) || 0),
+    analyticsBegan: input?.analyticsBegan === true,
+    contextSeen: input?.contextSeen && typeof input.contextSeen === 'object' ? { ...input.contextSeen } : {}
+  };
+}
+
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    const stage = clampStage(String(parsed.stage || STAGES.AWAIT_GLOBE));
-    return {
-      enabled: parsed.enabled !== false,
-      completed: parsed.completed === true,
-      stage,
-      worldSeconds: Number.isFinite(Number(parsed.worldSeconds)) ? Math.max(0, Number(parsed.worldSeconds)) : 0,
-      moonSeconds: Number.isFinite(Number(parsed.moonSeconds)) ? Math.max(0, Number(parsed.moonSeconds)) : 0,
-      modeSwitchCount: Number.isFinite(Number(parsed.modeSwitchCount)) ? Math.max(0, Number(parsed.modeSwitchCount)) : 0,
-      moonModeSwitchCount: Number.isFinite(Number(parsed.moonModeSwitchCount)) ? Math.max(0, Number(parsed.moonModeSwitchCount)) : 0,
-      buildInteracted: parsed.buildInteracted === true,
-      roomInteracted: parsed.roomInteracted === true,
-      openedMainMenu: parsed.openedMainMenu === true,
-      openedRoomsMenu: parsed.openedRoomsMenu === true,
-      selectedLocation: parsed.selectedLocation === true,
-      spawned: parsed.spawned === true,
-      inSpace: parsed.inSpace === true,
-      inMoon: parsed.inMoon === true,
-      shownStages: normalizeShownStages(parsed.shownStages)
-    };
+    const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (current && typeof current === 'object') return normalizeState(current);
+    const previous = JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY) || 'null');
+    if (previous && typeof previous === 'object') {
+      return normalizeState({
+        enabled: previous.enabled !== false,
+        completed: false,
+        skipped: false,
+        stage: STAGES.MOVE,
+        contextSeen: previous.contextSeen
+      });
+    }
   } catch {
-    return null;
+    // Storage failures must never block play.
   }
+  return defaultState();
 }
 
 function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(runtime.state));
-  } catch {
-    // Ignore quota/private mode failures.
-  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(runtime.state)); } catch { /* non-fatal */ }
 }
 
 const tutorialUi = createTutorialUi({
   runtime,
   safeCall,
+  onLater: () => dismissCurrentPrompt('not_now'),
+  onSkip: () => disableTutorial(),
   setTutorialEnabled: (enabled) => setTutorialEnabled(enabled),
   restartTutorial: () => restartTutorial()
 });
-const { createCardIfNeeded, ensureSettingsControls, hidePrompt, updateSettingsStatus } = tutorialUi;
+const { createCardIfNeeded, ensureSettingsControls, hidePrompt, updateSettingsStatus, setExpanded } = tutorialUi;
 
-function showPrompt(stage, config) {
-  if (!runtime.state.enabled || runtime.state.completed) {
-    hidePrompt();
-    return;
-  }
-  if (!config || runtime.stageShown.has(stage)) return;
-  const shownStages = Array.isArray(runtime.state.shownStages) ? runtime.state.shownStages : [];
-  if (shownStages.includes(stage)) return;
+function playerPosition() {
+  const target = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker
+    ? appCtx.Walk.state.walker
+    : appCtx.boatMode?.active
+      ? appCtx.boat
+      : appCtx.droneMode
+        ? appCtx.drone
+        : appCtx.planeMode?.active
+          ? appCtx.planeMode
+          : appCtx.car;
+  const x = Number(target?.x);
+  const z = Number(target?.z);
+  return Number.isFinite(x) && Number.isFinite(z) ? { x, z } : null;
+}
+
+function showPrompt(stage, config = {}) {
+  if (!runtime.state.enabled || runtime.state.skipped || (runtime.state.completed && !config.contextual)) return false;
+  if (!config.contextual && runtime.sessionPresented.has(stage)) return false;
+  if (uiBlocksTutorial()) return false;
   createCardIfNeeded();
-  if (!runtime.card || !runtime.titleEl || !runtime.bodyEl || !runtime.actionBtn) return;
-
-  runtime.stageShown.add(stage);
-  shownStages.push(stage);
-  runtime.state.shownStages = shownStages;
-  saveState();
-  runtime.titleEl.textContent = String(config.title || 'Next Tip');
-  runtime.bodyEl.textContent = String(config.body || '');
-
-  const hasAction = typeof config.onAction === 'function' && config.actionLabel;
-  runtime.actionBtn.style.display = hasAction ? 'inline-flex' : 'none';
-  runtime.actionBtn.textContent = hasAction ? String(config.actionLabel) : '';
-  runtime.currentButtonAction = hasAction ? config.onAction : null;
-  runtime.card.style.display = 'block';
+  if (!runtime.card) return false;
+  runtime.sessionPresented.add(stage);
+  runtime.currentStage = stage;
+  runtime.currentButtonAction = typeof config.onAction === 'function' ? config.onAction : null;
+  runtime.eyebrowEl.textContent = config.eyebrow || `First Journey · ${STAGE_NUMBER[stage] || 1} of ${CORE_STAGE_COUNT}`;
+  runtime.titleEl.textContent = config.title || 'Try this next';
+  runtime.bodyEl.textContent = config.body || '';
+  runtime.progressEl.style.width = `${Math.max(8, Math.min(100, Number(config.progress) || (STAGE_NUMBER[stage] / CORE_STAGE_COUNT * 100)))}%`;
+  runtime.actionBtn.hidden = !(config.actionLabel && runtime.currentButtonAction);
+  runtime.actionBtn.textContent = config.actionLabel || '';
+  runtime.skipBtn.hidden = config.contextual === true;
+  runtime.card.hidden = false;
+  setExpanded(config.expanded === true);
+  tutorialTelemetry('we3d_tutorial_step', { action: 'presented', step_id: stage });
 
   if (runtime.dismissTimer) clearTimeout(runtime.dismissTimer);
-  const autoHideMs = Number.isFinite(Number(config.autoHideMs)) ? Math.max(2400, Number(config.autoHideMs)) : 7600;
-  runtime.dismissTimer = setTimeout(() => {
-    runtime.dismissTimer = 0;
-    hidePrompt();
-  }, autoHideMs);
-}
-
-function markCompleted() {
-  runtime.state.completed = true;
-  runtime.state.stage = STAGES.COMPLETE;
-  saveState();
-  updateSettingsStatus('Tutorial complete. Use Restart Tutorial to run it again.');
-  showPrompt(STAGES.COMPLETE, {
-    title: 'Tutorial Complete',
-    body: 'You can keep exploring or try another location from the main menu.',
-    autoHideMs: 9500
-  });
-}
-
-function setStage(nextStage) {
-  const clamped = clampStage(nextStage);
-  if (runtime.state.stage === clamped) return;
-  runtime.state.stage = clamped;
-  saveState();
-  presentCurrentStage();
-}
-
-function getCurrentTravelMode() {
-  if (appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.isEnv(appCtx.ENV?.SPACE_FLIGHT))) return 'space';
-  if (appCtx.onMoon) return 'moon';
-  if (appCtx.planeMode?.active) return 'plane';
-  if (appCtx.droneMode) return 'drone';
-  if (appCtx.Walk?.state?.mode === 'walk') return 'walk';
-  return 'drive';
-}
-
-function requestSpaceTransition() {
-  if (typeof appCtx.travelToMoon === 'function' && !appCtx.onMoon && !appCtx.travelingToMoon) {
-    appCtx.travelToMoon();
+  runtime.dismissTimer = 0;
+  if (config.contextual) {
+    runtime.dismissTimer = window.setTimeout(() => dismissCurrentPrompt('auto_hidden'), Math.max(6000, Number(config.autoHideMs) || 10000));
   }
+  return true;
 }
 
-function requestMoonTransition() {
-  if (appCtx.spaceFlight?.active && typeof appCtx.forceSpaceFlightLanding === 'function') {
-    if (typeof appCtx.setSpaceFlightLandingTarget === 'function') {
-      appCtx.setSpaceFlightLandingTarget('moon');
-    }
-    appCtx.forceSpaceFlightLanding();
-    return;
-  }
-  if (typeof appCtx.directTravelToMoon === 'function' && !appCtx.onMoon && !appCtx.travelingToMoon) {
-    appCtx.directTravelToMoon();
-  }
+function dismissCurrentPrompt(action = 'not_now') {
+  if (runtime.currentStage) tutorialTelemetry('we3d_tutorial_step', { action, step_id: runtime.currentStage });
+  hidePrompt();
 }
 
-function requestEarthReturn() {
-  if (typeof appCtx.returnToEarth === 'function' && appCtx.onMoon && !appCtx.travelingToMoon) {
-    appCtx.returnToEarth();
-    return;
-  }
-  if (appCtx.spaceFlight?.active && typeof appCtx.startSpaceFlightToEarth === 'function') {
-    appCtx.startSpaceFlightToEarth();
-  }
+function openBackpack() {
+  const menuItem = document.getElementById('fBackpack');
+  if (menuItem instanceof HTMLElement) menuItem.click();
+  else appCtx.toggleUrbanEquipment?.(true);
 }
 
-function requestBuildMode() {
-  if (typeof appCtx.toggleBlockBuildMode === 'function') {
-    appCtx.toggleBlockBuildMode(true);
-  }
+function openExplorer() {
+  const menuItem = document.getElementById('fWorldDiscovery');
+  if (menuItem instanceof HTMLElement) menuItem.click();
+  else appCtx.toggleWorldDiscoveryJournal?.(true);
 }
 
-function requestRoomPanel() {
-  const panelBtn = document.getElementById('mpTitlePanelBtn');
-  const joinBtn = document.getElementById('fMpJoin');
-  if (panelBtn instanceof HTMLElement) {
-    panelBtn.click();
-    return;
-  }
-  if (joinBtn instanceof HTMLElement) {
-    joinBtn.click();
-  }
-}
-
-function requestGlobeOpen() {
-  safeCall(appCtx.openGlobeSelector);
+function openTravelMenu() {
+  document.getElementById('exploreBtn')?.click();
 }
 
 function presentCurrentStage() {
-  if (!runtime.state.enabled || runtime.state.completed) {
+  if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !appCtx.gameStarted) {
     hidePrompt();
     return;
   }
-
-  const stage = runtime.state.stage;
-  if (stage === STAGES.AWAIT_GLOBE) {
-    showPrompt(stage, {
-      title: 'Pick a Place on Earth',
-      body: 'Play starts from the globe selector.\nTip: search still works for city names or exact coordinates.',
-      actionLabel: 'Open Globe',
-      onAction: requestGlobeOpen,
-      autoHideMs: 9000
+  if (runtime.state.stage === STAGES.MOVE) {
+    const touchControls = appCtx.getMobileTouchInputSnapshot?.().enabled === true;
+    showPrompt(STAGES.MOVE, {
+      title: 'Move and look around',
+      body: touchControls
+        ? 'Use the left control to move and the right control to look. Travel a short distance so the camera and movement feel familiar.'
+        : 'Use the arrow keys to move and turn. WASD looks around, and Shift runs.',
+      progress: 25
     });
-    return;
+  } else if (runtime.state.stage === STAGES.PACK) {
+    showPrompt(STAGES.PACK, {
+      title: 'Open your Backpack',
+      body: 'Your tools, finds, gear, and six quick slots live in one place. Open it now; you do not need to equip anything yet.',
+      actionLabel: 'Open Backpack',
+      onAction: openBackpack,
+      progress: 50
+    });
+  } else if (runtime.state.stage === STAGES.EXPLORER) {
+    showPrompt(STAGES.EXPLORER, {
+      title: 'Open My Explorer',
+      body: 'This is the home for Field Today, activities, Journal records, the Field Guide, companions, and your Explorer progress.',
+      actionLabel: 'Open My Explorer',
+      onAction: openExplorer,
+      progress: 75
+    });
+  } else if (runtime.state.stage === STAGES.CHOOSE) {
+    showPrompt(STAGES.CHOOSE, {
+      title: 'Choose how to explore',
+      body: 'Start an activity in My Explorer, or try another travel mode. There is no required route through the sandbox.',
+      actionLabel: 'Open Travel Modes',
+      onAction: openTravelMenu,
+      progress: 94
+    });
   }
+}
 
-  if (stage === STAGES.MOVE_HINT) {
-    showPrompt(stage, {
-      title: 'Try Moving Around',
-      body: 'Walk controls:\nW/S move, A/D turn, arrow keys look, Space jumps, and Shift runs.',
-      autoHideMs: 9600
-    });
-    return;
-  }
+function setStage(nextStage, reason = 'progress') {
+  if (!STAGE_ORDER.includes(nextStage) || runtime.state.stage === nextStage) return false;
+  const previous = runtime.state.stage;
+  runtime.state.stage = nextStage;
+  runtime.sessionPresented.delete(nextStage);
+  saveState();
+  tutorialTelemetry('we3d_tutorial_step', { action: 'completed', step_id: previous, result: reason });
+  presentCurrentStage();
+  updateSettingsStatus(`First Journey: ${Math.min(CORE_STAGE_COUNT, STAGE_NUMBER[nextStage] || 1)} of ${CORE_STAGE_COUNT}.`);
+  return true;
+}
 
-  if (stage === STAGES.MODE_HINT) {
-    showPrompt(stage, {
-      title: 'Switch Travel Modes',
-      body: 'Use the right-side buttons to choose Walk, Driving, or Drone.\nKeyboard: F cycles through all three travel modes.',
-      autoHideMs: 9800
-    });
-    return;
-  }
+function completeTutorial(reason = 'path_chosen') {
+  if (runtime.state.completed) return;
+  const completedStep = runtime.state.stage;
+  runtime.state.completed = true;
+  runtime.state.skipped = false;
+  runtime.state.stage = STAGES.COMPLETE;
+  runtime.state.completedAtMs = Date.now();
+  saveState();
+  tutorialTelemetry('we3d_tutorial_step', { action: 'completed', step_id: completedStep, result: reason });
+  tutorialTelemetry('tutorial_complete');
+  updateSettingsStatus('First Journey complete. Optional tips appear once when you enter an unfamiliar system.');
+  hidePrompt();
+  runtime.sessionPresented.delete('core_complete');
+  showPrompt('core_complete', {
+    contextual: true,
+    eyebrow: 'First Journey complete',
+    title: 'Explore your way',
+    body: 'My Explorer remembers what you learn. Your Backpack carries what you use. Travel modes change how you move through the same world.',
+    progress: 100,
+    expanded: true,
+    autoHideMs: 12000
+  });
+}
 
-  if (stage === STAGES.SPACE_HINT) {
-    showPrompt(stage, {
-      title: 'Try Going to Space',
-      body: 'Use the travel menu to launch a space flight, then explore around Earth.',
-      actionLabel: 'Go To Space',
-      onAction: requestSpaceTransition,
-      autoHideMs: 9800
-    });
-    return;
-  }
+function disableTutorial() {
+  runtime.state.enabled = false;
+  runtime.state.skipped = true;
+  saveState();
+  tutorialTelemetry('we3d_tutorial_step', { action: 'disabled', step_id: runtime.state.stage });
+  updateSettingsStatus('Guidance is off. Your game progress is unchanged, and First Journey can be replayed here.');
+  hidePrompt();
+}
 
-  if (stage === STAGES.SPACE_FLY) {
-    showPrompt(stage, {
-      title: 'Fly Around Earth',
-      body: 'In space flight: Arrow keys steer, Space thrust, Shift brake.',
-      autoHideMs: 9000
-    });
-    return;
-  }
-
-  if (stage === STAGES.MOON_HINT) {
-    showPrompt(stage, {
-      title: 'Try the Moon',
-      body: 'Land on the Moon next to continue the walkthrough.',
-      actionLabel: 'Go To Moon',
-      onAction: requestMoonTransition,
-      autoHideMs: 9800
-    });
-    return;
-  }
-
-  if (stage === STAGES.MOON_MOVE) {
-    showPrompt(stage, {
-      title: 'Explore the Moon',
-      body: 'Try walking or driving on the Moon surface, then switch modes once.',
-      autoHideMs: 9200
-    });
-    return;
-  }
-
-  if (stage === STAGES.RETURN_HINT) {
-    showPrompt(stage, {
-      title: 'Return to Earth',
-      body: 'Head back to Earth and try building something at your location.',
-      actionLabel: 'Return To Earth',
-      onAction: requestEarthReturn,
-      autoHideMs: 9800
-    });
-    return;
-  }
-
-  if (stage === STAGES.BUILD_HINT) {
-    showPrompt(stage, {
-      title: 'Build Something',
-      body: 'Open Land & Property and choose Build with Blocks, or place an artifact in a room.',
-      actionLabel: 'Open Build with Blocks',
-      onAction: requestBuildMode,
-      autoHideMs: 9800
-    });
-    return;
-  }
-
-  if (stage === STAGES.ROOM_HINT) {
-    showPrompt(stage, {
-      title: 'Share It With a Room',
-      body: 'Create or join a room to share this place in multiplayer.',
-      actionLabel: 'Open Room Panel',
-      onAction: requestRoomPanel,
-      autoHideMs: 9800
-    });
-    return;
-  }
-
-  if (stage === STAGES.INVITE_HINT) {
-    showPrompt(stage, {
-      title: 'Invite Friends',
-      body: 'Open Main Menu -> Rooms -> Invite Link to share your room code.',
-      autoHideMs: 10200
-    });
+function showContextTip(id, config) {
+  if (!runtime.state.completed || !runtime.state.enabled || runtime.state.contextSeen[id]) return;
+  const presented = showPrompt(`context_${id}`, { ...config, contextual: true, progress: 100, autoHideMs: 9000 });
+  if (presented) {
+    runtime.state.contextSeen[id] = true;
+    saveState();
   }
 }
 
 function tutorialOnEvent(eventName, payload = {}) {
   if (!runtime.initialized) return;
-  if (!runtime.state.enabled || runtime.state.completed) return;
-
   const name = String(eventName || '');
-  if (!name) return;
-
-  if (name === 'location_selected') {
-    runtime.state.selectedLocation = true;
-    saveState();
-  }
-
   if (name === 'spawned_in_world') {
-    runtime.state.spawned = true;
-    runtime.state.worldSeconds = 0;
-    saveState();
-    setStage(STAGES.MOVE_HINT);
-    return;
+    runtime.movementOrigin = playerPosition();
+    runtime.lastPosition = runtime.movementOrigin;
+    presentCurrentStage();
+  } else if (name === 'opened_backpack' && runtime.state.stage === STAGES.PACK) {
+    setStage(STAGES.EXPLORER, 'backpack_opened');
+  } else if (name === 'opened_explorer' && runtime.state.stage === STAGES.EXPLORER) {
+    setStage(STAGES.CHOOSE, 'explorer_opened');
+  } else if (name === 'mode_switched' && runtime.state.stage === STAGES.CHOOSE) {
+    completeTutorial(`mode_${String(payload.mode || 'changed')}`);
+  } else if (name === 'build_mode_entered') {
+    showContextTip('building', {
+      eyebrow: 'Building tip',
+      title: 'Build in this world',
+      body: 'Build with Blocks and the Editor share the same placed-work authority. Save locally as you work; publish only when you choose.'
+    });
+  } else if (name === 'opened_rooms_menu' || name === 'room_created_or_toggled') {
+    showContextTip('rooms', {
+      eyebrow: 'Room tip',
+      title: 'Explore together',
+      body: 'Create or join a room when you want company. Room roles decide who can edit or moderate shared work.'
+    });
+  } else if (name === 'entered_space') {
+    showContextTip('space', {
+      eyebrow: 'Spaceflight tip',
+      title: 'Fly your own course',
+      body: 'Use the Wayfinder for direction or fly manually. Arrow keys steer, Space adds thrust, and Shift slows the ship.'
+    });
   }
-
-  if (name === 'mode_switched') {
-    runtime.state.modeSwitchCount += 1;
-    if (runtime.state.inMoon) runtime.state.moonModeSwitchCount += 1;
-    saveState();
-    if (runtime.state.stage === STAGES.MODE_HINT && runtime.state.modeSwitchCount >= 1) {
-      setStage(STAGES.SPACE_HINT);
-      return;
-    }
-    if (runtime.state.stage === STAGES.MOON_MOVE && runtime.state.moonModeSwitchCount >= 1) {
-      setStage(STAGES.RETURN_HINT);
-      return;
-    }
-  }
-
-  if (name === 'entered_space') {
-    runtime.state.inSpace = true;
-    runtime.state.inMoon = false;
-    saveState();
-    setStage(STAGES.SPACE_FLY);
-    return;
-  }
-
-  if (name === 'entered_moon') {
-    runtime.state.inMoon = true;
-    runtime.state.inSpace = false;
-    runtime.state.moonSeconds = 0;
-    saveState();
-    setStage(STAGES.MOON_MOVE);
-    return;
-  }
-
-  if (name === 'returned_to_earth') {
-    runtime.state.inMoon = false;
-    runtime.state.inSpace = false;
-    saveState();
-    if (runtime.state.stage === STAGES.RETURN_HINT || runtime.state.stage === STAGES.MOON_MOVE) {
-      setStage(STAGES.BUILD_HINT);
-      return;
-    }
-  }
-
-  if (name === 'build_mode_entered' || name === 'artifact_placed') {
-    runtime.state.buildInteracted = true;
-    saveState();
-    if (runtime.state.stage === STAGES.BUILD_HINT) {
-      setStage(STAGES.ROOM_HINT);
-      return;
-    }
-  }
-
-  if (name === 'room_created_or_toggled') {
-    runtime.state.roomInteracted = true;
-    saveState();
-    if (runtime.state.stage === STAGES.ROOM_HINT || runtime.state.stage === STAGES.BUILD_HINT) {
-      setStage(STAGES.INVITE_HINT);
-      return;
-    }
-  }
-
-  if (name === 'opened_main_menu') {
-    runtime.state.openedMainMenu = true;
-    saveState();
-  }
-
-  if (name === 'opened_rooms_menu') {
-    runtime.state.openedRoomsMenu = true;
-    saveState();
-  }
-
-  if (runtime.state.stage === STAGES.SPACE_FLY && runtime.state.inSpace) {
-    setStage(STAGES.MOON_HINT);
-    return;
-  }
-
-  if (runtime.state.stage === STAGES.INVITE_HINT && runtime.state.openedMainMenu && runtime.state.openedRoomsMenu) {
-    markCompleted();
-  }
-
-  if (payload && typeof payload === 'object' && payload.forceStage) {
-    setStage(clampStage(String(payload.forceStage)));
-  }
+  if (payload?.forceStage && STAGE_ORDER.includes(payload.forceStage)) setStage(payload.forceStage, 'forced');
 }
 
-function detectEventTransitions() {
-  const currentMode = getCurrentTravelMode();
-  if (runtime.previous.mode && runtime.previous.mode !== currentMode) {
-    tutorialOnEvent('mode_switched', { mode: currentMode });
-  }
-  runtime.previous.mode = currentMode;
+function onDiscoveryTelemetry(event) {
+  if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
+  const type = String(event?.detail?.type || '');
+  if (type !== 'activity_started') return;
+  if (runtime.state.stage === STAGES.EXPLORER) setStage(STAGES.CHOOSE, 'activity_selected');
+  if (runtime.state.stage === STAGES.CHOOSE) completeTutorial('activity_started');
+}
 
-  const inSpaceNow = !!(appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.isEnv(appCtx.ENV?.SPACE_FLIGHT)));
-  const inMoonNow = !!appCtx.onMoon;
-  const titleVisible = !!(document.getElementById('titleScreen') && !document.getElementById('titleScreen').classList.contains('hidden'));
-  const roomCodeNow = String(appCtx.multiplayerMapRooms?.currentRoomCode || '');
-  const roomPanelOpen = !!document.getElementById('roomPanelModal')?.classList.contains('show');
+function panelIsOpen(id) {
+  const element = document.getElementById(id);
+  return !!element && (element.classList.contains('show') || element.getAttribute('aria-hidden') === 'false');
+}
+
+function uiBlocksTutorial() {
+  return panelIsOpen('discoveryPanel') || panelIsOpen('urbanEquipment') ||
+    panelIsOpen('roomPanelModal') || !!document.querySelector('.floatMenu.open');
+}
+
+function detectContextTransitions() {
+  const inSpace = !!(appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.isEnv(appCtx.ENV?.SPACE_FLIGHT)));
+  const inMoon = !!appCtx.onMoon;
+  const roomPanelOpen = panelIsOpen('roomPanelModal');
   const buildModeOn = !!document.getElementById('fBlockBuild')?.classList.contains('on');
-
-  if (!runtime.previous.gameStarted && appCtx.gameStarted) {
-    tutorialOnEvent('spawned_in_world');
-  }
-  if (!runtime.previous.inSpace && inSpaceNow) {
-    tutorialOnEvent('entered_space');
-  }
-  if (!runtime.previous.inMoon && inMoonNow) {
-    tutorialOnEvent('entered_moon');
-  }
-  if (runtime.previous.inMoon && !inMoonNow) {
-    tutorialOnEvent('returned_to_earth');
-  }
-  if (!runtime.previous.roomCode && roomCodeNow) {
-    tutorialOnEvent('room_created_or_toggled', { roomCode: roomCodeNow });
-  }
-  if (!runtime.previous.roomPanelOpen && roomPanelOpen) {
-    tutorialOnEvent('opened_rooms_menu');
-  }
-  if (!runtime.previous.buildModeOn && buildModeOn) {
-    tutorialOnEvent('build_mode_entered');
-  }
-  if (!runtime.previous.titleVisible && titleVisible && appCtx.gameStarted === false) {
-    tutorialOnEvent('opened_main_menu');
-  }
-
-  runtime.previous.gameStarted = !!appCtx.gameStarted;
-  runtime.previous.inSpace = inSpaceNow;
-  runtime.previous.inMoon = inMoonNow;
-  runtime.previous.roomCode = roomCodeNow;
-  runtime.previous.roomPanelOpen = roomPanelOpen;
-  runtime.previous.buildModeOn = buildModeOn;
-  runtime.previous.titleVisible = titleVisible;
+  const backpackOpen = panelIsOpen('urbanEquipment');
+  const explorerOpen = panelIsOpen('discoveryPanel');
+  if (!runtime.previous.gameStarted && appCtx.gameStarted) tutorialOnEvent('spawned_in_world');
+  if (!runtime.previous.inSpace && inSpace) tutorialOnEvent('entered_space');
+  if (!runtime.previous.inMoon && inMoon) showContextTip('moon', {
+    eyebrow: 'Moon tip',
+    title: 'Explore the surface',
+    body: 'Walking and driving keep their familiar controls here. Use Travel Modes whenever you want to change how you explore.'
+  });
+  if (!runtime.previous.roomPanelOpen && roomPanelOpen) tutorialOnEvent('opened_rooms_menu');
+  if (!runtime.previous.buildModeOn && buildModeOn) tutorialOnEvent('build_mode_entered');
+  if (!runtime.previous.backpackOpen && backpackOpen) tutorialOnEvent('opened_backpack', { source: 'panel_state' });
+  if (!runtime.previous.explorerOpen && explorerOpen) tutorialOnEvent('opened_explorer', { source: 'panel_state' });
+  runtime.previous = {
+    gameStarted: !!appCtx.gameStarted,
+    inSpace,
+    inMoon,
+    roomPanelOpen,
+    buildModeOn,
+    backpackOpen,
+    explorerOpen
+  };
 }
 
-function tutorialUpdate(dt) {
+function tutorialUpdate() {
   if (!runtime.initialized) return;
-  const delta = Number.isFinite(dt) ? Math.max(0, dt) : 0;
-
-  detectEventTransitions();
-
-  if (!runtime.state.enabled || runtime.state.completed) return;
-
-  if (appCtx.gameStarted && !runtime.state.inMoon && !runtime.state.inSpace) {
-    runtime.state.worldSeconds += delta;
-  }
-  if (runtime.state.inMoon) {
-    runtime.state.moonSeconds += delta;
-  }
-
-  if (runtime.state.stage === STAGES.MOVE_HINT && runtime.state.worldSeconds >= 8) {
-    setStage(STAGES.MODE_HINT);
+  detectContextTransitions();
+  const activePanel = uiBlocksTutorial();
+  if (activePanel) {
+    if (runtime.card && !runtime.card.hidden) hidePrompt();
     return;
   }
-
-  if (runtime.state.stage === STAGES.MODE_HINT && (runtime.state.worldSeconds >= 60 || runtime.state.modeSwitchCount >= 1)) {
-    setStage(STAGES.SPACE_HINT);
-    return;
+  if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !appCtx.gameStarted) return;
+  if ((!runtime.card || runtime.card.hidden) && !runtime.sessionPresented.has(runtime.state.stage)) presentCurrentStage();
+  if (runtime.state.stage !== STAGES.MOVE) return;
+  const current = playerPosition();
+  if (!current) return;
+  if (!runtime.movementOrigin) runtime.movementOrigin = current;
+  if (runtime.lastPosition) {
+    const step = Math.hypot(current.x - runtime.lastPosition.x, current.z - runtime.lastPosition.z);
+    if (step > 0 && step < 25) runtime.state.distanceMoved = Math.min(MOVE_TARGET_METERS * 2, runtime.state.distanceMoved + step);
   }
-
-  if (runtime.state.stage === STAGES.MOON_MOVE && (runtime.state.moonSeconds >= 60 || runtime.state.moonModeSwitchCount >= 1)) {
-    setStage(STAGES.RETURN_HINT);
-    return;
+  runtime.lastPosition = current;
+  if (runtime.state.distanceMoved >= MOVE_TARGET_METERS) {
+    saveState();
+    setStage(STAGES.PACK, 'moved_8m');
   }
-
-  if (runtime.state.stage === STAGES.INVITE_HINT && runtime.state.openedMainMenu && runtime.state.openedRoomsMenu) {
-    markCompleted();
-    return;
-  }
-
-  saveState();
 }
 
 function setTutorialEnabled(enabled) {
   runtime.state.enabled = !!enabled;
-  if (!runtime.state.enabled) {
-    hidePrompt();
-    updateSettingsStatus('Tutorial disabled. You can re-enable it anytime.');
-  } else {
-    updateSettingsStatus(runtime.state.completed ? 'Tutorial completed on this browser.' : 'Tutorial enabled.');
-    presentCurrentStage();
-  }
+  if (enabled) runtime.state.skipped = false;
+  else if (!runtime.state.completed) runtime.state.skipped = true;
   saveState();
+  updateSettingsStatus(enabled ? 'Guidance enabled.' : 'Guidance disabled. Your game progress is unchanged.');
+  if (enabled) presentCurrentStage();
+  else hidePrompt();
 }
 
 function restartTutorial() {
-  runtime.state = {
-    enabled: true,
-    completed: false,
-    stage: STAGES.AWAIT_GLOBE,
-    worldSeconds: 0,
-    moonSeconds: 0,
-    modeSwitchCount: 0,
-    moonModeSwitchCount: 0,
-    buildInteracted: false,
-    roomInteracted: false,
-    openedMainMenu: false,
-    openedRoomsMenu: false,
-    selectedLocation: false,
-    spawned: false,
-    inSpace: false,
-    inMoon: false,
-    shownStages: []
-  };
-  runtime.stageShown.clear();
-  hidePrompt();
-  updateSettingsStatus('Tutorial restarted.');
+  runtime.state = defaultState();
+  runtime.state.startedAtMs = Date.now();
+  runtime.state.analyticsBegan = true;
+  runtime.sessionPresented.clear();
+  runtime.movementOrigin = playerPosition();
+  runtime.lastPosition = runtime.movementOrigin;
   saveState();
+  tutorialTelemetry('tutorial_begin');
+  updateSettingsStatus(`First Journey restarted: step 1 of ${CORE_STAGE_COUNT}.`);
   presentCurrentStage();
+}
+
+function getTutorialSnapshot() {
+  return {
+    version: TUTORIAL_VERSION,
+    enabled: runtime.state.enabled,
+    completed: runtime.state.completed,
+    skipped: runtime.state.skipped,
+    stage: runtime.state.stage,
+    step: STAGE_NUMBER[runtime.state.stage] || CORE_STAGE_COUNT,
+    steps: CORE_STAGE_COUNT,
+    distanceMoved: Number(runtime.state.distanceMoved.toFixed(2)),
+    promptVisible: !!runtime.card && !runtime.card.hidden && getComputedStyle(runtime.card).display !== 'none',
+    promptExpanded: !!runtime.card && !runtime.card.classList.contains('compact'),
+    title: runtime.titleEl?.textContent || ''
+  };
 }
 
 function initTutorial(appContext = null) {
   if (runtime.initialized) return;
-  if (appContext && typeof appContext === 'object') {
-    Object.assign(appCtx, appContext);
-  }
-
-  const persisted = loadState();
-  if (persisted) {
-    runtime.state = { ...runtime.state, ...persisted, stage: clampStage(persisted.stage) };
-  }
-
+  if (appContext && typeof appContext === 'object') Object.assign(appCtx, appContext);
+  runtime.state = loadState();
   createCardIfNeeded();
   ensureSettingsControls();
-  updateSettingsStatus(runtime.state.completed ? 'Tutorial completed on this browser.' : 'Tutorial is ready.');
-
-  runtime.previous.gameStarted = !!appCtx.gameStarted;
-  runtime.previous.mode = getCurrentTravelMode();
-  runtime.previous.inSpace = !!(appCtx.spaceFlight?.active);
-  runtime.previous.inMoon = !!appCtx.onMoon;
-  runtime.previous.roomCode = String(appCtx.multiplayerMapRooms?.currentRoomCode || '');
-  runtime.previous.roomPanelOpen = !!document.getElementById('roomPanelModal')?.classList.contains('show');
-  runtime.previous.buildModeOn = !!document.getElementById('fBlockBuild')?.classList.contains('on');
-  runtime.previous.titleVisible = !!(document.getElementById('titleScreen') && !document.getElementById('titleScreen').classList.contains('hidden'));
-
+  runtime.previous = {
+    gameStarted: !!appCtx.gameStarted,
+    inSpace: !!appCtx.spaceFlight?.active,
+    inMoon: !!appCtx.onMoon,
+    roomPanelOpen: panelIsOpen('roomPanelModal'),
+    buildModeOn: !!document.getElementById('fBlockBuild')?.classList.contains('on'),
+    backpackOpen: panelIsOpen('urbanEquipment'),
+    explorerOpen: panelIsOpen('discoveryPanel')
+  };
+  runtime.movementOrigin = playerPosition();
+  runtime.lastPosition = runtime.movementOrigin;
+  runtime.discoveryListener = onDiscoveryTelemetry;
+  globalThis.addEventListener?.('we3d:discovery-telemetry', runtime.discoveryListener);
   runtime.initialized = true;
 
-  if (!runtime.state.enabled) {
-    hidePrompt();
-    saveState();
-    return;
+  if (runtime.state.enabled && !runtime.state.completed && !runtime.state.skipped && !runtime.state.analyticsBegan) {
+    runtime.state.analyticsBegan = true;
+    runtime.state.startedAtMs = Date.now();
+    tutorialTelemetry('tutorial_begin');
   }
-
-  if (runtime.state.completed) {
-    hidePrompt();
-    saveState();
-    return;
-  }
-
-  // If the user already started a world before tutorial initialization,
-  // continue from movement hints instead of forcing title flow.
-  if (appCtx.gameStarted && STAGE_ORDER.indexOf(runtime.state.stage) < STAGE_ORDER.indexOf(STAGES.MOVE_HINT)) {
-    runtime.state.stage = STAGES.MOVE_HINT;
-  }
-
   saveState();
+  updateSettingsStatus(runtime.state.completed
+    ? 'First Journey complete. Replay it whenever you want.'
+    : runtime.state.enabled && !runtime.state.skipped
+      ? `First Journey: ${STAGE_NUMBER[runtime.state.stage] || 1} of ${CORE_STAGE_COUNT}.`
+      : 'Guidance is off. Replay First Journey whenever you want.');
   presentCurrentStage();
 }
 
 Object.assign(appCtx, {
-  initTutorial,
-  tutorialOnEvent,
-  tutorialUpdate,
-  setTutorialEnabled,
-  restartTutorial
-});
-
-export {
+  getTutorialSnapshot,
   initTutorial,
   restartTutorial,
   setTutorialEnabled,
   tutorialOnEvent,
   tutorialUpdate
-};
+});
+
+export { getTutorialSnapshot, initTutorial, restartTutorial, setTutorialEnabled, tutorialOnEvent, tutorialUpdate };

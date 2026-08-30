@@ -37,6 +37,21 @@ function distanceFromLocationMeters(node, location) {
   return Math.hypot(north, east);
 }
 
+function mappedTagIsPresent(value) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized !== '' && normalized !== 'no' && normalized !== 'false' &&
+    normalized !== '0' && normalized !== 'none';
+}
+
+function isEngineeredTransportWay(element) {
+  const tags = element?.tags || {};
+  return mappedTagIsPresent(tags.bridge) ||
+    mappedTagIsPresent(tags.tunnel) ||
+    mappedTagIsPresent(tags.covered) ||
+    String(tags.location || '').trim().toLowerCase() === 'underground' ||
+    (Number.isFinite(Number(tags.layer)) && Number(tags.layer) !== 0);
+}
+
 export function retainRegionalTransportOutsideCore(data, options = {}) {
   const location = options.location;
   const coreRadiusMeters = Math.max(0, Number(options.coreRadiusMeters) || 0);
@@ -55,12 +70,19 @@ export function retainRegionalTransportOutsideCore(data, options = {}) {
     const regional = points.some(
       (point) => distanceFromLocationMeters(point, location) >= overlapRadiusMeters
     );
-    if (!regional && !includeCore) return null;
+    const coreStructureFallback = !regional && !includeCore &&
+      isEngineeredTransportWay(element);
+    if (!regional && !includeCore && !coreStructureFallback) return null;
     return {
       ...element,
       tags: {
         ...element.tags,
-        ...(regional ? { _regionalContext: 'fixed-location' } : {}),
+        ...(regional || coreStructureFallback
+          ? { _regionalContext: 'fixed-location' }
+          : {}),
+        ...(coreStructureFallback
+          ? { _fallbackStructureAuthority: 'generalized' }
+          : {}),
         _sourceCompleteness: 'generalized'
       }
     };
@@ -78,6 +100,9 @@ export function retainRegionalTransportOutsideCore(data, options = {}) {
       coreRadiusMeters,
       retainedWays: retainedWays.length,
       retainedRoads: retainedWays.filter((way) => way.tags?.highway).length,
+      retainedCoreStructureFallbacks: retainedWays.filter(
+        (way) => way.tags?._fallbackStructureAuthority === 'generalized'
+      ).length,
       retainedNodes: retainedNodes.length
     }
   };
@@ -227,13 +252,16 @@ export async function waitForFixedRegionalGround(
   appCtx,
   loadMetrics,
   startLoadPhase = () => {},
-  endLoadPhase = () => {}
+  endLoadPhase = () => {},
+  options = {}
 ) {
   if (!(appCtx.fixedRegionalContextRadiusWorld > 0) ||
       typeof appCtx.waitForFarTerrainClipmap !== 'function') return false;
   startLoadPhase('waitForFixedRegionalGround');
   try {
-    loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(35000);
+    const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 35000);
+    loadMetrics.regionalGroundReady = await appCtx.waitForFarTerrainClipmap(timeoutMs);
+    loadMetrics.regionalGroundWaitTimeoutMs = timeoutMs;
     return loadMetrics.regionalGroundReady;
   } finally {
     endLoadPhase('waitForFixedRegionalGround');

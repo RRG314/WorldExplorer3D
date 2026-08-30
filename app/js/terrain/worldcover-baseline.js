@@ -1,5 +1,5 @@
 import { createProviderOutageCircuit } from '../earth-core/provider-outage-circuit.js?v=1';
-import { terrainSurfaceClassForWorldCover } from './surface-material-blend.js?v=1';
+import { terrainSurfaceClassForWorldCover } from './surface-material-blend.js?v=2';
 
 const WORLDCOVER_WMS_ENDPOINT = 'https://titiler.terrascope.be/wms';
 const WORLDCOVER_LAYER = 'esa-worldcover-map-10m-2021-v2_map';

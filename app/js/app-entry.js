@@ -1,50 +1,57 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
-import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
+import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
+import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=1';
 import './rdt.js?v=55';
-import './config.js?v=60';
+import './config.js?v=61';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=27';
-import './state.js?v=61';
+import './runtime-diagnostics.js?v=66';
+import './ui/legal-attribution.js?v=1';
+import './state.js?v=65';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=4';
-import './controls/action-input.js?v=6';
-import './transport/actor-contract.js?v=2';
+import './location-session.js?v=6';
+import './controls/action-input.js?v=10';
+import './interaction/context-router.js?v=4';
+import './transport/actor-contract.js?v=6';
 import './world/collection-registry.js?v=1';
+import './world/water-environment.js?v=2';
 import './perf.js?v=57';
 import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=88';
-import './physics.js?v=104';
-import './walking.js?v=71';
-import './travel-mode.js?v=20';
-import { initBoatMode } from './boat-mode.js?v=37';
-import './sky.js?v=86';
-import './weather.js?v=9';
-import './runtime/on-demand-modes.js?v=8';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=46';
-import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=2';
+import { init, tryEnablePostProcessing } from './engine.js?v=95';
+import './physics.js?v=122';
+import './walking.js?v=87';
+import './travel-mode.js?v=23';
+import { initBoatMode } from './boat-mode.js?v=57';
+import './sky.js?v=88';
+import './weather.js?v=10';
+import './runtime/on-demand-modes.js?v=12';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=167';
+import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
-import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=1';
+import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=5';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/vehicles.js?v=2';
-import './planetary/astronaut.js?v=1';
+import './planetary/solid-world-runtime.js?v=7';
+import './planetary/vehicles.js?v=3';
+import './planetary/astronaut.js?v=2';
 import './planetary/sky-orientation.js?v=13';
 import './planetary/moon-sky.js?v=1';
-import './planetary/tracks.js?v=1';
-import './game.js?v=62';
-import './input.js?v=60';
-import './hud.js?v=90';
-import './map.js?v=59';
+import './planetary/tracks.js?v=2';
+import './planetary/field-activities.js?v=8';
+import './game.js?v=63';
+import './input.js?v=72';
+import './hud.js?v=102';
+import './map.js?v=61';
 import { renderLoop } from './main.js?v=72';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=120';
+import { setupUI } from './ui.js?v=145';
+import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -61,6 +68,7 @@ const platformServices = createPlatformServiceRegistry({
         globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
     }
 });
+setupAnalyticsConsentUi();
 
 function scheduleIdleTask(task, timeout = 1200) {
     if (typeof task !== 'function') return;
@@ -97,7 +105,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'editor', category: 'authoring',
         load: async () => {
-            const mod = await import('./editor/session.js?v=5');
+            const mod = await import('./editor/session.js?v=10');
             mod.initEditorSession?.();
             return mod;
         }
@@ -113,7 +121,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=5');
+            const mod = await import('./activity-discovery/session.js?v=7');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -140,7 +148,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'editor-overlay', category: 'world-content',
         load: async () => {
-            const mod = await import('./editor/public-layer.js?v=5');
+            const mod = await import('./editor/public-layer.js?v=6');
             mod.initEditorPublicLayer?.();
             return mod;
         }
@@ -148,10 +156,18 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=76');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=83');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
+        }
+    });
+    platformServices.register({
+        id: 'augmented-reality', category: 'presentation',
+        load: async () => {
+            const mod = await import('./ar/session-service.js?v=6');
+            mod.initArPlatform?.(appCtx);
+            return mod;
         }
     });
 }
@@ -163,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=9').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=17').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -173,7 +189,7 @@ function ensureInteriorsReady() {
 
 function ensureFishingReady() {
     if (!_fishingModulePromise) {
-        _fishingModulePromise = import('./fishing-game.js?v=2').then((fishing) => {
+        _fishingModulePromise = import('./fishing-game.js?v=5').then((fishing) => {
             fishing.setupFishingGame?.();
             return fishing;
         }).catch((error) => {
@@ -195,6 +211,7 @@ function registerLazyFishingEntrypoints() {
     appCtx.updateFishingGame = () => false;
     const dockButton = document.getElementById('fishingDockBtn');
     const menuButton = document.getElementById('fFishing');
+    if (menuButton) menuButton.style.display = '';
     const activate = async (event) => {
         event?.preventDefault?.();
         dockButton?.removeEventListener('click', activate);
@@ -245,10 +262,13 @@ async function ensureOverlayRuntimeLayer() {
 }
 
 function shouldBootOverlayRuntime() {
-    if (!appCtx.gameStarted) return false;
-    if (appCtx.onMoon || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
+    // The public editor overlay is optional for first play. Starting it from
+    // the early gameStarted flag made its network/parse work overlap the
+    // blocking Earth compiler before a publication existed.
+    if (!appCtx.gameStarted || appCtx.worldLoading || appCtx.initialEarthWorldReady !== true) return false;
+    if (appCtx.onMoon || appCtx.activePlanetaryBodyId || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
     if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
-        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
+        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.PLANETARY) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
     }
     return true;
 }
@@ -271,16 +291,25 @@ async function ensureMultiplayerPlatformReady() {
 function scheduleTutorialInit() {
     if (_tutorialInitPromise) return _tutorialInitPromise;
     _tutorialInitPromise = new Promise((resolve) => {
-        scheduleAfterFirstPlay('tutorial-runtime', async () => {
+        let started = false;
+        const startTutorial = async () => {
+            if (started) return;
+            started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=2');
+                const mod = await import('./tutorial/tutorial.js?v=8');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
             } finally {
                 resolve(true);
             }
-        }, { timeout: 2200 });
+        };
+        scheduleAfterFirstPlay('tutorial-runtime', startTutorial, { timeout: 1200 });
+        globalThis.addEventListener?.('we3d:first-play-ready', startTutorial, { once: true });
+        // Continuous WebGL rendering can starve requestIdleCallback on some
+        // mobile browsers. The tutorial is small, so a bounded fallback keeps
+        // First Journey available without returning it to the blocking boot path.
+        globalThis.setTimeout(startTutorial, 6000);
     });
     return _tutorialInitPromise;
 }
@@ -306,7 +335,21 @@ function registerLazySubsystemEntrypoints() {
     };
     appCtx.listSupportedInteriorsNear = () => [];
     appCtx.sampleInteriorWalkSurface = () => null;
-    appCtx.updateInteriorInteraction = () => false;
+    appCtx.updateInteriorInteraction = () => {
+        const walking = appCtx.Walk?.state?.mode === 'walk' || appCtx.travelMode === 'walk';
+        if (
+            !_interiorsModulePromise &&
+            appCtx.gameStarted === true &&
+            walking &&
+            Array.isArray(appCtx.buildings) &&
+            appCtx.buildings.length > 0
+        ) {
+            void ensureInteriorsReady().then((interiors) => interiors.updateInteriorInteraction?.()).catch((error) => {
+                console.warn('[interior] Proximity runtime failed to initialize:', error);
+            });
+        }
+        return false;
+    };
     appCtx.clearActiveInterior = () => false;
     if (typeof appCtx.getEditorSnapshot !== 'function') {
         appCtx.getEditorSnapshot = () => ({
@@ -454,6 +497,19 @@ function registerLazySubsystemEntrypoints() {
     appCtx.ensureOverlayRuntimeReady = ensureOverlayRuntimeLayer;
     appCtx.kickOptionalRuntimeBoot = kickOptionalRuntimeBoot;
     appCtx.ensurePlatformService = ensurePlatformService;
+    appCtx.openArExperience = async (request = {}) => {
+        const mod = await ensurePlatformService('augmented-reality');
+        const platform = mod.initArPlatform?.(appCtx);
+        return platform?.open?.(request) ?? false;
+    };
+    appCtx.closeArExperience = async (reason = 'user-exit') => {
+        const mod = platformServices.peek('augmented-reality');
+        if (!mod) return false;
+        return mod.initArPlatform?.(appCtx)?.end?.(reason) ?? false;
+    };
+    appCtx.getArPlatformSnapshot = () => platformServices.peek('augmented-reality')?.getArPlatformSnapshot?.() || {
+        type: 'ArPlatformSnapshot', phase: 'idle', active: false
+    };
     appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
     appCtx.getAccountSnapshot = () => platformServices.peek('account')?.snapshot?.() || {
         started: false,
@@ -463,6 +519,12 @@ function registerLazySubsystemEntrypoints() {
         revision: 0
     };
     appCtx.ensureMultiplayerPlatformReady = ensureMultiplayerPlatformReady;
+    appCtx.openMultiplayerPanel = async () => {
+        const api = await ensureMultiplayerPlatformReady();
+        if (typeof api?.openRoomPanel !== 'function') return false;
+        api.openRoomPanel();
+        return true;
+    };
     appCtx.getCurrentMultiplayerRoom = () => platformServices.peek('multiplayer')?.getCurrentRoom?.() || null;
     appCtx.getCurrentMultiplayerRoomActivities = () => platformServices.peek('multiplayer')?.getCurrentRoomActivities?.() || [];
     appCtx.getCurrentMultiplayerRoomActivity = () => platformServices.peek('multiplayer')?.getActiveRoomActivity?.() || null;
@@ -544,6 +606,7 @@ function bootApp() {
         return { tryEnablePostProcessing };
     }
     runBootStep('registerLazySubsystemEntrypoints', () => registerLazySubsystemEntrypoints());
+    runBootStep('initAccessibility', () => { appCtx.accessibility = initAccessibility(); });
     runBootStep('setupUI', () => setupUI());
     runBootStep('initBoatMode', () => initBoatMode());
     runBootStep('registerLazyFishingEntrypoints', () => registerLazyFishingEntrypoints());

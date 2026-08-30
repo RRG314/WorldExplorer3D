@@ -1,23 +1,28 @@
 import { isImplausibleTallBuildingFootprint } from '../world/building-geometry-quality.js?v=1';
+import {
+  buildingSeedFromIdentity,
+  inferFallbackBuildingHeightMeters,
+  interpretBuildingSemantics
+} from '../building-semantics.js?v=4';
 
-function identityFraction(identity) {
-  let hash = 2166136261;
-  const text = String(identity || '');
-  for (let i = 0; i < text.length; i += 1) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return (hash >>> 0) / 4294967295;
+function mappedBuildingTags(properties = {}) {
+  const buildingType = String(
+    properties.building || properties.kind || properties.type || 'yes'
+  ).trim() || 'yes';
+  const tags = { building: buildingType };
+  const height = properties.height ?? properties.render_height ?? properties['building:height'];
+  const levels = properties['building:levels'] ?? properties.levels ?? properties.num_floors;
+  if (height !== null && height !== undefined && String(height).trim()) tags.height = height;
+  if (levels !== null && levels !== undefined && String(levels).trim()) {
+    tags['building:levels'] = levels;
+  }
+  return tags;
 }
 
-function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter) {
+function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter, options = {}) {
   const properties = building?.properties || {};
-  const mappedHeight = Number.parseFloat(
-    properties.height ?? properties.render_height ?? properties['building:height']
-  );
-  const kind = String(properties.kind || properties.type || '').toLowerCase();
-  const random = identityFraction(building?.identity);
-  const inferredHeight = /commercial|office|apartments|hotel/.test(kind)
-    ? 12 + random * 28
-    : 5.5 + random * 11;
-  const heightMeters = Math.max(3, Math.min(180, Number.isFinite(mappedHeight) ? mappedHeight : inferredHeight));
+  const tags = mappedBuildingTags(properties);
+  const kind = String(tags.building || '').toLowerCase();
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const point of footprint) {
     minX = Math.min(minX, point.x);
@@ -25,16 +30,41 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
     minZ = Math.min(minZ, point.z);
     maxZ = Math.max(maxZ, point.z);
   }
+  const footprintWidth = (maxX - minX) / unitsPerMeter;
+  const footprintDepth = (maxZ - minZ) / unitsPerMeter;
+  const footprintArea = areaWorld / (unitsPerMeter * unitsPerMeter);
+  const seed = buildingSeedFromIdentity(building?.identity, options.worldSeed);
+  const random = (seed >>> 0) / 4294967295;
+  const fallbackHeight = inferFallbackBuildingHeightMeters(
+    kind,
+    footprintArea,
+    footprintWidth,
+    footprintDepth,
+    random
+  );
+  const semantics = interpretBuildingSemantics(tags, {
+    buildingType: kind,
+    fallbackHeight,
+    footprintArea,
+    footprintWidth,
+    footprintDepth
+  });
+  const heightMeters = semantics.heightMeters;
   const intentionalVerticalStructure = /tower|spire|chimney|silo|lighthouse|mast|minaret/.test(kind);
   if (isImplausibleTallBuildingFootprint({
     heightMeters,
-    widthMeters: (maxX - minX) / unitsPerMeter,
-    depthMeters: (maxZ - minZ) / unitsPerMeter,
-    footprintAreaMeters: areaWorld / (unitsPerMeter * unitsPerMeter),
+    widthMeters: footprintWidth,
+    depthMeters: footprintDepth,
+    footprintAreaMeters: footprintArea,
     intentionalVerticalStructure
   })) return null;
   const shade = 0.44 + random * 0.12;
-  return { heightMeters, color: [shade * 1.02, shade, shade * 0.95] };
+  return {
+    heightMeters,
+    heightSource: semantics.heightSource,
+    identity: String(building?.identity || ''),
+    color: [shade * 1.02, shade, shade * 0.95]
+  };
 }
 
-export { resolveFarBuildingMassing };
+export { mappedBuildingTags, resolveFarBuildingMassing };

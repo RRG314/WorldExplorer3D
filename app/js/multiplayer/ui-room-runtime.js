@@ -1,7 +1,7 @@
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
 import { createGhostManager } from "./ghosts.js?v=58";
 import { listenExplorerLeaderboard } from "./loop.js?v=56";
-import { stopPresence } from "./presence.js?v=61";
+import { stopPresence } from "./presence.js?v=62";
 import {
   deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,
@@ -52,6 +52,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (typeof state.unsubRoomActivities === "function") state.unsubRoomActivities();
     if (typeof state.unsubRoomActivityState === "function") state.unsubRoomActivityState();
     if (typeof state.unsubSharedBlocks === "function") state.unsubSharedBlocks();
+    if (typeof state.unsubWorldModifications === "function") state.unsubWorldModifications();
     if (typeof state.unsubHomeBase === "function") state.unsubHomeBase();
     if (typeof state.unsubPaintClaims === "function") state.unsubPaintClaims();
     state.unsubRoom = null;
@@ -61,6 +62,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.unsubRoomActivities = null;
     state.unsubRoomActivityState = null;
     state.unsubSharedBlocks = null;
+    state.unsubWorldModifications = null;
     state.unsubHomeBase = null;
     state.unsubPaintClaims = null;
   }
@@ -76,6 +78,14 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.unsubInvites = null;
     state.unsubOwnedRooms = null;
     state.unsubLeaderboard = null;
+  }
+
+  function ensureLeaderboardSubscription() {
+    if (state.unsubLeaderboard) return;
+    state.unsubLeaderboard = listenExplorerLeaderboard((rows) => {
+      state.leaderboard = rows;
+      renderLeaderboard();
+    });
   }
 
   function roomWorldSignature(room) {
@@ -282,6 +292,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (typeof appCtx.setSharedBuildEntries === "function") {
       appCtx.setSharedBuildEntries([]);
     }
+    appCtx.configureSharedEditableWorld?.({ enabled: false });
     await stopPresence();
     if (!localOnly) {
       await leaveRoom();
@@ -382,12 +393,11 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       state.recentPlayers = [];
       state.invites = [];
       state.ownedRooms = [];
-      state.leaderboard = [];
       renderFriends();
       renderRecentPlayers();
       renderInvites();
       renderOwnedRooms();
-      renderLeaderboard();
+      ensureLeaderboardSubscription();
       renderFeaturedRooms();
       return;
     }
@@ -416,12 +426,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
         renderOwnedRooms();
       });
     }
-    if (!state.unsubLeaderboard) {
-      state.unsubLeaderboard = listenExplorerLeaderboard((rows) => {
-        state.leaderboard = rows;
-        renderLeaderboard();
-      });
-    }
+    ensureLeaderboardSubscription();
   }
 
   function currentRoomName() {

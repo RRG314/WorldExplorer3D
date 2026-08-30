@@ -78,6 +78,11 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-app-rail,
 .globe-destination-bar { background: var(--hub-bar); }
 .globe-selector-side { background: var(--hub-panel); }
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) #globeSelectorLiveGpsBtn,
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-stat,
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-actions {
+  display: none;
+}
 .globe-selector-stat,
 .globe-selector-live-details,
 .globe-selector-live-layer,
@@ -93,6 +98,32 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-mode-tab.active,
 .globe-selector-city-tab.active { color: var(--hub-text); background: var(--hub-active); border-color: var(--hub-blue); }
 #globeLocationSearchStatus { color: var(--hub-muted) !important; }
+.globe-location-search-results {
+  display: grid;
+  gap: 5px;
+  max-height: 190px;
+  overflow: auto;
+  padding: 2px;
+}
+.globe-location-search-results[hidden] { display: none; }
+.globe-location-search-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--hub-text);
+  text-align: left;
+  background: var(--hub-panel-2);
+  border: 1px solid var(--hub-line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.globe-location-search-result:hover,
+.globe-location-search-result[aria-selected="true"] { background: var(--hub-active); border-color: var(--hub-blue); }
+.globe-location-search-result strong { overflow: hidden; font: 700 11px/1.25 Inter, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.globe-location-search-result span { color: var(--hub-muted); font: 600 9px/1.25 Inter, sans-serif; }
+.globe-location-search-result small { grid-column: 1 / -1; overflow: hidden; color: var(--hub-muted); font: 500 9px/1.25 Inter, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
 .globe-selector-brand {
   gap: 5px;
   padding: 0 8px;
@@ -192,6 +223,9 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   background: rgba(0, 6, 11, 0.76);
 }
 #globeSelectorCanvas { position: relative; z-index: 1; }
+.globe-selector-basemap-controls,
+.globe-selector-basemap-attribution { z-index: 3; }
+.globe-selector-zoom-controls { z-index: 3; }
 .globe-selector-hint { z-index: 2; }
 
 .globe-selector-side {
@@ -230,6 +264,19 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   min-height: 48px;
   font: 700 12px/1 Inter, sans-serif;
   text-transform: uppercase;
+}
+.globe-selector-live-gps-btn {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #22d3ee !important;
+  border-radius: 2px !important;
+  background: linear-gradient(135deg,#0e7490,#155e75) !important;
+  color: #fff !important;
+  font: 800 12px/1 Inter, sans-serif !important;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  box-shadow: 0 7px 18px rgba(8,145,178,.22);
 }
 .globe-selector-mode-tabs { margin-top: 0; }
 .globe-selector-mode-panel { min-height: 0; }
@@ -271,6 +318,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-live-detail-copy,
 .globe-selector-live-detail-meta { color: var(--hub-muted); }
 .globe-selector-live-detail-heading { color: var(--hub-text); }
+.deflock-live-detail .deflock-live-warning { color: #f0b24a; }
 .globe-selector-live-layer-status.observed { color: #35d39a; }
 .globe-selector-live-layer-status.current { color: #35d39a; }
 .globe-selector-live-layer-status.derived { color: #f0b24a; }
@@ -317,6 +365,31 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-street-thumb span { font-size: 10px; font-weight: 700; }
 .globe-selector-street-thumb small { color: var(--hub-muted); font-size: 9px; }
 .globe-selector-live-action-btn:is(a) { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+.globe-legal-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--hub-line);
+  color: var(--hub-muted);
+  font: 500 10px/1.3 Inter, sans-serif;
+}
+.globe-legal-strip a,
+.globe-legal-strip button {
+  min-height: 24px;
+  padding: 4px 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.globe-legal-strip a:hover,
+.globe-legal-strip button:hover { color: var(--hub-text); text-decoration: underline; }
 
 .globe-destination-bar { padding: 0 18px; }
 .globe-destination-bar button {
@@ -561,6 +634,14 @@ body.start-hub-open #flowerChallengePanel {
 }
 
 @media (max-width: 900px) {
+  .deflock-live-detail .globe-selector-live-detail-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 8px 0 calc(4px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(7, 16, 24, 0), var(--hub-panel-2) 24%);
+  }
+  .deflock-live-detail .globe-selector-live-action-btn { min-height: 42px; flex: 1 1 130px; }
   .globe-selector-street-list { grid-template-columns: 1fr; }
   body.start-hub-open #appSignInBtn { top: 12px; right: 190px; height: 36px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #globeSelectorScreen .globe-selector-shell {
@@ -619,6 +700,7 @@ body.start-hub-open #flowerChallengePanel {
   }
   .globe-selector-stat { padding-top: 8px; }
   .globe-selector-city-list { max-height: 150px; }
+  .globe-location-search-results { max-height: 136px; }
   .globe-destination-bar { grid-column: 1; grid-row: 4; padding: 0; }
   .globe-destination-bar button .destination-thumb { width: 38px; height: 38px; flex-basis: 38px; }
   .globe-selector-side:has(#globeSelectorLiveEarthPanel.active)::before,
@@ -637,7 +719,8 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-panel-host { padding: 14px; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .globe-hub-footer-host .title-footer { grid-template-columns: 1fr; }
-  .globe-hub-footer-host .title-license { display: none; }
+  .globe-hub-footer-host .title-share-row { display: none; }
+  .globe-hub-footer-host .title-license { display: flex; font-size: 9px; }
 }
 
 @media (max-width: 620px) {

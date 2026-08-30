@@ -4,6 +4,7 @@ import {
   canUseSsao as engineCanUseSsao,
   createProceduralEnvironmentMap as createEngineProceduralEnvironmentMap,
   ensureHdrEnvironment as ensureEngineHdrEnvironment,
+  getEnvironmentLightingSnapshot as getEngineEnvironmentLightingSnapshot,
   getHighQualityEnabled as engineGetHighQualityEnabled,
   getShadowMapResolution as getEngineShadowMapResolution,
   getSsaoEnabled as engineGetSsaoEnabled,
@@ -11,16 +12,17 @@ import {
   setRenderQualityLevel as setEngineRenderQualityLevel,
   setSsaoEnabled as engineSetSsaoEnabled,
   setupPostProcessingPipeline as setupEnginePostProcessingPipeline,
+  refreshProceduralEnvironment as refreshEngineProceduralEnvironment,
   tryEnablePostProcessing as tryEnableEnginePostProcessing
-} from "./engine/quality.js?v=1";
+} from "./engine/quality.js?v=2";
 import {
   createBuildingGroundPatch as createBuildingGroundPatchRuntime,
   ensureEnginePbrTextures as ensureEnginePbrTexturesRuntime,
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=21";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=12";
+} from "./engine/materials-runtime.js?v=22";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=19";
 import { ROAD_CAR_CONFIG } from './physics/vehicle-config.js?v=1';
 
 const RENDER_QUALITY_LOW = 'low';
@@ -37,6 +39,8 @@ const engineState = {
   renderQualityLevel: RENDER_QUALITY_MED,
   hdrEnvMap: null,
   fallbackEnvMap: null,
+  fallbackEnvTarget: null,
+  fallbackEnvSignature: '',
   hdrLoadRequested: false,
   carPaintMaterial: null,
   ssaoEnabled: false,
@@ -154,6 +158,14 @@ function ensureHdrEnvironment() {
   return ensureEngineHdrEnvironment(buildEngineModuleContext());
 }
 
+function refreshEarthEnvironmentMap(profile = null, options = {}) {
+  return refreshEngineProceduralEnvironment(buildEngineModuleContext(), profile, options);
+}
+
+function getEnvironmentLightingSnapshot() {
+  return getEngineEnvironmentLightingSnapshot(buildEngineModuleContext());
+}
+
 function setRenderQualityLevel(level, options = {}) {
   return setEngineRenderQualityLevel(buildEngineModuleContext(), level, options);
 }
@@ -213,12 +225,14 @@ Object.assign(appCtx, {
   createBuildingGroundPatch,
   ensureEnginePbrTextures,
   getHighQualityEnabled,
+  getEnvironmentLightingSnapshot,
   getBuildingMaterial,
   getRenderQualityLevel,
   getShadowMapResolution,
   getSsaoEnabled,
   init,
   isLikelyMobileDevice,
+  refreshEarthEnvironmentMap,
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,
@@ -230,11 +244,13 @@ export {
   createBuildingGroundPatch,
   ensureEnginePbrTextures,
   getHighQualityEnabled,
+  getEnvironmentLightingSnapshot,
   getBuildingMaterial,
   getRenderQualityLevel,
   getShadowMapResolution,
   getSsaoEnabled,
   init,
+  refreshEarthEnvironmentMap,
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,

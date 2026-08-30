@@ -19,7 +19,8 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
   }
 
   function boatHudLabel() {
-    return `${waterKindLabel(appCtx.boatMode?.waterKind)} • ${getSeaStateConfig().label} Sea`;
+    const vessel = String(appCtx.boatMode?.vesselLabel || 'Boat');
+    return `${vessel} • ${waterKindLabel(appCtx.boatMode?.waterKind)} • ${getSeaStateConfig().label} Sea`;
   }
 
   function updateBoatMenuUi() {
@@ -27,7 +28,7 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
     if (boatButton) {
       const visible = !!(appCtx.boatMode?.active || appCtx.boatMode?.available || appCtx.oceanMode?.active);
       boatButton.style.display = visible ? '' : 'none';
-      boatButton.textContent = appCtx.boatMode?.active ? '⛴ Exit Boat' : appCtx.oceanMode?.active ? '🚤 Surface Boat' : '🚤 Boat Mode';
+      boatButton.textContent = appCtx.boatMode?.active ? '⛴ Exit Vessel' : appCtx.oceanMode?.active ? '🚤 Surface Boat' : '🚤 Boat Mode';
       boatButton.classList.toggle('on', !!appCtx.boatMode?.active);
     }
     if (seaStateButton) {

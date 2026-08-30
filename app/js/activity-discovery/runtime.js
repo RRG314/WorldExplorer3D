@@ -55,9 +55,10 @@ function getCompletionState(activityId = '') {
 
 function markCompleted(activity = {}, durationMs = 0) {
   const key = sanitizeText(activity.id || '', 120).toLowerCase();
-  if (!key) return;
+  if (!key) return null;
   const store = completionStore();
   const current = store[key] && typeof store[key] === 'object' ? store[key] : {};
+  const firstCompletion = Math.max(0, finiteNumber(current.count, 0)) === 0;
   store[key] = {
     count: Math.max(0, finiteNumber(current.count, 0)) + 1,
     lastCompletedAt: Date.now(),
@@ -66,6 +67,22 @@ function markCompleted(activity = {}, durationMs = 0) {
       : finiteNumber(current.bestTimeMs, 0)
   };
   writeCompletionStore(store);
+  const pose = currentPose();
+  void appCtx.recordExplorerEvent?.({
+    eventId: `event:activity-completed:${key}:${store[key].count}`,
+    eventType: 'activity-completed',
+    sourceSystem: 'games-and-activities',
+    sourceId: key,
+    pathId: 'activity',
+    name: sanitizeText(activity.title || activity.name || 'Activity complete', 120),
+    detail: firstCompletion ? 'First completion saved.' : `Completed again${durationMs > 0 ? ` in ${Math.max(1, Math.round(durationMs / 1000))} seconds` : ''}.`,
+    activityId: key,
+    localPosition: pose,
+    firstCompletion,
+    points: firstCompletion ? 2 : 0,
+    progressReason: firstCompletion ? 'first-activity-completion' : 'activity-replay'
+  });
+  return cloneJson(store[key]);
 }
 
 function currentPose() {

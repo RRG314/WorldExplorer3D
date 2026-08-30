@@ -48,13 +48,14 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       update(frame) {
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
         appCtx.updatePlanetaryTracks?.();
-        if (!appCtx.onMars) appCtx.refreshAstronomicalSky?.(false);
+        appCtx.updatePlanetaryFieldMap?.(frame.dt);
+        if (!appCtx.onMars && !appCtx.activePlanetaryBodyId) appCtx.refreshAstronomicalSky?.(false);
         appCtx.updateWaterWaveVisuals?.();
 
         weatherTimer += frame.dt;
         if (weatherTimer > 5) {
           weatherTimer = 0;
-          if (!appCtx.onMoon && !appCtx.onMars) void appCtx.refreshLiveWeather?.(false);
+          if (!appCtx.onMoon && !appCtx.onMars && !appCtx.activePlanetaryBodyId) void appCtx.refreshLiveWeather?.(false);
         }
 
         boatTimer += frame.dt;

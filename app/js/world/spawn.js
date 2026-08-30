@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=48";
-import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=7";
-import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
-import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=2';
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=63";
+import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=13";
+import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=2";
+import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=6';
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -47,10 +47,12 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const collisionBaseY = hasExplicitFeetY ? actorFeetY : terrainY;
   const nearestRoad = !options.skipRoadQuery && typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
     y: actorFeetY + 1.2,
-    maxVerticalDelta: 12
+    maxVerticalDelta: 12,
+    preferredRoad: options.preferredRoad || null
   }) : null;
   const onRoadSurface = isRoadSurfaceReachable(nearestRoad, {
-    extraLateralPadding: 0.25
+    extraLateralPadding: 0.25,
+    currentRoad: options.preferredRoad || null
   });
   const road = onRoadSurface ? nearestRoad?.road || null : null;
   let surfaceY = onRoadSurface && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : walkBaseY;
@@ -62,14 +64,24 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     actorHeight: 1.9,
     tolerance: 0.45
   });
+  let standingOnRoof = false;
   if (containingBuilding) {
     const minY = Number.isFinite(containingBuilding.minY) ? containingBuilding.minY : containingBuilding.baseY;
     const maxY = Number.isFinite(containingBuilding.maxY) ?
       containingBuilding.maxY :
       Number.isFinite(minY) && Number.isFinite(containingBuilding.height) ? minY + containingBuilding.height : NaN;
-    const standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
+    standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
       actorFeetY >= maxY - 0.12 && actorFeetY <= maxY + 1.2;
     if (!standingOnRoof) return { valid: false, reason: "inside_building", terrainY };
+  }
+  const buildingCheck = !standingOnRoof && typeof appCtx.checkBuildingCollision === "function" ?
+    appCtx.checkBuildingCollision(x, z, 1.5, {
+      actorBaseY: collisionBaseY,
+      actorHeight: 1.9
+    }) :
+    { collision: false };
+  if (buildingCheck?.collision) {
+    return { valid: false, reason: "building_clearance", terrainY, buildingCheck };
   }
   if (options.preserveElevatedSurface === true && hasExplicitFeetY && actorFeetY > surfaceY + 1) {
     surfaceY = actorFeetY;
@@ -104,11 +116,13 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   const actorFeetY = Number.isFinite(desiredFeetY) ? desiredFeetY : terrainY;
   const nearestRoad = !options.skipRoadQuery && typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
     y: actorFeetY + 1.2,
-    maxVerticalDelta: 18
+    maxVerticalDelta: 18,
+    preferredRoad: options.preferredRoad || null
   }) : null;
   const road = worldSpawnDeps.isVehicleRoad(nearestRoad?.road) ? nearestRoad.road : null;
   const onRoad = isRoadSurfaceReachable(nearestRoad, {
-    extraVerticalAllowance: 0.5
+    extraVerticalAllowance: 0.5,
+    currentRoad: options.preferredRoad || null
   }) && !!road;
   const resolvedSurfaceY = onRoad && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : terrainY;
   const collisionBaseY = onRoad ? resolvedSurfaceY : actorFeetY;
@@ -407,7 +421,8 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
   const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(8, options.maxDistance) : 220;
   const nearest = worldSpawnDeps.findNearestRoad(targetX, targetZ, {
     y: Number.isFinite(options.feetY) ? options.feetY + 1.2 : NaN,
-    maxVerticalDelta: 18
+    maxVerticalDelta: 18,
+    preferredRoad: options.preferredRoad || null
   });
   const road = nearest?.road;
   if (!road || !worldSpawnDeps.isVehicleRoad(road) || Number(nearest.dist) > maxDistance) return null;
@@ -418,6 +433,7 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
   const evaluated = evaluateDriveSpawnCandidate(point.x, point.z, {
     angle,
     feetY: options.feetY,
+    preferredRoad: options.preferredRoad || null,
     requireRoad: true,
     source: 'projected_road'
   });
@@ -461,6 +477,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       angle,
       feetY: options.feetY,
       preserveElevatedSurface: options.preserveElevatedSurface,
+      preferredRoad: options.preferredRoad || null,
       allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
     });
@@ -485,6 +502,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const direct = evaluateDriveSpawnCandidate(x, z, {
     angle,
     feetY: options.feetY,
+    preferredRoad: options.preferredRoad || null,
     source: options.source || "direct"
   });
   if (direct.valid && !isSubgradeArrival(direct) && (!preferRoad || direct.onRoad)) return direct;
@@ -492,6 +510,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const projectedRoad = resolveProjectedRoadSpawn(x, z, {
     angle,
     feetY: options.feetY,
+    preferredRoad: options.preferredRoad || null,
     maxDistance: options.maxRoadDistance
   });
   const localGroundFallback = options.fastLocalFallback === true && !projectedRoad ?
@@ -553,10 +572,19 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
     appCtx.car.rearSlip = 0;
     appCtx.car._lastSurfaceY = null;
     appCtx.car._terrainAirTimer = 0;
+    appCtx.car.groundContact = null;
     appCtx.car.isAirborne = false;
     appCtx.car.onRoad = !!resolved.onRoad;
     appCtx.car.road = resolved.road || null;
     if (typeof appCtx.invalidateRoadCache === "function") appCtx.invalidateRoadCache();
+    // GroundHeight keeps its own walking-road cache. A world load first places
+    // the shared actors on a generic road and can then resolve a custom arrival
+    // on a different vertical layer (for example, the Jones Falls Expressway).
+    // Keeping the earlier cached feature makes the first walking physics frame
+    // sample the lower road/terrain and drop the actor through the bridge deck.
+    // Invalidate the surface selector at the same authoritative handoff where
+    // car.road changes so every consumer starts from the resolved feature.
+    appCtx.GroundHeight?.invalidate?.();
     if (appCtx.carMesh) {
       appCtx.carMesh.position.set(resolved.x, resolved.carY, resolved.z);
       appCtx.carMesh.rotation.y = appCtx.car.angle;
@@ -566,6 +594,7 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
 
   if (syncWalker && appCtx.Walk?.state?.walker) {
     const walker = appCtx.Walk.state.walker;
+    walker._resolvedGroundState = null;
     walker.x = resolved.x;
     walker.z = resolved.z;
     walker.y = resolved.walkY;

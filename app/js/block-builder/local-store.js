@@ -12,6 +12,7 @@ export function createBlockLocalStore(options = {}) {
 
   let enabled = false;
   let detail = 'Not initialized.';
+  let notice = 'none';
   let entries = [];
 
   function detectStorage() {
@@ -27,17 +28,40 @@ export function createBlockLocalStore(options = {}) {
     }
   }
 
-  function preserveLegacyStorage() {
+  function migrateLegacyStorage() {
     if (!enabled || !globalThis.localStorage) return;
     try {
       if (localStorage.getItem(migrationKey) === 'done') return;
-      legacyKeys.forEach((key) => {
-        if (!key || key === storageKey || key === backupKey) return;
-      });
+      const currentStorageExists = localStorage.getItem(storageKey) !== null ||
+        localStorage.getItem(backupKey) !== null;
+      if (currentStorageExists) {
+        localStorage.setItem(migrationKey, 'done');
+        return;
+      }
+      for (const key of legacyKeys) {
+        if (!key || key === storageKey || key === backupKey) continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(localStorage.getItem(key));
+        } catch {
+          continue;
+        }
+        if (!Array.isArray(parsed)) continue;
+        const migrated = normalizeRows(parsed);
+        const previous = entries;
+        entries = migrated;
+        if (!save()) {
+          entries = previous;
+          return;
+        }
+        localStorage.setItem(migrationKey, 'done');
+        notice = 'migrated';
+        detail = `Migrated ${migrated.length} saved block${migrated.length === 1 ? '' : 's'} without deleting the previous copy.`;
+        return;
+      }
       localStorage.setItem(migrationKey, 'done');
-      detail = 'Existing local build data is preserved for compatibility on this browser.';
     } catch (error) {
-      console.warn('[blocks] Failed to preserve legacy build storage:', error);
+      console.warn('[blocks] Failed to migrate legacy build storage:', error);
     }
   }
 
@@ -49,27 +73,45 @@ export function createBlockLocalStore(options = {}) {
   function load() {
     if (!enabled) return [];
     const parseRows = (raw) => {
-      if (!raw) return null;
+      if (raw === null) return { state: 'missing', rows: null };
       try {
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : null;
+        return Array.isArray(parsed)
+          ? { state: 'valid', rows: parsed }
+          : { state: 'invalid', rows: null };
       } catch {
-        return null;
+        return { state: 'invalid', rows: null };
       }
     };
     try {
       const primary = parseRows(localStorage.getItem(storageKey));
-      if (primary) return normalizeRows(primary);
       const backup = parseRows(localStorage.getItem(backupKey));
-      if (backup) {
+
+      if (primary.state === 'valid') return normalizeRows(primary.rows);
+
+      if (backup.state === 'valid') {
+        const recovered = normalizeRows(backup.rows);
         try {
-          localStorage.setItem(storageKey, JSON.stringify(backup));
+          localStorage.setItem(storageKey, JSON.stringify(recovered));
         } catch {
           // Backup recovery remains best effort.
         }
-        return normalizeRows(backup);
+        notice = 'recovered';
+        detail = primary.state === 'invalid'
+          ? 'Recovered your blocks from the browser backup because the main saved copy was damaged.'
+          : 'Recovered your blocks from the browser backup because the main saved copy was missing.';
+        return recovered;
+      }
+
+      if (primary.state === 'invalid' || backup.state === 'invalid') {
+        notice = 'warning';
+        detail = primary.state === 'invalid' && backup.state === 'invalid'
+          ? 'Both saved block copies were damaged. Blocks started empty so corrupted data could not enter the world.'
+          : 'Saved block data was damaged and no usable backup was available. Blocks started empty.';
       }
     } catch (error) {
+      notice = 'warning';
+      detail = `Could not read saved blocks. Blocks started empty: ${error?.message || String(error)}`;
       console.warn('[blocks] Failed to read storage:', error);
     }
     return [];
@@ -78,12 +120,28 @@ export function createBlockLocalStore(options = {}) {
   function save() {
     if (!enabled) return false;
     const payload = JSON.stringify(entries);
+    const previousPrimary = localStorage.getItem(storageKey);
+    const previousBackup = localStorage.getItem(backupKey);
     try {
-      localStorage.setItem(storageKey, payload);
+      // Write the recovery copy first and the authoritative key last. If the
+      // authoritative write fails, load() still sees the previous committed
+      // primary value. The catch block restores the recovery copy when the
+      // storage provider still permits it.
       localStorage.setItem(backupKey, payload);
+      localStorage.setItem(storageKey, payload);
       return true;
     } catch (error) {
+      try {
+        if (previousBackup === null) localStorage.removeItem(backupKey);
+        else localStorage.setItem(backupKey, previousBackup);
+        if (previousPrimary === null) localStorage.removeItem(storageKey);
+        else localStorage.setItem(storageKey, previousPrimary);
+      } catch {
+        // The authoritative key was written last, so a total write failure
+        // still leaves the previous primary as the next-load authority.
+      }
       enabled = false;
+      notice = 'error';
       detail = `Storage write failed: ${error?.message || String(error)}`;
       console.warn('[blocks] Failed to save storage:', error);
       return false;
@@ -94,8 +152,9 @@ export function createBlockLocalStore(options = {}) {
     const storageState = detectStorage();
     enabled = storageState.enabled;
     detail = storageState.detail;
-    preserveLegacyStorage();
+    notice = enabled ? 'none' : 'error';
     entries = load();
+    migrateLegacyStorage();
   }
 
   function countForLocation(locationKey) {
@@ -107,7 +166,7 @@ export function createBlockLocalStore(options = {}) {
   }
 
   function upsert(rawEntry) {
-    if (!enabled) return true;
+    if (!enabled) return false;
     const existingIndex = entries.findIndex((entry) =>
       entry.locationKey === rawEntry.locationKey &&
       entry.gx === rawEntry.gx && entry.gy === rawEntry.gy && entry.gz === rawEntry.gz
@@ -132,7 +191,7 @@ export function createBlockLocalStore(options = {}) {
   }
 
   function removeAt(locationKey, gx, gy, gz) {
-    if (!enabled) return true;
+    if (!enabled) return false;
     const next = entries.filter((entry) =>
       !(entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz)
     );
@@ -145,7 +204,7 @@ export function createBlockLocalStore(options = {}) {
   }
 
   function clearLocation(locationKey) {
-    if (!enabled) return true;
+    if (!enabled) return false;
     const next = entries.filter((entry) => entry.locationKey !== locationKey);
     if (next.length === entries.length) return true;
     const previous = entries;
@@ -156,7 +215,7 @@ export function createBlockLocalStore(options = {}) {
   }
 
   function getStatus() {
-    return { enabled, detail, storageKey, totalCount: entries.length };
+    return { enabled, detail, notice, storageKey, totalCount: entries.length };
   }
 
   return { clearLocation, countForLocation, getStatus, initialize, listForLocation, removeAt, upsert };

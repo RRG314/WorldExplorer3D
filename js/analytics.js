@@ -1,5 +1,6 @@
-import { observeAuth } from './auth-ui.js';
-import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js';
+import { observeAuth } from './auth-ui.js?v=55';
+import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=55';
+import { readAnalyticsConsent } from './analytics-consent.js?v=1';
 
 const ANALYTICS_EVENT_WORLD_START = 'we3d_world_session_start';
 const ANALYTICS_EVENT_WORLD_END = 'we3d_world_session_end';
@@ -15,6 +16,28 @@ let trackingStarted = false;
 let trackingInterval = 0;
 let unloadBound = false;
 let authUnsubscribe = null;
+let productEventsBound = false;
+let discoveryEventListener = null;
+let tutorialEventListener = null;
+let productEventListener = null;
+let consentEventListener = null;
+let lastAuthUser = null;
+
+const ALLOWED_PRODUCT_EVENTS = new Set([
+  'tutorial_begin',
+  'tutorial_complete',
+  'we3d_tutorial_step',
+  'we3d_discovery_action',
+  'leaderboard_view',
+  'leaderboard_refresh',
+  'score_submit',
+  'room_create',
+  'room_join',
+  'room_leave',
+  'room_artifact_share',
+  'friend_add',
+  'explorer_progress'
+]);
 
 const state = {
   enabled: false,
@@ -27,6 +50,7 @@ const state = {
   worldSessionStartedAt: 0,
   worldSessionCount: 0,
   flushCount: 0,
+  productEventCount: 0,
   lastMode: '',
   lastEnvironment: '',
   lastLocationKey: '',
@@ -135,6 +159,7 @@ async function ensureAnalyticsTools() {
 }
 
 async function logAnalyticsEvent(eventName, params = {}) {
+  if (readAnalyticsConsent() !== 'granted') return false;
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics || typeof tools.logEvent !== 'function') return false;
   try {
@@ -146,7 +171,83 @@ async function logAnalyticsEvent(eventName, params = {}) {
   }
 }
 
+function sanitizeEventParams(params = {}) {
+  const safe = {};
+  Object.entries(params && typeof params === 'object' ? params : {}).slice(0, 20).forEach(([rawKey, rawValue]) => {
+    const key = sanitizeAnalyticsName(rawKey, '', 40);
+    if (!key || rawValue == null) return;
+    if (typeof rawValue === 'boolean') safe[key] = rawValue;
+    else if (typeof rawValue === 'number' && Number.isFinite(rawValue)) safe[key] = rawValue;
+    else if (Array.isArray(rawValue)) safe[key] = rawValue.map((value) => sanitizeAnalyticsName(value, '', 32)).filter(Boolean).slice(0, 4).join('|');
+    else safe[key] = sanitizeAnalyticsName(rawValue, 'unknown', 80);
+  });
+  return safe;
+}
+
+async function trackProductEvent(eventName, params = {}) {
+  const name = String(eventName || '').trim();
+  if (!ALLOWED_PRODUCT_EVENTS.has(name)) return false;
+  const logged = await logAnalyticsEvent(name, sanitizeEventParams(params));
+  if (logged) state.productEventCount += 1;
+  return logged;
+}
+
+function bindProductEvents() {
+  if (productEventsBound || typeof globalThis.addEventListener !== 'function') return;
+  productEventsBound = true;
+  discoveryEventListener = (event) => {
+    const detail = event?.detail || {};
+    void trackProductEvent('we3d_discovery_action', {
+      action: detail.type,
+      activity_id: detail.activityId,
+      catalog_family: detail.catalogFamily,
+      discipline: detail.discipline,
+      context_bands: detail.contextBands,
+      result: detail.result,
+      multiplayer: detail.multiplayer,
+      live_gps: detail.liveGps,
+      schema_version: detail.schemaVersion
+    });
+  };
+  tutorialEventListener = (event) => {
+    const detail = event?.detail || {};
+    void trackProductEvent(detail.name, detail.params || {});
+  };
+  productEventListener = (event) => {
+    const detail = event?.detail || {};
+    void trackProductEvent(detail.name, detail.params || {});
+  };
+  globalThis.addEventListener('we3d:discovery-telemetry', discoveryEventListener);
+  globalThis.addEventListener('we3d:tutorial-telemetry', tutorialEventListener);
+  globalThis.addEventListener('we3d:product-telemetry', productEventListener);
+  globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ = true;
+  const queuedTutorialEvents = Array.isArray(globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__)
+    ? globalThis.__WE3D_TUTORIAL_ANALYTICS_QUEUE__.splice(0)
+    : [];
+  queuedTutorialEvents.forEach((detail) => tutorialEventListener({ detail }));
+  const queuedProductEvents = Array.isArray(globalThis.__WE3D_PRODUCT_TELEMETRY_QUEUE__)
+    ? globalThis.__WE3D_PRODUCT_TELEMETRY_QUEUE__.splice(0)
+    : [];
+  queuedProductEvents.forEach((detail) => productEventListener({ detail }));
+}
+
+function unbindProductEvents() {
+  if (!productEventsBound || typeof globalThis.removeEventListener !== 'function') return;
+  productEventsBound = false;
+  globalThis.__WE3D_ANALYTICS_PRODUCT_EVENTS_BOUND__ = false;
+  if (discoveryEventListener) globalThis.removeEventListener('we3d:discovery-telemetry', discoveryEventListener);
+  if (tutorialEventListener) globalThis.removeEventListener('we3d:tutorial-telemetry', tutorialEventListener);
+  if (productEventListener) globalThis.removeEventListener('we3d:product-telemetry', productEventListener);
+  discoveryEventListener = null;
+  tutorialEventListener = null;
+  productEventListener = null;
+}
+
 async function syncAnalyticsUser(user = null) {
+  if (readAnalyticsConsent() !== 'granted') {
+    state.currentUserId = '';
+    return;
+  }
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics) return;
   try {
@@ -267,10 +368,31 @@ function startAnalyticsTracking(appCtx) {
   state.runtimeStartedAt = Date.now();
   state.measurementId = String(readFirebaseConfig()?.measurementId || '').trim();
 
+  consentEventListener = async (event) => {
+    const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js').catch(() => null);
+    const granted = event?.detail?.value === 'granted';
+    analyticsMod?.setConsent?.({
+      analytics_storage: granted ? 'granted' : 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied'
+    });
+    if (granted) {
+      void syncAnalyticsUser(lastAuthUser);
+    } else {
+      state.currentUserId = '';
+      const tools = await ensureAnalyticsTools();
+      tools?.setUserId?.(tools.analytics, null);
+    }
+  };
+  globalThis.addEventListener?.('we3d:analytics-consent', consentEventListener, { passive: true });
+
   void ensureAnalyticsTools();
   bindLifecycle(appCtx);
+  bindProductEvents();
 
   authUnsubscribe = observeAuth((user) => {
+    lastAuthUser = user || null;
     void syncAnalyticsUser(user || null);
   });
 
@@ -293,6 +415,12 @@ function stopAnalyticsTracking() {
     authUnsubscribe();
     authUnsubscribe = null;
   }
+  if (consentEventListener) {
+    globalThis.removeEventListener?.('we3d:analytics-consent', consentEventListener);
+    consentEventListener = null;
+  }
+  lastAuthUser = null;
+  unbindProductEvents();
 }
 
 function getAnalyticsSessionSnapshot(appCtx = null) {
@@ -302,6 +430,7 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     enabled: !!state.enabled,
     ready: !!state.ready,
     measurementId: state.measurementId || '',
+    consent: readAnalyticsConsent(),
     currentUserId: state.currentUserId || '',
     trackingStarted,
     runtimeAgeSec: clampDurationSec((now - (state.runtimeStartedAt || now)) / 1000),
@@ -309,6 +438,7 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     worldSessionAgeSec: state.worldSessionActive ? clampDurationSec((now - state.worldSessionStartedAt) / 1000) : 0,
     worldSessionCount: state.worldSessionCount,
     flushCount: state.flushCount,
+    productEventCount: state.productEventCount,
     currentMode: ctx ? currentTravelMode(ctx) : '',
     currentEnvironment: ctx ? currentEnvironment(ctx) : '',
     lastLocationKey: state.lastLocationKey || '',
@@ -320,5 +450,6 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
 export {
   getAnalyticsSessionSnapshot,
   startAnalyticsTracking,
-  stopAnalyticsTracking
+  stopAnalyticsTracking,
+  trackProductEvent
 };

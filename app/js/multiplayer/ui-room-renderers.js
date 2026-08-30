@@ -264,7 +264,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (!refs.titleLeaderboardList) return;
     if (!state.leaderboard.length) {
       refs.titleLeaderboardList.innerHTML =
-        '<li class="mpRoomEmpty">Leaderboard updates as explorers participate.</li>';
+        '<li class="mpRoomEmpty">No Community League activity yet. Join rooms, share creations, and make connections to begin.</li>';
       return;
     }
     refs.titleLeaderboardList.innerHTML = state.leaderboard

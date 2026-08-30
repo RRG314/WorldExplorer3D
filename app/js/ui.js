@@ -3,12 +3,12 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
-import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=68";
-import { initShareUi } from "./ui/share-links.js?v=62";
+import { initMapInteractions } from "./ui/map-interactions.js?v=60";
+import { initMobileControls } from "./ui/mobile-controls.js?v=77";
+import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=98";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=112";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -157,6 +157,7 @@ function setupUI() {
   // Helper function to close all float menus
   function closeAllFloatMenus() {
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+    document.querySelectorAll('.floatBtn[aria-expanded]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
     closeGameShareMenu();
     if (typeof appCtx.toggleFlowerActionMenu === 'function') {
       const menuEl = document.getElementById('flowerActionMenu');
@@ -194,6 +195,11 @@ function setupUI() {
     updateControlsModeUI();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     if (typeof appCtx.refreshFlowerLeaderboard === 'function') appCtx.refreshFlowerLeaderboard();
+    // Starting Earth from the title always recompiles the selected location.
+    // Keeping the previous fixed world behind that screen only retains its JS
+    // graph and WebGL buffers, which can make Chrome report >1 GB for an idle tab.
+    appCtx.releaseEarthWorldForTitle?.();
+    appCtx.hideLoad?.();
   }
 
   // Float menu
@@ -211,8 +217,10 @@ function setupUI() {
     if (!menu) return;
     const isOpen = menu.classList.contains('open');
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+    document.querySelectorAll('.floatBtn[aria-expanded]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
     if (!isOpen) {
       menu.classList.add('open');
+      document.getElementById(buttonId)?.setAttribute('aria-expanded', 'true');
       const hideTouchTutorial = () => {
         const tutorialCard = document.getElementById('tutorialHintCard');
         if (isTouchPreferredClient && menu.classList.contains('open') && tutorialCard) {
@@ -224,31 +232,9 @@ function setupUI() {
     }
   };
 
-  const floatMenuContainer = document.getElementById('floatMenuContainer');
-  if (floatMenuContainer && isTouchPreferredClient) {
-    floatMenuContainer.addEventListener('touchend', (event) => {
-      if (!appCtx.gameStarted) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target) return;
-
-      const menuBtn = target.closest('.floatBtn');
-      if (menuBtn && menuBtn.id) {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleFloatMenuByButton(menuBtn.id);
-        return;
-      }
-
-      const menuItem = target.closest('.floatItem');
-      if (menuItem) {
-        event.preventDefault();
-        event.stopPropagation();
-        menuItem.click();
-      }
-    }, { passive: false });
-  }
-
-  // Three separate float menu buttons
+  // Native click is the single menu input authority on mouse and touch. A
+  // second touchend dispatcher used to invoke the same toggle twice on some
+  // mobile browsers, making a menu appear to switch rapidly between states.
   document.getElementById('travelBtn').addEventListener('click', () => toggleFloatMenuByButton('travelBtn'));
   document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
   document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
@@ -259,9 +245,18 @@ function setupUI() {
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
+  document.getElementById('fBackpack')?.addEventListener('click', () => {
+    appCtx.toggleWorldDiscoveryJournal?.(false);
+    appCtx.toggleUrbanEquipment?.(true);
+    emitTutorialEvent('opened_backpack', { source: 'exploration_menu' });
+    closeAllFloatMenus();
+  });
   document.getElementById('fEditorMode')?.addEventListener('click', () => {
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.openBlockBuilder === 'function') appCtx.openBlockBuilder();
+    if (typeof appCtx.closeBlockBuilder === 'function') appCtx.closeBlockBuilder();
+    if (typeof appCtx.openEditorSession === 'function') {
+      void appCtx.openEditorSession({ initialTab: 'workspace' });
+    }
     closeAllFloatMenus();
   });
   document.getElementById('fEditorMine')?.addEventListener('click', () => {
@@ -304,6 +299,13 @@ function setupUI() {
       appCtx.toggleActivityBrowser({ scope: 'rooms' });
     }
     closeAllFloatMenus();
+  });
+  document.getElementById('fMultiplayer')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    void appCtx.openMultiplayerPanel?.().catch((error) => {
+      console.error('[multiplayer] Could not open the room panel.', error);
+      appCtx.showToast?.('Multiplayer is unavailable right now.');
+    });
   });
   document.getElementById('fDeFlock')?.addEventListener('click', () => {
     if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {
@@ -406,13 +408,6 @@ function setupUI() {
       closeAllFloatMenus();
     });
   }
-  document.getElementById('fPolice').addEventListener('click', () => {
-    appCtx.policeOn = !appCtx.policeOn;
-    document.getElementById('fPolice').classList.toggle('on', appCtx.policeOn);
-    document.getElementById('police').classList.toggle('show', appCtx.policeOn);
-    if (appCtx.policeOn) appCtx.spawnPolice();else appCtx.clearPolice();
-    closeAllFloatMenus();
-  });
   // Travel mode switchers - mutually exclusive
   document.getElementById('fDriving').addEventListener('click', () => {
     if (typeof appCtx.setTravelMode === 'function') {
@@ -567,12 +562,26 @@ function setupUI() {
   }
   const controlsBarBtn = document.getElementById('controlsBarBtn');
   if (controlsBarBtn && ctrlContent) {
-    controlsBarBtn.addEventListener('click', (e) => {
+    let lastTouchToggleAt = 0;
+    const toggleControlsPanel = (e) => {
       e.stopPropagation();
       document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
       ctrlContent.classList.toggle('hidden');
       controlsTab?.classList.toggle('bar-open', !ctrlContent.classList.contains('hidden'));
       updateControlsModeUI();
+    };
+    controlsBarBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      lastTouchToggleAt = performance.now();
+      toggleControlsPanel(e);
+    }, { passive: false });
+    controlsBarBtn.addEventListener('click', (e) => {
+      if (performance.now() - lastTouchToggleAt < 700) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      toggleControlsPanel(e);
     });
   }
 
@@ -624,7 +633,14 @@ function setupUI() {
   document.getElementById('resumeBtn').addEventListener('click', () => {appCtx.setPauseReason?.('manual_pause', false);document.getElementById('pauseScreen').classList.remove('show');});
   document.getElementById('restartBtn').addEventListener('click', () => {appCtx.setPauseReason?.('manual_pause', false);document.getElementById('pauseScreen').classList.remove('show');appCtx.startMode();});
   document.getElementById('menuBtn').addEventListener('click', () => goToMainMenu());
-  document.getElementById('caughtBtn').addEventListener('click', () => {document.getElementById('caughtScreen').classList.remove('show');appCtx.policeHits = 0;appCtx.setPauseReason?.('caught', false);document.getElementById('police').textContent = '💔 0/3';appCtx.spawnOnRoad();});
+  document.getElementById('caughtBtn').addEventListener('click', () => {
+    document.getElementById('caughtScreen').classList.remove('show');
+    appCtx.policeHits = 0;
+    appCtx.setPauseReason?.('caught', false);
+    document.getElementById('police').textContent = '💔 0/3';
+    if (appCtx.handleUrbanCustodyContinue?.() === true) return;
+    appCtx.spawnOnRoad();
+  });
   document.getElementById('againBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.setPauseReason?.('game_result', false);appCtx.startMode();});
   document.getElementById('freeBtn').addEventListener('click', () => {
     appCtx.hideResult();

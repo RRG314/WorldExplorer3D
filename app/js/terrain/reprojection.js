@@ -1,9 +1,9 @@
 import {
   buildFeatureRibbonEdges,
   isRoadSurfaceReachable
-} from "../structure-semantics.js?v=48";
-import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=25";
-import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=3';
+} from "../structure-semantics.js?v=63";
+import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=28";
+import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=4';
 
 function mappedWaterReprojectionBase(mesh, sampledBoundaryHeights = []) {
   const layer = String(
@@ -184,6 +184,19 @@ function createTerrainReprojectionApi(deps = {}) {
       if (mesh.userData?.isMappedVessel) return;
       const pts = mesh.userData.buildingFootprint;
       if (!pts || pts.length === 0) return;
+
+      // The building compiler already sampled accepted ground, published one
+      // foundation base, and bound collision to that same vertical extent.
+      // A later terrain-material/corridor rebuild must not replace that
+      // immutable authority with a second min-plus-lift estimate. Besides
+      // moving whole buildings, doing so also collapsed mapped roof meshes to
+      // the body base because every mesh was treated as a generic footprint.
+      if (
+        mesh.userData?.buildingProvenance?.foundation?.authority === 'accepted_ground' &&
+        Number.isFinite(mesh.userData.buildingProvenance.foundation.baseY)
+      ) {
+        return;
+      }
 
       const fallbackElevation = Number.isFinite(mesh.userData?.avgElevation) ?
         mesh.userData.avgElevation :

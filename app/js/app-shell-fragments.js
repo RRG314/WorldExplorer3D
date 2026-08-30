@@ -84,7 +84,7 @@ const APP_SHELL_FRAGMENT_HTML = `
   </div>
 </div>
 <div id="roomPanelModal" class="room-panel-modal" aria-hidden="true">
-  <section class="room-panel" role="dialog" aria-label="Multiplayer room panel">
+  <section class="room-panel" role="dialog" aria-modal="true" aria-label="Multiplayer room panel" tabindex="-1">
     <div class="room-panel-head">
       <div class="room-panel-title">MULTIPLAYER ROOM</div>
       <button id="roomPanelCloseBtn" class="room-panel-close" type="button">Close</button>
@@ -214,9 +214,9 @@ const APP_SHELL_FRAGMENT_HTML = `
 <div id="debugOverlay" style="position:fixed;top:var(--debug-overlay-top,20px);left:var(--debug-overlay-left,clamp(190px,24vw,470px));background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:var(--debug-overlay-z,145);display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
 <div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
 <div id="loading"><div class="spinner"></div><div id="loadText">Loading...</div></div>
-<div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
-<div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
-<div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
+<div id="pauseScreen" role="dialog" aria-modal="true" aria-labelledby="pauseScreenTitle" tabindex="-1"><div class="pauseTitle" id="pauseScreenTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
+<div id="resultScreen" role="dialog" aria-modal="true" aria-labelledby="resultTitle" tabindex="-1"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
+<div id="caughtScreen" role="dialog" aria-modal="true" aria-labelledby="caughtScreenTitle" tabindex="-1"><div class="caughtBox"><div class="caughtTitle" id="caughtScreenTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
 `;
 
 async function publishImmutableBuildIdentity() {

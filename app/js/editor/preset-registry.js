@@ -56,7 +56,7 @@ const PRESET_EXAMPLES = Object.freeze({
   ],
   water: [
     'Add a pond or basin polygon so the world renders the area as water.',
-    'Patch a local water outline that is missing from the base ingest.'
+    'Correct a local water outline that is missing from the map.'
   ],
   landuse_park: [
     'Add a park or plaza polygon that improves outdoor context and traversal.',
@@ -71,20 +71,20 @@ const PRESET_EXAMPLES = Object.freeze({
     'Create a simple marker that supplements the base world without replacing it.'
   ],
   interior_room: [
-    'Scaffold a room polygon inside a level-aware building shell.',
-    'Lay out a lobby or office room for future interior navigation.'
+    'Draw a room polygon inside a level-aware building.',
+    'Lay out a lobby or office room for indoor navigation.'
   ],
   corridor: [
-    'Add an indoor corridor centerline for level-aware traversal scaffolding.',
-    'Mark a concourse path before the full interior editor ships.'
+    'Add an indoor corridor centerline for level-aware navigation.',
+    'Mark a concourse path through a large indoor space.'
   ],
   stairs: [
     'Add a staircase connector between two or more levels.',
-    'Mark a stair line so later indoor traversal knows the connection path.'
+    'Mark a stair line so indoor navigation knows the connection path.'
   ],
   elevator: [
-    'Add an elevator point with served levels for accessibility scaffolding.',
-    'Mark a lift anchor before detailed indoor geometry is authored.'
+    'Add an elevator point with served levels for accessible navigation.',
+    'Mark a lift location and the floors it serves.'
   ]
 });
 

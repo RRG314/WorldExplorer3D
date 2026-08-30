@@ -14,16 +14,19 @@ function setStatus(message) {
   if (status) status.textContent = String(message || '');
 }
 
+function deferTutorialPrompt() {
+  const card = document.getElementById('tutorialHintCard');
+  if (!card || card.hidden) return;
+  const later = card.querySelector('.tutorial-icon-btn');
+  if (later instanceof HTMLButtonElement) later.click();
+  else card.hidden = true;
+}
+
 function syncBlockBuilderUi(snapshot = {}) {
   if (!panel) return;
   const enabled = snapshot.enabled === true;
   panel.classList.toggle('show', enabled);
   panel.setAttribute('aria-hidden', enabled ? 'false' : 'true');
-  const menuItem = document.getElementById('fEditorMode');
-  if (menuItem) {
-    menuItem.classList.toggle('on', enabled);
-    menuItem.textContent = enabled ? '🧱 Build with Blocks: ON' : '🧱 Build with Blocks';
-  }
 
   panel.querySelectorAll('[data-block-tool]').forEach((button) => {
     const active = button.dataset.blockTool === snapshot.tool;
@@ -54,8 +57,17 @@ function syncBlockBuilderUi(snapshot = {}) {
 
 function openBlockBuilder() {
   if (!appCtx.gameStarted || typeof appCtx.toggleBlockBuildMode !== 'function') return false;
+  deferTutorialPrompt();
   const enabled = appCtx.toggleBlockBuildMode(true);
-  if (enabled) setStatus('Choose a shape and color, then place it in the world.');
+  if (enabled) {
+    const snapshot = appCtx.getBlockBuilderSnapshot?.() || {};
+    const persistence = appCtx.getBuildPersistenceStatus?.() || {};
+    const recoveryNotice = snapshot.shared !== true && persistence.notice && persistence.notice !== 'none'
+      ? String(persistence.detail || '')
+      : '';
+    const guidance = snapshot.characterAssistance?.guidanceLabel || 'Basic placement guidance';
+    setStatus(recoveryNotice || `${guidance}. Choose a piece and color, or select a nearby mapped building.`);
+  }
   return enabled;
 }
 
@@ -103,6 +115,10 @@ function initBlockBuilderUi() {
   panel.addEventListener('pointerdown', stopBuildPointer);
   panel.addEventListener('click', stopBuildPointer);
   document.getElementById('blockBuilderClose')?.addEventListener('click', closeBlockBuilder);
+  document.getElementById('blockBuilderBack')?.addEventListener('click', async () => {
+    closeBlockBuilder();
+    await appCtx.openEditorSession?.({ initialTab: 'workspace', skipTutorial: true });
+  });
   panel.querySelectorAll('[data-block-tool]').forEach((button) => {
     button.addEventListener('click', () => appCtx.setBlockBuildTool?.(button.dataset.blockTool));
   });
@@ -138,10 +154,40 @@ function initBlockBuilderUi() {
   document.getElementById('blockBuilderUndo')?.addEventListener('click', () => {
     if (!appCtx.undoLastBuildAction?.()) setStatus('Nothing to undo.');
   });
+  const selectionLabel = document.getElementById('editableWorldSelection');
+  document.getElementById('editableWorldSelectBuilding')?.addEventListener('click', () => {
+    const radius = Number(appCtx.getConstructionAssistance?.().mappedSelectionRadiusMeters) || 42;
+    const selected = appCtx.selectNearestEditableBuilding?.(radius);
+    if (!selected) {
+      if (selectionLabel) selectionLabel.textContent = `No mapped building within ${radius.toFixed(0)} m. Move closer and try again.`;
+      return;
+    }
+    if (selectionLabel) selectionLabel.textContent = `${selected.label} · ${selected.distance.toFixed(1)} m · ${selected.sourceFeatureId}`;
+    setStatus('Mapped building selected. Virtual removal only affects this saved world or room.');
+  });
+  document.getElementById('editableWorldSuppressBuilding')?.addEventListener('click', async () => {
+    if (!globalThis.confirm('Virtually remove the selected mapped building from this saved world? The real map data is never changed.')) return;
+    const result = await appCtx.suppressSelectedEditableBuilding?.();
+    setStatus(result?.committed ? 'Saved. Rebuilding this fixed world from cached source data…' : `Could not remove building: ${result?.reason || 'select a nearby building first'}.`);
+  });
+  document.getElementById('editableWorldRestoreBuilding')?.addEventListener('click', async () => {
+    const result = await appCtx.restoreSelectedEditableBuilding?.();
+    setStatus(result?.committed ? 'Building restored. Rebuilding this fixed world…' : `Could not restore building: ${result?.reason || 'nothing selected'}.`);
+  });
+  document.getElementById('editableWorldReset')?.addEventListener('click', async () => {
+    if (!globalThis.confirm('Restore the base world here? This clears virtual removals, custom structures, and your local blocks at this location.')) return;
+    const result = await appCtx.resetLocalEditableWorld?.();
+    setStatus(result?.committed ? 'Base world restored. Reloading this fixed location…' : `Could not reset world: ${result?.reason || 'unknown error'}.`);
+  });
   document.getElementById('blockBuilderClear')?.addEventListener('click', () => {
     if (!globalThis.confirm('Clear your blocks at this location?')) return;
-    appCtx.clearAllBuildBlocks?.();
-    setStatus('Blocks cleared for this location.');
+    const shared = appCtx.getBlockBuilderSnapshot?.()?.shared === true;
+    const cleared = appCtx.clearAllBuildBlocks?.();
+    if (cleared === false) {
+      setStatus('Could not save that clear. Your blocks were kept.');
+    } else {
+      setStatus(shared ? 'Removing your saved room blocks…' : 'Blocks cleared for this location.');
+    }
     syncBlockBuilderUi(appCtx.getBlockBuilderSnapshot?.() || {});
   });
   refreshButton?.addEventListener('click', refreshMapData);

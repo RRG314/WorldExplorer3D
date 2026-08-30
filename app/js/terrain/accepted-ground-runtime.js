@@ -1,5 +1,5 @@
 import {
-  selectGroundArtifact
+  selectGroundArtifacts
 } from './ground-provider-registry.js?v=3';
 import {
   loadGroundArtifact
@@ -25,7 +25,10 @@ function freezeState(state) {
     verticalDatum: state.verticalDatum ? String(state.verticalDatum) : null,
     contentSha256: state.contentSha256
       ? String(state.contentSha256)
-      : null
+      : null,
+    artifactCount: Number(state.artifactCount || 0),
+    artifactIds: Object.freeze([...(state.artifactIds || [])].map(String)),
+    contentSha256s: Object.freeze([...(state.contentSha256s || [])].map(String))
   });
 }
 
@@ -64,7 +67,7 @@ export function createAcceptedGroundRuntime(options = {}) {
     : null;
 
   let generation = 0;
-  let activeArtifact = null;
+  let activeArtifacts = [];
   let state = freezeState({
     generation,
     status: 'blocked',
@@ -78,36 +81,39 @@ export function createAcceptedGroundRuntime(options = {}) {
 
   const clear = (reason = 'cleared') => {
     generation += 1;
-    activeArtifact = null;
+    activeArtifacts = [];
     return publish({ status: 'blocked', reason });
   };
 
   const sampleAtLatLon = (latitude, longitude) => {
     const location = locationRecord(latitude, longitude);
-    if (!activeArtifact || state.status !== 'accepted') {
+    if (activeArtifacts.length === 0 || state.status !== 'accepted') {
       return unavailable('accepted-ground-not-active', state);
     }
     const projected = geographicToWebMercatorMeters(
       location.latitude,
       location.longitude
     );
-    const sample = sampleDistrictGroundMeters(
-      activeArtifact.model,
-      projected.eastingMeters,
-      projected.northingMeters
-    );
-    if (sample.status !== 'available') {
-      return unavailable(sample.reason || 'ground-sample-unavailable', state, {
+    for (const activeArtifact of activeArtifacts) {
+      const sample = sampleDistrictGroundMeters(
+        activeArtifact.model,
+        projected.eastingMeters,
+        projected.northingMeters
+      );
+      if (sample.status !== 'available') continue;
+      return Object.freeze({
+        ...sample,
+        artifactId: activeArtifact.artifactId,
+        providerId: activeArtifact.providerId,
+        sourceRelease: activeArtifact.sourceRelease,
+        verticalDatum: activeArtifact.verticalDatum,
         latitude: location.latitude,
-        longitude: location.longitude
+        longitude: location.longitude,
+        eastingMeters: projected.eastingMeters,
+        northingMeters: projected.northingMeters
       });
     }
-    return Object.freeze({
-      ...sample,
-      artifactId: activeArtifact.artifactId,
-      providerId: activeArtifact.providerId,
-      sourceRelease: activeArtifact.sourceRelease,
-      verticalDatum: activeArtifact.verticalDatum,
+    return unavailable('outside-accepted-ground-stack', state, {
       latitude: location.latitude,
       longitude: location.longitude,
       eastingMeters: projected.eastingMeters,
@@ -167,8 +173,8 @@ export function createAcceptedGroundRuntime(options = {}) {
   } = {}) => {
     const location = locationRecord(latitude, longitude);
     const requestGeneration = ++generation;
-    activeArtifact = null;
-    const selection = selectGroundArtifact({
+    activeArtifacts = [];
+    const selection = selectGroundArtifacts({
       latitude: location.latitude,
       longitude: location.longitude,
       manifests
@@ -181,16 +187,18 @@ export function createAcceptedGroundRuntime(options = {}) {
       });
     }
 
-    const artifactUrl = String(
-      artifactUrlForManifest(selection.manifest) || ''
-    );
-    if (!artifactUrl) {
+    const manifestsWithUrls = selection.manifests.map((manifest) => ({
+      manifest,
+      url: String(artifactUrlForManifest(manifest) || '')
+    }));
+    const missingUrl = manifestsWithUrls.find((entry) => !entry.url);
+    if (missingUrl) {
       return publish({
         status: 'rejected',
         reason: 'artifact-url-missing',
         location,
-        artifactId: selection.manifest.artifactId,
-        providerId: selection.manifest.providerId
+        artifactId: missingUrl.manifest.artifactId,
+        providerId: missingUrl.manifest.providerId
       });
     }
 
@@ -198,16 +206,33 @@ export function createAcceptedGroundRuntime(options = {}) {
       status: 'loading',
       reason: null,
       location,
-      artifactId: selection.manifest.artifactId,
-      providerId: selection.manifest.providerId
+      artifactId: selection.manifests[0].artifactId,
+      providerId: selection.provider.id,
+      artifactCount: selection.manifests.length,
+      artifactIds: selection.manifests.map((manifest) => manifest.artifactId)
     });
-    let loaded;
+    const loadedArtifacts = [];
     try {
-      loaded = await loadArtifact({
-        manifest: selection.manifest,
-        url: artifactUrl,
-        signal
-      });
+      for (const entry of manifestsWithUrls) {
+        const loaded = await loadArtifact({
+          manifest: entry.manifest,
+          url: entry.url,
+          signal
+        });
+        if (loaded?.status !== 'accepted') {
+          activeArtifacts = [];
+          return publish({
+            status: 'rejected',
+            reason: loaded?.reason || 'artifact-load-rejected',
+            location,
+            artifactId: entry.manifest.artifactId,
+            providerId: entry.manifest.providerId,
+            artifactCount: selection.manifests.length,
+            artifactIds: selection.manifests.map((manifest) => manifest.artifactId)
+          });
+        }
+        loadedArtifacts.push(loaded);
+      }
     } catch (error) {
       if (signal?.aborted) throw error;
       if (requestGeneration !== generation) {
@@ -216,17 +241,17 @@ export function createAcceptedGroundRuntime(options = {}) {
           status: 'superseded',
           reason: 'newer-ground-request-active',
           location,
-          artifactId: selection.manifest.artifactId,
-          providerId: selection.manifest.providerId
+          artifactId: selection.manifests[0].artifactId,
+          providerId: selection.provider.id
         });
       }
-      activeArtifact = null;
+      activeArtifacts = [];
       return publish({
         status: 'rejected',
         reason: 'artifact-load-threw',
         location,
-        artifactId: selection.manifest.artifactId,
-        providerId: selection.manifest.providerId
+        artifactId: selection.manifests[0].artifactId,
+        providerId: selection.provider.id
       });
     }
     if (signal?.aborted) throw signal.reason instanceof Error
@@ -238,31 +263,24 @@ export function createAcceptedGroundRuntime(options = {}) {
         status: 'superseded',
         reason: 'newer-ground-request-active',
         location,
-        artifactId: selection.manifest.artifactId,
-        providerId: selection.manifest.providerId
+        artifactId: selection.manifests[0].artifactId,
+        providerId: selection.provider.id
       });
     }
-    if (loaded?.status !== 'accepted') {
-      activeArtifact = null;
-      return publish({
-        status: 'rejected',
-        reason: loaded?.reason || 'artifact-load-rejected',
-        location,
-        artifactId: selection.manifest.artifactId,
-        providerId: selection.manifest.providerId
-      });
-    }
-
-    activeArtifact = loaded;
+    activeArtifacts = loadedArtifacts;
+    const primary = activeArtifacts[0];
     publish({
       status: 'accepted',
       reason: null,
       location,
-      artifactId: loaded.artifactId,
-      providerId: loaded.providerId,
-      sourceRelease: loaded.sourceRelease,
-      verticalDatum: loaded.verticalDatum,
-      contentSha256: loaded.contentSha256
+      artifactId: primary.artifactId,
+      providerId: primary.providerId,
+      sourceRelease: primary.sourceRelease,
+      verticalDatum: primary.verticalDatum,
+      contentSha256: primary.contentSha256,
+      artifactCount: activeArtifacts.length,
+      artifactIds: activeArtifacts.map((artifact) => artifact.artifactId),
+      contentSha256s: activeArtifacts.map((artifact) => artifact.contentSha256)
     });
 
     const probes = Array.isArray(coverageProbes) && coverageProbes.length > 0
@@ -270,16 +288,19 @@ export function createAcceptedGroundRuntime(options = {}) {
       : [location];
     const coverage = verifyCoverage(probes);
     if (coverage.status !== 'accepted') {
-      activeArtifact = null;
+      activeArtifacts = [];
       return publish({
         status: 'rejected',
         reason: coverage.reason,
         location,
-        artifactId: loaded.artifactId,
-        providerId: loaded.providerId,
-        sourceRelease: loaded.sourceRelease,
-        verticalDatum: loaded.verticalDatum,
-        contentSha256: loaded.contentSha256
+        artifactId: primary.artifactId,
+        providerId: primary.providerId,
+        sourceRelease: primary.sourceRelease,
+        verticalDatum: primary.verticalDatum,
+        contentSha256: primary.contentSha256,
+        artifactCount: loadedArtifacts.length,
+        artifactIds: loadedArtifacts.map((artifact) => artifact.artifactId),
+        contentSha256s: loadedArtifacts.map((artifact) => artifact.contentSha256)
       });
     }
     return state;

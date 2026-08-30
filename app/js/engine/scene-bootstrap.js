@@ -1,6 +1,11 @@
-import { setupEngineInputHandlers } from "./input-handlers.js?v=7";
-import { createVehicleHeadlightRig } from "./night-lighting.js?v=6";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=11";
+import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
+import { createClassicUtilityCar } from './classic-utility-car.js?v=3';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
+import {
+  buildEarthAtmosphereProfile,
+  createEarthAtmosphereVisual
+} from '../sky/earth-atmosphere.js?v=1';
 import {
   recordStartupDiagnostic,
   showStartupDiagnostics,
@@ -205,6 +210,14 @@ function createRendererWithFallback() {
 }
 
 function addSkyVisuals(appCtx, gpuTier) {
+  const initialAtmosphereProfile = buildEarthAtmosphereProfile(null, null, {
+    phase: 'day',
+    backgroundHex: 0x87ceeb
+  });
+  appCtx.earthAtmosphereProfile = initialAtmosphereProfile;
+  appCtx.earthAtmosphere = createEarthAtmosphereVisual(initialAtmosphereProfile);
+  if (appCtx.earthAtmosphere) appCtx.scene.add(appCtx.earthAtmosphere);
+
   appCtx.sunSphere = new THREE.Mesh(
     new THREE.SphereGeometry(40, 16, 8),
     new THREE.MeshBasicMaterial({ color: 0xffdd00, fog: false })
@@ -248,17 +261,29 @@ function addSkyVisuals(appCtx, gpuTier) {
   appCtx.moonSphere.userData.glow = moonGlow;
 
   const cloudCanvas = document.createElement('canvas');
-  cloudCanvas.width = 128;
-  cloudCanvas.height = 128;
+  cloudCanvas.width = 256;
+  cloudCanvas.height = 256;
   const cloudContext = cloudCanvas.getContext('2d');
-  const cloudGradient = cloudContext.createRadialGradient(64, 62, 5, 64, 64, 62);
-  cloudGradient.addColorStop(0, 'rgba(255,255,255,0.96)');
-  cloudGradient.addColorStop(0.46, 'rgba(255,255,255,0.82)');
-  cloudGradient.addColorStop(0.78, 'rgba(255,255,255,0.28)');
-  cloudGradient.addColorStop(1, 'rgba(255,255,255,0)');
-  cloudContext.fillStyle = cloudGradient;
-  cloudContext.fillRect(0, 0, 128, 128);
-  const cloudPixels = cloudContext.getImageData(0, 0, 128, 128);
+  // Keep clouds under the existing sky owner, but give each point an
+  // asymmetric multi-lobe silhouette instead of the previous circular disc.
+  // These dimensions are artistic presentation values, not weather measures.
+  const cloudLobes = [
+    [70, 143, 47, 0.56],
+    [104, 124, 58, 0.72],
+    [145, 116, 66, 0.78],
+    [185, 139, 50, 0.58],
+    [127, 153, 73, 0.64]
+  ];
+  for (const [x, y, radius, alpha] of cloudLobes) {
+    const cloudGradient = cloudContext.createRadialGradient(x, y, radius * 0.08, x, y, radius);
+    cloudGradient.addColorStop(0, `rgba(255,255,255,${alpha})`);
+    cloudGradient.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.82})`);
+    cloudGradient.addColorStop(0.82, `rgba(255,255,255,${alpha * 0.24})`);
+    cloudGradient.addColorStop(1, 'rgba(255,255,255,0)');
+    cloudContext.fillStyle = cloudGradient;
+    cloudContext.fillRect(0, 0, cloudCanvas.width, cloudCanvas.height);
+  }
+  const cloudPixels = cloudContext.getImageData(0, 0, cloudCanvas.width, cloudCanvas.height);
   for (let i = 3; i < cloudPixels.data.length; i += 4) {
     if (cloudPixels.data[i] === 0) continue;
     const dither = ((i * 17) % 9) - 4;
@@ -281,15 +306,14 @@ function addSkyVisuals(appCtx, gpuTier) {
     fog: true
   });
 
-  const cloudCount = gpuTier === 'low' ? 28 : 52;
+  const cloudCount = gpuTier === 'low' ? 22 : 36;
   const cloudPositions = new Float32Array(cloudCount * 3);
   for (let i = 0; i < cloudCount; i++) {
-    const cluster = Math.floor(i / 3);
-    const clusterAngle = cluster * 2.399963229728653;
-    const clusterRadius = 520 + (cluster % 9) * 230;
-    cloudPositions[i * 3] = Math.cos(clusterAngle) * clusterRadius + (i % 3 - 1) * 72;
-    cloudPositions[i * 3 + 1] = 320 + (cluster % 5) * 38 + (i % 3) * 9;
-    cloudPositions[i * 3 + 2] = Math.sin(clusterAngle) * clusterRadius + ((i * 37) % 3 - 1) * 68;
+    const angle = i * 2.399963229728653;
+    const radius = 540 + (i % 10) * 205;
+    cloudPositions[i * 3] = Math.cos(angle) * radius;
+    cloudPositions[i * 3 + 1] = 350 + (i % 6) * 41;
+    cloudPositions[i * 3 + 2] = Math.sin(angle) * radius;
   }
   const cloudGeometry = new THREE.BufferGeometry();
   cloudGeometry.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
@@ -341,86 +365,10 @@ function addSkyVisuals(appCtx, gpuTier) {
 
 function createDefaultCarMesh(ctx) {
   const { appCtx, state } = ctx;
-  appCtx.carMesh = new THREE.Group();
-
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0xc31421,
-    metalness: 0.45,
-    roughness: 0.38,
-    envMapIntensity: 0.6
-  });
-  state.carPaintMaterial = bodyMat;
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 3.5), bodyMat);
-  body.position.y = 0.5;
-  body.castShadow = true;
-  appCtx.carMesh.add(body);
-
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 1.5), bodyMat);
-  roof.position.set(0, 0.95, -0.2);
-  roof.castShadow = true;
-  appCtx.carMesh.add(roof);
-
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x88ccff,
-    metalness: 0.1,
-    roughness: 0.05,
-    envMapIntensity: 0.8,
-    transparent: true,
-    opacity: 0.4
-  });
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.35, 0.1), glassMat);
-  windshield.position.set(0, 0.85, 0.55);
-  windshield.rotation.x = -0.3;
-  appCtx.carMesh.add(windshield);
-
-  const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9, metalness: 0.1 });
-  const wheelPositions = [[-0.85, 0.35, 1.1], [0.85, 0.35, 1.1], [-0.85, 0.35, -1.1], [0.85, 0.35, -1.1]];
-  appCtx.wheelMeshes = [];
-  wheelPositions.forEach((pos) => {
-    const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-    wheel.rotation.z = Math.PI / 2;
-    wheel.position.set(pos[0], pos[1], pos[2]);
-    wheel.castShadow = true;
-    appCtx.carMesh.add(wheel);
-    appCtx.wheelMeshes.push(wheel);
-  });
-
-  const headlightMat = new THREE.MeshStandardMaterial({
-    color: 0xffffee,
-    emissive: 0xffffaa,
-    emissiveIntensity: 1.0,
-    roughness: 0.1,
-    metalness: 0.1
-  });
-  const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), headlightMat);
-  hl1.userData.vehicleHeadlightLens = true;
-  hl1.position.set(-0.55, 0.45, 1.76);
-  appCtx.carMesh.add(hl1);
-  const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), headlightMat);
-  hl2.userData.vehicleHeadlightLens = true;
-  hl2.position.set(0.55, 0.45, 1.76);
-  appCtx.carMesh.add(hl2);
-
-  const tailMat = new THREE.MeshStandardMaterial({
-    color: 0xff0000,
-    emissive: 0xff0000,
-    emissiveIntensity: 0.8,
-    roughness: 0.2,
-    metalness: 0.1
-  });
-  const tl1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), tailMat);
-  tl1.position.set(-0.55, 0.45, -1.76);
-  appCtx.carMesh.add(tl1);
-  const tl2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), tailMat);
-  tl2.position.set(0.55, 0.45, -1.76);
-  appCtx.carMesh.add(tl2);
-
-  const carVisualYOffset = -1.1;
-  appCtx.carMesh.children.forEach((child) => {
-    if (child && child.position) child.position.y += carVisualYOffset;
-  });
+  const visual = createClassicUtilityCar(THREE);
+  appCtx.carMesh = visual.car;
+  appCtx.wheelMeshes = visual.wheels;
+  state.carPaintMaterial = visual.paintMaterial;
   createVehicleHeadlightRig(appCtx.carMesh);
 
   appCtx.scene.add(appCtx.carMesh);

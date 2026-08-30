@@ -2,6 +2,242 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.1.0] - 2026-08-30
+
+### Added
+
+- Ten source-bounded regional Field Guide packs for built-in destinations in
+  addition to Baltimore, bringing the attainable guide to 180 entries across
+  eleven regional packs.
+- A dedicated Journal with Fieldwork, Games, Making, Travel, Community, and
+  Companion paths.
+- Journal backup and restore, current-region and World Guide scopes, grouped
+  unidentified entries, and regional life-list progress.
+- Backpack categories, item history, inspection, equip and use actions, hotbar
+  assignment, and Field Kit synchronization.
+- Distinct road-vehicle handling, responder vehicle entry and equipment,
+  recoverable world loot, mapped convenience-store exchange, defensive NPC
+  behavior, and configurable quick-slot equipment.
+- Individual companion trust and level progression for eligible domestic
+  animals, birds, and livestock, including vehicle travel state.
+- Manual and assisted solar-system journeys, accepted planetary surfaces,
+  celestial collision, solid-world landing, atmospheric destinations, and
+  Earth return.
+- Airport and helipad aircraft, in-flight exit and skydiving, mapped marinas
+  and ports, playable boat and ship classes, and mapped historic-vessel labels.
+- Shared airport layouts with gates, stands, taxi and runway activity, control
+  towers, ticket halls, destination search, and pilot or passenger journeys.
+- Familiar-name place search, including landmarks and airports, plus a
+  location-aware First Journey that can be postponed or turned off.
+
+### Changed
+
+- Games, creation, Blocks, place visits, room joins, companion care, fieldwork,
+  and fishing now contribute to the same Explorer profile and Journal.
+- Every built-in Earth destination now selects a bounded regional field pack;
+  expansion entries remain reference fallbacks unless reviewed media or models
+  are available.
+- The Explorer panel separates permanent Journal progress from recurring Field
+  Today, Expedition, and seasonal opportunities.
+- Mobile Earth compilation keeps the near-player district and a bounded regional
+  context while shortening optional provider waits and repeated feature scans.
+- Boats retain nearby shores and use tighter follow-camera framing in harbors
+  and channels; open-ocean travel keeps its wider view.
+- Projectiles, spent charges, world loot, downed actors, wrecked local vehicles,
+  responders, aircraft, and vessels now use bounded disposal or recovery rules.
+
+### Fixed
+
+- Regional Guide totals now count entries the player can actually reach with
+  released activities.
+- Fishing only credits a regional Guide entry when the caught species matches
+  that entry.
+- Backpack tools and the Explorer Field Kit remain synchronized across game
+  modes.
+- Player-facing Guide and Journal language no longer exposes implementation
+  labels or repeats generic unknown-entry names.
+- Corrected manual space control, planetary underside visibility, roof and
+  interior collision, elevator floor choice, weapon reticles, open-water layer
+  ownership, mobile walking direction, follow camera, loading coverage, globe
+  selection, prompt overlap, and mode-specific speed units.
+- Kept mapped ship identity separate from generated maritime activity, restored
+  USS Constellation as a sloop-of-war museum ship, and preserved rooftop walking
+  after landing or climbing onto an eligible building.
+
+## [5.0.0] - 2026-08-26
+
+### Added
+
+- Field Today activities, daily and weekly Expeditions, seasonal surveys, life
+  lists, specialties, companions, and non-punitive return progression connected
+  to the Backpack, Journal, and Field Guide.
+- A Baltimore–Chesapeake ecology pack covering 60 plants, mammals, birds,
+  insects and arachnids, freshwater fish, and marine fish, with distinct
+  observation, photography, track/sign, macro, habitat, geology, and community
+  survey activities.
+- Shore, boat, and underwater fishing connected to the same Journal and Field
+  Guide records, including catch, loss, retry, and recovery outcomes.
+- Persistent local and multiplayer Blocks inside the World Editor, plus shared
+  room building, activities, and vehicles.
+- Browser zoom, visible focus, keyboard navigation, live status announcements,
+  reduced motion, larger text, increased contrast, and larger touch targets.
+
+### Changed
+
+- Player-facing wildlife opportunities use game language such as field leads;
+  they never claim a generated opportunity proves a real animal is present.
+- Live GPS and free-roam walking share field activity and progression authority.
+- Mobile walking, driving, drone, plane, map, Backpack, settings, reload, reset,
+  and recovery remain on the stabilized control implementation.
+- The former standalone Block Builder entry is replaced by the integrated World
+  Editor Blocks workspace. Supported local and room builds are preserved.
+- Existing Backpack data upgrades automatically with a local recovery backup.
+
+### Fixed
+
+- Returning to the title screen or changing locations more reliably clears the
+  previous world and its browser memory.
+- Released multiplayer vehicles remain reclaimable after reconnecting or when
+  local terrain and collision detail differ.
+- Walking routes avoid vehicle-only and engineered transport surfaces while
+  retaining safe attributed sidewalk fallbacks.
+- Kept the loading image above the game until the selected world is ready.
+- Kept globe selection markers attached to the chosen location while zooming.
+- Corrected mobile walking left/right direction and kept the camera behind the
+  character during movement.
+- Removed contextual field and interaction prompts while a bottom menu is open.
+- Unified walking, driving, boat, plane, drone, and underwater speed units.
+
+## [4.3.1] - 2026-08-22
+
+### Added
+
+- Street-oriented building entrances and storefront presentation integrated
+  into the owning facade material, with contextual keyboard and touch entry.
+- Multi-floor generated interiors with stable floor identity, walkable stairs
+  and a proximity elevator for eligible buildings.
+- A six-slot character equipment loop, contextual world actions, richer
+  pedestrian roles, vehicle families and bounded civic-response gameplay.
+- More expressive water, wake, sky and evidence-labeled bathymetry presentation.
+
+### Changed
+
+- Preserved mapped building height through selection, batching and every
+  published LOD so distant presentation cannot silently shorten authoritative
+  skyline metadata.
+- Unified final terrain, at-grade roads, junction footprints, building
+  clearance and vehicle wheel contact around the same published surface.
+- Reconciled bridge, ramp, overpass, elevated-road and tunnel endpoint profiles
+  inside the shared transport compiler instead of adding city-specific geometry.
+- Kept Earth as one bounded selected-location world. No actor-centered or
+  continuous-world streaming system was added.
+- Released location-owned terrain, provider state and scene resources during
+  teardown, and kept one shared Firebase/module authority in packaged output.
+
+### Fixed
+
+- Restored Baltimore and Manhattan tall-building visibility without reducing
+  distant mapped detail or changing authoritative building heights by quality.
+- Closed false cross-layer transport joins, duplicate structure ownership,
+  jagged at-grade junction wedges and conflicting road/terrain cross-sections.
+- Aligned non-player vehicles to four-wheel road contact on grades and kept
+  pedestrians off vehicle-only transport surfaces.
+- Preserved the nearest valid mapped arrival instead of relocating the player
+  to a different road solely to satisfy a test.
+- Removed obsolete hosted assets and internal audit, handoff and R&D records
+  from the public release tip.
+
+## [4.3.0] - 2026-08-17
+
+Superseded by 4.3.1, the corrected 4.3 release.
+
+### Production-candidate repair — 2026-08-19
+
+- Reconciled exact bridge, ramp, overpass, elevated-road and tunnel joins after
+  all terrain and structural profile finalization, retaining one transport
+  surface authority and measured/provenance-labeled elevation inputs.
+- Rebuilt distant pedestrians and traffic as recognizable multi-part actors,
+  retained stable LOD identity, increased visibility hysteresis and preserved
+  real-scale vehicle family dimensions and curb-aware parked placement.
+- Added segment-continuous pedestrian/vehicle collision, coherent Backpack
+  condition and ammunition presentation, fallen-actor ammunition recovery, and
+  mapped hospital recovery distinct from mapped police custody.
+- Restored Live GPS behind-actor camera alignment for walking and sustained-speed
+  vehicle transition, with one current browser journey covering both states.
+- Kept entrances inside the owning facade shader, added context-gated pitched
+  roofs, restored the previously approved aerial Baltimore harbor/skyline hero
+  byte-for-byte and limited the supporting gallery to current product flows.
+- Replaced the compromised historical test suite with current source,
+  complete-world, Live GPS, environment, security, multiplayer and
+  immutable-artifact release boundaries.
+- Added a full assembled-game location matrix for Baltimore/JFX, Golden Gate,
+  London, Monaco, Manhattan and rural Iowa. It validates exact structure joins
+  and engineered grades while inspecting the same terrain, buildings, water,
+  traffic, pedestrians and renderer delivered to the player.
+- Removed the competing tunnel-system mutation that rewrote compiled road
+  heights back to raw terrain, and changed internal tunnel-way splits to one
+  graph-corridor elevation solve anchored only by real surface portals.
+- Hardened account deletion coverage for discovery trades, room activities,
+  world modifications and DeFlock state; token checks now reject revoked
+  sessions. Added baseline anti-sniffing, referrer, frame and opener headers.
+
+### Added
+
+- A coherent World Discovery loop with contextual wildlife, geology, field
+  tools, Journal, Field Guide, Collection, Explorer progression and regional
+  goals.
+- Multiple dog, cat and bird companions with catalog-owned scale, grounded or
+  airborne following, care state and contextual AR presentation.
+- A capability-aware AR platform for companions, recorded specimens and
+  habitat-gated virtual wildlife challenges, with WebXR, camera-overlay and
+  interactive-3D fallback modes.
+- Consolidated account/admin operations, guided onboarding, current analytics
+  events and trusted Discovery inventory/trading backend contracts.
+
+### Changed
+
+- Reorganized Explorer UI into collapsible, task-focused surfaces that reuse the
+  existing application shell instead of occupying the play view continuously.
+- Expanded living-world pedestrian and vehicle variety while retaining bounded
+  logical draw-call and triangle budgets.
+- Updated the landing page with current gameplay media and a clearer explanation
+  of the connected real-location exploration experience.
+
+### Fixed
+
+- Restored visible regional bridge, ramp and tunnel continuity for Baltimore,
+  San Francisco and connected multi-segment tunnel systems.
+- Prevented Discovery targets, equipment, wildlife and companions from sampling
+  the wrong surface coordinates or appearing inside buildings.
+- Preserved fixed-world ownership through travel, editor, multiplayer,
+  planetary, Ocean and title transitions, with explicit world-memory release.
+- Removed obsolete landing media and an orphaned duplicate Discovery progression
+  implementation so strict production reachability is green.
+
+## [4.2.1] - 2026-08-16
+
+### Added
+
+- Performance-bounded Field Navigator, Classic Utility car, Harbor Scout boat,
+  Trailblazer plane, and Wayfinder spacecraft procedural presentation.
+- A worldwide browser-gameplay gallery and a developer-facing system inventory.
+- A release regression gate for traversal-model triangle, draw, material,
+  transparency, footprint, propeller, and thrust-effect budgets.
+
+### Changed
+
+- Replaced the simplest player and traversal silhouettes without changing
+  physics, collision, controls, cameras, water ownership, or world loading.
+- Expanded the README, landing page, and GitHub Pages overview with direct
+  browser captures of worldwide gameplay and phone-sized DeFlock states.
+
+### Fixed
+
+- Kept utility-car paint readable across quality tiers instead of inheriting a
+  near-black sports-car material override.
+- Shared spacecraft exhaust materials so the upgraded presentation does not
+  multiply transparent material state.
+
 ## [4.2.0] - 2026-08-15
 
 ### Added

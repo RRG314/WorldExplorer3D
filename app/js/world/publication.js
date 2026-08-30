@@ -29,6 +29,7 @@ function publishLocationWorld() {
     setListVisible(appCtx.landuseMeshes, () => false);
     setListVisible(appCtx.poiMeshes, () => false);
     setListVisible(appCtx.streetFurnitureMeshes, () => false);
+    setSceneObjectVisible(appCtx.transportFacilityVisual?.group, false);
     appCtx.setPerfLiveStat?.('lodVisible', { near: 0, mid: 0 });
     return { active: false, buildings: 0 };
   }
@@ -42,6 +43,7 @@ function publishLocationWorld() {
   );
   setListVisible(appCtx.poiMeshes, () => appCtx.poiMode === true);
   setListVisible(appCtx.streetFurnitureMeshes);
+  setSceneObjectVisible(appCtx.transportFacilityVisual?.group, true);
 
   const near = (appCtx.buildingMeshes || []).reduce((count, mesh) => (
     mesh?.userData?.lodTier === 'mid' ? count : count + Number(mesh?.userData?.batchCount || 1)

@@ -11,6 +11,11 @@ import {
   toDays
 } from "../astro.js?v=1";
 import { resolveObservedEarthLocation } from "../earth-location.js?v=2";
+import {
+  applyEarthAtmosphereProfile,
+  atmosphereSnapshot,
+  buildEarthAtmosphereProfile
+} from './earth-atmosphere.js?v=1';
 
 const SKY_UPDATE_INTERVAL_MS = 15000;
 const SKY_LOCATION_PRECISION = 3;
@@ -35,7 +40,7 @@ const SKY_PRESETS = {
   sunset: {
     skyColor: 0xff7e5f,
     groundColor: 0x3d2817,
-    hemiIntensity: 0.58,
+    hemiIntensity: 0.68,
     sunColor: 0xff6b35,
     sunIntensity: 0.9,
     fillColor: 0xff8c69,
@@ -55,12 +60,12 @@ const SKY_PRESETS = {
     sunColor: 0x6b8cff,
     sunIntensity: 0.14,
     fillColor: 0x607ca8,
-    fillIntensity: 0.5,
+    fillIntensity: 0.62,
     ambientColor: 0x8a9bb8,
-    ambientIntensity: 0.55,
+    ambientIntensity: 0.64,
     fogColor: 0x121a34,
     fogDensity: 0.00008,
-    exposure: 1.08,
+    exposure: 1.18,
     bloomStrength: 0.25,
     icon: "\ud83c\udf19"
   },
@@ -299,6 +304,31 @@ function applyStarVisibility(state) {
   }
 }
 
+function refreshEarthAtmosphereVisual(options = {}) {
+  if (!appCtx.earthAtmosphere || appCtx.onMoon || appCtx.onMars) return null;
+  const profile = buildEarthAtmosphereProfile(
+    appCtx.skyState,
+    appCtx.weatherState,
+    {
+      phase: appCtx.timeOfDay || 'day',
+      weatherMode: appCtx.weatherMode || 'live',
+      backgroundHex: appCtx.scene?.background?.getHex?.() ?? 0x87ceeb
+    }
+  );
+  const changed = appCtx.earthAtmosphereProfile?.signature !== profile.signature;
+  appCtx.earthAtmosphereProfile = profile;
+  applyEarthAtmosphereProfile(appCtx.earthAtmosphere, profile);
+  appCtx.earthAtmosphere.visible = appCtx.getEnv?.() === appCtx.ENV?.EARTH;
+  if (changed || options.force === true) {
+    appCtx.refreshEarthEnvironmentMap?.(profile, { force: options.force === true });
+  }
+  return profile;
+}
+
+function getEarthAtmosphereSnapshot() {
+  return atmosphereSnapshot(appCtx.earthAtmosphere, appCtx.earthAtmosphereProfile);
+}
+
 function applySkyVisualState(config, state) {
   if (!appCtx.scene || !appCtx.sun || !appCtx.hemiLight || !appCtx.fillLight || !appCtx.ambientLight) return;
 
@@ -386,6 +416,8 @@ function applySkyVisualState(config, state) {
     cloudMaterial.color.setHex(mixColorHex(0x9cb9d0, 0xffffff, 0.4 + (state?.sun?.daylightFactor || 0) * 0.6));
     cloudMaterial.opacity = (appCtx.cloudsVisible ? 1 : 0) * (0.16 + (state?.sun?.daylightFactor || 0) * 0.66 + (state?.sun?.twilightFactor || 0) * 0.12);
   }
+
+  refreshEarthAtmosphereVisual();
 
   if (typeof appCtx.applyWeatherPresentation === "function") {
     appCtx.applyWeatherPresentation();
@@ -530,6 +562,13 @@ export function getAstronomicalSkySnapshot() {
     localSiderealTimeDeg: Number(radToDeg(state.localSiderealTimeRad).toFixed(2))
   };
 }
+
+Object.assign(appCtx, {
+  getEarthAtmosphereSnapshot,
+  refreshEarthAtmosphereVisual
+});
+
+export { getEarthAtmosphereSnapshot, refreshEarthAtmosphereVisual };
 
 export function inspectAstronomicalSkyState(lat, lon, dateInput = new Date()) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;

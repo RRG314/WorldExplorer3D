@@ -1,11 +1,16 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { updateNightLighting } from "./engine/night-lighting.js?v=6";
+import { updateNightLighting } from "./engine/night-lighting.js?v=8";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
-import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
-import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=1";
+import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=5";
+import {
+  carSpeedToMph,
+  worldUnitsPerSecondToKnots,
+  worldUnitsPerSecondToMph
+} from "./physics/vehicle-speed-units.js?v=2";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
-import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=4";
+import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -374,7 +379,7 @@ function updateCamera(dt = 1 / 60) {
     // Order: YXZ (yaw, pitch, roll)
     appCtx.camera.rotation.order = 'YXZ';
     appCtx.camera.rotation.y = dronePose.yaw + (Number(dronePose.cameraYawOffset) || 0);
-    appCtx.camera.rotation.x = dronePose.pitch;
+    appCtx.camera.rotation.x = dronePose.pitch + (Number(dronePose.cameraPitchOffset) || 0);
     appCtx.camera.rotation.z = dronePose.roll;
 
     updateCameraLinkedEffects();
@@ -404,7 +409,9 @@ function updateCamera(dt = 1 / 60) {
   carLook.pitch += lookPitch * cameraLookSpeed;
   if (manualCameraInput) carLook.lastInputAt = performance.now();
   const cameraIdleMs = performance.now() - (Number(carLook.lastInputAt) || 0);
-  if (!manualCameraInput && cameraIdleMs > 900 && appCtx.camMode === 0) {
+  const liveGpsVehicleFollow = appCtx.getLiveGpsSnapshot?.().travelMode === 'drive' &&
+    appCtx.liveGpsTranslationOwned?.() === true;
+  if ((!manualCameraInput && cameraIdleMs > 900 || liveGpsVehicleFollow) && appCtx.camMode === 0) {
     const returnBlend = 1 - Math.exp(-4.2 * clampValue(dt, 1 / 240, 0.05));
     carLook.yaw += (0 - carLook.yaw) * returnBlend;
     carLook.pitch += (0 - carLook.pitch) * returnBlend;
@@ -416,7 +423,7 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
+  const planetaryChase = !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 
   // Get car's actual Y position (follows terrain)
   const carGroundY = Number(presentationCar?.y ?? appCtx.carMesh.position.y) - CAR_BODY_HEIGHT_FROM_GROUND;
@@ -438,10 +445,10 @@ function updateCamera(dt = 1 / 60) {
   const insideTunnel = tunnelCameraState.inside;
   const d = insideTunnel
     ? tunnelCameraEnvelope.chaseDistance
-    : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
+    : planetaryChase ? 12 : CHASE_CAMERA_DISTANCE;
   const h = insideTunnel
     ? tunnelCameraEnvelope.cameraHeight
-    : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
+    : planetaryChase ? 6.5 : CHASE_CAMERA_HEIGHT;
   const viewAngle = carAngle + carLook.yaw + (lb ? Math.PI : 0);
 
   // Show car mesh for non-first-person modes
@@ -478,11 +485,13 @@ function updateCamera(dt = 1 / 60) {
           targetX, targetY, targetZ,
           dt
         );
-    if (!planetaryChase && !insideTunnel) {
+    if (!insideTunnel) {
       const terrainTarget = resolveChaseCameraTerrainCollision(
         { x: lookX, y: lookY, z: lookZ },
         collisionTarget,
-        (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+        planetaryChase
+          ? (x, z) => planetarySurfaceYAtRenderXZ(appCtx, x, z)
+          : (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
       );
       collisionTarget = {
         ...terrainTarget,
@@ -548,7 +557,10 @@ function updateHUD() {
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
 
   if (appCtx.boatMode?.active) {
-    const knots = Math.max(0, Math.round(Math.abs(appCtx.boat.speed) * 0.43));
+    const knots = Math.max(0, Math.round(Math.abs(worldUnitsPerSecondToKnots(
+      appCtx.boat.forwardSpeed ?? appCtx.boat.speed,
+      appCtx.METERS_PER_WORLD_UNIT
+    ))));
     const seaLabel = typeof appCtx.boatHudLabel === 'function' ? appCtx.boatHudLabel() : 'Boat Travel';
     const shorelineKnown = appCtx.boatMode.currentWater?.shorelineDistanceKnown !== false;
     const shoreline = shorelineKnown && Number.isFinite(appCtx.boatMode.shorelineDistance) ?
@@ -574,10 +586,10 @@ function updateHUD() {
     const plane = appCtx.planeMode;
     const groundY = appCtx.SurfaceQuery?.terrainAt?.(plane.x, plane.z)?.position?.y ?? 0;
     const altitude = Math.max(0, Math.round(plane.y - groundY));
-    const mph = Math.max(0, Math.round(plane.speed * 2.237));
-    setHudUnitLabels('MPH', 'ALT');
-    document.getElementById('speed').textContent = `${mph}`;
-    document.getElementById('speed').classList.toggle('fast', mph > 105);
+    const knots = Math.max(0, Math.round(worldUnitsPerSecondToKnots(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
+    setHudUnitLabels('KTS', 'ALT');
+    document.getElementById('speed').textContent = `${knots}`;
+    document.getElementById('speed').classList.toggle('fast', knots > 120);
     document.getElementById('limit').textContent = `${altitude}`;
     setStreetAndLocation(plane.airborne ? 'Flight' : 'Taxi', locationName());
     const bf = document.getElementById('boostFill');
@@ -587,7 +599,7 @@ function updateHUD() {
     document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
     document.getElementById('indBoost').textContent = 'PWR';
     document.getElementById('indDrift').classList.toggle('on', plane.airborne);
-    document.getElementById('indDrift').textContent = plane.airborne ? 'AIR' : 'GEAR';
+    document.getElementById('indDrift').textContent = plane.stalled ? 'STALL' : plane.airborne ? 'AIR' : 'GEAR';
     updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }
@@ -595,27 +607,24 @@ function updateHUD() {
   if (appCtx.droneMode) {
     // Calculate ground elevation for altitude display
     let groundY = 0;
-    const planetarySurface = appCtx.onMars ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(appCtx.drone.x, 2000, appCtx.drone.z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir || new globalThis.THREE.Vector3(0, -1, 0));
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      if (hits.length > 0) {
-        groundY = hits[0].point.y;
-      }
+    if (appCtx.onMars || appCtx.onMoon) {
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, appCtx.drone.x, appCtx.drone.z);
+      if (Number.isFinite(surfaceY)) groundY = surfaceY;
     } else if (appCtx.terrainEnabled) {
       groundY = appCtx.SurfaceQuery?.terrainAt?.(appCtx.drone.x, appCtx.drone.z)?.position?.y ?? 0;
     }
 
     const altitudeMeters = Math.max(0, Math.round(appCtx.drone.y - groundY));
-    const altitudeCap = appCtx.onMoon || appCtx.onMars ? 2000 : 400;
-
-    // Drone mode HUD (everyday wording; avoid aviation jargon like AGL).
-    setHudUnitLabels('HEIGHT', 'CEILING');
-    document.getElementById('speed').textContent = `${altitudeMeters}`;
+    const droneSpeedMph = Math.max(0, Math.round(worldUnitsPerSecondToMph(
+      Math.hypot(Number(appCtx.drone.vx) || 0, Number(appCtx.drone.vy) || 0, Number(appCtx.drone.vz) || 0),
+      appCtx.METERS_PER_WORLD_UNIT
+    )));
+    // Keep the primary readout semantically consistent across traversal modes:
+    // speed stays speed, while the secondary value carries height.
+    setHudUnitLabels('MPH', 'HEIGHT');
+    document.getElementById('speed').textContent = `${droneSpeedMph}`;
     document.getElementById('speed').classList.remove('fast');
-    document.getElementById('limit').textContent = `${altitudeCap}`;
+    document.getElementById('limit').textContent = `${altitudeMeters}m`;
     setStreetAndLocation('Drone View', locationName());
     const bf = document.getElementById('boostFill');
     bf.style.width = '0%';
@@ -637,15 +646,31 @@ function updateHUD() {
     const activeInterior = appCtx.activeInterior || null;
 
     let walkSurface = null;
-    if (!activeInterior && !appCtx.onMoon && !appCtx.onMars && typeof appCtx.findNearestTraversalFeature === 'function') {
-      const nearest = appCtx.findNearestTraversalFeature(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z, {
-        mode: 'walk',
-        maxDistance: 18
-      });
-      if (nearest?.feature) {
-        const featureWidth = Number.isFinite(nearest.feature.width) ? nearest.feature.width : 4;
-        const edge = Math.max(WALK_ROAD_EDGE_MIN, featureWidth * WALK_ROAD_EDGE_SCALE);
-        if (nearest.dist < edge) walkSurface = nearest.feature;
+    if (!activeInterior && !appCtx.onMoon && !appCtx.onMars) {
+      const walker = appCtx.Walk.state.walker;
+      const authoritativeWalkSurface = appCtx.SurfaceQuery?.walkAt?.(
+        walker.x,
+        walker.z,
+        {
+          currentY: Number(walker.y) - 1.7,
+          // The HUD needs mapped identity and speed-limit metadata, not a
+          // second rendered-geometry height sample. Walking physics already
+          // owns contact resolution through this same SurfaceQuery authority.
+          sampleRenderedMesh: false
+        }
+      );
+      if (authoritativeWalkSurface?.feature) {
+        walkSurface = authoritativeWalkSurface.feature;
+      } else if (typeof appCtx.findNearestTraversalFeature === 'function') {
+        const nearest = appCtx.findNearestTraversalFeature(walker.x, walker.z, {
+          mode: 'walk',
+          maxDistance: 18
+        });
+        if (nearest?.feature) {
+          const featureWidth = Number.isFinite(nearest.feature.width) ? nearest.feature.width : 4;
+          const edge = Math.max(WALK_ROAD_EDGE_MIN, featureWidth * WALK_ROAD_EDGE_SCALE);
+          if (nearest.dist < edge) walkSurface = nearest.feature;
+        }
       }
     }
 

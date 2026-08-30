@@ -1,5 +1,18 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
+function normalizeRoadIdentity(value) {
+  const identity = String(value || '').trim();
+  return identity && identity.length <= 180 && /^[a-z0-9:._/-]+$/i.test(identity)
+    ? identity
+    : null;
+}
+
+function roadIdentity(feature) {
+  return normalizeRoadIdentity(
+    feature?.sourceFeatureId || feature?.transportRecord?.identity || feature?.id
+  );
+}
+
 function readSharedExperienceParams() {
   const params = new URLSearchParams(window.location.search);
   const hasKnown = params.has('loc') || params.has('lat') || params.has('lon') || params.has('gm') || params.has('mode') || params.has('camMode') || params.has('seed');
@@ -38,6 +51,7 @@ function readSharedExperienceParams() {
     refX: toNum('rx'),
     refY: toNum('ry'),
     refZ: toNum('rz'),
+    refRoadId: normalizeRoadIdentity(params.get('rid')),
     yaw: toNum('yaw'),
     pitch: toNum('pitch')
   };
@@ -84,6 +98,10 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const z = Number.isFinite(pending.refZ) ? pending.refZ : null;
     const yaw = Number.isFinite(pending.yaw) ? pending.yaw : null;
     const pitch = Number.isFinite(pending.pitch) ? pending.pitch : null;
+    const hasSharedPosition = Number.isFinite(x) && Number.isFinite(z);
+    const preferredRoad = pending.refRoadId
+      ? (appCtx.roads || []).find((road) => roadIdentity(road) === pending.refRoadId) || null
+      : null;
     const terrainYAt = (tx, tz) => typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(tx, tz) : appCtx.elevationWorldYAtWorldXZ(tx, tz);
 
     const runtimeMode = {
@@ -98,9 +116,9 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
         source: 'shared_state',
         emitTutorial: false,
         force: true,
-        x: Number.isFinite(x) ? x : undefined,
+        x: hasSharedPosition ? x : undefined,
         y: Number.isFinite(y) ? y : undefined,
-        z: Number.isFinite(z) ? z : undefined,
+        z: hasSharedPosition ? z : undefined,
         yaw: Number.isFinite(yaw) ? yaw : undefined,
         pitch: Number.isFinite(pitch) ? pitch : undefined,
         airborne: runtimeMode === 'plane' && Number.isFinite(y) && y > groundY + 1.4
@@ -110,28 +128,37 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     if (mode === 'plane') {
       // Plane placement is applied atomically by setTravelMode above.
     } else if (mode === 'drone') {
-      if (Number.isFinite(x)) appCtx.drone.x = x;
-      if (Number.isFinite(z)) appCtx.drone.z = z;
-      appCtx.drone.y = Number.isFinite(y) ? y : terrainYAt(appCtx.drone.x, appCtx.drone.z) + 45;
-      if (Number.isFinite(yaw)) appCtx.drone.yaw = yaw;
-      if (Number.isFinite(pitch)) appCtx.drone.pitch = pitch;
+      // A mode-only share has no authority over the arrival selected by the
+      // published world. Only restore a pose when the link actually contains a
+      // complete local position.
+      if (hasSharedPosition) {
+        appCtx.drone.x = x;
+        appCtx.drone.z = z;
+        appCtx.drone.y = Number.isFinite(y) ? y : terrainYAt(x, z) + 45;
+        if (Number.isFinite(yaw)) appCtx.drone.yaw = yaw;
+        if (Number.isFinite(pitch)) appCtx.drone.pitch = pitch;
+      }
     } else if (mode === 'walking' && appCtx.Walk?.state?.walker) {
       const walker = appCtx.Walk.state.walker;
-      if (Number.isFinite(x)) walker.x = x;
-      if (Number.isFinite(z)) walker.z = z;
-      walker.y = Number.isFinite(y) ? y : terrainYAt(walker.x, walker.z) + 1.7;
-      walker.vy = 0;
+      if (hasSharedPosition && typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
+        const restored = appCtx.resolveSafeWorldSpawn(x, z, {
+          mode: 'walk',
+          angle: Number.isFinite(yaw) ? yaw : walker.angle,
+          feetY: Number.isFinite(y) ? y - 1.7 : undefined,
+          preserveElevatedSurface: Number.isFinite(y),
+          preferredRoad,
+          source: 'shared_walk_pose'
+        });
+        appCtx.applyResolvedWorldSpawn(restored, { mode: 'walk', syncCar: true, syncWalker: true });
+      }
       if (Number.isFinite(yaw)) {
         walker.yaw = yaw;
         walker.angle = yaw;
       }
-      if (appCtx.Walk.state.characterMesh) {
+      if (hasSharedPosition && appCtx.Walk.state.characterMesh) {
         appCtx.Walk.state.characterMesh.position.set(walker.x, walker.y - 1.7, walker.z);
         appCtx.Walk.state.characterMesh.rotation.y = Number.isFinite(yaw) ? yaw : appCtx.Walk.state.characterMesh.rotation.y;
       }
-      appCtx.car.x = walker.x;
-      appCtx.car.z = walker.z;
-      appCtx.car.angle = Number.isFinite(yaw) ? yaw : appCtx.car.angle;
     } else if (mode === 'boat') {
       if (Number.isFinite(x)) appCtx.boat.x = x;
       if (Number.isFinite(z)) appCtx.boat.z = z;
@@ -146,14 +173,19 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
         });
       }
     } else {
-      if (Number.isFinite(x)) appCtx.car.x = x;
-      if (Number.isFinite(z)) appCtx.car.z = z;
-      appCtx.car.y = Number.isFinite(y) ? y : terrainYAt(appCtx.car.x, appCtx.car.z) + 1.2;
+      if (hasSharedPosition && typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
+        const restored = appCtx.resolveSafeWorldSpawn(x, z, {
+          mode: 'drive',
+          angle: Number.isFinite(yaw) ? yaw : appCtx.car.angle,
+          feetY: Number.isFinite(y) ? y - 1.2 : undefined,
+          preferRoad: true,
+          preferredRoad,
+          source: 'shared_drive_pose'
+        });
+        appCtx.applyResolvedWorldSpawn(restored, { mode: 'drive', syncCar: true, syncWalker: true });
+      }
       if (Number.isFinite(yaw)) appCtx.car.angle = yaw;
-      appCtx.car.speed = 0;
-      appCtx.car.vx = 0;
-      appCtx.car.vz = 0;
-      if (appCtx.carMesh) {
+      if (hasSharedPosition && appCtx.carMesh) {
         appCtx.carMesh.position.set(appCtx.car.x, appCtx.car.y, appCtx.car.z);
         appCtx.carMesh.rotation.y = appCtx.car.angle;
       }
@@ -204,6 +236,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const pendingZ = pending && Number.isFinite(pending.refZ) ? pending.refZ : null;
     const pendingYaw = pending && Number.isFinite(pending.yaw) ? pending.yaw : null;
     const pendingPitch = pending && Number.isFinite(pending.pitch) ? pending.pitch : null;
+    const pendingRoadId = normalizeRoadIdentity(pending?.refRoadId);
 
     if (mode === 'plane') {
       params.set('rx', fmt(pendingX ?? appCtx.planeMode?.x ?? 0));
@@ -219,15 +252,36 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       params.set('pitch', fmt(pendingPitch ?? appCtx.drone?.pitch ?? 0, 4));
     } else if (mode === 'walking') {
       const walker = appCtx.Walk?.state?.walker || null;
+      const walkSurface = appCtx.SurfaceQuery?.walkAt?.(
+        Number(pendingX ?? walker?.x ?? 0),
+        Number(pendingZ ?? walker?.z ?? 0),
+        { currentY: Number(pendingY ?? walker?.y ?? 1.7) - 1.7 }
+      );
+      const surfaceRoadId = walkSurface?.kind === 'road'
+        ? roadIdentity(walkSurface.feature)
+        : null;
       params.set('rx', fmt(pendingX ?? walker?.x ?? 0));
       params.set('ry', fmt(pendingY ?? walker?.y ?? 1.7));
       params.set('rz', fmt(pendingZ ?? walker?.z ?? 0));
       params.set('yaw', fmt(pendingYaw ?? walker?.yaw ?? walker?.angle ?? 0, 4));
+      if (pendingRoadId || surfaceRoadId) params.set('rid', pendingRoadId || surfaceRoadId);
     } else {
+      const driveSurface = appCtx.SurfaceQuery?.driveAt?.(
+        Number(pendingX ?? appCtx.car?.x ?? 0),
+        Number(pendingZ ?? appCtx.car?.z ?? 0),
+        {
+          currentY: Number(pendingY ?? appCtx.car?.y ?? 1.2) - 1.2,
+          preferRoad: true
+        }
+      );
+      const surfaceRoadId = driveSurface?.kind === 'road'
+        ? roadIdentity(driveSurface.feature)
+        : appCtx.car?.onRoad ? roadIdentity(appCtx.car.road) : null;
       params.set('rx', fmt(pendingX ?? appCtx.car?.x ?? 0));
       params.set('ry', fmt(pendingY ?? appCtx.car?.y ?? 0));
       params.set('rz', fmt(pendingZ ?? appCtx.car?.z ?? 0));
       params.set('yaw', fmt(pendingYaw ?? appCtx.car?.angle ?? 0, 4));
+      if (pendingRoadId || surfaceRoadId) params.set('rid', pendingRoadId || surfaceRoadId);
     }
 
     url.search = params.toString();

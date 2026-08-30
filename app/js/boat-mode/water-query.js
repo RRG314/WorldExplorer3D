@@ -5,7 +5,7 @@ import {
   resolveWaterMotionProfile,
   sampleWaterSurfaceMotion,
   sampleWaterwaySurfaceProfile
-} from "../water-dynamics.js?v=4";
+} from "../water-dynamics.js?v=9";
 import {
   BOAT_AREA_MIN_AREA,
   BOAT_AREA_MIN_SPAN,
@@ -38,7 +38,7 @@ import {
   normalizeWaterBody,
   resolveWaterBodySurfaceY,
   waterKindLabel
-} from '../world/water-body-contract.js?v=3';
+} from '../world/water-body-contract.js?v=4';
 import { pointInWaterBody } from '../world/water-surface-registry.js?v=3';
 
 let _waterRaycaster = null;
@@ -228,6 +228,14 @@ function localizeBoatCandidate(candidate, shorelineDistance = 0) {
   };
 }
 
+function isPointInsideBoatCandidate(candidate, x, z) {
+  if (!candidate || ![x, z].every(Number.isFinite)) return false;
+  if (candidate.synthetic === true || candidate.source?.synthetic === true) return true;
+  if (candidate.type === 'area') return pointInWaterBody(candidate.source, x, z);
+  if (candidate.type === 'waterway') return buildWaterwayCandidate(candidate.source, x, z)?.inside === true;
+  return false;
+}
+
 function angleFromDirection(dirX, dirZ, fallbackAngle = 0) {
   if (!Number.isFinite(dirX) || !Number.isFinite(dirZ) || (Math.abs(dirX) < 1e-6 && Math.abs(dirZ) < 1e-6)) {
     return fallbackAngle;
@@ -298,11 +306,14 @@ function getReferencePosition() {
     };
   }
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) {
+    const walker = appCtx.Walk.state.walker;
+    const resolvedSurfaceY = Number(walker._resolvedGroundState?.effectiveGroundY);
     return {
-      x: appCtx.Walk.state.walker.x,
-      y: appCtx.Walk.state.walker.y,
-      z: appCtx.Walk.state.walker.z,
-      angle: Number.isFinite(appCtx.Walk.state.walker.angle) ? appCtx.Walk.state.walker.angle : appCtx.Walk.state.walker.yaw || 0,
+      x: walker.x,
+      // Water reachability compares surfaces, not the walker's eye/body origin.
+      y: Number.isFinite(resolvedSurfaceY) ? resolvedSurfaceY : Number(walker.y) - 1.7,
+      z: walker.z,
+      angle: Number.isFinite(walker.angle) ? walker.angle : walker.yaw || 0,
       mode: 'walk'
     };
   }
@@ -386,6 +397,24 @@ function buildWaterwayCandidate(way, x, z) {
 function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANCE, options = {}) {
   if (String(options.structureTerrainMode || '') === 'subgrade') return null;
   let best = null;
+  const previousSynthetic = options?.allowSynthetic === true && isSyntheticBoatCandidate(options.syntheticCandidate)
+    ? options.syntheticCandidate
+    : null;
+  // A port transition is an explicit, bounded navigation surface. Keep that
+  // authority until the vessel reaches its edge instead of immediately
+  // replacing it with a smaller overlapping map polygon on the next frame.
+  if (previousSynthetic?.source) {
+    const source = previousSynthetic.source;
+    const stats = source._boatStats || polygonStats(source.pts || []);
+    source._boatStats = stats;
+    const centerX = Number.isFinite(source.centerX) ? source.centerX : stats.centerX;
+    const centerZ = Number.isFinite(source.centerZ) ? source.centerZ : stats.centerZ;
+    const radius = Math.max(80, stats.minSpan * 0.5);
+    if (Math.hypot(x - centerX, z - centerZ) < radius * 0.82) {
+      const continued = buildAreaCandidate(source, x, z);
+      if (continued) return { ...continued, synthetic: true };
+    }
+  }
   const requireContainment = options.requireContainment !== false;
   const referenceY = Number(options.referenceY);
   const maximumVerticalDelta = Math.max(0.5, Number(options.maximumVerticalDelta) || 2.8);
@@ -417,21 +446,11 @@ function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANC
   }
 
   if (!best && options?.allowSynthetic === true) {
-    const previous = options.syntheticCandidate;
-    if (isSyntheticBoatCandidate(previous) && previous?.source) {
-      const source = previous.source;
-      const stats = source._boatStats || polygonStats(source.pts || []);
-      source._boatStats = stats;
-      const centerX = Number.isFinite(source.centerX) ? source.centerX : stats.centerX;
-      const centerZ = Number.isFinite(source.centerZ) ? source.centerZ : stats.centerZ;
-      const radius = Math.max(80, stats.minSpan * 0.5);
-      if (Math.hypot(x - centerX, z - centerZ) < radius * 0.52) {
-        const continued = buildAreaCandidate(source, x, z);
-        if (continued) return { ...continued, synthetic: true };
-      }
-    }
+    // Never chain transition surfaces indefinitely. Once an existing bounded
+    // transition ends, mapped water must take over or the vessel stops.
+    if (previousSynthetic) return null;
     return buildSyntheticBoatCandidate(x, z, {
-      waterKind: options.waterKind || previous?.source?.waterKind || previous?.waterKind || 'open_ocean'
+      waterKind: options.waterKind || 'open_ocean'
     });
   }
 
@@ -441,6 +460,10 @@ function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANC
 function getBoatModeSnapshot() {
   return {
     active: !!appCtx.boatMode?.active,
+    transportEntityId: String(appCtx.boatMode?.transportEntityId || ''),
+    transportCatalogId: String(appCtx.boatMode?.transportCatalogId || 'marina-runabout'),
+    vesselLabel: String(appCtx.boatMode?.vesselLabel || 'Marina runabout'),
+    condition: Number(appCtx.boatMode?.condition ?? 1),
     available: !!appCtx.boatMode?.available,
     seaState: appCtx.boatMode?.seaState || 'moderate',
     waveIntensity: getWaveIntensity(),
@@ -462,6 +485,7 @@ export {
   getBoatWaveProfile,
   getReferencePosition,
   isPointInsideWaterFootprint,
+  isPointInsideBoatCandidate,
   isSyntheticBoatCandidate,
   localizeBoatCandidate,
   measureBoatShorelineDistance,

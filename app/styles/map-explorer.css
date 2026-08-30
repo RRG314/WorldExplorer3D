@@ -1,0 +1,43 @@
+@layer interface{
+#largeMap{--map-edge:max(14px,env(safe-area-inset-left));box-sizing:border-box;padding:74px 72px 58px;background:rgba(1,8,13,.9);backdrop-filter:blur(12px)}
+#largeMapCanvas{width:min(calc(100vw - 144px),calc(100vh - 132px),800px);height:auto;aspect-ratio:1;max-width:800px;max-height:800px;border:1px solid rgba(157,205,224,.5);border-radius:10px;background:#0a1820;box-shadow:0 24px 80px rgba(0,0,0,.48);cursor:grab;touch-action:none}
+#largeMapCanvas.is-panning{cursor:grabbing}
+#mapExplorerHeader{position:absolute;top:max(14px,env(safe-area-inset-top));left:var(--map-edge);right:var(--map-edge);z-index:202;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:none}
+#mapExplorerHeader>div{display:grid;gap:2px;min-width:0;padding:8px 11px;border-left:2px solid #51c5e9;background:rgba(3,18,27,.88)}
+#mapExplorerHeader span{color:#73d8f5;font:700 9px Orbitron,sans-serif;letter-spacing:.14em}
+#mapExplorerHeader strong{color:#eaf8fd;font:600 11px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mapExplorerHeader button,#mapClose,#mapControlDock button,#mapLegend{min-height:42px;border:1px solid rgba(158,210,229,.5)!important;border-radius:8px!important;color:#eaf8fd!important;background:rgba(5,25,36,.9)!important;box-shadow:0 8px 24px rgba(0,0,0,.25);font:700 9px Orbitron,sans-serif!important;letter-spacing:.04em;pointer-events:auto}
+#mapExplorerHeader button{padding:0 13px}
+#mapClose{top:max(14px,env(safe-area-inset-top));right:var(--map-edge);z-index:204;padding:0 15px;transform:none!important}
+#mapExplorerHeader{padding-right:78px}
+#mapExplorerHint{position:absolute;left:50%;bottom:max(13px,env(safe-area-inset-bottom));z-index:202;max-width:calc(100vw - 170px);padding:7px 11px;border:1px solid rgba(158,210,229,.25);border-radius:8px;color:#a9c5d0;background:rgba(3,18,27,.88);font:600 10px/1.3 Inter,sans-serif;transform:translateX(-50%);pointer-events:none}
+#mapControlDock{position:absolute;right:var(--map-edge);bottom:max(14px,env(safe-area-inset-bottom));z-index:203;display:grid;grid-template-columns:repeat(2,44px);gap:7px}
+#mapControlDock button{width:44px;height:42px;padding:0;font-size:16px!important}
+#mapControlDock>span{grid-column:1/-1;height:1px;background:rgba(158,210,229,.28)}
+#mapControlDock #zoomLevel{grid-column:1/-1;padding:5px;border:1px solid rgba(158,210,229,.3);border-radius:7px;color:#78daf5;background:rgba(3,18,27,.9);font:700 9px Orbitron,sans-serif;text-align:center}
+#mapSatelliteToggle.active,#mapRoadsToggle.active,#mapPathsToggle.active{border-color:#66d4f2!important;color:#06131a!important;background:#66d4f2!important}
+#mapLegend{left:var(--map-edge)!important;bottom:max(14px,env(safe-area-inset-bottom))!important;padding:0 13px!important}
+#largeMap.browsing #mapExplorerStatus{color:#f2c56e}
+#largeMap.browsing #mapRecenter{border-color:#f2c56e!important;color:#f8d998!important}
+body:has(#largeMap.show) #mainMenuBtn,body:has(#largeMap.show) #hud,body:has(#largeMap.show) #minimap,body:has(#largeMap.show) #minimapZoomControls,body:has(#largeMap.show) #coords,body:has(#largeMap.show) #floatMenuContainer,body:has(#largeMap.show) #controlsTab,body:has(#largeMap.show) #urbanEquipmentToggle,body:has(#largeMap.show) #urbanVehiclePrompt,body:has(#largeMap.show) #urbanWeaponReticle,body:has(#largeMap.show) #mobileTouchControls,body:has(#largeMap.show) #liveGpsHud,body:has(#largeMap.show) .tutorial-card{display:none!important}
+@media(max-width:760px),(pointer:coarse){#largeMap{padding:max(64px,calc(env(safe-area-inset-top) + 58px)) 8px max(112px,calc(env(safe-area-inset-bottom) + 104px))}#largeMapCanvas{width:min(calc(100vw - 16px),calc(100dvh - max(176px,calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 162px))));height:auto;max-width:none;max-height:none;border-radius:8px}#mapExplorerHeader{right:8px;left:8px;padding-right:63px}#mapExplorerHeader>div{padding:7px 9px}#mapExplorerHeader button{padding:0 9px;font-size:8px!important}#mapClose{right:8px;padding:0 12px}#mapExplorerHint{left:8px;right:8px;bottom:max(66px,calc(env(safe-area-inset-bottom) + 58px));max-width:none;text-align:center;transform:none}#mapControlDock{right:8px;bottom:max(8px,env(safe-area-inset-bottom));display:flex}#mapControlDock>span{display:none}#mapControlDock #zoomLevel{display:grid;min-width:40px;place-items:center}#mapLegend{left:8px!important;bottom:max(8px,env(safe-area-inset-bottom))!important}#legendPanel{inset:62px 8px 64px!important;max-width:none!important;max-height:none!important;box-sizing:border-box}#mapInfoPanel{inset:62px 8px 64px!important;width:auto!important;max-height:none!important;box-sizing:border-box}}
+}
+
+@layer interface{
+@media(min-width:761px) and (pointer:fine){
+  #largeMap{padding:48px 24px 24px}
+  #largeMapCanvas{width:min(calc(100vw - 48px),calc(100dvh - 48px),1040px);max-width:1040px;max-height:1040px}
+  #legendPanel{top:70px!important;left:14px!important;width:min(390px,calc(100vw - 28px));max-width:390px!important;max-height:calc(100% - 140px)!important;box-sizing:border-box;padding:12px!important}
+}
+#legendPanel{border:1px solid rgba(112,196,222,.55)!important;background:rgba(3,14,22,.96)!important;color:#d9edf4!important}
+#legendPanel>div{margin-bottom:8px!important}
+#legendPanel label{color:#d9edf4;text-transform:none}
+#legendPanel input[type="checkbox"]{accent-color:#55c9e9}
+.mapLegendGroup{margin:7px 0;border:1px solid rgba(112,196,222,.22);border-radius:7px;background:rgba(7,29,41,.54)}
+.mapLegendSummary{display:flex!important;align-items:center;gap:6px;min-height:40px;box-sizing:border-box;margin:0!important;padding:9px 10px;cursor:pointer;list-style:none;color:#aee7f5!important}
+.mapLegendSummary::-webkit-details-marker{display:none}
+.mapLegendSummary::after{content:'+';margin-left:auto;color:#71d7ef;font-size:14px}
+.mapLegendGroup[open]>.mapLegendSummary::after{content:'−'}
+.mapLegendSummary small{margin-left:auto;color:#789aa8;font:600 8px Inter,sans-serif}
+.mapLegendGroup>div{padding:2px 10px 10px!important}
+}

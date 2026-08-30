@@ -46,10 +46,16 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
   const posAttr = geometry.attributes.position;
   const normAttr = geometry.attributes.normal;
   const uvAttr = geometry.attributes.uv;
+  const facadeEntranceAttr = geometry.attributes.facadeEntrance;
   const baseVertex = batch.positions.length / 3;
   const startPos = batch.positions.length;
   const startNormals = batch.normals.length;
   const startUvs = batch.uvs.length;
+  const startFacadeEntrances = Array.isArray(batch.facadeEntrances) ? batch.facadeEntrances.length : 0;
+  const startColors = Array.isArray(batch.colors) ? batch.colors.length : 0;
+  const startFacadeParams = Array.isArray(batch.facadeParams) ? batch.facadeParams.length : 0;
+  const startRoofAParams = Array.isArray(batch.roofAParams) ? batch.roofAParams.length : 0;
+  const startRoofColorsB = Array.isArray(batch.roofColorsB) ? batch.roofColorsB.length : 0;
   const startIdx = batch.indices.length;
 
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
@@ -60,6 +66,11 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     batch.positions.length = startPos;
     batch.normals.length = startNormals;
     batch.uvs.length = startUvs;
+    if (Array.isArray(batch.facadeEntrances)) batch.facadeEntrances.length = startFacadeEntrances;
+    if (Array.isArray(batch.colors)) batch.colors.length = startColors;
+    if (Array.isArray(batch.facadeParams)) batch.facadeParams.length = startFacadeParams;
+    if (Array.isArray(batch.roofAParams)) batch.roofAParams.length = startRoofAParams;
+    if (Array.isArray(batch.roofColorsB)) batch.roofColorsB.length = startRoofColorsB;
     batch.indices.length = startIdx;
   };
 
@@ -89,6 +100,19 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     } else {
       batch.uvs.push(0, 0);
     }
+
+    if (Array.isArray(batch.facadeEntrances)) {
+      if (facadeEntranceAttr?.itemSize === 4) {
+        batch.facadeEntrances.push(
+          facadeEntranceAttr.getX(i),
+          facadeEntranceAttr.getY(i),
+          facadeEntranceAttr.getZ(i) + Number(matrix?.elements?.[13] || 0),
+          facadeEntranceAttr.getW(i)
+        );
+      } else {
+        batch.facadeEntrances.push(0, 0, 0, 0);
+      }
+    }
   }
 
   if (geometry.index) {
@@ -115,6 +139,11 @@ export function buildMergedGeometry(batch) {
   if (batch.positions.length % 3 !== 0 || batch.normals.length % 3 !== 0 || batch.uvs.length % 2 !== 0) return null;
   if (batch.normals.length !== batch.positions.length) return null;
   if (batch.uvs.length !== batch.positions.length / 3 * 2) return null;
+  if (Array.isArray(batch.facadeEntrances) && batch.facadeEntrances.length !== batch.positions.length / 3 * 4) return null;
+  if (Array.isArray(batch.colors) && batch.colors.length !== batch.positions.length) return null;
+  if (Array.isArray(batch.facadeParams) && batch.facadeParams.length !== batch.positions.length / 3 * 4) return null;
+  if (Array.isArray(batch.roofAParams) && batch.roofAParams.length !== batch.positions.length / 3 * 4) return null;
+  if (Array.isArray(batch.roofColorsB) && batch.roofColorsB.length !== batch.positions.length / 3 * 4) return null;
 
   for (let i = 0; i < batch.positions.length; i++) {
     if (!Number.isFinite(batch.positions[i])) return null;
@@ -135,6 +164,21 @@ export function buildMergedGeometry(batch) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
+  if (Array.isArray(batch.facadeEntrances)) {
+    geometry.setAttribute('facadeEntrance', new THREE.Float32BufferAttribute(batch.facadeEntrances, 4));
+  }
+  if (Array.isArray(batch.colors)) {
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(batch.colors, 3));
+  }
+  if (Array.isArray(batch.facadeParams)) {
+    geometry.setAttribute('buildingFacadeParams', new THREE.Float32BufferAttribute(batch.facadeParams, 4));
+  }
+  if (Array.isArray(batch.roofAParams)) {
+    geometry.setAttribute('buildingRoofAParams', new THREE.Float32BufferAttribute(batch.roofAParams, 4));
+  }
+  if (Array.isArray(batch.roofColorsB)) {
+    geometry.setAttribute('buildingRoofColorB', new THREE.Float32BufferAttribute(batch.roofColorsB, 4));
+  }
 
   const indexArray = vertexCount > 65535 ? new Uint32Array(batch.indices) : new Uint16Array(batch.indices);
   geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));

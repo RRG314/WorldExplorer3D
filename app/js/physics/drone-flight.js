@@ -19,12 +19,23 @@ export function updateDrone(dt) {
   const turnSpeed = 2 * dt;
   const forward = Number(actions.move) || 0;
   const turn = Number(actions.turn) || 0;
+  const lookYaw = Number(actions.lookYaw) || 0;
+  const lookPitch = Number(actions.lookPitch) || 0;
+  const manualCameraInput = Math.abs(lookYaw) > 0.05 || Math.abs(lookPitch) > 0.05;
 
   appCtx.drone.yaw = wrapYaw(appCtx.drone.yaw + turn * turnSpeed);
-  appCtx.drone.pitch += (Number(actions.lookPitch) || 0) * turnSpeed;
   appCtx.drone.cameraYawOffset = wrapYaw(
-    (Number(appCtx.drone.cameraYawOffset) || 0) + (Number(actions.lookYaw) || 0) * turnSpeed
+    (Number(appCtx.drone.cameraYawOffset) || 0) + lookYaw * turnSpeed
   );
+  appCtx.drone.cameraPitchOffset = Math.max(-1.2, Math.min(1.2,
+    (Number(appCtx.drone.cameraPitchOffset) || 0) + lookPitch * turnSpeed
+  ));
+  appCtx.drone.cameraLookTimer = manualCameraInput ? 1.15 : Math.max(0, Number(appCtx.drone.cameraLookTimer || 0) - dt);
+  if (!manualCameraInput && appCtx.drone.cameraLookTimer <= 0) {
+    const recenterBlend = 1 - Math.exp(-dt * 3.4);
+    appCtx.drone.cameraYawOffset = wrapYaw(appCtx.drone.cameraYawOffset * (1 - recenterBlend));
+    appCtx.drone.cameraPitchOffset *= 1 - recenterBlend;
+  }
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;

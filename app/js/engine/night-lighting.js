@@ -2,11 +2,10 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 
 const STREET_LIGHT_COLOR = 0xffd7a3;
 const HEADLIGHT_COLOR = 0xfff1d2;
-const STREET_LIGHT_DISTANCE = 42;
-const STREET_LIGHT_HEIGHT = 6.05;
+const STREET_LIGHT_DISTANCE = 58;
 const UPDATE_INTERVAL_MS = 240;
-const HEADLIGHT_INTENSITY = 1100;
-const STREET_LIGHT_INTENSITY = 72;
+const HEADLIGHT_INTENSITY = 180;
+const STREET_LIGHT_INTENSITY = 260;
 
 const headlightLocalPosition = new THREE.Vector3();
 const headlightLocalTarget = new THREE.Vector3();
@@ -31,12 +30,15 @@ function ensureStreetLightPool() {
   const desired = streetLightBudget();
   if (!Array.isArray(appCtx.streetLightPool)) appCtx.streetLightPool = [];
   while (appCtx.streetLightPool.length < desired) {
-    const light = new THREE.PointLight(STREET_LIGHT_COLOR, 0, STREET_LIGHT_DISTANCE, 2);
+    const target = new THREE.Object3D();
+    const light = new THREE.SpotLight(STREET_LIGHT_COLOR, 0, STREET_LIGHT_DISTANCE, 0.78, 0.62, 1.5);
+    light.target = target;
     light.visible = false;
     light.castShadow = false;
     light.userData.worldStreetLight = true;
     appCtx.scene?.add(light);
-    appCtx.streetLightPool.push(light);
+    appCtx.scene?.add(target);
+    appCtx.streetLightPool.push({ light, target });
   }
   return appCtx.streetLightPool;
 }
@@ -46,7 +48,7 @@ export function createVehicleHeadlightRig(carMesh) {
   const rig = [];
   for (const x of [-0.56, 0.56]) {
     const target = new THREE.Object3D();
-    const light = new THREE.SpotLight(HEADLIGHT_COLOR, 0, 110, 0.52, 0.52, 1.15);
+    const light = new THREE.SpotLight(HEADLIGHT_COLOR, 0, 76, 0.34, 0.68, 1.35);
     light.target = target;
     light.castShadow = false;
     light.visible = false;
@@ -63,10 +65,10 @@ export function resetStreetLampFixtures() {
   appCtx.streetLampFixtures = [];
 }
 
-export function registerStreetLamp(group, head) {
+export function registerStreetLamp(group, head, target = null) {
   if (!group) return;
   if (!Array.isArray(appCtx.streetLampFixtures)) appCtx.streetLampFixtures = [];
-  appCtx.streetLampFixtures.push({ group, head });
+  appCtx.streetLampFixtures.push({ group, head, target });
 }
 
 function updateHeadlights(factor) {
@@ -76,8 +78,8 @@ function updateHeadlights(factor) {
     entry.light.visible = active;
     entry.light.intensity = active ? HEADLIGHT_INTENSITY * factor : 0;
     if (active) {
-      headlightLocalPosition.set(entry.x, -0.55, 1.6);
-      headlightLocalTarget.set(entry.x * 0.25, -3, 38);
+      headlightLocalPosition.set(entry.x, -0.48, 1.65);
+      headlightLocalTarget.set(entry.x * 0.22, -1.25, 32);
       appCtx.carMesh.localToWorld(headlightLocalPosition);
       appCtx.carMesh.localToWorld(headlightLocalTarget);
       entry.light.position.copy(headlightLocalPosition);
@@ -118,20 +120,26 @@ function updateStreetLights(factor, now) {
   lastStreetUpdateAt = now;
   const fixtures = enabled ? nearestFixtures(pool.length) : [];
   for (let index = 0; index < pool.length; index++) {
-    const light = pool[index];
+    const entry = pool[index];
+    const light = entry.light;
     const fixture = fixtures[index]?.fixture;
     if (!fixture) {
       light.visible = false;
       light.intensity = 0;
       continue;
     }
-    light.position.set(
-      fixture.group.position.x,
-      fixture.group.position.y + STREET_LIGHT_HEIGHT,
-      fixture.group.position.z
+    fixture.head.getWorldPosition(light.position);
+    const targetX = Number(fixture.target?.x);
+    const targetZ = Number(fixture.target?.z);
+    entry.target.position.set(
+      Number.isFinite(targetX) ? targetX : fixture.group.position.x,
+      fixture.group.position.y + 0.15,
+      Number.isFinite(targetZ) ? targetZ : fixture.group.position.z
     );
+    entry.target.updateMatrixWorld();
     light.intensity = STREET_LIGHT_INTENSITY * factor;
     light.visible = true;
+    light.updateMatrixWorld();
   }
 
   const lampMaterial = appCtx.streetLampHeadMaterial;

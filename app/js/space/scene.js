@@ -7,7 +7,8 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=19";
+import { initUniverseRuntime } from "../universe/runtime.js?v=21";
+import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=3";
 
 export function createSpaceFlightScene(options = {}) {
   console.log("Creating space flight scene...");
@@ -164,69 +165,7 @@ function createSpaceMoon() {
 }
 
 function createSpaceRocket() {
-  appCtx.spaceFlight.rocket = new THREE.Group();
-
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(2, 2.5, 12, 20),
-    new THREE.MeshPhongMaterial({ color: 0xf0f0f0, shininess: 90, specular: 0x444444 })
-  );
-  appCtx.spaceFlight.rocket.add(body);
-
-  const nose = new THREE.Mesh(
-    new THREE.ConeGeometry(2, 5, 20),
-    new THREE.MeshPhongMaterial({ color: 0xdd3333, shininess: 60, specular: 0x331111 })
-  );
-  nose.position.y = 8.5;
-  appCtx.spaceFlight.rocket.add(nose);
-
-  const rocketWindow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.8, 16),
-    new THREE.MeshPhongMaterial({ color: 0x88ccff, emissive: 0x224466, shininess: 100 })
-  );
-  rocketWindow.position.set(0, 3, 2.1);
-  appCtx.spaceFlight.rocket.add(rocketWindow);
-
-  const finMat = new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 30, specular: 0x222222 });
-  for (let i = 0; i < 4; i++) {
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4, 3), finMat);
-    const angle = i / 4 * Math.PI * 2;
-    fin.position.x = Math.cos(angle) * 2.5;
-    fin.position.z = Math.sin(angle) * 2.5;
-    fin.position.y = -4;
-    fin.rotation.y = -angle;
-    appCtx.spaceFlight.rocket.add(fin);
-  }
-
-  const nozzle = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.5, 2, 2, 20),
-    new THREE.MeshPhongMaterial({ color: 0x555555, shininess: 40, specular: 0x333333 })
-  );
-  nozzle.position.y = -7;
-  appCtx.spaceFlight.rocket.add(nozzle);
-
-  const glow = new THREE.Mesh(
-    new THREE.ConeGeometry(2, 8, 16),
-    new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0 })
-  );
-  glow.position.y = -12;
-  glow.rotation.x = Math.PI;
-  glow.name = 'engineGlow';
-  appCtx.spaceFlight.rocket.add(glow);
-
-  const exhaustGroup = new THREE.Group();
-  exhaustGroup.name = 'exhaust';
-  for (let i = 0; i < 6; i++) {
-    const particle = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5 + Math.random() * 0.5, 8, 8),
-      new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0 })
-    );
-    particle.position.y = -10 - Math.random() * 6;
-    particle.position.x = (Math.random() - 0.5) * 3;
-    particle.position.z = (Math.random() - 0.5) * 3;
-    exhaustGroup.add(particle);
-  }
-  appCtx.spaceFlight.rocket.add(exhaustGroup);
-
+  appCtx.spaceFlight.rocket = createExpeditionSpacecraftMesh();
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.rocket);
 }
 

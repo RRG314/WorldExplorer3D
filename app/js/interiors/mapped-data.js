@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingLabel, distanceToFootprint } from "../building-entry.js?v=5";
+import { buildingLabel, distanceToFootprint } from "../building-entry.js?v=7";
 import { INTERIOR_FAST_ENTRY_WAIT_MS, INTERIOR_FETCH_TIMEOUT_MS } from "./constants.js?v=1";
 import {
   buildingGeoBounds,
@@ -15,7 +15,7 @@ import {
   wayWorldPoints,
   worldToGeo,
   isClosedWay
-} from "./core.js?v=3";
+} from "./core.js?v=4";
 
 export async function fetchMappedInteriorDefinition(support, interiorCache) {
   if (!support?.enterable || !support.allowMappedData || typeof appCtx.fetchOverpassJSON !== 'function') return null;
@@ -116,6 +116,19 @@ export async function fetchMappedInteriorDefinition(support, interiorCache) {
   const selectedEntrances = entrances.filter((entry) => Math.abs(entry.level - selectedLevel) < 0.01);
   if (selectedFeatures.length === 0) return null;
 
+  // Retain every mapped level as source-owned indoor geometry. Publication is
+  // still bounded by the active-plus-adjacent floor window, but changing floors
+  // must not silently replace mapped rooms/corridors with a generated layout.
+  const mappedLevelValues = [...new Set(features
+    .map((feature) => Number(feature.level))
+    .filter(Number.isFinite))]
+    .sort((a, b) => a - b);
+  const mappedLevels = mappedLevelValues.map((level) => Object.freeze({
+    level,
+    features: Object.freeze(features.filter((feature) => Math.abs(feature.level - level) < 0.01)),
+    entrances: Object.freeze(entrances.filter((entry) => Math.abs(entry.level - level) < 0.01))
+  }));
+
   return createInteriorCacheEntry(interiorCache, {
     key: support.key,
     label: support.label || buildingLabel(building),
@@ -125,6 +138,8 @@ export async function fetchMappedInteriorDefinition(support, interiorCache) {
     selectedLevel,
     features: selectedFeatures,
     entrances: selectedEntrances,
+    mappedLevels: Object.freeze(mappedLevels),
+    mappedLevelValues: Object.freeze(mappedLevelValues),
     rawFeatureCount: features.length,
     rawEntranceCount: entrances.length
   });

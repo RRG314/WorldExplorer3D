@@ -1,12 +1,13 @@
 import { listenArtifacts } from "./artifacts.js?v=57";
 import {
   clearMySharedBlocks,
+  clearRoomSharedBlocks,
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
-} from "./blocks.js?v=63";
+} from "./blocks.js?v=69";
 import { listenChat } from "./chat.js?v=56";
-import { listenPlayers, startPresence } from "./presence.js?v=61";
+import { listenPlayers, startPresence } from "./presence.js?v=62";
 import {
   deriveRoomDeterministicSeed,
   listenHomeBase,
@@ -56,6 +57,20 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     }
 
     clearSubscriptions();
+    await appCtx.ensureEditableWorldRuntime?.();
+    const [{
+      listenRoomWorldModifications,
+      resetRoomWorldModifications,
+      restoreRoomBuilding,
+      suppressRoomBuilding
+    }, {
+      editableRoomPermissions,
+      resolveEditableRoomRole,
+      roomWorldModificationIdentity
+    }] = await Promise.all([
+      import('./world-modifications.js?v=1'),
+      import('../editable-world/room-model.js?v=1')
+    ]);
     state.currentRoom = room;
     emitTutorialEvent("room_created_or_toggled", {
       roomCode: normalizeCode(room.code || room.id || ""),
@@ -66,11 +81,29 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       appCtx.configureSharedBuildSync({
         enabled: true,
         roomId: room.id,
+        connected: globalThis.navigator?.onLine !== false,
         upsert: (entry) => upsertSharedBlock(room.id, entry),
         remove: (entry) => removeSharedBlock(room.id, entry),
         clearMine: () => clearMySharedBlocks(room.id)
       });
     }
+    const editableRole = resolveEditableRoomRole(room, state.authUser?.uid || '');
+    const editablePermissions = editableRoomPermissions(editableRole);
+    appCtx.configureSharedEditableWorld?.({
+      enabled: true,
+      roomId: room.id,
+      worldId: roomWorldModificationIdentity(room),
+      canManage: editablePermissions.resetWorld,
+      suppress: (sourceFeatureId) => suppressRoomBuilding(room, sourceFeatureId),
+      restore: (sourceFeatureId) => restoreRoomBuilding(room, sourceFeatureId),
+      reset: async () => {
+        const [modifications, blocks] = await Promise.all([
+          resetRoomWorldModifications(room),
+          clearRoomSharedBlocks(room.id)
+        ]);
+        return modifications + blocks;
+      }
+    });
     state.artifacts = [];
     state.roomActivities = [];
     state.activeRoomActivity = null;
@@ -183,6 +216,12 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       }
     }, {
       onError: () => setStatus("Shared builds are reconnecting; existing blocks were kept.", true)
+    });
+
+    state.unsubWorldModifications = listenRoomWorldModifications(room, (rows) => {
+      appCtx.setSharedEditableWorldRows?.(rows);
+    }, {
+      onError: () => setStatus('Shared world edits are reconnecting; the last committed room world remains visible.', true)
     });
 
     state.unsubHomeBase = listenHomeBase(room.id, (homeBase) => {

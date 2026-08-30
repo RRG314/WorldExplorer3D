@@ -73,7 +73,8 @@ export function compileGroundArtifact({ manifest = {}, artifact = {} } = {}) {
     verticalDatum: manifest.verticalDatum,
     minimumConfidence: artifact.minimumConfidence,
     grid: artifact.grid,
-    samples: artifact.samples
+    samples: artifact.samples,
+    encodedSamples: artifact.sampleEncoding
   });
   if (model.status !== 'accepted') {
     return rejection('ground-model-rejected', {
@@ -82,11 +83,14 @@ export function compileGroundArtifact({ manifest = {}, artifact = {} } = {}) {
       modelDiagnostics: model.diagnostics
     });
   }
-  if (model.grid.sampleCount !== Number(artifact.samples?.length)) {
+  const artifactSampleCount = artifact.sampleEncoding
+    ? Number(artifact.sampleEncoding.sampleCount)
+    : Number(artifact.samples?.length);
+  if (model.grid.sampleCount !== artifactSampleCount) {
     return rejection('artifact-sample-count-mismatch', {
       artifactId: String(manifest.artifactId),
       expectedCount: model.grid.sampleCount,
-      receivedCount: Number(artifact.samples?.length || 0)
+      receivedCount: Number(artifactSampleCount || 0)
     });
   }
 

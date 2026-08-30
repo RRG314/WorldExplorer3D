@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createLifecycleScope } from "../runtime/lifecycle-scope.js?v=2";
+import { canUseEquippedItemOnMobile } from './equipment-action-policy.js?v=1';
 
 const MOBILE_CONTROL_PROFILES = {
   driving: {
@@ -55,6 +56,23 @@ const MOBILE_CONTROL_PROFILES = {
       { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
       { label: 'Run', binding: { channel: 'earth', key: 'ShiftLeft' } }
     ]
+  },
+  skydiving: {
+    moveLabel: 'Canopy',
+    lookLabel: 'Look',
+    move: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
+    },
+    actions: [{ label: 'Deploy', binding: { channel: 'earth', key: 'Space' } }]
   },
   drone: {
     moveLabel: 'Move',
@@ -133,6 +151,17 @@ const MOBILE_CONTROL_PROFILES = {
   }
 };
 
+const MOBILE_CONTROL_GUIDANCE = {
+  driving: ['Driving', 'Throttle · steer', 'Look', 'Brake'],
+  boat: ['Boat', 'Throttle · steer', 'Look', 'Brake'],
+  walking: ['Walking', 'Move', 'Look', 'Jump · Run'],
+  skydiving: ['Skydiving', 'Steer · flare', 'Look', 'Deploy parachute'],
+  drone: ['Drone', 'Fly · turn', 'Look', 'Ascend · descend'],
+  plane: ['Plane', 'Pitch · roll', 'Look', 'Throttle + · −'],
+  rocket: ['Rocket', '—', 'Steer', 'Accelerate · brake'],
+  ocean: ['Submersible', 'Thrust · turn', 'Look', 'Ascend · descend']
+};
+
 function initMobileControls() {
   const mobileControlScope = createLifecycleScope('mobile-controls');
   const controlsTab = document.getElementById('controlsTab');
@@ -154,6 +183,20 @@ function initMobileControls() {
   const mobileLookLabel = document.getElementById('mobileLookLabel');
   const mobileActionPrimary = document.getElementById('mobileActionPrimary');
   const mobileActionSecondary = document.getElementById('mobileActionSecondary');
+  const mobileEquipmentUse = document.getElementById('mobileEquipmentUse');
+  const mobileActionStack = document.getElementById('mobileActionStack');
+  const urbanEquipmentToggle = document.getElementById('urbanEquipmentToggle');
+  const mobileControlsHandedness = document.getElementById('mobileControlsHandedness');
+  const mobileMoveSensitivity = document.getElementById('mobileMoveSensitivity');
+  const mobileMoveSensitivityValue = document.getElementById('mobileMoveSensitivityValue');
+  const mobileLookSensitivity = document.getElementById('mobileLookSensitivity');
+  const mobileLookSensitivityValue = document.getElementById('mobileLookSensitivityValue');
+  const mobileCameraRecenter = document.getElementById('mobileCameraRecenter');
+  const mobileControlsReset = document.getElementById('mobileControlsReset');
+  const mobileControlModeName = document.getElementById('mobileControlModeName');
+  const mobileControlLeftSummary = document.getElementById('mobileControlLeftSummary');
+  const mobileControlRightSummary = document.getElementById('mobileControlRightSummary');
+  const mobileControlActionSummary = document.getElementById('mobileControlActionSummary');
   const mobileHoldButtons = [
     'mobileMoveUp',
     'mobileMoveLeft',
@@ -174,8 +217,14 @@ function initMobileControls() {
       return (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
     }
   })();
+
+  if (isTouchPreferredClient && mobileActionStack && urbanEquipmentToggle) {
+    urbanEquipmentToggle.classList.add('mobilePackAction');
+    mobileActionStack.append(urbanEquipmentToggle);
+  }
   const mobileHeldCounts = new Map();
   const mobileActivePointers = new Map();
+  const analogPadPointers = new Map();
 
   function setVirtualInputPressed(channel, key, pressed) {
     if (!key) return;
@@ -214,10 +263,70 @@ function initMobileControls() {
     }
     mobileHeldCounts.clear();
     mobileActivePointers.clear();
+    analogPadPointers.clear();
+    appCtx.clearMobileTouchInput?.('mobile-controls-cleared');
+    [mobileMovePad, mobileLookPad].forEach((pad) => {
+      pad?.classList.remove('active');
+      const knob = pad?.querySelector('.mobilePadLabel');
+      if (knob) knob.style.transform = '';
+    });
     mobileHoldButtons.forEach((btn) => {
       btn.classList.remove('active');
       delete btn.dataset.activeCount;
     });
+  }
+
+  function bindAnalogPad(pad, kind) {
+    if (!pad || typeof PointerEvent === 'undefined') return;
+    const update = (event) => {
+      const activePointer = analogPadPointers.get(kind);
+      if (activePointer?.pointerId !== event.pointerId) return;
+      const bounds = pad.getBoundingClientRect();
+      const radius = Math.max(32, Math.min(bounds.width, bounds.height) * 0.48);
+      const rawX = (event.clientX - activePointer.originX) / radius;
+      const rawY = (event.clientY - activePointer.originY) / radius;
+      const length = Math.hypot(rawX, rawY) || 1;
+      const scale = length > 1 ? 1 / length : 1;
+      const x = rawX * scale;
+      const y = rawY * scale;
+      appCtx.setMobileTouchPad?.(kind, x, y, true, performance.now());
+      const knob = pad.querySelector('.mobilePadLabel');
+      if (knob) knob.style.transform = `translate(${(x * radius * 0.52).toFixed(1)}px, ${(y * radius * 0.52).toFixed(1)}px)`;
+    };
+    const start = (event) => {
+      if (analogPadPointers.has(kind)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      // Thumb-down is neutral. Landing off-center must not immediately command
+      // a turn or sprint before the player deliberately drags.
+      analogPadPointers.set(kind, {
+        pointerId: event.pointerId,
+        originX: event.clientX,
+        originY: event.clientY
+      });
+      try { pad.setPointerCapture?.(event.pointerId); } catch (_) {}
+      pad.classList.add('active');
+      update(event);
+    };
+    const move = (event) => {
+      if (analogPadPointers.get(kind)?.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      update(event);
+    };
+    const end = (event) => {
+      if (analogPadPointers.get(kind)?.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      analogPadPointers.delete(kind);
+      appCtx.setMobileTouchPad?.(kind, 0, 0, false, performance.now());
+      pad.classList.remove('active');
+      const knob = pad.querySelector('.mobilePadLabel');
+      if (knob) knob.style.transform = '';
+    };
+    mobileControlScope.listen(pad, 'pointerdown', start);
+    mobileControlScope.listen(pad, 'pointermove', move);
+    mobileControlScope.listen(pad, 'pointerup', end);
+    mobileControlScope.listen(pad, 'pointercancel', end);
+    mobileControlScope.listen(pad, 'lostpointercapture', end);
   }
 
   function bindPadButton(prefix, direction, binding) {
@@ -264,6 +373,31 @@ function initMobileControls() {
     });
   }
 
+  function syncMobileControlSettingsUi() {
+    const settings = appCtx.getMobileTouchInputSnapshot?.().settings;
+    if (!settings) return;
+    if (mobileControlsHandedness) mobileControlsHandedness.value = settings.handedness;
+    if (mobileMoveSensitivity) mobileMoveSensitivity.value = String(Math.round(settings.moveSensitivity * 100));
+    if (mobileMoveSensitivityValue) mobileMoveSensitivityValue.value = `${Math.round(settings.moveSensitivity * 100)}%`;
+    if (mobileLookSensitivity) mobileLookSensitivity.value = String(Math.round(settings.lookSensitivity * 100));
+    if (mobileLookSensitivityValue) mobileLookSensitivityValue.value = `${Math.round(settings.lookSensitivity * 100)}%`;
+    if (mobileCameraRecenter) mobileCameraRecenter.checked = settings.cameraRecenter !== false;
+    if (mobileTouchControls) mobileTouchControls.dataset.handedness = settings.handedness;
+  }
+
+  function updateMobileControlGuidance(mode) {
+    const guidance = MOBILE_CONTROL_GUIDANCE[mode] || MOBILE_CONTROL_GUIDANCE.driving;
+    if (mobileControlModeName) mobileControlModeName.textContent = guidance[0];
+    if (mobileControlLeftSummary) mobileControlLeftSummary.textContent = guidance[1];
+    if (mobileControlRightSummary) mobileControlRightSummary.textContent = guidance[2];
+    if (mobileControlActionSummary) mobileControlActionSummary.textContent = guidance[3];
+  }
+
+  function updateMobileSettings(patch) {
+    appCtx.updateMobileTouchSettings?.(patch);
+    syncMobileControlSettingsUi();
+  }
+
   function bindMobileHoldButton(btn) {
     const beginHold = (token, channel, key) => {
       if (!token || !key || mobileActivePointers.has(token)) return;
@@ -297,6 +431,13 @@ function initMobileControls() {
       }
       const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 0;
       beginHold(`${btn.id}:p:${pointerId}`, btn.dataset.channel || 'earth', btn.dataset.key);
+      if (
+        btn === mobileActionPrimary &&
+        btn.dataset.key === 'Space' &&
+        detectControlsMode() === 'skydiving'
+      ) {
+        appCtx.handleUrbanEquipmentUse?.();
+      }
     };
 
     const onPointerRelease = (event) => {
@@ -311,6 +452,13 @@ function initMobileControls() {
       for (let index = 0; index < event.changedTouches.length; index++) {
         const id = event.changedTouches[index]?.identifier;
         if (Number.isFinite(id)) beginHold(`${btn.id}:t:${id}`, btn.dataset.channel || 'earth', btn.dataset.key);
+      }
+      if (
+        btn === mobileActionPrimary &&
+        btn.dataset.key === 'Space' &&
+        detectControlsMode() === 'skydiving'
+      ) {
+        appCtx.handleUrbanEquipmentUse?.();
       }
     };
 
@@ -346,12 +494,15 @@ function initMobileControls() {
     if (appCtx.boatMode?.active) return 'boat';
     if (appCtx.planeMode?.active) return 'plane';
     if (appCtx.droneMode) return 'drone';
-    if (appCtx.Walk?.state?.mode === 'walk') return 'walking';
+    if (appCtx.Walk?.state?.mode === 'walk') {
+      return appCtx.urbanSandboxRuntime?.parachute?.skydiving === true ? 'skydiving' : 'walking';
+    }
     return 'driving';
   }
 
   function updateMobileTouchControls(mode = detectControlsMode()) {
     if (!mobileTouchControls || !isTouchPreferredClient) return;
+    updateMobileControlGuidance(mode);
     const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');
     const inSpaceFlight = mode === 'rocket';
     const controlsExpanded = !!(ctrlContent && !ctrlContent.classList.contains('hidden'));
@@ -368,12 +519,28 @@ function initMobileControls() {
       mobileTouchControls.dataset.mode = mode;
     }
 
-    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-drone', 'mode-plane', 'mode-rocket', 'mode-ocean');
+    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-skydiving', 'mode-drone', 'mode-plane', 'mode-rocket', 'mode-ocean');
     mobileTouchControls.classList.add(`mode-${mode}`);
+    mobileTouchControls.dataset.handedness = appCtx.getMobileTouchInputSnapshot?.().settings?.handedness || 'standard';
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     let actions = profile.actions;
+    if (mode === 'skydiving' && appCtx.isUrbanParachuteDeployed?.() === true) {
+      actions = [{ label: 'Flare', binding: { channel: 'earth', key: 'Space' } }];
+    }
+    if (mode === 'driving' && appCtx.car?.vehicleServiceType === 'responder') {
+      actions = [
+        ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
+        { label: appCtx.car?.vehicleServiceLightsActive ? 'Siren off' : 'Siren', binding: { channel: 'earth', key: 'KeyH' } }
+      ];
+    }
+    if (appCtx.activePlanetaryBodyId && (mode === 'walking' || mode === 'driving')) {
+      actions = [
+        ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
+        { label: 'Explore', binding: { channel: 'earth', key: 'KeyE' } }
+      ];
+    }
     if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {
       actions = Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : [];
       actions.push({ label: 'DeFlock', binding: { channel: 'earth', key: 'KeyE' } });
@@ -381,6 +548,19 @@ function initMobileControls() {
     applyPadProfile('mobileMove', mobileMovePad, profile.move, mobileMoveLabel, profile.moveLabel || 'Move');
     applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
     applyActionProfile(actions);
+    const showPackAction = mode === 'walking' && urbanEquipmentToggle && !urbanEquipmentToggle.hidden;
+    const equipped = appCtx.playerBackpackInventory?.equipped?.() || null;
+    const showEquipmentUse = mode === 'walking' &&
+      canUseEquippedItemOnMobile(equipped) &&
+      typeof appCtx.handleUrbanEquipmentUse === 'function';
+    if (mobileEquipmentUse) {
+      mobileEquipmentUse.textContent = equipped?.actionLabel || 'Use';
+      mobileEquipmentUse.setAttribute('aria-label', `${equipped?.actionLabel || 'Use'} ${equipped?.label || 'equipped item'}`);
+      mobileEquipmentUse.classList.toggle('hidden', !showEquipmentUse);
+      mobileEquipmentUse.disabled = !showEquipmentUse;
+    }
+    urbanEquipmentToggle?.classList.toggle('mobile-mode-hidden', !showPackAction);
+    mobileActionStack?.classList.toggle('has-pack-action', !!showPackAction);
     mobileTouchControls.classList.add('show');
   }
 
@@ -423,7 +603,7 @@ function initMobileControls() {
     if (typeof appCtx.syncTravelModeButtons === 'function') appCtx.syncTravelModeButtons();
     if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
     if (boatControls) boatControls.style.display = mode === 'boat' ? 'block' : 'none';
-    if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
+    if (walkingControls) walkingControls.style.display = mode === 'walking' || mode === 'skydiving' ? 'block' : 'none';
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
     if (planeControls) planeControls.style.display = mode === 'plane' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
@@ -446,8 +626,9 @@ function initMobileControls() {
       const modeLabel =
         mode === 'boat' ? 'Boat Mode' :
         mode === 'walking' ? 'Walking Mode' :
+        mode === 'skydiving' ? 'Skydiving' :
         mode === 'drone' ? 'Drone Mode' :
-        mode === 'plane' ? 'Plane Mode' :
+        mode === 'plane' ? 'Personal Plane' :
         mode === 'rocket' ? 'Rocket Mode' :
         mode === 'ocean' ? 'Submarine Mode' :
         'Driving Mode';
@@ -463,12 +644,27 @@ function initMobileControls() {
   }
 
   if (mobileTouchControls && isTouchPreferredClient) {
+    appCtx.setMobileTouchEnabled?.(true);
+    bindAnalogPad(mobileMovePad, 'move');
+    bindAnalogPad(mobileLookPad, 'look');
     mobileHoldButtons.forEach((btn) => bindMobileHoldButton(btn));
+    mobileControlScope.listen(mobileEquipmentUse, 'click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      appCtx.handleUrbanEquipmentUse?.();
+    });
+    syncMobileControlSettingsUi();
+    mobileControlScope.listen(mobileControlsHandedness, 'change', () => updateMobileSettings({ handedness: mobileControlsHandedness.value }));
+    mobileControlScope.listen(mobileMoveSensitivity, 'input', () => updateMobileSettings({ moveSensitivity: Number(mobileMoveSensitivity.value) / 100 }));
+    mobileControlScope.listen(mobileLookSensitivity, 'input', () => updateMobileSettings({ lookSensitivity: Number(mobileLookSensitivity.value) / 100 }));
+    mobileControlScope.listen(mobileCameraRecenter, 'change', () => updateMobileSettings({ cameraRecenter: mobileCameraRecenter.checked }));
+    mobileControlScope.listen(mobileControlsReset, 'click', () => updateMobileSettings({ handedness: 'standard', moveSensitivity: 1, lookSensitivity: 0.82, cameraRecenter: true, cameraRecenterDelayMs: 650 }));
     mobileControlScope.listen(window, 'blur', clearVirtualHeldInputs);
     mobileControlScope.listen(document, 'visibilitychange', () => {
       if (document.hidden) clearVirtualHeldInputs();
     });
   } else {
+    appCtx.setMobileTouchEnabled?.(false);
     mobileTouchControls?.classList.remove('show');
   }
 
@@ -478,6 +674,7 @@ function initMobileControls() {
 
   const dispose = (reason = 'mobile-controls-disposed') => {
     clearVirtualHeldInputs();
+    appCtx.setMobileTouchEnabled?.(false);
     mobileTouchControls?.classList.remove('show');
     return mobileControlScope.dispose(reason);
   };

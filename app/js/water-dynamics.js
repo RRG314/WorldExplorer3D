@@ -1,6 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
 const DEFAULT_WAVE_INTENSITY = 0.46;
+// Detailed Earth terrain is guaranteed 0.6 world units below open water.
+// Reserve clearance for wake/interpolation so a rendered trough never exposes
+// the presentation bed. This is a render-safety bound, not bathymetry.
+const MAX_SAFE_WATER_TROUGH_DEPTH = 0.4;
 const SEA_STATE_SEQUENCE = ['calm', 'moderate', 'rough'];
 
 const SEA_STATE_CONFIG = Object.freeze({
@@ -385,9 +389,10 @@ function sampleWaterSurfaceMotion(x, z, time, options = {}) {
     slopeZ: swell.slopeZ + primary.slopeZ + secondary.slopeZ + ripple.slopeZ
   });
 
+  const rawHeight = swell.height + primary.height + secondary.height + ripple.height;
   return {
     profile,
-    height: swell.height + primary.height + secondary.height + ripple.height,
+    height: Math.max(-MAX_SAFE_WATER_TROUGH_DEPTH, rawHeight),
     slopeX: swell.slopeX + primary.slopeX + secondary.slopeX + ripple.slopeX,
     slopeZ: swell.slopeZ + primary.slopeZ + secondary.slopeZ + ripple.slopeZ,
     crest,
@@ -423,6 +428,18 @@ function buildWaveCrestExpression(components, speedVar, scaleVar, posVar, timeVa
   }).join(' + ');
 }
 
+function buildWaveSlopeExpression(components, amplitudeVar, speedVar, scaleVar, posVar, timeVar) {
+  return components.map((component) => {
+    const dx = (component.dirX * component.frequency).toFixed(6);
+    const dz = (component.dirZ * component.frequency).toFixed(6);
+    const speed = component.speed.toFixed(6);
+    const weight = component.weight.toFixed(6);
+    const phase = component.phase.toFixed(6);
+    const theta = `(((${posVar}.x * ${dx}) + (${posVar}.y * ${dz})) * ${scaleVar} + ${timeVar} * ${speedVar} * ${speed} + ${phase})`;
+    return `vec2(${dx}, ${dz}) * (${scaleVar}) * cos(${theta}) * (${amplitudeVar} * ${weight})`;
+  }).join(' + ');
+}
+
 function buildWaterShaderLibrary() {
   const primaryHeightExpr = buildWaveHeightExpression(PRIMARY_COMPONENTS, 'weWaveAmplitude', 'weWaveSpeed', 'weWaveScale', 'worldXZ', 'weWaveTime');
   const secondaryHeightExpr = buildWaveHeightExpression(SECONDARY_COMPONENTS, 'weWaveSecondaryAmplitude', 'weWaveSpeed', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
@@ -432,6 +449,10 @@ function buildWaterShaderLibrary() {
   const primaryCrestExpr = buildWaveCrestExpression(PRIMARY_COMPONENTS, 'weWaveSpeed', 'weWaveScale', 'worldXZ', 'weWaveTime');
   const secondaryCrestExpr = buildWaveCrestExpression(SECONDARY_COMPONENTS, 'weWaveSpeed', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
   const rippleCrestExpr = buildWaveCrestExpression(RIPPLE_COMPONENTS, 'weWaveSpeed', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
+  const primarySlopeExpr = buildWaveSlopeExpression(PRIMARY_COMPONENTS, 'weWaveAmplitude', 'weWaveSpeed', 'weWaveScale', 'worldXZ', 'weWaveTime');
+  const secondarySlopeExpr = buildWaveSlopeExpression(SECONDARY_COMPONENTS, 'weWaveSecondaryAmplitude', 'weWaveSpeed', 'weWaveScale * 1.12', 'vec2(worldXZ.x + 23.5, worldXZ.y - 11.8)', 'weWaveTime * 1.08');
+  const swellSlopeExpr = buildWaveSlopeExpression(SWELL_COMPONENTS, 'weWaveSwellAmplitude', 'weWaveSpeed', 'weWaveScale * 0.72', 'vec2(worldXZ.x - 41.7, worldXZ.y + 28.3)', 'weWaveTime * 0.72');
+  const rippleSlopeExpr = buildWaveSlopeExpression(RIPPLE_COMPONENTS, 'weWaveRippleAmplitude', 'weWaveSpeed', 'weWaveScale * 1.42', 'vec2(worldXZ.x - 8.2, worldXZ.y + 4.6)', 'weWaveTime * 1.3');
 
   return `uniform float weWaveTime;
 uniform float weWaveAmplitude;
@@ -443,7 +464,17 @@ uniform float weWaveSpeed;
 uniform float weWaveVisualStrength;
 uniform float weWaveFoamStrength;
 uniform float weWaveEdgeFade;
+uniform float weWaveTroughDepth;
+uniform float weWaterNormalStrength;
+uniform vec3 weWaterZenithColor;
+uniform vec3 weWaterHorizonColor;
+uniform vec3 weWaterSunColor;
+uniform vec3 weWaterSunDirection;
+uniform float weWaterDaylight;
+uniform float weWaterNight;
+uniform float weWaterOvercast;
 varying vec2 vWeWaveWorldXZ;
+varying vec3 vWeWaveWorldPosition;
 varying vec2 vWePatchUv;
 
 float weWavePrimary(vec2 worldXZ) {
@@ -463,16 +494,36 @@ float weWaveRipples(vec2 worldXZ) {
 }
 
 float weWaveField(vec2 worldXZ) {
-  return weWaveSwell(worldXZ) + weWavePrimary(worldXZ) + weWaveSecondary(worldXZ) + weWaveRipples(worldXZ);
+  float rawHeight = weWaveSwell(worldXZ) + weWavePrimary(worldXZ) + weWaveSecondary(worldXZ) + weWaveRipples(worldXZ);
+  return max(rawHeight, -weWaveTroughDepth);
 }
 
 float weWaveCrest(vec2 worldXZ) {
   return clamp((${swellCrestExpr}) * 0.26 + (${primaryCrestExpr}) * 0.54 + (${secondaryCrestExpr}) * 0.82 + (${rippleCrestExpr}) * 0.38, 0.0, 2.1);
+}
+
+vec2 weWaveSlope(vec2 worldXZ) {
+  return (${swellSlopeExpr}) + (${primarySlopeExpr}) + (${secondarySlopeExpr}) + (${rippleSlopeExpr});
+}
+
+vec3 weWaveWorldNormal(vec2 worldXZ, float strength) {
+  // Optical micro-normal gain makes sparse mapped meshes readable without
+  // changing vertex displacement, CPU surface sampling, or buoyancy.
+  vec2 slope = weWaveSlope(worldXZ) * mix(4.5, 10.5, clamp(strength, 0.0, 1.0));
+  vec2 capillarySlope = vec2(
+    sin(worldXZ.x * 0.39 + worldXZ.y * 0.21 + weWaveTime * weWaveSpeed * 1.7) +
+      0.58 * sin(worldXZ.x * 0.83 - worldXZ.y * 0.57 - weWaveTime * weWaveSpeed * 2.3),
+    cos(worldXZ.x * 0.17 - worldXZ.y * 0.46 - weWaveTime * weWaveSpeed * 1.3) +
+      0.54 * cos(worldXZ.x * 0.71 + worldXZ.y * 0.92 + weWaveTime * weWaveSpeed * 2.0)
+  ) * (0.042 + weWaveRippleAmplitude * 0.3) * mix(0.55, 1.0, clamp(strength, 0.0, 1.0));
+  slope += capillarySlope;
+  return normalize(vec3(-slope.x, 1.0, -slope.y));
 }`;
 }
 
 export {
   DEFAULT_WAVE_INTENSITY,
+  MAX_SAFE_WATER_TROUGH_DEPTH,
   SEA_STATE_CONFIG,
   SEA_STATE_SEQUENCE,
   WATER_KIND_CONFIG,

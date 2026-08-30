@@ -1,48 +1,96 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-15 for version 4.2.0.
+Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
 
-## Map Coverage
+## Location and map coverage
 
-- Building footprints, heights, roof shapes, indoor details, roads, vegetation, and water depend on available source data. Coverage varies globally.
-- Missing building heights, materials, facade details, and roof equipment use bounded visual fallbacks; those fallbacks are not claims about the real structure.
-- New OpenStreetMap edits appear only after upstream services and local caches refresh.
+- Earth is a location-based experience. Each session loads one bounded selected
+  area; player movement does not turn it into a continuously streaming world.
+- Roads, buildings, building heights, roofs, entrances, indoor details,
+  vegetation and water depend on available mapped data. Coverage and freshness
+  vary by location and provider.
+- Mapped identities and height metadata are retained when available. Bounded
+  visual fallbacks fill missing attributes but are not surveyed measurements or
+  claims about an exact real-world structure.
+- The same accepted location snapshot is deterministic. A later session can
+  differ when an upstream map provider publishes newer data or a primary source
+  is temporarily unavailable and the documented fallback is used.
 
-## Loading and Performance
+## Roads and structures
 
-- Dense cities, rapid plane travel, detailed facades, and large structure networks can be demanding on GPU memory and network bandwidth.
-- The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
-- Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
-- Provider latency can make the same location load at different speeds even when the generated world is unchanged.
-- Narrow or tightly mapped service roads can leave little vehicle clearance.
-  The runtime gate samples all road centers and lanes for building collisions,
-  then runs movement journeys only on verified straight, unobstructed segments.
+- Bridges, ramps, elevated roads, overpasses and tunnels depend on mapped
+  structure, layer and connection tags. Incomplete source tagging or provider
+  timing can produce a shorter or less detailed structure than the real one.
+- Road and structure geometry is intended for exploration gameplay, not
+  turn-by-turn navigation, engineering, surveying or safety-critical use.
+- Very narrow service roads and unusually complex multi-level junctions can
+  leave limited clearance for larger vehicles.
+- Airport runways, aprons, terminals, gates, and towers use available map data.
+  The shared airport experience fills missing playable details, but its shape
+  and scale may differ from the real airport when mapping is incomplete.
 
-## External Services
+## Performance and compatibility
 
-- Geocoding, map geometry, elevation, imagery, weather, and other live context can be degraded by upstream rate limits or outages.
-- The runtime includes timeout and fallback behavior, but a fallback may be less detailed than the primary source.
-- OpenSky access can be restricted from some cloud-hosting networks. The release preview must pass the production-egress preflight; otherwise aircraft remain explicitly labeled reference routes rather than observed flights.
-- Panoramax and KartaView street imagery is an inspection layer with uneven global coverage. It is not used as an unlicensed facade texture source.
-- Live vessel positions are not currently presented as observed AIS data. Shipping corridors remain labeled reference data until an AIS source and redistribution license are selected.
-- NOAA water-level observations and tide predictions are limited to supported stations, primarily in the United States. Open-Meteo marine values are modeled guidance and remain labeled separately.
+- Dense cities, rapid aerial travel, detailed facades and large structure
+  networks can be demanding on browser and GPU memory. World teardown now
+  releases location-owned terrain, provider state and scene resources, but
+  total browser memory still varies by browser, driver and device.
+- Quality settings control rendering cost and effects. They do not rewrite
+  mapped building height or replace the selected world with a lower-detail data
+  source.
+- WebXR, camera-overlay AR, geolocation and some graphics features depend on
+  browser support, device hardware and explicit user permission.
+- Performance varies by browser, graphics hardware, and device. Final staging
+  review covers desktop and a 390×844 mobile layout, but does not guarantee a
+  particular battery, thermal, or frame-rate result on every physical phone.
 
-## Generated Content
+## External services
 
-- Real indoor data is uncommon. Buildings without usable indoor mapping receive a footprint-aware generated interior.
-- Generated interiors are traversable and sized from the building footprint, but may be visually sparse when no authoritative indoor geometry exists.
-- Procedural vegetation, inferred buildings, distant aerial context, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
-- Solar-system distances and planetary sizes use documented visual scaling so destinations remain navigable. The experience is educational and exploratory, not an orbital-navigation simulator.
+- Geocoding, map geometry, elevation, imagery, weather and live-context layers
+  depend on third-party services. Rate limits, outages and regional coverage can
+  delay a layer or activate a labeled fallback.
+- Live-context layers distinguish observations, predictions, models and
+  reference routes. Generated or modeled content is never presented as a
+  confirmed real-world observation.
 
-## Backend Features
+## Generated content
 
-- Sign-in, multiplayer, cloud saves, social features, moderation, leaderboards, and optional support flows require the production backend.
-- Local or forked copies do not receive production credentials or administrative access.
+- Real indoor mapping is uncommon. Eligible buildings without usable indoor
+  data receive a footprint-aware generated interior that may be visually sparse.
+- Inferred entrances, facade details, vegetation, distant context and
+  deep-space encounters fill data gaps and should not be interpreted as exact
+  observations.
+- Solar-system distance and body-size presentation uses documented visual
+  scaling so destinations remain playable; it is not an orbital simulator.
 
-## Product Scope
+## Action and combat
 
-- World Explorer 3D is not turn-by-turn navigation, a marine chart, an aviation trainer, or survey-grade GIS.
-- Ocean and underwater behavior is gameplay-oriented rather than a scientific fluid or bathymetry simulation.
-- Tunnels, bridges, ramps, and stacked roads depend on mapped structure and layer tags. Incomplete source tagging can reduce geometric detail or cause the safer fallback profile to be used.
+- Ranged equipment has a screen reticle, camera-directed projectiles, visible
+  use actions, impact handling, and bounded projectile cleanup. Precision aim,
+  sight alignment, recoil, spread, throwing feel, hit feedback, sound, and
+  mobile aiming still need further tuning and presentation work.
+- Combat is part of the sandbox rather than a competitive shooting simulator.
+  Collision and impact results can vary with browser frame timing and complex
+  world geometry.
 
-Please report reproducible problems through [GitHub Issues](https://github.com/RRG314/WorldExplorer3D/issues).
+## Field Guide and Journal
+
+- The eleven regional packs are bounded identification and activity slices for
+  built-in destinations, not a complete worldwide species catalog. Their field
+  leads use broad habitat and seasonal context; they do not report abundance or
+  confirm that an organism is present at the selected point.
+- Expansion-pack entries currently use reference presentation unless separately
+  reviewed media or creature models are available. Missing media does not block
+  identification, Journal, life-list, or activity progress.
+- The complete Journal, Guide, companion history, and local Backpack history are
+  stored in the current browser. Backup and restore are available, but full
+  cross-device Journal sync is not yet provided.
+
+## Online features
+
+- Accounts, multiplayer, cloud saves, social features, moderation,
+  leaderboards and optional support flows require the production backend.
+- Local forks do not receive production credentials or administrative access.
+
+Please report reproducible problems through
+[GitHub Issues](https://github.com/RRG314/WorldExplorer3D/issues).

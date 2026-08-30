@@ -1,5 +1,12 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
+const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
+// Production-like local runs must behave exactly like the deployed build.
+// Developer controls are available only through an explicit diagnostic URL;
+// localhost by itself is not authorization to expose debug gameplay controls.
+const developerDiagnosticsEnabled = diagnosticsParams.get('diagnostics') === '1';
+appCtx.developerDiagnosticsEnabled = developerDiagnosticsEnabled;
+
 const runtimeErrors = [];
 function recordRuntimeError(kind, value) {
   const message = value instanceof Error
@@ -17,12 +24,76 @@ function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
+function compiledEndpointConnectionPublished(feature, endpoint) {
+  const connected = feature?.connectedFeatures?.[endpoint];
+  if (Array.isArray(connected) && connected.length > 0) return true;
+  const total = Number(feature?.transportGraphRef?.totalDistance);
+  if (!Number.isFinite(total)) return false;
+  const tolerance = Math.max(0.2, Math.min(1.25, (Number(feature?.width) || 6) * 0.08));
+  return (feature?.transportGraphRef?.stations || []).some((station) => {
+    const distance = Number(station?.distanceAlong);
+    if (!Number.isFinite(distance)) return false;
+    return endpoint === 'start' ? distance <= tolerance : total - distance <= tolerance;
+  });
+}
+
 function vectorSnapshot(vector) {
   if (!vector) return null;
   return {
     x: numberOrNull(vector.x),
     y: numberOrNull(vector.y),
     z: numberOrNull(vector.z)
+  };
+}
+
+function transportFacilitySnapshot() {
+  const graph = appCtx.transportFacilityGraph;
+  const visual = appCtx.transportFacilityVisual?.group;
+  if (!graph) return { active: false, recordCount: 0, aviation: 0, maritime: 0 };
+  return {
+    active: true,
+    authority: String(graph.authority || ''),
+    bounded: graph.coverage?.bounded === true,
+    recordCount: Number(graph.records?.length || 0),
+    aviation: Number(graph.byDomain?.aviation?.length || 0),
+    maritime: Number(graph.byDomain?.maritime?.length || 0),
+    typeCounts: graph.diagnostics?.typeCounts || {},
+    visualAttached: Boolean(visual?.parent),
+    visualCount: Number(visual?.children?.length || 0),
+    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false)
+  };
+}
+
+function cameraFollowSnapshot(activeActor) {
+  const camera = appCtx.camera;
+  const yaw = Number(activeActor?.orientation?.yaw);
+  const actorX = Number(activeActor?.position?.x);
+  const actorZ = Number(activeActor?.position?.z);
+  const elements = camera?.matrixWorld?.elements;
+  if (!camera || !Number.isFinite(yaw) || !Number.isFinite(actorX) ||
+      !Number.isFinite(actorZ) || !elements?.length) return null;
+  const actorForwardX = Math.sin(yaw);
+  const actorForwardZ = Math.cos(yaw);
+  const cameraForwardX = -Number(elements[8]);
+  const cameraForwardZ = -Number(elements[10]);
+  const cameraForwardLength = Math.hypot(cameraForwardX, cameraForwardZ);
+  if (!(cameraForwardLength > 0.0001)) return null;
+  const normalizedCameraX = cameraForwardX / cameraForwardLength;
+  const normalizedCameraZ = cameraForwardZ / cameraForwardLength;
+  const dot = Math.max(-1, Math.min(1,
+    normalizedCameraX * actorForwardX + normalizedCameraZ * actorForwardZ
+  ));
+  const signedHeadingOffset = Math.atan2(
+    actorForwardZ * normalizedCameraX - actorForwardX * normalizedCameraZ,
+    dot
+  );
+  const cameraOffsetX = Number(camera.position?.x) - actorX;
+  const cameraOffsetZ = Number(camera.position?.z) - actorZ;
+  return {
+    headingAlignmentDegrees: Number((Math.acos(dot) * 180 / Math.PI).toFixed(2)),
+    signedHeadingOffsetDegrees: Number((signedHeadingOffset * 180 / Math.PI).toFixed(2)),
+    trailingDistance: Number((-(cameraOffsetX * actorForwardX + cameraOffsetZ * actorForwardZ)).toFixed(2)),
+    horizontalDistance: Number(Math.hypot(cameraOffsetX, cameraOffsetZ).toFixed(2))
   };
 }
 
@@ -36,22 +107,66 @@ function safeCall(callback, fallback = null) {
 
 function surfaceSampleSnapshot(sample) {
   if (!sample) return null;
+  const feature = sample.feature || null;
+  const featureId = String(feature?.sourceFeatureId || feature?.transportRecord?.identity || feature?.id || '');
+  const assembly = feature?.transportStructureAssembly || null;
+  const connectedEndpoints = ['start', 'end'].filter((endpoint) =>
+    Array.isArray(feature?.connectedFeatures?.[endpoint]) &&
+    feature.connectedFeatures[endpoint].length > 0
+  );
+  const connectedEndpointAbutments = (assembly?.abutments || []).filter((abutment) =>
+    connectedEndpoints.includes(String(abutment?.endpoint || '').replace('_tie_in', ''))
+  );
+  const matchingStructureVisuals = featureId
+    ? (appCtx.structureVisualMeshes || []).filter((mesh) =>
+        Array.isArray(mesh?.userData?.structureFeatureIds) &&
+        mesh.userData.structureFeatureIds.includes(featureId)
+      )
+    : [];
   return {
     kind: String(sample.kind || ""),
     y: numberOrNull(sample.position?.y),
     source: String(sample.provenance?.source || ""),
     dataset: String(sample.provenance?.dataset || ""),
     fallback: sample.provenance?.fallback === true,
-    feature: sample.feature
+    feature: feature
       ? {
-          id: String(sample.feature.id || sample.feature.sourceFeatureId || ""),
-          kind: String(sample.feature.kind || sample.feature.networkKind || sample.feature.type || ""),
-          name: String(sample.feature.name || sample.feature.tags?.name || ""),
-          terrainMode: String(sample.feature.structureSemantics?.terrainMode || ""),
-          structureKind: String(sample.feature.structureSemantics?.structureKind || ""),
-          verticalOrder: numberOrNull(sample.feature.structureSemantics?.verticalOrder),
-          cutDepth: numberOrNull(sample.feature.structureSemantics?.cutDepth),
-          structureTags: sample.feature.structureTags || null
+          id: featureId,
+          kind: String(feature.kind || feature.networkKind || feature.type || ""),
+          name: String(feature.name || feature.tags?.name || ""),
+          terrainMode: String(feature.structureSemantics?.terrainMode || ""),
+          structureKind: String(feature.structureSemantics?.structureKind || ""),
+          verticalOrder: numberOrNull(feature.structureSemantics?.verticalOrder),
+          cutDepth: numberOrNull(feature.structureSemantics?.cutDepth),
+          structureTags: feature.structureTags || null,
+          transportSource: feature.transportRecord
+            ? {
+                identity: String(feature.transportRecord.identity || featureId),
+                providerNamespace: String(feature.transportRecord.providerNamespace || ''),
+                completeness: String(feature.transportRecord.completeness || ''),
+                routeState: String(feature.transportRecord.routeState || '')
+              }
+            : null,
+          graphStationCount: Number(feature.transportGraphRef?.stations?.length || 0),
+          connectionCount: Number(feature.transportConnections?.length || 0),
+          structureAssembly: assembly
+            ? {
+                authority: String(assembly.authority || ''),
+                family: String(assembly.family || ''),
+                publishBody: assembly.publishBody === true,
+                bodyCoverage: numberOrNull(assembly.bodyCoverage),
+                supportStationCount: Number(assembly.supportStations?.length || 0),
+                terminalSupportCount: Number(assembly.terminalSupports?.length || 0),
+                abutmentCount: Number(assembly.abutments?.length || 0),
+                connectedEndpoints,
+                connectedEndpointAbutmentCount: connectedEndpointAbutments.length
+              }
+            : null,
+          structureVisual: {
+            meshCount: matchingStructureVisuals.length,
+            attachedMeshCount: matchingStructureVisuals.filter((mesh) => !!mesh?.parent).length,
+            visibleMeshCount: matchingStructureVisuals.filter((mesh) => mesh?.visible !== false && !!mesh?.parent).length
+          }
         }
       : null
   };
@@ -88,6 +203,125 @@ function buildingSnapshot(building) {
     height: numberOrNull(building.height),
     allowsPassageBelow: building.allowsPassageBelow === true,
     collisionDisabled: building.collisionDisabled === true
+  };
+}
+
+function mappedTallBuildingVisualSnapshot() {
+  const visualsByIdentity = new Map();
+  for (const mesh of appCtx.buildingMeshes || []) {
+    if (!mesh) continue;
+    const attached = !!mesh.parent;
+    const visible = attached && mesh.visible !== false && mesh.material?.visible !== false;
+    const direct = mesh.userData?.buildingProvenance;
+    const batch = mesh.userData?.buildingProvenanceRecords || [];
+    const records = direct ? [direct, ...batch] : batch;
+    for (const record of records) {
+      const identity = String(record?.identity?.featureId || '');
+      if (!identity) continue;
+      const current = visualsByIdentity.get(identity) || {
+        meshCount: 0,
+        attachedMeshCount: 0,
+        visibleMeshCount: 0,
+        lodTiers: new Set(),
+        renderedTopOffsetMeters: null
+      };
+      current.meshCount += 1;
+      if (attached) current.attachedMeshCount += 1;
+      if (visible) current.visibleMeshCount += 1;
+      if (mesh.userData?.lodTier) current.lodTiers.add(String(mesh.userData.lodTier));
+      if (direct && mesh.geometry) {
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        const groundBaseY = Number(direct?.foundation?.groundBaseY);
+        if (mesh.geometry.boundingBox && Number.isFinite(groundBaseY)) {
+          mesh.updateMatrixWorld(true);
+          const bounds = mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+          const foundationRise = Math.max(0, Number(mesh.userData?.terrainFoundationRise) || 0);
+          const topOffset = bounds.max.y - groundBaseY - foundationRise;
+          if (Number.isFinite(topOffset)) {
+            current.renderedTopOffsetMeters = Math.max(
+              topOffset,
+              Number(current.renderedTopOffsetMeters) || -Infinity
+            );
+          }
+        }
+      }
+      const batchedTopOffset = Number(mesh.userData?.buildingVisualTopOffsetsByFeatureId?.[identity]);
+      if (Number.isFinite(batchedTopOffset)) {
+        current.renderedTopOffsetMeters = Math.max(
+          batchedTopOffset,
+          Number(current.renderedTopOffsetMeters) || -Infinity
+        );
+      }
+      visualsByIdentity.set(identity, current);
+    }
+  }
+
+  const records = (appCtx.buildingProvenanceRecords || []).map((record) => {
+    const heightField = record?.fields?.heightMeters;
+    const levelsField = record?.fields?.levels;
+    const heightMeters = Number(heightField?.value);
+    const mappedHeightAuthority = heightField?.status === 'mapped' || (
+      heightField?.status === 'inferred' &&
+      heightField?.method === 'levels' &&
+      levelsField?.status === 'mapped'
+    );
+    if (!mappedHeightAuthority || !(heightMeters >= 60)) return null;
+    const identity = String(record?.identity?.featureId || '');
+    const visual = visualsByIdentity.get(identity) || null;
+    const structureBaseOffsetMeters = Number(record?.foundation?.structureBaseOffsetMeters) || 0;
+    // A mapped `height` is the feature top above ground. A height inferred
+    // from mapped levels is the rendered body thickness, so an elevated part
+    // must add its mapped base offset before comparing final geometry.
+    const expectedTopOffsetMeters = heightField?.status === 'mapped'
+      ? heightMeters
+      : structureBaseOffsetMeters + heightMeters;
+    const renderedTopOffsetMeters = numberOrNull(visual?.renderedTopOffsetMeters);
+    const heightDeltaMeters = renderedTopOffsetMeters == null
+      ? null
+      : renderedTopOffsetMeters - expectedTopOffsetMeters;
+    const heightToleranceMeters = Math.max(3, expectedTopOffsetMeters * 0.05);
+    return {
+      identity,
+      name: String(record?.fields?.name?.value || ''),
+      heightMeters,
+      heightAuthority: heightField?.status === 'mapped' ? 'explicit_height' : 'mapped_levels',
+      heightSourceFeatureId: String(
+        heightField?.status === 'mapped'
+          ? heightField?.sourceFeatureId || ''
+          : levelsField?.sourceFeatureId || ''
+      ),
+      geometryAuthority: String(record?.identity?.geometryAuthority || ''),
+      meshCount: Number(visual?.meshCount || 0),
+      attachedMeshCount: Number(visual?.attachedMeshCount || 0),
+      visibleMeshCount: Number(visual?.visibleMeshCount || 0),
+      lodTiers: visual ? [...visual.lodTiers].sort() : [],
+      buildingRole: String(record?.identity?.role || ''),
+      structureBaseOffsetMeters,
+      mappedMinimumHeight: record?.fields?.minHeightMeters || null,
+      foundation: record?.foundation || null,
+      expectedTopOffsetMeters,
+      renderedTopOffsetMeters,
+      heightDeltaMeters: numberOrNull(heightDeltaMeters),
+      heightToleranceMeters,
+      heightMatchesMappedSource: heightDeltaMeters != null && Math.abs(heightDeltaMeters) <= heightToleranceMeters
+    };
+  }).filter(Boolean).sort((left, right) =>
+    right.heightMeters - left.heightMeters || left.identity.localeCompare(right.identity)
+  );
+  const attached = records.filter((record) => record.attachedMeshCount > 0).length;
+  const visible = records.filter((record) => record.visibleMeshCount > 0).length;
+  const missingRenderedHeight = records.filter((record) => record.renderedTopOffsetMeters == null).length;
+  const heightMismatches = records.filter((record) => record.heightMatchesMappedSource !== true).length;
+  return {
+    authority: 'mapped-building-identity-to-final-scene-visual',
+    mappedTallRecords: records.length,
+    attachedMappedTallRecords: attached,
+    visibleMappedTallRecords: visible,
+    missingVisualRecords: records.length - attached,
+    hiddenVisualRecords: records.length - visible,
+    missingRenderedHeightRecords: missingRenderedHeight,
+    heightMismatchRecords: heightMismatches,
+    samples: records.slice(0, 32)
   };
 }
 
@@ -214,6 +448,7 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
 
   const renderedY = Number(renderedTerrainY);
   const walkY = Number(walk?.position?.y);
+  const driveY = Number(drive?.position?.y);
   return {
     coordinateSystem: "local tangent world; +x east, +y up, +z south",
     world: { x, z },
@@ -226,7 +461,21 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
       centerY: numberOrNull(actor.position?.y),
       feetY: numberOrNull(feetY),
       grounded: actor.contact?.grounded ?? null,
-      contactKind: String(actor.contact?.kind || "")
+      contactKind: String(actor.contact?.kind || ""),
+      vehicleContact: actor.mode === 'drive' && appCtx.car?.groundContact
+        ? {
+            centerY: numberOrNull(appCtx.car.groundContact.centerY),
+            supportY: numberOrNull(appCtx.car.groundContact.supportY),
+            chassisClearance: Number.isFinite(feetY) && Number.isFinite(Number(appCtx.car.groundContact.supportY))
+              ? feetY - Number(appCtx.car.groundContact.supportY)
+              : null,
+            pitch: numberOrNull(appCtx.car.groundContact.pitch),
+            roll: numberOrNull(appCtx.car.groundContact.roll),
+            sampleCount: Number(appCtx.car.groundContact.sampleCount || 0),
+            supportSampleCount: Number(appCtx.car.groundContact.supportSampleCount || 0),
+            roadCentered: appCtx.car.groundContact.roadCentered === true
+          }
+        : null
     },
     sourceElevationMeters: numberOrNull(sourceElevationMeters),
     terrainSourceSample:
@@ -244,6 +493,9 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
         : null,
       feetMinusWalkSurface: Number.isFinite(feetY) && Number.isFinite(walkY)
         ? feetY - walkY
+        : null,
+      feetMinusDriveSurface: Number.isFinite(feetY) && Number.isFinite(driveY)
+        ? feetY - driveY
         : null,
       renderedMinusSourceWorld: Number.isFinite(renderedY) && Number.isFinite(Number(sourceWorldY))
         ? renderedY - Number(sourceWorldY)
@@ -289,7 +541,9 @@ function rendererSnapshot() {
     height: numberOrNull(renderer.domElement?.height),
     calls: numberOrNull(renderer.info?.render?.calls),
     triangles: numberOrNull(renderer.info?.render?.triangles),
-    programs: Array.isArray(renderer.info?.programs) ? renderer.info.programs.length : null
+    programs: Array.isArray(renderer.info?.programs) ? renderer.info.programs.length : null,
+    geometries: numberOrNull(renderer.info?.memory?.geometries),
+    textures: numberOrNull(renderer.info?.memory?.textures)
   };
 }
 
@@ -354,27 +608,413 @@ function worldCompositionSnapshot() {
   return result;
 }
 
+function transportStructureSnapshot() {
+  const roads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
+  const visuals = Array.isArray(appCtx.structureVisualMeshes) ? appCtx.structureVisualMeshes : [];
+  const generalizedEndpointAuditRadius = Number.isFinite(Number(appCtx.worldTraversalRadiusWorld)) &&
+    Number(appCtx.worldTraversalRadiusWorld) > 0
+    ? Number(appCtx.worldTraversalRadiusWorld)
+    : 2700;
+  const allGeneralizedEndpointRecords = roads.filter((road) =>
+    road?.transportRecord?.completeness === 'generalized' &&
+    road?.structureSemantics?.gradeSeparated === true &&
+    road?.transportStructureAssembly?.publishBody === true &&
+    Array.isArray(road?.pts) && road.pts.length >= 2
+  ).flatMap((road) => {
+    const profile = road.transportSurfaceModel;
+    const distances = profile?.distances || [];
+    const heights = profile?.centerHeights || [];
+    return ['start', 'end'].map((endpoint) => {
+      const atStart = endpoint === 'start';
+      const point = atStart ? road.pts[0] : road.pts[road.pts.length - 1];
+      const surfaceY = Number(heights[atStart ? 0 : heights.length - 1]);
+      const terrainY = Number(
+        appCtx.terrainMeshHeightAt?.(Number(point?.x), Number(point?.z)) ??
+        appCtx.elevationWorldYAtWorldXZ?.(Number(point?.x), Number(point?.z))
+      );
+      const endpointRef = road?.transportStructureRef?.[endpoint] || null;
+      const abutmentPublished = (road?.transportStructureAssembly?.abutments || [])
+        .some((abutment) => String(abutment?.endpoint || '').startsWith(endpoint));
+      const terminalSupportPublished = (road?.transportStructureAssembly?.terminalSupports || [])
+        .some((station) => String(station?.terminalFor || '') === endpoint);
+      const supportWithinEndpointRun = (road?.transportStructureAssembly?.supportStations || [])
+        .some((station) => atStart
+          ? Number(station?.distance) <= 18
+          : Number(road?.transportStructureAssembly?.total) - Number(station?.distance) <= 18);
+      const compiledConnectionPublished = compiledEndpointConnectionPublished(road, endpoint);
+      return {
+        id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || ''),
+        name: String(road?.name || ''),
+        type: String(road?.type || ''),
+        endpoint,
+        state: String(endpointRef?.state || ''),
+        policy: String(endpointRef?.policy || ''),
+        connectionCount: Number(endpointRef?.connectionCount || 0),
+        surfaceY: numberOrNull(surfaceY),
+        terrainY: numberOrNull(terrainY),
+        clearance: Number.isFinite(surfaceY) && Number.isFinite(terrainY)
+          ? surfaceY - terrainY
+          : null,
+        x: numberOrNull(Number(point?.x)),
+        z: numberOrNull(Number(point?.z)),
+        terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+        verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
+        abutmentPublished,
+        terminalSupportPublished,
+        supportWithinEndpointRun,
+        compiledConnectionPublished
+      };
+    });
+  });
+  const generalizedEndpointRecords = allGeneralizedEndpointRecords.filter((record) =>
+    Number.isFinite(record.x) && Number.isFinite(record.z) &&
+    Math.hypot(record.x, record.z) <= generalizedEndpointAuditRadius
+  );
+  const unsupportedGeneralizedOpenBoundaries = generalizedEndpointRecords
+    .filter((record) =>
+      record.state === 'open_boundary' &&
+      Number(record.clearance) > 1.2 &&
+      record.compiledConnectionPublished !== true &&
+      record.abutmentPublished !== true &&
+      record.terminalSupportPublished !== true &&
+      record.supportWithinEndpointRun !== true)
+    .sort((left, right) => Number(right.clearance) - Number(left.clearance));
+  const exactStructureSamples = roads.filter((road) =>
+    road?.transportRecord?.completeness === 'lossless' &&
+    road?.structureSemantics?.gradeSeparated === true &&
+    Array.isArray(road?.pts) && road.pts.length >= 2
+  ).map((road) => {
+    const segIndex = Math.max(0, Math.min(
+      road.pts.length - 2,
+      Math.floor((road.pts.length - 1) * 0.5)
+    ));
+    const start = road.pts[segIndex];
+    const end = road.pts[segIndex + 1];
+    const x = (Number(start.x) + Number(end.x)) * 0.5;
+    const z = (Number(start.z) + Number(end.z)) * 0.5;
+    return {
+      id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || road?.id || ''),
+      name: String(road?.name || ''),
+      terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+      structureKind: String(road?.structureSemantics?.structureKind || ''),
+      x,
+      z,
+      surfaceY: Number(appCtx.sampleFeatureSurfaceY?.(road, x, z, { segIndex, t: 0.5 }))
+    };
+  }).filter((sample) =>
+    sample.id && [sample.x, sample.z, sample.surfaceY].every(Number.isFinite));
+  const gradeProfiles = roads.map((road) => {
+    const distances = road?.transportSurfaceModel?.distances || [];
+    const heights = road?.transportSurfaceModel?.centerHeights || [];
+    let steepestSegment = null;
+    for (let index = 1; index < distances.length && index < heights.length; index += 1) {
+      const run = Number(distances[index]) - Number(distances[index - 1]);
+      if (!(run > 1e-6)) continue;
+      const rise = Number(heights[index]) - Number(heights[index - 1]);
+      const grade = Math.abs(rise / run);
+      if (!steepestSegment || grade > steepestSegment.grade) {
+        steepestSegment = { index, run, rise, grade };
+      }
+    }
+    return {
+      id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || road?.id || ''),
+      name: String(road?.name || ''),
+      terrainMode: String(road?.structureSemantics?.terrainMode || 'at_grade'),
+      verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
+      engineeredApproach: road?.transportSurfaceModel?.engineeredApproach === true,
+      maximumGrade: Number(steepestSegment?.grade || 0),
+      compilerReportedMaximumGrade: Number(road?.transportSurfaceModel?.stats?.maximumGrade),
+      designMaximumGrade: Number(road?.transportSurfaceModel?.maximumGrade),
+      profileLength: Number(distances[distances.length - 1] || 0),
+      steepestSegment,
+      graphAnchors: (road?.structureTransitionAnchors || [])
+        .filter((anchor) => anchor?.source === 'transport_graph_node')
+        .map((anchor) => ({
+          distance: Number(anchor?.distance || 0),
+          targetSurfaceY: Number(anchor?.targetSurfaceY),
+          endpoint: anchor?.endpoint || null,
+          ownerFeatureId: String(anchor?.ownerFeatureId || ''),
+          continuityRepair: anchor?.continuityRepair === true,
+          approachContinuation: anchor?.approachContinuation === true,
+          finalNodeReconciliation: anchor?.finalNodeReconciliation === true,
+          residualAtGradeReconciliation: anchor?.residualAtGradeReconciliation === true
+        }))
+    };
+  }).filter((record) => Number.isFinite(record.maximumGrade) && Number.isFinite(record.designMaximumGrade));
+  gradeProfiles.sort((left, right) => right.maximumGrade - left.maximumGrade);
+  // Only grade-separated structures and their compiled approaches have a
+  // product-owned design envelope. Ordinary streets follow measured terrain;
+  // treating a universal 12% slope as source data created false failures in
+  // naturally steep cities and hid the actual structure solver defects.
+  const engineeredGradeProfiles = gradeProfiles.filter((record) =>
+    record.terrainMode !== 'at_grade' || record.engineeredApproach === true);
+  const gradeViolations = engineeredGradeProfiles.filter((record) =>
+    record.maximumGrade > record.designMaximumGrade + 0.002);
+  const atGradeRoads = roads.filter((road) =>
+    road?.structureSemantics?.terrainMode === 'at_grade' &&
+    road?.driveable !== false);
+  const atGradeTerrainAuthority = Object.freeze({
+    authority: 'compiled_transport_surface',
+    roadCount: atGradeRoads.length,
+    compiledSurfaceRoads: atGradeRoads.filter((road) =>
+      road?.transportSurfaceModel?.authority === 'compiled_transport_surface').length,
+    compiledCenterlineFitRoads: atGradeRoads.filter((road) =>
+      road?.transportSurfaceModel?.endpointPolicy === 'compiled_centerline_terrain_fit').length,
+    liveTerrainSamplerRoads: atGradeRoads.filter((road) =>
+      typeof road?.surfaceTerrainSampler === 'function').length,
+    corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
+    adjustedTerrainVertices: Number(appCtx.transportTerrainCorridorStats?.adjustedVertices || 0),
+    terrainMeshes: Number(appCtx.transportTerrainCorridorStats?.terrainMeshes || 0),
+    heightSamplingAuthority:
+      String(appCtx.transportTerrainCorridorStats?.heightSamplingAuthority || '') || null,
+    terrainSeamAuthority:
+      String(appCtx.transportTerrainCorridorStats?.terrainSeams?.authority || '') || null,
+    sharedTerrainEdgeVertices:
+      Number(appCtx.transportTerrainCorridorStats?.terrainSeams?.sharedVertices || 0),
+    maximumTerrainSeamDeltaBefore:
+      Number(appCtx.transportTerrainCorridorStats?.terrainSeams?.maximumDeltaBefore || 0)
+  });
+  const sharedPhysicalSurfaces = [...new Map(roads.map((road) => {
+    const surface = road?.transportSurfacePresentation;
+    return surface?.status === 'compiled' ? [surface.id, surface] : null;
+  }).filter(Boolean)).values()].map((surface) => ({
+    id: String(surface.id || ''),
+    authority: String(surface.authority || ''),
+    physicalSurfaceKind: String(surface.physicalSurfaceKind || ''),
+    widthMeters: numberOrNull(surface.width),
+    lanes: Number(surface?.transportRecord?.crossSection?.lanes || 0),
+    memberFeatureIds: [...(surface.memberFeatureIds || [])],
+    publisherFeatureId: String(surface.publisherFeatureId || ''),
+    measurementStatus: String(surface.measurementStatus || ''),
+    sourceUrl: String(surface.sourceUrl || ''),
+    sampleCount: Number(surface.pts?.length || 0)
+  }));
+  const visualTypes = {};
+  for (const mesh of visuals) {
+    const type = String(mesh?.userData?.structureVisualType || 'unclassified');
+    if (!visualTypes[type]) {
+      visualTypes[type] = {
+        meshes: 0,
+        visibleMeshes: 0,
+        instances: 0,
+        vertices: 0
+      };
+    }
+    const record = visualTypes[type];
+    record.meshes += 1;
+    if (mesh?.visible !== false && mesh?.parent) record.visibleMeshes += 1;
+    record.instances += Number(mesh?.count || 0);
+    record.vertices += Number(mesh?.geometry?.attributes?.position?.count || 0);
+  }
+  return {
+    elevatedRoads: roads.filter((road) =>
+      road?.structureSemantics?.terrainMode === 'elevated').length,
+    bridgeRoads: roads.filter((road) =>
+      road?.structureSemantics?.isBridge === true).length,
+    engineeredApproaches: roads.filter((road) =>
+      road?.transportSurfaceModel?.engineeredApproach === true).length,
+    publishedBodies: roads.filter((road) =>
+      road?.transportStructureAssembly?.publishBody === true).length,
+    publishedVerticalControls: roads.filter((road) =>
+      road?.transportSurfaceControlResolution?.status === 'resolved').map((road) => ({
+        id: String(road.sourceFeatureId || ''),
+        name: String(road.name || ''),
+        controlId: String(road.transportSurfaceControlResolution.controlId || ''),
+        authority: String(road.transportSurfaceControlResolution.authority || ''),
+        minimumSurfaceY: numberOrNull(road.transportSurfaceControlResolution.minimumSurfaceY),
+        mappedWaterSamples: Number(road.transportSurfaceControlResolution.mappedWaterSamples || 0),
+        referenceDatum: String(road.transportSurfaceControlResolution.referenceDatum || ''),
+        measurementStatus: String(road.transportSurfaceControlResolution.measurementStatus || ''),
+        sourceUrl: String(road.transportSurfaceControlResolution.sourceUrl || '')
+      })),
+    sharedPhysicalSurfaces,
+    exactStructureSamples,
+    transportNetwork: {
+      ...(appCtx.transportNetworkModel?.stats || {}),
+      generalizedJoinToleranceMeters:
+        numberOrNull(appCtx.transportNetworkModel?.generalizedJoinToleranceMeters),
+      generalizedExpandedEndpointConnections:
+        (appCtx.transportNetworkModel?.connections || []).filter((connection) =>
+          String(connection?.provenance?.method || '').startsWith('generalized-aligned-')).length
+    },
+    generalizedEndpointIntegrity: {
+      authority: 'compiled-generalized-structure-endpoints',
+      horizontalAuditRadius: generalizedEndpointAuditRadius,
+      sourceEndpoints: allGeneralizedEndpointRecords.length,
+      sampledEndpoints: generalizedEndpointRecords.length,
+      unsupportedOpenBoundaryCount: unsupportedGeneralizedOpenBoundaries.length,
+      unsupportedOpenBoundaries: unsupportedGeneralizedOpenBoundaries.slice(0, 24)
+    },
+    junctionContinuity: appCtx.transportJunctionProfile?.continuity || null,
+    continuityRepair: appCtx.transportJunctionProfile?.continuityRepair || null,
+    gradeProfile: {
+      authority: 'compiled_grade_separated_transport_surface_profile',
+      sampledRoads: engineeredGradeProfiles.length,
+      maximumGrade: engineeredGradeProfiles[0]?.maximumGrade || 0,
+      violationCount: gradeViolations.length,
+      violations: gradeViolations.slice(0, 24),
+      steepest: engineeredGradeProfiles.slice(0, 24),
+      allMappedRoadsObserved: gradeProfiles.length,
+      allMappedRoadsSteepest: gradeProfiles.slice(0, 24)
+    },
+    roadSurfaceIntegrity: appCtx.transportSurfacePublication?.roadSurfaceIntegrity || null,
+    atGradeTerrainAuthority,
+    visualMeshes: visuals.length,
+    attachedVisualMeshes: visuals.filter((mesh) => !!mesh?.parent).length,
+    visibleVisualMeshes: visuals.filter((mesh) =>
+      mesh?.visible !== false && !!mesh?.parent).length,
+    visualTypes
+  };
+}
+
 function getWorldExplorerRuntimeDiagnostics() {
   const activeActor = appCtx.activeTransportActor?.() || null;
+  const interiorCandidates = !appCtx.activeInterior && activeActor?.position &&
+      typeof appCtx.listSupportedInteriorsNear === 'function'
+    ? appCtx.listSupportedInteriorsNear(
+      Number(activeActor.position.x),
+      Number(activeActor.position.z),
+      650,
+      80
+    )
+    : [];
+  const activeInterior = appCtx.activeInterior;
+  const interiorWallColliders = (appCtx.dynamicBuildingColliders || [])
+    .filter((collider) => collider?.isInteriorCollider && collider?.buildingType === 'interior_wall')
+    .slice(0, 48)
+    .map((collider) => ({
+      minX: Number(collider.minX),
+      maxX: Number(collider.maxX),
+      minZ: Number(collider.minZ),
+      maxZ: Number(collider.maxZ),
+      centerX: Number(collider.centerX),
+      centerZ: Number(collider.centerZ),
+      floorLevel: Number(collider.floorLevel || 0)
+    }));
   return {
+    developerDiagnostics: {
+      enabled: developerDiagnosticsEnabled,
+      networkWrites: false,
+      capturedErrors: runtimeErrors.length
+    },
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
     runtimeErrors: [...runtimeErrors],
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    blockBuilder: {
+      ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
+      persistence: appCtx.getBuildPersistenceStatus?.() || null
+    },
     deflock: appCtx.getDeFlockSnapshot?.() || { active: false },
     liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
+    liveEarth: appCtx.inspectLiveEarthState?.() || null,
+    augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
+    livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
+    worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
+    publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
+      activeAreaSignature: '',
+      publishedCount: 0,
+      featureIds: [],
+      renderedObjectCount: 0,
+      groupAttached: false
+    },
+    fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
+    interior: activeInterior ? {
+      active: true,
+      key: String(activeInterior.key || ''),
+      mode: String(activeInterior.mode || 'generated'),
+      floorId: String(activeInterior.floorId || ''),
+      floorLabel: String(activeInterior.floorLabel || 'Lobby'),
+      activeLevel: Number(activeInterior.activeLevel || 0),
+      floorCount: Number(activeInterior.floorPlan?.floorCount || 1),
+      floorBaseY: Number(activeInterior.floorBaseY || 0),
+      storyHeight: Number(activeInterior.floorPlan?.storyHeight || 0),
+      loadedLevels: Array.isArray(activeInterior.loadedLevels) ? [...activeInterior.loadedLevels] : [],
+      connectorsAvailable: activeInterior.connector != null,
+      walkSurfaceCount: Array.isArray(activeInterior.walkSurfaces) ? activeInterior.walkSurfaces.length : 0,
+      colliderCount: Number(appCtx.dynamicBuildingColliders?.length || 0),
+      buildingCollisionDisabled: activeInterior.building?.collisionDisabled === true,
+      groupAttached: activeInterior.group?.parent != null,
+      stairs: (activeInterior.stairs || []).map((stair) => ({
+        start: { x: Number(stair.start?.x), z: Number(stair.start?.z) },
+        end: { x: Number(stair.end?.x), z: Number(stair.end?.z) },
+        floorLevel: Number(stair.floorLevel || 0),
+        targetLevel: Number(stair.targetLevel || 0)
+      })),
+      interactions: (activeInterior.interactions || []).map((interaction) => ({
+        kind: String(interaction.kind || ''),
+        label: String(interaction.label || ''),
+        level: Number(interaction.level || 0),
+        targetLevel: Number.isFinite(Number(interaction.targetLevel)) ? Number(interaction.targetLevel) : null,
+        x: Number(interaction.x),
+        z: Number(interaction.z),
+        radius: Number(interaction.radius || 0)
+      })),
+      wallColliders: interiorWallColliders
+    } : {
+      active: false,
+      candidates: interiorCandidates,
+      promptTargetKey: String(appCtx.interiorHint?.key || ''),
+      promptSourceBuildingId: String(appCtx.interiorHint?.sourceBuildingId || ''),
+      colliderCount: Number(appCtx.dynamicBuildingColliders?.length || 0)
+    },
+    mobileControls: appCtx.getMobileTouchInputSnapshot?.() || { enabled: false },
+    urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+    aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+    flightDynamics: appCtx.planeMode?.active ? {
+      catalogId: String(appCtx.planeMode.transportCatalogId || ''),
+      airborne: appCtx.planeMode.airborne === true,
+      airspeed: numberOrNull(appCtx.planeMode.speed),
+      horizontalSpeed: numberOrNull(appCtx.planeMode.horizontalSpeed),
+      climbRate: numberOrNull(appCtx.planeMode.climbRate),
+      pitch: numberOrNull(appCtx.planeMode.pitch),
+      flightPathAngle: numberOrNull(appCtx.planeMode.flightPathAngle),
+      angleOfAttack: numberOrNull(appCtx.planeMode.angleOfAttack),
+      liftLoad: numberOrNull(appCtx.planeMode.liftLoad),
+      turnRate: numberOrNull(appCtx.planeMode.turnRate),
+      stalled: appCtx.planeMode.stalled === true,
+      passengerMode: appCtx.planeMode.passengerMode === true
+    } : null,
+    boatDynamics: appCtx.boatMode?.active ? {
+      catalogId: String(appCtx.boatMode.transportCatalogId || ''),
+      steerInput: numberOrNull(appCtx.readControlActions?.('boat')?.steer),
+      throttle: numberOrNull(appCtx.boat?.throttle),
+      forwardSpeed: numberOrNull(appCtx.boat?.forwardSpeed),
+      lateralSpeed: numberOrNull(appCtx.boat?.lateralSpeed),
+      turnRate: numberOrNull(appCtx.boat?.turnRate)
+    } : null,
+    maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+    boatNavigation: appCtx.boatMode?.active ? {
+      waterKind: String(appCtx.boatMode.waterKind || ''),
+      shorelineDistance: numberOrNull(appCtx.boatMode.shorelineDistance),
+      shoreVisible: appCtx.boatMode.openOceanSurfaceSuppression?.shoreVisible !== false,
+      cameraFraming: appCtx.camera?.userData?.boatrig?.framing || null
+    } : null,
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
+    transportFacilities: transportFacilitySnapshot(),
     activeActor,
+    cameraFollow: cameraFollowSnapshot(activeActor),
     surfaceChain: surfaceChainSnapshot(activeActor),
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted,
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
     worldLoad: appCtx.worldLoadRuntimeState || null,
+    onDemandModes: appCtx.getOnDemandModeSnapshot?.() || {
+      ocean: { requested: false, active: false, rendererReady: false },
+      space: { requested: false, active: false, rendererReady: false }
+    },
+    transportCompilation: appCtx.transportSurfacePublication ? {
+      roadCount: Number(appCtx.transportSurfacePublication.roadCount || 0),
+      meshCount: Number(appCtx.transportSurfacePublication.meshCount || 0),
+      phaseDurationsMs: appCtx.transportSurfacePublication.phaseDurationsMs || null
+    } : null,
+    terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
+    mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),
     modes: {
       boat: !!appCtx.boatMode?.active,
       drone: !!appCtx.droneMode,
@@ -394,8 +1034,17 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
+    universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
+      currentFrameId: appCtx.universeRuntime.current?.id || null,
+      selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
+      courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
+      courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
+      courseStatus: appCtx.universeRuntime.course?.status || null,
+      transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
+    } : null),
     spaceCatalog: spaceCatalogSnapshot(),
     curatedLandmarks: appCtx.curatedLandmarkMetrics || null,
+    mappedLandmarks: appCtx.mappedLandmarkMetrics || null,
     titleVisible: !!document.getElementById("titleScreen") &&
       !document.getElementById("titleScreen").classList.contains("hidden"),
     camera: appCtx.camera
@@ -429,8 +1078,18 @@ function getWorldExplorerRuntimeDiagnostics() {
         }
       : null,
     renderer: rendererSnapshot(),
+    accessibility: globalThis.getWorldExplorerAccessibilitySnapshot?.() || null,
+    lastEarthWorldRelease: appCtx.lastEarthWorldRelease || null,
     composer: composerSnapshot(),
     worldComposition: worldCompositionSnapshot(),
+    visualOwners: {
+      atmosphere: appCtx.getEarthAtmosphereSnapshot?.() || null,
+      water: {
+        ...(appCtx.waterSurfaceRegistrySnapshot || appCtx.waterSurfaceRegistry?.snapshot?.() || {}),
+        ...(appCtx.getWaterOpticsSnapshot?.() || {})
+      }
+    },
+    transportStructures: transportStructureSnapshot(),
     farTerrainClipmap: appCtx.farTerrainClipmapState || null,
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
@@ -450,7 +1109,18 @@ function getWorldExplorerRuntimeDiagnostics() {
       roads: appCtx.roads?.length ?? null,
       terrainTiles: appCtx.terrainTileCache?.size ?? null,
       visibleBuildingMeshes: Array.isArray(appCtx.buildingMeshes)
-        ? appCtx.buildingMeshes.filter((mesh) => mesh?.visible && mesh?.parent === appCtx.scene).length
+        ? appCtx.buildingMeshes.filter((mesh) => mesh?.visible !== false && !!mesh?.parent).length
+        : null,
+      pitchedRoofMeshes: Array.isArray(appCtx.buildingMeshes)
+        ? appCtx.buildingMeshes.filter((mesh) =>
+            mesh?.visible !== false && !!mesh?.parent &&
+            mesh?.userData?.roofShape && mesh.userData.roofShape !== 'flat'
+          ).length
+        : null,
+      inferredPitchedRoofMeshes: Array.isArray(appCtx.buildingMeshes)
+        ? appCtx.buildingMeshes.filter((mesh) =>
+            mesh?.visible !== false && !!mesh?.parent && mesh?.userData?.isInferredRoof === true
+          ).length
         : null,
       guardedRoads: Array.isArray(appCtx.roads)
         ? appCtx.roads.filter((road) => road?.guardrailColliders?.length > 0).length
@@ -476,8 +1146,85 @@ function getWorldExplorerRuntimeDiagnostics() {
 }
 
 globalThis.getWorldExplorerRuntimeDiagnostics = getWorldExplorerRuntimeDiagnostics;
+if (developerDiagnosticsEnabled) {
+  const roofCandidates = () => {
+    const actor = appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 };
+    return (appCtx.buildings || []).filter((building) => {
+      const minY = Number(building?.minY ?? building?.baseY);
+      const maxY = Number(building?.maxY ?? (minY + Number(building?.height)));
+      const width = Number(building?.maxX) - Number(building?.minX);
+      const depth = Number(building?.maxZ) - Number(building?.minZ);
+      return !building?.collisionDisabled && building?.allowsPassageBelow !== true &&
+        building?.collisionKind !== 'barrier' && Number.isFinite(minY) && Number.isFinite(maxY) &&
+        maxY - minY >= 3 && width >= 7 && depth >= 7;
+    }).map((building, index) => ({
+      id: String(building.sourceBuildingId || `roof:${index}`),
+      x: Number(building.centerX ?? (building.minX + building.maxX) * .5),
+      z: Number(building.centerZ ?? (building.minZ + building.maxZ) * .5),
+      roofY: Number(building.maxY ?? (Number(building.baseY) + Number(building.height))),
+      width: Number(building.maxX) - Number(building.minX),
+      depth: Number(building.maxZ) - Number(building.minZ),
+      distance: Math.hypot(Number(building.centerX || 0) - Number(actor.x || 0), Number(building.centerZ || 0) - Number(actor.z || 0))
+    })).filter((roof) => [roof.x, roof.z, roof.roofY].every(Number.isFinite))
+      .sort((left, right) => left.distance - right.distance);
+  };
+  globalThis.__WE3D_ROOF_SUPPORT__ = Object.freeze({
+    list: () => roofCandidates().slice(0, 24),
+    landOn(roofId) {
+      const roof = roofCandidates().find(({ id }) => id === String(roofId)) || roofCandidates()[0];
+      const walker = appCtx.Walk?.state?.walker;
+      if (!roof || !walker) return false;
+      appCtx.Walk?.setModeWalk?.({ preserveResolvedSpawn: true, deferWorldSync: true });
+      walker.x = roof.x;
+      walker.z = roof.z;
+      walker.y = roof.roofY + Number(appCtx.Walk?.CFG?.eyeHeight || 1.7) + 10;
+      walker.vy = -3;
+      walker.onGround = false;
+      walker.onBuilding = false;
+      walker._resolvedGroundState = null;
+      walker.angle = 0;
+      walker.yaw = 0;
+      return roof;
+    },
+    snapshot: () => {
+      const walker = appCtx.Walk?.state?.walker;
+      return walker ? {
+        x: Number(walker.x), y: Number(walker.y), z: Number(walker.z),
+        onGround: walker.onGround === true,
+        onBuilding: walker.onBuilding === true,
+        vy: Number(walker.vy || 0)
+      } : null;
+    }
+  });
+}
 globalThis.render_game_to_text = () => JSON.stringify({
+  developerDiagnostics: {
+    enabled: developerDiagnosticsEnabled,
+    networkWrites: false,
+    capturedErrors: runtimeErrors.length
+  },
   environment: appCtx.getEnv?.() || null,
+  modes: {
+    boat: !!appCtx.boatMode?.active,
+    drone: !!appCtx.droneMode,
+    plane: !!appCtx.planeMode?.active,
+    ocean: !!appCtx.oceanMode?.active,
+    space: !!appCtx.spaceFlight?.active,
+    walking: appCtx.Walk?.state?.mode === 'walk'
+  },
+  planetary: {
+    flightDestination: appCtx.spaceFlight?.destination || null,
+    flightMode: appCtx.spaceFlight?.mode || null,
+    nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
+  },
+  universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
+    currentFrameId: appCtx.universeRuntime.current?.id || null,
+    selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
+    courseDestinationId: appCtx.universeRuntime.course?.destination?.id || null,
+    courseFrameId: appCtx.universeRuntime.course?.frame?.id || null,
+    courseStatus: appCtx.universeRuntime.course?.status || null,
+    transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
+  } : null),
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,
@@ -488,6 +1235,37 @@ globalThis.render_game_to_text = () => JSON.stringify({
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
+  liveEarth: appCtx.inspectLiveEarthState?.() || null,
+  augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
+  livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
+  urbanSandbox: appCtx.urbanSandboxRuntimeSnapshot?.() || { active: false },
+  aviation: appCtx.aviationRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+  maritime: appCtx.maritimeRuntime?.snapshot?.() || { active: false, fleetCount: 0, playableCount: 0 },
+  transportFacilities: transportFacilitySnapshot(),
+  fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false, stage: 'idle' },
+  blockBuilder: {
+    ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
+    persistence: appCtx.getBuildPersistenceStatus?.() || null
+  },
+  interior: appCtx.activeInterior ? {
+    active: true,
+    key: String(appCtx.activeInterior.key || ''),
+    floorId: String(appCtx.activeInterior.floorId || ''),
+    floorLabel: String(appCtx.activeInterior.floorLabel || 'Lobby'),
+    activeLevel: Number(appCtx.activeInterior.activeLevel || 0),
+    floorCount: Number(appCtx.activeInterior.floorPlan?.floorCount || 1),
+    loadedLevels: Array.isArray(appCtx.activeInterior.loadedLevels) ? [...appCtx.activeInterior.loadedLevels] : [],
+    connectorsAvailable: appCtx.activeInterior.connector != null
+  } : { active: false },
+  worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
+  editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
+  publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
+    publishedCount: 0,
+    featureIds: [],
+    renderedObjectCount: 0,
+    groupAttached: false
+  },
+  transportStructures: transportStructureSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

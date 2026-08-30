@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  getDocsFromServer,
   limit,
   onSnapshot,
   query,
@@ -11,8 +12,8 @@ import {
   where,
   writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { getCurrentUser } from '../../../js/auth-ui.js';
-import { initFirebase } from '../../../js/firebase-init.js';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
+import { initFirebase } from '../../../js/firebase-init.js?v=55';
 import {
   BLOCK_MATERIALS,
   blockDocumentIdFromCoords,
@@ -148,6 +149,23 @@ async function clearMySharedBlocks(roomId, options = {}) {
   return count;
 }
 
+async function clearRoomSharedBlocks(roomId, options = {}) {
+  const { db } = getServices();
+  requireSignedInUser();
+  const normalizedRoomId = normalizeCode(roomId);
+  if (!normalizedRoomId) throw new Error('Invalid room code.');
+  const resultLimit = Math.max(1, Math.min(1000, Math.floor(Number(options.resultLimit || BLOCKS_RESULT_LIMIT))));
+  const snap = await getDocs(query(
+    collection(db, ROOM_COLLECTION, normalizedRoomId, BLOCKS_COLLECTION),
+    limit(resultLimit)
+  ));
+  if (snap.empty) return 0;
+  const batch = writeBatch(db);
+  snap.forEach((blockSnap) => batch.delete(blockSnap.ref));
+  await batch.commit();
+  return snap.size;
+}
+
 function listenSharedBlocks(roomId, callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
   const normalizedRoomId = normalizeCode(roomId);
@@ -170,7 +188,7 @@ function listenSharedBlocks(roomId, callback, options = {}) {
     limit(resultLimit)
   );
 
-  return onSnapshot(blocksQuery, (snap) => {
+  const rowsFromSnapshot = (snap) => {
     const rows = [];
     snap.forEach((blockSnap) => {
       const block = toSharedBlockObject(blockSnap);
@@ -182,15 +200,48 @@ function listenSharedBlocks(roomId, callback, options = {}) {
       if (a.gz !== b.gz) return a.gz - b.gz;
       return a.gy - b.gy;
     });
+    return rows;
+  };
+  let closed = false;
+  let listenerDeliveries = 0;
+  let lastListenerSize = null;
+  const unsubscribe = onSnapshot(blocksQuery, (snap) => {
+    const rows = rowsFromSnapshot(snap);
+    listenerDeliveries += 1;
+    lastListenerSize = rows.length;
     callback(rows);
   }, (err) => {
     console.warn('[multiplayer][blocks] listenSharedBlocks failed:', err);
     if (typeof options.onError === 'function') options.onError(err);
   });
+
+  // A newly joined client can receive an empty local-cache snapshot while the
+  // realtime stream is still establishing its server view. Confirm the initial
+  // room state directly so an existing build does not remain invisible. Never
+  // apply this read after the listener has delivered a non-empty or subsequent
+  // state, which prevents an older response from reviving a removed block.
+  void getDocsFromServer(blocksQuery).then((snap) => {
+    if (closed) return;
+    const rows = rowsFromSnapshot(snap);
+    const listenerOnlyDeliveredEmptyCache = listenerDeliveries === 1 && lastListenerSize === 0;
+    if (listenerDeliveries === 0 || (listenerOnlyDeliveredEmptyCache && rows.length > 0)) {
+      callback(rows);
+    }
+  }).catch((err) => {
+    if (closed || listenerDeliveries > 0) return;
+    console.warn('[multiplayer][blocks] initial server read failed:', err);
+    if (typeof options.onError === 'function') options.onError(err);
+  });
+
+  return () => {
+    closed = true;
+    unsubscribe();
+  };
 }
 
 export {
   clearMySharedBlocks,
+  clearRoomSharedBlocks,
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock

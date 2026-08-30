@@ -167,12 +167,12 @@ const SYNTHETIC_FIELD_DEFINITIONS = Object.freeze([
     helpText: 'Source type explains whether the feature is a brand-new overlay, a local base patch, or a rendering override.',
     help: {
       longText: 'Use source type only in advanced mode. Normal contributors should usually stay with the preset default unless a moderator or advanced workflow requires a different overlay strategy.',
-      advancedNotes: 'Changing source type can alter moderation expectations and runtime merge safety.'
+      advancedNotes: 'Changing source type can alter moderation expectations and publishing behavior.'
     },
     defaultValue: 'overlay_new',
     options: [
       { value: 'overlay_new', label: 'Overlay New', description: 'Adds new overlay content that supplements the base world.' },
-      { value: 'base_patch', label: 'Base Patch', description: 'Targets a local correction against imported base content without mutating the raw ingest.' },
+      { value: 'base_patch', label: 'Base Patch', description: 'Targets a local correction without changing the original map source.' },
       { value: 'render_override', label: 'Render Override', description: 'Overrides rendering behavior for an existing base feature after approval.' }
     ],
     advancedMapping: [
@@ -187,20 +187,20 @@ const SYNTHETIC_FIELD_DEFINITIONS = Object.freeze([
     label: 'Merge Mode',
     kind: 'select',
     advancedOnly: true,
-    description: 'Controls how the approved overlay merges into runtime layers.',
-    helpText: 'Merge mode decides whether this overlay adds new content, overrides local rendering, or replaces a local base segment at runtime.',
+    description: 'Controls how an approved contribution appears in the shared world.',
+    helpText: 'Merge mode decides whether this contribution adds content, changes how a place appears, or replaces one local map segment.',
     help: {
-      longText: 'Only use advanced merge changes when you understand the moderation and runtime implications. Additive is safest. Local replacement and render override usually need a concrete base target.',
+      longText: 'Use advanced merge changes carefully. Additive is safest. Local replacement and render override usually need a specific map feature as their target.',
       advancedNotes: 'Changing merge mode can make a previously valid draft require a base feature reference.'
     },
     defaultValue: 'additive',
     options: [
-      { value: 'additive', label: 'Additive', description: 'Adds runtime content without replacing a base feature.' },
-      { value: 'render_override', label: 'Render Override', description: 'Changes how an existing base feature renders at runtime.' },
+      { value: 'additive', label: 'Additive', description: 'Adds content without replacing an existing map feature.' },
+      { value: 'render_override', label: 'Render Override', description: 'Changes how an existing map feature appears.' },
       { value: 'local_replace', label: 'Local Replace', description: 'Replaces a local base segment or footprint after approval.' }
     ],
     advancedMapping: [
-      { path: 'mergeMode', label: 'Runtime merge mode' }
+      { path: 'mergeMode', label: 'Publishing mode' }
     ],
     readValue: (feature = {}) => sanitizeText(feature.mergeMode || 'additive', 40).toLowerCase() || 'additive',
     applyValue: (feature = {}, value) => applyTopLevelText(feature, 'mergeMode', value, 40),

@@ -1,3 +1,7 @@
+import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=2';
+import { explorerProgressSnapshot } from '../discovery/explorer-events.js?v=3';
+import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
+
 function createFlowerChallengeLeaderboardApi(context) {
   const {
     FIREBASE_CONFIG_KEY,
@@ -168,6 +172,12 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function readRemoteLeaderboard(challengeType = 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
+    // The existing cloud collection belongs to Community League. Keep the
+    // Explorer profile separate until its server schema is reviewed.
+    if (normalizedType === 'explorer') {
+      challengeState.leaderboardBackend = 'local';
+      return null;
+    }
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return null;
 
@@ -183,7 +193,7 @@ function createFlowerChallengeLeaderboardApi(context) {
       );
 
       return (await firestoreMod.getDocs(q)).docs
-        .map((doc) => normalizeLeaderboardEntry({ ...doc.data(), id: doc.id }, normalizedType))
+        .map((doc) => normalizeLeaderboardEntry({ ...doc.data(), id: doc.id, source: 'cloud' }, normalizedType))
         .filter(Boolean)
         .sort((a, b) => compareLeaderboardEntries(a, b, normalizedType))
         .slice(0, LEADERBOARD_LIMIT);
@@ -208,9 +218,9 @@ function createFlowerChallengeLeaderboardApi(context) {
         challenge: normalizedType,
         player: entry.player,
         timeMs: entry.timeMs,
-        paintedPct: entry.paintedPct,
-        paintedBuildings: entry.paintedBuildings,
-        totalBuildings: entry.totalBuildings,
+        paintedPct: entry.paintedPct == null ? null : Number(entry.paintedPct),
+        paintedBuildings: Number.isFinite(Number(entry.paintedBuildings)) ? Math.max(0, Math.round(Number(entry.paintedBuildings))) : 0,
+        totalBuildings: Number.isFinite(Number(entry.totalBuildings)) ? Math.max(0, Math.round(Number(entry.totalBuildings))) : 0,
         location: entry.location,
         lat: entry.lat,
         lon: entry.lon,
@@ -253,8 +263,42 @@ function createFlowerChallengeLeaderboardApi(context) {
     }
   }
 
+  async function syncExplorerProfileToLocalLeaderboard() {
+    const profileStore = appCtx.worldDiscoveryRuntime?.profileStore;
+    if (typeof profileStore?.getProfile !== 'function') return null;
+    try {
+      const profile = await profileStore.getProfile();
+      const progress = explorerProgressSnapshot(profile?.explorerProgress);
+      if (progress.points <= 0 && progress.totalRecords <= 0) return null;
+      const entry = normalizeLeaderboardEntry({
+        id: 'explorer_profile_local',
+        challenge: 'explorer',
+        player: resolvePlayerName(),
+        score: progress.points,
+        rankLabel: progress.rankLabel,
+        totalRecords: progress.totalRecords,
+        uniqueDiscoveries: progress.uniqueDiscoveries,
+        regionsVisited: progress.regions.length,
+        badgeCount: progress.badgeAwards.length,
+        location: getRuntimeLocationLabel(),
+        mode: inferTravelMode(),
+        foundAt: new Date().toISOString(),
+        source: 'device'
+      }, 'explorer');
+      if (!entry) return null;
+      const existing = readLocalLeaderboard('explorer')
+        .filter((candidate) => candidate.id !== entry.id);
+      writeLocalLeaderboard('explorer', [entry, ...existing]);
+      return entry;
+    } catch (error) {
+      console.warn('[explorer-profile] Could not refresh the local Explorer profile.', error);
+      return null;
+    }
+  }
+
   async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
+    const definition = getLeaderboardDefinition(normalizedType);
     challengeState.leaderboardView = normalizedType;
     if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
     if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
@@ -266,17 +310,26 @@ function createFlowerChallengeLeaderboardApi(context) {
       ui.titleStartBtn.style.display = flowerView ? '' : 'none';
       ui.titleStartBtn.disabled = !flowerView;
     }
-    const entries = await readRemoteLeaderboard(normalizedType) || readLocalLeaderboard(normalizedType);
+    if (ui.titleBadge) ui.titleBadge.textContent = definition.label;
+    if (ui.titleScope) ui.titleScope.textContent = `${definition.scope} • ${definition.objective}`;
+    if (ui.titleRefreshBtn) {
+      ui.titleRefreshBtn.disabled = true;
+      ui.titleRefreshBtn.setAttribute('aria-busy', 'true');
+    }
+    if (ui.status) {
+      ui.status.textContent = `Loading ${definition.label}…`;
+      ui.status.classList.remove('error', 'ok');
+    }
+    if (normalizedType === 'explorer') await syncExplorerProfileToLocalLeaderboard();
+    const localEntries = readLocalLeaderboard(normalizedType).map((entry) => ({ ...entry, source: 'device' }));
+    const remoteEntries = await readRemoteLeaderboard(normalizedType);
+    const entries = remoteEntries === null
+      ? localEntries
+      : sortLeaderboardEntries([...remoteEntries, ...localEntries], normalizedType).slice(0, LEADERBOARD_LIMIT);
     renderLeaderboard(entries);
 
     if (ui.titleHint) {
-      ui.titleHint.textContent = {
-        flower: 'Fastest red-flower runs. Signed-in scores publish to the shared board.',
-        painttown: 'Most buildings painted during the two-minute rooftop challenge.',
-        fishing: 'Best catches ranked by species rarity, size, strength, and line control.',
-        explorer: 'Community score from joining rooms, sharing artifacts, and making connections.',
-        deflock: 'Completed virtual-camera hunts ranked by score, then completion time.'
-      }[normalizedType];
+      ui.titleHint.textContent = definition.objective;
     }
     if (ui.status) {
       const prefix = {
@@ -286,9 +339,28 @@ function createFlowerChallengeLeaderboardApi(context) {
       ui.status.dataset.backend = challengeState.leaderboardBackend === 'firebase'
         ? `${prefix}: Firebase live`
         : `${prefix}: Local fallback`;
+      const cloudCount = remoteEntries?.length || 0;
+      const deviceCount = localEntries.length;
+      ui.status.textContent = remoteEntries === null
+        ? `Offline view • ${deviceCount} result${deviceCount === 1 ? '' : 's'} saved on this device`
+        : `Updated now • ${cloudCount} shared${deviceCount ? ` + ${deviceCount} on this device` : ''}`;
+      ui.status.classList.toggle('ok', remoteEntries !== null);
     }
+    if (ui.titleRefreshBtn) {
+      ui.titleRefreshBtn.disabled = false;
+      ui.titleRefreshBtn.removeAttribute('aria-busy');
+    }
+    emitProductTelemetry('leaderboard_view', {
+      board_id: normalizedType,
+      backend: remoteEntries === null ? 'device' : (deviceCountForTelemetry(localEntries) ? 'cloud_and_device' : 'cloud'),
+      result_count: entries.length
+    });
 
     return entries;
+  }
+
+  function deviceCountForTelemetry(entries = []) {
+    return Array.isArray(entries) && entries.length > 0;
   }
 
   function storeLocalResult(challengeType, entry) {
@@ -343,11 +415,13 @@ function createFlowerChallengeLeaderboardApi(context) {
     const entry = capturePaintTownEntry(payload);
     if (!entry) return null;
 
-    if (!(await writeRemoteLeaderboard('painttown', entry))) {
+    const published = await writeRemoteLeaderboard('painttown', entry);
+    if (!published) {
       storeLocalResult('painttown', entry);
     }
     await refreshFlowerLeaderboard(challengeState.leaderboardView);
     setTitleStatus(`${entry.player} painted ${entry.paintedBuildings || 0} buildings in 2:00 at ${entry.location}.`, 'ok');
+    emitProductTelemetry('score_submit', { board_id: 'painttown', outcome: published ? 'cloud' : 'device', score: entry.paintedBuildings });
     return entry;
   }
 
@@ -358,16 +432,18 @@ function createFlowerChallengeLeaderboardApi(context) {
       challenge: 'fishing',
       player: resolvePlayerName(),
       location: payload.location || getRuntimeLocationLabel(),
-      mode: 'boat',
+      mode: String(payload.mode || inferTravelMode()),
       foundAt: payload.caughtAt || new Date().toISOString()
     }, 'fishing');
     if (!entry) return null;
 
-    if (!(await writeRemoteLeaderboard('fishing', entry))) {
+    const published = await writeRemoteLeaderboard('fishing', entry);
+    if (!published) {
       storeLocalResult('fishing', entry);
     }
     if (challengeState.leaderboardView === 'fishing') await refreshFlowerLeaderboard('fishing');
     setTitleStatus(`${entry.player} landed ${entry.species} for ${entry.score} points at ${entry.location}.`, 'ok');
+    emitProductTelemetry('score_submit', { board_id: 'fishing', outcome: published ? 'cloud' : 'device', score: entry.score });
     return entry;
   }
 
@@ -382,9 +458,11 @@ function createFlowerChallengeLeaderboardApi(context) {
       foundAt: payload.completedAt || new Date().toISOString()
     }, 'deflock');
     if (!entry) return null;
-    if (!(await writeRemoteLeaderboard('deflock', entry))) storeLocalResult('deflock', entry);
+    const published = await writeRemoteLeaderboard('deflock', entry);
+    if (!published) storeLocalResult('deflock', entry);
     if (challengeState.leaderboardView === 'deflock') await refreshFlowerLeaderboard('deflock');
     setTitleStatus(`${entry.player} virtually disabled ${entry.disabledCameras}/${entry.totalCameras} mapped cameras at ${entry.location}.`, 'ok');
+    emitProductTelemetry('score_submit', { board_id: 'deflock', outcome: published ? 'cloud' : 'device', score: entry.score });
     return entry;
   }
 
@@ -404,6 +482,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     setChallengeLeaderboardView,
     sortLeaderboardEntries,
     storeLocalResult,
+    syncExplorerProfileToLocalLeaderboard,
     submitFishingScore,
     submitDeFlockScore,
     submitPaintTownScore,

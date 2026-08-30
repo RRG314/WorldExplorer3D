@@ -186,7 +186,7 @@ selectField({
   textField({
     id: 'indoor_shell_levels',
     label: 'Shell Levels',
-    helpText: 'Optional scaffold for future interior editing. Add comma-separated levels to mark this building as level-aware.',
+    helpText: 'Add comma-separated levels when the building has indoor map details.',
     example: 'B1, 0, 1, 2',
     advancedMapping: [
       { path: 'relations.indoorShell.enabled', label: 'Indoor shell flag' },
@@ -430,7 +430,7 @@ selectField({
   textField({
     id: 'connector_levels',
     label: 'Served Levels',
-    helpText: 'Comma-separated levels this stairs or elevator connects. This is scaffold data for the future interior editor.',
+    helpText: 'Enter the comma-separated levels connected by these stairs or this elevator.',
     example: '0, 1, 2',
     advancedMapping: [
       { path: 'threeD.stairs[] / threeD.elevators[]', label: 'Served level lists' }

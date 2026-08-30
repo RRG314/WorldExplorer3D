@@ -1,5 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=48";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=63";
+import { roadWidthAtProjection } from './road-cross-section-profile.js?v=1';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
 
 function roadHeadingAtSegment(road, segmentIndex, fallbackAngle = 0) {
   const points = Array.isArray(road?.pts) ? road.pts : [];
@@ -25,15 +27,9 @@ function createWorldSpawnSurfaceApi(context) {
   }
 
   function terrainYAtWorld(x, z) {
-    if (appCtx.onMoon && appCtx.moonSurface) {
-      appCtx.moonSurface.updateMatrixWorld(true);
-      const raycaster = typeof appCtx._getPhysRaycaster === "function" ? appCtx._getPhysRaycaster() : null;
-      if (raycaster && appCtx._physRayStart && appCtx._physRayDir) {
-        appCtx._physRayStart.set(x, 1200, z);
-        raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-        const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-        if (hits.length > 0 && Number.isFinite(hits[0]?.point?.y)) return hits[0].point.y;
-      }
+    if (appCtx.onMoon || appCtx.onMars) {
+      const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+      if (Number.isFinite(surfaceY)) return surfaceY;
     }
 
     const sample = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
@@ -41,14 +37,14 @@ function createWorldSpawnSurfaceApi(context) {
   }
 
   function driveCenterYAtWorld(x, z, preferRoad = false) {
-    if (appCtx.onMoon) return terrainYAtWorld(x, z) + 1.2;
+    if (appCtx.onMoon || appCtx.onMars) return terrainYAtWorld(x, z) + 1.2;
     const sample = appCtx.SurfaceQuery?.driveAt?.(x, z, { preferRoad });
     if (Number.isFinite(sample?.position?.y)) return sample.position.y + 1.2;
     return terrainYAtWorld(x, z) + 1.2;
   }
 
   function walkBaseYAtWorld(x, z) {
-    if (appCtx.onMoon) return terrainYAtWorld(x, z);
+    if (appCtx.onMoon || appCtx.onMars) return terrainYAtWorld(x, z);
     const sample = appCtx.SurfaceQuery?.walkAt?.(x, z);
     if (Number.isFinite(sample?.position?.y)) return sample.position.y;
     return terrainYAtWorld(x, z);
@@ -181,7 +177,7 @@ function createWorldSpawnSurfaceApi(context) {
     if (!deps.isVehicleRoad(road)) return false;
     if (!isRoadSurfaceReachable(nearestRoad, { extraVerticalAllowance: 0.4 })) return false;
 
-    const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
+    const roadHalfWidth = roadWidthAtProjection(road, nearestRoad) * 0.5;
     const onRoadCenter = nearestRoad.dist <= Math.max(2.2, roadHalfWidth - 0.35);
     const onRoadCore = nearestRoad.dist <= Math.max(1.6, roadHalfWidth - 0.95);
     const colliderDetail = buildingCheck?.building?.colliderDetail === "bbox" ? "bbox" : "full";

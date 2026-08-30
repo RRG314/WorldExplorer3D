@@ -246,13 +246,26 @@ service cloud.firestore {
 
     function validAnchorData(anchor) {
       return anchor is map &&
-        anchor.keys().hasOnly(['kind', 'lat', 'lon', 'x', 'y', 'z']) &&
+        anchor.keys().hasOnly([
+          'kind',
+          'lat',
+          'lon',
+          'x',
+          'y',
+          'z',
+          'interiorKey',
+          'buildingKey',
+          'interiorLabel'
+        ]) &&
         anchor.kind in ['earth', 'moon', 'space'] &&
         anchor.lat is number &&
         anchor.lon is number &&
         anchor.x is number &&
         anchor.y is number &&
-        anchor.z is number;
+        anchor.z is number &&
+        (!('interiorKey' in anchor) || (anchor.interiorKey is string && anchor.interiorKey.size() <= 160)) &&
+        (!('buildingKey' in anchor) || (anchor.buildingKey is string && anchor.buildingKey.size() <= 160)) &&
+        (!('interiorLabel' in anchor) || (anchor.interiorLabel is string && anchor.interiorLabel.size() <= 80));
     }
 
     function validEditorEditType(value) {
@@ -585,10 +598,25 @@ service cloud.firestore {
 
     function validFrameData(frame) {
       return frame is map &&
-        frame.keys().hasOnly(['kind', 'locLat', 'locLon']) &&
+        frame.keys().hasOnly([
+          'kind',
+          'locLat',
+          'locLon',
+          'interiorKey',
+          'interiorFloorId',
+          'interiorFloorLevel'
+        ]) &&
         frame.kind in ['earth', 'moon', 'space'] &&
         frame.locLat is number &&
-        frame.locLon is number;
+        frame.locLon is number &&
+        (!('interiorKey' in frame) ||
+          (frame.interiorKey is string && frame.interiorKey.size() <= 180)) &&
+        (!('interiorFloorId' in frame) ||
+          (frame.interiorFloorId is string && frame.interiorFloorId.size() <= 220)) &&
+        (!('interiorFloorLevel' in frame) ||
+          (frame.interiorFloorLevel is int &&
+            frame.interiorFloorLevel >= 0 &&
+            frame.interiorFloorLevel <= 7));
     }
 
     function validPlayerDoc(roomId, uid) {
@@ -1230,7 +1258,10 @@ service cloud.firestore {
         request.resource.data.materialIndex >= 0 &&
         request.resource.data.materialIndex <= 7 &&
         (!('shape' in request.resource.data) ||
-          request.resource.data.shape in ['cube', 'slab', 'ramp', 'column']) &&
+          request.resource.data.shape in [
+            'cube', 'slab', 'ramp', 'column', 'wall', 'floor', 'roof',
+            'window', 'door', 'storefront', 'glass_wall', 'stairs', 'fence', 'sign'
+          ]) &&
         (!('rotation' in request.resource.data) ||
           (request.resource.data.rotation is int &&
             request.resource.data.rotation >= 0 &&
@@ -1244,6 +1275,98 @@ service cloud.firestore {
     function validRoomBlockUpdate(blockId) {
       return validRoomBlockData(blockId) &&
         request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    function validWorldModificationVector(vector, scaleVector) {
+      return vector is map &&
+        vector.keys().hasOnly(['x', 'y', 'z']) &&
+        vector.x is number &&
+        vector.y is number &&
+        vector.z is number &&
+        (
+          (scaleVector == true &&
+            vector.x >= 0.1 && vector.x <= 20 &&
+            vector.y >= 0.1 && vector.y <= 20 &&
+            vector.z >= 0.1 && vector.z <= 20) ||
+          (scaleVector == false &&
+            vector.x >= -50000 && vector.x <= 50000 &&
+            vector.y >= -1200 && vector.y <= 1200 &&
+            vector.z >= -50000 && vector.z <= 50000)
+        );
+    }
+
+    function validWorldModificationTransform(transform) {
+      return transform is map &&
+        transform.keys().hasOnly(['position', 'rotation', 'scale']) &&
+        validWorldModificationVector(transform.position, false) &&
+        validWorldModificationVector(transform.rotation, false) &&
+        validWorldModificationVector(transform.scale, true);
+    }
+
+    function validRoomWorldModificationData(roomId, modificationId) {
+      return request.resource.data.keys().hasOnly([
+          'id', 'worldId', 'worldSeed', 'kind', 'sourceFeatureId', 'objectId',
+          'objectType', 'catalogId', 'materialId', 'transform', 'active',
+          'createdBy', 'updatedBy', 'revision', 'history', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.id == modificationId &&
+        request.resource.data.worldSeed == roomData(roomId).world.seed &&
+        request.resource.data.worldId is string &&
+        request.resource.data.worldId.size() > 0 &&
+        request.resource.data.worldId.size() <= 220 &&
+        request.resource.data.kind in ['suppression', 'object'] &&
+        request.resource.data.sourceFeatureId is string &&
+        request.resource.data.sourceFeatureId.size() <= 180 &&
+        request.resource.data.objectId is string &&
+        request.resource.data.objectId.size() <= 120 &&
+        request.resource.data.objectType in [
+          'none', 'wall', 'floor', 'roof', 'window', 'door', 'storefront',
+          'stairs', 'ramp', 'column', 'fence', 'glass_wall', 'sign', 'decorative_facade'
+        ] &&
+        request.resource.data.catalogId is string &&
+        request.resource.data.catalogId.size() <= 80 &&
+        request.resource.data.materialId is string &&
+        request.resource.data.materialId.size() <= 60 &&
+        validWorldModificationTransform(request.resource.data.transform) &&
+        request.resource.data.active is bool &&
+        request.resource.data.createdBy is string &&
+        request.resource.data.createdBy.size() > 0 &&
+        request.resource.data.createdBy.size() <= 128 &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.revision is int &&
+        request.resource.data.revision > 0 &&
+        request.resource.data.history is list &&
+        request.resource.data.history.size() <= 20 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          (request.resource.data.kind == 'suppression' &&
+            request.resource.data.sourceFeatureId.size() > 0 &&
+            request.resource.data.objectId == '' &&
+            request.resource.data.objectType == 'none') ||
+          (request.resource.data.kind == 'object' &&
+            request.resource.data.sourceFeatureId == '' &&
+            request.resource.data.objectId.size() > 0 &&
+            request.resource.data.objectType != 'none')
+        );
+    }
+
+    function canCreateRoomWorldModification(roomId) {
+      return (
+        request.resource.data.kind == 'suppression' && canManageRoom(roomId)
+      ) || (
+        request.resource.data.kind == 'object' && isRoomMember(roomId)
+      );
+    }
+
+    function canUpdateRoomWorldModification(roomId) {
+      return (
+        resource.data.kind == 'suppression' && canManageRoom(roomId)
+      ) || (
+        resource.data.kind == 'object' &&
+        (resource.data.createdBy == request.auth.uid || canManageRoom(roomId))
+      );
     }
 
     function validPaintClaimId(claimId) {
@@ -1549,6 +1672,142 @@ service cloud.firestore {
         request.resource.data.score <= resource.data.score + 20;
     }
 
+    function validLeaderboardBase(challenge, allowedKeys) {
+      return request.resource.data.keys().hasAll([
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly(allowedKeys) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.challenge == challenge &&
+        request.resource.data.player is string &&
+        request.resource.data.player.size() > 0 &&
+        request.resource.data.player.size() <= 24 &&
+        request.resource.data.location is string &&
+        request.resource.data.location.size() > 0 &&
+        request.resource.data.location.size() <= 80 &&
+        request.resource.data.lat is number &&
+        request.resource.data.lat >= -90 &&
+        request.resource.data.lat <= 90 &&
+        request.resource.data.lon is number &&
+        request.resource.data.lon >= -180 &&
+        request.resource.data.lon <= 180 &&
+        request.resource.data.mode is string &&
+        request.resource.data.mode.size() > 0 &&
+        request.resource.data.mode.size() <= 24 &&
+        request.resource.data.createdAtIso is string &&
+        request.resource.data.createdAtIso.size() >= 20 &&
+        request.resource.data.createdAtIso.size() <= 40 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    function validFlowerLeaderboardEntry() {
+      return validLeaderboardBase('flower', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 21600000 &&
+        request.resource.data.paintedPct == null &&
+        request.resource.data.paintedBuildings == 0 &&
+        request.resource.data.totalBuildings == 0;
+    }
+
+    function validPaintTownLeaderboardEntry() {
+      return validLeaderboardBase('painttown', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 600000 &&
+        request.resource.data.paintedPct is number &&
+        request.resource.data.paintedPct >= 0 &&
+        request.resource.data.paintedPct <= 100 &&
+        request.resource.data.paintedBuildings is int &&
+        request.resource.data.paintedBuildings >= 0 &&
+        request.resource.data.paintedBuildings <= 100000 &&
+        request.resource.data.totalBuildings is int &&
+        request.resource.data.totalBuildings >= request.resource.data.paintedBuildings &&
+        request.resource.data.totalBuildings <= 100000;
+    }
+
+    function validFishingLeaderboardEntry() {
+      return validLeaderboardBase('fishing', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt', 'species', 'speciesId',
+          'score', 'weightKg', 'lengthCm', 'strength', 'rarity', 'behavior',
+          'fightTimeMs', 'lineIntegrityPct', 'maxTensionPct', 'waterKind'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 86400000 &&
+        request.resource.data.paintedPct == null &&
+        request.resource.data.paintedBuildings == 0 &&
+        request.resource.data.totalBuildings == 0 &&
+        request.resource.data.species is string &&
+        request.resource.data.species.size() > 0 &&
+        request.resource.data.species.size() <= 80 &&
+        request.resource.data.speciesId is string &&
+        request.resource.data.speciesId.size() <= 48 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 1000000 &&
+        request.resource.data.weightKg is number &&
+        request.resource.data.weightKg > 0 &&
+        request.resource.data.weightKg <= 5000 &&
+        request.resource.data.lengthCm is number &&
+        request.resource.data.lengthCm > 0 &&
+        request.resource.data.lengthCm <= 3000 &&
+        (request.resource.data.strength == null || request.resource.data.strength is number) &&
+        request.resource.data.rarity is string &&
+        request.resource.data.rarity.size() <= 24 &&
+        request.resource.data.behavior is string &&
+        request.resource.data.behavior.size() <= 32 &&
+        (request.resource.data.fightTimeMs == null || request.resource.data.fightTimeMs is number) &&
+        (request.resource.data.lineIntegrityPct == null ||
+          (request.resource.data.lineIntegrityPct is number && request.resource.data.lineIntegrityPct >= 0 && request.resource.data.lineIntegrityPct <= 100)) &&
+        (request.resource.data.maxTensionPct == null ||
+          (request.resource.data.maxTensionPct is number && request.resource.data.maxTensionPct >= 0 && request.resource.data.maxTensionPct <= 100)) &&
+        request.resource.data.waterKind is string &&
+        request.resource.data.waterKind.size() > 0 &&
+        request.resource.data.waterKind.size() <= 24;
+    }
+
+    function validDeFlockLeaderboardEntry() {
+      return validLeaderboardBase('deflock', [
+          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
+          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
+          'mode', 'createdAtIso', 'createdAt', 'score', 'disabledCameras',
+          'totalCameras', 'detections', 'distance'
+        ]) &&
+        request.resource.data.timeMs is number &&
+        request.resource.data.timeMs > 0 &&
+        request.resource.data.timeMs <= 86400000 &&
+        (request.resource.data.paintedPct == null || request.resource.data.paintedPct == 0) &&
+        request.resource.data.paintedBuildings == 0 &&
+        request.resource.data.totalBuildings == 0 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 100000 &&
+        request.resource.data.disabledCameras is int &&
+        request.resource.data.disabledCameras > 0 &&
+        request.resource.data.disabledCameras <= 750 &&
+        request.resource.data.totalCameras is int &&
+        request.resource.data.totalCameras == request.resource.data.disabledCameras &&
+        request.resource.data.detections is int &&
+        request.resource.data.detections >= 0 &&
+        request.resource.data.detections <= 100000 &&
+        request.resource.data.distance is number &&
+        request.resource.data.distance >= 0;
+    }
+
     match /users/{userId} {
       allow read: if isSelf(userId);
       allow create: if isSelf(userId) && validUserSelfCreate(userId);
@@ -1602,6 +1861,25 @@ service cloud.firestore {
       allow create: if validCreatorProfileCreate(userId);
       allow update: if validCreatorProfileUpdate(userId);
       allow delete: if false;
+    }
+
+    match /explorerProfiles/{userId} {
+      // Discovery ownership, claims, companions, mastery, and museum records
+      // are minted or changed only by trusted Cloud Functions. Owners may read
+      // their complete profile tree; browser clients cannot forge inventory.
+      allow read: if isSelf(userId);
+      allow create, update, delete: if false;
+
+      match /{document=**} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /discoveryTrades/{tradeId} {
+      allow read: if isSignedIn() &&
+        (resource.data.ownerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create, update, delete: if false;
     }
 
     match /editorSubmissions/{submissionId} {
@@ -1665,70 +1943,25 @@ service cloud.firestore {
 
     match /flowerLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && validFlowerLeaderboardEntry();
       allow update, delete: if false;
     }
 
     match /paintTownLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && validPaintTownLeaderboardEntry();
       allow update, delete: if false;
     }
 
     match /deflockLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn() &&
-        request.resource.data.keys().hasOnly([
-          'uid', 'challenge', 'player', 'timeMs', 'paintedPct',
-          'paintedBuildings', 'totalBuildings', 'location', 'lat', 'lon',
-          'mode', 'createdAtIso', 'createdAt', 'score', 'disabledCameras',
-          'totalCameras', 'detections', 'distance'
-        ]) &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.challenge == 'deflock' &&
-        request.resource.data.player is string &&
-        request.resource.data.player.size() > 0 &&
-        request.resource.data.player.size() <= 24 &&
-        request.resource.data.location is string &&
-        request.resource.data.location.size() <= 80 &&
-        request.resource.data.timeMs is number &&
-        request.resource.data.timeMs > 0 &&
-        request.resource.data.timeMs <= 86400000 &&
-        request.resource.data.score is int &&
-        request.resource.data.score >= 0 &&
-        request.resource.data.score <= 100000 &&
-        request.resource.data.disabledCameras is int &&
-        request.resource.data.disabledCameras > 0 &&
-        request.resource.data.disabledCameras <= 750 &&
-        request.resource.data.totalCameras is int &&
-        request.resource.data.totalCameras == request.resource.data.disabledCameras &&
-        request.resource.data.detections is int &&
-        request.resource.data.detections >= 0 &&
-        request.resource.data.detections <= 100000 &&
-        request.resource.data.distance is number &&
-        request.resource.data.distance >= 0;
+      allow create: if isSignedIn() && validDeFlockLeaderboardEntry();
       allow update, delete: if false;
     }
 
     match /fishingLeaderboard/{entryId} {
       allow read: if true;
-      allow create: if isSignedIn() &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.challenge == 'fishing' &&
-        request.resource.data.player is string &&
-        request.resource.data.player.size() > 0 &&
-        request.resource.data.player.size() <= 24 &&
-        request.resource.data.species is string &&
-        request.resource.data.species.size() > 0 &&
-        request.resource.data.species.size() <= 80 &&
-        request.resource.data.score is int &&
-        request.resource.data.score >= 0 &&
-        request.resource.data.weightKg is number &&
-        request.resource.data.weightKg > 0 &&
-        request.resource.data.lengthCm is number &&
-        request.resource.data.lengthCm > 0 &&
-        request.resource.data.location is string &&
-        request.resource.data.location.size() <= 80;
+      allow create: if isSignedIn() && validFishingLeaderboardEntry();
       allow update, delete: if false;
     }
 
@@ -1837,6 +2070,31 @@ service cloud.firestore {
           (resource.data.createdBy == request.auth.uid || canManageRoom(roomId));
       }
 
+      match /worldModifications/{modificationId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          validRoomWorldModificationData(roomId, modificationId) &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.revision == 1 &&
+          request.resource.data.createdAt == request.time &&
+          canCreateRoomWorldModification(roomId);
+        allow update: if isMultiplayerEntitled() &&
+          validRoomWorldModificationData(roomId, modificationId) &&
+          request.resource.data.worldId == resource.data.worldId &&
+          request.resource.data.worldSeed == resource.data.worldSeed &&
+          request.resource.data.kind == resource.data.kind &&
+          request.resource.data.sourceFeatureId == resource.data.sourceFeatureId &&
+          request.resource.data.objectId == resource.data.objectId &&
+          request.resource.data.objectType == resource.data.objectType &&
+          request.resource.data.createdBy == resource.data.createdBy &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.revision == resource.data.revision + 1 &&
+          canUpdateRoomWorldModification(roomId);
+        allow delete: if isMultiplayerEntitled() &&
+          (canManageRoom(roomId) ||
+            (resource.data.kind == 'object' && resource.data.createdBy == request.auth.uid));
+      }
+
       match /paintClaims/{claimId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
         allow create: if isMultiplayerEntitled() &&
@@ -1852,6 +2110,29 @@ service cloud.firestore {
       match /deflockStates/{cameraId} {
         // Shared DeFlock state is written only by the verified Cloud Function.
         // Room members may observe the immutable overlay for join/rejoin sync.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
+      match /urbanEntities/{entityId} {
+        // Vehicle leases and condition changes are transaction-owned by Cloud
+        // Functions. Room clients can observe them but cannot forge ownership,
+        // position, damage, repair, or revision fields directly.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
+      match /urbanActors/{uid} {
+        // Server-owned action clocks bound equipment use and are readable only
+        // by the actor or room managers for support/moderation diagnostics.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId) &&
+          (isSelf(uid) || canManageRoom(roomId));
+        allow create, update, delete: if false;
+      }
+
+      match /urbanCivic/{stateId} {
+        // The active witnessed event and its outcome are written only by the
+        // verified room transaction. Members share one consequence timeline.
         allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
         allow create, update, delete: if false;
       }

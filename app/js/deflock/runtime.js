@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=3";
+import { DEFLOCK_SOURCE_VERSION, loadSurveillanceFeatures } from "./source.js?v=7";
 import { computeCameraPlacement } from "./placement.js?v=2";
 import {
   applySharedDisabled,
@@ -106,6 +106,16 @@ function cameraState(state, sourceId) {
   return "undiscovered";
 }
 
+function directionSectorsFor(feature) {
+  const sectors = Array.isArray(feature?.directionSectors)
+    ? feature.directionSectors.filter((sector) => Number.isFinite(Number(sector?.bearingDegrees)))
+    : [];
+  if (sectors.length) return sectors;
+  return Number.isFinite(Number(feature?.direction))
+    ? [{ bearingDegrees: Number(feature.direction), fieldOfViewDegrees: null, kind: 'bearing' }]
+    : [];
+}
+
 function readActorPosition() {
   const actor = appCtx.activeTransportActor?.();
   if (!actor || actor.mode === "ocean" || actor.mode === "rocket") return null;
@@ -170,7 +180,9 @@ function createCameraLayer(session) {
     count
   );
 
-  const directed = session.state.features.filter((feature) => Number.isFinite(feature.direction));
+  const directed = session.state.features.flatMap((feature) => directionSectorsFor(feature)
+    .filter((sector) => sector.kind !== 'panoramic')
+    .map((sector) => ({ feature, sector })));
   let zones = null;
   if (directed.length > 0) {
     const halfWidth = Math.tan(DETECTION_HALF_ANGLE * Math.PI / 180) * DETECTION_RANGE;
@@ -359,11 +371,18 @@ function refreshPlacements(session, force = false, animationOnly = false) {
     matrix.compose(position, identityQuaternion, scale);
     render.beacon.setMatrixAt(index, matrix);
 
-    if (Number.isFinite(feature.direction) && render.zones) {
+    if (render.zones) directionSectorsFor(feature).filter((sector) => sector.kind !== 'panoramic').forEach((sector) => {
+      const sectorBearing = Number(sector.bearingDegrees) * Math.PI / 180;
+      yawQuaternion.setFromAxisAngle(upAxis, -sectorBearing);
+      const mappedHalfAngle = Number.isFinite(Number(sector.fieldOfViewDegrees))
+        ? Math.max(4, Math.min(175, Number(sector.fieldOfViewDegrees) * 0.5))
+        : DETECTION_HALF_ANGLE;
+      const widthScale = Math.tan(mappedHalfAngle * Math.PI / 180) / Math.tan(DETECTION_HALF_ANGLE * Math.PI / 180);
+      scale.set(Math.max(0.12, Math.min(6, widthScale)), 1, 1);
       position.set(feature.x, feature.groundY + 0.16, feature.z);
       matrix.compose(position, yawQuaternion, scale);
       render.zones.setMatrixAt(directedIndex++, matrix);
-    }
+    });
   });
   completedAnimations.forEach((sourceId) => session.fallStarts.delete(sourceId));
   [render.pole, render.mountArm, render.camera, render.lens, render.target, render.beam, render.beacon, render.zones].filter(Boolean).forEach((mesh) => {
@@ -414,7 +433,7 @@ function publishMapMarkers(session) {
     z: feature.z,
     groundY: feature.groundY,
     state: cameraState(state, feature.sourceId),
-    objective: nearest?.sourceId === feature.sourceId,
+    objective: (session.focusTargetSourceId || nearest?.sourceId) === feature.sourceId,
     cameraType: feature.cameraType,
     cameraMount: feature.cameraMount,
     mountKind: feature.mountKind,
@@ -423,6 +442,9 @@ function publishMapMarkers(session) {
     overhead: feature.overhead === true,
     surveillanceType: feature.surveillanceType,
     direction: feature.direction,
+    directions: feature.directions,
+    directionSectors: feature.directionSectors,
+    directionRaw: feature.directionRaw,
     operator: feature.operator,
     manufacturer: feature.manufacturer,
     sourceDataset: feature.sourceDataset,
@@ -447,14 +469,21 @@ function renderHud(session) {
 }
 
 function detectionContains(feature, actor) {
-  if (!Number.isFinite(feature.direction)) return false;
+  const sectors = directionSectorsFor(feature);
+  if (!sectors.length) return false;
   const dx = actor.x - feature.x;
   const dz = actor.z - feature.z;
   const distance = Math.hypot(dx, dz);
   if (distance <= INTERACTION_RADIUS || distance > DETECTION_RANGE) return false;
   const bearingToActor = ((Math.atan2(dx, -dz) * 180 / Math.PI) + 360) % 360;
-  const delta = Math.abs((((bearingToActor - feature.direction) + 540) % 360) - 180);
-  return delta <= DETECTION_HALF_ANGLE;
+  return sectors.some((sector) => {
+    if (sector.kind === 'panoramic') return true;
+    const delta = Math.abs((((bearingToActor - Number(sector.bearingDegrees)) + 540) % 360) - 180);
+    const halfAngle = Number.isFinite(Number(sector.fieldOfViewDegrees))
+      ? Math.max(4, Math.min(175, Number(sector.fieldOfViewDegrees) * 0.5))
+      : DETECTION_HALF_ANGLE;
+    return delta <= halfAngle;
+  });
 }
 
 function updateNearbyState(session, actor) {
@@ -655,6 +684,17 @@ async function initializeSession(session) {
       location: session.location,
       persisted: localProgress
     });
+    const pendingTarget = appCtx.pendingDeFlockTarget || null;
+    if (pendingTarget) {
+      const exact = loaded.features.find((feature) => feature.sourceId === pendingTarget.sourceId);
+      const nearest = exact || loaded.features.slice().sort((a, b) => (
+        (a.lat - Number(pendingTarget.lat)) ** 2 + (a.lon - Number(pendingTarget.lon)) ** 2
+      ) - (
+        (b.lat - Number(pendingTarget.lat)) ** 2 + (b.lon - Number(pendingTarget.lon)) ** 2
+      ))[0] || null;
+      session.focusTargetSourceId = nearest?.sourceId || null;
+      appCtx.pendingDeFlockTarget = null;
+    }
     session.source = loaded;
     createCameraLayer(session);
     publishMapMarkers(session);
@@ -664,7 +704,8 @@ async function initializeSession(session) {
     } else if (/bundled|stale/i.test(String(loaded.cacheSource || ""))) {
       setStatus(session, `${loaded.features.length} virtual cameras loaded from a dated last-good OpenStreetMap snapshot.`, "empty");
     } else {
-      setStatus(session, `${loaded.features.length} publicly mapped virtual cameras loaded from OpenStreetMap.`);
+      const focused = session.focusTargetSourceId ? ' Selected globe camera is highlighted as your first objective.' : '';
+      setStatus(session, `${loaded.features.length} publicly mapped virtual cameras loaded from OpenStreetMap.${focused}`);
     }
     renderHud(session);
   } catch (error) {

@@ -1,10 +1,10 @@
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "../world/shortbread-source.js?v=17";
+} from "../world/shortbread-source.js?v=19";
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
-import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=2';
+import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=4';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
@@ -203,6 +203,37 @@ function pointInMappedLandArea(lon, lat, area) {
   ) return false;
   if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
   return !(area?.holes || []).some((hole) => pointInLonLatRing(lon, lat, hole));
+}
+
+function createLandAreaSpatialBucket(areas, gridSize = 16) {
+  if (!Array.isArray(areas) || areas.length === 0) return null;
+  const bounds = areas.reduce((result, area) => ({
+    minLon: Math.min(result.minLon, Number(area?.bounds?.minLon)),
+    minLat: Math.min(result.minLat, Number(area?.bounds?.minLat)),
+    maxLon: Math.max(result.maxLon, Number(area?.bounds?.maxLon)),
+    maxLat: Math.max(result.maxLat, Number(area?.bounds?.maxLat))
+  }), { minLon: Infinity, minLat: Infinity, maxLon: -Infinity, maxLat: -Infinity });
+  if (!Object.values(bounds).every(Number.isFinite)) return null;
+  const lonSpan = Math.max(1e-12, bounds.maxLon - bounds.minLon);
+  const latSpan = Math.max(1e-12, bounds.maxLat - bounds.minLat);
+  const size = Math.max(4, Math.floor(Number(gridSize) || 16));
+  const cells = Array.from({ length: size * size }, () => []);
+  const cellIndex = (lon, lat) => {
+    const x = Math.max(0, Math.min(size - 1, Math.floor((lon - bounds.minLon) / lonSpan * size)));
+    const y = Math.max(0, Math.min(size - 1, Math.floor((lat - bounds.minLat) / latSpan * size)));
+    return { x, y };
+  };
+  // `areas` is already priority-sorted. Inserting in that order preserves the
+  // exact winner chosen by the prior full-bucket scan while reducing each
+  // vertex to only polygons whose bounds overlap its small cell.
+  for (const area of areas) {
+    const min = cellIndex(Number(area.bounds.minLon), Number(area.bounds.minLat));
+    const max = cellIndex(Number(area.bounds.maxLon), Number(area.bounds.maxLat));
+    for (let y = min.y; y <= max.y; y += 1) {
+      for (let x = min.x; x <= max.x; x += 1) cells[y * size + x].push(area);
+    }
+  }
+  return { bounds, cells, latSpan, lonSpan, size };
 }
 
 function contextTileCount(bounds, zoom) {
@@ -408,6 +439,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
   const tiles = contextBatch.values;
   const buildingBuckets = [];
   const landAreasByTile = new Map();
+  const landAreaSpatialByTile = new Map();
   const surfaceFallbackByTile = new Map();
   let landAreas = 0;
   let skippedNearBuildings = 0;
@@ -445,7 +477,9 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     }
     if (landBucket.length > 0) {
       landBucket.sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0));
-      landAreasByTile.set(`${tileRecord.z}/${tileRecord.x}/${tileRecord.y}`, landBucket);
+      const tileKey = `${tileRecord.z}/${tileRecord.x}/${tileRecord.y}`;
+      landAreasByTile.set(tileKey, landBucket);
+      landAreaSpatialByTile.set(tileKey, createLandAreaSpatialBucket(landBucket));
       landAreas += landBucket.length;
     }
     const buildingLayer = tileRecord.tile.layers.buildings;
@@ -527,6 +561,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     contextMaxInFlight: contextBatch.metrics.maxInFlight,
     landAreas,
     landAreasByTile,
+    landAreaSpatialByTile,
     surfaceFallbackByTile
   };
 }

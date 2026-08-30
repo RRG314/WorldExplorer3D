@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { normalizeWorldSurfaceEvidence } from './earth-core/world-surface-domain.js?v=2';
+import { normalizeWorldSurfaceEvidence } from './earth-core/world-surface-domain.js?v=3';
 
 let loadedSelection = null;
 
@@ -9,6 +9,26 @@ function cloneCustomLocation(location) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   const surfaceEvidence = normalizeWorldSurfaceEvidence(location?.surfaceEvidence);
   const waterKind = surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
+  const rawDetails = location?.locationDetails || location?.details || null;
+  const countryCode = String(
+    location?.countryCode || rawDetails?.countryCode || rawDetails?.country_code || ''
+  ).trim().toUpperCase();
+  const locationDetails = rawDetails && typeof rawDetails === 'object'
+    ? Object.freeze({
+        city: String(rawDetails.city || '').slice(0, 100),
+        county: String(rawDetails.county || '').slice(0, 100),
+        region: String(rawDetails.region || '').slice(0, 100),
+        country: String(rawDetails.country || '').slice(0, 100),
+        countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null,
+        airportClass: String(rawDetails.airportClass || rawDetails.aerodrome || '').trim().toLowerCase().slice(0, 40),
+        iata: /^[A-Z0-9]{3}$/.test(String(rawDetails.iata || '').trim().toUpperCase())
+          ? String(rawDetails.iata).trim().toUpperCase()
+          : '',
+        icao: /^[A-Z0-9]{4}$/.test(String(rawDetails.icao || '').trim().toUpperCase())
+          ? String(rawDetails.icao).trim().toUpperCase()
+          : ''
+      })
+    : null;
   return {
     lat: Math.max(-90, Math.min(90, lat)),
     lon: ((lon + 180) % 360 + 360) % 360 - 180,
@@ -17,7 +37,9 @@ function cloneCustomLocation(location) {
       ? location.arrivalMode
       : 'auto',
     waterKind,
-    surfaceEvidence
+    surfaceEvidence,
+    countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null,
+    locationDetails
   };
 }
 
@@ -96,7 +118,10 @@ export function resolveLocationSelection() {
     key,
     lat: Math.max(-90, Math.min(90, lat)),
     lon: ((lon + 180) % 360 + 360) % 360 - 180,
-    name: String(preset?.name || key).trim() || key
+    name: String(preset?.name || key).trim() || key,
+    countryCode: /^[A-Z]{2}$/.test(String(preset?.countryCode || '').toUpperCase())
+      ? String(preset.countryCode).toUpperCase()
+      : null
   };
 }
 

@@ -6,69 +6,116 @@
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=semver)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
-World Explorer 3D is a browser-based geospatial exploration game built around real-world map context. Pick a preset city, use the interactive globe, or enter coordinates, then explore by walking, driving, flying, boating, or changing worlds entirely.
+World Explorer 3D is a browser-based world sandbox built around real places.
+Choose a location, step into the world, and explore by land, water, air, or
+space.
 
-**[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
+<p align="center">
+  <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
+  · <a href="CONTROLS_REFERENCE.md">Controls</a>
+  · <a href="RELEASE_NOTES_5.1.0.md">What’s new</a>
+  · <a href="ROADMAP.md">Roadmap</a>
+</p>
 
-## Version 4.2.0
+![Walking beside USS Constellation in Baltimore's Inner Harbor](assets/readme/baltimore-harbor.webp)
 
-Version 4.2.0 adds DeFlock Hunt and bounded Live GPS Explore while stabilizing
-the fixed-location Earth world introduced in 4.1.3. Location loads publish one
-immutable world, movement does not reload world data, and returning from Space
-restores the retained Earth scene.
+*Baltimore’s Inner Harbor, with the mapped USS Constellation identified as a
+sloop-of-war museum ship.*
 
-Highlights:
+## A world you can play in
 
-- Map-informed Earth scenes with roads, buildings, terrain, land use, vegetation, water, bridges, tunnels, and selected landmarks.
-- Preset cities, geolocation, coordinate entry, and an interactive globe for choosing locations worldwide.
-- Live Earth views for observed satellites, earthquakes, aircraft, current weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
-- Walk, drive, drone, plane, boat, underwater, rover, astronaut, and rocket traversal.
-- Selected-location Earth sessions with atomic loading and explicit cancellation.
-- Structure-aware bridges, elevated roads, ramps, underpasses, and tunnels.
-- Material-aware building facades and improved rooftop geometry with restrained fallbacks when mapped detail is unavailable.
-- Terrain, actor, vehicle, and camera interpolation designed to prevent clipping and visible pose drift.
-- In-session Earth, Moon, Mars, ocean, and space transitions without a page reload.
-- A navigable solar system with planets, moons, asteroid and Kuiper belts, spacecraft, and inner/full system maps.
-- Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.
-- Enterable buildings using mapped indoor geometry where available and footprint-aware generated interiors elsewhere.
-- Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
-- [DeFlock Hunt](docs/DEFLOCK_MODE.md), a virtual single-player and cooperative mode built from publicly mapped OpenStreetMap surveillance nodes.
-- Live GPS Explore, an optional foreground-only mode that follows a player's physical location inside one bounded, fixed world without continuous-world streaming.
-- Responsive touch controls for current iPhone and Android layouts.
-- Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
+Select a city, landmark, airport, harbor, or coordinates and enter a bounded 3D
+world shaped by available terrain, roads, buildings, water, land cover, and
+places. Walk the streets, cross bridges and rooftops, enter mapped or eligible
+generated interiors, drive, fly, sail, fish, survey habitats, build, or meet
+other players in a room tied to that location.
 
-## Multiplayer model
+The same Explorer connects your Backpack, quick slots, Journal, Field Guide,
+activities, Expeditions, specialties, companions, and seasonal surveys. The
+World Editor holds both reviewed overlays and persistent Blocks, so creating a
+place remains part of the world instead of a separate building game.
 
-Multiplayer uses bounded shared rooms rather than one continuous MMO server. A
-room keeps one fixed world/location, live player presence, chat, shared blocks,
-artifacts, and room activities together. Private rooms are unlisted and joined
-with a six-character invite code; public rooms are discovered by city; featured
-rooms are curated by administrators. Rooms support 2–32 players, with 8–14
-recommended for the current browser renderer and Firestore presence model.
+| Water and shore | Flight |
+| :--: | :--: |
+| ![Shore fishing beside Baltimore's Inner Harbor](assets/readme/baltimore-shore-fishing-mobile.webp) | ![Personal aircraft at BWI](assets/readme/bwi-personal-plane.webp) |
+| **Fish from shore, pilot boats, dive, and explore ports** | **Use a personal aircraft or board aircraft at mapped airports** |
 
-Run the real two-browser contract with `npm run test:multiplayer-integration`.
-It uses local Auth and Firestore emulators and verifies private-code joining,
-presence/movement, chat, and shared half-grid shape stacks without production
-data.
+| Deep space | Explorer progression |
+| :--: | :--: |
+| ![Wayfinder approach to Sagittarius A star](assets/readme/space-wayfinder-sagittarius.webp) | ![Field Today in My Explorer](assets/readme/explorer-today.webp) |
+| **Fly manually or use optional Wayfinder assistance** | **Choose an activity and carry the result into one Explorer record** |
 
-## Screenshots
+![A playable container cargo ship underway near Rotterdam](assets/readme/rotterdam-cargo-ship.webp)
 
-![Driving through Baltimore](assets/landing/gameplay/drive-baltimore.png)
-![Exploring Monaco by drone](assets/landing/gameplay/drone-monaco.png)
-![Space flight](assets/landing/gameplay/fly-in-space.png)
+*A playable cargo ship underway near Rotterdam, with the shoreline kept in the
+active world.*
 
-## Data and Accuracy
+## What you can do
 
-Earth scenes use OpenStreetMap-derived geometry and other attributed public datasets. Source coverage, freshness, height data, and provider availability vary by location. The runtime uses bounded fallbacks when data is missing, but it does not claim survey-grade accuracy and is not a replacement for navigation or GIS software.
+- Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
+  astronaut, or spacecraft, or use optional Live GPS play while walking.
+- Visit supported mapped airports to board aircraft, choose pilot or passenger
+  travel, search for destinations, or take a local sightseeing flight.
+- Search for places by familiar names, including cities, landmarks, airports,
+  and other expected location searches.
+- Use configurable Backpack quick slots for field tools, fishing gear,
+  equipment, and ranged actions.
+- Photograph, inspect, survey, identify, fish, follow tracks and signs, and
+  record finds in the Journal and Field Guide.
+- Care for companions, build trust and levels, and travel with eligible
+  domestic, bird, and livestock companions.
+- Enter persistent multiplayer rooms with presence, chat, activities, shared
+  Blocks, and room vehicles.
+- Build with Blocks inside the World Editor and return to supported local or
+  shared creations later.
+- Leave Earth for the Moon, planets, the solar system, and selected deep-space
+  destinations, with manual flight always available.
+
+## Version 5.1
+
+Version 5.1 brings the Explorer systems into one clearer experience and expands
+the sandbox across Earth, oceans, airports, and space. It includes distinct
+vehicle handling, visible damage, enterable responder vehicles, aviation and
+skydiving, playable maritime fleets, regional field guides, companion growth,
+configurable quick slots, improved place search, a redesigned First Journey,
+rooftop traversal, and a more capable Wayfinder.
+
+Eleven regional Field Guide packs provide 180 attainable entries across the
+built-in Earth destinations. Field leads are game opportunities: they do not
+claim that a real animal is physically present at the player’s location.
+
+Read the full [5.1 release notes](RELEASE_NOTES_5.1.0.md) and the current
+[known issues](KNOWN_ISSUES.md).
+
+## Multiplayer and building
+
+Multiplayer uses bounded rooms rather than one continuous MMO world. A room
+shares one location, player presence, chat, activities, persistent vehicles,
+and player-built Blocks. Private rooms use invite codes; public rooms can be
+found by city.
+
+Blocks are part of the World Editor. Existing supported local and room Blocks
+remain on that shared persistence path, with one owner for placement,
+permissions, saving, and recovery.
+
+## World data and accuracy
+
+Earth scenes use OpenStreetMap-derived geometry and other attributed public or
+licensed sources. Coverage, freshness, height information, and provider
+availability vary by location. Mapped, observed, modeled, reference, and
+game-created content stay visibly distinct.
+
+World Explorer 3D is a game. It is not a navigation, appraisal, surveying,
+wildlife-presence, or safety service.
 
 - [Data sources](DATA_SOURCES.md)
 - [Attribution](ATTRIBUTION.md)
-- [Known issues and limitations](KNOWN_ISSUES.md)
+- [Known issues](KNOWN_ISSUES.md)
 - [Acknowledgements](ACKNOWLEDGEMENTS.md)
 
-Required attribution: `© OpenStreetMap contributors`
+Required map attribution: `© OpenStreetMap contributors`
 
-## Run Locally
+## Run locally
 
 Requirements: Node.js 22+, Java 21, and a browser with WebGL support.
 
@@ -82,43 +129,31 @@ python3 -m http.server --directory dist 4173
 
 Open `http://127.0.0.1:4173/app/`.
 
-Core exploration can run locally without production credentials. Account, multiplayer, moderation, and other backend-dependent features require an authorized environment and are not configured by public repository secrets.
+Keyboard and touch controls support browser zoom, visible focus, higher
+contrast, larger text, and reduced motion.
 
-## Verify a Change
+Core exploration can run without production credentials. Accounts,
+multiplayer, moderation, and other online features require an authorized
+environment. Secrets are not included in the repository.
 
-```bash
-npm run build:hosting -- --firebase-env staging
-npm run verify:hosting
-npm run audit:reachability
-npm run runtime:verify
-npm run release:verify
-```
+## Project guide
 
-`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor and multiplayer surfaces, planetary round trips, provider fallbacks, ocean and biome behavior, and a representative global location matrix.
-
-## Repository Layout
-
-- `app/` - canonical browser runtime
-- `dist/` - ignored, generated hosting artifact
-- `functions/` - authorized backend functions
-- `scripts/` - verification and release tooling
-- `tests/` - security and runtime test fixtures
-- `assets/` - landing and documentation media
-- `github-pages/` - static project explainer for GitHub Pages
-
-Edit canonical source only. `npm run build:hosting` creates a fresh, content-hashed hosting artifact; generated `dist/` files are never edited or committed.
-`npm run audit:reachability` rejects hosted JavaScript or CSS that is no longer reachable from a declared page/runtime entrypoint.
-
-## Project Documents
-
+- [Release notes](RELEASE_NOTES_5.1.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
+- [System inventory](docs/SYSTEM_INVENTORY.md)
+- [Architecture](docs/ARCHITECTURE_MAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
-- [DeFlock Hunt](docs/DEFLOCK_MODE.md)
-- [Data sources and attribution](DATA_SOURCES.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
 ## License
 
-This repository is source-available under the custom terms in [LICENSE](LICENSE). It is not licensed as OSI open-source software. Third-party data and assets remain subject to their respective licenses.
+Copyright © 2026 Steven Reid / World Explorer 3D. All Rights Reserved.
+
+This repository is publicly viewable under the custom source-available terms
+in [LICENSE](LICENSE). It is not licensed as OSI open-source software, and
+attribution alone does not grant permission to copy, redistribute, publish,
+host, or create derivative works. Third-party data, software, and assets remain
+subject to their respective terms in [ATTRIBUTION.md](ATTRIBUTION.md) and
+[ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).

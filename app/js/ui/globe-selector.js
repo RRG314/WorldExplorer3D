@@ -1,7 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=14';
+import { searchPlaces } from '../places/place-search.js?v=2';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
-import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
+import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
 import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
 import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
 import {
@@ -15,6 +16,7 @@ import {
   getFavoriteCityGroups as getFavoriteCityGroupsFromData,
   getMenuFavoriteCities as getMenuFavoriteCitiesFromLocs,
   latLonToLocalPoint,
+  localPointToLatLon,
   loadSavedFavoriteCities as loadSavedFavoriteCitiesFromStorage,
   loadRecentPlaces,
   normalizeCityRecord,
@@ -24,12 +26,13 @@ import {
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=7";
+} from "./globe-selector/helpers.js?v=9";
 
 function createGlobeSelector(options = {}) {
   const {
-    root, stage, canvas, latLonReadout, placeReadout, searchInput, mobileSearchInput,
-    mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
+    root, stage, canvas, mapBasemapBtn, satelliteBasemapBtn, basemapAttribution,
+    zoomInBtn, zoomOutBtn, scaleReadout, latLonReadout, placeReadout, searchInput, mobileSearchInput,
+    mobileSearchBtn, searchStatus, searchResults, latInput, lonInput, startBtn, backBtn, moonBtn,
     spaceBtn, oceanBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
     liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn, saveFavoriteBtn,
@@ -57,12 +60,19 @@ function createGlobeSelector(options = {}) {
   let panelMode = 'explore';
   const reverseLookupCache = new Map();
   let nearbyLookupController = null, nearbyLookupToken = 0;
+  let searchController = null;
   let savedFavoriteCities = [], recentPlaces = [];
 
   const globeScene = createGlobeSelectorScene({
     appCtx,
     canvas,
     stage,
+    zoomInBtn,
+    zoomOutBtn,
+    scaleReadout,
+    mapBasemapBtn,
+    satelliteBasemapBtn,
+    basemapAttribution,
     placeReadout,
     getActiveCityTab: () => activeCityTab,
     getPanelMode: () => panelMode,
@@ -109,8 +119,8 @@ function createGlobeSelector(options = {}) {
     document.querySelector('.globe-selector-hint')?.replaceChildren(
       document.createTextNode(
         panelMode === 'live-earth' ?
-          'Drag to rotate · Scroll to zoom · Tap markers to inspect Live Earth layers' :
-          'Drag to rotate · Scroll to zoom · Tap/Click to pick'
+          `${globalThis.matchMedia?.('(pointer: coarse)')?.matches ? 'Drag to rotate · Pinch to zoom · Tap' : 'Drag to rotate · Scroll to zoom · Click'} markers to inspect Live Earth systems` :
+          `${globalThis.matchMedia?.('(pointer: coarse)')?.matches ? 'Drag to rotate · Pinch to zoom · Tap' : 'Drag to rotate · Scroll to zoom · Click'} to pick`
       )
     );
     if (appCtx.liveEarth && typeof appCtx.liveEarth.setPanelMode === 'function') {
@@ -254,9 +264,9 @@ function createGlobeSelector(options = {}) {
         ? meta.arrivalMode
         : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto',
       waterKind: coordsChanged ? null : meta.waterKind || selected?.waterKind || null,
-      surfaceEvidence: coordsChanged
-        ? null
-        : meta.surfaceEvidence || selected?.surfaceEvidence || null
+      countryCode: meta.countryCode || (coordsChanged ? null : selected?.countryCode || null),
+      locationDetails: meta.locationDetails || (coordsChanged ? null : selected?.locationDetails || null),
+      surfaceEvidence: meta.surfaceEvidence || (coordsChanged ? null : selected?.surfaceEvidence || null)
     };
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
@@ -313,6 +323,7 @@ function createGlobeSelector(options = {}) {
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
       selected.locationDetails = cached.details || null;
+      selected.countryCode = cached.details?.countryCode || null;
       selected.surfaceEvidence = cached.surfaceEvidence || null;
       selected.waterKind = cached.surfaceEvidence?.kind === 'open_ocean' ? 'open_ocean' : null;
       selected.arrivalMode = selected.waterKind ? 'boat' : 'auto';
@@ -364,6 +375,7 @@ function createGlobeSelector(options = {}) {
         if (liveCandidate) liveNearbyCity = liveCandidate;
         selected.name = parsed.display;
         selected.locationDetails = parsed.details;
+        selected.countryCode = parsed.details?.countryCode || null;
         selected.surfaceEvidence = parsed.surfaceEvidence || null;
         selected.waterKind = parsed.waterKind || null;
         selected.arrivalMode = parsed.waterKind ? 'boat' : 'auto';
@@ -392,6 +404,61 @@ function createGlobeSelector(options = {}) {
     }
   }
 
+  function clearSearchResults() {
+    if (!searchResults) return;
+    searchResults.replaceChildren();
+    searchResults.hidden = true;
+  }
+
+  function selectSearchResult(result) {
+    if (!result) return;
+    setSelection(result.lat, result.lon, {
+      name: result.name,
+      focus: true,
+      fetchNearby: true,
+      arrivalMode: result.arrivalMode,
+      countryCode: result.countryCode,
+      locationDetails: {
+        displayName: result.displayName,
+        kind: result.kindLabel,
+        region: result.region,
+        country: result.country,
+        countryCode: result.countryCode,
+        airportClass: result.airportClass || '',
+        iata: result.iata || '',
+        icao: result.icao || ''
+      }
+    });
+    if (searchInput) searchInput.value = result.name;
+    if (mobileSearchInput) mobileSearchInput.value = result.name;
+    searchResults?.querySelectorAll('[role="option"]').forEach((button) => {
+      button.setAttribute('aria-selected', String(button.dataset.resultId === result.id));
+    });
+  }
+
+  function renderSearchResults(results) {
+    if (!searchResults) return;
+    searchResults.replaceChildren();
+    results.slice(0, 6).forEach((result, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'globe-location-search-result';
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', String(index === 0));
+      button.dataset.resultId = result.id;
+      const name = document.createElement('strong');
+      name.textContent = result.name;
+      const kind = document.createElement('span');
+      kind.textContent = result.kindLabel;
+      const detail = document.createElement('small');
+      detail.textContent = result.displayName;
+      button.append(name, kind, detail);
+      button.addEventListener('click', () => selectSearchResult(result));
+      searchResults.append(button);
+    });
+    searchResults.hidden = results.length === 0;
+  }
+
   async function runSearchFromOverlay() {
     const query = (searchInput?.value || '').trim();
     if (!query) {
@@ -402,47 +469,37 @@ function createGlobeSelector(options = {}) {
       return;
     }
 
-    const legacyInput = document.getElementById('locationSearch');
-    const legacyStatus = document.getElementById('locationSearchStatus');
-    if (legacyInput) legacyInput.value = query;
+    searchController?.abort();
+    searchController = new AbortController();
     if (searchStatus) {
-      searchStatus.textContent = 'Searching...';
+      searchStatus.textContent = 'Searching places…';
       searchStatus.style.color = '#64748b';
     }
+    clearSearchResults();
 
     try {
-      if (typeof appCtx.searchLocation === 'function') {
-        searchInFlight = true;
-        if (searchBtn) searchBtn.disabled = true;
-        const result = await appCtx.searchLocation();
-        if (!result || !Number.isFinite(result.lat) || !Number.isFinite(result.lon)) {
-          throw new Error(legacyStatus?.textContent || 'Location was not found');
-        }
-        setSelection(result.lat, result.lon, {
-          name: result.name || query,
-          focus: true,
-          fetchNearby: true,
-          arrivalMode: result.arrivalMode || 'walk'
-        });
-        beginReverseLookup(result.lat, result.lon);
-      } else {
-        throw new Error('Search function unavailable');
-      }
+      searchInFlight = true;
+      if (searchBtn) searchBtn.disabled = true;
+      if (mobileSearchBtn) mobileSearchBtn.disabled = true;
+      const results = await searchPlaces(query, { signal: searchController.signal });
+      if (!results.length) throw new Error('No matching places. Try a city, landmark, airport, or coordinates.');
+      renderSearchResults(results);
+      selectSearchResult(results[0]);
 
       if (searchStatus) {
-        const legacyText = legacyStatus?.textContent || 'Search complete.';
-        searchStatus.textContent = legacyText;
-        const legacyColor = legacyStatus?.style?.color || '#64748b';
-        searchStatus.style.color = legacyColor;
+        searchStatus.textContent = results.length === 1 ? '1 place found.' : `${results.length} places found. Choose the best match.`;
+        searchStatus.style.color = '#059669';
       }
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       if (searchStatus) {
-        searchStatus.textContent = `Search failed: ${error?.message || error}`;
+        searchStatus.textContent = error?.message || 'Place search is unavailable right now.';
         searchStatus.style.color = '#dc2626';
       }
     } finally {
       searchInFlight = false;
       if (searchBtn) searchBtn.disabled = false;
+      if (mobileSearchBtn) mobileSearchBtn.disabled = false;
     }
   }
 
@@ -536,6 +593,13 @@ function createGlobeSelector(options = {}) {
         return openState;
       },
       latLonToLocalPoint,
+      localPointToLatLon,
+      getCameraDistance: globeScene.getCameraDistance,
+      getBasemapState: globeScene.getBasemapState,
+      getPointHitThresholdWorld: globeScene.getPointHitThresholdWorld,
+      getRenderStats: globeScene.getRenderStats,
+      getZoomState: globeScene.getZoomState,
+      projectLatLonToClient: globeScene.projectLatLonToClient,
       setCameraDistance: globeScene.setCameraDistance,
       setSelection,
       applySelectionAndResolve,
@@ -629,6 +693,7 @@ function createGlobeSelector(options = {}) {
     setGlobeSelectorScrollLock(false);
     reverseLookupToken += 1;
     nearbyLookupToken += 1;
+    searchController?.abort();
     nearbyLookupController?.abort();
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');
@@ -736,11 +801,13 @@ function createGlobeSelector(options = {}) {
   return {
     close,
     getSelection() { return selected ? { ...selected } : null; },
+    getBasemapState: globeScene.getBasemapState,
     isOpen() { return openState; },
     open,
     startHere: triggerStartHere,
     applySelectionAndResolve,
     setPanelMode,
+    setBasemap: globeScene.setBasemap,
     setSelection,
     setLocateButtonBusy,
     setSearchStatus(message, color = null) {

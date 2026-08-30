@@ -13,6 +13,7 @@ const SOURCE_ENTRIES = [
   'assets',
   'js',
   'legal',
+  'styles',
   'favicon.svg'
 ];
 const REPORT_EXTENSIONS = new Set(['.js', '.css']);

@@ -550,56 +550,6 @@
     },
     {
       "schemaVersion": 1,
-      "artifactId": "holland-tunnel-ground",
-      "providerId": "copernicus-dem-classified-ground-v1",
-      "sourceRelease": "COP-DEM-2021:GLO-30",
-      "contentSha256": "af7e3bdf0605407b3b07a69d257321e9ae5e54a10bff48a1d6c00c050010a107",
-      "spacingMeters": 90,
-      "coverage": {
-        "south": 40.70237046521202,
-        "north": 40.75077334502318,
-        "west": -74.04579325023343,
-        "east": -73.98192303353255
-      },
-      "verticalDatum": "EGM2008",
-      "complete": true,
-      "missingSampleCount": 0,
-      "licenseAttested": true,
-      "correctionAttested": true,
-      "sourceEvidence": {
-        "sourceClassification": "digital-surface-model",
-        "correctionMethod": "worldexplorer-pmf-grid-v1",
-        "sourceTiles": [
-          {
-            "tileId": "Copernicus_DSM_COG_10_N40_00_W075_00_DEM",
-            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N40_00_W075_00_DEM/Copernicus_DSM_COG_10_N40_00_W075_00_DEM.tif",
-            "resolutionMeters": 30,
-            "contentLength": 48213610,
-            "contentSha256": "1db5d9d32c1aac7a7362e0375b4640a2f80e54963e4cde2f602f1be981ab353f",
-            "etag": "daac3d54d256a967b9974327233de3ec",
-            "lastModified": "Mon, 09 May 2022 14:21:40 GMT"
-          },
-          {
-            "tileId": "Copernicus_DSM_COG_10_N40_00_W074_00_DEM",
-            "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N40_00_W074_00_DEM/Copernicus_DSM_COG_10_N40_00_W074_00_DEM.tif",
-            "resolutionMeters": 30,
-            "contentLength": 15806993,
-            "contentSha256": "6a0f4273de0bbc0709cc9db4793a89ac40c811388f59f23f644c0304b66ab94d",
-            "etag": "b376f35f17c3f045fb4cfebb3c55acfc",
-            "lastModified": "Mon, 09 May 2022 14:21:40 GMT"
-          }
-        ]
-      },
-      "attribution": {
-        "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
-        "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
-        "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
-        "modified": true
-      },
-      "url": "./holland-tunnel/ground-artifact.json"
-    },
-    {
-      "schemaVersion": 1,
       "artifactId": "hollywood-ground",
       "providerId": "copernicus-dem-classified-ground-v1",
       "sourceRelease": "COP-DEM-2021:GLO-30",
@@ -1060,23 +1010,187 @@
     },
     {
       "schemaVersion": 1,
-      "artifactId": "newyork-ground",
+      "artifactId": "newyork-detail-ground",
       "providerId": "usgs-3dep-best-available",
-      "sourceRelease": "USGS-3DEP:20200330+https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/TIFF/USGS_one_meter_x58y451_NJ_SdL5_2014.tif+https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/TIFF/USGS_one_meter_x58y452_NJ_SdL5_2014.tif+https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NY_CMPG_2013/TIFF/USGS_one_meter_x58y451_NY_CMPG_2013.tif",
-      "contentSha256": "5514c64171a155d7cae76f4cc32fb1f10cf5c172de1af2482b0f0f8667761558",
+      "sourceRelease": "USGS-3DEP:USGS-3DEP-13ARC:20221115+20240925",
+      "contentSha256": "94679a38effbf27dce5047019695e4dd9a916b466c15a80d84539cd9c81d6926",
       "spacingMeters": 90,
       "coverage": {
-        "south": 40.733621921524986,
-        "north": 40.78200207273416,
-        "west": -74.01749631878369,
-        "east": -73.95362610208281
+        "south": 40.671717541354845,
+        "north": 40.79791695267346,
+        "west": -74.08945137304164,
+        "east": -73.92290371936588
       },
       "verticalDatum": "EGM2008",
       "complete": true,
       "missingSampleCount": 0,
       "licenseAttested": true,
       "correctionAttested": false,
-      "url": "./newyork/ground-artifact.json"
+      "sourceEvidence": {
+        "sourceClassification": "bare-earth-dem",
+        "acquisitionMode": "bounded-image-service-export",
+        "sourceContentSha256": "d48e8b41f79f9ca955217dfd810afd0a706b5d98c179c65bc8fe97f375ed5cf4",
+        "sourceExports": [
+          {
+            "partId": "newyork-detail",
+            "request": {
+              "endpoint": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage",
+              "bbox": [
+                -8247645,
+                4963995,
+                -8229015,
+                4982625
+              ],
+              "bboxSR": 3857,
+              "imageSR": 3857,
+              "width": 207,
+              "height": 207,
+              "exportSpacingMeters": 90,
+              "format": "tiff",
+              "pixelType": "F32",
+              "interpolation": "RSP_NearestNeighbor"
+            },
+            "exportContentSha256": "c3336be384b6cad06bb08a8872e1ab7df839f41ab4391881f747859c1f4a23db",
+            "sourceAuthority": {
+              "mode": "locked-raster-mosaic",
+              "lockedRasterIds": [
+                4840,
+                5223
+              ],
+              "sourceMembers": [
+                {
+                  "objectId": 4840,
+                  "sourceRelease": "20221115",
+                  "sourceTitle": "USGS 1/3 Arc Second n41w075 20221115",
+                  "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w075/USGS_13_n41w075.tif",
+                  "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w075/USGS_13_n41w075.xml",
+                  "metadataSha256": "7a040ebabff3e0e460d730d047b0a175395a4bcabe5241c217dddf355f9a5835"
+                },
+                {
+                  "objectId": 5223,
+                  "sourceRelease": "20240925",
+                  "sourceTitle": "USGS 1/3 Arc Second n41w074 20240925",
+                  "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w074/USGS_13_n41w074.tif",
+                  "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w074/USGS_13_n41w074.xml",
+                  "metadataSha256": "a52f5f08e98901fe5258ebe26bf27192533ad75a6a61443647ac3e4b50312454"
+                }
+              ]
+            }
+          }
+        ],
+        "normalizer": {
+          "name": "we3d-proj-vdatum",
+          "version": "1.0.0",
+          "pyprojVersion": "3.7.2",
+          "projVersion": "9.5.1",
+          "datasetSha256": "6fb309e57c2b3214badd0f259bd642d5609c1fda3a9b64dd08e170c9cffa15cc",
+          "operationSha256": "25ba8e74f0c5a305ac2cb84551b842dcb875ed2f3d4c2b5cfde46567a7b3f975",
+          "grids": [
+            {
+              "id": "NOAA_GEOID18_CONUS",
+              "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+            },
+            {
+              "id": "NOAA_VDATUM_EGM2008_1MIN",
+              "sha256": "013efc11e58f5251d1d5f18a737b73dd8cd43857a8c37dcad8dd2f9c98e8da96"
+            }
+          ],
+          "uncertaintyPolicy": "NOAA-VDatum-CONUS-table2-plus-source-95"
+        }
+      },
+      "url": "./newyork-detail/ground-artifact.json"
+    },
+    {
+      "schemaVersion": 1,
+      "artifactId": "newyork-regional-ground",
+      "providerId": "usgs-3dep-best-available",
+      "sourceRelease": "USGS-3DEP:USGS-3DEP-13ARC:20221115+20240925",
+      "contentSha256": "d14a50baf79b8293764a8644b286e7ede5667dde8c5371fe81169ce1f6054c9a",
+      "spacingMeters": 320,
+      "coverage": {
+        "south": 40.486957452342075,
+        "north": 40.983579869839794,
+        "west": -74.33451178254944,
+        "east": -73.67910095125586
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "correctionAttested": false,
+      "sourceEvidence": {
+        "sourceClassification": "bare-earth-dem",
+        "acquisitionMode": "bounded-image-service-export",
+        "sourceContentSha256": "ee37a8e88e93994462f4c898ef8cb43edc6ef6cca4f86f440b01f2d471815dad",
+        "sourceExports": [
+          {
+            "partId": "newyork-regional",
+            "request": {
+              "endpoint": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage",
+              "bbox": [
+                -8275040,
+                4936800,
+                -8201760,
+                5010080
+              ],
+              "bboxSR": 3857,
+              "imageSR": 3857,
+              "width": 229,
+              "height": 229,
+              "exportSpacingMeters": 320,
+              "format": "tiff",
+              "pixelType": "F32",
+              "interpolation": "RSP_NearestNeighbor"
+            },
+            "exportContentSha256": "bc1745e4247515d1f86f71f8d0aa157890981ae669fbce6b3c687fd4b89f05d0",
+            "sourceAuthority": {
+              "mode": "locked-raster-mosaic",
+              "lockedRasterIds": [
+                4840,
+                5223
+              ],
+              "sourceMembers": [
+                {
+                  "objectId": 4840,
+                  "sourceRelease": "20221115",
+                  "sourceTitle": "USGS 1/3 Arc Second n41w075 20221115",
+                  "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w075/USGS_13_n41w075.tif",
+                  "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w075/USGS_13_n41w075.xml",
+                  "metadataSha256": "7a040ebabff3e0e460d730d047b0a175395a4bcabe5241c217dddf355f9a5835"
+                },
+                {
+                  "objectId": 5223,
+                  "sourceRelease": "20240925",
+                  "sourceTitle": "USGS 1/3 Arc Second n41w074 20240925",
+                  "sourceUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w074/USGS_13_n41w074.tif",
+                  "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w074/USGS_13_n41w074.xml",
+                  "metadataSha256": "a52f5f08e98901fe5258ebe26bf27192533ad75a6a61443647ac3e4b50312454"
+                }
+              ]
+            }
+          }
+        ],
+        "normalizer": {
+          "name": "we3d-proj-vdatum",
+          "version": "1.0.0",
+          "pyprojVersion": "3.7.2",
+          "projVersion": "9.5.1",
+          "datasetSha256": "6fb309e57c2b3214badd0f259bd642d5609c1fda3a9b64dd08e170c9cffa15cc",
+          "operationSha256": "25ba8e74f0c5a305ac2cb84551b842dcb875ed2f3d4c2b5cfde46567a7b3f975",
+          "grids": [
+            {
+              "id": "NOAA_GEOID18_CONUS",
+              "sha256": "fa9a407ac7ee3f5a3694008e4bcd09ce9cc250452f0c3b11700a4960340abce2"
+            },
+            {
+              "id": "NOAA_VDATUM_EGM2008_1MIN",
+              "sha256": "013efc11e58f5251d1d5f18a737b73dd8cd43857a8c37dcad8dd2f9c98e8da96"
+            }
+          ],
+          "uncertaintyPolicy": "NOAA-VDatum-CONUS-table2-plus-source-95"
+        }
+      },
+      "url": "./newyork-regional/ground-artifact.json"
     },
     {
       "schemaVersion": 1,

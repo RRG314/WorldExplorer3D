@@ -1,8 +1,8 @@
 const WORLD_LAYER_COLLECTIONS = Object.freeze({
   terrain: Object.freeze([]),
   hydrology: Object.freeze(['waterAreas', 'waterways', 'waterWaveVisuals']),
-  transport: Object.freeze(['roads', 'roadMeshes', 'urbanSurfaceMeshes', 'linearFeatures', 'linearFeatureMeshes']),
-  buildings: Object.freeze(['buildings', 'buildingMeshes', 'dynamicBuildingColliders', 'structureVisualMeshes']),
+  transport: Object.freeze(['roads', 'roadMeshes', 'urbanSurfaceMeshes', 'linearFeatures', 'linearFeatureMeshes', 'structureVisualMeshes']),
+  buildings: Object.freeze(['buildings', 'buildingMeshes', 'dynamicBuildingColliders']),
   landuse: Object.freeze(['landuses', 'surfaceFeatureHints', 'landuseMeshes', 'vegetationFeatures', 'vegetationMeshes']),
   places: Object.freeze(['pois', 'poiMeshes', 'historicSites', 'historicMarkers', 'streetFurnitureMeshes'])
 });
@@ -87,7 +87,8 @@ export function compileWorldLayerProducts(options = {}) {
   const transportPublication = artifacts.transportSurfacePublication || {};
   const waterPublication = artifacts.waterSurfaceRegistrySnapshot || {};
   const buildingPublication = artifacts.buildingProvenanceModel || {};
-  const transportProvider = loadMetrics.overpassSource || runtimeState.districtSource || 'selected-location-transport';
+  const transportProvider = runtimeState.transportProviderDecision?.selected ||
+    loadMetrics.overpassSource || runtimeState.districtSource || 'selected-location-transport';
   const buildingProvider = runtimeState?.publicationSources?.buildings || 'selected-location-buildings';
 
   return immutableValue({
@@ -128,11 +129,17 @@ export function compileWorldLayerProducts(options = {}) {
       provider: transportProvider,
       compiler: 'transport-surface-compiler',
       coverage,
-      compilation: compactScalars(transportPublication, [
-        'transportGraphId', 'roadCount', 'meshCount', 'intersectionCount',
-        'topologyIntersectionCount', 'compiledSampleCount', 'vertices', 'triangles',
-        'worldLoadSequence'
-      ])
+      compilation: {
+        ...compactScalars(transportPublication, [
+          'transportGraphId', 'roadCount', 'meshCount', 'intersectionCount',
+          'topologyIntersectionCount', 'compiledSampleCount', 'vertices', 'triangles',
+          'worldLoadSequence'
+        ]),
+        facilityGraphAuthority: runtimeState.transportFacilityGraph?.authority || null,
+        mappedFacilityCount: finiteCount(runtimeState.transportFacilityGraph?.records?.length),
+        mappedAviationFacilityCount: finiteCount(runtimeState.transportFacilityGraph?.byDomain?.aviation?.length),
+        mappedMaritimeFacilityCount: finiteCount(runtimeState.transportFacilityGraph?.byDomain?.maritime?.length)
+      }
     }),
     buildings: layerProduct({
       request,
@@ -148,8 +155,18 @@ export function compileWorldLayerProducts(options = {}) {
           'inferredGeometryCount', 'ambiguousMetadataCount'
         ]),
         ...compactScalars(loadMetrics.buildings?.geometryPublication, [
-          'candidateCount', 'renderedFeatureCount', 'yieldCount'
-        ])
+          'candidateCount', 'renderedFeatureCount', 'yieldCount',
+          'foundationCollisionProfiles', 'foundationCollisionMismatches',
+          'constrainedBuildings', 'constrainedRoads', 'constrainedSegments',
+          'gradeSeparatedOverlaps', 'newlyNonDriveableRoads',
+          'newlyNonDriveableSegments', 'nonDriveableSegments', 'minimumResolvedWidth',
+          'suppressedCenterlineConflicts', 'suppressedMappedCrossSectionConflicts',
+          'suppressedInferredFootprintConflicts', 'suppressedInsufficientClearanceConflicts',
+          'unresolvedAtGradeConflicts'
+        ]),
+        crossSectionAuthority: String(
+          loadMetrics.buildings?.geometryPublication?.authority || ''
+        ) || null
       }
     }),
     landuse: layerProduct({

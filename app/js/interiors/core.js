@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=5";
+import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=7";
 import {
   INTERIOR_FETCH_RADIUS_PAD,
   INTERIOR_FLOOR_CLEARANCE,
@@ -20,6 +20,10 @@ export function isWalkModeActive() {
     !appCtx.paused &&
     !appCtx.onMoon &&
     !appCtx.droneMode &&
+    !appCtx.planeMode?.active &&
+    !appCtx.boatMode?.active &&
+    !appCtx.oceanMode?.active &&
+    !appCtx.spaceFlight?.active &&
     appCtx.Walk &&
     appCtx.Walk.state?.mode === 'walk' &&
     appCtx.Walk.state.walker

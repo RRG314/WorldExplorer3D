@@ -266,6 +266,42 @@ function requireSourceTemplate(template) {
   if (!Number.isFinite(Number(source.sourceResolutionMeters))) {
     throw new Error('source attestation is missing sourceResolutionMeters');
   }
+  const lockedRasterIds = Array.isArray(source.lockedRasterIds)
+    ? source.lockedRasterIds.map(Number)
+    : [];
+  if (lockedRasterIds.length > 0 && (
+    lockedRasterIds.some((value) => !Number.isInteger(value) || value <= 0) ||
+    new Set(lockedRasterIds).size !== lockedRasterIds.length
+  )) {
+    throw new Error('source attestation has invalid lockedRasterIds');
+  }
+  if (lockedRasterIds.length > 0) {
+    const members = Array.isArray(source.sourceMembers)
+      ? source.sourceMembers
+      : [];
+    if (members.length !== lockedRasterIds.length) {
+      throw new Error('locked mosaic must attest every source member');
+    }
+    const memberIds = new Set();
+    for (const member of members) {
+      const objectId = Number(member?.objectId);
+      if (!lockedRasterIds.includes(objectId) || memberIds.has(objectId)) {
+        throw new Error('locked mosaic source member identity is invalid');
+      }
+      memberIds.add(objectId);
+      for (const field of [
+        'sourceRelease', 'sourceTitle', 'sourceUrl', 'metadataUrl',
+        'metadataSha256'
+      ]) {
+        if (!String(member?.[field] || '')) {
+          throw new Error(`locked mosaic source member is missing ${field}`);
+        }
+      }
+      if (!/^[a-f0-9]{64}$/i.test(String(member.metadataSha256))) {
+        throw new Error('locked mosaic source member metadata hash is invalid');
+      }
+    }
+  }
   return source;
 }
 
@@ -312,6 +348,16 @@ async function commandFetchUsgsExport() {
       interpolation: 'RSP_NearestNeighbor',
       adjustAspectRatio: 'false'
     });
+    const lockedRasterIds = Array.isArray(source.lockedRasterIds)
+      ? source.lockedRasterIds.map(Number)
+      : [];
+    if (lockedRasterIds.length > 0) {
+      parameters.set('mosaicRule', JSON.stringify({
+        mosaicMethod: 'esriMosaicLockRaster',
+        lockRasterIds: lockedRasterIds,
+        mosaicOperation: 'MT_FIRST'
+      }));
+    }
     const response = await fetch(
       `${USGS_3DEP_EXPORT_URL}?${parameters}`
     );
@@ -354,7 +400,14 @@ async function commandFetchUsgsExport() {
         pixelType: 'F32',
         interpolation: 'RSP_NearestNeighbor'
       },
-      exportContentSha256
+      exportContentSha256,
+      sourceAuthority: lockedRasterIds.length > 0
+        ? {
+            mode: 'locked-raster-mosaic',
+            lockedRasterIds,
+            sourceMembers: source.sourceMembers
+          }
+        : { mode: 'reviewed-mosaic-service' }
     });
     for (const point of part.points) {
       const columnIndex =
@@ -539,6 +592,29 @@ async function commandCompile() {
       part,
       sourceRelease,
       normalizedSamples: partSamples,
+      sourceEvidence: {
+        sourceClassification: 'bare-earth-dem',
+        acquisitionMode: Array.isArray(raw.sourceExports)
+          ? 'bounded-image-service-export'
+          : 'bounded-point-samples',
+        sourceContentSha256: sha256(rawText),
+        sourceExports: Array.isArray(raw.sourceExports)
+          ? raw.sourceExports
+          : [],
+        normalizer: {
+          name: normalization.normalizer.name,
+          version: normalization.normalizer.version,
+          pyprojVersion: normalization.normalizer.pyprojVersion,
+          projVersion: normalization.normalizer.projVersion,
+          datasetSha256: normalization.normalizer.datasetSha256,
+          operationSha256: normalization.normalizer.operationSha256,
+          grids: (normalization.normalizer.grids || []).map((grid) => ({
+            id: grid.id,
+            sha256: grid.sha256
+          })),
+          uncertaintyPolicy: normalization.normalizer.uncertaintyPolicy
+        }
+      },
       compactArtifact: true
     });
     const partDirectory = raw.plan.partCount === 1

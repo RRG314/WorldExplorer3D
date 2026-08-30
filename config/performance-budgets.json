@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "release": "5.0.0-minimum",
+  "desktopTier": {
+    "id": "apple-m1-8gb-mac-mini-chrome",
+    "hardware": "Apple M1 Mac mini, 8 GB unified memory",
+    "browser": "Installed Google Chrome",
+    "measurementAuthority": "physical desktop host",
+    "budgets": {
+      "firstPlayableMs": 120000,
+      "minimumAverageFps": 43.65,
+      "maximumP95FrameMs": 34.36,
+      "maximumP99FrameMs": 50,
+      "maximumDrawCalls": 1729,
+      "maximumTriangles": 4950000,
+      "maximumPrograms": 128,
+      "maximumGeometries": 4096,
+      "maximumTextures": 768,
+      "maximumJsHeapUsedBytes": 1073741824,
+      "maximumLocalTransferBytes": 83886080,
+      "maximumExternalRequests": 3000,
+      "maximumExternalTransferBytes": 67108864,
+      "maximumPersistentStorageBytes": 157286400
+    }
+  },
+  "mobileRegressionTier": {
+    "id": "390x844-touch-emulation-on-apple-m1",
+    "viewport": { "width": 390, "height": 844 },
+    "browser": "Installed Google Chrome with touch/mobile emulation",
+    "measurementAuthority": "software regression proxy; not physical-phone battery or thermal evidence",
+    "budgets": {
+      "firstPlayableMs": 60000,
+      "minimumAverageFps": 30,
+      "maximumP95FrameMs": 50,
+      "maximumP99FrameMs": 100,
+      "maximumDrawCalls": 1729,
+      "maximumTriangles": 4950000,
+      "maximumPrograms": 128,
+      "maximumGeometries": 4096,
+      "maximumTextures": 768,
+      "maximumJsHeapUsedBytes": 1073741824,
+      "maximumLocalTransferBytes": 83886080,
+      "maximumExternalRequests": 900,
+      "maximumExternalTransferBytes": 50331648,
+      "maximumPersistentStorageBytes": 157286400
+    }
+  },
+  "retention": {
+    "minimumEnvironmentCycles": 2,
+    "maximumRetainedRoads": 0,
+    "maximumRetainedBuildings": 0,
+    "maximumRetainedTerrainTiles": 0,
+    "maximumGeometryGrowthPerCycle": 256,
+    "maximumTextureGrowthPerCycle": 64,
+    "maximumHeapGrowthBytes": 268435456,
+    "minimumReloadBuildingRatio": 0.8,
+    "minimumReloadRoadRatio": 0.95,
+    "minimumReloadTerrainRatio": 1
+  },
+  "productionReference": {
+    "source": "2026-08-23 fixed-window Firebase production parity capture",
+    "minimumAverageFps": 43.65,
+    "maximumP95FrameMs": 34.36,
+    "maximumP99FrameMs": 50,
+    "maximumDrawCalls": 1729,
+    "maximumTriangles": 4950000
+  },
+  "explicitlyUnmeasured": [
+    "physical-phone battery drain",
+    "physical-phone thermal state",
+    "physical low-tier-phone sustained 30 FPS",
+    "five complete physical-device environment cycles",
+    "ten location replacements on the same physical devices"
+  ]
+}

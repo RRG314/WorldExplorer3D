@@ -3,12 +3,12 @@ import {
   compileTransportSurfaceModel,
   roadSkirtDepth,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=17';
+} from './world/compiler/transport-surface-model.js?v=25';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=2';
 import {
   assignFeatureConnections,
   assignStructureStackRanks as assignStructureStackRanksByGraph
-} from './structure-semantics/stacking.js?v=7';
+} from './structure-semantics/stacking.js?v=10';
 import {
   boundsIntersect,
   pointInPolygonXZ,
@@ -17,7 +17,12 @@ import {
   sampleProfileAtDistance,
   segmentIntersection2D,
   smoothstep01
-} from './structure-semantics/geometry.js?v=1';
+} from './structure-semantics/geometry.js?v=2';
+import { roadWidthAtProjection } from './world/road-cross-section-profile.js?v=1';
+
+function isNumericProfileArray(value) {
+  return value instanceof Float32Array || value instanceof Float64Array;
+}
 
 function assignStructureStackRanks(features = [], sampleTerrainY = null) {
   return assignStructureStackRanksByGraph(features, sampleTerrainY, {
@@ -60,6 +65,44 @@ function areRoadsStackContinuous(a, b) {
   return false;
 }
 
+function mappedWaterSampleAt(water, x, z) {
+  if (!water || water?.structureSemantics?.terrainMode === 'subgrade') {
+    return { inside: false, surfaceY: NaN };
+  }
+  if (String(water.shape || '') !== 'waterway') {
+    return {
+      inside: pointInPolygonXZ(x, z, water?.pts),
+      surfaceY: Number(water?.surfaceY)
+    };
+  }
+  const points = Array.isArray(water.pts) ? water.pts : [];
+  const profile = Array.isArray(water.surfaceProfile) ? water.surfaceProfile : [];
+  const halfWidth = Math.max(0.5, Number(water.width) * 0.5 || 0.5);
+  let nearestDistance = Infinity;
+  let nearestSurfaceY = NaN;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const lengthSquared = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - start.x) * dx + (z - start.z) * dz) / lengthSquared));
+    const distance = Math.hypot(x - (start.x + dx * t), z - (start.z + dz * t));
+    if (distance >= nearestDistance) continue;
+    nearestDistance = distance;
+    const startY = Number(profile[index]?.y);
+    const endY = Number(profile[index + 1]?.y);
+    nearestSurfaceY = Number.isFinite(startY) && Number.isFinite(endY)
+      ? startY + (endY - startY) * t
+      : Number(water.surfaceY);
+  }
+  return { inside: nearestDistance <= halfWidth, surfaceY: nearestSurfaceY };
+}
+
+function isPointWithinMappedWater(water, x, z) {
+  return mappedWaterSampleAt(water, x, z).inside;
+}
+
 function buildFeatureStations(feature, context = {}) {
   const semantics = feature?.structureSemantics || null;
   const points = Array.isArray(feature?.pts) ? feature.pts : [];
@@ -79,6 +122,12 @@ function buildFeatureStations(feature, context = {}) {
     ? semantics.cutDepth + stackOffset
     : semantics.deckClearance + stackOffset;
   const defaultSpan = Math.max(18, laneWidth * 4.5, defaultTarget * 4.2);
+  const publishedVerticalControl = feature?.transportSurfaceControl?.kind ===
+    'minimum_clearance_above_mapped_water'
+    ? feature.transportSurfaceControl
+    : null;
+  let publishedControlMinimumSurfaceY = NaN;
+  let publishedControlWaterSamples = 0;
   const approachProfileCache = new Map();
   const approachSurfaceAt = (candidate, segmentIndex, t) => {
     if (!sampleTerrainY || !Array.isArray(candidate?.pts) || candidate.pts.length < 2) {
@@ -212,38 +261,117 @@ function buildFeatureStations(feature, context = {}) {
     (semantics.terrainMode === 'elevated' || semantics.terrainMode === 'subgrade') &&
     waterAreas.length > 0
   ) {
-    for (let i = 0; i < points.length; i++) {
-      const point = points[i];
-      const prev = points[Math.max(0, i - 1)];
-      const next = points[Math.min(points.length - 1, i + 1)];
-      const midpoint = i > 0 && i < points.length - 1 ? {
-        x: (prev.x + next.x) * 0.5,
-        z: (prev.z + next.z) * 0.5
-      } : point;
-      let insideWater = false;
-      for (let w = 0; w < waterAreas.length; w++) {
-        const polygon = waterAreas[w]?.pts;
-        if (pointInPolygonXZ(midpoint.x, midpoint.z, polygon) || pointInPolygonXZ(point.x, point.z, polygon)) {
+    // Bridge source ways commonly stop at opposite shorelines and contain no
+    // vertex inside the water polygon. Sample every mapped segment, including
+    // its interior, so the authoritative water crossing is not missed and
+    // replaced by a fabricated generic-clearance fallback.
+    const waterSampleSpacing = Math.max(3, Math.min(10, laneWidth));
+    for (let segmentIndex = 0; segmentIndex < points.length - 1; segmentIndex += 1) {
+      const start = points[segmentIndex];
+      const end = points[segmentIndex + 1];
+      const segmentLength = Math.hypot(end.x - start.x, end.z - start.z);
+      const segmentSamples = Math.max(1, Math.ceil(segmentLength / waterSampleSpacing));
+      for (let sampleIndex = 0; sampleIndex <= segmentSamples; sampleIndex += 1) {
+        const segmentT = sampleIndex / segmentSamples;
+        const point = {
+          x: start.x + (end.x - start.x) * segmentT,
+          z: start.z + (end.z - start.z) * segmentT
+        };
+        let insideWater = false;
+        let mappedWaterSurfaceY = NaN;
+        for (let w = 0; w < waterAreas.length; w++) {
+          const area = waterAreas[w];
+          const waterSample = mappedWaterSampleAt(area, point.x, point.z);
+          if (!waterSample.inside) continue;
           insideWater = true;
-          break;
+          if (Number.isFinite(waterSample.surfaceY)) {
+            mappedWaterSurfaceY = Number.isFinite(mappedWaterSurfaceY)
+              ? Math.max(mappedWaterSurfaceY, waterSample.surfaceY)
+              : waterSample.surfaceY;
+          }
         }
-      }
-      if (insideWater) {
+        if (!insideWater) continue;
+        const distance = distances[segmentIndex] + segmentLength * segmentT;
         if (semantics.terrainMode === 'subgrade') {
           // Keep the tunnel crown physically below mapped water. The tunnel
           // shell clearance is derived from cutDepth, so an additional 2.4 m
           // provides a real water/terrain cover instead of a visible tube.
           addStation(
-            distances[i],
+            distance,
             Math.max(defaultTarget, semantics.cutDepth + 2.4),
             defaultSpan * 1.1,
             'underwater_tunnel'
           );
         } else {
-          addStation(distances[i], Math.max(defaultTarget, semantics.deckClearance + 0.6), defaultSpan * 1.1, 'water_crossing');
+          const ownApproachY = approachSurfaceAt(feature, segmentIndex, segmentT);
+          // A bridge tag establishes topology over mapped water; it does not
+          // measure navigational clearance. Short crossings therefore clear
+          // the authoritative water surface by deck thickness only. Long road
+          // structures still need a conservative, explicitly modeled lower
+          // bound when the provider has no surveyed vertical profile; without
+          // it, multi-kilometre bridge fragments collapse to the waterline.
+          // The model comes from the existing roadway-category/layer stacking
+          // contract and must never be reported as a measured bridge height.
+          const deckThickness = Math.max(0.18, Math.min(1.2, laneWidth * 0.08));
+          const sourceExplicitOffset = Math.max(0, Number(semantics.explicitBaseOffset) || 0);
+          const modeledLongSpanLowerBound =
+            semantics.featureCategory === 'road' && total >= 180
+              ? Math.max(0, Number(semantics.deckClearance) || 0)
+              : 0;
+          const publishedClearance = publishedVerticalControl && Number.isFinite(mappedWaterSurfaceY)
+            ? Math.max(0, Number(publishedVerticalControl.clearanceMeters) || 0)
+            : 0;
+          if (publishedClearance > 0) {
+            publishedControlMinimumSurfaceY = Number.isFinite(publishedControlMinimumSurfaceY)
+              ? Math.max(publishedControlMinimumSurfaceY, mappedWaterSurfaceY + publishedClearance)
+              : mappedWaterSurfaceY + publishedClearance;
+            publishedControlWaterSamples += 1;
+          }
+          const clearanceLowerBound = Math.max(
+            sourceExplicitOffset,
+            modeledLongSpanLowerBound,
+            publishedClearance
+          );
+          const waterClearanceOffset = Number.isFinite(mappedWaterSurfaceY) && Number.isFinite(ownApproachY)
+            ? mappedWaterSurfaceY + clearanceLowerBound + deckThickness - ownApproachY -
+              (Number(feature.surfaceBias) || 0.08)
+            : clearanceLowerBound + deckThickness;
+          addStation(
+            distance,
+            Math.max(0, waterClearanceOffset),
+            defaultSpan * 1.1,
+            publishedClearance > Math.max(sourceExplicitOffset, modeledLongSpanLowerBound)
+              ? 'water_crossing_published_reference_control'
+              : modeledLongSpanLowerBound > sourceExplicitOffset
+              ? 'water_crossing_modeled_lower_bound'
+              : 'water_crossing'
+          );
         }
       }
     }
+  }
+
+  if (publishedVerticalControl) {
+    // Published navigation clearance applies only at the mapped water
+    // stations that produced the control. Promoting it to one global minimum
+    // lifted both land approaches on complete OSM bridge ways and severed
+    // their exact graph-node tie-ins. The station lower bounds above remain
+    // authoritative locally; endpoints remain authoritative at their mapped
+    // transport connections.
+    delete feature.minimumStructureSurfaceY;
+    feature.transportSurfaceControlResolution = Object.freeze({
+      authority: 'compiled_transport_surface',
+      controlId: String(publishedVerticalControl.id || ''),
+      kind: String(publishedVerticalControl.kind || ''),
+      status: Number.isFinite(publishedControlMinimumSurfaceY) ? 'resolved' : 'unresolved_mapped_water',
+      mappedWaterSamples: publishedControlWaterSamples,
+      minimumSurfaceY: Number.isFinite(publishedControlMinimumSurfaceY)
+        ? publishedControlMinimumSurfaceY
+        : null,
+      referenceDatum: String(publishedVerticalControl.referenceDatum || ''),
+      measurementStatus: String(publishedVerticalControl.measurementStatus || ''),
+      sourceUrl: String(publishedVerticalControl.sourceUrl || '')
+    });
   }
 
   const requiresFallbackStructureHeight =
@@ -266,7 +394,13 @@ function buildFeatureStations(feature, context = {}) {
   for (let i = 0; i < stations.length; i++) {
     const station = stations[i];
     const previous = merged[merged.length - 1];
-    if (previous && Math.abs(previous.distance - station.distance) < Math.max(6, Math.min(previous.span, station.span) * 0.22)) {
+    const repeatedWaterSample = previous &&
+      String(previous.source).includes('water_crossing') &&
+      String(station.source).includes('water_crossing');
+    const mergeDistance = repeatedWaterSample
+      ? 0.25
+      : Math.max(6, Math.min(previous?.span || 0, station.span) * 0.22);
+    if (previous && Math.abs(previous.distance - station.distance) < mergeDistance) {
       previous.distance = (previous.distance + station.distance) * 0.5;
       previous.targetOffset = Math.max(previous.targetOffset, station.targetOffset);
       previous.span = Math.max(previous.span, station.span);
@@ -326,7 +460,7 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
   const connections = feature.connectedFeatures || null;
   const points = feature.pts;
   const totalDistance =
-    feature.surfaceDistances instanceof Float32Array && feature.surfaceDistances.length > 0 ?
+    isNumericProfileArray(feature.surfaceDistances) && feature.surfaceDistances.length > 0 ?
       Number(feature.surfaceDistances[feature.surfaceDistances.length - 1]) || 0 :
       polylineDistances(points).total;
   const featureLength = Math.max(0, totalDistance);
@@ -436,12 +570,11 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
       sampleStep: surfaceSampleStep
     })
   );
-  // Ordinary streets follow the live rendered terrain. Compiled profiles own
-  // only grade-separated structures; forcing city streets onto an engineered
-  // chord creates floating slabs and breaks steep terrain.
-  compiledFeature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade'
-    ? sampleTerrainY
-    : null;
+  // Every published road reads one compiled surface. The terrain publisher
+  // reconciles mapped at-grade corridors to this profile; retaining a live
+  // terrain sampler here would recreate a second, folded road authority for
+  // rendering, traversal, collision, and actors.
+  compiledFeature.surfaceTerrainSampler = null;
   return compiledFeature;
 }
 
@@ -473,7 +606,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
   }
 
   const baseTopBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
-  if (!(feature.surfaceDistances instanceof Float32Array) || !(feature.surfaceHeights instanceof Float32Array)) {
+  if (!isNumericProfileArray(feature.surfaceDistances) || !isNumericProfileArray(feature.surfaceHeights)) {
     updateFeatureSurfaceProfile(feature, sampleTerrainY, {
       surfaceBias: baseTopBias,
       width: halfWidth * 2
@@ -541,12 +674,13 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const profileDistance = profileTotal * distanceRatio;
     const model = feature.transportSurfaceModel || null;
     const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
+    const terrainDraped = atGrade && model?.engineeredApproach !== true;
     const terrainY = Number(sampleTerrainY(point.x, point.z));
     const surfaceOffset = feature.surfaceOffsets instanceof Float32Array ?
       Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceOffsets, profileDistance)) || 0 :
       0;
     const storedProfileY = Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceHeights, profileDistance));
-    const rawCenterY = atGrade && Number.isFinite(terrainY)
+    const rawCenterY = terrainDraped && Number.isFinite(terrainY)
       ? terrainY + surfaceOffset + baseTopBias
       : model
         ? sampleTransportSurfaceAtDistance(model, profileDistance, 0)
@@ -566,12 +700,12 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const leftZ = point.z + nz * (halfWidth + corridorCenterOffset) * joinFactor;
     const rightX = point.x + nx * (-halfWidth + corridorCenterOffset) * joinFactor;
     const rightZ = point.z + nz * (-halfWidth + corridorCenterOffset) * joinFactor;
-    const rawLeftY = atGrade
+    const rawLeftY = terrainDraped
       ? Number(sampleTerrainY(leftX, leftZ)) + baseTopBias
       : model
         ? sampleTransportSurfaceAtDistance(model, profileDistance, halfWidth)
         : centerY;
-    const rawRightY = atGrade
+    const rawRightY = terrainDraped
       ? Number(sampleTerrainY(rightX, rightZ)) + baseTopBias
       : model
         ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
@@ -612,14 +746,14 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   const projection = projected || projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
   const model = feature.transportSurfaceModel || null;
-  const distances = model?.distances instanceof Float32Array
+  const distances = isNumericProfileArray(model?.distances)
     ? model.distances
-    : feature.surfaceDistances instanceof Float32Array
+    : isNumericProfileArray(feature.surfaceDistances)
       ? feature.surfaceDistances
       : null;
-  const heights = model?.centerHeights instanceof Float32Array
+  const heights = isNumericProfileArray(model?.centerHeights)
     ? model.centerHeights
-    : feature.surfaceHeights instanceof Float32Array
+    : isNumericProfileArray(feature.surfaceHeights)
       ? feature.surfaceHeights
       : null;
   if (!distances || !heights || !distances.length || !heights.length) return NaN;
@@ -721,7 +855,7 @@ function roadSurfaceAttachmentThreshold(road, options = {}) {
 }
 
 function roadSurfaceLateralThreshold(road, options = {}) {
-  const halfWidth = Number.isFinite(road?.width) ? Number(road.width) * 0.5 : 0;
+  const halfWidth = roadWidthAtProjection(road, options?.projection) * 0.5;
   const semantics = road?.structureSemantics || null;
   let padding =
     semantics?.terrainMode === 'elevated' ? 1.05 :
@@ -761,7 +895,13 @@ function isRoadSurfaceReachable(nearestRoad, options = {}) {
   // overpasses capture an actor or vehicle at their planar crossing.
   const continuityAccess = sameRoad || connectedRoad;
 
-  let maxDist = roadSurfaceLateralThreshold(road, options);
+  let maxDist = roadSurfaceLateralThreshold(road, {
+    ...options,
+    projection: {
+      segIndex: nearestRoad?.segIndex,
+      t: nearestRoad?.t
+    }
+  });
   if (sameRoad) maxDist += 0.55;
   else if (connectedRoad) maxDist += 0.35;
   if (nearestRoad.dist > maxDist) return false;
@@ -839,5 +979,6 @@ export {
   roadSurfaceAttachmentThreshold,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts,
-  updateFeatureSurfaceProfile
+  updateFeatureSurfaceProfile,
+  isPointWithinMappedWater
 };

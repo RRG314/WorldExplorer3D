@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { carSpeedToMph } from "../physics/vehicle-speed-units.js?v=1";
+import { carSpeedToMph } from "../physics/vehicle-speed-units.js?v=2";
 
 export function updatePolice(dt) {
   if (!appCtx.policeOn || appCtx.police.length === 0) return;

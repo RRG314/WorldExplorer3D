@@ -78,7 +78,7 @@ function validateActivityDraft(activity = {}) {
         'error',
         `missing_${entry.id}`,
         `${template.label} needs at least ${entry.min} ${entry.label.toLowerCase()} anchor${entry.min === 1 ? '' : 's'}.`,
-        `Add ${entry.label.toLowerCase()} anchors from the anchor palette before testing or publishing.`
+        `Add ${entry.label.toLowerCase()} anchors from the anchor palette before testing or saving.`
       );
     }
     if (Number.isFinite(entry.max) && entry.count > entry.max) {

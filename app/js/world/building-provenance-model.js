@@ -61,7 +61,13 @@ function isStableBuildingMetadataMapping(tags = {}) {
   const metadataId = normalizedString(tags._buildingMetadataSourceId);
   const mapping = normalizedString(tags._buildingMetadataMapping);
   if (!metadataId) return true;
-  if (!['explicit_stable_id', 'same_source_feature'].includes(mapping)) return false;
+  const bundledSpatialIdentity =
+    mapping === 'bundled_osm_spatial_identity' &&
+    normalizedString(tags._buildingMetadataProvider).startsWith('bundled-osm:') &&
+    metadataId.startsWith('osm:way:');
+  if (!['explicit_stable_id', 'same_source_feature'].includes(mapping) && !bundledSpatialIdentity) {
+    return false;
+  }
   const explicitGeometryId = normalizedString(tags._buildingMetadataGeometryId);
   return !!explicitGeometryId && explicitGeometryId === geometryId;
 }

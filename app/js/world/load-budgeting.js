@@ -29,11 +29,10 @@ function isLanduseCandidate(tags) {
 }
 
 function setWorldSurfaceProfile(worldSurfaceProfile) {
-  if (typeof appCtx.setWorldSurfaceProfile === 'function') {
-    appCtx.setWorldSurfaceProfile(worldSurfaceProfile);
-  } else {
-    appCtx.worldSurfaceProfile = worldSurfaceProfile;
-  }
+  // Selection owns semantic state, not terrain material publication. Calling
+  // the public setter here recolored every terrain tile before landuse and
+  // transport data existed, then finalization repeated the same full pass.
+  appCtx.worldSurfaceProfile = worldSurfaceProfile;
 }
 
 function mappedTagIsPresent(value) {
@@ -123,18 +122,81 @@ export function prepareWorldFeatureSelections(options = {}) {
   const poiKeyFromTags = options.poiKeyFromTags;
   const roadTypePriority = options.roadTypePriority;
 
-  const allRoadWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    isDriveableHighwayTag(element.tags?.highway)
-  );
+  const allRoadWays = [];
+  const allBuildingWays = [];
+  const allLanduseWays = [];
+  const allWaterwayWays = [];
+  const allRailwayWays = [];
+  const allFootwayWays = [];
+  const allCyclewayWays = [];
+  const allStructureConnectorWays = [];
+  const allTreeNodes = [];
+  const allTreeRowWays = [];
+  const allPoiNodes = [];
+  // Provider payloads can contain hundreds of thousands of elements. Index
+  // every feature family in one pass; the prior implementation rescanned the
+  // full payload for roads, land, water, each path type, vegetation, and POIs.
+  for (const element of Array.isArray(data.elements) ? data.elements : []) {
+    const tags = element?.tags || {};
+    if (element?.type === 'node') {
+      if (tags.natural === 'tree') allTreeNodes.push(element);
+    } else if (element?.type === 'way') {
+      if (isDriveableHighwayTag(tags.highway)) allRoadWays.push(element);
+      if (tags.building || tags['building:part']) allBuildingWays.push(element);
+      if (isLanduseCandidate(tags)) allLanduseWays.push(element);
+      if (tags.waterway) allWaterwayWays.push(element);
+      if (tags.natural === 'tree_row') allTreeRowWays.push(element);
+      if (enableLinearFeatures) {
+        const classification = classifyLinearFeatureTags(tags);
+        if (classification?.kind === 'railway') allRailwayWays.push(element);
+        if (classification?.kind === 'footway') allFootwayWays.push(element);
+        if (classification?.kind === 'cycleway') allCyclewayWays.push(element);
+        const forcedClassification = classifyLinearFeatureTags(tags, { force: true });
+        if (forcedClassification?.kind === 'footway') {
+          const semantics = classifyStructureSemantics(tags, {
+            featureKind: forcedClassification.kind,
+            subtype: forcedClassification.subtype
+          });
+          if (semantics.gradeSeparated || semantics.skywalk) {
+            allStructureConnectorWays.push(element);
+          }
+        }
+      }
+    }
+    if (!poiKeyFromTags(tags)) continue;
+    if (element.type === 'node' && Number.isFinite(Number(element.lat)) && Number.isFinite(Number(element.lon))) {
+      allPoiNodes.push(element);
+      continue;
+    }
+    const lat = Number(element.center?.lat);
+    const lon = Number(element.center?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    allPoiNodes.push({
+      type: 'node',
+      id: `${element.type}:${element.id}`,
+      lat,
+      lon,
+      tags: {
+        ...tags,
+        _sourceElementType: element.type,
+        _sourceElementId: String(element.id)
+      },
+      sourceElementType: element.type,
+      sourceElementId: element.id
+    });
+  }
   const coreRoadWays = allRoadWays.filter(
     (way) => way.tags?._regionalContext !== 'fixed-location'
   );
   const regionalRoadWays = allRoadWays.filter(
     (way) => way.tags?._regionalContext === 'fixed-location'
   );
+  const mobileLike = typeof appCtx.isLikelyMobileDevice === 'function' &&
+    appCtx.isLikelyMobileDevice();
   const regionalRoadCap = regionalRoadWays.length > 0
-    ? Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
+    ? mobileLike
+      ? Math.min(900, Math.max(650, Math.floor(maxRoadWays * 0.45)))
+      : Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
     : 0;
   const regionalPartition = partitionFixedRegionalRoads(regionalRoadWays);
   const exactRegionalEngineered = regionalPartition.engineered.filter((way) =>
@@ -152,9 +214,9 @@ export function prepareWorldFeatureSelections(options = {}) {
       // Exact structures are never capped. The generalized outer source is a
       // geographically distributed continuity LOD; bounding it prevents the
       // quadratic profile work of thousands of duplicate low-detail segments.
-      globalCap: 600,
-      basePerTile: 20,
-      minPerTile: 8,
+      globalCap: mobileLike ? 180 : 600,
+      basePerTile: mobileLike ? 8 : 20,
+      minPerTile: mobileLike ? 3 : 8,
       tileDegrees: tileBudgetCfg.tileDegrees,
       useRdt: false,
       spreadAcrossArea: true,
@@ -167,8 +229,8 @@ export function prepareWorldFeatureSelections(options = {}) {
     ...selectedGeneralizedEngineered
   ];
   const regionalConnectorCap = Math.min(
-    1200,
-    Math.max(160, Math.ceil(regionalPartition.engineered.length * 0.5))
+    mobileLike ? 240 : 1200,
+    Math.max(mobileLike ? 80 : 160, Math.ceil(regionalPartition.engineered.length * (mobileLike ? 0.25 : 0.5)))
   );
   const selectedCoreRoadWays = limitWaysByTileBudget(coreRoadWays, nodes, {
     // The fixed outer context is additive. It must not consume the existing
@@ -180,11 +242,11 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting,
     compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
   });
-  const regionalPerTile = Math.max(16, Math.floor(regionalRoadCap / 64));
+  const regionalPerTile = Math.max(mobileLike ? 8 : 16, Math.floor(regionalRoadCap / 64));
   const selectedRegionalRoadWays = limitWaysByTileBudget(regionalPartition.general, nodes, {
     globalCap: regionalRoadCap,
     basePerTile: regionalPerTile,
-    minPerTile: Math.max(12, Math.floor(regionalPerTile * 0.65)),
+    minPerTile: Math.max(mobileLike ? 5 : 12, Math.floor(regionalPerTile * 0.65)),
     tileDegrees: tileBudgetCfg.tileDegrees,
     useRdt: false,
     spreadAcrossArea: true,
@@ -193,8 +255,8 @@ export function prepareWorldFeatureSelections(options = {}) {
   });
   const selectedRegionalConnectors = limitWaysByTileBudget(regionalPartition.connectors, nodes, {
     globalCap: regionalConnectorCap,
-    basePerTile: Math.max(12, Math.ceil(regionalConnectorCap / 64)),
-    minPerTile: 8,
+    basePerTile: Math.max(mobileLike ? 5 : 12, Math.ceil(regionalConnectorCap / 64)),
+    minPerTile: mobileLike ? 3 : 8,
     tileDegrees: tileBudgetCfg.tileDegrees,
     useRdt: false,
     spreadAcrossArea: true,
@@ -214,6 +276,7 @@ export function prepareWorldFeatureSelections(options = {}) {
   ];
   loadMetrics.regionalTransportSelection = {
     available: regionalRoadWays.length,
+    regionalCap: regionalRoadCap,
     engineeredAvailable: regionalPartition.engineered.length,
     exactEngineered: exactRegionalEngineered.length,
     generalizedEngineeredSelected: selectedGeneralizedEngineered.length,
@@ -227,9 +290,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       selectedRegionalConnectors.length + selectedRegionalRoadWays.length
   };
 
-  const allBuildingWays = data.elements.filter((element) =>
-    element.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
-  );
   const buildingWays = limitWaysByTileBudget(allBuildingWays, nodes, {
     globalCap: maxBuildingWays,
     basePerTile: tileBudgetCfg.buildingsPerTile,
@@ -240,11 +300,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     coreRatio: useRdtBudgeting ? 0.35 : 0.45
   });
 
-  const allLanduseWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    element.tags &&
-    isLanduseCandidate(element.tags)
-  );
   const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
     globalCap: maxLanduseWays,
     basePerTile: tileBudgetCfg.landusePerTile,
@@ -253,11 +308,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting
   });
 
-  const allWaterwayWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    element.tags &&
-    !!element.tags.waterway
-  );
   const waterwayWays = limitWaysByTileBudget(allWaterwayWays, nodes, {
     globalCap: Math.max(120, Math.floor(maxLanduseWays * 0.8)),
     basePerTile: Math.max(12, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
@@ -266,10 +316,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting
   });
 
-  const allRailwayWays = enableLinearFeatures ? data.elements.filter((element) =>
-    element.type === 'way' &&
-    classifyLinearFeatureTags(element.tags)?.kind === 'railway'
-  ) : [];
   const railwayWays = enableLinearFeatures ? limitWaysByTileBudget(allRailwayWays, nodes, {
     globalCap: Math.max(80, Math.floor(maxRoadWays * 0.22)),
     basePerTile: Math.max(6, Math.floor(tileBudgetCfg.roadsPerTile * 0.22)),
@@ -281,10 +327,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('railway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allFootwayWays = enableLinearFeatures ? data.elements.filter((element) =>
-    element.type === 'way' &&
-    classifyLinearFeatureTags(element.tags)?.kind === 'footway'
-  ) : [];
   const footwayWays = enableLinearFeatures ? limitWaysByTileBudget(allFootwayWays, nodes, {
     globalCap: Math.max(150, Math.floor(maxLanduseWays * 0.65)),
     basePerTile: Math.max(10, Math.floor(tileBudgetCfg.landusePerTile * 0.55)),
@@ -298,10 +340,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('footway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allCyclewayWays = enableLinearFeatures ? data.elements.filter((element) =>
-    element.type === 'way' &&
-    classifyLinearFeatureTags(element.tags)?.kind === 'cycleway'
-  ) : [];
   const cyclewayWays = enableLinearFeatures ? limitWaysByTileBudget(allCyclewayWays, nodes, {
     globalCap: Math.max(110, Math.floor(maxLanduseWays * 0.45)),
     basePerTile: Math.max(8, Math.floor(tileBudgetCfg.landusePerTile * 0.36)),
@@ -315,16 +353,6 @@ export function prepareWorldFeatureSelections(options = {}) {
       linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
   }) : [];
 
-  const allStructureConnectorWays = enableLinearFeatures ? data.elements.filter((element) => {
-    if (element.type !== 'way') return false;
-    const classification = classifyLinearFeatureTags(element.tags, { force: true });
-    if (!classification || classification.kind !== 'footway') return false;
-    const semantics = classifyStructureSemantics(element.tags || {}, {
-      featureKind: classification.kind,
-      subtype: classification.subtype
-    });
-    return semantics.gradeSeparated || semantics.skywalk;
-  }) : [];
   const structureConnectorWays = enableLinearFeatures ? limitWaysByTileBudget(allStructureConnectorWays, nodes, {
     globalCap: Math.max(36, Math.floor(tileBudgetCfg.landusePerTile * 1.4)),
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
@@ -340,10 +368,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     }
   }) : [];
 
-  const allTreeNodes = data.elements.filter((element) =>
-    element.type === 'node' &&
-    element.tags?.natural === 'tree'
-  );
   const treeNodes = limitNodesByTileBudget(allTreeNodes, {
     globalCap: maxTreeNodes,
     basePerTile: Math.max(6, Math.floor(tileBudgetCfg.landusePerTile * 0.22)),
@@ -352,10 +376,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     useRdt: useRdtBudgeting
   });
 
-  const allTreeRowWays = data.elements.filter((element) =>
-    element.type === 'way' &&
-    element.tags?.natural === 'tree_row'
-  );
   const treeRowWays = limitWaysByTileBudget(allTreeRowWays, nodes, {
     globalCap: maxTreeRowWays,
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.14)),
@@ -366,10 +386,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     coreRatio: 0.5
   });
 
-  const allPoiNodes = data.elements.filter((element) =>
-    element.type === 'node' &&
-    !!poiKeyFromTags(element.tags)
-  );
   const poiNodes = limitNodesByTileBudget(allPoiNodes, {
     globalCap: maxPoiNodes,
     basePerTile: tileBudgetCfg.poiPerTile,

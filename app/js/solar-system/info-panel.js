@@ -1,3 +1,8 @@
+import {
+  getAstronomicalBody,
+  SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
+} from '../astronomy/body-catalog.js?v=2';
+
 function setInfoMetricBlock(metaLabel, metric1Label, metric1Value, metric2Label, metric2Value, metric3Label, metric3Value) {
   const metaEl = document.getElementById('ssInfoMetaLabel');
   const metric1LabelEl = document.getElementById('ssInfoMetric1Label');
@@ -35,6 +40,19 @@ function hidePlanetInfo(ctx) {
     ctx.solarSystem.infoPanel.style.display = 'none';
   }
   ctx.solarSystem.selectedPlanet = null;
+  ctx.solarSystem.selectedBodyId = null;
+}
+
+function configureSetCourse(ctx, bodyId, label) {
+  const setCourse = document.getElementById('ssInfoSetCourse');
+  if (!setCourse) return;
+  const selectable = SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.includes(bodyId);
+  const canRetarget = selectable && ctx.appCtx.spaceJourney?.phase === 'parking_orbit' && bodyId !== 'earth';
+  setCourse.style.display = selectable && bodyId !== 'earth' ? 'block' : 'none';
+  setCourse.disabled = !canRetarget;
+  setCourse.style.opacity = canRetarget ? '1' : '0.55';
+  setCourse.textContent = canRetarget ? `SET COURSE TO ${label.toUpperCase()}` : 'CHANGE COURSE FROM PARKING ORBIT';
+  ctx.solarSystem.selectedBodyId = selectable ? bodyId : null;
 }
 
 function showPlanetInfo(ctx, entry) {
@@ -59,6 +77,7 @@ function showPlanetInfo(ctx, entry) {
 
   ctx.solarSystem.infoPanel.style.display = 'block';
   ctx.solarSystem.selectedPlanet = entry;
+  configureSetCourse(ctx, planet.bodyId, planet.name);
 
   ctx.solarSystem.planetMeshes.forEach((planetEntry) => {
     if (!planetEntry.mesh.children) return;
@@ -92,6 +111,7 @@ function showSunInfo(ctx) {
 
   ctx.solarSystem.infoPanel.style.display = 'block';
   ctx.solarSystem.selectedPlanet = null;
+  configureSetCourse(ctx, null, '');
 }
 
 function showAsteroidInfo(ctx, entry) {
@@ -102,7 +122,7 @@ function showAsteroidInfo(ctx, entry) {
   const distEarthKM = distEarth * 149597870.7;
 
   document.getElementById('ssInfoTitle').textContent = asteroid.name;
-  document.getElementById('ssInfoType').textContent = asteroid.type + ' (Asteroid Belt)';
+  document.getElementById('ssInfoType').textContent = asteroid.type + ' (' + (asteroid.region || 'Asteroid Belt') + ')';
   document.getElementById('ssInfoDesc').textContent = asteroid.description;
   setInfoMetricBlock(
     'BELT OBJECT DATA',
@@ -116,6 +136,31 @@ function showAsteroidInfo(ctx, entry) {
 
   ctx.solarSystem.infoPanel.style.display = 'block';
   ctx.solarSystem.selectedPlanet = entry;
+  const bodyId = getAstronomicalBody(asteroid.name)?.id || null;
+  configureSetCourse(ctx, bodyId, asteroid.name);
+}
+
+function showMoonInfo(ctx, entry) {
+  const body = getAstronomicalBody(entry.name);
+  if (!body) return;
+  const parent = getAstronomicalBody(body.parentId);
+  document.getElementById('ssInfoTitle').textContent = body.name;
+  document.getElementById('ssInfoType').textContent = `Natural satellite of ${parent?.name || 'its planet'}`;
+  document.getElementById('ssInfoDesc').textContent = body.exploration.experienceTier === 'featured'
+    ? `${body.presentation.surfaceLabel}. A featured solid-world destination with body-specific environment and fieldwork.`
+    : `${body.presentation.surfaceLabel}. Cataloged for a later regional-quality surface pack.`;
+  setInfoMetricBlock(
+    'PHYSICAL DATA',
+    'Mean radius',
+    `${formatKM(body.physical.meanRadiusM / 1000)} km`,
+    'Surface gravity',
+    `${body.physical.surfaceGravityMps2.toFixed(3)} m/s²`,
+    'Orbital period',
+    `${Math.abs(body.physical.orbitalPeriodS / 86400).toFixed(2)} days`
+  );
+  ctx.solarSystem.infoPanel.style.display = 'block';
+  ctx.solarSystem.selectedPlanet = null;
+  configureSetCourse(ctx, body.id, body.name);
 }
 
 function showSpacecraftInfo(ctx, entry) {
@@ -147,6 +192,7 @@ function showSpacecraftInfo(ctx, entry) {
 
   ctx.solarSystem.infoPanel.style.display = 'block';
   ctx.solarSystem.selectedPlanet = null;
+  configureSetCourse(ctx, null, '');
 }
 
 function showGalaxyInfo(ctx, entry) {
@@ -173,6 +219,7 @@ function showGalaxyInfo(ctx, entry) {
 
   ctx.solarSystem.infoPanel.style.display = 'block';
   ctx.solarSystem.selectedPlanet = null;
+  configureSetCourse(ctx, null, '');
 }
 
 function triggerSpaceLanding(text) {
@@ -195,6 +242,13 @@ function handleSpaceReturnAction(ctx) {
       ctx.appCtx.returnToEarthFromUniverse?.();
       return;
     }
+    if (
+      ctx.appCtx.spaceJourney?.phase === 'atmospheric_exploration' &&
+      typeof ctx.appCtx.requestRenderedAtmosphericDeparture === 'function'
+    ) {
+      const departure = ctx.appCtx.requestRenderedAtmosphericDeparture();
+      if (departure?.accepted) return;
+    }
     if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
       const forced = ctx.appCtx.forceSpaceFlightLanding('Earth');
       if (forced) return;
@@ -213,6 +267,10 @@ function handleSpaceReturnAction(ctx) {
 
 function handleMoonLandingAction(ctx) {
   if (ctx.appCtx.spaceFlight && ctx.appCtx.spaceFlight.active) {
+    if (ctx.appCtx.spaceJourney?.phase === 'parking_orbit') {
+      const retargeted = ctx.appCtx.retargetRenderedSpaceJourney?.('moon');
+      if (retargeted?.accepted) return;
+    }
     if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
       const forced = ctx.appCtx.forceSpaceFlightLanding('Moon');
       if (forced) return;
@@ -237,6 +295,10 @@ function handleMoonLandingAction(ctx) {
 function handleMarsLandingAction(ctx) {
   if (ctx.appCtx.onMars) return;
   if (ctx.appCtx.spaceFlight?.active) {
+    if (ctx.appCtx.spaceJourney?.phase === 'parking_orbit') {
+      const retargeted = ctx.appCtx.retargetRenderedSpaceJourney?.('mars');
+      if (retargeted?.accepted) return;
+    }
     if (ctx.appCtx.forceSpaceFlightLanding?.('Mars')) return;
     if (ctx.appCtx.setSpaceFlightLandingTarget?.('Mars', { force: true, autoLand: true })) return;
     ctx.appCtx.spaceFlight.destination = 'mars';
@@ -253,6 +315,7 @@ export {
   hidePlanetInfo,
   showAsteroidInfo,
   showGalaxyInfo,
+  showMoonInfo,
   showPlanetInfo,
   showSpacecraftInfo,
   showSunInfo

@@ -1,5 +1,6 @@
-import { createBlackHoleVisual } from './black-hole.js?v=2';
+import { createBlackHoleVisual } from './black-hole.js?v=3';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
+import { derivePlanetVisualProfile, deriveStarVisualProfile } from './body-visual-profile.js?v=1';
 
 function seededRandom(seed = 1) {
   let state = Math.abs(Math.floor(Number(seed) || 1)) >>> 0;
@@ -57,16 +58,143 @@ function makeOrbit(radius, color = 0x53677e) {
   );
 }
 
+function createStarMaterial(profile) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      starColor: { value: new THREE.Color(profile.color) },
+      time: { value: 0 },
+      activity: { value: profile.activity === 'active' ? 1.25 : profile.activity === 'moderate' ? 0.7 : 0.35 }
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 starColor;
+      uniform float time;
+      uniform float activity;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      float hash(vec3 p) {
+        p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+        p *= 17.0;
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+      }
+      void main() {
+        vec3 unitPosition = normalize(vPosition);
+        float cells = hash(floor(unitPosition * 42.0 + time * 0.16));
+        float waves = sin(unitPosition.x * 31.0 + time * 0.7) * sin(unitPosition.y * 27.0 - time * 0.43);
+        float limb = pow(max(0.08, abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)))), 0.22);
+        float flare = smoothstep(0.94, 1.0, sin(unitPosition.y * 18.0 + time * activity));
+        vec3 color = starColor * (0.82 + cells * 0.24 + waves * 0.07 + flare * activity * 0.12);
+        gl_FragColor = vec4(color * (0.78 + limb * 0.34), 1.0);
+      }
+    `
+  });
+}
+
+function createPlanetTexture(profile, mobile) {
+  const size = mobile ? 256 : 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size / 2;
+  const context = canvas.getContext('2d');
+  const random = seededRandom(profile.seed);
+  const colors = profile.palette.map((color) => `#${new THREE.Color(color).getHexString()}`);
+  const gas = ['gas-giant', 'ice-giant', 'mini-neptune'].includes(profile.kind);
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  for (let stop = 0; stop <= 8; stop += 1) {
+    const jitter = gas ? random() * 0.08 : random() * 0.22;
+    gradient.addColorStop(Math.min(1, stop / 8), colors[(stop + Math.floor(jitter * 10)) % colors.length]);
+  }
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (gas) {
+    for (let band = 0; band < 34; band += 1) {
+      const y = random() * canvas.height;
+      const thickness = 1 + random() * (mobile ? 4 : 7);
+      context.globalAlpha = 0.08 + random() * 0.23;
+      context.fillStyle = colors[(band + 1) % colors.length];
+      context.fillRect(0, y, canvas.width, thickness);
+    }
+    if (profile.kind === 'gas-giant') {
+      context.globalAlpha = 0.48;
+      context.fillStyle = colors[2];
+      context.beginPath();
+      context.ellipse(canvas.width * (0.25 + random() * 0.5), canvas.height * (0.48 + random() * 0.18), canvas.width * 0.075, canvas.height * 0.045, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+  } else {
+    for (let feature = 0; feature < (mobile ? 65 : 130); feature += 1) {
+      const x = random() * canvas.width;
+      const y = random() * canvas.height;
+      const width = 5 + random() * canvas.width * 0.12;
+      const height = 2 + random() * canvas.height * 0.1;
+      context.globalAlpha = 0.08 + random() * 0.34;
+      context.fillStyle = colors[feature % colors.length];
+      context.beginPath();
+      context.ellipse(x, y, width, height, random() * Math.PI, 0, Math.PI * 2);
+      context.fill();
+    }
+    if (profile.kind === 'lava-world') {
+      context.globalAlpha = 0.7;
+      context.strokeStyle = colors[1];
+      context.lineWidth = mobile ? 2 : 3;
+      for (let flow = 0; flow < 16; flow += 1) {
+        context.beginPath();
+        context.moveTo(random() * canvas.width, random() * canvas.height);
+        context.bezierCurveTo(random() * canvas.width, random() * canvas.height, random() * canvas.width, random() * canvas.height, random() * canvas.width, random() * canvas.height);
+        context.stroke();
+      }
+    }
+  }
+  context.globalAlpha = 1;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createCourseMarker(radius, destinationName) {
+  const marker = new THREE.Group();
+  marker.name = 'Active destination marker';
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x6fe8ff,
+    transparent: true,
+    opacity: 0.86,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const outer = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.8, Math.max(0.14, radius * 0.055), 8, 64), material);
+  outer.rotation.x = Math.PI / 2;
+  const cross = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.15, Math.max(0.12, radius * 0.045), 8, 48), material.clone());
+  cross.rotation.y = Math.PI / 2;
+  const label = createLabel(`${destinationName} · COURSE`, 460);
+  label.position.y = radius * 3.7;
+  label.scale.set(44, 9, 1);
+  marker.add(outer, cross, label);
+  marker.userData.baseScale = 1;
+  marker.visible = false;
+  return marker;
+}
+
 function createPlanetarySystem(entity) {
   if (entity.id === 'sol') {
     throw new Error('Sol visuals are owned by the authoritative solar-system runtime.');
   }
   const group = new THREE.Group();
-  const color = entity.visualProfile?.color || 0xfff0c2;
+  const starProfile = deriveStarVisualProfile(entity);
+  const color = starProfile.color;
   const starRadius = Math.max(18, Math.min(38, 24 + Number(entity.physical?.hostMassSolar || 1) * 8));
   const star = new THREE.Mesh(
-    new THREE.SphereGeometry(starRadius, 32, 24),
-    new THREE.MeshBasicMaterial({ color })
+    new THREE.SphereGeometry(starRadius, 64, 48),
+    createStarMaterial(starProfile)
   );
   star.name = entity.name;
   star.userData = { universeEntityId: entity.id };
@@ -85,22 +213,68 @@ function createPlanetarySystem(entity) {
   const maxAxis = Math.max(0.01, ...children.map((planet) => Number(planet.semiMajorAxisAu || 0.01)));
   const random = seededRandom(entity.visualProfile?.seed);
   group.userData.orbitingPlanets = [];
+  group.userData.destinationMeshes = new Map();
+  group.userData.gravityBodies = [star];
+  group.userData.starMaterials = [star.material];
+  group.userData.destinationMeshes.set(entity.id, star);
+  star.userData.massKg = Number(entity.physical?.hostMassSolar || 1) * 1.98847e30;
+  star.userData.physicalRadiusKm = Math.max(69570, Number(entity.physical?.hostMassSolar || 1) * 695700);
+  const mobile = globalThis.matchMedia?.('(max-width: 768px)').matches === true;
   children.forEach((planet, index) => {
     const axis = Math.max(0.005, Number(planet.semiMajorAxisAu || (index + 1) * 0.1));
     const orbitRadius = 70 + Math.sqrt(axis / maxAxis) * 290;
     group.add(makeOrbit(orbitRadius));
-    const radius = Math.max(3.5, Math.min(10, Number(planet.radiusEarth || 1) * 4.5));
-    const hue = 0.05 + random() * 0.55;
+    const radius = Math.max(7, Math.min(22, Math.sqrt(Number(planet.radiusEarth || 1)) * 7));
+    const profile = derivePlanetVisualProfile(planet, entity);
+    const texture = createPlanetTexture(profile, mobile);
     const body = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 20, 14),
-      new THREE.MeshPhongMaterial({ color: new THREE.Color().setHSL(hue, 0.42, 0.54), shininess: 8 })
+      new THREE.SphereGeometry(radius, mobile ? 32 : 56, mobile ? 24 : 40),
+      new THREE.MeshStandardMaterial({
+        map: texture,
+        roughness: profile.kind.includes('rocky') || profile.kind.includes('world') ? 0.86 : 0.56,
+        metalness: 0.02
+      })
     );
     body.name = planet.name;
-    body.userData = { universeEntityId: planet.id, planet };
+    body.userData = {
+      universeEntityId: planet.id,
+      planet,
+      visualProfile: profile,
+      massKg: profile.massEarth * 5.9722e24,
+      physicalRadiusKm: profile.radiusEarth * 6371
+    };
     const phase = random() * Math.PI * 2;
     body.position.set(Math.cos(phase) * orbitRadius, (random() - 0.5) * 8, Math.sin(phase) * orbitRadius);
     group.add(body);
-    group.userData.orbitingPlanets.push({ body, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
+    if (profile.atmosphere) {
+      const atmosphere = new THREE.Mesh(
+        new THREE.SphereGeometry(radius * 1.065, mobile ? 24 : 40, mobile ? 18 : 30),
+        new THREE.MeshBasicMaterial({
+          color: profile.kind === 'lava-world' ? 0xff8b54 : profile.kind === 'ice-world' ? 0xbcecff : 0x75c8ff,
+          transparent: true,
+          opacity: profile.clouds ? 0.1 : 0.055,
+          side: THREE.BackSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        })
+      );
+      atmosphere.name = `${planet.name} model-derived atmosphere`;
+      body.add(atmosphere);
+    }
+    if (profile.rings) {
+      const rings = new THREE.Mesh(
+        new THREE.RingGeometry(radius * 1.35, radius * 2.15, mobile ? 48 : 96),
+        new THREE.MeshBasicMaterial({ color: profile.palette[1], transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthWrite: false })
+      );
+      rings.rotation.x = Math.PI / 2.4;
+      rings.name = `${planet.name} model-derived ring system`;
+      body.add(rings);
+    }
+    const marker = createCourseMarker(radius, planet.name);
+    body.add(marker);
+    group.userData.destinationMeshes.set(planet.id, body);
+    group.userData.gravityBodies.push(body);
+    group.userData.orbitingPlanets.push({ body, marker, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
   });
   return group;
 }
@@ -259,11 +433,18 @@ function createStellarRegion(entity) {
   return group;
 }
 
-function createGalaxyPoints(entity, count = 5200, radius = 900) {
+function createGalaxyPoints(entity, count = null, radius = 900) {
   const random = seededRandom(entity.visualProfile?.seed);
   const positions = [];
+  const colors = [];
+  const resolvedCount = count == null
+    ? (globalThis.matchMedia?.('(max-width: 768px)').matches === true ? 6200 : 11800)
+    : count;
   const arms = Math.max(2, Number(entity.visualProfile?.arms || 2));
-  for (let i = 0; i < count; i++) {
+  const hot = new THREE.Color(entity.visualProfile?.tint || 0xb7d6ff);
+  const warm = new THREE.Color(0xffc98e);
+  const coreColor = new THREE.Color(0xfff2cf);
+  for (let i = 0; i < resolvedCount; i++) {
     const radial = Math.pow(random(), 0.58) * radius;
     const arm = i % arms;
     const baseAngle = arm / arms * Math.PI * 2;
@@ -274,18 +455,62 @@ function createGalaxyPoints(entity, count = 5200, radius = 900) {
       (random() - 0.5) * (28 + radial * 0.055) + (random() - 0.5) * bulge * 120,
       Math.sin(angle) * radial + (random() - 0.5) * 20
     );
+    const radialRatio = radial / radius;
+    const color = radialRatio < 0.22
+      ? coreColor.clone().lerp(warm, radialRatio / 0.22)
+      : hot.clone().lerp(warm, Math.max(0, 0.28 - radialRatio) * 1.8);
+    color.offsetHSL((random() - 0.5) * 0.035, (random() - 0.5) * 0.12, (random() - 0.5) * 0.15);
+    colors.push(color.r, color.g, color.b);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   return new THREE.Points(geometry, createRoundStarMaterial({
-    size: 2.4,
+    size: 2.6,
+    sizeAttenuation: false,
     color: 0xffffff,
-    vertexColors: false,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.84,
+    opacity: 0.96,
     depthWrite: false,
     blending: THREE.AdditiveBlending
   }));
+}
+
+function createGalaxyBulge(entity) {
+  const mobile = globalThis.matchMedia?.('(max-width: 768px)').matches === true;
+  const count = mobile ? 1000 : 2200;
+  const random = seededRandom((entity.visualProfile?.seed || 1) + 7703);
+  const positions = [];
+  const colors = [];
+  const inner = new THREE.Color(0xfff1cf);
+  const outer = new THREE.Color(0xd7a872);
+  for (let index = 0; index < count; index += 1) {
+    const radius = Math.pow(random(), 2.2) * 190;
+    const theta = random() * Math.PI * 2;
+    const phi = Math.acos(2 * random() - 1);
+    positions.push(
+      radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.cos(phi) * 0.32,
+      radius * Math.sin(phi) * Math.sin(theta)
+    );
+    const color = inner.clone().lerp(outer, radius / 190);
+    colors.push(color.r, color.g, color.b);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const bulge = new THREE.Points(geometry, createRoundStarMaterial({
+    size: mobile ? 2.4 : 3,
+    sizeAttenuation: false,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  }));
+  bulge.name = 'Model-derived galactic bulge stars';
+  return bulge;
 }
 
 function createGalaxy(entity) {
@@ -315,16 +540,29 @@ function createGalaxy(entity) {
     starField.material.size = 2.25;
   }
   group.add(starField);
-  const core = new THREE.Mesh(
-    new THREE.SphereGeometry(entity.visualProfile?.image ? 34 : 64, 24, 16),
-    new THREE.MeshBasicMaterial({
-      color: 0xffe2ae,
+  if (!entity.visualProfile?.image) group.add(createGalaxyBulge(entity));
+  if (!entity.visualProfile?.image) {
+    const haloTexture = createNebulaCloudTexture((entity.visualProfile?.seed || 1) + 9001);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: haloTexture,
+      color: entity.visualProfile?.tint || 0x7298d0,
       transparent: true,
-      opacity: entity.visualProfile?.image ? 0.18 : 0.45,
-      depthWrite: false
-    })
-  );
-  group.add(core);
+      opacity: 0.16,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    }));
+    halo.scale.set(1900, 720, 1);
+    halo.name = 'Model-derived galactic halo';
+    group.add(halo);
+    const dustLane = new THREE.Mesh(
+      new THREE.RingGeometry(120, 850, 160),
+      new THREE.MeshBasicMaterial({ color: 0x080b14, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })
+    );
+    dustLane.rotation.x = Math.PI / 2;
+    dustLane.scale.y = 0.13;
+    dustLane.name = 'Model-derived dust lane';
+    group.add(dustLane);
+  }
   const label = createLabel(entity.name, 420);
   label.position.y = 170;
   group.add(label);
@@ -369,15 +607,42 @@ function createUniverseFrameVisual(entity) {
   return group;
 }
 
+function getUniverseDestinationMesh(group, destinationId) {
+  return group?.userData?.destinationMeshes?.get?.(destinationId) || null;
+}
+
+function setUniverseCourseMarker(group, destinationId, active = true) {
+  let selected = null;
+  (group?.userData?.orbitingPlanets || []).forEach((entry) => {
+    const matches = entry.body?.userData?.universeEntityId === destinationId;
+    if (entry.marker) entry.marker.visible = Boolean(active && matches);
+    if (matches) selected = entry.body;
+  });
+  group.userData.activeDestinationId = active ? destinationId : null;
+  return selected;
+}
+
 function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
   if (!group) return;
   const orbiters = group.userData.orbitingPlanets || [];
+  if (orbiters.length && !Number.isFinite(group.userData.orbitEpochSeconds)) {
+    group.userData.orbitEpochSeconds = elapsedSeconds;
+  }
+  const localOrbitSeconds = Math.max(0, elapsedSeconds - Number(group.userData.orbitEpochSeconds || 0));
   orbiters.forEach((entry) => {
     const period = Math.max(1, entry.orbitDays);
-    const angle = entry.phase + elapsedSeconds * Math.PI * 2 / Math.max(8, Math.sqrt(period) * 9);
+    const angle = entry.phase + localOrbitSeconds * Math.PI * 2 / Math.max(900, Math.sqrt(period) * 150);
     entry.body.position.x = Math.cos(angle) * entry.orbitRadius;
     entry.body.position.z = Math.sin(angle) * entry.orbitRadius;
     entry.body.rotation.y += 0.006 * frameScale;
+    if (entry.marker?.visible) {
+      const pulse = 1 + Math.sin(elapsedSeconds * 3.2) * 0.08;
+      entry.marker.scale.setScalar(pulse);
+      entry.marker.rotation.z += 0.012 * frameScale;
+    }
+  });
+  (group.userData.starMaterials || []).forEach((material) => {
+    if (material.uniforms?.time) material.uniforms.time.value = elapsedSeconds;
   });
   if (group.userData.universeEntity?.objectClass === 'galaxy') group.rotation.y += 0.00012 * frameScale;
   if (group.userData.stellarRegionField) group.userData.stellarRegionField.rotation.y += 0.00022 * frameScale;
@@ -393,4 +658,9 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
   });
 }
 
-export { createUniverseFrameVisual, updateUniverseFrameVisual };
+export {
+  createUniverseFrameVisual,
+  getUniverseDestinationMesh,
+  setUniverseCourseMarker,
+  updateUniverseFrameVisual
+};

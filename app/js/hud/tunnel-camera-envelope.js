@@ -1,5 +1,5 @@
-import { polylineDistances } from '../structure-semantics/geometry.js?v=1';
-import { sampleTransportSurfaceAtDistance } from '../world/compiler/transport-surface-model.js?v=17';
+import { polylineDistances } from '../structure-semantics/geometry.js?v=2';
+import { sampleTransportSurfaceAtDistance } from '../world/compiler/transport-surface-model.js?v=25';
 
 function projectToFeature(feature, x, z) {
   const points = feature?.pts;

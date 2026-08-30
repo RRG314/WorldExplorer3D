@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
 
 let astronautGear = null;
 const earthMaterials = new Map();
@@ -103,7 +104,9 @@ function restoreEarthMaterials() {
 function setPlanetaryCharacter(body = 'earth') {
   const character = appCtx.Walk?.state?.characterMesh;
   if (!character) return null;
-  const planetary = body === 'moon' || body === 'mars';
+  const astronomicalBody = getAstronomicalBody(body);
+  const planetary = astronomicalBody?.id !== 'earth' &&
+    astronomicalBody?.exploration?.landingMode === LANDING_MODE.SOLID_SURFACE;
   if (!astronautGear) astronautGear = createAstronautGear();
   if (astronautGear.parent !== character) character.add(astronautGear);
   astronautGear.visible = planetary;

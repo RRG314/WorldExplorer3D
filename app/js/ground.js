@@ -2,8 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=48";
+} from "./structure-semantics.js?v=63";
 import { createSurfaceQuery } from './world/surface-contract.js?v=15';
+import { roadWidthAtProjection } from './world/road-cross-section-profile.js?v=1';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
@@ -299,7 +300,7 @@ const GroundHeight = {
 
   walkSurfaceInfo(x, z, currentY = NaN, options = {}) {
     const interiorSurface = typeof appCtx.sampleInteriorWalkSurface === 'function' ?
-      appCtx.sampleInteriorWalkSurface(x, z) :
+      appCtx.sampleInteriorWalkSurface(x, z, currentY) :
       null;
     if (interiorSurface && Number.isFinite(interiorSurface.y)) {
       return {
@@ -313,9 +314,13 @@ const GroundHeight = {
 
     const terrainY = this.terrainY(x, z);
     const nr = this._nearestWalkRoad(x, z, currentY);
+    const elevatedWalkSurface = nr?.road?.structureSemantics?.terrainMode === 'elevated';
     const roadOnSurface = isRoadSurfaceReachable(nr, {
       currentRoad: appCtx.car?.road || null,
-      extraLateralPadding: -0.1
+      // A bridge deck stops supporting a walking actor at its authored edge.
+      // The general road query carries generous vehicle/transition padding;
+      // retaining that padding here created an invisible ledge beside bridges.
+      extraLateralPadding: elevatedWalkSurface ? -1.05 : -0.1
     });
     const linear = this._nearestLinearWalkFeature(x, z);
     const featureWidth = Number(linear?.feature?.width) || 0;
@@ -414,7 +419,7 @@ const GroundHeight = {
       } else if (options.preferredRoadOnly && appCtx.car?.road) {
         const road = appCtx.car.road;
         const projection = this._projectPointToFeature(road, x, z);
-        const reuseRadius = Math.max(5, (Number(road.width) || 7) * 0.5 + 2.5);
+        const reuseRadius = Math.max(5, roadWidthAtProjection(road, projection) * 0.5 + 2.5);
         if (projection && projection.dist <= reuseRadius) {
           const profileY = sampleFeatureSurfaceY(road, projection.pt.x, projection.pt.z, projection);
           nearestRoad = {

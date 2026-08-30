@@ -1,4 +1,4 @@
-import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=18";
+import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=21";
 
 export function createWorldRoadLoaderSupport({
   addBuildingToSpatialIndex,

@@ -1,11 +1,11 @@
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=48";
+} from "../structure-semantics.js?v=63";
 import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex
-} from "./building-spatial-index.js?v=5";
+} from "./building-spatial-index.js?v=6";
 
 const STRUCTURE_COLLIDER_POLICY = 'actor-height-bounded-lossless-tunnel-side-walls';
 

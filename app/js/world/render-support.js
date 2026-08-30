@@ -1,11 +1,11 @@
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import { initRoofDetailSupport, createRoofDetailMesh } from "./roof-details.js?v=2";
-import { registerWaterWaveMaterial } from "./water-materials.js?v=1";
+import { registerWaterWaveMaterial } from "./water-materials.js?v=5";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=8";
-import { batchLanduseMeshes } from "./landuse-batching.js?v=2";
+} from "./building-batching.js?v=12";
+import { batchLanduseMeshes } from "./landuse-batching.js?v=3";
 
 export function initWorldRenderSupport(options = {}) {
   initRoofDetailSupport(options);

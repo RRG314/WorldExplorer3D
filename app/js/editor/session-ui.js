@@ -159,9 +159,9 @@ function renderOnboardingCard(ctx, refs, feature) {
   const preset = getOverlayPreset(feature?.presetId || ctx.state.activePresetId);
   const hasBaseSelection = !!ctx.state.selectedBaseFeature;
   refs.onboardingCard.innerHTML = `
-    <div class="editorOnboardingEyebrow">Beta Demo Workflow</div>
+    <div class="editorOnboardingEyebrow">World Editor</div>
     <div class="editorOnboardingTitle">Start here</div>
-    <div class="editorOnboardingCopy">Pick a preset first, then drag or click directly in the world. This beta demo previews World Explorer overlays only and does not post to OpenStreetMap.</div>
+    <div class="editorOnboardingCopy">Choose what you want to map, then draw or adjust it directly in the world. Contributions are reviewed for World Explorer and are not sent to OpenStreetMap.</div>
     <div class="editorOnboardingSteps">
       <div class="editorOnboardingStep">
         <strong>1. Choose a preset</strong>
@@ -451,8 +451,8 @@ export function renderUi(ctx) {
   refs.panel.dataset.sidebarView = sidebarView;
   document.body.classList.toggle('editor-workspace-open', ctx.state.active);
   document.body.classList.toggle('editor-workspace-peek', ctx.state.active && ctx.state.peekWorld === true);
-  if (refs.title) refs.title.textContent = 'Overlay Editor Beta';
-  if (refs.subline) refs.subline.textContent = 'Beta demo for World Explorer overlays. Use presets first. This does not submit to OpenStreetMap.';
+  if (refs.title) refs.title.textContent = 'World Editor Beta';
+  if (refs.subline) refs.subline.textContent = 'Create reviewed overlays or switch to persistent Blocks. Neither workflow changes OpenStreetMap, Overture, or imported provider data.';
   if (refs.authBadge) {
     refs.authBadge.textContent = ctx.state.authUser?.uid
       ? `${ctx.sanitizeText(ctx.state.authUser.displayName || ctx.state.authUser.email || 'Explorer', 60)}${ctx.state.userIsAdmin ? ' • Admin' : ''}`

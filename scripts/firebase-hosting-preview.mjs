@@ -4,6 +4,7 @@ import {
   firstPositional,
   parseFlag,
   runFirebase,
+  runChecked,
   runNodeScript
 } from './firebase-hosting-utils.mjs';
 
@@ -36,6 +37,11 @@ try {
   if (!skipChecks) {
     console.log('[preview:deploy] Verifying hosting artifact identity and source parity');
     runNodeScript('scripts/hosting-artifact.mjs', ['verify'], cwd);
+    console.log('[preview:deploy] Running the current complete-world verification against the bundled artifact');
+    runChecked(process.execPath, ['scripts/verification/world.mjs'], {
+      cwd,
+      env: { ...process.env, WE3D_VERIFY_ROOT: 'dist' }
+    });
   }
 
   console.log(`[preview:deploy] Deploying Firebase Hosting preview channel "${channelId}" for project "${projectId}"`);

@@ -19,7 +19,12 @@ export function isSuppressedBaseRoad(road) {
 export function isSuppressedBaseBuilding(building) {
   if (!building || String(building?.sourceBuildingId || '').startsWith('overlay:')) return false;
   const sourceId = String(building?.sourceBuildingId || '');
-  return !!(sourceId && overlaySuppressionSet('buildingIds').has(sourceId));
+  return !!(
+    sourceId && (
+      overlaySuppressionSet('buildingIds').has(sourceId) ||
+      appCtx.isLocalBuildingSuppressed?.(sourceId) === true
+    )
+  );
 }
 
 export function clearBuildingSpatialIndex() {

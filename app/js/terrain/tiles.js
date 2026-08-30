@@ -18,8 +18,8 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=49";
-import { stitchTerrainMeshEdges } from "./seams.js?v=1";
+} from "./surface-profiles.js?v=54";
+import { stitchTerrainMeshEdges } from "./seams.js?v=2";
 import {
   cancelTerrainTileRequest as cancelTileRequest,
   waitForTerrainTileRequest
@@ -241,6 +241,35 @@ export function terrainTileCacheSnapshot() {
   };
 }
 
+function releaseTerrainTile(tile) {
+  if (!tile) return;
+  tile.evicted = true;
+  tile.resolveReady?.(false);
+  tile.resolveReady = null;
+  if (tile.img) {
+    tile.img.onload = null;
+    tile.img.onerror = null;
+    tile.img.src = '';
+  }
+  tile.img = null;
+  tile.elev = null;
+  tile.ready = null;
+  tile.loading = false;
+  tile.loaded = false;
+}
+
+export function clearTerrainTileCache() {
+  const before = terrainTileCacheSnapshot();
+  appCtx.terrainTileCache.forEach(releaseTerrainTile);
+  appCtx.terrainTileCache.clear();
+  recentTerrainFailures.clear();
+  return Object.freeze({
+    releasedEntries: before.entries,
+    releasedElevationBytes: before.elevationBytes,
+    remaining: terrainTileCacheSnapshot()
+  });
+}
+
 export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   const safeLimit = Math.max(25, Math.round(Number(limit) || TERRAIN_TILE_CACHE_LIMIT));
   if (appCtx.terrainTileCache.size <= safeLimit) return terrainTileCacheSnapshot();
@@ -258,14 +287,7 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   for (let i = 0; i < candidates.length && removeCount > 0; i += 1) {
     const [key, tile] = candidates[i];
     if (!appCtx.terrainTileCache.delete(key)) continue;
-    tile.evicted = true;
-    if (tile.img) {
-      tile.img.onload = null;
-      tile.img.onerror = null;
-      tile.img.src = '';
-    }
-    tile.img = null;
-    tile.elev = null;
+    releaseTerrainTile(tile);
     removeCount -= 1;
   }
   return terrainTileCacheSnapshot();
@@ -526,13 +548,14 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     cachedBaseElevations?.length === pos.count;
   const nextBaseElevations = reuseBaseElevations
     ? cachedBaseElevations
-    : new Float64Array(pos.count);
+    : new Float32Array(pos.count);
   const latRange = bounds.latN - bounds.latS || 1;
   const lonRange = bounds.lonE - bounds.lonW || 1;
 
   let minElevation = Infinity;
   let maxElevation = -Infinity;
   let waterMaskedVertices = 0;
+  let transportCorridorAdjustedVertices = 0;
   const elevations = [];
   const elevationMetersSamples = [];
   const segments = Math.max(1, Number(appCtx.TERRAIN_SEGMENTS) || 1);
@@ -639,6 +662,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
     if (!reuseBaseElevations) nextBaseElevations[i] = baseY;
     const structureY = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
+    if (Math.abs(structureY - baseY) > 1e-6) transportCorridorAdjustedVertices += 1;
     const y = typeof deps.resolveWaterTerrainY === "function"
       ? deps.resolveWaterTerrainY(wx, wz, structureY, waterTerrainContext)
       : structureY;
@@ -659,6 +683,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   mesh.userData.pendingTerrainTile = false;
   mesh.userData.baseTerrainWorldY = nextBaseElevations;
   mesh.userData.waterMaskedVertices = waterMaskedVertices;
+  mesh.userData.transportCorridorAdjustedVertices = transportCorridorAdjustedVertices;
   mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;
 
@@ -674,7 +699,13 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     deps.computeElevationStatsMeters(elevationMetersSamples) :
     { min: minMeters, max: maxMeters, p75: maxMeters, p90: maxMeters };
   mesh.userData.elevationStatsMeters = elevationStats;
-  applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
+  // A batch world-finalization caller may own the one complete terrain
+  // presentation pass after every tile has its final water/transport height.
+  // In that case, repeating the full per-vertex material pass here would
+  // publish the same presentation twice before first play.
+  if (options.refreshVisualProfile !== false) {
+    applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
+  }
 }
 
 export {

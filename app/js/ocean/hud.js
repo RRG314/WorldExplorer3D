@@ -1,3 +1,5 @@
+import { worldUnitsPerSecondToKnots } from '../physics/vehicle-speed-units.js?v=2';
+
 function drawOceanNavigationMap(oceanMode, depth) {
   const canvas = document.getElementById('minimap');
   const ctx = canvas?.getContext?.('2d');
@@ -87,7 +89,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
   const boostFill = document.getElementById('boostFill');
   const sub = oceanMode.submarine;
 
-  const speedKnots = Math.abs(sub.speed) * 1.94;
+  const speedKnots = Math.abs(worldUnitsPerSecondToKnots(sub.speed, appCtx.METERS_PER_WORLD_UNIT));
   const depth = Math.max(0, Math.round(-sub.position.y));
   const batteryPct = Math.round(76 + Math.sin(nowSeconds * 0.09) * 7);
 

@@ -17,10 +17,58 @@ const OVERPASS_STAGGER_MS = 2000;
 const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
 const OVERPASS_MEMORY_CACHE_MAX = 6;
 const OVERPASS_LOC_EPSILON = 1e-7;
+const OVERPASS_PROVIDER_COOLDOWN_MS = 2 * 60 * 1000;
+const OVERPASS_PROVIDER_HEALTH_KEY = 'world-explorer:overpass-provider-health-v1';
 
 const overpassMemoryCache = [];
 let lastOverpassEndpoint = null;
 let readPerfModeValue = () => 'balanced';
+
+function readOverpassProviderHealth() {
+  try {
+    const parsed = JSON.parse(globalThis.sessionStorage?.getItem?.(OVERPASS_PROVIDER_HEALTH_KEY) || 'null');
+    return {
+      unavailableUntil: Math.max(0, Number(parsed?.unavailableUntil) || 0),
+      lastSuccessAt: Math.max(0, Number(parsed?.lastSuccessAt) || 0)
+    };
+  } catch {
+    return { unavailableUntil: 0, lastSuccessAt: 0 };
+  }
+}
+
+function writeOverpassProviderHealth(health) {
+  try {
+    globalThis.sessionStorage?.setItem?.(OVERPASS_PROVIDER_HEALTH_KEY, JSON.stringify(health));
+  } catch {
+    // Provider health is an optimization only. Storage denial must not affect loading.
+  }
+}
+
+function markOverpassProviderAvailable(nowMs = Date.now()) {
+  writeOverpassProviderHealth({ unavailableUntil: 0, lastSuccessAt: nowMs });
+}
+
+function markOverpassProviderUnavailable(requestStartedAt, nowMs = Date.now()) {
+  const health = readOverpassProviderHealth();
+  // A sibling request from the same provider batch may have succeeded while
+  // this request was still exhausting its endpoints. One success keeps the
+  // provider available for the rest of the session.
+  if (health.lastSuccessAt >= requestStartedAt) return;
+  writeOverpassProviderHealth({
+    unavailableUntil: nowMs + OVERPASS_PROVIDER_COOLDOWN_MS,
+    lastSuccessAt: health.lastSuccessAt
+  });
+}
+
+export function getOverpassProviderHealth() {
+  const nowMs = Date.now();
+  const health = readOverpassProviderHealth();
+  return Object.freeze({
+    status: health.unavailableUntil > nowMs ? 'cooldown' : 'probe-allowed',
+    retryAfterMs: Math.max(0, health.unavailableUntil - nowMs),
+    lastSuccessAt: health.lastSuccessAt || null
+  });
+}
 
 export function getOverpassRuntimeCacheStats() {
   return Object.freeze({
@@ -174,6 +222,37 @@ function formatBounds(location, radius) {
   return `(${location.lat - radius},${location.lon - radius},${location.lat + radius},${location.lon + radius})`;
 }
 
+function formatCoverageBounds(bounds) {
+  return `(${bounds.minLat},${bounds.minLon},${bounds.maxLat},${bounds.maxLon})`;
+}
+
+export function resolveBuildingPublicationBounds(location, visibleRadiusWorld, options = {}) {
+  const lat = Number(location?.lat);
+  const lon = Number(location?.lon);
+  const radiusWorld = Math.max(0, Number(visibleRadiusWorld) || 0);
+  const worldScale = Math.max(1, Number(options.worldScale) || 100000);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || radiusWorld <= 0) return null;
+
+  // The fixed-location renderer measures building LOD in local world space.
+  // Provider coverage must use the inverse of that same projection or its
+  // advertised far-visible circle becomes an increasingly narrow rectangle at
+  // higher latitudes. Polar locations normally skip settlement loading; the
+  // floor keeps the bounds finite if mapped buildings are explicitly present.
+  const longitudeScale = Math.max(0.01, Math.abs(Math.cos(lat * Math.PI / 180)));
+  const latRadius = radiusWorld / worldScale;
+  const lonRadius = radiusWorld / (worldScale * longitudeScale);
+  return Object.freeze({
+    minLat: lat - latRadius,
+    minLon: lon - lonRadius,
+    maxLat: lat + latRadius,
+    maxLon: lon + lonRadius,
+    latRadius,
+    lonRadius,
+    visibleRadiusWorld: radiusWorld,
+    authority: 'building-far-visible-lod'
+  });
+}
+
 function overpassCacheKey(meta, query) {
   if (!meta || !query) return null;
   let hash = 2166136261;
@@ -196,20 +275,35 @@ export function buildWorldOverpassPlan({
   roadsRadius,
   featureRadiusScale,
   poiRadiusScale,
+  buildingVisibleRadiusWorld,
   overpassTimeoutMs,
   loadStartedAt,
   maxTotalLoadMs
 }) {
   const featureRadius = roadsRadius * featureRadiusScale;
-  const buildingRadius = Math.min(
+  const waterStructureRadius = Math.min(
     0.022,
     Math.max(featureRadius, 0.014, roadsRadius * 1.2)
   );
+  const buildingCoverage = resolveBuildingPublicationBounds(
+    location,
+    buildingVisibleRadiusWorld
+  );
+  const buildingRadius = buildingCoverage
+    ? Math.max(buildingCoverage.latRadius, buildingCoverage.lonRadius)
+    : waterStructureRadius;
+  const buildingCoverageBounds = buildingCoverage || {
+    minLat: location.lat - buildingRadius,
+    minLon: location.lon - buildingRadius,
+    maxLat: location.lat + buildingRadius,
+    maxLon: location.lon + buildingRadius
+  };
   const buildingMetadataRadius = Math.min(buildingRadius, Math.max(0.004, roadsRadius * 0.22));
   const poiRadius = roadsRadius * poiRadiusScale;
   const roadsBounds = formatBounds(location, roadsRadius);
   const featureBounds = formatBounds(location, featureRadius);
-  const buildingBounds = formatBounds(location, buildingRadius);
+  const buildingBounds = formatCoverageBounds(buildingCoverageBounds);
+  const waterStructureBounds = formatBounds(location, waterStructureRadius);
   const buildingMetadataBounds = formatBounds(location, buildingMetadataRadius);
   const poiBounds = formatBounds(location, poiRadius);
   const queryTimeoutSeconds = Math.max(8, Math.floor(overpassTimeoutMs / 1000));
@@ -230,6 +324,9 @@ export function buildWorldOverpassPlan({
       lon: location.lon,
       roadsRadius,
       featureRadius: buildingRadius,
+      bounds: buildingCoverageBounds,
+      visibleRadiusWorld: buildingCoverage?.visibleRadiusWorld || null,
+      authority: buildingCoverage?.authority || 'legacy-angular-building-radius',
       poiRadius,
       kind: 'buildings'
     },
@@ -245,15 +342,57 @@ export function buildWorldOverpassPlan({
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
-      featureRadius: buildingRadius,
+      featureRadius: waterStructureRadius,
       poiRadius,
       kind: 'water-structures'
     },
+    civicFacilityCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'civic-facilities'
+    },
+    commercePlaceCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'commerce-places'
+    },
+    transportFacilityCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius,
+      poiRadius,
+      kind: 'transport-facilities-v1'
+    },
     waterStructureQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-                way["building"="ship"]${buildingBounds};
-                way["historic"="ship"]${buildingBounds};
-                way["building"="houseboat"]${buildingBounds};
+                way["building"="ship"]${waterStructureBounds};
+                way["historic"="ship"]${waterStructureBounds};
+                way["building"="houseboat"]${waterStructureBounds};
             );out body;>;out skel qt;`,
+    civicFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];
+            nwr["amenity"~"^(police|hospital)$"]${poiBounds};
+            out body center qt;`,
+    commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];
+            nwr["shop"="convenience"]${poiBounds};
+            out body center qt;`,
+    transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${featureBounds};
+            nwr["leisure"="marina"]${featureBounds};
+            nwr["harbour"="yes"]${featureBounds};
+            nwr["landuse"~"^(port|harbour)$"]${featureBounds};
+            nwr["man_made"~"^(pier|quay)$"]${featureBounds};
+            nwr["waterway"="dock"]${featureBounds};
+            nwr["amenity"="ferry_terminal"]${featureBounds};
+            nwr["route"="ferry"]${featureBounds};
+            nwr["mooring"]${featureBounds};
+            nwr["seamark:type"~"^(harbour|berth)$"]${featureBounds};
+        );out body center;>;out skel qt;`,
     buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
             );out tags center qt;`,
@@ -279,9 +418,9 @@ export function buildWorldOverpassPlan({
                 node["natural"="tree"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
-                way["building"="ship"]${buildingBounds};
-                way["historic"="ship"]${buildingBounds};
-                way["building"="houseboat"]${buildingBounds};
+                way["building"="ship"]${waterStructureBounds};
+                way["historic"="ship"]${waterStructureBounds};
+                way["building"="houseboat"]${waterStructureBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
             );out body;>;out skel qt;`,
@@ -296,6 +435,7 @@ function externalAbortError(signal) {
 }
 
 export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, options = {}) {
+  const requestStartedAt = Date.now();
   const externalSignal = options.signal || null;
   if (externalSignal?.aborted) throw externalAbortError(externalSignal);
   const cached = findOverpassMemoryCache(cacheMeta);
@@ -316,6 +456,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     return persistent.data;
   }
 
+  const usesDefaultProvider = !Array.isArray(options.endpoints) && typeof options.fetchImpl !== 'function';
+  const providerHealth = usesDefaultProvider ? getOverpassProviderHealth() : null;
+  if (providerHealth?.status === 'cooldown' && options.ignoreProviderCooldown !== true) {
+    const error = new Error(`Overpass provider retry paused for ${Math.ceil(providerHealth.retryAfterMs / 1000)}s after a complete endpoint failure.`);
+    error.code = 'OVERPASS_PROVIDER_COOLDOWN';
+    throw error;
+  }
+
   const controllers = [];
   const errors = [];
   const configuredEndpoints = Array.isArray(options.endpoints)
@@ -327,6 +475,14 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const staggerIntervalMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
     ? Number(options.staggerMs)
     : OVERPASS_STAGGER_MS);
+  // `timeoutMs` is the budget for the optional provider as a whole, not a
+  // separate allowance for every hedged endpoint. Otherwise a 3.5 second
+  // mobile probe can take nine seconds after endpoint staggering.
+  const requestedTimeoutMs = Math.max(1000, Number(timeoutMs) || OVERPASS_MIN_TIMEOUT_MS);
+  const requestDeadlineMs = Math.min(
+    Number.isFinite(deadlineMs) ? deadlineMs : Infinity,
+    performance.now() + requestedTimeoutMs
+  );
   const requestController = new AbortController();
   const abortRequest = () => requestController.abort(externalAbortError(externalSignal));
   externalSignal?.addEventListener?.('abort', abortRequest, { once: true });
@@ -339,15 +495,18 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
 
     const now = performance.now();
-    if (now >= deadlineMs - 300) {
+    if (now >= requestDeadlineMs - 300) {
       throw new Error(`[${endpoint}] skipped: load budget exhausted`);
     }
 
-    const timeLeftMs = deadlineMs - now;
+    const timeLeftMs = requestDeadlineMs - now;
     const timeoutForEndpointMs = Math.max(
-      3500,
+      500,
       Math.min(
-        Math.max(OVERPASS_MIN_TIMEOUT_MS, timeoutMs - idx * 1200),
+        Math.max(
+          Math.min(OVERPASS_MIN_TIMEOUT_MS, requestedTimeoutMs),
+          requestedTimeoutMs - idx * 1200
+        ),
         timeLeftMs - 250
       )
     );
@@ -389,6 +548,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       data._overpassCacheAgeMs = 0;
       requestSettled = true;
       lastOverpassEndpoint = endpoint;
+      if (usesDefaultProvider) markOverpassProviderAvailable();
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
@@ -423,6 +583,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
       return fallback.data;
     }
+    if (usesDefaultProvider) markOverpassProviderUnavailable(requestStartedAt);
     throw error?.message?.startsWith?.('All Overpass endpoints failed:')
       ? error
       : new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);

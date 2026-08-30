@@ -1,9 +1,11 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=2";
-import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=1";
+import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=3";
+import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=2";
 import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
-import { getCurrentUser } from "../../js/auth-ui.js";
-import { initFirebase } from "../../js/firebase-init.js";
+import { normalizeLeaderboardId } from "./leaderboards/catalog.js?v=2";
+import { emitProductTelemetry } from "./platform/product-telemetry.js?v=1";
+import { getCurrentUser } from "../../js/auth-ui.js?v=55";
+import { initFirebase } from "../../js/firebase-init.js?v=55";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';
@@ -55,6 +57,8 @@ const ui = {
   titleExplorerTabBtn: null,
   titleDeFlockTabBtn: null,
   titleHint: null,
+  titleBadge: null,
+  titleScope: null,
   titleList: null,
   hud: null,
   gameStatus: null,
@@ -91,8 +95,7 @@ function safeText(value) {
 }
 
 function normalizeChallengeType(raw) {
-  const value = String(raw || '').toLowerCase();
-  return ['flower', 'painttown', 'fishing', 'explorer', 'deflock'].includes(value) ? value : 'flower';
+  return normalizeLeaderboardId(raw);
 }
 
 function getLeaderboardStorageKey(challengeType) {
@@ -146,7 +149,8 @@ function getActiveActorPosition() {
 }
 
 function resolvePlayerName() {
-  const fromInput = sanitizePlayerName(ui.titleNameInput?.value || '');
+  const signedInName = getCurrentUser()?.displayName || '';
+  const fromInput = sanitizePlayerName(signedInName || ui.titleNameInput?.value || '');
   if (ui.titleNameInput) ui.titleNameInput.value = fromInput;
   try {
     localStorage.setItem(PLAYER_NAME_KEY, fromInput);
@@ -236,6 +240,7 @@ function toggleFlowerActionMenu() {
 
 const leaderboardView = createFlowerLeaderboardView({
   challengeState,
+  getSignedInUser: getCurrentUser,
   getLeaderboardStorageKey,
   getSortLeaderboardEntries: () => sortLeaderboardEntries,
   leaderboardLimit: LEADERBOARD_LIMIT,
@@ -334,6 +339,11 @@ async function completeChallenge() {
   if (!remoteSaved) {
     storeLocalResult('flower', entry);
   }
+  emitProductTelemetry('score_submit', {
+    board_id: 'flower',
+    outcome: remoteSaved ? 'cloud' : 'device',
+    duration_ms: entry.timeMs
+  });
 
   await refreshFlowerLeaderboard(challengeState.leaderboardView);
 
@@ -538,6 +548,8 @@ function setupFlowerChallenge() {
   ui.titleExplorerTabBtn = document.getElementById('leaderboardTabExplorer');
   ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
   ui.titleHint = document.getElementById('gameLeaderboardHint');
+  ui.titleBadge = document.getElementById('gameLeaderboardBadge');
+  ui.titleScope = document.getElementById('gameLeaderboardScope');
   ui.titleList = document.getElementById('flowerLeaderboardList');
   ui.hud = document.getElementById('flowerChallengeHud');
   ui.gameStatus = document.getElementById('flowerChallengeHudStatus');

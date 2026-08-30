@@ -14,11 +14,13 @@ export function createBoatOceanTransferApi(options = {}) {
     showBoatPrompt,
     startBoatMode,
     updateBoatMenuUi,
-    updateWaterWaveVisuals
+    updateWaterWaveVisuals,
+    restoreEarthSurfaceLayers
   } = options;
 
 function suspendBoatModeForOceanTransfer() {
   appCtx.boatMode.active = false;
+  restoreEarthSurfaceLayers?.();
   appCtx.boatMode.available = false;
   appCtx.boatMode.candidate = null;
   appCtx.boatMode.currentWater = null;
@@ -45,6 +47,11 @@ async function transferBoatToSubmarine(options = {}) {
   }
 
   captureEarthWorldSession();
+  appCtx.boatMode.oceanTransferVessel = Object.freeze({
+    transportEntityId: String(appCtx.boatMode.transportEntityId || ''),
+    transportCatalogId: String(appCtx.boatMode.transportCatalogId || 'marina-runabout'),
+    condition: Number(appCtx.boatMode.condition ?? 1)
+  });
   setPromptSignature('boat_to_submarine_transfer');
   showBoatPrompt('Diving underwater…', 'supported', promptDurationMs);
 
@@ -83,6 +90,7 @@ async function transferSubmarineToBoat(options = {}) {
   const lat = launchSite.lat - sub.position.z / appCtx.SCALE;
   const lon = launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
   const customName = `${launchSite.name || 'Ocean Site'} Surface`;
+  const transferVessel = appCtx.boatMode?.oceanTransferVessel || null;
   const customLatInput = document.getElementById('customLat');
   const customLonInput = document.getElementById('customLon');
   if (customLatInput) customLatInput.value = lat.toFixed(6);
@@ -99,9 +107,10 @@ async function transferSubmarineToBoat(options = {}) {
     if (typeof appCtx.showTransitionLoad === 'function') {
       await appCtx.showTransitionLoad('earth', 700);
     }
-    if (typeof appCtx.loadRoads === 'function') {
-      await appCtx.loadRoads();
-    }
+    // A submarine surfaces into the modeled open-ocean patch, not a terrestrial
+    // OSM scene. Waiting for a complete road/building/vegetation reload here
+    // both delays control and can place land cover over the boat. The explicit
+    // synthetic-water handoff below is the authority for this transition.
     if (typeof appCtx.applyCustomLocationSpawn === 'function') {
       appCtx.applyCustomLocationSpawn('walk', {
         source: 'submarine_transfer_spawn',
@@ -111,6 +120,7 @@ async function transferSubmarineToBoat(options = {}) {
       });
     }
     if (appCtx.boatMode?.active) {
+      appCtx.boatMode.oceanTransferVessel = null;
       if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
       return true;
     }
@@ -135,7 +145,10 @@ async function transferSubmarineToBoat(options = {}) {
         candidate,
         allowSynthetic: true,
         waterKind: candidate.waterKind || 'open_ocean',
-        entryMode: 'walk'
+        entryMode: 'walk',
+        transportEntityId: transferVessel?.transportEntityId,
+        transportCatalogId: transferVessel?.transportCatalogId,
+        condition: transferVessel?.condition
       }) :
       startBoatMode({
         source: options.source || 'submarine_transfer',
@@ -145,9 +158,14 @@ async function transferSubmarineToBoat(options = {}) {
         candidate,
         allowSynthetic: true,
         waterKind: candidate.waterKind || 'open_ocean',
-        entryMode: 'walk'
+        entryMode: 'walk',
+        transportEntityId: transferVessel?.transportEntityId,
+        transportCatalogId: transferVessel?.transportCatalogId,
+        condition: transferVessel?.condition
       });
-    return resolved === 'boat' || resolved === true;
+    const surfaced = resolved === 'boat' || resolved === true;
+    if (surfaced) appCtx.boatMode.oceanTransferVessel = null;
+    return surfaced;
   } catch (error) {
     console.warn('[BoatMode] submarine transfer failed', error);
     setPromptSignature('submarine_transfer_error');

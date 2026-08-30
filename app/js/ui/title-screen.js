@@ -1,10 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=81";
-import { readSharedExperienceParams } from "./share-links.js?v=62";
+import { createGlobeSelector } from "./globe-selector.js?v=91";
+import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
+import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
   geolocationErrorMessage,
@@ -22,6 +23,8 @@ function initTitleScreenUi({
 }) {
   const customPanel = document.getElementById('customPanel');
   const titleUseMyLocationBtn = document.getElementById('titleUseMyLocationBtn');
+  const titleLiveGpsBtn = document.getElementById('titleLiveGpsBtn');
+  const globeLiveGpsBtn = document.getElementById('globeSelectorLiveGpsBtn');
   const titleUseMyLocationStatus = document.getElementById('titleUseMyLocationStatus');
   const earthLaunchToggle = document.getElementById('earthLaunchToggle');
   const moonLaunchToggle = document.getElementById('moonLaunchToggle');
@@ -40,6 +43,7 @@ function initTitleScreenUi({
   let globeSelector = null;
   let skipGlobeGateOnce = false;
   let geolocationBusy = false;
+  let liveGpsLaunchBusy = false;
   let oceanEntryHadEarthWorld = false;
   let multiplayerWarmupPromise = null;
   let requestTitleStart = () => Promise.resolve(false);
@@ -297,6 +301,45 @@ function initTitleScreenUi({
     }
   };
 
+  const selectLiveGpsMode = () => {
+    document.querySelectorAll('.mode').forEach((element) => element.classList.remove('sel'));
+    document.querySelector('.mode[data-mode="livegps"]')?.classList.add('sel');
+    appCtx.gameMode = 'livegps';
+    setLaunchMode('earth');
+  };
+  const setLiveGpsLaunchBusy = (isBusy) => {
+    liveGpsLaunchBusy = !!isBusy;
+    [titleLiveGpsBtn, globeLiveGpsBtn].forEach((button) => {
+      if (!button) return;
+      button.disabled = liveGpsLaunchBusy;
+      button.setAttribute('aria-busy', liveGpsLaunchBusy ? 'true' : 'false');
+      button.textContent = liveGpsLaunchBusy ? 'Starting Live GPS…' : '📍 Start Live GPS Explore';
+    });
+  };
+  const runLiveGpsExplore = async () => {
+    if (liveGpsLaunchBusy) return false;
+    selectLiveGpsMode();
+    setLiveGpsLaunchBusy(true);
+    setTitleUseMyLocationStatus('Live GPS will ask for location access, then open the world at your position.', '#0e7490');
+    globeSelector?.setSearchStatus?.('Live GPS will ask for location access, then open the world at your position.', '#0e7490');
+    try {
+      const launched = await requestTitleStart();
+      if (launched === false && !document.getElementById('liveGpsPermissionPanel')?.classList.contains('show')) {
+        setTitleUseMyLocationStatus('Live GPS start canceled. Tap Start Live GPS Explore to retry.', '#b45309');
+        globeSelector?.setSearchStatus?.('Live GPS start canceled. Tap Start Live GPS Explore to retry.', '#b45309');
+      }
+      return launched;
+    } catch (error) {
+      const message = error?.message || 'Live GPS could not start. Check location access and try again.';
+      setTitleUseMyLocationStatus(message, '#dc2626');
+      globeSelector?.setSearchStatus?.(message, '#dc2626');
+      console.error('[live-gps] Title launch failed.', error);
+      return false;
+    } finally {
+      setLiveGpsLaunchBusy(false);
+    }
+  };
+
   appCtx.triggerTitleStart = (options = {}) => {
     if (options?.bypassCustomGate) {
       skipGlobeGateOnce = true;
@@ -313,6 +356,8 @@ function initTitleScreenUi({
     if (button.dataset.tab === 'multiplayer') primeMultiplayerUi();
   }));
   titleUseMyLocationBtn?.addEventListener('click', () => runUseMyLocation('menu'));
+  titleLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
+  globeLiveGpsBtn?.addEventListener('click', () => void runLiveGpsExplore());
 
   globeSelector = createGlobeSelector({
     onOpen: () => emitTutorialEvent('opened_globe_selector'),
@@ -327,16 +372,9 @@ function initTitleScreenUi({
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
         await appCtx.loadRoads();
-        let customSpawn = null;
-        if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-          customSpawn = appCtx.applyCustomLocationSpawn('walk', {
-            source: 'custom_location',
-            preferBoatIfWater: true
-          });
-        } else if (typeof appCtx.spawnOnRoad === 'function') {
-          appCtx.spawnOnRoad();
-        }
-        if (customSpawn?.mode !== 'boat' && !appCtx.boatMode?.active) {
+        // loadRoads publishes the world and applies its final arrival once.
+        // Do not run a second title-layer spawn over that resolved surface.
+        if (!appCtx.boatMode?.active) {
           resetTitleEarthTravelMode('globe_location_change');
         }
         return true;
@@ -498,6 +536,7 @@ function initTitleScreenUi({
       refX: sharedExperienceParams.refX,
       refY: sharedExperienceParams.refY,
       refZ: sharedExperienceParams.refZ,
+      refRoadId: sharedExperienceParams.refRoadId,
       yaw: sharedExperienceParams.yaw,
       pitch: sharedExperienceParams.pitch
     };
@@ -538,6 +577,24 @@ function initTitleScreenUi({
 
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ? appCtx.consumePendingFlowerChallengeStart() : false;
     appCtx.loadingScreenMode = requestedLaunchMode;
+    const selectedLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
+    const launchLoadingText = requestedLaunchMode === 'earth'
+      ? `Loading ${String(selectedLocation?.name || 'the selected location')}...`
+      : requestedLaunchMode === 'ocean'
+        ? 'Diving Into Ocean Mode...'
+        : requestedLaunchMode === 'moon'
+          ? 'Approaching The Moon...'
+          : requestedLaunchMode === 'mars'
+            ? 'Approaching Olympus Mons...'
+            : 'Preparing Space Flight...';
+    // Publish the opaque loading cover before hiding the title shell or
+    // exposing any gameplay HUD. The world and actor must never become the
+    // transition background while their scene is still being assembled.
+    appCtx.showLoad?.(launchLoadingText, {
+      mode: requestedLaunchMode,
+      bold: true,
+      overlay: 0.24
+    });
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('hud')?.classList.add('show');
     document.getElementById('minimap')?.classList.add('show');
@@ -545,19 +602,24 @@ function initTitleScreenUi({
     document.getElementById('floatMenuContainer')?.classList.add('show');
     document.getElementById('mainMenuBtn')?.classList.add('show');
     document.getElementById('controlsTab')?.classList.add('show');
+    const accessibilitySettings = document.getElementById('accessibilitySettings');
+    const mobileControlSettings = document.getElementById('mobileControlSettings');
+    if (accessibilitySettings && mobileControlSettings?.parentElement) mobileControlSettings.after(accessibilitySettings);
     document.getElementById('coords')?.classList.add('show');
     document.getElementById('historicBtn')?.classList.add('show');
     document.getElementById('memoryFlowerFloatBtn')?.classList.add('show');
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
-    if (requestedLaunchMode !== 'ocean') void appCtx.ensureStarCatalogLoaded?.();
+    appCtx.kickOptionalRuntimeBoot?.('boot');
+    if (requestedLaunchMode !== 'ocean' && requestedLaunchMode !== 'earth') {
+      void appCtx.ensureStarCatalogLoaded?.();
+    }
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
     if (requestedLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
-      if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 1100);
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
       const selectedOceanLocation = appCtx.resolveLocationSelection?.() || appCtx.customLoc || null;
       const oceanStarted = appCtx.startOceanMode({
@@ -572,6 +634,8 @@ function initTitleScreenUi({
       });
       if (oceanStarted === false) throw new Error('Ocean mode did not accept the selected coordinates.');
       updateControlsModeUI?.();
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      appCtx.hideLoad?.();
       appCtx.loadingScreenMode = 'earth';
       return true;
     }
@@ -605,15 +669,10 @@ function initTitleScreenUi({
     }
 
     await appCtx.loadRoads();
-    let customSpawn = null;
-    if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
-      customSpawn = appCtx.applyCustomLocationSpawn('walk', {
-        source: 'title_custom_start',
-        preferBoatIfWater: true
-      });
-    }
-
-    const startedOnWater = customSpawn?.mode === 'boat' || appCtx.boatMode?.active === true;
+    scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
+      timeout: 1800
+    });
+    const startedOnWater = appCtx.boatMode?.active === true;
     if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
     if (!startedOnWater && appCtx.Walk) {
       appCtx.Walk.state.view = 'third';
@@ -658,6 +717,10 @@ function initTitleScreenUi({
     document.getElementById('fPaths')?.classList.remove('on');
     document.getElementById('fLandUse')?.classList.remove('on');
     document.getElementById('fLandUseRE')?.classList.remove('on');
+    // World publication and all entry-mode setup are complete. A late optional
+    // loader may have reasserted the transition overlay after loadRoads hid it;
+    // the title launch owns the final handoff to playable input.
+    appCtx.hideLoad?.();
     appCtx.loadingScreenMode = 'earth';
     return true;
   };
@@ -666,9 +729,14 @@ function initTitleScreenUi({
   requestTitleStart = () => {
     if (titleStartPromise) return titleStartPromise;
     const pending = runTitleStart();
-    const tracked = pending.finally(() => {
-      if (titleStartPromise === tracked) titleStartPromise = null;
-    });
+    const tracked = pending
+      .catch((error) => {
+        appCtx.hideLoad?.();
+        throw error;
+      })
+      .finally(() => {
+        if (titleStartPromise === tracked) titleStartPromise = null;
+      });
     titleStartPromise = tracked;
     return titleStartPromise;
   };
@@ -688,7 +756,10 @@ function initTitleScreenUi({
     titleStartButton.setAttribute('aria-busy', runtimeReady ? 'false' : 'true');
   }
 
-  if (!sharedExperienceParams && !appCtx.gameStarted) {
+  // The hub owns the complete pre-game UI. Shared links pre-populate it; they
+  // do not bypass it. Leaving both titleScreen and globeSelectorScreen hidden
+  // produced a blank sky/ground shell for every lat/lon share URL.
+  if (!appCtx.gameStarted) {
     window.requestAnimationFrame(() => globeSelector.open());
   }
 

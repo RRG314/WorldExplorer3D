@@ -1,16 +1,16 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=17";
+} from "../surface-rules.js?v=18";
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
   worldCoverProviderSnapshot,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=16";
+} from "./worldcover-baseline.js?v=17";
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import { latLonToTileXY } from './tile-coordinates.js?v=1';
-import { pointInMappedLandArea } from './far-field-mapped-context.js?v=17';
+import { pointInMappedLandArea } from './far-field-mapped-context.js?v=20';
 import { refreshWorldBiomeFromWorldCoverStats, worldCoverStatsForLocation } from './worldcover-biome-state.js?v=1';
 import {
   applyTerrainProfileSurfaceMaterialMix,
@@ -18,8 +18,10 @@ import {
   applyWorldCoverSurfaceMaterialMix,
   configureTerrainSurfaceMaterialBlend,
   ensureTerrainSurfaceMixAttributes,
+  setNormalizedTerrainAttribute,
   setTerrainSurfaceMaterialMixAt
-} from './surface-material-blend.js?v=1';
+} from './surface-material-blend.js?v=2';
+import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 
 const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
@@ -425,7 +427,7 @@ export function applyWorldCoverVertexTints(mesh, result) {
   const encodingScale = Number(result?.surfaceTintEncodingScale || 170);
   if (!geometry || !uvs || !tints || size < 2 || encodingScale <= 0) return false;
 
-  const colors = new Float32Array(uvs.count * 3);
+  const colors = new Uint8Array(uvs.count * 3);
   const sample = (x, y, channel) => tints[(y * size + x) * 3 + channel] / encodingScale;
   for (let index = 0; index < uvs.count; index += 1) {
     const sourceX = Math.max(0, Math.min(size - 1, uvs.getX(index) * (size - 1)));
@@ -439,10 +441,12 @@ export function applyWorldCoverVertexTints(mesh, result) {
     for (let channel = 0; channel < 3; channel += 1) {
       const north = sample(x0, y0, channel) * (1 - tx) + sample(x1, y0, channel) * tx;
       const south = sample(x0, y1, channel) * (1 - tx) + sample(x1, y1, channel) * tx;
-      colors[index * 3 + channel] = north * (1 - ty) + south * ty;
+      colors[index * 3 + channel] = Math.round(
+        Math.max(0, Math.min(1, north * (1 - ty) + south * ty)) * 255
+      );
     }
   }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
   geometry.attributes.color.needsUpdate = true;
   mesh.material.vertexColors = true;
   return true;
@@ -457,6 +461,7 @@ export function applyMappedSemanticVertexTints(
   const positions = geometry?.attributes?.position;
   const contextZoom = Number(mappedContext?.contextZoom || 0);
   const buckets = mappedContext?.landAreasByTile;
+  const spatialBuckets = mappedContext?.landAreaSpatialByTile;
   if (!geometry || !positions || !buckets?.get || contextZoom <= 0 ||
       typeof appCtx.worldToLatLon !== 'function') return 0;
   if (options.force !== true && mesh.userData?.mappedSemanticTintContext === mappedContext) {
@@ -465,27 +470,71 @@ export function applyMappedSemanticVertexTints(
 
   let colors = geometry.attributes.color;
   if (!colors || colors.count !== positions.count) {
-    const neutral = new Float32Array(positions.count * 3);
-    neutral.fill(1);
-    colors = new THREE.Float32BufferAttribute(neutral, 3);
+    const neutral = new Uint8Array(positions.count * 3);
+    neutral.fill(255);
+    colors = new THREE.BufferAttribute(neutral, 3, true);
     geometry.setAttribute('color', colors);
   }
   const materialMix = ensureTerrainSurfaceMixAttributes(geometry);
+  const separableLocalProjection = Math.abs(Number(appCtx.LOC?.lat || 0)) < 84;
+  const longitudeTileByWorldX = separableLocalProjection ? new Map() : null;
+  const latitudeTileByWorldZ = separableLocalProjection ? new Map() : null;
   let tintedVertices = 0;
   for (let index = 0; index < positions.count; index += 1) {
-    const geographic = appCtx.worldToLatLon(
-      positions.getX(index) + Number(mesh.position?.x || 0),
-      positions.getZ(index) + Number(mesh.position?.z || 0)
-    );
-    const tile = latLonToTileXY(geographic.lat, geographic.lon, contextZoom);
-    const bucket = buckets.get(`${contextZoom}/${tile.x}/${tile.y}`) || [];
+    const worldX = positions.getX(index) + Number(mesh.position?.x || 0);
+    const worldZ = positions.getZ(index) + Number(mesh.position?.z || 0);
+    let geographic;
+    let tile;
+    if (separableLocalProjection) {
+      let longitudeTile = longitudeTileByWorldX.get(worldX);
+      if (!longitudeTile) {
+        const longitude = appCtx.worldToLatLon(worldX, 0).lon;
+        longitudeTile = {
+          longitude,
+          tileX: latLonToTileXY(Number(appCtx.LOC?.lat || 0), longitude, contextZoom).x
+        };
+        longitudeTileByWorldX.set(worldX, longitudeTile);
+      }
+      let latitudeTile = latitudeTileByWorldZ.get(worldZ);
+      if (!latitudeTile) {
+        const latitude = appCtx.worldToLatLon(0, worldZ).lat;
+        latitudeTile = {
+          latitude,
+          tileY: latLonToTileXY(latitude, Number(appCtx.LOC?.lon || 0), contextZoom).y
+        };
+        latitudeTileByWorldZ.set(worldZ, latitudeTile);
+      }
+      geographic = { lat: latitudeTile.latitude, lon: longitudeTile.longitude };
+      tile = { x: longitudeTile.tileX, y: latitudeTile.tileY };
+    } else {
+      geographic = appCtx.worldToLatLon(worldX, worldZ);
+      tile = latLonToTileXY(geographic.lat, geographic.lon, contextZoom);
+    }
+    const bucketKey = `${contextZoom}/${tile.x}/${tile.y}`;
+    let bucket = buckets.get(bucketKey) || [];
+    const spatial = spatialBuckets?.get?.(bucketKey);
+    if (spatial) {
+      const { bounds, latSpan, lonSpan, size } = spatial;
+      if (
+        geographic.lon < bounds.minLon || geographic.lon > bounds.maxLon ||
+        geographic.lat < bounds.minLat || geographic.lat > bounds.maxLat
+      ) {
+        bucket = [];
+      } else {
+        const cellX = Math.max(0, Math.min(size - 1,
+          Math.floor((geographic.lon - bounds.minLon) / lonSpan * size)));
+        const cellY = Math.max(0, Math.min(size - 1,
+          Math.floor((geographic.lat - bounds.minLat) / latSpan * size)));
+        bucket = spatial.cells[cellY * size + cellX] || [];
+      }
+    }
     const owner = bucket.find((area) => pointInMappedLandArea(
       geographic.lon,
       geographic.lat,
       area
     ));
     if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
-    colors.setXYZ(index, owner.tint[0], owner.tint[1], owner.tint[2]);
+    setNormalizedTerrainAttribute(colors, index, owner.tint);
     setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);
     tintedVertices += 1;
   }
@@ -520,7 +569,13 @@ function applyLoadedWorldCoverBaseline(mesh) {
   if (semanticProfile) {
     mesh.userData.terrainVisualProfile = semanticProfile;
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
-    applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
+    // WorldCover immediately publishes the complete per-vertex baseline below.
+    // This call owns only texture/material setup; publishing a fallback mix
+    // here would be overwritten in the same stack before a frame can render.
+    applyTerrainVisualProfile(mesh, semanticProfile, null, {
+      queueWorldCover: false,
+      deferSurfaceMaterialMix: true
+    });
   }
   if (result.surfaceTints) {
     const ownDetailMode = resolveWorldCoverDetailMode(semanticProfile, result);
@@ -772,18 +827,37 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   applyGroundFallbackProfile(nextProfile);
   mat.emissiveMap = null;
   mat.needsUpdate = true;
-  applyTerrainProfileSurfaceMaterialMix(mesh, nextMode);
-  applyMappedSemanticVertexTints(mesh);
-  applyTerrainReliefMaterialMix(mesh);
-  applyTerrainSemanticMaterialBlend(mesh, textureRepeats);
-  if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
+  const phaseTotals = appCtx._terrainSurfaceProfilePhaseTotals || null;
+  const measure = (name, task) => {
+    if (!phaseTotals) return task();
+    const startedAt = performance.now();
+    try {
+      return task();
+    } finally {
+      phaseTotals[name] = Number(phaseTotals[name] || 0) + performance.now() - startedAt;
+    }
+  };
+  const worldCoverOwnsFinalMix = options.queueWorldCover !== false && !!mesh.userData.worldCoverResult;
+  if (options.deferSurfaceMaterialMix !== true && !worldCoverOwnsFinalMix) {
+    measure('profileMaterialMix', () => applyTerrainProfileSurfaceMaterialMix(mesh, nextMode));
+    measure('mappedSemanticTints', () => applyMappedSemanticVertexTints(mesh));
+    measure('reliefMaterialMix', () => applyTerrainReliefMaterialMix(mesh));
+    measure('semanticMaterialBlend', () => applyTerrainSemanticMaterialBlend(mesh, textureRepeats));
+  }
+  if (options.queueWorldCover !== false) {
+    measure('worldCoverPublication', () => queueWorldCoverBaseline(mesh, tileBounds));
+  }
 }
 
 export function refreshTerrainSurfaceProfiles(profile = null) {
   const nextProfile = profile || appCtx.worldSurfaceProfile || null;
   if (appCtx.terrainGroup?.children?.length) {
+    const startedAt = performance.now();
+    const phaseTotals = appCtx._terrainSurfaceProfilePhaseTotals = Object.create(null);
+    let terrainMeshCount = 0;
     appCtx.terrainGroup.children.forEach((mesh) => {
       if (!mesh?.userData?.isTerrainMesh) return;
+      terrainMeshCount += 1;
       const bounds = mesh.userData?.terrainTile?.bounds || null;
       const minMeters = Number(mesh.userData?.minElevationMeters);
       const maxMeters = Number(mesh.userData?.maxElevationMeters);
@@ -798,9 +872,57 @@ export function refreshTerrainSurfaceProfiles(profile = null) {
         )
       );
     });
+    appCtx.terrainSurfaceProfileStats = Object.freeze({
+      terrainMeshCount,
+      phaseDurationsMs: Object.freeze({
+        ...Object.fromEntries(Object.entries(phaseTotals).map(([name, ms]) => [name, Number(ms.toFixed(2))])),
+        total: Number((performance.now() - startedAt).toFixed(2))
+      })
+    });
+    appCtx._terrainSurfaceProfilePhaseTotals = null;
     return;
   }
   applyGroundFallbackProfile(nextProfile);
+}
+
+export async function refreshTerrainSurfaceProfilesCooperatively(profile = null) {
+  const nextProfile = profile || appCtx.worldSurfaceProfile || null;
+  const meshes = Array.isArray(appCtx.terrainGroup?.children)
+    ? appCtx.terrainGroup.children.filter((mesh) => mesh?.userData?.isTerrainMesh)
+    : [];
+  if (!meshes.length) {
+    applyGroundFallbackProfile(nextProfile);
+    return;
+  }
+  const startedAt = performance.now();
+  const phaseTotals = appCtx._terrainSurfaceProfilePhaseTotals = Object.create(null);
+  for (let index = 0; index < meshes.length; index += 1) {
+    const mesh = meshes[index];
+    const bounds = mesh.userData?.terrainTile?.bounds || null;
+    const minMeters = Number(mesh.userData?.minElevationMeters);
+    const maxMeters = Number(mesh.userData?.maxElevationMeters);
+    const elevationStats = mesh.userData?.elevationStatsMeters || null;
+    applyTerrainVisualProfile(
+      mesh,
+      classifyTerrainVisualProfile(
+        bounds,
+        Number.isFinite(minMeters) ? minMeters : null,
+        Number.isFinite(maxMeters) ? maxMeters : null,
+        elevationStats
+      )
+    );
+    // Preserve every terrain vertex and semantic/material pass, but allow the
+    // loading image, progress UI, and browser input to paint between tiles.
+    await yieldToMainThread();
+  }
+  appCtx.terrainSurfaceProfileStats = Object.freeze({
+    terrainMeshCount: meshes.length,
+    phaseDurationsMs: Object.freeze({
+      ...Object.fromEntries(Object.entries(phaseTotals).map(([name, ms]) => [name, Number(ms.toFixed(2))])),
+      total: Number((performance.now() - startedAt).toFixed(2))
+    })
+  });
+  appCtx._terrainSurfaceProfilePhaseTotals = null;
 }
 
 export function setWorldSurfaceProfile(profile = null) {

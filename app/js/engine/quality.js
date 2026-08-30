@@ -1,19 +1,63 @@
-export function createProceduralEnvironmentMap(ctx, pmremGenerator) {
-  if (!pmremGenerator) return null;
+import {
+  buildEarthAtmosphereProfile,
+  createAtmosphereMaterial
+} from '../sky/earth-atmosphere.js?v=1';
+
+function buildProceduralEnvironmentTarget(ctx, profile) {
+  const pmremGenerator = ctx.appCtx.pmremGenerator;
+  if (!pmremGenerator || typeof THREE === 'undefined') return null;
+  const envScene = new THREE.Scene();
+  const envGeo = new THREE.BoxGeometry(20, 20, 20);
+  const envMat = createAtmosphereMaterial(profile, { name: 'WorldExplorerEarthEnvironment' });
+  if (!envMat) {
+    envGeo.dispose?.();
+    return null;
+  }
+  const envMesh = new THREE.Mesh(envGeo, envMat);
+  envScene.add(envMesh);
   try {
-    const envScene = new THREE.Scene();
-    const envGeo = new THREE.SphereGeometry(120, 8, 8);
-    const envMat = new THREE.MeshBasicMaterial({
-      color: 0x87ceeb,
-      side: THREE.BackSide
-    });
-    const envMesh = new THREE.Mesh(envGeo, envMat);
-    envScene.add(envMesh);
-    return pmremGenerator.fromScene(envScene, 0.04).texture;
+    return pmremGenerator.fromScene(envScene, 0.025, 0.1, 100);
   } catch (err) {
     console.warn('Procedural environment map generation failed:', err);
     return null;
+  } finally {
+    envScene.remove(envMesh);
+    envGeo.dispose?.();
+    envMat.dispose?.();
   }
+}
+
+export function refreshProceduralEnvironment(ctx, profile = null, options = {}) {
+  const nextProfile = profile || buildEarthAtmosphereProfile(null, null, {
+    phase: 'day',
+    backgroundHex: 0x87ceeb
+  });
+  if (
+    options.force !== true &&
+    ctx.state.fallbackEnvMap &&
+    ctx.state.fallbackEnvSignature === nextProfile.signature
+  ) {
+    return ctx.state.fallbackEnvMap;
+  }
+  const nextTarget = buildProceduralEnvironmentTarget(ctx, nextProfile);
+  if (!nextTarget?.texture) return ctx.state.fallbackEnvMap || null;
+
+  const previousTarget = ctx.state.fallbackEnvTarget;
+  const previousMap = ctx.state.fallbackEnvMap;
+  ctx.state.fallbackEnvTarget = nextTarget;
+  ctx.state.fallbackEnvMap = nextTarget.texture;
+  ctx.state.fallbackEnvSignature = nextProfile.signature;
+  if (!ctx.state.hdrEnvMap || ctx.state.renderQualityLevel === ctx.RENDER_QUALITY_LOW || ctx.appCtx.scene.environment === previousMap) {
+    ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap;
+  }
+  if (previousTarget && previousTarget !== nextTarget) previousTarget.dispose?.();
+  return ctx.state.fallbackEnvMap;
+}
+
+export function createProceduralEnvironmentMap(ctx, pmremGenerator) {
+  if (!pmremGenerator) return null;
+  ctx.appCtx.pmremGenerator = pmremGenerator;
+  return refreshProceduralEnvironment(ctx, ctx.appCtx.earthAtmosphereProfile || null, { force: true });
 }
 
 export function getShadowMapResolution(ctx, level) {
@@ -49,9 +93,16 @@ export function applyRenderQuality(ctx, level, options = {}) {
 
   if (ctx.state.carPaintMaterial) {
     const high = normalized === ctx.RENDER_QUALITY_HIGH;
-    ctx.state.carPaintMaterial.envMapIntensity = high ? 1.5 : normalized === ctx.RENDER_QUALITY_MED ? 1.2 : 0.65;
-    ctx.state.carPaintMaterial.roughness = high ? 0.14 : 0.2;
-    ctx.state.carPaintMaterial.metalness = high ? 0.95 : 0.88;
+    const utilityMatte = ctx.state.carPaintMaterial.userData?.vehiclePaintFinish === 'utility-matte';
+    ctx.state.carPaintMaterial.envMapIntensity = utilityMatte
+      ? (high ? 0.9 : normalized === ctx.RENDER_QUALITY_MED ? 0.7 : 0.4)
+      : (high ? 1.5 : normalized === ctx.RENDER_QUALITY_MED ? 1.2 : 0.65);
+    ctx.state.carPaintMaterial.roughness = utilityMatte
+      ? (high ? 0.44 : normalized === ctx.RENDER_QUALITY_MED ? 0.52 : 0.6)
+      : (high ? 0.14 : 0.2);
+    ctx.state.carPaintMaterial.metalness = utilityMatte
+      ? (high ? 0.3 : normalized === ctx.RENDER_QUALITY_MED ? 0.24 : 0.18)
+      : (high ? 0.95 : 0.88);
     if ('clearcoat' in ctx.state.carPaintMaterial) {
       ctx.state.carPaintMaterial.clearcoat = 0.0;
       ctx.state.carPaintMaterial.clearcoatRoughness = 1.0;
@@ -72,6 +123,17 @@ export function ensureHdrEnvironment(ctx) {
     ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap;
   }
   if (typeof ctx.appCtx.updatePerfPanel === 'function') ctx.appCtx.updatePerfPanel(true);
+}
+
+export function getEnvironmentLightingSnapshot(ctx) {
+  return Object.freeze({
+    authority: 'engine-quality-environment',
+    targetCount: ctx.state.fallbackEnvTarget ? 1 : 0,
+    signature: ctx.state.fallbackEnvSignature || null,
+    hasEnvironmentMap: !!ctx.state.fallbackEnvMap,
+    active: ctx.appCtx.scene?.environment === ctx.state.fallbackEnvMap,
+    quality: ctx.state.renderQualityLevel
+  });
 }
 
 export function setRenderQualityLevel(ctx, level, options = {}) {

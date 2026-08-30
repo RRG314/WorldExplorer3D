@@ -369,13 +369,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: none;
   backdrop-filter: blur(8px);
 }
-.hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 14px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 Orbitron, sans-serif; }
-.hud-box::after { content: attr(data-build-label); position: absolute; top: 18px; right: 16px; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; }
-.hud-box:not([data-build-label])::after { content: 'V4.2.0 · SOURCE'; }
+.hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 24px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 Orbitron, sans-serif; }
+.hud-box::after { content: attr(data-build-label); position: absolute; top: 39px; left: 16px; max-width: 190px; overflow: hidden; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.hud-box:not([data-build-label])::after { content: 'V5.1.0 · SOURCE'; }
 #hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
 #speed { color: var(--wx-text); font-family: Orbitron, sans-serif; }
 .hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }
 #weatherLine, #street, #hudClockDisplay { color: var(--wx-text); }
+#hudClockDisplay { position: static; width: 100%; margin-top: 8px; padding-top: 6px; transform: none; border-top: 1px solid var(--wx-line-soft); }
 #boostBar { background: #27323b; border-radius: 0; }
 #boostFill { background: var(--wx-blue); border-radius: 0; }
 #coords {
@@ -466,7 +467,8 @@ body.deflock-active .floatBtn::after {
   border-left: 1px solid var(--wx-line-soft);
   overflow-y: auto;
 }
-.floatItems::before { content: 'SYSTEM CONTROLS'; position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 Orbitron, sans-serif; }
+.floatItems::before { content: attr(data-menu-title); position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 Orbitron, sans-serif; }
+.floatItems:not([data-menu-title])::before { content: 'SYSTEM CONTROLS'; }
 .floatItem {
   min-height: 54px;
   box-sizing: border-box;
@@ -489,6 +491,11 @@ body.deflock-active .floatBtn::after {
   font: 600 9px/1 Orbitron, sans-serif;
   letter-spacing: 0.1em;
 }
+#gameMenu .floatItems { padding-bottom: 18px; }
+#gameMenu .floatItemSection { padding-top: 16px; }
+#gameMenu .floatItemSection:first-of-type { padding-top: 4px; }
+#gameMenu .floatItem { min-height: 50px; }
+[hidden] { display: none !important; }
 .mainMenuBtn {
   top: 0;
   right: 0;
@@ -606,25 +613,9 @@ body.deflock-active .floatBtn::after {
   }
   .floatMenu.open .floatItems { display: grid; }
   .floatItem { min-height: 48px; padding: 8px; font-size: 9px; white-space: normal; }
-  #mobileTouchControls.show { display: block; }
-  .mobilePad { width: 136px; height: 136px; top: auto; transform: none; gap: 3px; }
-  #mobileMovePad { left: 16px; right: auto; bottom: 104px; border: 1px solid rgba(255,255,255,0.45); border-radius: 50%; background: rgba(3,9,14,0.34); }
-  #mobileLookPad { left: auto; right: 16px; top: auto; bottom: 238px; width: 112px; height: 112px; }
-  .mobileNavBtn { border: 1px solid rgba(255,255,255,0.42); border-radius: 50%; background: rgba(6, 13, 19, 0.68); box-shadow: none; }
-  .mobilePadLabel { border-radius: 50%; color: var(--wx-text); background: rgba(255,255,255,0.18); }
-  #mobileActionStack { left: auto; right: 16px; top: auto; bottom: 104px; width: 112px; transform: none; }
-  .mobileActionBtn { min-width: 112px; min-height: 52px; border: 1px solid rgba(255,255,255,0.48); border-radius: 26px; background: rgba(6, 13, 19, 0.72); box-shadow: none; }
-  #mobileTouchControls.mode-driving #mobileMoveLeft,
-  #mobileTouchControls.mode-driving #mobileMoveRight,
-  #mobileTouchControls.mode-driving #mobileLookUp,
-  #mobileTouchControls.mode-driving #mobileLookDown { display: flex; }
-  #mobileTouchControls.mode-driving #mobileMoveLabel,
-  #mobileTouchControls.mode-driving #mobileLookLabel { display: flex; }
-  #mobileTouchControls.mode-driving #mobileActionStack,
-  #mobileTouchControls.mode-rocket #mobileActionStack { left: auto; right: 16px; top: auto; bottom: 104px; width: 112px; transform: none; }
-  #mobileTouchControls.mode-driving .mobileActionBtn,
-  #mobileTouchControls.mode-rocket .mobileActionBtn { min-width: 112px; }
-  #mobileTouchControls.mode-rocket #mobileLookPad { left: auto; right: 16px; top: auto; bottom: 238px; }
+  #gameMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
+  #gameMenu .floatItemSection:first-of-type { padding-top: 0; }
+  #gameMenu .floatItem { min-height: 48px; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }
   body.deflock-active .floatBtn { height: 58px; padding: 5px 2px 3px; }
@@ -636,10 +627,16 @@ body.deflock-active .floatBtn::after {
 @media (max-width: 390px) {
   .tab-content { bottom: 108px; }
   .loc-grid { grid-template-columns: 1fr; }
-  #mobileMovePad { width: 122px; height: 122px; left: 10px; }
-  #mobileLookPad { right: 10px; width: 100px; height: 100px; }
-  #mobileActionStack { right: 10px; width: 104px; }
-  .mobileActionBtn { min-width: 104px; }
+  body.solid-world-active #solidWorldPanel {
+    top: 76px !important;
+    right: 12px;
+    left: 12px !important;
+    max-width: none !important;
+  }
+  body.solid-world-active #solidWorldReturnBtn {
+    right: 12px !important;
+    min-height: 44px;
+  }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
@@ -647,8 +644,5 @@ body.deflock-active .floatBtn::after {
   #coords { top: auto; bottom: 170px; width: 148px; }
   .hud-box { width: 100%; max-width: none; padding-bottom: 8px; }
   #controlsTab { top: 66px; right: 12px; }
-  #mobileMovePad { bottom: 86px; width: 112px; height: 112px; }
-  #mobileLookPad { right: 138px; bottom: 86px; width: 96px; height: 96px; }
-  #mobileActionStack { bottom: 88px; }
 }
 }

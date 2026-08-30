@@ -1,31 +1,36 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=48";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=63";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=25";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=28";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
   resolveMappedRoof
-} from "./mapped-roof-geometry.js?v=5";
+} from "./mapped-roof-geometry.js?v=6";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=8";
+} from "./building-batching.js?v=12";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
-import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=6';
+import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=8';
 import {
   classifyBuildingWaterRelationship,
   createWaterAreaSpatialIndex,
   createMappedVesselMesh
-} from './water-adjacent-structures.js?v=3';
+} from './water-adjacent-structures.js?v=4';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
+import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
+
+export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
+  return String(tags._geometrySource || '') === 'inferred_road_frontage';
+}
 
 export async function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -38,6 +43,8 @@ export async function buildBuildingGeometryPass(options = {}) {
     metadataMatched: 0,
     mappedHeight: 0,
     mappedLevels: 0,
+    mappedTall: 0,
+    metadataMatchedTall: 0,
     inferredHeight: 0,
     inferredFullHeight: 0,
     inferredFullMinHeight: null,
@@ -59,12 +66,35 @@ export async function buildBuildingGeometryPass(options = {}) {
     farLod: 0,
     implausibleGeometry: 0,
     provenanceRejected: 0,
-    renderedFeatures: 0
+    renderedFeatures: 0,
+    foundationCollisionProfiles: 0,
+    foundationCollisionMismatches: 0
   };
+  loadMetrics.buildingPublication.foundationCollisionProfiles = Number(
+    loadMetrics.buildingPublication.foundationCollisionProfiles || 0
+  );
+  loadMetrics.buildingPublication.foundationCollisionMismatches = Number(
+    loadMetrics.buildingPublication.foundationCollisionMismatches || 0
+  );
   loadMetrics.buildingWater ||= {
     vessels: 0,
     explicitOverwaterStructures: 0,
     suppressedOverlaps: 0
+  };
+  loadMetrics.buildingRoadAuthority ||= {
+    constrainedBuildings: 0,
+    constrainedRoads: 0,
+    constrainedSegments: 0,
+    gradeSeparatedOverlaps: 0,
+    newlyNonDriveableRoads: 0,
+    newlyNonDriveableSegments: 0,
+    nonDriveableSegments: 0,
+    minimumResolvedWidth: null,
+    suppressedCenterlineConflicts: 0,
+    suppressedMappedCrossSectionConflicts: 0,
+    suppressedInferredFootprintConflicts: 0,
+    suppressedInsufficientClearanceConflicts: 0,
+    unresolvedAtGradeConflicts: 0
   };
   appCtx.buildingProvenanceRecords ||= [];
   appCtx.buildingProvenanceFeatureIds ||= new Set(
@@ -95,6 +125,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       world: appCtx.geoToWorld(landmark.lat, landmark.lon)
     }));
   const waterAreaIndex = createWaterAreaSpatialIndex(appCtx.waterAreas);
+  const suppressedBuildingIds = new Set(appCtx.getSuppressedEditableBuildingIds?.() || []);
 
   showLoad(`Loading buildings... (${buildingWays.length})`);
   startLoadPhase('buildBuildingGeometry');
@@ -102,10 +133,11 @@ export async function buildBuildingGeometryPass(options = {}) {
   startLoadPhase('buildBuildingRoadGuards');
   const {
     expandFootprintForGroundApron,
-    footprintIntersectsRoadCenterline,
     isBuildingNearLoadedRoad,
     overlapsRoadCorridor,
     pointOnRoadCorridor,
+    publishRoadCrossSectionProfiles,
+    resolveFootprintTransportAuthority,
     sampleFootprintCoverage
   } = await createBuildingRoadFootprintGuards({
     roads: appCtx.roads,
@@ -142,6 +174,11 @@ export async function buildBuildingGeometryPass(options = {}) {
   };
   for (let buildingIndex = 0; buildingIndex < buildingWays.length; buildingIndex += 1) {
     const way = buildingWays[buildingIndex];
+    const knownSourceBuildingId = String(way?.tags?._sourceFeatureId || way?.id || '');
+    if (knownSourceBuildingId && suppressedBuildingIds.has(knownSourceBuildingId)) {
+      loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
+      continue;
+    }
     try {
     loadMetrics.buildingPublication.candidates += 1;
     const pts = measureBuildingPhase('footprintPreparation', () => {
@@ -168,6 +205,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       const vesselMesh = createMappedVesselMesh(pts, waterSurfaceY, way.tags || {});
       if (vesselMesh) {
         vesselMesh.userData.waterRelationship = waterRelationship.kind;
+        vesselMesh.userData.buildingFootprint = pts;
         appCtx.addEarthWorldObject(vesselMesh);
         appCtx.buildingMeshes.push(vesselMesh);
         loadMetrics.buildingWater.vessels += 1;
@@ -176,16 +214,15 @@ export async function buildBuildingGeometryPass(options = {}) {
       continue;
     }
     const nearLoadedRoad = measureBuildingPhase('roadEligibility', () => isBuildingNearLoadedRoad(pts));
-    if (!nearLoadedRoad) {
+    if (!nearLoadedRoad && requiresLoadedRoadCoverageForBuilding(way.tags || {})) {
       loadMetrics.buildingPublication.outsideRoadCoverage += 1;
       continue;
     }
-    const roadCoreConflict = measureBuildingPhase('roadEligibility', () => footprintIntersectsRoadCenterline(pts));
-    if (roadCoreConflict) {
-      loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
-      loadMetrics.buildingPublication.roadOverlap += 1;
-      continue;
+    if (!nearLoadedRoad) {
+      loadMetrics.buildingPublication.retainedMappedBeyondRoadCoverage =
+        Number(loadMetrics.buildingPublication.retainedMappedBeyondRoadCoverage || 0) + 1;
     }
+    let roadCoreConflict = false;
     let centerX = 0;
     let centerZ = 0;
     let minFootprintX = Infinity;
@@ -281,6 +318,10 @@ export async function buildBuildingGeometryPass(options = {}) {
         dimensions.inferredFullHeightBuckets[bucket] = (dimensions.inferredFullHeightBuckets[bucket] || 0) + 1;
       }
     }
+    if (height >= 60 && ['explicit_height', 'levels'].includes(buildingSemantics.heightSource)) {
+      loadMetrics.buildingDimensions.mappedTall += 1;
+      if (way.tags._buildingMetadataSourceId) loadMetrics.buildingDimensions.metadataMatchedTall += 1;
+    }
     if (bt !== 'yes') loadMetrics.buildingDimensions.mappedType += 1;
     if (roofShape) loadMetrics.buildingDimensions.mappedRoof += 1;
     if (way.tags.name) loadMetrics.buildingDimensions.mappedName += 1;
@@ -297,6 +338,47 @@ export async function buildBuildingGeometryPass(options = {}) {
       way.id ||
       `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`
     );
+    const roadAuthority = measureBuildingPhase('roadEligibility', () =>
+      resolveFootprintTransportAuthority(pts, {
+        allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
+        inferredFootprint: way.tags._geometrySource === 'inferred_road_frontage',
+        sourceBuildingId
+      })
+    );
+    loadMetrics.buildingRoadAuthority.gradeSeparatedOverlaps +=
+      Number(roadAuthority.gradeSeparatedOverlaps || 0);
+    if (roadAuthority.action === 'constrain_inferred_width') {
+      loadMetrics.buildingRoadAuthority.constrainedBuildings += 1;
+      loadMetrics.buildingRoadAuthority.constrainedRoads += Number(roadAuthority.constrainedRoads || 0);
+      loadMetrics.buildingRoadAuthority.constrainedSegments += Number(roadAuthority.constrainedSegments || 0);
+      loadMetrics.buildingRoadAuthority.newlyNonDriveableRoads +=
+        Number(roadAuthority.newlyNonDriveableRoads || 0);
+      loadMetrics.buildingRoadAuthority.newlyNonDriveableSegments +=
+        Number(roadAuthority.newlyNonDriveableSegments || 0);
+      const resolvedWidth = Number(roadAuthority.minimumResolvedWidth);
+      if (Number.isFinite(resolvedWidth)) {
+        const currentMinimum = Number(loadMetrics.buildingRoadAuthority.minimumResolvedWidth);
+        loadMetrics.buildingRoadAuthority.minimumResolvedWidth = Number.isFinite(currentMinimum) && currentMinimum > 0
+          ? Math.min(currentMinimum, resolvedWidth)
+          : resolvedWidth;
+      }
+    } else if (roadAuthority.action === 'suppress_building') {
+      roadCoreConflict = true;
+      const counter = {
+        mapped_centerline_conflict: 'suppressedCenterlineConflicts',
+        mapped_cross_section_conflict: 'suppressedMappedCrossSectionConflicts',
+        inferred_footprint_conflict: 'suppressedInferredFootprintConflicts',
+        insufficient_centerline_clearance: 'suppressedInsufficientClearanceConflicts'
+      }[roadAuthority.reason];
+      if (counter) loadMetrics.buildingRoadAuthority[counter] += 1;
+      else loadMetrics.buildingRoadAuthority.unresolvedAtGradeConflicts += 1;
+      loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
+      loadMetrics.buildingPublication.roadOverlap += 1;
+      continue;
+    }
+    if (!knownSourceBuildingId && suppressedBuildingIds.has(sourceBuildingId)) {
+      loadMetrics.buildingPublication.locallySuppressed = Number(loadMetrics.buildingPublication.locallySuppressed || 0) + 1;
+    }
     const roadCorridorOverlap = measureBuildingPhase('apronClassification', () => {
       const expandedFootprint = expandFootprintForGroundApron(pts);
       const roadCorridorStats = sampleFootprintCoverage(expandedFootprint, pointOnRoadCorridor);
@@ -393,9 +475,19 @@ export async function buildBuildingGeometryPass(options = {}) {
       appCtx.buildingProvenanceFeatureIds.add(buildingProvenance.identity.featureId);
     }
     const baseElevation = baseElevationRaw + structureBaseOffset;
-    const collisionBaseElevation = maxElevation + 0.03 + structureBaseOffset;
     // Bound downhill foundations so cliff outliers cannot create towers.
-    const mappedRoof = measureBuildingPhase('meshCreation', () => resolveMappedRoof(way.tags, height, buildingSemantics, pts));
+    const mappedRoof = measureBuildingPhase('meshCreation', () => resolveMappedRoof(
+      way.tags,
+      height,
+      buildingSemantics,
+      pts,
+      {
+        buildingType: bt,
+        denseUrban: denseUrbanContext,
+        footprintArea,
+        levels: resolvedLevels
+      }
+    ));
     const bodyHeight = (mappedRoof ? Math.max(0.05, mappedRoof.wallHeight) : height) + terrainFoundationRise;
     const renderedHeight = height + terrainFoundationRise;
     const fallbackBaseColor = pickBuildingBaseColor(bt, bSeed ^ Math.floor(br2 * 0xffff));
@@ -471,7 +563,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.bodyHeightMeters = bodyHeight;
     mesh.userData.renderedHeightMeters = renderedHeight;
     mesh.userData.terrainFoundationRise = terrainFoundationRise;
-    mesh.userData.collisionBaseElevation = collisionBaseElevation;
+    mesh.userData.collisionBaseElevation = baseElevation;
     mesh.userData.heightSource = buildingSemantics.heightSource;
     mesh.userData.levels = resolvedLevels;
     mesh.userData.levelsSource = levelsSource;
@@ -497,7 +589,10 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.structureBaseOffset = structureBaseOffset;
     mesh.userData.structureSemantics = structureSemantics;
 
-    const colliderRef = measureBuildingPhase('collisionPublication', () => registerBuildingCollision(pts, height, {
+    // The rendered body owns the downhill foundation segment. Publish that
+    // same vertical extent to collision so a visible wall cannot be traversed
+    // below the former uphill-only collision base.
+    const colliderRef = measureBuildingPhase('collisionPublication', () => registerBuildingCollision(pts, renderedHeight, {
       detail: colliderDetail,
       centerX,
       centerZ,
@@ -521,16 +616,23 @@ export async function buildBuildingGeometryPass(options = {}) {
       metadataSourceId: way.tags._buildingMetadataSourceId || '',
       buildingProvenance,
       minLevels: Number.isFinite(buildingSemantics.buildingMinLevel) ? buildingSemantics.buildingMinLevel : null,
-      baseY: collisionBaseElevation,
+      baseY: baseElevation,
       buildingSemantics,
       structureSemantics
     }));
     if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
     else loadMetrics.colliders.simplified += 1;
     if (colliderRef) {
-      colliderRef.baseY = collisionBaseElevation;
-      colliderRef.minY = collisionBaseElevation;
-      colliderRef.maxY = collisionBaseElevation + height;
+      colliderRef.baseY = baseElevation;
+      colliderRef.minY = baseElevation;
+      colliderRef.maxY = baseElevation + renderedHeight;
+      loadMetrics.buildingPublication.foundationCollisionProfiles += 1;
+      if (
+        Math.abs(colliderRef.minY - baseElevation) > 1e-6 ||
+        Math.abs(colliderRef.maxY - (baseElevation + renderedHeight)) > 1e-6
+      ) {
+        loadMetrics.buildingPublication.foundationCollisionMismatches += 1;
+      }
     }
 
     appCtx.addEarthWorldObject(mesh);
@@ -551,6 +653,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       mappedRoofMesh.userData.geometrySource = way.tags._geometrySource || 'osm';
       mappedRoofMesh.userData.buildingProvenance = buildingProvenance;
       mappedRoofMesh.userData.lodTier = lodTier;
+      mappedRoofMesh.userData.terrainFoundationRise = terrainFoundationRise;
       appCtx.addEarthWorldObject(mappedRoofMesh);
       appCtx.buildingMeshes.push(mappedRoofMesh);
     }
@@ -610,6 +713,7 @@ export async function buildBuildingGeometryPass(options = {}) {
           return;
         }
         groundPatch.userData.landuseFootprint = pts;
+        groundPatch.userData.sourceBuildingId = sourceBuildingId;
         groundPatch.userData.landuseType = 'buildingGround';
         groundPatch.userData.avgElevation = baseElevation;
         groundPatch.userData.terrainAvgElevation = avgElevation;
@@ -639,6 +743,16 @@ export async function buildBuildingGeometryPass(options = {}) {
     }
   }
 
+  const roadCrossSectionPublication = publishRoadCrossSectionProfiles();
+  loadMetrics.buildingRoadAuthority.authority = roadCrossSectionPublication.authority;
+  loadMetrics.buildingRoadAuthority.constrainedRoads = roadCrossSectionPublication.constrainedRoads;
+  loadMetrics.buildingRoadAuthority.constrainedSegments = roadCrossSectionPublication.constrainedSegments;
+  loadMetrics.buildingRoadAuthority.nonDriveableSegments = roadCrossSectionPublication.nonDriveableSegments;
+  if (Number.isFinite(Number(roadCrossSectionPublication.minimumResolvedWidth))) {
+    loadMetrics.buildingRoadAuthority.minimumResolvedWidth =
+      Number(roadCrossSectionPublication.minimumResolvedWidth);
+  }
+
   loadMetrics.buildings.geometryChunkSize = yieldEveryBuildings;
   loadMetrics.buildings.geometryYieldCount = buildingYieldCount;
   loadMetrics.buildings.geometryWorkMs = Number(buildingWorkMs.toFixed(2));
@@ -649,6 +763,10 @@ export async function buildBuildingGeometryPass(options = {}) {
   ));
   loadMetrics.buildings.waterAreaIndex = waterAreaIndex.snapshot();
   endLoadPhase('buildBuildingGeometry');
+  startLoadPhase('publishBuildingFacadeEntrances');
+  const facadeEntrances = publishBuildingFacadeEntrances(appCtx);
+  loadMetrics.buildingFacadeEntrances = { ...facadeEntrances.diagnostics };
+  endLoadPhase('publishBuildingFacadeEntrances');
   startLoadPhase('batchBuildingGeometry');
   const batchScheduling = { yieldToMainThread };
   const batchedNearCount = appCtx.disableNearBuildingBatching
@@ -660,10 +778,14 @@ export async function buildBuildingGeometryPass(options = {}) {
   if (appCtx._lastBuildingBatchStats) {
     loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
   }
+  appCtx.refreshEditableBuildingVisibility?.();
   endLoadPhase('batchBuildingGeometry');
   return Object.freeze({
     candidateCount: buildingWays.length,
     renderedFeatureCount: Number(loadMetrics.buildingPublication.renderedFeatures || 0),
-    yieldCount: buildingYieldCount
+    foundationCollisionProfiles: Number(loadMetrics.buildingPublication.foundationCollisionProfiles || 0),
+    foundationCollisionMismatches: Number(loadMetrics.buildingPublication.foundationCollisionMismatches || 0),
+    yieldCount: buildingYieldCount,
+    ...loadMetrics.buildingRoadAuthority
   });
 }

@@ -2,25 +2,24 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=48";
+} from "../structure-semantics.js?v=63";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,
   updateStructureVisualVisibilityForContext
-} from "./structure-visual-meshes.js?v=20";
+} from "./structure-visual-meshes.js?v=26";
 import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=20";
+} from "./structure-tunnel-visuals.js?v=24";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
-} from "../world/bridge-safety.js?v=8";
+} from "../world/bridge-safety.js?v=13";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
-import { compileElevatedAssembly } from '../world/compiler/transport-structure-assembly.js?v=5';
 
 export function canPublishElevatedStructureVisual(feature) {
   if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;
@@ -110,6 +109,15 @@ export function collectStructureVisualInstances(deps = {}) {
     const feature = featuresToProcess[i];
     const semantics = feature?.structureSemantics;
     if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || !semantics) continue;
+    const sharedSurface = feature?.transportSurfacePresentation?.status === 'compiled'
+      ? feature.transportSurfacePresentation
+      : null;
+    if (
+      sharedSurface &&
+      String(feature.sourceFeatureId || '') !== String(sharedSurface.publisherFeatureId || '')
+    ) continue;
+    const visualSurface = sharedSurface || feature;
+    const sampleVisualSurfaceY = (x, z) => sampleFeatureSurfaceY(visualSurface, x, z);
     const category = String(semantics.featureCategory || feature.networkKind || feature.kind || "road").toLowerCase();
     const generalizedRoadVisual =
       category === 'road' &&
@@ -130,38 +138,28 @@ export function collectStructureVisualInstances(deps = {}) {
               4.2
         ) :
         10;
-    const visualPts =
-      typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
+    const visualPts = sharedSurface
+      ? sharedSurface.pts
+      : typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
         appCtx.subdivideRoadPoints(feature.pts, visualDetail) :
         feature.pts;
     const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
     const { distances, total } = polylineDistances(structurePts);
-    const structureAssembly = semantics.terrainMode === 'elevated'
-      ? feature.transportStructureAssembly || compileElevatedAssembly(
-          feature,
-          sampleTerrainHeight,
-          {
-            supportConflict: (candidateFeature, column) => supportPointConflictsWithDriveableRoad(
-              candidateFeature,
-              {
-                x: column.x,
-                z: column.z,
-                supportBottomY: column.terrainY,
-                supportTopY: column.topY,
-                columnRadius: column.width * 0.5,
-                roadIndex: roadConflictIndex
-              }
-            )
-          }
-        )
-      : null;
+    // The transport compiler is the only structure-assembly authority. The
+    // renderer must never repair a missing compilation product locally: that
+    // created provider/order-dependent bridges whose visual body could disagree
+    // with collision, navigation, and junction profiles.
+    const structureAssembly = feature.transportStructureAssembly || null;
     const transitionAnchorDistances =
       Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0 ?
         feature.structureTransitionAnchors
           .map((anchor) => Number(anchor?.distance))
           .filter((distance) => Number.isFinite(distance)) :
         [];
-    if (semantics.terrainMode === "elevated") {
+    if (
+      (semantics.terrainMode === "elevated" && structureAssembly?.family === 'elevated_road') ||
+      structureAssembly?.family === 'engineered_approach'
+    ) {
       if (suppressExteriorVisuals) continue;
       // Structural coverage is compiled once. Curvature, ramp classification,
       // nearby elevated roads, and feature length may tune detail, but may not
@@ -172,7 +170,7 @@ export function collectStructureVisualInstances(deps = {}) {
         Array.isArray(structureAssembly?.supportStations) &&
         structureAssembly.supportStations.length > 0;
       const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
-      const width = Math.max(2, Number(feature.width) || 4);
+      const width = Math.max(2, Number(visualSurface.width) || 4);
       const structureSpecification = feature?.transportStructureRef?.specification || {};
       const deckThickness = Number(structureSpecification.deckThickness) ||
         (isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11)));
@@ -184,11 +182,11 @@ export function collectStructureVisualInstances(deps = {}) {
         const dz = p2.z - p1.z;
         const segLen = Math.hypot(dx, dz);
         if (!(segLen > 0.35)) continue;
-        const startY = sampleFeatureSurfaceY(feature, p1.x, p1.z);
-        const endY = sampleFeatureSurfaceY(feature, p2.x, p2.z);
+        const startY = sampleVisualSurfaceY(p1.x, p1.z);
+        const endY = sampleVisualSurfaceY(p2.x, p2.z);
         const midX = (p1.x + p2.x) * 0.5;
         const midZ = (p1.z + p2.z) * 0.5;
-        const deckY = sampleFeatureSurfaceY(feature, midX, midZ);
+        const deckY = sampleVisualSurfaceY(midX, midZ);
         if (!Number.isFinite(deckY) || !Number.isFinite(startY) || !Number.isFinite(endY)) continue;
         const rotationY = Math.atan2(dx, dz);
         const nx = -dz / (segLen || 1);
@@ -427,18 +425,26 @@ export function collectStructureVisualInstances(deps = {}) {
         structureAssembly?.publishBody === true &&
         structureAssembly.total >= 0.5
       ) {
-        const rings = (structureAssembly.surfaceSamples || []).map((sample) => ({
-          x: sample.x,
-          y: sample.y,
-          z: sample.z,
-          thickness: sample.thickness
-        }));
+        const rings = sharedSurface
+          ? sharedSurface.pts.map((sample) => ({
+              x: sample.x,
+              y: sample.y,
+              z: sample.z,
+              thickness: structureAssembly.baseThickness
+            }))
+          : (structureAssembly.surfaceSamples || []).map((sample) => ({
+              x: sample.x,
+              y: sample.y,
+              z: sample.z,
+              thickness: sample.thickness
+            }));
         if (rings.length >= 2) {
           elevatedDeckShells.push({
             rings,
-            width: structureAssembly.width,
+            width: sharedSurface ? sharedSurface.width : structureAssembly.width,
             thickness: structureAssembly.baseThickness,
-            featureId: structureAssembly.featureId,
+            featureId: sharedSurface ? sharedSurface.id : structureAssembly.featureId,
+            featureIds: sharedSurface ? sharedSurface.memberFeatureIds : undefined,
             structureType: structureAssembly.structureType,
             bodyCoverage: structureAssembly.bodyCoverage
           });
@@ -463,7 +469,7 @@ export function collectStructureVisualInstances(deps = {}) {
           const point = samplePointAlongPolyline(structurePts, distance);
           if (!point) continue;
           const terrainY = sampleTerrainHeight(point.x, point.z);
-          const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+          const deckY = sampleVisualSurfaceY(point.x, point.z);
           const supportHeight = deckY - deckThickness - terrainY;
           if (!(supportHeight > 2.4)) continue;
           const pierWidth = Math.max(0.7, width * 0.22);
@@ -488,23 +494,42 @@ export function collectStructureVisualInstances(deps = {}) {
               z: column.z,
               scaleX: column.width,
               scaleY: column.height,
-              scaleZ: Math.max(1, column.width * 1.1)
+              scaleZ: Math.max(1, column.width * 1.1),
+              structureFamily: structureAssembly.family
             });
           }
-          const capHalfSpan = Math.max(
-            width * 0.42,
-            ...columns.map((column) => Math.abs(Number(column.offset) || 0) + column.width * 0.6)
-          );
-          addBeam(
-            capInstances,
-            station.x,
-            station.surfaceY - deckThickness - 0.18,
-            station.z,
-            capHalfSpan * 2,
-            0.34,
-            Math.max(0.58, ...columns.map((column) => column.width * 1.2)),
-            Math.atan2(station.tangentX, station.tangentZ)
-          );
+          if (station.publishCap !== false) {
+            const capHalfSpan = Math.max(
+              width * 0.42,
+              ...columns.map((column) => Math.abs(Number(column.offset) || 0) + column.width * 0.6)
+            );
+            addBeam(
+              capInstances,
+              station.x,
+              station.surfaceY - deckThickness - 0.18,
+              station.z,
+              capHalfSpan * 2,
+              0.34,
+              Math.max(0.58, ...columns.map((column) => column.width * 1.2)),
+              Math.atan2(station.tangentX, station.tangentZ)
+            );
+          }
+        }
+      }
+      if (!isConnectorLike && renderRoadSupports) {
+        for (const station of structureAssembly.terminalSupports || []) {
+          for (const column of station.columns || []) {
+            addSupportInstance({
+              x: column.x,
+              y: column.terrainY + column.height * 0.5,
+              z: column.z,
+              scaleX: column.width,
+              scaleY: column.height,
+              scaleZ: Math.max(1, column.width * 1.1),
+              supportKind: 'terminal_pier',
+              structureFamily: structureAssembly.family
+            });
+          }
         }
       }
 
@@ -512,7 +537,7 @@ export function collectStructureVisualInstances(deps = {}) {
         const point = samplePointAlongPolyline(structurePts, distance);
         if (!point) return;
         const terrainY = sampleTerrainHeight(point.x, point.z);
-        const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+        const deckY = sampleVisualSurfaceY(point.x, point.z);
         const supportHeight = deckY - 0.45 - terrainY;
         if (!(supportHeight > 1.4)) return;
         const nx = -point.tangentZ;
@@ -553,7 +578,9 @@ export function collectStructureVisualInstances(deps = {}) {
             scaleX: Math.max(2.4, width * 0.92),
             scaleY: abutment.height,
             scaleZ: Math.max(1.4, width * 0.38),
-            supportKind: 'abutment'
+            rotationY: Number(abutment.rotationY) || 0,
+            supportKind: 'abutment',
+            structureFamily: structureAssembly.family
           });
         }
       }

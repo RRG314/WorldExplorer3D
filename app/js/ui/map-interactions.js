@@ -7,6 +7,32 @@ const ACTIVITY_MARKER_HIT_RADIUS = 10;
 const DEFLOCK_MARKER_HIT_RADIUS = 10;
 const MINIMAP_ZOOM_MIN = 12;
 const MINIMAP_ZOOM_MAX = 18;
+const LARGE_MAP_ZOOM_MIN = 10;
+const LARGE_MAP_ZOOM_MAX = 18;
+let suppressLargeMapClick = false;
+
+function syncLargeMapBrowsingUi() {
+  const largeMap = document.getElementById('largeMap');
+  const status = document.getElementById('mapExplorerStatus');
+  const browsing = Number.isFinite(appCtx.largeMapCenterWorld?.x) && Number.isFinite(appCtx.largeMapCenterWorld?.z);
+  largeMap?.classList.toggle('browsing', browsing);
+  if (status) status.textContent = browsing ? 'Exploring away from your position' : 'Following your position';
+}
+
+function resetLargeMapBrowsing() {
+  appCtx.largeMapCenterWorld = null;
+  syncLargeMapBrowsingUi();
+}
+
+function adjustLargeMapZoom(delta = 0) {
+  const current = Math.round(Number(appCtx.largeMapZoom) || 14);
+  appCtx.largeMapZoom = Math.max(LARGE_MAP_ZOOM_MIN, Math.min(LARGE_MAP_ZOOM_MAX, current + delta));
+  const zoomLevel = document.getElementById('zoomLevel');
+  if (zoomLevel) zoomLevel.textContent = `Z ${appCtx.largeMapZoom}`;
+  document.getElementById('mapZoomIn')?.toggleAttribute('disabled', appCtx.largeMapZoom >= LARGE_MAP_ZOOM_MAX);
+  document.getElementById('mapZoomOut')?.toggleAttribute('disabled', appCtx.largeMapZoom <= LARGE_MAP_ZOOM_MIN);
+  appCtx.drawLargeMap?.();
+}
 
 function canvasPointerPoint(canvas, event) {
   const rect = canvas.getBoundingClientRect();
@@ -41,6 +67,10 @@ function bindLargeMapCanvasInteractions() {
 
   largeMapCanvas.addEventListener('click', (event) => {
     if (!appCtx.showLargeMap) return;
+    if (suppressLargeMapClick) {
+      suppressLargeMapClick = false;
+      return;
+    }
 
     const clickPoint = canvasPointerPoint(largeMapCanvas, event);
 
@@ -120,6 +150,52 @@ function bindLargeMapCanvasInteractions() {
       preferBoatIfWater: true
     });
   });
+
+  let panPointerId = null;
+  let lastPointer = null;
+  let panDistance = 0;
+  const endPan = (event) => {
+    if (panPointerId !== event.pointerId) return;
+    if (panDistance > 6) suppressLargeMapClick = true;
+    panPointerId = null;
+    lastPointer = null;
+    panDistance = 0;
+    largeMapCanvas.classList.remove('is-panning');
+    try { largeMapCanvas.releasePointerCapture(event.pointerId); } catch (_) {}
+  };
+
+  largeMapCanvas.addEventListener('pointerdown', (event) => {
+    if (!appCtx.showLargeMap || panPointerId !== null || event.button > 0) return;
+    panPointerId = event.pointerId;
+    lastPointer = { x: event.clientX, y: event.clientY };
+    panDistance = 0;
+    largeMapCanvas.classList.add('is-panning');
+    try { largeMapCanvas.setPointerCapture(event.pointerId); } catch (_) {}
+  });
+  largeMapCanvas.addEventListener('pointermove', (event) => {
+    if (panPointerId !== event.pointerId || !lastPointer || !appCtx.showLargeMap) return;
+    const dx = event.clientX - lastPointer.x;
+    const dy = event.clientY - lastPointer.y;
+    if (dx === 0 && dy === 0) return;
+    const rect = largeMapCanvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? largeMapCanvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? largeMapCanvas.height / rect.height : 1;
+    const center = appCtx.largeMapScreenToWorld(400 - dx * scaleX, 400 - dy * scaleY);
+    appCtx.largeMapCenterWorld = { x: center.x, z: center.z };
+    lastPointer = { x: event.clientX, y: event.clientY };
+    panDistance += Math.hypot(dx, dy);
+    syncLargeMapBrowsingUi();
+    appCtx.drawLargeMap?.();
+    event.preventDefault();
+  });
+  largeMapCanvas.addEventListener('pointerup', endPan);
+  largeMapCanvas.addEventListener('pointercancel', endPan);
+  largeMapCanvas.addEventListener('lostpointercapture', endPan);
+  largeMapCanvas.addEventListener('wheel', (event) => {
+    if (!appCtx.showLargeMap) return;
+    event.preventDefault();
+    adjustLargeMapZoom(event.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
 }
 
 function bindMapControls() {
@@ -129,6 +205,7 @@ function bindMapControls() {
   const minimapZoomOutBtn = document.getElementById('minimapZoomOut');
   const largeMap = document.getElementById('largeMap');
   const mapClose = document.getElementById('mapClose');
+  const mapRecenter = document.getElementById('mapRecenter');
   const mapLegend = document.getElementById('mapLegend');
   const mapSatelliteToggle = document.getElementById('mapSatelliteToggle');
   const mapRoadsToggle = document.getElementById('mapRoadsToggle');
@@ -157,12 +234,30 @@ function bindMapControls() {
   };
 
   syncMinimapZoomUi();
+  adjustLargeMapZoom(0);
+
+  const openLargeMap = () => {
+    resetLargeMapBrowsing();
+    appCtx.clearControlInputState?.('large-map-open');
+    appCtx.showLargeMap = true;
+    largeMap?.classList.add('show');
+    if (typeof appCtx.renderInteriorLegend === 'function') appCtx.renderInteriorLegend();
+    appCtx.drawLargeMap?.();
+  };
+  const closeLargeMap = () => {
+    appCtx.showLargeMap = false;
+    resetLargeMapBrowsing();
+    largeMap?.classList.remove('show');
+    document.getElementById('legendPanel')?.style.setProperty('display', 'none');
+    appCtx.closeMapInfo?.();
+  };
+  appCtx.openLargeMap = openLargeMap;
+  appCtx.closeLargeMap = closeLargeMap;
+  appCtx.adjustLargeMapZoom = adjustLargeMapZoom;
 
   if (minimapCanvas) {
     minimapCanvas.addEventListener('click', () => {
-      appCtx.showLargeMap = true;
-      largeMap?.classList.add('show');
-      if (typeof appCtx.renderInteriorLegend === 'function') appCtx.renderInteriorLegend();
+      openLargeMap();
     });
     minimapCanvas.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -188,9 +283,10 @@ function bindMapControls() {
     adjustMinimapZoom(-1);
   });
 
-  mapClose?.addEventListener('click', () => {
-    appCtx.showLargeMap = false;
-    largeMap?.classList.remove('show');
+  mapClose?.addEventListener('click', closeLargeMap);
+  mapRecenter?.addEventListener('click', () => {
+    resetLargeMapBrowsing();
+    appCtx.drawLargeMap?.();
   });
 
   mapLegend?.addEventListener('click', (event) => {
@@ -209,8 +305,7 @@ function bindMapControls() {
 
   largeMap?.addEventListener('click', (event) => {
     if (event.target?.id !== 'largeMap') return;
-    appCtx.showLargeMap = false;
-    largeMap.classList.remove('show');
+    closeLargeMap();
   });
 
   mapSatelliteToggle?.addEventListener('click', (event) => {
@@ -239,16 +334,12 @@ function bindMapControls() {
 
   mapZoomIn?.addEventListener('click', (event) => {
     event.stopPropagation();
-    if (appCtx.largeMapZoom >= 18) return;
-    appCtx.largeMapZoom++;
-    if (zoomLevel) zoomLevel.textContent = `Z: ${appCtx.largeMapZoom}`;
+    adjustLargeMapZoom(1);
   });
 
   mapZoomOut?.addEventListener('click', (event) => {
     event.stopPropagation();
-    if (appCtx.largeMapZoom <= 10) return;
-    appCtx.largeMapZoom--;
-    if (zoomLevel) zoomLevel.textContent = `Z: ${appCtx.largeMapZoom}`;
+    adjustLargeMapZoom(-1);
   });
 
   document.getElementById('legendCloseBtn')?.addEventListener('click', () => appCtx.closeLegend());

@@ -1,6 +1,6 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
 import { landusePresentationOwner, surfaceComposition } from './surface-contract.js?v=15';
-import { normalizeWaterBody } from './water-body-contract.js?v=3';
+import { normalizeWaterBody } from './water-body-contract.js?v=4';
 import { createWaterSurfaceRegistry } from './water-surface-registry.js?v=3';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 
@@ -53,13 +53,11 @@ function hardscapeMaterialOptions(appCtx, landuseType, composition) {
     : appCtx.pavementDiffuse
       ? { map: appCtx.pavementDiffuse, normalMap: appCtx.pavementNormal, roughnessMap: appCtx.pavementRoughness }
       : null;
-  return {
-    material: {
+  const material = {
       color: textures?.map ? 0xffffff : (appCtx.LANDUSE_STYLES?.[landuseType]?.color ?? 0xb8b8b8),
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
-      normalScale: textures?.normalMap ? new THREE.Vector2(0.34, 0.34) : undefined,
       roughness: 0.9,
       metalness: 0.0,
       transparent: false,
@@ -68,7 +66,10 @@ function hardscapeMaterialOptions(appCtx, landuseType, composition) {
       polygonOffset: true,
       polygonOffsetFactor: composition.polygonOffsetFactor,
       polygonOffsetUnits: composition.polygonOffsetUnits
-    },
+  };
+  if (textures?.normalMap) material.normalScale = new THREE.Vector2(0.34, 0.34);
+  return {
+    material,
     metersPerTile: 3.2
   };
 }
@@ -293,7 +294,8 @@ export function createWorldLandusePass(options = {}) {
         waveBase: 1.0,
         area: outerArea,
         span: Math.max(maxX - minX, maxZ - minZ),
-        waterKind: waterArea?.waterKind || inferWaterRenderContext({ area: outerArea, span: Math.max(maxX - minX, maxZ - minZ) })
+        waterKind: waterArea?.waterKind || inferWaterRenderContext({ area: outerArea, span: Math.max(maxX - minX, maxZ - minZ) }),
+        depthEvidence: waterArea?.depthEvidence || null
       });
     }
 

@@ -1,6 +1,6 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=5';
-import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=2';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=6';
+import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 
 let perfPanelTimer = 0;
@@ -88,6 +88,7 @@ function shouldUseComposer() {
 function dedicatedRendererActive() {
   return !!(
     appCtx.worldLoading ||
+    appCtx.arSessionActive ||
     appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) ||
     appCtx.spaceFlight?.active ||
     appCtx.oceanMode?.active
@@ -144,6 +145,8 @@ function registerRuntimeSystems() {
     phase: 'render',
     priority: 100,
     critical: false,
+    enabled: () => appCtx.developerDiagnosticsEnabled === true &&
+      appCtx.getPerfOverlayEnabled?.() === true && appCtx.gameStarted === true,
     update(frame) {
       perfPanelTimer += frame.dt;
       if (perfPanelTimer <= 0.2) return;

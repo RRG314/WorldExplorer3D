@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -27,18 +28,20 @@ function syncTravelModeButtons() {
   if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
   if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
+  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
   [
-    drivingBtn,
-    walkingBtn,
-    droneBtn,
-    planeBtn,
-    document.getElementById('fOceanMode'),
-    document.getElementById('fEarthMode'),
-    document.getElementById('fSpaceDirect'),
-    document.getElementById('fSpaceRocket'),
-    document.getElementById('fSpaceMars')
-  ].forEach((button) => {
-    if (button) button.style.display = boatLocked ? 'none' : '';
+    [drivingBtn, 'drive'],
+    [walkingBtn, 'walk'],
+    [droneBtn, 'drone'],
+    [planeBtn, 'plane'],
+    [boatBtn, 'boat'],
+    [document.getElementById('fOceanMode'), 'ocean'],
+    [document.getElementById('fEarthMode'), 'earth'],
+    [document.getElementById('fSpaceDirect'), 'space'],
+    [document.getElementById('fSpaceRocket'), 'space'],
+    [document.getElementById('fSpaceMars'), 'space']
+  ].forEach(([button, mode]) => {
+    if (button) button.style.display = boatLocked || (planetaryCapabilities && planetaryCapabilities[mode] !== true) ? 'none' : '';
   });
   return activeMode;
 }
@@ -89,17 +92,9 @@ function applyDroneRoofClearance(x, z, groundY, desiredY) {
 }
 
 function sampleDroneSpawnHeight(x, z) {
-  const planetarySurface = appCtx.onMars && appCtx.marsSurface ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
-  if (planetarySurface) {
-    const rc = appCtx._getPhysRaycaster?.();
-    if (rc && appCtx._physRayStart && appCtx._physRayDir) {
-      appCtx._physRayStart.set(x, 2000, z);
-      rc.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = rc.intersectObject(planetarySurface, false);
-      if (hits.length > 0 && Number.isFinite(hits[0]?.point?.y)) {
-        return hits[0].point.y + 10;
-      }
-    }
+  if (appCtx.onMars || appCtx.onMoon) {
+    const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+    if (Number.isFinite(surfaceY)) return surfaceY + 10;
     return 10;
   }
 
@@ -123,6 +118,8 @@ function syncDronePositionFromReference(options = {}) {
   appCtx.drone.z = ref.z;
   appCtx.drone.yaw = Number.isFinite(ref?.yaw) ? ref.yaw : Number.isFinite(ref?.angle) ? ref.angle : Number(appCtx.car?.angle) || 0;
   appCtx.drone.cameraYawOffset = 0;
+  appCtx.drone.cameraPitchOffset = 0;
+  appCtx.drone.cameraLookTimer = 0;
   appCtx.drone.roll = 0;
   const safeLaunchY = sampleDroneSpawnHeight(ref.x, ref.z);
   appCtx.drone.y = options.preserveAltitude && Number.isFinite(ref?.y) ? Math.max(safeLaunchY, ref.y) : safeLaunchY;
@@ -160,6 +157,8 @@ function clearControllerLocalState(targetMode) {
   if (targetMode !== 'drone' && appCtx.drone) {
     appCtx.drone.roll = 0;
     appCtx.drone.cameraYawOffset = 0;
+    appCtx.drone.cameraPitchOffset = 0;
+    appCtx.drone.cameraLookTimer = 0;
   }
 }
 
@@ -205,6 +204,10 @@ function handoffAirPositionToGround(reference, targetMode) {
 function setTravelMode(mode, options = {}) {
   const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
+  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
+  if (planetaryCapabilities && planetaryCapabilities[targetMode] !== true) {
+    return syncTravelModeButtons();
+  }
   const modeReference = captureActiveModeReference(currentMode);
   if (targetMode !== currentMode) clearControllerLocalState(targetMode);
 
@@ -282,7 +285,10 @@ function setTravelMode(mode, options = {}) {
         spawnZ: Number.isFinite(options.spawnZ) ? options.spawnZ : undefined,
         yaw: Number.isFinite(options.yaw) ? options.yaw : undefined,
         candidate: options.candidate || undefined,
-        entryMode: options.entryMode || undefined
+        entryMode: options.entryMode || undefined,
+        transportEntityId: options.transportEntityId || undefined,
+        transportCatalogId: options.transportCatalogId || undefined,
+        condition: Number.isFinite(options.condition) ? options.condition : undefined
       });
       if (!started) {
         return syncTravelModeButtons();

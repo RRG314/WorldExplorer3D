@@ -9,7 +9,7 @@ import {
   polygonSamplePoints,
   projectPointToPolygonRing,
   ringAreaAbs
-} from "./core.js?v=3";
+} from "./core.js?v=4";
 
 export function polygonEdgeClearance(point, polygon) {
   const hit = projectPointToPolygonRing(point, polygon);
@@ -399,18 +399,14 @@ export function prepareInteriorFeaturePlan(definition, shellFootprint, centroid)
       }
     }
     if (fittedFeatures.length > 0) {
-      const mappedLines = fittedFeatures.filter((feature) => feature.kind === 'line').length;
-      const mappedRooms = fittedFeatures.filter((feature) => feature.kind === 'polygon').length;
-      const sparseMappedShell = mappedLines === 0 && mappedRooms <= 1;
-      const buildingType = String(definition?.building?.buildingType || definition?.support?.building?.buildingType || 'building');
-      const partitions = sparseMappedShell
-        ? buildGeneratedPartitions(shellFootprint, centroid, { buildingType })
-        : [];
       return {
         mode: 'mapped',
         features: fittedFeatures,
-        partitions,
-        layoutKind: partitions.length > 0 ? 'mapped_shell_with_generated_rooms' : 'mapped'
+        // Sparse source geometry is still mapped geometry. Inventing room
+        // partitions here changes what the provider described and makes a
+        // generated plan look mapped. Preserve the source layout as-is.
+        partitions: [],
+        layoutKind: 'mapped'
       };
     }
   }

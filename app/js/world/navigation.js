@@ -39,6 +39,10 @@ function finiteNumberOr(value, fallback = 0) {
   return Number.isFinite(value) ? Number(value) : fallback;
 }
 
+function isNumericProfileArray(value) {
+  return value instanceof Float32Array || value instanceof Float64Array;
+}
+
 export function pointInPolygon(x, z, polygon) {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -236,7 +240,7 @@ function mapScreenToWorld(screenX, screenY, options = {}) {
   const mapCenterX = Number.isFinite(options.centerX) ? Number(options.centerX) : 0;
   const mapCenterY = Number.isFinite(options.centerY) ? Number(options.centerY) : 0;
   const zoom = Number.isFinite(options.zoom) ? Number(options.zoom) : 15;
-  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  const ref = options.ref || appCtx.getMapReferencePosition?.() || (appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z });
   const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
   const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
@@ -277,7 +281,10 @@ export function largeMapScreenToWorld(screenX, screenY) {
   return mapScreenToWorld(screenX, screenY, {
     centerX: 400,
     centerY: 400,
-    zoom: appCtx.largeMapZoom
+    zoom: appCtx.largeMapZoom,
+    ref: Number.isFinite(appCtx.largeMapCenterWorld?.x) && Number.isFinite(appCtx.largeMapCenterWorld?.z)
+      ? appCtx.largeMapCenterWorld
+      : null
   });
 }
 
@@ -302,7 +309,7 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
   const pts = Array.isArray(road?.pts) ? road.pts : null;
   if (!pts || pts.length < 2) return null;
   const semantics = road?.structureSemantics || null;
-  const profileDistances = road?.surfaceDistances instanceof Float32Array ? road.surfaceDistances : null;
+  const profileDistances = isNumericProfileArray(road?.surfaceDistances) ? road.surfaceDistances : null;
   const transitionAnchors = Array.isArray(road?.structureTransitionAnchors) ? road.structureTransitionAnchors : [];
   let totalDistance = Number.isFinite(profileDistances?.[profileDistances.length - 1]) ? Number(profileDistances[profileDistances.length - 1]) : NaN;
   if (!Number.isFinite(totalDistance) || totalDistance <= 0) {

@@ -1,19 +1,45 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=4";
-import { getWaterPalette } from "../water-palette.js?v=1";
+import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=9";
+import { getWaterPalette } from "../water-palette.js?v=2";
 import {
   getBoatWaveProfile,
   resolveBoatWaterKind,
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
-} from "./water-query.js?v=18";
+} from "./water-query.js?v=21";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
-import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";
+import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=2";
+import { modeledWaveRenderControls } from '../world/water-optics-evidence.js?v=2';
+
+function registerBoatWaterPatchMaterial(material) {
+  if (!material || material.userData?.weWaterWavePatched || typeof appCtx.registerWaterWaveMaterial !== 'function') return false;
+  appCtx.registerWaterWaveMaterial(material, {
+    waveScale: 1.08,
+    waveBase: 1.28,
+    visualBase: 0.78,
+    foamBase: 1.38,
+    edgeFade: 0.46,
+    useRuntimeKind: true,
+    localPatch: true,
+    shaderKey: 'boatPatchWake',
+    shaderHook: customizeBoatWaterPatchShader
+  });
+  material.userData.weWaterWaveConfig = {
+    ...(material.userData.weWaterWaveConfig || {}),
+    visualBase: 0.78,
+    foamBase: 1.38
+  };
+  return material.userData.weWaterWavePatched === true;
+}
 
 function ensureBoatWaterPatch() {
-  if (appCtx.boatMode?.waterPatch || typeof THREE === 'undefined' || !appCtx.scene) return appCtx.boatMode?.waterPatch || null;
+  if (appCtx.boatMode?.waterPatch) {
+    registerBoatWaterPatchMaterial(appCtx.boatMode.waterPatch.material);
+    return appCtx.boatMode.waterPatch;
+  }
+  if (typeof THREE === 'undefined' || !appCtx.scene) return null;
   const geometry = new THREE.PlaneGeometry(1, 1, 128, 128);
   geometry.rotateX(-Math.PI / 2);
   const palette = getWaterPalette(appCtx.boatMode?.waterKind);
@@ -31,24 +57,7 @@ function ensureBoatWaterPatch() {
     polygonOffsetFactor: -8,
     polygonOffsetUnits: -8
   });
-  if (typeof appCtx.registerWaterWaveMaterial === 'function') {
-    appCtx.registerWaterWaveMaterial(material, {
-      waveScale: 1.08,
-      waveBase: 1.28,
-      visualBase: 0.78,
-      foamBase: 1.38,
-      edgeFade: 0.46,
-      useRuntimeKind: true,
-      localPatch: true,
-      shaderKey: 'boatPatchWake',
-      shaderHook: customizeBoatWaterPatchShader
-    });
-    material.userData.weWaterWaveConfig = {
-      ...(material.userData.weWaterWaveConfig || {}),
-      visualBase: 0.78,
-      foamBase: 1.38
-    };
-  }
+  registerBoatWaterPatchMaterial(material);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'BoatWaterPatch';
   mesh.visible = false;
@@ -92,11 +101,11 @@ function updateBoatWaterPatch(candidate = null) {
   if (patch.material.color?.setHex) patch.material.color.setHex(palette.surface);
   if (patch.material.emissive?.setHex) patch.material.emissive.setHex(palette.emissive);
   patch.material.roughness =
-    waterKind === 'open_ocean' ? 0.46 :
-    waterKind === 'coastal' ? 0.44 :
-    waterKind === 'harbor' || waterKind === 'channel' ? 0.4 :
-    0.42;
-  patch.material.metalness = 0.02;
+    waterKind === 'open_ocean' ? 0.3 :
+    waterKind === 'coastal' ? 0.31 :
+    waterKind === 'harbor' || waterKind === 'channel' ? 0.33 :
+    0.32;
+  patch.material.metalness = 0;
   if (!patch.material.userData?.weWaterWaveShader) patch.material.needsUpdate = true;
   return true;
 }
@@ -105,13 +114,25 @@ function buildBoatWaveProfile(material, runtimeIntensity = getWaveIntensity(), t
   const config = material?.userData?.weWaterWaveConfig || {};
   const runtimeKind = resolveBoatWaterKind(appCtx.boatMode?.currentWater || null);
   const runtimeShoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
+  const boatDriven = appCtx.boatMode?.active || config.localPatch === true;
+  const modeledControls = modeledWaveRenderControls(appCtx.activeWaterOpticsEvidence?.wave);
+  const effectiveIntensity = modeledControls.usable ? modeledControls.intensity : runtimeIntensity;
   const profile = resolveWaterMotionProfile({
     waterKind: config.useRuntimeKind === true ? runtimeKind : inferWaterRenderContext({ kindHint: config.waterKind || runtimeKind }),
     shorelineDistance: Number.isFinite(config.shorelineDistance) ? config.shorelineDistance : runtimeShoreline,
-    intensity: appCtx.boatMode?.active ? runtimeIntensity : Math.min(runtimeIntensity, 0.24),
-    active: appCtx.boatMode?.active || config.localPatch === true,
-    energyScale: Number.isFinite(config.energyBase) ? config.energyBase : 1
+    intensity: appCtx.boatMode?.active ? effectiveIntensity : Math.min(effectiveIntensity, 0.24),
+    // Shared mapped water keeps a restrained optical wave field in walk and
+    // flight modes. This is presentation only; CPU sampling and buoyancy stay
+    // on the existing boat-mode water dynamics authority.
+    active: true,
+    energyScale: (Number.isFinite(config.energyBase) ? config.energyBase : 1) * (boatDriven ? 1 : 0.38)
   });
+  if (modeledControls.usable) {
+    profile.speed *= modeledControls.speedScale;
+    profile.waveEvidenceSource = modeledControls.sourceId;
+    profile.modeledWaveHeightM = modeledControls.waveHeightM;
+    profile.modeledWavePeriodS = modeledControls.wavePeriodS;
+  }
   const time = Number.isFinite(timeOverride) ? Number(timeOverride) : performance.now() * 0.001;
   return { config, profile, time };
 }
@@ -137,6 +158,24 @@ function applyWaveUniformsToMaterial(material, profileBundle) {
   }
   if (shader.uniforms.weWaveFoamStrength) {
     shader.uniforms.weWaveFoamStrength.value = (profile.foamStrength + profile.whitecapStrength * 0.4) * (Number(config.foamBase) || 1);
+  }
+  const atmosphere = appCtx.earthAtmosphereProfile;
+  if (atmosphere) {
+    shader.uniforms.weWaterZenithColor?.value?.setHex?.(atmosphere.zenithColor);
+    shader.uniforms.weWaterHorizonColor?.value?.setHex?.(atmosphere.horizonColor);
+    shader.uniforms.weWaterSunColor?.value?.setHex?.(atmosphere.sunColor);
+    shader.uniforms.weWaterSunDirection?.value?.set?.(
+      atmosphere.sunDirection.x,
+      atmosphere.sunDirection.y,
+      atmosphere.sunDirection.z
+    );
+    if (shader.uniforms.weWaterDaylight) shader.uniforms.weWaterDaylight.value = atmosphere.daylight;
+    if (shader.uniforms.weWaterNight) shader.uniforms.weWaterNight.value = atmosphere.night;
+    if (shader.uniforms.weWaterOvercast) shader.uniforms.weWaterOvercast.value = atmosphere.overcast;
+  }
+  if (shader.uniforms.weWaterNormalStrength) {
+    const quality = String(appCtx.renderQualityLevel || 'medium').toLowerCase();
+    shader.uniforms.weWaterNormalStrength.value = quality === 'low' ? 0.42 : quality === 'high' ? 1 : 0.72;
   }
   return true;
 }

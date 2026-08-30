@@ -7,7 +7,7 @@ import {
 } from './district-ground-model.js?v=2';
 import {
   filterSelectionToAcceptedGround
-} from './accepted-ground-selection.js?v=2';
+} from './accepted-ground-selection.js?v=12';
 
 function featureBudgetWarning(selection) {
   const requested = selection.requestedCounts || {};

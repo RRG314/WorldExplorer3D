@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createBlockBuilderInteraction } from "./block-builder/interaction.js?v=2";
+import { createBlockBuilderInteraction } from "./block-builder/interaction.js?v=4";
 import {
   BLOCK_MATERIALS,
   BLOCK_LIMIT_PER_LOCATION,
@@ -9,8 +9,18 @@ import {
   normalizeBlockShape
 } from "./block-builder/catalog.js?v=2";
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
-import { createBlockLocalStore } from './block-builder/local-store.js?v=1';
-import { createSharedBlockSync } from './block-builder/shared-sync.js?v=2';
+import { createBlockLocalStore } from './block-builder/local-store.js?v=3';
+import { createSharedBlockSync } from './block-builder/shared-sync.js?v=3';
+import { getPlanetarySurfaceRegion } from './planetary/runtime/surface-authority.js?v=3';
+import {
+  activePlanetaryBodyId,
+  planetarySurfaceYAtRenderXZ
+} from './planetary/runtime/surface-query.js?v=2';
+import {
+  planetaryBlockRenderCoordinates,
+  planetaryBlockStorageCoordinates
+} from './block-builder/world-coordinates.js?v=1';
+import { constructionTuning } from './character/construction-assistance.js?v=1';
 // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
@@ -21,11 +31,14 @@ const BUILD_MAX_DISTANCE = 260;
 const BUILD_TOOLS = new Set(['place', 'remove']);
 const BUILD_HISTORY_LIMIT = 50;
 
-const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
-const BUILD_STORAGE_BACKUP_KEY = 'worldExplorer3D.buildBlocks.backup.v1';
+const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v2';
+const BUILD_STORAGE_BACKUP_KEY = 'worldExplorer3D.buildBlocks.backup.v2';
 const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
-const BUILD_STORAGE_MIGRATION_KEY = 'worldExplorer3D.buildBlocks.migrated.v2';
-const LEGACY_BUILD_STORAGE_KEYS = Object.freeze([]);
+const BUILD_STORAGE_MIGRATION_KEY = 'worldExplorer3D.buildBlocks.migrated.v3';
+const LEGACY_BUILD_STORAGE_KEYS = Object.freeze([
+  'worldExplorer3D.buildBlocks.v1',
+  'worldExplorer3D.buildBlocks.backup.v1'
+]);
 const BUILD_LOCATION_PRECISION = 5;
 const BUILD_MAX_PER_LOCATION = BLOCK_LIMIT_PER_LOCATION;
 const BUILD_MAX_TOTAL = 5000;
@@ -42,6 +55,7 @@ let buildActionHistory = [];
 const buildBlocks = new Map();
 const buildColumns = new Map();
 const buildMaterials = [];
+const buildSpecialMaterials = new Map();
 
 const {
   getBuildCollisionAtWorldXZ,
@@ -96,8 +110,14 @@ const sharedBuildSync = createSharedBlockSync({
 const isSharedBuildSyncActive = () => sharedBuildSync.isActive();
 const normalizeSharedBlockEntry = (entry) => sharedBuildSync.normalizeEntry(entry);
 const setSharedBuildEntries = (entries = []) => sharedBuildSync.setEntries(entries);
-const configureSharedBuildSync = (config = {}) => sharedBuildSync.configure(config);
+const configureSharedBuildSync = (config = {}) => {
+  const before = sharedBuildSync.getStatus();
+  sharedBuildSync.configure(config);
+  const after = sharedBuildSync.getStatus();
+  if (before.enabled !== after.enabled || before.roomId !== after.roomId) buildActionHistory = [];
+};
 const getSharedBuildSyncStatus = () => sharedBuildSync.getStatus();
+const setSharedBuildConnectionState = (connected) => sharedBuildSync.setConnected(connected);
 
 function getLocRef() {
   const loc = appCtx.LOC;
@@ -105,10 +125,41 @@ function getLocRef() {
   return loc;
 }
 
-function getCurrentLocationKey() {
+function getPlanetaryBuildWorldContext() {
+  const bodyId = activePlanetaryBodyId(appCtx);
+  if (!bodyId || (!appCtx.onMoon && !appCtx.onMars && !appCtx.activePlanetaryBodyId)) return null;
+  const active = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active || null;
+  if (!active || active.bodyId !== bodyId) return null;
+  const manifest = getPlanetarySurfaceRegion(active.regionId);
+  if (!manifest || manifest.bodyId !== bodyId) return null;
+  return Object.freeze({
+    kind: 'planetary',
+    locationKey: active.addressKey,
+    bodyId,
+    regionId: active.regionId,
+    addressKey: active.addressKey,
+    placement: manifest.renderPlacement
+  });
+}
+
+function getCurrentBuildWorldContext() {
+  const planetary = getPlanetaryBuildWorldContext();
+  if (planetary) return planetary;
+  if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) return null;
   const loc = getLocRef();
   if (!loc) return null;
-  return `${loc.lat.toFixed(BUILD_LOCATION_PRECISION)},${loc.lon.toFixed(BUILD_LOCATION_PRECISION)}`;
+  return Object.freeze({
+    kind: 'earth',
+    locationKey: `${loc.lat.toFixed(BUILD_LOCATION_PRECISION)},${loc.lon.toFixed(BUILD_LOCATION_PRECISION)}`,
+    bodyId: 'earth',
+    regionId: null,
+    addressKey: null,
+    placement: Object.freeze({ x: 0, y: 0, z: 0 })
+  });
+}
+
+function getCurrentLocationKey() {
+  return getCurrentBuildWorldContext()?.locationKey || null;
 }
 
 function worldToLatLonSafe(x, z) {
@@ -158,6 +209,12 @@ function getBuildLimits() {
   };
 }
 
+function getConstructionAssistance() {
+  return constructionTuning(appCtx.resolveCharacterCapability?.('construction', {
+    environment: appCtx.getEnv?.() || (getPlanetaryBuildWorldContext() ? 'PLANETARY' : 'EARTH')
+  }));
+}
+
 function getBlockBuilderSnapshot() {
   const limits = getBuildLimits();
   return {
@@ -169,7 +226,8 @@ function getBlockBuilderSnapshot() {
     canUndo: buildActionHistory.length > 0,
     count: limits.currentLocationCount,
     maxCount: limits.maxPerLocation,
-    shared: isSharedBuildSyncActive()
+    shared: isSharedBuildSyncActive(),
+    characterAssistance: getConstructionAssistance()
   };
 }
 
@@ -185,6 +243,61 @@ function rememberBuildAction(action) {
   if (buildActionHistory.length > BUILD_HISTORY_LIMIT) buildActionHistory.shift();
   showBuildTransientMessage('');
   syncBlockBuilderUi();
+  const snapshot = getBlockBuilderSnapshot();
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:block-builder-change', { detail: {
+    action: action.kind,
+    worldId: getCurrentLocationKey() || 'current-world',
+    count: snapshot.count,
+    shared: snapshot.shared === true
+  } }));
+}
+
+function discardNewestBuildAction(kind, entry) {
+  const key = blockKey(entry?.gx, entry?.gy, entry?.gz);
+  for (let index = buildActionHistory.length - 1; index >= 0; index--) {
+    const action = buildActionHistory[index];
+    if (action.kind === kind && blockKey(action.gx, action.gy, action.gz) === key) {
+      buildActionHistory.splice(index, 1);
+      break;
+    }
+  }
+  syncBlockBuilderUi();
+}
+
+function reconcileSharedBuildHistory(entries = []) {
+  const simulated = new Map();
+  entries.forEach((raw) => {
+    const entry = normalizeSharedBlockEntry(raw);
+    if (entry) simulated.set(blockKey(entry.gx, entry.gy, entry.gz), entry);
+  });
+  const retainedReverse = [];
+  for (let index = buildActionHistory.length - 1; index >= 0; index--) {
+    const action = buildActionHistory[index];
+    const key = blockKey(action.gx, action.gy, action.gz);
+    const current = simulated.get(key) || null;
+    if (action.kind === 'place') {
+      const exact = current &&
+        current.materialIndex === normalizeBlockMaterial(action.materialIndex) &&
+        current.shape === normalizeBlockShape(action.shape) &&
+        current.rotation === normalizeBlockRotation(action.rotation);
+      if (!exact) continue;
+      retainedReverse.push(action);
+      simulated.delete(key);
+      continue;
+    }
+    if (action.kind === 'remove' && !current) {
+      retainedReverse.push(action);
+      simulated.set(key, {
+        gx: action.gx,
+        gy: action.gy,
+        gz: action.gz,
+        materialIndex: normalizeBlockMaterial(action.materialIndex),
+        shape: normalizeBlockShape(action.shape),
+        rotation: normalizeBlockRotation(action.rotation)
+      });
+    }
+  }
+  buildActionHistory = retainedReverse.reverse();
 }
 
 function showBuildTransientMessage(text) {
@@ -192,27 +305,51 @@ function showBuildTransientMessage(text) {
 }
 
 function canPersistBuildBlocks() {
-  if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined') {
-    return appCtx.isEnv(appCtx.ENV.EARTH);
-  }
-  return !appCtx.onMoon;
+  return !!getCurrentBuildWorldContext();
 }
 
 function normalizeBuildEntry(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const locationKey = String(raw.locationKey || '');
-  const lat = Number(raw.lat);
-  const lon = Number(raw.lon);
+  const worldKind = raw.worldKind === 'planetary' ? 'planetary' : 'earth';
   const gy = Number(raw.gy);
   const gx = Number(raw.gx);
   const gz = Number(raw.gz);
 
   if (!locationKey) return null;
+  if (!isFiniteNumber(gx) || !isFiniteNumber(gy) || !isFiniteNumber(gz)) return null;
+
+  if (worldKind === 'planetary') {
+    const bodyId = String(raw.bodyId || '');
+    const regionId = String(raw.regionId || '');
+    const addressKey = String(raw.addressKey || locationKey);
+    if (!bodyId || !regionId || !addressKey || addressKey !== locationKey) return null;
+    return {
+      schemaVersion: 2,
+      id: String(raw.id || `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+      worldKind,
+      locationKey,
+      addressKey,
+      bodyId,
+      regionId,
+      gx: Number(gx.toFixed(6)),
+      gy: toVerticalGridCoord(gy),
+      gz: Number(gz.toFixed(6)),
+      materialIndex: normalizeBlockMaterial(raw.materialIndex),
+      shape: normalizeBlockShape(raw.shape),
+      rotation: normalizeBlockRotation(raw.rotation),
+      createdAt: String(raw.createdAt || new Date().toISOString())
+    };
+  }
+
+  const lat = Number(raw.lat);
+  const lon = Number(raw.lon);
   if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
-  if (!isFiniteNumber(gy)) return null;
 
   return {
+    schemaVersion: 2,
     id: String(raw.id || `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+    worldKind,
     locationKey,
     lat: Number(lat.toFixed(7)),
     lon: Number(lon.toFixed(7)),
@@ -271,6 +408,21 @@ function ensureBuildMaterials() {
   });
 }
 
+function getBuildMaterial(shape, materialIndex) {
+  if (shape !== 'window' && shape !== 'glass_wall' && shape !== 'storefront') return buildMaterials[materialIndex];
+  const key = `${shape}:${materialIndex}`;
+  if (!buildSpecialMaterials.has(key)) {
+    buildSpecialMaterials.set(key, new THREE.MeshStandardMaterial({
+      color: shape === 'storefront' ? 0x76a9b8 : 0x5d93a5,
+      roughness: 0.24,
+      metalness: 0.48,
+      emissive: 0x162e38,
+      emissiveIntensity: 0.08
+    }));
+  }
+  return buildSpecialMaterials.get(key);
+}
+
 function getBuildGeometry(shape) {
   const normalizedShape = normalizeBlockShape(shape);
   if (buildGeometries.has(normalizedShape)) return buildGeometries.get(normalizedShape);
@@ -310,12 +462,10 @@ function getSurfaceYAt(x, z) {
     const interiorY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
     if (Number.isFinite(interiorY)) return interiorY;
   }
-  if (appCtx.onMoon && appCtx.moonSurface && typeof appCtx._getPhysRaycaster === 'function' && appCtx._physRayStart && appCtx._physRayDir) {
-    const raycaster = appCtx._getPhysRaycaster();
-    appCtx._physRayStart.set(x, 2000, z);
-    raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-    const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-    if (hits.length > 0) return hits[0].point.y;
+  if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) {
+    const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+    if (Number.isFinite(surfaceY)) return surfaceY;
+    return Number.NaN;
   }
   return appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
 }
@@ -325,6 +475,7 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
     const entry = sharedBuildSync.upsert({ gx, gy, gz, materialIndex, shape, rotation }, (err, failedEntry) => {
       console.warn('[blocks] Failed to save room block:', err);
       removeBuildBlock(failedEntry.gx, failedEntry.gy, failedEntry.gz, { persist: false });
+      discardNewestBuildAction('place', failedEntry);
       showBuildTransientMessage('Could not save block to this room.');
     });
     if (!entry) return false;
@@ -332,8 +483,28 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
   }
 
   if (!canPersistBuildBlocks()) return true;
-  const locationKey = getCurrentLocationKey();
-  if (!locationKey || !getLocRef()) return false;
+  const world = getCurrentBuildWorldContext();
+  if (!world) return false;
+
+  if (world.kind === 'planetary') {
+    const stored = planetaryBlockStorageCoordinates({ gx, gy, gz }, world.placement);
+    return blockLocalStore.upsert({
+      worldKind: 'planetary',
+      locationKey: world.locationKey,
+      addressKey: world.addressKey,
+      bodyId: world.bodyId,
+      regionId: world.regionId,
+      gx: stored.gx,
+      gy: stored.gy,
+      gz: stored.gz,
+      materialIndex: normalizeBlockMaterial(materialIndex),
+      shape: normalizeBlockShape(shape),
+      rotation: normalizeBlockRotation(rotation)
+    });
+  }
+
+  const locationKey = world.locationKey;
+  if (!getLocRef()) return false;
 
   const worldX = toWorldCoord(gx);
   const worldZ = toWorldCoord(gz);
@@ -365,6 +536,7 @@ function persistRemovedBuildBlock(gx, gy, gz) {
           rotation: previous.rotation
         });
       }
+      discardNewestBuildAction('remove', previous || { gx, gy, gz });
       showBuildTransientMessage('Could not remove block from this room.');
     });
     if (!entry) return false;
@@ -372,8 +544,18 @@ function persistRemovedBuildBlock(gx, gy, gz) {
   }
 
   if (!canPersistBuildBlocks()) return true;
-  const locationKey = getCurrentLocationKey();
-  return locationKey ? blockLocalStore.removeAt(locationKey, gx, gy, gz) : false;
+  const world = getCurrentBuildWorldContext();
+  if (!world) return false;
+  if (world.kind === 'planetary') {
+    const stored = planetaryBlockStorageCoordinates({ gx, gy, gz }, world.placement);
+    return blockLocalStore.removeAt(
+      world.locationKey,
+      stored.gx,
+      toVerticalGridCoord(stored.gy),
+      stored.gz
+    );
+  }
+  return blockLocalStore.removeAt(world.locationKey, gx, gy, gz);
 }
 
 function clearPersistedBuildBlocksForCurrentLocation() {
@@ -394,7 +576,7 @@ function clearPersistedBuildBlocksForCurrentLocation() {
   }
 
   if (!canPersistBuildBlocks()) return true;
-  const locationKey = getCurrentLocationKey();
+  const locationKey = getCurrentBuildWorldContext()?.locationKey;
   return locationKey ? blockLocalStore.clearLocation(locationKey) : false;
 }
 
@@ -424,7 +606,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
 
   const idx = normalizeBlockMaterial(materialIndex);
 
-  const mesh = new THREE.Mesh(shapeGeometry.geometry, buildMaterials[idx]);
+  const mesh = new THREE.Mesh(shapeGeometry.geometry, getBuildMaterial(shape, idx));
   mesh.position.set(toWorldCoord(gx), toWorldCoord(gy) + shapeGeometry.yOffset, toWorldCoord(gz));
   mesh.rotation.y = rotation * Math.PI * 0.5;
   mesh.castShadow = true;
@@ -448,7 +630,16 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
       if (mesh.parent) mesh.parent.remove(mesh);
       buildBlocks.delete(key);
       removeBuildColumnEntry(gx, gy, gz);
-      showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some blocks to continue.`);
+      const persistence = getBuildPersistenceStatus();
+      const limits = getBuildLimits();
+      const limitReached = limits.currentLocationCount >= BUILD_MAX_PER_LOCATION ||
+        limits.totalCount >= BUILD_MAX_TOTAL;
+      const sharedOffline = persistence.shared?.enabled === true && persistence.shared?.connected === false;
+      showBuildTransientMessage(limitReached
+        ? `Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some blocks to continue.`
+        : sharedOffline
+          ? 'Room is offline. The block was not saved; reconnect and try again.'
+          : `Could not save this block. ${persistence.detail || 'Browser storage is unavailable.'}`);
       return false;
     }
     emitTutorialEvent('artifact_placed', { source: 'build_block', gx, gy, gz });
@@ -460,13 +651,18 @@ function removeBuildBlock(gx, gy, gz, options = {}) {
   const key = blockKey(gx, gy, gz);
   const mesh = buildBlocks.get(key);
   if (!mesh) return false;
+
+  if (options.persist !== false && !persistRemovedBuildBlock(gx, gy, gz)) {
+    const sharedStatus = getSharedBuildSyncStatus();
+    showBuildTransientMessage(sharedStatus.enabled && sharedStatus.connected === false
+      ? 'Room is offline. The block was kept; reconnect and try again.'
+      : 'Could not save that removal. The block was kept in the world.');
+    return false;
+  }
+
   if (mesh.parent) mesh.parent.remove(mesh);
   buildBlocks.delete(key);
   removeBuildColumnEntry(gx, gy, gz);
-
-  if (options.persist !== false) {
-    persistRemovedBuildBlock(gx, gy, gz);
-  }
   return true;
 }
 
@@ -483,15 +679,19 @@ function clearRenderedBuildBlocks() {
 function clearAllBuildBlocks(options = {}) {
   if (isSharedBuildSyncActive()) {
     if (options.persist !== false) {
-      clearPersistedBuildBlocksForCurrentLocation();
+      if (!clearPersistedBuildBlocksForCurrentLocation()) return false;
     }
     refreshBlockBuilderForCurrentLocation();
-    return;
+    return true;
   }
   if (options.persist !== false) {
-    clearPersistedBuildBlocksForCurrentLocation();
+    if (!clearPersistedBuildBlocksForCurrentLocation()) {
+      showBuildTransientMessage('Could not save that clear. Your blocks were kept in the world.');
+      return false;
+    }
   }
   clearRenderedBuildBlocks();
+  return true;
 }
 
 function updateBuildModeUI() {
@@ -567,12 +767,13 @@ function clearBlockBuilderForWorldReload() {
 }
 
 function refreshBlockBuilderForCurrentLocation() {
-  buildActionHistory = [];
   ensureBuildGroup();
   clearRenderedBuildBlocks();
 
   if (isSharedBuildSyncActive()) {
-    sharedBuildSync.getEntries().forEach((entry) => {
+    const sharedEntries = sharedBuildSync.getEntries();
+    reconcileSharedBuildHistory(sharedEntries);
+    sharedEntries.forEach((entry) => {
       const normalized = normalizeSharedBlockEntry(entry);
       if (!normalized) return;
       placeBuildBlock(normalized.gx, normalized.gy, normalized.gz, normalized.materialIndex, {
@@ -586,8 +787,33 @@ function refreshBlockBuilderForCurrentLocation() {
     return;
   }
 
+  buildActionHistory = [];
+  const world = getCurrentBuildWorldContext();
+  if (!world) {
+    syncBlockBuilderUi();
+    return;
+  }
   const entries = getBuildEntriesForCurrentLocation();
   entries.forEach((entry) => {
+    if (world.kind === 'planetary') {
+      if (
+        entry.worldKind !== 'planetary' ||
+        entry.addressKey !== world.addressKey ||
+        entry.bodyId !== world.bodyId ||
+        entry.regionId !== world.regionId
+      ) return;
+      const render = planetaryBlockRenderCoordinates(entry, world.placement);
+      const gx = toGridCoord(render.gx);
+      const gy = toVerticalGridCoord(render.gy);
+      const gz = toGridCoord(render.gz);
+      placeBuildBlock(gx, gy, gz, entry.materialIndex, {
+        persist: false,
+        enforceLimit: false,
+        shape: entry.shape,
+        rotation: entry.rotation
+      });
+      return;
+    }
     if (!isFiniteNumber(entry.lat) || !isFiniteNumber(entry.lon) || !isFiniteNumber(entry.gy)) return;
     const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
     if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
@@ -614,6 +840,7 @@ const { handleBlockBuilderClick } = createBlockBuilderInteraction({
   getRotation: () => buildRotation,
   getSurfaceYAt,
   isEnabled: () => buildModeEnabled,
+  getMaxDistance: () => BUILD_MAX_DISTANCE * getConstructionAssistance().placementRangeScale,
   maxDistance: BUILD_MAX_DISTANCE,
   onAction: rememberBuildAction,
   placeBuildBlock,
@@ -631,6 +858,7 @@ Object.assign(appCtx, {
   configureSharedBuildSync,
   getBuildCollisionAtWorldXZ,
   getBuildLimits,
+  getConstructionAssistance,
   getBlockBuilderSnapshot,
   getBuildPersistenceStatus,
   getSharedBuildSyncStatus,
@@ -641,6 +869,7 @@ Object.assign(appCtx, {
   placeBuildBlock,
   refreshBlockBuilderForCurrentLocation,
   setSharedBuildEntries,
+  setSharedBuildConnectionState,
   setBuildModeEnabled,
   setBlockBuildMaterial,
   setBlockBuildShape,
@@ -666,6 +895,7 @@ export {
   placeBuildBlock,
   refreshBlockBuilderForCurrentLocation,
   setSharedBuildEntries,
+  setSharedBuildConnectionState,
   setBuildModeEnabled,
   setBlockBuildMaterial,
   setBlockBuildShape,

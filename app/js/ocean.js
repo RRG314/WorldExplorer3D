@@ -16,9 +16,10 @@ import {
   getRockTextureSet as getRockTextureSetAsset,
   getSeabedTextureSet as getSeabedTextureSetAsset
 } from "./ocean/scene-textures.js?v=1";
-import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=1";
-import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=3";
-import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=2";
+import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=2";
+import { createFishPopulationContext } from './fishing/population-authority.js?v=2';
+import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=4";
+import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=3";
 import {
   commitEnvironment,
   exitCurrentEnvironmentSync,
@@ -70,6 +71,8 @@ Object.assign(oceanMode, {
   animationId: null,
   fishEntities: [],
   fishSchools: [],
+  fishPopulationContext: null,
+  underwaterSchoolPlan: null,
   sharkEntity: null,
   launchSite: OCEAN_SITE,
   lastFrameMs: 0,
@@ -169,6 +172,24 @@ const { clearFishLife, initFishLife, updateFishLife } = createOceanFishLifeApi({
   oceanMode,
   disposeObject3D
 });
+
+function oceanFishPopulationContext() {
+  const site = oceanMode.launchSite || OCEAN_SITE;
+  const latitude = Number(site.lat);
+  const longitude = Number(site.lon);
+  return createFishPopulationContext({
+    accessMode: 'underwater',
+    waterbodyId: `ocean-site:${latitude.toFixed(4)}:${longitude.toFixed(4)}`,
+    waterKind: 'open_ocean',
+    waterClass: 'marine',
+    waterLabel: String(site.name || site.region || 'Ocean Site'),
+    sourceDataset: 'world-explorer-reviewed-ocean-site',
+    sourceTruth: 'modeled-ocean-environment',
+    latitude,
+    longitude,
+    depthTruth: oceanMode.localBathymetryReady ? 'modeled-local-bathymetry' : 'modeled-bathymetry-pending'
+  });
+}
 
 function rebuildOceanTerrainLayers(scene = oceanMode.scene, renderer = oceanMode.renderer) {
   if (!scene) return;
@@ -273,7 +294,6 @@ function createOceanScene() {
   oceanMode.fillLight = fillLight;
 
   rebuildOceanTerrainLayers(scene, renderer);
-  initFishLife(scene);
 
   primeLocalBathymetryGrid().then((ready) => {
     if (!ready || oceanMode.scene !== scene) return;
@@ -549,12 +569,14 @@ function startOceanMode(options = {}) {
     oceanSessionScope.defer(() => destroyOceanScene(), 'renderer');
     resetSubmarineAtLaunch(options.submarinePose || null);
     rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
+    initFishLife(oceanMode.scene, oceanFishPopulationContext());
 
     const worldCanvas = getWorldCanvas();
     if (worldCanvas) worldCanvas.style.display = 'none';
     if (oceanMode.canvas) oceanMode.canvas.style.display = 'block';
 
     oceanMode.active = true;
+    appCtx.updateInteriorInteraction?.();
     oceanMode.lastFrameMs = 0;
     oceanMode.weatherRefreshTimer = 0;
     oceanMode.animationId = oceanSessionScope.animationFrame(animateOceanMode);
@@ -632,6 +654,7 @@ function stopOceanMode(options = {}) {
     commitEnvironment(appCtx.ENV.EARTH, { source: 'ocean_stop' });
   }
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+  appCtx.updateInteriorInteraction?.();
   if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
   if (oceanMode.scene || oceanMode.renderer) destroyOceanScene();
   return wasActive;
@@ -644,6 +667,10 @@ registerEnvironmentLifecycle(appCtx.ENV.OCEAN, {
     animationActive: oceanMode.animationId != null,
     bathymetryReady: !!oceanMode.bathymetryReady,
     localBathymetryReady: !!oceanMode.localBathymetryReady,
+    fishPopulationContextId: oceanMode.fishPopulationContext?.contextId || null,
+    fishAuthorityVersion: oceanMode.fishPopulationContext?.authorityVersion || null,
+    underwaterSchoolCount: Number(oceanMode.underwaterSchoolPlan?.schools?.length || 0),
+    underwaterFishCount: Number(oceanMode.fishEntities?.length || 0),
     rendererReady: !!oceanMode.renderer,
     sceneReady: !!oceanMode.scene,
     scope: oceanSessionScope?.snapshot() || null
@@ -693,7 +720,14 @@ function getOceanModeDebugState() {
       z: Number.isFinite(sub.position.z) ? sub.position.z : null
     } : null,
     localBathymetryReady: !!oceanMode.localBathymetryReady,
-    bathymetryReady: !!oceanMode.bathymetryReady
+    bathymetryReady: !!oceanMode.bathymetryReady,
+    fishPopulationContextId: oceanMode.fishPopulationContext?.contextId || null,
+    fishAuthorityVersion: oceanMode.fishPopulationContext?.authorityVersion || null,
+    fishPopulationEvidence: oceanMode.fishPopulationContext?.evidence?.populationTruth || null,
+    underwaterSchoolCount: Number(oceanMode.underwaterSchoolPlan?.schools?.length || 0),
+    underwaterFishCount: Number(oceanMode.fishEntities?.length || 0),
+    underwaterSpeciesIds: (oceanMode.underwaterSchoolPlan?.schools || []).map((school) => school.speciesId),
+    fishLivePresenceClaim: oceanMode.underwaterSchoolPlan?.livePresenceClaim === true
   };
 }
 

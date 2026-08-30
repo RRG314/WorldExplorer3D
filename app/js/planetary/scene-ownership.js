@@ -155,7 +155,7 @@ function setEarthSceneVisible(visible) {
 function attachEarthSceneWithoutChangingLod() {
   const root = ensureEarthSceneRoot();
   if (!root) return;
-  [appCtx.terrainGroup, appCtx.cloudGroup].forEach((object) => adoptEarthObject(object, root));
+  [appCtx.terrainGroup, appCtx.cloudGroup, appCtx.earthAtmosphere].forEach((object) => adoptEarthObject(object, root));
   EARTH_MESH_LISTS.forEach((listName) => {
     const list = appCtx[listName];
     if (!Array.isArray(list)) return;
@@ -170,7 +170,7 @@ function clearEarthWorldSceneObjects() {
   const root = appCtx.earthSceneRoot || earthSceneRoot;
   const rootChildrenBefore = root?.children?.length || 0;
   const sceneChildrenBefore = appCtx.scene?.children?.length || 0;
-  const persistent = new Set([appCtx.terrainGroup, appCtx.cloudGroup].filter(Boolean));
+  const persistent = new Set([appCtx.terrainGroup, appCtx.cloudGroup, appCtx.earthAtmosphere].filter(Boolean));
   const trackedObjects = new Set();
   EARTH_MESH_LISTS.forEach((listName) => {
     appCtx[listName]?.forEach?.((object) => trackedObjects.add(object));

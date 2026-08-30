@@ -1,4 +1,5 @@
-import { getCurrentUser } from "../../../js/auth-ui.js";
+import { getCurrentUser } from "../../../js/auth-ui.js?v=55";
+import { emitProductTelemetry } from "../platform/product-telemetry.js?v=1";
 import { createArtifact, removeArtifact } from "./artifacts.js?v=57";
 import { sendMessage } from "./chat.js?v=56";
 import {
@@ -22,8 +23,8 @@ import {
   sendInviteToFriend
 } from "./social.js?v=55";
 import { createUiRoomRoomActionsApi } from "./ui-room-room-actions.js?v=2";
-import { createUiRoomRuntime } from "./ui-room-runtime.js?v=3";
-import { createUiRoomSession } from "./ui-room-session.js?v=2";
+import { createUiRoomRuntime } from "./ui-room-runtime.js?v=4";
+import { createUiRoomSession } from "./ui-room-session.js?v=8";
 
 export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, callbacks }) {
   const {
@@ -224,6 +225,10 @@ export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, c
       if (refs.roomArtifactTextInput) refs.roomArtifactTextInput.value = "";
 
       await bumpExplorerLeaderboard({ artifactsShared: 1 });
+      emitProductTelemetry('room_artifact_share', {
+        artifact_type: type,
+        visibility: state.currentRoom.visibility === 'public' ? 'public' : 'room'
+      });
       emitTutorialEvent("artifact_placed", {
         source: "multiplayer_artifact",
         roomCode: normalizeCode(state.currentRoom?.code || "")
@@ -355,6 +360,7 @@ export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, c
       const safeSource = source === "recent" ? "recent" : "manual";
       await addFriend(friendUid, displayName, safeSource);
       await bumpExplorerLeaderboard({ friendsAdded: 1 });
+      emitProductTelemetry('friend_add', { source: safeSource });
       if (refs.titleFriendsStatus) refs.titleFriendsStatus.textContent = "Friend added successfully.";
       setStatus("Friend added.");
     } catch (err) {

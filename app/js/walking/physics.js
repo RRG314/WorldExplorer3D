@@ -1,17 +1,23 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
+import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
+import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=5";
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
+import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
 function isPlanetarySurface() {
-  return !!(appCtx.onMoon || appCtx.onMars);
+  return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 }
 
-function getPlanetarySurfaceMesh() {
-  if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
-  if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
-  return null;
+function activePlanetaryBodyId() {
+  return appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
 }
 
 function createWalkingPhysicsHelpers({
@@ -76,6 +82,12 @@ function createWalkingPhysicsHelpers({
   function buildingRoofYAt(b, x, z) {
     if (Number.isFinite(b?.maxY)) return b.maxY;
     return buildingBaseYAt(b, x, z) + Math.max(0, Number(b?.height) || 0);
+  }
+
+  function walkerIsAtOrAboveRoof(building, walkerFeetY, tolerance = 1) {
+    if (!building || !Number.isFinite(walkerFeetY)) return false;
+    const roofY = buildingRoofYAt(building, state.walker.x, state.walker.z);
+    return Number.isFinite(roofY) && walkerFeetY >= roofY - Math.max(0.12, tolerance);
   }
 
   function findNearestWall(x, z) {
@@ -157,15 +169,17 @@ function createWalkingPhysicsHelpers({
 
   function resolveWalkGroundState(x, z, walkerY, finiteOr) {
     let groundY;
-    const planetarySurface = getPlanetarySurfaceMesh();
-    if (planetarySurface) {
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(x, 2200, z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(planetarySurface, false);
-      groundY = hits.length > 0 ? hits[0].point.y : -100;
+    if (isPlanetarySurface()) {
+      groundY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
+      if (!Number.isFinite(groundY)) groundY = -100;
     } else {
-      groundY = getWalkGroundY(x, z, -100);
+      // Overlapping interior floors require a vertical reference. Preserve the
+      // legacy outdoor query path, but choose the nearest published interior
+      // surface to the actor's feet instead of always selecting the lowest one.
+      const surfaceReferenceY = appCtx.activeInterior
+        ? finiteOr(walkerY, 0) - CFG.eyeHeight
+        : -100;
+      groundY = getWalkGroundY(x, z, surfaceReferenceY);
     }
 
     let effectiveGroundY = groundY;
@@ -198,11 +212,16 @@ function createWalkingPhysicsHelpers({
     const startX = finiteOr(state.walker.x, 0);
     const startZ = finiteOr(state.walker.z, 0);
     const actions = appCtx.readControlActions?.('walk') || {};
+    const mobileTouch = actions.mobileTouch === true;
     const liveGpsOwnsTranslation = appCtx.liveGpsTranslationOwned?.() === true;
     const liveGpsTarget = liveGpsOwnsTranslation
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
       : null;
-    const speed = Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
+    const skydiving = appCtx.urbanSandboxRuntime?.parachute?.skydiving === true;
+    const parachuteDeployedAtFrameStart = appCtx.isUrbanParachuteDeployed?.() === true;
+    const speed = skydiving
+      ? parachuteHorizontalSpeed(parachuteDeployedAtFrameStart)
+      : Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
     state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
@@ -213,14 +232,51 @@ function createWalkingPhysicsHelpers({
     state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, state.walker.pitch));
     if (liveGpsOwnsTranslation && Number.isFinite(liveGpsTarget?.headingDegrees)) {
       state.walker.angle = Math.PI - liveGpsTarget.headingDegrees * Math.PI / 180;
-    } else if (!liveGpsOwnsTranslation) {
+    } else if (!liveGpsOwnsTranslation && !mobileTouch) {
       state.walker.angle = state.walker.yaw;
     }
 
-    const forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
-    const jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
-    const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
-    const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
+    let forward = liveGpsOwnsTranslation ? 0 : Number(actions.move) || 0;
+    let strafe = liveGpsOwnsTranslation ? 0 : Number(actions.strafe) || 0;
+    if (mobileTouch && !liveGpsOwnsTranslation) {
+      const mobileMoveActive = actions.mobileMoveActive === true;
+      if (mobileMoveActive && state.walker.mobileMoveWasActive !== true) {
+        // Lock this gesture to the camera direction that was visible when the
+        // thumb went down. The chase camera may then move behind the explorer
+        // without feeding its own rotation back into a held left/right input
+        // and curling the player into a tight circle.
+        state.walker.mobileMoveBasisYaw = wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
+      }
+      state.walker.mobileMoveWasActive = mobileMoveActive;
+      const dampingRate = actions.mobileMoveActive === true ? 14 : 22;
+      const inputBlend = 1 - Math.exp(-Math.max(0, Math.min(0.1, dt)) * dampingRate);
+      state.walker.mobileForward = finiteOr(state.walker.mobileForward, 0) +
+        (forward - finiteOr(state.walker.mobileForward, 0)) * inputBlend;
+      state.walker.mobileStrafe = finiteOr(state.walker.mobileStrafe, 0) +
+        (strafe - finiteOr(state.walker.mobileStrafe, 0)) * inputBlend;
+      if (Math.abs(state.walker.mobileForward) < 0.002) state.walker.mobileForward = 0;
+      if (Math.abs(state.walker.mobileStrafe) < 0.002) state.walker.mobileStrafe = 0;
+      if (!mobileMoveActive && state.walker.mobileForward === 0 && state.walker.mobileStrafe === 0) {
+        state.walker.mobileMoveBasisYaw = null;
+      }
+      forward = state.walker.mobileForward;
+      strafe = state.walker.mobileStrafe;
+    } else {
+      state.walker.mobileForward = 0;
+      state.walker.mobileStrafe = 0;
+      state.walker.mobileMoveBasisYaw = null;
+      state.walker.mobileMoveWasActive = false;
+    }
+    let jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
+    if (skydiving && appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute') jumpAction = 0;
+    const planetaryBodyId = activePlanetaryBodyId();
+    const gravityMagnitude = planetaryBodyId
+      ? samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
+      : 9.80665;
+    const gravity = -gravityMagnitude;
+    const jumpVelocity = planetaryBodyId
+      ? Math.max(2.8, Math.min(4.2, 5 * Math.sqrt(gravityMagnitude / 9.80665)))
+      : 5.0;
 
     const groundState = state.walker._resolvedGroundState ||
       resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
@@ -253,16 +309,51 @@ function createWalkingPhysicsHelpers({
       }
     }
 
-    state.walker.vy += gravity * dt;
+    const parachuteDeployed = appCtx.isUrbanParachuteDeployed?.() === true &&
+      !isPlanetarySurface() && !state.walker.onGround && state.walker.vy < 0;
+    const parachuteFlare = parachuteDeployed && Number(actions.jump) > .05;
+    let skydivingFlight = null;
+    if (skydiving) {
+      skydivingFlight = integrateSkydivingDynamics(state.walker.skydivingFlight, {
+        deployed: parachuteDeployed,
+        flare: parachuteFlare,
+        forward,
+        turn: Number(actions.turn) || -strafe,
+        vx: state.walker.vx,
+        vz: state.walker.vz,
+        verticalVelocity: state.walker.vy
+      }, dt);
+      state.walker.skydivingFlight = skydivingFlight;
+      state.walker.angle = skydivingFlight.heading;
+      state.walker.vy = skydivingFlight.verticalSpeed;
+    } else {
+      state.walker.skydivingFlight = null;
+      state.walker.vy += gravity * dt;
+    }
     state.walker.y += state.walker.vy * dt;
+
+    if (appCtx.activeInterior) {
+      const ceiling = resolveInteriorCeiling({
+        activeInterior: appCtx.activeInterior,
+        x: state.walker.x,
+        z: state.walker.z,
+        eyeY: state.walker.y,
+        verticalVelocity: state.walker.vy
+      });
+      if (ceiling.collided) {
+        state.walker.y = ceiling.eyeY;
+        state.walker.vy = ceiling.verticalVelocity;
+      }
+    }
 
     if (state.walker.y <= effectiveGroundY + CFG.eyeHeight) {
       state.walker.y = effectiveGroundY + CFG.eyeHeight;
       state.walker.vy = 0;
       state.walker.onGround = true;
+      appCtx.onUrbanParachuteLanded?.();
     }
 
-    const speedMultiplier = appCtx.onMoon ? 0.6 : appCtx.onMars ? 0.72 : 1.0;
+    const speedMultiplier = planetaryBodyId === 'moon' ? 0.6 : planetaryBodyId ? 0.72 : 1.0;
     const adjustedSpeed = speed * speedMultiplier;
 
     const liveGpsMoved = !!liveGpsTarget && Math.hypot(
@@ -270,12 +361,82 @@ function createWalkingPhysicsHelpers({
       liveGpsTarget.z - state.walker.z
     ) > 0.002;
 
-    if (forward !== 0 || liveGpsMoved) {
-      const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+    if (liveGpsMoved) {
+      // GPS owns translation and heading while following. Camera look remains
+      // temporarily available, then continuously settles behind the explorer
+      // so looking aside cannot make movement direction ambiguous.
+      const headingDelta = wrapYaw(state.walker.angle - state.walker.yaw);
+      const followBlend = 1 - Math.exp(-dt * 4.8);
+      state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
+      state.walker.lookYawOffset *= Math.exp(-dt * 2.8);
+      if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+    } else if (mobileTouch && actions.mobileSettings?.cameraRecenter !== false && actions.mobileLookActive !== true) {
+      // Movement is not a reason to suspend the chase camera. While the move
+      // stick is held, keep settling behind the explorer so screen direction
+      // and travel direction remain readable. Only active look input owns the
+      // camera; after it is released the normal idle delay applies.
+      const idleFor = actions.mobileMoveActive === true
+        ? Number.POSITIVE_INFINITY
+        : performance.now() - (Number(actions.mobileLastLookInputAt) || 0);
+      const recenter = resolveMobileCameraRecenter({
+        actorYaw: state.walker.angle,
+        cameraYaw: state.walker.yaw + state.walker.lookYawOffset,
+        dt,
+        followRate: actions.mobileMoveActive === true ? 7.2 : 4.2,
+        idleMs: idleFor,
+        lookActive: actions.mobileLookActive,
+        settings: actions.mobileSettings
+      });
+      if (recenter.active) {
+        state.walker.yaw = recenter.yaw;
+        state.walker.lookYawOffset = 0;
+      }
+    }
+
+    if (forward !== 0 || strafe !== 0 || liveGpsMoved || skydivingFlight) {
+      const cameraYaw = mobileTouch && Number.isFinite(state.walker.mobileMoveBasisYaw)
+        ? state.walker.mobileMoveBasisYaw
+        : wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
+      const moveX = skydivingFlight
+        ? skydivingFlight.vx * dt
+        : mobileTouch && !liveGpsMoved
+        ? (Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
+        : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
+      const moveZ = skydivingFlight
+        ? skydivingFlight.vz * dt
+        : mobileTouch && !liveGpsMoved
+        ? (Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
+        : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+      if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
+        state.walker.angle = Math.atan2(moveX, moveZ);
+      }
 
       let newX = liveGpsMoved ? liveGpsTarget.x : state.walker.x + moveX;
       let newZ = liveGpsMoved ? liveGpsTarget.z : state.walker.z + moveZ;
+      if (planetaryBodyId) {
+        const activeSurface = appCtx.planetarySurfaceAuthority?.snapshot?.()?.active;
+        const manifest = activeSurface?.regionId
+          ? getPlanetarySurfaceRegion(activeSurface.regionId)
+          : null;
+        if (manifest?.bodyId === planetaryBodyId) {
+          const boundary = resolvePlanetarySurfaceBoundary(
+            { x: newX, z: newZ },
+            manifest,
+            { inset: 40 }
+          );
+          if (boundary.clamped) {
+            newX = boundary.x;
+            newZ = boundary.z;
+            appCtx.planetarySurfaceBoundary = Object.freeze({
+              bodyId: activeSurface.bodyId,
+              regionId: activeSurface.regionId,
+              edge: boundary.edge,
+              mode: 'walk',
+              atMs: Date.now()
+            });
+          }
+        }
+      }
       const sharedBuildingCollision = !isPlanetarySurface() && typeof appCtx.checkBuildingCollision === "function"
         ? appCtx.checkBuildingCollision
         : null;
@@ -297,7 +458,15 @@ function createWalkingPhysicsHelpers({
           if (sharedBuildingCollision) {
             const collision = sharedBuildingCollision(px, pz, sampleRadius, {
               actorBaseY: walkerFeetY,
-              actorHeight: CFG.eyeHeight * 0.95
+              actorHeight: CFG.eyeHeight * 0.95,
+              // The building collider owns walls, while the walking surface
+              // query owns a roof beneath the actor's feet. Once the walker
+              // has reached that roof, the same solid must not block every
+              // horizontal step across it.
+              acceptCollision: (candidate) => !walkerIsAtOrAboveRoof(
+                candidate?.building,
+                walkerFeetY
+              )
             });
             if (collision?.collision) return true;
           }
@@ -352,6 +521,15 @@ function createWalkingPhysicsHelpers({
           }
         }
       }
+      if (!isPlanetarySurface() && typeof appCtx.resolveUrbanActorCollision === 'function') {
+        const urbanCollision = appCtx.resolveUrbanActorCollision(
+          { x: state.walker.x, z: state.walker.z },
+          { x: newX, z: newZ },
+          { mode: 'walk', radius: .3 }
+        );
+        newX = urbanCollision.x;
+        newZ = urbanCollision.z;
+      }
       profileAfterCollision = profileEnabled ? performance.now() : 0;
 
       state.walker.x = newX;
@@ -372,17 +550,19 @@ function createWalkingPhysicsHelpers({
           state.walker.y = targetEyeY;
           state.walker.vy = 0;
           state.walker.onGround = true;
+          appCtx.onUrbanParachuteLanded?.();
         } else if (riseToGround >= 0 && riseToGround <= snapUpDistance) {
           state.walker.y = targetEyeY;
           state.walker.vy = 0;
           state.walker.onGround = true;
+          appCtx.onUrbanParachuteLanded?.();
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;
-      state.walker.speedMph = liveGpsMoved
-        ? Math.hypot(state.walker.x - startX, state.walker.z - startZ) /
-          Math.max(0.001, dt) * Number(appCtx.METERS_PER_WORLD_UNIT || 1) * 2.236936
-        : adjustedSpeed * 0.68;
+      state.walker.speedMph = worldUnitsPerSecondToMph(
+        Math.hypot(state.walker.x - startX, state.walker.z - startZ) / Math.max(0.001, dt),
+        appCtx.METERS_PER_WORLD_UNIT
+      );
     } else {
       state.walker.speedMph = 0;
     }
@@ -395,8 +575,11 @@ function createWalkingPhysicsHelpers({
         ? finalGroundState.effectiveGroundY + 0.04
         : Math.max(state.walker.y - CFG.eyeHeight, finalGroundState.effectiveGroundY + 0.02);
       state.characterMesh.position.set(state.walker.x, meshFeetY, state.walker.z);
+      state.characterMesh.rotation.order = 'YXZ';
       state.characterMesh.rotation.y = state.walker.angle;
-      animateCharacterWalk(state.characterMesh, state.walker.speedMph > 0, dt);
+      state.characterMesh.rotation.x = skydivingFlight?.bodyPitch || 0;
+      state.characterMesh.rotation.z = skydivingFlight ? -skydivingFlight.bank : 0;
+      animateCharacterWalk(state.characterMesh, !skydivingFlight && state.walker.speedMph > 0, dt);
     }
 
     if (profileEnabled) {

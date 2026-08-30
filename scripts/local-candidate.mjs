@@ -48,6 +48,9 @@ async function readManifest(directory, { requireCurrentCommit = false } = {}) {
 async function createCandidate(firebaseEnvironment = 'staging') {
   requireCleanSource();
   execFileSync(process.execPath, [
+    'scripts/verification/provider-release.mjs'
+  ], { cwd: rootDir, stdio: 'inherit' });
+  execFileSync(process.execPath, [
     'scripts/hosting-artifact.mjs',
     'build',
     '--firebase-env',

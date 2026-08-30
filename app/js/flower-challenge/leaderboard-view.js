@@ -1,6 +1,9 @@
+import { getLeaderboardDefinition } from '../leaderboards/catalog.js?v=2';
+
 export function createFlowerLeaderboardView(deps = {}) {
   const {
     challengeState,
+    getSignedInUser,
     getLeaderboardStorageKey,
     getSortLeaderboardEntries,
     leaderboardLimit,
@@ -40,10 +43,17 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   const roomsJoined = Number(raw.roomsJoined);
   const artifactsShared = Number(raw.artifactsShared);
   const friendsAdded = Number(raw.friendsAdded);
+  const rankLabel = String(raw.rankLabel || '').slice(0, 48);
+  const totalRecords = Number(raw.totalRecords);
+  const uniqueDiscoveries = Number(raw.uniqueDiscoveries);
+  const regionsVisited = Number(raw.regionsVisited);
+  const badgeCount = Number(raw.badgeCount);
   const disabledCameras = Number(raw.disabledCameras);
   const totalCameras = Number(raw.totalCameras);
   const detections = Number(raw.detections);
   const distance = Number(raw.distance);
+  const source = raw.source === 'cloud' ? 'cloud' : 'device';
+  const uid = String(raw.uid || '').slice(0, 128);
 
   if (challenge === 'flower') {
     if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
@@ -57,6 +67,8 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
 
   return {
     id: String(raw.id || raw.docId || `entry_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
+    uid,
+    source,
     challenge,
     player,
     timeMs: Number.isFinite(timeMs) && timeMs > 0 ? timeMs : null,
@@ -78,6 +90,11 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
     roomsJoined: Number.isFinite(roomsJoined) ? Math.max(0, Math.round(roomsJoined)) : 0,
     artifactsShared: Number.isFinite(artifactsShared) ? Math.max(0, Math.round(artifactsShared)) : 0,
     friendsAdded: Number.isFinite(friendsAdded) ? Math.max(0, Math.round(friendsAdded)) : 0,
+    rankLabel,
+    totalRecords: Number.isFinite(totalRecords) ? Math.max(0, Math.round(totalRecords)) : 0,
+    uniqueDiscoveries: Number.isFinite(uniqueDiscoveries) ? Math.max(0, Math.round(uniqueDiscoveries)) : 0,
+    regionsVisited: Number.isFinite(regionsVisited) ? Math.max(0, Math.round(regionsVisited)) : 0,
+    badgeCount: Number.isFinite(badgeCount) ? Math.max(0, Math.round(badgeCount)) : 0,
     disabledCameras: Number.isFinite(disabledCameras) ? Math.max(0, Math.round(disabledCameras)) : 0,
     totalCameras: Number.isFinite(totalCameras) ? Math.max(0, Math.round(totalCameras)) : 0,
     detections: Number.isFinite(detections) ? Math.max(0, Math.round(detections)) : 0,
@@ -122,16 +139,11 @@ function writeLocalLeaderboard(challengeType, entries) {
 function renderLeaderboard(entries) {
   if (!ui.titleList) return;
   const challengeType = normalizeChallengeType(challengeState.leaderboardView);
+  const definition = getLeaderboardDefinition(challengeType);
+  const signedInUid = String(getSignedInUser?.()?.uid || '');
 
   if (!entries || entries.length === 0) {
-    const empty = {
-      flower: 'No flower runs yet. Be the first.',
-      painttown: 'No paint runs yet. Reach rooftops to paint and post a score.',
-      fishing: 'No catches yet. Launch a boat, stop in open water, and cast.',
-      explorer: 'Explorer scores appear as people join rooms, share artifacts, and make connections.',
-      deflock: 'No completed DeFlock hunts yet.'
-    }[challengeType];
-    ui.titleList.innerHTML = `<li class="flowerLeaderboardEmpty">${safeText(empty)}</li>`;
+    ui.titleList.innerHTML = `<li class="flowerLeaderboardEmpty"><strong>No results yet</strong><span>${safeText(definition.empty)}</span></li>`;
     return;
   }
 
@@ -146,16 +158,18 @@ function renderLeaderboard(entries) {
       locationLine = `${safeText(entry.species || 'Fish')} | ${Number(entry.weightKg || 0).toFixed(2)} kg | ${Number(entry.lengthCm || 0).toFixed(1)} cm | ${safeText(entry.location)}`;
     } else if (challengeType === 'explorer') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
-      locationLine = `Rooms ${entry.roomsJoined || 0} | Artifacts ${entry.artifactsShared || 0} | Friends ${entry.friendsAdded || 0}`;
+      locationLine = `${safeText(entry.rankLabel || 'Trailhead')} | ${entry.totalRecords || 0} journal records | ${entry.uniqueDiscoveries || 0} discoveries | ${entry.regionsVisited || 0} regions`;
     } else if (challengeType === 'deflock') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
       locationLine = `${entry.disabledCameras || 0}/${entry.totalCameras || 0} virtual cameras | ${((Number(entry.timeMs) || 0) / 1000).toFixed(1)}s | ${safeText(entry.location)}`;
     }
-    return `<li class="flowerLeaderboardItem">
+    const isCurrentPlayer = !!signedInUid && entry.uid === signedInUid;
+    const sourceLabel = entry.source === 'device' ? '<span class="flowerLeaderboardSource">This device</span>' : '';
+    return `<li class="flowerLeaderboardItem${isCurrentPlayer ? ' current-player' : ''}">
       <span class="flowerLeaderboardRank">#${idx + 1}</span>
-      <span class="flowerLeaderboardPlayer">${safeText(entry.player)}</span>
+      <span class="flowerLeaderboardPlayer">${safeText(entry.player)}${isCurrentPlayer ? ' <em>You</em>' : ''}</span>
       <span class="flowerLeaderboardTime">${safeText(metric)}</span>
-      <span class="flowerLeaderboardLoc">${locationLine}</span>
+      <span class="flowerLeaderboardLoc">${locationLine}${sourceLabel}</span>
     </li>`;
   }).join('');
 }
