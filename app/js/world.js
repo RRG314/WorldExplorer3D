@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=26";
+} from "./world/osm-loader.js?v=27";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=206";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=207";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
@@ -171,7 +171,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=14";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=102";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=103";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

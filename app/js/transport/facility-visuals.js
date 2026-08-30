@@ -1,4 +1,4 @@
-import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=4';
+import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=5';
 
 const FACILITY_COLORS = Object.freeze({
   aviation: 0x84d7e8,
@@ -23,6 +23,87 @@ function pointsFor(record, sampleGround) {
     y: Number(sampleGround?.(point.x, point.z)) || 0,
     z: point.z
   }));
+}
+
+function physicalPublicationAllowed(record) {
+  if (record?.domain !== 'aviation') return true;
+  return record?.geometryAuthority === 'exact-openstreetmap' ||
+    (record?.geometryAuthority == null && record?.provenance?.provider !== 'openstreetmap-shortbread');
+}
+
+function surfaceFollowingProfile(record, sampleGround, spacing = 12, clearance = .09) {
+  const raw = recordPoints(record);
+  if (raw.length < 2) return [];
+  const width = facilityWidth(record);
+  const profile = [];
+  for (let segment = 1; segment < raw.length; segment += 1) {
+    const start = raw[segment - 1];
+    const end = raw[segment];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const length = Math.max(.001, Math.hypot(dx, dz));
+    const divisions = Math.max(1, Math.ceil(length / Math.max(4, spacing)));
+    const nx = -dz / length;
+    const nz = dx / length;
+    for (let division = segment === 1 ? 0 : 1; division <= divisions; division += 1) {
+      const t = division / divisions;
+      const x = start.x + dx * t;
+      const z = start.z + dz * t;
+      const sampled = [-.5, -.25, 0, .25, .5].map((factor) =>
+        Number(sampleGround?.(x + nx * width * factor, z + nz * width * factor)) || 0);
+      profile.push({ x, y: Math.max(...sampled) + clearance, z });
+    }
+  }
+  profile.forEach((point, index) => { point.t = index / Math.max(1, profile.length - 1); });
+  return profile;
+}
+
+function runwaySurfaceProfile(record, sampleGround, spacing = 12) {
+  return surfaceFollowingProfile(record, sampleGround, spacing, .09);
+}
+
+function profilePointAt(profile, fraction) {
+  if (!profile.length) return null;
+  const scaled = Math.max(0, Math.min(1, fraction)) * (profile.length - 1);
+  const left = profile[Math.floor(scaled)];
+  const right = profile[Math.min(profile.length - 1, Math.ceil(scaled))];
+  const mix = scaled - Math.floor(scaled);
+  return {
+    x: left.x + (right.x - left.x) * mix,
+    y: left.y + (right.y - left.y) * mix,
+    z: left.z + (right.z - left.z) * mix
+  };
+}
+
+function offsetProfile(profile, lateral, yOffset = 0) {
+  return profile.map((point, index) => {
+    const previous = profile[Math.max(0, index - 1)];
+    const next = profile[Math.min(profile.length - 1, index + 1)];
+    const dx = next.x - previous.x;
+    const dz = next.z - previous.z;
+    const length = Math.max(.001, Math.hypot(dx, dz));
+    return { x: point.x - dz / length * lateral, y: point.y + yOffset, z: point.z + dx / length * lateral };
+  });
+}
+
+function profileSurfaceYAt(surfaceProfiles, x, z) {
+  let best = null;
+  for (const surface of surfaceProfiles) {
+    for (let index = 1; index < surface.profile.length; index += 1) {
+      const start = surface.profile[index - 1];
+      const end = surface.profile[index];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const lengthSquared = Math.max(.0001, dx * dx + dz * dz);
+      const t = Math.max(0, Math.min(1, ((x - start.x) * dx + (z - start.z) * dz) / lengthSquared));
+      const px = start.x + dx * t;
+      const pz = start.z + dz * t;
+      const distance = Math.hypot(x - px, z - pz);
+      if (distance > surface.width * .55 + 1.5 || (best && distance >= best.distance)) continue;
+      best = { distance, y: start.y + (end.y - start.y) * t };
+    }
+  }
+  return best?.y ?? null;
 }
 
 function createRibbonGeometry(THREE, points, width = 3) {
@@ -50,11 +131,19 @@ function createRibbonGeometry(THREE, points, width = 3) {
   return geometry;
 }
 
-function createPolygonGeometry(THREE, points) {
+function createPolygonGeometry(THREE, points, sampleGround) {
   const shape = new THREE.Shape();
   points.forEach((point, index) => index ? shape.lineTo(point.x, point.z) : shape.moveTo(point.x, point.z));
   const geometry = new THREE.ShapeGeometry(shape);
   geometry.rotateX(Math.PI / 2);
+  const position = geometry.getAttribute('position');
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const z = position.getZ(index);
+    position.setY(index, (Number(sampleGround?.(x, z)) || 0) + .06);
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
   return geometry;
 }
 
@@ -80,9 +169,9 @@ function runwayMarkingMaterial(THREE, track) {
   return track.material(new THREE.MeshBasicMaterial({ color: 0xf4f5ef, polygonOffset: true, polygonOffsetFactor: -4 }));
 }
 
-function addRunwayPresentation(THREE, group, record, track, sampleGround, mobile) {
+function addRunwayPresentation(THREE, group, record, profile, track, mobile) {
   const raw = recordPoints(record);
-  if (raw.length < 2) return;
+  if (raw.length < 2 || profile.length < 2) return;
   const start = raw[0];
   const end = raw.at(-1);
   const dx = end.x - start.x;
@@ -90,35 +179,51 @@ function addRunwayPresentation(THREE, group, record, track, sampleGround, mobile
   const length = Math.max(1, Math.hypot(dx, dz));
   const yaw = Math.atan2(dx, dz);
   const width = facilityWidth(record);
-  const center = { x: (start.x + end.x) * .5, z: (start.z + end.z) * .5 };
-  const groundY = Number(sampleGround?.(center.x, center.z)) || 0;
   const white = runwayMarkingMaterial(THREE, track);
-  const markingGroup = new THREE.Group();
-  markingGroup.name = 'Runway markings';
-  markingGroup.position.y = groundY + .09;
-  markingGroup.rotation.y = yaw;
-  group.add(markingGroup);
   const edgeWidth = Math.max(.18, Math.min(.42, width * .012));
-  addBox(THREE, markingGroup, track, { x: edgeWidth, y: .018, z: length * .94 }, { x: -width * .46, y: 0, z: 0 }, white, 'Runway edge marking');
-  addBox(THREE, markingGroup, track, { x: edgeWidth, y: .018, z: length * .94 }, { x: width * .46, y: 0, z: 0 }, white, 'Runway edge marking');
+  for (const side of [-1, 1]) {
+    const edge = new THREE.Mesh(
+      track.geometry(createRibbonGeometry(THREE, offsetProfile(profile, side * width * .46, .055), edgeWidth)),
+      white
+    );
+    edge.name = 'Runway edge marking';
+    edge.renderOrder = 8;
+    group.add(edge);
+  }
   const dashCount = Math.min(mobile ? 20 : 38, Math.max(6, Math.floor(length / 30)));
   for (let index = 0; index < dashCount; index += 1) {
     if (index % 2) continue;
-    addBox(THREE, markingGroup, track, { x: .42, y: .02, z: length / dashCount * .58 }, {
-      x: 0, y: .01, z: -length * .46 + (index + .5) * length * .92 / dashCount
-    }, white, 'Runway centerline marking');
+    const startFraction = .04 + index * .92 / dashCount;
+    const endFraction = Math.min(.96, startFraction + .58 * .92 / dashCount);
+    const dash = new THREE.Mesh(track.geometry(createRibbonGeometry(THREE, [
+      { ...profilePointAt(profile, startFraction), y: profilePointAt(profile, startFraction).y + .06 },
+      { ...profilePointAt(profile, endFraction), y: profilePointAt(profile, endFraction).y + .06 }
+    ], .42)), white);
+    dash.name = 'Runway centerline marking';
+    dash.renderOrder = 8;
+    group.add(dash);
   }
   [-1, 1].forEach((direction) => {
     for (let stripe = -3; stripe <= 3; stripe += 1) {
       if (stripe === 0) continue;
-      addBox(THREE, markingGroup, track, { x: width * .055, y: .02, z: Math.min(8, length * .025) }, {
-        x: stripe * width * .095, y: .015, z: direction * length * .425
-      }, white, 'Runway threshold marking');
+      const fraction = direction < 0 ? .075 : .925;
+      const point = profilePointAt(profile, fraction);
+      const stripeMesh = addBox(THREE, group, track,
+        { x: width * .055, y: .02, z: Math.min(8, length * .025) },
+        { x: point.x + Math.cos(yaw) * stripe * width * .095, y: point.y + .095, z: point.z - Math.sin(yaw) * stripe * width * .095 },
+        white, 'Runway threshold marking');
+      stripeMesh.rotation.y = yaw;
+      stripeMesh.renderOrder = 8;
     }
     for (const x of [-width * .16, width * .16]) {
-      addBox(THREE, markingGroup, track, { x: width * .07, y: .02, z: Math.min(18, length * .055) }, {
-        x, y: .015, z: direction * length * .31
-      }, white, 'Runway aiming point');
+      const fraction = direction < 0 ? .19 : .81;
+      const point = profilePointAt(profile, fraction);
+      const aiming = addBox(THREE, group, track,
+        { x: width * .07, y: .02, z: Math.min(18, length * .055) },
+        { x: point.x + Math.cos(yaw) * x, y: point.y + .095, z: point.z - Math.sin(yaw) * x },
+        white, 'Runway aiming point');
+      aiming.rotation.y = yaw;
+      aiming.renderOrder = 8;
     }
   });
   const lightCount = Math.min(mobile ? 22 : 46, Math.max(10, Math.floor(length / 24)));
@@ -126,17 +231,22 @@ function addRunwayPresentation(THREE, group, record, track, sampleGround, mobile
   const lightGeometry = track.geometry(new THREE.SphereGeometry(.12, mobile ? 5 : 8, 5));
   for (let index = 0; index < lightCount; index += 1) {
     if (mobile && index % 2) continue;
-    const forward = -length * .47 + index * length * .94 / Math.max(1, lightCount - 1);
+    const fraction = .03 + index * .94 / Math.max(1, lightCount - 1);
+    const point = profilePointAt(profile, fraction);
     for (const side of [-1, 1]) {
       const light = new THREE.Mesh(lightGeometry, lightMat);
-      light.position.set(side * width * .51, .13, forward);
+      light.position.set(
+        point.x + Math.cos(yaw) * side * width * .51,
+        point.y + .14,
+        point.z - Math.sin(yaw) * side * width * .51
+      );
       light.name = 'Runway edge light';
-      markingGroup.add(light);
+      group.add(light);
     }
   }
 }
 
-function addRunwayDesignator(THREE, group, layout, track, sampleGround) {
+function addRunwayDesignator(THREE, group, layout, profile, track) {
   if (!globalThis.document?.createElement || !layout) return;
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -153,9 +263,10 @@ function addRunwayDesignator(THREE, group, layout, track, sampleGround) {
   texture.colorSpace = THREE.SRGBColorSpace;
   const material = track.material(new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }));
   const mesh = new THREE.Mesh(track.geometry(new THREE.PlaneGeometry(Math.min(20, layout.runwayWidth * .45), Math.min(10, layout.runwayLength * .04))), material);
-  const point = layout.runwayStart;
+  const point = profilePointAt(profile, .09);
+  if (!point) return;
   mesh.rotation.set(-Math.PI / 2, 0, -layout.yaw);
-  mesh.position.set(point.x + Math.sin(layout.yaw) * layout.runwayLength * .09, (Number(sampleGround?.(point.x, point.z)) || 0) + .13, point.z + Math.cos(layout.yaw) * layout.runwayLength * .09);
+  mesh.position.set(point.x, point.y + .1, point.z);
   mesh.name = 'Runway designator';
   group.add(mesh);
 }
@@ -252,30 +363,43 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
       color: FACILITY_COLORS[record.type] || FACILITY_COLORS[record.domain],
       roughness: .82,
       metalness: .08,
+      polygonOffset: ['runway', 'taxiway', 'apron'].includes(record.type),
+      polygonOffsetFactor: ['runway', 'taxiway', 'apron'].includes(record.type) ? -2 : 0,
+      polygonOffsetUnits: ['runway', 'taxiway', 'apron'].includes(record.type) ? -2 : 0,
       transparent: record.type === 'ferry_route',
       opacity: record.type === 'ferry_route' ? .62 : 1
     })));
     return materials.get(key);
   };
   const airportLayout = compileAirportOperationalLayout(graph, options);
-  const renderedRunwayIds = new Set();
+  let primaryRunwayProfile = [];
+  const surfaceProfiles = [];
   for (const record of graph.records) {
+    if (!physicalPublicationAllowed(record)) continue;
     const points = pointsFor(record, options.sampleGround);
     if (!points.length) continue;
     if (record.type === 'control_tower') continue;
     let mesh;
     if (record.geometry?.kind === 'polygon' && points.length >= 3 && ['apron', 'terminal', 'hangar', 'helipad', 'pier', 'quay', 'dock'].includes(record.type)) {
-      const geometry = track.geometry(createPolygonGeometry(THREE, points));
+      const geometry = track.geometry(createPolygonGeometry(THREE, points, options.sampleGround));
       mesh = new THREE.Mesh(geometry, materialFor(record));
-      mesh.position.y = Math.max(...points.map(({ y }) => y)) + .045;
     } else if (points.length >= 2) {
-      const geometry = track.geometry(createRibbonGeometry(THREE, points, facilityWidth(record)));
+      const surfaceProfile = record.type === 'runway'
+        ? runwaySurfaceProfile(record, options.sampleGround, options.mobile === true ? 18 : 10)
+        : record.type === 'taxiway'
+          ? surfaceFollowingProfile(record, options.sampleGround, options.mobile === true ? 20 : 12, .075)
+          : points;
+      const geometry = track.geometry(createRibbonGeometry(THREE, surfaceProfile, facilityWidth(record)));
+      if (['runway', 'taxiway'].includes(record.type)) {
+        surfaceProfiles.push({ profile: surfaceProfile, width: facilityWidth(record), type: record.type, id: record.id });
+      }
       mesh = new THREE.Mesh(geometry, materialFor(record));
       if (record.type === 'runway') {
-        renderedRunwayIds.add(record.id);
-        addRunwayPresentation(THREE, group, record, track, options.sampleGround, options.mobile === true);
+        mesh.renderOrder = 6;
+        if (record.id === airportLayout?.primaryRunway?.id) primaryRunwayProfile = surfaceProfile;
+        addRunwayPresentation(THREE, group, record, surfaceProfile, track, options.mobile === true);
       } else if (record.type === 'taxiway') {
-        const centerline = track.geometry(createRibbonGeometry(THREE, points.map((point) => ({ ...point, y: point.y + .06 })), .18));
+        const centerline = track.geometry(createRibbonGeometry(THREE, surfaceProfile.map((point) => ({ ...point, y: point.y + .06 })), .18));
         const centerlineMesh = new THREE.Mesh(centerline, track.material(new THREE.MeshBasicMaterial({ color: 0xe7c743 })));
         centerlineMesh.name = 'Taxiway centerline';
         group.add(centerlineMesh);
@@ -294,19 +418,7 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
     mesh.receiveShadow = true;
     group.add(mesh);
   }
-  if (airportLayout?.generatedFallback && !renderedRunwayIds.has(airportLayout.primaryRunway.id)) {
-    const record = airportLayout.primaryRunway;
-    const points = pointsFor(record, options.sampleGround);
-    const mesh = new THREE.Mesh(track.geometry(createRibbonGeometry(THREE, points, facilityWidth(record))), materialFor(record));
-    mesh.name = 'Generated gameplay runway';
-    mesh.userData.transportFacilityId = record.id;
-    mesh.userData.mapped = false;
-    mesh.userData.generatedActivity = true;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-    addRunwayPresentation(THREE, group, record, track, options.sampleGround, options.mobile === true);
-  }
-  addRunwayDesignator(THREE, group, airportLayout, track, options.sampleGround);
+  addRunwayDesignator(THREE, group, airportLayout, primaryRunwayProfile, track);
   addStandPresentation(THREE, group, airportLayout, track, options.sampleGround, options.mobile === true);
   addControlTower(THREE, group, airportLayout, track, options.sampleGround, options.mobile === true);
   addGeneratedTerminal(THREE, group, airportLayout, track, options.sampleGround, options.mobile === true);
@@ -315,6 +427,9 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
   return Object.freeze({
     group,
     airportLayout,
+    surfaceYAt(x, z) {
+      return profileSurfaceYAt(surfaceProfiles, Number(x), Number(z));
+    },
     dispose() {
       group.removeFromParent?.();
       resources.geometries.forEach((geometry) => geometry.dispose?.());
@@ -324,4 +439,9 @@ function createTransportFacilityVisuals(THREE, graph, options = {}) {
   });
 }
 
-export { createTransportFacilityVisuals };
+export {
+  createTransportFacilityVisuals,
+  physicalPublicationAllowed,
+  profileSurfaceYAt,
+  runwaySurfaceProfile
+};

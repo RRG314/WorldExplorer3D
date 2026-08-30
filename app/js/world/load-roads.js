@@ -33,8 +33,35 @@ import {
   completeFixedRegionalStructureLoad
 } from "./fixed-regional-structures.js?v=15";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
-import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=3";
-import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=5";
+import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=4";
+import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=6";
+
+const EXACT_AVIATION_TYPES = new Set([
+  'aerodrome', 'heliport', 'runway', 'taxiway', 'apron', 'terminal',
+  'helipad', 'hangar', 'parking_position', 'gate', 'control_tower'
+]);
+
+function isExactTransportFacilityElement(element = {}) {
+  const tags = element.tags || {};
+  if (EXACT_AVIATION_TYPES.has(String(tags.aeroway || '').toLowerCase())) return true;
+  if (String(tags.route || '').toLowerCase() === 'ferry') return true;
+  if (String(tags.amenity || '').toLowerCase() === 'ferry_terminal') return true;
+  if (String(tags.leisure || '').toLowerCase() === 'marina') return true;
+  if (['port', 'harbour'].includes(String(tags.landuse || '').toLowerCase())) return true;
+  if (['pier', 'quay'].includes(String(tags.man_made || '').toLowerCase())) return true;
+  if (String(tags.waterway || '').toLowerCase() === 'dock') return true;
+  if (String(tags.harbour || '').toLowerCase() === 'yes') return true;
+  if (String(tags.mooring || '').toLowerCase() && String(tags.mooring).toLowerCase() !== 'no') return true;
+  return ['harbour', 'berth'].includes(String(tags['seamark:type'] || '').toLowerCase());
+}
+
+function selectExactFacilityElements(data = {}) {
+  const elements = Array.isArray(data.elements) ? data.elements : [];
+  const facilities = elements.filter(isExactTransportFacilityElement);
+  const nodeIds = new Set(facilities.flatMap((element) => Array.isArray(element.nodes) ? element.nodes.map(String) : []));
+  return elements.filter((element) => isExactTransportFacilityElement(element) ||
+    (element.type === 'node' && nodeIds.has(String(element.id))));
+}
 
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -394,12 +421,6 @@ export function createWorldRoadLoader(deps = {}) {
           buildingMetadataCacheMeta,
           buildingMetadataQuery,
           buildingPublicationQuery,
-          civicFacilityCacheMeta,
-          civicFacilityQuery,
-          commercePlaceCacheMeta,
-          commercePlaceQuery,
-          transportFacilityCacheMeta,
-          transportFacilityQuery,
           waterStructureCacheMeta,
           waterStructureQuery,
           featureRadius,
@@ -452,52 +473,10 @@ export function createWorldRoadLoader(deps = {}) {
           })
         ).then((facilityData) => ({ facilityData, error: null }))
           .catch((error) => ({ facilityData: null, error }));
-        startLoadPhase('fetchFixedRegionalStructures');
-        const regionalStructureRequest = beginFixedRegionalStructureLoad({
-          deadlineMs: loadDeadline,
-          fetchOverpassJSON,
-          location: appCtx.LOC,
-          runProviderWork,
-          timeoutMs: Math.min(optionalProviderTimeoutMs, overpassTimeoutMs)
-        });
-        const civicFacilityRequest = runProviderWork(
-          'osm-overpass',
-          'civic-facilities',
-          (signal) => fetchOverpassJSON(
-            civicFacilityQuery,
-            Math.min(optionalProviderTimeoutMs, overpassTimeoutMs),
-            loadDeadline,
-            civicFacilityCacheMeta,
-            { signal }
-          )
-        ).then((facilityData) => ({ facilityData, error: null }))
-          .catch((error) => ({ facilityData: null, error }));
-        const commercePlaceRequest = runProviderWork(
-          'osm-overpass',
-          'commerce-places',
-          (signal) => fetchOverpassJSON(
-            commercePlaceQuery,
-            Math.min(optionalProviderTimeoutMs, overpassTimeoutMs),
-            loadDeadline,
-            commercePlaceCacheMeta,
-            { signal }
-          )
-        ).then((placeData) => ({ placeData, error: null }))
-          .catch((error) => ({ placeData: null, error }));
-        const transportFacilityRequest = runProviderWork(
-          'osm-overpass',
-          'transport-facilities',
-          (signal) => fetchOverpassJSON(
-            transportFacilityQuery,
-            Math.min(optionalProviderTimeoutMs, overpassTimeoutMs),
-            loadDeadline,
-            transportFacilityCacheMeta,
-            { signal }
-          )
-        ).then((facilityData) => ({ facilityData, error: null }))
-          .catch((error) => ({ facilityData: null, error }));
         startLoadPhase('fetchOverpass');
         let data;
+        let exactSupplementData = null;
+        let primaryOverpassError = null;
         let exactTransportLoaded = false;
         let mappedWaterStructureCoverageComplete = false;
         try {
@@ -517,16 +496,30 @@ export function createWorldRoadLoader(deps = {}) {
                 { signal }
               )
             );
+            exactSupplementData = data;
             exactTransportLoaded = true;
             mappedWaterStructureCoverageComplete = true;
           } catch (overpassErr) {
             if (!isActiveLoadContext()) throw overpassErr;
+            primaryOverpassError = overpassErr;
             recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
             appCtx.showLoad('Loading generalized mapped data...');
           }
         } finally {
           endLoadPhase('fetchOverpass');
         }
+        // Public Overpass instances expect one request at a time. The airport,
+        // civic, commerce, maritime, road, and surface records above now share
+        // the primary request. This wider reviewed-structure request starts only
+        // after that request has settled.
+        startLoadPhase('fetchFixedRegionalStructures');
+        const regionalStructureRequest = beginFixedRegionalStructureLoad({
+          deadlineMs: loadDeadline,
+          fetchOverpassJSON,
+          location: appCtx.LOC,
+          runProviderWork,
+          timeoutMs: Math.min(optionalProviderTimeoutMs, overpassTimeoutMs)
+        });
         try {
           data = await completeFixedRegionalTransportLoad({
             appCtx,
@@ -584,28 +577,14 @@ export function createWorldRoadLoader(deps = {}) {
           if (mappedPoiResult.error) recordLoadWarning('mapped Shortbread places', mappedPoiResult.error);
         }
         runtimeState.mappedPois = loadMetrics.mappedPois;
-        const civicFacilityResult = await civicFacilityRequest;
-        if (civicFacilityResult.facilityData?.elements?.length) {
-          const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
-          civicFacilityResult.facilityData.elements.forEach((element) => merged.set(`${element.type}:${element.id}`, element));
-          data = { ...data, elements: [...merged.values()] };
-          loadMetrics.civicFacilities = {
-            provider: 'osm-overpass',
-            mapped: civicFacilityResult.facilityData.elements.length,
-            status: 'loaded'
-          };
-        } else {
-          loadMetrics.civicFacilities = { provider: 'osm-overpass', mapped: 0, status: 'unavailable' };
-          if (civicFacilityResult.error) recordLoadWarning('mapped civic facilities', civicFacilityResult.error);
-        }
-        const commercePlaceResult = await commercePlaceRequest;
-        if (commercePlaceResult.placeData?.elements?.length) {
-          const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
-          commercePlaceResult.placeData.elements.forEach((element) => merged.set(`${element.type}:${element.id}`, element));
-          data = { ...data, elements: [...merged.values()] };
-        } else if (commercePlaceResult.error) {
-          recordLoadWarning('exact mapped convenience-store supplement', commercePlaceResult.error);
-        }
+        const exactElements = exactSupplementData?.elements || [];
+        const exactCivicElements = exactElements.filter((element) =>
+          ['police', 'hospital'].includes(String(element?.tags?.amenity || '').toLowerCase()));
+        loadMetrics.civicFacilities = {
+          provider: 'osm-overpass-consolidated',
+          mapped: exactCivicElements.length,
+          status: exactTransportLoaded ? (exactCivicElements.length ? 'loaded' : 'authoritative-empty') : 'unavailable'
+        };
         const mappedConvenienceCount = (data?.elements || []).filter((element) =>
           element?.tags?.shop === 'convenience' &&
           Number.isFinite(Number(element.lat ?? element.center?.lat)) &&
@@ -616,19 +595,18 @@ export function createWorldRoadLoader(deps = {}) {
           String(element?.tags?._sourceFeatureId || '').startsWith('shortbread:pois:')
         ).length;
         loadMetrics.commercePlaces = {
-          provider: commercePlaceResult.placeData?.elements?.length
+          provider: exactTransportLoaded
             ? shortbreadConvenienceCount > 0 ? 'openstreetmap-shortbread+osm-overpass' : 'osm-overpass'
             : 'openstreetmap-shortbread',
           mapped: mappedConvenienceCount,
           status: mappedConvenienceCount > 0 ? 'loaded' : 'authoritative-empty',
           shortbreadMapped: shortbreadConvenienceCount,
-          exactSupplementAvailable: Boolean(commercePlaceResult.placeData?.elements?.length),
+          exactSupplementAvailable: exactTransportLoaded,
           inventoryAuthority: 'world-explorer-gameplay'
         };
         runtimeState.commercePlaces = loadMetrics.commercePlaces;
-        const transportFacilityResult = await transportFacilityRequest;
         const generalizedTransportFacilityResult = await generalizedTransportFacilityRequest;
-        const exactFacilityElements = transportFacilityResult.facilityData?.elements || [];
+        const exactFacilityElements = selectExactFacilityElements(exactSupplementData);
         const generalizedFacilityElements = generalizedTransportFacilityResult.facilityData?.elements || [];
         const facilityElements = new Map(generalizedFacilityElements.map((element) => [
           String(element?.tags?._sourceFeatureId || `${element.type}:${element.id}`), element
@@ -636,16 +614,13 @@ export function createWorldRoadLoader(deps = {}) {
         exactFacilityElements.forEach((element) => facilityElements.set(`osm:${element.type}:${element.id}`, element));
         const transportFacilityData = {
           ...(generalizedTransportFacilityResult.facilityData || {}),
-          ...(transportFacilityResult.facilityData || {}),
+          ...(exactSupplementData || {}),
           elements: [...facilityElements.values()],
           _overpassSource: exactFacilityElements.length ? 'osm-overpass+shortbread-vector' : 'shortbread-vector',
           _overpassEndpoint: exactFacilityElements.length
-            ? transportFacilityResult.facilityData?._overpassEndpoint || ''
+            ? exactSupplementData?._overpassEndpoint || ''
             : generalizedTransportFacilityResult.facilityData?._overpassEndpoint || ''
         };
-        if (transportFacilityResult.error) {
-          recordLoadWarning('mapped aviation and maritime facilities', transportFacilityResult.error);
-        }
         if (generalizedTransportFacilityResult.error) {
           recordLoadWarning('generalized mapped aviation and maritime facilities', generalizedTransportFacilityResult.error);
         }
@@ -661,7 +636,7 @@ export function createWorldRoadLoader(deps = {}) {
           aviation: transportFacilityGraph.byDomain.aviation.length,
           maritime: transportFacilityGraph.byDomain.maritime.length,
           status: transportFacilityGraph.records.length ? 'loaded' :
-            transportFacilityResult.error && generalizedTransportFacilityResult.error ? 'unavailable' : 'authoritative-empty',
+            primaryOverpassError && generalizedTransportFacilityResult.error ? 'unavailable' : 'authoritative-empty',
           exactMapped: exactFacilityElements.length,
           generalizedMapped: generalizedFacilityElements.length,
           bounded: true,
