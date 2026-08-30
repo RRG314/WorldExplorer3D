@@ -1032,9 +1032,7 @@ function createUrbanEquipmentRuntime(options = {}) {
           z: Number(projectile.aimPoint.z.toFixed(2))
         }) : null,
         distance: Number(projectile.distance.toFixed(2)),
-        elapsed: Number(projectile.elapsed.toFixed(2)),
         maxDistance: Number((projectile.maxDistance || projectile.equipment.range || 0).toFixed(2)),
-        maxLife: Number(projectile.maxLife.toFixed(2)),
         landed: projectile.landed === true
       })),
       reticleVisible: state.equipmentUi?.reticle?.classList.contains('show') === true,
