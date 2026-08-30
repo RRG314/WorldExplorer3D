@@ -4,6 +4,15 @@ function roomIdentity(room) {
   return room ? `${String(room.code || room.id || '')}:${String(room.world?.seed || '')}` : '';
 }
 
+function resolveRoomVehicleLease(remote, actorUid, currentTime = Date.now()) {
+  const leaseOwnerUid = String(remote?.leaseOwnerUid || '');
+  const leaseActive = !!leaseOwnerUid && Number(remote?.leaseExpiresMs || 0) > Number(currentTime || 0);
+  return Object.freeze({
+    occupiedByOther: leaseActive && leaseOwnerUid !== String(actorUid || ''),
+    leaseOwnerUid: leaseActive ? leaseOwnerUid : ''
+  });
+}
+
 function createUrbanRoomAuthorityRuntime(options = {}) {
   const state = options.state;
   let disposed = false;
@@ -24,13 +33,15 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
       const remote = state.remoteEntities.get(vehicle.id);
       if (!remote || remote.kind !== 'vehicle') {
         vehicle.roomOccupiedByOther = false;
+        vehicle.roomLeaseOwnerUid = '';
         continue;
       }
       vehicle.condition = remote.condition;
       vehicle.visual.setCondition(remote.condition);
-      const occupiedByOther = !!remote.leaseOwnerUid && remote.leaseOwnerUid !== state.authority?.actorUid && remote.leaseExpiresMs > currentTime;
+      const lease = resolveRoomVehicleLease(remote, state.authority?.actorUid, currentTime);
+      const occupiedByOther = lease.occupiedByOther;
       vehicle.roomOccupiedByOther = occupiedByOther;
-      vehicle.roomLeaseOwnerUid = remote.leaseOwnerUid;
+      vehicle.roomLeaseOwnerUid = lease.leaseOwnerUid;
       if (!vehicle.attachedToPlayer && !occupiedByOther) options.syncVehiclePose(vehicle, remote.pose);
       vehicle.visual.root.visible = !occupiedByOther || vehicle.attachedToPlayer;
     }
@@ -184,4 +195,4 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   return Object.freeze({ civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update });
 }
 
-export { createUrbanRoomAuthorityRuntime };
+export { createUrbanRoomAuthorityRuntime, resolveRoomVehicleLease };
