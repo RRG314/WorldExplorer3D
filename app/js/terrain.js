@@ -4,7 +4,7 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=58";
+} from "./terrain/structure-visuals.js?v=59";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
