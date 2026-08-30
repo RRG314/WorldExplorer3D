@@ -70,6 +70,12 @@ function pointInPolygon(point, polygon) {
   return inside;
 }
 
+function selectDistributed(records, limit) {
+  if (records.length <= limit) return records;
+  return Array.from({ length: limit }, (_unused, index) =>
+    records[Math.min(records.length - 1, Math.floor((index + .5) * records.length / limit))]);
+}
+
 function runwayDesignator(yaw) {
   const heading = ((yaw * 180 / Math.PI) + 360) % 360;
   const number = Math.max(1, Math.min(36, Math.round(heading / 10) || 36));
@@ -131,7 +137,8 @@ function compileAirportOperationalLayout(graph, options = {}) {
     : scale === 'major' ? { min: 18, max: 24 } : scale === 'regional' ? { min: 14, max: 18 } : { min: 8, max: 10 };
   const standTarget = Math.max(standLimits.min,
     Math.min(standLimits.max, mappedStands.length + terminals.length * 4 + runways.length * 3));
-  const stands = mappedStands.map((record, index) => Object.freeze({
+  const publishedMappedStands = selectDistributed(mappedStands, standLimits.max);
+  const stands = publishedMappedStands.map((record, index) => Object.freeze({
     id: record.id,
     ...recordPoint(record),
     yaw: recordYaw(record) || yaw,
@@ -162,12 +169,27 @@ function compileAirportOperationalLayout(graph, options = {}) {
     }));
   }
   const mappedTower = airportRecords.find((record) => record.type === 'control_tower');
-  const towerPoint = recordPoint(mappedTower);
-  const tower = mappedTower && towerPoint ? Object.freeze({
-    id: mappedTower.id,
+  const mappedTowerPoint = recordPoint(mappedTower);
+  const apronCenter = recordPoint(standApron);
+  const generatedTowerPoint = apronCenter && standEnvelope.length
+    ? [
+        apronCenter,
+        { x: apronCenter.x + 24, z: apronCenter.z },
+        { x: apronCenter.x - 24, z: apronCenter.z },
+        { x: apronCenter.x, z: apronCenter.z + 24 },
+        { x: apronCenter.x, z: apronCenter.z - 24 }
+      ].filter((point) => pointInPolygon(point, standEnvelope))
+        .sort((left, right) => {
+          const clearance = (point) => Math.min(...stands.map((stand) => distanceBetween(point, stand)), 999);
+          return clearance(right) - clearance(left);
+        })[0] || null
+    : null;
+  const towerPoint = mappedTowerPoint || generatedTowerPoint;
+  const tower = towerPoint ? Object.freeze({
+    id: mappedTower?.id || `generated-airport-layout:control-tower:${standApron?.id || mappedPrimary.id}`,
     ...towerPoint,
-    mapped: true,
-    generatedActivity: false,
+    mapped: !!mappedTower,
+    generatedActivity: !mappedTower,
     height: scale === 'major' ? 38 : scale === 'regional' ? 30 : 22
   }) : null;
   const mappedTerminal = terminals[0] || null;

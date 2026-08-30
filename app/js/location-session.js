@@ -21,6 +21,15 @@ function cloneCustomLocation(location) {
         country: String(rawDetails.country || '').slice(0, 100),
         countryCode: /^[A-Z]{2}$/.test(countryCode) ? countryCode : null,
         airportClass: String(rawDetails.airportClass || rawDetails.aerodrome || '').trim().toLowerCase().slice(0, 40),
+        isAirport: rawDetails.isAirport === true || Boolean(
+          rawDetails.airportClass || rawDetails.aerodrome || rawDetails.iata || rawDetails.icao
+        ),
+        airportBounds: (() => {
+          const bounds = rawDetails.airportBounds || {};
+          const values = [bounds.minLat, bounds.maxLat, bounds.minLon, bounds.maxLon].map(Number);
+          if (!values.every(Number.isFinite) || values[0] >= values[1] || values[2] >= values[3]) return null;
+          return Object.freeze({ minLat: values[0], maxLat: values[1], minLon: values[2], maxLon: values[3] });
+        })(),
         iata: /^[A-Z0-9]{3}$/.test(String(rawDetails.iata || '').trim().toUpperCase())
           ? String(rawDetails.iata).trim().toUpperCase()
           : '',

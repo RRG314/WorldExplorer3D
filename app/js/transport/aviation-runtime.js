@@ -5,8 +5,8 @@ import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=6';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
-import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=5';
-import { createAirportHub } from './airport-hub.js?v=3';
+import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=6';
+import { createAirportHub } from './airport-hub.js?v=4';
 
 const BOARDING_DISTANCE = 8;
 const EXIT_SPEED_LIMIT = 1.5;
@@ -731,6 +731,13 @@ function startAviationRuntime(options = {}) {
     boardableAircraftCount: runtime.vehicles.filter((vehicle) => vehicle.boardable).length,
     airportLayoutAuthority: runtime.airportLayout?.authority || '',
     airportScale: runtime.airportLayout?.scale || '',
+    airportPhysicalAuthority: runtime.airportLayout?.provenance?.physicalAuthority || '',
+    mappedRunway: runtime.airportLayout?.mappedRunway === true,
+    generatedRunwayFallback: runtime.airportLayout?.generatedFallback === true,
+    mappedRunwayCount: Number(runtime.airportLayout?.provenance?.mappedRunwayCount || 0),
+    mappedStandCount: Number(runtime.airportLayout?.provenance?.mappedStandCount || 0),
+    publishedStandCount: Number(runtime.airportLayout?.stands?.length || 0),
+    generatedStandCount: Number(runtime.airportLayout?.provenance?.generatedStandCount || 0),
     airportHub: runtime.hub?.snapshot?.() || null,
     catalogIds: Object.freeze(runtime.vehicles.map(({ catalog }) => catalog.id)),
     vehicles: Object.freeze(runtime.vehicles.map((vehicle) => Object.freeze({
@@ -765,6 +772,12 @@ function startAviationRuntime(options = {}) {
         const entrance = runtime.airportLayout?.ticketCounter?.entrance;
         if (!entrance) return false;
         return moveWalkerForSupport(entrance.x, entrance.z, runtime.airportLayout?.yaw || 0);
+      },
+      moveNearRunway() {
+        const layout = runtime.airportLayout;
+        if (!layout?.runwayStart) return false;
+        const point = offsetPoint(layout.runwayStart, layout.yaw, 0, Math.min(70, layout.runwayLength * .08));
+        return moveWalkerForSupport(point.x, point.z, layout.yaw);
       },
       openHub(source = 'ticket_hall', aircraftId = '') {
         const vehicle = aircraftId ? runtime.vehicles.find(({ id }) => id === String(aircraftId)) : null;

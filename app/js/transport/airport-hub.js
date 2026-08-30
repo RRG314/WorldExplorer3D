@@ -1,4 +1,4 @@
-import { searchPlaces } from '../places/place-search.js?v=2';
+import { searchPlaces } from '../places/place-search.js?v=3';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
@@ -130,6 +130,8 @@ function createAirportHub(options = {}) {
           country: destination.country,
           displayName: destination.displayName,
           airportClass: destination.airportClass || '',
+          isAirport: destination.isAirport === true,
+          airportBounds: destination.airportBounds || null,
           iata: destination.iata || '',
           icao: destination.icao || ''
         }

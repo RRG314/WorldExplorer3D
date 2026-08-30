@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { searchPlaces } from '../places/place-search.js?v=2';
+import { searchPlaces } from '../places/place-search.js?v=3';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
@@ -425,6 +425,8 @@ function createGlobeSelector(options = {}) {
         country: result.country,
         countryCode: result.countryCode,
         airportClass: result.airportClass || '',
+        isAirport: result.isAirport === true,
+        airportBounds: result.airportBounds || null,
         iata: result.iata || '',
         icao: result.icao || ''
       }

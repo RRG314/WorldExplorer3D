@@ -1,4 +1,4 @@
-import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=5';
+import { compileAirportOperationalLayout, recordPoints } from './airport-layout.js?v=6';
 
 const FACILITY_COLORS = Object.freeze({
   aviation: 0x84d7e8,

@@ -58,6 +58,7 @@
     "verify:release-licensing": "node --test tests/release-licensing-current.test.mjs",
     "verify:cross-platform": "node scripts/verification/cross-platform-browser-current.mjs",
     "verify:airports-worldwide": "node scripts/verification/airports-worldwide-current.mjs",
+    "verify:airport-exclusion": "node scripts/verification/airport-exclusion-current.mjs",
     "verify:mission-lifecycle": "node scripts/verification/mission-lifecycle.mjs",
     "verify:retention-release": "node scripts/verification/retention-release.mjs",
     "verify:retention-ui": "node scripts/verification/retention-ui.mjs",

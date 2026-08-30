@@ -64,6 +64,9 @@ test('mapped runway geometry remains the operational runway and dense fleet uses
   const fleet = derivedFleet(source, { airportLayout: layout, mobile: false });
   assert.equal(layout.primaryRunway.id, 'mapped:runway');
   assert.equal(layout.generatedFallback, false);
+  assert.equal(layout.tower.generatedActivity, true);
+  assert.ok(layout.tower.x >= 65 && layout.tower.x <= 240);
+  assert.ok(layout.tower.z >= -260 && layout.tower.z <= 260);
   assert.equal(layout.runwayDesignator, '15/33');
   assert.equal(fleet.length, layout.stands.length);
   assert.equal(new Set(fleet.map(({ id }) => id)).size, fleet.length);
@@ -115,10 +118,13 @@ test('place search retains mapped airport classification for the world session',
     type: 'aerodrome',
     name: 'London Heathrow Airport',
     display_name: 'London Heathrow Airport, United Kingdom',
+    boundingbox: ['51.45', '51.49', '-0.51', '-0.41'],
     extratags: { aerodrome: 'international', iata: 'LHR', icao: 'EGLL' },
     address: { country: 'United Kingdom', country_code: 'gb' }
   }, 0);
   assert.equal(result.airportClass, 'international');
+  assert.equal(result.isAirport, true);
+  assert.deepEqual(result.airportBounds, { minLat: 51.45, maxLat: 51.49, minLon: -0.51, maxLon: -0.41 });
   assert.equal(result.iata, 'LHR');
   assert.equal(result.icao, 'EGLL');
   assert.equal(result.kindLabel, 'Airport');

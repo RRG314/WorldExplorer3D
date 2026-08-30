@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=103";
+} from "./load-runtime-session.js?v=105";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -35,6 +35,7 @@ import {
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
 import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=4";
 import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=6";
+import { fetchMappedAirportData, isAirportSelection } from "./osm-airport-source.js?v=1";
 
 const EXACT_AVIATION_TYPES = new Set([
   'aerodrome', 'heliport', 'runway', 'taxiway', 'apron', 'terminal',
@@ -55,8 +56,8 @@ function isExactTransportFacilityElement(element = {}) {
   return ['harbour', 'berth'].includes(String(tags['seamark:type'] || '').toLowerCase());
 }
 
-function selectExactFacilityElements(data = {}) {
-  const elements = Array.isArray(data.elements) ? data.elements : [];
+export function selectExactFacilityElements(data = {}) {
+  const elements = Array.isArray(data?.elements) ? data.elements : [];
   const facilities = elements.filter(isExactTransportFacilityElement);
   const nodeIds = new Set(facilities.flatMap((element) => Array.isArray(element.nodes) ? element.nodes.map(String) : []));
   return elements.filter((element) => isExactTransportFacilityElement(element) ||
@@ -508,6 +509,62 @@ export function createWorldRoadLoader(deps = {}) {
         } finally {
           endLoadPhase('fetchOverpass');
         }
+        const airportSelection = worldSession?.request?.selection || {
+          ...appCtx.LOC,
+          locationDetails: appCtx.customLoc?.locationDetails || null
+        };
+        const primaryHasExactRunway = selectExactFacilityElements(exactSupplementData)
+          .some((element) => String(element?.tags?.aeroway || '').toLowerCase() === 'runway');
+        if (isAirportSelection(airportSelection) && !primaryHasExactRunway) {
+          try {
+            const airportMapData = await runProviderWork(
+              'openstreetmap-map-api',
+              'airport-geometry',
+              (signal) => fetchMappedAirportData(airportSelection, {
+                signal,
+                timeoutMs: Math.min(28000, Math.max(5000, loadDeadline - performance.now() - 1000))
+              })
+            );
+            if (airportMapData?.elements?.length) {
+              const merged = new Map((exactSupplementData?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
+              airportMapData.elements.forEach((element) => merged.set(`${element.type}:${element.id}`, element));
+              exactSupplementData = {
+                ...(exactSupplementData || {}),
+                ...airportMapData,
+                elements: [...merged.values()],
+                _overpassSource: exactSupplementData?.elements?.length
+                  ? 'osm-overpass+openstreetmap-map-api'
+                  : 'openstreetmap-map-api'
+              };
+              loadMetrics.airportGeometry = {
+                provider: 'openstreetmap-map-api',
+                status: 'loaded',
+                mappedElements: airportMapData.elements.length,
+                cellCount: Number(airportMapData._airportMapCellCount || 0),
+                fallbackAfterOverpass: true
+              };
+            }
+          } catch (airportMapError) {
+            if (!isActiveLoadContext()) throw airportMapError;
+            recordLoadWarning('exact mapped airport geometry', airportMapError);
+            loadMetrics.airportGeometry = {
+              provider: 'openstreetmap-map-api',
+              status: 'unavailable',
+              mappedElements: 0,
+              fallbackAfterOverpass: true
+            };
+          }
+        } else if (primaryHasExactRunway) {
+          loadMetrics.airportGeometry = {
+            provider: 'osm-overpass-consolidated',
+            status: 'loaded',
+            mappedElements: selectExactFacilityElements(exactSupplementData).length,
+            fallbackAfterOverpass: false
+          };
+        }
+        runtimeState.airportGeometry = loadMetrics.airportGeometry || {
+          provider: '', status: isAirportSelection(airportSelection) ? 'unavailable' : 'not-requested', mappedElements: 0
+        };
         // Public Overpass instances expect one request at a time. The airport,
         // civic, commerce, maritime, road, and surface records above now share
         // the primary request. This wider reviewed-structure request starts only

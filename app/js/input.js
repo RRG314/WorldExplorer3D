@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { resolvePrimaryPlace } from './places/place-search.js?v=2';
+import { resolvePrimaryPlace } from './places/place-search.js?v=3';
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
 
@@ -358,7 +358,13 @@ async function searchLocation() {
         displayName: result.displayName,
         kind: result.kindLabel,
         region: result.region,
-        country: result.country
+        country: result.country,
+        countryCode: result.countryCode,
+        airportClass: result.airportClass || '',
+        isAirport: result.isAirport === true,
+        airportBounds: result.airportBounds || null,
+        iata: result.iata || '',
+        icao: result.icao || ''
       }
     });
     appCtx.setTitleLocationMode?.('custom');
