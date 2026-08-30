@@ -32,7 +32,6 @@ jobs:
         run: |
           mkdir -p _site/assets/showcase
           cp -R github-pages/. _site/
-          cp assets/landing/gameplay/showcase/*.webp _site/assets/showcase/
           cp assets/readme/*.webp _site/assets/showcase/
 
       - name: Upload project explainer
