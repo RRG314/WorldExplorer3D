@@ -565,7 +565,7 @@ function showWorldPanel(pack, environment) {
   const pressure = environment.pressurePa >= 1000
     ? `${(environment.pressurePa / 1000).toFixed(1)} kPa`
     : `${Math.round(environment.pressurePa)} Pa`;
-  const outpost = pack.outpost?.state === 'operational' ? `<section style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(125,243,208,.24);"><strong style="display:block;color:#91f2d3;">${pack.outpost.name}</strong><small>${pack.outpost.assignedCrewIds.length} crew · ${Math.round(Number(pack.outpost.condition || 0) * 100)}% condition · ${Number(pack.outpost.power?.storedMWh || 0).toFixed(1)} MWh stored</small></section>` : '';
+  const outpost = pack.outpost?.state === 'operational' ? `<section style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(125,243,208,.24);"><strong style="display:block;color:#91f2d3;">${pack.outpost.name}</strong><small>${String(pack.outpost.operationsStatus || 'operational').replaceAll('-', ' ')} · ${pack.outpost.assignedCrewIds.length} crew · ${Math.round(Number(pack.outpost.condition || 0) * 100)}% condition · ${Number(pack.outpost.power?.storedMWh || 0).toFixed(1)} MWh stored</small></section>` : '';
   panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C</span><br><small style="opacity:.72;">${pack.representation}</small>${outpost}<canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:220px;max-width:100%;height:105px;margin-top:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:5px;color:#a7f3d0;">Follow the field beacons · use E or Explore nearby</small><button id="planetaryJournalBtn" type="button" style="display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid rgba(167,243,208,.5);border-radius:6px;color:#eafff6;background:rgba(16,82,65,.66);font:700 10px Inter,sans-serif;cursor:pointer;">Open Journal &amp; Field Guide</button>`;
   panel.querySelector('#planetaryJournalBtn')?.addEventListener('click', () => appCtx.openPlanetaryJournal?.('journal'));
   panel.style.display = 'block';
@@ -609,13 +609,20 @@ function showReturnButton(pack) {
         appCtx.leaveExpeditionSurface?.(activePack.bodyId);
         return;
       }
+      if (activePack?.returnMode === 'space-flight') {
+        appCtx.startSpaceFlightFromExpeditionSurface?.({
+          frameId: activePack.parentSystemId,
+          courseDestinationId: activePack.bodyId
+        });
+        return;
+      }
       appCtx.startSpaceFlightToEarth?.();
     });
     document.body.appendChild(button);
   }
   button.textContent = pack.returnMode === 'expedition-contact'
     ? `Return to Surveyor from ${pack.bodyName}`
-    : `Leave ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
+    : `Return to Space from ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
   const compact = globalThis.innerWidth <= 600;
   const panelBottom = document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
   const compactTop = Number.isFinite(panelBottom) ? Math.ceil(panelBottom + 10) : 330;
@@ -798,7 +805,8 @@ function registerExpeditionSolidWorld(input = {}) {
     manifest,
     runtimeModeled: true,
     arrivalMode: 'walk',
-    returnMode: 'expedition-contact',
+    returnMode: input.returnMode || 'expedition-contact',
+    parentSystemId: String(input.parentSystemId || 'expedition'),
     reliefKind: ['cratered', 'volcanic', 'ice-lineae', 'nitrogen-ice'][seed % 4],
     detailSeed: seed || 1,
     rockColor: palette.rock,

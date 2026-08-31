@@ -98,3 +98,39 @@ test('an advance cannot create supplies', () => {
     uid: 'one', expectedRevision: 1, mutationKind: 'advance', nextExpedition: invalid
   }), /advance_cannot_create_resource:waterKg/);
 });
+
+test('the shared authority retains one advancing field-station record', () => {
+  const initial = plan();
+  initial.outposts = [{
+    id: 'station-one', contactId: 'contact-one', state: 'operational',
+    operationsStatus: 'operational', revision: 2, condition: 1,
+    lastAdvancedMissionS: 0, stores: { foodKg: 30, waterKg: 20 },
+    power: { storedMWh: 4, capacityMWh: 12, generationMW: 0.18, condition: 1 },
+    lifeSupport: { occupied: 2, condition: 1 }, assignedCrewIds: ['crew-one', 'crew-two']
+  }];
+  let shared = createSharedExpedition({ roomCode: 'SPACE5', actor: { uid: 'one' }, plan: initial });
+  shared = joinSharedExpedition(shared, { actor: { uid: 'two' } });
+  shared = setParticipantReady(shared, { uid: 'one' });
+  shared = setParticipantReady(shared, { uid: 'two' });
+  const station = shared.expedition.outposts[0];
+  const advanced = {
+    ...shared.expedition,
+    strategicElapsedS: 86_400,
+    progress: 0.01,
+    resources: { ...shared.expedition.resources, foodKg: 99, waterKg: 99, powerMWh: 99 },
+    outposts: [{
+      ...station,
+      revision: 3,
+      condition: 0.999,
+      lastAdvancedMissionS: 86_400,
+      stores: { foodKg: 29.96, waterKg: 19.988 }
+    }]
+  };
+  shared = commitSharedExpedition(shared, {
+    uid: 'one', expectedRevision: 1, mutationKind: 'advance', nextExpedition: advanced,
+    activeUids: ['one', 'two']
+  });
+  assert.equal(shared.expedition.outposts.length, 1);
+  assert.equal(shared.expedition.outposts[0].revision, 3);
+  assert.equal(shared.expedition.outposts[0].lastAdvancedMissionS, 86_400);
+});

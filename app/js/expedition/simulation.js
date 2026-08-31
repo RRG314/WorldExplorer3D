@@ -9,6 +9,7 @@ import {
 } from './voyage-director.js?v=1';
 import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=1';
 import { advanceLongDurationState } from './long-duration.js?v=1';
+import { advanceOutposts } from './outpost.js?v=1';
 
 function clone(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -96,7 +97,8 @@ function advanceExpedition(expedition, requestedDeltaS) {
     progress: totalS > 0 ? Math.min(1, elapsed / totalS) : 0,
     resources: consumeResources(prepared.resources, prepared.calculation.expectedResources, deltaS, totalS),
     systems: degradeSystems(prepared.systems, deltaS, totalS),
-    crew: advanceCrew(prepared.crew, deltaS, prepared.systems)
+    crew: advanceCrew(prepared.crew, deltaS, prepared.systems),
+    outposts: advanceOutposts(prepared, elapsed)
   });
   next = withExpeditionChanges(next, {
     failureChain: appendSystemTransitions(prepared.failureChain, prepared.systems, next.systems, elapsed)

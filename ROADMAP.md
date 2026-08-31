@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-08-30.
+Last updated: 2026-08-31.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -286,19 +286,18 @@ physically suitable destination exploration, resource-stop custody, generated
 room/item/UI references, modular rendering plan, animation and sound coverage,
 and the gameplay evidence required before the feature can ship as an alpha.
 
-Current status: the Surveyor now has three bounded walkable decks, 25 mapped
-rooms, pressure doors, a deck lift, compact and expanded ship maps, visible
-crew assignments, shared walking/collision authorities, mobile controls,
-Captain's Log/Journal handoff, and return to the same Space session. Its crew
-carry persistent health, fatigue, experience, and assignments and visibly
-follow routines derived from the Expedition state. One ship-work authority now
-connects room stations to the same crew, resources, systems, and mission log.
-The Voyage Director selects 14 paced chapters from 36 authored event families,
-with state-gated responses, three outcome bands, remembered decisions, delayed
-consequences, responsible rooms, crew work, and save migration from the earlier
-representative route. The full surface-resource handoff, local-craft
-deployment, event-specific action animation and sound, and complete
-visual/interaction polish remain incomplete; Stage 3 is not yet complete.
+Current status: the Surveyor has three bounded walkable decks, 25 mapped rooms,
+pressure doors, a deck lift, compact and expanded ship maps, visible crew
+assignments, shared walking and collision, mobile controls, Captain's Log and
+Journal handoff, and return to the same Space session. Room work changes the
+same crew, resources, systems, and log used by the strategic voyage. The Voyage
+Director selects 14 paced chapters from 36 authored event families with
+state-gated responses, three outcome bands, remembered decisions, delayed
+consequences, responsible rooms, visible action, and restrained audio. Local
+contacts now open in ordinary Space, accept supported planetary landing and
+field collection, return exact sample custody to Surveyor, process material,
+and resume the same voyage. Further room art, animation, audio, and interaction
+variety remain continuing quality work rather than missing system authorities.
 
 - Make each Expedition ship a bounded, high-quality, walkable place assembled
   from validated class-specific layouts. Required rooms must exist, remain
@@ -434,6 +433,22 @@ journey lived aboard the ship and through the existing Space world:
   duplicate planetary world.
 
 ### Completion and release gates
+
+Implementation status: the connected alpha slice now includes the planner,
+walkable Surveyor, active crew work, 36-family Voyage Director, causal failure
+and recovery, physical local stops, conserved sample processing and repair,
+cryogenic reserve replacement, generation continuity, relativistic time,
+shared room crew and rescue, and a bounded field station. Stable discoveries
+and field stations are retained in one durable discovery catalog and register
+once in Wayfinder before normal Space navigation begins. The field station
+uses the existing planetary address and Blocks authority, advances power,
+stores, condition, and operating status with strategic time, and remains
+visitable after the active mission slot is cleared.
+
+This is a release candidate, not an automatic production release. The exact
+artifact still requires owner review on desktop and phone, and the shared
+Expedition Functions and Firestore rules must be promoted with the compatible
+client when that release is approved.
 
 Interstellar Expeditions are complete only when the following connected
 journeys work from planning through persistence, not merely as menus or meters:

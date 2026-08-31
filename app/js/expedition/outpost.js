@@ -64,6 +64,7 @@ function createOutpostSite(expedition, contactId, nowMs = Date.now()) {
     worldAddressKey: surfaceAddressKey(contactId),
     name: `${contact.designation} Field Station`,
     state: 'planned',
+    operationsStatus: 'planned',
     revision: 1,
     ownerAuthority: 'interstellar-expedition',
     structureAuthority: 'block-builder-shape-catalog',
@@ -76,6 +77,7 @@ function createOutpostSite(expedition, contactId, nowMs = Date.now()) {
     condition: 1,
     createdAtMs: nowMs,
     updatedAtMs: nowMs,
+    lastAdvancedMissionS: Number(expedition.strategicElapsedS || 0),
     log: Object.freeze([{ atMissionS: Number(expedition.strategicElapsedS || 0), message: 'The returned survey site was reserved for a field station.' }])
   });
   return Object.freeze({
@@ -107,6 +109,7 @@ function constructOutpost(expedition, outpostId, nowMs = Date.now()) {
   const nextOutpost = Object.freeze({
     ...outpost,
     state: 'operational',
+    operationsStatus: 'operational',
     revision: outpost.revision + 1,
     installedMaterialKg: OUTPOST_CONSTRUCTION_COST.maintenanceKg + OUTPOST_CONSTRUCTION_COST.feedstockKg,
     power: Object.freeze({ ...outpost.power, storedMWh: OUTPOST_CONSTRUCTION_COST.powerMWh }),
@@ -114,6 +117,7 @@ function constructOutpost(expedition, outpostId, nowMs = Date.now()) {
     stores: Object.freeze({ foodKg: OUTPOST_CONSTRUCTION_COST.foodKg, waterKg: OUTPOST_CONSTRUCTION_COST.waterKg, maintenanceKg: 0 }),
     assignedCrewIds: Object.freeze(assignedCrew),
     updatedAtMs: nowMs,
+    lastAdvancedMissionS: Number(expedition.strategicElapsedS || 0),
     log: Object.freeze([...(outpost.log || []), { atMissionS: Number(expedition.strategicElapsedS || 0), message: 'Habitat, power, life support, storage, workshop, airlock, and landing pad commissioned.' }])
   });
   const outposts = expedition.outposts.map((entry, outpostIndex) => outpostIndex === index ? nextOutpost : entry);
@@ -142,6 +146,7 @@ function serviceOutpost(expedition, outpostId, nowMs = Date.now()) {
     condition: Math.min(1, Number(outpost.condition || 0) + 0.12),
     power: Object.freeze({ ...outpost.power, condition: Math.min(1, Number(outpost.power?.condition || 0) + 0.08) }),
     lifeSupport: Object.freeze({ ...outpost.lifeSupport, condition: Math.min(1, Number(outpost.lifeSupport?.condition || 0) + 0.08) }),
+    operationsStatus: Number(outpost.stores?.foodKg || 0) > 0 && Number(outpost.stores?.waterKg || 0) > 0 ? 'operational' : 'emergency',
     updatedAtMs: nowMs,
     log: Object.freeze([...(outpost.log || []), { atMissionS: Number(expedition.strategicElapsedS || 0), message: 'Crew serviced power, seals, and environmental controls.' }])
   });
@@ -157,7 +162,59 @@ function serviceOutpost(expedition, outpostId, nowMs = Date.now()) {
   });
 }
 
+function advanceOutpostState(outpost, missionS) {
+  if (outpost?.state !== 'operational') return outpost;
+  const fromS = Math.max(0, Number(outpost.lastAdvancedMissionS || 0));
+  const toS = Math.max(fromS, Number(missionS || 0));
+  const days = (toS - fromS) / 86_400;
+  if (days < 0.01) return outpost;
+  const occupied = Math.max(0, Number(outpost.lifeSupport?.occupied || outpost.assignedCrewIds?.length || 0));
+  const powerCondition = Math.max(0, Math.min(1, Number(outpost.power?.condition ?? 1)));
+  const lifeSupportCondition = Math.max(0, Math.min(1, Number(outpost.lifeSupport?.condition ?? 1)));
+  const generatedMWh = Number(outpost.power?.generationMW || 0) * 24 * days * powerCondition;
+  const requiredMWh = occupied * 0.04 * days;
+  const storedMWh = Math.max(0, Math.min(Number(outpost.power?.capacityMWh || 0), Number(outpost.power?.storedMWh || 0) + generatedMWh - requiredMWh));
+  const foodKg = Math.max(0, Number(outpost.stores?.foodKg || 0) - occupied * 0.02 * days);
+  const waterKg = Math.max(0, Number(outpost.stores?.waterKg || 0) - occupied * 0.006 * days);
+  const condition = Math.max(0.12, Number(outpost.condition || 0) - days * (0.00003 + occupied * 0.000002));
+  const nextPowerCondition = Math.max(0.12, powerCondition - days * 0.000018);
+  const nextLifeSupportCondition = Math.max(0.12, lifeSupportCondition - days * 0.000024);
+  const operationsStatus = foodKg <= 0.01 || waterKg <= 0.01 || storedMWh <= 0.1 || condition < 0.3 || nextLifeSupportCondition < 0.3
+    ? 'emergency'
+    : condition < 0.55 || nextLifeSupportCondition < 0.55 ? 'maintenance' : 'operational';
+  const statusChanged = operationsStatus !== outpost.operationsStatus;
+  const log = statusChanged
+    ? Object.freeze([...(outpost.log || []), Object.freeze({
+      atMissionS: toS,
+      message: operationsStatus === 'emergency'
+        ? 'The field station entered emergency conservation after its stores or systems fell below a safe operating margin.'
+        : operationsStatus === 'maintenance'
+          ? 'The field station reported a maintenance watch as systems aged.'
+          : 'The field station returned to normal operations.'
+    })])
+    : outpost.log;
+  return Object.freeze({
+    ...outpost,
+    revision: Number(outpost.revision || 0) + 1,
+    operationsStatus,
+    condition,
+    power: Object.freeze({ ...outpost.power, storedMWh, condition: nextPowerCondition }),
+    lifeSupport: Object.freeze({ ...outpost.lifeSupport, condition: nextLifeSupportCondition }),
+    stores: Object.freeze({ ...outpost.stores, foodKg, waterKg }),
+    lastAdvancedMissionS: toS,
+    log
+  });
+}
+
+function advanceOutposts(expedition, missionS) {
+  const outposts = (expedition?.outposts || []).map((outpost) => advanceOutpostState(outpost, missionS));
+  if (!outposts.some((outpost, index) => outpost !== expedition.outposts[index])) return expedition?.outposts || Object.freeze([]);
+  return Object.freeze(outposts);
+}
+
 export {
+  advanceOutposts,
+  advanceOutpostState,
   constructOutpost,
   constructionAvailability,
   createOutpostSite,

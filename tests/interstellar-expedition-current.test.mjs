@@ -20,11 +20,12 @@ import {
 } from '../app/js/expedition/simulation.js';
 import { appendSystemTransitions, assessCausalFailure, resolveSystemFailure, shipAlertState } from '../app/js/expedition/failure-authority.js';
 import { advanceLongDurationState } from '../app/js/expedition/long-duration.js';
-import { constructOutpost, createOutpostSite, OUTPOST_CONSTRUCTION_COST, serviceOutpost, surfaceAddressKey } from '../app/js/expedition/outpost.js';
+import { advanceOutpostState, constructOutpost, createOutpostSite, OUTPOST_CONSTRUCTION_COST, serviceOutpost, surfaceAddressKey } from '../app/js/expedition/outpost.js';
 import { availabilityForResponse } from '../app/js/expedition/voyage-director.js';
 import { VOYAGE_EVENT_COUNTS, VOYAGE_EVENT_FAMILIES } from '../app/js/expedition/voyage-events.js';
 import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
 import { createExpeditionStore } from '../app/js/expedition/store.js';
+import { createExpeditionArchive, EXPEDITION_DISCOVERY_KEY } from '../app/js/expedition/archive.js';
 import { deriveCrewOperations, summarizeCrewOperations } from '../app/js/expedition/crew-operations.js';
 import { SHIP_CREW_POSTS, SHIP_DECKS, SHIP_DOORS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
 import {
@@ -433,6 +434,14 @@ test('a returned survey site becomes one conserved persistent field station at t
   assert.equal(built.outpost.stores.waterKg, OUTPOST_CONSTRUCTION_COST.waterKg);
   assert.equal(built.outpost.assignedCrewIds.length, 2);
 
+  const afterOneYear = advanceOutpostState(built.outpost, 31_557_600);
+  assert.equal(afterOneYear.revision, built.outpost.revision + 1);
+  assert.ok(afterOneYear.condition < built.outpost.condition);
+  assert.ok(afterOneYear.stores.foodKg < built.outpost.stores.foodKg);
+  assert.ok(afterOneYear.stores.waterKg < built.outpost.stores.waterKg);
+  assert.ok(afterOneYear.power.storedMWh <= afterOneYear.power.capacityMWh);
+  assert.equal(afterOneYear.operationsStatus, 'operational');
+
   const degraded = {
     ...built.expedition,
     outposts: [{ ...built.outpost, condition: 0.7, power: { ...built.outpost.power, condition: 0.72 }, lifeSupport: { ...built.outpost.lifeSupport, condition: 0.76 } }]
@@ -458,6 +467,33 @@ test('save, overwrite, and rollback preserve the complete versioned Expedition r
   assert.equal(store.load().state, 'traveling');
   assert.equal(store.restoreBackup().state, 'planned');
   assert.equal(store.load().id, expedition.id);
+});
+
+test('saved route discoveries outlive the active mission slot without duplicating their world identity', () => {
+  const memory = new Map();
+  const storage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, String(value)),
+    removeItem: (key) => memory.delete(key)
+  };
+  const base = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 2350 });
+  const contact = {
+    id: `${base.id}-contact-641`, designation: 'Kepler Reach', stableSeed: 641,
+    spectralClass: 'dim red dwarf', worldClass: 'rocky world', resourceSignature: 'silicate and metal-bearing regolith',
+    status: 'surveyed', localOperationState: 'returned'
+  };
+  const withContact = { ...base, progress: 0.65, routeContacts: [contact] };
+  const store = createExpeditionStore(storage);
+  store.save(withContact);
+  store.save({ ...withContact, updatedAtMs: 2400, routeContacts: [{ ...contact, status: 'documented' }] });
+  store.clear();
+  assert.equal(store.load(), null);
+  const archive = createExpeditionArchive(storage).load();
+  assert.equal(archive.discoveries.length, 1);
+  assert.equal(archive.discoveries[0].id, contact.id);
+  assert.equal(archive.discoveries[0].contact.status, 'documented');
+  assert.equal(archive.discoveries[0].routeProgress, 0.65);
+  assert.ok(memory.has(EXPEDITION_DISCOVERY_KEY));
 });
 
 test('the current store fills crew-state fields in an earlier compatible Expedition save', () => {

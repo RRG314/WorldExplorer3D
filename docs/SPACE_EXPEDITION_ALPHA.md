@@ -1,6 +1,6 @@
 # Space Expedition Alpha
 
-Status: active implementation and release gate
+Status: complete connected alpha candidate; owner release review required
 
 ## The player promise
 
@@ -14,13 +14,15 @@ The experience should feel like a long-form survival journey inside an
 optimistic science-exploration sandbox. It is not a short chain of modal choices
 and it is not a separate game pasted over Space Flight.
 
-The current three-deck ship, persistent Expedition record, room map, crew
-routines, ship-work panel, and data-driven Voyage Director are the foundation.
-The Director now selects 14 paced chapters from 36 authored event families and
-records state-gated choices, outcome bands, decision tags, delayed
-consequences, contacts, crew responses, and save migration. The physically
-entered local-stop loop and event-specific room action remain incomplete, so
-this is not yet the completed alpha.
+The three-deck ship, persistent Expedition record, room map, crew routines,
+ship-work panel, and data-driven Voyage Director form one connected alpha. The
+Director selects 14 paced chapters from 36 authored event families and records
+state-gated choices, outcome bands, decision tags, delayed consequences,
+contacts, crew responses, and save migration. Route contacts can be entered in
+ordinary Space, explored on supported solid surfaces, sampled through field
+play, processed aboard, and revisited after reload. Cryogenic, generation,
+relativistic, shared-crew, rescue, causal-failure, and field-station journeys
+use the same record and shared authorities.
 
 ## Alpha shape
 
@@ -334,26 +336,26 @@ required inputs, expected result, risks, time, recommendation, and response.
 Mobile uses the same information architecture in a single-column sheet. It does
 not receive a separate set of authorities or abbreviated consequences.
 
-## Alpha implementation order
+## Implemented alpha slices
 
-1. Freeze this visual and interaction language and retain the current verified
-   gameplay checkpoint.
-2. Build the shared modular bulkhead, material, lighting, prop, and equipment
-   kits from the four references.
-3. Replace each current placeholder room with its required authored equipment
-   while preserving the validated room/door/lift/map graph.
-4. Add room-level detail/animation budgets, pooling, disposal, and mobile LOD.
-5. Extend the active Voyage Director and its 36-event content library with
-   event-specific room action, animation, sound, and local-space evidence.
-6. Add the unified Voyage/Ship/Crew/Log UI and keep contextual HUD elements
-   bounded during normal play.
-7. Implement persistent route contacts and a physically entered local Space
-   frame.
-8. Add a generic modeled solid-world surface path through the existing landing,
-   Character, rover, geology/mining, Backpack, and takeoff authorities.
-9. Complete one end-to-end resource mission and one emergency repair diversion.
-10. Add save/resume, lifecycle cleanup, causal failure reports, input and
-    accessibility review, and desktop/mobile performance budgets.
+1. Three validated decks, mapped rooms, doors, lift, ship map, crew posts, and
+   room equipment on the existing walking, collision, input, and lifecycle.
+2. One Voyage Director with 36 authored families, paced chapters, state-gated
+   responses, delayed consequences, visible ship action, audio cues, and log.
+3. Persistent route contacts, ordinary local Space, supported solid-world
+   landing, field collection, exact cargo transfer, processing, repair, and
+   voyage resumption.
+4. Causal recoverable and unrecoverable failures, explicit reports, and bounded
+   recovery through crew, parts, fabrication, diversion, or rescue.
+5. Cryogenic reserve specialists, generation continuity, and relativistic
+   external and crew-experienced time on the shared strategic clock.
+6. Server-owned room Expeditions with stable roles, coordinated time,
+   reconnect, revision checks, and one-time resource-conserving rescue.
+7. Persistent field stations at the existing planetary address using Blocks,
+   with conserved construction, aging systems, stores, operating status, and
+   ordinary free-roam revisit.
+8. Versioned save, backup, migration, durable discoveries, active-journey
+   reload, desktop/mobile gameplay verification, and bounded mobile layouts.
 
 ## Alpha release gate
 
@@ -383,5 +385,7 @@ following work in actual gameplay:
   performance, memory cleanup, keyboard, touch, and accessibility review have
   current evidence.
 
-Until that gate passes, the feature remains a local development alpha and must
-not be described as a complete space game or deployed as production-ready.
+The connected alpha is ready for owner release review. It must not be described
+as a complete space game or deployed as production-ready until the exact
+candidate artifact passes that review and its compatible shared backend is
+approved for promotion.

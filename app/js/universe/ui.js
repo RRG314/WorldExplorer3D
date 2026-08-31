@@ -48,6 +48,7 @@ function toggleUniverseNavigator() {
 
 function populateDestinationSelect(select) {
   const destinations = getUniverseDestinations();
+  select.replaceChildren();
   const systems = destinations.filter((item) => item.objectClass === 'planetary_system');
   const systemGroup = document.createElement('optgroup');
   systemGroup.label = CLASS_LABELS.planetary_system;
@@ -83,6 +84,16 @@ function populateDestinationSelect(select) {
     });
     if (group.children.length) select.appendChild(group);
   });
+}
+
+function syncDestinationSelect(select) {
+  const signature = getUniverseDestinations().map((item) => item.id).sort().join('|');
+  if (select.dataset.destinationSignature === signature) return false;
+  const selected = select.value;
+  populateDestinationSelect(select);
+  select.dataset.destinationSignature = signature;
+  if ([...select.options].some((option) => option.value === selected)) select.value = selected;
+  return true;
 }
 
 function createUniverseNavigator(handlers) {
@@ -137,7 +148,7 @@ function createUniverseNavigator(handlers) {
   }
 
   const select = panel.querySelector('#universeDestinationSelect');
-  populateDestinationSelect(select);
+  syncDestinationSelect(select);
   const primaryActions = panel.querySelector('#universePrimaryActions');
   const travel = makeButton('universeTravelBtn', 'Travel to destination', 'primary');
   const enterGalaxy = makeButton('universeEnterGalaxyBtn', 'Enter current galaxy');
@@ -226,6 +237,7 @@ function updateUniverseNavigator(state) {
   panel.querySelector('#universeFrameName').textContent = state.current.name;
   panel.querySelector('#universeAddress').textContent = state.current.address;
   const select = panel.querySelector('#universeDestinationSelect');
+  syncDestinationSelect(select);
   if (!state.transition && select.value !== state.selected?.id) select.value = state.selected?.id || state.current.id;
   setUniverseSelection(state.selected || state.current);
 

@@ -1,7 +1,7 @@
 # Interstellar Expedition System
 
 Decision record: 2026-08-30  
-Status: implementation authority; first journey and bounded Surveyor main deck implemented locally
+Status: implementation authority; connected alpha candidate implemented
 
 ## Product boundary
 
@@ -130,9 +130,9 @@ coverage for command, flight/navigation, engineering, medical/life support,
 and science/surface work. Routine schedules are automatic. Fatigue and health
 affect effective coverage without requiring hourly micromanagement.
 
-Cryogenic suspension is classified as speculative. A later cryogenic slice
-must model wake-up cost, medical risk, replacement role coverage, and reserve
-consumption rather than treating sleep as a label.
+Cryogenic suspension is classified as speculative. Reserve specialists have a
+controlled wake cost, recovery state, replacement role coverage, and finite
+medical and power demand rather than treating sleep as a label.
 
 Generation voyages use aggregate population continuity, aging, training, role
 succession, and knowledge preservation. The model will not store genetic data
@@ -180,7 +180,7 @@ Schema rollback restores the previous compatible record and keeps the newer
 record as diagnostic recovery data. Incomplete or unsupported versions fail
 closed without modifying the existing Explorer profile.
 
-## Initial complete slice
+## Connected alpha slice
 
 The first implementation target is a Proxima Centauri research expedition:
 
@@ -197,20 +197,19 @@ The first implementation target is a Proxima Centauri research expedition:
 10. hand the selected Proxima destination to the existing Wayfinder/local Space
     runtime while keeping the same Explorer and Expedition record.
 
-This slice is not the completion of cryogenic, generation, multiplayer rescue,
-resource-stop, or outpost stages. Those remain unavailable until their own
-connected acceptance journeys pass.
+The same record also supports physically entered resource stops, causal failure
+and recovery, cryogenic replacement, generation continuity, shared room crews,
+one-time rescue, and persistent field stations. Ordinary Space remains
+available without creating or loading an Expedition.
 
 ## Current implementation status
 
-The local Space roadmap branch now completes the first Proxima Centauri journey
-and the bounded Surveyor main-deck portion of Stage 3. The Surveyor has one
-validated eight-room layout, reachable collision-bounded walking space, eight
-working stations, seven visible assigned crew members, mobile walking controls,
-and a science interaction that records the same event in the Captain's Log and
-existing Explorer Journal. Entering the ship pauses the current Space session;
-returning to flight resumes that same session and course instead of creating a
-second Space environment.
+The Surveyor now has three validated decks, 25 reachable rooms, working
+pressure doors and lift, compact and expanded maps, visible assigned crew,
+mobile walking controls, and room stations connected to the same crew,
+resources, systems, mission log, and existing Explorer Journal. Entering the
+ship pauses the current Space session; returning to flight resumes that same
+session and course instead of creating a second Space environment.
 
 The seven visible crew now follow deterministic work, support, rest, and
 emergency-response assignments derived from the same persistent Expedition
@@ -220,12 +219,14 @@ repair and science outcomes affect the crew members whose roles performed the
 work. Their movement is a bounded presentation of that state, not another crew
 simulation.
 
-This is not the whole Interstellar Expedition roadmap. Full ship-system
-operations, explicit Backpack and planetary resource transfers, multi-stop
-resupply, cryogenic and generation missions, multiplayer rescue, persistent
-outposts, complete active-journey restore coverage, and the wider failure
-matrix remain later connected slices. Ordinary manual Space flight and optional
-Wayfinder assistance remain the established travel paths outside Expeditions.
+The connected alpha includes ship-system operations, explicit planetary sample
+custody and processing, repair and resupply stops, cryogenic and generation
+missions, relativistic time, shared human crew, reconnect, rescue, persistent
+field stations, full-record save and reload, durable discoveries, and causal
+failure reports. Ordinary manual Space flight and optional Wayfinder assistance
+remain the established travel paths outside Expeditions. Further destinations,
+ship classes, rooms, art, animation, audio, event families, and planetary
+activities expand this system without changing its authorities.
 
 ## Verification gates
 

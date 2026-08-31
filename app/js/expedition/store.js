@@ -2,6 +2,7 @@ import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=6';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
 import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
+import { createExpeditionArchive } from './archive.js?v=1';
 
 const EXPEDITION_STORAGE_KEY = 'world-explorer:interstellar-expedition:v1';
 const EXPEDITION_BACKUP_KEY = 'world-explorer:interstellar-expedition:backup:v1';
@@ -58,6 +59,7 @@ function parseRecord(value) {
 }
 
 function createExpeditionStore(storage = globalThis.localStorage) {
+  const archive = createExpeditionArchive(storage);
   function load() {
     return parseRecord(storage?.getItem?.(EXPEDITION_STORAGE_KEY));
   }
@@ -69,6 +71,7 @@ function createExpeditionStore(storage = globalThis.localStorage) {
     const existing = storage?.getItem?.(EXPEDITION_STORAGE_KEY);
     if (existing) storage.setItem(EXPEDITION_BACKUP_KEY, existing);
     storage.setItem(EXPEDITION_STORAGE_KEY, JSON.stringify(expedition));
+    archive.mergeExpedition(expedition);
     return expedition;
   }
 

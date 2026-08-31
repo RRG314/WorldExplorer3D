@@ -11,6 +11,7 @@ flowchart LR
     Session --> Earth[Bounded Earth world]
     Session --> Ocean[Ocean]
     Session --> Planetary[Moon, Mars, and space]
+    Planetary --> Expedition[Interstellar Expeditions]
     Earth --> World[Terrain, water, roads, buildings, and places]
     Earth --> Actors[Player, traffic, pedestrians, and wildlife]
     Earth --> Field[Field activities and progression]
@@ -21,6 +22,9 @@ flowchart LR
     Editor --> LocalState[Local persistence]
     Editor --> Rooms
     Rooms --> Firebase[Authorized backend and Firestore]
+    Expedition --> PlayerState
+    Expedition --> Editor
+    Expedition --> Rooms
 ```
 
 The session coordinator owns transitions. Only the active environment may own
@@ -173,6 +177,30 @@ collision, and landing checks. The rendered solar system uses declared
 presentation scales so it remains playable. Manual input cancels assisted travel,
 and swept body collision prevents a fast frame from passing through a planet or
 the Sun.
+
+Interstellar Expeditions extend those authorities rather than replacing them.
+`app/js/expedition/model.js` owns one versioned mission record for ship, route,
+strategic time, crew, stores, systems, contacts, events, failures, samples, and
+field stations. `simulation.js` advances analytical time; rendered frames never
+stand in for years of travel. `runtime.js` presents the planner, ship work, and
+local-stop handoff. The walkable ship remains nested inside the active Space
+session and returns to that same session.
+
+Stable route contacts are promoted through `contact-authority.js` into the
+existing universe catalog and planetary surface authority. `archive.js` keeps
+discovered contacts and their field stations after the active mission ends.
+Space restores that catalog before Wayfinder is built, and the catalog map
+replaces records by stable ID, so reload and free-roam revisit do not create a
+second star system or planet. A modeled contact remains labeled as modeled game
+content and never impersonates an observed catalog object.
+
+Field stations use the existing Blocks renderer, shape catalog, collision, and
+world address. Their structure is protected as system-owned while player Blocks
+retain their own placement limit and ownership. Construction and service remove
+the exact transferred ship resources. The strategic clock advances station
+power, stores, condition, operating status, revision, and log. Single-player
+state is local and versioned; a room Expedition is server-owned and clients may
+only request validated mutations through the existing room backend.
 
 ## World Editor and persistent Blocks
 

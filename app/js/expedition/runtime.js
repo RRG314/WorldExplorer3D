@@ -8,10 +8,10 @@ import {
 } from './simulation.js?v=5';
 import { createExpeditionStore } from './store.js?v=6';
 import { applyShipOperation, getShipStationView } from './ship-operations.js?v=2';
-import { getUniverseDestinations, registerUniverseRuntimeDestination, resolveUniverseAddress } from '../universe/catalog.js?v=11';
-import { registerExpeditionSolidWorld } from '../planetary/solid-world-runtime.js?v=8';
+import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
+import { registerExpeditionDiscovery } from './contact-authority.js?v=1';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -98,59 +98,21 @@ function ensureStylesheet() {
 }
 
 function availableDestinations() {
-  return getUniverseDestinations().filter((item) => ['planetary_system', 'black_hole'].includes(item.objectClass) && item.id !== 'sol');
+  return getUniverseDestinations().filter((item) =>
+    ['planetary_system', 'black_hole'].includes(item.objectClass)
+    && item.id !== 'sol'
+    && !item.generatedFlags?.includes('stable-expedition-contact')
+  );
 }
 
 function registerExpeditionContact(expedition, contact) {
-  if (!contact?.id || !Number.isInteger(Number(contact.stableSeed))) return null;
-  const seed = Number(contact.stableSeed) >>> 0;
-  const stellarProfiles = [
-    { mass: 0.16, temperature: 3050, kind: 'red-dwarf', color: 0xff805b },
-    { mass: 0.72, temperature: 4750, kind: 'k-star', color: 0xffbd79 },
-    { mass: 0.28, temperature: 3320, kind: 'red-dwarf', color: 0xff9169 },
-    { mass: 0.52, temperature: 3920, kind: 'k-star', color: 0xffa66f }
-  ];
-  const star = stellarProfiles[seed % stellarProfiles.length];
-  const radiusEarth = 0.78 + ((seed >>> 5) % 92) / 100;
-  const massEarth = Math.max(0.38, radiusEarth ** 2.7);
-  const orbitDays = 28 + (seed % 410);
-  const semiMajorAxisAu = 0.12 + ((seed >>> 9) % 130) / 100;
-  const destination = registerUniverseRuntimeDestination({
-    id: contact.id,
-    name: contact.designation,
-    objectClass: 'planetary_system',
-    parentId: 'milky-way',
-    address: `universe/local-group/milky-way/expedition/${contact.id}`,
-    accuracy: 'model-derived expedition contact',
-    canonicalPosition: { frame: 'expedition-route', distanceLy: Math.max(0.01, Number(expedition?.calculation?.distanceLy || 1) * Math.max(0.05, Number(expedition?.progress || 0.5))) },
-    physical: { hostMassSolar: star.mass, hostTemperatureK: star.temperature },
-    visualProfile: { kind: star.kind, color: star.color, seed },
-    generatedFlags: ['stable-expedition-contact', 'model-derived-appearance'],
-    uncertainty: { classification: 'Survey classification remains subject to local observation.' },
-    provenance: [],
-    children: [{
-      id: `${contact.id}-i`,
-      name: `${contact.designation} I`,
-      objectClass: 'exoplanet',
-      radiusEarth,
-      massEarth,
-      orbitDays,
-      semiMajorAxisAu,
-      accuracy: 'model-derived expedition world',
-      exploration: { landingMode: 'solid_surface', surfaceClass: contact.worldClass, surfaceAuthority: 'expedition-modeled-surface-v1' },
-      uncertainty: { resourceSignature: contact.resourceSignature }
-    }]
-  });
-  const world = resolveUniverseAddress(`${contact.id}-i`);
   const outpost = (expedition?.outposts || []).find((entry) => entry.contactId === contact.id) || null;
-  registerExpeditionSolidWorld({
-    ...world,
-    seed,
-    parentSystemId: contact.id,
-    starMassSolar: star.mass,
+  return registerExpeditionDiscovery({
+    contact,
+    distanceLy: expedition?.calculation?.distanceLy,
+    routeProgress: expedition?.progress,
     outpost
-  });
-  return destination;
+  }, { returnMode: 'expedition-contact' });
 }
 
 function syncExpeditionContacts(expedition = activeExpedition) {
@@ -506,7 +468,7 @@ function outpostMarkup(expedition) {
     const availability = constructionAvailability(expedition, outpost);
     const condition = Math.round(Number(outpost.condition || 0) * 100);
     const details = outpost.state === 'operational'
-      ? `${outpost.assignedCrewIds.length} crew · ${condition}% condition · ${Number(outpost.power?.storedMWh || 0).toFixed(1)} MWh · ${Math.round(Number(outpost.stores?.waterKg || 0))} kg water`
+      ? `${String(outpost.operationsStatus || 'operational').replaceAll('-', ' ')} · ${outpost.assignedCrewIds.length} crew · ${condition}% condition · ${Number(outpost.power?.storedMWh || 0).toFixed(1)} MWh · ${Math.round(Number(outpost.stores?.waterKg || 0))} kg water`
       : `Planned at the existing survey-world address · ${outpost.blueprint.length} structural records`;
     const action = outpost.state === 'planned'
       ? `<button type="button" data-build-outpost="${outpost.id}" ${availability.enabled ? '' : 'disabled'}>Build field station</button>${availability.reason ? `<small>${availability.reason}</small>` : ''}`
