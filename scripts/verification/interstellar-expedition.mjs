@@ -93,6 +93,12 @@ async function runJourney(viewport, name) {
     assert.equal(await page.locator('#shipInteriorHud').isVisible(), true);
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), false);
     assert.equal(await page.locator('#tutorialHintCard').isVisible(), false);
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 0, z: 26.5, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
+    });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-command-visual.png`), fullPage: true });
     await page.locator('#shipMapButton').click();
     assert.equal(await page.locator('#shipMapOverlay').isVisible(), true);
     assert.equal(await page.locator('#shipMapOverlay [data-map-deck="command"]').count(), 1);

@@ -91,14 +91,83 @@ function addConsole(group, x, z, yaw, accent, label) {
   const consoleGroup = new THREE.Group();
   consoleGroup.name = `ship-console:${label}`;
   const dark = material(0x111b28, { metalness: 0.62, roughness: 0.34 });
+  const frame = material(0x566675, { metalness: 0.58, roughness: 0.38 });
   const screen = material(accent, { emissive: accent, emissiveIntensity: 1.05, metalness: 0.08, roughness: 0.3 });
-  box(consoleGroup, { x: 2.4, y: 0.82, z: 0.78 }, { x: 0, y: 0.42, z: 0 }, dark);
-  const display = box(consoleGroup, { x: 2.05, y: 0.52, z: 0.08 }, { x: 0, y: 0.93, z: -0.31 }, screen);
+  box(consoleGroup, { x: 2.55, y: 0.16, z: 0.92 }, { x: 0, y: 0.08, z: 0 }, frame, `${label}:console-plinth`);
+  box(consoleGroup, { x: 2.3, y: 0.66, z: 0.72 }, { x: 0, y: 0.45, z: 0 }, dark, `${label}:console-body`);
+  [-1.08, 1.08].forEach((side) => box(consoleGroup, { x: 0.18, y: 0.82, z: 0.82 }, { x: side, y: 0.48, z: 0 }, frame, `${label}:console-edge`));
+  const display = box(consoleGroup, { x: 2.05, y: 0.55, z: 0.08 }, { x: 0, y: 1.02, z: -0.31 }, screen, `${label}:display`);
   display.rotation.x = -0.32;
+  display.userData.shipAnimated = 'screen';
+  display.userData.baseEmissiveIntensity = 0.9 + (accent % 7) * 0.025;
+  for (let index = 0; index < 10; index += 1) {
+    const buttonColor = index % 4 === 0 ? 0xe9a447 : index % 3 === 0 ? 0x72d6a2 : accent;
+    box(consoleGroup, { x: 0.14, y: 0.035, z: 0.11 }, {
+      x: -0.92 + (index % 5) * 0.46,
+      y: 0.81,
+      z: 0.02 + Math.floor(index / 5) * 0.2
+    }, material(buttonColor, { emissive: buttonColor, emissiveIntensity: 0.55, metalness: 0.06, roughness: 0.36 }), `${label}:control`);
+  }
+  const seat = new THREE.Group();
+  seat.name = `${label}:articulated-seat`;
+  const fabric = material(0x26394c, { roughness: 0.82, metalness: 0.04 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 0.42, 12), frame);
+  base.position.set(0, 0.21, 1.3);
+  seat.add(base);
+  box(seat, { x: 0.78, y: 0.18, z: 0.68 }, { x: 0, y: 0.58, z: 1.3 }, fabric, `${label}:seat-cushion`);
+  const back = box(seat, { x: 0.78, y: 0.92, z: 0.18 }, { x: 0, y: 1.05, z: 1.58 }, fabric, `${label}:seat-back`);
+  back.rotation.x = -0.12;
+  [-0.48, 0.48].forEach((side) => {
+    box(seat, { x: 0.1, y: 0.5, z: 0.1 }, { x: side, y: 0.65, z: 1.3 }, frame, `${label}:seat-arm`);
+    box(seat, { x: 0.2, y: 0.08, z: 0.5 }, { x: side, y: 0.9, z: 1.12 }, frame, `${label}:seat-armrest`);
+  });
+  consoleGroup.add(seat);
   consoleGroup.position.set(x, 0, z);
   consoleGroup.rotation.y = yaw;
   group.add(consoleGroup);
   return consoleGroup;
+}
+
+function addScienceBench(group, x, z, yaw, accent, label) {
+  const root = new THREE.Group();
+  root.name = `science-bench:${label}`;
+  const frame = material(0x566675, { metalness: 0.56, roughness: 0.4 });
+  const worktop = material(0xbac4ca, { metalness: 0.14, roughness: 0.58 });
+  const dark = material(0x162433, { metalness: 0.42, roughness: 0.48 });
+  box(root, { x: 4.4, y: 0.18, z: 1.25 }, { x: 0, y: 1.02, z: 0 }, worktop, `${label}:worktop`);
+  [-1.85, 0, 1.85].forEach((leg) => box(root, { x: 0.18, y: 1.02, z: 1.05 }, { x: leg, y: 0.51, z: 0 }, frame, `${label}:bench-frame`));
+  box(root, { x: 4.25, y: 0.7, z: 0.32 }, { x: 0, y: 1.55, z: 0.45 }, dark, `${label}:instrument-shelf`);
+  [-1.5, -0.75, 0, 0.75, 1.5].forEach((offset, index) => {
+    const vessel = new THREE.Mesh(new THREE.CylinderGeometry(0.09 + (index % 2) * 0.025, 0.1, 0.32 + (index % 3) * 0.06, 10), material(index % 2 ? 0x79c7d9 : 0xd9b06f, { emissive: index % 2 ? 0x245b68 : 0x604a22, emissiveIntensity: 0.25, metalness: 0.08, roughness: 0.32 }));
+    vessel.position.set(offset, 1.2, 0.05);
+    root.add(vessel);
+  });
+  const display = box(root, { x: 1.15, y: 0.65, z: 0.08 }, { x: -1.4, y: 1.55, z: 0.25 }, material(accent, { emissive: accent, emissiveIntensity: 0.85, metalness: 0.04, roughness: 0.28 }), `${label}:instrument-display`);
+  display.userData.shipAnimated = 'screen';
+  display.userData.baseEmissiveIntensity = 0.78;
+  root.position.set(x, 0, z);
+  root.rotation.y = yaw;
+  group.add(root);
+  return root;
+}
+
+function addWallServicePanel(group, x, z, yaw, accent, label) {
+  const root = new THREE.Group();
+  root.name = `service-panel:${label}`;
+  const frame = material(0x374b5b, { metalness: 0.58, roughness: 0.36 });
+  const recess = material(0x0f1d28, { metalness: 0.5, roughness: 0.44 });
+  box(root, { x: 1.5, y: 2.2, z: 0.14 }, { x: 0, y: 1.35, z: 0 }, frame, `${label}:service-frame`);
+  box(root, { x: 1.24, y: 1.88, z: 0.08 }, { x: 0, y: 1.35, z: -0.09 }, recess, `${label}:service-recess`);
+  [-0.42, 0, 0.42].forEach((offset, index) => {
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.25, 10), material(index === 1 ? accent : 0x7b8790, { emissive: index === 1 ? accent : 0x000000, emissiveIntensity: index === 1 ? 0.35 : 0, metalness: 0.42, roughness: 0.38 }));
+    tube.position.set(offset, 1.38, -0.18);
+    root.add(tube);
+  });
+  for (let index = 0; index < 4; index += 1) box(root, { x: 0.16, y: 0.08, z: 0.05 }, { x: -0.46 + index * 0.31, y: 2.28, z: -0.18 }, material(index === 0 ? 0xe8a54a : accent, { emissive: index === 0 ? 0xe8a54a : accent, emissiveIntensity: 0.65 }), `${label}:service-status`);
+  root.position.set(x, 0, z);
+  root.rotation.y = yaw;
+  group.add(root);
+  return root;
 }
 
 function addCrewMember(group, post, crew) {
@@ -247,8 +316,24 @@ function addDeckDetails(group, deckId) {
     addConsole(group, -8.2, 0.5, Math.PI / 2, 0x5ed69d, 'physical-science');
     addConsole(group, 8.2, 0.5, -Math.PI / 2, 0x3aa8d8, 'sensors');
     addConsole(group, -8.2, -14.5, Math.PI / 2, 0xb887e8, 'analysis');
-    box(group, { x: 5.6, y: 0.72, z: 2.3 }, { x: 7.8, y: 0.36, z: -14.5 }, dark, 'briefing-table');
-    [-2.8, 0, 2.8].forEach((x) => box(group, { x: 2.1, y: 0.62, z: 0.8 }, { x, y: 0.31, z: -30 }, soft, 'observation-seat'));
+    addScienceBench(group, -8.1, -3.3, Math.PI / 2, 0x5ed69d, 'sample-analysis');
+    addScienceBench(group, -8.1, -18.2, Math.PI / 2, 0xb887e8, 'data-instruments');
+    addWallServicePanel(group, 12.62, 17.9, -Math.PI / 2, 0x7399e8, 'communications-service');
+    addWallServicePanel(group, 12.62, 3.7, -Math.PI / 2, 0x3aa8d8, 'sensor-service');
+    const briefing = new THREE.Group();
+    briefing.name = 'briefing-furniture';
+    box(briefing, { x: 5.6, y: 0.18, z: 2.3 }, { x: 0, y: 0.92, z: 0 }, dark, 'briefing-tabletop');
+    [-2.2, 2.2].forEach((x) => box(briefing, { x: 0.24, y: 0.86, z: 1.6 }, { x, y: 0.43, z: 0 }, steel, 'briefing-table-leg'));
+    [-2.05, -0.7, 0.7, 2.05].forEach((x, index) => {
+      box(briefing, { x: 0.82, y: 0.15, z: 0.65 }, { x, y: 0.55, z: index % 2 ? -1.65 : 1.65 }, soft, 'briefing-seat');
+      box(briefing, { x: 0.82, y: 0.72, z: 0.14 }, { x, y: 0.91, z: index % 2 ? -1.96 : 1.96 }, soft, 'briefing-seat-back');
+    });
+    briefing.position.set(7.8, 0, -14.5);
+    group.add(briefing);
+    [-3.6, -1.2, 1.2, 3.6].forEach((x) => {
+      box(group, { x: 2.05, y: 0.2, z: 0.82 }, { x, y: 0.48, z: -31 }, soft, 'observation-seat');
+      box(group, { x: 2.05, y: 0.72, z: 0.16 }, { x, y: 0.86, z: -31.35 }, soft, 'observation-seat-back');
+    });
     addBridgeView(group);
   } else if (deckId === 'habitat') {
     box(group, { x: 7.2, y: 0.82, z: 2.6 }, { x: 0, y: 0.41, z: 30 }, dark, 'wardroom-table');
@@ -461,10 +546,13 @@ function buildSurveyorScene(expedition) {
   const crewById = new Map((expedition?.crew || []).map((crew) => [crew.id, crew]));
   const crewMeshes = SHIP_CREW_POSTS.map((post) => addCrewMember(crewLayer, post, crewById.get(post.crewId)));
   crewMeshes.forEach((mesh) => { mesh.visible = mesh.userData.deckId === 'command'; });
+  const animatedParts = [];
+  root.traverse((child) => { if (child.userData?.shipAnimated) animatedParts.push(child); });
   return {
     root,
     deckStates,
     crewMeshes,
+    animatedParts,
     walkSurface: {
       kind: 'polygon',
       pts: [
@@ -862,6 +950,12 @@ function updateExpeditionShipInterior(dt) {
   const tutorialCard = document.getElementById('tutorialHintCard');
   if (tutorialCard && tutorialCard.style.display !== 'none') tutorialCard.style.display = 'none';
   updateCrewMotion(activeSession, dt);
+  activeSession.sceneState.animatedParts.forEach((part, index) => {
+    if (!part.visible || !part.material) return;
+    if (part.userData.shipAnimated === 'screen') {
+      part.material.emissiveIntensity = Number(part.userData.baseEmissiveIntensity || 0.8) + Math.sin(activeSession.visualClock * 1.7 + index * 0.63) * 0.09;
+    }
+  });
   const state = activeDeckState(activeSession);
   state?.doorStates.forEach((door) => {
     door.panel.position.y += (door.targetY - door.panel.position.y) * Math.min(1, Math.max(0, dt) * 8);
