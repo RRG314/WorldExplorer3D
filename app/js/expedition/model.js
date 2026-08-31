@@ -5,7 +5,7 @@ import { createVoyageDirector } from './voyage-director.js?v=1';
 const EXPEDITION_SCHEMA_VERSION = 1;
 const RESOURCE_KEYS = Object.freeze([
   'foodKg', 'waterKg', 'powerMWh', 'propellantKg', 'medicalUnits',
-  'maintenanceKg', 'feedstockKg', 'scienceCargoKg'
+  'maintenanceKg', 'feedstockKg', 'scienceCargoKg', 'processingResidueKg'
 ]);
 
 function clone(value) {
@@ -107,6 +107,7 @@ function createExpeditionPlan({
     activeLocalContactId: null,
     localOperation: null,
     scienceSamples: Object.freeze([]),
+    materialLedger: Object.freeze({ installedRepairKg: 0 }),
     discoveries: Object.freeze([]),
     log: Object.freeze([{ atMissionS: 0, kind: 'planned', message: `Expedition planned for ${destinationId}.` }]),
     failureChain: Object.freeze([])

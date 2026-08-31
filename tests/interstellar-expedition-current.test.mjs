@@ -237,8 +237,9 @@ test('room operations use the persistent expedition record and conserve bounded 
   expedition = result.expedition;
   assert.equal(expedition.resources.feedstockKg, feedstockBefore - 25);
   assert.equal(expedition.resources.maintenanceKg, partsBefore + 18);
+  assert.equal(expedition.resources.processingResidueKg, 7);
   assert.equal(expedition.resources.powerMWh, powerBefore - 0.35);
-  assert.match(expedition.log.at(-1).message, /25 kg.+18 kg/i);
+  assert.match(expedition.log.at(-1).message, /25 kg.+18 kg.+7 kg/i);
   const repeated = applyShipOperation(expedition, 'fabricate-parts');
   assert.equal(repeated.changed, false);
   assert.match(repeated.message, /completed during this voyage segment/i);
@@ -259,6 +260,47 @@ test('room operations use the persistent expedition record and conserve bounded 
   assert.equal(processed.expedition.scienceSamples[0].processed, true);
   assert.equal(processed.expedition.resources.scienceCargoKg, cargoBefore);
   assert.match(processed.message, /4 kg remains in science cargo/i);
+});
+
+test('a surface recovery sample becomes conserved feedstock, fabricated parts, and an installed repair', () => {
+  let expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1800 });
+  expedition = {
+    ...expedition,
+    systems: { ...expedition.systems, thermal: { condition: 0.5, status: 'degraded' } },
+    resources: { ...expedition.resources, feedstockKg: 22, maintenanceKg: 0, scienceCargoKg: 4, processingResidueKg: 0 },
+    scienceSamples: [{
+      id: 'repair-sample', label: 'Survey Contact repair sample', massKg: 4, processed: false,
+      recoveryRequirement: { kind: 'repair-feedstock', systemId: 'thermal', recoveredFeedstockKg: 3, processingResidueKg: 1 }
+    }]
+  };
+  const initialTrackedMass = expedition.resources.feedstockKg + expedition.resources.maintenanceKg
+    + expedition.resources.scienceCargoKg + expedition.resources.processingResidueKg
+    + expedition.materialLedger.installedRepairKg;
+
+  const processed = applyShipOperation(expedition, 'process-resource-sample');
+  assert.equal(processed.changed, true);
+  expedition = processed.expedition;
+  assert.equal(expedition.resources.scienceCargoKg, 0);
+  assert.equal(expedition.resources.feedstockKg, 25);
+  assert.equal(expedition.resources.processingResidueKg, 1);
+
+  const fabricated = applyShipOperation(expedition, 'fabricate-parts');
+  assert.equal(fabricated.changed, true);
+  expedition = fabricated.expedition;
+  assert.equal(expedition.resources.feedstockKg, 0);
+  assert.equal(expedition.resources.maintenanceKg, 18);
+  assert.equal(expedition.resources.processingResidueKg, 8);
+
+  const repaired = applyShipOperation(expedition, 'repair-priority-system');
+  assert.equal(repaired.changed, true);
+  expedition = repaired.expedition;
+  assert.equal(expedition.resources.maintenanceKg, 6);
+  assert.equal(expedition.materialLedger.installedRepairKg, 12);
+  assert.equal(expedition.systems.thermal.condition, 0.58);
+  const finalTrackedMass = expedition.resources.feedstockKg + expedition.resources.maintenanceKg
+    + expedition.resources.scienceCargoKg + expedition.resources.processingResidueKg
+    + expedition.materialLedger.installedRepairKg;
+  assert.equal(finalTrackedMass, initialTrackedMass);
 });
 
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {

@@ -59,6 +59,10 @@ function operationCycle(expedition) {
 }
 
 function operationKey(expedition, actionId) {
+  if (actionId === 'process-resource-sample') {
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed !== true);
+    return `${actionId}:${sample?.id || 'none'}`;
+  }
   return `${actionId}:${operationCycle(expedition)}`;
 }
 
@@ -93,7 +97,13 @@ function actionAvailability(expedition, actionId) {
   if (actionId === 'fabricate-parts' && (Number(resources.feedstockKg) < 25 || Number(resources.powerMWh) < 0.35)) return Object.freeze({ enabled: false, reason: 'Requires 25 kg feedstock and 0.35 MWh.' });
   if (actionId === 'serve-crew-meal' && (Number(resources.foodKg) < 8 || Number(resources.waterKg) < 3)) return Object.freeze({ enabled: false, reason: 'Requires 8 kg food and 3 kg water.' });
   if (actionId === 'treat-crew' && Number(resources.medicalUnits) < 1) return Object.freeze({ enabled: false, reason: 'No treatment unit is available.' });
-  if (['repair-priority-system', 'service-water-loop', 'stabilize-life-support', 'service-thermal-loop'].includes(actionId) && Number(resources.maintenanceKg) < 5) return Object.freeze({ enabled: false, reason: 'Maintenance stores are too low.' });
+  const maintenanceCost = {
+    'repair-priority-system': 12,
+    'service-water-loop': 5,
+    'stabilize-life-support': 8,
+    'service-thermal-loop': 8
+  }[actionId];
+  if (maintenanceCost && Number(resources.maintenanceKg) < maintenanceCost) return Object.freeze({ enabled: false, reason: `Requires ${maintenanceCost} kg of maintenance parts.` });
   if (actionId === 'process-resource-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true)) {
     return Object.freeze({ enabled: false, reason: 'Acquire and transfer a sample from a supported local operation first.' });
   }
@@ -113,6 +123,7 @@ function applyShipOperation(expedition, actionId) {
   const resources = clone(expedition.resources || {});
   const systems = clone(expedition.systems || {});
   const crew = clone(expedition.crew || []);
+  const materialLedger = clone(expedition.materialLedger || { installedRepairKg: 0 });
   const flags = { ...(expedition.operationFlags || {}), [operationKey(expedition, actionId)]: true };
   let message = ACTION_LABELS[actionId] || actionId;
   let kind = 'ship-operation';
@@ -120,6 +131,7 @@ function applyShipOperation(expedition, actionId) {
   const improveSystem = (id, amount, cost = 0) => {
     if (!systems[id]) return;
     resources.maintenanceKg = Math.max(0, Number(resources.maintenanceKg || 0) - cost);
+    materialLedger.installedRepairKg = Math.max(0, Number(materialLedger.installedRepairKg || 0)) + Math.max(0, cost);
     systems[id].condition = Math.min(1, Number(systems[id].condition || 0) + amount);
     systems[id].status = conditionStatus(systems[id].condition);
   };
@@ -128,7 +140,8 @@ function applyShipOperation(expedition, actionId) {
     resources.feedstockKg -= 25;
     resources.powerMWh -= 0.35;
     resources.maintenanceKg += 18;
-    message = 'Fabrication converted 25 kg of feedstock into 18 kg of inspected maintenance parts.';
+    resources.processingResidueKg = Number(resources.processingResidueKg || 0) + 7;
+    message = 'Fabrication converted 25 kg of feedstock into 18 kg of inspected maintenance parts and retained 7 kg of process residue.';
   } else if (actionId === 'serve-crew-meal') {
     resources.foodKg -= 8;
     resources.waterKg -= 3;
@@ -187,8 +200,23 @@ function applyShipOperation(expedition, actionId) {
     const sample = samples.find((entry) => entry.processed !== true);
     sample.processed = true;
     sample.processedAtMissionS = Number(expedition.strategicElapsedS) || 0;
-    message = `${sample.label} was documented, separated, and sealed. Its ${Number(sample.massKg || 0)} kg remains in science cargo.`;
-    kind = 'science';
+    const recovery = sample.recoveryRequirement;
+    if (recovery?.kind === 'repair-feedstock') {
+      const feedstockKg = Math.max(0, Number(recovery.recoveredFeedstockKg || 0));
+      const residueKg = Math.max(0, Number(recovery.processingResidueKg || 0));
+      if (Math.abs(feedstockKg + residueKg - Number(sample.massKg || 0)) > 1e-9) {
+        return Object.freeze({ expedition, changed: false, message: 'The sample manifest does not conserve mass.' });
+      }
+      resources.scienceCargoKg = Math.max(0, Number(resources.scienceCargoKg || 0) - Number(sample.massKg || 0));
+      resources.feedstockKg = Number(resources.feedstockKg || 0) + feedstockKg;
+      resources.processingResidueKg = Number(resources.processingResidueKg || 0) + residueKg;
+      sample.outputs = Object.freeze({ feedstockKg, processingResidueKg: residueKg });
+      message = `${sample.label} yielded ${feedstockKg} kg of fabrication feedstock and ${residueKg} kg of retained process residue.`;
+      kind = 'resupply';
+    } else {
+      message = `${sample.label} was documented, separated, and sealed. Its ${Number(sample.massKg || 0)} kg remains in science cargo.`;
+      kind = 'science';
+    }
     const log = Object.freeze([...(expedition.log || []), Object.freeze({
       atMissionS: Number(expedition.strategicElapsedS) || 0,
       kind,
@@ -196,6 +224,7 @@ function applyShipOperation(expedition, actionId) {
     })]);
     const next = withExpeditionChanges(expedition, {
       scienceSamples: Object.freeze(samples.map((entry) => Object.freeze(entry))),
+      resources: Object.freeze(resources),
       operationFlags: Object.freeze(flags),
       log
     });
@@ -211,6 +240,7 @@ function applyShipOperation(expedition, actionId) {
     resources: Object.freeze(resources),
     systems: Object.freeze(systems),
     crew: Object.freeze(crew.map((member) => Object.freeze(member))),
+    materialLedger: Object.freeze(materialLedger),
     operationFlags: Object.freeze(flags),
     log
   });

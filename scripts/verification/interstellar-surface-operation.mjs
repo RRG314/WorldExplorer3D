@@ -50,6 +50,12 @@ async function seedJourney(page) {
         expedition = simulation.resolveExpeditionEvent(expedition, choice.id);
       }
     }
+    expedition = {
+      ...expedition,
+      systems: { ...expedition.systems, thermal: { condition: 0.5, status: 'degraded' } },
+      resources: { ...expedition.resources, feedstockKg: 22, maintenanceKg: 0, processingResidueKg: 0 },
+      materialLedger: { installedRepairKg: 0 }
+    };
     createExpeditionStore().save(expedition);
     return expedition;
   });
@@ -72,10 +78,14 @@ async function run(viewport, name) {
     const contact = seeded.routeContacts.find((entry) => entry.localOperationState === 'available');
     assert.ok(contact);
     const cargoBefore = Number(seeded.resources.scienceCargoKg);
+    const trackedMaterialBefore = Number(seeded.resources.feedstockKg) + Number(seeded.resources.maintenanceKg)
+      + Number(seeded.resources.scienceCargoKg) + Number(seeded.resources.processingResidueKg || 0)
+      + Number(seeded.materialLedger.installedRepairKg || 0);
 
     await page.locator('#sfExpeditionBtn').click();
     await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
     await page.locator(`[data-enter-contact="${contact.id}"]`).click();
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.localOperation?.recoveryRequirement?.kind === 'repair-feedstock');
     await page.waitForFunction((contactId) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.universeNavigation?.currentFrameId === contactId && snapshot.universeNavigation?.transitionDestinationId == null;
@@ -180,6 +190,7 @@ async function run(viewport, name) {
     assert.equal(resumed.interstellarExpedition.scienceSamples.length, 1);
     assert.equal(resumed.interstellarExpedition.scienceSamples[0].processed, false);
     assert.equal(resumed.interstellarExpedition.resources.scienceCargoKg, cargoBefore + 4);
+    assert.equal(resumed.interstellarExpedition.scienceSamples[0].recoveryRequirement.systemId, 'thermal');
     assert.match(resumed.interstellarExpedition.log.at(-2).message, /Backpack to Surveyor cargo/i);
     const backpackAfter = await page.evaluate(async (bodyId) => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -212,9 +223,43 @@ async function run(viewport, name) {
     await page.locator('[data-ship-action="process-resource-sample"]').click();
     resumed = await state(page);
     assert.equal(resumed.interstellarExpedition.scienceSamples[0].processed, true);
-    assert.equal(resumed.interstellarExpedition.resources.scienceCargoKg, cargoBefore + 4);
-    assert.match(resumed.interstellarExpedition.log.at(-1).message, /remains in science cargo/i);
-    await page.screenshot({ path: path.join(outputDir, `${name}-sample-processed.png`), fullPage: true });
+    assert.equal(resumed.interstellarExpedition.resources.scienceCargoKg, cargoBefore);
+    assert.equal(resumed.interstellarExpedition.resources.feedstockKg, 25);
+    assert.equal(resumed.interstellarExpedition.resources.processingResidueKg, 1);
+    assert.match(resumed.interstellarExpedition.log.at(-1).message, /3 kg.+1 kg/i);
+
+    await page.locator('[data-close-station]').click();
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: -4.3, z: 0.5, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
+    });
+    await page.waitForTimeout(180);
+    await page.keyboard.press('KeyE');
+    await page.locator('[data-ship-action="fabricate-parts"]').click();
+    resumed = await state(page);
+    assert.equal(resumed.interstellarExpedition.resources.feedstockKg, 0);
+    assert.equal(resumed.interstellarExpedition.resources.maintenanceKg, 18);
+    assert.equal(resumed.interstellarExpedition.resources.processingResidueKg, 8);
+
+    await page.locator('[data-close-station]').click();
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: -7, z: 30, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
+    });
+    await page.waitForTimeout(180);
+    await page.keyboard.press('KeyE');
+    await page.locator('[data-ship-action="repair-priority-system"]').click();
+    resumed = await state(page);
+    assert.equal(resumed.interstellarExpedition.resources.maintenanceKg, 6);
+    assert.equal(resumed.interstellarExpedition.materialLedger.installedRepairKg, 12);
+    assert.equal(resumed.interstellarExpedition.systems.thermal.condition, 0.58);
+    const trackedMaterialAfter = Number(resumed.interstellarExpedition.resources.feedstockKg)
+      + Number(resumed.interstellarExpedition.resources.maintenanceKg)
+      + Number(resumed.interstellarExpedition.resources.scienceCargoKg)
+      + Number(resumed.interstellarExpedition.resources.processingResidueKg)
+      + Number(resumed.interstellarExpedition.materialLedger.installedRepairKg);
+    assert.equal(trackedMaterialAfter, trackedMaterialBefore + 4);
+    await page.screenshot({ path: path.join(outputDir, `${name}-repair-complete.png`), fullPage: true });
 
     results.push({
       name,
@@ -222,6 +267,9 @@ async function run(viewport, name) {
       bodyId: surface.bodyId,
       sampleMassKg: resumed.interstellarExpedition.scienceSamples[0].massKg,
       processed: resumed.interstellarExpedition.scienceSamples[0].processed,
+      repairedSystem: 'thermal',
+      thermalCondition: resumed.interstellarExpedition.systems.thermal.condition,
+      conservedMaterialKg: trackedMaterialAfter,
       resumedFrame: resumed.universeNavigation.currentFrameId
     });
   } finally {

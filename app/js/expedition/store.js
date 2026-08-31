@@ -30,6 +30,9 @@ function parseRecord(value) {
     record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];
     record.activeLocalContactId ||= null;
     record.localOperation ||= null;
+    record.scienceSamples = Array.isArray(record.scienceSamples) ? record.scienceSamples : [];
+    record.resources = { processingResidueKg: 0, ...(record.resources || {}) };
+    record.materialLedger = { installedRepairKg: 0, ...(record.materialLedger || {}) };
     const hadVoyageDirector = record.voyageDirector?.version === 1;
     record.voyageDirector = normalizeVoyageDirector(record);
     if (!hadVoyageDirector) {

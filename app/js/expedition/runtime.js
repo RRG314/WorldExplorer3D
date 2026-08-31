@@ -105,6 +105,26 @@ function appendMissionLog(expedition, kind, message) {
   return Object.freeze([...(expedition?.log || []), Object.freeze({ atMissionS: Number(expedition?.strategicElapsedS || 0), kind, message })]);
 }
 
+function recoveryRequirement(expedition) {
+  const repairable = ['propulsion', 'power', 'life-support', 'thermal', 'fabrication', 'sensors', 'hull'];
+  const damaged = Object.entries(expedition?.systems || {})
+    .filter(([id, system]) => repairable.includes(id) && Number(system?.condition ?? 1) < 0.72)
+    .sort((a, b) => Number(a[1]?.condition ?? 1) - Number(b[1]?.condition ?? 1))[0];
+  const maintenanceKg = Math.max(0, Number(expedition?.resources?.maintenanceKg || 0));
+  const feedstockKg = Math.max(0, Number(expedition?.resources?.feedstockKg || 0));
+  if (!damaged || (maintenanceKg >= 12 && feedstockKg >= 25)) return null;
+  return Object.freeze({
+    kind: 'repair-feedstock',
+    systemId: damaged[0],
+    conditionBefore: Number(damaged[1]?.condition || 0),
+    maintenanceShortfallKg: Math.max(0, 12 - maintenanceKg),
+    fabricationFeedstockShortfallKg: Math.max(0, 25 - feedstockKg),
+    recoveredFeedstockKg: 3,
+    processingResidueKg: 1,
+    sampleMassKg: 4
+  });
+}
+
 function beginLocalContact(contactId) {
   const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === contactId);
   if (!contact || !['available', 'returned'].includes(contact.localOperationState)) return false;
@@ -112,10 +132,17 @@ function beginLocalContact(contactId) {
   if (!destination) return false;
   const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
   const previous = activeExpedition;
+  const requirement = recoveryRequirement(activeExpedition);
   activeExpedition = withExpeditionChanges(activeExpedition, {
     voyagePhase: 'local-operation',
     activeLocalContactId: contact.id,
-    localOperation: Object.freeze({ contactId: contact.id, returnFrameId, state: 'local-space', startedAtMissionS: Number(activeExpedition.strategicElapsedS || 0) }),
+    localOperation: Object.freeze({
+      contactId: contact.id,
+      returnFrameId,
+      state: 'local-space',
+      startedAtMissionS: Number(activeExpedition.strategicElapsedS || 0),
+      recoveryRequirement: requirement
+    }),
     routeContacts: updateContact(contact.id, { localOperationState: 'local-entered', status: 'local-operation' }),
     log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey began.`)
   });
@@ -195,6 +222,8 @@ function collectExpeditionGeologySample(activity) {
         bodyId: activity.bodyId,
         contactId: contact.id,
         massKg: 4,
+        resourceSignature: contact.resourceSignature,
+        recoveryKind: operation.recoveryRequirement?.kind || null,
         truthClass: 'modeled-game-world-material'
       }
     });
@@ -202,7 +231,9 @@ function collectExpeditionGeologySample(activity) {
   }
   activeExpedition = withExpeditionChanges(activeExpedition, {
     localOperation: Object.freeze({ ...operation, state: 'surface-sampled', sampleCatalogId: catalogId }),
-    log: appendMissionLog(activeExpedition, 'science', `${contact.designation} field team collected one 4 kg modeled geology sample.`)
+    log: appendMissionLog(activeExpedition, operation.recoveryRequirement ? 'resupply' : 'science', operation.recoveryRequirement
+      ? `${contact.designation} field team secured one 4 kg feedstock sample for the ${operation.recoveryRequirement.systemId.replaceAll('-', ' ')} repair.`
+      : `${contact.designation} field team collected one 4 kg modeled geology sample.`)
   });
   store.save(activeExpedition);
   activeContext?.showToast?.(`${contact.designation} sample secured in Backpack.`);
@@ -241,6 +272,8 @@ function leaveExpeditionSurface(bodyId) {
     bodyId,
     massKg: 4,
     processed: false,
+    recoveryRequirement: operation.recoveryRequirement || null,
+    resourceSignature: contact.resourceSignature,
     truthClass: 'modeled-game-world-material'
   });
   activeExpedition = withExpeditionChanges(activeExpedition, {
@@ -346,7 +379,11 @@ function renderMission() {
   if (expedition.activeLocalContactId) {
     const activeContact = expedition.routeContacts?.find((contact) => contact.id === expedition.activeLocalContactId);
     const localTransitActive = Boolean(activeContext?.universeRuntime?.transition);
-    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>Surveyor is holding this voyage chapter while you fly the local system. Land at the modeled survey site to collect a sample, or return without one.</p><div>${localTransitActive ? '' : `<button id="expeditionSetSurveyCourse" class="expeditionChoice" type="button">Set course to ${activeContact?.designation || 'contact'} I</button>`}<button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Surveyor'}</button></div></div>`;
+    const recovery = expedition.localOperation?.recoveryRequirement;
+    const purpose = recovery
+      ? `Engineering needs suitable feedstock before it can restore ${recovery.systemId.replaceAll('-', ' ')}. The current cargo is ${Math.round(recovery.fabricationFeedstockShortfallKg)} kg short of a fabrication batch.`
+      : 'The field team can collect a documented geology sample for Surveyor science.';
+    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>${purpose} Surveyor will hold this voyage chapter while you fly, land, and return.</p><div>${localTransitActive ? '' : `<button id="expeditionSetSurveyCourse" class="expeditionChoice" type="button">Set course to ${activeContact?.designation || 'contact'} I</button>`}<button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Surveyor'}</button></div></div>`;
     if (localTransitActive) {
       localTransitRefreshTimer = window.setTimeout(() => {
         localTransitRefreshTimer = 0;
