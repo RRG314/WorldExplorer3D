@@ -21,13 +21,13 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=94">
+<link rel="stylesheet" href="styles/title-shell.css?v=95">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=115">
 <link rel="stylesheet" href="styles/block-builder.css?v=7">
 <link rel="stylesheet" href="styles/universe.css?v=7">
 <link rel="stylesheet" href="styles/fishing-game.css?v=5">
 <link rel="stylesheet" href="styles/interface-v4.css?v=19">
-<link rel="stylesheet" href="styles/start-hub.css?v=17">
+<link rel="stylesheet" href="styles/start-hub.css?v=18">
 <link rel="stylesheet" href="styles/discovery.css?v=14">
 <link rel="stylesheet" href="styles/tutorial.css?v=5">
 <link rel="stylesheet" href="styles/ar.css?v=1">
@@ -112,8 +112,16 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
 </div>
 <div class="title-location-actions">
-<button id="titleLiveGpsBtn" class="title-live-gps-btn" type="button">📍 Start Live GPS Explore</button>
-<button id="titleUseMyLocationBtn" class="title-use-location-btn" type="button">Use My Location</button>
+<div class="location-entry-pair" aria-label="Choose how to use your location">
+<button id="titleUseMyLocationBtn" class="title-use-location-btn location-entry-card" type="button">
+  <span class="location-entry-icon" aria-hidden="true">◎</span>
+  <span class="location-entry-copy"><strong data-location-entry-label>Current Location</strong><small>Explore here once</small></span>
+</button>
+<button id="titleLiveGpsBtn" class="title-live-gps-btn location-entry-card" type="button">
+  <span class="location-entry-icon" aria-hidden="true">⌖</span>
+  <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
+</button>
+</div>
 <div id="titleUseMyLocationStatus" class="title-location-status" aria-live="polite"></div>
 </div>
 <div id="customPanel">
@@ -554,11 +562,20 @@ Graphics changes apply to the current session.
 </div>
 </div>
 <div class="globe-selector-side">
+<div class="globe-location-entry-pair" aria-label="Choose how to use your location">
+  <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
+    <span class="location-entry-icon" aria-hidden="true">◎</span>
+    <span class="location-entry-copy"><strong data-location-entry-label>Current Location</strong><small>Explore here once</small></span>
+  </button>
+  <button id="globeSelectorLiveGpsBtn" class="globe-location-entry-card globe-selector-live-gps-btn" type="button">
+    <span class="location-entry-icon" aria-hidden="true">⌖</span>
+    <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
+  </button>
+</div>
 <div class="globe-mobile-search">
   <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
   <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
-<button id="globeSelectorLiveGpsBtn" class="globe-selector-action-btn globe-selector-live-gps-btn" type="button">📍 Start Live GPS Explore</button>
 <div class="globe-selector-stat">
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
@@ -574,7 +591,6 @@ Graphics changes apply to the current session.
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
-<button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
 <div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
 <div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 <div class="globe-selector-field-label">Manual Coordinates</div>

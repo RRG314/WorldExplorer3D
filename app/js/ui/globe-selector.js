@@ -233,7 +233,9 @@ function createGlobeSelector(options = {}) {
   function setLocateButtonBusy(isBusy) {
     if (!locateBtn) return;
     locateBtn.disabled = !!isBusy;
-    locateBtn.textContent = isBusy ? 'Locating…' : 'Use My Location';
+    const label = locateBtn.querySelector('[data-location-entry-label]');
+    if (label) label.textContent = isBusy ? 'Locating…' : 'Current Location';
+    else locateBtn.textContent = isBusy ? 'Locating…' : 'Current Location';
   }
 
   function setStartButtonBusy(isBusy) {

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=92";
+import { createGlobeSelector } from "./globe-selector.js?v=93";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
@@ -249,16 +249,29 @@ function initTitleScreenUi({
     titleUseMyLocationStatus.textContent = message || '';
     titleUseMyLocationStatus.style.color = color || '#6b7280';
   };
+  const setLocationEntryLabel = (button, label) => {
+    if (!button) return;
+    const labelElement = button.querySelector('[data-location-entry-label]');
+    if (labelElement) labelElement.textContent = label;
+    else button.textContent = label;
+  };
   const setUseMyLocationBusy = (isBusy) => {
     geolocationBusy = !!isBusy;
     if (titleUseMyLocationBtn) {
       titleUseMyLocationBtn.disabled = geolocationBusy;
-      titleUseMyLocationBtn.textContent = geolocationBusy ? 'Locating…' : 'Use My Location';
+      setLocationEntryLabel(titleUseMyLocationBtn, geolocationBusy ? 'Locating…' : 'Current Location');
     }
     if (globeSelector && typeof globeSelector.setLocateButtonBusy === 'function') globeSelector.setLocateButtonBusy(geolocationBusy);
   };
+  const selectCurrentLocationMode = () => {
+    document.querySelectorAll('.mode').forEach((element) => element.classList.remove('sel'));
+    document.querySelector('.mode[data-mode="free"]')?.classList.add('sel');
+    appCtx.gameMode = 'free';
+    setLaunchMode('earth');
+  };
   const runUseMyLocation = async (source = 'menu') => {
     if (geolocationBusy) return;
+    selectCurrentLocationMode();
     if (globeSelector && typeof globeSelector.isOpen === 'function' && !globeSelector.isOpen()) {
       setTitleLocationMode('custom');
       globeSelector.open();
@@ -313,7 +326,7 @@ function initTitleScreenUi({
       if (!button) return;
       button.disabled = liveGpsLaunchBusy;
       button.setAttribute('aria-busy', liveGpsLaunchBusy ? 'true' : 'false');
-      button.textContent = liveGpsLaunchBusy ? 'Starting Live GPS…' : '📍 Start Live GPS Explore';
+      setLocationEntryLabel(button, liveGpsLaunchBusy ? 'Starting…' : 'Live GPS');
     });
   };
   const runLiveGpsExplore = async () => {

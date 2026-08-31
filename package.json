@@ -41,6 +41,7 @@
     "verify:actors-vehicles": "node scripts/verification/actors-vehicles.mjs",
     "verify:live-gps": "node scripts/verification/live-gps.mjs",
     "verify:live-gps-authority": "node --test tests/live-gps-field-session.test.mjs",
+    "verify:location-entry-pair": "node scripts/verification/location-entry-pair-current.mjs",
     "verify:shore-fishing": "node scripts/verification/shore-fishing.mjs",
     "verify:fish-population": "node --test tests/fish-population-authority.test.mjs tests/shore-fishing-authority.test.mjs",
     "verify:fishing-loss-recovery": "node scripts/verification/fishing-loss-recovery.mjs",

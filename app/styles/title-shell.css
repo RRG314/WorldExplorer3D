@@ -56,11 +56,17 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .loc.custom:hover{border-color:rgba(217,119,6,0.9);background:rgba(254,243,199,0.95)}
 .loc.custom.sel{border-color:rgba(245,158,11,0.9);background:rgba(254,243,199,0.95);box-shadow:0 4px 12px rgba(245,158,11,0.2)}
 .loc.custom .loc-name{color:#92400e}
-.title-location-actions{max-width:300px;margin:10px auto 12px;display:flex;flex-direction:column;gap:6px}
-.title-use-location-btn{width:100%;background:#f59e0b;border:none;border-radius:10px;padding:11px 12px;color:#ffffff;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.title-location-actions{max-width:440px;margin:10px auto 12px;display:grid;gap:6px}
+.location-entry-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.location-entry-card{display:flex;align-items:center;justify-content:flex-start;gap:9px;min-width:0;text-align:left}
+.location-entry-icon{flex:0 0 auto;font:700 20px/1 'Poppins',sans-serif}
+.location-entry-copy{display:grid;gap:3px;min-width:0}
+.location-entry-copy strong{font:700 12px/1.1 'Poppins',sans-serif}
+.location-entry-copy small{font:500 9px/1.2 'Inter',sans-serif;opacity:.78;white-space:normal}
+.title-use-location-btn{width:100%;min-height:48px;background:#f59e0b;border:none;border-radius:10px;padding:9px 10px;color:#ffffff;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
 .title-use-location-btn:hover{background:#d97706;transform:translateY(-1px);box-shadow:0 4px 12px rgba(245,158,11,0.26)}
 .title-use-location-btn:disabled{opacity:0.7;cursor:default;transform:none;box-shadow:none}
-.title-live-gps-btn{width:100%;min-height:48px;border:1px solid #0e7490;border-radius:10px;padding:11px 12px;background:linear-gradient(135deg,#0e7490,#155e75);color:#fff;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s,background .2s}
+.title-live-gps-btn{width:100%;min-height:48px;border:1px solid #0e7490;border-radius:10px;padding:9px 10px;background:linear-gradient(135deg,#0e7490,#155e75);color:#fff;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s,background .2s}
 .title-live-gps-btn:hover{background:linear-gradient(135deg,#0891b2,#0e7490);transform:translateY(-1px);box-shadow:0 5px 14px rgba(14,116,144,.3)}
 .title-live-gps-btn:disabled{opacity:.68;cursor:wait;transform:none;box-shadow:none}
 .title-location-status{font-size:11px;min-height:14px;color:#6b7280}
@@ -131,7 +137,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #globeSelectorBackBtn{background:#e2e8f0;color:#334155}
 #globeSelectorStartBtn{background:#334e8c;color:#ffffff}
 #globeSelectorStartBtn:disabled{opacity:0.62;cursor:wait}
-.globe-selector-live-gps-btn{grid-column:1/-1;min-height:48px;border:1px solid #0e7490!important;background:linear-gradient(135deg,#0e7490,#155e75)!important;color:#fff!important;font-weight:700!important}
 .globe-selector-live-gps-btn:disabled{opacity:.68;cursor:wait}
 .globe-selector-stage{background:#dbeafe;border:2px solid #cbd5e1;border-radius:8px;position:relative;overflow:hidden;min-width:0;min-height:300px}
 #globeSelectorCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
