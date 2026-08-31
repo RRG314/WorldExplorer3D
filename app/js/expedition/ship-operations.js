@@ -1,4 +1,4 @@
-import { withExpeditionChanges } from './model.js?v=6';
+import { withExpeditionChanges } from './model.js?v=7';
 import { resolveSystemFailure } from './failure-authority.js?v=1';
 import { reinforceGenerationTraining, wakeReserveSpecialist } from './long-duration.js?v=1';
 
@@ -31,7 +31,7 @@ const STATION_VIEWS = Object.freeze({
   'cargo-status': Object.freeze({ title: 'Cargo Hold', systemId: 'hull', summary: 'Review carried food, water, feedstock, maintenance parts, and science cargo.' }),
   'resource-processor-status': Object.freeze({ title: 'Resource Processing', systemId: 'fabrication', summary: 'Inspect and process samples transferred from a supported surface operation.', actions: ['process-resource-sample'] }),
   'airlock-status': Object.freeze({ title: 'EVA Airlock', systemId: 'hull', summary: 'Inspect suits and airlock readiness. EVA requires a supported local destination operation.', actions: ['verify-eva'] }),
-  'craft-bay-status': Object.freeze({ title: 'Local-Craft Bay', systemId: 'hull', summary: 'Inspect the secured survey craft used for supported local landings and field operations.', actions: ['verify-local-craft'] })
+  'craft-bay-status': Object.freeze({ title: 'Pod Launch Bay', systemId: 'hull', summary: 'Choose a surface-capable destination, board the pod, and launch into manual local flight.', actions: ['verify-local-craft'] })
 });
 
 const ACTION_LABELS = Object.freeze({

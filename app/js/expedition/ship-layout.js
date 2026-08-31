@@ -62,7 +62,7 @@ const SHIP_DECKS = Object.freeze([
     { id: 'cargo-hold', label: 'Cargo Hold', side: 'starboard', minX: 2.7, maxX: 12.4, minZ: -6, maxZ: 7, systemId: 'hull' },
     { id: 'resource-processing', label: 'Resource Processing', side: 'port', minX: -12.4, maxX: -2.7, minZ: -21, maxZ: -8, systemId: 'fabrication' },
     { id: 'eva-airlock', label: 'EVA Airlock', side: 'starboard', minX: 2.7, maxX: 12.4, minZ: -21, maxZ: -8, systemId: 'hull' },
-    { id: 'local-craft-bay', label: 'Local-Craft Bay', side: 'full', minX: -12.4, maxX: 12.4, minZ: -35, maxZ: -23, systemId: 'hull' }
+    { id: 'local-craft-bay', label: 'Pod Launch Bay', side: 'full', minX: -12.4, maxX: 12.4, minZ: -35, maxZ: -23, systemId: 'hull' }
   ], [
     { id: 'engineering-status', roomId: 'engineering', label: 'Review ship systems', x: 0, z: 25.2 },
     { id: 'engineering-repair', roomId: 'engineering', label: 'Prepare repair', x: -7, z: 30 },
@@ -72,7 +72,7 @@ const SHIP_DECKS = Object.freeze([
     { id: 'cargo-status', roomId: 'cargo-hold', label: 'Review cargo manifest', x: 4.3, z: 0.5 },
     { id: 'resource-processor-status', roomId: 'resource-processing', label: 'Inspect resource processor', x: -4.3, z: -14.5 },
     { id: 'airlock-status', roomId: 'eva-airlock', label: 'Inspect EVA readiness', x: 4.3, z: -14.5 },
-    { id: 'craft-bay-status', roomId: 'local-craft-bay', label: 'Inspect local craft bay', x: 5.4, z: -29 }
+    { id: 'craft-bay-status', roomId: 'local-craft-bay', label: 'Board expedition pod', x: 5.4, z: -29 }
   ])
 ]);
 

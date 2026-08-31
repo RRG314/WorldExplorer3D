@@ -102,7 +102,7 @@ door art.
 | Cargo hold | mission stores and secured samples | inspect mass, move declared cargo, stage surface equipment, preserve transfer history |
 | Resource-processing lab | returned material and ISRU products | weigh and classify input, choose a supported process, consume power/time, store measured output |
 | EVA airlock | suits, pressure cycle, exterior work | inspect suit readiness, prepare an EVA, isolate a damaged zone |
-| Local-craft bay | lander, rover, probes, drones | configure a supported craft and hand off to existing planetary flight, rover, geology, or mining play |
+| Pod launch bay | expedition pod, launch rails, clamps, pressure door | choose an available survey world, launch into manual local flight, land through the existing planetary authority, and rendezvous after surface work |
 
 ## Ship map and navigation
 
@@ -129,7 +129,7 @@ walkable interior does not contain.
   action. The game does not replace movement with a wall of explanatory text.
 - Consoles, medical beds, lockers, exercise equipment, hydroponic trays,
   filters, pumps, fabricators, cargo containers, sample instruments, suits, and
-  local craft are visible objects. Only objects with a real action advertise an
+  the expedition pod is a visible object. Only objects with a real action advertise an
   interaction.
 - Room interactions open one consistent ship-work panel. It identifies the
   system, evidence, crew assigned, required input, time, expected result, risk,
@@ -188,6 +188,14 @@ Space and planetary authorities: local flight, landing, Character, rover,
 geology or mining, Backpack/sample custody, return, cargo transfer, processing,
 and voyage resumption. The detection itself awards nothing. Material type,
 accessibility, yield, equipment, energy cost, waste, and transfer are explicit.
+
+The Pod Launch Bay makes that journey physical. The Explorer boards the pod,
+leaves Surveyor for manual local flight, chooses when to begin the supported
+landing sequence, and arrives beside the same pod on the walkable surface. The
+surface is prepared behind the descent transition. Returning requires walking
+back to the ramp, boarding the pod, launching, and completing rendezvous with
+Surveyor. Course, landing, surface, field-work, cargo, and return state remain
+owned by their existing authorities; the pod journey only orders those stages.
 
 Catalog black holes are valid Expedition destinations. They use the observed
 catalog identity and existing black-hole visual/navigation authority. Gameplay

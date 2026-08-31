@@ -903,7 +903,7 @@ function addDeckDetails(group, deckId) {
     addEvaSuit(group, 8.2, -14.5, 0, 0xdfa14a, 'eva-two');
     addEvaSuit(group, 10.2, -14.5, 0, 0xdfa14a, 'eva-three');
     const shuttle = new THREE.Group();
-    shuttle.name = 'local-survey-craft';
+    shuttle.name = 'expedition-landing-pod';
     const hull = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.65, 7.2, 22), steel);
     hull.rotation.x = Math.PI / 2;
     shuttle.add(hull);
@@ -936,6 +936,17 @@ function addDeckDetails(group, deckId) {
     [-0.56, 0.56].forEach((side) => box(shuttle, { x: 0.12, y: 0.12, z: 2.1 }, { x: side, y: 0.55, z: -3.5 }, material(0xdfa14a, { emissive: 0xdfa14a, emissiveIntensity: 0.62 }), 'survey-craft-marker'));
     shuttle.position.set(0, 1.45, -29.5);
     group.add(shuttle);
+    [-3.35, 3.35].forEach((side) => {
+      box(group, { x: 0.34, y: 0.3, z: 9.4 }, { x: side, y: 0.18, z: -29.5 }, dark, 'pod-launch-rail');
+      [-33.2, -25.8].forEach((z) => box(group, { x: 0.62, y: 0.72, z: 0.5 }, { x: side, y: 0.38, z }, steel, 'pod-magnetic-clamp'));
+    });
+    box(group, { x: 9.6, y: 0.1, z: 0.4 }, { x: 0, y: 0.08, z: -34.15 }, material(0x64c9e4, { emissive: 0x2e9fc2, emissiveIntensity: 0.54, metalness: 0.08, roughness: 0.28 }), 'pod-launch-threshold');
+    [-4.8, 4.8].forEach((side) => box(group, { x: 0.28, y: 3.1, z: 0.3 }, { x: side, y: 1.55, z: -34.45 }, steel, 'pod-bay-door-frame'));
+    box(group, { x: 9.9, y: 0.28, z: 0.3 }, { x: 0, y: 3.02, z: -34.45 }, steel, 'pod-bay-door-header');
+    const podStatus = box(group, { x: 1.4, y: 0.7, z: 0.045 }, { x: 5.35, y: 1.55, z: -29 }, shipDisplayMaterial('pod-launch-ready', 0xdfa14a, 0.74), 'pod-launch-status-display');
+    podStatus.rotation.y = -Math.PI / 2;
+    podStatus.userData.shipAnimated = 'screen';
+    podStatus.userData.baseEmissiveIntensity = 0.7;
   }
 }
 
@@ -1248,7 +1259,7 @@ function buildSurveyorScene(expedition) {
     consoleDisplayCount: 0,
     equipmentGroupCount: 0
   };
-  const equipmentPrefixes = ['ship-console:', 'science-bench:', 'service-panel:', 'medical-bed:', 'crew-bunk:', 'life-support:', 'hydroponics:', 'power-cabinet:', 'thermal-assembly:', 'cargo-module:', 'eva-suit:'];
+  const equipmentPrefixes = ['ship-console:', 'science-bench:', 'service-panel:', 'medical-bed:', 'crew-bunk:', 'life-support:', 'hydroponics:', 'power-cabinet:', 'thermal-assembly:', 'cargo-module:', 'eva-suit:', 'expedition-landing-pod'];
   root.traverse((child) => {
     if (child.material?.map) visualContract.texturedSurfaceCount += 1;
     if (child.name?.startsWith('floor-access-panel:')) visualContract.floorAccessPanelCount += 1;

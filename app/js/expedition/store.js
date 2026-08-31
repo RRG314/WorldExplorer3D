@@ -1,4 +1,4 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=6';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=7';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
 import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
@@ -32,6 +32,7 @@ function parseRecord(value) {
     record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];
     record.activeLocalContactId ||= null;
     record.localOperation ||= null;
+    record.podJourney ||= null;
     record.scienceSamples = Array.isArray(record.scienceSamples) ? record.scienceSamples : [];
     record.resources = { processingResidueKg: 0, ...(record.resources || {}) };
     record.materialLedger = { installedRepairKg: 0, ...(record.materialLedger || {}) };

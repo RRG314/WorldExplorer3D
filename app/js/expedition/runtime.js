@@ -1,17 +1,18 @@
 import { DEFAULT_CREW, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=6';
+import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=7';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
-} from './simulation.js?v=5';
-import { createExpeditionStore } from './store.js?v=6';
-import { applyShipOperation, getShipStationView } from './ship-operations.js?v=2';
+} from './simulation.js?v=6';
+import { createExpeditionStore } from './store.js?v=7';
+import { applyShipOperation, getShipStationView } from './ship-operations.js?v=3';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
-import { registerExpeditionDiscovery } from './contact-authority.js?v=1';
+import { registerExpeditionDiscovery } from './contact-authority.js?v=2';
+import { createPodJourney, POD_PHASE, transitionPodJourney } from './pod-journey-authority.js?v=1';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -21,6 +22,59 @@ let sharedAuthority = null;
 let sharedAuthorityRoomCode = '';
 let sharedAuthorityLoading = false;
 let sharedState = null;
+let activePodJourney = null;
+let podCourseTimer = 0;
+
+function setPodJourney(next) {
+  activePodJourney = next || null;
+  if (activeExpedition && store) {
+    activeExpedition = withExpeditionChanges(activeExpedition, { podJourney: activePodJourney });
+    store.save(activeExpedition);
+  }
+  return activePodJourney;
+}
+
+function advancePodJourney(event, details = {}) {
+  if (!activePodJourney) return false;
+  const result = transitionPodJourney(activePodJourney, event, details);
+  if (!result.accepted) return false;
+  setPodJourney(result.journey);
+  return true;
+}
+
+function cancelPodCourseTimer() {
+  if (!podCourseTimer) return;
+  window.clearTimeout(podCourseTimer);
+  podCourseTimer = 0;
+}
+
+function schedulePodPlanetCourse(contact, startedAt = performance.now()) {
+  cancelPodCourseTimer();
+  const bodyId = `${contact.id}-i`;
+  const attempt = () => {
+    podCourseTimer = 0;
+    if (!activePodJourney || activePodJourney.bodyId !== bodyId || activePodJourney.phase === POD_PHASE.FAILED) return;
+    const runtime = activeContext?.universeRuntime;
+    if (!runtime?.transition && runtime?.current?.id === contact.id) {
+      const accepted = activeContext?.travelToUniverseDestination?.(bodyId, {
+        kind: 'expedition-pod-surface-approach',
+        routeLabel: `${contact.designation} I`
+      });
+      if (accepted) {
+        advancePodJourney('course_acquired');
+        activeContext?.showSpaceFlightMessage?.(`POD COURSE SET · ${contact.designation.toUpperCase()} I · MANUAL APPROACH`, '#6fe8ff');
+        return;
+      }
+    }
+    if (performance.now() - startedAt >= 20_000) {
+      advancePodJourney('fail', { reason: 'pod-course-acquisition-timeout' });
+      activeContext?.showSpaceFlightMessage?.('Pod course could not be acquired. Manual Space remains available.', '#f59e0b');
+      return;
+    }
+    podCourseTimer = window.setTimeout(attempt, 120);
+  };
+  podCourseTimer = window.setTimeout(attempt, 120);
+}
 
 function currentRoom() {
   return activeContext?.getCurrentMultiplayerRoom?.() || null;
@@ -148,7 +202,7 @@ function recoveryRequirement(expedition) {
   });
 }
 
-function beginLocalContact(contactId) {
+function beginLocalContact(contactId, options = {}) {
   const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === contactId);
   if (!contact || !['available', 'returned'].includes(contact.localOperationState)) return false;
   const destination = registerExpeditionContact(activeExpedition, contact);
@@ -172,15 +226,43 @@ function beginLocalContact(contactId) {
   store.save(activeExpedition);
   closeExpeditionPlanner();
   const accepted = activeContext?.travelToUniverseDestination?.(destination.id, {
-    kind: 'expedition-local-operation',
+    kind: options.viaPod ? 'expedition-pod-launch' : 'expedition-local-operation',
     routeLabel: contact.designation
   });
-  if (accepted) return true;
+  if (accepted) {
+    if (options.viaPod) schedulePodPlanetCourse(contact);
+    return true;
+  }
   activeExpedition = previous;
   store.save(activeExpedition);
   openExpeditionPlanner(activeContext);
   activeContext?.showSpaceFlightMessage?.('The local route is not available from the current flight state.', '#f59e0b');
   return false;
+}
+
+function launchPodToContact(contactId) {
+  const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === contactId);
+  if (!contact || !['available', 'returned'].includes(contact.localOperationState)) return false;
+  const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
+  setPodJourney(createPodJourney({
+    expeditionId: activeExpedition.id,
+    contactId: contact.id,
+    bodyId: `${contact.id}-i`,
+    returnFrameId
+  }));
+  advancePodJourney('launch');
+  closeShipStationPanel();
+  const exited = activeContext?.exitExpeditionShipInterior?.() === true;
+  if (!exited) {
+    advancePodJourney('fail', { reason: 'ship-interior-exit-failed' });
+    return false;
+  }
+  window.requestAnimationFrame(() => {
+    if (!beginLocalContact(contact.id, { viaPod: true })) {
+      advancePodJourney('fail', { reason: 'pod-launch-route-unavailable' });
+    }
+  });
+  return true;
 }
 
 function returnFromLocalContact() {
@@ -205,7 +287,10 @@ function returnFromLocalContact() {
     kind: 'expedition-route-return',
     routeLabel: 'Return to Surveyor'
   });
-  if (accepted) return true;
+  if (accepted) {
+    if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) advancePodJourney('recover');
+    return true;
+  }
   activeExpedition = previous;
   store.save(activeExpedition);
   openExpeditionPlanner(activeContext);
@@ -278,12 +363,16 @@ function leaveExpeditionSurface(bodyId) {
   const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
     frameId: contact.id,
     courseDestinationId: bodyId,
-    onReady: () => returnFromLocalContact()
+    onReady: () => {
+      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+      returnFromLocalContact();
+    }
   }) === true;
   if (!departureStarted) {
     activeContext?.showToast?.('Surveyor could not begin the return flight. The sample remains in your Backpack.');
     return false;
   }
+  markExpeditionPodSurfaceLaunch(bodyId);
   const consumed = inventory.consumeItem?.(catalogId, 1) ?? inventory.consume?.(catalogId, 1);
   if (!consumed) return false;
   activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
@@ -707,13 +796,61 @@ function renderShipStationPanel(interaction) {
   return true;
 }
 
+function podReadyContacts() {
+  return (activeExpedition?.routeContacts || []).filter((contact) => ['available', 'returned'].includes(contact.localOperationState));
+}
+
+function renderPodLaunchPanel(interaction) {
+  if (!interaction || !activeExpedition) return false;
+  let panel = document.getElementById('shipStationPanel');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.id = 'shipStationPanel';
+    document.body.appendChild(panel);
+  }
+  const contacts = podReadyContacts();
+  const blockedByTransit = Boolean(activeContext?.universeRuntime?.transition);
+  const targetMarkup = contacts.length
+    ? `<div class="ship-station-actions">${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
+    : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
+  panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
+    <header><div><span>SURVEYOR FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
+    <p>Board the expedition pod and launch from Surveyor. The pod enters the existing local Space world under manual control; approach and landing preserve the destination body's modeled environment, collision, and surface authorities.</p>
+    <div class="ship-station-metrics"><div><span>Pod</span><strong>Sealed · fueled · surface capable</strong></div><div><span>Flight</span><strong>Manual after bay departure</strong></div><div><span>Landing</span><strong>Descent masks surface preparation</strong></div><div><span>Return</span><strong>Board the same pod on the surface</strong></div></div>
+    ${targetMarkup}
+  </div>`;
+  panel.classList.add('show');
+  panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
+  panel.querySelectorAll('[data-pod-contact]').forEach((button) => button.addEventListener('click', () => {
+    if (!launchPodToContact(button.dataset.podContact)) activeContext?.showToast?.('That pod route is not available from the current ship position.');
+  }));
+  return true;
+}
+
+function markExpeditionPodDescent(bodyId) {
+  if (!activePodJourney || String(bodyId || '').toLowerCase() !== activePodJourney.bodyId.toLowerCase()) return false;
+  return activePodJourney.phase === POD_PHASE.LOCAL_FLIGHT ? advancePodJourney('begin_descent') : activePodJourney.phase === POD_PHASE.DESCENT;
+}
+
+function markExpeditionPodLanded(bodyId) {
+  if (!activePodJourney || String(bodyId || '').toLowerCase() !== activePodJourney.bodyId.toLowerCase()) return false;
+  if (activePodJourney.phase === POD_PHASE.LOCAL_FLIGHT) advancePodJourney('begin_descent');
+  return activePodJourney.phase === POD_PHASE.DESCENT ? advancePodJourney('surface_ready') : activePodJourney.phase === POD_PHASE.SURFACE;
+}
+
+function markExpeditionPodSurfaceLaunch(bodyId) {
+  if (!activePodJourney || String(bodyId || '').toLowerCase() !== activePodJourney.bodyId.toLowerCase()) return false;
+  return activePodJourney.phase === POD_PHASE.SURFACE ? advancePodJourney('launch') : activePodJourney.phase === POD_PHASE.SURFACE_LAUNCH;
+}
+
 async function handleShipInteraction(interaction) {
+  if (interaction?.id === 'craft-bay-status') return renderPodLaunchPanel(interaction);
   return renderShipStationPanel(interaction);
 }
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=8');
+  const ship = await import('./ship-interior.js?v=9');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,
@@ -731,10 +868,16 @@ function openExpeditionPlanner(appContext) {
   if (activeContext) Object.assign(activeContext, {
     collectExpeditionGeologySample,
     getInterstellarExpeditionSnapshot: getExpeditionSnapshot,
-    leaveExpeditionSurface
+    leaveExpeditionSurface,
+    markExpeditionPodDescent,
+    markExpeditionPodLanded,
+    markExpeditionPodSurfaceLaunch
   });
   store ||= createExpeditionStore();
   activeExpedition = store.load();
+  activePodJourney = activeExpedition?.podJourney?.type === 'ExpeditionPodJourney'
+    ? Object.freeze({ ...activeExpedition.podJourney })
+    : null;
   syncExpeditionContacts(activeExpedition);
   void ensureSharedAuthority();
   ensureStylesheet();
@@ -762,7 +905,11 @@ function closeExpeditionPlanner() {
 }
 
 function getExpeditionSnapshot() {
-  return activeExpedition ? JSON.parse(JSON.stringify(activeExpedition)) : null;
+  if (!activeExpedition) return null;
+  return {
+    ...JSON.parse(JSON.stringify(activeExpedition)),
+    podJourney: activePodJourney ? { ...activePodJourney } : null
+  };
 }
 
 export { closeExpeditionPlanner, getExpeditionSnapshot, openExpeditionPlanner };

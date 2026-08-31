@@ -116,6 +116,7 @@ function createExpeditionPlan({
     routeContacts: Object.freeze([]),
     activeLocalContactId: null,
     localOperation: null,
+    podJourney: null,
     scienceSamples: Object.freeze([]),
     materialLedger: Object.freeze({ installedRepairKg: 0 }),
     outposts: Object.freeze([]),

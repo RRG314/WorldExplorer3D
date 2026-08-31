@@ -172,6 +172,8 @@ const runtimeWorldPacks = new Map();
 let activePack = null;
 let transitionId = 0;
 let priorWorldPresentation = null;
+let activeReturnPod = null;
+let unregisterReturnPodInteraction = null;
 
 function deterministicNoise(x, z, seed) {
   const a = Math.sin((x + seed * 13) * 0.0031 + Math.cos(z * 0.0023));
@@ -443,6 +445,175 @@ function addVisualSurfaceHorizon(pack, world) {
   });
 }
 
+function addExpeditionReturnPod(pack, world) {
+  if (pack.returnMode !== 'expedition-contact') return null;
+  if (world.returnPod) {
+    world.returnPod.visible = true;
+    if (world.returnPod.parent !== appCtx.scene) appCtx.scene.add(world.returnPod);
+    return world.returnPod;
+  }
+  const group = new THREE.Group();
+  group.name = `expedition-return-pod:${pack.bodyId}`;
+  const shell = new THREE.MeshStandardMaterial({ color: 0x9fb2be, metalness: 0.52, roughness: 0.34 });
+  const shellPanel = new THREE.MeshStandardMaterial({ color: 0x607986, metalness: 0.62, roughness: 0.3 });
+  const frame = new THREE.MeshStandardMaterial({ color: 0x1b2c36, metalness: 0.72, roughness: 0.27 });
+  const heatShield = new THREE.MeshStandardMaterial({ color: 0x282d30, metalness: 0.18, roughness: 0.78 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x3b7c94, emissive: 0x123e51, emissiveIntensity: 0.48, metalness: 0.12, roughness: 0.16, transparent: true, opacity: 0.82 });
+  const accent = new THREE.MeshStandardMaterial({ color: 0x6fe8ff, emissive: 0x2fa9c8, emissiveIntensity: 0.82, metalness: 0.08, roughness: 0.25 });
+  const cabin = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.75, 3.8, 32), shell);
+  cabin.position.y = 2.45;
+  cabin.name = 'return-pod-pressure-cabin';
+  cabin.castShadow = true;
+  group.add(cabin);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.45, 32), shellPanel);
+  roof.position.y = 5.05;
+  roof.name = 'return-pod-aeroshell';
+  roof.castShadow = true;
+  group.add(roof);
+  [1.12, 3.72, 4.52].forEach((height, index) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(index === 2 ? 1.34 : 1.57, index === 1 ? 0.09 : 0.12, 8, 32), frame);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = height;
+    ring.name = `return-pod-structural-ring-${index + 1}`;
+    group.add(ring);
+  });
+  const shield = new THREE.Mesh(new THREE.CylinderGeometry(1.78, 1.62, 0.32, 32), heatShield);
+  shield.position.y = 0.52;
+  shield.name = 'return-pod-heat-shield';
+  group.add(shield);
+  const windowMesh = new THREE.Mesh(new THREE.SphereGeometry(1.15, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.48), glass);
+  windowMesh.scale.set(1, 0.72, 0.42);
+  windowMesh.rotation.x = Math.PI / 2;
+  windowMesh.position.set(0, 3.55, -1.55);
+  windowMesh.name = 'return-pod-forward-window';
+  group.add(windowMesh);
+  [-1, 1].forEach((side) => {
+    const sideWindow = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.76, 0.08), glass);
+    sideWindow.position.set(side * 1.49, 3.28, -0.34);
+    sideWindow.rotation.y = side * Math.PI / 2;
+    sideWindow.name = `return-pod-side-window-${side < 0 ? 'port' : 'starboard'}`;
+    group.add(sideWindow);
+    const servicePanel = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.14, 0.09), shellPanel);
+    servicePanel.position.set(side * 1.62, 2.18, 0.34);
+    servicePanel.rotation.y = side * Math.PI / 2;
+    servicePanel.name = `return-pod-service-panel-${side < 0 ? 'port' : 'starboard'}`;
+    group.add(servicePanel);
+    const rcsHousing = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.38, 0.76), frame);
+    rcsHousing.position.set(side * 1.72, 4.08, 0.22);
+    rcsHousing.name = `return-pod-rcs-${side < 0 ? 'port' : 'starboard'}`;
+    group.add(rcsHousing);
+    [-0.16, 0.16].forEach((zOffset) => {
+      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.14, 0.28, 12), heatShield);
+      nozzle.rotation.z = Math.PI / 2;
+      nozzle.position.set(side * 2.02, 4.08, 0.22 + zOffset);
+      group.add(nozzle);
+    });
+  });
+  [-1.25, 1.25].forEach((side) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.3, 0.18), frame);
+    leg.position.set(side, 0.75, 0.72);
+    leg.rotation.z = side < 0 ? -0.22 : 0.22;
+    group.add(leg);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.16, 18), frame);
+    pad.position.set(side * 1.15, -0.32, 0.72);
+    group.add(pad);
+  });
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.14, 3.1), frame);
+  ramp.rotation.x = -0.28;
+  ramp.position.set(0, 0.58, -2.45);
+  ramp.name = 'return-pod-boarding-ramp';
+  group.add(ramp);
+  const hatch = new THREE.Mesh(new THREE.BoxGeometry(1.18, 1.75, 0.12), frame);
+  hatch.position.set(0, 2.05, -1.73);
+  hatch.name = 'return-pod-hatch';
+  group.add(hatch);
+  const hatchInset = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, 0.08, 24), shellPanel);
+  hatchInset.rotation.x = Math.PI / 2;
+  hatchInset.position.set(0, 2.18, -1.81);
+  hatchInset.name = 'return-pod-hatch-inset';
+  group.add(hatchInset);
+  const hatchStatus = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.13, 0.05), accent);
+  hatchStatus.position.set(0, 1.39, -1.82);
+  hatchStatus.name = 'return-pod-hatch-status';
+  group.add(hatchStatus);
+  for (let index = 0; index < 6; index += 1) {
+    const vent = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.045), heatShield);
+    vent.position.set(0, 2.15 + index * 0.14, 1.69);
+    vent.name = `return-pod-aft-vent-${index + 1}`;
+    group.add(vent);
+  }
+  [-0.42, 0, 0.42].forEach((offset) => {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 2.55), accent);
+    strip.position.set(offset, 0.74, -2.48);
+    strip.rotation.x = -0.28;
+    group.add(strip);
+  });
+  const beacon = new THREE.PointLight(0x6fe8ff, 1.35, 14, 2);
+  beacon.position.set(0, 4.8, 0);
+  group.add(beacon);
+  const beaconLens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.18, 18), accent);
+  beaconLens.position.set(0, 5.86, 0);
+  group.add(beaconLens);
+  const offsetX = 9;
+  const offsetZ = 7;
+  const x = Number(pack.spawn.x) + offsetX;
+  const z = Number(pack.spawn.z) + offsetZ;
+  const y = Number(pack.manifest.renderPlacement.y) + sampleModeledRelief(pack, x, z) + 0.36;
+  group.position.set(x, y, z);
+  const toSpawnX = Number(pack.spawn.x) - x;
+  const toSpawnZ = Number(pack.spawn.z) - z;
+  group.rotation.y = Math.atan2(-toSpawnX, -toSpawnZ);
+  group.scale.setScalar(0.9);
+  group.userData.bodyId = pack.bodyId;
+  group.userData.boardingRadius = 5.5;
+  group.userData.authority = 'expedition-pod-journey';
+  world.returnPod = group;
+  world.objects.push(group);
+  appCtx.scene.add(group);
+  return group;
+}
+
+function returnPodDistance() {
+  if (!activeReturnPod) return Infinity;
+  const walker = appCtx.Walk?.state?.mode === 'walk' ? appCtx.Walk.state.walker : null;
+  const actor = walker || appCtx.car;
+  if (!actor) return Infinity;
+  return Math.hypot(Number(actor.x || 0) - activeReturnPod.position.x, Number(actor.z || 0) - activeReturnPod.position.z);
+}
+
+function startReturnPodLaunch() {
+  if (!activePack || !activeReturnPod || returnPodDistance() > Number(activeReturnPod.userData.boardingRadius || 5.5)) {
+    appCtx.showToast?.('Approach the pod ramp to board.');
+    return false;
+  }
+  if (activePack.returnMode === 'expedition-contact') return appCtx.leaveExpeditionSurface?.(activePack.bodyId) === true;
+  if (activePack.returnMode === 'space-flight') {
+    return appCtx.startSpaceFlightFromExpeditionSurface?.({ frameId: activePack.parentSystemId, courseDestinationId: activePack.bodyId }) === true;
+  }
+  return false;
+}
+
+function ensureReturnPodInteraction() {
+  if (unregisterReturnPodInteraction || typeof appCtx.registerContextInteraction !== 'function') return;
+  unregisterReturnPodInteraction = appCtx.registerContextInteraction({
+    id: 'expedition-return-pod',
+    priority: 96,
+    evaluate() {
+      const distance = returnPodDistance();
+      if (!activeReturnPod || !Number.isFinite(distance) || distance > Number(activeReturnPod.userData.boardingRadius || 5.5)) return null;
+      return {
+        available: true,
+        action: 'board-return-pod',
+        label: 'Board pod for Surveyor',
+        detail: 'Surface launch and ship rendezvous',
+        distance,
+        data: { bodyId: activePack?.bodyId || null }
+      };
+    },
+    perform: startReturnPodLaunch
+  });
+}
+
 async function createSolidWorld(pack) {
   const cached = worldCache.get(pack.bodyId);
   const authority = ensurePlanetarySurfaceAuthority(appCtx);
@@ -456,6 +627,7 @@ async function createSolidWorld(pack) {
       object.visible = true;
       if (object.parent !== appCtx.scene) appCtx.scene.add(object);
     });
+    addExpeditionReturnPod(pack, cached);
     return cached;
   }
   let surface = null;
@@ -508,6 +680,7 @@ async function createSolidWorld(pack) {
   addVisualSurfaceHorizon(pack, world);
   addGeneratedSurfaceDetail(pack, world);
   await addParentBodyView(pack, world);
+  addExpeditionReturnPod(pack, world);
   return world;
 }
 
@@ -606,7 +779,9 @@ function showReturnButton(pack) {
     button.style.cssText = 'position:fixed;top:82px;right:20px;z-index:1000;padding:10px 20px;font-size:16px;background:#315d9d;color:#fff;border:1px solid #8ab4ff;border-radius:5px;cursor:pointer;';
     button.addEventListener('click', () => {
       if (activePack?.returnMode === 'expedition-contact') {
-        appCtx.leaveExpeditionSurface?.(activePack.bodyId);
+        const distance = returnPodDistance();
+        if (distance <= Number(activeReturnPod?.userData?.boardingRadius || 5.5)) startReturnPodLaunch();
+        else appCtx.showToast?.(`Return pod is ${Math.round(distance)} m away. Approach its ramp and use Interact.`);
         return;
       }
       if (activePack?.returnMode === 'space-flight') {
@@ -621,7 +796,7 @@ function showReturnButton(pack) {
     document.body.appendChild(button);
   }
   button.textContent = pack.returnMode === 'expedition-contact'
-    ? `Return to Surveyor from ${pack.bodyName}`
+    ? `Return pod · approach to board`
     : `Return to Space from ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
   const compact = globalThis.innerWidth <= 600;
   const panelBottom = document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
@@ -657,6 +832,7 @@ function hideActiveWorld() {
   document.getElementById('solidWorldPanel')?.style.setProperty('display', 'none');
   document.getElementById('solidWorldReturnBtn')?.style.setProperty('display', 'none');
   appCtx.activePlanetaryBodyId = null;
+  activeReturnPod = null;
   appCtx.activeSolidWorldSurface = null;
   appCtx.activePlanetaryEnvironment = null;
   appCtx.planetaryTravelCapabilities = null;
@@ -707,6 +883,8 @@ async function arriveAtSolidWorld(bodyInput) {
   const world = await createSolidWorld(pack);
   if (requestId !== transitionId) return false;
   activePack = pack;
+  activeReturnPod = world.returnPod || null;
+  ensureReturnPodInteraction();
   appCtx.activePlanetaryBodyId = bodyId;
   appCtx.activeSolidWorldSurface = world.surface;
   const environment = pack.environment || samplePhysicalEnvironment(bodyId, { heightM: 0, timestampS: Date.now() / 1000 });
@@ -753,6 +931,7 @@ async function arriveAtSolidWorld(bodyInput) {
   showWorldPanel(pack, environment);
   showReturnButton(pack);
   setSolidWorldInterfaceActive(true);
+  appCtx.markExpeditionPodLanded?.(bodyId);
   appCtx.syncTravelModeButtons?.();
   appCtx.updateControlsModeUI?.();
   return true;
