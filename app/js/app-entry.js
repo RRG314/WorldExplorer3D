@@ -439,7 +439,9 @@ function registerLazySubsystemEntrypoints() {
         appCtx.getAnalyticsSessionSnapshot = () => ({
             enabled: false,
             ready: false,
+            disabledReason: 'not_started',
             measurementId: '',
+            consent: 'unset',
             currentUserId: '',
             trackingStarted: false,
             runtimeAgeSec: 0,
@@ -447,6 +449,10 @@ function registerLazySubsystemEntrypoints() {
             worldSessionAgeSec: 0,
             worldSessionCount: 0,
             flushCount: 0,
+            productEventCount: 0,
+            eventLoggedCount: 0,
+            recentEvents: [],
+            deliveryState: 'warmup_pending',
             currentMode: '',
             currentEnvironment: '',
             lastLocationKey: '',
@@ -454,6 +460,7 @@ function registerLazySubsystemEntrypoints() {
             errors: []
         });
     }
+    globalThis.getWorldExplorerAnalyticsSnapshot = () => appCtx.getAnalyticsSessionSnapshot();
     appCtx.openActivityCreator = async (options = {}) => {
         const mod = await ensureActivityCreatorModule();
         return typeof mod.openActivityCreator === 'function' ? mod.openActivityCreator(options) : false;

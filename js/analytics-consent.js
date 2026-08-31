@@ -3,12 +3,12 @@ const CONSENT_GRANTED = 'granted';
 const CONSENT_DENIED = 'denied';
 
 function readAnalyticsConsent() {
+  const memoryValue = globalThis.__WE3D_ANALYTICS_CONSENT__;
   try {
     const value = localStorage.getItem(ANALYTICS_CONSENT_KEY);
-    return value === CONSENT_GRANTED || value === CONSENT_DENIED ? value : 'unset';
-  } catch (_) {
-    return 'unset';
-  }
+    if (value === CONSENT_GRANTED || value === CONSENT_DENIED) return value;
+  } catch (_) {}
+  return memoryValue === CONSENT_GRANTED || memoryValue === CONSENT_DENIED ? memoryValue : 'unset';
 }
 
 function writeAnalyticsConsent(value) {

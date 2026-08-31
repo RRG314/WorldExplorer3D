@@ -4,7 +4,7 @@ import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=93";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
@@ -650,10 +650,18 @@ function initTitleScreenUi({
       await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
       appCtx.hideLoad?.();
       appCtx.loadingScreenMode = 'earth';
+      markFirstPlayReady({ environment: 'ocean', launchMode: 'ocean', source: 'title_launch' });
       return true;
     }
 
-    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return true;
+    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) {
+      markFirstPlayReady({
+        environment: requestedLaunchMode === 'space' ? 'space' : requestedLaunchMode,
+        launchMode: requestedLaunchMode,
+        source: 'title_launch'
+      });
+      return true;
+    }
 
     await ensureEarthWorldRuntime();
     appCtx.ensureEnginePbrTextures?.();
