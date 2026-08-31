@@ -229,6 +229,16 @@ existing ship room and station; the ship interior owns its warning beacon,
 route guidance, crew response, and physical interaction. The planner can report
 the incident but cannot resolve it outside the ship.
 
+At the affected station, a selected response starts one three-step physical
+procedure. `ship-interior.js` publishes only the current procedure node through
+the existing interior interaction collection; `interiors/runtime.js` routes the
+normal E/touch action back to the ship. The interior owns the console geometry,
+step lighting, prompt, and movement feedback. It does not alter mission state.
+After the third step, `expedition/runtime.js` asks the existing Voyage Director
+to apply crew, resource, system, delayed-consequence, and outcome changes to the
+same Expedition record. Failed persistence leaves the final verification step
+available instead of presenting an uncommitted repair as complete.
+
 Stable route contacts are promoted through `contact-authority.js` into the
 existing universe catalog and planetary surface authority. `archive.js` keeps
 discovered contacts and their field stations after the active mission ends.

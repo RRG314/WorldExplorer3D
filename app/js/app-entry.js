@@ -31,7 +31,7 @@ import './travel-mode.js?v=23';
 import { initBoatMode } from './boat-mode.js?v=57';
 import './sky.js?v=88';
 import './weather.js?v=10';
-import './runtime/on-demand-modes.js?v=30';
+import './runtime/on-demand-modes.js?v=31';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=172';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
@@ -179,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=19').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=20').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

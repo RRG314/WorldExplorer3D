@@ -15,6 +15,22 @@ import { shipAlertState } from './failure-authority.js?v=1';
 
 let activeSession = null;
 
+const INCIDENT_PROCEDURE_STEPS = Object.freeze({
+  navigation: Object.freeze(['Inspect the flight solution', 'Align the reference frame', 'Confirm the safe course']),
+  engineering: Object.freeze(['Isolate the affected system', 'Service the damaged assembly', 'Verify stable readings']),
+  crew: Object.freeze(['Assess the crew member', 'Prepare the required support', 'Confirm recovery status']),
+  science: Object.freeze(['Calibrate the instrument', 'Capture the observation', 'Validate the science record']),
+  hazard: Object.freeze(['Secure the affected zone', 'Stabilize the ship system', 'Verify the compartment is safe']),
+  discovery: Object.freeze(['Resolve the contact', 'Record the sensor pass', 'Confirm the field report']),
+  social: Object.freeze(['Review the incoming signal', 'Prepare the ship response', 'Confirm the transmission']),
+  default: Object.freeze(['Inspect the affected station', 'Complete the ship procedure', 'Verify the result'])
+});
+
+function procedureStepsFor(event = {}) {
+  const steps = INCIDENT_PROCEDURE_STEPS[event.kind] || INCIDENT_PROCEDURE_STEPS.default;
+  return Object.freeze(steps.map((label, index) => Object.freeze({ id: `step-${index + 1}`, label })));
+}
+
 function material(color, options = {}) {
   return new THREE.MeshStandardMaterial({
     color,
@@ -62,6 +78,44 @@ function createShipDisplayTexture(label, accentColor) {
   context.fillStyle = 'rgba(220,245,255,.7)';
   context.font = '16px monospace';
   context.fillText('SURVEYOR // ACTIVE', 302, 220);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createIncidentStepTexture(index, label, accentColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = 192;
+  const context = canvas.getContext('2d');
+  const accent = hexColor(accentColor);
+  context.fillStyle = '#06121d';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = 'rgba(178,220,235,.16)';
+  context.lineWidth = 2;
+  for (let x = 0; x <= canvas.width; x += 48) {
+    context.beginPath(); context.moveTo(x, 0); context.lineTo(x, canvas.height); context.stroke();
+  }
+  for (let y = 0; y <= canvas.height; y += 32) {
+    context.beginPath(); context.moveTo(0, y); context.lineTo(canvas.width, y); context.stroke();
+  }
+  context.fillStyle = accent;
+  context.fillRect(0, 0, 12, canvas.height);
+  context.font = '700 64px Arial, sans-serif';
+  context.fillText(String(index + 1).padStart(2, '0'), 28, 76);
+  context.fillStyle = '#e8f7ff';
+  context.font = '700 25px Arial, sans-serif';
+  const words = String(label || 'SHIP PROCEDURE').toUpperCase().split(/\s+/);
+  const first = words.slice(0, Math.ceil(words.length * 0.5)).join(' ');
+  const second = words.slice(Math.ceil(words.length * 0.5)).join(' ');
+  context.fillText(first.slice(0, 23), 30, 122);
+  if (second) context.fillText(second.slice(0, 23), 30, 154);
+  context.fillStyle = accent;
+  context.fillRect(284, 42, 66, 8);
+  context.fillRect(284, 66, 44, 8);
+  context.fillRect(284, 90, 58, 8);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
@@ -1313,8 +1367,14 @@ function ensureShipHud(expedition, crewSummary = null) {
 function disposePresentation(group) {
   group?.traverse?.((child) => {
     child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach((entry) => entry?.dispose?.());
-    else child.material?.dispose?.();
+    const disposeSurface = (surface) => {
+      surface?.map?.dispose?.();
+      surface?.emissiveMap?.dispose?.();
+      surface?.bumpMap?.dispose?.();
+      surface?.dispose?.();
+    };
+    if (Array.isArray(child.material)) child.material.forEach(disposeSurface);
+    else disposeSurface(child.material);
   });
   group?.parent?.remove?.(group);
 }
@@ -1323,7 +1383,83 @@ function clearIncidentPresentation(session) {
   if (!session) return;
   if (session.incidentPresentation?.group) disposePresentation(session.incidentPresentation.group);
   session.incidentPresentation = null;
+  session.incidentProcedure = null;
   document.getElementById('shipObjectiveCue')?.classList.remove('show');
+}
+
+function refreshIncidentProcedureVisuals(session) {
+  const presentation = session?.incidentPresentation;
+  if (!presentation) return false;
+  const procedure = session.incidentProcedure;
+  presentation.nodes.forEach((node, index) => {
+    const complete = procedure && index < procedure.stepIndex;
+    const active = procedure && index === procedure.stepIndex && !procedure.completing;
+    const color = complete ? 0x6ee7a8 : active ? 0x6fe8ff : 0xff9f43;
+    node.indicator.material.color.setHex(color);
+    node.indicator.material.emissive.setHex(color);
+    node.indicator.material.emissiveIntensity = active ? 2.4 : complete ? 1.05 : 0.42;
+    node.root.scale.setScalar(active ? 1.12 : 1);
+  });
+  const cue = document.getElementById('shipObjectiveCue');
+  if (!cue || !procedure) return true;
+  const current = procedure.steps[Math.min(procedure.stepIndex, procedure.steps.length - 1)];
+  cue.innerHTML = `<span>SHIP RESPONSE · ${Math.min(procedure.stepIndex + 1, procedure.steps.length)} OF ${procedure.steps.length}</span><strong>${procedure.completing ? 'Crew verification in progress' : current.label}</strong><small>${presentation.deckLabel} · ${presentation.roomLabel}</small><button type="button">Show route</button>`;
+  cue.querySelector('button')?.addEventListener('click', () => {
+    session.mapDeckId = presentation.deckId;
+    toggleShipMap(true);
+  });
+  return true;
+}
+
+function startIncidentProcedure(details = {}) {
+  const session = activeSession;
+  const pending = session?.expedition?.pendingEvent;
+  if (!session || !pending || pending.id !== details.eventId || !session.incidentPresentation) return false;
+  if (session.incidentProcedure?.eventId === pending.id) return true;
+  session.incidentProcedure = {
+    eventId: pending.id,
+    choiceId: String(details.choiceId || ''),
+    choiceLabel: String(details.choiceLabel || 'Complete ship response'),
+    steps: procedureStepsFor(pending),
+    stepIndex: 0,
+    completing: false,
+    complete: typeof details.complete === 'function' ? details.complete : null
+  };
+  document.getElementById('shipStationPanel')?.classList.remove('show');
+  refreshIncidentProcedureVisuals(session);
+  updateActiveDeckContract(session);
+  appCtx.showToast?.(`Begin ship response: ${session.incidentProcedure.steps[0].label}.`);
+  playShipTone('operation');
+  return true;
+}
+
+async function advanceIncidentProcedure(interaction) {
+  const session = activeSession;
+  const procedure = session?.incidentProcedure;
+  const presentation = session?.incidentPresentation;
+  if (!procedure || !presentation || procedure.completing) return false;
+  const expected = `incident-step:${procedure.eventId}:${procedure.stepIndex}`;
+  if (interaction?.id !== expected) return false;
+  procedure.stepIndex += 1;
+  playShipTone('operation');
+  if (procedure.stepIndex < procedure.steps.length) {
+    refreshIncidentProcedureVisuals(session);
+    updateActiveDeckContract(session);
+    appCtx.showToast?.(procedure.steps[procedure.stepIndex].label);
+    return true;
+  }
+  procedure.completing = true;
+  refreshIncidentProcedureVisuals(session);
+  updateActiveDeckContract(session);
+  const completed = await procedure.complete?.();
+  if (completed === false && activeSession === session && session.expedition?.pendingEvent?.id === procedure.eventId) {
+    procedure.completing = false;
+    procedure.stepIndex = Math.max(0, procedure.steps.length - 1);
+    refreshIncidentProcedureVisuals(session);
+    updateActiveDeckContract(session);
+    return false;
+  }
+  return true;
 }
 
 function syncIncidentPresentation(session) {
@@ -1375,11 +1511,53 @@ function syncIncidentPresentation(session) {
     return particle;
   });
   particleSurface.dispose();
+  const procedureSteps = procedureStepsFor(pending);
+  const nodeOffsets = Object.freeze([Object.freeze({ x: 0.72, z: -0.7 }), Object.freeze({ x: 0, z: -0.9 }), Object.freeze({ x: -0.72, z: -0.7 })]);
+  box(group, { x: 2.35, y: 0.18, z: 0.58 }, { x: 0, y: 0.12, z: -0.78 }, material(0x263947, { metalness: 0.72, roughness: 0.23 }), 'incident-service-console-base');
+  box(group, { x: 2.12, y: 0.07, z: 0.12 }, { x: 0, y: 0.26, z: -0.58 }, material(palette.primary, { emissive: palette.primary, emissiveIntensity: 0.62, metalness: 0.2, roughness: 0.22 }), 'incident-service-console-light-rail');
+  const conduit = cylinder(group, 0.055, 0.055, 1.7, { x: 0, y: 0.34, z: -0.98 }, material(0x8596a2, { metalness: 0.82, roughness: 0.18 }), 'incident-service-console-conduit', { x: 0, y: 0, z: Math.PI / 2 }, 12);
+  conduit.castShadow = true;
+  const nodes = procedureSteps.map((step, index) => {
+    const offset = nodeOffsets[index];
+    const root = new THREE.Group();
+    root.name = `incident-action-node:${index}`;
+    root.position.set(offset.x, 0, offset.z);
+    box(root, { x: 0.58, y: 0.72, z: 0.46 }, { x: 0, y: 0.54, z: 0 }, material(0x4f626f, { metalness: 0.68, roughness: 0.24 }), 'incident-component-housing');
+    box(root, { x: 0.51, y: 0.64, z: 0.025 }, { x: 0, y: 0.54, z: 0.243 }, material(0x263641, { metalness: 0.5, roughness: 0.3 }), 'incident-component-rear-panel');
+    [-0.25, 0.25].forEach((side) => box(root, { x: 0.055, y: 0.78, z: 0.51 }, { x: side, y: 0.54, z: 0 }, material(0x82939e, { metalness: 0.82, roughness: 0.18 }), 'incident-component-edge-rail'));
+    const screenTexture = createIncidentStepTexture(index, step.label, palette.primary);
+    const screenSurface = material(0xffffff, { map: screenTexture, emissiveMap: screenTexture, emissive: 0xffffff, emissiveIntensity: 0.76, metalness: 0.04, roughness: 0.18 });
+    const screen = box(root, { x: 0.43, y: 0.25, z: 0.028 }, { x: 0, y: 0.66, z: -0.246 }, screenSurface, 'incident-component-screen');
+    const indicator = box(root, { x: 0.35, y: 0.075, z: 0.035 }, { x: 0, y: 0.33, z: -0.25 }, material(palette.primary, { emissive: palette.primary, emissiveIntensity: 0.42, metalness: 0.08, roughness: 0.18 }), 'incident-component-indicator');
+    [-0.14, 0, 0.14].forEach((side, controlIndex) => cylinder(root, 0.038, 0.038, 0.045, { x: side, y: 0.22, z: -0.255 }, material(controlIndex === index ? palette.primary : 0xb5c4cc, { emissive: controlIndex === index ? palette.primary : 0x000000, emissiveIntensity: 0.56, metalness: 0.45, roughness: 0.22 }), 'incident-component-control', { x: Math.PI / 2, y: 0, z: 0 }, 12));
+    const dial = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.018, 8, 20), material(0xb9c9d1, { metalness: 0.8, roughness: 0.16 }));
+    dial.name = 'incident-component-dial';
+    dial.position.set(0, 0.43, -0.26);
+    root.add(dial);
+    screen.userData.shipAnimated = 'screen';
+    screen.userData.baseEmissiveIntensity = 0.7;
+    group.add(root);
+    return { root, indicator, offset, step };
+  });
   const warningLight = new THREE.PointLight(palette.primary, 1.4, 8, 2);
   warningLight.position.y = 1.45;
   group.add(warningLight);
   deckState.group.add(group);
-  session.incidentPresentation = { eventId: pending.id, roomId: room.id, deckId: room.deckId, group, ring, column, particles, warningLight };
+  session.incidentPresentation = {
+    eventId: pending.id,
+    roomId: room.id,
+    roomLabel: room.label,
+    deckId: room.deckId,
+    deckLabel: getShipDeck(room.deckId)?.label || room.deckId,
+    group,
+    ring,
+    column,
+    particles,
+    nodes,
+    warningLight,
+    x,
+    z
+  };
   session.selectedRoomId = room.id;
   session.mapDeckId = room.deckId;
   let cue = document.getElementById('shipObjectiveCue');
@@ -1533,6 +1711,22 @@ function activeDeckInteractions(session = activeSession) {
   if (session.activeDeckId === 'command') {
     stations.push({ id: 'return-to-flight', deckId: 'command', roomId: 'bridge', label: 'Return to flight controls', x: 0, z: 25.8, radius: 2.1, kind: 'ship-exit', level: 0 });
   }
+  const procedure = session.incidentProcedure;
+  const presentation = session.incidentPresentation;
+  if (procedure && presentation?.deckId === session.activeDeckId && !procedure.completing) {
+    const node = presentation.nodes[procedure.stepIndex];
+    if (node) stations.push({
+      id: `incident-step:${procedure.eventId}:${procedure.stepIndex}`,
+      deckId: presentation.deckId,
+      roomId: presentation.roomId,
+      label: node.step.label,
+      x: presentation.x + node.offset.x,
+      z: presentation.z + node.offset.z,
+      radius: 2.15,
+      kind: 'ship-incident-step',
+      level: 0
+    });
+  }
   return stations.concat(doors);
 }
 
@@ -1677,7 +1871,7 @@ function ensureShipMaps(session) {
     const link = document.createElement('link');
     link.id = 'expeditionShipStyles';
     link.rel = 'stylesheet';
-    link.href = 'styles/expedition-ship.css?v=4';
+    link.href = 'styles/expedition-ship.css?v=5';
     document.head.appendChild(link);
   }
   let mini = document.getElementById('shipMiniMap');
@@ -1719,7 +1913,8 @@ function enterSurveyorInterior(options = {}) {
     audioContext: null,
     ambientOscillator: null,
     actionFeedback: null,
-    incidentPresentation: null
+    incidentPresentation: null,
+    incidentProcedure: null
   };
   activeSession = session;
   syncCrewMeshes(session, options.expedition);
@@ -1843,6 +2038,10 @@ function handleShipInteriorInteraction(interaction) {
   if (interaction.kind === 'ship-exit' || interaction.id === 'return-to-flight') return exitSurveyorInterior();
   if (interaction.kind === 'ship-door') return toggleShipDoor(interaction.id);
   if (interaction.kind === 'ship-lift' || interaction.id.startsWith('deck-lift:')) return showDeckLift();
+  if (interaction.kind === 'ship-incident-step') {
+    void advanceIncidentProcedure(interaction);
+    return true;
+  }
   const result = activeSession.onInteraction?.(interaction, activeSession.expedition);
   return result !== false;
 }
@@ -1931,6 +2130,16 @@ function getShipInteriorSnapshot() {
       deckId: activeSession.incidentPresentation.deckId,
       visible: activeSession.incidentPresentation.group.visible !== false
     } : null,
+    incidentProcedure: activeSession.incidentProcedure ? {
+      eventId: activeSession.incidentProcedure.eventId,
+      choiceId: activeSession.incidentProcedure.choiceId,
+      stepIndex: activeSession.incidentProcedure.stepIndex,
+      stepCount: activeSession.incidentProcedure.steps.length,
+      completing: activeSession.incidentProcedure.completing,
+      currentInteractionId: activeSession.incidentProcedure.completing
+        ? ''
+        : `incident-step:${activeSession.incidentProcedure.eventId}:${activeSession.incidentProcedure.stepIndex}`
+    } : null,
     audioState: activeSession.audioContext?.state || 'not-started',
     visualContract: { ...activeSession.sceneState.visualContract },
     player: walker ? {
@@ -1963,7 +2172,8 @@ Object.assign(appCtx, {
   toggleExpeditionShipMap: toggleShipMap,
   updateExpeditionShipRecord,
   playExpeditionShipAction,
+  startExpeditionIncidentProcedure: startIncidentProcedure,
   updateExpeditionShipInterior
 });
 
-export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };
+export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, startIncidentProcedure, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };

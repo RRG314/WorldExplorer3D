@@ -758,6 +758,29 @@ function closeShipStationPanel() {
   document.getElementById('shipStationPanel')?.classList.remove('show');
 }
 
+async function commitVoyageResponse(choiceId, interaction) {
+  const previousId = activeExpedition?.pendingEvent?.id;
+  const next = resolveExpeditionEvent(activeExpedition, choiceId);
+  if (next === activeExpedition || next.pendingEvent?.id === previousId) {
+    activeContext?.showToast?.('That response is not available with the current crew and stores.');
+    return false;
+  }
+  try {
+    await applyExpeditionMutation(next, 'event');
+  } catch (error) {
+    reportSharedMutationError(error);
+    return false;
+  }
+  activeContext?.playExpeditionShipAction?.({
+    actionId: 'event-response',
+    kind: activeExpedition.failureReport ? 'alert' : 'operation',
+    message: activeExpedition.log.at(-1)?.message || 'The crew completed the response.',
+    interaction
+  });
+  activeContext?.showToast?.(activeExpedition.log.at(-1)?.message || 'The crew completed the response.');
+  return true;
+}
+
 async function recordBaselineInJournal() {
   await activeContext?.recordExplorerEvent?.({
     eventId: `event:space-expedition:${activeExpedition.id}:ship-survey`,
@@ -887,26 +910,16 @@ function renderShipStationPanel(interaction) {
     renderShipStationPanel(interaction);
   }));
   panel.querySelectorAll('[data-voyage-response]').forEach((button) => button.addEventListener('click', async () => {
-    const previousId = activeExpedition.pendingEvent?.id;
-    const next = resolveExpeditionEvent(activeExpedition, button.dataset.voyageResponse);
-    if (next === activeExpedition || next.pendingEvent?.id === previousId) {
-      activeContext?.showToast?.('That response is not available with the current crew and stores.');
-      return;
-    }
-    try {
-      await applyExpeditionMutation(next, 'event');
-    } catch (error) {
-      reportSharedMutationError(error);
-      return;
-    }
-    activeContext?.playExpeditionShipAction?.({
-      actionId: 'event-response',
-      kind: activeExpedition.failureReport ? 'alert' : 'operation',
-      message: activeExpedition.log.at(-1)?.message || 'The crew completed the response.',
-      interaction
+    const pending = activeExpedition.pendingEvent;
+    const choiceId = button.dataset.voyageResponse;
+    const started = activeContext?.startExpeditionIncidentProcedure?.({
+      eventId: pending?.id,
+      choiceId,
+      choiceLabel: button.textContent?.trim() || 'Complete ship response',
+      complete: () => commitVoyageResponse(choiceId, interaction)
     });
-    activeContext?.showToast?.(activeExpedition.log.at(-1)?.message || 'The crew completed the response.');
-    renderShipStationPanel(interaction);
+    if (started) return;
+    if (await commitVoyageResponse(choiceId, interaction)) renderShipStationPanel(interaction);
   }));
   return true;
 }
@@ -1003,7 +1016,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=9');
+  const ship = await import('./ship-interior.js?v=10');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

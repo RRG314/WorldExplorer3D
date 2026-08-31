@@ -360,6 +360,12 @@ contacts now open in ordinary Space, accept supported planetary landing and
 field collection, return exact sample custody to Surveyor, process material,
 and resume the same voyage. Further room art, animation, audio, and interaction
 variety remain continuing quality work rather than missing system authorities.
+Voyage responses now begin at the affected station and require three visible,
+role-specific interactions at a connected service console before the existing
+Voyage Director commits its success, partial, or setback outcome. This closes
+the button-only gap for the shared incident path, but event-specific tools,
+crew animation, damaged-component variants, and broader room art still remain
+part of the alpha quality gate.
 
 The current connected slice is mechanically ahead of its presentation. It is
 not yet the intended visual or activity standard for a public Space alpha.

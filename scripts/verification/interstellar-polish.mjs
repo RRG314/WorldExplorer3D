@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
+const viewportScope = String(process.env.WE3D_VIEWPORT_SCOPE || 'all').trim().toLowerCase();
 const outputDir = path.resolve('output/verification/interstellar-polish');
 await fs.mkdir(outputDir, { recursive: true });
 
@@ -17,10 +18,8 @@ async function snapshot(page) {
 async function openSpace(page) {
   await page.goto(`${baseUrl}/app/?launch=space`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120000 });
-  await page.evaluate(() => {
-    document.getElementById('spaceLaunchToggle')?.click();
-    document.getElementById('startBtn')?.click();
-  });
+  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
+  await page.locator('#globeSelectorSpaceBtn').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 120000 });
 }
 
@@ -99,13 +98,14 @@ async function runViewport(name, viewport) {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const names = [];
       ctx.activeInterior?.group?.traverse?.((child) => {
-        if (child.name?.startsWith('ship-incident:') || child.name === 'incident-floor-beacon' || child.name === 'incident-guidance-column') names.push(child.name);
+        if (child.name?.startsWith('ship-incident:') || child.name?.startsWith('incident-action-node:') || child.name === 'incident-floor-beacon' || child.name === 'incident-guidance-column') names.push(child.name);
       });
       return names;
     });
     assert.ok(incidentObjects.some((nameValue) => nameValue.startsWith('ship-incident:')));
     assert.ok(incidentObjects.includes('incident-floor-beacon'));
     assert.ok(incidentObjects.includes('incident-guidance-column'));
+    assert.equal(incidentObjects.filter((nameValue) => nameValue.startsWith('incident-action-node:')).length, 3);
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: 7, z: 27, angle: 0, yaw: 0, lookYawOffset: 0, pitch: -0.08 });
@@ -121,12 +121,34 @@ async function runViewport(name, viewport) {
     await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
     assert.equal(await page.locator('.ship-voyage-response').isVisible(), true);
     await page.locator('[data-voyage-response]:not(:disabled)').first().click();
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentProcedure?.stepIndex === 0);
+    for (let stepIndex = 0; stepIndex < 3; stepIndex += 1) {
+      const procedureTarget = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const snapshot = ctx.getShipInteriorSnapshot?.();
+        return ctx.activeInterior?.interactions?.find((entry) => entry.id === snapshot?.incidentProcedure?.currentInteractionId) || null;
+      });
+      assert.ok(procedureTarget, `missing physical incident action ${stepIndex + 1}`);
+      await page.evaluate(async ({ x, z }) => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const walker = ctx.Walk?.state?.walker;
+        if (walker) Object.assign(walker, { x, z: z - 1.75, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0.18 });
+      }, procedureTarget);
+      await page.waitForTimeout(120);
+      if (stepIndex === 0) await page.screenshot({ path: path.join(outputDir, `${name}-incident-procedure.png`), fullPage: true });
+      await page.keyboard.press('KeyE');
+      if (stepIndex < 2) {
+        await page.waitForFunction((expected) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentProcedure?.stepIndex === expected, stepIndex + 1);
+      } else {
+        await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.pendingEvent == null);
+      }
+    }
     state = await snapshot(page);
     assert.equal(state.interstellarExpedition.pendingEvent, null);
     assert.equal(state.expeditionShipInterior.incidentPresentation, null);
+    assert.equal(state.expeditionShipInterior.incidentProcedure, null);
     assert.equal(await page.locator('#shipObjectiveCue').isVisible(), false);
     assert.ok(state.expeditionShipInterior.actionFeedback);
-    await page.locator('[data-close-station]').click();
     if (name === 'mobile') {
       const actionBox = await page.locator('#shipActionCue').boundingBox();
       const controlBoxes = await Promise.all(['#mobileMovePad', '#mobileLookPad', '#mobileActionPrimary', '#mobileActionSecondary'].map((selector) => page.locator(selector).boundingBox()));
@@ -140,11 +162,11 @@ async function runViewport(name, viewport) {
 }
 
 try {
-  await runViewport('desktop', { width: 1440, height: 900 });
-  await runViewport('mobile', { width: 390, height: 844 });
+  if (viewportScope !== 'mobile') await runViewport('desktop', { width: 1440, height: 900 });
+  if (viewportScope !== 'desktop') await runViewport('mobile', { width: 390, height: 844 });
 } finally {
   await browser.close();
 }
 
 assert.deepEqual(failures, []);
-console.log('Interstellar polish verification passed in installed Chrome (desktop + 390x844 mobile).');
+console.log(`Interstellar polish verification passed in installed Chrome (${viewportScope === 'all' ? 'desktop + 390x844 mobile' : viewportScope}).`);
