@@ -115,26 +115,29 @@ wildlife-presence, or safety service.
 
 Required map attribution: `© OpenStreetMap contributors`
 
-## Run locally
+## Run locally without Firebase
 
-Requirements: Node.js 22+, Java 21, and a browser with WebGL support.
+The standalone local edition runs the current game without a Firebase project,
+account, credentials, emulators, or Java. Requirements: Node.js 20+ and a
+browser with WebGL support.
 
 ```bash
-git clone https://github.com/RRG314/WorldExplorer3D.git
-cd WorldExplorer3D
-npm install
-npm run build:hosting -- --firebase-env staging
-python3 -m http.server --directory dist 4173
+git clone --branch steven/local-standalone-5.1.0 --single-branch https://github.com/RRG314/WorldExplorer3D.git WorldExplorer3D-Standalone
+cd WorldExplorer3D-Standalone
+npm run dev:standalone
 ```
 
-Open `http://127.0.0.1:4173/app/`.
+Open `http://127.0.0.1:4192/app/`. See the
+[standalone guide](docs/LOCAL_STANDALONE.md) for supported features and other
+devices on your local network.
 
 Keyboard and touch controls support browser zoom, visible focus, higher
 contrast, larger text, and reduced motion.
 
-Core exploration can run without production credentials. Accounts,
-multiplayer, moderation, and other online features require an authorized
-environment. Secrets are not included in the repository.
+Earth, ocean, space, traversal, local progression, and browser saves remain
+available. Accounts, cloud sync, multiplayer, shared rooms, live leaderboards,
+moderation, and payments remain online-only. Secrets are not included in the
+repository.
 
 ## Project guide
 

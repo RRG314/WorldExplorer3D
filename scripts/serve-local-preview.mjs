@@ -6,9 +6,21 @@ import { serveMutableSourceManifest } from './source-preview-manifest.mjs';
 
 const sourceRootDir = process.cwd();
 const rootDir = path.resolve(process.env.WE3D_PREVIEW_ROOT || sourceRootDir);
-const host = '127.0.0.1';
-const port = Number(process.env.PORT || 4192);
+const args = process.argv.slice(2);
+
+function readArgument(name, fallback) {
+  const index = args.indexOf(name);
+  return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
+}
+
+const standalone = args.includes('--standalone') || process.env.WE3D_STANDALONE === '1';
+const host = readArgument('--host', process.env.HOST || '127.0.0.1');
+const port = Number(readArgument('--port', process.env.PORT || 4192));
 const { queryAircraft, queryDeFlockCameras, queryStreetImagery } = geospatial;
+
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error(`Invalid preview port: ${port}`);
+}
 
 async function readCandidateManifest() {
   try {
@@ -40,8 +52,29 @@ const mime = new Map([
   ['.webp', 'image/webp'],
   ['.ico', 'image/x-icon'],
   ['.map', 'application/json; charset=utf-8'],
-  ['.glb', 'model/gltf-binary']
+  ['.glb', 'model/gltf-binary'],
+  ['.woff', 'font/woff'],
+  ['.woff2', 'font/woff2'],
+  ['.ttf', 'font/ttf'],
+  ['.mp4', 'video/mp4'],
+  ['.webm', 'video/webm'],
+  ['.mp3', 'audio/mpeg'],
+  ['.ogg', 'audio/ogg'],
+  ['.wav', 'audio/wav'],
+  ['.csv', 'text/csv; charset=utf-8']
 ]);
+
+const standaloneOverrides = new Map([
+  ['/js/firebase-project-config.js', path.join(rootDir, 'js/standalone/runtime-config.js')],
+  ['/js/firebase-init.js', path.join(rootDir, 'js/standalone/firebase-init.js')]
+]);
+
+function responseHeaders(extra = {}) {
+  return {
+    ...(standalone ? { 'X-WorldExplorer-Mode': 'standalone' } : {}),
+    ...extra
+  };
+}
 
 async function exists(filePath) {
   try {
@@ -55,6 +88,19 @@ async function exists(filePath) {
 const server = http.createServer(async (req, res) => {
   try {
     const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+    if (standalone && reqUrl.pathname === '/api/standalone/status') {
+      res.writeHead(200, responseHeaders({
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store'
+      }));
+      res.end(JSON.stringify({
+        mode: 'standalone',
+        firebaseEnabled: false,
+        cloudFeatures: false,
+        geospatialProxy: true
+      }));
+      return;
+    }
     if (!candidateId && await serveMutableSourceManifest({
       pathname: reqUrl.pathname,
       rootDir,
@@ -140,10 +186,11 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+    const overridePath = standalone ? standaloneOverrides.get(reqUrl.pathname) : null;
     let relPath = decodeURIComponent(reqUrl.pathname || '/');
     if (relPath === '/') relPath = '/index.html';
 
-    const resolved = path.resolve(path.join(rootDir, relPath));
+    const resolved = overridePath || path.resolve(path.join(rootDir, relPath));
     if (!resolved.startsWith(rootDir)) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('forbidden');
@@ -173,7 +220,7 @@ const server = http.createServer(async (req, res) => {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = mime.get(ext) || 'application/octet-stream';
     const body = await fs.readFile(filePath);
-    res.writeHead(200, {
+    res.writeHead(200, responseHeaders({
       'Content-Type': contentType,
       'Cache-Control': candidateId && !/\.html?$/i.test(ext)
         ? 'public, max-age=31536000, immutable'
@@ -181,7 +228,7 @@ const server = http.createServer(async (req, res) => {
       ...(candidateId ? { 'X-WorldExplorer-Candidate': candidateId } : {}),
       Pragma: 'no-cache',
       Expires: '0'
-    });
+    }));
     res.end(body);
   } catch (error) {
     res.writeHead(500, {
@@ -195,7 +242,11 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  if (candidateId) {
+  if (standalone) {
+    console.log('World Explorer 3D standalone local edition');
+    console.log(`http://${host}:${port}/app/`);
+    console.log('Firebase services: disabled');
+  } else if (candidateId) {
     console.log(`Immutable candidate ${candidateId}`);
     console.log(`http://${host}:${port}/app/?candidate=${encodeURIComponent(candidateId)}`);
   } else {

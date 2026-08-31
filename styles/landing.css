@@ -254,6 +254,8 @@ h1 {
 }
 
 .hero-notes li::before { margin-right: 7px; color: var(--world); content: '●'; font-size: 8px; }
+.hero-notes a { color: inherit; text-underline-offset: 3px; }
+.hero-notes a:hover { color: var(--paper); }
 
 .perf-note {
   margin: 10px 0 0;

@@ -7,6 +7,8 @@
   "main": "three.js",
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
+    "dev:standalone": "node scripts/serve-local-preview.mjs --standalone",
+    "verify:standalone": "node scripts/verification/standalone-local.mjs",
     "candidate:create": "node scripts/local-candidate.mjs create",
     "candidate:serve": "node scripts/local-candidate.mjs serve",
     "candidate:create-and-serve": "node scripts/local-candidate.mjs create-and-serve",
