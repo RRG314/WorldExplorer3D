@@ -7,6 +7,7 @@ import {
   resolveDirectedEvent,
   VOYAGE_SLOTS
 } from './voyage-director.js?v=1';
+import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=1';
 
 function clone(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -96,6 +97,17 @@ function advanceExpedition(expedition, requestedDeltaS) {
     systems: degradeSystems(prepared.systems, deltaS, totalS),
     crew: advanceCrew(prepared.crew, deltaS, prepared.systems)
   });
+  next = withExpeditionChanges(next, {
+    failureChain: appendSystemTransitions(prepared.failureChain, prepared.systems, next.systems, elapsed)
+  });
+  const failure = assessCausalFailure(next);
+  if (failure) return withExpeditionChanges(next, {
+    state: 'failed',
+    voyagePhase: 'mission-loss',
+    pendingEvent: null,
+    failureReport: failure,
+    log: appendLog(next.log, { atMissionS: elapsed, kind: 'mission-loss', message: failure.summary })
+  });
   if (slot && elapsed + 1 >= totalS * slot.progress) {
     const event = createDirectedEvent(next, slot);
     if (event) return withExpeditionChanges(next, {
@@ -122,15 +134,22 @@ function advanceToNextMilestone(expedition) {
 function resolveExpeditionEvent(expedition, choice) {
   const result = resolveDirectedEvent(expedition, choice);
   if (!result) return expedition;
-  return withExpeditionChanges(expedition, {
+  let next = withExpeditionChanges(expedition, {
     pendingEvent: null,
     systems: result.systems,
     resources: result.resources,
     crew: result.crew,
     routeContacts: result.routeContacts,
     voyageDirector: result.voyageDirector,
+    failureChain: appendSystemTransitions(expedition.failureChain, expedition.systems, result.systems, expedition.strategicElapsedS),
     log: appendLog(expedition.log, result.logEntry)
   });
+  const failure = assessCausalFailure(next);
+  if (failure) next = withExpeditionChanges(next, {
+    state: 'failed', voyagePhase: 'mission-loss', failureReport: failure,
+    log: appendLog(next.log, { atMissionS: next.strategicElapsedS, kind: 'mission-loss', message: failure.summary })
+  });
+  return next;
 }
 
 const VOYAGE_MILESTONES = VOYAGE_SLOTS;

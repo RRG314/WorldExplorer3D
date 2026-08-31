@@ -11,6 +11,7 @@ import {
   SHIP_STATIONS
 } from './ship-layout.js?v=4';
 import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
+import { shipAlertState } from './failure-authority.js?v=1';
 
 let activeSession = null;
 
@@ -796,7 +797,11 @@ function buildDeckScene(deckDefinition) {
     light.position.set(0, 3.18, z);
     group.add(light);
   });
-  return { group, colliders, doorStates };
+  const alertLight = new THREE.PointLight(0xff6b45, 0, 30, 2);
+  alertLight.position.set(0, 3.1, 0);
+  alertLight.name = `ship-alert-light:${deckDefinition.id}`;
+  group.add(alertLight);
+  return { group, colliders, doorStates, alertLight };
 }
 
 function buildSurveyorScene(expedition) {
@@ -847,12 +852,87 @@ function ensureShipHud(expedition, crewSummary = null) {
   const progress = Math.round((Number(expedition?.progress) || 0) * 100);
   const crewLine = crewSummary ? `${crewSummary.active} on duty · ${crewSummary.resting} resting` : 'Crew watch active';
   const deckLabel = getShipDeck(activeSession?.activeDeckId)?.shortLabel || 'Command';
-  hud.innerHTML = `<div><span>SURVEYOR · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
+  const alert = shipAlertState(expedition);
+  hud.classList.toggle('attention', alert.level === 'attention');
+  hud.classList.toggle('critical', alert.level === 'critical');
+  hud.innerHTML = `<div><span>SURVEYOR · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
   hud.classList.add('show');
   hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSurveyorInterior());
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
   hud.querySelector('#shipMapButton')?.addEventListener('click', () => toggleShipMap());
   return hud;
+}
+
+function ensureShipAudio(session = activeSession) {
+  if (!session || session.audioContext) return session?.audioContext || null;
+  const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!AudioContext) return null;
+  try {
+    const context = new AudioContext();
+    const gain = context.createGain();
+    const oscillator = context.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 46;
+    gain.gain.value = 0.0025;
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    session.audioContext = context;
+    session.ambientOscillator = oscillator;
+    return context;
+  } catch {
+    return null;
+  }
+}
+
+function playShipTone(kind = 'operation') {
+  const context = ensureShipAudio();
+  if (!context) return false;
+  if (context.state === 'suspended') void context.resume();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = kind === 'door' ? 'sine' : kind === 'alert' ? 'sawtooth' : 'triangle';
+  oscillator.frequency.setValueAtTime(kind === 'door' ? 180 : kind === 'alert' ? 132 : 320, context.currentTime);
+  if (kind === 'operation') oscillator.frequency.linearRampToValueAtTime(430, context.currentTime + 0.16);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(kind === 'alert' ? 0.035 : 0.022, context.currentTime + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.24);
+  oscillator.connect(gain).connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.26);
+  return true;
+}
+
+function playExpeditionShipAction(details = {}) {
+  const session = activeSession;
+  if (!session) return false;
+  const station = details.interaction || SHIP_STATIONS.find((entry) => entry.id === details.stationId);
+  if (!station) return false;
+  session.actionFeedback = {
+    actionId: details.actionId || 'operation',
+    label: details.message || station.label || 'Ship operation complete',
+    deckId: station.deckId || session.activeDeckId,
+    x: Number(station.x) || 0,
+    z: Number(station.z) || 0,
+    elapsed: 0,
+    duration: 1.8
+  };
+  const state = session.sceneState.deckStates.get(session.actionFeedback.deckId);
+  if (state && !state.actionBeacon) {
+    const surface = material(0x6fe8ff, { emissive: 0x6fe8ff, emissiveIntensity: 1.5, metalness: 0.1, roughness: 0.2 });
+    state.actionBeacon = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.055, 10, 32), surface);
+    state.actionBeacon.rotation.x = Math.PI / 2;
+    state.group.add(state.actionBeacon);
+  }
+  if (state?.actionBeacon) {
+    state.actionBeacon.position.set(session.actionFeedback.x, 1.25, session.actionFeedback.z);
+    state.actionBeacon.visible = true;
+  }
+  let cue = document.getElementById('shipActionCue');
+  if (!cue) { cue = document.createElement('div'); cue.id = 'shipActionCue'; document.body.appendChild(cue); }
+  cue.textContent = session.actionFeedback.label;
+  cue.classList.add('show');
+  playShipTone(details.kind === 'alert' ? 'alert' : 'operation');
+  return true;
 }
 
 function snapshotWalkingState() {
@@ -975,6 +1055,7 @@ function toggleShipDoor(doorId) {
   updateActiveDeckContract(session);
   renderShipMaps(session);
   appCtx.showToast?.(`${door.label} ${door.open ? 'open' : 'closed'}.`);
+  playShipTone('door');
   return true;
 }
 
@@ -1094,7 +1175,10 @@ function enterSurveyorInterior(options = {}) {
     operations: Object.freeze([]),
     operationSummary: null,
     operationRefreshElapsed: 0,
-    visualClock: 0
+    visualClock: 0,
+    audioContext: null,
+    ambientOscillator: null,
+    actionFeedback: null
   };
   activeSession = session;
   refreshCrewOperations(session, true);
@@ -1167,6 +1251,7 @@ function exitSurveyorInterior() {
   document.getElementById('shipMapOverlay')?.classList.remove('show');
   document.getElementById('shipDeckPicker')?.classList.remove('show');
   document.getElementById('shipStationPanel')?.classList.remove('show');
+  document.getElementById('shipActionCue')?.classList.remove('show');
   appCtx.toggleWorldDiscoveryJournal?.(false);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;
@@ -1179,6 +1264,8 @@ function exitSurveyorInterior() {
     if (Array.isArray(child.material)) child.material.forEach((entry) => { entry?.map?.dispose?.(); entry?.dispose?.(); });
     else { child.material?.map?.dispose?.(); child.material?.dispose?.(); }
   });
+  try { session.ambientOscillator?.stop?.(); } catch {}
+  void session.audioContext?.close?.();
   restoreWalkingState(session.walking);
   appCtx.scene.background = session.sceneBackground;
   if (appCtx.renderer?.shadowMap) appCtx.renderer.shadowMap.enabled = session.shadowMapEnabled;
@@ -1220,6 +1307,14 @@ function updateExpeditionShipInterior(dt) {
   const tutorialCard = document.getElementById('tutorialHintCard');
   if (tutorialCard && tutorialCard.style.display !== 'none') tutorialCard.style.display = 'none';
   updateCrewMotion(activeSession, dt);
+  activeSession.visualClock += Math.max(0, Number(dt) || 0);
+  const alert = shipAlertState(activeSession.expedition);
+  activeSession.sceneState.deckStates.forEach((deckState) => {
+    if (!deckState.alertLight) return;
+    const pulse = 0.55 + Math.sin(activeSession.visualClock * (alert.level === 'critical' ? 5.5 : 2.7)) * 0.25;
+    deckState.alertLight.intensity = alert.level === 'critical' ? 2.1 * pulse : alert.level === 'attention' ? 0.85 * pulse : 0;
+    deckState.alertLight.color.setHex(alert.level === 'critical' ? 0xff3b30 : 0xffa340);
+  });
   activeSession.sceneState.animatedParts.forEach((part, index) => {
     if (!part.visible || !part.material) return;
     if (part.userData.shipAnimated === 'screen') {
@@ -1230,6 +1325,19 @@ function updateExpeditionShipInterior(dt) {
   state?.doorStates.forEach((door) => {
     door.panel.position.y += (door.targetY - door.panel.position.y) * Math.min(1, Math.max(0, dt) * 8);
   });
+  if (activeSession.actionFeedback) {
+    activeSession.actionFeedback.elapsed += Math.max(0, Number(dt) || 0);
+    const feedbackState = activeSession.sceneState.deckStates.get(activeSession.actionFeedback.deckId);
+    if (feedbackState?.actionBeacon) {
+      feedbackState.actionBeacon.rotation.z += Math.max(0, Number(dt) || 0) * 2.8;
+      feedbackState.actionBeacon.scale.setScalar(1 + Math.sin(activeSession.actionFeedback.elapsed * 8) * 0.12);
+      feedbackState.actionBeacon.visible = activeSession.actionFeedback.elapsed < activeSession.actionFeedback.duration;
+    }
+    if (activeSession.actionFeedback.elapsed >= activeSession.actionFeedback.duration) {
+      document.getElementById('shipActionCue')?.classList.remove('show');
+      activeSession.actionFeedback = null;
+    }
+  }
   activeSession.mapRefreshElapsed += Math.max(0, Number(dt) || 0);
   if (activeSession.mapRefreshElapsed >= 0.25) {
     activeSession.mapRefreshElapsed = 0;
@@ -1256,6 +1364,9 @@ function getShipInteriorSnapshot() {
     totalCrewCount: activeSession.sceneState.crewMeshes.length,
     crewOperations: activeSession.operations.map((operation) => ({ ...operation })),
     crewOperationSummary: { ...activeSession.operationSummary },
+    alert: shipAlertState(activeSession.expedition),
+    actionFeedback: activeSession.actionFeedback ? { ...activeSession.actionFeedback } : null,
+    audioState: activeSession.audioContext?.state || 'not-started',
     crewPresentation: activeSession.sceneState.crewMeshes.map((mesh) => ({
       crewId: mesh.userData.crewId,
       roomId: mesh.userData.currentRoomId,
@@ -1278,7 +1389,8 @@ Object.assign(appCtx, {
   switchSurveyorDeck,
   toggleExpeditionShipMap: toggleShipMap,
   updateExpeditionShipRecord,
+  playExpeditionShipAction,
   updateExpeditionShipInterior
 });
 
-export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };
+export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };

@@ -1,4 +1,5 @@
 import { withExpeditionChanges } from './model.js?v=6';
+import { resolveSystemFailure } from './failure-authority.js?v=1';
 
 const STATION_VIEWS = Object.freeze({
   'bridge-flight': Object.freeze({ title: 'Flight Controls', systemId: 'navigation', summary: 'Review heading, velocity, and the margins on the active route.' }),
@@ -124,16 +125,19 @@ function applyShipOperation(expedition, actionId) {
   const systems = clone(expedition.systems || {});
   const crew = clone(expedition.crew || []);
   const materialLedger = clone(expedition.materialLedger || { installedRepairKg: 0 });
+  const recoveredSystems = [];
   const flags = { ...(expedition.operationFlags || {}), [operationKey(expedition, actionId)]: true };
   let message = ACTION_LABELS[actionId] || actionId;
   let kind = 'ship-operation';
 
   const improveSystem = (id, amount, cost = 0) => {
     if (!systems[id]) return;
+    const before = Number(systems[id].condition || 0);
     resources.maintenanceKg = Math.max(0, Number(resources.maintenanceKg || 0) - cost);
     materialLedger.installedRepairKg = Math.max(0, Number(materialLedger.installedRepairKg || 0)) + Math.max(0, cost);
     systems[id].condition = Math.min(1, Number(systems[id].condition || 0) + amount);
     systems[id].status = conditionStatus(systems[id].condition);
+    if (systems[id].condition > before) recoveredSystems.push(id);
   };
 
   if (actionId === 'fabricate-parts') {
@@ -236,11 +240,18 @@ function applyShipOperation(expedition, actionId) {
     kind,
     message
   })]);
+  let failureChain = expedition.failureChain || [];
+  recoveredSystems.forEach((systemId) => {
+    if (failureChain.some((entry) => entry.systemId === systemId && entry.status === 'active')) {
+      failureChain = resolveSystemFailure(failureChain, systemId, systems[systemId].condition, expedition.strategicElapsedS, message);
+    }
+  });
   const next = withExpeditionChanges(expedition, {
     resources: Object.freeze(resources),
     systems: Object.freeze(systems),
     crew: Object.freeze(crew.map((member) => Object.freeze(member))),
     materialLedger: Object.freeze(materialLedger),
+    failureChain,
     operationFlags: Object.freeze(flags),
     log
   });

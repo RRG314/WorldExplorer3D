@@ -12,11 +12,13 @@ import {
   createExpeditionPlan
 } from '../app/js/expedition/model.js';
 import {
+  advanceExpedition,
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
 } from '../app/js/expedition/simulation.js';
+import { appendSystemTransitions, assessCausalFailure, resolveSystemFailure, shipAlertState } from '../app/js/expedition/failure-authority.js';
 import { availabilityForResponse } from '../app/js/expedition/voyage-director.js';
 import { VOYAGE_EVENT_COUNTS, VOYAGE_EVENT_FAMILIES } from '../app/js/expedition/voyage-events.js';
 import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
@@ -301,6 +303,55 @@ test('a surface recovery sample becomes conserved feedstock, fabricated parts, a
     + expedition.resources.scienceCargoKg + expedition.resources.processingResidueKg
     + expedition.materialLedger.installedRepairKg;
   assert.equal(finalTrackedMass, initialTrackedMass);
+});
+
+test('system thresholds form a causal chain, preserve recovery options, and produce an explicit mission-loss report', () => {
+  let expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1850 });
+  const priorSystems = structuredClone(expedition.systems);
+  const failedSystems = structuredClone(expedition.systems);
+  failedSystems['life-support'] = { condition: 0, status: 'critical' };
+  const failureChain = appendSystemTransitions([], priorSystems, failedSystems, 600);
+  assert.deepEqual(failureChain.map((entry) => entry.stage), ['degraded', 'critical', 'offline']);
+  expedition = {
+    ...expedition,
+    systems: failedSystems,
+    resources: { ...expedition.resources, maintenanceKg: 0, feedstockKg: 0 },
+    failureChain
+  };
+  const failure = assessCausalFailure(expedition);
+  assert.equal(failure.systemId, 'life-support');
+  assert.match(failure.summary, /life support became unrecoverable/i);
+  assert.ok(failure.causes.length >= 5);
+  assert.equal(shipAlertState(expedition).level, 'critical');
+
+  const recovered = resolveSystemFailure(failureChain, 'life-support', 0.58, 700, 'Life support repair verified.');
+  assert.equal(recovered.filter((entry) => entry.status === 'active').length, 0);
+  assert.match(recovered.at(-1).message, /repair verified/i);
+});
+
+test('strategic simulation ends only after an essential offline chain has exhausted real recovery capacity', () => {
+  let expedition = startExpedition(createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1875 }), 1880);
+  expedition = {
+    ...expedition,
+    systems: { ...expedition.systems, 'life-support': { condition: 0.002, status: 'critical' } },
+    resources: { ...expedition.resources, maintenanceKg: 0, feedstockKg: 0 },
+    failureChain: [
+      { id: 'life-support:degraded:1', systemId: 'life-support', stage: 'degraded', status: 'active', message: 'life support became degraded.' },
+      { id: 'life-support:critical:2', systemId: 'life-support', stage: 'critical', status: 'active', message: 'life support became critical.' }
+    ]
+  };
+  const failed = advanceExpedition(expedition, expedition.calculation.properElapsedS * 0.1);
+  assert.equal(failed.state, 'failed');
+  assert.equal(failed.failureReport.systemId, 'life-support');
+  assert.equal(failed.pendingEvent, null);
+  assert.match(failed.log.at(-1).message, /Surveyor was lost/i);
+
+  const recoverable = advanceExpedition({
+    ...expedition,
+    resources: { ...expedition.resources, maintenanceKg: 1000 }
+  }, expedition.calculation.properElapsedS * 0.1);
+  assert.notEqual(recoverable.state, 'failed');
+  assert.equal(recoverable.failureReport, null);
 });
 
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {

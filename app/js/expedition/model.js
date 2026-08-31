@@ -110,7 +110,8 @@ function createExpeditionPlan({
     materialLedger: Object.freeze({ installedRepairKg: 0 }),
     discoveries: Object.freeze([]),
     log: Object.freeze([{ atMissionS: 0, kind: 'planned', message: `Expedition planned for ${destinationId}.` }]),
-    failureChain: Object.freeze([])
+    failureChain: Object.freeze([]),
+    failureReport: null
   });
 }
 

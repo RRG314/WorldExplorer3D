@@ -33,6 +33,8 @@ function parseRecord(value) {
     record.scienceSamples = Array.isArray(record.scienceSamples) ? record.scienceSamples : [];
     record.resources = { processingResidueKg: 0, ...(record.resources || {}) };
     record.materialLedger = { installedRepairKg: 0, ...(record.materialLedger || {}) };
+    record.failureChain = Array.isArray(record.failureChain) ? record.failureChain : [];
+    record.failureReport ||= null;
     const hadVoyageDirector = record.voyageDirector?.version === 1;
     record.voyageDirector = normalizeVoyageDirector(record);
     if (!hadVoyageDirector) {

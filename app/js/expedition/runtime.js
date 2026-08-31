@@ -350,6 +350,12 @@ function readinessMarkup(expedition) {
   const destination = resolveUniverseAddress(expedition.destinationId);
   const readiness = expedition.readiness;
   const issues = [...readiness.failures, ...readiness.warnings];
+  const assessment = expedition.state === 'planned'
+    ? readiness.status.toUpperCase()
+    : expedition.state === 'failed'
+      ? 'MISSION LOST'
+      : expedition.state === 'arrived' ? 'ARRIVED' : 'UNDERWAY';
+  const assessmentClass = expedition.state === 'failed' ? 'insufficient' : readiness.status;
   return `
     <div class="expeditionSummary">
       <div><span>Destination</span><strong>${destination?.name || expedition.destinationId}</strong></div>
@@ -357,7 +363,7 @@ function readinessMarkup(expedition) {
       <div><span>Mission time</span><strong>${formatYears(expedition.calculation.externalYears)}</strong></div>
       <div><span>Crew time</span><strong>${formatYears(expedition.calculation.properYears)}</strong></div>
       <div><span>Peak speed</span><strong>${(expedition.calculation.peakVelocityFractionC * 100).toFixed(1)}% c</strong></div>
-      <div><span>Assessment</span><strong class="is-${readiness.status}">${readiness.status.toUpperCase()}</strong></div>
+      <div><span>Status</span><strong class="is-${assessmentClass}">${assessment}</strong></div>
     </div>
     <div class="expeditionManifest">
       <section><h3>Crew</h3><p>${expedition.crew.length} ${expedition.state === 'planned' ? 'assigned' : 'aboard'} · command, navigation, engineering, medical, life support, and science covered.</p></section>
@@ -400,11 +406,14 @@ function renderMission() {
     action = `<button id="expeditionAdvance" class="expeditionPrimary" type="button">Continue to next watch or event</button>`;
   } else if (expedition.state === 'arrived') {
     action = `<button id="expeditionArrive" class="expeditionPrimary" type="button">Continue in local Space</button>`;
+  } else if (expedition.state === 'failed') {
+    const report = expedition.failureReport;
+    action = `<div class="expeditionEvent expeditionFailure"><span>MISSION ENDED</span><h3>${report?.summary || 'Surveyor could not continue.'}</h3>${report?.causes?.length ? `<ol>${report.causes.map((cause) => `<li>${cause}</li>`).join('')}</ol>` : '<p>The Captain’s Log retains the mission record.</p>'}</div>`;
   }
   const log = [...(expedition.log || [])].reverse().slice(0, 6);
   const reachedCount = Math.min(VOYAGE_MILESTONES.length, Number(expedition.voyageDirector?.nextSlotIndex || 0));
   const contacts = expedition.routeContacts || [];
-  const shipAction = expedition.readiness.status !== 'insufficient'
+  const shipAction = expedition.readiness.status !== 'insufficient' && expedition.state !== 'failed'
     ? `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">Enter Surveyor</button><small>Walk the ship, meet the crew, inspect systems, and return to the same flight.</small></div>`
     : '';
   host.innerHTML = `
@@ -508,6 +517,7 @@ function renderShipStationPanel(interaction) {
     activeExpedition = result.expedition;
     store.save(activeExpedition);
     activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+    activeContext?.playExpeditionShipAction?.({ actionId, message: result.message, interaction });
     if (actionId === 'record-baseline') await recordBaselineInJournal();
     activeContext?.showToast?.(result.message);
     renderShipStationPanel(interaction);
@@ -522,6 +532,12 @@ function renderShipStationPanel(interaction) {
     activeExpedition = next;
     store.save(activeExpedition);
     activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+    activeContext?.playExpeditionShipAction?.({
+      actionId: 'event-response',
+      kind: activeExpedition.failureReport ? 'alert' : 'operation',
+      message: activeExpedition.log.at(-1)?.message || 'The crew completed the response.',
+      interaction
+    });
     activeContext?.showToast?.(activeExpedition.log.at(-1)?.message || 'The crew completed the response.');
     renderShipStationPanel(interaction);
   }));
