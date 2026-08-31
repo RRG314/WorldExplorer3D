@@ -20,6 +20,7 @@ const TRANSITIONS = Object.freeze({
 function freezeMissionState(value) {
   return Object.freeze({
     ...value,
+    evidence: Object.freeze([...(value.evidence || [])]),
     history: Object.freeze([...(value.history || [])])
   });
 }
@@ -35,6 +36,7 @@ function createDestinationMissionState(definition, atMs = Date.now()) {
     startedAtMs: null,
     updatedAtMs: Number(atMs),
     completedAtMs: null,
+    evidence: [],
     history: []
   });
 }
@@ -99,6 +101,29 @@ function createDestinationMissionStore(storage = globalThis.localStorage) {
         updatedAtMs: result.state.updatedAtMs
       });
       return Object.freeze({ ...result, ledger: nextLedger });
+    },
+    recordEvidence(definition, evidenceId, details = {}) {
+      const id = String(evidenceId || '').trim();
+      const current = stateFor(definition);
+      if (!id) return Object.freeze({ accepted: false, reason: 'evidence-id-required', state: current, ledger });
+      if (![PHASE.FIELDWORK, PHASE.ANALYSIS].includes(current.phase)) {
+        return Object.freeze({ accepted: false, reason: `mission-evidence-not-allowed:${current.phase}`, state: current, ledger });
+      }
+      if (current.evidence.includes(id)) return Object.freeze({ accepted: true, duplicate: true, state: current, ledger });
+      const atMs = Math.max(Number(current.updatedAtMs || 0), Number(details.atMs ?? Date.now()));
+      const state = freezeMissionState({
+        ...current,
+        updatedAtMs: atMs,
+        evidence: [...current.evidence, id],
+        history: [...current.history, Object.freeze({ event: 'record_evidence', phase: current.phase, atMs, evidenceId: id })]
+      });
+      const nextLedger = persist({
+        ...ledger,
+        activeMissionId: definition.id,
+        missions: { ...ledger.missions, [definition.id]: state },
+        updatedAtMs: atMs
+      });
+      return Object.freeze({ accepted: true, duplicate: false, state, ledger: nextLedger });
     },
     get(definition) { return stateFor(definition); },
     load() { return ledger; },

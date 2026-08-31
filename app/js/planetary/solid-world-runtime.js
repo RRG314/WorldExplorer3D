@@ -446,7 +446,7 @@ function addVisualSurfaceHorizon(pack, world) {
 }
 
 function addExpeditionReturnPod(pack, world) {
-  if (pack.returnMode !== 'expedition-contact') return null;
+  if (!['expedition-contact', 'destination-mission'].includes(pack.returnMode)) return null;
   if (world.returnPod) {
     world.returnPod.visible = true;
     if (world.returnPod.parent !== appCtx.scene) appCtx.scene.add(world.returnPod);
@@ -587,6 +587,7 @@ function startReturnPodLaunch() {
     return false;
   }
   if (activePack.returnMode === 'expedition-contact') return appCtx.leaveExpeditionSurface?.(activePack.bodyId) === true;
+  if (activePack.returnMode === 'destination-mission') return appCtx.leaveDestinationMissionSurface?.(activePack.bodyId) === true;
   if (activePack.returnMode === 'space-flight') {
     return appCtx.startSpaceFlightFromExpeditionSurface?.({ frameId: activePack.parentSystemId, courseDestinationId: activePack.bodyId }) === true;
   }
@@ -778,7 +779,7 @@ function showReturnButton(pack) {
     button.className = 'game-btn';
     button.style.cssText = 'position:fixed;top:82px;right:20px;z-index:1000;padding:10px 20px;font-size:16px;background:#315d9d;color:#fff;border:1px solid #8ab4ff;border-radius:5px;cursor:pointer;';
     button.addEventListener('click', () => {
-      if (activePack?.returnMode === 'expedition-contact') {
+      if (['expedition-contact', 'destination-mission'].includes(activePack?.returnMode)) {
         const distance = returnPodDistance();
         if (distance <= Number(activeReturnPod?.userData?.boardingRadius || 5.5)) startReturnPodLaunch();
         else appCtx.showToast?.(`Return pod is ${Math.round(distance)} m away. Approach its ramp and use Interact.`);
@@ -795,7 +796,7 @@ function showReturnButton(pack) {
     });
     document.body.appendChild(button);
   }
-  button.textContent = pack.returnMode === 'expedition-contact'
+  button.textContent = ['expedition-contact', 'destination-mission'].includes(pack.returnMode)
     ? `Return pod · approach to board`
     : `Return to Space from ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
   const compact = globalThis.innerWidth <= 600;
@@ -947,6 +948,7 @@ function registerExpeditionSolidWorld(input = {}) {
   const bodyId = String(input.id || '').trim().toLowerCase();
   if (!bodyId) throw new TypeError('An Expedition solid world requires a stable id.');
   if (SOLID_WORLD_PACKS[bodyId]) throw new Error(`Expedition world cannot replace catalog body: ${bodyId}`);
+  if (runtimeWorldPacks.has(bodyId)) return runtimeWorldPacks.get(bodyId);
   const seed = Number(input.seed) >>> 0;
   const radiusEarth = Math.max(0.2, Number(input.radiusEarth) || 1);
   const massEarth = Math.max(0.05, Number(input.massEarth) || radiusEarth ** 2.7);
@@ -970,7 +972,7 @@ function registerExpeditionSolidWorld(input = {}) {
     localBounds: { minX: -8_000, maxX: 8_000, minZ: -8_000, maxZ: 8_000 },
     renderPlacement: { x: 0, y: -80, z: 0 },
     modelInputs: { seed, radiusEarth, massEarth, semiMajorAxisAu: orbitAu, starMassSolar },
-    source: {
+    source: input.source || {
       title: 'Expedition route survey model',
       provider: 'World Explorer 3D',
       attribution: 'Seeded model derived from the saved route contact',
@@ -999,8 +1001,8 @@ function registerExpeditionSolidWorld(input = {}) {
     fillIntensity: 0.34,
     exposure: 1.28,
     title: `${input.name || bodyId} · Survey Site`,
-    context: `${gravityMps2.toFixed(2)} m/s² modeled gravity · atmosphere unconfirmed`,
-    representation: 'Seeded physical model · generated relief · no observed surface imagery',
+    context: input.context || `${gravityMps2.toFixed(2)} m/s² modeled gravity · atmosphere unconfirmed`,
+    representation: input.representation || 'Seeded physical model · generated relief · no observed surface imagery',
     environment: Object.freeze({
       bodyId,
       gravityMps2,
@@ -1010,11 +1012,11 @@ function registerExpeditionSolidWorld(input = {}) {
       truthClass: 'modeled',
       uncertainty: 'Temperature is an equilibrium estimate; the local atmosphere is unconfirmed and the suit model uses a vacuum-safe assumption.'
     }),
-    fieldNotes: Object.freeze([
+    fieldNotes: Object.freeze((input.fieldNotes || [
       Object.freeze(['Document the survey site', 'photograph', 'places', 'Record the generated survey terrain and the model inputs used to create it.']),
       Object.freeze(['Collect geology sample', 'geology-inspect', 'rock', 'Collect one modeled field sample for Surveyor processing. The sample represents game-world material, not a real-world observation.']),
       Object.freeze(['Survey local conditions', 'habitat-survey', 'places', 'Log the model-derived gravity and thermal estimate with their uncertainty.'])
-    ]),
+    ]).map((entry) => Object.freeze([...entry]))),
     outpost: input.outpost || null
   });
   runtimeWorldPacks.set(bodyId, pack);

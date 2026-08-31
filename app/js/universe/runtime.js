@@ -12,7 +12,7 @@ import {
   UNIVERSE_GUIDANCE_MODE
 } from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
-import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=1';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=2';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import {
   createUniverseFrameVisual,
@@ -125,25 +125,41 @@ function playDestinationMissionScan(destinationId, operation = 'survey') {
   const mesh = getUniverseDestinationMesh(universeRuntime.frameGroup, destinationId);
   if (!mesh) return false;
   const radius = Number(mesh.geometry?.parameters?.radius) || 12;
+  const thermalScale = operation.includes('thermal') ? 3.4 : 1;
   const group = new THREE.Group();
   group.name = `destination-mission-scan:${destinationId}`;
+  const scanColor = operation.includes('nightside') ? 0x739dff
+    : operation.includes('thermal') ? 0xffa35c
+      : operation.includes('biosignature') ? 0x76f0c7 : 0x6fe8ff;
   const shellMaterial = new THREE.MeshBasicMaterial({
-    color: operation.includes('biosignature') ? 0x76f0c7 : 0x6fe8ff,
+    color: scanColor,
     transparent: true,
     opacity: 0.68,
     wireframe: true,
+    depthTest: false,
     depthWrite: false,
     blending: THREE.AdditiveBlending
   });
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.16, 24, 16), shellMaterial);
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.16 * thermalScale, 24, 16), shellMaterial);
   group.add(shell);
   for (let index = 0; index < 3; index += 1) {
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(radius * (1.25 + index * 0.18), Math.max(0.12, radius * 0.018), 8, 48),
+      new THREE.TorusGeometry(radius * (1.25 + index * 0.18) * thermalScale, Math.max(0.12, radius * 0.018 * thermalScale), 8, 48),
       shellMaterial.clone()
     );
     ring.rotation.set(index * 0.73, index * 1.05, index * 0.41);
     group.add(ring);
+  }
+  if (operation.includes('thermal')) {
+    for (let index = 0; index < 7; index += 1) {
+      const band = new THREE.Mesh(
+        new THREE.BoxGeometry(radius * 0.065 * thermalScale, radius * (0.45 + index * 0.12) * thermalScale, radius * 0.04 * thermalScale),
+        shellMaterial.clone()
+      );
+      band.position.x = (index - 3) * radius * 0.19 * thermalScale;
+      band.position.z = radius * 1.22 * thermalScale;
+      group.add(band);
+    }
   }
   mesh.add(group);
   missionScanEffects.push({ group, startedAt: performance.now(), durationMs: 2200 });
@@ -498,7 +514,8 @@ function getUniverseHudTarget() {
       : universeRuntime.current.objectClass === 'nebula' ? 240
         : universeRuntime.current.objectClass === 'stellar_region' ? 180 : 80;
   const activeDestination = courseBody ? courseDestination : courseInTransit ? courseDestination : universeRuntime.current;
-  const solidSurface = courseBody && activeDestination?.exploration?.landingMode === 'solid_surface';
+  const missionSurface = courseBody && appCtx.isDestinationMissionSurfaceTarget?.(activeDestination?.id) === true;
+  const solidSurface = courseBody && (activeDestination?.exploration?.landingMode === 'solid_surface' || missionSurface);
   return {
     name: courseBody || courseInTransit ? courseDestination.name : universeRuntime.current.name,
     position: courseBody ? coursePosition : group?.position || new THREE.Vector3(),
@@ -733,7 +750,7 @@ function getUniverseGravityBodies() {
       massKg: mesh.userData.massKg,
       physicalRadiusKm: mesh.userData.physicalRadiusKm,
       mesh,
-      landable: false
+      landable: appCtx.isDestinationMissionSurfaceTarget?.(planet?.id) === true
     };
   });
 }

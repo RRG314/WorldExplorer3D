@@ -147,7 +147,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = 'styles/expedition.css?v=5';
+  link.href = 'styles/expedition.css?v=6';
   document.head.appendChild(link);
 }
 
@@ -261,6 +261,32 @@ function launchPodToContact(contactId) {
     if (!beginLocalContact(contact.id, { viaPod: true })) {
       advancePodJourney('fail', { reason: 'pod-launch-route-unavailable' });
     }
+  });
+  return true;
+}
+
+function launchDestinationMissionPod() {
+  const mission = activeContext?.getDestinationMissionSnapshot?.();
+  if (!activeExpedition || !mission?.surfaceRequired || mission.phase !== 'fieldwork' || !mission.atDestination) return false;
+  if (!activeContext?.prepareDestinationMissionSurface?.(mission.destinationId)) return false;
+  const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
+  setPodJourney(createPodJourney({
+    expeditionId: activeExpedition.id,
+    contactId: `destination-mission:${mission.destinationId}`,
+    bodyId: mission.destinationId,
+    returnFrameId
+  }));
+  advancePodJourney('launch');
+  closeShipStationPanel();
+  const exited = activeContext?.exitExpeditionShipInterior?.() === true;
+  if (!exited) {
+    advancePodJourney('fail', { reason: 'ship-interior-exit-failed' });
+    return false;
+  }
+  window.requestAnimationFrame(() => {
+    if (!activePodJourney || activePodJourney.bodyId !== mission.destinationId) return;
+    advancePodJourney('course_acquired');
+    activeContext?.showSpaceFlightMessage?.(`POD RELEASED · ${mission.destinationId.replaceAll('-', ' ').toUpperCase()} · MANUAL APPROACH`, '#6fe8ff');
   });
   return true;
 }
@@ -400,6 +426,26 @@ function leaveExpeditionSurface(bodyId) {
   store.save(activeExpedition);
   activeContext?.updateExpeditionShipRecord?.(activeExpedition);
   return true;
+}
+
+function leaveDestinationMissionSurface(bodyId) {
+  const mission = activeContext?.getDestinationMissionSnapshot?.();
+  if (!activePodJourney || activePodJourney.bodyId !== bodyId || mission?.destinationId !== bodyId) return false;
+  if (mission.phase !== 'analysis') {
+    activeContext?.showToast?.('Complete all three marked field records before returning to Surveyor.');
+    return false;
+  }
+  const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
+    frameId: mission.systemId || activePodJourney.returnFrameId,
+    courseDestinationId: bodyId,
+    onReady: () => {
+      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+      if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) advancePodJourney('recover');
+      activeContext?.showSpaceFlightMessage?.('POD RECOVERED · SURFACE EVIDENCE READY FOR ANALYSIS', '#83e6a6');
+    }
+  }) === true;
+  if (!departureStarted) return false;
+  return markExpeditionPodSurfaceLaunch(bodyId);
 }
 
 function destinationTypeLabel(destination) {
@@ -809,9 +855,11 @@ function renderPodLaunchPanel(interaction) {
     document.body.appendChild(panel);
   }
   const contacts = podReadyContacts();
+  const mission = activeContext?.getDestinationMissionSnapshot?.();
+  const missionReady = Boolean(mission?.surfaceRequired && mission.phase === 'fieldwork' && mission.atDestination);
   const blockedByTransit = Boolean(activeContext?.universeRuntime?.transition);
-  const targetMarkup = contacts.length
-    ? `<div class="ship-station-actions">${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
+  const targetMarkup = contacts.length || missionReady
+    ? `<div class="ship-station-actions">${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to Surveyor</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
     : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
   panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>SURVEYOR FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
@@ -824,6 +872,9 @@ function renderPodLaunchPanel(interaction) {
   panel.querySelectorAll('[data-pod-contact]').forEach((button) => button.addEventListener('click', () => {
     if (!launchPodToContact(button.dataset.podContact)) activeContext?.showToast?.('That pod route is not available from the current ship position.');
   }));
+  panel.querySelector('[data-pod-mission]')?.addEventListener('click', () => {
+    if (!launchDestinationMissionPod()) activeContext?.showToast?.('The destination mission pod route is not ready.');
+  });
   return true;
 }
 
@@ -837,10 +888,13 @@ function renderDestinationMissionAnalysisPanel(interaction) {
     document.body.appendChild(panel);
   }
   const destinationName = mission.destinationId.split('-').map((word) => word ? `${word[0].toUpperCase()}${word.slice(1)}` : '').join(' ');
+  const lifeFinding = mission.habitability?.lifeEvidence === 'none-confirmed'
+    ? 'No confirmed evidence of life'
+    : mission.habitability?.lifeEvidence || 'No confirmed extraterrestrial life';
   panel.innerHTML = `<div class="ship-station-card destination-analysis-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>SURVEYOR ANALYSIS LAB</span><strong id="shipStationTitle">${mission.title}</strong></div><button type="button" data-close-station aria-label="Close analysis">×</button></header>
     <p>The field package is aboard. Compare the instrument record, preserve uncertainty, and publish the destination report to the Captain’s Log and Explorer Journal.</p>
-    <div class="ship-station-metrics"><div><span>Destination</span><strong>${destinationName}</strong></div><div><span>Evidence</span><strong>Field survey secured</strong></div><div><span>Life finding</span><strong>${mission.habitability?.lifeEvidence || 'No confirmed extraterrestrial life'}</strong></div></div>
+    <div class="ship-station-metrics"><div><span>Destination</span><strong>${destinationName}</strong></div><div><span>Evidence</span><strong>Field survey secured</strong></div><div><span>Life finding</span><strong>${lifeFinding}</strong></div></div>
     <div class="ship-station-actions"><button type="button" data-complete-destination-analysis>Complete science analysis</button></div>
   </div>`;
   panel.classList.add('show');
@@ -899,6 +953,7 @@ function openExpeditionPlanner(appContext) {
     collectExpeditionGeologySample,
     getInterstellarExpeditionSnapshot: getExpeditionSnapshot,
     leaveExpeditionSurface,
+    leaveDestinationMissionSurface,
     markExpeditionPodDescent,
     markExpeditionPodLanded,
     markExpeditionPodSurfaceLaunch

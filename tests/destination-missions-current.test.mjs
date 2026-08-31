@@ -60,3 +60,19 @@ test('mission state rejects skipped objectives and persists one ordered record a
   assert.equal(store.get(mission).phase, 'approach');
   assert.equal(store.load().activeMissionId, mission.id);
 });
+
+test('surface evidence is deduplicated and persists without skipping fieldwork', () => {
+  const mission = getDestinationMission('proxima-centauri-b');
+  const memory = new Map();
+  const storage = { getItem: (key) => memory.get(key) || null, setItem: (key, value) => memory.set(key, value) };
+  const store = createDestinationMissionStore(storage);
+  store.activate(mission);
+  store.advance(mission, 'review_briefing', { atMs: 10 });
+  store.advance(mission, 'arrive', { atMs: 20 });
+  const first = store.recordEvidence(mission, 'photograph', { atMs: 30 });
+  const duplicate = store.recordEvidence(mission, 'photograph', { atMs: 31 });
+  assert.equal(first.accepted, true);
+  assert.equal(duplicate.duplicate, true);
+  assert.deepEqual(createDestinationMissionStore(storage).get(mission).evidence, ['photograph']);
+  assert.equal(store.get(mission).phase, 'fieldwork');
+});
