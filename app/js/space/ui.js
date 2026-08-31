@@ -79,6 +79,9 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
     <button id="sfAssistBtn" style="width:100%;padding:12px;margin-bottom:8px;background:#315d9d;border:1px solid #60a5fa;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;">
       ENGAGE FLIGHT ASSIST
     </button>
+    <button id="sfExpeditionBtn" style="width:100%;padding:11px;margin-bottom:8px;background:#152b4f;border:1px solid #38bdf8;border-radius:8px;color:#e0f2fe;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;">
+      INTERSTELLAR EXPEDITION
+    </button>
     <button id="sfLandBtn" style="width:100%;padding:12px;background:#667eea;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;opacity:0.5;" disabled>
       EXPLORE SOLAR SYSTEM
     </button>
@@ -96,6 +99,10 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
     target.addEventListener(eventName, listener, options);
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
+  listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
+    const runtime = await import('../expedition/runtime.js?v=1');
+    runtime.openExpeditionPlanner(appCtx);
+  });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
     const hud = document.getElementById('spaceFlightHUD');
     const collapsed = hud?.classList.toggle('collapsed') === true;
