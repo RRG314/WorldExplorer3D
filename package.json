@@ -89,6 +89,7 @@
     "verify:planetary-build": "node --test tests/planetary-build-surface-current.test.mjs tests/block-local-store-current.test.mjs",
     "verify:spacecraft-authority": "node --test tests/spacecraft-authority-current.test.mjs",
     "verify:space-journey": "node --test tests/space-journey-authority-current.test.mjs",
+    "verify:interstellar-interior-visual": "node scripts/verification/interstellar-interior-visual-current.mjs",
     "verify:space-atmosphere": "node --test tests/space-atmospheric-exploration-current.test.mjs",
     "verify:space-destinations": "node --test tests/space-destination-completeness-current.test.mjs",
     "verify:universe-wayfinder": "node --test tests/universe-wayfinder-current.test.mjs",

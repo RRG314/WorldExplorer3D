@@ -21,7 +21,164 @@ function material(color, options = {}) {
     roughness: options.roughness ?? 0.58,
     metalness: options.metalness ?? 0.26,
     emissive: options.emissive ?? 0x000000,
-    emissiveIntensity: options.emissiveIntensity ?? 0
+    emissiveIntensity: options.emissiveIntensity ?? 0,
+    emissiveMap: options.emissiveMap || null,
+    map: options.map || null,
+    bumpMap: options.bumpMap || null,
+    bumpScale: options.bumpScale ?? 0,
+    transparent: options.transparent === true,
+    opacity: options.opacity ?? 1
+  });
+}
+
+function createShipDisplayTexture(label, accentColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  const accent = hexColor(accentColor);
+  context.fillStyle = '#06101a';
+  context.fillRect(0, 0, 512, 256);
+  context.strokeStyle = 'rgba(150,205,225,.12)';
+  context.lineWidth = 2;
+  for (let x = 0; x <= 512; x += 64) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, 256); context.stroke(); }
+  for (let y = 0; y <= 256; y += 48) { context.beginPath(); context.moveTo(0, y); context.lineTo(512, y); context.stroke(); }
+  context.fillStyle = accent;
+  context.globalAlpha = 0.82;
+  [0.72, 0.48, 0.88, 0.36].forEach((ratio, index) => context.fillRect(32, 72 + index * 34, 250 * ratio, 10));
+  context.globalAlpha = 1;
+  context.strokeStyle = accent;
+  context.lineWidth = 5;
+  context.beginPath();
+  for (let index = 0; index < 14; index += 1) {
+    const x = 300 + index * 13;
+    const y = 148 - Math.sin(index * 1.13 + label.length) * 34 - (index % 3) * 7;
+    if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+  }
+  context.stroke();
+  context.fillStyle = '#e8f7ff';
+  context.font = '700 25px Arial, sans-serif';
+  context.fillText(String(label).replaceAll('-', ' ').toUpperCase(), 28, 42);
+  context.fillStyle = 'rgba(220,245,255,.7)';
+  context.font = '16px monospace';
+  context.fillText('SURVEYOR // ACTIVE', 302, 220);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function deckAccent(deckId) {
+  return deckId === 'command' ? 0x2d9ec4 : deckId === 'habitat' ? 0x4d9f79 : 0xc47742;
+}
+
+function hexColor(value) {
+  return `#${Number(value || 0).toString(16).padStart(6, '0')}`;
+}
+
+function createShipPanelTexture(kind, accentColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext('2d');
+  const accent = hexColor(accentColor);
+  const palettes = {
+    floor: ['#1f2a36', '#283542', '#111a24'],
+    corridor: ['#243847', '#2d4658', '#101b25'],
+    wall: ['#46545f', '#60707b', '#26323c'],
+    ceiling: ['#2b3743', '#374654', '#17212b']
+  };
+  const [base, panel, seam] = palettes[kind] || palettes.floor;
+  context.fillStyle = base;
+  context.fillRect(0, 0, 512, 512);
+
+  const cellX = kind === 'wall' ? 256 : 96;
+  const cellY = kind === 'corridor' ? 128 : kind === 'wall' ? 256 : 96;
+  for (let y = -cellY; y < 512 + cellY; y += cellY) {
+    for (let x = -cellX; x < 512 + cellX; x += cellX) {
+      const stagger = kind === 'wall' ? 0 : ((Math.floor(y / cellY) & 1) * cellX) / 2;
+      const px = x + stagger;
+      context.fillStyle = panel;
+      context.fillRect(px + 4, y + 4, cellX - 8, cellY - 8);
+      context.strokeStyle = seam;
+      context.lineWidth = 3;
+      context.strokeRect(px + 4, y + 4, cellX - 8, cellY - 8);
+      context.strokeStyle = kind === 'wall' ? 'rgba(235,246,250,.18)' : 'rgba(220,240,250,.08)';
+      context.lineWidth = 1;
+      context.strokeRect(px + 9, y + 9, cellX - 18, cellY - 18);
+      [[12, 12], [cellX - 12, 12], [12, cellY - 12], [cellX - 12, cellY - 12]].forEach(([fx, fy]) => {
+        context.fillStyle = kind === 'wall' ? '#34424d' : '#788794';
+        context.beginPath();
+        context.arc(px + fx, y + fy, 2.3, 0, Math.PI * 2);
+        context.fill();
+      });
+    }
+  }
+
+  context.globalAlpha = kind === 'wall' ? 0.2 : 0.32;
+  context.fillStyle = accent;
+  if (kind === 'wall') context.fillRect(0, 394, 512, 12);
+  else if (kind === 'corridor') {
+    context.fillRect(18, 0, 9, 512);
+    context.fillRect(485, 0, 9, 512);
+  } else if (kind === 'ceiling') {
+    context.fillRect(246, 0, 20, 512);
+  } else {
+    context.fillRect(0, 246, 512, 10);
+  }
+  context.globalAlpha = 1;
+
+  for (let index = 0; index < 42; index += 1) {
+    const x = (index * 137 + 31) % 512;
+    const y = (index * 83 + 17) % 512;
+    const length = 10 + (index % 5) * 8;
+    context.strokeStyle = kind === 'wall' ? 'rgba(40,52,61,.12)' : 'rgba(205,226,236,.06)';
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(Math.min(511, x + length), Math.max(0, y - 2 - (index % 4)));
+    context.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  const repeat = kind === 'corridor' ? [2, 18] : kind === 'wall' ? [3, 10] : kind === 'ceiling' ? [5, 16] : [7, 18];
+  texture.repeat.set(...repeat);
+  texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function shipSurfaceMaterial(kind, deckId) {
+  const accentColor = deckAccent(deckId);
+  const texture = createShipPanelTexture(kind, accentColor);
+  const colors = {
+    floor: 0x71808c,
+    corridor: 0x6b8596,
+    wall: 0xb3bec4,
+    ceiling: 0x7b8993
+  };
+  return material(colors[kind] || colors.floor, {
+    roughness: kind === 'wall' ? 0.58 : 0.46,
+    metalness: kind === 'wall' ? 0.2 : 0.42,
+    map: texture,
+    bumpMap: texture,
+    bumpScale: kind === 'wall' ? 0.012 : 0.022
+  });
+}
+
+function shipDisplayMaterial(label, accent, intensity = 0.72) {
+  const texture = createShipDisplayTexture(label, accent);
+  return material(0xffffff, {
+    map: texture,
+    emissive: 0xffffff,
+    emissiveMap: texture,
+    emissiveIntensity: intensity,
+    metalness: 0.04,
+    roughness: 0.24
   });
 }
 
@@ -93,14 +250,19 @@ function addConsole(group, x, z, yaw, accent, label) {
   consoleGroup.name = `ship-console:${label}`;
   const dark = material(0x111b28, { metalness: 0.62, roughness: 0.34 });
   const frame = material(0x566675, { metalness: 0.58, roughness: 0.38 });
-  const screen = material(accent, { emissive: accent, emissiveIntensity: 1.05, metalness: 0.08, roughness: 0.3 });
+  const screen = shipDisplayMaterial(label, accent);
   box(consoleGroup, { x: 2.55, y: 0.16, z: 0.92 }, { x: 0, y: 0.08, z: 0 }, frame, `${label}:console-plinth`);
   box(consoleGroup, { x: 2.3, y: 0.66, z: 0.72 }, { x: 0, y: 0.45, z: 0 }, dark, `${label}:console-body`);
   [-1.08, 1.08].forEach((side) => box(consoleGroup, { x: 0.18, y: 0.82, z: 0.82 }, { x: side, y: 0.48, z: 0 }, frame, `${label}:console-edge`));
-  const display = box(consoleGroup, { x: 2.05, y: 0.55, z: 0.08 }, { x: 0, y: 1.02, z: -0.31 }, screen, `${label}:display`);
+  const bezel = box(consoleGroup, { x: 2.28, y: 0.72, z: 0.12 }, { x: 0, y: 1.01, z: -0.3 }, frame, `${label}:display-bezel`);
+  bezel.rotation.x = -0.32;
+  const display = box(consoleGroup, { x: 2.04, y: 0.54, z: 0.035 }, { x: 0, y: 1.02, z: -0.372 }, screen, `${label}:display`);
   display.rotation.x = -0.32;
   display.userData.shipAnimated = 'screen';
-  display.userData.baseEmissiveIntensity = 0.9 + (accent % 7) * 0.025;
+  display.userData.baseEmissiveIntensity = 0.68 + (accent % 7) * 0.018;
+  box(consoleGroup, { x: 1.74, y: 0.28, z: 0.035 }, { x: 0, y: 0.43, z: -0.375 }, material(0x273847, { metalness: 0.52, roughness: 0.4 }), `${label}:service-access`);
+  [-0.62, -0.31, 0, 0.31, 0.62].forEach((offset) => box(consoleGroup, { x: 0.18, y: 0.04, z: 0.025 }, { x: offset, y: 0.43, z: -0.4 }, material(0x7c8d98, { metalness: 0.66, roughness: 0.32 }), `${label}:service-vent`));
+  box(consoleGroup, { x: 1.8, y: 0.035, z: 0.06 }, { x: 0, y: 0.15, z: -0.42 }, material(accent, { emissive: accent, emissiveIntensity: 0.42, metalness: 0.08, roughness: 0.3 }), `${label}:console-underglow`);
   for (let index = 0; index < 10; index += 1) {
     const buttonColor = index % 4 === 0 ? 0xe9a447 : index % 3 === 0 ? 0x72d6a2 : accent;
     box(consoleGroup, { x: 0.14, y: 0.035, z: 0.11 }, {
@@ -143,9 +305,21 @@ function addScienceBench(group, x, z, yaw, accent, label) {
     vessel.position.set(offset, 1.2, 0.05);
     root.add(vessel);
   });
-  const display = box(root, { x: 1.15, y: 0.65, z: 0.08 }, { x: -1.4, y: 1.55, z: 0.25 }, material(accent, { emissive: accent, emissiveIntensity: 0.85, metalness: 0.04, roughness: 0.28 }), `${label}:instrument-display`);
+  const display = box(root, { x: 1.42, y: 0.7, z: 0.05 }, { x: -1.28, y: 1.56, z: 0.25 }, shipDisplayMaterial(label, accent, 0.76), `${label}:instrument-display`);
   display.userData.shipAnimated = 'screen';
   display.userData.baseEmissiveIntensity = 0.78;
+  const scannerBed = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.1, 24), material(0x263845, { metalness: 0.62, roughness: 0.32 }));
+  scannerBed.rotation.x = Math.PI / 2;
+  scannerBed.position.set(0.65, 1.18, -0.04);
+  scannerBed.name = `${label}:sample-scanner-bed`;
+  root.add(scannerBed);
+  const scannerRing = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.07, 10, 28), material(accent, { emissive: accent, emissiveIntensity: 0.48, metalness: 0.32, roughness: 0.28 }));
+  scannerRing.rotation.x = Math.PI / 2;
+  scannerRing.position.set(0.65, 1.38, -0.04);
+  scannerRing.name = `${label}:sample-scanner-ring`;
+  root.add(scannerRing);
+  box(root, { x: 0.1, y: 0.88, z: 0.1 }, { x: 1.28, y: 1.48, z: -0.02 }, frame, `${label}:scanner-arm`);
+  box(root, { x: 0.72, y: 0.1, z: 0.1 }, { x: 0.96, y: 1.9, z: -0.02 }, frame, `${label}:scanner-boom`);
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
   group.add(root);
@@ -182,12 +356,22 @@ function cylinder(group, radiusTop, radiusBottom, height, position, surface, nam
   return mesh;
 }
 
+function addRoomTaskLight(group, x, z, color, label, intensity = 0.7, distance = 10) {
+  const fixture = box(group, { x: 2.4, y: 0.08, z: 0.65 }, { x, y: 3.14, z }, material(color, { emissive: color, emissiveIntensity: 0.82, metalness: 0.08, roughness: 0.26 }), `${label}:ceiling-task-light`);
+  fixture.userData.shipAnimated = 'screen';
+  fixture.userData.baseEmissiveIntensity = 0.74;
+  const light = new THREE.PointLight(color, intensity, distance, 1.7);
+  light.position.set(x, 2.82, z);
+  light.name = `${label}:task-light-source`;
+  group.add(light);
+}
+
 function addMedicalBed(group, x, z, yaw, accent, label) {
   const root = new THREE.Group();
   root.name = `medical-bed:${label}`;
   const frame = material(0x667989, { metalness: 0.48, roughness: 0.38 });
   const cushion = material(0xd5e0e4, { metalness: 0.03, roughness: 0.86 });
-  const screenSurface = material(accent, { emissive: accent, emissiveIntensity: 0.86, metalness: 0.04, roughness: 0.26 });
+  const screenSurface = shipDisplayMaterial(`${label}-vitals`, accent, 0.78);
   box(root, { x: 2, y: 0.22, z: 3.35 }, { x: 0, y: 0.68, z: 0 }, frame, `${label}:bed-frame`);
   box(root, { x: 1.76, y: 0.22, z: 2.88 }, { x: 0, y: 0.87, z: 0.1 }, cushion, `${label}:mattress`);
   box(root, { x: 1.5, y: 0.2, z: 0.68 }, { x: 0, y: 1.02, z: -1.05 }, material(0xb8cbd4, { roughness: 0.9, metalness: 0 }), `${label}:pillow`);
@@ -199,6 +383,10 @@ function addMedicalBed(group, x, z, yaw, accent, label) {
   display.userData.shipAnimated = 'screen';
   display.userData.baseEmissiveIntensity = 0.82;
   box(root, { x: 0.1, y: 1.1, z: 0.1 }, { x: 1.32, y: 1.12, z: -0.95 }, frame, `${label}:display-arm`);
+  box(root, { x: 1.35, y: 0.1, z: 0.1 }, { x: 0.7, y: 2.1, z: 0.82 }, frame, `${label}:diagnostic-boom`);
+  const diagnosticLamp = cylinder(root, 0.32, 0.24, 0.12, { x: 0.08, y: 2.04, z: 0.82 }, material(0xccecf0, { emissive: 0xa9e4ea, emissiveIntensity: 0.8, metalness: 0.12, roughness: 0.24 }), `${label}:diagnostic-lamp`, { x: Math.PI / 2, y: 0, z: 0 }, 18);
+  diagnosticLamp.userData.shipAnimated = 'screen';
+  diagnosticLamp.userData.baseEmissiveIntensity = 0.74;
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
   group.add(root);
@@ -235,13 +423,55 @@ function addGalleyModule(group, x, z, yaw, accent) {
   [-2.55, -0.85, 0.85, 2.55].forEach((offset, index) => {
     box(root, { x: 1.45, y: 0.7, z: 0.08 }, { x: offset, y: 0.5, z: -0.79 }, dark, `galley-cabinet:${index}`);
     box(root, { x: 1.48, y: 0.56, z: 0.12 }, { x: offset, y: 1.72, z: 0.58 }, dark, `galley-appliance:${index}`);
-    const panel = box(root, { x: 1.1, y: 0.28, z: 0.05 }, { x: offset, y: 1.72, z: 0.51 }, material(index === 1 ? 0xe2a34b : accent, { emissive: index === 1 ? 0xe2a34b : accent, emissiveIntensity: 0.6 }), `galley-display:${index}`);
+    const panelAccent = index === 1 ? 0xe2a34b : accent;
+    const panel = box(root, { x: 1.1, y: 0.34, z: 0.045 }, { x: offset, y: 1.72, z: 0.51 }, shipDisplayMaterial(`galley-${index + 1}`, panelAccent, 0.62), `galley-display:${index}`);
     panel.userData.shipAnimated = 'screen';
     panel.userData.baseEmissiveIntensity = 0.56;
+    box(root, { x: 0.62, y: 0.05, z: 0.08 }, { x: offset, y: 0.5, z: -0.86 }, frame, `galley-handle:${index}`);
   });
   [0, 0.52, 1.04].forEach((offset) => cylinder(root, 0.11, 0.1, 0.28, { x: 2.25 + offset, y: 1.24, z: -0.15 }, material(0x96c3d0, { metalness: 0.06, roughness: 0.38 }), 'galley-container'));
+  const sink = cylinder(root, 0.62, 0.62, 0.08, { x: -2.3, y: 1.12, z: -0.05 }, dark, 'galley-sink', null, 24);
+  sink.scale.z = 0.65;
+  const tap = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.055, 8, 18, Math.PI), frame);
+  tap.rotation.x = Math.PI / 2;
+  tap.position.set(-2.3, 1.35, 0.06);
+  tap.name = 'galley-water-tap';
+  root.add(tap);
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
+  group.add(root);
+  return root;
+}
+
+function addWardroomTable(group, x, z, accent) {
+  const root = new THREE.Group();
+  root.name = 'wardroom-furniture';
+  const frame = material(0x596c79, { metalness: 0.56, roughness: 0.36 });
+  const top = material(0x3a302d, { metalness: 0.12, roughness: 0.62 });
+  const fabric = material(0x29495b, { metalness: 0.02, roughness: 0.82 });
+  const ceramic = material(0xd7e2e4, { metalness: 0.02, roughness: 0.52 });
+  box(root, { x: 7.2, y: 0.18, z: 2.6 }, { x: 0, y: 0.92, z: 0 }, top, 'wardroom-tabletop');
+  box(root, { x: 5.9, y: 0.025, z: 0.22 }, { x: 0, y: 1.02, z: 0 }, material(accent, { emissive: accent, emissiveIntensity: 0.38, metalness: 0.06, roughness: 0.28 }), 'wardroom-table-status-strip');
+  [-2.7, 2.7].forEach((leg) => {
+    box(root, { x: 0.28, y: 0.86, z: 1.8 }, { x: leg, y: 0.43, z: 0 }, frame, 'wardroom-table-leg');
+    box(root, { x: 1.15, y: 0.14, z: 1.55 }, { x: leg, y: 0.12, z: 0 }, frame, 'wardroom-table-foot');
+  });
+  [-2.45, -0.85, 0.85, 2.45].forEach((placeX, index) => {
+    const placeZ = index % 2 ? -0.68 : 0.68;
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.035, 24), ceramic);
+    plate.position.set(placeX, 1.04, placeZ);
+    plate.name = `wardroom-place-setting:${index}`;
+    root.add(plate);
+    cylinder(root, 0.09, 0.08, 0.24, { x: placeX + 0.45, y: 1.15, z: placeZ }, material(index % 2 ? 0x6faab9 : 0xc79b5a, { metalness: 0.04, roughness: 0.46 }), `wardroom-cup:${index}`, null, 14);
+    box(root, { x: 0.06, y: 0.025, z: 0.52 }, { x: placeX - 0.48, y: 1.05, z: placeZ }, frame, `wardroom-utensil:${index}`);
+  });
+  [-4.1, -1.35, 1.35, 4.1].forEach((seatX, index) => {
+    const seatZ = index % 2 ? -1.85 : 1.85;
+    box(root, { x: 1.05, y: 0.18, z: 0.78 }, { x: seatX, y: 0.55, z: seatZ }, fabric, 'wardroom-seat');
+    box(root, { x: 1.05, y: 0.7, z: 0.14 }, { x: seatX, y: 0.9, z: seatZ + (seatZ < 0 ? -0.38 : 0.38) }, fabric, 'wardroom-seat-back');
+    cylinder(root, 0.12, 0.2, 0.42, { x: seatX, y: 0.25, z: seatZ }, frame, 'wardroom-seat-pedestal', null, 12);
+  });
+  root.position.set(x, 0, z);
   group.add(root);
   return root;
 }
@@ -274,12 +504,22 @@ function addHydroponicsRack(group, x, z, yaw, accent, label) {
     box(root, { x: 3.55, y: 0.18, z: 1.45 }, { x: 0, y: height, z: 0 }, tray, `${label}:grow-tray`);
     box(root, { x: 3.25, y: 0.05, z: 0.22 }, { x: 0, y: height + 0.56, z: 0 }, material(accent, { emissive: accent, emissiveIntensity: 0.76, metalness: 0.04, roughness: 0.28 }), `${label}:grow-light`);
     [-1.25, -0.62, 0, 0.62, 1.25].forEach((offset, index) => {
-      const plant = new THREE.Mesh(new THREE.SphereGeometry(0.15 + (index % 2) * 0.04, 8, 6), material(index % 3 === 0 ? 0x73ad5f : 0x4c8f58, { roughness: 0.94, metalness: 0 }));
-      plant.scale.set(1.3, 0.72, 1);
-      plant.position.set(offset, height + 0.28, (index % 2 ? 0.23 : -0.2));
-      root.add(plant);
+      const plantMaterial = material(index % 3 === 0 ? 0x73ad5f : 0x4c8f58, { roughness: 0.94, metalness: 0 });
+      cylinder(root, 0.025, 0.035, 0.34, { x: offset, y: height + 0.28, z: index % 2 ? 0.23 : -0.2 }, material(0x477447, { roughness: 0.92, metalness: 0 }), `${label}:plant-stem`);
+      [-0.11, 0.11].forEach((leafOffset, leafIndex) => {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.14 + (index % 2) * 0.035, 10, 7), plantMaterial);
+        leaf.scale.set(1.5, 0.34, 0.75);
+        leaf.rotation.z = leafOffset < 0 ? -0.42 : 0.42;
+        leaf.position.set(offset + leafOffset, height + 0.38 + leafIndex * 0.08, (index % 2 ? 0.23 : -0.2));
+        leaf.name = `${label}:plant-leaf`;
+        root.add(leaf);
+      });
     });
   });
+  box(root, { x: 0.18, y: 2.34, z: 0.18 }, { x: -1.48, y: 1.35, z: 0.72 }, material(0x5aaeb5, { emissive: 0x1c5960, emissiveIntensity: 0.3, metalness: 0.4, roughness: 0.3 }), `${label}:nutrient-line`);
+  const monitor = box(root, { x: 0.92, y: 0.58, z: 0.045 }, { x: 1.14, y: 2.45, z: -0.77 }, shipDisplayMaterial(`${label}-growth`, accent, 0.68), `${label}:growth-monitor`);
+  monitor.userData.shipAnimated = 'screen';
+  monitor.userData.baseEmissiveIntensity = 0.64;
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
   group.add(root);
@@ -330,6 +570,29 @@ function addCargoModule(group, x, z, yaw, accent, label) {
   [-0.72, 0, 0.72].forEach((height) => box(root, { x: 1.65, y: 0.1, z: 0.08 }, { x: 0, y: 0.88 + height, z: -1.19 }, material(height === 0 ? accent : 0xc5a35c, { emissive: height === 0 ? accent : 0x000000, emissiveIntensity: height === 0 ? 0.5 : 0 }), `${label}:cargo-mark`));
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
+  group.add(root);
+  return root;
+}
+
+function addFabricationWorkbench(group, x, z, accent) {
+  const root = new THREE.Group();
+  root.name = 'fabrication-workbench-system';
+  const frame = material(0x596976, { metalness: 0.62, roughness: 0.34 });
+  const dark = material(0x16232d, { metalness: 0.48, roughness: 0.44 });
+  const copper = material(0xb5754f, { metalness: 0.58, roughness: 0.3 });
+  box(root, { x: 4.7, y: 0.18, z: 1.55 }, { x: 0, y: 0.92, z: 0 }, frame, 'fabrication-workbench');
+  [-1.75, 1.75].forEach((side) => box(root, { x: 0.86, y: 0.82, z: 1.25 }, { x: side, y: 0.42, z: 0 }, dark, 'fabrication-drawer-bank'));
+  [-0.22, 0.02, 0.26].forEach((height) => [-1.75, 1.75].forEach((side) => box(root, { x: 0.56, y: 0.04, z: 0.05 }, { x: side, y: 0.44 + height, z: -0.65 }, frame, 'fabrication-drawer-handle')));
+  [-2.05, 2.05].forEach((side) => box(root, { x: 0.16, y: 1.45, z: 0.18 }, { x: side, y: 1.65, z: 0.48 }, frame, 'fabrication-gantry-post'));
+  box(root, { x: 4.25, y: 0.16, z: 0.18 }, { x: 0, y: 2.35, z: 0.48 }, frame, 'fabrication-gantry-rail');
+  box(root, { x: 0.5, y: 0.42, z: 0.5 }, { x: 0.4, y: 2.15, z: 0.48 }, dark, 'fabrication-tool-head');
+  cylinder(root, 0.07, 0.12, 0.58, { x: 0.4, y: 1.67, z: 0.48 }, copper, 'fabrication-tool-nozzle', null, 12);
+  box(root, { x: 1.3, y: 0.06, z: 0.92 }, { x: 0.4, y: 1.05, z: 0.08 }, material(0x273842, { metalness: 0.7, roughness: 0.26 }), 'fabrication-build-plate');
+  const monitor = box(root, { x: 1.15, y: 0.66, z: 0.045 }, { x: -1.1, y: 1.68, z: -0.7 }, shipDisplayMaterial('fabrication-queue', accent, 0.72), 'fabrication-queue-display');
+  monitor.userData.shipAnimated = 'screen';
+  monitor.userData.baseEmissiveIntensity = 0.68;
+  [-1.25, 0, 1.25].forEach((offset, index) => cylinder(root, 0.2, 0.24, 0.62, { x: offset, y: 1.32, z: -0.05 }, material(index === 1 ? accent : 0x81919a, { emissive: index === 1 ? 0x6d3c13 : 0x000000, emissiveIntensity: index === 1 ? 0.3 : 0 }), 'fabrication-feedstock'));
+  root.position.set(x, 0, z);
   group.add(root);
   return root;
 }
@@ -529,6 +792,8 @@ function addDeckDetails(group, deckId) {
   group.add(lift);
 
   if (deckId === 'command') {
+    addRoomTaskLight(group, 0, 29.2, 0x9fe8f3, 'bridge', 0.72, 11);
+    addRoomTaskLight(group, -8.2, -1.4, 0x79c7e5, 'physical-science', 0.62, 8);
     addConsole(group, -4.5, 32.1, Math.PI, 0x3aa8d8, 'navigation');
     addConsole(group, 4.5, 32.1, Math.PI, 0x5ed69d, 'flight');
     addConsole(group, 0, 27.2, 0, 0xe7a648, 'captain-log');
@@ -557,14 +822,11 @@ function addDeckDetails(group, deckId) {
     });
     addBridgeView(group);
   } else if (deckId === 'habitat') {
+    addRoomTaskLight(group, 1.5, 30, 0xffd5a4, 'wardroom', 0.74, 12);
+    addRoomTaskLight(group, -8.2, 15.5, 0xc7f0f2, 'medical', 0.68, 9);
+    addRoomTaskLight(group, -8.2, -29, 0xa7efba, 'hydroponics', 0.64, 10);
     addGalleyModule(group, -7.6, 26.1, 0, 0x5fd6a3);
-    box(group, { x: 7.2, y: 0.18, z: 2.6 }, { x: 1.5, y: 0.92, z: 30.2 }, dark, 'wardroom-tabletop');
-    [-1.2, 4.2].forEach((x) => box(group, { x: 0.22, y: 0.86, z: 1.8 }, { x, y: 0.43, z: 30.2 }, steel, 'wardroom-table-leg'));
-    [-2.6, 0.15, 2.85, 5.55].forEach((x, index) => {
-      const seatZ = index % 2 ? 28.35 : 32.05;
-      box(group, { x: 1.05, y: 0.18, z: 0.78 }, { x, y: 0.55, z: seatZ }, soft, 'wardroom-seat');
-      box(group, { x: 1.05, y: 0.7, z: 0.14 }, { x, y: 0.9, z: seatZ + (seatZ < 30 ? -0.38 : 0.38) }, soft, 'wardroom-seat-back');
-    });
+    addWardroomTable(group, 1.5, 30.2, 0x5fd6a3);
     [11.2, 15.4, 19.6].forEach((z, index) => addMedicalBed(group, -8.2, z, 0, index === 1 ? 0x7fd9c3 : 0x66add4, `medical-${index + 1}`));
     addWallServicePanel(group, -12.55, 18.8, Math.PI / 2, 0x66add4, 'medical-gases');
     box(group, { x: 1.8, y: 0.25, z: 4.9 }, { x: 6.8, y: 0.14, z: 15.5 }, dark, 'exercise-treadmill-bed');
@@ -585,6 +847,9 @@ function addDeckDetails(group, deckId) {
     box(group, { x: 7.5, y: 0.2, z: 1.35 }, { x: 8.1, y: 0.46, z: -29 }, soft, 'storm-shelter-bench');
     box(group, { x: 7.5, y: 0.68, z: 0.16 }, { x: 8.1, y: 0.84, z: -29.62 }, soft, 'storm-shelter-back');
   } else {
+    addRoomTaskLight(group, 0, 30, 0xffbd82, 'main-engineering', 0.76, 12);
+    addRoomTaskLight(group, -8.2, -2.4, 0xffc58f, 'fabrication', 0.66, 9);
+    addRoomTaskLight(group, 0, -29, 0x8ecfe8, 'local-craft-bay', 0.7, 12);
     const coreRoot = new THREE.Group();
     coreRoot.name = 'propulsion-core';
     const coreShell = cylinder(coreRoot, 1.18, 1.42, 5.6, { x: 0, y: 0, z: 0 }, material(0x573a34, { emissive: 0x33150d, emissiveIntensity: 0.42, metalness: 0.7, roughness: 0.26 }), 'propulsion-core-shell', { x: Math.PI / 2, y: 0, z: 0 }, 24);
@@ -601,6 +866,18 @@ function addDeckDetails(group, deckId) {
       [-2.2, 2.2].forEach((z) => box(coreRoot, { x: 0.28, y: 2.5, z: 0.34 }, { x, y: -0.55, z }, steel, 'propulsion-core-support'));
     });
     [-2.2, 2.2].forEach((z) => box(coreRoot, { x: 3.95, y: 0.22, z: 0.34 }, { x: 0, y: -1.75, z }, steel, 'propulsion-core-crossbrace'));
+    [-1.35, -0.45, 0.45, 1.35].forEach((x, index) => {
+      const node = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), material(index % 2 ? 0xffb272 : 0x76d8ea, { emissive: index % 2 ? 0xff7d3b : 0x3fb4cf, emissiveIntensity: 0.9, metalness: 0.12, roughness: 0.24 }));
+      node.position.set(x, 0, -2.93);
+      node.name = `propulsion-core-field-node:${index}`;
+      node.userData.shipAnimated = 'screen';
+      node.userData.baseEmissiveIntensity = 0.82;
+      coreRoot.add(node);
+    });
+    [-1.65, 1.65].forEach((x) => {
+      cylinder(coreRoot, 0.085, 0.085, 5.1, { x, y: -1.25, z: 0 }, material(0xa66a45, { metalness: 0.66, roughness: 0.3 }), 'propulsion-core-service-conduit', { x: Math.PI / 2, y: 0, z: 0 }, 10);
+      [-2.45, 2.45].forEach((z) => cylinder(coreRoot, 0.18, 0.18, 0.26, { x, y: -1.25, z }, material(0x314652, { metalness: 0.7, roughness: 0.28 }), 'propulsion-core-conduit-coupling', { x: Math.PI / 2, y: 0, z: 0 }, 12));
+    });
     coreRoot.position.set(0, 1.82, 30.5);
     group.add(coreRoot);
     addConsole(group, -4.5, 31.2, Math.PI, 0xe28d4c, 'propulsion-control');
@@ -610,8 +887,7 @@ function addDeckDetails(group, deckId) {
     addThermalAssembly(group, 8.2, 12.4, 0, 0x55b9d7, 'coolant-a');
     addThermalAssembly(group, 8.2, 18.7, Math.PI, 0x55b9d7, 'coolant-b');
     addConsole(group, -8, 0.5, Math.PI / 2, 0xdfa14a, 'fabricator');
-    box(group, { x: 4.4, y: 0.18, z: 1.45 }, { x: -8.2, y: 0.92, z: -3.7 }, steel, 'fabrication-workbench');
-    [-9.8, -8.2, -6.6].forEach((x, index) => cylinder(group, 0.2, 0.24, 0.62, { x, y: 1.32, z: -3.7 }, material(index === 1 ? 0xdfa14a : 0x81919a, { emissive: index === 1 ? 0x6d3c13 : 0x000000, emissiveIntensity: index === 1 ? 0.3 : 0 }), 'fabrication-feedstock'));
+    addFabricationWorkbench(group, -8.2, -3.7, 0xdfa14a);
     [-3.6, 0, 3.6].forEach((z, index) => addCargoModule(group, 8.2, z, index % 2 ? Math.PI : 0, 0xdfa14a, `cargo-${index + 1}`));
     const processorRoot = new THREE.Group();
     processorRoot.name = 'resource-processor';
@@ -640,7 +916,23 @@ function addDeckDetails(group, deckId) {
     canopy.position.set(0, 1.05, 1.1);
     shuttle.add(canopy);
     box(shuttle, { x: 7.4, y: 0.16, z: 2.15 }, { x: 0, y: -0.15, z: -0.4 }, steel, 'survey-craft-wing');
+    box(shuttle, { x: 0.18, y: 1.45, z: 2.35 }, { x: 0, y: 0.62, z: -3.15 }, steel, 'survey-craft-tail-fin');
+    [-2.3, 2.3].forEach((side) => box(shuttle, { x: 2.3, y: 0.12, z: 1.25 }, { x: side, y: 0.16, z: -2.8 }, steel, 'survey-craft-tailplane'));
     [-3.2, 3.2].forEach((side) => cylinder(shuttle, 0.44, 0.62, 2.8, { x: side, y: -0.12, z: -0.4 }, dark, 'survey-craft-thruster', { x: Math.PI / 2, y: 0, z: 0 }, 16));
+    [-3.2, 3.2].forEach((side) => {
+      const engineRing = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.09, 10, 22), material(0x607685, { metalness: 0.74, roughness: 0.26 }));
+      engineRing.position.set(side, -0.12, -1.8);
+      engineRing.name = 'survey-craft-engine-ring';
+      shuttle.add(engineRing);
+      const exhaust = cylinder(shuttle, 0.34, 0.34, 0.08, { x: side, y: -0.12, z: -1.86 }, material(0x61c9e4, { emissive: 0x2e9fc2, emissiveIntensity: 0.72, metalness: 0.06, roughness: 0.24 }), 'survey-craft-engine-glow', { x: Math.PI / 2, y: 0, z: 0 }, 18);
+      exhaust.userData.shipAnimated = 'screen';
+      exhaust.userData.baseEmissiveIntensity = 0.66;
+    });
+    [-0.56, 0.56].forEach((side) => box(shuttle, { x: 0.08, y: 0.75, z: 1.42 }, { x: side, y: 1.1, z: 0.92 }, material(0x7895a3, { metalness: 0.56, roughness: 0.3 }), 'survey-craft-canopy-frame'));
+    [-2.45, 0, 2.45].forEach((side, index) => {
+      box(shuttle, { x: 0.18, y: 1.1, z: 0.18 }, { x: side, y: -0.68, z: index === 1 ? 1.9 : -0.55 }, dark, 'survey-craft-landing-strut');
+      cylinder(shuttle, 0.27, 0.27, 0.18, { x: side, y: -1.24, z: index === 1 ? 1.9 : -0.55 }, material(0x17212b, { metalness: 0.25, roughness: 0.72 }), 'survey-craft-landing-pad', null, 16);
+    });
     [-0.56, 0.56].forEach((side) => box(shuttle, { x: 0.12, y: 0.12, z: 2.1 }, { x: side, y: 0.55, z: -3.5 }, material(0xdfa14a, { emissive: 0xdfa14a, emissiveIntensity: 0.62 }), 'survey-craft-marker'));
     shuttle.position.set(0, 1.45, -29.5);
     group.add(shuttle);
@@ -766,6 +1058,66 @@ function addDoorArchitecture(group, door, room, accentColor) {
   });
 }
 
+function addDeckSurfaceDetails(group, deckDefinition, accentColor) {
+  const trim = material(0x3b4c59, { metalness: 0.7, roughness: 0.3 });
+  const dark = material(0x111b24, { metalness: 0.52, roughness: 0.48 });
+  const accent = material(accentColor, { emissive: accentColor, emissiveIntensity: 0.5, metalness: 0.16, roughness: 0.34 });
+  const deckPlate = material(
+    deckDefinition.id === 'command' ? 0x283b4b : deckDefinition.id === 'habitat' ? 0x2d403a : 0x43352d,
+    { metalness: 0.38, roughness: 0.5 }
+  );
+
+  [-2.64, 2.64].forEach((x) => {
+    box(group, { x: 0.13, y: 0.22, z: 70.2 }, { x, y: 0.12, z: 0 }, trim, `corridor-kick-rail:${deckDefinition.id}`);
+    box(group, { x: 0.1, y: 0.12, z: 70.2 }, { x, y: 2.57, z: 0 }, dark, `corridor-service-rail:${deckDefinition.id}`);
+  });
+  [-12.76, 12.76].forEach((x) => {
+    box(group, { x: 0.11, y: 0.34, z: 70.2 }, { x, y: 0.18, z: 0 }, trim, `hull-kick-rail:${deckDefinition.id}`);
+    box(group, { x: 0.09, y: 0.11, z: 70.2 }, { x, y: 2.62, z: 0 }, dark, `hull-service-rail:${deckDefinition.id}`);
+  });
+
+  [-32, -24, -16, -8, 0, 8, 16, 24, 32].forEach((z) => {
+    box(group, { x: 25.55, y: 0.16, z: 0.24 }, { x: 0, y: 3.28, z }, trim, `ceiling-crossbeam:${deckDefinition.id}`);
+    [-10.8, -2.45, 2.45, 10.8].forEach((x) => {
+      box(group, { x: 0.2, y: 0.16, z: 0.58 }, { x, y: 3.19, z }, dark, `ceiling-hardpoint:${deckDefinition.id}`);
+    });
+  });
+  [-1.36, 1.36].forEach((x) => {
+    box(group, { x: 0.18, y: 0.11, z: 69.5 }, { x, y: 3.34, z: 0 }, trim, `ceiling-service-spine:${deckDefinition.id}`);
+  });
+
+  deckDefinition.rooms.forEach((room, roomIndex) => {
+    const centerX = (room.minX + room.maxX) * 0.5;
+    const centerZ = (room.minZ + room.maxZ) * 0.5;
+    const plateWidth = room.side === 'full' ? Math.min(14, room.maxX - room.minX - 2) : Math.min(6.6, room.maxX - room.minX - 1.4);
+    const plateDepth = Math.min(5.2, room.maxZ - room.minZ - 1.5);
+    box(group, { x: plateWidth, y: 0.028, z: plateDepth }, { x: centerX, y: 0.022, z: centerZ }, deckPlate, `floor-access-panel:${room.id}`);
+    const frameY = 0.041;
+    box(group, { x: plateWidth + 0.16, y: 0.025, z: 0.07 }, { x: centerX, y: frameY, z: centerZ - plateDepth * 0.5 }, roomIndex % 3 === 0 ? accent : trim, `floor-panel-frame:${room.id}`);
+    box(group, { x: plateWidth + 0.16, y: 0.025, z: 0.07 }, { x: centerX, y: frameY, z: centerZ + plateDepth * 0.5 }, roomIndex % 3 === 0 ? accent : trim, `floor-panel-frame:${room.id}`);
+    box(group, { x: 0.07, y: 0.025, z: plateDepth }, { x: centerX - plateWidth * 0.5, y: frameY, z: centerZ }, trim, `floor-panel-frame:${room.id}`);
+    box(group, { x: 0.07, y: 0.025, z: plateDepth }, { x: centerX + plateWidth * 0.5, y: frameY, z: centerZ }, trim, `floor-panel-frame:${room.id}`);
+
+    if (room.side !== 'full') {
+      const outerX = room.side === 'port' ? -12.79 : 12.79;
+      [room.minZ + 0.65, room.maxZ - 0.65].forEach((z) => {
+        box(group, { x: 0.1, y: 2.82, z: 0.2 }, { x: outerX, y: 1.48, z }, trim, `room-wall-frame:${room.id}`);
+      });
+    }
+  });
+
+  SHIP_DOORS.filter((door) => door.deckId === deckDefinition.id).forEach((door) => {
+    const thresholdSize = door.orientation === 'side'
+      ? { x: 0.72, y: 0.045, z: 2.05 }
+      : { x: 2.05, y: 0.045, z: 0.72 };
+    box(group, thresholdSize, { x: door.x, y: 0.055, z: door.z }, dark, `door-threshold:${door.id}`);
+    const insetSize = door.orientation === 'side'
+      ? { x: 0.74, y: 0.02, z: 0.1 }
+      : { x: 0.1, y: 0.02, z: 0.74 };
+    box(group, insetSize, { x: door.x, y: 0.083, z: door.z }, accent, `door-threshold-signal:${door.id}`);
+  });
+}
+
 function addDeckArchitecture(group, deckDefinition, accentColor) {
   const rib = material(0x34495d, { metalness: 0.54, roughness: 0.38 });
   const strip = material(accentColor, { emissive: accentColor, emissiveIntensity: 1.1, metalness: 0.08, roughness: 0.24 });
@@ -781,6 +1133,7 @@ function addDeckArchitecture(group, deckDefinition, accentColor) {
     const room = deckDefinition.rooms.find((entry) => entry.id === door.roomId);
     if (room) addDoorArchitecture(group, door, room, accentColor);
   });
+  addDeckSurfaceDetails(group, deckDefinition, accentColor);
 }
 
 function buildDeckScene(deckDefinition) {
@@ -788,11 +1141,11 @@ function buildDeckScene(deckDefinition) {
   group.name = `surveyor-deck:${deckDefinition.id}`;
   const colliders = [];
   const doorStates = [];
-  const deckSurface = material(0x283444, { roughness: 0.72, metalness: 0.36 });
-  const wallSurface = material(0xb8c3cf, { roughness: 0.66, metalness: 0.2, emissive: 0x111820, emissiveIntensity: 0.12 });
-  const ceiling = material(0x5f6f80, { roughness: 0.74, metalness: 0.22, emissive: 0x18212b, emissiveIntensity: 0.18 });
-  const corridor = material(0x314d64, { roughness: 0.58, metalness: 0.3 });
-  const accentColor = deckDefinition.id === 'command' ? 0x2d9ec4 : deckDefinition.id === 'habitat' ? 0x4d9f79 : 0xc47742;
+  const deckSurface = shipSurfaceMaterial('floor', deckDefinition.id);
+  const wallSurface = shipSurfaceMaterial('wall', deckDefinition.id);
+  const ceiling = shipSurfaceMaterial('ceiling', deckDefinition.id);
+  const corridor = shipSurfaceMaterial('corridor', deckDefinition.id);
+  const accentColor = deckAccent(deckDefinition.id);
   const accent = material(accentColor, { emissive: accentColor, emissiveIntensity: 0.38, roughness: 0.4 });
 
   box(group, { x: 26, y: 0.18, z: 72 }, { x: 0, y: -0.08, z: 0 }, deckSurface, `${deckDefinition.id}:deck`);
@@ -832,13 +1185,13 @@ function buildDeckScene(deckDefinition) {
   addDeckArchitecture(group, deckDefinition, accentColor);
   addDeckDetails(group, deckDefinition.id);
   addDeckPropColliders(colliders, deckDefinition.id);
-  group.add(new THREE.HemisphereLight(0xcde7ff, 0x162130, 1.02));
-  const fill = new THREE.DirectionalLight(0xf4f7ff, 1.12);
+  group.add(new THREE.HemisphereLight(0xcde7ff, 0x101923, 0.5));
+  const fill = new THREE.DirectionalLight(0xdceaf3, 0.68);
   fill.position.set(8, 18, 8);
   group.add(fill);
-  [-29, -15, 0, 15, 29].forEach((z) => {
-    const light = new THREE.PointLight(deckDefinition.id === 'engineering' ? 0xffc49a : 0xbde9ff, 0.72, 22, 2);
-    light.position.set(0, 3.18, z);
+  [-30, -20, -10, 0, 10, 20, 30].forEach((z, index) => {
+    const light = new THREE.PointLight(deckDefinition.id === 'engineering' ? 0xffc49a : deckDefinition.id === 'habitat' ? 0xd9ffe9 : 0xbde9ff, 0.92, 17, 2);
+    light.position.set(index % 2 ? -1.1 : 1.1, 3.12, z);
     group.add(light);
   });
   const alertLight = new THREE.PointLight(0xff6b45, 0, 30, 2);
@@ -887,12 +1240,30 @@ function buildSurveyorScene(expedition) {
     [-18.5, -15.2, -11.9].forEach((z, index) => addWallServicePanel(command.group, 11.6, z, -Math.PI / 2, index === 0 ? 0xb6a4ff : 0x76d8ff, `continuity-archive-${index + 1}`));
   }
   root.traverse((child) => { if (child.userData?.shipAnimated) animatedParts.push(child); });
+  const visualContract = {
+    texturedSurfaceCount: 0,
+    floorAccessPanelCount: 0,
+    ceilingCrossbeamCount: 0,
+    doorThresholdCount: 0,
+    consoleDisplayCount: 0,
+    equipmentGroupCount: 0
+  };
+  const equipmentPrefixes = ['ship-console:', 'science-bench:', 'service-panel:', 'medical-bed:', 'crew-bunk:', 'life-support:', 'hydroponics:', 'power-cabinet:', 'thermal-assembly:', 'cargo-module:', 'eva-suit:'];
+  root.traverse((child) => {
+    if (child.material?.map) visualContract.texturedSurfaceCount += 1;
+    if (child.name?.startsWith('floor-access-panel:')) visualContract.floorAccessPanelCount += 1;
+    if (child.name?.startsWith('ceiling-crossbeam:')) visualContract.ceilingCrossbeamCount += 1;
+    if (child.name?.startsWith('door-threshold:')) visualContract.doorThresholdCount += 1;
+    if (child.name?.endsWith(':display') && child.parent?.name?.startsWith('ship-console:')) visualContract.consoleDisplayCount += 1;
+    if (equipmentPrefixes.some((prefix) => child.name?.startsWith(prefix))) visualContract.equipmentGroupCount += 1;
+  });
   return {
     root,
     deckStates,
     crewMeshes,
     crewLayer,
     animatedParts,
+    visualContract: Object.freeze(visualContract),
     walkSurface: {
       kind: 'polygon',
       pts: [
@@ -1524,6 +1895,7 @@ function updateExpeditionShipInterior(dt) {
 
 function getShipInteriorSnapshot() {
   if (!activeSession) return null;
+  const walker = appCtx.Walk?.state?.walker;
   return {
     active: true,
     shipId: 'surveyor',
@@ -1549,6 +1921,14 @@ function getShipInteriorSnapshot() {
       visible: activeSession.incidentPresentation.group.visible !== false
     } : null,
     audioState: activeSession.audioContext?.state || 'not-started',
+    visualContract: { ...activeSession.sceneState.visualContract },
+    player: walker ? {
+      x: Number(walker.x.toFixed(3)),
+      y: Number(walker.y.toFixed(3)),
+      z: Number(walker.z.toFixed(3)),
+      yaw: Number(walker.yaw.toFixed(3)),
+      grounded: walker.onGround === true
+    } : null,
     crewPresentation: activeSession.sceneState.crewMeshes.map((mesh) => ({
       crewId: mesh.userData.crewId,
       roomId: mesh.userData.currentRoomId,
