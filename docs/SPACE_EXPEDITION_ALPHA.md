@@ -46,6 +46,10 @@ Every chapter contains some combination of:
 The player can leave the planner and walk the ship between events. Important
 events identify the responsible room and crew member. Choosing a response may
 start a real task there rather than resolving everything inside the event card.
+Voyage problems are handled aboard Surveyor: the ship map marks the affected
+room, the equipment area carries a visible warning beacon, assigned crew move
+to the response, and the available action is completed at that room's station.
+The mission panel reports the situation but cannot resolve it remotely.
 
 ## Voyage Director
 

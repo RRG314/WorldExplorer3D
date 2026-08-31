@@ -744,17 +744,26 @@ function addDoorArchitecture(group, door, room, accentColor) {
     box(group, { x: 2.34, y: 0.22, z: 0.36 }, { x: door.x, y: 3.12, z: door.z }, frameSurface, `door-header:${door.id}`);
     box(group, { x: 0.12, y: 0.34, z: 0.08 }, { x: door.x + 1.22, y: 2.42, z: door.z - 0.22 }, signal, `door-status:${door.id}`);
   }
-  const labelSurface = new THREE.MeshBasicMaterial({ map: roomLabelTexture(room.label, accentColor), transparent: true, side: THREE.DoubleSide, depthWrite: false });
-  const label = new THREE.Mesh(new THREE.PlaneGeometry(2.45, 0.58), labelSurface);
-  label.name = `room-sign:${room.id}`;
-  label.position.set(door.x, 2.75, door.z);
-  if (door.orientation === 'side') {
-    label.position.x += room.side === 'port' ? 0.195 : -0.195;
-    label.rotation.y = Math.PI / 2;
-  } else {
-    label.position.z += room.minZ >= 23 ? -0.195 : 0.195;
-  }
-  group.add(label);
+  const roomDirection = door.orientation === 'side'
+    ? { x: room.side === 'port' ? -1 : 1, z: 0 }
+    : { x: 0, z: room.minZ >= 23 ? 1 : -1 };
+  const signs = [
+    { suffix: 'room', direction: roomDirection },
+    { suffix: 'corridor', direction: { x: -roomDirection.x, z: -roomDirection.z } }
+  ];
+  signs.forEach(({ suffix, direction }) => {
+    const labelSurface = new THREE.MeshBasicMaterial({
+      map: roomLabelTexture(room.label, accentColor),
+      transparent: true,
+      side: THREE.FrontSide,
+      depthWrite: false
+    });
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(2.45, 0.58), labelSurface);
+    label.name = `room-sign:${room.id}:${suffix}`;
+    label.position.set(door.x + direction.x * 0.195, 2.75, door.z + direction.z * 0.195);
+    label.rotation.y = Math.atan2(direction.x, direction.z);
+    group.add(label);
+  });
 }
 
 function addDeckArchitecture(group, deckDefinition, accentColor) {
@@ -917,6 +926,93 @@ function ensureShipHud(expedition, crewSummary = null) {
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
   hud.querySelector('#shipMapButton')?.addEventListener('click', () => toggleShipMap());
   return hud;
+}
+
+function disposePresentation(group) {
+  group?.traverse?.((child) => {
+    child.geometry?.dispose?.();
+    if (Array.isArray(child.material)) child.material.forEach((entry) => entry?.dispose?.());
+    else child.material?.dispose?.();
+  });
+  group?.parent?.remove?.(group);
+}
+
+function clearIncidentPresentation(session) {
+  if (!session) return;
+  if (session.incidentPresentation?.group) disposePresentation(session.incidentPresentation.group);
+  session.incidentPresentation = null;
+  document.getElementById('shipObjectiveCue')?.classList.remove('show');
+}
+
+function syncIncidentPresentation(session) {
+  if (!session) return false;
+  const pending = session.expedition?.pendingEvent;
+  if (!pending?.roomId) {
+    clearIncidentPresentation(session);
+    return false;
+  }
+  if (session.incidentPresentation?.eventId === pending.id) return true;
+  clearIncidentPresentation(session);
+  const room = SHIP_ROOMS.find((entry) => entry.id === pending.roomId);
+  if (!room) return false;
+  const deckState = session.sceneState.deckStates.get(room.deckId);
+  if (!deckState) return false;
+  const station = SHIP_STATIONS.find((entry) => entry.roomId === room.id);
+  const x = Number(station?.x ?? ((room.minX + room.maxX) * 0.5));
+  const z = Number(station?.z ?? ((room.minZ + room.maxZ) * 0.5));
+  const palette = pending.kind === 'crew'
+    ? { primary: 0xff6b86, secondary: 0xffd0d8 }
+    : pending.kind === 'science'
+      ? { primary: 0x66ddff, secondary: 0xc8f5ff }
+      : { primary: 0xff9f43, secondary: 0xffe0a6 };
+  const group = new THREE.Group();
+  group.name = `ship-incident:${pending.id}`;
+  group.position.set(x, 0, z);
+  const ringSurface = material(palette.primary, { emissive: palette.primary, emissiveIntensity: 1.7, metalness: 0.08, roughness: 0.24 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.075, 10, 40), ringSurface);
+  ring.name = 'incident-floor-beacon';
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.08;
+  group.add(ring);
+  const columnSurface = material(palette.primary, { emissive: palette.primary, emissiveIntensity: 0.9, metalness: 0, roughness: 0.5 });
+  columnSurface.transparent = true;
+  columnSurface.opacity = 0.12;
+  columnSurface.depthWrite = false;
+  const column = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.72, 2.5, 18, 1, true), columnSurface);
+  column.name = 'incident-guidance-column';
+  column.position.y = 1.25;
+  group.add(column);
+  const particleSurface = material(palette.secondary, { emissive: palette.primary, emissiveIntensity: 1.6, metalness: 0.05, roughness: 0.28 });
+  const particles = Array.from({ length: 8 }, (_, index) => {
+    const particle = new THREE.Mesh(new THREE.SphereGeometry(0.045 + (index % 3) * 0.012, 8, 6), particleSurface.clone());
+    const angle = index * 2.399963229728653;
+    particle.position.set(Math.cos(angle) * (0.28 + (index % 2) * 0.22), 0.25 + (index % 4) * 0.43, Math.sin(angle) * (0.28 + (index % 2) * 0.22));
+    particle.userData.baseY = particle.position.y;
+    particle.userData.phase = index * 0.71;
+    group.add(particle);
+    return particle;
+  });
+  particleSurface.dispose();
+  const warningLight = new THREE.PointLight(palette.primary, 1.4, 8, 2);
+  warningLight.position.y = 1.45;
+  group.add(warningLight);
+  deckState.group.add(group);
+  session.incidentPresentation = { eventId: pending.id, roomId: room.id, deckId: room.deckId, group, ring, column, particles, warningLight };
+  session.selectedRoomId = room.id;
+  session.mapDeckId = room.deckId;
+  let cue = document.getElementById('shipObjectiveCue');
+  if (!cue) {
+    cue = document.createElement('aside');
+    cue.id = 'shipObjectiveCue';
+    document.body.appendChild(cue);
+  }
+  cue.innerHTML = `<span>SHIP RESPONSE</span><strong>${pending.title}</strong><small>${getShipDeck(room.deckId)?.label || room.deckId} · ${room.label}</small><button type="button">Show route</button>`;
+  cue.classList.add('show');
+  cue.querySelector('button')?.addEventListener('click', () => {
+    session.mapDeckId = room.deckId;
+    toggleShipMap(true);
+  });
+  return true;
 }
 
 function ensureShipAudio(session = activeSession) {
@@ -1188,6 +1284,7 @@ function updateExpeditionShipRecord(expedition) {
   activeSession.expedition = expedition;
   syncCrewMeshes(activeSession, expedition);
   refreshCrewOperations(activeSession, true);
+  syncIncidentPresentation(activeSession);
   renderShipMaps(activeSession);
   ensureShipHud(expedition, activeSession.operationSummary);
   return true;
@@ -1198,7 +1295,7 @@ function ensureShipMaps(session) {
     const link = document.createElement('link');
     link.id = 'expeditionShipStyles';
     link.rel = 'stylesheet';
-    link.href = 'styles/expedition-ship.css?v=3';
+    link.href = 'styles/expedition-ship.css?v=4';
     document.head.appendChild(link);
   }
   let mini = document.getElementById('shipMiniMap');
@@ -1239,7 +1336,8 @@ function enterSurveyorInterior(options = {}) {
     visualClock: 0,
     audioContext: null,
     ambientOscillator: null,
-    actionFeedback: null
+    actionFeedback: null,
+    incidentPresentation: null
   };
   activeSession = session;
   syncCrewMeshes(session, options.expedition);
@@ -1298,8 +1396,10 @@ function enterSurveyorInterior(options = {}) {
   const interiorPrompt = document.getElementById('interiorPrompt');
   if (interiorPrompt) interiorPrompt.style.display = '';
   appCtx.renderLoop?.();
+  syncIncidentPresentation(session);
   ensureShipMaps(session);
   ensureShipHud(options.expedition, session.operationSummary);
+  if (session.incidentPresentation) playShipTone('alert');
   appCtx.updateControlsModeUI?.();
   return true;
 }
@@ -1314,6 +1414,7 @@ function exitSurveyorInterior() {
   document.getElementById('shipDeckPicker')?.classList.remove('show');
   document.getElementById('shipStationPanel')?.classList.remove('show');
   document.getElementById('shipActionCue')?.classList.remove('show');
+  document.getElementById('shipObjectiveCue')?.classList.remove('show');
   appCtx.toggleWorldDiscoveryJournal?.(false);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;
@@ -1383,6 +1484,19 @@ function updateExpeditionShipInterior(dt) {
       part.material.emissiveIntensity = Number(part.userData.baseEmissiveIntensity || 0.8) + Math.sin(activeSession.visualClock * 1.7 + index * 0.63) * 0.09;
     }
   });
+  const incident = activeSession.incidentPresentation;
+  if (incident) {
+    const elapsed = activeSession.visualClock;
+    incident.ring.rotation.z = elapsed * 1.35;
+    incident.ring.scale.setScalar(1 + Math.sin(elapsed * 4.2) * 0.1);
+    incident.column.material.opacity = 0.09 + (Math.sin(elapsed * 3.1) + 1) * 0.035;
+    incident.warningLight.intensity = 1.15 + (Math.sin(elapsed * 5.2) + 1) * 0.45;
+    incident.particles.forEach((particle) => {
+      const phase = elapsed * 1.8 + particle.userData.phase;
+      particle.position.y = particle.userData.baseY + (Math.sin(phase) + 1) * 0.28;
+      particle.scale.setScalar(0.7 + (Math.sin(phase * 1.7) + 1) * 0.22);
+    });
+  }
   const state = activeDeckState(activeSession);
   state?.doorStates.forEach((door) => {
     door.panel.position.y += (door.targetY - door.panel.position.y) * Math.min(1, Math.max(0, dt) * 8);
@@ -1428,6 +1542,12 @@ function getShipInteriorSnapshot() {
     crewOperationSummary: { ...activeSession.operationSummary },
     alert: shipAlertState(activeSession.expedition),
     actionFeedback: activeSession.actionFeedback ? { ...activeSession.actionFeedback } : null,
+    incidentPresentation: activeSession.incidentPresentation ? {
+      eventId: activeSession.incidentPresentation.eventId,
+      roomId: activeSession.incidentPresentation.roomId,
+      deckId: activeSession.incidentPresentation.deckId,
+      visible: activeSession.incidentPresentation.group.visible !== false
+    } : null,
     audioState: activeSession.audioContext?.state || 'not-started',
     crewPresentation: activeSession.sceneState.crewMeshes.map((mesh) => ({
       crewId: mesh.userData.crewId,

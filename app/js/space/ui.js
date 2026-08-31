@@ -91,8 +91,28 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   appCtx.spaceFlight.hud = hud;
 
   setupSpaceFlightControls(attemptLanding, lifecycleScope);
-  if (globalThis.matchMedia?.('(max-width: 768px)').matches) hud.classList.add('collapsed');
-  document.body.classList.remove('space-flight-hud-expanded');
+  prepareSpaceFlightHudForEntry();
+}
+
+export function setSpaceFlightHudCollapsed(collapsed) {
+  const hud = document.getElementById('spaceFlightHUD');
+  const isCollapsed = Boolean(collapsed);
+  hud?.classList.toggle('collapsed', isCollapsed);
+  const isVisible = hud ? globalThis.getComputedStyle?.(hud).display !== 'none' : false;
+  document.body.classList.toggle('space-flight-hud-expanded', !isCollapsed && isVisible);
+  const toggle = document.getElementById('sfHudToggle');
+  if (toggle) {
+    toggle.textContent = isCollapsed ? '+' : '−';
+    toggle.setAttribute('aria-expanded', String(!isCollapsed));
+    toggle.setAttribute('aria-label', isCollapsed ? 'Expand flight instruments' : 'Collapse flight instruments');
+  }
+  return isCollapsed;
+}
+
+export function prepareSpaceFlightHudForEntry() {
+  const hud = document.getElementById('spaceFlightHUD');
+  const mobile = globalThis.matchMedia?.('(max-width: 768px)').matches === true;
+  return setSpaceFlightHudCollapsed(mobile || hud?.classList.contains('collapsed'));
 }
 
 function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
@@ -106,14 +126,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
     const hud = document.getElementById('spaceFlightHUD');
-    const collapsed = hud?.classList.toggle('collapsed') === true;
-    document.body.classList.toggle('space-flight-hud-expanded', !collapsed);
-    const toggle = document.getElementById('sfHudToggle');
-    if (toggle) {
-      toggle.textContent = collapsed ? '+' : '−';
-      toggle.setAttribute('aria-expanded', String(!collapsed));
-      toggle.setAttribute('aria-label', collapsed ? 'Expand flight instruments' : 'Collapse flight instruments');
-    }
+    setSpaceFlightHudCollapsed(!hud?.classList.contains('collapsed'));
   });
   listen(document.getElementById('sfAssistBtn'), 'click', () => {
     if (appCtx.spaceJourney?.phase === 'atmospheric_exploration') return;

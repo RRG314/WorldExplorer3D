@@ -94,6 +94,7 @@
     "verify:universe-wayfinder-browser": "node scripts/verification/universe-wayfinder.mjs",
     "verify:interstellar-expedition": "node --test tests/interstellar-expedition-current.test.mjs",
     "verify:interstellar-expedition-browser": "node scripts/verification/interstellar-expedition.mjs",
+    "verify:interstellar-polish": "node scripts/verification/interstellar-polish.mjs",
     "verify:interstellar-persistence": "node scripts/verification/interstellar-persistence.mjs",
     "verify:artifact-runtime": "WE3D_VERIFY_ROOT=dist node scripts/verification/world.mjs",
     "test": "npm run verify:source && npm run verify:world",

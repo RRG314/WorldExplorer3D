@@ -28,6 +28,40 @@ async function openSpace(page) {
   }, null, { timeout: 120000 });
 }
 
+async function respondToIncidentAboardShip(page, name, capture = false) {
+  const before = await diagnostics(page);
+  const roomId = before.interstellarExpedition?.pendingEvent?.roomId;
+  assert.ok(roomId, 'expected an affected ship room for the active voyage incident');
+  assert.equal(await page.locator('.expeditionEvent .expeditionChoice').count(), 0);
+  await page.locator('#expeditionEnterShip').click();
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentPresentation != null);
+  await page.evaluate(async (targetRoomId) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { getShipDeckForRoom, SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js?v=1');
+    const deckId = getShipDeckForRoom(targetRoomId);
+    if (deckId && ctx.getShipInteriorSnapshot?.()?.deckId !== deckId) ctx.switchSurveyorDeck?.(deckId);
+    const station = SHIP_STATIONS.find((entry) => entry.roomId === targetRoomId);
+    if (!station) throw new Error(`No physical response station exists in ${targetRoomId}`);
+    Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
+  }, roomId);
+  await page.waitForTimeout(180);
+  await page.keyboard.press('KeyE');
+  await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('.ship-voyage-response').isVisible(), true);
+  if (capture) await page.screenshot({ path: path.join(outputDir, `${name}-ship-voyage-response.png`), fullPage: true });
+  await page.locator('[data-voyage-response]:not(:disabled)').first().click();
+  const after = await diagnostics(page);
+  assert.equal(after.interstellarExpedition.pendingEvent, null);
+  assert.equal(after.expeditionShipInterior.incidentPresentation, null);
+  await page.locator('[data-close-station]').click();
+  await page.locator('#shipExitButton').click();
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior == null);
+  if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
+  await page.locator('#sfExpeditionBtn').click();
+  await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+  return after;
+}
+
 async function runJourney(viewport, name) {
   const context = await browser.newContext({ viewport, hasTouch: name === 'mobile' });
   const page = await context.newPage();
@@ -79,7 +113,7 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.collisionAuthority, 'activeInterior');
     assert.equal(state.expeditionShipInterior.deckCount, 3);
     assert.equal(state.expeditionShipInterior.roomCount, 25);
-    assert.equal(state.expeditionShipInterior.stationCount, 30);
+    assert.equal(state.expeditionShipInterior.stationCount, 32);
     assert.equal(state.expeditionShipInterior.doorCount, 25);
     assert.equal(state.expeditionShipInterior.totalCrewCount, 7);
     assert.ok(state.expeditionShipInterior.visibleCrewCount >= 1);
@@ -235,29 +269,10 @@ async function runJourney(viewport, name) {
       if (chapter === 0) {
         await page.locator('.expeditionEvent').scrollIntoViewIfNeeded();
         await page.screenshot({ path: path.join(outputDir, `${name}-voyage-event.png`), fullPage: true });
-        await page.locator('#expeditionEnterShip').click();
-        await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
-        await page.evaluate(async () => {
-          const { ctx } = await import('/app/js/shared-context.js?v=55');
-          Object.assign(ctx.Walk.state.walker, { x: 7, z: 31, angle: Math.PI, yaw: Math.PI, lookYawOffset: 0, pitch: 0 });
-        });
-        await page.waitForTimeout(180);
-        await page.keyboard.press('KeyE');
-        await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
-        assert.equal(await page.locator('.ship-voyage-response').isVisible(), true);
-        await page.screenshot({ path: path.join(outputDir, `${name}-ship-voyage-response.png`), fullPage: true });
-        await page.locator('[data-voyage-response]:not(:disabled)').first().click();
-        state = await diagnostics(page);
-        assert.equal(state.interstellarExpedition.pendingEvent, null);
+        state = await respondToIncidentAboardShip(page, name, true);
         assert.equal(state.interstellarExpedition.voyageDirector.history.length, 1);
-        await page.locator('[data-close-station]').click();
-        await page.locator('#shipExitButton').click();
-        await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior == null);
-        if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
-        await page.locator('#sfExpeditionBtn').click();
-        await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
       } else {
-        await page.locator('.expeditionChoice:not(:disabled)').first().click();
+        state = await respondToIncidentAboardShip(page, name, false);
       }
     }
     state = await diagnostics(page);

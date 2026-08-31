@@ -4,7 +4,7 @@ import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=18";
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=26";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=23";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=24";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -125,6 +125,7 @@ function startSpaceFlightToMoon() {
 
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
+  prepareSpaceFlightHudForEntry();
   document.getElementById('sfDestination').textContent = 'Moon';
   document.getElementById('sfLandBtn').textContent = 'LAND ON MOON';
 
@@ -183,6 +184,7 @@ function startSpaceFlightToEarth() {
 
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
+  prepareSpaceFlightHudForEntry();
   document.getElementById('sfDestination').textContent = 'Earth';
   document.getElementById('sfLandBtn').textContent = 'LAND ON EARTH';
 
@@ -244,6 +246,7 @@ function startSpaceFlightToMars() {
 
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
+  prepareSpaceFlightHudForEntry();
   document.getElementById('sfDestination').textContent = 'Mars';
   document.getElementById('sfLandBtn').textContent = 'LAND ON MARS';
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
@@ -293,6 +296,7 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
 
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
+  prepareSpaceFlightHudForEntry();
   const destinationLabel = document.getElementById('sfDestination');
   if (destinationLabel) destinationLabel.textContent = courseDestinationId;
   const worldCanvas = getPrimaryWorldCanvas(appCtx);

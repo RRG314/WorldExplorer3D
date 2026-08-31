@@ -184,7 +184,10 @@ strategic time, crew, stores, systems, contacts, events, failures, samples, and
 field stations. `simulation.js` advances analytical time; rendered frames never
 stand in for years of travel. `runtime.js` presents the planner, ship work, and
 local-stop handoff. The walkable ship remains nested inside the active Space
-session and returns to that same session.
+session and returns to that same session. A pending voyage event selects one
+existing ship room and station; the ship interior owns its warning beacon,
+route guidance, crew response, and physical interaction. The planner can report
+the incident but cannot resolve it outside the ship.
 
 Stable route contacts are promoted through `contact-authority.js` into the
 existing universe catalog and planetary surface authority. `archive.js` keeps

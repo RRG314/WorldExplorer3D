@@ -504,9 +504,8 @@ function renderMission() {
   } else if (expedition.state === 'planned') {
     action = `<button id="expeditionDepart" class="expeditionPrimary" type="button" ${expedition.readiness.status === 'insufficient' ? 'disabled' : ''}>Depart on Surveyor</button>`;
   } else if (expedition.pendingEvent) {
-    const options = expedition.pendingEvent.options || expedition.pendingEvent.choices.map((id) => ({ id, label: id.replaceAll('-', ' '), enabled: true, reason: '' }));
-    const choices = options.map((option) => `<div class="expeditionChoiceRow"><button class="expeditionChoice" data-choice="${option.id}" type="button" ${option.enabled ? '' : 'disabled'}>${option.label}</button>${option.reason ? `<small>${option.reason}</small>` : ''}</div>`).join('');
-    action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Respond from ${String(expedition.pendingEvent.roomId || 'the ship').replaceAll('-', ' ')}.</small><div>${choices}</div></div>`;
+    const responseRoom = String(expedition.pendingEvent.roomId || 'the ship').replaceAll('-', ' ');
+    action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Response location: ${responseRoom}. Enter Surveyor; the ship map and warning beacon are already set to the affected station.</small></div>`;
   } else if (expedition.state === 'traveling') {
     action = `<button id="expeditionAdvance" class="expeditionPrimary" type="button">Continue to next watch or event</button>`;
   } else if (expedition.state === 'arrived') {
@@ -519,7 +518,7 @@ function renderMission() {
   const reachedCount = Math.min(VOYAGE_MILESTONES.length, Number(expedition.voyageDirector?.nextSlotIndex || 0));
   const contacts = expedition.routeContacts || [];
   const shipAction = expedition.readiness.status !== 'insufficient' && expedition.state !== 'failed'
-    ? `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">Enter Surveyor</button><small>Walk the ship, meet the crew, inspect systems, and return to the same flight.</small></div>`
+    ? `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? 'Respond aboard Surveyor' : 'Enter Surveyor'}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
     : '';
   host.innerHTML = `
     ${readinessMarkup(expedition)}
@@ -568,12 +567,6 @@ function renderMission() {
       renderMission();
     } catch (error) { reportSharedMutationError(error); }
   });
-  host.querySelectorAll('.expeditionChoice').forEach((button) => button.addEventListener('click', async () => {
-    try {
-      await applyExpeditionMutation(resolveExpeditionEvent(activeExpedition, button.dataset.choice), 'event');
-      renderMission();
-    } catch (error) { reportSharedMutationError(error); }
-  }));
   document.getElementById('expeditionArrive')?.addEventListener('click', () => {
     const destinationId = activeExpedition.destinationId;
     closeExpeditionPlanner();
@@ -720,7 +713,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=7');
+  const ship = await import('./ship-interior.js?v=8');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,
