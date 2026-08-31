@@ -22,6 +22,8 @@ let tutorialEventListener = null;
 let productEventListener = null;
 let consentEventListener = null;
 let lastAuthUser = null;
+let runtimeReadyLogPending = false;
+let worldSessionStartPending = false;
 
 const ALLOWED_PRODUCT_EVENTS = new Set([
   'tutorial_begin',
@@ -51,6 +53,9 @@ const state = {
   worldSessionCount: 0,
   flushCount: 0,
   productEventCount: 0,
+  eventLoggedCount: 0,
+  recentEvents: [],
+  disabledReason: 'not_started',
   lastMode: '',
   lastEnvironment: '',
   lastLocationKey: '',
@@ -98,6 +103,8 @@ function currentEnvironment(appCtx) {
   if (appCtx.oceanMode?.active || (typeof appCtx.isEnv === 'function' && appCtx.ENV && appCtx.isEnv(appCtx.ENV.OCEAN))) return 'ocean';
   if (appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.ENV && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT))) return 'space';
   if (appCtx.onMoon) return 'moon';
+  if (appCtx.onMars || String(appCtx.activePlanetaryBodyId || '').toLowerCase() === 'mars') return 'mars';
+  if (appCtx.activePlanetaryBodyId || (typeof appCtx.isEnv === 'function' && appCtx.ENV && appCtx.isEnv(appCtx.ENV.PLANETARY))) return 'planetary';
   return 'earth';
 }
 
@@ -129,8 +136,15 @@ async function ensureAnalyticsTools() {
   analyticsToolsPromise = (async () => {
     const measurementId = String(readFirebaseConfig()?.measurementId || '').trim();
     state.measurementId = measurementId;
+    if (!measurementId) {
+      state.disabledReason = 'measurement_id_missing';
+      state.enabled = false;
+      state.ready = false;
+      return null;
+    }
     const analytics = await initFirebaseAnalytics();
     if (!analytics) {
+      state.disabledReason = 'analytics_unavailable';
       state.enabled = false;
       state.ready = false;
       analyticsTools = null;
@@ -145,10 +159,12 @@ async function ensureAnalyticsTools() {
     };
     state.enabled = true;
     state.ready = true;
+    state.disabledReason = '';
     return analyticsTools;
   })().catch((error) => {
     state.enabled = false;
     state.ready = false;
+    state.disabledReason = 'initialization_error';
     state.errors.push(String(error?.message || error));
     analyticsTools = null;
     return null;
@@ -164,6 +180,9 @@ async function logAnalyticsEvent(eventName, params = {}) {
   if (!tools?.analytics || typeof tools.logEvent !== 'function') return false;
   try {
     tools.logEvent(tools.analytics, eventName, params);
+    state.eventLoggedCount += 1;
+    state.recentEvents.push(eventName);
+    state.recentEvents = state.recentEvents.slice(-8);
     return true;
   } catch (error) {
     state.errors.push(String(error?.message || error));
@@ -263,27 +282,47 @@ async function syncAnalyticsUser(user = null) {
 }
 
 async function logRuntimeReady(appCtx) {
-  if (state.runtimeReadyLogged) return;
-  state.runtimeReadyLogged = true;
-  await logAnalyticsEvent(ANALYTICS_EVENT_RUNTIME_READY, worldSessionParams(appCtx, {
-    ready_source: 'app_boot'
-  }));
+  if (state.runtimeReadyLogged || runtimeReadyLogPending || readAnalyticsConsent() !== 'granted') return false;
+  runtimeReadyLogPending = true;
+  try {
+    const logged = await logAnalyticsEvent(ANALYTICS_EVENT_RUNTIME_READY, worldSessionParams(appCtx, {
+      ready_source: 'app_boot'
+    }));
+    if (logged) state.runtimeReadyLogged = true;
+    return logged;
+  } finally {
+    runtimeReadyLogPending = false;
+  }
 }
 
 async function startWorldSession(appCtx, reason = 'game_started') {
-  if (state.worldSessionActive) return;
-  state.worldSessionActive = true;
-  state.worldSessionStartedAt = Date.now();
-  state.worldSessionCount += 1;
+  if (state.worldSessionActive || worldSessionStartPending || readAnalyticsConsent() !== 'granted') return false;
+  worldSessionStartPending = true;
+  try {
+    const nextSessionIndex = state.worldSessionCount + 1;
+    const logged = await logAnalyticsEvent(ANALYTICS_EVENT_WORLD_START, worldSessionParams(appCtx, {
+      start_reason: sanitizeAnalyticsName(reason, 'game_started', 32),
+      session_index: nextSessionIndex
+    }));
+    if (!logged) return false;
+    state.worldSessionActive = true;
+    state.worldSessionStartedAt = Date.now();
+    state.worldSessionCount = nextSessionIndex;
+    state.lastReason = reason;
+    state.lastMode = currentTravelMode(appCtx);
+    state.lastEnvironment = currentEnvironment(appCtx);
+    state.lastLocationKey = locationContext(appCtx).locationKey;
+    state.lastMultiplayer = !!appCtx.multiplayerMapRooms?.currentRoomCode;
+    return true;
+  } finally {
+    worldSessionStartPending = false;
+  }
+}
+
+function abandonWorldSession(reason = 'consent_denied') {
+  state.worldSessionActive = false;
+  state.worldSessionStartedAt = 0;
   state.lastReason = reason;
-  state.lastMode = currentTravelMode(appCtx);
-  state.lastEnvironment = currentEnvironment(appCtx);
-  state.lastLocationKey = locationContext(appCtx).locationKey;
-  state.lastMultiplayer = !!appCtx.multiplayerMapRooms?.currentRoomCode;
-  await logAnalyticsEvent(ANALYTICS_EVENT_WORLD_START, worldSessionParams(appCtx, {
-    start_reason: sanitizeAnalyticsName(reason, 'game_started', 32),
-    session_index: state.worldSessionCount
-  }));
 }
 
 async function endWorldSession(appCtx, reason = 'ended') {
@@ -367,6 +406,7 @@ function startAnalyticsTracking(appCtx) {
   trackingStarted = true;
   state.runtimeStartedAt = Date.now();
   state.measurementId = String(readFirebaseConfig()?.measurementId || '').trim();
+  state.disabledReason = 'initializing';
 
   consentEventListener = async (event) => {
     const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js').catch(() => null);
@@ -378,8 +418,10 @@ function startAnalyticsTracking(appCtx) {
       ad_personalization: 'denied'
     });
     if (granted) {
-      void syncAnalyticsUser(lastAuthUser);
+      await syncAnalyticsUser(lastAuthUser);
+      await tick(appCtx);
     } else {
+      abandonWorldSession('consent_denied');
       state.currentUserId = '';
       const tools = await ensureAnalyticsTools();
       tools?.setUserId?.(tools.analytics, null);
@@ -429,6 +471,7 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
   return {
     enabled: !!state.enabled,
     ready: !!state.ready,
+    disabledReason: state.disabledReason || '',
     measurementId: state.measurementId || '',
     consent: readAnalyticsConsent(),
     currentUserId: state.currentUserId || '',
@@ -439,6 +482,15 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     worldSessionCount: state.worldSessionCount,
     flushCount: state.flushCount,
     productEventCount: state.productEventCount,
+    eventLoggedCount: state.eventLoggedCount,
+    recentEvents: [...state.recentEvents],
+    deliveryState: readAnalyticsConsent() !== 'granted'
+      ? `consent_${readAnalyticsConsent()}`
+      : !trackingStarted
+        ? 'warmup_pending'
+        : state.ready
+          ? 'ready'
+          : state.disabledReason || 'initializing',
     currentMode: ctx ? currentTravelMode(ctx) : '',
     currentEnvironment: ctx ? currentEnvironment(ctx) : '',
     lastLocationKey: state.lastLocationKey || '',

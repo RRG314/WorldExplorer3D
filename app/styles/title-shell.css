@@ -273,6 +273,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .analytics-consent-actions{display:flex;align-items:center;gap:8px}
 .analytics-consent-actions button{border:1px solid #69a0f7;border-radius:4px;padding:9px 11px;background:#2d7dff;color:white;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
 .analytics-consent-actions button.secondary{border-color:rgba(148,163,184,.45);background:#14212c;color:#dce5eb}
+.analytics-consent-banner.attention{animation:analytics-consent-attention .7s ease-out}
+@keyframes analytics-consent-attention{0%,100%{box-shadow:0 20px 60px rgba(0,0,0,.55)}45%{box-shadow:0 0 0 3px rgba(105,160,247,.55),0 20px 60px rgba(0,0,0,.65)}}
 
 .flowerChallengeToggleBtn{position:fixed;top:max(12px,calc(env(safe-area-inset-top) + 8px));right:12px;background:rgba(15,23,42,0.88);border:1px solid rgba(147,197,253,0.55);border-radius:12px;padding:9px 12px;color:#e2e8f0;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(2,6,23,0.35);display:flex;align-items:center;gap:6px;z-index:260;backdrop-filter:blur(8px);transition:transform 0.16s ease,filter 0.16s ease}
 .flowerChallengeToggleBtn:hover{transform:translateY(-1px);filter:brightness(1.08)}
