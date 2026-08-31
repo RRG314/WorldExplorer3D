@@ -9,7 +9,7 @@ const STATION_VIEWS = Object.freeze({
   'communications-status': Object.freeze({ title: 'Mission Communications', systemId: 'navigation', summary: 'Review outbound reports and the increasing signal delay to home.' }),
   'science-survey': Object.freeze({ title: 'Physical Sciences', systemId: 'sensors', summary: 'Record a bounded stellar baseline from the ship’s current position.', actions: ['record-baseline'] }),
   'sensor-scan': Object.freeze({ title: 'Sensor Control', systemId: 'sensors', summary: 'Run a calibrated local scan. Results are observations in the game world, not claims that a real object is present.', actions: ['run-sensor-scan'] }),
-  'analysis-review': Object.freeze({ title: 'Analysis & Data', systemId: 'sensors', summary: 'Review collected evidence, provenance, uncertainty, and unresolved observations.' }),
+  'analysis-review': Object.freeze({ title: 'Analysis & Data', systemId: 'sensors', summary: 'Review collected evidence, provenance, uncertainty, and unresolved observations.', actions: ['approve-processed-sample'] }),
   'briefing-status': Object.freeze({ title: 'Crew Briefing', systemId: 'navigation', summary: 'Review the current watch, resting crew, and the ship’s most urgent system.' }),
   'generation-continuity': Object.freeze({ title: 'Generation Continuity', systemId: 'education', summary: 'Review population, role succession, training coverage, and the knowledge archive.', actions: ['train-successors'] }),
   'observation-view': Object.freeze({ title: 'Observation Gallery', systemId: 'sensors', summary: 'Observe local space without changing the ship’s course.' }),
@@ -28,7 +28,7 @@ const STATION_VIEWS = Object.freeze({
   'power-status': Object.freeze({ title: 'Power Control', systemId: 'power', summary: 'Review generation, storage, and distribution margins.', actions: ['balance-power'] }),
   'thermal-status': Object.freeze({ title: 'Thermal Control', systemId: 'thermal', summary: 'Inspect coolant loops and heat-rejection margins.', actions: ['service-thermal-loop'] }),
   'fabricator-status': Object.freeze({ title: 'Fabrication Shop', systemId: 'fabrication', summary: 'Convert carried feedstock into a bounded batch of maintenance parts.', actions: ['fabricate-parts'] }),
-  'cargo-status': Object.freeze({ title: 'Cargo Hold', systemId: 'hull', summary: 'Review carried food, water, feedstock, maintenance parts, and science cargo.', actions: ['load-backpack-materials'] }),
+  'cargo-status': Object.freeze({ title: 'Cargo Hold', systemId: 'hull', summary: 'Review carried food, water, feedstock, maintenance parts, and science cargo.', actions: ['load-backpack-materials', 'transfer-approved-sample'] }),
   'resource-processor-status': Object.freeze({ title: 'Resource Processing', systemId: 'fabrication', summary: 'Inspect and process samples transferred from a supported surface operation.', actions: ['process-resource-sample'] }),
   'airlock-status': Object.freeze({ title: 'EVA Airlock', systemId: 'hull', summary: 'Inspect suits and airlock readiness. EVA requires a supported local destination operation.', actions: ['verify-eva'] }),
   'craft-bay-status': Object.freeze({ title: 'Pod Launch Bay', systemId: 'hull', summary: 'Choose a surface-capable destination, board the pod, and launch into manual local flight.', actions: ['verify-local-craft'] })
@@ -52,6 +52,8 @@ const ACTION_LABELS = Object.freeze({
   'service-thermal-loop': 'Service thermal loop',
   'fabricate-parts': 'Fabricate parts',
   'load-backpack-materials': 'Load Backpack materials',
+  'approve-processed-sample': 'Approve sealed sample',
+  'transfer-approved-sample': 'Move approved sample to Backpack',
   'process-resource-sample': 'Process loaded sample',
   'verify-eva': 'Verify EVA readiness',
   'verify-local-craft': 'Verify craft readiness'
@@ -68,6 +70,10 @@ function operationCycle(expedition) {
 function operationKey(expedition, actionId) {
   if (actionId === 'process-resource-sample') {
     const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed !== true);
+    return `${actionId}:${sample?.id || 'none'}`;
+  }
+  if (actionId === 'approve-processed-sample') {
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true);
     return `${actionId}:${sample?.id || 'none'}`;
   }
   return `${actionId}:${operationCycle(expedition)}`;
@@ -101,6 +107,10 @@ function actionAvailability(expedition, actionId) {
   const resources = expedition?.resources || {};
   const used = expedition?.operationFlags?.[operationKey(expedition, actionId)] === true;
   if (actionId === 'load-backpack-materials') return Object.freeze({ enabled: true, reason: 'Compatible material bundles transfer from the shared Backpack with exact mass.' });
+  if (actionId === 'transfer-approved-sample') {
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true);
+    return Object.freeze({ enabled: !!sample, reason: sample ? 'Transfers one conserved approved lot to the shared Backpack.' : 'Process and approve a science sample first.' });
+  }
   if (used) return Object.freeze({ enabled: false, reason: 'Completed during this voyage segment.' });
   if (actionId === 'fabricate-parts' && (Number(resources.feedstockKg) < 25 || Number(resources.powerMWh) < 0.35)) return Object.freeze({ enabled: false, reason: 'Requires 25 kg feedstock and 0.35 MWh.' });
   if (actionId === 'serve-crew-meal' && (Number(resources.foodKg) < 8 || Number(resources.waterKg) < 3)) return Object.freeze({ enabled: false, reason: 'Requires 8 kg food and 3 kg water.' });
@@ -120,6 +130,13 @@ function actionAvailability(expedition, actionId) {
   if (maintenanceCost && Number(resources.maintenanceKg) < maintenanceCost) return Object.freeze({ enabled: false, reason: `Requires ${maintenanceCost} kg of maintenance parts.` });
   if (actionId === 'process-resource-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true)) {
     return Object.freeze({ enabled: false, reason: 'Acquire and transfer a sample from a supported local operation first.' });
+  }
+  if (actionId === 'approve-processed-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed === true && !sample.recoveryRequirement && sample.analysisApproved !== true && sample.exported !== true)) {
+    const approved = (expedition?.scienceSamples || []).some((sample) => sample.processed === true && sample.analysisApproved === true && !sample.recoveryRequirement && sample.exported !== true);
+    return Object.freeze({
+      enabled: false,
+      reason: approved ? 'The sealed sample is approved and ready for transfer from the Cargo Hold.' : 'No processed science sample is awaiting review.'
+    });
   }
   if (actionId === 'verify-local-craft' && expedition?.state !== 'arrived') return Object.freeze({ enabled: false, reason: 'The craft remains secured during interstellar cruise.' });
   return Object.freeze({ enabled: true, reason: '' });
@@ -252,6 +269,25 @@ function applyShipOperation(expedition, actionId) {
     const next = withExpeditionChanges(expedition, {
       scienceSamples: Object.freeze(samples.map((entry) => Object.freeze(entry))),
       resources: Object.freeze(resources),
+      operationFlags: Object.freeze(flags),
+      log
+    });
+    return Object.freeze({ expedition: next, changed: true, message });
+  } else if (actionId === 'approve-processed-sample') {
+    const samples = clone(expedition.scienceSamples || []);
+    const sample = samples.find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true);
+    sample.analysisApproved = true;
+    sample.analysisApprovedAtMissionS = Number(expedition.strategicElapsedS) || 0;
+    sample.tradeClassification = 'approved-game-world-research-sample';
+    message = `${sample.label} passed provenance, containment, and science review as an approved game-world research sample.`;
+    kind = 'science';
+    const log = Object.freeze([...(expedition.log || []), Object.freeze({
+      atMissionS: Number(expedition.strategicElapsedS) || 0,
+      kind,
+      message
+    })]);
+    const next = withExpeditionChanges(expedition, {
+      scienceSamples: Object.freeze(samples.map((entry) => Object.freeze(entry))),
       operationFlags: Object.freeze(flags),
       log
     });

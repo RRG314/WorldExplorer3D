@@ -35,7 +35,7 @@ async function run() {
       const [{ ctx }, equipment, commerce] = await Promise.all([
         import('/app/js/shared-context.js?v=55'),
         import('/app/js/urban-sandbox/equipment-model.js?v=9'),
-        import('/app/js/urban-sandbox/commerce-model.js?v=2')
+        import('/app/js/urban-sandbox/commerce-model.js?v=3')
       ]);
       const inventory = equipment.ensurePlayerBackpackInventory(ctx);
       const economy = commerce.createLocalCommerceModel({ inventory, now: () => Date.parse('2026-08-31T12:00:00Z') });

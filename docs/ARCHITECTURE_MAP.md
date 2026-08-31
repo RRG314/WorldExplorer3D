@@ -175,6 +175,17 @@ and outpost storage remain separate owners. Shared-room transfer is disabled
 until a server transaction can authorize the Backpack removal and cargo addition
 together.
 
+The return path uses the same owners in reverse without collapsing their roles.
+A planetary field interaction creates one Backpack sample; boarding the return
+pod transfers that exact lot into Surveyor science cargo. Resource Processing
+documents and seals it, Analysis & Data approves eligible non-recovery evidence,
+and the Cargo Hold performs the only ship-to-Backpack export. The exported item
+retains its sample, body, contact, mass, truth-class, and review identifiers.
+Mapped businesses may buy it only when their game business class is authorized;
+the resulting Explorer Credits value is a game rule, not a real commodity price.
+Failed cargo persistence removes the tentative Backpack lot. Shared-room export
+remains locked until both ownership changes can use one server transaction.
+
 ## Field exploration and progression
 
 ```mermaid

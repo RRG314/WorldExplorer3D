@@ -1,4 +1,4 @@
-import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog.js?v=1';
+import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog.js?v=2';
 
 const COMMERCE_SCHEMA_VERSION = 2;
 const COMMERCE_STORAGE_KEY = 'world-explorer:local-commerce:v1';
@@ -200,7 +200,9 @@ function createLocalCommerceModel(options = {}) {
       .filter((item) => item.catalogId === stock.rare.requirementId)
       .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const sellable = inventorySnapshot.items.filter((item) =>
-      item.tradeable === true && Number(item.metadata?.commerceSellValue || 0) > 0
+      item.tradeable === true && Number(item.metadata?.commerceSellValue || 0) > 0 && (
+        !Array.isArray(item.metadata?.allowedCommerceKinds) || item.metadata.allowedCommerceKinds.includes(store.kind)
+      )
     ).map((item) => Object.freeze({
       instanceId: item.instanceId,
       catalogId: item.catalogId,
@@ -246,6 +248,9 @@ function createLocalCommerceModel(options = {}) {
     const item = inventory?.snapshot?.().items?.find((entry) => entry.instanceId === String(instanceId || ''));
     const sellPrice = Number(item?.metadata?.commerceSellValue || 0);
     if (!item || item.tradeable !== true || sellPrice <= 0) return Object.freeze({ ok: false, reason: 'not_sellable' });
+    if (Array.isArray(item.metadata?.allowedCommerceKinds) && !item.metadata.allowedCommerceKinds.includes(store.kind)) {
+      return Object.freeze({ ok: false, reason: 'store_not_authorized_for_item' });
+    }
     if (!inventory?.consumeItem?.(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
     state.credits += sellPrice;
     record('sell', { storeId: store.id, catalogId: item.catalogId, credits: sellPrice });

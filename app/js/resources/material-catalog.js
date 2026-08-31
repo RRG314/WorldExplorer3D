@@ -32,6 +32,12 @@ function transferableMaterial(catalogId) {
   return MATERIAL_BY_ID.get(String(catalogId || '')) || null;
 }
 
+function approvedSampleTradeValue(sample = {}) {
+  if (sample.recoveryRequirement || sample.processed !== true || sample.analysisApproved !== true) return 0;
+  const massKg = Math.max(0, Number(sample.massKg || 0));
+  return massKg > 0 ? Math.max(12, Math.round(20 + massKg * 8)) : 0;
+}
+
 function summarizeExpeditionTransfers(items = []) {
   const transfers = [];
   const resources = {};
@@ -55,4 +61,4 @@ function summarizeExpeditionTransfers(items = []) {
   return Object.freeze({ transfers: Object.freeze(transfers), resources: Object.freeze(resources), totalMassKg });
 }
 
-export { summarizeExpeditionTransfers, transferableMaterial, TRANSFERABLE_MATERIAL_DEFINITIONS };
+export { approvedSampleTradeValue, summarizeExpeditionTransfers, transferableMaterial, TRANSFERABLE_MATERIAL_DEFINITIONS };

@@ -265,6 +265,15 @@ test('room operations use the persistent expedition record and conserve bounded 
   assert.equal(processed.expedition.scienceSamples[0].processed, true);
   assert.equal(processed.expedition.resources.scienceCargoKg, cargoBefore);
   assert.match(processed.message, /4 kg remains in science cargo/i);
+  const analysisView = getShipStationView(processed.expedition, 'analysis-review');
+  assert.equal(analysisView.actions[0].id, 'approve-processed-sample');
+  assert.equal(analysisView.actions[0].enabled, true);
+  const approved = applyShipOperation(processed.expedition, 'approve-processed-sample');
+  assert.equal(approved.changed, true);
+  assert.equal(approved.expedition.scienceSamples[0].analysisApproved, true);
+  assert.equal(approved.expedition.resources.scienceCargoKg, cargoBefore);
+  const cargoView = getShipStationView(approved.expedition, 'cargo-status');
+  assert.equal(cargoView.actions.find((action) => action.id === 'transfer-approved-sample')?.enabled, true);
 });
 
 test('a surface recovery sample becomes conserved feedstock, fabricated parts, and an installed repair', () => {

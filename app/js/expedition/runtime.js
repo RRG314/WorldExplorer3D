@@ -7,13 +7,13 @@ import {
   VOYAGE_MILESTONES
 } from './simulation.js?v=7';
 import { createExpeditionStore } from './store.js?v=8';
-import { applyShipOperation, getShipStationView } from './ship-operations.js?v=5';
+import { applyShipOperation, getShipStationView } from './ship-operations.js?v=6';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { registerExpeditionDiscovery } from './contact-authority.js?v=2';
 import { createPodJourney, POD_PHASE, transitionPodJourney } from './pod-journey-authority.js?v=1';
-import { summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=1';
+import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -862,6 +862,84 @@ async function loadBackpackMaterialsToShip() {
   }
 }
 
+async function transferApprovedSampleToBackpack() {
+  if (!activeExpedition) return Object.freeze({ changed: false, message: 'No Expedition cargo is active.' });
+  if (sharedState) return Object.freeze({ changed: false, message: 'Room sample export stays locked until ship cargo and player inventory can commit in one server transaction.' });
+  const sample = (activeExpedition.scienceSamples || []).find((entry) =>
+    entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true
+  );
+  if (!sample) return Object.freeze({ changed: false, message: 'Process and approve a science sample before moving it to the Backpack.' });
+  const massKg = Math.max(0, Number(sample.massKg || 0));
+  if (massKg <= 0 || Number(activeExpedition.resources?.scienceCargoKg || 0) + 1e-9 < massKg) {
+    return Object.freeze({ changed: false, message: 'The approved sample does not match the current science-cargo manifest.' });
+  }
+  const value = approvedSampleTradeValue(sample);
+  if (value <= 0) return Object.freeze({ changed: false, message: 'This sample has not passed the required game-world trade review.' });
+  const inventory = activeContext ? ensurePlayerBackpackInventory(activeContext) : null;
+  if (!inventory) return Object.freeze({ changed: false, message: 'The shared Backpack is unavailable.' });
+  const catalogId = `approved-space-sample:${String(sample.id).replace(/[^a-z0-9:_-]+/gi, '-').toLowerCase()}`;
+  const instanceId = `${catalogId}:lot`;
+  const definition = Object.freeze({
+    id: catalogId,
+    label: `${sample.label} · approved lot`,
+    category: 'research-sample',
+    icon: 'SAMPLE',
+    verbs: Object.freeze(['inspect']),
+    stackLimit: 1,
+    description: 'A sealed game-world research sample approved aboard Surveyor. Its value is a game rule, not a real commodity price.'
+  });
+  inventory.registerDefinitions?.([definition]);
+  const priorItem = inventory.snapshot?.().items?.find((entry) => entry.instanceId === instanceId) || null;
+  if (priorItem) return Object.freeze({ changed: false, message: 'That approved lot is already in the Backpack.' });
+  inventory.upsertItem?.({
+    instanceId,
+    catalogId,
+    quantity: 1,
+    authority: 'expedition-cargo-transfer',
+    provenance: 'approved-surveyor-science-cargo',
+    sourceEventId: sample.id,
+    tradeable: true,
+    acquiredAt: Date.now(),
+    metadata: {
+      label: definition.label,
+      category: definition.category,
+      icon: definition.icon,
+      description: definition.description,
+      sampleId: sample.id,
+      bodyId: sample.bodyId,
+      contactId: sample.contactId,
+      massKg,
+      truthClass: sample.truthClass,
+      commerceSellValue: value,
+      allowedCommerceKinds: ['pawn', 'hardware', 'outdoor']
+    }
+  }, { definition });
+  activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+  const samples = (activeExpedition.scienceSamples || []).map((entry) => Object.freeze(entry.id === sample.id ? {
+    ...entry,
+    exported: true,
+    exportedAtMissionS: Number(activeExpedition.strategicElapsedS || 0),
+    exportedCatalogId: catalogId,
+    gameTradeValue: value
+  } : { ...entry }));
+  const next = withExpeditionChanges(activeExpedition, {
+    scienceSamples: Object.freeze(samples),
+    resources: Object.freeze({
+      ...activeExpedition.resources,
+      scienceCargoKg: Math.max(0, Number(activeExpedition.resources.scienceCargoKg || 0) - massKg)
+    }),
+    log: appendMissionLog(activeExpedition, 'science', `Transferred the approved ${sample.label} lot from Surveyor science cargo to the Explorer Backpack.`)
+  });
+  try {
+    await applyExpeditionMutation(next, 'operation');
+  } catch (error) {
+    inventory.consumeItem?.(instanceId, 1);
+    activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+    return Object.freeze({ changed: false, message: String(error?.message || 'The approved sample transfer could not be committed.') });
+  }
+  return Object.freeze({ changed: true, message: `${definition.label} moved to the Backpack. Eligible research buyers offer ${value} Explorer Credits.` });
+}
+
 function renderShipStationPanel(interaction) {
   if (!interaction || !activeExpedition) return false;
   let panel = document.getElementById('shipStationPanel');
@@ -889,6 +967,12 @@ function renderShipStationPanel(interaction) {
     const actionId = button.dataset.shipAction;
     if (actionId === 'load-backpack-materials') {
       const result = await loadBackpackMaterialsToShip();
+      activeContext?.showToast?.(result.message);
+      if (result.changed) renderShipStationPanel(interaction);
+      return;
+    }
+    if (actionId === 'transfer-approved-sample') {
+      const result = await transferApprovedSampleToBackpack();
       activeContext?.showToast?.(result.message);
       if (result.changed) renderShipStationPanel(interaction);
       return;

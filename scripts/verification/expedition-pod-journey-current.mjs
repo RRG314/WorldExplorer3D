@@ -76,6 +76,99 @@ async function enterPodBay(page, contactId) {
   assert.equal(await page.locator(`[data-pod-contact="${contactId}"]`).isEnabled(), true);
 }
 
+async function switchShipDeck(page, deckId) {
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
+  });
+  await page.waitForTimeout(120);
+  await page.keyboard.press('KeyE');
+  await page.locator('#shipDeckPicker').waitFor({ state: 'visible' });
+  await page.locator(`#shipDeckPicker [data-deck="${deckId}"]`).click();
+}
+
+async function useShipStation(page, station, actionId) {
+  await page.evaluate(async (pose) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    Object.assign(ctx.Walk.state.walker, { ...pose, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
+  }, station);
+  await page.waitForTimeout(180);
+  await page.keyboard.press('KeyE');
+  await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
+  const action = page.locator(`#shipStationPanel [data-ship-action="${actionId}"]`);
+  await action.waitFor({ state: 'visible' });
+  assert.equal(await action.isEnabled(), true, `${actionId} should be enabled at ${station.x},${station.z}`);
+  await action.click();
+}
+
+async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
+  await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
+  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
+  await page.locator('#globeLocationSearch').fill('Baltimore, Maryland');
+  await page.locator('#globeLocationSearchBtn').click();
+  const searchResult = page.locator('#globeLocationSearchResults [role="option"]').first();
+  await searchResult.waitFor({ state: 'visible', timeout: 30_000 });
+  await searchResult.click();
+  await page.locator('#globeSelectorStartBtn').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
+  }, null, { timeout: 120_000 });
+  const hardwareStores = await page.evaluate(async () => {
+    const [{ ctx }, commerce] = await Promise.all([
+      import('/app/js/shared-context.js?v=55'),
+      import('/app/js/urban-sandbox/commerce-model.js?v=3')
+    ]);
+    const published = new Map((ctx.urbanSandboxRuntimeSnapshot?.().commerce?.stores || []).map((store) => [store.id, store]));
+    return commerce.mappedCommercePlaces(ctx.pois)
+      .filter((place) => place.kind === 'hardware')
+      .map((place) => ({
+        id: place.id,
+        name: place.name,
+        kind: place.kind,
+        interactionX: published.get(place.id)?.interactionX ?? place.x,
+        interactionZ: published.get(place.id)?.interactionZ ?? place.z
+      }));
+  });
+  assert.ok(hardwareStores.length > 0, 'The loaded Earth world did not publish an eligible mapped hardware business.');
+  const openedStoreId = await page.evaluate(async (stores) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.setTravelMode?.('walk', { source: 'sample-return-verification', emitTutorial: false });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    for (const store of stores) {
+      if (!globalThis.__WE3D_STORE_SUPPORT__?.moveNear(store.id)) continue;
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const candidate = ctx.resolvePrimaryContextInteraction?.();
+      if (candidate?.action !== 'visit_store' || candidate?.data?.storeId !== store.id) continue;
+      if (await ctx.handlePrimaryContextInteraction?.() === true) return store.id;
+    }
+    return '';
+  }, hardwareStores);
+  assert.ok(openedStoreId, 'No eligible mapped hardware business opened through the player interaction authority.');
+  await page.locator('#urbanStore.show').waitFor({ state: 'visible' });
+  const sellButton = page.locator(`#urbanStoreSell [data-store-action="sell"][data-store-item="${expectedCatalogId}:lot"]`);
+  await sellButton.waitFor({ state: 'visible' });
+  const beforeCredits = Number((await page.locator('#urbanStoreCredits').textContent()).match(/\d+/)?.[0] || 0);
+  await page.screenshot({ path: path.join(outputDir, 'desktop-earth-sample-sale-ready.png'), fullPage: true });
+  await sellButton.click();
+  await page.waitForFunction((credits) => Number((document.getElementById('urbanStoreCredits')?.textContent || '').match(/\d+/)?.[0] || 0) > credits, beforeCredits);
+  const sale = await page.evaluate(async (catalogId) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').match(/\d+/)?.[0] || 0),
+      status: document.getElementById('urbanStoreStatus')?.textContent || '',
+      source: document.getElementById('urbanStoreSource')?.textContent || '',
+      stillCarried: ctx.playerBackpackInventory.snapshot().items.some((item) => item.catalogId === catalogId)
+    };
+  }, expectedCatalogId);
+  assert.equal(sale.stillCarried, false, JSON.stringify(sale));
+  assert.match(sale.source, /game stock/i);
+  assert.match(sale.source, /OpenStreetMap/i);
+  assert.match(sale.status, /sold/i);
+  return { storeId: openedStoreId, storeName: hardwareStores.find((store) => store.id === openedStoreId)?.name, beforeCredits, ...sale };
+}
+
 async function run() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -189,12 +282,53 @@ async function run() {
       const saved = JSON.parse(localStorage.getItem('world-explorer:interstellar-expedition:v1') || 'null');
       return saved?.podJourney?.phase;
     }), 'recovered');
+    assert.equal(final.interstellarExpedition.scienceSamples.length, 1);
+    assert.equal(final.interstellarExpedition.scienceSamples[0].processed, false);
+    assert.equal(final.interstellarExpedition.resources.scienceCargoKg >= 4, true);
+
+    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
+    await page.locator('#sfExpeditionBtn').click();
+    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+    await page.locator('#expeditionEnterShip').click();
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
+    await switchShipDeck(page, 'engineering');
+    await useShipStation(page, { x: -4.3, z: -14.5 }, 'process-resource-sample');
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.scienceSamples?.[0]?.processed === true);
+    await page.screenshot({ path: path.join(outputDir, 'desktop-resource-processing-complete.png'), fullPage: true });
+    await page.locator('[data-close-station]').click();
+
+    await switchShipDeck(page, 'command');
+    await useShipStation(page, { x: -5.1, z: -14.5 }, 'approve-processed-sample');
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.scienceSamples?.[0]?.analysisApproved === true);
+    await page.screenshot({ path: path.join(outputDir, 'desktop-analysis-approval-complete.png'), fullPage: true });
+    await page.locator('[data-close-station]').click();
+
+    await switchShipDeck(page, 'engineering');
+    await useShipStation(page, { x: 4.3, z: 0.5 }, 'transfer-approved-sample');
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.scienceSamples?.[0]?.exported === true);
+    const exported = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      const sample = state.interstellarExpedition.scienceSamples[0];
+      const item = ctx.playerBackpackInventory.snapshot().items.find((entry) => entry.catalogId === sample.exportedCatalogId);
+      return { sample, item, scienceCargoKg: state.interstellarExpedition.resources.scienceCargoKg };
+    });
+    assert.ok(exported.item, JSON.stringify(exported));
+    assert.equal(exported.item.tradeable, true);
+    assert.equal(exported.sample.gameTradeValue > 0, true);
+    await page.screenshot({ path: path.join(outputDir, 'desktop-cargo-export-complete.png'), fullPage: true });
+
+    const earthSale = await sellReturnedSampleOnEarth(page, exported.sample.exportedCatalogId);
+    assert.equal(earthSale.credits - earthSale.beforeCredits, exported.sample.gameTradeValue);
     return {
       contactId: contact.id,
       bodyId,
       finalPhase: final.interstellarExpedition.podJourney.phase,
       returnFrameId: final.universeNavigation.currentFrameId,
-      surfacePodVisible: surfacePod.visible
+      surfacePodVisible: surfacePod.visible,
+      sampleId: exported.sample.id,
+      sampleValue: exported.sample.gameTradeValue,
+      earthSale
     };
   } finally {
     await context.close();

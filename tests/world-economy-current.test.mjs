@@ -4,7 +4,7 @@ import test from 'node:test';
 import { getShipProfile } from '../app/js/expedition/catalog.js';
 import { createExpeditionPlan } from '../app/js/expedition/model.js';
 import { getShipStationView } from '../app/js/expedition/ship-operations.js';
-import { summarizeExpeditionTransfers } from '../app/js/resources/material-catalog.js';
+import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../app/js/resources/material-catalog.js';
 import { createEquipmentInventory } from '../app/js/urban-sandbox/equipment-model.js';
 import {
   COMMERCE_STORAGE_KEY,
@@ -77,4 +77,28 @@ test('the existing Surveyor cargo station owns Earth-to-space material loading',
   });
   const cargo = getShipStationView(expedition, 'cargo-status');
   assert.ok(cargo.actions.some((action) => action.id === 'load-backpack-materials' && action.enabled));
+});
+
+test('only processed and Analysis-approved science samples receive a game trade value', () => {
+  const sample = { massKg: 4, processed: true, analysisApproved: true, recoveryRequirement: null };
+  assert.equal(approvedSampleTradeValue(sample), 52);
+  assert.equal(approvedSampleTradeValue({ ...sample, processed: false }), 0);
+  assert.equal(approvedSampleTradeValue({ ...sample, analysisApproved: false }), 0);
+  assert.equal(approvedSampleTradeValue({ ...sample, recoveryRequirement: { kind: 'repair-feedstock' } }), 0);
+});
+
+test('approved research lots are sellable only to their game-authorized business classes', () => {
+  const inventory = createEquipmentInventory();
+  inventory.registerDefinitions([{ id: 'approved:sample', label: 'Approved sample lot', category: 'research-sample', icon: 'SAMPLE', verbs: ['inspect'], stackLimit: 1 }]);
+  inventory.upsertItem({
+    instanceId: 'approved:sample:lot', catalogId: 'approved:sample', quantity: 1, tradeable: true,
+    metadata: { label: 'Approved sample lot', category: 'research-sample', commerceSellValue: 52, allowedCommerceKinds: ['pawn', 'hardware'] }
+  });
+  const economy = createLocalCommerceModel({ storage: memoryStorage(), inventory, now: () => Date.parse('2026-08-31T12:00:00Z') });
+  const convenience = economy.snapshot({ id: 'store:convenience', name: 'Corner shop', kind: 'convenience' });
+  const pawn = economy.snapshot({ id: 'store:pawn', name: 'Research exchange', kind: 'pawn' });
+  assert.equal(convenience.sellable.some((item) => item.instanceId === 'approved:sample:lot'), false);
+  assert.equal(pawn.sellable.some((item) => item.instanceId === 'approved:sample:lot'), true);
+  assert.equal(economy.sell({ id: 'store:convenience', name: 'Corner shop', kind: 'convenience' }, 'approved:sample:lot').reason, 'store_not_authorized_for_item');
+  assert.equal(economy.sell({ id: 'store:pawn', name: 'Research exchange', kind: 'pawn' }, 'approved:sample:lot').credits, 172);
 });

@@ -15,7 +15,7 @@ import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=2';
+import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=3';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
@@ -854,6 +854,7 @@ function commerceFailureMessage(reason) {
     sold_out: 'That item is sold out here today.',
     not_enough_credits: 'Not enough Explorer Credits.',
     not_sellable: 'That Backpack item cannot be sold here.',
+    store_not_authorized_for_item: 'This business does not trade that type of item.',
     already_traded_today: 'This store’s rare trade is complete for today.',
     missing_trade_items: 'The Backpack does not have the requested trade items.',
     inventory_unavailable: 'The Backpack could not complete that exchange.'

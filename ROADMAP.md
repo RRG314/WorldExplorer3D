@@ -127,15 +127,19 @@ or space currencies.
 
 ### Staged delivery
 
-1. **Foundation:** one Credits wallet, one Backpack item catalog, typed mapped
+1. **Foundation — implemented locally:** one Credits wallet, one Backpack item catalog, typed mapped
    businesses, stable game stock, Earth material bundles, and exact
    Backpack-to-ship transfer through the existing cargo station.
 2. **Services and gathering:** vehicle repair and energy services, Earth
    salvage and gathering activities, commissions, specialist shops, and clear
    earning and spending history.
-3. **Return trade:** conserved ship-to-Backpack unloading, sample analysis,
+3. **Return trade — first complete single-player custody path:** conserved ship-to-Backpack unloading, sample analysis,
    material processing, legal sale categories, rare exchanges, collection
-   records, and home or camp storage.
+   records, and home or camp storage. A collected planetary geology sample can
+   now return by pod, remain in Surveyor science cargo, be processed and
+   approved at separate ship stations, move to the shared Backpack, and sell
+   only at an eligible mapped business. Rare exchanges, broader material
+   classes, collection records, and home or camp storage remain staged work.
 4. **Persistent economy:** account recovery, server-authorized multiplayer
    trade, inflation controls, property and decoration sinks, progression
    rewards, migration, and rollback.

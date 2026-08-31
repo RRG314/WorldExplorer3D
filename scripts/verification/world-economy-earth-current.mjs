@@ -31,7 +31,7 @@ async function run() {
     const places = await page.evaluate(async () => {
       const [{ ctx }, commerce] = await Promise.all([
         import('/app/js/shared-context.js?v=55'),
-        import('/app/js/urban-sandbox/commerce-model.js?v=2')
+        import('/app/js/urban-sandbox/commerce-model.js?v=3')
       ]);
       const published = new Map((ctx.urbanSandboxRuntimeSnapshot?.().commerce?.stores || []).map((store) => [store.id, store]));
       return commerce.mappedCommercePlaces(ctx.pois).map((place) => ({
