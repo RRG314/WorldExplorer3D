@@ -1,4 +1,4 @@
-import { withExpeditionChanges } from './model.js?v=7';
+import { withExpeditionChanges } from './model.js?v=8';
 import { resolveSystemFailure } from './failure-authority.js?v=1';
 import { reinforceGenerationTraining, wakeReserveSpecialist } from './long-duration.js?v=1';
 

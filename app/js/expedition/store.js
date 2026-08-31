@@ -1,4 +1,4 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=7';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=8';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
 import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';

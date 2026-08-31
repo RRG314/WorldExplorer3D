@@ -30,9 +30,9 @@ async function seedSurfaceTarget(page) {
   return page.evaluate(async () => {
     const [{ DEFAULT_CREW }, { createExpeditionPlan }, simulation, { createExpeditionStore }] = await Promise.all([
       import('/app/js/expedition/catalog.js?v=2'),
-      import('/app/js/expedition/model.js?v=7'),
-      import('/app/js/expedition/simulation.js?v=6'),
-      import('/app/js/expedition/store.js?v=7')
+      import('/app/js/expedition/model.js?v=8'),
+      import('/app/js/expedition/simulation.js?v=7'),
+      import('/app/js/expedition/store.js?v=8')
     ]);
     let expedition = createExpeditionPlan({
       destinationId: 'proxima-centauri',

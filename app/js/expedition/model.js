@@ -79,6 +79,9 @@ function createExpeditionPlan({
   const crewPopulation = crewPopulationForShip(shipId, crew.length);
   const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crewPopulation });
   const provisioned = resources ? clone(resources) : recommendedResources(calculation.expectedResources, survival === 'severe' ? 0.08 : 0.25);
+  if (!resources && ship) {
+    provisioned.propellantKg = Math.min(Number(provisioned.propellantKg || 0), Number(ship.propellantCapacityKg || 0));
+  }
   const readiness = assessExpeditionReadiness({ ship, propulsion, crew, crewPopulation, resources: provisioned, calculation });
   const systems = Object.fromEntries((ship?.systems || []).map((systemId) => [systemId, { condition: 1, status: 'optimal' }]));
   return Object.freeze({

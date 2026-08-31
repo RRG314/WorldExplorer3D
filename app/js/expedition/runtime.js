@@ -1,13 +1,13 @@
 import { DEFAULT_CREW, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=7';
+import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=8';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
-} from './simulation.js?v=6';
-import { createExpeditionStore } from './store.js?v=7';
-import { applyShipOperation, getShipStationView } from './ship-operations.js?v=3';
+} from './simulation.js?v=7';
+import { createExpeditionStore } from './store.js?v=8';
+import { applyShipOperation, getShipStationView } from './ship-operations.js?v=4';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';

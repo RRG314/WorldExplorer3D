@@ -1,5 +1,5 @@
 import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=11';
-import { getDestinationMission } from './mission-catalog.js?v=1';
+import { getDestinationMission } from './mission-catalog.js?v=2';
 
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',
@@ -45,6 +45,20 @@ function closeUniverseNavigator() {
 function toggleUniverseNavigator() {
   const panel = document.getElementById('universeNavigator');
   return panel ? setNavigatorOpen(panel.hidden) : false;
+}
+
+function ensureUniverseToggle() {
+  const existingControls = document.getElementById('ssToggleContainer');
+  if (!existingControls) return null;
+  let toggle = document.getElementById('universeToggle');
+  if (toggle) return toggle;
+  toggle = makeButton('universeToggle', 'WAYFINDER');
+  toggle.classList.add('ssToggleBtn');
+  toggle.setAttribute('aria-controls', 'universeNavigator');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.addEventListener('click', toggleUniverseNavigator);
+  existingControls.appendChild(toggle);
+  return toggle;
 }
 
 function populateDestinationSelect(select) {
@@ -189,15 +203,7 @@ function createUniverseNavigator(handlers) {
     closeUniverseNavigator();
   });
 
-  const existingControls = document.getElementById('ssToggleContainer');
-  if (existingControls && !document.getElementById('universeToggle')) {
-    const toggle = makeButton('universeToggle', 'WAYFINDER');
-    toggle.classList.add('ssToggleBtn');
-    toggle.setAttribute('aria-controls', 'universeNavigator');
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.addEventListener('click', toggleUniverseNavigator);
-    existingControls.appendChild(toggle);
-  }
+  ensureUniverseToggle();
   return panel;
 }
 
@@ -304,7 +310,7 @@ function updateUniverseNavigator(state) {
 }
 
 function showUniverseNavigator() {
-  const toggle = document.getElementById('universeToggle');
+  const toggle = ensureUniverseToggle();
   if (toggle) toggle.style.display = '';
 }
 

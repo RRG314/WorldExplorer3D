@@ -109,6 +109,9 @@ function makeMission(destination, authored, scope) {
     title,
     premise,
     operation,
+    observationTargets: operation === 'transit-network-survey'
+      ? Object.freeze((destination.children || []).filter((child) => child.objectClass === 'exoplanet').map((child) => child.id))
+      : Object.freeze([]),
     stages: missionStages(operation),
     habitability,
     truthClass: fictional ? 'fictional-game-world' : destination.accuracy === 'observed' ? 'observed-context-with-modeled-gameplay' : 'catalog-derived-with-modeled-gameplay',
@@ -142,6 +145,7 @@ const SOLAR_BODY_MISSIONS = new Map(SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.map
     title: authored[0],
     premise: authored[1],
     operation: authored[2],
+    observationTargets: Object.freeze([]),
     stages: missionStages(authored[2]),
     habitability: null,
     truthClass: 'observed-context-with-modeled-gameplay',

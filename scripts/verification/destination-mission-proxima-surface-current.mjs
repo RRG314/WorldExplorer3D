@@ -80,7 +80,7 @@ async function run() {
   try {
     await openSpace(page);
     const surfaceCatalogProfiles = await page.evaluate(async () => {
-      const { listDestinationMissions } = await import('/app/js/universe/mission-catalog.js?v=1');
+      const { listDestinationMissions } = await import('/app/js/universe/mission-catalog.js?v=2');
       const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
       const { deriveExpeditionWorldProfile, sampleModeledRelief } = await import('/app/js/planetary/solid-world-runtime.js?v=12');
       const stableSeed = (value) => {

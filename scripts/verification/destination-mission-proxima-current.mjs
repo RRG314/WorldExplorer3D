@@ -28,9 +28,9 @@ async function seedExpedition(page) {
   await page.evaluate(async () => {
     const [{ DEFAULT_CREW }, { createExpeditionPlan }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
       import('/app/js/expedition/catalog.js?v=2'),
-      import('/app/js/expedition/model.js?v=7'),
-      import('/app/js/expedition/simulation.js?v=6'),
-      import('/app/js/expedition/store.js?v=7')
+      import('/app/js/expedition/model.js?v=8'),
+      import('/app/js/expedition/simulation.js?v=7'),
+      import('/app/js/expedition/store.js?v=8')
     ]);
     const planned = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, id: 'destination-mission-verification', createdAtMs: 88_000 });
     createExpeditionStore().save(startExpedition(planned, 88_100));
