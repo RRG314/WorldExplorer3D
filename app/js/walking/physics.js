@@ -6,6 +6,7 @@ import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=4';
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
+import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
@@ -458,7 +459,8 @@ function createWalkingPhysicsHelpers({
         : null;
       const checkBuildingsFallback = !isPlanetarySurface() && !sharedBuildingCollision && (getBuildingsArray || getNearbyBuildings);
       const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === "function";
-      if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks) {
+      const checkPlanetaryObstacles = isPlanetarySurface();
+      if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks || checkPlanetaryObstacles) {
         const allBuildings = checkBuildingsFallback ? queryBuildings(newX, newZ, 32) || [] : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
         const sampleRadius = 0.28;
@@ -471,6 +473,7 @@ function createWalkingPhysicsHelpers({
         ];
 
         function isBlockedByWorld(px, pz) {
+          if (checkPlanetaryObstacles && queryPlanetaryObstacle(px, pz, sampleRadius, planetaryBodyId)?.collision) return true;
           if (sharedBuildingCollision) {
             const collision = sharedBuildingCollision(px, pz, sampleRadius, {
               actorBaseY: walkerFeetY,

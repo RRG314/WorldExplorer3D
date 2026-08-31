@@ -237,6 +237,24 @@ async function run() {
     });
     assert.ok(surfacePod?.visible);
 
+    const podCollisionStart = await page.evaluate(async (pose) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const x = pose.x + 3.1;
+      const z = pose.z;
+      const heading = Math.atan2(pose.x - x, pose.z - z);
+      Object.assign(ctx.Walk.state.walker, { x, z, y: pose.y + 1.7, angle: heading, yaw: heading, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
+      return Math.hypot(x - pose.x, z - pose.z);
+    }, surfacePod);
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(900);
+    await page.keyboard.up('ArrowUp');
+    const podCollisionEnd = await page.evaluate(async (pose) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return Math.hypot(Number(ctx.Walk.state.walker.x) - pose.x, Number(ctx.Walk.state.walker.z) - pose.z);
+    }, surfacePod);
+    assert.ok(podCollisionEnd < podCollisionStart, JSON.stringify({ podCollisionStart, podCollisionEnd }));
+    assert.ok(podCollisionEnd >= 1.85, JSON.stringify({ podCollisionStart, podCollisionEnd }));
+
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === 'geology-inspect');
@@ -339,6 +357,7 @@ async function run() {
       finalPhase: final.interstellarExpedition.podJourney.phase,
       returnFrameId: final.universeNavigation.currentFrameId,
       surfacePodVisible: surfacePod.visible,
+      podCollision: { startDistance: podCollisionStart, stoppedDistance: podCollisionEnd },
       sampleId: exported.sample.id,
       sampleValue: exported.sample.gameTradeValue,
       earthSale

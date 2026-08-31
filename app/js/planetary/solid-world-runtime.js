@@ -8,6 +8,7 @@ import {
 import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 import { configureColorTexture } from './catalog.js?v=1';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
+import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
 import {
   CALORIS_PLANITIA_SURFACE_REGION,
   CERES_OCCATOR_SURFACE_REGION,
@@ -938,6 +939,7 @@ function hideActiveWorld() {
   document.getElementById('solidWorldPanel')?.style.setProperty('display', 'none');
   document.getElementById('solidWorldReturnBtn')?.style.setProperty('display', 'none');
   appCtx.activePlanetaryBodyId = null;
+  clearActivePlanetaryObstacles();
   activeReturnPod = null;
   appCtx.activeSolidWorldSurface = null;
   appCtx.activePlanetaryEnvironment = null;
@@ -990,6 +992,13 @@ async function arriveAtSolidWorld(bodyInput) {
   if (requestId !== transitionId) return false;
   activePack = pack;
   activeReturnPod = world.returnPod || null;
+  setActivePlanetaryObstacles(bodyId, activeReturnPod ? [Object.freeze({
+    id: 'expedition-return-pod',
+    x: activeReturnPod.position.x,
+    z: activeReturnPod.position.z,
+    radius: 1.62,
+    kind: 'spacecraft-hull'
+  })] : []);
   ensureReturnPodInteraction();
   appCtx.activePlanetaryBodyId = bodyId;
   appCtx.activeSolidWorldSurface = world.surface;

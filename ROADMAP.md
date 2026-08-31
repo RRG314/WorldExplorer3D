@@ -381,8 +381,10 @@ action standard, but it does not complete surface life, NPC behavior, rover and
 pod art, or destination-specific resource-site variety. The return pod has also
 received a first close-range structure pass—segmented shell longerons, docking
 hardware, heat tiles, four landing struts, ramp rails, and a framed hatch—while
-retaining the same journey and boarding authority. Final materials, collision,
-entry/launch effects, and interior presentation remain in the quality gate.
+retaining the same journey and boarding authority. Final materials, vehicle
+contact, entry/launch effects, and interior presentation remain in the quality gate. The
+pod hull now blocks planetary walking through a dedicated active-world obstacle
+authority; it does not reuse Earth buildings or player-created Blocks.
 
 The current connected slice is mechanically ahead of its presentation. It is
 not yet the intended visual or activity standard for a public Space alpha.
