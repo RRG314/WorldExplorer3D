@@ -280,6 +280,12 @@ three-deck ship, compact and expanded maps, pressure-door and route graph,
 room-specific activities, connected voyage loop, science/fiction boundary,
 failure recovery, shared authorities, and staged acceptance journeys.
 
+Alpha design and release gate: `docs/SPACE_EXPEDITION_ALPHA.md` defines the
+Voyage Director, 36-event minimum content budget, delayed consequence chains,
+physically suitable destination exploration, resource-stop custody, generated
+room/item/UI references, modular rendering plan, animation and sound coverage,
+and the gameplay evidence required before the feature can ship as an alpha.
+
 Current status: the Surveyor now has three bounded walkable decks, 25 mapped
 rooms, pressure doors, a deck lift, compact and expanded ship maps, visible
 crew assignments, shared walking/collision authorities, mobile controls,
@@ -322,6 +328,11 @@ complete.
   and unresolved problems can form an understandable failure chain. A prepared
   Expedition normally has backups, warnings, repair, diversion, and rescue
   opportunities before it can be lost.
+- Replace the representative fixed nine-beat foundation with the data-driven
+  Voyage Director before alpha. The alpha content floor is 36 authored event
+  families with state-dependent options, immediate and delayed outcomes,
+  cooldowns, incompatibilities, responsible rooms/crew, and visible action.
+  Parameter variations do not count as distinct authored families.
 - Record departures, arrivals, repairs, losses, discoveries, route changes,
   resupply, rescue, outposts, and outcomes in a Captain's Log presentation
   backed by the existing Journal and progression authority.
