@@ -1,4 +1,4 @@
-import { withExpeditionChanges } from './model.js?v=5';
+import { withExpeditionChanges } from './model.js?v=6';
 
 const STATION_VIEWS = Object.freeze({
   'bridge-flight': Object.freeze({ title: 'Flight Controls', systemId: 'navigation', summary: 'Review heading, velocity, and the margins on the active route.' }),
@@ -25,7 +25,7 @@ const STATION_VIEWS = Object.freeze({
   'thermal-status': Object.freeze({ title: 'Thermal Control', systemId: 'thermal', summary: 'Inspect coolant loops and heat-rejection margins.', actions: ['service-thermal-loop'] }),
   'fabricator-status': Object.freeze({ title: 'Fabrication Shop', systemId: 'fabrication', summary: 'Convert carried feedstock into a bounded batch of maintenance parts.', actions: ['fabricate-parts'] }),
   'cargo-status': Object.freeze({ title: 'Cargo Hold', systemId: 'hull', summary: 'Review carried food, water, feedstock, maintenance parts, and science cargo.' }),
-  'resource-processor-status': Object.freeze({ title: 'Resource Processing', systemId: 'fabrication', summary: 'Process samples acquired during a supported surface or asteroid operation. No raw material is currently loaded.', actions: ['process-resource-sample'] }),
+  'resource-processor-status': Object.freeze({ title: 'Resource Processing', systemId: 'fabrication', summary: 'Inspect and process samples transferred from a supported surface operation.', actions: ['process-resource-sample'] }),
   'airlock-status': Object.freeze({ title: 'EVA Airlock', systemId: 'hull', summary: 'Inspect suits and airlock readiness. EVA requires a supported local destination operation.', actions: ['verify-eva'] }),
   'craft-bay-status': Object.freeze({ title: 'Local-Craft Bay', systemId: 'hull', summary: 'Inspect the secured survey craft used for supported local landings and field operations.', actions: ['verify-local-craft'] })
 });
@@ -94,7 +94,9 @@ function actionAvailability(expedition, actionId) {
   if (actionId === 'serve-crew-meal' && (Number(resources.foodKg) < 8 || Number(resources.waterKg) < 3)) return Object.freeze({ enabled: false, reason: 'Requires 8 kg food and 3 kg water.' });
   if (actionId === 'treat-crew' && Number(resources.medicalUnits) < 1) return Object.freeze({ enabled: false, reason: 'No treatment unit is available.' });
   if (['repair-priority-system', 'service-water-loop', 'stabilize-life-support', 'service-thermal-loop'].includes(actionId) && Number(resources.maintenanceKg) < 5) return Object.freeze({ enabled: false, reason: 'Maintenance stores are too low.' });
-  if (actionId === 'process-resource-sample') return Object.freeze({ enabled: false, reason: 'Acquire and load a sample during a supported local operation first.' });
+  if (actionId === 'process-resource-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true)) {
+    return Object.freeze({ enabled: false, reason: 'Acquire and transfer a sample from a supported local operation first.' });
+  }
   if (actionId === 'verify-local-craft' && expedition?.state !== 'arrived') return Object.freeze({ enabled: false, reason: 'The craft remains secured during interstellar cruise.' });
   return Object.freeze({ enabled: true, reason: '' });
 }
@@ -180,6 +182,24 @@ function applyShipOperation(expedition, actionId) {
   } else if (actionId === 'record-baseline') {
     message = 'A stellar baseline was recorded with the current mission position and instrument state.';
     kind = 'science';
+  } else if (actionId === 'process-resource-sample') {
+    const samples = clone(expedition.scienceSamples || []);
+    const sample = samples.find((entry) => entry.processed !== true);
+    sample.processed = true;
+    sample.processedAtMissionS = Number(expedition.strategicElapsedS) || 0;
+    message = `${sample.label} was documented, separated, and sealed. Its ${Number(sample.massKg || 0)} kg remains in science cargo.`;
+    kind = 'science';
+    const log = Object.freeze([...(expedition.log || []), Object.freeze({
+      atMissionS: Number(expedition.strategicElapsedS) || 0,
+      kind,
+      message
+    })]);
+    const next = withExpeditionChanges(expedition, {
+      scienceSamples: Object.freeze(samples.map((entry) => Object.freeze(entry))),
+      operationFlags: Object.freeze(flags),
+      log
+    });
+    return Object.freeze({ expedition: next, changed: true, message });
   }
 
   const log = Object.freeze([...(expedition.log || []), Object.freeze({

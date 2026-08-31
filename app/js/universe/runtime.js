@@ -448,12 +448,17 @@ function getUniverseHudTarget() {
     : universeRuntime.current.objectClass === 'planetary_system' ? 24
       : universeRuntime.current.objectClass === 'nebula' ? 240
         : universeRuntime.current.objectClass === 'stellar_region' ? 180 : 80;
+  const activeDestination = courseBody ? courseDestination : courseInTransit ? courseDestination : universeRuntime.current;
+  const solidSurface = courseBody && activeDestination?.exploration?.landingMode === 'solid_surface';
   return {
     name: courseBody || courseInTransit ? courseDestination.name : universeRuntime.current.name,
     position: courseBody ? coursePosition : group?.position || new THREE.Vector3(),
     radius: courseBody ? Number(courseBody.geometry?.parameters?.radius) || 6 : radius,
     physicalRadiusKm: courseBody ? Number(courseBody.userData?.physicalRadiusKm) || null : null,
-    landable: false,
+    mesh: courseBody || null,
+    destinationId: activeDestination?.id || null,
+    exploration: activeDestination?.exploration || null,
+    landable: Boolean(solidSurface),
     objectClass: courseBody ? 'exoplanet' : universeRuntime.current.objectClass,
     address: courseBody || courseInTransit ? courseDestination.address : universeRuntime.current.address,
     course: universeRuntime.course,
@@ -466,6 +471,21 @@ function getUniverseHudTarget() {
       appCtx.spaceFlight?.speed
     )
   };
+}
+
+function restoreUniverseLocalFrame(frameId, courseDestinationId = '') {
+  if (!universeRuntime.initialized || !universeRuntime.scene) return false;
+  const frame = resolveUniverseAddress(frameId);
+  const destination = resolveUniverseAddress(courseDestinationId);
+  if (!frame || frame.objectClass !== 'planetary_system') return false;
+  universeRuntime.transition = null;
+  universeRuntime.pendingEarthReturn = false;
+  universeRuntime.selected = destination || frame;
+  universeRuntime.course = destination ? createUniverseCourse(destination, frame.id, performance.now()) : null;
+  installFrame(frame);
+  if (destination?.parentFrameId === frame.id) positionRocketForCourseDestination(destination);
+  updateUniverseNavigator(universeRuntime);
+  return true;
 }
 
 function getLocalCourseTarget() {
@@ -740,6 +760,7 @@ Object.assign(appCtx, {
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,
+  restoreUniverseLocalFrame,
   setUniverseDestination: setSelectedDestination,
   showUniverseUI,
   toggleUniverseCourseAssist,
@@ -757,6 +778,7 @@ export {
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,
+  restoreUniverseLocalFrame,
   showUniverseUI,
   toggleUniverseCourseAssist,
   travelToUniverseDestination,

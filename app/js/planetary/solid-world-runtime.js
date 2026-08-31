@@ -17,10 +17,11 @@ import {
   IO_TVASHTAR_SURFACE_REGION,
   MAXWELL_MONTES_SURFACE_REGION,
   PLUTO_SPUTNIK_SURFACE_REGION,
+  registerModeledSurfaceRegion,
   TITAN_SHANGRI_LA_SURFACE_REGION,
   TRITON_CANTALOUPE_SURFACE_REGION,
   VESTA_RHEASILVIA_SURFACE_REGION
-} from './runtime/surface-authority.js?v=3';
+} from './runtime/surface-authority.js?v=4';
 
 const WALK_AND_DRIVE = Object.freeze({ drive: true, walk: true, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
 const PROTECTED_DRIVE = Object.freeze({ drive: true, walk: false, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
@@ -167,6 +168,7 @@ const SOLID_WORLD_PACKS = Object.freeze({
 });
 
 const worldCache = new Map();
+const runtimeWorldPacks = new Map();
 let activePack = null;
 let transitionId = 0;
 let priorWorldPresentation = null;
@@ -250,6 +252,41 @@ function sampleModeledRelief(pack, x, z) {
 
 function loadSurfaceTexture(pack) {
   const asset = pack.manifest.assets[0];
+  if (!asset) {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    const image = context.createImageData(size, size);
+    let seed = (Number(pack.detailSeed) || 1) >>> 0;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    const phaseA = random() * Math.PI * 2;
+    const phaseB = random() * Math.PI * 2;
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const broad = Math.sin(x * 0.055 + phaseA) * 15 + Math.sin(y * 0.071 + phaseB) * 12;
+        const grain = (random() - 0.5) * 34;
+        const value = Math.max(72, Math.min(224, Math.round(154 + broad + grain)));
+        const index = (y * size + x) * 4;
+        image.data[index] = value;
+        image.data[index + 1] = value;
+        image.data[index + 2] = value;
+        image.data[index + 3] = 255;
+      }
+    }
+    context.putImageData(image, 0, 0);
+    const texture = configureColorTexture(new THREE.CanvasTexture(canvas), appCtx.renderer);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(10, 10);
+    texture.anisotropy = Math.min(4, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+    texture.needsUpdate = true;
+    return Promise.resolve(texture);
+  }
   return new Promise((resolve, reject) => {
     new THREE.TextureLoader().load(
       asset.url,
@@ -454,7 +491,7 @@ async function createSolidWorld(pack) {
     surface.userData.worldAddress = pack.manifest.address;
     surface.userData.worldAddressKey = pack.manifest.addressKey;
     surface.userData.terrainTruthClass = 'modeled';
-    surface.userData.textureTruthClass = 'derived_from_observations';
+    surface.userData.textureTruthClass = pack.runtimeModeled ? 'generated_model_material' : 'derived_from_observations';
     return {
       sampleHeight: (x, z) => sampleModeledRelief(pack, x, z),
       renderArtifact: surface,
@@ -492,7 +529,20 @@ function positionPlayer(pack) {
   appCtx.carMesh?.position.set(pack.spawn.x, ground + 1.2, pack.spawn.z);
   if (appCtx.carMesh) {
     appCtx.carMesh.rotation.y = pack.spawn.angle;
-    appCtx.carMesh.visible = true;
+    appCtx.carMesh.visible = pack.arrivalMode !== 'walk';
+  }
+  if (pack.arrivalMode === 'walk' && appCtx.Walk?.state?.walker) {
+    Object.assign(appCtx.Walk.state.walker, {
+      x: pack.spawn.x,
+      z: pack.spawn.z,
+      y: ground + 1.2,
+      angle: pack.spawn.angle,
+      yaw: pack.spawn.angle,
+      lookYawOffset: 0,
+      pitch: 0,
+      vy: 0,
+      onGround: true
+    });
   }
   appCtx.camera?.position.set(pack.spawn.x + 18, ground + 10, pack.spawn.z + 22);
   appCtx.camera?.lookAt(pack.spawn.x, ground + 3, pack.spawn.z);
@@ -526,10 +576,18 @@ function showReturnButton(pack) {
     button.id = 'solidWorldReturnBtn';
     button.className = 'game-btn';
     button.style.cssText = 'position:fixed;top:82px;right:20px;z-index:1000;padding:10px 20px;font-size:16px;background:#315d9d;color:#fff;border:1px solid #8ab4ff;border-radius:5px;cursor:pointer;';
-    button.addEventListener('click', () => appCtx.startSpaceFlightToEarth?.());
+    button.addEventListener('click', () => {
+      if (activePack?.returnMode === 'expedition-contact') {
+        appCtx.leaveExpeditionSurface?.(activePack.bodyId);
+        return;
+      }
+      appCtx.startSpaceFlightToEarth?.();
+    });
     document.body.appendChild(button);
   }
-  button.textContent = `Leave ${getAstronomicalBody(pack.bodyId).name}`;
+  button.textContent = pack.returnMode === 'expedition-contact'
+    ? `Return to Surveyor from ${pack.bodyName}`
+    : `Leave ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
   const compact = globalThis.innerWidth <= 600;
   const panelBottom = document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
   const compactTop = Number.isFinite(panelBottom) ? Math.ceil(panelBottom + 10) : 330;
@@ -596,13 +654,14 @@ function hideActiveWorld() {
 }
 
 async function arriveAtSolidWorld(bodyInput) {
-  const bodyId = normalizeAstronomicalBodyId(bodyInput);
-  const pack = SOLID_WORLD_PACKS[bodyId];
+  const inputId = String(typeof bodyInput === 'object' ? bodyInput.id : bodyInput || '').trim().toLowerCase();
+  const bodyId = normalizeAstronomicalBodyId(inputId) || inputId;
+  const pack = SOLID_WORLD_PACKS[bodyId] || runtimeWorldPacks.get(bodyId) || [...runtimeWorldPacks.values()].find((entry) => entry.bodyName.toLowerCase() === inputId);
   if (!pack) return false;
   const requestId = ++transitionId;
   const body = getAstronomicalBody(bodyId);
-  appCtx.showLoad?.(`Preparing ${body.name} surface...`, {
-    background: body.presentation.globalTexturePath,
+  appCtx.showLoad?.(`Preparing ${body?.name || pack.bodyName} surface...`, {
+    background: body?.presentation?.globalTexturePath || '',
     mode: 'space',
     overlay: 0.38,
     bold: true
@@ -615,7 +674,7 @@ async function arriveAtSolidWorld(bodyInput) {
   activePack = pack;
   appCtx.activePlanetaryBodyId = bodyId;
   appCtx.activeSolidWorldSurface = world.surface;
-  const environment = samplePhysicalEnvironment(bodyId, { heightM: 0, timestampS: Date.now() / 1000 });
+  const environment = pack.environment || samplePhysicalEnvironment(bodyId, { heightM: 0, timestampS: Date.now() / 1000 });
   appCtx.activePlanetaryEnvironment = environment;
   appCtx.planetaryTravelCapabilities = pack.capabilities;
   appCtx.activatePlanetaryFieldActivities?.(pack, world, (x, z) => sampleModeledRelief(pack, x, z));
@@ -645,12 +704,12 @@ async function arriveAtSolidWorld(bodyInput) {
   }
   if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity;
   if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity;
-  appCtx.setTravelMode?.('drive', { source: `${bodyId}_arrival`, emitTutorial: false });
+  appCtx.setTravelMode?.(pack.arrivalMode || 'drive', { source: `${bodyId}_arrival`, emitTutorial: false });
   positionPlayer(pack);
-  await appCtx.setPlanetaryVehicle?.(bodyId);
+  await appCtx.setPlanetaryVehicle?.(pack.vehicleBodyId || bodyId);
   if (requestId !== transitionId) return false;
-  appCtx.setPlanetaryCharacter?.(bodyId);
-  appCtx.setPlanetarySky?.(bodyId);
+  appCtx.setPlanetaryCharacter?.(pack.vehicleBodyId || bodyId);
+  if (!pack.runtimeModeled) appCtx.setPlanetarySky?.(bodyId);
   if (!commitEnvironment(ENV.PLANETARY, { source: `${bodyId}_arrival` })) return false;
   appCtx.refreshBlockBuilderForCurrentLocation?.();
   showWorldPanel(pack, environment);
@@ -665,6 +724,82 @@ async function arriveAtSolidWorld(bodyInput) {
       appCtx.setPauseReason?.('planetary_transition', false);
     }
   }
+}
+
+function registerExpeditionSolidWorld(input = {}) {
+  const bodyId = String(input.id || '').trim().toLowerCase();
+  if (!bodyId) throw new TypeError('An Expedition solid world requires a stable id.');
+  if (SOLID_WORLD_PACKS[bodyId]) throw new Error(`Expedition world cannot replace catalog body: ${bodyId}`);
+  const seed = Number(input.seed) >>> 0;
+  const radiusEarth = Math.max(0.2, Number(input.radiusEarth) || 1);
+  const massEarth = Math.max(0.05, Number(input.massEarth) || radiusEarth ** 2.7);
+  const gravityMps2 = 9.80665 * massEarth / (radiusEarth ** 2);
+  const starMassSolar = Math.max(0.08, Number(input.starMassSolar) || 0.5);
+  const orbitAu = Math.max(0.02, Number(input.semiMajorAxisAu) || 0.5);
+  const luminositySolar = Math.max(0.0001, starMassSolar ** 3.5);
+  const temperatureK = Math.max(45, 278 * luminositySolar ** 0.25 / Math.sqrt(orbitAu));
+  const palette = [
+    { ground: 0x826f5c, rock: 0x463c35, sky: 0x030407 },
+    { ground: 0x756d62, rock: 0x393733, sky: 0x020306 },
+    { ground: 0x8b7154, rock: 0x4d3b2b, sky: 0x050304 },
+    { ground: 0x68716d, rock: 0x343b39, sky: 0x020405 }
+  ][seed % 4];
+  const regionId = `${bodyId}-survey-site`;
+  const manifest = registerModeledSurfaceRegion({
+    bodyId,
+    systemId: String(input.parentSystemId || 'expedition'),
+    regionId,
+    displayName: `${input.name || bodyId} survey site`,
+    localBounds: { minX: -8_000, maxX: 8_000, minZ: -8_000, maxZ: 8_000 },
+    renderPlacement: { x: 0, y: -80, z: 0 },
+    modelInputs: { seed, radiusEarth, massEarth, semiMajorAxisAu: orbitAu, starMassSolar },
+    source: {
+      title: 'Expedition route survey model',
+      provider: 'World Explorer 3D',
+      attribution: 'Seeded model derived from the saved route contact',
+      rights: 'World Explorer 3D generated game content',
+      processing: 'Relief and appearance are generated from the stable contact seed. No observed surface imagery or local measurement is claimed.'
+    }
+  });
+  const pack = worldPack({
+    bodyId,
+    bodyName: String(input.name || bodyId),
+    manifest,
+    runtimeModeled: true,
+    arrivalMode: 'walk',
+    returnMode: 'expedition-contact',
+    reliefKind: ['cratered', 'volcanic', 'ice-lineae', 'nitrogen-ice'][seed % 4],
+    detailSeed: seed || 1,
+    rockColor: palette.rock,
+    rockScale: 4.2,
+    spawn: { x: 420, z: -360, angle: 0.7 },
+    material: { color: palette.ground, roughness: 0.94, bumpScale: 1.6 },
+    skyColor: palette.sky,
+    sunColor: 0xffd7aa,
+    sunIntensity: Math.max(0.04, Math.min(2.2, luminositySolar / (orbitAu ** 2))),
+    ambientIntensity: 0.42,
+    fillIntensity: 0.34,
+    exposure: 1.28,
+    title: `${input.name || bodyId} · Survey Site`,
+    context: `${gravityMps2.toFixed(2)} m/s² modeled gravity · atmosphere unconfirmed`,
+    representation: 'Seeded physical model · generated relief · no observed surface imagery',
+    environment: Object.freeze({
+      bodyId,
+      gravityMps2,
+      gravityMagnitudeMps2: gravityMps2,
+      pressurePa: 0,
+      temperatureK,
+      truthClass: 'modeled',
+      uncertainty: 'Temperature is an equilibrium estimate; the local atmosphere is unconfirmed and the suit model uses a vacuum-safe assumption.'
+    }),
+    fieldNotes: Object.freeze([
+      Object.freeze(['Document the survey site', 'photograph', 'places', 'Record the generated survey terrain and the model inputs used to create it.']),
+      Object.freeze(['Collect geology sample', 'geology-inspect', 'rock', 'Collect one modeled field sample for Surveyor processing. The sample represents game-world material, not a real-world observation.']),
+      Object.freeze(['Survey local conditions', 'habitat-survey', 'places', 'Log the model-derived gravity and thermal estimate with their uncertainty.'])
+    ])
+  });
+  runtimeWorldPacks.set(bodyId, pack);
+  return pack;
 }
 
 function sampleActiveSolidWorldHeight(x, z) {
@@ -683,11 +818,13 @@ registerEnvironmentLifecycle(ENV.PLANETARY, {
 
 Object.assign(appCtx, {
   arriveAtSolidWorld,
+  registerExpeditionSolidWorld,
   sampleActiveSolidWorldHeight
 });
 
 export {
   arriveAtSolidWorld,
+  registerExpeditionSolidWorld,
   sampleActiveSolidWorldHeight,
   SOLID_WORLD_PACKS,
   visualHorizonRegions

@@ -530,12 +530,81 @@ const SURFACE_REGIONS = Object.freeze({
   [PLUTO_SPUTNIK_SURFACE_REGION.regionId]: PLUTO_SPUTNIK_SURFACE_REGION
 });
 
+const RUNTIME_SURFACE_REGIONS = new Map();
+
+function createModeledSurfaceRegionManifest(input = {}) {
+  const bodyId = cleanId(input.bodyId, 'Surface body ID');
+  const regionId = cleanId(input.regionId, 'Surface region ID');
+  const systemId = cleanId(input.systemId || 'expedition', 'Surface system ID');
+  const truthClass = String(input.truthClass || SURFACE_TRUTH_CLASS.MODELED);
+  if (truthClass !== SURFACE_TRUTH_CLASS.MODELED) {
+    throw new RangeError('Runtime Expedition surfaces must be identified as modeled.');
+  }
+  const latitudeDeg = finite(input.latitudeDeg ?? 0, 'Surface latitude');
+  const longitudeDegPositiveEast = finite(input.longitudeDegPositiveEast ?? 0, 'Surface longitude');
+  const address = frozenRecord({
+    schemaVersion: 1,
+    systemId,
+    bodyId,
+    bodyFixedFrameId: `${bodyId}-fixed`,
+    coordinateKind: 'planetocentric_lat_lon',
+    latitudeDeg,
+    longitudeDegPositiveEast,
+    heightM: finite(input.heightM ?? 0, 'Surface height'),
+    regionId,
+    scopeType: 'world',
+    scopeId: 'expedition'
+  });
+  return frozenRecord({
+    type: 'PlanetarySurfaceRegionManifest',
+    schemaVersion: PLANETARY_SURFACE_SCHEMA_VERSION,
+    regionId,
+    bodyId,
+    address,
+    addressKey: ['we3d-world', 'v1', systemId, bodyId, `${bodyId}-fixed`, regionId, 'expedition'].join(':'),
+    displayName: String(input.displayName || regionId),
+    truthClass,
+    coordinateSystem: 'Model-derived planetocentric local frame',
+    verticalDatum: 'Seeded modeled relief; not an observed elevation product',
+    metersPerUnit: Math.max(0.000001, finite(input.metersPerUnit ?? 1, 'Surface meters per unit')),
+    localBounds: normalizeBounds(input.localBounds),
+    renderPlacement: {
+      x: finite(input.renderPlacement?.x ?? 0, 'Surface placement X'),
+      y: finite(input.renderPlacement?.y ?? -80, 'Surface placement Y'),
+      z: finite(input.renderPlacement?.z ?? 0, 'Surface placement Z')
+    },
+    source: {
+      title: String(input.source?.title || 'Seeded expedition world model'),
+      url: String(input.source?.url || ''),
+      provider: String(input.source?.provider || 'World Explorer 3D'),
+      attribution: String(input.source?.attribution || 'Model-derived Expedition world'),
+      rights: String(input.source?.rights || 'World Explorer 3D generated game content'),
+      processing: String(input.source?.processing || 'Appearance and local relief are generated from the saved Expedition seed and declared physical parameters; no observed surface imagery is claimed.')
+    },
+    modelInputs: frozenRecord(input.modelInputs || {}),
+    assets: Object.freeze([]),
+    rollbackId: String(input.rollbackId || `${regionId}-modeled-v1`)
+  });
+}
+
+function registerModeledSurfaceRegion(input = {}) {
+  const manifest = input?.type === 'PlanetarySurfaceRegionManifest'
+    ? input
+    : createModeledSurfaceRegionManifest(input);
+  if (SURFACE_REGIONS[manifest.regionId]) {
+    throw new Error(`Runtime surface cannot replace catalog region: ${manifest.regionId}`);
+  }
+  RUNTIME_SURFACE_REGIONS.set(manifest.regionId, manifest);
+  return manifest;
+}
+
 function getPlanetarySurfaceRegion(regionId) {
-  return SURFACE_REGIONS[String(regionId || '').trim().toLowerCase()] || null;
+  const id = String(regionId || '').trim().toLowerCase();
+  return SURFACE_REGIONS[id] || RUNTIME_SURFACE_REGIONS.get(id) || null;
 }
 
 function listPlanetarySurfaceRegions() {
-  return Object.freeze(Object.values(SURFACE_REGIONS));
+  return Object.freeze([...Object.values(SURFACE_REGIONS), ...RUNTIME_SURFACE_REGIONS.values()]);
 }
 
 function publicationSummary(publication) {
@@ -745,6 +814,7 @@ export {
   CALORIS_PLANITIA_SURFACE_REGION,
   CERES_OCCATOR_SURFACE_REGION,
   createPlanetarySurfaceAuthority,
+  createModeledSurfaceRegionManifest,
   createSurfaceRegionManifest,
   ensurePlanetarySurfaceAuthority,
   ENCELADUS_SOUTH_POLAR_SURFACE_REGION,
@@ -756,6 +826,7 @@ export {
   OLYMPUS_MONS_SURFACE_REGION,
   PLUTO_SPUTNIK_SURFACE_REGION,
   PLANETARY_SURFACE_SCHEMA_VERSION,
+  registerModeledSurfaceRegion,
   SURFACE_PUBLICATION_STATUS,
   SURFACE_TRUTH_CLASS,
   TITAN_SHANGRI_LA_SURFACE_REGION,

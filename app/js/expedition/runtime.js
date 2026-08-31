@@ -1,5 +1,5 @@
 import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=5';
+import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=6';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
@@ -7,8 +7,10 @@ import {
   VOYAGE_MILESTONES
 } from './simulation.js?v=5';
 import { createExpeditionStore } from './store.js?v=6';
-import { applyShipOperation, getShipStationView } from './ship-operations.js?v=1';
+import { applyShipOperation, getShipStationView } from './ship-operations.js?v=2';
 import { getUniverseDestinations, registerUniverseRuntimeDestination, resolveUniverseAddress } from '../universe/catalog.js?v=11';
+import { registerExpeditionSolidWorld } from '../planetary/solid-world-runtime.js?v=8';
+import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -54,7 +56,7 @@ function registerExpeditionContact(expedition, contact) {
   const massEarth = Math.max(0.38, radiusEarth ** 2.7);
   const orbitDays = 28 + (seed % 410);
   const semiMajorAxisAu = 0.12 + ((seed >>> 9) % 130) / 100;
-  return registerUniverseRuntimeDestination({
+  const destination = registerUniverseRuntimeDestination({
     id: contact.id,
     name: contact.designation,
     objectClass: 'planetary_system',
@@ -76,10 +78,18 @@ function registerExpeditionContact(expedition, contact) {
       orbitDays,
       semiMajorAxisAu,
       accuracy: 'model-derived expedition world',
-      exploration: { landingMode: 'not-yet-supported', surfaceClass: contact.worldClass },
+      exploration: { landingMode: 'solid_surface', surfaceClass: contact.worldClass, surfaceAuthority: 'expedition-modeled-surface-v1' },
       uncertainty: { resourceSignature: contact.resourceSignature }
     }]
   });
+  const world = resolveUniverseAddress(`${contact.id}-i`);
+  registerExpeditionSolidWorld({
+    ...world,
+    seed,
+    parentSystemId: contact.id,
+    starMassSolar: star.mass
+  });
+  return destination;
 }
 
 function syncExpeditionContacts(expedition = activeExpedition) {
@@ -151,6 +161,100 @@ function returnFromLocalContact() {
   openExpeditionPlanner(activeContext);
   activeContext?.showSpaceFlightMessage?.('Surveyor could not recover the prior route frame.', '#f59e0b');
   return false;
+}
+
+function collectExpeditionGeologySample(activity) {
+  const operation = activeExpedition?.localOperation;
+  const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === operation?.contactId);
+  if (!operation || !contact || activity?.bodyId !== `${contact.id}-i`) return false;
+  const inventory = activeContext ? ensurePlayerBackpackInventory(activeContext) : null;
+  if (!inventory) return false;
+  const catalogId = `expedition-sample-${activity.bodyId}`;
+  inventory.registerDefinitions?.([{
+    id: catalogId,
+    label: `${contact.designation} geology sample`,
+    category: 'geology-sample',
+    icon: 'ROCK',
+    verbs: ['inspect'],
+    stackLimit: 1
+  }]);
+  if (!inventory.has?.(catalogId)) {
+    inventory.upsertItem?.({
+      instanceId: `${activeExpedition.id}:${catalogId}`,
+      catalogId,
+      quantity: 1,
+      authority: 'expedition-field-operation',
+      provenance: 'modeled-expedition-surface-sample',
+      sourceEventId: `${activeExpedition.id}:${activity.id}:sample`,
+      tradeable: false,
+      acquiredAt: Date.now(),
+      metadata: {
+        label: `${contact.designation} geology sample`,
+        category: 'geology-sample',
+        icon: 'ROCK',
+        bodyId: activity.bodyId,
+        contactId: contact.id,
+        massKg: 4,
+        truthClass: 'modeled-game-world-material'
+      }
+    });
+    activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+  }
+  activeExpedition = withExpeditionChanges(activeExpedition, {
+    localOperation: Object.freeze({ ...operation, state: 'surface-sampled', sampleCatalogId: catalogId }),
+    log: appendMissionLog(activeExpedition, 'science', `${contact.designation} field team collected one 4 kg modeled geology sample.`)
+  });
+  store.save(activeExpedition);
+  activeContext?.showToast?.(`${contact.designation} sample secured in Backpack.`);
+  return true;
+}
+
+function leaveExpeditionSurface(bodyId) {
+  const operation = activeExpedition?.localOperation;
+  const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === operation?.contactId);
+  if (!operation || !contact || bodyId !== `${contact.id}-i`) return false;
+  const inventory = activeContext ? ensurePlayerBackpackInventory(activeContext) : null;
+  const catalogId = operation.sampleCatalogId;
+  if (!catalogId || !inventory?.has?.(catalogId)) {
+    activeContext?.showToast?.('Collect the geology sample before returning to Surveyor.');
+    return false;
+  }
+  const item = inventory.snapshot?.().items?.find((entry) => entry.catalogId === catalogId);
+  if (!item || Number(item.quantity) < 1) return false;
+  const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
+    frameId: contact.id,
+    courseDestinationId: bodyId,
+    onReady: () => returnFromLocalContact()
+  }) === true;
+  if (!departureStarted) {
+    activeContext?.showToast?.('Surveyor could not begin the return flight. The sample remains in your Backpack.');
+    return false;
+  }
+  const consumed = inventory.consumeItem?.(catalogId, 1) ?? inventory.consume?.(catalogId, 1);
+  if (!consumed) return false;
+  activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+  const sample = Object.freeze({
+    id: `${activeExpedition.id}:${catalogId}:cargo`,
+    catalogId,
+    label: item.label,
+    contactId: contact.id,
+    bodyId,
+    massKg: 4,
+    processed: false,
+    truthClass: 'modeled-game-world-material'
+  });
+  activeExpedition = withExpeditionChanges(activeExpedition, {
+    scienceSamples: Object.freeze([...(activeExpedition.scienceSamples || []), sample]),
+    resources: Object.freeze({
+      ...activeExpedition.resources,
+      scienceCargoKg: Number(activeExpedition.resources?.scienceCargoKg || 0) + sample.massKg
+    }),
+    localOperation: Object.freeze({ ...operation, state: 'cargo-loaded', transferredSampleId: sample.id }),
+    log: appendMissionLog(activeExpedition, 'science', `Transferred one ${sample.massKg} kg ${contact.designation} sample from Backpack to Surveyor cargo.`)
+  });
+  store.save(activeExpedition);
+  activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+  return true;
 }
 
 function destinationTypeLabel(destination) {
@@ -242,7 +346,7 @@ function renderMission() {
   if (expedition.activeLocalContactId) {
     const activeContact = expedition.routeContacts?.find((contact) => contact.id === expedition.activeLocalContactId);
     const localTransitActive = Boolean(activeContext?.universeRuntime?.transition);
-    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>Surveyor is holding this voyage chapter while you fly the local system. No supplies are awarded by entering or leaving.</p><div><button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Surveyor'}</button></div></div>`;
+    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>Surveyor is holding this voyage chapter while you fly the local system. Land at the modeled survey site to collect a sample, or return without one.</p><div>${localTransitActive ? '' : `<button id="expeditionSetSurveyCourse" class="expeditionChoice" type="button">Set course to ${activeContact?.designation || 'contact'} I</button>`}<button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Surveyor'}</button></div></div>`;
     if (localTransitActive) {
       localTransitRefreshTimer = window.setTimeout(() => {
         localTransitRefreshTimer = 0;
@@ -300,6 +404,13 @@ function renderMission() {
     if (!accepted) activeContext?.showSpaceFlightMessage?.('Open Wayfinder to continue at the destination.', '#8ab4ff');
   });
   document.getElementById('expeditionReturnFromContact')?.addEventListener('click', returnFromLocalContact);
+  document.getElementById('expeditionSetSurveyCourse')?.addEventListener('click', () => {
+    const bodyId = `${activeExpedition?.activeLocalContactId || ''}-i`;
+    if (activeContext?.travelToUniverseDestination?.(bodyId, { kind: 'expedition-surface-approach', routeLabel: 'Survey site' })) {
+      closeExpeditionPlanner();
+      activeContext?.showSpaceFlightMessage?.('SURVEY COURSE SET · APPROACH THE WORLD TO LAND', '#6fe8ff');
+    }
+  });
   host.querySelectorAll('[data-enter-contact]').forEach((button) => button.addEventListener('click', () => beginLocalContact(button.dataset.enterContact)));
   document.getElementById('expeditionEnterShip')?.addEventListener('click', () => void enterActiveShip());
 }
@@ -401,7 +512,11 @@ async function enterActiveShip() {
 
 function openExpeditionPlanner(appContext) {
   activeContext = appContext || activeContext;
-  if (activeContext) activeContext.getInterstellarExpeditionSnapshot = getExpeditionSnapshot;
+  if (activeContext) Object.assign(activeContext, {
+    collectExpeditionGeologySample,
+    getInterstellarExpeditionSnapshot: getExpeditionSnapshot,
+    leaveExpeditionSurface
+  });
   store ||= createExpeditionStore();
   activeExpedition = store.load();
   syncExpeditionContacts(activeExpedition);

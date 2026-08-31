@@ -2,9 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=17";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=18";
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=26";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=22";
+import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=23";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -12,7 +12,7 @@ import {
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
 import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=5';
-import { resolveCompletedLandingTarget } from './space/landing-target.js?v=1';
+import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -38,6 +38,7 @@ appCtx.spaceFlight = {
   destination: 'moon',
   _nearestBody: null,
   _landingTarget: null,
+  _runtimeLandingTarget: null,
   _manualLandingTarget: null,
   _autopilotTarget: null,
   _gravityVec: null,
@@ -63,6 +64,7 @@ function beginSpaceFlightSession() {
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
   appCtx.spaceFlight.overviewMode = false;
   appCtx.spaceFlight._landingTarget = null;
+  appCtx.spaceFlight._runtimeLandingTarget = null;
   return appCtx.spaceFlight._sessionId;
 }
 
@@ -271,6 +273,52 @@ function startSpaceFlightToMars() {
   return true;
 }
 
+function startSpaceFlightFromExpeditionSurface(options = {}) {
+  if (appCtx.spaceFlight.active) return false;
+  const frameId = String(options.frameId || '').trim();
+  const courseDestinationId = String(options.courseDestinationId || '').trim();
+  if (!frameId || !courseDestinationId) return false;
+  const sessionId = beginSpaceFlightSession();
+  const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'expedition_surface_return' });
+  appCtx.setEnvironmentTransitionActive(true);
+  appCtx.setPauseReason?.('planetary_transition', true);
+  suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
+  appCtx.spaceFlight.destination = courseDestinationId;
+  appCtx.spaceFlight.mode = 'launching';
+  appCtx.spaceFlight.active = true;
+  appCtx.spaceFlight._launchSource = courseDestinationId;
+  appCtx.spaceFlight.launchStartMs = Date.now();
+  appCtx.spaceFlight._isThrusting = false;
+  if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
+
+  appCtx.spaceFlight.canvas.style.display = 'block';
+  appCtx.spaceFlight.hud.style.display = 'block';
+  const destinationLabel = document.getElementById('sfDestination');
+  if (destinationLabel) destinationLabel.textContent = courseDestinationId;
+  const worldCanvas = getPrimaryWorldCanvas(appCtx);
+  if (worldCanvas) worldCanvas.style.display = 'none';
+  hideGameUI();
+  createSpaceFlightScene({ includeExtendedSpace: true });
+  ensureExtendedSpaceScene();
+  leaseSpaceFlightResources();
+  if (!appCtx.restoreUniverseLocalFrame?.(frameId, courseDestinationId)) {
+    exitSpaceFlight('expedition_surface_restore_failed');
+    return false;
+  }
+  appCtx.stopRuntimeKernel?.('space-flight-active');
+  animateSpaceFlight();
+  appCtx.showUniverseUI?.();
+  spaceSessionScope.timeout(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, courseDestinationId)) return;
+    appCtx.spaceFlight.mode = 'flying';
+    appCtx.spaceFlight.speed = 0;
+    appCtx.setPauseReason?.('planetary_transition', false);
+    showFlightMessage('SURVEY TEAM ABOARD · SAMPLE TRANSFER COMPLETE', '#83e6a6');
+    options.onReady?.();
+  }, 800);
+  return true;
+}
+
 function animateSpaceFlight() {
   return animateSpaceFlightRuntime(animationDeps);
 }
@@ -340,6 +388,7 @@ function exitSpaceFlight(source = 'runtime') {
   appCtx.renderLoop?.();
   appCtx.spaceFlight.keys = {};
   appCtx.spaceFlight._manualLandingTarget = null;
+  appCtx.spaceFlight._runtimeLandingTarget = null;
   appCtx.spaceFlight._autopilotTarget = null;
   appCtx.spaceFlight._launchSource = null;
   appCtx.spaceFlight.launchStartMs = 0;
@@ -381,6 +430,7 @@ Object.assign(appCtx, {
   showSpaceFlightMessage: showFlightMessage,
   setSpaceFlightLandingTarget,
   startSpaceFlightToEarth,
+  startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
   startSpaceFlightToMoon
 });
@@ -391,6 +441,7 @@ export {
   forceSpaceFlightLanding,
   setSpaceFlightLandingTarget,
   startSpaceFlightToEarth,
+  startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
   startSpaceFlightToMoon
 };

@@ -1,10 +1,9 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=8';
+import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
@@ -2575,10 +2574,8 @@ function startUrbanSandboxRuntime(options = {}) {
     close: document.getElementById('urbanEquipmentCloseBtn'),
     reticle: document.getElementById('urbanWeaponReticle')
   };
-  const backpackStore = appCtx.playerBackpackStore || createLocalBackpackStore();
-  appCtx.playerBackpackStore = backpackStore;
-  const equipment = appCtx.playerBackpackInventory || createEquipmentInventory({ persistedState: backpackStore.load() });
-  appCtx.playerBackpackInventory = equipment;
+  const equipment = ensurePlayerBackpackInventory(appCtx);
+  const backpackStore = appCtx.playerBackpackStore;
   const stores = mappedConvenienceStores(appCtx.pois).map(resolveStoreApproach);
   const commerce = appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
   appCtx.localConvenienceStoreCommerce = commerce;

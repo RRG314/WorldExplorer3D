@@ -217,7 +217,7 @@ function markerFor(activity) {
 }
 
 function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
-  const definitions = BODY_FIELD_NOTES[pack?.bodyId];
+  const definitions = pack?.fieldNotes || BODY_FIELD_NOTES[pack?.bodyId];
   if (!definitions || !world || typeof sampleHeight !== 'function') {
     active = null;
     return Object.freeze([]);
@@ -249,6 +249,7 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
   }
   active = Object.freeze({
     bodyId: pack.bodyId,
+    bodyName: pack.bodyName || getAstronomicalBody(pack.bodyId)?.name || pack.bodyId,
     regionId: pack.manifest.regionId,
     center: Object.freeze({ x: pack.spawn.x, z: pack.spawn.z }),
     activities: world.fieldActivities
@@ -309,7 +310,7 @@ function updatePlanetaryFieldMap(dt = 0) {
 
 async function recordActivity(activity) {
   const body = getAstronomicalBody(activity.bodyId);
-  if (!body) return false;
+  const bodyName = body?.name || active?.bodyName || activity.bodyId;
   profileStore ||= appCtx.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
   const result = await profileStore.recordObservation({
     claimId: `planetary-field:${activity.id}`,
@@ -328,7 +329,7 @@ async function recordActivity(activity) {
       surfaceRegionId: activity.regionId
     },
     regionId: activity.regionId,
-    regionLabel: `${body.presentation.surfaceLabel}, ${body.name}`,
+    regionLabel: body ? `${body.presentation.surfaceLabel}, ${body.name}` : `${activity.regionId}, ${bodyName}`,
     worldIdentity: `${activity.bodyId}:${activity.regionId}`,
     locationKey: `${activity.bodyId}:${activity.regionId}`,
     localPosition: { x: activity.x, y: activity.y, z: activity.z },
@@ -340,6 +341,9 @@ async function recordActivity(activity) {
     ? `${activity.label.toUpperCase()} · SAVED TO JOURNAL`
     : `${activity.label.toUpperCase()} · ALREADY DOCUMENTED`;
   appCtx.showSpaceFlightMessage?.(message, result.recorded ? '#83e6a6' : '#8ab4ff');
+  if (activity.activityId === 'geology-inspect') {
+    appCtx.collectExpeditionGeologySample?.(activity);
+  }
   globalThis.dispatchEvent?.(new CustomEvent('we3d:planetary-field-recorded', { detail: { activity, result } }));
   if (planetaryJournalOpen) void refreshPlanetaryJournal();
   return true;

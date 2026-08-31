@@ -1,4 +1,4 @@
-import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=5';
+import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=6';
 import { JULIAN_YEAR_S } from './travel-calculator.js?v=2';
 import {
   applyDueConsequences,

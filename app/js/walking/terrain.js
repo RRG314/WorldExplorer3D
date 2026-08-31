@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 
 function createWalkingTerrainHelpers({ car, state, CFG }) {
   function finiteOr(value, fallback) {

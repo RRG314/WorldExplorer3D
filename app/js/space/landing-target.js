@@ -1,6 +1,8 @@
 import { normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
 
 function resolveCompletedLandingTarget(spaceFlight = {}, journey = null) {
+  const runtimeTarget = String(spaceFlight._runtimeLandingTarget || '').trim().toLowerCase();
+  if (runtimeTarget) return runtimeTarget;
   const journeyDestination = ['surface', 'complete'].includes(journey?.phase)
     ? normalizeAstronomicalBodyId(journey.destinationBodyId)
     : null;

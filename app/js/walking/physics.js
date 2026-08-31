@@ -2,9 +2,9 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
 import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=6";
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
-import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=4';
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
 import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
@@ -274,8 +274,11 @@ function createWalkingPhysicsHelpers({
     let jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
     if (skydiving && appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute') jumpAction = 0;
     const planetaryBodyId = activePlanetaryBodyId();
+    const activeEnvironment = appCtx.activePlanetaryEnvironment?.bodyId === planetaryBodyId
+      ? appCtx.activePlanetaryEnvironment
+      : null;
     const gravityMagnitude = planetaryBodyId
-      ? samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
+      ? Number(activeEnvironment?.gravityMagnitudeMps2) || samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
       : 9.80665;
     const gravity = -gravityMagnitude;
     const jumpVelocity = planetaryBodyId

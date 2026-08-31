@@ -101,7 +101,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=12');
+    const runtime = await import('../expedition/runtime.js?v=13');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
@@ -461,23 +461,31 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     : activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
   if (universeTarget) {
-    if (landingBar) landingBar.style.width = '0%';
+    const supportedSurface = universeTarget.targetKind === 'exoplanet' && universeTarget.landable === true;
+    const surveyDescentDistance = Math.max(18, universeTarget.radius * 3);
+    const surveyCanLand = supportedSurface && activeDist < universeTarget.radius + surveyDescentDistance;
+    const surveyProgress = supportedSurface ? Math.max(0, 1 - (activeDist - universeTarget.radius) / surveyDescentDistance) : 0;
+    if (landingBar) landingBar.style.width = supportedSurface ? `${Math.round(surveyProgress * 100)}%` : '0%';
     if (landingText) {
       const dilation = universeTarget.encounter?.timeDilation;
       const generatedEncounter = universeTarget.encounter?.type === 'generated-asteroids'
         ? `Asteroid field · X pulse · ${universeTarget.encounter.active} remaining`
         : '';
-      landingText.textContent = universeTarget.targetKind === 'exoplanet'
-        ? `Course locked · orbital entry marker active`
+      landingText.textContent = supportedSurface
+        ? surveyCanLand ? 'Survey landing corridor ready' : `Approach ${universeTarget.name} to begin descent`
+        : universeTarget.targetKind === 'exoplanet'
+        ? `Course locked · orbital survey only`
         : Number.isFinite(dilation)
         ? `Relativistic clock rate: ${(dilation * 100).toFixed(1)}%`
         : generatedEncounter || `${formatAcceleration(universeTarget.navigation?.timeAcceleration)} · ${universeTarget.address}`;
     }
     if (landBtn) {
-      landBtn.disabled = true;
-      landBtn.style.opacity = '0.7';
-      landBtn.style.background = '#315d9d';
-      landBtn.textContent = universeTarget.targetKind === 'exoplanet'
+      landBtn.disabled = !surveyCanLand;
+      landBtn.style.opacity = surveyCanLand ? '1' : '0.7';
+      landBtn.style.background = surveyCanLand ? '#10b981' : '#315d9d';
+      landBtn.textContent = supportedSurface
+        ? surveyCanLand ? 'LAND ON ' + activeHudBody.name.toUpperCase() : 'APPROACH ' + activeHudBody.name.toUpperCase()
+        : universeTarget.targetKind === 'exoplanet'
         ? 'ORBIT TARGET · ' + activeHudBody.name.toUpperCase()
         : 'EXPLORING ' + activeHudBody.name.toUpperCase();
     }

@@ -721,6 +721,23 @@ export function animateSpaceFlight(deps = {}) {
 }
 
 export function attemptLanding(deps = {}) {
+  const universeTarget = appCtx.getUniverseHudTarget?.();
+  if (universeTarget?.targetKind === 'exoplanet' && universeTarget.landable === true && universeTarget.position) {
+    const distance = appCtx.spaceFlight.rocket.position.distanceTo(universeTarget.position);
+    const descentDistance = Math.max(18, universeTarget.radius * 3);
+    if (distance >= descentDistance + universeTarget.radius) {
+      deps.showFlightMessage?.('MOVE CLOSER TO BEGIN SURVEY DESCENT', '#f59e0b');
+      return false;
+    }
+    appCtx.spaceFlight._runtimeLandingTarget = universeTarget.destinationId;
+    return startLandingSequence(
+      { position: universeTarget.position },
+      universeTarget.radius,
+      universeTarget.destinationId,
+      deps,
+      2200
+    );
+  }
   if (
     appCtx.spaceJourney?.phase === 'atmospheric_exploration' &&
     typeof appCtx.requestRenderedAtmosphericDeparture === 'function'

@@ -106,6 +106,7 @@ function createExpeditionPlan({
     routeContacts: Object.freeze([]),
     activeLocalContactId: null,
     localOperation: null,
+    scienceSamples: Object.freeze([]),
     discoveries: Object.freeze([]),
     log: Object.freeze([{ atMissionS: 0, kind: 'planned', message: `Expedition planned for ${destinationId}.` }]),
     failureChain: Object.freeze([])

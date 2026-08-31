@@ -1,5 +1,5 @@
 import { createApollo11SiteEquipment } from './apollo11-site.js?v=1';
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 
 function createMoonLandingUiApi(context) {
   const {

@@ -57,6 +57,9 @@ function getPlanetarySurfaceMesh() {
 
 function getPlanetaryGravity() {
   const bodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : 'earth');
+  if (appCtx.activePlanetaryEnvironment?.bodyId === bodyId && Number.isFinite(Number(appCtx.activePlanetaryEnvironment.gravityMagnitudeMps2))) {
+    return -Number(appCtx.activePlanetaryEnvironment.gravityMagnitudeMps2);
+  }
   return -samplePhysicalEnvironment(bodyId, {
     heightM: 0,
     timestampS: Number(appCtx.astronomicalSkyState?.timestampMs || Date.now()) / 1000

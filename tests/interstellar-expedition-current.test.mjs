@@ -30,6 +30,11 @@ import {
   routeDistanceLy
 } from '../app/js/expedition/travel-calculator.js';
 import { getUniverseDestinations, getUniverseFrame, registerUniverseRuntimeDestination, resolveUniverseAddress } from '../app/js/universe/catalog.js';
+import {
+  createPlanetarySurfaceAuthority,
+  getPlanetarySurfaceRegion,
+  registerModeledSurfaceRegion
+} from '../app/js/planetary/runtime/surface-authority.js';
 
 test('the catalog distance remains physical and separate from compressed player time', () => {
   const ship = getShipProfile('long-range-research-vessel');
@@ -71,6 +76,31 @@ test('a stable Expedition contact can join the existing universe address and fra
   assert.equal(world.parentFrameId, system.id);
   assert.equal(getUniverseFrame(world).id, system.id);
   assert.equal(getUniverseDestinations().filter((entry) => entry.id === system.id).length, 1);
+});
+
+test('a modeled Expedition world publishes through the existing surface authority without impersonating observed terrain', async () => {
+  const manifest = registerModeledSurfaceRegion({
+    bodyId: 'test-expedition-contact-i',
+    systemId: 'test-expedition-contact',
+    regionId: 'test-expedition-contact-i-survey-site',
+    displayName: 'Survey Contact Test I survey site',
+    localBounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 },
+    modelInputs: { seed: 421, radiusEarth: 1.1, massEarth: 1.3 }
+  });
+  assert.equal(manifest.truthClass, 'modeled');
+  assert.equal(manifest.assets.length, 0);
+  assert.match(manifest.source.processing, /no observed surface imagery/i);
+  assert.equal(getPlanetarySurfaceRegion(manifest.regionId), manifest);
+  const authority = createPlanetarySurfaceAuthority({ now: () => 42 });
+  const publication = await authority.prepare(manifest.regionId, async () => ({
+    sampleHeight: (x, z) => x * 0.1 + z * 0.05,
+    readyAssetIds: []
+  }));
+  assert.equal(publication.status, 'accepted');
+  const sample = authority.sampleAtLocalXZ(20, -10, { regionId: manifest.regionId });
+  assert.equal(sample.status, 'available');
+  assert.equal(sample.truthClass, 'modeled');
+  assert.equal(sample.local.y, 1.5);
 });
 
 test('relativistic legs reproduce Lorentz factors at representative capped velocities', () => {
@@ -214,7 +244,21 @@ test('room operations use the persistent expedition record and conserve bounded 
   assert.match(repeated.message, /completed during this voyage segment/i);
   const processing = getShipStationView(expedition, 'resource-processor-status');
   assert.equal(processing.actions[0].enabled, false);
-  assert.match(processing.actions[0].reason, /acquire and load a sample/i);
+  assert.match(processing.actions[0].reason, /acquire and transfer a sample/i);
+
+  const loaded = {
+    ...expedition,
+    scienceSamples: [{ id: 'sample-1', label: 'Survey sample', massKg: 4, processed: false }],
+    resources: { ...expedition.resources, scienceCargoKg: expedition.resources.scienceCargoKg + 4 }
+  };
+  const cargoBefore = loaded.resources.scienceCargoKg;
+  const loadedView = getShipStationView(loaded, 'resource-processor-status');
+  assert.equal(loadedView.actions[0].enabled, true);
+  const processed = applyShipOperation(loaded, 'process-resource-sample');
+  assert.equal(processed.changed, true);
+  assert.equal(processed.expedition.scienceSamples[0].processed, true);
+  assert.equal(processed.expedition.resources.scienceCargoKg, cargoBefore);
+  assert.match(processed.message, /4 kg remains in science cargo/i);
 });
 
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {

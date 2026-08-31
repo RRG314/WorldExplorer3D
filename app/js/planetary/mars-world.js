@@ -11,7 +11,7 @@ import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 import {
   ensurePlanetarySurfaceAuthority,
   OLYMPUS_MONS_SURFACE_REGION
-} from './runtime/surface-authority.js?v=3';
+} from './runtime/surface-authority.js?v=4';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 256;
