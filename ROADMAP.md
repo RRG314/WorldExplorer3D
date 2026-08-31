@@ -275,6 +275,13 @@ Explorer through the existing local Space and planetary systems.
 
 ### Stage 3: the ship, crew, and voyage
 
+Current status: the first bounded Surveyor main deck is implemented locally
+with its validated eight-room layout, eight functional stations, seven visible
+crew assignments, shared walking/collision authorities, mobile controls,
+Captain's Log/Journal handoff, and return to the same Space session. Active crew
+routines, deeper system operations, strategic resource work, and the broader
+voyage-event/failure coverage remain incomplete; Stage 3 is not yet complete.
+
 - Make each Expedition ship a bounded, high-quality, walkable place assembled
   from validated class-specific layouts. Required rooms must exist, remain
   reachable, fit the exterior, support collision, and perform real functions;

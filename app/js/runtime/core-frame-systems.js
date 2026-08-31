@@ -46,6 +46,11 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'world',
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
+        // Ship interiors are a bounded activity nested inside Space Flight.
+        // Earth weather, astronomical-sky refresh, boat availability, and
+        // planetary field layers must not mutate this scene while it owns the
+        // shared world renderer.
+        if (appCtx.activeShipInterior === true) return;
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
         appCtx.updatePlanetaryTracks?.();
         appCtx.updatePlanetaryFieldMap?.(frame.dt);

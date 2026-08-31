@@ -17,6 +17,7 @@ import {
   startExpedition
 } from '../app/js/expedition/simulation.js';
 import { createExpeditionStore } from '../app/js/expedition/store.js';
+import { SHIP_CREW_POSTS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
 import {
   calculateExpeditionTravel,
   LIGHT_SPEED_MPS,
@@ -127,3 +128,17 @@ test('save, overwrite, and rollback preserve the complete versioned Expedition r
   assert.equal(store.load().id, expedition.id);
 });
 
+test('Surveyor publishes every required room through one bounded walkable deck contract', () => {
+  const validation = validateShipLayout();
+  assert.equal(validation.valid, true);
+  assert.equal(validation.roomCount, 8);
+  assert.equal(validation.stationCount, 8);
+  assert.equal(validation.crewPostCount, 7);
+  assert.deepEqual(
+    new Set(SHIP_ROOMS.map((room) => room.id)),
+    new Set(getShipProfile('long-range-research-vessel').requiredRooms)
+  );
+  assert.ok(SHIP_STATIONS.some((station) => station.id === 'return-to-flight'));
+  assert.ok(SHIP_STATIONS.some((station) => station.id === 'science-survey'));
+  assert.ok(SHIP_CREW_POSTS.every((post) => DEFAULT_CREW.some((crew) => crew.id === post.crewId)));
+});

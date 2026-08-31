@@ -1,5 +1,5 @@
 import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=1';
-import { createExpeditionPlan } from './model.js?v=1';
+import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=1';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
@@ -29,7 +29,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = 'styles/expedition.css?v=1';
+  link.href = 'styles/expedition.css?v=2';
   document.head.appendChild(link);
 }
 
@@ -105,7 +105,7 @@ function readinessMarkup(expedition) {
     <div class="expeditionManifest">
       <section><h3>Crew</h3><p>${expedition.crew.length} ${expedition.state === 'planned' ? 'assigned' : 'aboard'} · command, navigation, engineering, medical, life support, and science covered.</p></section>
       <section><h3>Supplies</h3><p>${formatMass(expedition.resources.foodKg)} food · ${formatMass(expedition.resources.waterKg)} water reserve · ${formatMass(expedition.resources.maintenanceKg)} maintenance material.</p></section>
-      <section><h3>Ship</h3><p>Surveyor · planned interior includes bridge, engineering, life support, quarters, medical, cargo/fabrication, science, and local-craft bay.</p></section>
+      <section><h3>Ship</h3><p>Surveyor · the walkable main deck connects the bridge, engineering, life support, quarters, medical, cargo/fabrication, science, and local-craft bay.</p></section>
     </div>
     ${issues.length ? `<ul class="expeditionIssues">${issues.map((issue) => `<li>${issue}</li>`).join('')}</ul>` : ''}`;
 }
@@ -126,10 +126,14 @@ function renderMission() {
     action = `<button id="expeditionArrive" class="expeditionPrimary" type="button">Continue in local Space</button>`;
   }
   const log = [...(expedition.log || [])].reverse().slice(0, 6);
+  const shipAction = expedition.readiness.status !== 'insufficient'
+    ? `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">Enter Surveyor</button><small>Walk the ship, meet the crew, inspect systems, and return to the same flight.</small></div>`
+    : '';
   host.innerHTML = `
     ${readinessMarkup(expedition)}
     ${expedition.state !== 'planned' ? `<div class="expeditionProgress"><span style="width:${Math.round(expedition.progress * 100)}%"></span></div><p class="expeditionProgressCopy">${Math.round(expedition.progress * 100)}% of crew-experienced travel complete · ${expedition.state}</p>` : ''}
     ${action}
+    ${shipAction}
     <section class="expeditionLog"><h3>Captain's Log</h3>${log.map((entry) => `<p><span>${entry.kind}</span>${entry.message}</p>`).join('')}</section>`;
 
   document.getElementById('expeditionDepart')?.addEventListener('click', () => {
@@ -156,6 +160,75 @@ function renderMission() {
     });
     if (!accepted) activeContext?.showSpaceFlightMessage?.('Open Wayfinder to continue at the destination.', '#8ab4ff');
   });
+  document.getElementById('expeditionEnterShip')?.addEventListener('click', () => void enterActiveShip());
+}
+
+function appendShipLog(kind, message) {
+  if (!activeExpedition) return false;
+  const duplicate = (activeExpedition.log || []).some((entry) => entry.kind === kind && entry.message === message);
+  if (duplicate) return false;
+  activeExpedition = withExpeditionChanges(activeExpedition, {
+    log: Object.freeze([...(activeExpedition.log || []), Object.freeze({
+      atMissionS: Number(activeExpedition.strategicElapsedS) || 0,
+      kind,
+      message
+    })])
+  });
+  store.save(activeExpedition);
+  return true;
+}
+
+async function handleShipInteraction(interaction) {
+  if (!interaction || !activeExpedition) return false;
+  const statusById = {
+    'bridge-log': `${activeExpedition.state === 'planned' ? 'Expedition staged' : 'Mission underway'} · ${Math.round((activeExpedition.progress || 0) * 100)}% complete.`,
+    'medical-status': `${activeExpedition.crew.filter((member) => member.status !== 'dead').length} crew accounted for · medical system ${activeExpedition.systems.medical?.status || 'optimal'}.`,
+    'life-support-status': `Life support ${activeExpedition.systems['life-support']?.status || 'optimal'} · ${formatMass(activeExpedition.resources.waterKg)} water reserve.`,
+    'fabricator-status': `${formatMass(activeExpedition.resources.maintenanceKg)} maintenance material · ${formatMass(activeExpedition.resources.feedstockKg)} feedstock.`,
+    'craft-bay-status': 'Local survey craft secured. Deployment becomes available at supported destination operations.',
+    'engineering-status': `Propulsion ${activeExpedition.systems.propulsion?.status || 'optimal'} · thermal ${activeExpedition.systems.thermal?.status || 'optimal'} · power ${activeExpedition.systems.power?.status || 'optimal'}.`
+  };
+  if (interaction.id === 'science-survey') {
+    const message = 'Surveyor stellar baseline recorded from the main science lab.';
+    const added = appendShipLog('ship-survey', message);
+    if (added) {
+      await activeContext?.recordExplorerEvent?.({
+        eventId: `event:space-expedition:${activeExpedition.id}:ship-survey`,
+        eventType: 'interstellar-ship-survey',
+        sourceSystem: 'interstellar-expedition',
+        sourceId: `${activeExpedition.id}:ship-survey`,
+        pathId: 'travel',
+        name: 'Surveyor stellar baseline',
+        detail: 'A stellar baseline was recorded from the Surveyor science lab.',
+        regionId: activeExpedition.destinationId,
+        regionLabel: String(activeExpedition.destinationId).replaceAll('-', ' '),
+        worldIdentity: activeExpedition.destinationId,
+        environment: 'SPACE_FLIGHT',
+        points: 8,
+        firstCompletion: true,
+        projections: { journal: true, profile: true, place: false, fieldGuide: false }
+      });
+    }
+    activeContext?.showToast?.(added ? 'Stellar baseline saved to the Captain\'s Log and Explorer Journal.' : 'This stellar baseline is already in the log.');
+    return true;
+  }
+  activeContext?.showToast?.(statusById[interaction.id] || interaction.label || 'Surveyor station ready.');
+  return true;
+}
+
+async function enterActiveShip() {
+  if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
+  const ship = await import('./ship-interior.js?v=1');
+  closeExpeditionPlanner();
+  const entered = ship.enterSurveyorInterior({
+    expedition: activeExpedition,
+    onInteraction: handleShipInteraction
+  });
+  if (!entered) {
+    openExpeditionPlanner(activeContext);
+    activeContext?.showSpaceFlightMessage?.('The Surveyor interior is unavailable right now.', '#f59e0b');
+  }
+  return entered;
 }
 
 function openExpeditionPlanner(appContext) {

@@ -7,9 +7,9 @@ import {
   stabilizeEarthVehicleSurfaceY,
   updateVehicleSurface
 } from "./physics/vehicle-surface.js?v=6";
-import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
+import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=3";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=8";
-import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
+import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=4";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=3";
 import {
   arcadeSteeringYawTarget,

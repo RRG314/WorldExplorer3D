@@ -432,6 +432,9 @@ export async function enterInteriorForSupport(support, deps) {
 
 export function clearActiveInterior(options = {}, deps) {
   const active = appCtx.activeInterior;
+  if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
+    return appCtx.exitExpeditionShipInterior?.() === true;
+  }
   if (!active) {
     closeElevatorFloorPicker(null);
     appCtx.replaceWorldCollection('dynamicBuildingColliders');
@@ -568,6 +571,9 @@ export async function handleInteriorAction(deps) {
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
+    if (interaction?.kind === 'ship-station' || interaction?.kind === 'ship-exit') {
+      return (await appCtx.handleShipInteriorInteraction?.(interaction)) !== false;
+    }
     if (interaction?.kind === 'exit') {
       clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
       return true;

@@ -485,6 +485,7 @@ function initMobileControls() {
   }
 
   function detectControlsMode() {
+    if (appCtx.activeShipInterior === true && appCtx.Walk?.state?.mode === 'walk') return 'walking';
     if ((typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.OCEAN)) || appCtx.oceanMode?.active) {
       return 'ocean';
     }
@@ -539,6 +540,12 @@ function initMobileControls() {
       actions = [
         ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
         { label: 'Explore', binding: { channel: 'earth', key: 'KeyE' } }
+      ];
+    }
+    if (appCtx.activeShipInterior === true && mode === 'walking') {
+      actions = [
+        { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
+        { label: 'Interact', binding: { channel: 'earth', key: 'KeyE' } }
       ];
     }
     if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {

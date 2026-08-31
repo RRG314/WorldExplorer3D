@@ -86,6 +86,12 @@ export function getNearbyBuildings(x, z, radius = 80) {
   const dynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [];
   const overlayColliders = Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders : [];
 
+  // A walkable spacecraft reuses the canonical walking collision query, but
+  // it is not physically co-located with the cached Earth city at local 0,0.
+  // Only the published ship colliders may participate while this nested Space
+  // activity is active.
+  if (appCtx.activeShipInterior === true) return dynamicColliders;
+
   if (!Number.isFinite(x) || !Number.isFinite(z) || !buildingSpatialIndex || buildingSpatialIndex.size === 0) {
     return baseBuildings.filter((building) => !isSuppressedBaseBuilding(building)).concat(dynamicColliders, overlayColliders);
   }

@@ -9,7 +9,9 @@ function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, toleran
 
 function createBuildingCollisionQuery(appCtx) {
   return function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
-    if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return { collision: false };
+    const hasBaseBuildings = Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0;
+    const hasDynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) && appCtx.dynamicBuildingColliders.length > 0;
+    if (!hasBaseBuildings && !hasDynamicColliders) return { collision: false };
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const acceptCollision = typeof options?.acceptCollision === 'function'

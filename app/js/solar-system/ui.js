@@ -316,6 +316,8 @@ export function hideSolarSystemUI(ctx) {
   if (ctx?.appCtx?.spaceFlight) ctx.appCtx.spaceFlight.overviewMode = false;
   const scale = document.getElementById('solarSystemScale');
   if (scale) scale.style.display = 'none';
+  const proximity = document.getElementById('ssProximity');
+  if (proximity) proximity.style.display = 'none';
   ctx?.appCtx?.hideUniverseUI?.();
   hidePlanetInfo(ctx);
 }

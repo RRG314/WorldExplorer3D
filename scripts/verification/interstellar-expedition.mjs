@@ -29,7 +29,7 @@ async function openSpace(page) {
 }
 
 async function runJourney(viewport, name) {
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport, hasTouch: name === 'mobile' });
   const page = await context.newPage();
   page.on('pageerror', (error) => failures.push(`${name} pageerror: ${error.stack || error}`));
   page.on('response', (response) => {
@@ -66,6 +66,49 @@ async function runJourney(viewport, name) {
     assert.equal(state.interstellarExpedition.readiness.status, 'ready');
     assert.ok(state.interstellarExpedition.calculation.externalYears > state.interstellarExpedition.calculation.properYears);
     await page.screenshot({ path: path.join(outputDir, `${name}-ready.png`), fullPage: true });
+
+    await page.locator('#expeditionEnterShip').click();
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.expeditionShipInterior?.active === true;
+    }, null, { timeout: 10000 });
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior.parentEnvironment, 'SPACE_FLIGHT');
+    assert.equal(state.expeditionShipInterior.movementAuthority, 'Walk');
+    assert.equal(state.expeditionShipInterior.collisionAuthority, 'activeInterior');
+    assert.equal(state.expeditionShipInterior.roomCount, 8);
+    assert.equal(state.expeditionShipInterior.stationCount, 8);
+    assert.equal(state.expeditionShipInterior.visibleCrewCount, 7);
+    assert.equal(state.interior.key, 'expedition-ship:surveyor');
+    assert.equal(await page.locator('#shipInteriorHud').isVisible(), true);
+    assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), false);
+    if (name === 'mobile') {
+      await page.waitForFunction(() => document.getElementById('mobileTouchControls')?.dataset.mode === 'walking');
+      assert.equal(await page.locator('#mobileActionSecondary').textContent(), 'Interact');
+    }
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(1800);
+    await page.keyboard.up('ArrowUp');
+    await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-interior.png`), fullPage: true });
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(1200);
+    await page.keyboard.up('ArrowUp');
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(150);
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior?.active, true);
+    assert.equal(state.interior?.key, 'expedition-ship:surveyor');
+    await page.locator('#shipExitButton').click();
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.expeditionShipInterior == null && snapshot.modes?.space === true;
+    }, null, { timeout: 10000 });
+    assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), true);
+    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) {
+      await page.locator('#sfHudToggle').click();
+    }
+    await page.locator('#sfExpeditionBtn').click();
+    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
 
     await page.locator('#expeditionDepart').click();
     await page.locator('#expeditionAdvance').click();

@@ -1,7 +1,7 @@
 # Interstellar Expedition System
 
 Decision record: 2026-08-30  
-Status: implementation authority for the optional Expedition roadmap
+Status: implementation authority; first journey and bounded Surveyor main deck implemented locally
 
 ## Product boundary
 
@@ -201,6 +201,25 @@ This slice is not the completion of cryogenic, generation, multiplayer rescue,
 resource-stop, or outpost stages. Those remain unavailable until their own
 connected acceptance journeys pass.
 
+## Current implementation status
+
+The local Space roadmap branch now completes the first Proxima Centauri journey
+and the bounded Surveyor main-deck portion of Stage 3. The Surveyor has one
+validated eight-room layout, reachable collision-bounded walking space, eight
+working stations, seven visible assigned crew members, mobile walking controls,
+and a science interaction that records the same event in the Captain's Log and
+existing Explorer Journal. Entering the ship pauses the current Space session;
+returning to flight resumes that same session and course instead of creating a
+second Space environment.
+
+This is not the whole Interstellar Expedition roadmap. The visible crew do not
+yet run strategic work and rest routines in the rendered ship. Full ship-system
+operations, explicit Backpack and planetary resource transfers, multi-stop
+resupply, cryogenic and generation missions, multiplayer rescue, persistent
+outposts, complete save-and-restore coverage, and the wider failure matrix
+remain later connected slices. Ordinary manual Space flight and optional
+Wayfinder assistance remain the established travel paths outside Expeditions.
+
 ## Verification gates
 
 Each gate is written from the behavior implemented at that checkpoint. Existing
@@ -255,4 +274,3 @@ the current authority.
   safe populations vary widely; the game therefore uses bounded aggregate
   simulation and discloses uncertainty.  
   https://doi.org/10.1016/j.actaastro.2013.12.013
-

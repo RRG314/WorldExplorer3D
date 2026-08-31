@@ -152,7 +152,7 @@ import {
   getNearbyBuildings,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=6";
+} from "./world/building-spatial-index.js?v=7";
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,

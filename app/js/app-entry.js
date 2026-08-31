@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=68';
+import './runtime-diagnostics.js?v=69';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -25,14 +25,14 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
-import './physics.js?v=123';
+import './physics.js?v=124';
 import './walking.js?v=87';
 import './travel-mode.js?v=23';
 import { initBoatMode } from './boat-mode.js?v=57';
 import './sky.js?v=88';
 import './weather.js?v=10';
-import './runtime/on-demand-modes.js?v=12';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=170';
+import './runtime/on-demand-modes.js?v=13';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=171';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=5';
@@ -45,12 +45,12 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=8';
 import './game.js?v=63';
-import './input.js?v=73';
+import './input.js?v=74';
 import './hud.js?v=102';
 import './map.js?v=61';
-import { renderLoop } from './main.js?v=72';
+import { renderLoop } from './main.js?v=74';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=147';
+import { setupUI } from './ui.js?v=148';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -179,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=17').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=18').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

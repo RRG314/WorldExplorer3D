@@ -1249,6 +1249,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
   } : null),
   interstellarExpedition: appCtx.getInterstellarExpeditionSnapshot?.() || null,
+  expeditionShipInterior: appCtx.getShipInteriorSnapshot?.() || null,
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=6';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=7';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 
@@ -89,7 +89,7 @@ function dedicatedRendererActive() {
   return !!(
     appCtx.worldLoading ||
     appCtx.arSessionActive ||
-    appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) ||
+    (appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) && appCtx.activeShipInterior !== true) ||
     appCtx.spaceFlight?.active ||
     appCtx.oceanMode?.active
   );
