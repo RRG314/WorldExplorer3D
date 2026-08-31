@@ -91,6 +91,7 @@
     "verify:space-journey": "node --test tests/space-journey-authority-current.test.mjs",
     "verify:interstellar-interior-visual": "node scripts/verification/interstellar-interior-visual-current.mjs",
     "verify:expedition-pod": "node --test tests/expedition-pod-journey-current.test.mjs && node scripts/verification/expedition-pod-journey-current.mjs",
+    "verify:destination-missions": "node --test tests/destination-missions-current.test.mjs && node scripts/verification/destination-mission-proxima-current.mjs",
     "verify:space-atmosphere": "node --test tests/space-atmospheric-exploration-current.test.mjs",
     "verify:space-destinations": "node --test tests/space-destination-completeness-current.test.mjs",
     "verify:universe-wayfinder": "node --test tests/universe-wayfinder-current.test.mjs",

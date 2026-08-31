@@ -12,6 +12,7 @@ import {
   UNIVERSE_GUIDANCE_MODE
 } from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import {
   createUniverseFrameVisual,
@@ -27,7 +28,7 @@ import {
   showUniverseNavigator,
   updateUniverseCourseCue,
   updateUniverseNavigator
-} from './ui.js?v=6';
+} from './ui.js?v=7';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -66,6 +67,7 @@ const _localCourseCue = {
   ndcX: 0,
   ndcY: 0
 };
+const missionScanEffects = [];
 
 const universeRuntime = {
   initialized: false,
@@ -111,11 +113,58 @@ function setSolVisibility(visible) {
 
 function disposeActiveFrame() {
   if (!universeRuntime.frameGroup) return;
+  missionScanEffects.length = 0;
   universeRuntime.scene?.remove(universeRuntime.frameGroup);
   disposeThreeObjectTree(universeRuntime.frameGroup);
   universeRuntime.frameGroup = null;
   universeRuntime.encounter = null;
   universeRuntime.galaxyEntry = null;
+}
+
+function playDestinationMissionScan(destinationId, operation = 'survey') {
+  const mesh = getUniverseDestinationMesh(universeRuntime.frameGroup, destinationId);
+  if (!mesh) return false;
+  const radius = Number(mesh.geometry?.parameters?.radius) || 12;
+  const group = new THREE.Group();
+  group.name = `destination-mission-scan:${destinationId}`;
+  const shellMaterial = new THREE.MeshBasicMaterial({
+    color: operation.includes('biosignature') ? 0x76f0c7 : 0x6fe8ff,
+    transparent: true,
+    opacity: 0.68,
+    wireframe: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.16, 24, 16), shellMaterial);
+  group.add(shell);
+  for (let index = 0; index < 3; index += 1) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * (1.25 + index * 0.18), Math.max(0.12, radius * 0.018), 8, 48),
+      shellMaterial.clone()
+    );
+    ring.rotation.set(index * 0.73, index * 1.05, index * 0.41);
+    group.add(ring);
+  }
+  mesh.add(group);
+  missionScanEffects.push({ group, startedAt: performance.now(), durationMs: 2200 });
+  return true;
+}
+
+function updateMissionScanEffects(nowMs = performance.now()) {
+  for (let index = missionScanEffects.length - 1; index >= 0; index -= 1) {
+    const effect = missionScanEffects[index];
+    const progress = Math.min(1, Math.max(0, (nowMs - effect.startedAt) / effect.durationMs));
+    effect.group.rotation.y += 0.018;
+    effect.group.rotation.x += 0.006;
+    effect.group.scale.setScalar(1 + progress * 1.8);
+    effect.group.children.forEach((child) => {
+      if (child.material) child.material.opacity = Math.max(0, 0.72 * (1 - progress));
+    });
+    if (progress < 1) continue;
+    effect.group.parent?.remove(effect.group);
+    disposeThreeObjectTree(effect.group);
+    missionScanEffects.splice(index, 1);
+  }
 }
 
 function resetFlightMotion() {
@@ -701,6 +750,8 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   }
   const localCourseTarget = updateLocalCourseAssist(frameSeconds);
   updateLocalCourseCue(localCourseTarget);
+  updateMissionScanEffects();
+  updateDestinationMissionRuntime();
   rebaseActiveFrame();
   updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket);
   updateDeepSkyLayer(
@@ -730,7 +781,9 @@ function initUniverseRuntime(scene) {
     setDeepSkyFrame(universeRuntime.deepSky, universeRuntime.current, false);
   }
   setupUniverseInput();
+  initDestinationMissionRuntime(appCtx);
   createUniverseNavigator({
+    onMission: (destinationId) => appCtx.openDestinationMission?.(destinationId),
     onSelection: setSelectedDestination,
     onTravel: travelToUniverseDestination,
     onEnterGalaxy: enterCurrentGalaxy,
@@ -757,6 +810,7 @@ Object.assign(appCtx, {
   getUniverseGravityBodies,
   hideUniverseUI,
   initUniverseRuntime,
+  playDestinationMissionScan,
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,

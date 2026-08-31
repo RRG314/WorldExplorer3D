@@ -827,6 +827,33 @@ function renderPodLaunchPanel(interaction) {
   return true;
 }
 
+function renderDestinationMissionAnalysisPanel(interaction) {
+  const mission = activeContext?.getDestinationMissionSnapshot?.();
+  if (!interaction || !mission || mission.phase !== 'analysis') return false;
+  let panel = document.getElementById('shipStationPanel');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.id = 'shipStationPanel';
+    document.body.appendChild(panel);
+  }
+  const destinationName = mission.destinationId.split('-').map((word) => word ? `${word[0].toUpperCase()}${word.slice(1)}` : '').join(' ');
+  panel.innerHTML = `<div class="ship-station-card destination-analysis-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
+    <header><div><span>SURVEYOR ANALYSIS LAB</span><strong id="shipStationTitle">${mission.title}</strong></div><button type="button" data-close-station aria-label="Close analysis">×</button></header>
+    <p>The field package is aboard. Compare the instrument record, preserve uncertainty, and publish the destination report to the Captain’s Log and Explorer Journal.</p>
+    <div class="ship-station-metrics"><div><span>Destination</span><strong>${destinationName}</strong></div><div><span>Evidence</span><strong>Field survey secured</strong></div><div><span>Life finding</span><strong>${mission.habitability?.lifeEvidence || 'No confirmed extraterrestrial life'}</strong></div></div>
+    <div class="ship-station-actions"><button type="button" data-complete-destination-analysis>Complete science analysis</button></div>
+  </div>`;
+  panel.classList.add('show');
+  panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
+  panel.querySelector('[data-complete-destination-analysis]')?.addEventListener('click', async () => {
+    const completed = await activeContext?.completeDestinationMissionAnalysis?.();
+    if (!completed) return activeContext?.showToast?.('The destination evidence is not ready for analysis.');
+    activeContext?.playExpeditionShipAction?.({ actionId: 'destination-analysis', kind: 'science', message: `${mission.title} analysis complete.`, interaction });
+    closeShipStationPanel();
+  });
+  return true;
+}
+
 function markExpeditionPodDescent(bodyId) {
   if (!activePodJourney || String(bodyId || '').toLowerCase() !== activePodJourney.bodyId.toLowerCase()) return false;
   return activePodJourney.phase === POD_PHASE.LOCAL_FLIGHT ? advancePodJourney('begin_descent') : activePodJourney.phase === POD_PHASE.DESCENT;
@@ -845,6 +872,9 @@ function markExpeditionPodSurfaceLaunch(bodyId) {
 
 async function handleShipInteraction(interaction) {
   if (interaction?.id === 'craft-bay-status') return renderPodLaunchPanel(interaction);
+  if (interaction?.id === 'analysis-review' && activeContext?.getDestinationMissionSnapshot?.()?.phase === 'analysis') {
+    return renderDestinationMissionAnalysisPanel(interaction);
+  }
   return renderShipStationPanel(interaction);
 }
 

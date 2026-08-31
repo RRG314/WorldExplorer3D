@@ -1,4 +1,5 @@
 import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=11';
+import { getDestinationMission } from './mission-catalog.js?v=1';
 
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',
@@ -150,12 +151,13 @@ function createUniverseNavigator(handlers) {
   const select = panel.querySelector('#universeDestinationSelect');
   syncDestinationSelect(select);
   const primaryActions = panel.querySelector('#universePrimaryActions');
+  const mission = makeButton('universeMissionBtn', 'Mission briefing');
   const travel = makeButton('universeTravelBtn', 'Travel to destination', 'primary');
   const enterGalaxy = makeButton('universeEnterGalaxyBtn', 'Enter current galaxy');
   const pulse = makeButton('universePulseBtn', 'Fire mining pulse');
   enterGalaxy.hidden = true;
   pulse.hidden = true;
-  primaryActions.append(travel, enterGalaxy, pulse);
+  primaryActions.append(mission, travel, enterGalaxy, pulse);
   const returnActions = panel.querySelector('#universeReturnActions');
   const returnSol = makeButton('universeReturnSolBtn', 'Return to Sol');
   const returnEarth = makeButton('universeReturnEarthBtn', 'Return to Earth', 'earth');
@@ -163,6 +165,7 @@ function createUniverseNavigator(handlers) {
 
   const refreshSelection = () => handlers.onSelection?.(select.value);
   select.addEventListener('change', refreshSelection);
+  mission.addEventListener('click', () => handlers.onMission?.(select.value));
   travel.addEventListener('click', () => {
     if (handlers.onTravel?.(select.value) !== false) closeUniverseNavigator();
   });
@@ -220,7 +223,9 @@ function setUniverseSelection(entity) {
   const source = entity.provenance?.[0];
   const host = entity.objectClass === 'exoplanet' ? ` · ${entity.hostName}` : '';
   const generated = entity.generatedFlags?.length ? ' · modeled display details' : '';
-  meta.textContent = formatDistance(entity) + host + ' · ' + entity.accuracy + generated;
+  const mission = getDestinationMission(entity.id);
+  const habitability = mission?.habitability?.candidate ? ' · temperate-world candidate' : '';
+  meta.textContent = formatDistance(entity) + host + ' · ' + entity.accuracy + generated + habitability;
   const link = panel.querySelector('#universeSourceLink');
   if (source?.url) {
     link.href = source.url;
@@ -274,7 +279,12 @@ function updateUniverseNavigator(state) {
   panel.classList.toggle('is-busy', Boolean(state.transition));
   select.disabled = Boolean(state.transition);
   const travel = panel.querySelector('#universeTravelBtn');
+  const mission = panel.querySelector('#universeMissionBtn');
   const selectedName = state.selected?.name || 'destination';
+  const selectedMission = getDestinationMission(state.selected?.id);
+  mission.hidden = !selectedMission;
+  mission.disabled = Boolean(state.transition) || !selectedMission;
+  if (selectedMission) mission.textContent = `MISSION · ${selectedMission.title}`;
   travel.textContent = state.transition
     ? `TRAVELING · ${state.transition.destination?.name || state.transition.to?.name || selectedName}`
     : state.course?.destination?.id === state.selected?.id
