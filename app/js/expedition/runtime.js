@@ -1,4 +1,4 @@
-import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
+import { DEFAULT_CREW, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
 import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=6';
 import {
   advanceToNextMilestone,
@@ -311,6 +311,9 @@ function renderPlanner() {
   const propulsionOptions = PROPULSION_PROFILES.filter((profile) => profile.crewedInterstellarEligible).map((profile) =>
     `<option value="${profile.id}">${profile.name} · ${profile.classification}</option>`
   ).join('');
+  const shipOptions = SHIP_PROFILES.filter((profile) => String(profile.releaseStatus).startsWith('playable-')).map((profile) =>
+    `<option value="${profile.id}">${profile.name}</option>`
+  ).join('');
   root.innerHTML = `
     <section class="expeditionPanel" role="dialog" aria-modal="true" aria-labelledby="expeditionTitle">
       <header class="expeditionHeader">
@@ -322,7 +325,7 @@ function renderPlanner() {
         <label>Destination<select id="expeditionDestination">${destinationOptions}</select></label>
         <label>Travel model<select id="expeditionRealism"><option value="science-inspired">Science-inspired</option><option value="custom">Custom</option></select></label>
         <label>Survival<select id="expeditionSurvival"><option value="forgiving">Forgiving</option><option value="severe">Severe</option></select></label>
-        <label>Ship<select id="expeditionShip"><option value="${SHIP_PROFILES[0].id}">${SHIP_PROFILES[0].name}</option></select></label>
+        <label>Ship<select id="expeditionShip">${shipOptions}</select></label>
         <label class="expeditionWide">Propulsion<select id="expeditionPropulsion">${propulsionOptions}</select></label>
       </div>
       <button id="expeditionPlan" class="expeditionPrimary" type="button">Assess expedition</button>
@@ -330,6 +333,11 @@ function renderPlanner() {
     </section>`;
   root.querySelector('#expeditionDestination').value = 'proxima-centauri';
   root.querySelector('#expeditionPropulsion').value = 'radiant-plasma-field-drive';
+  root.querySelector('#expeditionShip').addEventListener('change', (event) => {
+    const ship = getShipProfile(event.target.value);
+    const propulsion = root.querySelector('#expeditionPropulsion');
+    if (ship && !ship.supportedPropulsionIds.includes(propulsion.value)) propulsion.value = ship.supportedPropulsionIds[0];
+  });
   root.querySelector('#expeditionClose').addEventListener('click', closeExpeditionPlanner);
   root.querySelector('#expeditionPlan').addEventListener('click', () => {
     activeExpedition = createExpeditionPlan({
@@ -356,6 +364,18 @@ function readinessMarkup(expedition) {
       ? 'MISSION LOST'
       : expedition.state === 'arrived' ? 'ARRIVED' : 'UNDERWAY';
   const assessmentClass = expedition.state === 'failed' ? 'insufficient' : readiness.status;
+  const ship = getShipProfile(expedition.ship?.profileId);
+  const longDuration = expedition.longDuration || { kind: 'standard' };
+  const populationCopy = longDuration.kind === 'generation'
+    ? `${Number(longDuration.population || expedition.crewPopulation).toLocaleString()} aboard · ${expedition.crew.length} active watch representatives`
+    : longDuration.kind === 'cryogenic'
+      ? `${expedition.crew.length} active · ${(longDuration.reserveCrew || []).filter((member) => member.status === 'cryogenic').length} reserve specialists asleep`
+      : `${expedition.crew.length} ${expedition.state === 'planned' ? 'assigned' : 'aboard'}`;
+  const architecture = longDuration.kind === 'generation'
+    ? `<section class="expeditionLongDuration"><h3>Generation continuity</h3><p>Generation ${longDuration.generationIndex} · ${Number(longDuration.population || 0).toLocaleString()} population · ${Math.round(Number(longDuration.roleContinuity || 0) * 100)}% role continuity · ${Math.round(Number(longDuration.knowledgePreservation || 0) * 100)}% knowledge archive</p><small>${longDuration.uncertainty}</small></section>`
+    : longDuration.kind === 'cryogenic'
+      ? `<section class="expeditionLongDuration"><h3>Cryogenic reserve</h3><p>${(longDuration.reserveCrew || []).filter((member) => member.status === 'cryogenic').length} specialists asleep · wake cycle uses ${longDuration.wakeCost.medicalUnits} medical units and ${longDuration.wakeCost.powerMWh} MWh</p><small>Human long-duration suspension remains speculative. Wake-up has a medical cost and recovery period.</small></section>`
+      : '';
   return `
     <div class="expeditionSummary">
       <div><span>Destination</span><strong>${destination?.name || expedition.destinationId}</strong></div>
@@ -366,10 +386,12 @@ function readinessMarkup(expedition) {
       <div><span>Status</span><strong class="is-${assessmentClass}">${assessment}</strong></div>
     </div>
     <div class="expeditionManifest">
-      <section><h3>Crew</h3><p>${expedition.crew.length} ${expedition.state === 'planned' ? 'assigned' : 'aboard'} · command, navigation, engineering, medical, life support, and science covered.</p></section>
+      <section><h3>Crew</h3><p>${populationCopy} · command, navigation, engineering, medical, life support, and science covered.</p></section>
       <section><h3>Supplies</h3><p>${formatMass(expedition.resources.foodKg)} food · ${formatMass(expedition.resources.waterKg)} water reserve · ${formatMass(expedition.resources.maintenanceKg)} maintenance material.</p></section>
-      <section><h3>Ship</h3><p>Surveyor · three walkable decks connect command, science, habitat, health, engineering, mission stores, EVA, and the local-craft bay.</p></section>
+      <section><h3>Ship</h3><p>${expedition.ship?.name || ship?.name} · ${ship?.name || 'expedition vessel'} · bounded walkable operations decks connect crew and ship work.</p></section>
     </div>
+    ${architecture}
+    <section class="expeditionLongDuration"><h3>Relativistic travel</h3><p>External time ${formatYears(expedition.calculation.externalYears)} · crew proper time ${formatYears(expedition.calculation.properYears)} · peak Lorentz factor ${Number(expedition.calculation.peakLorentzFactor || 1).toFixed(4)}</p><small>Physical distance remains ${expedition.calculation.distanceLy.toFixed(2)} light-years; player-time compression does not alter it.</small></section>
     ${issues.length ? `<ul class="expeditionIssues">${issues.map((issue) => `<li>${issue}</li>`).join('')}</ul>` : ''}`;
 }
 

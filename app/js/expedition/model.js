@@ -1,6 +1,7 @@
 import { getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
 import { calculateExpeditionTravel } from './travel-calculator.js?v=2';
 import { createVoyageDirector } from './voyage-director.js?v=1';
+import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
 
 const EXPEDITION_SCHEMA_VERSION = 1;
 const RESOURCE_KEYS = Object.freeze([
@@ -32,14 +33,15 @@ function totalCargoMass(resources) {
   }, 0);
 }
 
-function assessExpeditionReadiness({ ship, propulsion, crew, resources, calculation }) {
+function assessExpeditionReadiness({ ship, propulsion, crew, crewPopulation = null, resources, calculation }) {
   const failures = [];
   const warnings = [];
-  if (!ship || ship.releaseStatus !== 'playable-slice') failures.push('This ship is not available in the current Expedition slice.');
+  if (!ship || !String(ship.releaseStatus || '').startsWith('playable-')) failures.push('This ship is not available in the current Expedition slice.');
   if (!propulsion?.crewedInterstellarEligible) failures.push('This propulsion system cannot support a crewed interstellar route.');
   if (ship && propulsion && !ship.supportedPropulsionIds.includes(propulsion.id)) failures.push('The selected propulsion system does not fit this ship.');
-  if ((crew?.length || 0) < Number(ship?.minCrew || 1)) failures.push(`At least ${ship?.minCrew || 1} crew members are required.`);
-  if ((crew?.length || 0) > Number(ship?.maxCrew || 0)) failures.push(`This ship supports no more than ${ship?.maxCrew || 0} crew members.`);
+  const population = Number.isFinite(Number(crewPopulation)) ? Number(crewPopulation) : (crew?.length || 0);
+  if (population < Number(ship?.minCrew || 1)) failures.push(`At least ${ship?.minCrew || 1} crew members are required.`);
+  if (population > Number(ship?.maxCrew || 0)) failures.push(`This ship supports no more than ${ship?.maxCrew || 0} crew members.`);
   const coverage = crewRoleCoverage(crew);
   for (const role of ship?.requiredRoles || []) {
     if (!coverage.has(role)) failures.push(`Crew coverage is missing: ${role}.`);
@@ -74,9 +76,10 @@ function createExpeditionPlan({
 }) {
   const ship = getShipProfile(shipId);
   const propulsion = getPropulsionProfile(propulsionId);
-  const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crew.length });
+  const crewPopulation = crewPopulationForShip(shipId, crew.length);
+  const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crewPopulation });
   const provisioned = resources ? clone(resources) : recommendedResources(calculation.expectedResources, survival === 'severe' ? 0.08 : 0.25);
-  const readiness = assessExpeditionReadiness({ ship, propulsion, crew, resources: provisioned, calculation });
+  const readiness = assessExpeditionReadiness({ ship, propulsion, crew, crewPopulation, resources: provisioned, calculation });
   const systems = Object.fromEntries((ship?.systems || []).map((systemId) => [systemId, { condition: 1, status: 'optimal' }]));
   return Object.freeze({
     type: 'InterstellarExpedition',
@@ -89,9 +92,16 @@ function createExpeditionPlan({
     realism,
     survival,
     state: 'planned',
-    ship: Object.freeze({ id: `${id}-ship`, profileId: shipId, name: 'Surveyor', interiorSeed: ship?.interiorSeed || 0 }),
+    ship: Object.freeze({
+      id: `${id}-ship`,
+      profileId: shipId,
+      name: shipId === 'generation-ship' ? 'Continuance' : shipId === 'cryogenic-expedition-vessel' ? 'Vigil' : 'Surveyor',
+      interiorSeed: ship?.interiorSeed || 0
+    }),
     propulsionId,
+    crewPopulation,
     crew: Object.freeze(clone(crew)),
+    longDuration: createLongDurationState(shipId),
     resources: Object.freeze(provisioned),
     systems: Object.freeze(systems),
     calculation,

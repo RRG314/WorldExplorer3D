@@ -19,6 +19,7 @@ import {
   VOYAGE_MILESTONES
 } from '../app/js/expedition/simulation.js';
 import { appendSystemTransitions, assessCausalFailure, resolveSystemFailure, shipAlertState } from '../app/js/expedition/failure-authority.js';
+import { advanceLongDurationState } from '../app/js/expedition/long-duration.js';
 import { availabilityForResponse } from '../app/js/expedition/voyage-director.js';
 import { VOYAGE_EVENT_COUNTS, VOYAGE_EVENT_FAMILIES } from '../app/js/expedition/voyage-events.js';
 import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
@@ -354,6 +355,51 @@ test('strategic simulation ends only after an essential offline chain has exhaus
   assert.equal(recoverable.failureReport, null);
 });
 
+test('a cryogenic reserve specialist wakes through the same crew and resource authorities', () => {
+  let expedition = createExpeditionPlan({
+    destinationId: 'proxima-centauri', shipId: 'cryogenic-expedition-vessel',
+    propulsionId: 'radiant-plasma-field-drive', crew: DEFAULT_CREW, createdAtMs: 1900
+  });
+  expedition = {
+    ...expedition,
+    crew: expedition.crew.map((member) => member.id === 'crew-eng' ? { ...member, status: 'dead' } : member)
+  };
+  assert.equal(expedition.longDuration.kind, 'cryogenic');
+  assert.equal(expedition.crewPopulation, DEFAULT_CREW.length + 3);
+  const medicalBefore = expedition.resources.medicalUnits;
+  const powerBefore = expedition.resources.powerMWh;
+  const view = getShipStationView(expedition, 'cryogenic-status');
+  assert.equal(view.actions[0].enabled, true);
+  const result = applyShipOperation(expedition, 'wake-reserve-specialist');
+  assert.equal(result.changed, true);
+  expedition = result.expedition;
+  assert.equal(expedition.resources.medicalUnits, medicalBefore - 3);
+  assert.equal(expedition.resources.powerMWh, powerBefore - 2);
+  assert.ok(expedition.crew.some((member) => member.id === 'reserve-engineer' && member.status === 'active'));
+  assert.equal(expedition.longDuration.wakeHistory.length, 1);
+  assert.match(expedition.log.at(-1).message, /controlled wake cycle/i);
+});
+
+test('generation continuity retires the founders and transfers active roles through the strategic clock', () => {
+  const expedition = createExpeditionPlan({
+    destinationId: 'proxima-centauri', shipId: 'generation-ship',
+    propulsionId: 'fusion-pulse-interstellar', crew: DEFAULT_CREW, createdAtMs: 1950
+  });
+  assert.equal(expedition.longDuration.kind, 'generation');
+  assert.equal(expedition.crewPopulation, 40_000);
+  assert.equal(expedition.readiness.status === 'insufficient', false);
+  const after = advanceLongDurationState({
+    ...expedition,
+    strategicElapsedS: 76 * 31_557_600
+  }, 76 * 31_557_600);
+  assert.ok(after.longDuration.generationIndex >= 3);
+  assert.equal(after.longDuration.originalCrewStatus, 'retired');
+  assert.ok(after.crew.every((member) => member.id.startsWith('successor-g')));
+  assert.ok(after.crew.flatMap((member) => member.roles).includes('education'));
+  assert.ok(after.longDuration.transitions.length >= 3);
+  assert.match(after.logEntries.at(-1).message, /Generation 3/i);
+});
+
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {
   const memory = new Map();
   const storage = {
@@ -400,7 +446,7 @@ test('Surveyor publishes three bounded mapped decks and retains every required s
   assert.equal(validation.valid, true);
   assert.equal(validation.deckCount, 3);
   assert.equal(validation.roomCount, 25);
-  assert.equal(validation.stationCount, 30);
+  assert.equal(validation.stationCount, 32);
   assert.equal(validation.doorCount, 25);
   assert.equal(validation.crewPostCount, 7);
   const roomIds = new Set(SHIP_ROOMS.map((room) => room.id));

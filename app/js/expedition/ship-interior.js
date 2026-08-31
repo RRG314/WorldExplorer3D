@@ -380,6 +380,41 @@ function addCrewMember(group, post, crew) {
   return root;
 }
 
+function postForCrewMember(crew, index = 0) {
+  const roles = crew?.roles || [];
+  if (roles.includes('engineering')) return { crewId: crew.id, deckId: 'engineering', roomId: 'engineering', x: -4.2 + (index % 3) * 2.2, z: 27.2, yaw: 0 };
+  if (roles.includes('medical')) return { crewId: crew.id, deckId: 'habitat', roomId: 'medical', x: -5.5 - (index % 3) * 1.5, z: 19, yaw: Math.PI / 2 };
+  if (roles.includes('life-support')) return { crewId: crew.id, deckId: 'habitat', roomId: 'life-support', x: 7.5, z: -11 - (index % 3) * 2, yaw: -Math.PI / 2 };
+  if (roles.includes('science') || roles.includes('education')) return { crewId: crew.id, deckId: 'command', roomId: 'science', x: -7.2, z: -1 + (index % 3) * 2, yaw: Math.PI / 2 };
+  return { crewId: crew.id, deckId: 'command', roomId: 'bridge', x: -4 + (index % 4) * 2.5, z: 29.5, yaw: Math.PI };
+}
+
+function disposeObject(root) {
+  root?.traverse?.((child) => {
+    child.geometry?.dispose?.();
+    if (Array.isArray(child.material)) child.material.forEach((entry) => entry?.dispose?.());
+    else child.material?.dispose?.();
+  });
+}
+
+function syncCrewMeshes(session, expedition) {
+  const desired = (expedition?.crew || []).filter((crew) => crew.id !== 'player' && crew.status !== 'dead');
+  const desiredIds = new Set(desired.map((crew) => crew.id));
+  session.sceneState.crewMeshes = session.sceneState.crewMeshes.filter((mesh) => {
+    if (desiredIds.has(mesh.userData.crewId)) return true;
+    mesh.parent?.remove?.(mesh);
+    disposeObject(mesh);
+    return false;
+  });
+  const existing = new Set(session.sceneState.crewMeshes.map((mesh) => mesh.userData.crewId));
+  desired.forEach((crew, index) => {
+    if (existing.has(crew.id)) return;
+    const mesh = addCrewMember(session.sceneState.crewLayer, postForCrewMember(crew, index), crew);
+    mesh.visible = mesh.userData.deckId === session.activeDeckId;
+    session.sceneState.crewMeshes.push(mesh);
+  });
+}
+
 const ROOM_DOORS = Object.freeze(Object.fromEntries(SHIP_DOORS.map((door) => [door.roomId, Object.freeze({ x: door.x, z: door.z })])));
 
 const ASSIGNMENT_TARGETS = Object.freeze({
@@ -822,11 +857,32 @@ function buildSurveyorScene(expedition) {
   const crewMeshes = SHIP_CREW_POSTS.map((post) => addCrewMember(crewLayer, post, crewById.get(post.crewId)));
   crewMeshes.forEach((mesh) => { mesh.visible = mesh.userData.deckId === 'command'; });
   const animatedParts = [];
+  const profileId = expedition?.ship?.profileId;
+  if (profileId === 'cryogenic-expedition-vessel') {
+    const habitat = deckStates.get('habitat');
+    const shell = material(0x71889b, { metalness: 0.52, roughness: 0.34 });
+    const glass = material(0x76d8ff, { emissive: 0x1f6f8b, emissiveIntensity: 0.46, metalness: 0.08, roughness: 0.2 });
+    glass.transparent = true; glass.opacity = 0.46;
+    [11.1, 15.5, 19.9].forEach((z, index) => {
+      const pod = new THREE.Group();
+      pod.name = `cryogenic-pod:${index + 1}`;
+      box(pod, { x: 2.1, y: 1.1, z: 3.4 }, { x: 0, y: 0.65, z: 0 }, shell, `cryogenic-shell:${index + 1}`);
+      const canopy = box(pod, { x: 1.65, y: 0.55, z: 2.35 }, { x: 0, y: 1.18, z: 0.15 }, glass, `cryogenic-canopy:${index + 1}`);
+      canopy.userData.shipAnimated = 'screen'; canopy.userData.baseEmissiveIntensity = 0.46;
+      pod.position.set(-11, 0, z);
+      habitat.group.add(pod);
+      habitat.colliders.push(colliderForBox(-11, z, 2.2, 3.5, 0, 1.5, `cryogenic-pod:${index + 1}`));
+    });
+  } else if (profileId === 'generation-ship') {
+    const command = deckStates.get('command');
+    [-18.5, -15.2, -11.9].forEach((z, index) => addWallServicePanel(command.group, 11.6, z, -Math.PI / 2, index === 0 ? 0xb6a4ff : 0x76d8ff, `continuity-archive-${index + 1}`));
+  }
   root.traverse((child) => { if (child.userData?.shipAnimated) animatedParts.push(child); });
   return {
     root,
     deckStates,
     crewMeshes,
+    crewLayer,
     animatedParts,
     walkSurface: {
       kind: 'polygon',
@@ -855,7 +911,7 @@ function ensureShipHud(expedition, crewSummary = null) {
   const alert = shipAlertState(expedition);
   hud.classList.toggle('attention', alert.level === 'attention');
   hud.classList.toggle('critical', alert.level === 'critical');
-  hud.innerHTML = `<div><span>SURVEYOR · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
+  hud.innerHTML = `<div><span>${String(expedition?.ship?.name || 'Surveyor').toUpperCase()} · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
   hud.classList.add('show');
   hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSurveyorInterior());
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
@@ -982,7 +1038,11 @@ function activeDeckColliders(session = activeSession) {
 
 function activeDeckInteractions(session = activeSession) {
   if (!session) return [];
-  const stations = SHIP_STATIONS.filter((station) => station.deckId === session.activeDeckId).map((station) => ({
+  const profileId = session.expedition?.ship?.profileId;
+  const stations = SHIP_STATIONS.filter((station) => station.deckId === session.activeDeckId)
+    .filter((station) => station.id !== 'cryogenic-status' || profileId === 'cryogenic-expedition-vessel')
+    .filter((station) => station.id !== 'generation-continuity' || profileId === 'generation-ship')
+    .map((station) => ({
     ...station,
     kind: station.id.startsWith('deck-lift:') ? 'ship-lift' : 'ship-station',
     level: 0
@@ -1126,6 +1186,7 @@ function toggleShipMap(show) {
 function updateExpeditionShipRecord(expedition) {
   if (!activeSession || !expedition || expedition.id !== activeSession.expedition?.id) return false;
   activeSession.expedition = expedition;
+  syncCrewMeshes(activeSession, expedition);
   refreshCrewOperations(activeSession, true);
   renderShipMaps(activeSession);
   ensureShipHud(expedition, activeSession.operationSummary);
@@ -1181,6 +1242,7 @@ function enterSurveyorInterior(options = {}) {
     actionFeedback: null
   };
   activeSession = session;
+  syncCrewMeshes(session, options.expedition);
   refreshCrewOperations(session, true);
   document.body.classList.add('expedition-ship-interior-open');
 
@@ -1207,7 +1269,7 @@ function enterSurveyorInterior(options = {}) {
 
   appCtx.activeInterior = {
     key: 'expedition-ship:surveyor',
-    label: 'Surveyor',
+    label: options.expedition?.ship?.name || 'Surveyor',
     mode: 'authored-ship',
     environmentKind: 'expedition-ship',
     group: sceneState.root,
@@ -1228,7 +1290,7 @@ function enterSurveyorInterior(options = {}) {
     lastValidPosition: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 20.5, yaw: 0, angle: 0 },
     containmentNoticeUntil: 0
   };
-  appCtx.interiorHint = { state: 'inside', label: 'Surveyor', mode: 'authored-ship' };
+  appCtx.interiorHint = { state: 'inside', label: options.expedition?.ship?.name || 'Surveyor', mode: 'authored-ship' };
   appCtx.setPauseReason?.('planetary_transition', false);
   applyShipWalkingState();
   appCtx.scene.background = new THREE.Color(0x02050b);

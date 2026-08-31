@@ -29,6 +29,7 @@ const SHIP_DECKS = Object.freeze([
     { id: 'sensor-scan', roomId: 'sensor-control', label: 'Configure sensor scan', x: 5.1, z: 0.5 },
     { id: 'analysis-review', roomId: 'analysis-data', label: 'Review observation evidence', x: -5.1, z: -14.5 },
     { id: 'briefing-status', roomId: 'briefing', label: 'Review crew priorities', x: 3.7, z: -14.5 },
+    { id: 'generation-continuity', roomId: 'briefing', label: 'Review role continuity', x: 10.2, z: -9.2 },
     { id: 'observation-view', roomId: 'observation-gallery', label: 'Observe local space', x: 0, z: -30 }
   ]),
   deck('habitat', 'Deck 2 · Habitat & Health', 'Habitat', [
@@ -45,6 +46,7 @@ const SHIP_DECKS = Object.freeze([
     { id: 'galley-meal', roomId: 'galley-wardroom', label: 'Prepare crew meal', x: 0, z: 27.9 },
     { id: 'medical-status', roomId: 'medical', label: 'Review crew health', x: -4.2, z: 15.5 },
     { id: 'medical-treatment', roomId: 'medical', label: 'Prepare treatment', x: -4.2, z: 11.2 },
+    { id: 'cryogenic-status', roomId: 'medical', label: 'Review reserve crew', x: -5, z: 20.5 },
     { id: 'exercise-session', roomId: 'exercise-bay', label: 'Begin exercise session', x: 4.2, z: 15.5 },
     { id: 'quarters-status', roomId: 'quarters', label: 'Review personal assignment', x: -7.5, z: 0.5 },
     { id: 'hygiene-status', roomId: 'hygiene-waste', label: 'Inspect water recovery', x: -7.5, z: -14.5 },

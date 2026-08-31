@@ -8,6 +8,7 @@ import {
   VOYAGE_SLOTS
 } from './voyage-director.js?v=1';
 import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=1';
+import { advanceLongDurationState } from './long-duration.js?v=1';
 
 function clone(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -26,7 +27,7 @@ function startExpedition(expedition, atMs = Date.now()) {
   if (expedition.readiness.status === 'insufficient') throw new Error('The Expedition is not ready to depart.');
   return withExpeditionChanges(expedition, {
     state: 'traveling', voyagePhase: 'departure', departedAtMs: atMs, updatedAtMs: atMs,
-    log: appendLog(expedition.log, { atMissionS: 0, kind: 'departure', message: 'Surveyor departed the Solar System.' })
+    log: appendLog(expedition.log, { atMissionS: 0, kind: 'departure', message: `${expedition.ship?.name || 'Surveyor'} departed the Solar System.` })
   });
 }
 
@@ -100,6 +101,13 @@ function advanceExpedition(expedition, requestedDeltaS) {
   next = withExpeditionChanges(next, {
     failureChain: appendSystemTransitions(prepared.failureChain, prepared.systems, next.systems, elapsed)
   });
+  const longDuration = advanceLongDurationState(next, deltaS);
+  next = withExpeditionChanges(next, {
+    longDuration: longDuration.longDuration,
+    crew: longDuration.crew,
+    resources: longDuration.resources,
+    log: appendLogs(next.log, longDuration.logEntries)
+  });
   const failure = assessCausalFailure(next);
   if (failure) return withExpeditionChanges(next, {
     state: 'failed',
@@ -121,7 +129,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
   }
   if (elapsed + 1 >= totalS) return withExpeditionChanges(next, {
     state: 'arrived', voyagePhase: 'arrival', progress: 1,
-    log: appendLog(next.log, { atMissionS: totalS, kind: 'arrival', message: `Surveyor arrived at ${next.destinationId}.` })
+    log: appendLog(next.log, { atMissionS: totalS, kind: 'arrival', message: `${next.ship?.name || 'Surveyor'} arrived at ${next.destinationId}.` })
   });
   return next;
 }

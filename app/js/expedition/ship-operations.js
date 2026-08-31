@@ -1,5 +1,6 @@
 import { withExpeditionChanges } from './model.js?v=6';
 import { resolveSystemFailure } from './failure-authority.js?v=1';
+import { reinforceGenerationTraining, wakeReserveSpecialist } from './long-duration.js?v=1';
 
 const STATION_VIEWS = Object.freeze({
   'bridge-flight': Object.freeze({ title: 'Flight Controls', systemId: 'navigation', summary: 'Review heading, velocity, and the margins on the active route.' }),
@@ -10,10 +11,12 @@ const STATION_VIEWS = Object.freeze({
   'sensor-scan': Object.freeze({ title: 'Sensor Control', systemId: 'sensors', summary: 'Run a calibrated local scan. Results are observations in the game world, not claims that a real object is present.', actions: ['run-sensor-scan'] }),
   'analysis-review': Object.freeze({ title: 'Analysis & Data', systemId: 'sensors', summary: 'Review collected evidence, provenance, uncertainty, and unresolved observations.' }),
   'briefing-status': Object.freeze({ title: 'Crew Briefing', systemId: 'navigation', summary: 'Review the current watch, resting crew, and the ship’s most urgent system.' }),
+  'generation-continuity': Object.freeze({ title: 'Generation Continuity', systemId: 'education', summary: 'Review population, role succession, training coverage, and the knowledge archive.', actions: ['train-successors'] }),
   'observation-view': Object.freeze({ title: 'Observation Gallery', systemId: 'sensors', summary: 'Observe local space without changing the ship’s course.' }),
   'galley-meal': Object.freeze({ title: 'Galley & Wardroom', systemId: 'food-production', summary: 'Serve a measured crew meal and give the active watch a short recovery period.', actions: ['serve-crew-meal'] }),
   'medical-status': Object.freeze({ title: 'Medical Bay', systemId: 'medical', summary: 'Review crew health, fatigue, and treatment reserves.' }),
   'medical-treatment': Object.freeze({ title: 'Treatment Station', systemId: 'medical', summary: 'Treat the crew member with the greatest current need.', actions: ['treat-crew'] }),
+  'cryogenic-status': Object.freeze({ title: 'Cryogenic Reserve', systemId: 'cryogenic', summary: 'Review speculative human suspension, reserve specialists, wake risk, and medical support.', actions: ['wake-reserve-specialist'] }),
   'exercise-session': Object.freeze({ title: 'Exercise Bay', systemId: 'medical', summary: 'Complete the crew’s scheduled resistance and cardiovascular session.', actions: ['complete-exercise'] }),
   'quarters-status': Object.freeze({ title: 'Crew Quarters', systemId: 'life-support', summary: 'Review the player’s berth, current assignment, and rest status.' }),
   'hygiene-status': Object.freeze({ title: 'Water Recovery', systemId: 'life-support', summary: 'Inspect hygiene loads, stored water, and recovery-loop condition.', actions: ['service-water-loop'] }),
@@ -37,6 +40,8 @@ const ACTION_LABELS = Object.freeze({
   'run-sensor-scan': 'Run local scan',
   'serve-crew-meal': 'Serve meal',
   'treat-crew': 'Treat crew member',
+  'wake-reserve-specialist': 'Wake needed specialist',
+  'train-successors': 'Train next watch',
   'complete-exercise': 'Complete session',
   'service-water-loop': 'Service recovery loop',
   'stabilize-life-support': 'Stabilize life support',
@@ -98,6 +103,12 @@ function actionAvailability(expedition, actionId) {
   if (actionId === 'fabricate-parts' && (Number(resources.feedstockKg) < 25 || Number(resources.powerMWh) < 0.35)) return Object.freeze({ enabled: false, reason: 'Requires 25 kg feedstock and 0.35 MWh.' });
   if (actionId === 'serve-crew-meal' && (Number(resources.foodKg) < 8 || Number(resources.waterKg) < 3)) return Object.freeze({ enabled: false, reason: 'Requires 8 kg food and 3 kg water.' });
   if (actionId === 'treat-crew' && Number(resources.medicalUnits) < 1) return Object.freeze({ enabled: false, reason: 'No treatment unit is available.' });
+  if (actionId === 'wake-reserve-specialist') {
+    if (expedition?.longDuration?.kind !== 'cryogenic') return Object.freeze({ enabled: false, reason: 'Available only on a cryogenic mission.' });
+    if (!(expedition.longDuration.reserveCrew || []).some((member) => member.status === 'cryogenic')) return Object.freeze({ enabled: false, reason: 'No reserve specialist remains asleep.' });
+    if (Number(resources.medicalUnits || 0) < 3 || Number(resources.powerMWh || 0) < 2) return Object.freeze({ enabled: false, reason: 'Requires 3 medical units and 2 MWh.' });
+  }
+  if (actionId === 'train-successors' && expedition?.longDuration?.kind !== 'generation') return Object.freeze({ enabled: false, reason: 'Available only on a generation voyage.' });
   const maintenanceCost = {
     'repair-priority-system': 12,
     'service-water-loop': 5,
@@ -121,6 +132,16 @@ function getShipStationView(expedition, stationId) {
 function applyShipOperation(expedition, actionId) {
   const availability = actionAvailability(expedition, actionId);
   if (!availability.enabled) return Object.freeze({ expedition, changed: false, message: availability.reason });
+  if (actionId === 'wake-reserve-specialist' || actionId === 'train-successors') {
+    const result = actionId === 'wake-reserve-specialist' ? wakeReserveSpecialist(expedition) : reinforceGenerationTraining(expedition);
+    if (!result.changed) return result;
+    return Object.freeze({
+      ...result,
+      expedition: withExpeditionChanges(result.expedition, {
+        operationFlags: Object.freeze({ ...(result.expedition.operationFlags || {}), [operationKey(expedition, actionId)]: true })
+      })
+    });
+  }
   const resources = clone(expedition.resources || {});
   const systems = clone(expedition.systems || {});
   const crew = clone(expedition.crew || []);

@@ -1,6 +1,7 @@
 import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=6';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
+import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
 
 const EXPEDITION_STORAGE_KEY = 'world-explorer:interstellar-expedition:v1';
 const EXPEDITION_BACKUP_KEY = 'world-explorer:interstellar-expedition:backup:v1';
@@ -35,6 +36,8 @@ function parseRecord(value) {
     record.materialLedger = { installedRepairKg: 0, ...(record.materialLedger || {}) };
     record.failureChain = Array.isArray(record.failureChain) ? record.failureChain : [];
     record.failureReport ||= null;
+    record.crewPopulation = Number(record.crewPopulation) || crewPopulationForShip(record.ship?.profileId, record.crew.length);
+    record.longDuration ||= createLongDurationState(record.ship?.profileId);
     const hadVoyageDirector = record.voyageDirector?.version === 1;
     record.voyageDirector = normalizeVoyageDirector(record);
     if (!hadVoyageDirector) {
