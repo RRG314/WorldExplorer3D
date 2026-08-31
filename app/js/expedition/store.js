@@ -1,5 +1,6 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=3';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=4';
 import { DEFAULT_CREW } from './catalog.js?v=2';
+import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
 
 const EXPEDITION_STORAGE_KEY = 'world-explorer:interstellar-expedition:v1';
 const EXPEDITION_BACKUP_KEY = 'world-explorer:interstellar-expedition:backup:v1';
@@ -27,6 +28,18 @@ function parseRecord(value) {
     record.eventFlags = { ...(record.eventFlags || {}) };
     record.operationFlags = { ...(record.operationFlags || {}) };
     record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];
+    const hadVoyageDirector = record.voyageDirector?.version === 1;
+    record.voyageDirector = normalizeVoyageDirector(record);
+    if (!hadVoyageDirector) {
+      const reachedSlots = VOYAGE_SLOTS.filter((slot) => Number(record.progress || 0) + 1e-9 >= slot.progress).length;
+      record.voyageDirector = Object.freeze({
+        ...record.voyageDirector,
+        step: reachedSlots,
+        nextSlotIndex: reachedSlots,
+        tags: Object.freeze({ migratedFromRepresentativeVoyage: true })
+      });
+      if (record.pendingEvent && !record.pendingEvent.familyId) record.pendingEvent = null;
+    }
     return record;
   } catch {
     return null;

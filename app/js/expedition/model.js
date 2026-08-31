@@ -1,5 +1,6 @@
 import { getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
 import { calculateExpeditionTravel } from './travel-calculator.js?v=1';
+import { createVoyageDirector } from './voyage-director.js?v=1';
 
 const EXPEDITION_SCHEMA_VERSION = 1;
 const RESOURCE_KEYS = Object.freeze([
@@ -99,6 +100,7 @@ function createExpeditionPlan({
     progress: 0,
     pendingEvent: null,
     voyagePhase: 'departure',
+    voyageDirector: createVoyageDirector({ id, destinationId, createdAtMs }),
     eventFlags: Object.freeze({}),
     operationFlags: Object.freeze({}),
     routeContacts: Object.freeze([]),

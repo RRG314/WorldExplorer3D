@@ -50,4 +50,13 @@
 .ship-station-actions button:disabled{border-color:rgba(125,211,252,.2);background:#172633;color:#8094a2}
 .ship-station-actions small,.ship-station-readonly{color:#9eb2c0;font-size:11px;line-height:1.4}
 .ship-station-readonly{display:block;margin-top:14px}
-@media(max-width:620px){#shipMiniMap{top:122px;right:8px;width:92px;padding:6px}#shipMiniMap header span{font-size:7px}.shipInteriorHud.show,#shipInteriorHud.show{right:8px;left:8px;width:auto;transform:none}.shipInteriorHud>div:last-child,#shipInteriorHud>div:last-child{gap:4px}.shipInteriorHud button,#shipInteriorHud button{padding:6px 7px;font-size:8px}#shipMapOverlay,#shipStationPanel{padding:0}#shipMapOverlay>section,.ship-station-card{max-height:100dvh;border-radius:0}.ship-map-deck{width:min(280px,82vw)}.ship-station-metrics{grid-template-columns:1fr}.ship-station-actions{grid-template-columns:1fr}}
+.ship-voyage-response{margin:14px 0;padding:14px;border:1px solid rgba(244,180,70,.55);border-radius:11px;background:rgba(61,38,11,.5)}
+.ship-voyage-response>span{color:#f3c66d;font:700 8px Orbitron,sans-serif;letter-spacing:.12em}
+.ship-voyage-response h3{margin:6px 0;color:#fff;font:700 16px Orbitron,sans-serif}
+.ship-voyage-response p{margin:0 0 10px;color:#dce6ec;font-size:12px;line-height:1.5}
+.ship-voyage-response>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ship-voyage-response>div>div{display:grid;gap:4px}
+.ship-voyage-response button{min-height:44px;padding:9px 12px;border:1px solid #e9bc68;border-radius:8px;background:#5d431f;color:#fff;font:700 9px Orbitron,sans-serif}
+.ship-voyage-response button:disabled{opacity:.42}
+.ship-voyage-response small{color:#d4c09b;font-size:10px;line-height:1.35}
+@media(max-width:620px){#shipMiniMap{top:122px;right:8px;width:92px;padding:6px}#shipMiniMap header span{font-size:7px}.shipInteriorHud.show,#shipInteriorHud.show{right:8px;left:8px;width:auto;transform:none}.shipInteriorHud>div:last-child,#shipInteriorHud>div:last-child{gap:4px}.shipInteriorHud button,#shipInteriorHud button{padding:6px 7px;font-size:8px}#shipMapOverlay,#shipStationPanel{padding:0}#shipMapOverlay>section,.ship-station-card{max-height:100dvh;border-radius:0}.ship-map-deck{width:min(280px,82vw)}.ship-station-metrics,.ship-voyage-response>div{grid-template-columns:1fr}.ship-station-actions{grid-template-columns:1fr}}

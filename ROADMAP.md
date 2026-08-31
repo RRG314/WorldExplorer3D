@@ -293,9 +293,12 @@ Captain's Log/Journal handoff, and return to the same Space session. Its crew
 carry persistent health, fatigue, experience, and assignments and visibly
 follow routines derived from the Expedition state. One ship-work authority now
 connects room stations to the same crew, resources, systems, and mission log.
-The full surface-resource handoff, local-craft deployment, causal failure set,
-and complete visual/interaction polish remain incomplete; Stage 3 is not yet
-complete.
+The Voyage Director selects 14 paced chapters from 36 authored event families,
+with state-gated responses, three outcome bands, remembered decisions, delayed
+consequences, responsible rooms, crew work, and save migration from the earlier
+representative route. The full surface-resource handoff, local-craft
+deployment, event-specific action animation and sound, and complete
+visual/interaction polish remain incomplete; Stage 3 is not yet complete.
 
 - Make each Expedition ship a bounded, high-quality, walkable place assembled
   from validated class-specific layouts. Required rooms must exist, remain
@@ -328,10 +331,11 @@ complete.
   and unresolved problems can form an understandable failure chain. A prepared
   Expedition normally has backups, warnings, repair, diversion, and rescue
   opportunities before it can be lost.
-- Replace the representative fixed nine-beat foundation with the data-driven
-  Voyage Director before alpha. The alpha content floor is 36 authored event
-  families with state-dependent options, immediate and delayed outcomes,
-  cooldowns, incompatibilities, responsible rooms/crew, and visible action.
+- Continue the data-driven Voyage Director now used in place of the fixed
+  nine-beat foundation. Its 36 authored event families provide state-dependent
+  options, immediate and delayed outcomes, cooldowns, incompatibilities, and
+  responsible rooms and crew. Complete the visible room action, audio, local
+  stop, and consequence presentation for those families before alpha.
   Parameter variations do not count as distinct authored families.
 - Record departures, arrivals, repairs, losses, discoveries, route changes,
   resupply, rescue, outposts, and outcomes in a Captain's Log presentation

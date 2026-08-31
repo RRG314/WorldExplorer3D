@@ -17,6 +17,8 @@ import {
   startExpedition,
   VOYAGE_MILESTONES
 } from '../app/js/expedition/simulation.js';
+import { availabilityForResponse } from '../app/js/expedition/voyage-director.js';
+import { VOYAGE_EVENT_COUNTS, VOYAGE_EVENT_FAMILIES } from '../app/js/expedition/voyage-events.js';
 import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
 import { createExpeditionStore } from '../app/js/expedition/store.js';
 import { deriveCrewOperations, summarizeCrewOperations } from '../app/js/expedition/crew-operations.js';
@@ -87,7 +89,27 @@ test('readiness is derived from role coverage, supplies, compatibility, and capa
   assert.ok(readiness.failures.includes('Crew coverage is missing: medical.'));
 });
 
-test('one complete strategic journey crosses every voyage phase, changes state, preserves contacts, and arrives', () => {
+test('the Voyage Director publishes 36 authored families with the required category budget and response contract', () => {
+  assert.equal(VOYAGE_EVENT_FAMILIES.length, 36);
+  assert.deepEqual(VOYAGE_EVENT_COUNTS, { navigation: 6, engineering: 8, crew: 7, science: 6, hazard: 5, stop: 4 });
+  assert.equal(new Set(VOYAGE_EVENT_FAMILIES.map((entry) => entry.id)).size, 36);
+  assert.ok(VOYAGE_EVENT_FAMILIES.every((entry) => entry.title && entry.evidence && entry.roomId && entry.roles.length >= 1));
+  assert.ok(VOYAGE_EVENT_FAMILIES.every((entry) => entry.choices.length >= 2 && entry.choices.length <= 5));
+  assert.ok(VOYAGE_EVENT_FAMILIES.flatMap((entry) => entry.choices).every((choice) => choice.label && choice.results.length === 3));
+});
+
+test('response availability is derived from current stores and prior voyage decisions', () => {
+  const expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 900 });
+  const pump = VOYAGE_EVENT_FAMILIES.find((entry) => entry.id === 'coolant-pump-wear');
+  const replace = pump.choices.find((choice) => choice.id === 'replace-pump');
+  assert.equal(availabilityForResponse(expedition, pump, replace).enabled, true);
+  const depleted = { ...expedition, resources: { ...expedition.resources, maintenanceKg: 10 } };
+  const unavailable = availabilityForResponse(depleted, pump, replace);
+  assert.equal(unavailable.enabled, false);
+  assert.match(unavailable.reason, /requires 120/i);
+});
+
+test('one seeded strategic journey selects varied families, records outcomes and consequences, and arrives', () => {
   let expedition = createExpeditionPlan({
     destinationId: 'proxima-centauri',
     crew: DEFAULT_CREW,
@@ -99,32 +121,41 @@ test('one complete strategic journey crosses every voyage phase, changes state, 
   const initialAge = expedition.crew[0].ageYears;
   const initialEngineeringExperience = expedition.crew.find((member) => member.id === 'crew-eng').experienceYears;
   expedition = startExpedition(expedition, 1100);
-
-  const choices = ['review-course', 'replace', 'service-converter', 'inspect-hull', 'survey', 'rotate-watch', 'mark-stop', 'take-shelter', 'calibrate-arrival'];
-  const kinds = [];
+  const families = [];
+  const categories = [];
+  const outcomes = [];
   const progress = [];
-  for (const choice of choices) {
+  while (expedition.state === 'traveling') {
     expedition = advanceToNextMilestone(expedition);
-    assert.ok(expedition.pendingEvent, `expected an event before ${choice}`);
-    kinds.push(expedition.pendingEvent.kind);
+    if (!expedition.pendingEvent) break;
+    const event = expedition.pendingEvent;
+    assert.ok(event.options.some((option) => option.enabled));
+    assert.ok(event.options.some((option) => typeof option.reason === 'string'));
+    families.push(event.familyId);
+    categories.push(event.kind);
     progress.push(expedition.progress);
+    const choice = event.options.find((option) => option.enabled).id;
     expedition = resolveExpeditionEvent(expedition, choice);
     assert.equal(expedition.pendingEvent, null);
+    outcomes.push(expedition.voyageDirector.history.at(-1).outcome);
   }
-  assert.deepEqual(kinds, VOYAGE_MILESTONES.map((milestone) => milestone.kind));
+  if (expedition.state === 'traveling') expedition = advanceToNextMilestone(expedition);
+  assert.equal(families.length, VOYAGE_MILESTONES.length);
+  assert.equal(families[0], 'departure-handoff');
+  assert.equal(families.at(-1), 'final-approach');
+  assert.equal(new Set(families).size, families.length);
+  assert.ok(['navigation', 'engineering', 'crew', 'science', 'hazard', 'stop'].every((category) => categories.includes(category)));
+  assert.ok(outcomes.every((outcome) => ['success', 'partial', 'setback'].includes(outcome)));
   assert.ok(progress.every((value, index) => index === 0 || value > progress[index - 1]));
-  expedition = advanceToNextMilestone(expedition);
   assert.equal(expedition.state, 'arrived');
   assert.equal(expedition.progress, 1);
   assert.ok(expedition.crew[0].ageYears > initialAge + 20);
   assert.ok(expedition.resources.foodKg < initialFood);
-  assert.ok(expedition.resources.maintenanceKg < initialMaintenance - 179);
+  assert.ok(expedition.resources.maintenanceKg <= initialMaintenance);
   assert.ok(expedition.crew.find((member) => member.id === 'crew-eng').experienceYears >= initialEngineeringExperience);
-  assert.ok(expedition.log.some((entry) => entry.kind === 'repair'));
-  assert.ok(expedition.log.some((entry) => entry.kind === 'science'));
+  assert.equal(expedition.voyageDirector.history.length, VOYAGE_MILESTONES.length);
+  assert.ok(expedition.log.some((entry) => entry.kind === 'science' || entry.kind === 'engineering'));
   assert.ok(expedition.log.some((entry) => entry.kind === 'arrival'));
-  assert.equal(expedition.routeContacts.length, 2);
-  assert.ok(expedition.routeContacts.some((contact) => contact.status === 'route-stop' && contact.localOperationState === 'available'));
   assert.ok(expedition.routeContacts.every((contact) => contact.truthClass === 'modeled-uncharted-system' && Number.isInteger(contact.stableSeed)));
 });
 
@@ -140,11 +171,9 @@ test('crew work, support, rest, and emergency assignments derive from the persis
 
   expedition = startExpedition(expedition, 1600);
   expedition = advanceToNextMilestone(expedition);
-  expedition = resolveExpeditionEvent(expedition, 'review-course');
-  expedition = advanceToNextMilestone(expedition);
   const response = deriveCrewOperations(expedition);
-  assert.equal(response.find((operation) => operation.crewId === 'crew-eng').assignmentId, 'thermal-response');
-  assert.equal(response.find((operation) => operation.crewId === 'crew-eng').roomId, 'engineering');
+  assert.ok(response.some((operation) => operation.assignmentId === 'event-response'));
+  assert.ok(response.some((operation) => operation.roomId === expedition.pendingEvent.roomId));
   assert.ok(response.some((operation) => operation.status === 'responding'));
 });
 
@@ -198,12 +227,18 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   const expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 2500 });
   const earlier = structuredClone(expedition);
   earlier.crew = earlier.crew.map(({ health, fatigue, experienceYears, assignment, ...member }) => member);
+  delete earlier.voyageDirector;
+  earlier.progress = 0.26;
+  earlier.pendingEvent = { milestoneId: 'legacy-power', choices: ['old-choice'] };
   const store = createExpeditionStore(storage);
   storage.setItem(store.storageKey, JSON.stringify(earlier));
   const restored = store.load();
   assert.equal(restored.id, expedition.id);
   assert.ok(restored.crew.every((member) => Number.isFinite(member.health) && Number.isFinite(member.fatigue) && Number.isFinite(member.experienceYears)));
   assert.ok(restored.crew.every((member) => typeof member.assignment === 'string' && member.assignment.length > 0));
+  assert.equal(restored.pendingEvent, null);
+  assert.equal(restored.voyageDirector.nextSlotIndex, 4);
+  assert.equal(restored.voyageDirector.tags.migratedFromRepresentativeVoyage, true);
 });
 
 test('Surveyor publishes three bounded mapped decks and retains every required ship-class room', () => {

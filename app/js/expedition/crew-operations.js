@@ -22,19 +22,19 @@ function freezeOperation(operation) {
 
 function emergencyAssignment(member, pendingEvent) {
   const roles = new Set(member?.roles || []);
-  if (pendingEvent?.kind === 'maintenance' && roles.has('engineering')) {
+  const responsible = new Set(pendingEvent?.responsibleRoles || []);
+  const isResponsible = [...roles].some((role) => responsible.has(role));
+  if (pendingEvent && isResponsible) {
     return freezeOperation({
-      status: 'responding', roomId: 'engineering', task: 'Responding to the thermal-control warning', assignmentId: 'thermal-response'
+      status: 'responding',
+      roomId: pendingEvent.roomId || (pendingEvent.kind === 'crew' ? 'medical' : pendingEvent.kind === 'science' ? 'science' : 'engineering'),
+      task: `Responding to ${String(pendingEvent.title || 'the current ship event').toLowerCase()}`,
+      assignmentId: pendingEvent.kind === 'engineering' ? 'thermal-response' : pendingEvent.kind === 'science' ? 'discovery-response' : 'event-response'
     });
   }
-  if (pendingEvent?.kind === 'maintenance' && (roles.has('medical') || roles.has('life-support'))) {
+  if (pendingEvent?.kind === 'engineering' && (roles.has('medical') || roles.has('life-support'))) {
     return freezeOperation({
       status: 'supporting', roomId: roles.has('medical') ? 'medical' : 'life-support', task: 'Monitoring crew and life-support margins', assignmentId: 'maintenance-support'
-    });
-  }
-  if (pendingEvent?.kind === 'discovery' && roles.has('science')) {
-    return freezeOperation({
-      status: 'responding', roomId: 'science', task: 'Characterizing the detected object', assignmentId: 'discovery-response'
     });
   }
   return null;

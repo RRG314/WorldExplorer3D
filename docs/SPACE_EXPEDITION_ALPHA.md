@@ -1,6 +1,6 @@
 # Space Expedition Alpha
 
-Status: implementation design and release gate
+Status: active implementation and release gate
 
 ## The player promise
 
@@ -15,8 +15,12 @@ optimistic science-exploration sandbox. It is not a short chain of modal choices
 and it is not a separate game pasted over Space Flight.
 
 The current three-deck ship, persistent Expedition record, room map, crew
-routines, ship-work panel, and nine-beat representative journey are the
-foundation. They are not the completed alpha.
+routines, ship-work panel, and data-driven Voyage Director are the foundation.
+The Director now selects 14 paced chapters from 36 authored event families and
+records state-gated choices, outcome bands, decision tags, delayed
+consequences, contacts, crew responses, and save migration. The physically
+entered local-stop loop and event-specific room action remain incomplete, so
+this is not yet the completed alpha.
 
 ## Alpha shape
 
@@ -339,8 +343,8 @@ not receive a separate set of authorities or abbreviated consequences.
 3. Replace each current placeholder room with its required authored equipment
    while preserving the validated room/door/lift/map graph.
 4. Add room-level detail/animation budgets, pooling, disposal, and mobile LOD.
-5. Replace the fixed milestone chain with the data-driven Voyage Director and
-   implement the 36-event content budget in tested groups.
+5. Extend the active Voyage Director and its 36-event content library with
+   event-specific room action, animation, sound, and local-space evidence.
 6. Add the unified Voyage/Ship/Crew/Log UI and keep contextual HUD elements
    bounded during normal play.
 7. Implement persistent route contacts and a physically entered local Space

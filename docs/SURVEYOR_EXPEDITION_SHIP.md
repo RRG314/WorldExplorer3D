@@ -164,11 +164,11 @@ walkable interior does not contain.
 ## Voyage structure and story
 
 The ship is the main stage of an Expedition, not a waiting room between a
-planner and an arrival screen. A representative nearby-star route contains at
-least departure, watch handoff, maintenance, power, hull, survey, crew-health,
-resource, radiation, and arrival-approach beats. The specific order and
-severity may vary from route and state, but quiet work, discovery, human needs,
-and risk all have time to develop before arrival.
+planner and an arrival screen. A nearby-star voyage now contains 14 paced
+chapters selected from 36 authored navigation, engineering, crew, science,
+hazard, and route-change families. Departure and arrival retain clear
+boundaries while the incidents, discoveries, decisions, results, and delayed
+consequences between them vary with the saved voyage and current state.
 
 Each beat names the crew and room responsible for the first response. The
 player can walk to that room, inspect evidence, help perform the work, or accept

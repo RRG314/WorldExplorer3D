@@ -1056,7 +1056,7 @@ function ensureShipMaps(session) {
     const link = document.createElement('link');
     link.id = 'expeditionShipStyles';
     link.rel = 'stylesheet';
-    link.href = 'styles/expedition-ship.css?v=2';
+    link.href = 'styles/expedition-ship.css?v=3';
     document.head.appendChild(link);
   }
   let mini = document.getElementById('shipMiniMap');

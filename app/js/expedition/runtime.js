@@ -1,12 +1,12 @@
 import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { createExpeditionPlan } from './model.js?v=3';
+import { createExpeditionPlan } from './model.js?v=4';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
-} from './simulation.js?v=3';
-import { createExpeditionStore } from './store.js?v=4';
+} from './simulation.js?v=4';
+import { createExpeditionStore } from './store.js?v=5';
 import { applyShipOperation, getShipStationView } from './ship-operations.js?v=1';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=10';
 
@@ -31,7 +31,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = 'styles/expedition.css?v=3';
+  link.href = 'styles/expedition.css?v=4';
   document.head.appendChild(link);
 }
 
@@ -124,22 +124,16 @@ function renderMission() {
   if (expedition.state === 'planned') {
     action = `<button id="expeditionDepart" class="expeditionPrimary" type="button" ${expedition.readiness.status === 'insufficient' ? 'disabled' : ''}>Depart on Surveyor</button>`;
   } else if (expedition.pendingEvent) {
-    const choiceLabels = {
-      'review-course': 'Review course', 'hold-course': 'Hold course', replace: 'Replace pump', 'reduce-load': 'Reduce reactor load',
-      'service-converter': 'Service converter', 'shed-load': 'Shed nonessential loads', 'inspect-hull': 'Inspect and patch', 'isolate-zone': 'Isolate section',
-      survey: 'Survey contact', continue: 'Continue on course', 'rotate-watch': 'Rotate the watch', 'medical-support': 'Provide medical support',
-      'mark-stop': 'Add route stop', 'remain-on-course': 'Remain on course', 'take-shelter': 'Take shelter', 'alter-course': 'Alter course',
-      'calibrate-arrival': 'Calibrate arrival', 'manual-approach': 'Keep manual approach'
-    };
-    const choices = expedition.pendingEvent.choices.map((choice) => `<button class="expeditionChoice" data-choice="${choice}" type="button">${choiceLabels[choice] || choice.replaceAll('-', ' ')}</button>`).join('');
-    action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><div>${choices}</div></div>`;
+    const options = expedition.pendingEvent.options || expedition.pendingEvent.choices.map((id) => ({ id, label: id.replaceAll('-', ' '), enabled: true, reason: '' }));
+    const choices = options.map((option) => `<div class="expeditionChoiceRow"><button class="expeditionChoice" data-choice="${option.id}" type="button" ${option.enabled ? '' : 'disabled'}>${option.label}</button>${option.reason ? `<small>${option.reason}</small>` : ''}</div>`).join('');
+    action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Respond from ${String(expedition.pendingEvent.roomId || 'the ship').replaceAll('-', ' ')}.</small><div>${choices}</div></div>`;
   } else if (expedition.state === 'traveling') {
     action = `<button id="expeditionAdvance" class="expeditionPrimary" type="button">Continue to next watch or event</button>`;
   } else if (expedition.state === 'arrived') {
     action = `<button id="expeditionArrive" class="expeditionPrimary" type="button">Continue in local Space</button>`;
   }
   const log = [...(expedition.log || [])].reverse().slice(0, 6);
-  const reachedCount = VOYAGE_MILESTONES.filter((milestone) => expedition.eventFlags?.[milestone.id]).length;
+  const reachedCount = Math.min(VOYAGE_MILESTONES.length, Number(expedition.voyageDirector?.nextSlotIndex || 0));
   const contacts = expedition.routeContacts || [];
   const shipAction = expedition.readiness.status !== 'insufficient'
     ? `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">Enter Surveyor</button><small>Walk the ship, meet the crew, inspect systems, and return to the same flight.</small></div>`
@@ -147,7 +141,7 @@ function renderMission() {
   host.innerHTML = `
     ${readinessMarkup(expedition)}
     ${expedition.state !== 'planned' ? `<div class="expeditionProgress"><span style="width:${Math.round(expedition.progress * 100)}%"></span></div><p class="expeditionProgressCopy">${Math.round(expedition.progress * 100)}% of crew-experienced travel complete · ${expedition.state}</p>` : ''}
-    ${expedition.state !== 'planned' ? `<section class="expeditionVoyage"><header><span>VOYAGE</span><strong>${String(expedition.voyagePhase || 'departure').replaceAll('-', ' ')}</strong></header><div>${VOYAGE_MILESTONES.map((milestone, index) => `<i class="${expedition.eventFlags?.[milestone.id] ? 'reached' : index === reachedCount ? 'next' : ''}" title="${milestone.title}"></i>`).join('')}</div><small>${reachedCount} of ${VOYAGE_MILESTONES.length} voyage encounters reached</small></section>` : ''}
+    ${expedition.state !== 'planned' ? `<section class="expeditionVoyage"><header><span>VOYAGE</span><strong>${String(expedition.voyagePhase || 'departure').replaceAll('-', ' ')}</strong></header><div>${VOYAGE_MILESTONES.map((milestone, index) => `<i class="${index < reachedCount ? 'reached' : index === reachedCount ? 'next' : ''}" title="${String(milestone.phase || milestone.id).replaceAll('-', ' ')}"></i>`).join('')}</div><small>${reachedCount} of ${VOYAGE_MILESTONES.length} voyage chapters reached</small></section>` : ''}
     ${action}
     ${shipAction}
     ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span></p>`).join('')}</section>` : ''}
@@ -212,9 +206,15 @@ function renderShipStationPanel(interaction) {
     document.body.appendChild(panel);
   }
   const view = getShipStationView(activeExpedition, interaction.id);
+  const voyageEvent = activeExpedition.pendingEvent?.roomId === interaction.roomId ? activeExpedition.pendingEvent : null;
+  const voyageEventMarkup = voyageEvent ? `<section class="ship-voyage-response">
+    <span>ACTIVE VOYAGE EVENT</span><h3>${voyageEvent.title}</h3><p>${voyageEvent.message}</p>
+    <div>${(voyageEvent.options || []).map((option) => `<div><button type="button" data-voyage-response="${option.id}" ${option.enabled ? '' : 'disabled'}>${option.label}</button>${option.reason ? `<small>${option.reason}</small>` : ''}</div>`).join('')}</div>
+  </section>` : '';
   panel.innerHTML = `<div class="ship-station-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>SURVEYOR SYSTEM</span><strong id="shipStationTitle">${view.title}</strong></div><button type="button" data-close-station aria-label="Close station">×</button></header>
     <p>${view.summary}</p>
+    ${voyageEventMarkup}
     <div class="ship-station-metrics">${view.metrics.map((metric) => `<div><span>${metric.label}</span><strong>${metric.value}</strong></div>`).join('')}</div>
     ${view.actions.length ? `<div class="ship-station-actions">${view.actions.map((action) => `<button type="button" data-ship-action="${action.id}" ${action.enabled ? '' : 'disabled'}>${action.label}</button>${action.reason ? `<small>${action.reason}</small>` : ''}`).join('')}</div>` : '<small class="ship-station-readonly">This station is informational during the current voyage state.</small>'}
   </div>`;
@@ -234,6 +234,19 @@ function renderShipStationPanel(interaction) {
     activeContext?.showToast?.(result.message);
     renderShipStationPanel(interaction);
   }));
+  panel.querySelectorAll('[data-voyage-response]').forEach((button) => button.addEventListener('click', () => {
+    const previousId = activeExpedition.pendingEvent?.id;
+    const next = resolveExpeditionEvent(activeExpedition, button.dataset.voyageResponse);
+    if (next === activeExpedition || next.pendingEvent?.id === previousId) {
+      activeContext?.showToast?.('That response is not available with the current crew and stores.');
+      return;
+    }
+    activeExpedition = next;
+    store.save(activeExpedition);
+    activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+    activeContext?.showToast?.(activeExpedition.log.at(-1)?.message || 'The crew completed the response.');
+    renderShipStationPanel(interaction);
+  }));
   return true;
 }
 
@@ -243,7 +256,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=6');
+  const ship = await import('./ship-interior.js?v=7');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

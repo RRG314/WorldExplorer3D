@@ -220,23 +220,53 @@ async function runJourney(viewport, name) {
     await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
 
     await page.locator('#expeditionDepart').click();
-    const voyageChoices = [
-      ['operations', 'review-course'], ['maintenance', 'replace'], ['power', 'service-converter'],
-      ['collision', 'inspect-hull'], ['discovery', 'survey'], ['medical', 'rotate-watch'],
-      ['resupply', 'mark-stop'], ['radiation', 'take-shelter'], ['navigation', 'calibrate-arrival']
-    ];
+    const voyageFamilies = [];
+    const voyageCategories = new Set();
     let previousProgress = 0;
-    for (const [kind, choice] of voyageChoices) {
+    for (let chapter = 0; chapter < 14; chapter += 1) {
       await page.locator('#expeditionAdvance').click();
       state = await diagnostics(page);
-      assert.equal(state.interstellarExpedition.pendingEvent.kind, kind);
+      assert.ok(state.interstellarExpedition.pendingEvent?.familyId);
+      assert.ok(state.interstellarExpedition.pendingEvent.options.some((option) => option.enabled));
+      voyageFamilies.push(state.interstellarExpedition.pendingEvent.familyId);
+      voyageCategories.add(state.interstellarExpedition.pendingEvent.kind);
       assert.ok(state.interstellarExpedition.progress > previousProgress);
       previousProgress = state.interstellarExpedition.progress;
-      await page.locator(`[data-choice="${choice}"]`).click();
+      if (chapter === 0) {
+        await page.locator('.expeditionEvent').scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(outputDir, `${name}-voyage-event.png`), fullPage: true });
+        await page.locator('#expeditionEnterShip').click();
+        await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
+        await page.evaluate(async () => {
+          const { ctx } = await import('/app/js/shared-context.js?v=55');
+          Object.assign(ctx.Walk.state.walker, { x: 7, z: 31, angle: Math.PI, yaw: Math.PI, lookYawOffset: 0, pitch: 0 });
+        });
+        await page.waitForTimeout(180);
+        await page.keyboard.press('KeyE');
+        await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('.ship-voyage-response').isVisible(), true);
+        await page.screenshot({ path: path.join(outputDir, `${name}-ship-voyage-response.png`), fullPage: true });
+        await page.locator('[data-voyage-response]:not(:disabled)').first().click();
+        state = await diagnostics(page);
+        assert.equal(state.interstellarExpedition.pendingEvent, null);
+        assert.equal(state.interstellarExpedition.voyageDirector.history.length, 1);
+        await page.locator('[data-close-station]').click();
+        await page.locator('#shipExitButton').click();
+        await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior == null);
+        if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
+        await page.locator('#sfExpeditionBtn').click();
+        await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+      } else {
+        await page.locator('.expeditionChoice:not(:disabled)').first().click();
+      }
     }
     state = await diagnostics(page);
-    assert.equal(state.interstellarExpedition.routeContacts.length, 2);
-    assert.ok(state.interstellarExpedition.routeContacts.some((contact) => contact.status === 'route-stop'));
+    assert.equal(voyageFamilies[0], 'departure-handoff');
+    assert.equal(voyageFamilies.at(-1), 'final-approach');
+    assert.equal(new Set(voyageFamilies).size, 14);
+    assert.ok(['navigation', 'engineering', 'crew', 'science', 'hazard', 'stop'].every((category) => voyageCategories.has(category)));
+    assert.equal(state.interstellarExpedition.voyageDirector.history.length, 14);
+    assert.ok(state.interstellarExpedition.voyageDirector.history.every((entry) => ['success', 'partial', 'setback'].includes(entry.outcome)));
     await page.locator('#expeditionAdvance').click();
     state = await diagnostics(page);
     assert.equal(state.interstellarExpedition.state, 'arrived');
