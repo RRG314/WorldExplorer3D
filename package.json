@@ -19,6 +19,7 @@
     "verify:provider-release": "node scripts/verification/provider-release.mjs",
     "verify:firestore-rules": "firebase emulators:exec --only firestore --project we3d-staging-20260712 \"node --test tests/firestore.rules.security.test.mjs\"",
     "verify:multiplayer": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/multiplayer.mjs\"",
+    "verify:interstellar-shared": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/interstellar-shared.mjs\"",
     "verify:world": "node scripts/verification/world.mjs",
     "verify:city-switch-lifecycle": "node scripts/verification/city-switch-lifecycle.mjs",
     "verify:urban-equipment": "node scripts/verification/urban-equipment.mjs",

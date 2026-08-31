@@ -31,6 +31,14 @@ const {
   updateUrbanVehicleLease,
   urbanEntityDocumentId
 } = require('./urban-sandbox');
+const {
+  commitSharedExpedition,
+  createSharedExpedition,
+  joinSharedExpedition,
+  rescueIntoSharedExpedition,
+  setParticipantConnection,
+  setParticipantReady
+} = require('./expedition-authority');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -776,6 +784,7 @@ async function deleteRoomTree(roomRef) {
     'artifacts',
     'activities',
     'activityState',
+    'expeditions',
     'blocks',
     'worldModifications',
     'paintClaims',
@@ -1917,6 +1926,116 @@ exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onReque
   } catch (error) {
     console.error('[resolveUrbanCivicOutcome] failed:', error);
     res.status(500).json({ error: 'Could not resolve this shared civic outcome right now.' });
+  }
+});
+
+async function requireExpeditionRoomContext(req, res, auth) {
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!roomCode) {
+    res.status(400).json({ error: 'A valid multiplayer room is required.' });
+    return null;
+  }
+  const roomRef = db.collection('rooms').doc(roomCode);
+  const [roomSnap, memberSnap] = await Promise.all([
+    roomRef.get(),
+    roomRef.collection('players').doc(auth.uid).get()
+  ]);
+  if (!roomSnap.exists) {
+    res.status(404).json({ error: 'Room not found.' });
+    return null;
+  }
+  const room = roomSnap.data() || {};
+  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+    res.status(403).json({ error: 'Join this room before using its Expedition.' });
+    return null;
+  }
+  const playerSnap = memberSnap.exists ? memberSnap : await roomRef.collection('players').doc(auth.uid).get();
+  if (!playerSnap.exists) {
+    res.status(409).json({ error: 'Active room presence is required.' });
+    return null;
+  }
+  const player = playerSnap.data() || {};
+  const lastSeenMs = timestampToMillis(player.lastSeenAt);
+  if (!Number.isFinite(lastSeenMs) || Date.now() - lastSeenMs > 120_000) {
+    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
+    return null;
+  }
+  return { roomCode, roomRef, room, player };
+}
+
+exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireExpeditionRoomContext(req, res, auth);
+    if (!context) return;
+    const action = sanitizeText(req.body && req.body.action, 32).toLowerCase();
+    const nowMs = Date.now();
+    const authUser = await admin.auth().getUser(auth.uid);
+    const actor = {
+      uid: auth.uid,
+      displayName: sanitizeText(authUser.displayName || authUser.email || context.player.displayName || 'Explorer', 60),
+      role: sanitizeText(req.body && req.body.role, 32)
+    };
+    const expeditionRef = context.roomRef.collection('expeditions').doc('active');
+    const playersSnap = await context.roomRef.collection('players').get();
+    const activeUids = playersSnap.docs.filter((entry) => {
+      const data = entry.data() || {};
+      const lastSeen = timestampToMillis(data.lastSeenAt);
+      const expiresAt = timestampToMillis(data.expiresAt);
+      return Number.isFinite(lastSeen) && nowMs - lastSeen <= 120_000 &&
+        (!Number.isFinite(expiresAt) || expiresAt >= nowMs - 2_000);
+    }).map((entry) => entry.id);
+
+    const state = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(expeditionRef);
+      const current = snapshot.exists ? snapshot.data() || null : null;
+      let next;
+      if (action === 'create') {
+        if (current && current.expedition?.state !== 'failed' && current.expedition?.state !== 'arrived') {
+          throw new Error('shared_expedition_already_active');
+        }
+        next = createSharedExpedition({ roomCode: context.roomCode, actor, plan: req.body?.expedition, nowMs });
+      } else {
+        if (!current || current.type !== 'SharedInterstellarExpedition') throw new Error('shared_expedition_not_found');
+        if (action === 'join') next = joinSharedExpedition(current, { actor, requestedRole: req.body?.role, nowMs });
+        else if (action === 'ready') next = setParticipantReady(current, { uid: auth.uid, ready: req.body?.ready !== false, nowMs });
+        else if (action === 'connection') next = setParticipantConnection(current, { uid: auth.uid, connected: req.body?.connected !== false, nowMs });
+        else if (action === 'commit') next = commitSharedExpedition(current, {
+          uid: auth.uid,
+          expectedRevision: req.body?.expectedRevision,
+          mutationKind: sanitizeText(req.body?.mutationKind, 24).toLowerCase(),
+          nextExpedition: req.body?.expedition,
+          activeUids,
+          nowMs
+        });
+        else if (action === 'rescue') next = rescueIntoSharedExpedition(current, {
+          uid: auth.uid,
+          manifestId: req.body?.manifestId,
+          nowMs
+        });
+        else throw new Error('invalid_shared_expedition_action');
+      }
+      transaction.set(expeditionRef, { ...next, updatedAt: FieldValue.serverTimestamp() });
+      return next;
+    });
+    res.status(200).json({ accepted: true, state });
+  } catch (error) {
+    const code = String(error && error.message || '');
+    const conflicts = new Set([
+      'shared_expedition_already_active', 'shared_expedition_not_found',
+      'stale_expedition_revision', 'two_connected_crew_required', 'connected_crew_not_ready',
+      'rescue_already_completed'
+    ]);
+    const invalid = code.startsWith('invalid_') || code.startsWith('advance_') ||
+      code === 'expedition_identity_is_immutable' || code === 'only_advance_changes_time' ||
+      code === 'progress_cannot_reverse' || code === 'expedition_record_too_large';
+    if (conflicts.has(code)) return res.status(409).json({ error: code.replaceAll('_', ' ') });
+    if (invalid) return res.status(422).json({ error: code.replaceAll('_', ' ') });
+    console.error('[mutateSharedExpedition] failed:', error);
+    return res.status(500).json({ error: 'Could not update the shared Expedition right now.' });
   }
 });
 

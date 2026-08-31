@@ -16,6 +16,64 @@ let activeContext = null;
 let activeExpedition = null;
 let store = null;
 let localTransitRefreshTimer = 0;
+let sharedAuthority = null;
+let sharedAuthorityRoomCode = '';
+let sharedAuthorityLoading = false;
+let sharedState = null;
+
+function currentRoom() {
+  return activeContext?.getCurrentMultiplayerRoom?.() || null;
+}
+
+function sharedParticipant() {
+  return sharedState?.participants?.[sharedAuthority?.userUid] || null;
+}
+
+function connectedSharedCrew() {
+  return Object.values(sharedState?.participants || {}).filter((participant) => participant.connected !== false);
+}
+
+async function ensureSharedAuthority() {
+  const room = currentRoom();
+  const roomCode = String(room?.code || room?.id || '').trim().toUpperCase();
+  if (!roomCode) {
+    sharedAuthority?.dispose?.();
+    sharedAuthority = null;
+    sharedAuthorityRoomCode = '';
+    sharedState = null;
+    return null;
+  }
+  if (sharedAuthority && sharedAuthorityRoomCode === roomCode) return sharedAuthority;
+  if (sharedAuthorityLoading) return null;
+  sharedAuthority?.dispose?.();
+  sharedAuthority = null;
+  sharedState = null;
+  sharedAuthorityLoading = true;
+  try {
+    const module = await import('./shared-authority.js?v=1');
+    const authority = module.createSharedExpeditionAuthority({
+      room,
+      onState(next) {
+        sharedState = next;
+        if (next?.expedition) {
+          activeExpedition = next.expedition;
+          store?.save?.(activeExpedition);
+          syncExpeditionContacts(activeExpedition);
+          activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+        }
+        if (!overlay()?.hidden) renderMission();
+      },
+      onError() {
+        activeContext?.showToast?.('Shared Expedition is reconnecting. The last confirmed ship state remains visible.');
+      }
+    });
+    sharedAuthority = authority;
+    sharedAuthorityRoomCode = authority ? roomCode : '';
+    return authority;
+  } finally {
+    sharedAuthorityLoading = false;
+  }
+}
 
 function formatYears(value) {
   const years = Number(value) || 0;
@@ -395,6 +453,45 @@ function readinessMarkup(expedition) {
     ${issues.length ? `<ul class="expeditionIssues">${issues.map((issue) => `<li>${issue}</li>`).join('')}</ul>` : ''}`;
 }
 
+function sharedMissionMarkup() {
+  const room = currentRoom();
+  if (!room) return '';
+  const roomLabel = String(room.name || room.code || room.id || 'current room');
+  if (!sharedState) {
+    return `<section class="expeditionShared"><span>ROOM EXPEDITION</span><h3>${roomLabel}</h3><p>Share this voyage with the crew already in your multiplayer room.</p>${activeExpedition ? '<button id="expeditionShareCreate" type="button">Share this Expedition</button>' : ''}</section>`;
+  }
+  const participant = sharedParticipant();
+  const connected = connectedSharedCrew();
+  const ready = connected.filter((member) => member.readyForRevision === sharedState.revision).length;
+  const crew = Object.values(sharedState.participants || {}).map((member) =>
+    `<li class="${member.connected === false ? 'is-offline' : ''}"><strong>${member.displayName}</strong><span>${String(member.role || 'crew').replaceAll('-', ' ')} · ${member.connected === false ? 'away' : member.readyForRevision === sharedState.revision ? 'ready' : 'aboard'}</span></li>`
+  ).join('');
+  return `<section class="expeditionShared"><span>ROOM EXPEDITION · REVISION ${sharedState.revision}</span><h3>${roomLabel}</h3><p>${connected.length} connected · ${ready} ready for the next watch</p><ul>${crew}</ul>${participant ? `<button id="expeditionShareReady" type="button">${participant.readyForRevision === sharedState.revision ? 'Not ready yet' : 'Ready for next watch'}</button>` : '<button id="expeditionShareJoin" type="button">Join this crew</button>'}</section>`;
+}
+
+async function applyExpeditionMutation(next, mutationKind) {
+  if (!next || next === activeExpedition) return false;
+  if (sharedState) {
+    if (!sharedParticipant()) throw new Error('Join the room crew before changing its Expedition.');
+    const response = await sharedAuthority?.commit?.(next, mutationKind);
+    if (response?.state?.expedition) {
+      sharedState = response.state;
+      activeExpedition = response.state.expedition;
+    }
+  } else {
+    activeExpedition = next;
+  }
+  store.save(activeExpedition);
+  activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+  return true;
+}
+
+function reportSharedMutationError(error) {
+  const message = String(error?.message || 'Shared Expedition could not be updated.');
+  activeContext?.showToast?.(message);
+  renderMission();
+}
+
 function renderMission() {
   const host = document.getElementById('expeditionMission');
   if (!host || !activeExpedition) return;
@@ -440,6 +537,7 @@ function renderMission() {
     : '';
   host.innerHTML = `
     ${readinessMarkup(expedition)}
+    ${sharedMissionMarkup()}
     ${expedition.state !== 'planned' ? `<div class="expeditionProgress"><span style="width:${Math.round(expedition.progress * 100)}%"></span></div><p class="expeditionProgressCopy">${Math.round(expedition.progress * 100)}% of crew-experienced travel complete · ${expedition.state}</p>` : ''}
     ${expedition.state !== 'planned' ? `<section class="expeditionVoyage"><header><span>VOYAGE</span><strong>${String(expedition.voyagePhase || 'departure').replaceAll('-', ' ')}</strong></header><div>${VOYAGE_MILESTONES.map((milestone, index) => `<i class="${index < reachedCount ? 'reached' : index === reachedCount ? 'next' : ''}" title="${String(milestone.phase || milestone.id).replaceAll('-', ' ')}"></i>`).join('')}</div><small>${reachedCount} of ${VOYAGE_MILESTONES.length} voyage chapters reached</small></section>` : ''}
     ${action}
@@ -447,20 +545,47 @@ function renderMission() {
     ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span>${!expedition.activeLocalContactId && ['available', 'returned'].includes(contact.localOperationState) ? `<button type="button" data-enter-contact="${contact.id}">Enter local Space</button>` : ''}</p>`).join('')}</section>` : ''}
     <section class="expeditionLog"><h3>Captain's Log</h3>${log.map((entry) => `<p><span>${entry.kind}</span>${entry.message}</p>`).join('')}</section>`;
 
-  document.getElementById('expeditionDepart')?.addEventListener('click', () => {
-    activeExpedition = startExpedition(activeExpedition);
-    store.save(activeExpedition);
-    renderMission();
+  document.getElementById('expeditionShareCreate')?.addEventListener('click', async () => {
+    try {
+      const authority = await ensureSharedAuthority();
+      if (!authority) throw new Error('Sign in and join the current multiplayer room first.');
+      const response = await authority.create(activeExpedition, 'command');
+      if (response?.state) sharedState = response.state;
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
   });
-  document.getElementById('expeditionAdvance')?.addEventListener('click', () => {
-    activeExpedition = advanceToNextMilestone(activeExpedition);
-    store.save(activeExpedition);
-    renderMission();
+  document.getElementById('expeditionShareJoin')?.addEventListener('click', async () => {
+    try {
+      const response = await sharedAuthority?.join?.();
+      if (response?.state) sharedState = response.state;
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
   });
-  host.querySelectorAll('.expeditionChoice').forEach((button) => button.addEventListener('click', () => {
-    activeExpedition = resolveExpeditionEvent(activeExpedition, button.dataset.choice);
-    store.save(activeExpedition);
-    renderMission();
+  document.getElementById('expeditionShareReady')?.addEventListener('click', async () => {
+    try {
+      const participant = sharedParticipant();
+      const response = await sharedAuthority?.setReady?.(participant?.readyForRevision !== sharedState?.revision);
+      if (response?.state) sharedState = response.state;
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  });
+  document.getElementById('expeditionDepart')?.addEventListener('click', async () => {
+    try {
+      await applyExpeditionMutation(startExpedition(activeExpedition), 'operation');
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  });
+  document.getElementById('expeditionAdvance')?.addEventListener('click', async () => {
+    try {
+      await applyExpeditionMutation(advanceToNextMilestone(activeExpedition), 'advance');
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  });
+  host.querySelectorAll('.expeditionChoice').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      await applyExpeditionMutation(resolveExpeditionEvent(activeExpedition, button.dataset.choice), 'event');
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
   }));
   document.getElementById('expeditionArrive')?.addEventListener('click', () => {
     const destinationId = activeExpedition.destinationId;
@@ -536,24 +661,30 @@ function renderShipStationPanel(interaction) {
       activeContext?.showToast?.(result.message);
       return;
     }
-    activeExpedition = result.expedition;
-    store.save(activeExpedition);
-    activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+    try {
+      await applyExpeditionMutation(result.expedition, 'operation');
+    } catch (error) {
+      reportSharedMutationError(error);
+      return;
+    }
     activeContext?.playExpeditionShipAction?.({ actionId, message: result.message, interaction });
     if (actionId === 'record-baseline') await recordBaselineInJournal();
     activeContext?.showToast?.(result.message);
     renderShipStationPanel(interaction);
   }));
-  panel.querySelectorAll('[data-voyage-response]').forEach((button) => button.addEventListener('click', () => {
+  panel.querySelectorAll('[data-voyage-response]').forEach((button) => button.addEventListener('click', async () => {
     const previousId = activeExpedition.pendingEvent?.id;
     const next = resolveExpeditionEvent(activeExpedition, button.dataset.voyageResponse);
     if (next === activeExpedition || next.pendingEvent?.id === previousId) {
       activeContext?.showToast?.('That response is not available with the current crew and stores.');
       return;
     }
-    activeExpedition = next;
-    store.save(activeExpedition);
-    activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+    try {
+      await applyExpeditionMutation(next, 'event');
+    } catch (error) {
+      reportSharedMutationError(error);
+      return;
+    }
     activeContext?.playExpeditionShipAction?.({
       actionId: 'event-response',
       kind: activeExpedition.failureReport ? 'alert' : 'operation',
@@ -595,6 +726,7 @@ function openExpeditionPlanner(appContext) {
   store ||= createExpeditionStore();
   activeExpedition = store.load();
   syncExpeditionContacts(activeExpedition);
+  void ensureSharedAuthority();
   ensureStylesheet();
   let root = overlay();
   if (!root) {

@@ -2056,6 +2056,13 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /expeditions/{expeditionId} {
+        // The room may observe its current Expedition directly, but all
+        // mutations pass through the server authority and its revision check.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
       match /blocks/{blockId} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
         allow create: if isMultiplayerEntitled() &&
