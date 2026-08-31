@@ -29,6 +29,7 @@ import {
   relativisticLeg,
   routeDistanceLy
 } from '../app/js/expedition/travel-calculator.js';
+import { getUniverseDestinations, getUniverseFrame, registerUniverseRuntimeDestination, resolveUniverseAddress } from '../app/js/universe/catalog.js';
 
 test('the catalog distance remains physical and separate from compressed player time', () => {
   const ship = getShipProfile('long-range-research-vessel');
@@ -55,6 +56,21 @@ test('catalog black holes are valid Expedition targets without being treated as 
   assert.ok(calculation.distanceLy > 26000);
   assert.equal(calculation.destinationId, 'sagittarius-a-star');
   assert.equal(calculation.classification, PROPULSION_CLASS.FICTIONAL);
+});
+
+test('a stable Expedition contact can join the existing universe address and frame authority', () => {
+  const system = registerUniverseRuntimeDestination({
+    id: 'test-expedition-contact', name: 'Survey Contact Test', objectClass: 'planetary_system', parentId: 'milky-way',
+    address: 'universe/local-group/milky-way/expedition/test-expedition-contact',
+    accuracy: 'model-derived expedition contact', canonicalPosition: { frame: 'expedition-route', distanceLy: 2.1 },
+    physical: { hostMassSolar: 0.22, hostTemperatureK: 3200 }, visualProfile: { kind: 'red-dwarf', color: 0xff8b65, seed: 421 },
+    children: [{ id: 'test-expedition-contact-i', name: 'Survey Contact Test I', objectClass: 'exoplanet', radiusEarth: 1.1, massEarth: 1.3, orbitDays: 44, semiMajorAxisAu: 0.19 }]
+  });
+  const world = resolveUniverseAddress('test-expedition-contact-i');
+  assert.equal(resolveUniverseAddress(system.id).id, system.id);
+  assert.equal(world.parentFrameId, system.id);
+  assert.equal(getUniverseFrame(world).id, system.id);
+  assert.equal(getUniverseDestinations().filter((entry) => entry.id === system.id).length, 1);
 });
 
 test('relativistic legs reproduce Lorentz factors at representative capped velocities', () => {
@@ -156,6 +172,7 @@ test('one seeded strategic journey selects varied families, records outcomes and
   assert.equal(expedition.voyageDirector.history.length, VOYAGE_MILESTONES.length);
   assert.ok(expedition.log.some((entry) => entry.kind === 'science' || entry.kind === 'engineering'));
   assert.ok(expedition.log.some((entry) => entry.kind === 'arrival'));
+  assert.ok(expedition.routeContacts.some((contact) => ['available', 'returned'].includes(contact.localOperationState)));
   assert.ok(expedition.routeContacts.every((contact) => contact.truthClass === 'modeled-uncharted-system' && Number.isInteger(contact.stableSeed)));
 });
 

@@ -1,4 +1,4 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=4';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=5';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
 
@@ -28,6 +28,8 @@ function parseRecord(value) {
     record.eventFlags = { ...(record.eventFlags || {}) };
     record.operationFlags = { ...(record.operationFlags || {}) };
     record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];
+    record.activeLocalContactId ||= null;
+    record.localOperation ||= null;
     const hadVoyageDirector = record.voyageDirector?.version === 1;
     record.voyageDirector = normalizeVoyageDirector(record);
     if (!hadVoyageDirector) {

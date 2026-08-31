@@ -2,7 +2,7 @@ import {
   distanceLightYears,
   icrsToCartesian,
   resolveUniverseAddress
-} from '../universe/catalog.js?v=10';
+} from '../universe/catalog.js?v=11';
 
 const LIGHT_SPEED_MPS = 299_792_458;
 const LIGHT_YEAR_M = 9.4607304725808e15;
@@ -134,4 +134,3 @@ export {
   relativisticLeg,
   routeDistanceLy
 };
-

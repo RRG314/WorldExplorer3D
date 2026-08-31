@@ -1,18 +1,19 @@
 import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { createExpeditionPlan } from './model.js?v=4';
+import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=5';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
-} from './simulation.js?v=4';
-import { createExpeditionStore } from './store.js?v=5';
+} from './simulation.js?v=5';
+import { createExpeditionStore } from './store.js?v=6';
 import { applyShipOperation, getShipStationView } from './ship-operations.js?v=1';
-import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=10';
+import { getUniverseDestinations, registerUniverseRuntimeDestination, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 
 let activeContext = null;
 let activeExpedition = null;
 let store = null;
+let localTransitRefreshTimer = 0;
 
 function formatYears(value) {
   const years = Number(value) || 0;
@@ -31,12 +32,125 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = 'styles/expedition.css?v=4';
+  link.href = 'styles/expedition.css?v=5';
   document.head.appendChild(link);
 }
 
 function availableDestinations() {
   return getUniverseDestinations().filter((item) => ['planetary_system', 'black_hole'].includes(item.objectClass) && item.id !== 'sol');
+}
+
+function registerExpeditionContact(expedition, contact) {
+  if (!contact?.id || !Number.isInteger(Number(contact.stableSeed))) return null;
+  const seed = Number(contact.stableSeed) >>> 0;
+  const stellarProfiles = [
+    { mass: 0.16, temperature: 3050, kind: 'red-dwarf', color: 0xff805b },
+    { mass: 0.72, temperature: 4750, kind: 'k-star', color: 0xffbd79 },
+    { mass: 0.28, temperature: 3320, kind: 'red-dwarf', color: 0xff9169 },
+    { mass: 0.52, temperature: 3920, kind: 'k-star', color: 0xffa66f }
+  ];
+  const star = stellarProfiles[seed % stellarProfiles.length];
+  const radiusEarth = 0.78 + ((seed >>> 5) % 92) / 100;
+  const massEarth = Math.max(0.38, radiusEarth ** 2.7);
+  const orbitDays = 28 + (seed % 410);
+  const semiMajorAxisAu = 0.12 + ((seed >>> 9) % 130) / 100;
+  return registerUniverseRuntimeDestination({
+    id: contact.id,
+    name: contact.designation,
+    objectClass: 'planetary_system',
+    parentId: 'milky-way',
+    address: `universe/local-group/milky-way/expedition/${contact.id}`,
+    accuracy: 'model-derived expedition contact',
+    canonicalPosition: { frame: 'expedition-route', distanceLy: Math.max(0.01, Number(expedition?.calculation?.distanceLy || 1) * Math.max(0.05, Number(expedition?.progress || 0.5))) },
+    physical: { hostMassSolar: star.mass, hostTemperatureK: star.temperature },
+    visualProfile: { kind: star.kind, color: star.color, seed },
+    generatedFlags: ['stable-expedition-contact', 'model-derived-appearance'],
+    uncertainty: { classification: 'Survey classification remains subject to local observation.' },
+    provenance: [],
+    children: [{
+      id: `${contact.id}-i`,
+      name: `${contact.designation} I`,
+      objectClass: 'exoplanet',
+      radiusEarth,
+      massEarth,
+      orbitDays,
+      semiMajorAxisAu,
+      accuracy: 'model-derived expedition world',
+      exploration: { landingMode: 'not-yet-supported', surfaceClass: contact.worldClass },
+      uncertainty: { resourceSignature: contact.resourceSignature }
+    }]
+  });
+}
+
+function syncExpeditionContacts(expedition = activeExpedition) {
+  return (expedition?.routeContacts || []).map((contact) => registerExpeditionContact(expedition, contact)).filter(Boolean);
+}
+
+function updateContact(contactId, changes) {
+  const contacts = (activeExpedition?.routeContacts || []).map((contact) => Object.freeze(contact.id === contactId ? { ...contact, ...changes } : { ...contact }));
+  return Object.freeze(contacts);
+}
+
+function appendMissionLog(expedition, kind, message) {
+  return Object.freeze([...(expedition?.log || []), Object.freeze({ atMissionS: Number(expedition?.strategicElapsedS || 0), kind, message })]);
+}
+
+function beginLocalContact(contactId) {
+  const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === contactId);
+  if (!contact || !['available', 'returned'].includes(contact.localOperationState)) return false;
+  const destination = registerExpeditionContact(activeExpedition, contact);
+  if (!destination) return false;
+  const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
+  const previous = activeExpedition;
+  activeExpedition = withExpeditionChanges(activeExpedition, {
+    voyagePhase: 'local-operation',
+    activeLocalContactId: contact.id,
+    localOperation: Object.freeze({ contactId: contact.id, returnFrameId, state: 'local-space', startedAtMissionS: Number(activeExpedition.strategicElapsedS || 0) }),
+    routeContacts: updateContact(contact.id, { localOperationState: 'local-entered', status: 'local-operation' }),
+    log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey began.`)
+  });
+  store.save(activeExpedition);
+  closeExpeditionPlanner();
+  const accepted = activeContext?.travelToUniverseDestination?.(destination.id, {
+    kind: 'expedition-local-operation',
+    routeLabel: contact.designation
+  });
+  if (accepted) return true;
+  activeExpedition = previous;
+  store.save(activeExpedition);
+  openExpeditionPlanner(activeContext);
+  activeContext?.showSpaceFlightMessage?.('The local route is not available from the current flight state.', '#f59e0b');
+  return false;
+}
+
+function returnFromLocalContact() {
+  const operation = activeExpedition?.localOperation;
+  const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === operation?.contactId);
+  if (!operation || !contact) return false;
+  if (activeContext?.universeRuntime?.transition) {
+    activeContext?.showSpaceFlightMessage?.('Complete the local approach before returning to Surveyor.', '#f59e0b');
+    return false;
+  }
+  const previous = activeExpedition;
+  activeExpedition = withExpeditionChanges(activeExpedition, {
+    voyagePhase: 'route-resume',
+    activeLocalContactId: null,
+    localOperation: null,
+    routeContacts: updateContact(contact.id, { localOperationState: 'returned', status: 'surveyed' }),
+    log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey ended. Surveyor resumed the voyage.`)
+  });
+  store.save(activeExpedition);
+  closeExpeditionPlanner();
+  const accepted = activeContext?.travelToUniverseDestination?.(operation.returnFrameId || activeExpedition.originId || 'sol', {
+    kind: 'expedition-route-return',
+    routeLabel: 'Return to Surveyor'
+  });
+  if (accepted) return true;
+  activeExpedition = previous;
+  store.save(activeExpedition);
+  openExpeditionPlanner(activeContext);
+  activeContext?.showSpaceFlightMessage?.('Surveyor could not recover the prior route frame.', '#f59e0b');
+  return false;
 }
 
 function destinationTypeLabel(destination) {
@@ -119,9 +233,23 @@ function readinessMarkup(expedition) {
 function renderMission() {
   const host = document.getElementById('expeditionMission');
   if (!host || !activeExpedition) return;
+  if (localTransitRefreshTimer) {
+    window.clearTimeout(localTransitRefreshTimer);
+    localTransitRefreshTimer = 0;
+  }
   const expedition = activeExpedition;
   let action = '';
-  if (expedition.state === 'planned') {
+  if (expedition.activeLocalContactId) {
+    const activeContact = expedition.routeContacts?.find((contact) => contact.id === expedition.activeLocalContactId);
+    const localTransitActive = Boolean(activeContext?.universeRuntime?.transition);
+    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>Surveyor is holding this voyage chapter while you fly the local system. No supplies are awarded by entering or leaving.</p><div><button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Surveyor'}</button></div></div>`;
+    if (localTransitActive) {
+      localTransitRefreshTimer = window.setTimeout(() => {
+        localTransitRefreshTimer = 0;
+        if (!document.getElementById('expeditionOverlay')?.hidden && activeExpedition?.activeLocalContactId) renderMission();
+      }, 250);
+    }
+  } else if (expedition.state === 'planned') {
     action = `<button id="expeditionDepart" class="expeditionPrimary" type="button" ${expedition.readiness.status === 'insufficient' ? 'disabled' : ''}>Depart on Surveyor</button>`;
   } else if (expedition.pendingEvent) {
     const options = expedition.pendingEvent.options || expedition.pendingEvent.choices.map((id) => ({ id, label: id.replaceAll('-', ' '), enabled: true, reason: '' }));
@@ -144,7 +272,7 @@ function renderMission() {
     ${expedition.state !== 'planned' ? `<section class="expeditionVoyage"><header><span>VOYAGE</span><strong>${String(expedition.voyagePhase || 'departure').replaceAll('-', ' ')}</strong></header><div>${VOYAGE_MILESTONES.map((milestone, index) => `<i class="${index < reachedCount ? 'reached' : index === reachedCount ? 'next' : ''}" title="${String(milestone.phase || milestone.id).replaceAll('-', ' ')}"></i>`).join('')}</div><small>${reachedCount} of ${VOYAGE_MILESTONES.length} voyage chapters reached</small></section>` : ''}
     ${action}
     ${shipAction}
-    ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span></p>`).join('')}</section>` : ''}
+    ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span>${!expedition.activeLocalContactId && ['available', 'returned'].includes(contact.localOperationState) ? `<button type="button" data-enter-contact="${contact.id}">Enter local Space</button>` : ''}</p>`).join('')}</section>` : ''}
     <section class="expeditionLog"><h3>Captain's Log</h3>${log.map((entry) => `<p><span>${entry.kind}</span>${entry.message}</p>`).join('')}</section>`;
 
   document.getElementById('expeditionDepart')?.addEventListener('click', () => {
@@ -171,6 +299,8 @@ function renderMission() {
     });
     if (!accepted) activeContext?.showSpaceFlightMessage?.('Open Wayfinder to continue at the destination.', '#8ab4ff');
   });
+  document.getElementById('expeditionReturnFromContact')?.addEventListener('click', returnFromLocalContact);
+  host.querySelectorAll('[data-enter-contact]').forEach((button) => button.addEventListener('click', () => beginLocalContact(button.dataset.enterContact)));
   document.getElementById('expeditionEnterShip')?.addEventListener('click', () => void enterActiveShip());
 }
 
@@ -274,6 +404,7 @@ function openExpeditionPlanner(appContext) {
   if (activeContext) activeContext.getInterstellarExpeditionSnapshot = getExpeditionSnapshot;
   store ||= createExpeditionStore();
   activeExpedition = store.load();
+  syncExpeditionContacts(activeExpedition);
   ensureStylesheet();
   let root = overlay();
   if (!root) {
@@ -289,6 +420,10 @@ function openExpeditionPlanner(appContext) {
 }
 
 function closeExpeditionPlanner() {
+  if (localTransitRefreshTimer) {
+    window.clearTimeout(localTransitRefreshTimer);
+    localTransitRefreshTimer = 0;
+  }
   const root = overlay();
   if (root) root.hidden = true;
   return true;

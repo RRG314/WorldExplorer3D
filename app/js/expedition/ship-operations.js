@@ -1,4 +1,4 @@
-import { withExpeditionChanges } from './model.js?v=4';
+import { withExpeditionChanges } from './model.js?v=5';
 
 const STATION_VIEWS = Object.freeze({
   'bridge-flight': Object.freeze({ title: 'Flight Controls', systemId: 'navigation', summary: 'Review heading, velocity, and the margins on the active route.' }),

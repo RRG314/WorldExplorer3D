@@ -1,8 +1,8 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
-import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=10';
+import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=3';
-import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
+import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=3';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import {
@@ -10,9 +10,9 @@ import {
   setUniverseCourseGuidance,
   setUniverseCourseStatus,
   UNIVERSE_GUIDANCE_MODE
-} from './course-authority.js?v=2';
+} from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
-import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
+import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
@@ -27,7 +27,7 @@ import {
   showUniverseNavigator,
   updateUniverseCourseCue,
   updateUniverseNavigator
-} from './ui.js?v=5';
+} from './ui.js?v=6';
 import {
   createWormholeVisual,
   getWormholeRoute,

@@ -267,6 +267,40 @@ async function runJourney(viewport, name) {
     assert.ok(['navigation', 'engineering', 'crew', 'science', 'hazard', 'stop'].every((category) => voyageCategories.has(category)));
     assert.equal(state.interstellarExpedition.voyageDirector.history.length, 14);
     assert.ok(state.interstellarExpedition.voyageDirector.history.every((entry) => ['success', 'partial', 'setback'].includes(entry.outcome)));
+    const localContact = state.interstellarExpedition.routeContacts.find((contact) => contact.localOperationState === 'available');
+    assert.ok(localContact, 'expected the voyage to retain an available local contact');
+    await page.locator(`[data-enter-contact="${localContact.id}"]`).click();
+    await page.waitForFunction((contactId) => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.universeNavigation?.currentFrameId === contactId && snapshot.interstellarExpedition?.activeLocalContactId === contactId;
+    }, localContact.id, { timeout: 15000 });
+    await page.screenshot({ path: path.join(outputDir, `${name}-local-route-contact.png`), fullPage: true });
+    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
+    await page.locator('#sfExpeditionBtn').click();
+    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#expeditionAdvance').count(), 0);
+    assert.equal(await page.locator('#expeditionReturnFromContact').isDisabled(), true);
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.universeNavigation?.transitionDestinationId == null;
+    }, null, { timeout: 15000 });
+    await page.waitForFunction(() => document.getElementById('expeditionReturnFromContact')?.disabled === false, null, { timeout: 5000 });
+    await page.locator('#expeditionReturnFromContact').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(outputDir, `${name}-local-route-contact-arrived.png`), fullPage: true });
+    await page.locator('#expeditionReturnFromContact').click();
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.universeNavigation?.currentFrameId === 'sol' && snapshot.interstellarExpedition?.activeLocalContactId == null;
+    }, null, { timeout: 15000 });
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.universeNavigation?.transitionDestinationId == null;
+    }, null, { timeout: 15000 });
+    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
+    await page.locator('#sfExpeditionBtn').click();
+    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+    state = await diagnostics(page);
+    assert.ok(state.interstellarExpedition.routeContacts.some((contact) => contact.id === localContact.id && contact.localOperationState === 'returned'));
     await page.locator('#expeditionAdvance').click();
     state = await diagnostics(page);
     assert.equal(state.interstellarExpedition.state, 'arrived');

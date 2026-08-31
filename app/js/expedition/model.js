@@ -1,5 +1,5 @@
 import { getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
-import { calculateExpeditionTravel } from './travel-calculator.js?v=1';
+import { calculateExpeditionTravel } from './travel-calculator.js?v=2';
 import { createVoyageDirector } from './voyage-director.js?v=1';
 
 const EXPEDITION_SCHEMA_VERSION = 1;
@@ -104,6 +104,8 @@ function createExpeditionPlan({
     eventFlags: Object.freeze({}),
     operationFlags: Object.freeze({}),
     routeContacts: Object.freeze([]),
+    activeLocalContactId: null,
+    localOperation: null,
     discoveries: Object.freeze([]),
     log: Object.freeze([{ atMissionS: 0, kind: 'planned', message: `Expedition planned for ${destinationId}.` }]),
     failureChain: Object.freeze([])

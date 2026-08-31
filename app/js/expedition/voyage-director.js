@@ -127,6 +127,10 @@ function selectWeighted(expedition, candidates, slot) {
 
 function selectVoyageEvent(expedition, slot) {
   if (slot.forceEventId && eventIsEligible(expedition, VOYAGE_EVENT_BY_ID[slot.forceEventId])) return VOYAGE_EVENT_BY_ID[slot.forceEventId];
+  if (slot.category === 'stop' && !(expedition.routeContacts || []).some((contact) => ['available', 'returned'].includes(contact.localOperationState))) {
+    const surveyStop = VOYAGE_EVENT_BY_ID['modeled-salvage'];
+    if (eventIsEligible(expedition, surveyStop)) return surveyStop;
+  }
   const eligible = VOYAGE_EVENT_FAMILIES.filter((entry) => !FORCED_EVENT_IDS.has(entry.id) && eventIsEligible(expedition, entry));
   const preferred = eligible.filter((entry) => entry.category === slot.category);
   return selectWeighted(expedition, preferred.length ? preferred : eligible, slot);
@@ -226,7 +230,7 @@ function applyContactEffect(expedition, contacts, definition, effect) {
     contact = clone(stableContact(expedition, definition.id));
     contacts.push(contact);
   }
-  if (effect === 'survey') contact.status = 'surveyed';
+  if (effect === 'survey') { contact.status = 'surveyed'; contact.localOperationState = 'available'; }
   if (effect === 'offer-stop') { contact.status = 'surveyed'; contact.localOperationState = 'available'; }
   if (effect === 'mark-stop') { contact.status = 'route-stop'; contact.localOperationState = 'available'; }
 }

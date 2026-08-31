@@ -92,6 +92,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
 
   setupSpaceFlightControls(attemptLanding, lifecycleScope);
   if (globalThis.matchMedia?.('(max-width: 768px)').matches) hud.classList.add('collapsed');
+  document.body.classList.remove('space-flight-hud-expanded');
 }
 
 function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
@@ -100,12 +101,13 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=10');
+    const runtime = await import('../expedition/runtime.js?v=12');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
     const hud = document.getElementById('spaceFlightHUD');
     const collapsed = hud?.classList.toggle('collapsed') === true;
+    document.body.classList.toggle('space-flight-hud-expanded', !collapsed);
     const toggle = document.getElementById('sfHudToggle');
     if (toggle) {
       toggle.textContent = collapsed ? '+' : '−';

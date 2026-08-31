@@ -1,4 +1,4 @@
-import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=10';
+import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=11';
 
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',

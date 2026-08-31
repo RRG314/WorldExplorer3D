@@ -933,6 +933,7 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
 .spaceFlightHud.collapsed .spaceFlightHudBody{display:none}
 .spaceFlightMessage{--space-flight-message-color:#69e7bf;position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;z-index:10002;max-width:min(520px,calc(100vw - 32px));box-sizing:border-box;padding:9px 16px;transform:translateX(-50%);border:1px solid var(--space-flight-message-color);border-radius:999px;background:rgba(3,9,20,.88);color:var(--space-flight-message-color);font:700 12px/1.25 Orbitron,sans-serif;letter-spacing:.03em;text-align:center;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.34)}
 @media (max-width:768px){.spaceFlightHud{top:max(150px,calc(env(safe-area-inset-top) + 138px));right:max(8px,env(safe-area-inset-right));width:min(204px,calc(100vw - 16px));padding:8px}.spaceFlightHudHead{font-size:10px}.spaceFlightHudStatus{margin-bottom:0}.spaceFlightHud.collapsed{min-width:168px}.spaceFlightMessage{top:auto;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));padding:7px 12px;font-size:10px}}
+@media (max-width:768px){body.space-flight-hud-expanded #mobileTouchControls.mode-rocket{visibility:hidden}}
 
 @media(min-width:761px){
   body:has(#floatMenuContainer.show) #urbanVehiclePrompt,
