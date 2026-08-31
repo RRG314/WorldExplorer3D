@@ -191,8 +191,53 @@ function craterRelief(x, z, centerX, centerZ, radius, depth) {
   return Math.max(0, rim) * depth * 0.28;
 }
 
+function mountainMass(x, z, centerX, centerZ, radiusX, radiusZ, height) {
+  const dx = (x - centerX) / radiusX;
+  const dz = (z - centerZ) / radiusZ;
+  const distance = dx * dx + dz * dz;
+  if (distance >= 1) return 0;
+  const shoulder = (1 - distance) ** 1.55;
+  return height * shoulder;
+}
+
+function localCoordinates(pack, x, z) {
+  return { x: x - Number(pack.spawn?.x || 0), z: z - Number(pack.spawn?.z || 0) };
+}
+
 function sampleModeledRelief(pack, x, z) {
   const noise = deterministicNoise(x, z, pack.detailSeed);
+  const local = localCoordinates(pack, x, z);
+  const amplitude = Math.max(0.65, Number(pack.reliefAmplitude || 1));
+  if (pack.reliefKind === 'tectonic-highlands') {
+    const westernRange = mountainMass(local.x, local.z, -1_050, -720, 1_050, 760, 620);
+    const easternRange = mountainMass(local.x, local.z, 1_180, 380, 920, 1_260, 510);
+    const distantPeak = mountainMass(local.x, local.z, 120, -1_850, 760, 900, 780);
+    const ridge = Math.abs(Math.sin((local.x * 0.0021) + Math.sin(local.z * 0.0008) * 2.4)) ** 3 * 92;
+    const valley = -85 * Math.exp(-((local.x - 120) ** 2 + (local.z + 90) ** 2) / 560_000);
+    return (westernRange + easternRange + distantPeak + ridge + valley + noise * 34) * amplitude;
+  }
+  if (pack.reliefKind === 'basalt-highlands') {
+    const plateauA = mountainMass(local.x, local.z, -760, -480, 1_280, 1_050, 390);
+    const plateauB = mountainMass(local.x, local.z, 1_350, 820, 1_100, 900, 330);
+    const scarps = Math.max(0, Math.sin((local.x - local.z) * 0.0018)) ** 5 * 120;
+    const caldera = craterRelief(local.x, local.z, 520, -1_050, 640, 150);
+    return (plateauA + plateauB + scarps + caldera + noise * 28) * amplitude;
+  }
+  if (pack.reliefKind === 'glacial-mountains') {
+    const spine = mountainMass(local.x, local.z, -420, -1_000, 720, 1_650, 720);
+    const horn = mountainMass(local.x, local.z, 1_080, -180, 650, 780, 560);
+    const trough = -110 * Math.exp(-((local.x + 80) ** 2 + (local.z - 420) ** 2) / 780_000);
+    const fractures = Math.abs(Math.sin((local.x + local.z * 0.28) * 0.0031)) ** 8 * 48;
+    return (spine + horn + trough + fractures + noise * 22) * amplitude;
+  }
+  if (pack.reliefKind === 'fractured-highlands') {
+    const northMassif = mountainMass(local.x, local.z, -880, -1_120, 940, 1_220, 590);
+    const southMassif = mountainMass(local.x, local.z, 1_050, 940, 1_180, 980, 470);
+    const faultA = Math.max(0, Math.sin((local.x + local.z * 0.46) * 0.0024)) ** 6 * 105;
+    const faultB = Math.max(0, Math.cos((local.z - local.x * 0.22) * 0.0017)) ** 8 * 72;
+    const basin = -96 * Math.exp(-((local.x - 50) ** 2 + (local.z + 120) ** 2) / 720_000);
+    return (northMassif + southMassif + faultA + faultB + basin + noise * 30) * amplitude;
+  }
   if (pack.reliefKind === 'cratered') {
     return noise * 13 +
       craterRelief(x, z, -1_900, 1_250, 1_050, 145) +
@@ -739,8 +784,16 @@ function showWorldPanel(pack, environment) {
   const pressure = environment.pressurePa >= 1000
     ? `${(environment.pressurePa / 1000).toFixed(1)} kPa`
     : `${Math.round(environment.pressurePa)} Pa`;
+  const gravityG = Number(environment.gravityMagnitudeMps2 || environment.gravityMps2 || 0) / 9.80665;
+  const wind = environment.windVectorMps || { eastMps: 0, northMps: 0, upMps: 0 };
+  const windSpeed = Math.hypot(Number(wind.eastMps || 0), Number(wind.northMps || 0), Number(wind.upMps || 0));
+  const weather = environment.weatherModelId && environment.weatherModelId !== 'none'
+    ? `${environment.weatherLabel || String(environment.weatherModelId).replaceAll('_', ' ')} · ${windSpeed.toFixed(1)} m/s wind`
+    : environment.atmosphereEvidence === 'unconfirmed'
+      ? 'Atmosphere unresolved · weather unavailable'
+      : 'No active weather model';
   const outpost = pack.outpost?.state === 'operational' ? `<section style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(125,243,208,.24);"><strong style="display:block;color:#91f2d3;">${pack.outpost.name}</strong><small>${String(pack.outpost.operationsStatus || 'operational').replaceAll('-', ' ')} · ${pack.outpost.assignedCrewIds.length} crew · ${Math.round(Number(pack.outpost.condition || 0) * 100)}% condition · ${Number(pack.outpost.power?.storedMWh || 0).toFixed(1)} MWh stored</small></section>` : '';
-  panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C</span><br><small style="opacity:.72;">${pack.representation}</small>${outpost}<canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:220px;max-width:100%;height:105px;margin-top:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:5px;color:#a7f3d0;">Follow the field beacons · use E or Explore nearby</small><button id="planetaryJournalBtn" type="button" style="display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid rgba(167,243,208,.5);border-radius:6px;color:#eafff6;background:rgba(16,82,65,.66);font:700 10px Inter,sans-serif;cursor:pointer;">Open Journal &amp; Field Guide</button>`;
+  panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C · ${gravityG.toFixed(2)}g</span><br><span>${pack.landformLabel || String(pack.reliefKind || 'modeled terrain').replaceAll('-', ' ')} · ${weather}</span><br><small style="opacity:.72;">${pack.representation}</small>${outpost}<canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:220px;max-width:100%;height:105px;margin-top:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:5px;color:#a7f3d0;">Follow the field beacons · use E or Explore nearby</small><button id="planetaryJournalBtn" type="button" style="display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid rgba(167,243,208,.5);border-radius:6px;color:#eafff6;background:rgba(16,82,65,.66);font:700 10px Inter,sans-serif;cursor:pointer;">Open Journal &amp; Field Guide</button>`;
   panel.querySelector('#planetaryJournalBtn')?.addEventListener('click', () => appCtx.openPlanetaryJournal?.('journal'));
   panel.style.display = 'block';
 }
@@ -944,11 +997,7 @@ async function arriveAtSolidWorld(bodyInput) {
   }
 }
 
-function registerExpeditionSolidWorld(input = {}) {
-  const bodyId = String(input.id || '').trim().toLowerCase();
-  if (!bodyId) throw new TypeError('An Expedition solid world requires a stable id.');
-  if (SOLID_WORLD_PACKS[bodyId]) throw new Error(`Expedition world cannot replace catalog body: ${bodyId}`);
-  if (runtimeWorldPacks.has(bodyId)) return runtimeWorldPacks.get(bodyId);
+function deriveExpeditionWorldProfile(input = {}) {
   const seed = Number(input.seed) >>> 0;
   const radiusEarth = Math.max(0.2, Number(input.radiusEarth) || 1);
   const massEarth = Math.max(0.05, Number(input.massEarth) || radiusEarth ** 2.7);
@@ -956,13 +1005,98 @@ function registerExpeditionSolidWorld(input = {}) {
   const starMassSolar = Math.max(0.08, Number(input.starMassSolar) || 0.5);
   const orbitAu = Math.max(0.02, Number(input.semiMajorAxisAu) || 0.5);
   const luminositySolar = Math.max(0.0001, starMassSolar ** 3.5);
-  const temperatureK = Math.max(45, 278 * luminositySolar ** 0.25 / Math.sqrt(orbitAu));
-  const palette = [
+  const suppliedTemperatureK = Number(input.equilibriumTemperatureK);
+  const temperatureK = Math.max(45, Number.isFinite(suppliedTemperatureK) && suppliedTemperatureK > 0
+    ? suppliedTemperatureK
+    : 278 * luminositySolar ** 0.25 / Math.sqrt(orbitAu));
+  const gravityRatio = gravityMps2 / 9.80665;
+  const reliefAmplitude = Math.max(0.82, Math.min(2.35, 1 / Math.sqrt(Math.max(0.16, gravityRatio))));
+  const candidateLandforms = ['tectonic-highlands', 'fractured-highlands', 'tectonic-highlands'];
+  const reliefKind = input.reliefKind || (
+    temperatureK > 430 ? 'basalt-highlands'
+      : temperatureK < 190 ? 'glacial-mountains'
+        : input.habitabilityCandidate ? candidateLandforms[seed % candidateLandforms.length]
+          : ['tectonic-highlands', 'basalt-highlands', 'fractured-highlands'][seed % 3]
+  );
+  const landformLabel = {
+    'tectonic-highlands': 'Folded highlands and deep survey valleys',
+    'basalt-highlands': 'Basalt plateaus, scarps, and caldera terrain',
+    'glacial-mountains': 'Ice-cut mountain spines and troughs',
+    'fractured-highlands': 'Fractured peaks and fault-bounded valleys'
+  }[reliefKind] || String(reliefKind).replaceAll('-', ' ');
+  const basePalette = [
     { ground: 0x826f5c, rock: 0x463c35, sky: 0x030407 },
     { ground: 0x756d62, rock: 0x393733, sky: 0x020306 },
     { ground: 0x8b7154, rock: 0x4d3b2b, sky: 0x050304 },
     { ground: 0x68716d, rock: 0x343b39, sky: 0x020405 }
   ][seed % 4];
+  const originalGameWorld = input.originalGameWorld === true;
+  let atmosphere = {
+    pressurePa: 0,
+    atmosphereEvidence: 'unconfirmed',
+    weatherModelId: 'none',
+    weatherLabel: 'Atmosphere unresolved · weather unavailable',
+    windVectorMps: Object.freeze({ eastMps: 0, northMps: 0, upMps: 0, truthClass: 'unavailable' }),
+    visibilityM: 80_000,
+    fogColor: null,
+    fogDensity: 0,
+    skyColor: basePalette.sky,
+    truthClass: 'modeled',
+    uncertainty: 'Temperature is an equilibrium estimate; the local atmosphere is unconfirmed and the suit model uses a vacuum-safe assumption.'
+  };
+  if (originalGameWorld) {
+    const weatherOptions = temperatureK < 210
+      ? [{ id: 'ice_crystal_squalls', label: 'Ice-crystal squalls', pressurePa: 38_000, windMps: 16, sky: 0x26384d, fog: 0xa7bdcb, density: 0.0001, visibilityM: 9_000 }]
+      : temperatureK > 360
+        ? [{ id: 'convective_dust_fronts', label: 'Convective dust fronts', pressurePa: 24_000, windMps: 13, sky: 0x533222, fog: 0x9b6742, density: 0.00013, visibilityM: 6_500 }]
+        : [
+            { id: 'variable_cloud_bands', label: 'Variable cloud bands', pressurePa: 82_000, windMps: 8, sky: 0x294a62, fog: 0x6f93a5, density: 0.000055, visibilityM: 22_000 },
+            { id: 'mineral_haze_and_gusts', label: 'Mineral haze and gusts', pressurePa: 54_000, windMps: 11, sky: 0x4f4540, fog: 0x8d8177, density: 0.000075, visibilityM: 14_000 }
+          ];
+    const selected = weatherOptions[seed % weatherOptions.length];
+    atmosphere = {
+      pressurePa: selected.pressurePa,
+      atmosphereEvidence: 'fictional-game-world',
+      weatherModelId: selected.id,
+      weatherLabel: selected.label,
+      windVectorMps: Object.freeze({ eastMps: selected.windMps, northMps: selected.windMps * 0.35, upMps: 0, truthClass: 'fictional-game-world' }),
+      visibilityM: selected.visibilityM,
+      fogColor: selected.fog,
+      fogDensity: selected.density,
+      skyColor: selected.sky,
+      truthClass: 'fictional-game-world',
+      uncertainty: 'This atmosphere and weather are canonical conditions for an original World Explorer game world, not an astronomical observation.'
+    };
+  }
+  return Object.freeze({
+    seed,
+    radiusEarth,
+    massEarth,
+    gravityMps2,
+    gravityRatio,
+    starMassSolar,
+    orbitAu,
+    luminositySolar,
+    temperatureK,
+    reliefAmplitude,
+    reliefKind,
+    landformLabel,
+    palette: Object.freeze({ ground: basePalette.ground, rock: basePalette.rock, sky: atmosphere.skyColor }),
+    atmosphere: Object.freeze(atmosphere)
+  });
+}
+
+function registerExpeditionSolidWorld(input = {}) {
+  const bodyId = String(input.id || '').trim().toLowerCase();
+  if (!bodyId) throw new TypeError('An Expedition solid world requires a stable id.');
+  if (SOLID_WORLD_PACKS[bodyId]) throw new Error(`Expedition world cannot replace catalog body: ${bodyId}`);
+  if (runtimeWorldPacks.has(bodyId)) return runtimeWorldPacks.get(bodyId);
+  const profile = deriveExpeditionWorldProfile(input);
+  const {
+    seed, radiusEarth, massEarth, gravityMps2, starMassSolar, orbitAu, luminositySolar,
+    temperatureK, reliefAmplitude, reliefKind, landformLabel, palette
+  } = profile;
+  const atmosphere = profile.atmosphere;
   const regionId = `${bodyId}-survey-site`;
   const manifest = registerModeledSurfaceRegion({
     bodyId,
@@ -988,13 +1122,17 @@ function registerExpeditionSolidWorld(input = {}) {
     arrivalMode: 'walk',
     returnMode: input.returnMode || 'expedition-contact',
     parentSystemId: String(input.parentSystemId || 'expedition'),
-    reliefKind: ['cratered', 'volcanic', 'ice-lineae', 'nitrogen-ice'][seed % 4],
+    reliefKind,
+    reliefAmplitude,
+    landformLabel,
     detailSeed: seed || 1,
     rockColor: palette.rock,
     rockScale: 4.2,
     spawn: { x: 420, z: -360, angle: 0.7 },
     material: { color: palette.ground, roughness: 0.94, bumpScale: 1.6 },
     skyColor: palette.sky,
+    fogColor: atmosphere.fogColor,
+    fogDensity: atmosphere.fogDensity,
     sunColor: 0xffd7aa,
     sunIntensity: Math.max(0.04, Math.min(2.2, luminositySolar / (orbitAu ** 2))),
     ambientIntensity: 0.42,
@@ -1007,10 +1145,15 @@ function registerExpeditionSolidWorld(input = {}) {
       bodyId,
       gravityMps2,
       gravityMagnitudeMps2: gravityMps2,
-      pressurePa: 0,
+      pressurePa: atmosphere.pressurePa,
       temperatureK,
-      truthClass: 'modeled',
-      uncertainty: 'Temperature is an equilibrium estimate; the local atmosphere is unconfirmed and the suit model uses a vacuum-safe assumption.'
+      atmosphereEvidence: atmosphere.atmosphereEvidence,
+      weatherModelId: atmosphere.weatherModelId,
+      weatherLabel: atmosphere.weatherLabel,
+      windVectorMps: atmosphere.windVectorMps,
+      visibilityM: atmosphere.visibilityM,
+      truthClass: atmosphere.truthClass,
+      uncertainty: atmosphere.uncertainty
     }),
     fieldNotes: Object.freeze((input.fieldNotes || [
       Object.freeze(['Document the survey site', 'photograph', 'places', 'Record the generated survey terrain and the model inputs used to create it.']),
@@ -1046,8 +1189,10 @@ Object.assign(appCtx, {
 
 export {
   arriveAtSolidWorld,
+  deriveExpeditionWorldProfile,
   registerExpeditionSolidWorld,
   sampleActiveSolidWorldHeight,
+  sampleModeledRelief,
   SOLID_WORLD_PACKS,
   visualHorizonRegions
 };

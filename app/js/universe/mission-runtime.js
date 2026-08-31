@@ -104,6 +104,7 @@ function prepareDestinationMissionSurface(destinationId = currentDefinition()?.d
   const destination = resolveUniverseAddress(mission.destinationId);
   const system = resolveUniverseAddress(mission.systemId);
   if (!destination || !system) return null;
+  const originalGameWorld = mission.truthClass === 'fictional-game-world';
   return activeContext.registerExpeditionSolidWorld({
     id: destination.id,
     name: destination.name,
@@ -113,9 +114,16 @@ function prepareDestinationMissionSurface(destinationId = currentDefinition()?.d
     massEarth: destination.massEarth,
     starMassSolar: system.physical?.hostMassSolar,
     semiMajorAxisAu: destination.semiMajorAxisAu,
+    equilibriumTemperatureK: mission.habitability?.equilibriumTemperatureK,
+    habitabilityCandidate: mission.habitability?.candidate === true,
+    originalGameWorld,
     returnMode: 'destination-mission',
-    context: `${mission.title} · protected field survey · atmosphere unresolved`,
-    representation: 'Modeled terrain based on published orbital parameters · no observed surface imagery',
+    context: originalGameWorld
+      ? `${mission.title} · original game-world field survey`
+      : `${mission.title} · protected field survey · atmosphere unresolved`,
+    representation: originalGameWorld
+      ? 'Original World Explorer terrain, atmosphere, and weather model'
+      : 'Modeled terrain based on published orbital parameters · no observed surface imagery',
     source: {
       title: `${destination.name} mission surface model`,
       provider: 'World Explorer 3D',

@@ -79,6 +79,73 @@ async function run() {
   page.on('response', (response) => { if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
   try {
     await openSpace(page);
+    const surfaceCatalogProfiles = await page.evaluate(async () => {
+      const { listDestinationMissions } = await import('/app/js/universe/mission-catalog.js?v=1');
+      const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
+      const { deriveExpeditionWorldProfile, sampleModeledRelief } = await import('/app/js/planetary/solid-world-runtime.js?v=12');
+      const stableSeed = (value) => {
+        let hash = 2166136261;
+        for (const character of String(value || '')) {
+          hash ^= character.charCodeAt(0);
+          hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+      };
+      return listDestinationMissions()
+        .filter((mission) => mission.scope === 'planet' && mission.operation.includes('surface'))
+        .map((mission) => {
+          const destination = resolveUniverseAddress(mission.destinationId);
+          const system = resolveUniverseAddress(mission.systemId);
+          const seed = stableSeed(destination.id);
+          const profile = deriveExpeditionWorldProfile({
+            id: destination.id,
+            seed,
+            radiusEarth: destination.radiusEarth,
+            massEarth: destination.massEarth,
+            starMassSolar: system.physical?.hostMassSolar,
+            semiMajorAxisAu: destination.semiMajorAxisAu,
+            equilibriumTemperatureK: mission.habitability?.equilibriumTemperatureK,
+            habitabilityCandidate: mission.habitability?.candidate === true,
+            originalGameWorld: mission.truthClass === 'fictional-game-world'
+          });
+          const pack = {
+            reliefKind: profile.reliefKind,
+            reliefAmplitude: profile.reliefAmplitude,
+            detailSeed: profile.seed || 1,
+            spawn: { x: 420, z: -360 }
+          };
+          let minElevation = Infinity;
+          let maxElevation = -Infinity;
+          for (let x = -3_600; x <= 3_600; x += 240) {
+            for (let z = -3_600; z <= 3_600; z += 240) {
+              const elevation = sampleModeledRelief(pack, x, z);
+              minElevation = Math.min(minElevation, elevation);
+              maxElevation = Math.max(maxElevation, elevation);
+            }
+          }
+          return {
+            id: destination.id,
+            truthClass: mission.truthClass,
+            reliefKind: profile.reliefKind,
+            reliefRangeM: maxElevation - minElevation,
+            gravityG: profile.gravityRatio,
+            temperatureK: profile.temperatureK,
+            atmosphereEvidence: profile.atmosphere.atmosphereEvidence,
+            weatherModelId: profile.atmosphere.weatherModelId,
+            pressurePa: profile.atmosphere.pressurePa
+          };
+        });
+    });
+    assert.ok(surfaceCatalogProfiles.length >= 8, JSON.stringify(surfaceCatalogProfiles));
+    assert.equal(surfaceCatalogProfiles.every((profile) => profile.reliefRangeM > 300), true, JSON.stringify(surfaceCatalogProfiles));
+    assert.equal(surfaceCatalogProfiles.every((profile) => profile.gravityG > 0.05 && profile.gravityG < 4), true, JSON.stringify(surfaceCatalogProfiles));
+    assert.ok(new Set(surfaceCatalogProfiles.map((profile) => profile.reliefKind)).size >= 3, JSON.stringify(surfaceCatalogProfiles));
+    assert.ok(Math.max(...surfaceCatalogProfiles.map((profile) => profile.gravityG)) - Math.min(...surfaceCatalogProfiles.map((profile) => profile.gravityG)) > 0.5, JSON.stringify(surfaceCatalogProfiles));
+    const observedCandidates = surfaceCatalogProfiles.filter((profile) => profile.truthClass !== 'fictional-game-world');
+    assert.equal(observedCandidates.every((profile) => profile.atmosphereEvidence === 'unconfirmed' && profile.weatherModelId === 'none'), true, JSON.stringify(observedCandidates));
+    const originalWorlds = surfaceCatalogProfiles.filter((profile) => profile.truthClass === 'fictional-game-world');
+    assert.ok(originalWorlds.length >= 2, JSON.stringify(surfaceCatalogProfiles));
+    assert.equal(originalWorlds.every((profile) => profile.atmosphereEvidence === 'fictional-game-world' && profile.weatherModelId !== 'none' && profile.pressurePa > 0), true, JSON.stringify(originalWorlds));
     await beginProximaBMission(page);
     assert.ok(await page.evaluate(() => localStorage.getItem('world-explorer:interstellar-expedition:v1')));
     await enterPodBay(page);
@@ -101,6 +168,30 @@ async function run() {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.environment === 'PLANETARY' && state.interstellarExpedition?.podJourney?.phase === 'surface';
     }, null, { timeout: 35_000 });
+    const worldProfile = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const positions = ctx.activeSolidWorldSurface.geometry.attributes.position;
+      let minElevation = Infinity;
+      let maxElevation = -Infinity;
+      for (let index = 0; index < positions.count; index += 1) {
+        minElevation = Math.min(minElevation, positions.getY(index));
+        maxElevation = Math.max(maxElevation, positions.getY(index));
+      }
+      return {
+        minElevation,
+        maxElevation,
+        reliefRange: maxElevation - minElevation,
+        gravityMps2: ctx.activePlanetaryEnvironment?.gravityMagnitudeMps2,
+        pressurePa: ctx.activePlanetaryEnvironment?.pressurePa,
+        atmosphereEvidence: ctx.activePlanetaryEnvironment?.atmosphereEvidence,
+        weatherModelId: ctx.activePlanetaryEnvironment?.weatherModelId
+      };
+    });
+    assert.ok(worldProfile.reliefRange > 500, JSON.stringify(worldProfile));
+    assert.ok(worldProfile.gravityMps2 > 9 && worldProfile.gravityMps2 < 11, JSON.stringify(worldProfile));
+    assert.equal(worldProfile.atmosphereEvidence, 'unconfirmed');
+    assert.equal(worldProfile.weatherModelId, 'none');
+    await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-arrival-terrain.png'), fullPage: true });
     assert.equal((await snapshot(page)).destinationMission.phase, 'fieldwork');
     for (const id of ['photograph', 'geology-inspect', 'habitat-survey']) await recordSurfaceActivity(page, id);
     await page.waitForFunction(() => {
@@ -152,11 +243,62 @@ async function run() {
     await page.locator('[data-complete-destination-analysis]').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'complete');
     const final = await snapshot(page);
+    const fictionalWorldProfile = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
+      const { arriveAtSolidWorld, registerExpeditionSolidWorld } = await import('/app/js/planetary/solid-world-runtime.js?v=12');
+      ctx.exitExpeditionShipInterior?.();
+      const destination = resolveUniverseAddress('andromeda-explorer-a-b');
+      const system = resolveUniverseAddress(destination.parentFrameId);
+      let seed = 2166136261;
+      for (const character of destination.id) {
+        seed ^= character.charCodeAt(0);
+        seed = Math.imul(seed, 16777619);
+      }
+      registerExpeditionSolidWorld({
+        id: destination.id,
+        name: destination.name,
+        seed: seed >>> 0,
+        parentSystemId: system.id,
+        radiusEarth: destination.radiusEarth,
+        massEarth: destination.massEarth,
+        starMassSolar: system.physical?.hostMassSolar,
+        semiMajorAxisAu: destination.semiMajorAxisAu,
+        originalGameWorld: true,
+        context: 'Copper Dawn · original game-world field survey',
+        representation: 'Original World Explorer terrain, atmosphere, and weather model'
+      });
+      const arrived = await arriveAtSolidWorld(destination.id);
+      const positions = ctx.activeSolidWorldSurface.geometry.attributes.position;
+      let minElevation = Infinity;
+      let maxElevation = -Infinity;
+      for (let index = 0; index < positions.count; index += 1) {
+        minElevation = Math.min(minElevation, positions.getY(index));
+        maxElevation = Math.max(maxElevation, positions.getY(index));
+      }
+      return {
+        arrived,
+        reliefRange: maxElevation - minElevation,
+        gravityMps2: ctx.activePlanetaryEnvironment?.gravityMagnitudeMps2,
+        pressurePa: ctx.activePlanetaryEnvironment?.pressurePa,
+        atmosphereEvidence: ctx.activePlanetaryEnvironment?.atmosphereEvidence,
+        weatherModelId: ctx.activePlanetaryEnvironment?.weatherModelId
+      };
+    });
+    assert.equal(fictionalWorldProfile.arrived, true, JSON.stringify(fictionalWorldProfile));
+    assert.ok(fictionalWorldProfile.reliefRange > 300, JSON.stringify(fictionalWorldProfile));
+    assert.equal(fictionalWorldProfile.atmosphereEvidence, 'fictional-game-world');
+    assert.notEqual(fictionalWorldProfile.weatherModelId, 'none');
+    assert.ok(fictionalWorldProfile.pressurePa > 0, JSON.stringify(fictionalWorldProfile));
+    await page.screenshot({ path: path.join(outputDir, 'desktop-andromeda-copper-dawn-weather.png'), fullPage: true });
     return {
       missionPhase: final.destinationMission.phase,
       evidence: final.destinationMission.evidence,
       podPhase: final.interstellarExpedition.podJourney.phase,
-      frameId: final.universeNavigation.currentFrameId
+      frameId: final.universeNavigation.currentFrameId,
+      worldProfile,
+      fictionalWorldProfile,
+      surfaceCatalogProfiles
     };
   } finally {
     await context.close();
