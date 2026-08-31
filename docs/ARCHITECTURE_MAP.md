@@ -138,6 +138,43 @@ travel state. Domestic animals, birds, and eligible livestock use one companion
 authority. Vehicle travel records an aboard state instead of leaving the
 companion to trail through the scene.
 
+## Economy and resource custody
+
+```mermaid
+flowchart LR
+    Place[Mapped place identity] --> Stock[Game stock and services]
+    Activity[Fieldwork, travel, and commissions] --> Wallet[Explorer Credits]
+    Wallet --> Stock
+    Stock --> Backpack[Character Backpack]
+    Surface[Earth or planetary gathering] --> Backpack
+    Backpack --> Cargo[Ship cargo]
+    Cargo --> Processing[Ship analysis and processing]
+    Processing --> Backpack
+    Backpack --> Trade[Eligible Earth sale or exchange]
+    Trade --> Wallet
+```
+
+`app/js/urban-sandbox/commerce-model.js` owns the current local Explorer Credits
+record, transaction history, stable game stock, and mapped-business exchange.
+The legacy storage key is retained so existing Credits survive the schema
+change. `app/js/resources/material-catalog.js` defines material identity, unit
+mass, and allowed cargo conversion. The Character Backpack remains the item
+owner; the economy does not maintain a second list of carried objects.
+
+Mapped place records provide identity, category, position, provider, licence,
+and attribution. They do not provide World Explorer stock, price, rarity,
+service availability, staffing, access, or a promise that a transaction can
+occur at the real place. Those are deterministic game rules and are labeled as
+game stock in the interface.
+
+Earth-to-ship material transfer is performed at the existing Surveyor cargo
+station. It consumes the exact Backpack quantities, adds the declared mass to
+the existing Expedition resources, checks ship capacity, records the transfer,
+and restores the Backpack if persistence fails. Personal equipment, ship cargo,
+and outpost storage remain separate owners. Shared-room transfer is disabled
+until a server transaction can authorize the Backpack removal and cargo addition
+together.
+
 ## Field exploration and progression
 
 ```mermaid
@@ -171,6 +208,9 @@ Planetary play resolves bodies through one catalog and world-address model.
 Solid worlds publish an accepted traversable surface with collision and a
 separate non-colliding horizon presentation. Atmospheric giants use an explicit
 atmospheric journey rather than pretending they have a solid landing surface.
+All surface star layers switch to terrain-occluded rendering on planetary entry
+and restore their exact Earth material state on exit. Catalog and generated
+mission worlds use the same entry and cleanup path.
 
 Spacecraft state uses SI units for mass, velocity, thrust, propellant, gravity,
 collision, and landing checks. The rendered solar system uses declared

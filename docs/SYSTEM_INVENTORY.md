@@ -27,7 +27,7 @@ with explicit entry and exit lifecycles.
 | Browser support | Standards-based WebGL browser runtime verified through current Chromium and Firefox desktop gameplay, with responsive keyboard and touch layouts | Physical-device and assistive-technology coverage remains a release acceptance responsibility; provider features still depend on browser permissions and capabilities |
 | Character and equipment | One persistent character profile, attributes, skills, condition, six assignable quick slots, ammunition, field tools, and usable equipment | Complete cross-device character sync is not yet available |
 | Vehicles and collisions | Distinct road-vehicle families plus boats, aircraft, rovers, and spacecraft; enter/exit, condition, collision, damage presentation, and recovery. Fixed-wing classes have distinct acceleration, rotation, lift, stall, drag, bank, and turn response; vessels use length- and displacement-aware throttle, drag, rudder, braking, and wave response | Collisions and handling are readable game physics, not an engineering or accident simulator |
-| Urban play | Pedestrian behavior, bounded defensive combat, civic response, recoverable world loot, mapped convenience-store trade, responder vehicles, and lifecycle cleanup for temporary entities | Shared-room combat, loot, and retirement remain restricted where server authority is unavailable |
+| Urban play | Pedestrian behavior, bounded defensive combat, civic response, recoverable world loot, typed mapped-business trade, responder vehicles, and lifecycle cleanup for temporary entities | Stock, price, and services are game rules rather than claims about a mapped business; shared-room combat, trade, loot, and retirement remain restricted where server authority is unavailable |
 | Companions | Individual domestic animals, birds, livestock, trust, care, level progression, travel state, and vehicle boarding | Availability follows the game catalog and regional rules, not live occurrence reports |
 | Field exploration | Field leads, Journal, Field Guide, typed activities, life lists, specialties, companions, Field Today, Expeditions, and seasonal surveys | Game opportunities do not assert live real-world animal presence |
 | Regional ecology | One versioned registry with 11 packs and 180 taxa covers all 15 built-in Earth destinations; packs retain habitat, season, source, license, attribution, sensitive-species, localization, migration, and rollback metadata | The 10 expansion packs still await independent domain review; this is not worldwide completeness |
@@ -52,7 +52,7 @@ with explicit entry and exit lifecycles.
 | Living world | `app/js/living-world/`, `app/js/urban-sandbox/` | Pedestrians, traffic, wildlife, vehicles, and civic-response play |
 | Field and progression | `app/js/discovery/`, `app/js/player/` | Ecology, activities, Backpack, Journal, progression, and retention programs |
 | Character and companions | `app/js/character/`, `app/js/discovery/companions/` | Attributes, skills, equipment integration, individual companions, care, trust, levels, and travel state |
-| Commerce and combat | `app/js/urban-sandbox/`, `app/js/player/`, `app/js/runtime/entity-lifecycle-policy.js` | Mapped-store exchange, weapons, ammunition, defensive NPC behavior, condition, world loot, Backpack delivery, and bounded local cleanup |
+| Economy, resources, and combat | `app/js/urban-sandbox/`, `app/js/resources/`, `app/js/player/`, `app/js/expedition/`, `app/js/runtime/entity-lifecycle-policy.js` | One Explorer Credits record, typed mapped-business exchange, transferable material catalog, exact Backpack-to-ship cargo loading, weapons, ammunition, defensive NPC behavior, condition, world loot, Backpack delivery, and bounded local cleanup |
 | Input and cameras | `app/js/controls/`, `app/js/ui/mobile-controls.js`, `app/js/hud.js`, `app/js/hud/boat-camera.js`, `app/js/walking/` | Keyboard, touch, gamepad, movement, follow cameras, harbor/channel framing, and HUD units |
 | Editor and Blocks | `app/js/editor/`, `app/js/block-builder/`, `app/js/blocks.js` | Integrated editing, persistence, undo, sharing, moderation, and rollback |
 | Multiplayer | `app/js/multiplayer/`, `firestore.rules`, `functions/` | Room state, authorization, presence, chat, shared content, and activities |
@@ -69,6 +69,9 @@ with explicit entry and exit lifecycles.
 - Field leads and virtual wildlife are gameplay. They are not reports of a real
   organism at the player’s location.
 - Sensitive-species records avoid exposing precise real-world locations.
+- Mapped business identity and category do not establish current inventory,
+  prices, hours, access, or service availability. Store stock and Credits are
+  game systems.
 
 See [DATA_SOURCES.md](../DATA_SOURCES.md) and
 [ATTRIBUTION.md](../ATTRIBUTION.md) for source and license details.

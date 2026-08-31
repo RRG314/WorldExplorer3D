@@ -28,7 +28,7 @@ const STATION_VIEWS = Object.freeze({
   'power-status': Object.freeze({ title: 'Power Control', systemId: 'power', summary: 'Review generation, storage, and distribution margins.', actions: ['balance-power'] }),
   'thermal-status': Object.freeze({ title: 'Thermal Control', systemId: 'thermal', summary: 'Inspect coolant loops and heat-rejection margins.', actions: ['service-thermal-loop'] }),
   'fabricator-status': Object.freeze({ title: 'Fabrication Shop', systemId: 'fabrication', summary: 'Convert carried feedstock into a bounded batch of maintenance parts.', actions: ['fabricate-parts'] }),
-  'cargo-status': Object.freeze({ title: 'Cargo Hold', systemId: 'hull', summary: 'Review carried food, water, feedstock, maintenance parts, and science cargo.' }),
+  'cargo-status': Object.freeze({ title: 'Cargo Hold', systemId: 'hull', summary: 'Review carried food, water, feedstock, maintenance parts, and science cargo.', actions: ['load-backpack-materials'] }),
   'resource-processor-status': Object.freeze({ title: 'Resource Processing', systemId: 'fabrication', summary: 'Inspect and process samples transferred from a supported surface operation.', actions: ['process-resource-sample'] }),
   'airlock-status': Object.freeze({ title: 'EVA Airlock', systemId: 'hull', summary: 'Inspect suits and airlock readiness. EVA requires a supported local destination operation.', actions: ['verify-eva'] }),
   'craft-bay-status': Object.freeze({ title: 'Pod Launch Bay', systemId: 'hull', summary: 'Choose a surface-capable destination, board the pod, and launch into manual local flight.', actions: ['verify-local-craft'] })
@@ -51,6 +51,7 @@ const ACTION_LABELS = Object.freeze({
   'balance-power': 'Balance distribution',
   'service-thermal-loop': 'Service thermal loop',
   'fabricate-parts': 'Fabricate parts',
+  'load-backpack-materials': 'Load Backpack materials',
   'process-resource-sample': 'Process loaded sample',
   'verify-eva': 'Verify EVA readiness',
   'verify-local-craft': 'Verify craft readiness'
@@ -99,6 +100,7 @@ function stationMetrics(expedition, view) {
 function actionAvailability(expedition, actionId) {
   const resources = expedition?.resources || {};
   const used = expedition?.operationFlags?.[operationKey(expedition, actionId)] === true;
+  if (actionId === 'load-backpack-materials') return Object.freeze({ enabled: true, reason: 'Compatible material bundles transfer from the shared Backpack with exact mass.' });
   if (used) return Object.freeze({ enabled: false, reason: 'Completed during this voyage segment.' });
   if (actionId === 'fabricate-parts' && (Number(resources.feedstockKg) < 25 || Number(resources.powerMWh) < 0.35)) return Object.freeze({ enabled: false, reason: 'Requires 25 kg feedstock and 0.35 MWh.' });
   if (actionId === 'serve-crew-meal' && (Number(resources.foodKg) < 8 || Number(resources.waterKg) < 3)) return Object.freeze({ enabled: false, reason: 'Requires 8 kg food and 3 kg water.' });

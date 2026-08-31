@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=27";
+} from "./world/osm-loader.js?v=28";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -94,7 +94,7 @@ import {
   poiKeyFromTags,
   roadTypePriority,
   classifyLinearFeatureTags as classifyLinearFeatureTagsBase
-} from "./world/load-style.js?v=3";
+} from "./world/load-style.js?v=4";
 import {
   limitNodesByDistance,
   limitWaysByDistance,
@@ -162,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=212";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=213";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,

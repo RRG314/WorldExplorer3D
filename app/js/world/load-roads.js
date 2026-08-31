@@ -642,22 +642,23 @@ export function createWorldRoadLoader(deps = {}) {
           mapped: exactCivicElements.length,
           status: exactTransportLoaded ? (exactCivicElements.length ? 'loaded' : 'authoritative-empty') : 'unavailable'
         };
-        const mappedConvenienceCount = (data?.elements || []).filter((element) =>
-          element?.tags?.shop === 'convenience' &&
+        const commerceShopTypes = new Set(['convenience', 'supermarket', 'hardware', 'doityourself', 'pawnbroker', 'second_hand', 'car_repair', 'car_parts', 'outdoor', 'fishing', 'boat', 'aviation']);
+        const mappedCommerceCount = (data?.elements || []).filter((element) =>
+          (commerceShopTypes.has(String(element?.tags?.shop || '').toLowerCase()) || ['fuel', 'charging_station'].includes(String(element?.tags?.amenity || '').toLowerCase())) &&
           Number.isFinite(Number(element.lat ?? element.center?.lat)) &&
           Number.isFinite(Number(element.lon ?? element.center?.lon))
         ).length;
-        const shortbreadConvenienceCount = (data?.elements || []).filter((element) =>
-          element?.tags?.shop === 'convenience' &&
+        const shortbreadCommerceCount = (data?.elements || []).filter((element) =>
+          (commerceShopTypes.has(String(element?.tags?.shop || '').toLowerCase()) || ['fuel', 'charging_station'].includes(String(element?.tags?.amenity || '').toLowerCase())) &&
           String(element?.tags?._sourceFeatureId || '').startsWith('shortbread:pois:')
         ).length;
         loadMetrics.commercePlaces = {
           provider: exactTransportLoaded
-            ? shortbreadConvenienceCount > 0 ? 'openstreetmap-shortbread+osm-overpass' : 'osm-overpass'
+            ? shortbreadCommerceCount > 0 ? 'openstreetmap-shortbread+osm-overpass' : 'osm-overpass'
             : 'openstreetmap-shortbread',
-          mapped: mappedConvenienceCount,
-          status: mappedConvenienceCount > 0 ? 'loaded' : 'authoritative-empty',
-          shortbreadMapped: shortbreadConvenienceCount,
+          mapped: mappedCommerceCount,
+          status: mappedCommerceCount > 0 ? 'loaded' : 'authoritative-empty',
+          shortbreadMapped: shortbreadCommerceCount,
           exactSupplementAvailable: exactTransportLoaded,
           inventoryAuthority: 'world-explorer-gameplay'
         };

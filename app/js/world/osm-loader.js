@@ -368,9 +368,10 @@ export function buildWorldOverpassPlan({
     civicFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];
             nwr["amenity"~"^(police|hospital)$"]${poiBounds};
             out body center qt;`,
-    commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];
-            nwr["shop"="convenience"]${poiBounds};
-            out body center qt;`,
+    commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+            nwr["shop"~"^(convenience|supermarket|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|outdoor|fishing|boat|aviation)$"]${poiBounds};
+            nwr["amenity"~"^(fuel|charging_station)$"]${poiBounds};
+            );out body center qt;`,
     transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
             nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${transportFacilityBounds};
             nwr["leisure"="marina"]${featureBounds};
@@ -424,7 +425,8 @@ export function buildWorldOverpassPlan({
                 nwr["mooring"]${featureBounds};
                 nwr["seamark:type"~"^(harbour|berth)$"]${featureBounds};
                 nwr["amenity"~"^(police|hospital)$"]${poiBounds};
-                nwr["shop"="convenience"]${poiBounds};
+                nwr["shop"~"^(convenience|supermarket|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|outdoor|fishing|boat|aviation)$"]${poiBounds};
+                nwr["amenity"~"^(fuel|charging_station)$"]${poiBounds};
             );out body;>;out skel qt;`,
     loadDeadline: loadStartedAt + maxTotalLoadMs
   };

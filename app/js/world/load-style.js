@@ -331,6 +331,7 @@ export function poiKeyFromTags(tags = {}) {
   if (tags.shop === 'supermarket') return 'shop=supermarket';
   if (tags.shop === 'mall') return 'shop=mall';
   if (tags.shop === 'convenience') return 'shop=convenience';
+  if (['hardware', 'doityourself', 'pawnbroker', 'second_hand', 'car_repair', 'car_parts', 'outdoor', 'fishing', 'boat', 'aviation'].includes(tags.shop)) return `shop=${tags.shop}`;
   if (tags.tourism) return `tourism=${tags.tourism}`;
   if (tags.historic) return tags.historic === 'monument' ? 'historic=monument' : 'historic=memorial';
   if (tags.leisure) return `leisure=${tags.leisure}`;

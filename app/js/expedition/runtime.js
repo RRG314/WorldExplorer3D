@@ -1,5 +1,5 @@
-import { DEFAULT_CREW, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=8';
+import { DEFAULT_CREW, getPropulsionProfile, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
+import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=8';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
@@ -7,12 +7,13 @@ import {
   VOYAGE_MILESTONES
 } from './simulation.js?v=7';
 import { createExpeditionStore } from './store.js?v=8';
-import { applyShipOperation, getShipStationView } from './ship-operations.js?v=4';
+import { applyShipOperation, getShipStationView } from './ship-operations.js?v=5';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { registerExpeditionDiscovery } from './contact-authority.js?v=2';
 import { createPodJourney, POD_PHASE, transitionPodJourney } from './pod-journey-authority.js?v=1';
+import { summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=1';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -776,6 +777,68 @@ async function recordBaselineInJournal() {
   });
 }
 
+async function loadBackpackMaterialsToShip() {
+  if (sharedState) {
+    return Object.freeze({ changed: false, message: 'Shared-room cargo transfer needs one server-authorized Backpack and ship transaction before it can be enabled.' });
+  }
+  const inventory = activeContext ? ensurePlayerBackpackInventory(activeContext) : null;
+  const before = inventory?.snapshot?.();
+  const transfer = summarizeExpeditionTransfers(before?.items || []);
+  if (!inventory || transfer.transfers.length === 0) {
+    return Object.freeze({ changed: false, message: 'No compatible material bundles are in the Backpack.' });
+  }
+  const resources = { ...(activeExpedition.resources || {}) };
+  Object.entries(transfer.resources).forEach(([key, amount]) => {
+    resources[key] = Number(resources[key] || 0) + Number(amount || 0);
+  });
+  const ship = getShipProfile(activeExpedition.ship?.profileId);
+  if (ship && totalCargoMass(resources) > Number(ship.cargoCapacityKg || 0)) {
+    return Object.freeze({ changed: false, message: 'Surveyor does not have enough cargo capacity for those Backpack materials.' });
+  }
+  const originals = transfer.transfers.map((entry) => before.items.find((item) => item.instanceId === entry.instanceId)).filter(Boolean);
+  const restoreBackpack = () => {
+    originals.forEach((item) => inventory.upsertItem?.(item));
+    activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+  };
+  for (const entry of transfer.transfers) {
+    if (!inventory.consumeItem?.(entry.instanceId, entry.quantity)) {
+      restoreBackpack();
+      return Object.freeze({ changed: false, message: 'The Backpack changed before the cargo transfer could finish.' });
+    }
+  }
+  activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+  const manifest = transfer.transfers.map((entry) => `${entry.quantity} × ${entry.label}`).join(', ');
+  const message = `${transfer.totalMassKg.toFixed(1)} kg moved from the Backpack into Surveyor stores: ${manifest}.`;
+  const readiness = assessExpeditionReadiness({
+    ship,
+    propulsion: getPropulsionProfile(activeExpedition.propulsionId),
+    crew: activeExpedition.crew,
+    crewPopulation: activeExpedition.crewPopulation,
+    resources,
+    calculation: activeExpedition.calculation
+  });
+  const next = withExpeditionChanges(activeExpedition, {
+    resources: Object.freeze(resources),
+    readiness,
+    materialLedger: Object.freeze({
+      ...(activeExpedition.materialLedger || {}),
+      earthLoadedKg: Number(activeExpedition.materialLedger?.earthLoadedKg || 0) + transfer.totalMassKg
+    }),
+    log: Object.freeze([...(activeExpedition.log || []), Object.freeze({
+      atMissionS: Number(activeExpedition.strategicElapsedS) || 0,
+      kind: 'cargo',
+      message
+    })])
+  });
+  try {
+    await applyExpeditionMutation(next, 'cargo-transfer');
+    return Object.freeze({ changed: true, message, transfer });
+  } catch (error) {
+    restoreBackpack();
+    return Object.freeze({ changed: false, message: String(error?.message || 'The cargo transfer could not be saved, so the Backpack was restored.') });
+  }
+}
+
 function renderShipStationPanel(interaction) {
   if (!interaction || !activeExpedition) return false;
   let panel = document.getElementById('shipStationPanel');
@@ -801,6 +864,12 @@ function renderShipStationPanel(interaction) {
   panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
   panel.querySelectorAll('[data-ship-action]').forEach((button) => button.addEventListener('click', async () => {
     const actionId = button.dataset.shipAction;
+    if (actionId === 'load-backpack-materials') {
+      const result = await loadBackpackMaterialsToShip();
+      activeContext?.showToast?.(result.message);
+      if (result.changed) renderShipStationPanel(interaction);
+      return;
+    }
     const result = applyShipOperation(activeExpedition, actionId);
     if (!result.changed) {
       activeContext?.showToast?.(result.message);

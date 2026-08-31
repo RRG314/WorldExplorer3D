@@ -3,7 +3,7 @@
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
 import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=1';
 import './rdt.js?v=55';
-import './config.js?v=61';
+import './config.js?v=62';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
@@ -37,14 +37,14 @@ import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.j
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=5';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=12';
+import './planetary/solid-world-runtime.js?v=13';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=2';
-import './planetary/sky-orientation.js?v=13';
+import './planetary/sky-orientation.js?v=14';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=9';
-import './game.js?v=63';
+import './game.js?v=64';
 import './input.js?v=75';
 import './hud.js?v=102';
 import './map.js?v=61';

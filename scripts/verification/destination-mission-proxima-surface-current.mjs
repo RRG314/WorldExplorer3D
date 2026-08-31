@@ -191,6 +191,28 @@ async function run() {
     assert.ok(worldProfile.gravityMps2 > 9 && worldProfile.gravityMps2 < 11, JSON.stringify(worldProfile));
     assert.equal(worldProfile.atmosphereEvidence, 'unconfirmed');
     assert.equal(worldProfile.weatherModelId, 'none');
+    const surfaceSky = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const layers = [];
+      ctx.starField?.traverse((object) => {
+        if (!(object.isPoints || object.isLine || object.isLineSegments) || !object.material) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => layers.push({
+          name: object.name || '(unnamed)',
+          depthTest: material.depthTest,
+          depthWrite: material.depthWrite,
+          transparent: material.transparent,
+          renderOrder: object.renderOrder
+        }));
+      });
+      return {
+        active: ctx.starField?.userData?.planetarySurfaceOcclusion === true,
+        layers
+      };
+    });
+    assert.equal(surfaceSky.active, true, JSON.stringify(surfaceSky));
+    assert.ok(surfaceSky.layers.length >= 2, JSON.stringify(surfaceSky));
+    assert.equal(surfaceSky.layers.every((layer) => layer.depthTest && !layer.depthWrite && layer.transparent && layer.renderOrder === 1000), true, JSON.stringify(surfaceSky));
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-arrival-terrain.png'), fullPage: true });
     assert.equal((await snapshot(page)).destinationMission.phase, 'fieldwork');
     for (const id of ['photograph', 'geology-inspect', 'habitat-survey']) await recordSurfaceActivity(page, id);
@@ -228,6 +250,10 @@ async function run() {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'recovered';
     }, null, { timeout: 35_000 });
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.starField?.userData?.planetarySurfaceOcclusion === false;
+    }), true);
 
     await page.locator('#sfExpeditionBtn').click();
     await page.locator('#expeditionEnterShip').click();

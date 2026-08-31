@@ -83,6 +83,67 @@ Completion means a player can sign in on another supported device, recover the
 same supported progression, understand any conflict, and continue without a
 duplicate profile.
 
+## Shared economy, trade, and materials
+
+Explorer Credits are the single game currency for ordinary sandbox play. They
+have no cash value, cannot be withdrawn, and do not represent a real price or
+account balance. The existing Credits record will expand with account-backed
+progression rather than being replaced by separate store, property, vehicle,
+or space currencies.
+
+### One connected resource loop
+
+- Let players earn Credits through supported field contracts, travel,
+  activities, discoveries, commissions, and the sale of eligible game items.
+  Repeated actions, client-only claims, and duplicated room events must not
+  create unbounded rewards.
+- Use Credits for equipment, supplies, repairs, vehicle services, tickets,
+  storage, decoration, homes, base camps, and other understandable game
+  services. Prices and stock are game rules, not claims about a real business.
+- Use mapped convenience stores, markets, fuel and charging stations, hardware
+  stores, pawn and second-hand shops, repair and parts shops, and relevant
+  outdoor, fishing, boat, and aviation shops as place anchors when the provider
+  supplies an eligible record. A mapped category never proves current hours,
+  inventory, price, staff, access, or willingness to trade.
+- Give each business class a clear role. Markets cover ordinary supplies;
+  hardware and parts shops cover material and repair bundles; mechanics cover
+  vehicle service; pawn and second-hand shops accept a wider range of eligible
+  finds; specialist shops support their related travel and field activities.
+- Keep equipment and carried goods in the Backpack, vehicle supplies on the
+  vehicle, voyage resources in ship cargo, and settlement resources in the
+  home, camp, or outpost record. Transfers must identify both owners, conserve
+  quantity or mass, survive interruption, and roll back when the destination
+  cannot accept them.
+- Let suitable Earth materials support later fabrication and Expedition
+  preparation. Space samples remain mission or science cargo until custody,
+  analysis, and processing make a resulting item eligible for use or sale.
+  Finding a planet never creates a valuable material by itself.
+- Give returned material a stable source, world address, collection method,
+  truth class, quantity, mass, processing history, and rights policy. Catalog
+  facts and game-generated composition remain visibly distinct.
+- Keep shared-room wallets, rewards, sales, cargo transfer, and persistent
+  ownership server-authorized. Until one transaction can validate both sides,
+  consequential local-to-room transfers remain unavailable.
+
+### Staged delivery
+
+1. **Foundation:** one Credits wallet, one Backpack item catalog, typed mapped
+   businesses, stable game stock, Earth material bundles, and exact
+   Backpack-to-ship transfer through the existing cargo station.
+2. **Services and gathering:** vehicle repair and energy services, Earth
+   salvage and gathering activities, commissions, specialist shops, and clear
+   earning and spending history.
+3. **Return trade:** conserved ship-to-Backpack unloading, sample analysis,
+   material processing, legal sale categories, rare exchanges, collection
+   records, and home or camp storage.
+4. **Persistent economy:** account recovery, server-authorized multiplayer
+   trade, inflation controls, property and decoration sinks, progression
+   rewards, migration, and rollback.
+
+Completion means a player can earn, buy, gather, carry, transfer, use, return,
+sell, and review an item through one recoverable chain without a duplicate
+wallet, inventory, cargo record, or invented claim about a real business.
+
 ## Homes, base camps, and virtual real estate
 
 Property will become a progression system built on the existing mapped building,
@@ -264,9 +325,10 @@ alternatives.
   strategic time, crew, supplies, system condition, cargo, discoveries, major
   events, and mission state. Stable ship identity includes its class,
   configuration, upgrades, condition, crew association, and history.
-- Add an interim mission allocation for initial provisioning without embedding
-  a temporary currency throughout the game. It must be replaceable by the
-  future shared World Explorer economy.
+- Retire the interim mission-allocation concept in favor of the shared World
+  Explorer economy. Initial provisioning may still provide a bounded starter
+  manifest, while later purchases and transfers use Explorer Credits, the
+  Backpack, and conserved ship cargo rather than an Expedition-only wallet.
 
 The first implementation proves a complete representative journey: prepare,
 board, depart, advance time, consume supplies, respond to a real ship problem,
@@ -298,6 +360,39 @@ contacts now open in ordinary Space, accept supported planetary landing and
 field collection, return exact sample custody to Surveyor, process material,
 and resume the same voyage. Further room art, animation, audio, and interaction
 variety remain continuing quality work rather than missing system authorities.
+
+The current connected slice is mechanically ahead of its presentation. It is
+not yet the intended visual or activity standard for a public Space alpha.
+Primary pods, rooms, crew, field tools, surface life, resource sites, and mission
+actions need authored form, readable animation, contact and collision, material
+variation, lighting, sound, and visible state change. Text may explain a result,
+but it cannot stand in for the action that produced it.
+
+Before a Space alpha can ship:
+
+- solid terrain must occlude the lower sky, support contact from both sides of
+  the normal play envelope, continue to the visible horizon, and keep the pod,
+  Explorer, vehicles, samples, and field markers on the same surface authority;
+- pod boarding, bay departure, manual approach, atmospheric entry where
+  applicable, landing, surface work, launch, rendezvous, and recovery must be
+  visible connected states rather than unrelated screens or instant results;
+- every featured mission needs a navigable objective chain with at least three
+  distinct 3D actions, a meaningful crew or ship dependency, more than one
+  supported outcome, Journal evidence, and a return consequence;
+- crew must visibly travel to work, use the relevant station or equipment,
+  respond to hazards, rest, and recover. A label beside a stationary figure is
+  not a finished NPC action;
+- surface materials, landforms, weather, lighting, gravity response, life, and
+  resource sites must follow the destination profile and quality tier. Unknown
+  real conditions remain unknown; original game worlds may use authored life
+  and weather with an explicit game-world classification;
+- hero assets and rooms need reviewed reference, scale, collision, close-view
+  geometry, materials, animation, mobile level of detail, rights, and visual
+  acceptance captures. Repeated primitive assemblies remain acceptable only
+  for distant or low-priority detail; and
+- desktop and 390×844 journeys must prove objective guidance, interaction,
+  failure recovery, save and reload, memory cleanup, and unchanged Free Flight
+  without relying on a source-only or button-only check.
 
 - Make each Expedition ship a bounded, high-quality, walkable place assembled
   from validated class-specific layouts. Required rooms must exist, remain

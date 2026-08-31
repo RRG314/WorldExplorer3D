@@ -15,7 +15,7 @@ import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-model.js?v=1';
+import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=2';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
@@ -791,6 +791,20 @@ function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
     .sort((left, right) => left.distance - right.distance)[0] || null;
 }
 
+function storeInteractionCandidate(state) {
+  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
+  const nearestStore = nearestStoreCandidate(state);
+  if (!nearestStore) return null;
+  return {
+    available: true,
+    action: 'visit_store',
+    label: 'Visit store',
+    detail: `${nearestStore.store.name} · today’s game stock`,
+    distance: nearestStore.distance,
+    data: { storeId: nearestStore.store.id }
+  };
+}
+
 function activeStore(state) {
   return state.stores.find((store) => store.id === state.activeStoreId) || null;
 }
@@ -810,7 +824,7 @@ function resolveStoreApproach(store) {
     const resolved = appCtx.resolveSafeWorldSpawn?.(candidate.x, candidate.z, {
       mode: 'walk',
       feetY: groundY,
-      source: 'mapped_convenience_store_approach',
+      source: 'mapped_commerce_place_approach',
       maxGroundRadius: 2
     });
     if (resolved?.valid === false) continue;
@@ -855,7 +869,7 @@ function renderStore(state) {
   if (!visible) return;
   const view = state.commerce.snapshot(store);
   ui.name.textContent = store.name;
-  ui.source.textContent = `${store.attribution} · ${store.license}`;
+  ui.source.textContent = `${store.label} · game stock · ${store.attribution} · ${store.license}`;
   ui.credits.textContent = `${view.credits} Explorer Credits`;
   ui.stock.innerHTML = view.standard.map((item) => `
     <article class="urbanStoreCard">
@@ -2576,8 +2590,9 @@ function startUrbanSandboxRuntime(options = {}) {
   };
   const equipment = ensurePlayerBackpackInventory(appCtx);
   const backpackStore = appCtx.playerBackpackStore;
-  const stores = mappedConvenienceStores(appCtx.pois).map(resolveStoreApproach);
-  const commerce = appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  const stores = mappedCommercePlaces(appCtx.pois).map(resolveStoreApproach);
+  const commerce = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
   const storeUi = {
     root: document.getElementById('urbanStore'),
@@ -2778,10 +2793,7 @@ function startUrbanSandboxRuntime(options = {}) {
   state.unregisterStoreInteraction = appCtx.registerContextInteraction?.({
     id: 'urban_store',
     priority: 90,
-    evaluate: () => {
-      const candidate = interactionCandidate(state);
-      return candidate?.action === 'visit_store' ? candidate : null;
-    },
+    evaluate: () => storeInteractionCandidate(state),
     perform: (candidate) => performInteraction(state, candidate)
   });
   state.unregisterInteraction = appCtx.registerContextInteraction?.({

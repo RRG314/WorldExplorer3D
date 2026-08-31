@@ -976,7 +976,10 @@ async function arriveAtSolidWorld(bodyInput) {
   await appCtx.setPlanetaryVehicle?.(pack.vehicleBodyId || bodyId);
   if (requestId !== transitionId) return false;
   appCtx.setPlanetaryCharacter?.(pack.vehicleBodyId || bodyId);
-  if (!pack.runtimeModeled) appCtx.setPlanetarySky?.(bodyId);
+  const surfaceStarOpacity = pack.fogColor == null
+    ? 0.94
+    : Math.max(0.04, Math.min(0.55, 0.55 - Number(pack.fogDensity || 0) * 900));
+  appCtx.setPlanetarySky?.(bodyId, new Date(), { starOpacity: surfaceStarOpacity });
   if (!commitEnvironment(ENV.PLANETARY, { source: `${bodyId}_arrival` })) return false;
   await appCtx.ensureBlockBuilderReady?.();
   if (requestId !== transitionId) return false;

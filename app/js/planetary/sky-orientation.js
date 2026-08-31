@@ -2,6 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
 import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=15';
 import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
+import { setPlanetaryStarOcclusion } from './star-occlusion.js?v=1';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 const DAY_MS = 86400000;
@@ -66,19 +67,29 @@ function bodyOrientation(body, date = new Date()) {
   };
 }
 
-function setPlanetarySky(body, date = new Date()) {
+function setPlanetarySky(body, date = new Date(), options = {}) {
   const normalizedBody = String(body || '').toLowerCase();
   const orientation = bodyOrientation(normalizedBody, date);
-  if (!orientation || !appCtx.starField) return null;
-  alignStarFieldToBody(orientation);
+  if (!appCtx.starField) return null;
+  if (orientation) alignStarFieldToBody(orientation);
+  else appCtx.starField.userData.observerBody = normalizedBody || 'planetary';
+  setPlanetaryStarOcclusion(appCtx.starField, true);
   appCtx.starField.visible = true;
-  appCtx.starField.children.forEach((child) => {
+  const requestedOpacity = Number(options.starOpacity);
+  const starOpacity = orientation?.starOpacity ?? (Number.isFinite(requestedOpacity) ? requestedOpacity : 0.9);
+  appCtx.starField.traverse((child) => {
     if (!child.material || child.userData?.skyHitbox) return;
     const baseOpacity = Number(child.userData?.baseOpacity ?? child.material.opacity ?? 1);
     child.material.transparent = true;
-    child.material.opacity = Math.min(baseOpacity, orientation.starOpacity);
+    child.material.opacity = Math.min(baseOpacity, starOpacity);
+    child.material.needsUpdate = true;
   });
-  appCtx.planetarySkyOrientation = orientation;
+  appCtx.planetarySkyOrientation = orientation || Object.freeze({
+    body: normalizedBody || 'planetary',
+    starOpacity,
+    computedAtIso: date.toISOString(),
+    truthClass: 'gameplay_abstraction'
+  });
   const marsAtmosphere = ensurePlanetaryAtmosphere(appCtx.scene, 'mars');
   if (marsAtmosphere) marsAtmosphere.visible = normalizedBody === 'mars';
   updatePlanetarySky();
@@ -88,6 +99,7 @@ function setPlanetarySky(body, date = new Date()) {
 function clearPlanetarySky() {
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
   if (marsAtmosphere) marsAtmosphere.visible = false;
+  setPlanetaryStarOcclusion(appCtx.starField, false);
   appCtx.planetarySkyOrientation = null;
   // Planetary modes directly restyle the shared star materials. Invalidate
   // Earth's cached sky signature so the next forced astronomical refresh
