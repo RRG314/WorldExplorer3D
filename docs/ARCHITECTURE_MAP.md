@@ -232,6 +232,12 @@ step calls the existing Journal record and, for geology, the existing Expedition
 sample transfer. Destination missions listen for that final field record rather
 than maintaining separate field objects.
 
+The surface return pod remains presentation inside
+`app/js/planetary/solid-world-runtime.js`; `app/js/expedition/pod-journey-authority.js`
+continues to own phase changes and `app/js/expedition/runtime.js` owns sample
+custody. Added shell, docking, thermal, landing, ramp, and hatch meshes therefore
+cannot bypass the established approach radius, return check, or rendezvous.
+
 Spacecraft state uses SI units for mass, velocity, thrust, propellant, gravity,
 collision, and landing checks. The rendered solar system uses declared
 presentation scales so it remains playable. Manual input cancels assisted travel,

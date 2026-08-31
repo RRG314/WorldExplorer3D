@@ -499,8 +499,8 @@ function addExpeditionReturnPod(pack, world) {
   }
   const group = new THREE.Group();
   group.name = `expedition-return-pod:${pack.bodyId}`;
-  const shell = new THREE.MeshStandardMaterial({ color: 0x9fb2be, metalness: 0.52, roughness: 0.34 });
-  const shellPanel = new THREE.MeshStandardMaterial({ color: 0x607986, metalness: 0.62, roughness: 0.3 });
+  const shell = new THREE.MeshStandardMaterial({ color: 0xb8c6cc, metalness: 0.48, roughness: 0.3 });
+  const shellPanel = new THREE.MeshStandardMaterial({ color: 0x536d79, metalness: 0.64, roughness: 0.28 });
   const frame = new THREE.MeshStandardMaterial({ color: 0x1b2c36, metalness: 0.72, roughness: 0.27 });
   const heatShield = new THREE.MeshStandardMaterial({ color: 0x282d30, metalness: 0.18, roughness: 0.78 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x3b7c94, emissive: 0x123e51, emissiveIntensity: 0.48, metalness: 0.12, roughness: 0.16, transparent: true, opacity: 0.82 });
@@ -510,11 +510,29 @@ function addExpeditionReturnPod(pack, world) {
   cabin.name = 'return-pod-pressure-cabin';
   cabin.castShadow = true;
   group.add(cabin);
+  for (let index = 0; index < 10; index += 1) {
+    const angle = index / 10 * Math.PI * 2;
+    const longeron = new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.42, 0.12), index % 2 ? frame : shellPanel);
+    longeron.position.set(Math.sin(angle) * 1.58, 2.45, Math.cos(angle) * 1.58);
+    longeron.rotation.y = angle;
+    longeron.name = `return-pod-longeron-${index + 1}`;
+    longeron.castShadow = true;
+    group.add(longeron);
+  }
   const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.45, 32), shellPanel);
   roof.position.y = 5.05;
   roof.name = 'return-pod-aeroshell';
   roof.castShadow = true;
   group.add(roof);
+  const dockingCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.52, 0.3, 24), frame);
+  dockingCollar.position.y = 5.72;
+  dockingCollar.name = 'return-pod-docking-collar';
+  group.add(dockingCollar);
+  const dockingSeal = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.055, 8, 28), accent);
+  dockingSeal.rotation.x = Math.PI / 2;
+  dockingSeal.position.y = 5.88;
+  dockingSeal.name = 'return-pod-docking-seal';
+  group.add(dockingSeal);
   [1.12, 3.72, 4.52].forEach((height, index) => {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(index === 2 ? 1.34 : 1.57, index === 1 ? 0.09 : 0.12, 8, 32), frame);
     ring.rotation.x = Math.PI / 2;
@@ -526,6 +544,14 @@ function addExpeditionReturnPod(pack, world) {
   shield.position.y = 0.52;
   shield.name = 'return-pod-heat-shield';
   group.add(shield);
+  for (let index = 0; index < 12; index += 1) {
+    const angle = index / 12 * Math.PI * 2;
+    const tile = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.09), heatShield);
+    tile.position.set(Math.sin(angle) * 1.7, 0.66, Math.cos(angle) * 1.7);
+    tile.rotation.y = angle;
+    tile.name = `return-pod-heat-tile-${index + 1}`;
+    group.add(tile);
+  }
   const windowMesh = new THREE.Mesh(new THREE.SphereGeometry(1.15, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.48), glass);
   windowMesh.scale.set(1, 0.72, 0.42);
   windowMesh.rotation.x = Math.PI / 2;
@@ -554,13 +580,15 @@ function addExpeditionReturnPod(pack, world) {
       group.add(nozzle);
     });
   });
-  [-1.25, 1.25].forEach((side) => {
+  [[-1.25, 0.72], [1.25, 0.72], [-1.3, -0.25], [1.3, -0.25]].forEach(([side, z], index) => {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.3, 0.18), frame);
-    leg.position.set(side, 0.75, 0.72);
+    leg.position.set(side, 0.75, z);
     leg.rotation.z = side < 0 ? -0.22 : 0.22;
+    leg.name = `return-pod-landing-strut-${index + 1}`;
     group.add(leg);
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.16, 18), frame);
-    pad.position.set(side * 1.15, -0.32, 0.72);
+    pad.position.set(side * 1.15, -0.32, z);
+    pad.name = `return-pod-landing-pad-${index + 1}`;
     group.add(pad);
   });
   const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.14, 3.1), frame);
@@ -568,10 +596,28 @@ function addExpeditionReturnPod(pack, world) {
   ramp.position.set(0, 0.58, -2.45);
   ramp.name = 'return-pod-boarding-ramp';
   group.add(ramp);
+  [-0.82, 0.82].forEach((side, sideIndex) => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 2.72), shellPanel);
+    rail.position.set(side, 1.14, -2.44);
+    rail.rotation.x = -0.28;
+    rail.name = `return-pod-ramp-rail-${sideIndex + 1}`;
+    group.add(rail);
+    [-1.08, 0, 1.08].forEach((offset, postIndex) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.72, 0.07), frame);
+      post.position.set(side, 0.9 + offset * 0.076, -2.44 + offset);
+      post.name = `return-pod-ramp-post-${sideIndex + 1}-${postIndex + 1}`;
+      group.add(post);
+    });
+  });
   const hatch = new THREE.Mesh(new THREE.BoxGeometry(1.18, 1.75, 0.12), frame);
   hatch.position.set(0, 2.05, -1.73);
   hatch.name = 'return-pod-hatch';
   group.add(hatch);
+  const hatchFrame = new THREE.Mesh(new THREE.BoxGeometry(1.42, 2.02, 0.1), shellPanel);
+  hatchFrame.position.set(0, 2.05, -1.67);
+  hatchFrame.name = 'return-pod-hatch-frame';
+  group.add(hatchFrame);
+  hatch.position.z = -1.79;
   const hatchInset = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.43, 0.08, 24), shellPanel);
   hatchInset.rotation.x = Math.PI / 2;
   hatchInset.position.set(0, 2.18, -1.81);
@@ -581,6 +627,12 @@ function addExpeditionReturnPod(pack, world) {
   hatchStatus.position.set(0, 1.39, -1.82);
   hatchStatus.name = 'return-pod-hatch-status';
   group.add(hatchStatus);
+  [-0.46, 0.46].forEach((side, index) => {
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.52, 0.06), accent);
+    handle.position.set(side, 2.05, -1.87);
+    handle.name = `return-pod-hatch-handle-${index + 1}`;
+    group.add(handle);
+  });
   for (let index = 0; index < 6; index += 1) {
     const vent = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 0.045), heatShield);
     vent.position.set(0, 2.15 + index * 0.14, 1.69);
@@ -596,8 +648,8 @@ function addExpeditionReturnPod(pack, world) {
   const beacon = new THREE.PointLight(0x6fe8ff, 1.35, 14, 2);
   beacon.position.set(0, 4.8, 0);
   group.add(beacon);
-  const beaconLens = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.18, 18), accent);
-  beaconLens.position.set(0, 5.86, 0);
+  const beaconLens = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.2, 18), accent);
+  beaconLens.position.set(0, 6.04, 0);
   group.add(beaconLens);
   const offsetX = 9;
   const offsetZ = 7;

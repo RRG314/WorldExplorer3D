@@ -85,7 +85,7 @@ async function run() {
     const surfaceCatalogProfiles = await page.evaluate(async () => {
       const { listDestinationMissions } = await import('/app/js/universe/mission-catalog.js?v=2');
       const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
-      const { deriveExpeditionWorldProfile, sampleModeledRelief } = await import('/app/js/planetary/solid-world-runtime.js?v=12');
+      const { deriveExpeditionWorldProfile, sampleModeledRelief } = await import('/app/js/planetary/solid-world-runtime.js?v=14');
       const stableSeed = (value) => {
         let hash = 2166136261;
         for (const character of String(value || '')) {
@@ -275,7 +275,7 @@ async function run() {
     const fictionalWorldProfile = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
-      const { arriveAtSolidWorld, registerExpeditionSolidWorld } = await import('/app/js/planetary/solid-world-runtime.js?v=12');
+      const { arriveAtSolidWorld, registerExpeditionSolidWorld } = await import('/app/js/planetary/solid-world-runtime.js?v=14');
       ctx.exitExpeditionShipInterior?.();
       const destination = resolveUniverseAddress('andromeda-explorer-a-b');
       const system = resolveUniverseAddress(destination.parentFrameId);

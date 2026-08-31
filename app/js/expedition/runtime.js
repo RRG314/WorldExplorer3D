@@ -11,7 +11,7 @@ import { applyShipOperation, getShipStationView } from './ship-operations.js?v=6
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
-import { registerExpeditionDiscovery } from './contact-authority.js?v=2';
+import { registerExpeditionDiscovery } from './contact-authority.js?v=3';
 import { createPodJourney, POD_PHASE, transitionPodJourney } from './pod-journey-authority.js?v=1';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 

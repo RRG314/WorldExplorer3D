@@ -378,7 +378,11 @@ sensor mast with sampling plate. Each uses a three-step in-world procedure
 through the normal interaction input, and only the final step may commit the
 existing Journal evidence or geology sample. This improves the shared field
 action standard, but it does not complete surface life, NPC behavior, rover and
-pod art, or destination-specific resource-site variety.
+pod art, or destination-specific resource-site variety. The return pod has also
+received a first close-range structure pass—segmented shell longerons, docking
+hardware, heat tiles, four landing struts, ramp rails, and a framed hatch—while
+retaining the same journey and boarding authority. Final materials, collision,
+entry/launch effects, and interior presentation remain in the quality gate.
 
 The current connected slice is mechanically ahead of its presentation. It is
 not yet the intended visual or activity standard for a public Space alpha.
