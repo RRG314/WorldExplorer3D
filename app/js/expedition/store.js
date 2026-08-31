@@ -34,6 +34,7 @@ function parseRecord(value) {
     record.scienceSamples = Array.isArray(record.scienceSamples) ? record.scienceSamples : [];
     record.resources = { processingResidueKg: 0, ...(record.resources || {}) };
     record.materialLedger = { installedRepairKg: 0, ...(record.materialLedger || {}) };
+    record.outposts = Array.isArray(record.outposts) ? record.outposts : [];
     record.failureChain = Array.isArray(record.failureChain) ? record.failureChain : [];
     record.failureReport ||= null;
     record.crewPopulation = Number(record.crewPopulation) || crewPopulationForShip(record.ship?.profileId, record.crew.length);

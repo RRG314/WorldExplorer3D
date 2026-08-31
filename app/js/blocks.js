@@ -57,6 +57,14 @@ const buildColumns = new Map();
 const buildMaterials = [];
 const buildSpecialMaterials = new Map();
 
+function playerRenderedBlockCount() {
+  let count = 0;
+  buildBlocks.forEach((mesh) => {
+    if (mesh?.userData?.buildAuthority !== 'expedition-outpost') count += 1;
+  });
+  return count;
+}
+
 const {
   getBuildCollisionAtWorldXZ,
   getBuildTopSurfaceAtWorldXZ,
@@ -596,7 +604,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
   const enforceLimit = options.enforceLimit !== false;
   if (enforceLimit) {
     const limits = getBuildLimits();
-    if (buildBlocks.size >= BUILD_MAX_PER_LOCATION ||
+    if (playerRenderedBlockCount() >= BUILD_MAX_PER_LOCATION ||
     limits.currentLocationCount >= BUILD_MAX_PER_LOCATION ||
     limits.totalCount >= BUILD_MAX_TOTAL) {
       showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some blocks to continue.`);
@@ -618,7 +626,8 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     shape,
     rotation,
     gx, gy, gz,
-    blockKey: key
+    blockKey: key,
+    buildAuthority: String(options.authority || 'player')
   };
 
   group.add(mesh);
@@ -651,6 +660,10 @@ function removeBuildBlock(gx, gy, gz, options = {}) {
   const key = blockKey(gx, gy, gz);
   const mesh = buildBlocks.get(key);
   if (!mesh) return false;
+  if (mesh.userData?.buildAuthority === 'expedition-outpost' && options.systemAuthority !== true) {
+    showBuildTransientMessage('This field-station structure is managed from the Expedition record. Add your own Blocks around it.');
+    return false;
+  }
 
   if (options.persist !== false && !persistRemovedBuildBlock(gx, gy, gz)) {
     const sharedStatus = getSharedBuildSyncStatus();
@@ -682,6 +695,7 @@ function clearAllBuildBlocks(options = {}) {
       if (!clearPersistedBuildBlocksForCurrentLocation()) return false;
     }
     refreshBlockBuilderForCurrentLocation();
+    appCtx.renderActiveExpeditionOutpost?.();
     return true;
   }
   if (options.persist !== false) {
@@ -691,6 +705,7 @@ function clearAllBuildBlocks(options = {}) {
     }
   }
   clearRenderedBuildBlocks();
+  appCtx.renderActiveExpeditionOutpost?.();
   return true;
 }
 
@@ -867,6 +882,7 @@ Object.assign(appCtx, {
   getBuildVehicleSurfaceAtWorldXZ,
   handleBlockBuilderClick,
   placeBuildBlock,
+  removeBuildBlock,
   refreshBlockBuilderForCurrentLocation,
   setSharedBuildEntries,
   setSharedBuildConnectionState,
@@ -893,6 +909,7 @@ export {
   getBuildVehicleSurfaceAtWorldXZ,
   handleBlockBuilderClick,
   placeBuildBlock,
+  removeBuildBlock,
   refreshBlockBuilderForCurrentLocation,
   setSharedBuildEntries,
   setSharedBuildConnectionState,

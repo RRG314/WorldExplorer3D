@@ -447,6 +447,7 @@ async function createSolidWorld(pack) {
   const cached = worldCache.get(pack.bodyId);
   const authority = ensurePlanetarySurfaceAuthority(appCtx);
   if (cached) {
+    cached.pack = pack;
     const activation = authority.activate(pack.manifest.regionId);
     if (activation.status !== 'accepted') throw new Error(`${pack.title} surface activation failed.`);
     cached.surface.visible = true;
@@ -564,9 +565,36 @@ function showWorldPanel(pack, environment) {
   const pressure = environment.pressurePa >= 1000
     ? `${(environment.pressurePa / 1000).toFixed(1)} kPa`
     : `${Math.round(environment.pressurePa)} Pa`;
-  panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C</span><br><small style="opacity:.72;">${pack.representation}</small><canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:220px;max-width:100%;height:105px;margin-top:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:5px;color:#a7f3d0;">Follow the field beacons · use E or Explore nearby</small><button id="planetaryJournalBtn" type="button" style="display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid rgba(167,243,208,.5);border-radius:6px;color:#eafff6;background:rgba(16,82,65,.66);font:700 10px Inter,sans-serif;cursor:pointer;">Open Journal &amp; Field Guide</button>`;
+  const outpost = pack.outpost?.state === 'operational' ? `<section style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(125,243,208,.24);"><strong style="display:block;color:#91f2d3;">${pack.outpost.name}</strong><small>${pack.outpost.assignedCrewIds.length} crew · ${Math.round(Number(pack.outpost.condition || 0) * 100)}% condition · ${Number(pack.outpost.power?.storedMWh || 0).toFixed(1)} MWh stored</small></section>` : '';
+  panel.innerHTML = `<strong style="display:block;font-size:14px;margin-bottom:4px;">${pack.title}</strong><span>${pack.context}</span><br><span>${pressure} · ${temperatureC}°C</span><br><small style="opacity:.72;">${pack.representation}</small>${outpost}<canvas id="planetaryFieldMap" width="220" height="105" style="display:block;width:220px;max-width:100%;height:105px;margin-top:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;"></canvas><small id="planetaryFieldHint" style="display:block;margin-top:5px;color:#a7f3d0;">Follow the field beacons · use E or Explore nearby</small><button id="planetaryJournalBtn" type="button" style="display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid rgba(167,243,208,.5);border-radius:6px;color:#eafff6;background:rgba(16,82,65,.66);font:700 10px Inter,sans-serif;cursor:pointer;">Open Journal &amp; Field Guide</button>`;
   panel.querySelector('#planetaryJournalBtn')?.addEventListener('click', () => appCtx.openPlanetaryJournal?.('journal'));
   panel.style.display = 'block';
+}
+
+function renderActiveExpeditionOutpost() {
+  const pack = activePack;
+  const outpost = pack?.outpost;
+  if (!pack || outpost?.state !== 'operational' || !Array.isArray(outpost.blueprint)) return 0;
+  const originX = Math.round(Number(pack.spawn?.x || 0) + 58);
+  const originZ = Math.round(Number(pack.spawn?.z || 0) + 24);
+  const originY = Math.round((Number(pack.manifest?.renderPlacement?.y || 0) + sampleModeledRelief(pack, originX, originZ)) * 2) / 2;
+  let placed = 0;
+  for (const block of outpost.blueprint) {
+    if (appCtx.placeBuildBlock?.(
+      originX + Number(block.gx || 0),
+      originY + Number(block.gy || 0),
+      originZ + Number(block.gz || 0),
+      Number(block.materialIndex || 0),
+      {
+        persist: false,
+        enforceLimit: false,
+        authority: 'expedition-outpost',
+        shape: block.shape,
+        rotation: block.rotation
+      }
+    )) placed += 1;
+  }
+  return placed;
 }
 
 function showReturnButton(pack) {
@@ -711,7 +739,10 @@ async function arriveAtSolidWorld(bodyInput) {
   appCtx.setPlanetaryCharacter?.(pack.vehicleBodyId || bodyId);
   if (!pack.runtimeModeled) appCtx.setPlanetarySky?.(bodyId);
   if (!commitEnvironment(ENV.PLANETARY, { source: `${bodyId}_arrival` })) return false;
+  await appCtx.ensureBlockBuilderReady?.();
+  if (requestId !== transitionId) return false;
   appCtx.refreshBlockBuilderForCurrentLocation?.();
+  renderActiveExpeditionOutpost();
   showWorldPanel(pack, environment);
   showReturnButton(pack);
   setSolidWorldInterfaceActive(true);
@@ -796,7 +827,8 @@ function registerExpeditionSolidWorld(input = {}) {
       Object.freeze(['Document the survey site', 'photograph', 'places', 'Record the generated survey terrain and the model inputs used to create it.']),
       Object.freeze(['Collect geology sample', 'geology-inspect', 'rock', 'Collect one modeled field sample for Surveyor processing. The sample represents game-world material, not a real-world observation.']),
       Object.freeze(['Survey local conditions', 'habitat-survey', 'places', 'Log the model-derived gravity and thermal estimate with their uncertainty.'])
-    ])
+    ]),
+    outpost: input.outpost || null
   });
   runtimeWorldPacks.set(bodyId, pack);
   return pack;
@@ -818,6 +850,7 @@ registerEnvironmentLifecycle(ENV.PLANETARY, {
 
 Object.assign(appCtx, {
   arriveAtSolidWorld,
+  renderActiveExpeditionOutpost,
   registerExpeditionSolidWorld,
   sampleActiveSolidWorldHeight
 });

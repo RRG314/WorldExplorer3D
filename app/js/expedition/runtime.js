@@ -11,6 +11,7 @@ import { applyShipOperation, getShipStationView } from './ship-operations.js?v=2
 import { getUniverseDestinations, registerUniverseRuntimeDestination, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { registerExpeditionSolidWorld } from '../planetary/solid-world-runtime.js?v=8';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
+import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -141,11 +142,13 @@ function registerExpeditionContact(expedition, contact) {
     }]
   });
   const world = resolveUniverseAddress(`${contact.id}-i`);
+  const outpost = (expedition?.outposts || []).find((entry) => entry.contactId === contact.id) || null;
   registerExpeditionSolidWorld({
     ...world,
     seed,
     parentSystemId: contact.id,
-    starMassSolar: star.mass
+    starMassSolar: star.mass,
+    outpost
   });
   return destination;
 }
@@ -492,6 +495,27 @@ function reportSharedMutationError(error) {
   renderMission();
 }
 
+function outpostMarkup(expedition) {
+  const contacts = expedition.routeContacts || [];
+  const rows = contacts.map((contact) => {
+    const outpost = (expedition.outposts || []).find((entry) => entry.contactId === contact.id);
+    if (!outpost) {
+      const surveyed = contact.status === 'surveyed' || contact.localOperationState === 'returned';
+      return surveyed ? `<article><div><strong>${contact.designation} Field Station</strong><span>Survey site ready for a persistent base</span></div><button type="button" data-plan-outpost="${contact.id}">Reserve site</button></article>` : '';
+    }
+    const availability = constructionAvailability(expedition, outpost);
+    const condition = Math.round(Number(outpost.condition || 0) * 100);
+    const details = outpost.state === 'operational'
+      ? `${outpost.assignedCrewIds.length} crew · ${condition}% condition · ${Number(outpost.power?.storedMWh || 0).toFixed(1)} MWh · ${Math.round(Number(outpost.stores?.waterKg || 0))} kg water`
+      : `Planned at the existing survey-world address · ${outpost.blueprint.length} structural records`;
+    const action = outpost.state === 'planned'
+      ? `<button type="button" data-build-outpost="${outpost.id}" ${availability.enabled ? '' : 'disabled'}>Build field station</button>${availability.reason ? `<small>${availability.reason}</small>` : ''}`
+      : `<button type="button" data-service-outpost="${outpost.id}">Service station</button><button type="button" data-enter-contact="${contact.id}">Visit station</button>`;
+    return `<article><div><strong>${outpost.name}</strong><span>${details}</span></div><div>${action}</div></article>`;
+  }).filter(Boolean).join('');
+  return rows ? `<section class="expeditionOutposts"><h3>Field Stations</h3>${rows}</section>` : '';
+}
+
 function renderMission() {
   const host = document.getElementById('expeditionMission');
   if (!host || !activeExpedition) return;
@@ -543,6 +567,7 @@ function renderMission() {
     ${action}
     ${shipAction}
     ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span>${!expedition.activeLocalContactId && ['available', 'returned'].includes(contact.localOperationState) ? `<button type="button" data-enter-contact="${contact.id}">Enter local Space</button>` : ''}</p>`).join('')}</section>` : ''}
+    ${outpostMarkup(expedition)}
     <section class="expeditionLog"><h3>Captain's Log</h3>${log.map((entry) => `<p><span>${entry.kind}</span>${entry.message}</p>`).join('')}</section>`;
 
   document.getElementById('expeditionShareCreate')?.addEventListener('click', async () => {
@@ -605,6 +630,36 @@ function renderMission() {
     }
   });
   host.querySelectorAll('[data-enter-contact]').forEach((button) => button.addEventListener('click', () => beginLocalContact(button.dataset.enterContact)));
+  host.querySelectorAll('[data-plan-outpost]').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      const result = createOutpostSite(activeExpedition, button.dataset.planOutpost);
+      if (!result.changed) return activeContext?.showToast?.(result.message);
+      await applyExpeditionMutation(result.expedition, 'operation');
+      syncExpeditionContacts(activeExpedition);
+      activeContext?.showToast?.(result.message);
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  }));
+  host.querySelectorAll('[data-build-outpost]').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      const result = constructOutpost(activeExpedition, button.dataset.buildOutpost);
+      if (!result.changed) return activeContext?.showToast?.(result.message);
+      await applyExpeditionMutation(result.expedition, 'operation');
+      syncExpeditionContacts(activeExpedition);
+      activeContext?.showToast?.(result.message);
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  }));
+  host.querySelectorAll('[data-service-outpost]').forEach((button) => button.addEventListener('click', async () => {
+    try {
+      const result = serviceOutpost(activeExpedition, button.dataset.serviceOutpost);
+      if (!result.changed) return activeContext?.showToast?.(result.message);
+      await applyExpeditionMutation(result.expedition, 'operation');
+      syncExpeditionContacts(activeExpedition);
+      activeContext?.showToast?.(result.message);
+      renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  }));
   document.getElementById('expeditionEnterShip')?.addEventListener('click', () => void enterActiveShip());
 }
 

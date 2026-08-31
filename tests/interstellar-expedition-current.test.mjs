@@ -20,6 +20,7 @@ import {
 } from '../app/js/expedition/simulation.js';
 import { appendSystemTransitions, assessCausalFailure, resolveSystemFailure, shipAlertState } from '../app/js/expedition/failure-authority.js';
 import { advanceLongDurationState } from '../app/js/expedition/long-duration.js';
+import { constructOutpost, createOutpostSite, OUTPOST_CONSTRUCTION_COST, serviceOutpost, surfaceAddressKey } from '../app/js/expedition/outpost.js';
 import { availabilityForResponse } from '../app/js/expedition/voyage-director.js';
 import { VOYAGE_EVENT_COUNTS, VOYAGE_EVENT_FAMILIES } from '../app/js/expedition/voyage-events.js';
 import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
@@ -398,6 +399,48 @@ test('generation continuity retires the founders and transfers active roles thro
   assert.ok(after.crew.flatMap((member) => member.roles).includes('education'));
   assert.ok(after.longDuration.transitions.length >= 3);
   assert.match(after.logEntries.at(-1).message, /Generation 3/i);
+});
+
+test('a returned survey site becomes one conserved persistent field station at the same world address', () => {
+  const base = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1975 });
+  const contactId = `${base.id}-contact-field`;
+  const expedition = {
+    ...base,
+    routeContacts: [{ id: contactId, designation: 'Tern Reach', status: 'surveyed', localOperationState: 'returned' }],
+    resources: {
+      ...base.resources,
+      maintenanceKg: OUTPOST_CONSTRUCTION_COST.maintenanceKg + 20,
+      feedstockKg: OUTPOST_CONSTRUCTION_COST.feedstockKg + 20,
+      powerMWh: OUTPOST_CONSTRUCTION_COST.powerMWh + 10,
+      foodKg: OUTPOST_CONSTRUCTION_COST.foodKg + 100,
+      waterKg: OUTPOST_CONSTRUCTION_COST.waterKg + 100
+    }
+  };
+  const planned = createOutpostSite(expedition, contactId, 10);
+  assert.equal(planned.changed, true);
+  assert.equal(planned.outpost.worldAddressKey, surfaceAddressKey(contactId));
+  assert.equal(planned.outpost.structureAuthority, 'block-builder-shape-catalog');
+  assert.ok(planned.outpost.blueprint.length > 100);
+
+  const before = planned.expedition.resources;
+  const built = constructOutpost(planned.expedition, planned.outpost.id, 20);
+  assert.equal(built.outpost.state, 'operational');
+  assert.equal(built.outpost.installedMaterialKg, OUTPOST_CONSTRUCTION_COST.maintenanceKg + OUTPOST_CONSTRUCTION_COST.feedstockKg);
+  for (const [key, cost] of Object.entries(OUTPOST_CONSTRUCTION_COST)) {
+    assert.equal(built.expedition.resources[key], before[key] - cost);
+  }
+  assert.equal(built.outpost.stores.foodKg, OUTPOST_CONSTRUCTION_COST.foodKg);
+  assert.equal(built.outpost.stores.waterKg, OUTPOST_CONSTRUCTION_COST.waterKg);
+  assert.equal(built.outpost.assignedCrewIds.length, 2);
+
+  const degraded = {
+    ...built.expedition,
+    outposts: [{ ...built.outpost, condition: 0.7, power: { ...built.outpost.power, condition: 0.72 }, lifeSupport: { ...built.outpost.lifeSupport, condition: 0.76 } }]
+  };
+  const serviced = serviceOutpost(degraded, built.outpost.id, 30);
+  assert.equal(serviced.changed, true);
+  assert.equal(serviced.outpost.condition, 0.82);
+  assert.equal(serviced.outpost.installedMaterialKg, built.outpost.installedMaterialKg + 8);
 });
 
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {
