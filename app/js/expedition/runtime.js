@@ -243,7 +243,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=5');
+  const ship = await import('./ship-interior.js?v=6');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

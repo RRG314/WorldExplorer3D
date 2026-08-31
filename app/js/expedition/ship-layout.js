@@ -21,14 +21,14 @@ const SHIP_DECKS = Object.freeze([
     { id: 'briefing', label: 'Briefing Room', side: 'starboard', minX: 2.7, maxX: 12.4, minZ: -21, maxZ: -8, systemId: 'navigation' },
     { id: 'observation-gallery', label: 'Observation Gallery', side: 'full', minX: -12.4, maxX: 12.4, minZ: -35, maxZ: -23, systemId: 'sensors' }
   ], [
-    { id: 'bridge-flight', roomId: 'bridge', label: 'Flight controls', x: 4.5, z: 31 },
-    { id: 'bridge-log', roomId: 'bridge', label: "Review Captain's Log", x: 0, z: 28 },
-    { id: 'navigation-course', roomId: 'navigation-cartography', label: 'Review route and margins', x: -7.5, z: 15.5 },
-    { id: 'communications-status', roomId: 'communications', label: 'Review mission communications', x: 7.5, z: 15.5 },
-    { id: 'science-survey', roomId: 'science', label: 'Record stellar survey', x: -7.5, z: 0.5 },
-    { id: 'sensor-scan', roomId: 'sensor-control', label: 'Configure sensor scan', x: 7.5, z: 0.5 },
-    { id: 'analysis-review', roomId: 'analysis-data', label: 'Review observation evidence', x: -7.5, z: -14.5 },
-    { id: 'briefing-status', roomId: 'briefing', label: 'Review crew priorities', x: 7.5, z: -14.5 },
+    { id: 'bridge-flight', roomId: 'bridge', label: 'Flight controls', x: 7, z: 31 },
+    { id: 'bridge-log', roomId: 'bridge', label: "Review Captain's Log", x: 0, z: 25.5 },
+    { id: 'navigation-course', roomId: 'navigation-cartography', label: 'Review route and margins', x: -5.1, z: 15.5 },
+    { id: 'communications-status', roomId: 'communications', label: 'Review mission communications', x: 5.1, z: 15.5 },
+    { id: 'science-survey', roomId: 'science', label: 'Record stellar survey', x: -5.1, z: 0.5 },
+    { id: 'sensor-scan', roomId: 'sensor-control', label: 'Configure sensor scan', x: 5.1, z: 0.5 },
+    { id: 'analysis-review', roomId: 'analysis-data', label: 'Review observation evidence', x: -5.1, z: -14.5 },
+    { id: 'briefing-status', roomId: 'briefing', label: 'Review crew priorities', x: 3.7, z: -14.5 },
     { id: 'observation-view', roomId: 'observation-gallery', label: 'Observe local space', x: 0, z: -30 }
   ]),
   deck('habitat', 'Deck 2 · Habitat & Health', 'Habitat', [
@@ -42,15 +42,15 @@ const SHIP_DECKS = Object.freeze([
     { id: 'hydroponics', label: 'Hydroponics', side: 'port', minX: -12.4, maxX: -2.7, minZ: -35, maxZ: -23, systemId: 'food-production' },
     { id: 'storm-shelter', label: 'Storm Shelter', side: 'starboard', minX: 2.7, maxX: 12.4, minZ: -35, maxZ: -23, systemId: 'hull' }
   ], [
-    { id: 'galley-meal', roomId: 'galley-wardroom', label: 'Prepare crew meal', x: 0, z: 30 },
-    { id: 'medical-status', roomId: 'medical', label: 'Review crew health', x: -7.5, z: 15.5 },
-    { id: 'medical-treatment', roomId: 'medical', label: 'Prepare treatment', x: -9.6, z: 12.2 },
-    { id: 'exercise-session', roomId: 'exercise-bay', label: 'Begin exercise session', x: 7.5, z: 15.5 },
+    { id: 'galley-meal', roomId: 'galley-wardroom', label: 'Prepare crew meal', x: 0, z: 27.9 },
+    { id: 'medical-status', roomId: 'medical', label: 'Review crew health', x: -4.2, z: 15.5 },
+    { id: 'medical-treatment', roomId: 'medical', label: 'Prepare treatment', x: -4.2, z: 11.2 },
+    { id: 'exercise-session', roomId: 'exercise-bay', label: 'Begin exercise session', x: 4.2, z: 15.5 },
     { id: 'quarters-status', roomId: 'quarters', label: 'Review personal assignment', x: -7.5, z: 0.5 },
     { id: 'hygiene-status', roomId: 'hygiene-waste', label: 'Inspect water recovery', x: -7.5, z: -14.5 },
     { id: 'life-support-status', roomId: 'life-support', label: 'Inspect life support', x: 7.5, z: -14.5 },
-    { id: 'hydroponics-tend', roomId: 'hydroponics', label: 'Tend hydroponics', x: -7.5, z: -29 },
-    { id: 'storm-shelter-status', roomId: 'storm-shelter', label: 'Inspect storm shelter', x: 7.5, z: -29 }
+    { id: 'hydroponics-tend', roomId: 'hydroponics', label: 'Tend hydroponics', x: -4.2, z: -29 },
+    { id: 'storm-shelter-status', roomId: 'storm-shelter', label: 'Inspect storm shelter', x: 4.2, z: -29 }
   ]),
   deck('engineering', 'Deck 3 · Engineering & Mission', 'Engineering', [
     { id: 'engineering', label: 'Main Engineering', side: 'full', minX: -12.4, maxX: 12.4, minZ: 24, maxZ: 35, systemId: 'propulsion' },
@@ -62,15 +62,15 @@ const SHIP_DECKS = Object.freeze([
     { id: 'eva-airlock', label: 'EVA Airlock', side: 'starboard', minX: 2.7, maxX: 12.4, minZ: -21, maxZ: -8, systemId: 'hull' },
     { id: 'local-craft-bay', label: 'Local-Craft Bay', side: 'full', minX: -12.4, maxX: 12.4, minZ: -35, maxZ: -23, systemId: 'hull' }
   ], [
-    { id: 'engineering-status', roomId: 'engineering', label: 'Review ship systems', x: 0, z: 30 },
-    { id: 'engineering-repair', roomId: 'engineering', label: 'Prepare repair', x: -4.5, z: 31 },
+    { id: 'engineering-status', roomId: 'engineering', label: 'Review ship systems', x: 0, z: 25.2 },
+    { id: 'engineering-repair', roomId: 'engineering', label: 'Prepare repair', x: -7, z: 30 },
     { id: 'power-status', roomId: 'power-control', label: 'Review power distribution', x: -7.5, z: 15.5 },
     { id: 'thermal-status', roomId: 'thermal-control', label: 'Review thermal loops', x: 7.5, z: 15.5 },
-    { id: 'fabricator-status', roomId: 'cargo-fabrication', label: 'Inspect fabrication stores', x: -7.5, z: 0.5 },
-    { id: 'cargo-status', roomId: 'cargo-hold', label: 'Review cargo manifest', x: 7.5, z: 0.5 },
-    { id: 'resource-processor-status', roomId: 'resource-processing', label: 'Inspect resource processor', x: -7.5, z: -14.5 },
-    { id: 'airlock-status', roomId: 'eva-airlock', label: 'Inspect EVA readiness', x: 7.5, z: -14.5 },
-    { id: 'craft-bay-status', roomId: 'local-craft-bay', label: 'Inspect local craft bay', x: 0, z: -30 }
+    { id: 'fabricator-status', roomId: 'cargo-fabrication', label: 'Inspect fabrication stores', x: -4.3, z: 0.5 },
+    { id: 'cargo-status', roomId: 'cargo-hold', label: 'Review cargo manifest', x: 4.3, z: 0.5 },
+    { id: 'resource-processor-status', roomId: 'resource-processing', label: 'Inspect resource processor', x: -4.3, z: -14.5 },
+    { id: 'airlock-status', roomId: 'eva-airlock', label: 'Inspect EVA readiness', x: 4.3, z: -14.5 },
+    { id: 'craft-bay-status', roomId: 'local-craft-bay', label: 'Inspect local craft bay', x: 5.4, z: -29 }
   ])
 ]);
 

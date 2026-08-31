@@ -119,6 +119,38 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.deckId, 'habitat');
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 10, z: 26.1, angle: -Math.PI / 2, yaw: -Math.PI / 2, lookYawOffset: 0, pitch: 0 });
+    });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-habitat-visual.png`), fullPage: true });
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
+    });
+    await page.waitForTimeout(120);
+    await page.keyboard.press('KeyE');
+    await page.locator('#shipDeckPicker').waitFor({ state: 'visible' });
+    await page.locator('#shipDeckPicker [data-deck="engineering"]').click();
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior.deckId, 'engineering');
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 10, z: 27, angle: -Math.PI / 2, yaw: -Math.PI / 2, lookYawOffset: 0, pitch: 0 });
+    });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-engineering-visual.png`), fullPage: true });
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
+    });
+    await page.waitForTimeout(120);
+    await page.keyboard.press('KeyE');
+    await page.locator('#shipDeckPicker').waitFor({ state: 'visible' });
+    await page.locator('#shipDeckPicker [data-deck="habitat"]').click();
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior.deckId, 'habitat');
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: -1.45, z: 0.5 });
     });
     await page.waitForTimeout(120);
@@ -140,7 +172,7 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.deckId, 'command');
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      Object.assign(ctx.Walk.state.walker, { x: -7.5, z: 15.5 });
+      Object.assign(ctx.Walk.state.walker, { x: -5.1, z: 15.5 });
     });
     await page.waitForTimeout(120);
     assert.match(String(await page.locator('#interiorPrompt').textContent()), /route|margin/i);
