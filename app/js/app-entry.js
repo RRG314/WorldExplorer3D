@@ -31,7 +31,7 @@ import './travel-mode.js?v=23';
 import { initBoatMode } from './boat-mode.js?v=57';
 import './sky.js?v=88';
 import './weather.js?v=10';
-import './runtime/on-demand-modes.js?v=15';
+import './runtime/on-demand-modes.js?v=18';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=171';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
@@ -45,7 +45,7 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=8';
 import './game.js?v=63';
-import './input.js?v=74';
+import './input.js?v=75';
 import './hud.js?v=102';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
@@ -179,7 +179,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=18').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=19').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

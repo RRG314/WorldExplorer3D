@@ -14,11 +14,13 @@ import {
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
-  startExpedition
+  startExpedition,
+  VOYAGE_MILESTONES
 } from '../app/js/expedition/simulation.js';
+import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
 import { createExpeditionStore } from '../app/js/expedition/store.js';
 import { deriveCrewOperations, summarizeCrewOperations } from '../app/js/expedition/crew-operations.js';
-import { SHIP_CREW_POSTS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
+import { SHIP_CREW_POSTS, SHIP_DECKS, SHIP_DOORS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
 import {
   calculateExpeditionTravel,
   LIGHT_SPEED_MPS,
@@ -41,6 +43,15 @@ test('the catalog distance remains physical and separate from compressed player 
   assert.ok(calculation.externalYears > calculation.properYears);
   assert.ok(calculation.properYears > 20 && calculation.properYears < 30);
   assert.equal(calculation.expectedPlayerMinutes, 24);
+  assert.equal(calculation.classification, PROPULSION_CLASS.FICTIONAL);
+});
+
+test('catalog black holes are valid Expedition targets without being treated as landable worlds', () => {
+  const ship = getShipProfile('long-range-research-vessel');
+  const propulsion = getPropulsionProfile('radiant-plasma-field-drive');
+  const calculation = calculateExpeditionTravel({ destinationId: 'sagittarius-a-star', ship, propulsion, crewCount: DEFAULT_CREW.length });
+  assert.ok(calculation.distanceLy > 26000);
+  assert.equal(calculation.destinationId, 'sagittarius-a-star');
   assert.equal(calculation.classification, PROPULSION_CLASS.FICTIONAL);
 });
 
@@ -76,7 +87,7 @@ test('readiness is derived from role coverage, supplies, compatibility, and capa
   assert.ok(readiness.failures.includes('Crew coverage is missing: medical.'));
 });
 
-test('one complete strategic journey consumes supplies, changes ship state, logs repair and discovery, ages crew, and arrives', () => {
+test('one complete strategic journey crosses every voyage phase, changes state, preserves contacts, and arrives', () => {
   let expedition = createExpeditionPlan({
     destinationId: 'proxima-centauri',
     crew: DEFAULT_CREW,
@@ -89,29 +100,32 @@ test('one complete strategic journey consumes supplies, changes ship state, logs
   const initialEngineeringExperience = expedition.crew.find((member) => member.id === 'crew-eng').experienceYears;
   expedition = startExpedition(expedition, 1100);
 
-  expedition = advanceToNextMilestone(expedition);
-  assert.equal(expedition.pendingEvent.kind, 'maintenance');
-  assert.equal(expedition.systems.thermal.status, 'degraded');
-  assert.ok(expedition.resources.foodKg < initialFood);
-
-  expedition = resolveExpeditionEvent(expedition, 'replace');
-  assert.equal(expedition.systems.thermal.status, 'optimal');
-  assert.ok(expedition.resources.maintenanceKg < initialMaintenance - 179);
-  assert.ok(expedition.crew.find((member) => member.id === 'crew-eng').experienceYears > initialEngineeringExperience);
-
-  expedition = advanceToNextMilestone(expedition);
-  assert.equal(expedition.pendingEvent.kind, 'discovery');
-  assert.equal(expedition.discoveries[0].id, 'expedition-current-contract-object-01');
-  assert.equal(expedition.discoveries[0].truthClass, 'procedural-game-object');
-
-  expedition = resolveExpeditionEvent(expedition, 'observe');
+  const choices = ['review-course', 'replace', 'service-converter', 'inspect-hull', 'survey', 'rotate-watch', 'mark-stop', 'take-shelter', 'calibrate-arrival'];
+  const kinds = [];
+  const progress = [];
+  for (const choice of choices) {
+    expedition = advanceToNextMilestone(expedition);
+    assert.ok(expedition.pendingEvent, `expected an event before ${choice}`);
+    kinds.push(expedition.pendingEvent.kind);
+    progress.push(expedition.progress);
+    expedition = resolveExpeditionEvent(expedition, choice);
+    assert.equal(expedition.pendingEvent, null);
+  }
+  assert.deepEqual(kinds, VOYAGE_MILESTONES.map((milestone) => milestone.kind));
+  assert.ok(progress.every((value, index) => index === 0 || value > progress[index - 1]));
   expedition = advanceToNextMilestone(expedition);
   assert.equal(expedition.state, 'arrived');
   assert.equal(expedition.progress, 1);
   assert.ok(expedition.crew[0].ageYears > initialAge + 20);
+  assert.ok(expedition.resources.foodKg < initialFood);
+  assert.ok(expedition.resources.maintenanceKg < initialMaintenance - 179);
+  assert.ok(expedition.crew.find((member) => member.id === 'crew-eng').experienceYears >= initialEngineeringExperience);
   assert.ok(expedition.log.some((entry) => entry.kind === 'repair'));
-  assert.ok(expedition.log.some((entry) => entry.kind === 'discovery'));
+  assert.ok(expedition.log.some((entry) => entry.kind === 'science'));
   assert.ok(expedition.log.some((entry) => entry.kind === 'arrival'));
+  assert.equal(expedition.routeContacts.length, 2);
+  assert.ok(expedition.routeContacts.some((contact) => contact.status === 'route-stop' && contact.localOperationState === 'available'));
+  assert.ok(expedition.routeContacts.every((contact) => contact.truthClass === 'modeled-uncharted-system' && Number.isInteger(contact.stableSeed)));
 });
 
 test('crew work, support, rest, and emergency assignments derive from the persistent Expedition state', () => {
@@ -126,10 +140,35 @@ test('crew work, support, rest, and emergency assignments derive from the persis
 
   expedition = startExpedition(expedition, 1600);
   expedition = advanceToNextMilestone(expedition);
+  expedition = resolveExpeditionEvent(expedition, 'review-course');
+  expedition = advanceToNextMilestone(expedition);
   const response = deriveCrewOperations(expedition);
   assert.equal(response.find((operation) => operation.crewId === 'crew-eng').assignmentId, 'thermal-response');
   assert.equal(response.find((operation) => operation.crewId === 'crew-eng').roomId, 'engineering');
   assert.ok(response.some((operation) => operation.status === 'responding'));
+});
+
+test('room operations use the persistent expedition record and conserve bounded inputs', () => {
+  let expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1750 });
+  const feedstockBefore = expedition.resources.feedstockKg;
+  const partsBefore = expedition.resources.maintenanceKg;
+  const powerBefore = expedition.resources.powerMWh;
+  const fabrication = getShipStationView(expedition, 'fabricator-status');
+  assert.equal(fabrication.actions[0].id, 'fabricate-parts');
+  assert.equal(fabrication.actions[0].enabled, true);
+  const result = applyShipOperation(expedition, 'fabricate-parts');
+  assert.equal(result.changed, true);
+  expedition = result.expedition;
+  assert.equal(expedition.resources.feedstockKg, feedstockBefore - 25);
+  assert.equal(expedition.resources.maintenanceKg, partsBefore + 18);
+  assert.equal(expedition.resources.powerMWh, powerBefore - 0.35);
+  assert.match(expedition.log.at(-1).message, /25 kg.+18 kg/i);
+  const repeated = applyShipOperation(expedition, 'fabricate-parts');
+  assert.equal(repeated.changed, false);
+  assert.match(repeated.message, /completed during this voyage segment/i);
+  const processing = getShipStationView(expedition, 'resource-processor-status');
+  assert.equal(processing.actions[0].enabled, false);
+  assert.match(processing.actions[0].reason, /acquire and load a sample/i);
 });
 
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {
@@ -167,17 +206,20 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   assert.ok(restored.crew.every((member) => typeof member.assignment === 'string' && member.assignment.length > 0));
 });
 
-test('Surveyor publishes every required room through one bounded walkable deck contract', () => {
+test('Surveyor publishes three bounded mapped decks and retains every required ship-class room', () => {
   const validation = validateShipLayout();
   assert.equal(validation.valid, true);
-  assert.equal(validation.roomCount, 8);
-  assert.equal(validation.stationCount, 8);
+  assert.equal(validation.deckCount, 3);
+  assert.equal(validation.roomCount, 25);
+  assert.equal(validation.stationCount, 30);
+  assert.equal(validation.doorCount, 25);
   assert.equal(validation.crewPostCount, 7);
-  assert.deepEqual(
-    new Set(SHIP_ROOMS.map((room) => room.id)),
-    new Set(getShipProfile('long-range-research-vessel').requiredRooms)
-  );
-  assert.ok(SHIP_STATIONS.some((station) => station.id === 'return-to-flight'));
+  const roomIds = new Set(SHIP_ROOMS.map((room) => room.id));
+  assert.ok(getShipProfile('long-range-research-vessel').requiredRooms.every((roomId) => roomIds.has(roomId)));
+  assert.deepEqual(new Set(SHIP_DECKS.map((deck) => deck.id)), new Set(['command', 'habitat', 'engineering']));
+  assert.ok(SHIP_DECKS.every((deck) => deck.rooms.length >= 8 && deck.stations.length >= 9));
+  assert.ok(SHIP_DOORS.every((door) => roomIds.has(door.roomId)));
+  assert.ok(SHIP_STATIONS.filter((station) => station.id.startsWith('deck-lift:')).length === 3);
   assert.ok(SHIP_STATIONS.some((station) => station.id === 'science-survey'));
   assert.ok(SHIP_CREW_POSTS.every((post) => DEFAULT_CREW.some((crew) => crew.id === post.crewId)));
 });

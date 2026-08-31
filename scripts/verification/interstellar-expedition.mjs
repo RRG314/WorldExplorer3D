@@ -56,6 +56,7 @@ async function runJourney(viewport, name) {
     await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     assert.equal(await page.locator('#expeditionDestination').inputValue(), 'proxima-centauri');
+    assert.equal(await page.locator('#expeditionDestination option[value="sagittarius-a-star"]').count(), 1);
     assert.equal(await page.locator('#expeditionPropulsion').inputValue(), 'radiant-plasma-field-drive');
     await page.screenshot({ path: path.join(outputDir, `${name}-planner.png`), fullPage: true });
 
@@ -76,9 +77,13 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.parentEnvironment, 'SPACE_FLIGHT');
     assert.equal(state.expeditionShipInterior.movementAuthority, 'Walk');
     assert.equal(state.expeditionShipInterior.collisionAuthority, 'activeInterior');
-    assert.equal(state.expeditionShipInterior.roomCount, 8);
-    assert.equal(state.expeditionShipInterior.stationCount, 8);
-    assert.equal(state.expeditionShipInterior.visibleCrewCount, 7);
+    assert.equal(state.expeditionShipInterior.deckCount, 3);
+    assert.equal(state.expeditionShipInterior.roomCount, 25);
+    assert.equal(state.expeditionShipInterior.stationCount, 30);
+    assert.equal(state.expeditionShipInterior.doorCount, 25);
+    assert.equal(state.expeditionShipInterior.totalCrewCount, 7);
+    assert.ok(state.expeditionShipInterior.visibleCrewCount >= 1);
+    assert.equal(state.expeditionShipInterior.miniMapVisible, true);
     assert.equal(state.expeditionShipInterior.crewOperationSummary.total, 7);
     assert.equal(state.expeditionShipInterior.crewOperationSummary.active, 5);
     assert.equal(state.expeditionShipInterior.crewOperationSummary.resting, 2);
@@ -88,6 +93,60 @@ async function runJourney(viewport, name) {
     assert.equal(await page.locator('#shipInteriorHud').isVisible(), true);
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), false);
     assert.equal(await page.locator('#tutorialHintCard').isVisible(), false);
+    await page.locator('#shipMapButton').click();
+    assert.equal(await page.locator('#shipMapOverlay').isVisible(), true);
+    assert.equal(await page.locator('#shipMapOverlay [data-map-deck="command"]').count(), 1);
+    await page.locator('#shipMapOverlay [data-map-deck="habitat"]').click();
+    assert.equal(await page.locator('#shipMapOverlay [data-room="medical"]').count(), 1);
+    await page.locator('#shipMapOverlay [data-room="medical"]').click();
+    await page.screenshot({ path: path.join(outputDir, `${name}-ship-map.png`), fullPage: true });
+    await page.locator('#shipMapOverlay [data-close-map]').click();
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
+    });
+    await page.waitForTimeout(120);
+    await page.keyboard.press('KeyE');
+    await page.locator('#shipDeckPicker').waitFor({ state: 'visible' });
+    await page.locator('#shipDeckPicker [data-deck="habitat"]').click();
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior.deckId, 'habitat');
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: -1.45, z: 0.5 });
+    });
+    await page.waitForTimeout(120);
+    assert.match(String(await page.locator('#interiorPrompt').textContent()), /pressure door/i);
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(250);
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior.openDoorCount, 1);
+    await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-habitat.png`), fullPage: true });
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6 });
+    });
+    await page.waitForTimeout(120);
+    await page.keyboard.press('KeyE');
+    await page.locator('#shipDeckPicker').waitFor({ state: 'visible' });
+    await page.locator('#shipDeckPicker [data-deck="command"]').click();
+    state = await diagnostics(page);
+    assert.equal(state.expeditionShipInterior.deckId, 'command');
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      Object.assign(ctx.Walk.state.walker, { x: -7.5, z: 15.5 });
+    });
+    await page.waitForTimeout(120);
+    assert.match(String(await page.locator('#interiorPrompt').textContent()), /route|margin/i);
+    await page.keyboard.press('KeyE');
+    await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#shipStationTitle').textContent(), 'Navigation & Cartography');
+    await page.locator('[data-ship-action="verify-course"]').click();
+    state = await diagnostics(page);
+    assert.ok(Object.keys(state.interstellarExpedition.operationFlags || {}).some((key) => key.startsWith('verify-course:')));
+    assert.equal(await page.locator('[data-ship-action="verify-course"]').isDisabled(), true);
+    await page.screenshot({ path: path.join(outputDir, `${name}-ship-operation.png`), fullPage: true });
+    await page.locator('[data-close-station]').click();
     if (name === 'mobile') {
       await page.waitForFunction(() => document.getElementById('mobileTouchControls')?.dataset.mode === 'walking');
       assert.equal(await page.locator('#mobileActionSecondary').textContent(), 'Interact');
@@ -123,21 +182,23 @@ async function runJourney(viewport, name) {
     await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
 
     await page.locator('#expeditionDepart').click();
-    await page.locator('#expeditionAdvance').click();
+    const voyageChoices = [
+      ['operations', 'review-course'], ['maintenance', 'replace'], ['power', 'service-converter'],
+      ['collision', 'inspect-hull'], ['discovery', 'survey'], ['medical', 'rotate-watch'],
+      ['resupply', 'mark-stop'], ['radiation', 'take-shelter'], ['navigation', 'calibrate-arrival']
+    ];
+    let previousProgress = 0;
+    for (const [kind, choice] of voyageChoices) {
+      await page.locator('#expeditionAdvance').click();
+      state = await diagnostics(page);
+      assert.equal(state.interstellarExpedition.pendingEvent.kind, kind);
+      assert.ok(state.interstellarExpedition.progress > previousProgress);
+      previousProgress = state.interstellarExpedition.progress;
+      await page.locator(`[data-choice="${choice}"]`).click();
+    }
     state = await diagnostics(page);
-    assert.equal(state.interstellarExpedition.pendingEvent.kind, 'maintenance');
-    assert.equal(state.interstellarExpedition.systems.thermal.status, 'degraded');
-    const maintenanceBefore = state.interstellarExpedition.resources.maintenanceKg;
-    await page.locator('[data-choice="replace"]').click();
-    state = await diagnostics(page);
-    assert.equal(state.interstellarExpedition.systems.thermal.status, 'optimal');
-    assert.ok(state.interstellarExpedition.resources.maintenanceKg < maintenanceBefore);
-
-    await page.locator('#expeditionAdvance').click();
-    state = await diagnostics(page);
-    assert.equal(state.interstellarExpedition.pendingEvent.kind, 'discovery');
-    assert.equal(state.interstellarExpedition.discoveries[0].truthClass, 'procedural-game-object');
-    await page.locator('[data-choice="observe"]').click();
+    assert.equal(state.interstellarExpedition.routeContacts.length, 2);
+    assert.ok(state.interstellarExpedition.routeContacts.some((contact) => contact.status === 'route-stop'));
     await page.locator('#expeditionAdvance').click();
     state = await diagnostics(page);
     assert.equal(state.interstellarExpedition.state, 'arrived');

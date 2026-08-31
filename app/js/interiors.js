@@ -24,7 +24,7 @@ import {
   sampleInteriorWalkSurface as sampleInteriorWalkSurfaceRuntime,
   scanNearbyInteriorSupport as scanNearbyInteriorSupportRuntime,
   updateInteriorInteraction as updateInteriorInteractionRuntime
-} from "./interiors/runtime.js?v=13";
+} from "./interiors/runtime.js?v=14";
 
 const interiorCache = new Map();
 const mappedInteriorWarmPromises = new Map();

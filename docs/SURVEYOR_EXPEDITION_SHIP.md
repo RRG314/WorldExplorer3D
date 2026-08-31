@@ -161,6 +161,39 @@ walkable interior does not contain.
 9. **Arrive or return:** resume ordinary local Space at the selected catalog
    destination with the same Explorer, ship, cargo, crew, and history.
 
+## Voyage structure and story
+
+The ship is the main stage of an Expedition, not a waiting room between a
+planner and an arrival screen. A representative nearby-star route contains at
+least departure, watch handoff, maintenance, power, hull, survey, crew-health,
+resource, radiation, and arrival-approach beats. The specific order and
+severity may vary from route and state, but quiet work, discovery, human needs,
+and risk all have time to develop before arrival.
+
+Each beat names the crew and room responsible for the first response. The
+player can walk to that room, inspect evidence, help perform the work, or accept
+a qualified crew recommendation. Outcomes change the same Expedition record
+used by later events. A rushed repair can therefore affect a later thermal
+warning; depleted maintenance stock can make a surface diversion useful; crew
+fatigue can alter watch coverage.
+
+Suitable routes may reveal a stable survey contact. Player-facing language
+uses “survey contact,” “uncharted system,” and “uncharted world.” Save data
+retains a stable seed and internal modeled-content label. A contact advances
+through detected, surveyed, route stop, locally entered, sampled, processed,
+and completed states rather than being regenerated whenever a screen opens.
+
+An optional resource stop must become a real local journey through the existing
+Space and planetary authorities: local flight, landing, Character, rover,
+geology or mining, Backpack/sample custody, return, cargo transfer, processing,
+and voyage resumption. The detection itself awards nothing. Material type,
+accessibility, yield, equipment, energy cost, waste, and transfer are explicit.
+
+Catalog black holes are valid Expedition destinations. They use the observed
+catalog identity and existing black-hole visual/navigation authority. Gameplay
+is sensor work and constrained local flight with clear safe limits; black holes
+do not receive invented solid surfaces or survivable event-horizon landings.
+
 ## Failure and recovery
 
 Failures are causal and readable. A filter loses efficiency before air quality

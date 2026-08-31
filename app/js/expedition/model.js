@@ -98,7 +98,10 @@ function createExpeditionPlan({
     strategicElapsedS: 0,
     progress: 0,
     pendingEvent: null,
-    eventFlags: Object.freeze({ maintenance: false, discovery: false }),
+    voyagePhase: 'departure',
+    eventFlags: Object.freeze({}),
+    operationFlags: Object.freeze({}),
+    routeContacts: Object.freeze([]),
     discoveries: Object.freeze([]),
     log: Object.freeze([{ atMissionS: 0, kind: 'planned', message: `Expedition planned for ${destinationId}.` }]),
     failureChain: Object.freeze([])

@@ -83,6 +83,12 @@ function onKey(code, event) {
     return;
   }
 
+  if (appCtx.activeShipInterior === true && code === 'KeyM') {
+    if (!event?.repeat) appCtx.toggleExpeditionShipMap?.();
+    event?.preventDefault?.();
+    return;
+  }
+
   if (appCtx.activeShipInterior === true && ['KeyF', 'KeyP', 'KeyG', 'KeyB'].includes(code)) {
     if (!event?.repeat) appCtx.showToast?.('Return to flight before changing traversal modes.');
     return;

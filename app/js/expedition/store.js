@@ -1,4 +1,4 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=2';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=3';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 
 const EXPEDITION_STORAGE_KEY = 'world-explorer:interstellar-expedition:v1';
@@ -23,6 +23,10 @@ function parseRecord(value) {
         assignment: member?.assignment || defaults.assignment || 'general-watch'
       };
     });
+    record.voyagePhase ||= record.state === 'arrived' ? 'arrival' : 'departure';
+    record.eventFlags = { ...(record.eventFlags || {}) };
+    record.operationFlags = { ...(record.operationFlags || {}) };
+    record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];
     return record;
   } catch {
     return null;

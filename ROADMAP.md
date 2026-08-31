@@ -280,15 +280,16 @@ three-deck ship, compact and expanded maps, pressure-door and route graph,
 room-specific activities, connected voyage loop, science/fiction boundary,
 failure recovery, shared authorities, and staged acceptance journeys.
 
-Current status: the first bounded Surveyor main deck is implemented locally
-with its validated eight-room layout, eight functional stations, seven visible
+Current status: the Surveyor now has three bounded walkable decks, 25 mapped
+rooms, pressure doors, a deck lift, compact and expanded ship maps, visible
 crew assignments, shared walking/collision authorities, mobile controls,
 Captain's Log/Journal handoff, and return to the same Space session. Its crew
-now carry persistent health, fatigue, experience, and primary assignments, and
-visibly follow work, support, rest, and emergency-response routines derived
-from the Expedition state. Deeper system operations, strategic resource work,
-and the broader voyage-event/failure coverage remain incomplete; Stage 3 is not
-yet complete.
+carry persistent health, fatigue, experience, and assignments and visibly
+follow routines derived from the Expedition state. One ship-work authority now
+connects room stations to the same crew, resources, systems, and mission log.
+The full surface-resource handoff, local-craft deployment, causal failure set,
+and complete visual/interaction polish remain incomplete; Stage 3 is not yet
+complete.
 
 - Make each Expedition ship a bounded, high-quality, walkable place assembled
   from validated class-specific layouts. Required rooms must exist, remain
@@ -325,11 +326,57 @@ yet complete.
   resupply, rescue, outposts, and outcomes in a Captain's Log presentation
   backed by the existing Journal and progression authority.
 
+### The voyage is the game
+
+An Expedition is not a short chain of confirmation dialogs. It is a persistent
+journey lived aboard the ship and through the existing Space world:
+
+- Divide each leg into visible departure, watch, cruise, survey, resource,
+  hazard, approach, and arrival phases. Nearby stars still require several
+  meaningful watches and events; longer routes add variation without inflating
+  the UI with filler.
+- Give crew members real overlapping jobs. Navigation, flight, engineering,
+  life support, medical, science, and systems watches respond in their actual
+  rooms, while the player may inspect, assist, repair, scan, rest, fabricate,
+  shelter, or continue flying.
+- Let quiet watches, scientific observations, equipment wear, particle damage,
+  radiation, fatigue, power loss, and discoveries emerge from route, ship,
+  crew, and resource state. Events must have causes, consequences, and more
+  than one reasonable response.
+- Detect stable uncharted systems and worlds along suitable routes. Player
+  presentation uses natural names such as “survey contact” and “uncharted
+  world.” Their save data retains a stable seed and an internal truth label so
+  they are never confused with observed catalog objects.
+- Let an optional stop pause strategic travel and enter the existing local
+  Space and planetary play. The player flies or deploys the local craft, lands,
+  walks or drives, scans, mines or collects a supported material, returns to
+  the ship, transfers the declared cargo, and processes it. A menu never grants
+  fuel, food, water, parts, or raw material merely because a world was found.
+- Match local challenges to the actual need without guaranteeing an easy
+  solution. A repair diversion may reveal metal or ceramic feedstock; a water
+  shortage requires evidence of accessible volatiles; power recovery may need
+  parts, deployed collection equipment, or load reduction. Findings retain
+  uncertainty until the player scans and samples them.
+- Keep food production, water recovery, power collection, fabrication, and
+  repairs constrained by energy, material, equipment condition, crew time, and
+  losses. Local solar collection depends on the current star and cannot be
+  treated as a constant interstellar power source.
+- Make catalog black holes valid Expedition destinations. They are explored
+  through local flight, sensors, safe navigation limits, observations, and the
+  ship rather than a fictional solid surface or survivable event horizon.
+- Preserve manual free flight at every local stop and destination. Assistance
+  may guide the player, but it does not replace piloting or silently teleport
+  the Expedition through its story.
+
 ### Stage 4: stops, discoveries, and long-duration missions
 
 - Let a route include known planets, moons, small bodies, bases, outposts, and
   stable game-generated destinations. Reachability comes from distance, ship,
   propulsion, supplies, and valid stops rather than an arbitrary player level.
+- Use one route-contact record to promote a detection into a surveyed system,
+  optional stop, physically entered local frame, completed surface operation,
+  processed cargo, and resumed voyage. Do not build parallel “story planet” and
+  ordinary planet systems.
 - Make resource recovery use the existing planetary flight, geology, mining,
   rover, Backpack, and cargo paths. A player may land and gather, deploy a
   capable rover, trade with a stocked location, salvage a valid object, or
