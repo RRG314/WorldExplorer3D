@@ -55,7 +55,6 @@
             <li>Runs in your browser</li>
             <li>No download required</li>
             <li>Optional sign-in</li>
-            <li><a href="https://github.com/RRG314/WorldExplorer3D/tree/steven/local-standalone-5.1.0#run-locally-without-firebase" target="_blank" rel="noopener noreferrer">Run locally</a></li>
           </ul>
           <p class="perf-note" id="landingPerformanceNote">Desktop is recommended for the highest world detail. Mobile field controls are included.</p>
           <p class="status" id="multiplayerStatus" aria-live="polite"></p>
@@ -251,15 +250,33 @@
     </section>
   </main>
 
-  <footer>
-    <span>World Explorer 3D</span>
-    <span id="landingBuildIdentity">Version 5.1.0</span>
-    <a href="./about/">About</a>
-    <a href="./legal/privacy">Privacy</a>
-    <a href="./legal/terms">Terms</a>
-    <a href="mailto:mail@worldexplorer3d.io">Contact</a>
-    <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
-    <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
+  <footer class="site-footer">
+    <div class="footer-layout">
+      <div class="footer-brand">
+        <strong>World Explorer 3D</strong>
+        <span id="landingBuildIdentity">Version 5.1.0</span>
+        <p>Explore real places, build a field record, and keep going beyond Earth.</p>
+      </div>
+      <nav class="footer-nav" aria-label="Footer navigation">
+        <div class="footer-link-group">
+          <strong>Explore</strong>
+          <a href="./app/">Enter world</a>
+          <a href="./about/">About</a>
+        </div>
+        <div class="footer-link-group footer-project-links">
+          <strong>Project</strong>
+          <a href="https://github.com/RRG314/WorldExplorer3D" target="_blank" rel="noopener noreferrer">GitHub repository</a>
+          <a class="footer-standalone-link" href="https://github.com/RRG314/WorldExplorer3D/blob/steven/local-standalone-5.1.0/docs/LOCAL_STANDALONE.md" target="_blank" rel="noopener noreferrer">Run locally <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="footer-link-group">
+          <strong>Legal</strong>
+          <a href="./legal/privacy">Privacy</a>
+          <a href="./legal/terms">Terms</a>
+          <a href="mailto:mail@worldexplorer3d.io">Contact</a>
+        </div>
+      </nav>
+    </div>
+    <div class="footer-attribution">OpenStreetMap data © OpenStreetMap contributors (ODbL)</div>
   </footer>
 
   <script type="module">

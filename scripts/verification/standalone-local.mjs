@@ -127,15 +127,18 @@ try {
 
   await fs.mkdir(outputDir, { recursive: true });
   await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
-  const localRunLink = page.locator('.hero-notes a', { hasText: 'Run locally' });
+  assert.equal(await page.locator('.hero-notes a', { hasText: 'Run locally' }).count(), 0);
+  const localRunLink = page.locator('.footer-project-links a', { hasText: 'Run locally' });
   await localRunLink.waitFor({ state: 'visible' });
   assert.equal(
     await localRunLink.getAttribute('href'),
-    'https://github.com/RRG314/WorldExplorer3D/tree/steven/local-standalone-5.1.0#run-locally-without-firebase'
+    'https://github.com/RRG314/WorldExplorer3D/blob/steven/local-standalone-5.1.0/docs/LOCAL_STANDALONE.md'
   );
   assert.equal(await localRunLink.getAttribute('target'), '_blank');
+  await localRunLink.scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(outputDir, 'standalone-landing-link.png'), fullPage: false });
   await page.setViewportSize({ width: 390, height: 844 });
+  await localRunLink.scrollIntoViewIfNeeded();
   const mobileLinkBox = await localRunLink.boundingBox();
   assert.ok(mobileLinkBox, 'Run locally link is not visible at 390×844.');
   assert.ok(mobileLinkBox.x >= 0 && mobileLinkBox.x + mobileLinkBox.width <= 390, 'Run locally link overflows the mobile viewport.');
