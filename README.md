@@ -127,9 +127,8 @@ cd WorldExplorer3D-Standalone
 npm run dev:standalone
 ```
 
-Open `http://127.0.0.1:4192/app/`. See the
-[standalone guide](docs/LOCAL_STANDALONE.md) for supported features and other
-devices on your local network.
+Open `http://localhost:4192/app/` on that computer. See the
+[standalone guide](docs/LOCAL_STANDALONE.md) for supported features.
 
 Keyboard and touch controls support browser zoom, visible focus, higher
 contrast, larger text, and reduced motion.

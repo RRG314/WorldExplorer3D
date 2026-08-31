@@ -15,7 +15,7 @@ cd WorldExplorer3D-Standalone
 npm run dev:standalone
 ```
 
-Open [http://127.0.0.1:4192/app/](http://127.0.0.1:4192/app/).
+Open [http://localhost:4192/app/](http://localhost:4192/app/) on that computer.
 
 The standalone server uses Node's built-in modules, so there is no package
 installation or Firebase setup step. Keep the terminal window open while you
@@ -40,22 +40,6 @@ play. Press `Ctrl+C` in that window to stop the server.
 
 The local edition does not silently connect to production Firebase services.
 Online-only controls remain unavailable when there is no online session.
-
-## Use another device on your network
-
-To open the world from another computer or phone on the same trusted network,
-start the server with:
-
-```bash
-npm run dev:standalone -- --host 0.0.0.0
-```
-
-Then open `http://YOUR-COMPUTER-IP:4192/app/` on the other device. Your firewall
-may ask whether Node.js can accept local network connections. Live GPS normally
-requires a secure browser context and may not be available over a plain local
-network address; `127.0.0.1` and `localhost` are treated specially by browsers.
-
-Do not expose this development server directly to the public internet.
 
 ## Data and licensing
 
